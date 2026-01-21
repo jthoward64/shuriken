@@ -1,0 +1,6 @@
+[alias]
+full-clippy = "clippy --all-targets --all-features -- -D warnings"
+full-check = "check --all-targets --all-features"
+
+[target.'cfg(not(windows))']
+rustflags = ["-C", "debuginfo=1"]
