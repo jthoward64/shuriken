@@ -1,4 +1,4 @@
-pub mod rfc;
-pub mod error;
 pub mod domain;
+pub mod error;
 pub mod remote;
+pub mod rfc;
