@@ -1,12 +1,13 @@
+use shuriken::app::db::connection;
 use shuriken::component::config::Config;
 
-fn main() -> anyhow::Result<()> {
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
     let config = Config::load()?;
 
-    println!(
-        "Configuration loaded, database URL: {}",
-        config.database.url
-    );
+    let pool = connection::create_pool(&config.database.url).await?;
+
+    println!("Database connection pool established");
 
     Ok(())
 }

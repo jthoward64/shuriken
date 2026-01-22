@@ -27,7 +27,6 @@ map_err_ignore = "warn"
 non_zero_suggestions = "warn"
 return_and_then = "warn"
 self_named_module_files = "warn"
-str_to_string = "warn"
 single_char_lifetime_names = "warn"
 unwrap_used = "warn"
 
@@ -43,7 +42,7 @@ diesel = { version = "2.3.5", features = [
     "uuid",
 ] }
 diesel-adapter = { version = "1.2.0", features = ["postgres"] }
-diesel-async = { version = "0.7.4", features = ["postgres", "tokio"] }
+diesel-async = { version = "0.7.4", features = ["postgres", "tokio", "bb8"] }
 diesel-guard = "0.5.0"
 ipnetwork = "0.21.1"
 pest = "2.8.5"

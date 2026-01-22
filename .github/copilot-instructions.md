@@ -32,12 +32,33 @@
 - Global mutable state is the devil, avoid it
 - So are drill parameters, prefer keeping state in tight scopes
 - Leverage Rust's type system for safety (e.g., enums for state, newtypes for domain concepts)
+- Add `#[must_use]` to any functions that return a value and have no side effects, basicaly fucntions where if you don't use the return value there is no point in calling them
 
 ## Dependencies & Usage
 
 ### Core Async & Runtime
 - **tokio**: Async runtime for handling concurrent requests and I/O operations
 - **salvo**: Web framework for HTTP API endpoints and request routing
+
+#### Async Traits
+
+Public traits cannot use `async fn` syntax directly. Instead, return `impl Future`:
+
+```rust
+// ✅ Good: Public trait with async method
+pub trait Seeder {
+    fn seed(&self, conn: &mut DbConnection<'_>) -> impl Future<Output = anyhow::Result<()>>;
+    // Add `+ Send` if the future needs to be Send-safe:
+    // fn seed(&self, conn: &mut DbConnection<'_>) -> impl Future<Output = anyhow::Result<()>> + Send;
+}
+
+// Implementation can still use async fn
+impl Seeder for MySeeder {
+    async fn seed(&self, conn: &mut DbConnection<'_>) -> anyhow::Result<()> {
+        // ... async code
+    }
+}
+```
 
 ### Database
 - **diesel** & **diesel-async**: ORM for type-safe database queries and schema management
