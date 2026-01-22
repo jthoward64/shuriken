@@ -45,6 +45,29 @@
   - Use diesel's type system to prevent SQL injection
   - Leverage migrations for schema changes
 
+#### Schema & Migrations
+
+- **Schema source of truth**: The auto-generated schema in `src/app/db/schema/mod.rs` is always the most up-to-date representation of the database structure
+- **Migration style**: Write migrations with SQL comments that document tables and columns—these comments are preserved by Diesel and appear in the generated schema
+- **UUID v7 IDs**: All primary keys use PostgreSQL 17's native `uuidv7()` function for time-ordered, globally unique identifiers
+- **Naming**: Use `snake_case` for all table and column names
+- **Timestamps**: Don't add `created_at` columns—use `uuid_extract_timestamp(id)` to get creation time from UUID v7. Only include `updated_at` when modification tracking is needed
+
+**Example migration pattern:**
+```sql
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT uuidv7(),
+    name TEXT NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+COMMENT ON TABLE users IS 'User accounts for the CalDAV/CardDAV server';
+COMMENT ON COLUMN users.id IS 'UUID v7 primary key';
+COMMENT ON COLUMN users.name IS 'Display name of the user';
+```
+
+After running migrations, Diesel automatically updates the schema file with these comments included.
+
 #### Diesel Query Composition Pattern
 
 Extract query logic into small, reusable functions that **return queries or expressions** rather than executing them. This enables composition and reuse:

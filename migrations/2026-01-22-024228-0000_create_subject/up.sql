@@ -2,7 +2,6 @@
 -- Groups table - organizational unit for users
 CREATE TABLE groups (
     id UUID PRIMARY KEY DEFAULT uuidv7(),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -15,7 +14,6 @@ CREATE TABLE users (
     name TEXT NOT NULL,
     email TEXT NOT NULL UNIQUE,
     group_id UUID REFERENCES groups(id) ON DELETE SET NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -31,7 +29,6 @@ CREATE TABLE auth_users (
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     auth_source TEXT NOT NULL,
     auth_id TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE(auth_source, auth_id)
 );
