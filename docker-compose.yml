@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: shuriken
+      POSTGRES_PASSWORD: shuriken
+      POSTGRES_DB: shuriken
+    ports:
+      - "4523:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
