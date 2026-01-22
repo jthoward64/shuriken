@@ -45,6 +45,33 @@
   - Use diesel's type system to prevent SQL injection
   - Leverage migrations for schema changes
 
+#### Diesel Query Composition Pattern
+
+Extract query logic into small, reusable functions that **return queries or expressions** rather than executing them. This enables composition and reuse:
+
+```rust
+// ✅ Good: Returns a query, composable and testable
+fn all() -> BoxedQuery<'static> {
+    users::table.select(User::as_select()).into_boxed()
+}
+
+fn by_id(id: i32) -> BoxedQuery<'static> {
+    all().filter(users::id.eq(id)).into_boxed()
+}
+
+// Usage: compose further
+let user = by_id(42).inner_join(profiles::table).select(...).first(conn)?;
+```
+
+```rust
+// ❌ Avoid: Functions that take connection and execute
+fn by_id(id: i32, conn: &mut PgConnection) -> QueryResult<User> {
+    users::table.find(id).first(conn)  // Can't reuse or compose
+}
+```
+
+Use `#[diesel::dsl::auto_type]` to avoid complex explicit return types. Extract SQL expressions into filter functions using `AsExpression` for type flexibility.
+
 ### Serialization
 - **serde** + **serde_derive**: Serialization/deserialization for config and API payloads
 - **quick-xml**: XML parsing for RFC compliance (CalDAV/CardDAV standards)
