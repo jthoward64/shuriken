@@ -1,10 +1,34 @@
 use anyhow::Result;
-use config::Config as RawConfig;
+use config::Config;
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct Config {
+pub struct Settings {
     pub database: DatabaseConfig,
+    pub auth: AuthConfig,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AuthMethod {
+    SingleUser,
+    Proxy,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct AuthConfig {
+    pub method: AuthMethod,
+    pub proxy: Option<ProxyAuthConfig>,
+    pub single_user: Option<SingleUserAuthConfig>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ProxyAuthConfig {}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SingleUserAuthConfig {
+    pub name: String,
+    pub email: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -12,14 +36,9 @@ pub struct DatabaseConfig {
     pub url: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-struct FlatConfig {
-    database_url: String,
-}
-
-impl Config {
+impl Settings {
     /// ## Summary
-    /// Loads configuration from `.env` file and environment variables into a `Config`.
+    /// Loads configuration from `.env` file and environment variables into a `Settings`.
     /// Environment variables take precedence over `.env` file values.
     ///
     /// ## Errors
@@ -27,15 +46,18 @@ impl Config {
     pub fn load() -> Result<Self> {
         dotenv::dotenv().ok();
 
-        let flat: FlatConfig = RawConfig::builder()
-            .add_source(config::Environment::default())
+        Ok(Config::builder()
+            // Env file
+            .add_source(
+                config::Environment::default()
+                    .convert_case(config::Case::Snake)
+                    .separator("_")
+                    .ignore_empty(true)
+                    .try_parsing(true),
+            )
+            // TOML file
+            .add_source(config::File::with_name("config.toml").required(false))
             .build()?
-            .try_deserialize()?;
-
-        Ok(Self {
-            database: DatabaseConfig {
-                url: flat.database_url,
-            },
-        })
+            .try_deserialize::<Settings>()?)
     }
 }
