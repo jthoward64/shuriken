@@ -2,7 +2,7 @@ pub mod group_name;
 
 use diesel::prelude::*;
 
-use crate::app::db::schema;
+use crate::component::db::schema;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Queryable, Selectable, Identifiable, AsChangeset)]
 #[diesel(table_name = schema::group)]

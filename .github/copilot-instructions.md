@@ -170,6 +170,25 @@ let user = db::get_user(id).map_err(|e| anyhow::anyhow!("DB error: {}", e))?;
 - Add inline comments explaining non-obvious logic or important decisions
 - Comment WHY code does something, not WHAT it does
 - Use `// TODO:` or `// FIXME:` for known limitations or future improvements
+- Comments should be markdown formatted with the following sections (each with `##` header level) where applicable:
+    - **Summary**: A brief overview of what the code does
+    - **Side Effects**: Any important side effects or considerations
+    - **Errors**: Possible error conditions and how they are handled
+    - **Panics**: Conditions that may lead to panics
+
+```
+/// ## Summary
+/// Describe what the function does and its purpose.
+///
+/// ## Side Effects
+/// Describe any side effects the function may have outside its return value.
+///
+/// ## Errors
+/// Returns an error if the pool cannot be created with the provided database URL.
+///
+/// ## Panics
+/// Panics if the provided database URL is invalid.
+```
 
 ### Error Cases
 

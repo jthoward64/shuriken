@@ -1,6 +1,10 @@
+use std::sync::OnceLock;
+
 use anyhow::Result;
 use config::Config;
 use serde::Deserialize;
+
+static CONFIG: OnceLock<Settings> = OnceLock::new();
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Settings {
@@ -44,8 +48,6 @@ impl Settings {
     /// ## Errors
     /// Returns an error if building the configuration or deserializing it fails.
     pub fn load() -> Result<Self> {
-        dotenv::dotenv().ok();
-
         Ok(Config::builder()
             // Env file
             .add_source(
@@ -60,4 +62,18 @@ impl Settings {
             .build()?
             .try_deserialize::<Settings>()?)
     }
+}
+
+pub fn load_config() -> Result<()> {
+    dotenv::dotenv().ok();
+
+    let settings = Settings::load()?;
+    CONFIG
+        .set(settings)
+        .expect("Failed to set global configuration");
+    Ok(())
+}
+
+pub fn get_config() -> &'static Settings {
+    CONFIG.get().expect("Configuration not loaded")
 }

@@ -1,7 +1,7 @@
 pub mod authuser;
 pub mod membership;
 
-use crate::app::db::schema;
+use crate::component::db::schema;
 use diesel::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -26,7 +26,7 @@ pub struct User {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Insertable)]
 #[diesel(table_name = schema::user)]
-pub struct NewUser {
-    pub name: String,
-    pub email: String,
+pub struct NewUser<'a> {
+    pub name: &'a str,
+    pub email: &'a str,
 }

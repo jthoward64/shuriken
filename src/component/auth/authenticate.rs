@@ -1,0 +1,58 @@
+use diesel::prelude::*;
+
+use crate::component::{
+    config::{AuthMethod, get_config},
+    db::{connection::connect, schema},
+    error::{Error, Result},
+    model::user::{NewUser, User},
+};
+
+/// Get the user configured in settings for single user authentication.
+///
+/// If it doesn't exist, insert it into the database.
+///
+/// ## Errors
+///
+/// Returns an error if the user cannot be created or retrieved from the database.
+async fn authenticate_single_user() -> Result<User> {
+    let config = get_config();
+    let single_user_config =
+        config
+            .auth
+            .single_user
+            .as_ref()
+            .ok_or(Error::InvalidConfiguration(
+                "Single user config is missing".to_string(),
+            ))?;
+
+    let mut conn = connect().await?;
+
+    // Check if the user already exists
+    if let Some(user) = schema::user::table
+        .filter(schema::user::email.eq(&single_user_config.email))
+        .select(User::as_select())
+        .first::<User>(&mut conn)
+        .optional()?
+    {
+        return Ok(user);
+    }
+
+    // If not, create the user
+    let new_user = NewUser {
+        name: single_user_config.name.as_str(),
+        email: single_user_config.email.as_str(),
+    };
+
+    let user = diesel::insert_into(schema::user::table)
+        .values(&new_user)
+        .returning(User::as_select())
+        .get_result::<User>(&mut conn)?;
+
+    Ok(user)
+}
+
+pub async fn authenticate(req: salvo::Request) -> Result<User> {
+    let config = get_config();
+
+    match config.auth.method {}
+}

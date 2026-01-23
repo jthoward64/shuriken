@@ -1,6 +1,6 @@
 use diesel::prelude::*;
 
-use crate::app::db::schema;
+use crate::component::db::schema;
 
 #[derive(
     Debug,

@@ -27,7 +27,6 @@ map_err_ignore = "warn"
 non_zero_suggestions = "warn"
 return_and_then = "warn"
 self_named_module_files = "warn"
-single_char_lifetime_names = "warn"
 unwrap_used = "warn"
 
 [dependencies]

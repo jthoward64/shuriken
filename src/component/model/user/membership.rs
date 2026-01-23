@@ -1,4 +1,4 @@
-use crate::{app::db::schema, component::model};
+use crate::{component::db::schema, component::model};
 use diesel::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Identifiable, Queryable, Selectable, Associations)]
