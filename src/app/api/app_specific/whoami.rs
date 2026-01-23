@@ -6,7 +6,7 @@ use crate::component::middleware::auth::DepotUser;
 
 /// ## Summary
 /// Returns the authenticated user's information as JSON.
-/// The user is retrieved from the depot set by the AuthMiddleware.
+/// The user is retrieved from the depot set by the `AuthMiddleware`.
 #[handler]
 async fn whoami(depot: &Depot) -> salvo::prelude::Json<serde_json::Value> {
     match depot.get::<DepotUser>("user") {

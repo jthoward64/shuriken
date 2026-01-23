@@ -14,17 +14,25 @@ static DB_POOL: OnceLock<DbPool> = OnceLock::new();
 ///
 /// ## Errors
 /// Returns an error if the pool cannot be created with the provided database URL.
-pub async fn create_pool(database_url: &str, size: u32) -> anyhow::Result<DbPool> {
+///
+/// ## Panics
+/// Panics if the database pool is already initialized.
+pub async fn create_pool(database_url: &str, size: u32) -> anyhow::Result<()> {
     let config = AsyncDieselConnectionManager::<AsyncPgConnection>::new(database_url);
 
-    Ok(Pool::builder()
+    let pool = Pool::builder()
         .max_size(size)
         .min_idle(Some(size))
         .test_on_check_out(false)
         .idle_timeout(None)
         .max_lifetime(None)
         .build(config)
-        .await?)
+        .await?;
+
+    #[expect(clippy::expect_used)]
+    DB_POOL.set(pool).expect("Database pool is already set");
+
+    Ok(())
 }
 
 /// Get a connection from the database pool.
