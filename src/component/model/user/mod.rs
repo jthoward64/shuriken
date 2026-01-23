@@ -3,6 +3,7 @@ pub mod membership;
 
 use crate::component::db::schema;
 use diesel::{pg::Pg, prelude::*};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum UserUniqueCriteria {
@@ -14,7 +15,9 @@ pub enum UserUniqueCriteria {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Identifiable, Queryable, Selectable)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Hash, Identifiable, Queryable, Selectable, Serialize, Deserialize,
+)]
 #[diesel(table_name = schema::user)]
 #[diesel(check_for_backend(Pg))]
 pub struct User {

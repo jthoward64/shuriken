@@ -3,8 +3,11 @@
 use salvo::Router;
 
 mod healthcheck;
+mod whoami;
 
 #[must_use]
 pub fn routes() -> Router {
-    Router::with_path("app").push(healthcheck::routes())
+    Router::with_path("app")
+        .push(healthcheck::routes())
+        .push(whoami::routes())
 }

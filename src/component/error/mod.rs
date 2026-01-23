@@ -9,6 +9,8 @@ pub enum Error {
 
     #[error("Authentication error: {0}")]
     AuthenticationError(String),
+    #[error("Not Authenticated")]
+    NotAuthenticated,
     #[error("Authorization error: {0}")]
     AuthorizationError(String),
     #[error("Casbin error: {0}")]
