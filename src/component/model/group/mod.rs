@@ -1,12 +1,12 @@
 pub mod group_name;
 
-use diesel::prelude::*;
+use diesel::{pg::Pg, prelude::*};
 
 use crate::component::db::schema;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Queryable, Selectable, Identifiable, AsChangeset)]
 #[diesel(table_name = schema::group)]
-#[diesel(check_for_backend(diesel::pg::Pg))]
+#[diesel(check_for_backend(Pg))]
 pub struct Group {
     pub id: uuid::Uuid,
     pub primary_name: Option<uuid::Uuid>,

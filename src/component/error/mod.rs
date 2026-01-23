@@ -11,6 +11,8 @@ pub enum Error {
     AuthenticationError(String),
     #[error("Authorization error: {0}")]
     AuthorizationError(String),
+    #[error("Casbin error: {0}")]
+    CasbinError(#[from] casbin::Error),
 
     #[error("Not found: {0}")]
     NotFound(String),
@@ -18,6 +20,9 @@ pub enum Error {
     ValidationError(String),
     #[error("Invalid configuration: {0}")]
     InvalidConfiguration(String),
+
+    #[error("Invariant violation: {0}")]
+    InvariantViolation(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

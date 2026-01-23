@@ -1,9 +1,9 @@
 use crate::component::db::schema;
-use diesel::prelude::*;
+use diesel::{pg::Pg, prelude::*};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Identifiable, Queryable, Selectable, Associations)]
 #[diesel(table_name = schema::auth_user)]
-#[diesel(check_for_backend(diesel::pg::Pg))]
+#[diesel(check_for_backend(Pg))]
 #[diesel(belongs_to(super::User, foreign_key = user_id))]
 pub struct AuthUser {
     pub id: uuid::Uuid,

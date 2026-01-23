@@ -1,9 +1,9 @@
 use crate::{component::db::schema, component::model};
-use diesel::prelude::*;
+use diesel::{pg::Pg, prelude::*};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Identifiable, Queryable, Selectable, Associations)]
 #[diesel(table_name = schema::membership)]
-#[diesel(check_for_backend(diesel::pg::Pg))]
+#[diesel(check_for_backend(Pg))]
 #[diesel(primary_key(user_id, group_id))]
 #[diesel(belongs_to(model::user::User, foreign_key = user_id))]
 #[diesel(belongs_to(model::group::Group, foreign_key = group_id))]

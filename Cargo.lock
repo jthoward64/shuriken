@@ -979,23 +979,7 @@ dependencies = [
  "itoa",
  "libc",
  "pq-sys",
- "r2d2",
  "uuid",
-]
-
-[[package]]
-name = "diesel-adapter"
-version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee23d2655b19f59fb932700e0f0a76fc1fe1790dee83566d1037ade88f7f4463"
-dependencies = [
- "async-trait",
- "casbin",
- "diesel",
- "futures",
- "libsqlite3-sys",
- "once_cell",
- "tokio",
 ]
 
 [[package]]
@@ -1011,6 +995,21 @@ dependencies = [
  "scoped-futures",
  "tokio",
  "tokio-postgres",
+]
+
+[[package]]
+name = "diesel-async-adapter"
+version = "0.1.0"
+source = "git+https://github.com/jthoward64/diesel-async-adapter.git#dfc170fe1030dc4495293f33181ab4275927aff2"
+dependencies = [
+ "async-trait",
+ "casbin",
+ "diesel",
+ "diesel-async",
+ "futures",
+ "libsqlite3-sys",
+ "once_cell",
+ "tokio",
 ]
 
 [[package]]
@@ -2734,17 +2733,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69cdb34c158ceb288df11e18b4bd39de994f6657d83847bdffdbd7f346754b0f"
 
 [[package]]
-name = "r2d2"
-version = "0.8.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "51de85fb3fb6524929c8a2eb85e6b6d363de4e8c48f9e2c2eac4944abc181c93"
-dependencies = [
- "log",
- "parking_lot",
- "scheduled-thread-pool",
-]
-
-[[package]]
 name = "radium"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3459,15 +3447,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "scheduled-thread-pool"
-version = "0.2.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3cbc66816425a074528352f5789333ecff06ca41b36b0b0efdfbb29edc391a19"
-dependencies = [
- "parking_lot",
-]
-
-[[package]]
 name = "scoped-futures"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3665,8 +3644,8 @@ dependencies = [
  "chrono-tz",
  "config",
  "diesel",
- "diesel-adapter",
  "diesel-async",
+ "diesel-async-adapter",
  "diesel-guard",
  "dotenv",
  "ipnetwork",

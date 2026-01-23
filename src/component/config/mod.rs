@@ -64,6 +64,15 @@ impl Settings {
     }
 }
 
+/// ## Summary
+/// Loads configuration from environment variables and `.env` file, then stores it globally.
+///
+/// ## Errors
+/// Returns an error if loading or deserializing the configuration fails.
+///
+/// ## Panics
+/// Panics if the global configuration has already been initialized.
+#[expect(clippy::expect_used)]
 pub fn load_config() -> Result<()> {
     dotenv::dotenv().ok();
 
@@ -74,6 +83,12 @@ pub fn load_config() -> Result<()> {
     Ok(())
 }
 
+/// ## Summary
+/// Retrieves the globally loaded configuration.
+///
+/// ## Panics
+/// Panics if the global configuration has not been initialized via `load_config()`.
+#[expect(clippy::expect_used)]
 pub fn get_config() -> &'static Settings {
     CONFIG.get().expect("Configuration not loaded")
 }

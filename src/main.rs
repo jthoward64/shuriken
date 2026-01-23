@@ -1,8 +1,9 @@
 use salvo::conn::TcpListener;
 use salvo::{Listener, Router};
 use shuriken::app::api::routes;
-use shuriken::component::config::{Settings, get_config, load_config};
-use shuriken::component::db::{build_pool, connection};
+use shuriken::component::auth::casbin::init_casbin;
+use shuriken::component::config::{get_config, load_config};
+use shuriken::component::db::connection;
 use tracing_subscriber::fmt;
 
 #[tokio::main]
@@ -13,7 +14,9 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("Configuration loaded: {:?}", get_config());
 
-    build_pool(&get_config().database.url, get_config().database.pool_size)?;
+    connection::create_pool(&get_config().database.url, 4).await?;
+
+    init_casbin().await?;
 
     tracing::info!("Database connection pool created.");
 

@@ -2,7 +2,7 @@ pub mod authuser;
 pub mod membership;
 
 use crate::component::db::schema;
-use diesel::prelude::*;
+use diesel::{pg::Pg, prelude::*};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum UserUniqueCriteria {
@@ -16,7 +16,7 @@ pub enum UserUniqueCriteria {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Identifiable, Queryable, Selectable)]
 #[diesel(table_name = schema::user)]
-#[diesel(check_for_backend(diesel::pg::Pg))]
+#[diesel(check_for_backend(Pg))]
 pub struct User {
     pub id: uuid::Uuid,
     pub name: String,

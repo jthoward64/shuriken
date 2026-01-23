@@ -1,4 +1,4 @@
-use diesel::prelude::*;
+use diesel::{pg::Pg, prelude::*};
 
 use crate::component::db::schema;
 
@@ -16,7 +16,7 @@ use crate::component::db::schema;
 )]
 #[diesel(table_name = schema::group_name)]
 #[diesel(belongs_to(super::Group, foreign_key = group_id))]
-#[diesel(check_for_backend(diesel::pg::Pg))]
+#[diesel(check_for_backend(Pg))]
 pub struct GroupName {
     pub id: uuid::Uuid,
     pub group_id: uuid::Uuid,
