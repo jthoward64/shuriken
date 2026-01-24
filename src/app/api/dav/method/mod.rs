@@ -5,3 +5,6 @@ pub mod get_head;
 pub mod options;
 pub mod propfind;
 pub mod report;
+
+#[cfg(test)]
+mod options_tests;
