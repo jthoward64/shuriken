@@ -32,6 +32,9 @@ mod lexer;
 mod parser;
 mod values;
 
+#[cfg(test)]
+mod error_tests;
+
 pub use error::{ParseError, ParseErrorKind, ParseResult};
 pub use lexer::{parse_content_line, split_lines, unfold, ContentLine};
 pub use parser::{parse, parse_single};
