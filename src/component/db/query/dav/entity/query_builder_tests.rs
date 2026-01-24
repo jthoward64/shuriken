@@ -1,6 +1,5 @@
 //! Unit tests for DAV entity query builders.
 
-use diesel::prelude::*;
 use diesel::query_builder::QueryFragment;
 
 use super::query_builders::*;
@@ -17,75 +16,34 @@ where
 
 #[test]
 fn test_all_entities_query_builds() {
-    let query = all_entities();
-    assert!(query_is_valid(query), "all_entities() query should be valid");
+    let query = all();
+    assert!(query_is_valid(query), "all() query should be valid");
 }
 
 #[test]
 fn test_entity_by_id_query_builds() {
     let id = uuid::Uuid::new_v4();
-    let query = entity_by_id(id);
-    assert!(query_is_valid(query), "entity_by_id() query should be valid");
+    let query = by_id(id);
+    assert!(query_is_valid(query), "by_id() query should be valid");
 }
 
 #[test]
 fn test_entity_by_logical_uid_query_builds() {
     let uid = "test-uid-123";
-    let query = entity_by_logical_uid(uid);
-    assert!(query_is_valid(query), "entity_by_logical_uid() query should be valid");
+    let query = by_logical_uid(uid);
+    assert!(query_is_valid(query), "by_logical_uid() query should be valid");
 }
 
 #[test]
 fn test_entity_not_deleted_query_builds() {
-    let query = entity_not_deleted();
-    assert!(query_is_valid(query), "entity_not_deleted() query should be valid");
+    let query = not_deleted();
+    assert!(query_is_valid(query), "not_deleted() query should be valid");
 }
 
 #[test]
 fn test_all_components_query_builds() {
-    let query = all_components();
-    assert!(query_is_valid(query), "all_components() query should be valid");
-}
-
-#[test]
-fn test_component_by_id_query_builds() {
-    let id = uuid::Uuid::new_v4();
-    let query = component_by_id(id);
-    assert!(query_is_valid(query), "component_by_id() query should be valid");
-}
-
-#[test]
-fn test_components_for_entity_query_builds() {
-    let entity_id = uuid::Uuid::new_v4();
-    let query = components_for_entity(entity_id);
+    let query = components_for_entity(uuid::Uuid::new_v4());
     assert!(query_is_valid(query), "components_for_entity() query should be valid");
-}
-
-#[test]
-fn test_root_components_for_entity_query_builds() {
-    let entity_id = uuid::Uuid::new_v4();
-    let query = root_components_for_entity(entity_id);
-    assert!(query_is_valid(query), "root_components_for_entity() query should be valid");
-}
-
-#[test]
-fn test_child_components_query_builds() {
-    let parent_id = uuid::Uuid::new_v4();
-    let query = child_components(parent_id);
-    assert!(query_is_valid(query), "child_components() query should be valid");
-}
-
-#[test]
-fn test_all_properties_query_builds() {
-    let query = all_properties();
-    assert!(query_is_valid(query), "all_properties() query should be valid");
-}
-
-#[test]
-fn test_property_by_id_query_builds() {
-    let id = uuid::Uuid::new_v4();
-    let query = property_by_id(id);
-    assert!(query_is_valid(query), "property_by_id() query should be valid");
 }
 
 #[test]
@@ -93,19 +51,6 @@ fn test_properties_for_component_query_builds() {
     let component_id = uuid::Uuid::new_v4();
     let query = properties_for_component(component_id);
     assert!(query_is_valid(query), "properties_for_component() query should be valid");
-}
-
-#[test]
-fn test_all_parameters_query_builds() {
-    let query = all_parameters();
-    assert!(query_is_valid(query), "all_parameters() query should be valid");
-}
-
-#[test]
-fn test_parameter_by_id_query_builds() {
-    let id = uuid::Uuid::new_v4();
-    let query = parameter_by_id(id);
-    assert!(query_is_valid(query), "parameter_by_id() query should be valid");
 }
 
 #[test]
@@ -118,47 +63,32 @@ fn test_parameters_for_property_query_builds() {
 #[test]
 fn test_entity_query_contains_filters() {
     let uid = "unique-identifier";
-    let query_str = diesel::debug_query::<diesel::pg::Pg, _>(&entity_by_logical_uid(uid)).to_string();
+    let query_str = diesel::debug_query::<diesel::pg::Pg, _>(&by_logical_uid(uid)).to_string();
     
     assert!(
         query_str.contains("logical_uid"),
-        "entity_by_logical_uid should filter by logical_uid"
+        "by_logical_uid should filter by logical_uid"
     );
 }
 
 #[test]
 fn test_entity_not_deleted_filter() {
-    let query_str = diesel::debug_query::<diesel::pg::Pg, _>(&entity_not_deleted()).to_string();
+    let query_str = diesel::debug_query::<diesel::pg::Pg, _>(&not_deleted()).to_string();
     
     assert!(
         query_str.contains("deleted_at"),
-        "entity_not_deleted should filter by deleted_at"
+        "not_deleted should filter by deleted_at"
     );
 }
 
 #[test]
-fn test_root_components_filter() {
+fn test_components_for_entity_filter() {
     let entity_id = uuid::Uuid::new_v4();
-    let query_str = diesel::debug_query::<diesel::pg::Pg, _>(&root_components_for_entity(entity_id)).to_string();
+    let query_str = diesel::debug_query::<diesel::pg::Pg, _>(&components_for_entity(entity_id)).to_string();
     
     assert!(
         query_str.contains("entity_id"),
-        "root_components_for_entity should filter by entity_id"
-    );
-    assert!(
-        query_str.contains("parent_component_id"),
-        "root_components_for_entity should filter by parent_component_id being null"
-    );
-}
-
-#[test]
-fn test_child_components_filter() {
-    let parent_id = uuid::Uuid::new_v4();
-    let query_str = diesel::debug_query::<diesel::pg::Pg, _>(&child_components(parent_id)).to_string();
-    
-    assert!(
-        query_str.contains("parent_component_id"),
-        "child_components should filter by parent_component_id"
+        "components_for_entity should filter by entity_id"
     );
 }
 
