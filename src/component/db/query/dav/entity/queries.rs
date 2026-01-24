@@ -1,4 +1,4 @@
-//! Query functions for DAV entities and their component trees.
+//! Query building functions for DAV entities.
 
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;

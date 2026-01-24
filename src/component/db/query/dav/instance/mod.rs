@@ -1,24 +1,15 @@
 //! Query functions for DAV instances with `ETag` generation and tombstone support.
 
+mod etag;
+
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
-use sha2::{Digest, Sha256};
 
 use crate::component::db::schema::{dav_instance, dav_tombstone};
 use crate::component::model::dav::instance::{DavInstance, NewDavInstance};
 use crate::component::model::dav::tombstone::NewDavTombstone;
 
-/// ## Summary
-/// Generates an `ETag` from canonical bytes using SHA256.
-///
-/// The `ETag` is the hex-encoded SHA256 hash of the content, wrapped in quotes.
-#[must_use]
-pub fn generate_etag(canonical_bytes: &[u8]) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(canonical_bytes);
-    let hash = hasher.finalize();
-    format!("\"{}\"", hex::encode(hash))
-}
+pub use etag::generate_etag;
 
 /// ## Summary
 /// Returns a query to select all instances.

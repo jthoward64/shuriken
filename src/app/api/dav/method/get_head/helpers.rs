@@ -1,48 +1,15 @@
-//! GET and HEAD method handlers for `WebDAV` resources.
+//! Helper functions for GET and HEAD request processing.
 
 use salvo::http::{HeaderValue, StatusCode};
-use salvo::{Request, Response, handler};
+use salvo::{Request, Response};
 
 use crate::component::db::connection;
 use crate::component::db::query::dav::instance;
 use crate::component::model::dav::instance::DavInstance;
 
-/// ## Summary
-/// Handles GET requests for `WebDAV` resources.
-///
-/// Retrieves the resource content from the database and returns it with
-/// appropriate headers (`ETag`, `Last-Modified`, `Content-Type`).
-///
-/// ## Side Effects
-/// - Queries the database for the resource
-/// - Sets response headers and body
-///
-/// ## Errors
-/// Returns 404 if the resource is not found, 500 for database errors.
-#[handler]
-pub async fn get(req: &mut Request, res: &mut Response) {
-    handle_get_or_head(req, res, false).await;
-}
-
-/// ## Summary
-/// Handles HEAD requests for `WebDAV` resources.
-///
-/// Same as GET but does not return the response body.
-///
-/// ## Side Effects
-/// - Queries the database for the resource
-/// - Sets response headers (no body)
-///
-/// ## Errors
-/// Returns 404 if the resource is not found, 500 for database errors.
-#[handler]
-pub async fn head(req: &mut Request, res: &mut Response) {
-    handle_get_or_head(req, res, true).await;
-}
-
 /// Shared implementation for GET and HEAD handlers.
 #[expect(dead_code)]
-async fn handle_get_or_head(req: &mut Request, res: &mut Response, _is_head: bool) {
+pub(super) async fn handle_get_or_head(req: &mut Request, res: &mut Response, _is_head: bool) {
     // Extract the resource path from the request
     let _path = req.uri().path();
     

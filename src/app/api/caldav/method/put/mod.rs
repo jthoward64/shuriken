@@ -1,4 +1,6 @@
-//! PUT method handler for `CardDAV` vCard objects.
+//! PUT method handler for `CalDAV` calendar objects.
+
+mod types;
 
 use salvo::http::{HeaderValue, StatusCode};
 use salvo::{Request, Response, handler};
@@ -6,15 +8,17 @@ use salvo::{Request, Response, handler};
 use crate::component::db::connection;
 use crate::component::db::query::dav::instance;
 
+use types::{PutError, PutResult};
+
 /// ## Summary
-/// Handles PUT requests for vCard objects (`.vcf` files).
+/// Handles PUT requests for calendar objects (`.ics` files).
 ///
-/// Parses the vCard request body, validates it, checks preconditions
+/// Parses the iCalendar request body, validates it, checks preconditions
 /// (`If-Match`, `If-None-Match`), stores the entity/instance in the database,
 /// and generates an `ETag`.
 ///
 /// ## Side Effects
-/// - Parses vCard data
+/// - Parses iCalendar data
 /// - Creates or updates database entity and instance
 /// - Bumps collection sync token
 /// - Returns 201 Created or 204 No Content
@@ -71,15 +75,15 @@ pub async fn put(req: &mut Request, res: &mut Response) {
         Ok(PutResult::PreconditionFailed) => {
             res.status_code(StatusCode::PRECONDITION_FAILED);
         }
-        Err(PutError::InvalidVcardData(msg)) => {
-            tracing::error!("Invalid vCard data: {}", msg);
+        Err(PutError::InvalidCalendarData(msg)) => {
+            tracing::error!("Invalid calendar data: {}", msg);
             res.status_code(StatusCode::BAD_REQUEST);
-            // TODO: Return proper CardDAV error XML with valid-address-data precondition
+            // TODO: Return proper CalDAV error XML with valid-calendar-data precondition
         }
         Err(PutError::UidConflict(uid)) => {
             tracing::error!("UID conflict: {}", uid);
             res.status_code(StatusCode::CONFLICT);
-            // TODO: Return proper CardDAV error XML with no-uid-conflict precondition
+            // TODO: Return proper CalDAV error XML with no-uid-conflict precondition
         }
         Err(PutError::DatabaseError(e)) => {
             tracing::error!("Database error: {}", e);
@@ -88,40 +92,12 @@ pub async fn put(req: &mut Request, res: &mut Response) {
     }
 }
 
-/// Result of a PUT operation.
-#[expect(dead_code)]
-enum PutResult {
-    /// Resource was created with the given `ETag`.
-    Created(String),
-    /// Resource was updated with the given `ETag`.
-    Updated(String),
-    /// Precondition failed (If-Match or If-None-Match).
-    PreconditionFailed,
-}
-
-/// Errors that can occur during PUT.
-#[expect(dead_code)]
-enum PutError {
-    /// Invalid vCard data.
-    InvalidVcardData(String),
-    /// UID conflict with another resource.
-    UidConflict(String),
-    /// Database error.
-    DatabaseError(anyhow::Error),
-}
-
-impl From<anyhow::Error> for PutError {
-    fn from(e: anyhow::Error) -> Self {
-        Self::DatabaseError(e)
-    }
-}
-
 /// ## Summary
-/// Performs the PUT operation for a vCard object.
+/// Performs the PUT operation for a calendar object.
 ///
 /// ## Errors
 /// Returns `PutError` for validation failures, conflicts, or database errors.
-#[expect(clippy::unused_async, dead_code)]
+#[expect(clippy::unused_async)]
 async fn perform_put(
     _conn: &mut connection::DbConnection<'_>,
     _path: &str,
@@ -132,15 +108,16 @@ async fn perform_put(
     // TODO: Parse path to get collection_id and uri
     // TODO: Check authorization
     
-    // Parse vCard data
-    // TODO: Use vCard parser from RFC module
-    let _vcard_data = std::str::from_utf8(body)
-        .map_err(|e| PutError::InvalidVcardData(e.to_string()))?;
+    // Parse iCalendar data
+    // TODO: Use icalendar parser from RFC module
+    let _ical_data = std::str::from_utf8(body)
+        .map_err(|e| PutError::InvalidCalendarData(e.to_string()))?;
     
-    // TODO: Validate vCard data
-    // - Must be valid vCard
-    // - Must have exactly one VCARD component
-    // - Extract UID and FN (formatted name)
+    // TODO: Validate calendar data
+    // - Must be valid iCalendar
+    // - Must have exactly one VCALENDAR
+    // - Must have at least one component (VEVENT, VTODO, etc.)
+    // - Extract UID
     
     // Check If-None-Match: * (create-only)
     if let Some(inm) = if_none_match
@@ -157,8 +134,8 @@ async fn perform_put(
     }
     
     // TODO: Store entity and instance in database
-    // 1. Extract UID from vCard
-    // 2. Check for UID conflicts in the addressbook
+    // 1. Extract UID from iCalendar
+    // 2. Check for UID conflicts in the collection
     // 3. Create or update entity
     // 4. Create or update instance with generated ETag
     // 5. Bump collection sync token
