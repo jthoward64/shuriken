@@ -54,15 +54,83 @@ pub fn unfold(input: &str) -> String {
     result
 }
 
-/// Splits unfolded input into individual content lines.
+/// Unfolds content lines while preserving a single space at fold boundaries.
 ///
-/// Returns an iterator over (`line_number`, `line_content`) pairs.
-pub fn split_lines(input: &str) -> impl Iterator<Item = (usize, &str)> {
-    input
-        .split("\r\n")
-        .enumerate()
-        .map(|(i, line)| (i + 1, line))
-        .filter(|(_, line)| !line.is_empty())
+/// Useful for lenient parsing where human-authored content expects a space
+/// between folded segments (e.g., long summary text).
+#[must_use]
+#[expect(dead_code)]
+pub fn unfold_with_space(input: &str) -> String {
+    let mut result = String::with_capacity(input.len());
+    let bytes = input.as_bytes();
+    let len = bytes.len();
+    let mut i = 0;
+
+    while i < len {
+        if bytes[i] == b'\r' && i + 1 < len && bytes[i + 1] == b'\n' {
+            if i + 2 < len && (bytes[i + 2] == b' ' || bytes[i + 2] == b'\t') {
+                result.push(' ');
+                i += 3;
+            } else {
+                result.push('\r');
+                result.push('\n');
+                i += 2;
+            }
+        } else if bytes[i] == b'\n' {
+            if i + 1 < len && (bytes[i + 1] == b' ' || bytes[i + 1] == b'\t') {
+                result.push(' ');
+                i += 2;
+            } else {
+                result.push('\r');
+                result.push('\n');
+                i += 1;
+            }
+        } else {
+            result.push(bytes[i] as char);
+            i += 1;
+        }
+    }
+
+    result
+}
+
+/// Splits input into content lines, merging folded continuations.
+///
+/// Handles both CRLF and bare LF line endings. Lines starting with SP/HTAB are
+/// treated as continuations of the previous line with a single space inserted
+/// to preserve separation.
+#[must_use]
+pub fn split_lines(input: &str) -> Vec<(usize, String)> {
+    let mut lines: Vec<(usize, String)> = Vec::new();
+
+    for (i, raw_line) in input.lines().enumerate() {
+        let line = raw_line.trim_end_matches('\r');
+        if line.is_empty() {
+            continue;
+        }
+
+        if line.starts_with([' ', '\t']) {
+            let continuation = line.trim_start_matches([' ', '\t']);
+            if let Some((_, prev)) = lines.last_mut() {
+                prev.push(' ');
+                prev.push_str(continuation);
+            } else {
+                lines.push((i + 1, continuation.to_string()));
+            }
+        } else if !line.contains(':') {
+            // Lenient: treat lines without a colon as folded continuations.
+            if let Some((_, prev)) = lines.last_mut() {
+                prev.push(' ');
+                prev.push_str(line);
+            } else {
+                lines.push((i + 1, line.to_string()));
+            }
+        } else {
+            lines.push((i + 1, line.to_string()));
+        }
+    }
+
+    lines
 }
 
 /// Parses a single content line.
@@ -122,9 +190,8 @@ pub fn parse_content_line(line: &str, line_num: usize) -> ParseResult<ContentLin
     }
 
     // The colon should be found now
-    let colon_pos = colon_pos.ok_or_else(|| {
-        ParseError::new(ParseErrorKind::MissingColon, line_num, line.len())
-    })?;
+    let colon_pos = colon_pos
+        .ok_or_else(|| ParseError::new(ParseErrorKind::MissingColon, line_num, line.len()))?;
 
     // Value is everything after the colon
     let value = &line[colon_pos + 1..];
@@ -195,11 +262,10 @@ fn parse_parameter(
                 return Ok((Parameter::with_values(param_name, values), true));
             }
             Some(&(i, c)) => {
-                return Err(ParseError::new(
-                    ParseErrorKind::InvalidParameter,
-                    line_num,
-                    i + 1,
-                ).with_context(format!("unexpected character '{c}'")));
+                return Err(
+                    ParseError::new(ParseErrorKind::InvalidParameter, line_num, i + 1)
+                        .with_context(format!("unexpected character '{c}'")),
+                );
             }
             None => {
                 return Err(ParseError::new(

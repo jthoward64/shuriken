@@ -42,13 +42,64 @@ pub fn unfold(input: &str) -> String {
     result
 }
 
-/// Splits unfolded input into logical lines.
+/// Unfolds lines while preserving a single space at fold boundaries.
 #[must_use]
-pub fn split_lines(input: &str) -> Vec<&str> {
-    input
-        .lines()
-        .filter(|line| !line.is_empty())
-        .collect()
+pub fn unfold_with_space(input: &str) -> String {
+    let mut result = String::with_capacity(input.len());
+    let mut chars = input.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        if c == '\r' {
+            if chars.peek() == Some(&'\n') {
+                chars.next();
+                if matches!(chars.peek(), Some(' ' | '\t')) {
+                    chars.next();
+                    result.push(' ');
+                } else {
+                    result.push('\n');
+                }
+            } else {
+                result.push(c);
+            }
+        } else if c == '\n' {
+            if matches!(chars.peek(), Some(' ' | '\t')) {
+                chars.next();
+                result.push(' ');
+            } else {
+                result.push('\n');
+            }
+        } else {
+            result.push(c);
+        }
+    }
+
+    result
+}
+
+/// Splits unfolded input into logical lines, merging folded continuations.
+#[must_use]
+pub fn split_lines(input: &str) -> Vec<String> {
+    let mut lines: Vec<String> = Vec::new();
+
+    for line in input.lines() {
+        if line.is_empty() {
+            continue;
+        }
+
+        if line.starts_with([' ', '\t']) {
+            let continuation = line.trim_start_matches([' ', '\t']);
+            if let Some(prev) = lines.last_mut() {
+                prev.push(' ');
+                prev.push_str(continuation);
+            } else {
+                lines.push(continuation.to_string());
+            }
+        } else {
+            lines.push(line.to_string());
+        }
+    }
+
+    lines
 }
 
 /// A parsed content line before value interpretation.
@@ -316,7 +367,8 @@ mod tests {
 
     #[test]
     fn parse_quoted_param() {
-        let line = parse_content_line("ADR;LABEL=\"123 Main St\\nAnytown\":;;123 Main St", 1).unwrap();
+        let line =
+            parse_content_line("ADR;LABEL=\"123 Main St\\nAnytown\":;;123 Main St", 1).unwrap();
         assert_eq!(line.params.len(), 1);
     }
 

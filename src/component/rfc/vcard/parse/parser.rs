@@ -1,14 +1,12 @@
 //! vCard document parser.
 
 use super::error::{ParseError, ParseErrorKind, ParseResult};
-use super::lexer::{parse_content_line, split_lines, unfold, ContentLine};
+use super::lexer::{ContentLine, parse_content_line, split_lines, unfold_with_space};
 use super::values::{
     parse_address, parse_client_pid_map, parse_date_and_or_time, parse_gender, parse_organization,
     parse_structured_name, unescape_text,
 };
-use crate::component::rfc::vcard::core::{
-    VCard, VCardProperty, VCardValue, VCardVersion,
-};
+use crate::component::rfc::vcard::core::{VCard, VCardProperty, VCardValue, VCardVersion};
 
 /// Parses a vCard document into one or more vCards.
 ///
@@ -19,9 +17,9 @@ use crate::component::rfc::vcard::core::{
 /// Returns a parse error if the document is malformed or contains
 /// invalid property values.
 pub fn parse(input: &str) -> ParseResult<Vec<VCard>> {
-    let unfolded = unfold(input);
+    let unfolded = unfold_with_space(input);
     let lines = split_lines(&unfolded);
-    let mut parser = Parser::new(&lines);
+    let mut parser = Parser::new(lines);
     parser.parse_document()
 }
 
@@ -43,13 +41,13 @@ pub fn parse_single(input: &str) -> ParseResult<VCard> {
     })
 }
 
-struct Parser<'a> {
-    lines: &'a [&'a str],
+struct Parser {
+    lines: Vec<String>,
     pos: usize,
 }
 
-impl<'a> Parser<'a> {
-    fn new(lines: &'a [&'a str]) -> Self {
+impl Parser {
+    fn new(lines: Vec<String>) -> Self {
         Self { lines, pos: 0 }
     }
 
@@ -61,7 +59,7 @@ impl<'a> Parser<'a> {
         let mut cards = Vec::new();
 
         while self.pos < self.lines.len() {
-            let line = self.lines[self.pos];
+            let line = &self.lines[self.pos];
 
             // Skip empty lines
             if line.trim().is_empty() {
@@ -89,7 +87,7 @@ impl<'a> Parser<'a> {
         let start_line = self.current_line();
 
         while self.pos < self.lines.len() {
-            let line = self.lines[self.pos];
+            let line = &self.lines[self.pos];
             let line_num = self.current_line();
             self.pos += 1;
 
@@ -100,7 +98,10 @@ impl<'a> Parser<'a> {
 
             // Check for END:VCARD
             if line.eq_ignore_ascii_case("END:VCARD") {
-                return Ok(VCard { version, properties });
+                return Ok(VCard {
+                    version,
+                    properties,
+                });
             }
 
             // Parse content line

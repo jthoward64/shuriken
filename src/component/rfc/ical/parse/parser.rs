@@ -3,7 +3,7 @@
 //! Parses complete iCalendar documents into typed structures.
 
 use super::error::{ParseError, ParseErrorKind, ParseResult};
-use super::lexer::{parse_content_line, split_lines, unfold};
+use super::lexer::{parse_content_line, split_lines};
 use super::values::{
     parse_boolean, parse_date, parse_datetime, parse_duration, parse_float, parse_integer,
     parse_period, parse_rrule, parse_utc_offset, unescape_text,
@@ -18,8 +18,7 @@ use crate::component::rfc::ical::core::{
 ///
 /// Returns an error if the input is not valid iCalendar.
 pub fn parse(input: &str) -> ParseResult<ICalendar> {
-    let unfolded = unfold(input);
-    let lines: Vec<(usize, &str)> = split_lines(&unfolded).collect();
+    let lines = split_lines(input);
 
     if lines.is_empty() {
         return Err(ParseError::new(ParseErrorKind::MissingBegin, 1, 1));
@@ -27,7 +26,10 @@ pub fn parse(input: &str) -> ParseResult<ICalendar> {
 
     let content_lines: Vec<(usize, ContentLine)> = lines
         .into_iter()
-        .map(|(line_num, line)| parse_content_line(line, line_num).map(|cl| (line_num, cl)))
+        .map(|(line_num, line)| {
+            let parsed = parse_content_line(&line, line_num);
+            parsed.map(|cl| (line_num, cl))
+        })
         .collect::<ParseResult<_>>()?;
 
     let mut iter = content_lines.into_iter().peekable();
@@ -59,7 +61,9 @@ fn parse_component(
     }
 
     let component_name = begin_line.raw_value.to_ascii_uppercase();
-    if let Some(expected) = expected_name && component_name != expected {
+    if let Some(expected) = expected_name
+        && component_name != expected
+    {
         return Err(
             ParseError::new(ParseErrorKind::MismatchedComponent, line_num, 1)
                 .with_context(format!("expected {expected}, got {component_name}")),

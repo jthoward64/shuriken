@@ -134,7 +134,7 @@ impl fmt::Display for Parameter {
 
 /// Checks if a parameter value needs quoting.
 fn needs_quoting(s: &str) -> bool {
-    s.chars().any(|c| matches!(c, ':' | ';' | ',' | '"'))
+    s.chars().any(|c| matches!(c, ';' | ',' | '"'))
 }
 
 /// RELATED parameter values for TRIGGER (RFC 5545 §3.2.14).
