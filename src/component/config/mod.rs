@@ -92,3 +92,6 @@ pub fn load_config() -> Result<()> {
 pub fn get_config() -> &'static Settings {
     CONFIG.get().expect("Configuration not loaded")
 }
+
+#[cfg(test)]
+mod tests;

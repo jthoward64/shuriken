@@ -126,14 +126,3 @@ impl fmt::Display for ParseErrorKind {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn error_display() {
-        let err = ParseError::missing_element("prop");
-        assert!(err.to_string().contains("missing element"));
-        assert!(err.to_string().contains("prop"));
-    }
-}

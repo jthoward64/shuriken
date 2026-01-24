@@ -4,9 +4,12 @@
 //! using the `quick-xml` crate.
 
 mod error;
-mod propfind;
+pub mod propfind;
 mod proppatch;
 mod report;
+
+#[cfg(test)]
+mod error_tests;
 
 pub use error::{ParseError, ParseResult};
 pub use propfind::parse_propfind;

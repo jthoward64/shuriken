@@ -104,20 +104,3 @@ impl fmt::Display for ParseErrorKind {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn error_display() {
-        let err = ParseError::new(ParseErrorKind::InvalidValue, 5, "bad date format");
-        assert_eq!(err.to_string(), "line 5: invalid value: bad date format");
-    }
-
-    #[test]
-    fn unexpected_error() {
-        let err = ParseError::unexpected(10, "BEGIN", "END");
-        assert!(err.message.contains("expected BEGIN"));
-        assert!(err.message.contains("found END"));
-    }
-}
