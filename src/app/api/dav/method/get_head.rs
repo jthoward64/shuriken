@@ -162,13 +162,12 @@ fn set_response_headers_and_body(
 /// Returns true if the request should be served with 304 Not Modified.
 #[must_use]
 fn check_if_none_match(req: &Request, instance_etag: &str) -> bool {
-    if let Some(if_none_match) = req.headers().get("If-None-Match") {
-        if let Ok(value) = if_none_match.to_str() {
-            // Check if any of the ETags match
-            return value.split(',')
-                .map(str::trim)
-                .any(|etag| etag == instance_etag || etag == "*");
-        }
+    if let Some(if_none_match) = req.headers().get("If-None-Match")
+        && let Ok(value) = if_none_match.to_str() {
+        // Check if any of the ETags match
+        return value.split(',')
+            .map(str::trim)
+            .any(|etag| etag == instance_etag || etag == "*");
     }
     false
 }
