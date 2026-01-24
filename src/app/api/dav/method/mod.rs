@@ -7,4 +7,8 @@ pub mod propfind;
 pub mod report;
 
 #[cfg(test)]
+mod delete_tests;
+#[cfg(test)]
+mod get_head_tests;
+#[cfg(test)]
 mod options_tests;

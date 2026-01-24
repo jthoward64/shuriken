@@ -2,7 +2,7 @@
 
 use salvo::http::StatusCode;
 use salvo::prelude::*;
-use salvo::test::{ResponseExt, TestClient};
+use salvo::test::TestClient;
 
 use super::options::{options, options_collection, options_item};
 
@@ -13,7 +13,7 @@ async fn options_returns_ok() {
     let router = Router::new().options(options);
     let service = Service::new(router);
     
-    let mut resp = TestClient::options("http://127.0.0.1:5800/")
+    let resp = TestClient::options("http://127.0.0.1:5800/")
         .send(&service)
         .await;
     
@@ -27,7 +27,7 @@ async fn options_sets_allow_header() {
     let router = Router::new().options(options);
     let service = Service::new(router);
     
-    let mut resp = TestClient::options("http://127.0.0.1:5800/")
+    let resp = TestClient::options("http://127.0.0.1:5800/")
         .send(&service)
         .await;
     
@@ -52,7 +52,7 @@ async fn options_sets_dav_header() {
     let router = Router::new().options(options);
     let service = Service::new(router);
     
-    let mut resp = TestClient::options("http://127.0.0.1:5800/")
+    let resp = TestClient::options("http://127.0.0.1:5800/")
         .send(&service)
         .await;
     
@@ -75,7 +75,7 @@ async fn options_collection_includes_mkcol_methods() {
     let router = Router::new().options(options_collection);
     let service = Service::new(router);
     
-    let mut resp = TestClient::options("http://127.0.0.1:5800/")
+    let resp = TestClient::options("http://127.0.0.1:5800/")
         .send(&service)
         .await;
     
@@ -96,7 +96,7 @@ async fn options_item_excludes_collection_methods() {
     let router = Router::new().options(options_item);
     let service = Service::new(router);
     
-    let mut resp = TestClient::options("http://127.0.0.1:5800/")
+    let resp = TestClient::options("http://127.0.0.1:5800/")
         .send(&service)
         .await;
     
