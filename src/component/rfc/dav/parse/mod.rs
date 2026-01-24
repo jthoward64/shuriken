@@ -4,7 +4,7 @@
 //! using the `quick-xml` crate.
 
 mod error;
-mod propfind;
+pub mod propfind;
 mod proppatch;
 mod report;
 
