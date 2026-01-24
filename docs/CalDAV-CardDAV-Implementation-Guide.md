@@ -3426,6 +3426,12 @@ Note: Some servers include extra, non-standard elements for debugging in error b
 
 ## 16. Implementation Phases
 
+### Phase 0: Database Schema and Architecture
+
+Create database migrations to bring the database up to the level needed for full implementation.
+
+Build out the skeleton file structure and traits that will be used going forward.
+
 ### Phase 1: Core Parsing & Serialization
 
 **Goal**: Round-trip iCalendar and vCard data without loss.
