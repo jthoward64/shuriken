@@ -9,54 +9,41 @@ use crate::component::model::dav::entity::{DavEntity, NewDavEntity};
 use crate::component::model::dav::parameter::{DavParameter, NewDavParameter};
 use crate::component::model::dav::property::{DavProperty, NewDavProperty};
 
-type BoxedQuery<'a, T> = dav_entity::BoxedQuery<'a, diesel::pg::Pg, T>;
-
 /// ## Summary
 /// Returns a query to select all entities.
-#[diesel::dsl::auto_type]
 #[must_use]
-pub fn all() -> BoxedQuery<'static, DavEntity> {
-    dav_entity::table
-        .select(DavEntity::as_select())
-        .into_boxed()
+pub fn all() -> dav_entity::BoxedQuery<'static, diesel::pg::Pg> {
+    dav_entity::table.into_boxed()
 }
 
 /// ## Summary
 /// Returns a query to find an entity by ID.
-#[diesel::dsl::auto_type]
 #[must_use]
-pub fn by_id(id: uuid::Uuid) -> BoxedQuery<'static, DavEntity> {
-    all().filter(dav_entity::id.eq(id)).into_boxed()
+pub fn by_id(id: uuid::Uuid) -> dav_entity::BoxedQuery<'static, diesel::pg::Pg> {
+    all().filter(dav_entity::id.eq(id))
 }
 
 /// ## Summary
 /// Returns a query to find entities by logical UID.
 #[must_use]
-pub fn by_logical_uid(uid: &str) -> dav_entity::BoxedQuery<'_, diesel::pg::Pg, DavEntity> {
+pub fn by_logical_uid(uid: &str) -> dav_entity::BoxedQuery<'_, diesel::pg::Pg> {
     all()
         .filter(dav_entity::logical_uid.eq(uid))
-        .into_boxed()
 }
 
 /// ## Summary
 /// Returns a query to find non-deleted entities.
-#[diesel::dsl::auto_type]
 #[must_use]
-pub fn not_deleted() -> BoxedQuery<'static, DavEntity> {
+pub fn not_deleted() -> dav_entity::BoxedQuery<'static, diesel::pg::Pg> {
     all()
         .filter(dav_entity::deleted_at.is_null())
-        .into_boxed()
 }
 
 /// ## Summary
 /// Returns a query to find components for an entity.
-#[diesel::dsl::auto_type]
 #[must_use]
-pub fn components_for_entity(
-    entity_id: uuid::Uuid,
-) -> dav_component::BoxedQuery<'static, diesel::pg::Pg, DavComponent> {
+pub fn components_for_entity(entity_id: uuid::Uuid) -> dav_component::BoxedQuery<'static, diesel::pg::Pg> {
     dav_component::table
-        .select(DavComponent::as_select())
         .filter(dav_component::entity_id.eq(entity_id))
         .filter(dav_component::deleted_at.is_null())
         .order(dav_component::ordinal.asc())
@@ -65,13 +52,9 @@ pub fn components_for_entity(
 
 /// ## Summary
 /// Returns a query to find properties for a component.
-#[diesel::dsl::auto_type]
 #[must_use]
-pub fn properties_for_component(
-    component_id: uuid::Uuid,
-) -> dav_property::BoxedQuery<'static, diesel::pg::Pg, DavProperty> {
+pub fn properties_for_component(component_id: uuid::Uuid) -> dav_property::BoxedQuery<'static, diesel::pg::Pg> {
     dav_property::table
-        .select(DavProperty::as_select())
         .filter(dav_property::component_id.eq(component_id))
         .filter(dav_property::deleted_at.is_null())
         .order(dav_property::ordinal.asc())
@@ -80,13 +63,9 @@ pub fn properties_for_component(
 
 /// ## Summary
 /// Returns a query to find parameters for a property.
-#[diesel::dsl::auto_type]
 #[must_use]
-pub fn parameters_for_property(
-    property_id: uuid::Uuid,
-) -> dav_parameter::BoxedQuery<'static, diesel::pg::Pg, DavParameter> {
+pub fn parameters_for_property(property_id: uuid::Uuid) -> dav_parameter::BoxedQuery<'static, diesel::pg::Pg> {
     dav_parameter::table
-        .select(DavParameter::as_select())
         .filter(dav_parameter::property_id.eq(property_id))
         .filter(dav_parameter::deleted_at.is_null())
         .order(dav_parameter::ordinal.asc())
@@ -238,7 +217,7 @@ pub async fn get_entity_with_tree(
     )>,
 > {
     let entity: Option<DavEntity> = by_id(entity_id)
-        .get_result::<DavEntity>(conn)
+        .first(conn)
         .await
         .optional()?;
 
@@ -247,19 +226,19 @@ pub async fn get_entity_with_tree(
     };
 
     let components: Vec<DavComponent> = components_for_entity(entity_id)
-        .get_results::<DavComponent>(conn)
+        .load(conn)
         .await?;
 
     let mut component_tree = Vec::new();
     for component in components {
         let properties: Vec<DavProperty> = properties_for_component(component.id)
-            .get_results::<DavProperty>(conn)
+            .load(conn)
             .await?;
 
         let mut property_tree = Vec::new();
         for property in properties {
             let parameters: Vec<DavParameter> = parameters_for_property(property.id)
-                .get_results::<DavParameter>(conn)
+                .load(conn)
                 .await?;
             property_tree.push((property, parameters));
         }

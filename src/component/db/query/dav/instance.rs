@@ -1,4 +1,4 @@
-//! Query functions for DAV instances with ETag generation and tombstone support.
+//! Query functions for DAV instances with `ETag` generation and tombstone support.
 
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
@@ -8,12 +8,10 @@ use crate::component::db::schema::{dav_instance, dav_tombstone};
 use crate::component::model::dav::instance::{DavInstance, NewDavInstance};
 use crate::component::model::dav::tombstone::NewDavTombstone;
 
-type BoxedQuery<'a, T> = dav_instance::BoxedQuery<'a, diesel::pg::Pg, T>;
-
 /// ## Summary
-/// Generates an ETag from canonical bytes using SHA256.
+/// Generates an `ETag` from canonical bytes using SHA256.
 ///
-/// The ETag is the hex-encoded SHA256 hash of the content, wrapped in quotes.
+/// The `ETag` is the hex-encoded SHA256 hash of the content, wrapped in quotes.
 #[must_use]
 pub fn generate_etag(canonical_bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
@@ -24,30 +22,24 @@ pub fn generate_etag(canonical_bytes: &[u8]) -> String {
 
 /// ## Summary
 /// Returns a query to select all instances.
-#[diesel::dsl::auto_type]
 #[must_use]
-pub fn all() -> BoxedQuery<'static, DavInstance> {
-    dav_instance::table
-        .select(DavInstance::as_select())
-        .into_boxed()
+pub fn all() -> dav_instance::BoxedQuery<'static, diesel::pg::Pg> {
+    dav_instance::table.into_boxed()
 }
 
 /// ## Summary
 /// Returns a query to find an instance by ID.
-#[diesel::dsl::auto_type]
 #[must_use]
-pub fn by_id(id: uuid::Uuid) -> BoxedQuery<'static, DavInstance> {
-    all().filter(dav_instance::id.eq(id)).into_boxed()
+pub fn by_id(id: uuid::Uuid) -> dav_instance::BoxedQuery<'static, diesel::pg::Pg> {
+    all().filter(dav_instance::id.eq(id))
 }
 
 /// ## Summary
 /// Returns a query to find instances in a collection.
-#[diesel::dsl::auto_type]
 #[must_use]
-pub fn by_collection(collection_id: uuid::Uuid) -> BoxedQuery<'static, DavInstance> {
+pub fn by_collection(collection_id: uuid::Uuid) -> dav_instance::BoxedQuery<'static, diesel::pg::Pg> {
     all()
         .filter(dav_instance::collection_id.eq(collection_id))
-        .into_boxed()
 }
 
 /// ## Summary
@@ -56,31 +48,26 @@ pub fn by_collection(collection_id: uuid::Uuid) -> BoxedQuery<'static, DavInstan
 pub fn by_collection_and_uri(
     collection_id: uuid::Uuid,
     uri: &str,
-) -> dav_instance::BoxedQuery<'_, diesel::pg::Pg, DavInstance> {
+) -> dav_instance::BoxedQuery<'_, diesel::pg::Pg> {
     by_collection(collection_id)
         .filter(dav_instance::uri.eq(uri))
         .filter(dav_instance::deleted_at.is_null())
-        .into_boxed()
 }
 
 /// ## Summary
 /// Returns a query to find non-deleted instances in a collection.
-#[diesel::dsl::auto_type]
 #[must_use]
-pub fn by_collection_not_deleted(collection_id: uuid::Uuid) -> BoxedQuery<'static, DavInstance> {
+pub fn by_collection_not_deleted(collection_id: uuid::Uuid) -> dav_instance::BoxedQuery<'static, diesel::pg::Pg> {
     by_collection(collection_id)
         .filter(dav_instance::deleted_at.is_null())
-        .into_boxed()
 }
 
 /// ## Summary
 /// Returns a query to find instances by entity ID.
-#[diesel::dsl::auto_type]
 #[must_use]
-pub fn by_entity(entity_id: uuid::Uuid) -> BoxedQuery<'static, DavInstance> {
+pub fn by_entity(entity_id: uuid::Uuid) -> dav_instance::BoxedQuery<'static, diesel::pg::Pg> {
     all()
         .filter(dav_instance::entity_id.eq(entity_id))
-        .into_boxed()
 }
 
 /// ## Summary
@@ -100,7 +87,7 @@ pub async fn create_instance(
 }
 
 /// ## Summary
-/// Updates an instance's ETag, sync revision, and last modified time.
+/// Updates an instance's `ETag`, sync revision, and last modified time.
 ///
 /// ## Errors
 /// Returns a database error if the update fails.
@@ -171,8 +158,9 @@ pub async fn delete_instance_with_tombstone(
     synctoken: i64,
 ) -> diesel::QueryResult<uuid::Uuid> {
     // Get the instance first
-    let instance = by_id(instance_id)
-        .get_result::<DavInstance>(conn)
+    let instance: DavInstance = by_id(instance_id)
+        .select(DavInstance::as_select())
+        .first(conn)
         .await?;
 
     // Soft-delete the instance

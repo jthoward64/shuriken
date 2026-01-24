@@ -20,7 +20,7 @@ use crate::component::rfc::vcard::core::{VCard, VCardParameter, VCardProperty, V
 /// Returns an error if the mapping fails (e.g., unsupported value types).
 pub fn icalendar_to_db_models<'a>(
     ical: &'a ICalendar,
-    entity_type: &'a str,
+    entity_type: &str,
 ) -> anyhow::Result<(
     NewDavEntity<'static>,
     Vec<NewDavComponent<'a>>,
@@ -28,11 +28,14 @@ pub fn icalendar_to_db_models<'a>(
     Vec<NewDavParameter<'static>>,
 )> {
     // Extract logical UID from top-level component - leak to get 'static lifetime
-    let logical_uid_opt = extract_ical_uid(&ical.component)
+    let logical_uid_opt = extract_ical_uid(&ical.root)
         .map(|s| Box::leak(s.into_boxed_str()) as &'static str);
 
+    // Leak entity_type to get 'static lifetime
+    let entity_type_static = Box::leak(entity_type.to_string().into_boxed_str()) as &'static str;
+
     let entity = NewDavEntity {
-        entity_type,
+        entity_type: entity_type_static,
         logical_uid: logical_uid_opt,
     };
 
@@ -44,7 +47,7 @@ pub fn icalendar_to_db_models<'a>(
     let entity_id = uuid::Uuid::nil();
 
     map_ical_component_recursive(
-        &ical.component,
+        &ical.root,
         entity_id,
         None,
         0,
@@ -63,10 +66,9 @@ pub fn icalendar_to_db_models<'a>(
 ///
 /// ## Errors
 /// Returns an error if the mapping fails.
-#[expect(clippy::needless_pass_by_value)]
 pub fn vcard_to_db_models<'a>(
     vcard: &'a VCard,
-    entity_type: &'a str,
+    entity_type: &str,
 ) -> anyhow::Result<(
     NewDavEntity<'static>,
     Vec<NewDavComponent<'a>>,
@@ -76,8 +78,11 @@ pub fn vcard_to_db_models<'a>(
     let logical_uid_opt = extract_vcard_uid(vcard)
         .map(|s| Box::leak(s.into_boxed_str()) as &'static str);
 
+    // Leak entity_type to get 'static lifetime
+    let entity_type_static = Box::leak(entity_type.to_string().into_boxed_str()) as &'static str;
+
     let entity = NewDavEntity {
-        entity_type,
+        entity_type: entity_type_static,
         logical_uid: logical_uid_opt,
     };
 
@@ -360,7 +365,7 @@ fn extract_vcard_value<'a>(
 }
 
 /// ## Summary
-/// Converts an iCalendar DateTime to UTC.
+/// Converts an iCalendar `DateTime` to UTC.
 fn datetime_to_utc(
     dt: &crate::component::rfc::ical::core::DateTime,
 ) -> anyhow::Result<chrono::DateTime<chrono::Utc>> {
