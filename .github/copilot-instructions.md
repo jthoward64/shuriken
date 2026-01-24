@@ -377,7 +377,13 @@ pub struct AuthUser {
 **Authentication & Authorization** (`src/component/auth/`):
 - `casbin.rs` - Casbin enforcer integration
 - `authenticate.rs` - Authentication logic
+- `casbin_model.conf` - ReBAC authorization model
 - Uses principal-based ACL system for unified identity management
+- Flat group model (no nested groups)
+- Enforcement expands user to `{user} ∪ groups(user) ∪ {public}` for permission checks
+- Supports direct sharing to users, groups, and "public"
+- Type-based permissions per resource type (calendar, calendar_event, addressbook, vcard)
+- Roles: freebusy, reader, writer, owner
 
 ### Implementation Guidelines
 
