@@ -10,3 +10,6 @@ pub mod vcard;
 // Re-export main API
 pub use ical::icalendar_to_db_models;
 pub use vcard::vcard_to_db_models;
+
+#[cfg(test)]
+mod tests;
