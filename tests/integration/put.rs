@@ -3,7 +3,7 @@
 //!
 //! Verifies resource creation/update, precondition handling, and side effects.
 
-#[allow(unused_imports)]
+#[expect(unused_imports)]
 use super::helpers::*;
 
 /// ## Summary

@@ -97,7 +97,7 @@ pub async fn put(req: &mut Request, res: &mut Response) {
 ///
 /// ## Errors
 /// Returns `PutError` for validation failures, conflicts, or database errors.
-#[expect(clippy::unused_async, dead_code)]
+#[expect(clippy::unused_async)]
 async fn perform_put(
     _conn: &mut connection::DbConnection<'_>,
     _path: &str,

@@ -38,7 +38,7 @@ fn error_invalid_value() {
 #[test]
 fn error_display() {
     let err = ParseError::new(ParseErrorKind::InvalidDateTime, 12, "bad date");
-    let displayed = format!("{}", err);
+    let displayed = format!("{err}");
     assert!(displayed.contains("line 12"));
     assert!(displayed.contains("invalid date/time"));
     assert!(displayed.contains("bad date"));

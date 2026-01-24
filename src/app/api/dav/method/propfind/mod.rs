@@ -83,10 +83,10 @@ pub async fn propfind(req: &mut Request, res: &mut Response) {
     
     // Set response
     res.status_code(StatusCode::MULTI_STATUS);
-    let _ = res.add_header(
+    res.add_header(
         "Content-Type",
         salvo::http::HeaderValue::from_static("application/xml; charset=utf-8"),
         true,
     );
-    let _ = res.write_body(xml);
+    res.write_body(xml);
 }

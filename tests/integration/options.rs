@@ -3,7 +3,7 @@
 //!
 //! Verifies that OPTIONS returns correct Allow and DAV headers.
 
-#[allow(unused_imports)]
+#[expect(unused_imports)]
 use super::helpers::*;
 
 /// ## Summary

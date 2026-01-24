@@ -3,7 +3,7 @@
 //!
 //! Verifies resource deletion, tombstone creation, and idempotency.
 
-#[allow(unused_imports)]
+#[expect(unused_imports)]
 use super::helpers::*;
 
 /// ## Summary

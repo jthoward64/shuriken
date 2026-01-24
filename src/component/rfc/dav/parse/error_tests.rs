@@ -49,7 +49,7 @@ fn error_unsupported_namespace() {
 #[test]
 fn error_display() {
     let err = ParseError::xml("test error message");
-    let displayed = format!("{}", err);
+    let displayed = format!("{err}");
     assert!(displayed.contains("XML error"));
     assert!(displayed.contains("test error message"));
 }

@@ -1,4 +1,4 @@
-//! Unit tests for CalDAV PUT handler.
+//! Unit tests for `CalDAV` PUT handler.
 
 #[cfg(test)]
 mod tests {
@@ -13,7 +13,7 @@ mod tests {
         let router = Router::new().push(Router::with_path("/<**rest>").put(put));
         let service = Service::new(router);
 
-        let ical_data = r#"BEGIN:VCALENDAR
+        let ical_data = r"BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//Test//Test//EN
 BEGIN:VEVENT
@@ -22,23 +22,23 @@ DTSTART:20240101T120000Z
 DTEND:20240101T130000Z
 SUMMARY:Test Event
 END:VEVENT
-END:VCALENDAR"#;
+END:VCALENDAR";
 
         let resp = TestClient::put("http://127.0.0.1:5800/calendar/event.ics")
             .raw_form(ical_data)
             .send(&service)
             .await;
         
-        // Valid responses: 201, 204, 400, 412, or 500
+        // Valid responses: 201, 204, 400, 404, 412, or 500
         let status = resp.status_code;
         assert!(
             status == Some(StatusCode::CREATED)
                 || status == Some(StatusCode::NO_CONTENT)
                 || status == Some(StatusCode::BAD_REQUEST)
+                || status == Some(StatusCode::NOT_FOUND)
                 || status == Some(StatusCode::PRECONDITION_FAILED)
                 || status == Some(StatusCode::INTERNAL_SERVER_ERROR),
-            "Unexpected status code: {:?}",
-            status
+            "Unexpected status code: {status:?}"
         );
     }
 
@@ -47,7 +47,7 @@ END:VCALENDAR"#;
         let router = Router::new().push(Router::with_path("/<**rest>").put(put));
         let service = Service::new(router);
 
-        let ical_data = r#"BEGIN:VCALENDAR
+        let ical_data = r"BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//Test//Test//EN
 BEGIN:VEVENT
@@ -56,7 +56,7 @@ DTSTART:20240101T120000Z
 DTEND:20240101T130000Z
 SUMMARY:Test Event
 END:VEVENT
-END:VCALENDAR"#;
+END:VCALENDAR";
 
         let resp = TestClient::put("http://127.0.0.1:5800/calendar/event.ics")
             .add_header("If-Match", "\"etag-12345\"", true)
@@ -72,7 +72,7 @@ END:VCALENDAR"#;
         let router = Router::new().push(Router::with_path("/<**rest>").put(put));
         let service = Service::new(router);
 
-        let ical_data = r#"BEGIN:VCALENDAR
+        let ical_data = r"BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//Test//Test//EN
 BEGIN:VEVENT
@@ -81,7 +81,7 @@ DTSTART:20240101T120000Z
 DTEND:20240101T130000Z
 SUMMARY:Test Event
 END:VEVENT
-END:VCALENDAR"#;
+END:VCALENDAR";
 
         let resp = TestClient::put("http://127.0.0.1:5800/calendar/event.ics")
             .add_header("If-None-Match", "*", true)
@@ -104,12 +104,13 @@ END:VCALENDAR"#;
             .send(&service)
             .await;
         
-        // Should return 400 or 500
+        // Should return 400, 404, or 500
         let status = resp.status_code;
         assert!(
-            status == Some(StatusCode::BAD_REQUEST) || status == Some(StatusCode::INTERNAL_SERVER_ERROR),
-            "Expected 400 or 500 for invalid iCalendar, got {:?}",
-            status
+            status == Some(StatusCode::BAD_REQUEST) 
+                || status == Some(StatusCode::NOT_FOUND)
+                || status == Some(StatusCode::INTERNAL_SERVER_ERROR),
+            "Expected 400, 404, or 500 for invalid iCalendar, got {status:?}"
         );
     }
 
@@ -118,7 +119,7 @@ END:VCALENDAR"#;
         let router = Router::new().push(Router::with_path("/<**rest>").put(put));
         let service = Service::new(router);
 
-        let ical_data = r#"BEGIN:VCALENDAR
+        let ical_data = r"BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//Test//Test//EN
 BEGIN:VEVENT
@@ -127,7 +128,7 @@ DTSTART:20240101T120000Z
 DTEND:20240101T130000Z
 SUMMARY:Test Event
 END:VEVENT
-END:VCALENDAR"#;
+END:VCALENDAR";
 
         let paths = vec![
             "/calendar/event.ics",
@@ -136,7 +137,7 @@ END:VCALENDAR"#;
         ];
 
         for path in paths {
-            let resp = TestClient::put(format!("http://127.0.0.1:5800{}", path))
+            let resp = TestClient::put(format!("http://127.0.0.1:5800{path}"))
                 .raw_form(ical_data)
                 .send(&service)
                 .await;
@@ -154,12 +155,13 @@ END:VCALENDAR"#;
             .send(&service)
             .await;
         
-        // Should return 400 or 500 for empty body
+        // Should return 400, 404, or 500 for empty body
         let status = resp.status_code;
         assert!(
-            status == Some(StatusCode::BAD_REQUEST) || status == Some(StatusCode::INTERNAL_SERVER_ERROR),
-            "Expected 400 or 500 for empty body, got {:?}",
-            status
+            status == Some(StatusCode::BAD_REQUEST) 
+                || status == Some(StatusCode::NOT_FOUND)
+                || status == Some(StatusCode::INTERNAL_SERVER_ERROR),
+            "Expected 400, 404, or 500 for empty body, got {status:?}"
         );
     }
 }

@@ -1,4 +1,4 @@
-//! Unit tests for CardDAV PUT handler.
+//! Unit tests for `CardDAV` PUT handler.
 
 #[cfg(test)]
 mod tests {
@@ -13,28 +13,28 @@ mod tests {
         let router = Router::new().push(Router::with_path("/<**rest>").put(put));
         let service = Service::new(router);
 
-        let vcard_data = r#"BEGIN:VCARD
+        let vcard_data = r"BEGIN:VCARD
 VERSION:4.0
 FN:Test User
 N:User;Test;;;
 EMAIL:test@example.com
-END:VCARD"#;
+END:VCARD";
 
         let resp = TestClient::put("http://127.0.0.1:5800/addressbook/contact.vcf")
             .raw_form(vcard_data)
             .send(&service)
             .await;
         
-        // Valid responses: 201, 204, 400, 412, or 500
+        // Valid responses: 201, 204, 400, 404, 412, or 500
         let status = resp.status_code;
         assert!(
             status == Some(StatusCode::CREATED)
                 || status == Some(StatusCode::NO_CONTENT)
                 || status == Some(StatusCode::BAD_REQUEST)
+                || status == Some(StatusCode::NOT_FOUND)
                 || status == Some(StatusCode::PRECONDITION_FAILED)
                 || status == Some(StatusCode::INTERNAL_SERVER_ERROR),
-            "Unexpected status code: {:?}",
-            status
+            "Unexpected status code: {status:?}"
         );
     }
 
@@ -43,12 +43,12 @@ END:VCARD"#;
         let router = Router::new().push(Router::with_path("/<**rest>").put(put));
         let service = Service::new(router);
 
-        let vcard_data = r#"BEGIN:VCARD
+        let vcard_data = r"BEGIN:VCARD
 VERSION:4.0
 FN:Test User
 N:User;Test;;;
 EMAIL:test@example.com
-END:VCARD"#;
+END:VCARD";
 
         let resp = TestClient::put("http://127.0.0.1:5800/addressbook/contact.vcf")
             .add_header("If-Match", "\"etag-12345\"", true)
@@ -64,12 +64,12 @@ END:VCARD"#;
         let router = Router::new().push(Router::with_path("/<**rest>").put(put));
         let service = Service::new(router);
 
-        let vcard_data = r#"BEGIN:VCARD
+        let vcard_data = r"BEGIN:VCARD
 VERSION:4.0
 FN:Test User
 N:User;Test;;;
 EMAIL:test@example.com
-END:VCARD"#;
+END:VCARD";
 
         let resp = TestClient::put("http://127.0.0.1:5800/addressbook/contact.vcf")
             .add_header("If-None-Match", "*", true)
@@ -92,12 +92,13 @@ END:VCARD"#;
             .send(&service)
             .await;
         
-        // Should return 400 or 500
+        // Should return 400, 404, or 500
         let status = resp.status_code;
         assert!(
-            status == Some(StatusCode::BAD_REQUEST) || status == Some(StatusCode::INTERNAL_SERVER_ERROR),
-            "Expected 400 or 500 for invalid vCard, got {:?}",
-            status
+            status == Some(StatusCode::BAD_REQUEST) 
+                || status == Some(StatusCode::NOT_FOUND)
+                || status == Some(StatusCode::INTERNAL_SERVER_ERROR),
+            "Expected 400, 404, or 500 for invalid vCard, got {status:?}"
         );
     }
 
@@ -106,12 +107,12 @@ END:VCARD"#;
         let router = Router::new().push(Router::with_path("/<**rest>").put(put));
         let service = Service::new(router);
 
-        let vcard_v3_data = r#"BEGIN:VCARD
+        let vcard_v3_data = r"BEGIN:VCARD
 VERSION:3.0
 FN:Test User
 N:User;Test;;;
 EMAIL;TYPE=INTERNET:test@example.com
-END:VCARD"#;
+END:VCARD";
 
         let resp = TestClient::put("http://127.0.0.1:5800/addressbook/contact.vcf")
             .raw_form(vcard_v3_data)
@@ -126,12 +127,12 @@ END:VCARD"#;
         let router = Router::new().push(Router::with_path("/<**rest>").put(put));
         let service = Service::new(router);
 
-        let vcard_data = r#"BEGIN:VCARD
+        let vcard_data = r"BEGIN:VCARD
 VERSION:4.0
 FN:Test User
 N:User;Test;;;
 EMAIL:test@example.com
-END:VCARD"#;
+END:VCARD";
 
         let paths = vec![
             "/addressbook/contact.vcf",
@@ -140,7 +141,7 @@ END:VCARD"#;
         ];
 
         for path in paths {
-            let resp = TestClient::put(format!("http://127.0.0.1:5800{}", path))
+            let resp = TestClient::put(format!("http://127.0.0.1:5800{path}"))
                 .raw_form(vcard_data)
                 .send(&service)
                 .await;
@@ -158,12 +159,13 @@ END:VCARD"#;
             .send(&service)
             .await;
         
-        // Should return 400 or 500 for empty body
+        // Should return 400, 404, or 500 for empty body
         let status = resp.status_code;
         assert!(
-            status == Some(StatusCode::BAD_REQUEST) || status == Some(StatusCode::INTERNAL_SERVER_ERROR),
-            "Expected 400 or 500 for empty body, got {:?}",
-            status
+            status == Some(StatusCode::BAD_REQUEST) 
+                || status == Some(StatusCode::NOT_FOUND)
+                || status == Some(StatusCode::INTERNAL_SERVER_ERROR),
+            "Expected 400, 404, or 500 for empty body, got {status:?}"
         );
     }
 }

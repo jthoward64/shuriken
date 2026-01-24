@@ -3,7 +3,7 @@
 //!
 //! Verifies destination rules, href updates, and tombstone generation.
 
-#[allow(unused_imports)]
+#[expect(unused_imports)]
 use super::helpers::*;
 
 /// ## Summary

@@ -8,6 +8,14 @@ use crate::component::rfc::vcard::core::{VCard, VCardParameter, VCardProperty};
 
 use super::extract::{extract_vcard_uid, extract_vcard_value};
 
+/// Type alias for the complex return type of database model mappings.
+type DbModels<'a> = (
+    NewDavEntity<'static>,
+    Vec<NewDavComponent<'a>>,
+    Vec<NewDavProperty<'a>>,
+    Vec<NewDavParameter<'static>>,
+);
+
 /// ## Summary
 /// Maps a vCard to database models.
 ///
@@ -18,12 +26,7 @@ use super::extract::{extract_vcard_uid, extract_vcard_value};
 pub fn vcard_to_db_models<'a>(
     vcard: &'a VCard,
     entity_type: &str,
-) -> anyhow::Result<(
-    NewDavEntity<'static>,
-    Vec<NewDavComponent<'a>>,
-    Vec<NewDavProperty<'a>>,
-    Vec<NewDavParameter<'static>>,
-)> {
+) -> anyhow::Result<DbModels<'a>> {
     let logical_uid_opt = extract_vcard_uid(vcard)
         .map(|s| Box::leak(s.into_boxed_str()) as &'static str);
 

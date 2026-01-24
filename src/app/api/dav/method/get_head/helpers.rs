@@ -8,7 +8,6 @@ use crate::component::db::query::dav::instance;
 use crate::component::model::dav::instance::DavInstance;
 
 /// Shared implementation for GET and HEAD handlers.
-#[expect(dead_code)]
 pub(super) async fn handle_get_or_head(req: &mut Request, res: &mut Response, _is_head: bool) {
     // Extract the resource path from the request
     let _path = req.uri().path();

@@ -76,7 +76,7 @@ async fn test_get_accepts_various_paths() {
     for path in paths {
         let service = salvo::Router::new().push(salvo::Router::with_path("/<**rest>").get(get));
         
-        let content = TestClient::get(format!("http://127.0.0.1:5800{}", path))
+        let content = TestClient::get(format!("http://127.0.0.1:5800{path}"))
             .send(service)
             .await;
         
@@ -98,7 +98,7 @@ async fn test_head_accepts_various_paths() {
     for path in paths {
         let service = salvo::Router::new().push(salvo::Router::with_path("/<**rest>").head(head));
         
-        let content = TestClient::head(format!("http://127.0.0.1:5800{}", path))
+        let content = TestClient::head(format!("http://127.0.0.1:5800{path}"))
             .send(service)
             .await;
         

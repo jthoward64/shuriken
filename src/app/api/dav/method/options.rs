@@ -26,8 +26,8 @@ pub async fn options(_req: &mut Request, res: &mut Response) {
     // addressbook: CardDAV support
     let dav_header = "1, 3, calendar-access, addressbook";
     
-    let _ = res.add_header("Allow", HeaderValue::from_static(allow_methods), true);
-    let _ = res.add_header("DAV", HeaderValue::from_static(dav_header), true);
+    res.add_header("Allow", HeaderValue::from_static(allow_methods), true);
+    res.add_header("DAV", HeaderValue::from_static(dav_header), true);
     res.status_code(salvo::http::StatusCode::OK);
 }
 
@@ -41,8 +41,8 @@ pub async fn options_collection(_req: &mut Request, res: &mut Response) {
     let allow_methods = "OPTIONS, GET, HEAD, PUT, DELETE, PROPFIND, MKCALENDAR, MKCOL";
     let dav_header = "1, 3, calendar-access, addressbook";
     
-    let _ = res.add_header("Allow", HeaderValue::from_static(allow_methods), true);
-    let _ = res.add_header("DAV", HeaderValue::from_static(dav_header), true);
+    res.add_header("Allow", HeaderValue::from_static(allow_methods), true);
+    res.add_header("DAV", HeaderValue::from_static(dav_header), true);
     res.status_code(salvo::http::StatusCode::OK);
 }
 
@@ -56,7 +56,7 @@ pub async fn options_item(_req: &mut Request, res: &mut Response) {
     let allow_methods = "OPTIONS, GET, HEAD, PUT, DELETE";
     let dav_header = "1, 3, calendar-access, addressbook";
     
-    let _ = res.add_header("Allow", HeaderValue::from_static(allow_methods), true);
-    let _ = res.add_header("DAV", HeaderValue::from_static(dav_header), true);
+    res.add_header("Allow", HeaderValue::from_static(allow_methods), true);
+    res.add_header("DAV", HeaderValue::from_static(dav_header), true);
     res.status_code(salvo::http::StatusCode::OK);
 }

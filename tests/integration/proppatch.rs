@@ -3,7 +3,7 @@
 //!
 //! Verifies property modification, protected properties, and partial success handling.
 
-#[allow(unused_imports)]
+#[expect(unused_imports)]
 use super::helpers::*;
 
 /// ## Summary

@@ -3,7 +3,7 @@
 //!
 //! Verifies resource retrieval, ETag handling, and conditional requests.
 
-#[allow(unused_imports)]
+#[expect(unused_imports)]
 use super::helpers::*;
 
 /// ## Summary
