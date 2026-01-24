@@ -1,5 +1,7 @@
 //! OPTIONS method handler for `WebDAV` resources.
 
+#![allow(clippy::expect_used)]
+
 use salvo::http::HeaderValue;
 use salvo::{Request, Response, handler};
 

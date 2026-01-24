@@ -1,6 +1,8 @@
 //! GET and HEAD method handlers for `WebDAV` resources.
 
 #![allow(dead_code)]
+#![allow(clippy::allow_attributes)]
+#![allow(clippy::expect_used)]
 
 use salvo::http::{HeaderValue, StatusCode};
 use salvo::{Request, Response, handler};

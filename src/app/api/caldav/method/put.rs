@@ -1,6 +1,9 @@
 //! PUT method handler for `CalDAV` calendar objects.
 
 #![allow(dead_code)]
+#![allow(clippy::allow_attributes)]
+#![allow(clippy::expect_used)]
+#![allow(clippy::collapsible_if)]
 
 use salvo::http::{HeaderValue, StatusCode};
 use salvo::{Request, Response, handler};

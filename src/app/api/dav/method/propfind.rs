@@ -1,6 +1,9 @@
 //! PROPFIND method handler for `WebDAV` resources.
 
 #![allow(dead_code)]
+#![allow(clippy::allow_attributes)]
+#![allow(clippy::expect_used)]
+#![allow(clippy::else_if_without_else)]
 
 use salvo::http::StatusCode;
 use salvo::{Request, Response, handler};

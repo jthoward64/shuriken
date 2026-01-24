@@ -1,6 +1,7 @@
 //! DELETE method handler for `WebDAV` resources.
 
 #![allow(dead_code)]
+#![allow(clippy::allow_attributes)]
 
 use salvo::http::StatusCode;
 use salvo::{Request, Response, handler};
