@@ -1,16 +1,11 @@
 
 
-
-
-
-
 Internet Engineering Task Force (IETF)                      S. Perreault
 Request for Comments: 6350                                      Viagenie
 Obsoletes: 2425, 2426, 4770                                  August 2011
 Updates: 2739
 Category: Standards Track
 ISSN: 2070-1721
-
 
                        vCard Format Specification
 
@@ -51,14 +46,6 @@ Copyright Notice
    include Simplified BSD License text as described in Section 4.e of
    the Trust Legal Provisions and are provided without warranty as
    described in the Simplified BSD License.
-
-
-
-
-Perreault                    Standards Track                    [Page 1]
-
-RFC 6350                          vCard                      August 2011
-
 
    This document may contain material from IETF Documents or IETF
    Contributions published or made publicly available before November
@@ -107,14 +94,6 @@ Table of Contents
      5.9.  SORT-AS  . . . . . . . . . . . . . . . . . . . . . . . . . 21
      5.10. GEO  . . . . . . . . . . . . . . . . . . . . . . . . . . . 22
      5.11. TZ . . . . . . . . . . . . . . . . . . . . . . . . . . . . 22
-
-
-
-
-Perreault                    Standards Track                    [Page 2]
-
-RFC 6350                          vCard                      August 2011
-
 
    6.  vCard Properties . . . . . . . . . . . . . . . . . . . . . . . 23
      6.1.  General Properties . . . . . . . . . . . . . . . . . . . . 23
@@ -165,13 +144,6 @@ RFC 6350                          vCard                      August 2011
        6.9.2.  CALADRURI  . . . . . . . . . . . . . . . . . . . . . . 50
        6.9.3.  CALURI . . . . . . . . . . . . . . . . . . . . . . . . 50
 
-
-
-Perreault                    Standards Track                    [Page 3]
-
-RFC 6350                          vCard                      August 2011
-
-
      6.10. Extended Properties and Parameters . . . . . . . . . . . . 51
    7.  Synchronization  . . . . . . . . . . . . . . . . . . . . . . . 51
      7.1.  Mechanisms . . . . . . . . . . . . . . . . . . . . . . . . 51
@@ -208,25 +180,6 @@ RFC 6350                          vCard                      August 2011
      A.1.  New Structure  . . . . . . . . . . . . . . . . . . . . . . 73
      A.2.  Removed Features . . . . . . . . . . . . . . . . . . . . . 73
      A.3.  New Properties and Parameters  . . . . . . . . . . . . . . 73
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Perreault                    Standards Track                    [Page 4]
-
-RFC 6350                          vCard                      August 2011
-
 
 1.  Introduction
 
@@ -277,13 +230,6 @@ RFC 6350                          vCard                      August 2011
    (U+0009)).  The folded line MUST contain at least one character.  Any
    sequence of CRLF followed immediately by a single white space
 
-
-
-Perreault                    Standards Track                    [Page 5]
-
-RFC 6350                          vCard                      August 2011
-
-
    character is ignored (removed) when processing the content type.  For
    example, the line:
 
@@ -332,13 +278,6 @@ RFC 6350                          vCard                      August 2011
            "END:VCARD" CRLF
      ; A vCard object MUST include the VERSION and FN properties.
      ; VERSION MUST come immediately after BEGIN:VCARD.
-
-
-
-Perreault                    Standards Track                    [Page 6]
-
-RFC 6350                          vCard                      August 2011
-
 
    contentline = [group "."] name *(";" param) ":" value CRLF
      ; When parsing a content line, folded lines must first
@@ -389,13 +328,6 @@ RFC 6350                          vCard                      August 2011
    VALUE-CHAR = WSP / VCHAR / NON-ASCII
      ; Any textual character
 
-
-
-Perreault                    Standards Track                    [Page 7]
-
-RFC 6350                          vCard                      August 2011
-
-
    A line that begins with a white space character is a continuation of
    the previous line, as described in Section 3.2.  The white space
    character and immediately preceeding CRLF should be discarded when
@@ -440,17 +372,6 @@ RFC 6350                          vCard                      August 2011
    single content line by separating the values with a comma ",".  This
    approach has been taken for several of the content types defined
    below (date, time, integer, float).
-
-
-
-
-
-
-
-Perreault                    Standards Track                    [Page 8]
-
-RFC 6350                          vCard                      August 2011
-
 
 3.4.  Property Value Escaping
 
@@ -501,13 +422,6 @@ RFC 6350                          vCard                      August 2011
            / iana-valuespec
        ; Actual value type depends on property name and VALUE parameter.
 
-
-
-Perreault                    Standards Track                    [Page 9]
-
-RFC 6350                          vCard                      August 2011
-
-
      text = *TEXT-CHAR
 
      TEXT-CHAR = "\\" / "\," / "\n" / WSP / NON-ASCII
@@ -557,13 +471,6 @@ RFC 6350                          vCard                      August 2011
      time-notrunc  = hour [minute [second]] [zone]
      time-complete = hour  minute  second   [zone]
 
-
-
-Perreault                    Standards Track                   [Page 10]
-
-RFC 6350                          vCard                      August 2011
-
-
      time-designator = %x54  ; uppercase "T"
      date-time = date-noreduc  time-designator time-notrunc
      timestamp = date-complete time-designator time-complete
@@ -610,16 +517,6 @@ RFC 6350                          vCard                      August 2011
    demonstrating the \n literal formatted line break technique, the
    CRLF-followed-by-space line folding technique, and the backslash
    escape technique.
-
-
-
-
-
-Perreault                    Standards Track                   [Page 11]
-
-RFC 6350                          vCard                      August 2011
-
-
 4.2.  URI
 
    "uri": The "uri" value type should be used to identify values that
@@ -665,17 +562,6 @@ RFC 6350                          vCard                      August 2011
              --0412
              ---12
 
-
-
-
-
-
-
-Perreault                    Standards Track                   [Page 12]
-
-RFC 6350                          vCard                      August 2011
-
-
    Note the use of YYYY-MM in the second example above.  YYYYMM is
    disallowed to prevent confusion with YYMMDD.  Note also that
    YYYY-MM-DD is disallowed since we are using the basic format instead
@@ -720,17 +606,6 @@ RFC 6350                          vCard                      August 2011
              19961022T140000
              --1022T1400
              ---22T14
-
-
-
-
-
-
-
-Perreault                    Standards Track                   [Page 13]
-
-RFC 6350                          vCard                      August 2011
-
 
 4.3.4.  DATE-AND-OR-TIME
 
@@ -778,16 +653,6 @@ RFC 6350                          vCard                      August 2011
        false
        True
 
-
-
-
-
-
-Perreault                    Standards Track                   [Page 14]
-
-RFC 6350                          vCard                      August 2011
-
-
 4.5.  INTEGER
 
    "integer": The "integer" value type is used to express signed
@@ -834,16 +699,6 @@ RFC 6350                          vCard                      August 2011
    to 59.  Hour and minutes are 2 digits with high-order zeroes required
    to maintain digit count.  The basic format for ISO 8601 UTC offsets
    MUST be used.
-
-
-
-
-
-Perreault                    Standards Track                   [Page 15]
-
-RFC 6350                          vCard                      August 2011
-
-
 4.8.  LANGUAGE-TAG
 
    "language-tag": A single language tag, as defined in [RFC5646].
@@ -890,16 +745,6 @@ RFC 6350                          vCard                      August 2011
    formats is encouraged even if the value parameter is not explicitly
    used.  By defining a standard set of value types and their formats,
    existing parsing and processing code can be leveraged.  The
-
-
-
-
-
-Perreault                    Standards Track                   [Page 16]
-
-RFC 6350                          vCard                      August 2011
-
-
    predefined data type values MUST NOT be repeated in COMMA-separated
    value lists except within the N, NICKNAME, ADR, and CATEGORIES
    properties.
@@ -946,16 +791,6 @@ RFC 6350                          vCard                      August 2011
 
            pref-param = "PREF=" (1*2DIGIT / "100")
                                 ; An integer between 1 and 100.
-
-
-
-
-
-Perreault                    Standards Track                   [Page 17]
-
-RFC 6350                          vCard                      August 2011
-
-
 5.4.  ALTID
 
    The ALTID parameter is used to "tag" property instances as being
@@ -1004,14 +839,6 @@ RFC 6350                          vCard                      August 2011
      TITLE;ALTID=2;LANGUAGE=en:Boss
      (Should probably have the same ALTID value.)
 
-
-
-
-Perreault                    Standards Track                   [Page 18]
-
-RFC 6350                          vCard                      August 2011
-
-
      TITLE;ALTID=1;LANGUAGE=fr:Patron
      TITLE:LANGUAGE=en:Boss
      (Second line should probably have ALTID=1.)
@@ -1058,16 +885,6 @@ RFC 6350                          vCard                      August 2011
    predefined enumeration.  In this document, the following properties
    make use of this parameter: FN, NICKNAME, PHOTO, ADR, TEL, EMAIL,
    IMPP, LANG, TZ, GEO, TITLE, ROLE, LOGO, ORG, RELATED, CATEGORIES,
-
-
-
-
-
-Perreault                    Standards Track                   [Page 19]
-
-RFC 6350                          vCard                      August 2011
-
-
    NOTE, SOUND, URL, KEY, FBURL, CALADRURI, and CALURI.  The TYPE
    parameter MUST NOT be applied on other properties defined in this
    document.
@@ -1117,13 +934,6 @@ RFC 6350                          vCard                      August 2011
    the Gregorian system.  It is the default when the parameter is
    absent.  Additional values may be defined in extension documents and
 
-
-
-Perreault                    Standards Track                   [Page 20]
-
-RFC 6350                          vCard                      August 2011
-
-
    registered with IANA (see Section 10.3.4).  A vCard implementation
    MUST ignore properties with a CALSCALE parameter value that it does
    not understand.
@@ -1170,16 +980,6 @@ RFC 6350                          vCard                      August 2011
 
            FN:Chistine d'Aboville
            N;SORT-AS="Aboville,Christine":d'Aboville;Christine;;
-
-
-
-
-
-Perreault                    Standards Track                   [Page 21]
-
-RFC 6350                          vCard                      August 2011
-
-
            FN:H. James de Mann
            N;SORT-AS="Mann,James":de Mann;Henry,James;;
 
@@ -1220,21 +1020,6 @@ RFC 6350                          vCard                      August 2011
    ABNF:
 
      tz-parameter = "TZ=" (param-value / DQUOTE URI DQUOTE)
-
-
-
-
-
-
-
-
-
-
-
-Perreault                    Standards Track                   [Page 22]
-
-RFC 6350                          vCard                      August 2011
-
 
 6.  vCard Properties
 
@@ -1284,14 +1069,6 @@ RFC 6350                          vCard                      August 2011
    Special notes:  The content entity MUST end with the END type with a
       value of "VCARD".  The value is case-insensitive.
 
-
-
-
-Perreault                    Standards Track                   [Page 23]
-
-RFC 6350                          vCard                      August 2011
-
-
       The END property is used in conjunction with the BEGIN property to
       delimit an entity containing a related set of properties within a
       text/vcard content-type.  This construct can be used instead of or
@@ -1338,16 +1115,6 @@ RFC 6350                          vCard                      August 2011
    Examples:
 
      SOURCE:ldap://ldap.example.com/cn=Babs%20Jensen,%20o=Babsco,%20c=US
-
-
-
-
-
-Perreault                    Standards Track                   [Page 24]
-
-RFC 6350                          vCard                      August 2011
-
-
      SOURCE:http://directory.example.com/addressbooks/jdoe/
       Jean%20Dupont.vcf
 
@@ -1391,18 +1158,6 @@ RFC 6350                          vCard                      August 2011
          organization as a whole, as is the case with a group vCard.
          For example, an EMAIL property might specify the address of a
          contact point for the organization.
-
-
-
-
-
-
-
-
-Perreault                    Standards Track                   [Page 25]
-
-RFC 6350                          vCard                      August 2011
-
 
       "location"  for a named geographical place.  A location vCard will
          usually contain a GEO property, but it is not required to.  A
@@ -1450,16 +1205,6 @@ RFC 6350                          vCard                      August 2011
       Some clients might also make functional distinctions among the
       kinds, ignoring "location" vCards for some purposes and
       considering only "location" vCards for others.
-
-
-
-
-
-Perreault                    Standards Track                   [Page 26]
-
-RFC 6350                          vCard                      August 2011
-
-
       When designing those sorts of visual and functional distinctions,
       client implementations have to decide how to fit unsupported kinds
       into the scheme.  What icon is used for them?  The one for
@@ -1508,13 +1253,6 @@ RFC 6350                          vCard                      August 2011
    Special notes:  The content of this property is a single XML 1.0
       [W3C.REC-xml-20081126] element whose namespace MUST be explicitly
       specified using the xmlns attribute and MUST NOT be the vCard 4
-
-
-
-Perreault                    Standards Track                   [Page 27]
-
-RFC 6350                          vCard                      August 2011
-
 
       namespace ("urn:ietf:params:xml:ns:vcard-4.0").  (This implies
       that it cannot duplicate a standard vCard property.)  The element
@@ -1565,13 +1303,6 @@ RFC 6350                          vCard                      August 2011
 
          FN:Mr. John Q. Public\, Esq.
 
-
-
-Perreault                    Standards Track                   [Page 28]
-
-RFC 6350                          vCard                      August 2011
-
-
 6.2.2.  N
 
    Purpose:  To specify the components of the name of the object the
@@ -1616,17 +1347,6 @@ RFC 6350                          vCard                      August 2011
       (U+002C).
 
    Cardinality:  *
-
-
-
-
-
-
-
-Perreault                    Standards Track                   [Page 29]
-
-RFC 6350                          vCard                      August 2011
-
 
    Special note:  The nickname is the descriptive name given instead of
       or in addition to the one belonging to the object the vCard
@@ -1675,14 +1395,6 @@ RFC 6350                          vCard                      August 2011
 
    Purpose:  To specify the birth date of the object the vCard
       represents.
-
-
-
-
-Perreault                    Standards Track                   [Page 30]
-
-RFC 6350                          vCard                      August 2011
-
 
    Value type:  The default is a single date-and-or-time value.  It can
       also be reset to a single text value.
@@ -1733,13 +1445,6 @@ RFC 6350                          vCard                      August 2011
 
              ANNIVERSARY:19960415
 
-
-
-Perreault                    Standards Track                   [Page 31]
-
-RFC 6350                          vCard                      August 2011
-
-
 6.2.7.  GENDER
 
    Purpose:  To specify the components of the sex and gender identity of
@@ -1787,14 +1492,6 @@ RFC 6350                          vCard                      August 2011
 
    Value type:  A single structured text value, separated by the
       SEMICOLON character (U+003B).
-
-
-
-
-Perreault                    Standards Track                   [Page 32]
-
-RFC 6350                          vCard                      August 2011
-
 
    Cardinality:  *
 
@@ -1844,14 +1541,6 @@ RFC 6350                          vCard                      August 2011
                / geo-parameter / tz-parameter / altid-param / pid-param
                / pref-param / type-param / any-param
 
-
-
-
-Perreault                    Standards Track                   [Page 33]
-
-RFC 6350                          vCard                      August 2011
-
-
      ADR-value = ADR-component-pobox ";" ADR-component-ext ";"
                  ADR-component-street ";" ADR-component-locality ";"
                  ADR-component-region ";" ADR-component-code ";"
@@ -1898,16 +1587,6 @@ RFC 6350                          vCard                      August 2011
       use for the telephone number.  The predefined values for the TYPE
       parameter are:
 
-
-
-
-
-
-Perreault                    Standards Track                   [Page 34]
-
-RFC 6350                          vCard                      August 2011
-
-
    +-----------+-------------------------------------------------------+
    | Value     | Description                                           |
    +-----------+-------------------------------------------------------+
@@ -1952,17 +1631,6 @@ RFC 6350                          vCard                      August 2011
      type-param-tel = "text" / "voice" / "fax" / "cell" / "video"
                     / "pager" / "textphone" / iana-token / x-name
        ; type-param-tel MUST NOT be used with a property other than TEL.
-
-
-
-
-
-
-
-Perreault                    Standards Track                   [Page 35]
-
-RFC 6350                          vCard                      August 2011
-
 
    Example:
 
@@ -2013,13 +1681,6 @@ RFC 6350                          vCard                      August 2011
       indicate that this is a preferred address and has the same
       semantics as the "PREF" parameter in a TEL property.
 
-
-
-Perreault                    Standards Track                   [Page 36]
-
-RFC 6350                          vCard                      August 2011
-
-
       If this property's value is a URI that can be used for voice
       and/or video, the TEL property (Section 6.4.1) SHOULD be used in
       addition to this property.
@@ -2069,13 +1730,6 @@ RFC 6350                          vCard                      August 2011
    Purpose:  To specify information related to the time zone of the
       object the vCard represents.
 
-
-
-Perreault                    Standards Track                   [Page 37]
-
-RFC 6350                          vCard                      August 2011
-
-
    Value type:  The default is a single text value.  It can also be
       reset to a single URI or utc-offset value.
 
@@ -2124,14 +1778,6 @@ RFC 6350                          vCard                      August 2011
    Special notes:  The "geo" URI scheme [RFC5870] is particularly well
       suited for this property, but other schemes MAY be used.
 
-
-
-
-Perreault                    Standards Track                   [Page 38]
-
-RFC 6350                          vCard                      August 2011
-
-
    ABNF:
 
      GEO-param = "VALUE=uri" / pid-param / pref-param / type-param
@@ -2178,16 +1824,6 @@ RFC 6350                          vCard                      August 2011
    Value type:  A single text value.
 
    Cardinality:  *
-
-
-
-
-
-Perreault                    Standards Track                   [Page 39]
-
-RFC 6350                          vCard                      August 2011
-
-
    Special notes:  This property is based on the X.520 Business Category
       explanatory attribute [CCITT.X520.1988].  This property is
       included as an organizational type to avoid confusion with the
@@ -2236,14 +1872,6 @@ RFC 6350                          vCard                      August 2011
    Value type:  A single structured text value consisting of components
       separated by the SEMICOLON character (U+003B).
 
-
-
-
-Perreault                    Standards Track                   [Page 40]
-
-RFC 6350                          vCard                      August 2011
-
-
    Cardinality:  *
 
    Special notes:  The property is based on the X.520 Organization Name
@@ -2283,22 +1911,6 @@ RFC 6350                          vCard                      August 2011
      MEMBER-param = "VALUE=uri" / pid-param / pref-param / altid-param
                   / mediatype-param / any-param
      MEMBER-value = URI
-
-
-
-
-
-
-
-
-
-
-
-
-Perreault                    Standards Track                   [Page 41]
-
-RFC 6350                          vCard                      August 2011
-
 
    Examples:
 
@@ -2349,13 +1961,6 @@ RFC 6350                          vCard                      August 2011
       agent:  an entity who may sometimes act on behalf of the entity
          associated with the vCard.
 
-
-
-Perreault                    Standards Track                   [Page 42]
-
-RFC 6350                          vCard                      August 2011
-
-
       emergency:  indicates an emergency contact
 
    ABNF:
@@ -2403,14 +2008,6 @@ RFC 6350                          vCard                      August 2011
       (U+002C).
 
    Cardinality:  *
-
-
-
-
-Perreault                    Standards Track                   [Page 43]
-
-RFC 6350                          vCard                      August 2011
-
 
    ABNF:
 
@@ -2461,13 +2058,6 @@ RFC 6350                          vCard                      August 2011
       Universal Resource Names in [RFC3406] to ensure that the text
       value is unique.
 
-
-
-Perreault                    Standards Track                   [Page 44]
-
-RFC 6350                          vCard                      August 2011
-
-
    ABNF:
 
      PRODID-param = "VALUE=text" / any-param
@@ -2514,16 +2104,6 @@ RFC 6350                          vCard                      August 2011
                  / type-param / mediatype-param / altid-param
                  / any-param
      SOUND-value = URI
-
-
-
-
-
-Perreault                    Standards Track                   [Page 45]
-
-RFC 6350                          vCard                      August 2011
-
-
    Example:
 
      SOUND:CID:JOHNQPUBLIC.part8.19960229T080000.xyzMail@example.com
@@ -2565,20 +2145,6 @@ RFC 6350                          vCard                      August 2011
    Example:
 
            UID:urn:uuid:f81d4fae-7dec-11d0-a765-00a0c91e6bf6
-
-
-
-
-
-
-
-
-
-
-Perreault                    Standards Track                   [Page 46]
-
-RFC 6350                          vCard                      August 2011
-
 
 6.7.7.  CLIENTPIDMAP
 
@@ -2628,14 +2194,6 @@ RFC 6350                          vCard                      August 2011
 
    Value type:  A single uri value.
 
-
-
-
-Perreault                    Standards Track                   [Page 47]
-
-RFC 6350                          vCard                      August 2011
-
-
    ABNF:
 
      URL-param = "VALUE=uri" / pid-param / pref-param / type-param
@@ -2684,14 +2242,6 @@ RFC 6350                          vCard                      August 2011
 
    Cardinality:  *
 
-
-
-
-Perreault                    Standards Track                   [Page 48]
-
-RFC 6350                          vCard                      August 2011
-
-
    ABNF:
 
      KEY-param = KEY-uri-param / KEY-text-param
@@ -2737,16 +2287,6 @@ RFC 6350                          vCard                      August 2011
       or months of busy time data.  If the iCalendar object is
       represented as a file or document, its file extension should be
       ".ifb".
-
-
-
-
-
-
-Perreault                    Standards Track                   [Page 49]
-
-RFC 6350                          vCard                      August 2011
-
 
    ABNF:
 
@@ -2797,13 +2337,6 @@ RFC 6350                          vCard                      August 2011
       default CALURI property is indicated with the PREF parameter.  The
       property should contain a URI pointing to an iCalendar [RFC5545]
 
-
-
-Perreault                    Standards Track                   [Page 50]
-
-RFC 6350                          vCard                      August 2011
-
-
       object associated with a snapshot of the user's calendar store.
       If the iCalendar object is represented as a file or document, its
       file extension should be ".ics".
@@ -2852,14 +2385,6 @@ RFC 6350                          vCard                      August 2011
    equivalent MUST be matched.  Equivalence is determined as specified
    in [RFC3986], Section 6.
 
-
-
-
-Perreault                    Standards Track                   [Page 51]
-
-RFC 6350                          vCard                      August 2011
-
-
    In all other cases, vCard instances MAY be matched at the discretion
    of the synchronization engine.
 
@@ -2902,19 +2427,6 @@ RFC 6350                          vCard                      August 2011
 
    For example, PID value "5.1", in the first vCard below, and PID value
    "5.2", in the second vCard below, represent the same global value.
-
-
-
-
-
-
-
-
-
-Perreault                    Standards Track                   [Page 52]
-
-RFC 6350                          vCard                      August 2011
-
 
      BEGIN:VCARD
      VERSION:4.0
@@ -2961,16 +2473,6 @@ RFC 6350                          vCard                      August 2011
    property, the second device understands that this is a new vCard
    (i.e., unmatched) and thus the synchronization results in a simple
    copy.
-
-
-
-
-
-
-Perreault                    Standards Track                   [Page 53]
-
-RFC 6350                          vCard                      August 2011
-
 
 7.2.3.  Adding and Sharing a Property
 
@@ -3020,14 +2522,6 @@ RFC 6350                          vCard                      August 2011
    each of the two devices, and then a new synchronization event
    happens.  Here are the vCards that are communicated to each other:
 
-
-
-
-Perreault                    Standards Track                   [Page 54]
-
-RFC 6350                          vCard                      August 2011
-
-
      BEGIN:VCARD
      VERSION:4.0
      UID:urn:uuid:4fbe8971-0bc3-424c-9c26-36c3e1eff6b1
@@ -3073,16 +2567,6 @@ RFC 6350                          vCard                      August 2011
 
    All this results in the following vCard, which is stored on both
    devices:
-
-
-
-
-
-
-Perreault                    Standards Track                   [Page 55]
-
-RFC 6350                          vCard                      August 2011
-
 
      BEGIN:VCARD
      VERSION:4.0
@@ -3133,13 +2617,6 @@ RFC 6350                          vCard                      August 2011
     ANNIVERSARY:20090808T1430-0500
     GENDER:M
 
-
-
-Perreault                    Standards Track                   [Page 56]
-
-RFC 6350                          vCard                      August 2011
-
-
     LANG;PREF=1:fr
     LANG;PREF=2:en
     ORG;TYPE=work:Viagenie
@@ -3187,14 +2664,6 @@ RFC 6350                          vCard                      August 2011
 
    o  Many vCard properties may be used to transport URIs.  Please refer
       to [RFC3986], Section 7, for considerations related to URIs.
-
-
-
-
-Perreault                    Standards Track                   [Page 57]
-
-RFC 6350                          vCard                      August 2011
-
 
 10.  IANA Considerations
 
@@ -3244,14 +2713,6 @@ RFC 6350                          vCard                      August 2011
       *  text/directory; profile=vcard
       *  text/x-vcard
 
-
-
-
-Perreault                    Standards Track                   [Page 58]
-
-RFC 6350                          vCard                      August 2011
-
-
    Published specification:  RFC 6350
 
    Applications that use this media type:  They are numerous, diverse,
@@ -3298,16 +2759,6 @@ RFC 6350                          vCard                      August 2011
    properties.  A Standards Track RFC is also REQUIRED for registration
    of vCard elements that modify vCard elements previously documented in
    a Standards Track RFC.
-
-
-
-
-
-Perreault                    Standards Track                   [Page 59]
-
-RFC 6350                          vCard                      August 2011
-
-
    The registration procedure begins when a completed registration
    template, defined in the sections below, is sent to vcarddav@ietf.org
    and iana@iana.org.  Within two weeks, the designated expert is
@@ -3357,13 +2808,6 @@ RFC 6350                          vCard                      August 2011
    of those specifications.  Registrations in the vendor namespace may
    be submitted directly to the IANA.
 
-
-
-Perreault                    Standards Track                   [Page 60]
-
-RFC 6350                          vCard                      August 2011
-
-
 10.2.3.  Registration Template for Properties
 
    A property is defined by completing the following template.
@@ -3411,14 +2855,6 @@ RFC 6350                          vCard                      August 2011
 
    Format definition:  The ABNF for the parameter definition needs to be
       specified.
-
-
-
-
-Perreault                    Standards Track                   [Page 61]
-
-RFC 6350                          vCard                      August 2011
-
 
    Example(s):  One or more examples of instances of the parameter need
       to be specified.
@@ -3468,14 +2904,6 @@ RFC 6350                          vCard                      August 2011
    Conformance:  This value can be used with the "TYPE" parameter
       applied on the "RELATED" property.
 
-
-
-
-Perreault                    Standards Track                   [Page 62]
-
-RFC 6350                          vCard                      August 2011
-
-
    Example(s):
 
    RELATED;TYPE=supervisor:urn:uuid:f81d4fae-7dec-11d0-a765-00a0c91e6bf6
@@ -3485,52 +2913,6 @@ RFC 6350                          vCard                      August 2011
    The IANA has created and will maintain the following registries for
    vCard elements with pointers to appropriate reference documents.  The
    registries are grouped together under the heading "vCard Elements".
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Perreault                    Standards Track                   [Page 63]
-
-RFC 6350                          vCard                      August 2011
-
 
 10.3.1.  Properties Registry
 
@@ -3578,16 +2960,6 @@ RFC 6350                          vCard                      August 2011
           |           | CALURI       | RFC 6350, Section 6.9.3 |
           +-----------+--------------+-------------------------+
 
-
-
-
-
-
-Perreault                    Standards Track                   [Page 64]
-
-RFC 6350                          vCard                      August 2011
-
-
 10.3.2.  Parameters Registry
 
    The following table has been used to initialize the parameters
@@ -3631,19 +3003,6 @@ RFC 6350                          vCard                      August 2011
               | UTC-OFFSET       | RFC 6350, Section 4.7   |
               +------------------+-------------------------+
 
-
-
-
-
-
-
-
-
-Perreault                    Standards Track                   [Page 65]
-
-RFC 6350                          vCard                      August 2011
-
-
 10.3.4.  Values Registries
 
    Separate tables are used for property and parameter values.
@@ -3664,41 +3023,6 @@ RFC 6350                          vCard                      August 2011
 
    The following table has been used to initialize the parameter values
    registry.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Perreault                    Standards Track                   [Page 66]
-
-RFC 6350                          vCard                      August 2011
-
 
    +------------------------+-----------+--------------+---------------+
    | Property               | Parameter | Value        | Reference     |
@@ -3748,14 +3072,6 @@ RFC 6350                          vCard                      August 2011
    |                        |           |              | Section 6.6.6 |
    |                        |           |              | and [xfn]     |
 
-
-
-
-Perreault                    Standards Track                   [Page 67]
-
-RFC 6350                          vCard                      August 2011
-
-
    | RELATED                | TYPE      | co-worker    | RFC 6350,     |
    |                        |           |              | Section 6.6.6 |
    |                        |           |              | and [xfn]     |
@@ -3803,14 +3119,6 @@ RFC 6350                          vCard                      August 2011
    | RELATED                | TYPE      | emergency    | RFC 6350,     |
    |                        |           |              | Section 6.6.6 |
    +------------------------+-----------+--------------+---------------+
-
-
-
-
-Perreault                    Standards Track                   [Page 68]
-
-RFC 6350                          vCard                      August 2011
-
 
 11.  Acknowledgments
 
@@ -3860,14 +3168,6 @@ RFC 6350                          vCard                      August 2011
               - Representation of dates and times", ISO Standard 8601,
               December 2004.
 
-
-
-
-Perreault                    Standards Track                   [Page 69]
-
-RFC 6350                          vCard                      August 2011
-
-
    [RFC2045]  Freed, N. and N. Borenstein, "Multipurpose Internet Mail
               Extensions (MIME) Part One: Format of Internet Message
               Bodies", RFC 2045, November 1996.
@@ -3916,14 +3216,6 @@ RFC 6350                          vCard                      August 2011
    [RFC5646]  Phillips, A. and M. Davis, "Tags for Identifying
               Languages", BCP 47, RFC 5646, September 2009.
 
-
-
-
-Perreault                    Standards Track                   [Page 70]
-
-RFC 6350                          vCard                      August 2011
-
-
    [RFC5870]  Mayrhofer, A. and C. Spanring, "A Uniform Resource
               Identifier for Geographic Locations ('geo' URI)",
               RFC 5870, June 2010.
@@ -3970,16 +3262,6 @@ RFC 6350                          vCard                      August 2011
    [RFC3282]  Alvestrand, H., "Content Language Headers", RFC 3282,
               May 2002.
 
-
-
-
-
-
-Perreault                    Standards Track                   [Page 71]
-
-RFC 6350                          vCard                      August 2011
-
-
    [RFC3406]  Daigle, L., van Gulik, D., Iannella, R., and P. Faltstrom,
               "Uniform Resource Names (URN) Namespace Definition
               Mechanisms", BCP 66, RFC 3406, October 2002.
@@ -4009,32 +3291,6 @@ RFC 6350                          vCard                      August 2011
 
    [vCard21]  Internet Mail Consortium, "vCard - The Electronic Business
               Card Version 2.1", September 1996.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Perreault                    Standards Track                   [Page 72]
-
-RFC 6350                          vCard                      August 2011
-
 
 Appendix A.  Differences from RFCs 2425 and 2426
 
@@ -4085,13 +3341,6 @@ A.3.  New Properties and Parameters
 
    o  The ALTID and PID parameters have been added.
 
-
-
-Perreault                    Standards Track                   [Page 73]
-
-RFC 6350                          vCard                      August 2011
-
-
    o  The MEDIATYPE parameter has been added and replaces the TYPE
       parameter when it was used for indicating the media type of the
       property's content.
@@ -4107,41 +3356,6 @@ Author's Address
    Phone: +1 418 656 9254
    EMail: simon.perreault@viagenie.ca
    URI:   http://www.viagenie.ca
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 Perreault                    Standards Track                   [Page 74]
 

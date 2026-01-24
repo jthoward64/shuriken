@@ -1,15 +1,8 @@
-
-
-
-
-
-
 Internet Engineering Task Force (IETF)                          C. Daboo
 Request for Comments: 6868                                         Apple
 Updates: 5545, 6321, 6350, 6351                            February 2013
 Category: Standards Track
 ISSN: 2070-1721
-
 
             Parameter Value Encoding in iCalendar and vCard
 
@@ -47,18 +40,6 @@ Copyright Notice
    include Simplified BSD License text as described in Section 4.e of
    the Trust Legal Provisions and are provided without warranty as
    described in the Simplified BSD License.
-
-
-
-
-
-
-
-
-Daboo                        Standards Track                    [Page 1]
-
-RFC 6868                   Parameter Encoding              February 2013
-
 
 Table of Contents
 
@@ -101,20 +82,6 @@ Table of Contents
    "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and
    "OPTIONAL" in this document are to be interpreted as described in
    [RFC2119].
-
-
-
-
-
-
-
-
-
-
-Daboo                        Standards Track                    [Page 2]
-
-RFC 6868                   Parameter Encoding              February 2013
-
 
 3.  Parameter Value Encoding Scheme
 
@@ -159,19 +126,6 @@ RFC 6868                   Parameter Encoding              February 2013
    in the text-based format and are decoded when the parameter values
    appear in the alternate data formats.
 
-
-
-
-
-
-
-
-
-Daboo                        Standards Track                    [Page 3]
-
-RFC 6868                   Parameter Encoding              February 2013
-
-
 3.1.  iCalendar Example
 
    The following example is an "ATTENDEE" property with a "CN" parameter
@@ -212,22 +166,6 @@ RFC 6868                   Parameter Encoding              February 2013
    Thanks to Michael Angstadt, Tim Bray, Mike Douglass, Barry Leiba,
    Simon Perreault, and Pete Resnick for feedback on this specification.
 
-
-
-
-
-
-
-
-
-
-
-
-Daboo                        Standards Track                    [Page 4]
-
-RFC 6868                   Parameter Encoding              February 2013
-
-
 6.  Normative References
 
    [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
@@ -245,44 +183,6 @@ RFC 6868                   Parameter Encoding              February 2013
 
    [RFC6351]  Perreault, S., "xCard: vCard XML Representation",
               RFC 6351, August 2011.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Daboo                        Standards Track                    [Page 5]
-
-RFC 6868                   Parameter Encoding              February 2013
-
 
 Appendix A.  Choice of Quoting Mechanism
 
@@ -326,20 +226,6 @@ Appendix A.  Choice of Quoting Mechanism
    used, and it ought to be one least likely to be found in existing
    data.
 
-
-
-
-
-
-
-
-
-
-Daboo                        Standards Track                    [Page 6]
-
-RFC 6868                   Parameter Encoding              February 2013
-
-
 Author's Address
 
    Cyrus Daboo
@@ -350,46 +236,6 @@ Author's Address
 
    EMail: cyrus@daboo.name
    URI:   http://www.apple.com/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 Daboo                        Standards Track                    [Page 7]
 

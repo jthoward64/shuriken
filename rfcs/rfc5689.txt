@@ -1,14 +1,7 @@
-
-
-
-
-
-
 Network Working Group                                           C. Daboo
 Request for Comments: 5689                                    Apple Inc.
 Updates: 4791, 4918                                       September 2009
 Category: Standards Track
-
 
   Extended MKCOL for Web Distributed Authoring and Versioning (WebDAV)
 
@@ -50,16 +43,6 @@ Copyright Notice
    Without obtaining an adequate license from the person(s) controlling
    the copyright in such materials, this document may not be modified
    outside the IETF Standards Process, and derivative works of it may
-
-
-
-
-
-Daboo                       Standards Track                     [Page 1]
-
-RFC 5689               Extended MKCOL for WebDAV          September 2009
-
-
    not be created outside the IETF Standards Process, except to format
    it for publication as an RFC or to translate it into languages other
    than English.
@@ -85,36 +68,6 @@ Table of Contents
    6.  Security Considerations  . . . . . . . . . . . . . . . . . . . 11
    7.  Acknowledgments  . . . . . . . . . . . . . . . . . . . . . . . 11
    8.  Normative References . . . . . . . . . . . . . . . . . . . . . 11
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Daboo                       Standards Track                     [Page 2]
-
-RFC 5689               Extended MKCOL for WebDAV          September 2009
-
 
 1.  Introduction
 
@@ -161,16 +114,6 @@ RFC 5689               Extended MKCOL for WebDAV          September 2009
    4.  Extension attributes (attributes not already defined as valid for
        this element) may be added anywhere, except when explicitly
        stated otherwise.
-
-
-
-
-
-
-Daboo                       Standards Track                     [Page 3]
-
-RFC 5689               Extended MKCOL for WebDAV          September 2009
-
 
    When an XML element type in the "DAV:" namespace is referenced in
    this document outside of the context of an XML fragment, the string
@@ -220,14 +163,6 @@ RFC 5689               Extended MKCOL for WebDAV          September 2009
    In all other respects, the behavior of the extended MKCOL request
    follows that of the standard MKCOL request.
 
-
-
-
-Daboo                       Standards Track                     [Page 4]
-
-RFC 5689               Extended MKCOL for WebDAV          September 2009
-
-
 3.1.  Extended MKCOL Support
 
    A server supporting the features described in this document MUST
@@ -271,19 +206,6 @@ RFC 5689               Extended MKCOL for WebDAV          September 2009
    Purpose:  (precondition) -- The server MUST support the specified
       resourcetype value for the specified collection.
 
-
-
-
-
-
-
-
-
-Daboo                       Standards Track                     [Page 5]
-
-RFC 5689               Extended MKCOL for WebDAV          September 2009
-
-
 3.4.  Example: Successful Extended MKCOL Request
 
    This example shows how the extended MKCOL request is used to create a
@@ -323,22 +245,6 @@ RFC 5689               Extended MKCOL for WebDAV          September 2009
    create a collection of a fictitious type "special-resource", which is
    not actually supported by the server.  The response body shows that
    an error occurred specifically with the DAV:resourcetype property.
-
-
-
-
-
-
-
-
-
-
-
-
-Daboo                       Standards Track                     [Page 6]
-
-RFC 5689               Extended MKCOL for WebDAV          September 2009
-
 
    >> Request <<
 
@@ -388,14 +294,6 @@ RFC 5689               Extended MKCOL for WebDAV          September 2009
      </D:propstat>
    </D:mkcol-response>
 
-
-
-
-Daboo                       Standards Track                     [Page 7]
-
-RFC 5689               Extended MKCOL for WebDAV          September 2009
-
-
 4.  Using Extended MKCOL as an Alternative for MKxxx Methods
 
    One of the goals of this extension is to eliminate the need for other
@@ -439,19 +337,6 @@ RFC 5689               Extended MKCOL for WebDAV          September 2009
      </D:set>
    </C:mkcalendar>
 
-
-
-
-
-
-
-
-
-Daboo                       Standards Track                     [Page 8]
-
-RFC 5689               Extended MKCOL for WebDAV          September 2009
-
-
    >> MKCALENDAR Response <<
 
    HTTP/1.1 201 Created
@@ -494,19 +379,6 @@ RFC 5689               Extended MKCOL for WebDAV          September 2009
        </D:prop>
      </D:set>
    </D:mkcol>
-
-
-
-
-
-
-
-
-
-Daboo                       Standards Track                     [Page 9]
-
-RFC 5689               Extended MKCOL for WebDAV          September 2009
-
 
    >> MKCOL Response <<
 
@@ -554,16 +426,6 @@ RFC 5689               Extended MKCOL for WebDAV          September 2009
 
    Namespace:  DAV:
 
-
-
-
-
-
-Daboo                       Standards Track                    [Page 10]
-
-RFC 5689               Extended MKCOL for WebDAV          September 2009
-
-
    Purpose:  Used in a response to indicate the status of properties
       that were set or failed to be set during an extended MKCOL
       request.
@@ -585,7 +447,6 @@ RFC 5689               Extended MKCOL for WebDAV          September 2009
 
    Thanks to Bernard Desruisseaux, Mike Douglass, Alexey Melnikov,
    Julian Reschke, and Simon Vaillancourt.
-
 
 8.  Normative References
 
@@ -610,16 +471,6 @@ RFC 5689               Extended MKCOL for WebDAV          September 2009
               Recommendation REC-xml-20081126, November 2008,
               <http://www.w3.org/TR/2008/REC-xml-20081126>.
 
-
-
-
-
-
-Daboo                       Standards Track                    [Page 11]
-
-RFC 5689               Extended MKCOL for WebDAV          September 2009
-
-
 Author's Address
 
    Cyrus Daboo
@@ -630,46 +481,6 @@ Author's Address
 
    EMail: cyrus@daboo.name
    URI:   http://www.apple.com/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 Daboo                       Standards Track                    [Page 12]
 

@@ -1,15 +1,10 @@
 
 
-
-
-
-
 Internet Engineering Task Force (IETF)                          C. Daboo
 Request for Comments: 7986                                    Apple Inc.
 Updates: 5545                                               October 2016
 Category: Standards Track
 ISSN: 2070-1721
-
 
                       New Properties for iCalendar
 
@@ -48,18 +43,6 @@ Copyright Notice
    the Trust Legal Provisions and are provided without warranty as
    described in the Simplified BSD License.
 
-
-
-
-
-
-
-
-Daboo                        Standards Track                    [Page 1]
-
-RFC 7986              iCalendar Property Extensions         October 2016
-
-
 Table of Contents
 
    1. Introduction ....................................................3
@@ -94,27 +77,6 @@ Table of Contents
       10.2. Informative References ...................................22
    Acknowledgments ...................................................23
    Author's Address ..................................................23
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Daboo                        Standards Track                    [Page 2]
-
-RFC 7986              iCalendar Property Extensions         October 2016
-
 
 1.  Introduction
 
@@ -163,14 +125,6 @@ RFC 7986              iCalendar Property Extensions         October 2016
    above, the "FOO" property would have a "VALUE=URI" parameter.  This
    allows iCalendar parser/generator software to track the correct types
    of unknown properties.
-
-
-
-
-Daboo                        Standards Track                    [Page 3]
-
-RFC 7986              iCalendar Property Extensions         October 2016
-
 
    New properties defined in this specification use the term "no
    default" in the "Value Type" definition to indicate that the "VALUE"
@@ -221,13 +175,6 @@ RFC 7986              iCalendar Property Extensions         October 2016
                 ; The following are OPTIONAL,
                 ; and MAY occur more than once.
 
-
-
-Daboo                        Standards Track                    [Page 4]
-
-RFC 7986              iCalendar Property Extensions         October 2016
-
-
                 ;
                 conference / image
                 ;
@@ -272,18 +219,6 @@ RFC 7986              iCalendar Property Extensions         October 2016
       including this property multiple times with different "LANGUAGE"
       parameter values on each.
 
-
-
-
-
-
-
-
-Daboo                        Standards Track                    [Page 5]
-
-RFC 7986              iCalendar Property Extensions         October 2016
-
-
    Format Definition:  This property is defined by the following
       notation:
 
@@ -327,19 +262,6 @@ RFC 7986              iCalendar Property Extensions         October 2016
       language variants can be specified by including this property
       multiple times with different "LANGUAGE" parameter values on each.
 
-
-
-
-
-
-
-
-
-Daboo                        Standards Track                    [Page 6]
-
-RFC 7986              iCalendar Property Extensions         October 2016
-
-
 5.3.  UID Property
 
    This specification modifies the definition of the "UID" property to
@@ -379,22 +301,6 @@ RFC 7986              iCalendar Property Extensions         October 2016
    opaque identifiers for the "UID" value, they MUST have a length less
    than 255 octets and MUST conform to the "iana-token" ABNF syntax
    defined in Section 3.1 of [RFC5545].
-
-
-
-
-
-
-
-
-
-
-
-
-Daboo                        Standards Track                    [Page 7]
-
-RFC 7986              iCalendar Property Extensions         October 2016
-
 
 5.4.  LAST-MODIFIED Property
 
@@ -438,19 +344,6 @@ RFC 7986              iCalendar Property Extensions         October 2016
    Description:  When multiple properties are present, the set of
       categories that apply to the iCalendar object are the union of all
       the categories listed in each property value.
-
-
-
-
-
-
-
-
-
-Daboo                        Standards Track                    [Page 8]
-
-RFC 7986              iCalendar Property Extensions         October 2016
-
 
 5.7.  REFRESH-INTERVAL Property
 
@@ -498,16 +391,6 @@ RFC 7986              iCalendar Property Extensions         October 2016
    Example:  The following is an example of this property:
 
    REFRESH-INTERVAL;VALUE=DURATION:P1W
-
-
-
-
-
-Daboo                        Standards Track                    [Page 9]
-
-RFC 7986              iCalendar Property Extensions         October 2016
-
-
 5.8.  SOURCE Property
 
    Property Name:  SOURCE
@@ -555,14 +438,6 @@ RFC 7986              iCalendar Property Extensions         October 2016
 
    Conformance:  This property can be specified once in an iCalendar
       object or in "VEVENT", "VTODO", or "VJOURNAL" calendar components.
-
-
-
-
-Daboo                        Standards Track                   [Page 10]
-
-RFC 7986              iCalendar Property Extensions         October 2016
-
 
    Description:  This property specifies a color that clients MAY use
       when presenting the relevant data to a user.  Typically, this
@@ -613,13 +488,6 @@ RFC 7986              iCalendar Property Extensions         October 2016
       display none.  The "DISPLAY" parameter is used to indicate the
       intended display mode for the image.  The "ALTREP" parameter,
 
-
-
-Daboo                        Standards Track                   [Page 11]
-
-RFC 7986              iCalendar Property Extensions         October 2016
-
-
       defined in [RFC5545], can be used to provide a "clickable" image
       where the URI in the parameter value can be "launched" by a click
       on the image in the calendar user agent.
@@ -666,16 +534,6 @@ RFC 7986              iCalendar Property Extensions         October 2016
    IMAGE;VALUE=URI;DISPLAY=BADGE;FMTTYPE=image/png:h
     ttp://example.com/images/party.png
 
-
-
-
-
-
-Daboo                        Standards Track                   [Page 12]
-
-RFC 7986              iCalendar Property Extensions         October 2016
-
-
 5.11.  CONFERENCE Property
 
    Property Name:  CONFERENCE
@@ -719,18 +577,6 @@ RFC 7986              iCalendar Property Extensions         October 2016
       The "LANGUAGE" property parameter can be used to specify the
       language used for text values used with this property (as per
       Section 3.2.10 of [RFC5545]).
-
-
-
-
-
-
-
-
-Daboo                        Standards Track                   [Page 13]
-
-RFC 7986              iCalendar Property Extensions         October 2016
-
 
    Format Definition:  This property is defined by the following
       notation:
@@ -778,16 +624,6 @@ RFC 7986              iCalendar Property Extensions         October 2016
 
    Purpose:  To specify different ways in which an image for a calendar
       or component can be displayed.
-
-
-
-
-
-Daboo                        Standards Track                   [Page 14]
-
-RFC 7986              iCalendar Property Extensions         October 2016
-
-
    Format Definition:  This property parameter is defined by the
       following notation:
 
@@ -836,14 +672,6 @@ RFC 7986              iCalendar Property Extensions         October 2016
 
    emailparam = "EMAIL" "=" param-value
 
-
-
-
-Daboo                        Standards Track                   [Page 15]
-
-RFC 7986              iCalendar Property Extensions         October 2016
-
-
    Description:  This property parameter MAY be specified on "ORGANIZER"
       or "ATTENDEE" properties.  This property can be used in situations
       where the calendar user address value of the "ORGANIZER" and
@@ -888,18 +716,6 @@ RFC 7986              iCalendar Property Extensions         October 2016
                     x-name /      ; Experimental type
                     iana-token)   ; Other IANA-registered type
 
-
-
-
-
-
-
-
-Daboo                        Standards Track                   [Page 16]
-
-RFC 7986              iCalendar Property Extensions         October 2016
-
-
    Description:  This property parameter MAY be specified on the
       "CONFERENCE" property.  Multiple values can be specified.  The
       "MODERATOR" value is used to indicate that the property value is
@@ -943,18 +759,6 @@ RFC 7986              iCalendar Property Extensions         October 2016
    CONFERENCE;VALUE=URI;FEATURE=VIDEO;
     LABEL="Web video chat, access code=76543";
     :https://video-chat.example.com/;group-id=1234
-
-
-
-
-
-
-
-
-Daboo                        Standards Track                   [Page 17]
-
-RFC 7986              iCalendar Property Extensions         October 2016
-
 
 7.  Security Considerations
 
@@ -1005,13 +809,6 @@ RFC 7986              iCalendar Property Extensions         October 2016
    ensure that suitable permission is granted by calendar users before
    such URIs are dereferenced.  In particular, calendar publishers
 
-
-
-Daboo                        Standards Track                   [Page 18]
-
-RFC 7986              iCalendar Property Extensions         October 2016
-
-
    wishing to help protect the privacy of their subscribers MUST use
    HTTP with Transport Layer Security [RFC7230] ("https:" URIs instead
    of "http:" URIs) for access to calendar data or ancillary data such
@@ -1050,23 +847,6 @@ RFC 7986              iCalendar Property Extensions         October 2016
    defined in Section 8.3.2 of [RFC5545].  IANA has also added a
    reference to this document where the properties originally defined in
    RFC 5545 have been updated by this document.
-
-
-
-
-
-
-
-
-
-
-
-
-
-Daboo                        Standards Track                   [Page 19]
-
-RFC 7986              iCalendar Property Extensions         October 2016
-
 
    +------------------+---------+--------------------------------------+
    | Property         | Status  | Reference                            |
@@ -1112,18 +892,6 @@ RFC 7986              iCalendar Property Extensions         October 2016
    described in Sections 8.2.1 and 8.2.6 of [RFC5545] are used to
    register them.
 
-
-
-
-
-
-
-
-Daboo                        Standards Track                   [Page 20]
-
-RFC 7986              iCalendar Property Extensions         October 2016
-
-
 9.3.1.  Display Types Registry
 
    The following table has been used to initialize the "Display Types"
@@ -1168,17 +936,6 @@ RFC 7986              iCalendar Property Extensions         October 2016
               Unique IDentifier (UUID) URN Namespace", RFC 4122,
               DOI 10.17487/RFC4122, July 2005,
               <http://www.rfc-editor.org/info/rfc4122>.
-
-
-
-
-
-
-
-Daboo                        Standards Track                   [Page 21]
-
-RFC 7986              iCalendar Property Extensions         October 2016
-
 
    [RFC5234]  Crocker, D., Ed. and P. Overell, "Augmented BNF for Syntax
               Specifications: ABNF", STD 68, RFC 5234,
@@ -1228,14 +985,6 @@ RFC 7986              iCalendar Property Extensions         October 2016
               RFC 7230, DOI 10.17487/RFC7230, June 2014,
               <http://www.rfc-editor.org/info/rfc7230>.
 
-
-
-
-Daboo                        Standards Track                   [Page 22]
-
-RFC 7986              iCalendar Property Extensions         October 2016
-
-
 Acknowledgments
 
    Thanks to the following individuals for feedback: Bernard
@@ -1255,37 +1004,6 @@ Author's Address
 
    Email: cyrus@daboo.name
    URI:   http://www.apple.com/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 Daboo                        Standards Track                   [Page 23]
 

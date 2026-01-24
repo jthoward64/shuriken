@@ -1,15 +1,10 @@
 
 
-
-
-
-
 Internet Engineering Task Force (IETF)                          C. Daboo
 Request for Comments: 7809                                         Apple
 Updates: 4791                                                 March 2016
 Category: Standards Track
 ISSN: 2070-1721
-
 
    Calendaring Extensions to WebDAV (CalDAV): Time Zones by Reference
 
@@ -48,17 +43,6 @@ Copyright Notice
    include Simplified BSD License text as described in Section 4.e of
    the Trust Legal Provisions and are provided without warranty as
    described in the Simplified BSD License.
-
-
-
-
-
-
-
-Daboo                        Standards Track                    [Page 1]
-
-RFC 7809               CalDAV Time Zone Extension             March 2016
-
 
 Table of Contents
 
@@ -106,16 +90,6 @@ Table of Contents
    mobile or limited devices, with limited network bandwidth, CPU, and
    energy resources.
 
-
-
-
-
-
-Daboo                        Standards Track                    [Page 2]
-
-RFC 7809               CalDAV Time Zone Extension             March 2016
-
-
    A set of standard time zone definitions are available at the IANA-
    hosted time zone database [RFC6557].  That database provides the
    "raw" data for time zone definitions, and those can be converted into
@@ -158,19 +132,6 @@ RFC 7809               CalDAV Time Zone Extension             March 2016
    based on the iCalendar Transport-Independent Interoperability
    Protocol (iTIP) [RFC5546], e.g., the iCalendar Message-Based
    Interoperability Protocol (iMIP) [RFC6047], or other methods.
-
-
-
-
-
-
-
-
-
-Daboo                        Standards Track                    [Page 3]
-
-RFC 7809               CalDAV Time Zone Extension             March 2016
-
 
 3.1.  New Server Behavior
 
@@ -221,13 +182,6 @@ RFC 7809               CalDAV Time Zone Extension             March 2016
    the advertised time zone distribution servers (see Section 3.1.2).
    However, the server MUST return the appropriate "VTIMEZONE" component
 
-
-
-Daboo                        Standards Track                    [Page 4]
-
-RFC 7809               CalDAV Time Zone Extension             March 2016
-
-
    for each time zone with an identifier not available on the advertised
    time zone distribution servers.  This behavior applies to all HTTP
    requests on CalDAV resources that return iCalendar data either
@@ -275,14 +229,6 @@ RFC 7809               CalDAV Time Zone Extension             March 2016
        -- in which case, they MUST reject the HTTP request containing
        such data using a WebDAV precondition code of
        CALDAV:valid-timezone.
-
-
-
-
-Daboo                        Standards Track                    [Page 5]
-
-RFC 7809               CalDAV Time Zone Extension             March 2016
-
 
    3.  Servers can, with appropriate knowledge, map the unknown/
        nonstandard time zone to a standard time zone definition that
@@ -333,13 +279,6 @@ RFC 7809               CalDAV Time Zone Extension             March 2016
    use when doing time-based queries on calendar data (see Sections 7.3
    and 9.8 of [RFC4791]).  The content of that XML element is an
 
-
-
-Daboo                        Standards Track                    [Page 6]
-
-RFC 7809               CalDAV Time Zone Extension             March 2016
-
-
    iCalendar "VTIMEZONE" component.  This specification defines a new
    CALDAV:timezone-id XML element that can be used as an alternative to
    the CALDAV:timezone XML element; it allows a specific time zone to be
@@ -383,18 +322,6 @@ RFC 7809               CalDAV Time Zone Extension             March 2016
        definitions either from its own cache of standard time zones or
        from the set of time zone distribution servers advertised by the
        CalDAV server (see Section 3.1.2).
-
-
-
-
-
-
-
-
-Daboo                        Standards Track                    [Page 7]
-
-RFC 7809               CalDAV Time Zone Extension             March 2016
-
 
    4.  Clients SHOULD remove standard time zone definitions from
        iCalendar data they send to the server, provided the
@@ -442,16 +369,6 @@ RFC 7809               CalDAV Time Zone Extension             March 2016
    DAV:href value: URI of a time zone data distribution service
    as defined by this specification.
 
-
-
-
-
-
-Daboo                        Standards Track                    [Page 8]
-
-RFC 7809               CalDAV Time Zone Extension             March 2016
-
-
    Example:
 
    <C:timezone-service-set
@@ -498,16 +415,6 @@ RFC 7809               CalDAV Time Zone Extension             March 2016
    The CALDAV:calendar-query XML element, defined in Section 9.5 of
    [RFC4791], is modified to allow use of the CALDAV:timezone-id XML
    element as follows.
-
-
-
-
-
-Daboo                        Standards Track                    [Page 9]
-
-RFC 7809               CalDAV Time Zone Extension             March 2016
-
-
    Definition:
 
    <!ELEMENT calendar-query ((DAV:allprop |
@@ -551,18 +458,6 @@ RFC 7809               CalDAV Time Zone Extension             March 2016
    Example:
 
    CalDAV-Timezones: F
-
-
-
-
-
-
-
-
-Daboo                        Standards Track                   [Page 10]
-
-RFC 7809               CalDAV Time Zone Extension             March 2016
-
 
 8.  Security Considerations
 
@@ -610,16 +505,6 @@ RFC 7809               CalDAV Time Zone Extension             March 2016
    Specification document(s): this document (Section 7.1)
 
    Related information: none
-
-
-
-
-
-Daboo                        Standards Track                   [Page 11]
-
-RFC 7809               CalDAV Time Zone Extension             March 2016
-
-
 11.  References
 
 11.1.  Normative References
@@ -669,13 +554,6 @@ RFC 7809               CalDAV Time Zone Extension             March 2016
               DOI 10.17487/RFC6047, December 2010,
               <http://www.rfc-editor.org/info/rfc6047>.
 
-
-
-Daboo                        Standards Track                   [Page 12]
-
-RFC 7809               CalDAV Time Zone Extension             March 2016
-
-
    [RFC6557]  Lear, E. and P. Eggert, "Procedures for Maintaining the
               Time Zone Database", BCP 175, RFC 6557,
               DOI 10.17487/RFC6557, February 2012,
@@ -697,35 +575,6 @@ Author's Address
 
    Email: cyrus@daboo.name
    URI:   http://www.apple.com/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 Daboo                        Standards Track                   [Page 13]
 

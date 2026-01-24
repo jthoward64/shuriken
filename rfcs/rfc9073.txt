@@ -1,13 +1,9 @@
 ﻿
-
-
-
 Internet Engineering Task Force (IETF)                       M. Douglass
 Request for Comments: 9073                                      Bedework
 Updates: 5545                                                August 2021
 Category: Standards Track                                               
 ISSN: 2070-1721
-
 
                 Event Publishing Extensions to iCalendar
 

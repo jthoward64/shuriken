@@ -1,15 +1,10 @@
 
 
-
-
-
-
 Internet Engineering Task Force (IETF)                          C. Daboo
 Request for Comments: 6638                                    Apple Inc.
 Updates: 4791, 5546                                      B. Desruisseaux
 Category: Standards Track                                         Oracle
 ISSN: 2070-1721                                                June 2012
-
 
                     Scheduling Extensions to CalDAV
 
@@ -49,16 +44,6 @@ Copyright Notice
    include Simplified BSD License text as described in Section 4.e of
    the Trust Legal Provisions and are provided without warranty as
    described in the Simplified BSD License.
-
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                    [Page 1]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
 
    This document may contain material from IETF Documents or IETF
    Contributions published or made publicly available before November
@@ -104,17 +89,6 @@ Table of Contents
                   3.2.3.2. DELETE ....................................22
                   3.2.3.3. COPY ......................................23
                   3.2.3.4. MOVE ......................................24
-
-
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                    [Page 2]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
 
            3.2.4. Additional Method Preconditions ....................24
                   3.2.4.1. CALDAV:unique-scheduling-object-resource
@@ -162,16 +136,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
            6.2.4. CALDAV:schedule-send-freebusy Privilege ............41
       6.3. Aggregation of Scheduling Privileges ......................42
 
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                    [Page 3]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    7. Additional iCalendar Property Parameters .......................42
       7.1. Schedule Agent Parameter ..................................42
       7.2. Schedule Force Send Parameter .............................44
@@ -209,24 +173,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    14. References ....................................................57
       14.1. Normative References .....................................57
       14.2. Informative References ...................................58
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                    [Page 4]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
 
    Appendix A. Scheduling Privileges Summary .........................59
      A.1. Scheduling Inbox Privileges ................................59
@@ -276,14 +222,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    receive scheduling messages with "external" users (e.g., using the
    iCalendar Message-Based Interoperability Protocol (iMIP) [RFC6047]).
 
-
-
-
-Daboo & Desruisseaux         Standards Track                    [Page 5]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    Section 3 defines the automated "Scheduling Operations" that allow a
    client to store iCalendar data on a CalDAV server, with the server
    taking specific actions in response.  One of three scheduling
@@ -332,14 +270,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
       scheduling object resource for which the server will deliver
       scheduling messages to other calendar users.
 
-
-
-
-Daboo & Desruisseaux         Standards Track                    [Page 6]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    Scheduling message:  A calendar object that describes a scheduling
       operation such as schedule, reschedule, reply, or cancel.
 
@@ -385,17 +315,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
 
    2.  element ordering is irrelevant unless explicitly stated,
 
-
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                    [Page 7]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    3.  extension elements (elements not already defined as valid child
        elements) can be added anywhere, except when explicitly stated
        otherwise, and
@@ -433,24 +352,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    (as per Section 6), as well as provide scheduling functionality.  It
    is the server's responsibility to create these collection resources,
    and clients have no way to create or delete them.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                    [Page 8]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
 
 2.1.  Scheduling Outbox Collection
 
@@ -498,16 +399,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    The following WebDAV property is defined on principal resources and
    used to locate the corresponding Outbox collection for the associated
    principal.
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                    [Page 9]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
 2.1.1.  CALDAV:schedule-outbox-URL Property
 
    Name:  schedule-outbox-URL
@@ -557,13 +448,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
        <C:schedule-inbox xmlns:C="urn:ietf:params:xml:ns:caldav"/>
      </D:resourcetype>
 
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 10]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    Scheduling Inbox collections MUST only contain calendar object
    resources that obey the restrictions specified in iTIP [RFC5546].
    Consequently, scheduling Inbox collections MUST NOT contain any types
@@ -611,14 +495,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
 
    Purpose:  Identify the URL of the scheduling Inbox collection owned
       by the associated principal resource.
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 11]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
 
    Protected:  This property MAY be protected.
 
@@ -669,13 +545,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    Purpose:  Identify the calendar addresses of the associated principal
       resource.
 
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 12]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    Protected:  This property MAY be protected.
 
    PROPFIND behavior:  This property SHOULD NOT be returned by a
@@ -721,16 +590,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
       parameter defined in Section 3.2.3 of [RFC5545].
 
    Protected:  This property MAY be protected.
-
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 13]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
 
    PROPFIND behavior:  This property SHOULD NOT be returned by a
       PROPFIND DAV:allprop request (as defined in Section 14.2 of
@@ -778,16 +637,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    operations are referred to as scheduling object resources.  There are
    two types of scheduling object resources: organizer scheduling object
    resources, and attendee scheduling object resources.
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 14]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    A calendar object resource is considered to be a valid organizer
    scheduling object resource if the "ORGANIZER" iCalendar property is
    present and set in all the calendar components to a value that
@@ -834,16 +683,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    that specifies a "UID" property value already specified in a
    scheduling object resource contained in another calendar collection
    of the "Organizer".
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 15]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
 3.2.1.1.  Create
 
    When an "Organizer" creates a scheduling object resource, the server
@@ -887,18 +726,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    scheduling-object-change precondition code (Section 3.2.4.3) when the
    "Organizer" attempts to change the iCalendar data in a manner that is
    forbidden.
-
-
-
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 16]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
 
 3.2.1.2.  Modify
 
@@ -946,16 +773,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    scheduling-object-change precondition code (Section 3.2.4.3) when the
    "Organizer" attempts to change the iCalendar data in a manner that is
    forbidden.
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 17]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
 3.2.1.3.  Remove
 
    When an "Organizer" removes a scheduling object resource, the server
@@ -1002,16 +819,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    4.   add, modify, or remove any "COMPLETED" iCalendar properties.
 
    5.   add, modify, or remove any "VALARM" iCalendar components.
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 18]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    6.   add, modify, or remove the "CALSCALE" iCalendar property within
         the top-level "VCALENDAR" component.
 
@@ -1052,21 +859,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    treats the resource.  The value of the "SCHEDULE-AGENT" iCalendar
    property parameter on all "ORGANIZER" iCalendar properties MUST be
    the same.
-
-
-
-
-
-
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 19]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
 
    +----------------+--------------------------------------------------+
    | SCHEDULE-AGENT | Action                                           |
@@ -1117,13 +909,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    "REPLY" scheduling message to the "Organizer" to indicate the new
    participation status of the "Attendee".
 
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 20]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    If the "Attendee" adds an "EXDATE" property value to effectively
    remove a recurrence instance, the server MUST deliver an iTIP "REPLY"
    scheduling message to the "Organizer" to indicate that the "Attendee"
@@ -1167,19 +952,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    above.  The use of these methods is subject to the restrictions in
    [RFC4791], in addition to what is described below.
 
-
-
-
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 21]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
 3.2.3.1.  PUT
 
    When the server receives a PUT method request, it MUST execute the
@@ -1215,27 +987,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    calendar collection, it MUST execute the Remove operation on all
    scheduling object resources contained in the calendar collection.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 22]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
 3.2.3.3.  COPY
 
    When the server receives a COPY method request, it MUST execute the
@@ -1265,32 +1016,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
 
    The behavior of a COPY method request on a calendar collection is
    undefined.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 23]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
 
 3.2.3.4.  MOVE
 
@@ -1338,16 +1063,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
 
    Use with:  403 Forbidden
 
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 24]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    Purpose:  (precondition) -- Servers MAY reject requests to create a
       scheduling object resource with an iCalendar "UID" property value
       already in use by another scheduling object resource owned by the
@@ -1394,16 +1109,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
 
    Use with:  403 Forbidden
 
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 25]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    Purpose:  (precondition) -- Servers MAY impose restrictions on
       modifications allowed by an "Organizer".  For instance, servers
       MAY prevent the "Organizer" from setting the "PARTSTAT" property
@@ -1444,22 +1149,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    the "SEQUENCE" iCalendar property value is updated as per iTIP
    [RFC5546].
 
-
-
-
-
-
-
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 26]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
 3.2.6.  Restrict Recurrence Instances Sent to "Attendees"
 
    Servers MUST ensure that "Attendees" only get information about
@@ -1495,26 +1184,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    parameter to request an "Attendee" that previously declined an
    invitation to reconsider his participation status without being
    forced to modify the event.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 27]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
 
 3.2.8.  "Attendee" Participation Status
 
@@ -1564,14 +1233,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    "Organizer" might wish to re-invite "Attendees" who might be impacted
    by the change).
 
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 28]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
 3.2.9.  Schedule Status Values
 
    When scheduling with an "Attendee", there are two types of status
@@ -1617,17 +1278,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    |          | delivered.                                             |
    |          |                                                        |
 
-
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 29]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    | 3.7      | The scheduling message was not delivered because the   |
    |          | server did not recognize the calendar user address as  |
    |          | a valid calendar user.  Note that this code applies to |
@@ -1666,23 +1316,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    restriction:
 
       For a 1.xx code, all components MUST have exactly the same code.
-
-
-
-
-
-
-
-
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 30]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
 
    Definition of the new 1.xx codes is as follows:
 
@@ -1730,16 +1363,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    merge calendar data changes from a client with changes made as a
    result of a scheduling operation carried out by some other calendar
    user.
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 31]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    This specification introduces a new WebDAV resource property CALDAV:
    schedule-tag with a corresponding response header "Schedule-Tag", and
    a new "If-Schedule-Tag-Match" request header to allow client changes
@@ -1787,14 +1410,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
       2.  The server MUST change the CALDAV:schedule-tag property value
           when the scheduling object resource is changed directly via an
           HTTP request (e.g., PUT, COPY, or MOVE).
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 32]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
 
    o  For an "Attendee's" copy of a scheduling object resource:
 
@@ -1844,14 +1459,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    or MOVE request processing for the resource.  Otherwise, the server
    MUST fail the request with a 412 Precondition Failed status code.
 
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 33]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
 4.  Processing Incoming Scheduling Messages
 
    Scheduling operations can cause the delivery of a scheduling message
@@ -1898,16 +1505,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    In each case, the scheduling message MUST only appear in the
    "Attendee's" scheduling Inbox collection once all automatic
    processing has been done.
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 34]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
 4.2.  Processing "Attendee" Replies
 
    For a scheduling message reply sent by an "Attendee", the server
@@ -1957,13 +1554,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    a calendar user, specifies whether this calendar user has a default
    calendar collection.  See Section 9.2.
 
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 35]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    Servers SHOULD create new scheduling object resources in the default
    calendar collection, if the CALDAV:schedule-default-calendar-URL
    WebDAV property is set.
@@ -2012,14 +1602,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
 
    Apply to:  PROPPATCH
 
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 36]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    Use with:  403 Forbidden
 
    Purpose:  (precondition) -- The client attempted to set the CALDAV:
@@ -2060,21 +1642,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    iCalendar "VFREEBUSY" component).  See Section 10 for details on the
    child elements.  See Appendix B.5 for an example busy time request
    and response.
-
-
-
-
-
-
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 37]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
 
 5.1.  Status Codes
 
@@ -2124,14 +1691,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
 
    Use with:  400 Bad Request
 
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 38]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    Purpose:  (precondition) -- The resource submitted in the POST
       request MUST obey all the restrictions specified in Section 3.3.2
       of iTIP [RFC5546].
@@ -2178,16 +1737,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    from a calendar user is allowed by the calendar user who "owns" the
    scheduling Inbox collection.  This allows calendar users to choose
    which other calendar users can schedule with them.
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 39]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    Note that when a scheduling message is delivered to a calendar user,
    in addition to a scheduling object resource being created in the
    calendar user's scheduling Inbox collection, a new scheduling object
@@ -2237,13 +1786,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    calendar users who can act on their behalf (e.g., assistants working
    on behalf of their boss).
 
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 40]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    The privileges defined in this section are ignored if applied to a
    resource other than a scheduling Outbox collection.
 
@@ -2292,14 +1834,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
 
      <!ELEMENT schedule-send-freebusy EMPTY>
 
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 41]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
 6.3.  Aggregation of Scheduling Privileges
 
    Server implementations MUST aggregate the scheduling privileges as
@@ -2341,20 +1875,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
 
    Purpose:  To specify the agent expected to deliver scheduling
       messages to the corresponding "Organizer" or "Attendee".
-
-
-
-
-
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 42]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
 
    Format Definition:  This property parameter is defined by the
       following notation:
@@ -2404,14 +1924,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
      ORGANIZER;SCHEDULE-AGENT=SERVER:mailto:bernard@example.com
      ATTENDEE;SCHEDULE-AGENT=NONE:mailto:cyrus@example.com
 
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 43]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
 7.2.  Schedule Force Send Parameter
 
    Parameter Name:  SCHEDULE-FORCE-SEND
@@ -2456,17 +1968,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
       ignored"; see Section 3.6 of [RFC5546]) when the "SCHEDULE-FORCE-
       SEND" parameter is set to an iana-token value they do not
       recognize.
-
-
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 44]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
 
    Example:
 
@@ -2517,13 +2018,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
       Clients MUST NOT include this parameter in any scheduling messages
       that they themselves send.
 
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 45]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
       Values for this property parameter are described in Section 3.2.9.
 
    Example:
@@ -2572,14 +2066,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
 
    All scheduling object resources MUST support the Schedule-Tag header.
 
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 46]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
      Schedule-Tag = "Schedule-Tag" ":" opaque-tag
      ; "opaque-tag" is defined in Section 3.11 of [RFC2616].
 
@@ -2626,16 +2112,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
 
    COPY/MOVE behavior:  This property value SHOULD be kept during a MOVE
       operation, and SHOULD be copied and preserved in a COPY.
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 47]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    Description:  This property SHOULD be defined on all calendar
       collections.  If present, it contains one of two XML elements that
       indicate whether the calendar object resources in the calendar
@@ -2682,16 +2158,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
 
    COPY/MOVE behavior:  This property is only defined on a scheduling
       Inbox collection that cannot be moved or copied.
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 48]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    Description:  This property MAY be defined on a scheduling Inbox
       collection.  If present, it contains zero or one DAV:href XML
       elements.  When a DAV:href element is present, its value indicates
@@ -2737,16 +2203,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    Definition:
 
      <!ELEMENT schedule-tag (#PCDATA)>
-
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 49]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
 
    Example:
 
@@ -2797,13 +2253,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
 
    Namespace:  urn:ietf:params:xml:ns:caldav
 
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 50]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    Purpose:  The calendar user address that the enclosing response for a
       POST method request is for.
 
@@ -2848,17 +2297,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    particular, servers SHOULD enforce CALDAV:max-resource-size, CALDAV:
    max-instances, and CALDAV:max-attendees-per-instance preconditions as
    applicable for scheduling Inbox and Outbox collections.
-
-
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 51]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
 
 11.2.  Verifying Scheduling Operations
 
@@ -2909,13 +2347,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
        under this privilege, on the scheduling Outbox collection
        targeted by the request.
 
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 52]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    3.  Servers MUST only return valid freebusy information for
        recipients when the CALDAV:schedule-deliver privilege, or a
        sub-privilege aggregated under this privilege, is granted on the
@@ -2965,13 +2396,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
 
    Eavesdropping and Data Integrity:  Addressed by requiring TLS.
 
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 53]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    Flooding a Calendar:  Addressed by requirements in Section 11.1.
 
    Unauthorized REFRESH Requests:  This specification does not support
@@ -3020,14 +2444,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
 
    Status: standard
 
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 54]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    Author/Change controller: IETF
 
    Specification document(s): this specification (Section 8.3)
@@ -3073,17 +2489,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    process described in Section 8.2.1 of [RFC5545] is used to register
    them.
 
-
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 55]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
 12.4.1.  Schedule Agent Values Registry
 
    The following table has been used to initialize the Schedule Agent
@@ -3124,21 +2529,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    The authors would also like to thank the Calendaring and Scheduling
    Consortium for advice with this specification, and for organizing
    interoperability testing events to help refine it.
-
-
-
-
-
-
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 56]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
 
 14.  References
 
@@ -3185,17 +2575,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
               Interoperability Protocol (iTIP)", RFC 5546,
               December 2009.
 
-
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 57]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    [RFC6125]  Saint-Andre, P. and J. Hodges, "Representation and
               Verification of Domain-Based Application Service Identity
               within Internet Public Key Infrastructure Using X.509
@@ -3214,43 +2593,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    [RFC6047]  Melnikov, A., Ed., "iCalendar Message-Based
               Interoperability Protocol (iMIP)", RFC 6047,
               December 2010.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 58]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
 
 Appendix A.  Scheduling Privileges Summary
 
@@ -3273,7 +2615,6 @@ A.1.  Scheduling Inbox Privileges
    |   schedule-query-freebusy   |         |       |     |        |
    +-----------------------------+---------+-------+-----+--------+
 
-
                                  +----------------------+
                                  | METHOD for VFREEBUSY |
    +-----------------------------+----------------------+
@@ -3284,29 +2625,6 @@ A.1.  Scheduling Inbox Privileges
    |   schedule-deliver-reply    |                      |
    |   schedule-query-freebusy   |          *           |
    +-----------------------------+----------------------+
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 59]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
 
 A.2.  Scheduling Outbox Privileges
 
@@ -3327,7 +2645,6 @@ A.2.  Scheduling Outbox Privileges
    |   schedule-send-reply       |         |   *   |     |        |
    |   schedule-send-freebusy    |         |       |     |        |
    +-----------------------------+---------+-------+-----+--------+
-
 
                                  +----------------------+
                                  | METHOD for VFREEBUSY |
@@ -3354,16 +2671,6 @@ Appendix B.  Example Scheduling Operations
    calendar users hosted by the server.  Calendar users with an email
    address at the "example.org" domain are assumed to not be hosted by
    the server.
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 60]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    In the following examples, the requests and responses are incomplete
    and are only for illustrative purposes.  In particular, HTTP
    authentication headers and behaviors are not shown, even though they
@@ -3413,13 +2720,6 @@ B.1.  Example: "Organizer" Inviting Multiple "Attendees"
    HTTP/1.1 201 Created
    Content-Length: 0
 
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 61]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    Date: Tue, 02 Jun 2009 18:52:54 GMT
    Last-Modified: Tue, 02 Jun 2009 18:52:54 GMT
    ETag: "d85561cfe74a4e785eb4639451b434fb"
@@ -3466,16 +2766,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
     =NEEDS-ACTION;ROLE=REQ-PARTICIPANT;RSVP=TRUE;SCHEDULE-STATUS=
     1.2:mailto:wilfredo@e
     xample.com
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 62]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    ATTENDEE;CN="Bernard Desruisseaux";CUTYPE=INDIVIDUAL;PARTSTAT=
     NEEDS-ACTION;ROLE=REQ-PARTICIPANT;RSVP=TRUE;SCHEDULE-STATUS=
     1.0:mailto:bernard@example.net
@@ -3523,14 +2813,6 @@ B.2.  Example: "Attendee" Receiving an Invitation
    ATTENDEE;CN="Wilfredo Sanchez Vega";CUTYPE=INDIVIDUAL;PARTSTAT
     =NEEDS-ACTION;ROLE=REQ-PARTICIPANT;RSVP=TRUE:mailto:wilfredo@
     example.com
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 63]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
 
    ATTENDEE;CN="Bernard Desruisseaux";CUTYPE=INDIVIDUAL;PARTSTAT=
     NEEDS-ACTION;ROLE=REQ-PARTICIPANT;RSVP=TRUE:mailto:bernard@ex
@@ -3581,13 +2863,6 @@ B.3.  Example: "Attendee" Replying to an Invitation
    ATTENDEE;CN="Cyrus Daboo";CUTYPE=INDIVIDUAL;PARTSTAT=ACCEPTED:
     mailto:cyrus@example.com
 
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 64]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    ATTENDEE;CN="Wilfredo Sanchez Vega";CUTYPE=INDIVIDUAL;PARTSTAT
     =ACCEPTED;ROLE=REQ-PARTICIPANT;RSVP=TRUE:mailto:wilfredo@exam
     ple.com
@@ -3631,18 +2906,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    Schedule-Tag: "8893ee45-eb9d-428f-b53c-c777daf19e41"
    Content-Type: text/calendar; charset="utf-8"
    Content-Length: xxxx
-
-
-
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 65]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
 
    BEGIN:VCALENDAR
    VERSION:2.0
@@ -3689,17 +2952,6 @@ B.4.  Example: "Organizer" Receiving a Reply to an Invitation
    GET /home/cyrus/calendars/inbox/c0a58c27d93f.ics HTTP/1.1
    Host: cal.example.com
 
-
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 66]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    >> Response <<
 
    HTTP/1.1 200 OK
@@ -3744,18 +2996,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    GET /home/cyrus/calendars/work/9263504FD3AD.ics HTTP/1.1
    Host: cal.example.com
 
-
-
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 67]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    >> Response <<
 
    HTTP/1.1 200 OK
@@ -3790,27 +3030,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
     CTION;RSVP=TRUE;SCHEDULE-STATUS=3.7:mailto:mike@example.org
    END:VEVENT
    END:VCALENDAR
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 68]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
 
 B.5.  Example: "Organizer" Requesting Busy Time Information
 
@@ -3861,13 +3080,6 @@ B.5.  Example: "Organizer" Requesting Busy Time Information
    METHOD:REPLY
    BEGIN:VFREEBUSY
 
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 69]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    UID:4FD3AD926350
    DTSTAMP:20090602T200733Z
    DTSTART:20090602T000000Z
@@ -3911,19 +3123,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    </C:response>
    </C:schedule-response>
 
-
-
-
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 70]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
 B.6.  Example: User Attempting to Invite "Attendee" on Behalf of
       "Organizer"
 
@@ -3959,26 +3158,6 @@ B.6.  Example: User Attempting to Invite "Attendee" on Behalf of
     e.net
    END:VEVENT
    END:VCALENDAR
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 71]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
 
    >> Response <<
 
@@ -4029,13 +3208,6 @@ B.7.  Example: "Attendee" Declining an Instance of a Recurring Event
    TZOFFSETTO:-0400
    END:DAYLIGHT
 
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 72]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    END:VTIMEZONE
    BEGIN:VEVENT
    UID:9263504FD3AD
@@ -4079,18 +3251,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    Last-Modified: Tue, 02 Jun 2009 18:52:54 GMT
    ETag: "d85561cfe74a4e785eb4639451b434fb"
    Schedule-Tag: "488177c8-2ea7-4176-a6cb-fab8cfccdea2"
-
-
-
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 73]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
 
    Bernard's participation status update will cause his server to
    deliver a scheduling message to Cyrus.  Cyrus's client will find the
@@ -4141,13 +3301,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    DTEND;TZID=America/Montreal:20090602T160000
    SUMMARY:Review Internet-Draft
 
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 74]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    ORGANIZER;CN="Cyrus Daboo":mailto:cyrus@example.com
    ATTENDEE;CN="Bernard Desruisseaux";PARTSTAT=DECLINED:
     mailto:bernard@example.net
@@ -4197,13 +3350,6 @@ B.8.  Example: "Attendee" Removing an Instance of a Recurring Event
    DTSTART;TZID=America/Montreal:20090601T150000
    DTEND;TZID=America/Montreal:20090601T160000
 
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 75]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    RRULE:FREQ=DAILY;INTERVAL=1;COUNT=5
    EXDATE;TZID=America/Montreal:20090603T150000
    TRANSP:OPAQUE
@@ -4252,14 +3398,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    Content-Type: text/calendar; charset="utf-8"
    Content-Length: xxxx
 
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 76]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
    BEGIN:VCALENDAR
    VERSION:2.0
    PRODID:-//Example Corp.//CalDAV Client//EN
@@ -4296,26 +3434,6 @@ RFC 6638                    CalDAV Scheduling                  June 2012
    END:VEVENT
    END:VCALENDAR
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Daboo & Desruisseaux         Standards Track                   [Page 77]
-
-RFC 6638                    CalDAV Scheduling                  June 2012
-
-
 Authors' Addresses
 
    Cyrus Daboo
@@ -4327,7 +3445,6 @@ Authors' Addresses
    EMail: cyrus@daboo.name
    URI:   http://www.apple.com/
 
-
    Bernard Desruisseaux
    Oracle Corporation
    600 Blvd. de Maisonneuve West
@@ -4337,35 +3454,6 @@ Authors' Addresses
 
    EMail: bernard.desruisseaux@oracle.com
    URI:   http://www.oracle.com/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 Daboo & Desruisseaux         Standards Track                   [Page 78]
 

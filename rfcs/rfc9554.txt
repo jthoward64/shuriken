@@ -1,13 +1,9 @@
 ﻿
-
-
-
 Internet Engineering Task Force (IETF)                       R. Stepanek
 Request for Comments: 9554                                      Fastmail
 Updates: 6350                                                M. Loffredo
 Category: Standards Track                                        IIT-CNR
 ISSN: 2070-1721                                                 May 2024
-
 
                  vCard Format Extensions for JSContact
 
@@ -984,7 +980,6 @@ Authors' Addresses
    Melbourne VIC 8007
    Australia
    Email: rsto@fastmailteam.com
-
 
    Mario Loffredo
    IIT-CNR

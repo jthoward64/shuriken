@@ -1,15 +1,10 @@
 
 
-
-
-
-
 Internet Engineering Task Force (IETF)                          C. Daboo
 Request for Comments: 7953                                         Apple
 Updates: 4791, 5545, 6638                                    M. Douglass
 Category: Standards Track                            Spherical Cow Group
 ISSN: 2070-1721                                              August 2016
-
 
                          Calendar Availability
 
@@ -41,24 +36,6 @@ Status of This Memo
    Information about the current status of this document, any errata,
    and how to provide feedback on it may be obtained at
    http://www.rfc-editor.org/info/rfc7953.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Daboo & Douglass             Standards Track                    [Page 1]
-
-RFC 7953                  Calendar Availability              August 2016
-
 
 Copyright Notice
 
@@ -99,22 +76,6 @@ Table of Contents
    Appendix B.  Example Calendar #2  . . . . . . . . . . . . . . . .  23
    Acknowledgements  . . . . . . . . . . . . . . . . . . . . . . . .  24
    Authors' Addresses  . . . . . . . . . . . . . . . . . . . . . . .  24
-
-
-
-
-
-
-
-
-
-
-
-
-Daboo & Douglass             Standards Track                    [Page 2]
-
-RFC 7953                  Calendar Availability              August 2016
-
 
 1.  Introduction
 
@@ -164,14 +125,6 @@ RFC 7953                  Calendar Availability              August 2016
    "OPTIONAL" in this document are to be interpreted as described in
    [RFC2119].
 
-
-
-
-Daboo & Douglass             Standards Track                    [Page 3]
-
-RFC 7953                  Calendar Availability              August 2016
-
-
    When XML element types in the namespaces "DAV:" and
    "urn:ietf:params:xml:ns:caldav" are referenced in this document
    outside of the context of an XML fragment, the string "DAV:" and
@@ -218,16 +171,6 @@ RFC 7953                  Calendar Availability              August 2016
    Purpose:  Provide a grouping of component properties and
       subcomponents that describe the availability associated with a
       calendar user.
-
-
-
-
-
-Daboo & Douglass             Standards Track                    [Page 4]
-
-RFC 7953                  Calendar Availability              August 2016
-
-
    Format Definition:  A "VAVAILABILITY" calendar component is defined
       by the following notation:
 
@@ -269,20 +212,6 @@ RFC 7953                  Calendar Availability              August 2016
    availablec  = "BEGIN" ":" "AVAILABLE" CRLF
                 availableprop
                 "END" ":" "AVAILABLE" CRLF
-
-
-
-
-
-
-
-
-
-
-Daboo & Douglass             Standards Track                    [Page 5]
-
-RFC 7953                  Calendar Availability              August 2016
-
 
    availableprop  = *(
                  ;
@@ -329,17 +258,6 @@ RFC 7953                  Calendar Availability              August 2016
       overridden using normal iCalendar recurrence behavior (i.e., use
       of the "RECURRENCE-ID" property).
 
-
-
-
-
-
-
-Daboo & Douglass             Standards Track                    [Page 6]
-
-RFC 7953                  Calendar Availability              August 2016
-
-
       If specified, the "DTSTART" and "DTEND" properties in
       "VAVAILABILITY" components and "AVAILABLE" subcomponents MUST be
       "DATE-TIME" values specified as either the date with UTC time or
@@ -384,18 +302,6 @@ RFC 7953                  Calendar Availability              August 2016
    END:AVAILABLE
    END:VAVAILABILITY
 
-
-
-
-
-
-
-
-Daboo & Douglass             Standards Track                    [Page 7]
-
-RFC 7953                  Calendar Availability              August 2016
-
-
       The following is an example of a "VAVAILABILITY" calendar
       component used to represent the availability of a user available
       Monday through Thursday, 9:00 am to 5:00 pm, at the main office,
@@ -436,21 +342,6 @@ RFC 7953                  Calendar Availability              August 2016
       The last of these has no DTEND so it continues on "forever".  This
       example shows one way "blocks" of available time can be
       represented.  See Section 4 for another approach using priorities.
-
-
-
-
-
-
-
-
-
-
-
-Daboo & Douglass             Standards Track                    [Page 8]
-
-RFC 7953                  Calendar Availability              August 2016
-
 
    BEGIN:VAVAILABILITY
    ORGANIZER:mailto:bernard@example.com
@@ -496,17 +387,6 @@ RFC 7953                  Calendar Availability              August 2016
    LOCATION:Montreal
    END:AVAILABLE
    END:VAVAILABILITY
-
-
-
-
-
-
-
-Daboo & Douglass             Standards Track                    [Page 9]
-
-RFC 7953                  Calendar Availability              August 2016
-
 
 3.2.  Busy Time Type
 
@@ -557,13 +437,6 @@ RFC 7953                  Calendar Availability              August 2016
    Rather than modify their existing availability, the "PRIORITY"
    property allows new "VAVAILABILITY" components to override others of
 
-
-
-Daboo & Douglass             Standards Track                   [Page 10]
-
-RFC 7953                  Calendar Availability              August 2016
-
-
    lower ordinal priority.  Note that iCalendar [RFC5545] defines the
    "PRIORITY" property such that a value of 0 is undefined, 1 is the
    highest priority, and 9 is the lowest.
@@ -610,16 +483,6 @@ RFC 7953                  Calendar Availability              August 2016
    existing ones, with priority 3 (shown as {d} in the table).  As seen
    in the table, additional "slots" are open for more "VAVAILABILITY"
    components to be added with other priorities if needed.
-
-
-
-
-
-Daboo & Douglass             Standards Track                   [Page 11]
-
-RFC 7953                  Calendar Availability              August 2016
-
-
             +-----+----+----+-----+----+-----+----+-----+----+------+
             | Low |    |    |     |    |     |    |     |    | High |
             +-----+----+----+-----+----+-----+----+-----+----+------+
@@ -667,14 +530,6 @@ RFC 7953                  Calendar Availability              August 2016
 
        D.  Append the "VAVAILABILITY" component to a list of components
            for further processing in step 3, if it has not been ignored.
-
-
-
-
-Daboo & Douglass             Standards Track                   [Page 12]
-
-RFC 7953                  Calendar Availability              August 2016
-
 
    3.  For each "VAVAILABILITY" component in the list resulting from
        step 2, in order from the first item to the last item:
@@ -725,13 +580,6 @@ RFC 7953                  Calendar Availability              August 2016
    time range of 8:00 am to 6:00 pm, together with one "VEVENT"
    component representing a two hour meeting starting at 12:00 pm.
 
-
-
-Daboo & Douglass             Standards Track                   [Page 13]
-
-RFC 7953                  Calendar Availability              August 2016
-
-
    A free-busy request for Monday, 6th November 2011, midnight to
    midnight in the America/Montreal time zone would be calculated as
    follows using the steps described above.
@@ -778,16 +626,6 @@ RFC 7953                  Calendar Availability              August 2016
    | 3.P1 | U  | U  | U  | U  | U  | F  | F  | F  | F  | F  | U  | U  |
    | 4.   | U  | U  | U  | U  | U  | F  | F  | B  | F  | F  | U  | U  |
    +------+----+----+----+----+----+----+----+----+----+----+----+----+
-
-
-
-
-
-Daboo & Douglass             Standards Track                   [Page 14]
-
-RFC 7953                  Calendar Availability              August 2016
-
-
 6.  Use with iTIP
 
    This specification does not define how "VAVAILABILITY" components are
@@ -828,21 +666,6 @@ RFC 7953                  Calendar Availability              August 2016
    Processing of "VAVAILABILITY" components MUST conform to all the
    requirements CalDAV imposes on calendar object resources (see
    Section 4.1 of [RFC4791]).
-
-
-
-
-
-
-
-
-
-
-
-Daboo & Douglass             Standards Track                   [Page 15]
-
-RFC 7953                  Calendar Availability              August 2016
-
 
 7.2.  New Features in CalDAV
 
@@ -892,14 +715,6 @@ RFC 7953                  Calendar Availability              August 2016
    "DTEND" value MUST be a "DATE-TIME" value equal to or after the
    "DTSTART" value, if specified.
 
-
-
-
-Daboo & Douglass             Standards Track                   [Page 16]
-
-RFC 7953                  Calendar Availability              August 2016
-
-
        +------------------------------------------------------------+
        | VAVAILABILITY has the DTSTART property?                    |
        |   +--------------------------------------------------------+
@@ -948,14 +763,6 @@ RFC 7953                  Calendar Availability              August 2016
       availability scenarios, clients can store multiple "VAVAILABILITY"
       components in the calendar user's calendar collections.
 
-
-
-
-Daboo & Douglass             Standards Track                   [Page 17]
-
-RFC 7953                  Calendar Availability              August 2016
-
-
    Description:  This property allows a user to specify their
       availability by including an "VAVAILABILITY" component in the
       value of this property.  If present, the server MUST use this
@@ -1002,16 +809,6 @@ RFC 7953                  Calendar Availability              August 2016
    the CALDAV:calendar-availability property on the owner's Inbox MUST
    also be included in the free-busy calculation.  Processing of all
    such "VAVAILABILITY" components is done as per Section 5.
-
-
-
-
-
-Daboo & Douglass             Standards Track                   [Page 18]
-
-RFC 7953                  Calendar Availability              August 2016
-
-
 8.  Security Considerations
 
    Calculation of availability information, particularly with multiple
@@ -1053,20 +850,6 @@ RFC 7953                  Calendar Availability              August 2016
 
    Privacy considerations in [RFC5545], [RFC5546], [RFC4791], [RFC6638],
    and [RFC7809] MUST also be adhered to.
-
-
-
-
-
-
-
-
-
-
-Daboo & Douglass             Standards Track                   [Page 19]
-
-RFC 7953                  Calendar Availability              August 2016
-
 
 10.  IANA Considerations
 
@@ -1117,13 +900,6 @@ RFC 7953                  Calendar Availability              August 2016
               DOI 10.17487/RFC5546, December 2009,
               <http://www.rfc-editor.org/info/rfc5546>.
 
-
-
-Daboo & Douglass             Standards Track                   [Page 20]
-
-RFC 7953                  Calendar Availability              August 2016
-
-
    [RFC6638]  Daboo, C. and B. Desruisseaux, "Scheduling Extensions to
               CalDAV", RFC 6638, DOI 10.17487/RFC6638, June 2012,
               <http://www.rfc-editor.org/info/rfc6638>.
@@ -1131,54 +907,6 @@ RFC 7953                  Calendar Availability              August 2016
    [RFC7809]  Daboo, C., "Calendaring Extensions to WebDAV (CalDAV):
               Time Zones by Reference", RFC 7809, DOI 10.17487/RFC7809,
               March 2016, <http://www.rfc-editor.org/info/rfc7809>.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Daboo & Douglass             Standards Track                   [Page 21]
-
-RFC 7953                  Calendar Availability              August 2016
-
 
 Appendix A.  Example Calendar #1
 
@@ -1206,35 +934,6 @@ Appendix A.  Example Calendar #1
    END:AVAILABLE
    END:VAVAILABILITY
    END:VCALENDAR
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Daboo & Douglass             Standards Track                   [Page 22]
-
-RFC 7953                  Calendar Availability              August 2016
-
 
 Appendix B.  Example Calendar #2
 
@@ -1281,17 +980,6 @@ Appendix B.  Example Calendar #2
    END:VAVAILABILITY
    END:VCALENDAR
 
-
-
-
-
-
-
-Daboo & Douglass             Standards Track                   [Page 23]
-
-RFC 7953                  Calendar Availability              August 2016
-
-
 Acknowledgements
 
    Thanks to the following for providing feedback: Toby Considine,
@@ -1310,7 +998,6 @@ Authors' Addresses
    Email: cyrus@daboo.name
    URI:   http://www.apple.com/
 
-
    Michael Douglass
    Spherical Cow Group
    226 3rd Street
@@ -1319,29 +1006,6 @@ Authors' Addresses
 
    Email: mdouglass@sphericalcowgroup.com
    URI:   http://sphericalcowgroup.com
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 Daboo & Douglass             Standards Track                   [Page 24]
 

@@ -8,13 +8,24 @@
 - **Public .ics URL subscriptions** to allow external calendar access
 - **Public .ics URL sharing** for distributing calendars and contacts
 - **User and group sharing** for collaborative calendar/contact management
+- **Casbin-based authorization** for fine-grained access control
+- **Principal-based ACL system** for unified identity management
 
 ## Architecture Principles
 
 ### Module Organization
 
 - `src/component/` contains internal service logic and domain models
+  - `auth/` - Authentication (Casbin) and authorization logic
+  - `config/` - Configuration management
+  - `db/` - Database connection, schema, queries, and mappings
+  - `error/` - Custom error types using thiserror
+  - `middleware/` - HTTP middleware (auth, etc.)
+  - `model/` - Domain models (user, group)
+  - `remote/` - External integrations (holiday, .ics subscriptions)
+  - `rfc/` - RFC parsers and validators (DAV, iCal, vCard)
 - `src/app/` handles HTTP API routing and request/response handling
+  - `api/` - HTTP endpoints organized by protocol (CalDAV, CardDAV, app-specific)
 - `src/util/` provides reusable utilities and helpers
 - Keep modules focused and single-responsibility
 - Break complex logic into smaller, composable functions
@@ -65,14 +76,18 @@ impl Seeder for MySeeder {
   - Manages Postgres connections and async query execution
   - Use diesel's type system to prevent SQL injection
   - Leverage migrations for schema changes
+- **diesel-guard**: Additional utilities for Diesel
+- **diesel-async-adapter**: Adapter for compatibility between diesel and diesel-async
 
 #### Schema & Migrations
 
-- **Schema source of truth**: The auto-generated schema in `src/app/db/schema/mod.rs` is always the most up-to-date representation of the database structure
+- **Schema source of truth**: The auto-generated schema in `src/component/db/schema.rs` is always the most up-to-date representation of the database structure
 - **Migration style**: Write migrations with SQL comments that document tables and columns—these comments are preserved by Diesel and appear in the generated schema
 - **UUID v7 IDs**: All primary keys use PostgreSQL 17's native `uuidv7()` function for time-ordered, globally unique identifiers
 - **Naming**: Use `snake_case` for all table and column names
 - **Timestamps**: Don't add `created_at` columns—use `uuid_extract_timestamp(id)` to get creation time from UUID v7. Only include `updated_at` when modification tracking is needed
+- **Auto-updated timestamps**: Use `SELECT diesel_manage_updated_at('table_name');` in migrations to auto-update `updated_at` columns
+- **Soft deletes**: Use `deleted_at TIMESTAMPTZ` columns for soft-delete functionality where appropriate (undo window / pending purge)
 
 **Example migration pattern:**
 ```sql
@@ -81,6 +96,8 @@ CREATE TABLE users (
     name TEXT NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+SELECT diesel_manage_updated_at('users');
 
 COMMENT ON TABLE users IS 'User accounts for the CalDAV/CardDAV server';
 COMMENT ON COLUMN users.id IS 'UUID v7 primary key';
@@ -99,41 +116,49 @@ fn all() -> BoxedQuery<'static> {
     users::table.select(User::as_select()).into_boxed()
 }
 
-fn by_id(id: i32) -> BoxedQuery<'static> {
+fn by_id(id: uuid::Uuid) -> BoxedQuery<'static> {
     all().filter(users::id.eq(id)).into_boxed()
 }
 
 // Usage: compose further
-let user = by_id(42).inner_join(profiles::table).select(...).first(conn)?;
+let user = by_id(user_id).inner_join(profiles::table).select(...).first(conn)?;
 ```
 
 ```rust
 // ❌ Avoid: Functions that take connection and execute
-fn by_id(id: i32, conn: &mut PgConnection) -> QueryResult<User> {
+fn by_id(id: uuid::Uuid, conn: &mut PgConnection) -> QueryResult<User> {
     users::table.find(id).first(conn)  // Can't reuse or compose
 }
 ```
 
 Use `#[diesel::dsl::auto_type]` to avoid complex explicit return types. Extract SQL expressions into filter functions using `AsExpression` for type flexibility.
 
+**Query Module Organization:**
+- Place query composition functions in `src/component/db/query/` organized by domain
+- Query functions should be pure and return `BoxedQuery` for flexibility
+- Keep query logic separate from models to maintain clean separation of concerns
+
 ### Serialization
 - **serde** + **serde_derive**: Serialization/deserialization for config and API payloads
+- **serde_json**: JSON serialization/deserialization
 - **quick-xml**: XML parsing for RFC compliance (CalDAV/CardDAV standards)
 - **chrono** & **chrono-tz**: Date/time handling with timezone support
-- **uuid**: Unique identifiers for resources
+- **uuid**: Unique identifiers for resources (using v7 for time-ordered IDs)
 
 ### Networking & HTTP
 - **reqwest**: HTTP client for making external requests (public .ics subscriptions)
 - **ipnetwork**: IP address/network utilities for access control
 
-### Parsing & Configuration
-- **pest**: Parser combinator for custom DSL parsing if needed
+### Authorization & Configuration
+- **casbin**: Authorization enforcement library for ACL
 - **config**: Configuration management from environment variables and files
-- **thiserror**: Error type derive macros for component-level error handling
+- **dotenv**: Load environment variables from .env files
 
-### Quality & Debugging
+### Parsing & Quality
+- **pest**: Parser combinator for custom DSL parsing if needed
+- **thiserror**: Error type derive macros for component-level error handling
 - **anyhow**: Error context for main application logic
-- **tracing**: Structured logging and debugging
+- **tracing** & **tracing-subscriber**: Structured logging and debugging
 
 ## Error Handling Strategy
 
@@ -145,20 +170,29 @@ Use `#[diesel::dsl::auto_type]` to avoid complex explicit return types. Extract 
 ### Use `thiserror` for:
 - Internal component errors with specific error variants
 - Errors that get propagated within the service layer
-- Define custom error types in `src/component/error/`
+- Define custom error types in `src/component/error/mod.rs`
 
 **Example:**
 ```rust
 // component/error/mod.rs - Use thiserror
 #[derive(thiserror::Error, Debug)]
-pub enum DatabaseError {
+pub enum Error {
     #[error("User not found: {0}")]
     UserNotFound(uuid::Uuid),
     #[error("Invalid query")]
     InvalidQuery,
+    #[error("Database error: {0}")]
+    DatabaseError(#[from] diesel::result::Error),
 }
 
-// app/mod.rs - Convert to anyhow at API boundary
+pub type Result<T> = std::result::Result<T, Error>;
+
+// In components - Use component::error::Result
+pub fn get_user(id: uuid::Uuid) -> crate::component::error::Result<User> {
+    // ... implementation
+}
+
+// app/mod.rs - Convert to anyhow at API boundary if needed
 let user = db::get_user(id).map_err(|e| anyhow::anyhow!("DB error: {}", e))?;
 ```
 
@@ -170,6 +204,26 @@ let user = db::get_user(id).map_err(|e| anyhow::anyhow!("DB error: {}", e))?;
 - Add inline comments explaining non-obvious logic or important decisions
 - Comment WHY code does something, not WHAT it does
 - Use `// TODO:` or `// FIXME:` for known limitations or future improvements
+- Comments should be markdown formatted with the following sections (each with `##` header level) where applicable:
+    - **Summary**: A brief overview of what the code does
+    - **Side Effects**: Any important side effects or considerations
+    - **Errors**: Possible error conditions and how they are handled
+    - **Panics**: Conditions that may lead to panics
+
+**Example:**
+```rust
+/// ## Summary
+/// Creates a new database connection pool.
+///
+/// ## Errors
+/// Returns an error if the pool cannot be created with the provided database URL.
+///
+/// ## Panics
+/// Panics if the provided database URL is invalid.
+pub async fn create_pool(database_url: &str, size: u32) -> anyhow::Result<()> {
+    // ... implementation
+}
+```
 - Comments should be markdown formatted with the following sections (each with `##` header level) where applicable:
     - **Summary**: A brief overview of what the code does
     - **Side Effects**: Any important side effects or considerations
@@ -231,8 +285,106 @@ Before considering work done:
 
 ## Notable Implementation Details
 
+### Database Schema Overview
+
+The database schema is organized into several key areas:
+
+**Core Identity & Access:**
+- `user` - User accounts with email and display name
+- `auth_user` - External authentication provider mappings (OAuth, LDAP)
+- `group` - Organizational groups for collaborative sharing
+- `group_name` - Group names and aliases (supports multiple names per group)
+- `membership` - Many-to-many relationship between users and groups
+- `principal` - Unified principal namespace for ACL subjects (users, groups, system/public/resource principals)
+- `casbin_rule` - Casbin authorization rules
+
+**DAV Storage (CalDAV/CardDAV):**
+- `dav_collection` - Collections (calendars/addressbooks) owned by principals
+- `dav_entity` - Canonical content entity (shared across collection instances)
+- `dav_instance` - Per-collection resource instance referencing a canonical entity
+- `dav_component` - Component tree for iCalendar/vCard content (e.g., VEVENT, VCARD)
+- `dav_property` - Properties for components with typed value columns
+- `dav_parameter` - Parameters associated with properties
+- `dav_tombstone` - Deletion tombstones for sync correctness after purge
+- `dav_shadow` - Debug shadow storage of inbound/outbound payloads
+
+**Derived Indexes for Queries:**
+- `cal_index` - CalDAV query index (time-range, UID lookups, etc.)
+- `cal_occurrence` - Occurrence expansion cache for recurring components
+- `card_index` - CardDAV query index (FN, UID, full-text search)
+- `card_email` - Indexed vCard email addresses
+- `card_phone` - Indexed vCard phone numbers
+
+**Key Design Patterns:**
+- Entity/Instance separation allows sharing content across multiple collections
+- Soft deletes (`deleted_at`) provide undo windows and pending purge functionality
+- Monotonic sync tokens and revisions enable efficient client synchronization
+- Component tree structure supports nested iCalendar/vCard components
+- Typed value columns in `dav_property` ensure deterministic serialization
+
+### Code Organization
+
+**Model Layer** (`src/component/model/`):
+- Models use Diesel derives: `Queryable`, `Selectable`, `Identifiable`, `Insertable`, `AsChangeset`
+- Separate structs for querying (`User`) and insertion (`NewUser`)
+- Models are organized by domain (user, group) with submodules for related entities
+- Use `Associations` derive and `#[diesel(belongs_to(...))]` for relationships
+- All models check for Postgres backend with `#[diesel(check_for_backend(Pg))]`
+
+**Model Pattern Example:**
+```rust
+// Query struct
+#[derive(Debug, Clone, Queryable, Selectable, Identifiable)]
+#[diesel(table_name = schema::user)]
+#[diesel(check_for_backend(Pg))]
+pub struct User {
+    pub id: uuid::Uuid,
+    pub name: String,
+    pub email: String,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+    pub principal_id: uuid::Uuid,
+}
+
+// Insert struct
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = schema::user)]
+pub struct NewUser<'a> {
+    pub name: &'a str,
+    pub email: &'a str,
+    pub principal_id: uuid::Uuid,
+}
+
+// Association example
+#[derive(Debug, Identifiable, Queryable, Selectable, Associations)]
+#[diesel(table_name = schema::auth_user)]
+#[diesel(check_for_backend(Pg))]
+#[diesel(belongs_to(User, foreign_key = user_id))]
+pub struct AuthUser {
+    pub id: uuid::Uuid,
+    pub auth_source: String,
+    pub auth_id: String,
+    pub user_id: uuid::Uuid,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+```
+
+**Database Layer** (`src/component/db/`):
+- `connection.rs` - Pool management using `OnceLock` for global singleton
+- `schema.rs` - Auto-generated Diesel schema (never edit manually)
+- `query/` - Query composition functions (currently empty, to be populated)
+- `map/` - Mapping functions between database and domain models (to be implemented)
+
+**Authentication & Authorization** (`src/component/auth/`):
+- `casbin.rs` - Casbin enforcer integration
+- `authenticate.rs` - Authentication logic
+- Uses principal-based ACL system for unified identity management
+
+### Implementation Guidelines
+
 - All database operations are async via diesel-async
+- Use `DbPool` and `DbConnection<'pool>` types from `src/component/db/connection.rs`
+- Global database pool is initialized once with `create_pool()` and accessed via `connect()`
 - Public .ics URLs should validate access permissions before serving
-- Sharing logic must handle both individual users and groups correctly
+- Sharing logic must handle both individual users and groups correctly via principals
 - Configuration is environment-variable driven; see `src/component/config/mod.rs` for adding new settings
 - CalDAV/CardDAV RFC compliance is managed in `src/component/rfc/`

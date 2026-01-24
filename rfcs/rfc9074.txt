@@ -1,13 +1,9 @@
 ﻿
-
-
-
 Internet Engineering Task Force (IETF)                          C. Daboo
 Request for Comments: 9074                                         Apple
 Updates: 5545                                          K. Murchison, Ed.
 Category: Standards Track                                       Fastmail
 ISSN: 2070-1721                                              August 2021
-
 
                    "VALARM" Extensions for iCalendar
 
@@ -834,7 +830,6 @@ Authors' Addresses
 
    Email: cyrus@daboo.name
    URI:   http://www.apple.com/
-
 
    Kenneth Murchison (editor)
    Fastmail US LLC

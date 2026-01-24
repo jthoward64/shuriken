@@ -1,13 +1,9 @@
 ﻿
-
-
-
 Internet Engineering Task Force (IETF)                       M. Douglass
 Request for Comments: 9253                                      Bedework
 Updates: 5545                                                August 2022
 Category: Standards Track                                               
 ISSN: 2070-1721
-
 
                   Support for iCalendar Relationships
 
@@ -632,7 +628,6 @@ Table of Contents
       notation:
 
         refid      = "REFID" refidparam ":" text CRLF
-
 
         refidparam      = *(";" other-param)
 

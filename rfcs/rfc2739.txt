@@ -1,9 +1,3 @@
-
-
-
-
-
-
 Network Working Group                                            T. Small
 Request for Comments: 2739                                  XpertSite.Com
 Category: Standards Track                                     D. Hennessy
@@ -12,9 +6,7 @@ Category: Standards Track                                     D. Hennessy
                                                                     Lotus
                                                              January 2000
 
-
                  Calendar Attributes for vCard and LDAP
-
 
 Status of this Memo
 
@@ -48,17 +40,6 @@ Abstract
    - Personal data exchange using the vCard format; and
 
    - Directory lookup using the LDAP protocol.
-
-
-
-
-
-
-
-Small, et al.               Standards Track                     [Page 1]
-
-RFC 2739                Locating a Calendar User            January 2000
-
 
 Table of Contents
 
@@ -95,26 +76,6 @@ Table of Contents
    6 Authors' Addresses...............................................13
    7 Bibliography.....................................................15
    8 Full Copyright Statement.........................................16
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Small, et al.               Standards Track                     [Page 2]
-
-RFC 2739                Locating a Calendar User            January 2000
-
 
 1  Calendaring and Scheduling URIs
 
@@ -158,19 +119,6 @@ RFC 2739                Locating a Calendar User            January 2000
    URI points to a file resource, it is recommended that the file
    extension be "ifb" to distinguish it from an arbitrary iCalendar
    object (e.g., with the "ics" file extension).
-
-
-
-
-
-
-
-
-
-Small, et al.               Standards Track                     [Page 3]
-
-RFC 2739                Locating a Calendar User            January 2000
-
 
 1.2 Calendar Access URI (CAPURI)
 
@@ -221,13 +169,6 @@ RFC 2739                Locating a Calendar User            January 2000
    can communicate these URIs to other users. The following section
    outlines how these URIs can be distributed to other users.
 
-
-
-Small, et al.               Standards Track                     [Page 4]
-
-RFC 2739                Locating a Calendar User            January 2000
-
-
 2.1 Manual Transfer
 
    The simplest way to obtain these URIs is for a user to communicate
@@ -266,23 +207,6 @@ RFC 2739                Locating a Calendar User            January 2000
 
    One of these properties can be designated as the "default" by adding
    the "PREF" parameter.
-
-
-
-
-
-
-
-
-
-
-
-
-
-Small, et al.               Standards Track                     [Page 5]
-
-RFC 2739                Locating a Calendar User            January 2000
-
 
    Here is a simple example of a vCard containing a "FBURL" and a
    "CALURI".
@@ -329,17 +253,6 @@ RFC 2739                Locating a Calendar User            January 2000
 
    Intended usage: Refer to section 1.1.
 
-
-
-
-
-
-
-Small, et al.               Standards Track                     [Page 6]
-
-RFC 2739                Locating a Calendar User            January 2000
-
-
    Type examples:
 
       FBURL;PREF:http://www.host1.com/busy/janedoe
@@ -370,31 +283,6 @@ RFC 2739                Locating a Calendar User            January 2000
    Type examples:
 
       CALADRURI;PREF:mailto:janedoe@host.com
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Small, et al.               Standards Track                     [Page 7]
-
-RFC 2739                Locating a Calendar User            January 2000
-
 
 2.3.3  CAPURI Property IANA Registration
 
@@ -442,16 +330,6 @@ RFC 2739                Locating a Calendar User            January 2000
    should be "ics".
 
    Intended usage: Refer to section 1.4.
-
-
-
-
-
-Small, et al.               Standards Track                     [Page 8]
-
-RFC 2739                Locating a Calendar User            January 2000
-
-
    Type examples:
 
       CALURI;PREF:http://cal.host1.com/calA
@@ -500,13 +378,6 @@ RFC 2739                Locating a Calendar User            January 2000
    used to communicate with the user's calendar. The calCalAdrURI
    contains a URI that points to the location to which event requests
    should be sent for that user.
-
-
-
-Small, et al.               Standards Track                     [Page 9]
-
-RFC 2739                Locating a Calendar User            January 2000
-
 
    The calOtherCalURIs is a multi-valued property containing URIs to
    snapshots of other calendars that the user may have. The
@@ -557,13 +428,6 @@ RFC 2739                Locating a Calendar User            January 2000
         NAME 'calFBURL'
         EQUALITY caseIgnoreMatch
 
-
-
-Small, et al.               Standards Track                    [Page 10]
-
-RFC 2739                Locating a Calendar User            January 2000
-
-
         SUBSTRING caseIgnoreMatch
         SYNTAX 'IA5String'
         USAGE userApplications
@@ -610,16 +474,6 @@ RFC 2739                Locating a Calendar User            January 2000
         MULTI-VALUE
         USAGE userApplications
       )
-
-
-
-
-
-Small, et al.               Standards Track                    [Page 11]
-
-RFC 2739                Locating a Calendar User            January 2000
-
-
 2.4.4.7  calOtherCAPURIs
 
       (1.2.840.113556.1.4.484
@@ -668,14 +522,6 @@ RFC 2739                Locating a Calendar User            January 2000
    an entity other than that represented by the vCard. Recipients should
    be certain of the source that generated the vCard.
 
-
-
-
-Small, et al.               Standards Track                    [Page 12]
-
-RFC 2739                Locating a Calendar User            January 2000
-
-
    Also, care should be taken in making use of information obtained from
    directory servers that has been supplied by client, as it may now be
    out of date. In many networks, for example, IP addresses are
@@ -722,16 +568,6 @@ RFC 2739                Locating a Calendar User            January 2000
    EMAIL;TYPE=INTERNET:denis.hennessy@isocor.com
    CALADRURI:MAILTO:denis.hennessy@isocor.com
    END:VCARD
-
-
-
-
-
-Small, et al.               Standards Track                    [Page 13]
-
-RFC 2739                Locating a Calendar User            January 2000
-
-
    BEGIN:VCARD
    VERSION:3.0
    N:Dawson;Frank
@@ -766,28 +602,6 @@ RFC 2739                Locating a Calendar User            January 2000
    CALADRURI:MAILTO:pregen@egenconsulting.com
    END:VCARD
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Small, et al.               Standards Track                    [Page 14]
-
-RFC 2739                Locating a Calendar User            January 2000
-
-
 7  Bibliography
 
    [1] Wahl, M., Howes, T. and S. Kille, "Lightweight Directory Access
@@ -805,44 +619,6 @@ RFC 2739                Locating a Calendar User            January 2000
 
    [5] Dawson, F. and S. Mansour, "iCalendar Message-Based
        Interopability Protocal (iMIP)", RFC 2447, November 1997.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Small, et al.               Standards Track                    [Page 15]
-
-RFC 2739                Locating a Calendar User            January 2000
-
 
 8  Full Copyright Statement
 
@@ -876,24 +652,6 @@ Acknowledgement
 
    Funding for the RFC Editor function is currently provided by the
    Internet Society.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 Small, et al.               Standards Track                    [Page 16]
 
