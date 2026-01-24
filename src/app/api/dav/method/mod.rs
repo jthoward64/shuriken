@@ -12,3 +12,5 @@ mod delete_tests;
 mod get_head_tests;
 #[cfg(test)]
 mod options_tests;
+#[cfg(test)]
+mod propfind_tests;
