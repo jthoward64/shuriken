@@ -24,3 +24,6 @@ pub use query_builders::{
     properties_for_component,
 };
 pub use tree::{get_entity_with_tree, replace_entity_tree};
+
+#[cfg(test)]
+mod query_builder_tests;
