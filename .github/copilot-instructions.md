@@ -45,6 +45,26 @@
 - Leverage Rust's type system for safety (e.g., enums for state, newtypes for domain concepts)
 - Add `#[must_use]` to any functions that return a value and have no side effects, basicaly fucntions where if you don't use the return value there is no point in calling them
 
+### Testability & Side-Effect Isolation
+
+- **Default to pure functions**: parsing, validation, query composition, and response shaping should be pure (inputs → outputs).
+- **Isolate side effects** (DB, Casbin, time, randomness/UUIDs, network, filesystem) behind small, discrete APIs.
+- **Prefer parameter injection** over reaching into globals:
+    - Services should accept `&mut DbConnection<'_>` and an authorizer wrapper (or `impl Authorizer`) as parameters.
+    - HTTP handlers are allowed to acquire connections/enforcer wrappers from globals and pass them down.
+- **Short functions are testable functions**:
+    - Keep functions <40 lines when possible.
+    - Split large handlers into: header/body parsing helpers + service call + response serialization.
+- **Avoid “hidden I/O” in helpers**:
+    - `src/component/db/query/*` must stay pure query composition.
+    - `src/component/rfc/*` must not talk to DB or the network.
+- **Mock-friendly boundaries**:
+    - Introduce tiny “ports” traits where needed (`Authorizer`, `Clock`, `HttpClient`) with production and test implementations.
+    - Public traits must express async behavior as `fn ... -> impl Future<Output = ...>` (add `+ Send` when needed).
+- **Test strategy**:
+    - Unit tests: RFC parsers, validators, header parsing, multistatus building.
+    - Integration tests: in-process Salvo `Service` tests and/or real Postgres-backed tests for DB + sync-token/ETag semantics.
+
 ## Dependencies & Usage
 
 ### Core Async & Runtime

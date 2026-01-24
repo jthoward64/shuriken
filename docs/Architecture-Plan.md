@@ -17,6 +17,90 @@ It is written to match the current entrypoints:
 - Keep DB query composition in `src/component/db/query/` (pure functions returning Diesel queries/expressions).
 - Keep files small and narrowly-scoped; prefer more modules over large modules.
 
+## Testability & Side-Effect Isolation
+
+The CalDAV/CardDAV surface area is large and protocol-heavy. The only way to keep it maintainable is to make it trivially testable:
+
+- **Short functions, single responsibility**: aim for <40 lines; if a function needs 2+ paragraphs to explain, split it.
+- **Pure logic is the default**: parsing, validation, query composition, and response-shaping should be pure functions that accept inputs and return outputs.
+- **Side effects live at the edges**: only a few modules should do I/O (DB, network, clock, randomness). Everything else should depend on those modules via small, mockable interfaces.
+
+### What counts as a “side effect” in Shuriken
+
+Treat these as side effects that should be isolated behind discrete APIs:
+
+- **Database I/O** (diesel-async queries, transactions)
+- **Casbin enforcement** (policy store reads + matcher evaluation)
+- **Clock/timezone lookup** (`Utc::now()`, timezone resolution)
+- **UUID / random generation** (`Uuid::new_v4()`, `uuidv7()` generation on the DB side)
+- **Network calls** (ics subscription fetches, future iMIP email sending)
+- **Filesystem / config** (loading config files, reading casbin model)
+
+### Architecture rule: “Handlers are glue; services orchestrate; helpers compute”
+
+- **HTTP handlers (`src/app/`)**
+  - Do: parse request, call service, serialize response.
+  - Don’t: contain business rules or Diesel queries.
+  - Testability: use Salvo’s in-process testing (`Service::new(router)` + `TestClient`) to assert status/headers/body.
+
+- **Services (`src/component/*/service/`)**
+  - Do: sequence operations and own transactions (authorize → validate → read/write → index → bump tokens).
+  - Don’t: build XML or parse headers.
+  - Testability: services should accept dependencies explicitly so they can be swapped in tests.
+
+- **Helpers (`src/component/*/validate`, `src/component/rfc/*`, `src/component/db/query/*`)**
+  - Do: pure computation and composition.
+  - Testability: unit tests with fixtures and golden outputs.
+
+### Dependency injection patterns (Rust-friendly)
+
+Use one of these patterns to keep dependencies mockable without over-engineering:
+
+1. **Parameter injection (preferred)**
+   - Services accept `&mut DbConnection<'_>` and `&Authorizer` (or `impl Authorizer`) and other small deps.
+   - The handler is responsible for obtaining the real connection and passing it in.
+
+2. **Small “ports” traits for side effects**
+   - Define tiny traits in `src/component/*/service/` or `src/component/auth/`:
+     - `Authorizer`: `enforce(subject, object, action) -> Result<()>`
+     - `Clock`: `now_utc() -> DateTime<Utc>`
+     - `HttpClient`: `get(url) -> bytes`
+   - Provide a production implementation that wraps Casbin / chrono / reqwest.
+   - Provide a test implementation that returns deterministic values.
+
+   Note: for **public traits**, keep async methods as `fn foo(&self) -> impl Future<Output = ...>` (your repo standard). For private/internal traits, `async_trait` is acceptable if it keeps code simpler.
+
+3. **Functional core, imperative shell**
+   - Put “decision” logic into pure functions:
+     - “What status code do we return?”
+     - “Which DAV precondition applies?”
+     - “Which properties go into propstat 200 vs 404?”
+   - Then have a thin shell apply those decisions via I/O.
+
+### DB testability rules
+
+- Keep Diesel query construction in `src/component/db/query/*` as **pure** functions that return queries/expressions.
+- Keep DB reads/writes in a small number of “executor” functions (e.g., `store_entity_tx(conn, ...)`), so tests can:
+  - run them against a test Postgres, or
+  - mock the executor at the service layer.
+- Prefer services that take `&mut DbConnection<'_>` rather than calling the global pool directly; this enables test code to:
+  - wrap a whole test in a transaction, or
+  - inject a connection to a temporary schema.
+
+### HTTP/DAV testability rules
+
+- Build DAV XML responses from typed structures (not string concatenation).
+- Centralize multistatus construction helpers so all endpoints produce consistent 207 formatting.
+- Put header parsing into small helpers (Depth, If-Match, Destination) that can be unit tested with table-driven cases.
+
+### “No hidden globals” rule
+
+Globals can exist (DB pool, Casbin enforcer), but business logic should not *reach out* to them implicitly.
+
+- Handlers may access global singletons to acquire a connection/enforcer wrapper.
+- Services should receive dependencies explicitly (arguments/struct fields).
+- This keeps unit tests fast and makes integration tests predictable.
+
 ## Proposed File Layout
 
 ### 1) HTTP API (Salvo) Layer — `src/app/`
