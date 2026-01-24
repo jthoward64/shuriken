@@ -1,3 +1,4 @@
+#![allow(clippy::doc_markdown, clippy::unused_async)]
 //! Tests for DELETE method.
 //!
 //! Verifies resource deletion, tombstone creation, and idempotency.

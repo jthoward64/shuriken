@@ -1,3 +1,4 @@
+#![allow(clippy::doc_markdown, clippy::unused_async)]
 //! Test fixtures for DAV database tests.
 //!
 //! Provides helpers for creating test data: principals, collections, entities, and instances.

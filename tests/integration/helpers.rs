@@ -1,3 +1,4 @@
+#![allow(clippy::doc_markdown, clippy::unused_async)]
 //! Test helpers for integration tests.
 //!
 //! Provides utilities for:

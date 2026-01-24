@@ -1,3 +1,4 @@
+#![allow(clippy::doc_markdown, clippy::unused_async)]
 //! Tests for COPY and MOVE methods.
 //!
 //! Verifies destination rules, href updates, and tombstone generation.

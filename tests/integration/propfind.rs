@@ -1,3 +1,4 @@
+#![allow(clippy::doc_markdown, clippy::unused_async)]
 //! Tests for PROPFIND method.
 //!
 //! Verifies property retrieval, Depth handling, and multistatus responses.

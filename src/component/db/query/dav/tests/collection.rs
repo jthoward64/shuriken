@@ -1,3 +1,4 @@
+#![allow(clippy::doc_markdown, clippy::unused_async)]
 //! Tests for collection operations.
 //!
 //! Verifies CRUD operations, ownership, sync token behavior, and soft-delete filtering.

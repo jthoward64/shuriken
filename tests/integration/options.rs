@@ -1,3 +1,4 @@
+#![allow(clippy::doc_markdown, clippy::unused_async)]
 //! Tests for OPTIONS method.
 //!
 //! Verifies that OPTIONS returns correct Allow and DAV headers.

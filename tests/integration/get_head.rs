@@ -1,3 +1,4 @@
+#![allow(clippy::doc_markdown, clippy::unused_async)]
 //! Tests for GET and HEAD methods.
 //!
 //! Verifies resource retrieval, ETag handling, and conditional requests.
