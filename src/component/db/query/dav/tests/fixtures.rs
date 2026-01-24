@@ -37,10 +37,10 @@ pub fn test_user<'a>(name: &'a str, email: &'a str, principal_id: Uuid) -> NewUs
 
 /// Creates a test calendar collection.
 #[must_use]
-pub fn test_calendar_collection<'a>(
-    uri: &'a str,
+pub fn test_calendar_collection(
+    uri: &str,
     owner_principal_id: Uuid,
-) -> NewDavCollection<'a> {
+) -> NewDavCollection<'_> {
     NewDavCollection {
         uri,
         owner_principal_id,
@@ -53,10 +53,10 @@ pub fn test_calendar_collection<'a>(
 
 /// Creates a test addressbook collection.
 #[must_use]
-pub fn test_addressbook_collection<'a>(
-    uri: &'a str,
+pub fn test_addressbook_collection(
+    uri: &str,
     owner_principal_id: Uuid,
-) -> NewDavCollection<'a> {
+) -> NewDavCollection<'_> {
     NewDavCollection {
         uri,
         owner_principal_id,

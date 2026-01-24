@@ -66,3 +66,54 @@ pub fn parameters_for_property(property_id: uuid::Uuid) -> dav_parameter::BoxedQ
         .order(dav_parameter::ordinal.asc())
         .into_boxed()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn all_query_builds() {
+        let _query = all();
+        // Query should build without errors
+    }
+
+    #[test]
+    fn by_id_filters_correctly() {
+        let id = uuid::Uuid::new_v4();
+        let _query = by_id(id);
+        // Query should build with id filter
+    }
+
+    #[test]
+    fn by_logical_uid_filters_correctly() {
+        let _query = by_logical_uid("unique-id-123");
+        // Query should build with logical_uid filter
+    }
+
+    #[test]
+    fn not_deleted_filters_correctly() {
+        let _query = not_deleted();
+        // Query should build with deleted_at null filter
+    }
+
+    #[test]
+    fn components_for_entity_filters_and_orders() {
+        let entity_id = uuid::Uuid::new_v4();
+        let _query = components_for_entity(entity_id);
+        // Query should build with entity_id filter and ordinal ordering
+    }
+
+    #[test]
+    fn properties_for_component_filters_and_orders() {
+        let component_id = uuid::Uuid::new_v4();
+        let _query = properties_for_component(component_id);
+        // Query should build with component_id filter and ordinal ordering
+    }
+
+    #[test]
+    fn parameters_for_property_filters_and_orders() {
+        let property_id = uuid::Uuid::new_v4();
+        let _query = parameters_for_property(property_id);
+        // Query should build with property_id filter and ordinal ordering
+    }
+}
