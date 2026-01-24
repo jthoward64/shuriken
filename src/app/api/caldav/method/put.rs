@@ -1,10 +1,5 @@
 //! PUT method handler for `CalDAV` calendar objects.
 
-#![allow(dead_code)]
-#![allow(clippy::allow_attributes)]
-#![allow(clippy::expect_used)]
-#![allow(clippy::collapsible_if)]
-
 use salvo::http::{HeaderValue, StatusCode};
 use salvo::{Request, Response, handler};
 
@@ -94,6 +89,7 @@ pub async fn put(req: &mut Request, res: &mut Response) {
 }
 
 /// Result of a PUT operation.
+#[expect(dead_code)]
 enum PutResult {
     /// Resource was created with the given `ETag`.
     Created(String),
@@ -104,6 +100,7 @@ enum PutResult {
 }
 
 /// Errors that can occur during PUT.
+#[expect(dead_code)]
 enum PutError {
     /// Invalid iCalendar data.
     InvalidCalendarData(String),
@@ -113,6 +110,7 @@ enum PutError {
     DatabaseError(anyhow::Error),
 }
 
+#[expect(dead_code)]
 impl From<anyhow::Error> for PutError {
     fn from(e: anyhow::Error) -> Self {
         Self::DatabaseError(e)
@@ -124,8 +122,7 @@ impl From<anyhow::Error> for PutError {
 ///
 /// ## Errors
 /// Returns `PutError` for validation failures, conflicts, or database errors.
-#[allow(clippy::unused_async)]
-#[allow(clippy::too_many_lines)]
+#[expect(clippy::unused_async)]
 async fn perform_put(
     _conn: &mut connection::DbConnection<'_>,
     _path: &str,
@@ -148,11 +145,10 @@ async fn perform_put(
     // - Extract UID
     
     // Check If-None-Match: * (create-only)
-    if let Some(inm) = if_none_match {
-        if inm.to_str().unwrap_or("") == "*" {
-            // TODO: Check if resource already exists
-            // If exists, return PreconditionFailed
-        }
+    if let Some(inm) = if_none_match
+        && inm.to_str().unwrap_or("") == "*" {
+        // TODO: Check if resource already exists
+        // If exists, return PreconditionFailed
     }
     
     // Check If-Match (update precondition)

@@ -1,9 +1,5 @@
 //! GET and HEAD method handlers for `WebDAV` resources.
 
-#![allow(dead_code)]
-#![allow(clippy::allow_attributes)]
-#![allow(clippy::expect_used)]
-
 use salvo::http::{HeaderValue, StatusCode};
 use salvo::{Request, Response, handler};
 
@@ -45,6 +41,7 @@ pub async fn head(req: &mut Request, res: &mut Response) {
 }
 
 /// Shared implementation for GET and HEAD handlers.
+#[expect(dead_code)]
 async fn handle_get_or_head(req: &mut Request, res: &mut Response, _is_head: bool) {
     // Extract the resource path from the request
     let _path = req.uri().path();
@@ -88,6 +85,7 @@ async fn handle_get_or_head(req: &mut Request, res: &mut Response, _is_head: boo
 ///
 /// ## Errors
 /// Returns database errors if the query fails.
+#[expect(dead_code)]
 async fn load_instance(
     conn: &mut connection::DbConnection<'_>,
     collection_id: uuid::Uuid,
@@ -120,6 +118,7 @@ async fn load_instance(
 ///
 /// ## Side Effects
 /// Sets `ETag`, `Last-Modified`, `Content-Type` headers and response body (for GET).
+#[expect(dead_code)]
 fn set_response_headers_and_body(
     res: &mut Response,
     instance: &DavInstance,
@@ -128,8 +127,7 @@ fn set_response_headers_and_body(
 ) {
     // Set ETag header
     if let Ok(etag_value) = HeaderValue::from_str(&instance.etag) {
-        res.add_header("ETag", etag_value, true)
-            .expect("valid header");
+        let _ = res.add_header("ETag", etag_value, true);
     }
     
     // Set Last-Modified header
@@ -137,14 +135,12 @@ fn set_response_headers_and_body(
         .format("%a, %d %b %Y %H:%M:%S GMT")
         .to_string();
     if let Ok(lm_value) = HeaderValue::from_str(&last_modified) {
-        res.add_header("Last-Modified", lm_value, true)
-            .expect("valid header");
+        let _ = res.add_header("Last-Modified", lm_value, true);
     }
     
     // Set Content-Type header
     if let Ok(ct_value) = HeaderValue::from_str(&instance.content_type) {
-        res.add_header("Content-Type", ct_value, true)
-            .expect("valid header");
+        let _ = res.add_header("Content-Type", ct_value, true);
     }
     
     res.status_code(StatusCode::OK);
@@ -161,6 +157,7 @@ fn set_response_headers_and_body(
 ///
 /// Returns true if the request should be served with 304 Not Modified.
 #[must_use]
+#[expect(dead_code)]
 fn check_if_none_match(req: &Request, instance_etag: &str) -> bool {
     if let Some(if_none_match) = req.headers().get("If-None-Match")
         && let Ok(value) = if_none_match.to_str() {

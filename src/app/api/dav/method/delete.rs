@@ -1,8 +1,5 @@
 //! DELETE method handler for `WebDAV` resources.
 
-#![allow(dead_code)]
-#![allow(clippy::allow_attributes)]
-
 use salvo::http::StatusCode;
 use salvo::{Request, Response, handler};
 
@@ -64,7 +61,7 @@ pub async fn delete(req: &mut Request, res: &mut Response) {
 ///
 /// ## Errors
 /// Returns database errors if the operation fails.
-#[allow(clippy::unused_async)]
+#[expect(clippy::unused_async, dead_code)]
 async fn perform_delete(
     _conn: &mut connection::DbConnection<'_>,
     _path: &str,

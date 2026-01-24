@@ -1,10 +1,5 @@
 //! PUT method handler for `CardDAV` vCard objects.
 
-#![allow(dead_code)]
-#![allow(clippy::allow_attributes)]
-#![allow(clippy::expect_used)]
-#![allow(clippy::collapsible_if)]
-
 use salvo::http::{HeaderValue, StatusCode};
 use salvo::{Request, Response, handler};
 
@@ -94,6 +89,7 @@ pub async fn put(req: &mut Request, res: &mut Response) {
 }
 
 /// Result of a PUT operation.
+#[expect(dead_code)]
 enum PutResult {
     /// Resource was created with the given `ETag`.
     Created(String),
@@ -104,6 +100,7 @@ enum PutResult {
 }
 
 /// Errors that can occur during PUT.
+#[expect(dead_code)]
 enum PutError {
     /// Invalid vCard data.
     InvalidVcardData(String),
@@ -124,7 +121,7 @@ impl From<anyhow::Error> for PutError {
 ///
 /// ## Errors
 /// Returns `PutError` for validation failures, conflicts, or database errors.
-#[allow(clippy::unused_async)]
+#[expect(clippy::unused_async, dead_code)]
 async fn perform_put(
     _conn: &mut connection::DbConnection<'_>,
     _path: &str,
@@ -146,11 +143,10 @@ async fn perform_put(
     // - Extract UID and FN (formatted name)
     
     // Check If-None-Match: * (create-only)
-    if let Some(inm) = if_none_match {
-        if inm.to_str().unwrap_or("") == "*" {
-            // TODO: Check if resource already exists
-            // If exists, return PreconditionFailed
-        }
+    if let Some(inm) = if_none_match
+        && inm.to_str().unwrap_or("") == "*" {
+        // TODO: Check if resource already exists
+        // If exists, return PreconditionFailed
     }
     
     // Check If-Match (update precondition)

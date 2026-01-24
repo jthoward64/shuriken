@@ -1,10 +1,5 @@
 //! PROPFIND method handler for `WebDAV` resources.
 
-#![allow(dead_code)]
-#![allow(clippy::allow_attributes)]
-#![allow(clippy::expect_used)]
-#![allow(clippy::else_if_without_else)]
-
 use salvo::http::StatusCode;
 use salvo::{Request, Response, handler};
 
@@ -87,13 +82,12 @@ pub async fn propfind(req: &mut Request, res: &mut Response) {
     
     // Set response
     res.status_code(StatusCode::MULTI_STATUS);
-    res.add_header(
+    let _ = res.add_header(
         "Content-Type",
         salvo::http::HeaderValue::from_static("application/xml; charset=utf-8"),
         true,
-    )
-    .expect("valid header");
-    res.write_body(xml).expect("valid body");
+    );
+    let _ = res.write_body(xml);
 }
 
 /// ## Summary
@@ -104,7 +98,7 @@ pub async fn propfind(req: &mut Request, res: &mut Response) {
 ///
 /// ## Errors
 /// Returns errors for database failures or property resolution issues.
-#[allow(clippy::unused_async)]
+#[expect(dead_code)]
 async fn build_propfind_response(
     conn: &mut connection::DbConnection<'_>,
     req: &Request,
@@ -146,8 +140,7 @@ async fn build_propfind_response(
 ///
 /// ## Errors
 /// Returns errors if property resolution fails.
-#[allow(clippy::unused_async)]
-#[allow(clippy::too_many_lines)]
+#[expect(clippy::unused_async, clippy::too_many_lines)]
 async fn get_properties_for_resource(
     _conn: &mut connection::DbConnection<'_>,
     _path: &str,
@@ -217,6 +210,9 @@ async fn get_properties_for_resource(
                 }
             }
         }
+    } else {
+        // No specific properties requested - this case shouldn't happen
+        // as allprop and propname are already handled above
     }
     
     Ok(properties)

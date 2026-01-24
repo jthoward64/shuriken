@@ -1,15 +1,7 @@
 //! Database <-> canonical DAV mapping helpers.
 //!
 //! This module provides functions to convert between RFC-parsed types
-//! (iCalendar/vCard) and database models (DavEntity, DavComponent, etc.).
-
-#![allow(clippy::cast_possible_truncation)]
-#![allow(clippy::cast_possible_wrap)]
-#![allow(clippy::match_same_arms)]
-#![allow(clippy::unnecessary_wraps)]
-#![allow(clippy::doc_markdown)]
-#![allow(clippy::type_complexity)]
-#![allow(clippy::too_many_arguments)]
+//! (iCalendar/vCard) and database models (`DavEntity`, `DavComponent`, etc.).
 
 use crate::component::model::dav::component::NewDavComponent;
 use crate::component::model::dav::entity::NewDavEntity;
@@ -115,10 +107,11 @@ pub fn vcard_to_db_models<'a>(
         map_vcard_property(
             prop,
             component_id,
-            ordinal as i32,
+            #[expect(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+            { ordinal as i32 },
             &mut properties,
             &mut parameters,
-        )?;
+        );
     }
 
     Ok((entity, components, properties, parameters))
@@ -126,6 +119,7 @@ pub fn vcard_to_db_models<'a>(
 
 /// ## Summary
 /// Recursively maps an iCalendar component and its children to database models.
+#[expect(clippy::too_many_arguments)]
 fn map_ical_component_recursive<'a>(
     component: &'a Component,
     entity_id: uuid::Uuid,
@@ -149,7 +143,8 @@ fn map_ical_component_recursive<'a>(
         map_ical_property(
             prop,
             component_id,
-            prop_ord as i32,
+            #[expect(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+            { prop_ord as i32 },
             properties,
             parameters,
         )?;
@@ -161,7 +156,8 @@ fn map_ical_component_recursive<'a>(
             child,
             entity_id,
             Some(component_id),
-            child_ord as i32,
+            #[expect(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+            { child_ord as i32 },
             components,
             properties,
             parameters,
@@ -202,7 +198,13 @@ fn map_ical_property<'a>(
 
     // Map parameters
     for (param_ord, param) in prop.params.iter().enumerate() {
-        map_ical_parameter(param, property_id, param_ord as i32, parameters);
+        map_ical_parameter(
+            param,
+            property_id,
+            #[expect(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+            { param_ord as i32 },
+            parameters,
+        );
     }
 
     Ok(())
@@ -236,11 +238,11 @@ fn map_vcard_property<'a>(
     ordinal: i32,
     properties: &mut Vec<NewDavProperty<'a>>,
     parameters: &mut Vec<NewDavParameter<'static>>,
-) -> anyhow::Result<()> {
+) {
     let property_id = uuid::Uuid::nil(); // Placeholder
 
     let (value_type, value_text, value_int, value_float, value_bool, value_json) =
-        extract_vcard_value(&prop.value, &prop.raw_value)?;
+        extract_vcard_value(&prop.value, &prop.raw_value);
 
     properties.push(NewDavProperty {
         component_id,
@@ -259,10 +261,14 @@ fn map_vcard_property<'a>(
 
     // Map parameters
     for (param_ord, param) in prop.params.iter().enumerate() {
-        map_vcard_parameter(param, property_id, param_ord as i32, parameters);
+        map_vcard_parameter(
+            param,
+            property_id,
+            #[expect(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+            { param_ord as i32 },
+            parameters,
+        );
     }
-
-    Ok(())
 }
 
 /// ## Summary
@@ -288,7 +294,7 @@ fn map_vcard_parameter(
 /// ## Summary
 /// Extracts typed value fields from an iCalendar Value.
 ///
-/// Returns a tuple of (value_type, value_text, value_int, value_float, value_bool, value_date, value_tstz).
+/// Returns a tuple of (`value_type`, `value_text`, `value_int`, `value_float`, `value_bool`, `value_date`, `value_tstz`).
 #[expect(clippy::type_complexity)]
 fn extract_ical_value<'a>(
     value: &Value,
@@ -324,12 +330,10 @@ fn extract_ical_value<'a>(
             Ok(("datetime", None, None, None, None, None, Some(tstz)))
         }
         Value::Duration(_) | Value::Period(_) | Value::Recur(_) | Value::Time(_)
-        | Value::UtcOffset(_) => {
+        | Value::UtcOffset(_) | Value::Binary(_) | Value::Unknown(_) => {
             // Store complex types as text (raw value)
             Ok(("text", Some(raw), None, None, None, None, None))
         }
-        Value::Binary(_) => Ok(("text", Some(raw), None, None, None, None, None)),
-        Value::Unknown(_) => Ok(("text", Some(raw), None, None, None, None, None)),
     }
 }
 
@@ -339,23 +343,20 @@ fn extract_ical_value<'a>(
 fn extract_vcard_value<'a>(
     value: &VCardValue,
     raw: &'a str,
-) -> anyhow::Result<(
+) -> (
     &'static str,
     Option<&'a str>,
     Option<i64>,
     Option<f64>,
     Option<bool>,
     Option<&'a serde_json::Value>,
-)> {
+) {
     match value {
         VCardValue::Text(_)
         | VCardValue::TextList(_)
         | VCardValue::Uri(_)
-        | VCardValue::LanguageTag(_) => Ok(("text", Some(raw), None, None, None, None)),
-        VCardValue::Integer(i) => Ok(("integer", None, Some(*i), None, None, None)),
-        VCardValue::Float(f) => Ok(("float", None, None, Some(*f), None, None)),
-        VCardValue::Boolean(b) => Ok(("boolean", None, None, None, Some(*b), None)),
-        VCardValue::DateAndOrTime(_)
+        | VCardValue::LanguageTag(_)
+        | VCardValue::DateAndOrTime(_)
         | VCardValue::Timestamp(_)
         | VCardValue::StructuredName(_)
         | VCardValue::Address(_)
@@ -363,12 +364,15 @@ fn extract_vcard_value<'a>(
         | VCardValue::Gender(_)
         | VCardValue::ClientPidMap(_)
         | VCardValue::Related(_)
-        | VCardValue::UtcOffset(_) => {
-            // Store structured types as text (raw)
-            Ok(("text", Some(raw), None, None, None, None))
+        | VCardValue::UtcOffset(_)
+        | VCardValue::Binary(_)
+        | VCardValue::Unknown(_) => {
+            // Store text and structured types as text (raw)
+            ("text", Some(raw), None, None, None, None)
         }
-        VCardValue::Binary(_) => Ok(("text", Some(raw), None, None, None, None)),
-        VCardValue::Unknown(_) => Ok(("text", Some(raw), None, None, None, None)),
+        VCardValue::Integer(i) => ("integer", None, Some(*i), None, None, None),
+        VCardValue::Float(f) => ("float", None, None, Some(*f), None, None),
+        VCardValue::Boolean(b) => ("boolean", None, None, None, Some(*b), None),
     }
 }
 
