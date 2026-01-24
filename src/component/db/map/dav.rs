@@ -3,6 +3,14 @@
 //! This module provides functions to convert between RFC-parsed types
 //! (iCalendar/vCard) and database models (DavEntity, DavComponent, etc.).
 
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_possible_wrap)]
+#![allow(clippy::match_same_arms)]
+#![allow(clippy::unnecessary_wraps)]
+#![allow(clippy::doc_markdown)]
+#![allow(clippy::type_complexity)]
+#![allow(clippy::too_many_arguments)]
+
 use crate::component::model::dav::component::NewDavComponent;
 use crate::component::model::dav::entity::NewDavEntity;
 use crate::component::model::dav::parameter::NewDavParameter;
