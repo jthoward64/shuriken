@@ -7,6 +7,7 @@ use crate::component::{
     config::{AuthMethod, get_config},
     db::{connection::connect, schema},
     error::{Error, Result},
+    model::principal::{NewPrincipal, PrincipalType},
     model::user::{NewUser, User},
 };
 
@@ -44,9 +45,25 @@ async fn authenticate_single_user() -> Result<User> {
     }
 
     // If not, create the user
+    let principal_id = uuid::Uuid::now_v7();
+    let principal_uri = format!("/principals/users/{principal_id}");
+
+    let new_principal = NewPrincipal {
+        id: principal_id,
+        principal_type: PrincipalType::User.as_str(),
+        uri: principal_uri.as_str(),
+        display_name: Some(single_user_config.name.as_str()),
+    };
+
+    let _principal_row_count = diesel::insert_into(schema::principal::table)
+        .values(&new_principal)
+        .execute(&mut conn)
+        .await?;
+
     let new_user = NewUser {
         name: single_user_config.name.as_str(),
         email: single_user_config.email.as_str(),
+        principal_id,
     };
 
     let user = diesel::insert_into(schema::user::table)
@@ -58,52 +75,10 @@ async fn authenticate_single_user() -> Result<User> {
     Ok(user)
 }
 
-#[expect(unused)]
+#[allow(clippy::unused_async)]
 async fn authenticate_proxy(req: &salvo::Request) -> Result<User> {
-    use diesel_async::RunQueryDsl;
-
-    todo!("Implement configuration for proxy authentication");
-
-    // Extract user information from request headers
-    let name = req
-        .headers()
-        .get("X-User-Name")
-        .and_then(|v| v.to_str().ok())
-        .ok_or(Error::AuthenticationError(
-            "Missing X-User-Name header".to_string(),
-        ))?;
-
-    let email = req
-        .headers()
-        .get("X-User-Email")
-        .and_then(|v| v.to_str().ok())
-        .ok_or(Error::AuthenticationError(
-            "Missing X-User-Email header".to_string(),
-        ))?;
-
-    let mut conn = connect().await?;
-
-    // Check if the user already exists
-    if let Some(user) = schema::user::table
-        .filter(schema::user::email.eq(email))
-        .select(User::as_select())
-        .first::<User>(&mut conn)
-        .await
-        .optional()?
-    {
-        return Ok(user);
-    }
-
-    // If not, create the user
-    let new_user = NewUser { name, email };
-
-    let user = diesel::insert_into(schema::user::table)
-        .values(&new_user)
-        .returning(User::as_select())
-        .get_result::<User>(&mut conn)
-        .await?;
-
-    Ok(user)
+    let _ = req;
+    todo!("Implement configuration for proxy authentication")
 }
 
 /// ## Summary

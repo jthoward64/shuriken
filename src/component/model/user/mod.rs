@@ -25,6 +25,7 @@ pub struct User {
     pub name: String,
     pub email: String,
     pub updated_at: chrono::DateTime<chrono::Utc>,
+    pub principal_id: uuid::Uuid,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Insertable)]
@@ -32,4 +33,5 @@ pub struct User {
 pub struct NewUser<'a> {
     pub name: &'a str,
     pub email: &'a str,
+    pub principal_id: uuid::Uuid,
 }

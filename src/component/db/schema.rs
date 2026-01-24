@@ -1,4 +1,5 @@
 // @generated automatically by Diesel CLI.
+#![allow(clippy::doc_markdown, clippy::wildcard_imports)]
 
 /// A module containing custom SQL type definitions
 ///

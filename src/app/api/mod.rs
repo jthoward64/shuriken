@@ -1,6 +1,7 @@
 mod app_specific;
 mod caldav;
 mod carddav;
+mod dav;
 
 use salvo::Router;
 
