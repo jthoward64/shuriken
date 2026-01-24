@@ -2,10 +2,7 @@
 
 mod helpers;
 
-use salvo::http::StatusCode;
 use salvo::{Request, Response, handler};
-
-use crate::component::db::connection;
 
 use helpers::handle_get_or_head;
 

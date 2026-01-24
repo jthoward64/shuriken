@@ -14,4 +14,5 @@ pub fn routes() -> Router {
         .push(app_specific::routes())
         .push(caldav::routes())
         .push(carddav::routes())
+        .push(dav::routes())
 }

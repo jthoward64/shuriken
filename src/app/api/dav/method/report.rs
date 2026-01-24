@@ -1,11 +1,31 @@
-//! WebDAV sync-collection REPORT handler.
+//! `WebDAV` sync-collection REPORT handler.
 
 use salvo::http::StatusCode;
-use salvo::{Request, Response};
+use salvo::{Request, Response, handler};
 
 use crate::component::db::connection;
 use crate::component::rfc::dav::build::multistatus::serialize_multistatus;
 use crate::component::rfc::dav::core::{Multistatus, SyncCollection};
+
+/// ## Summary
+/// Main REPORT method dispatcher for `WebDAV`.
+///
+/// Parses the REPORT request body and dispatches to the appropriate handler
+/// based on the report type (`sync-collection`, etc.).
+///
+/// ## Side Effects
+/// - Parses XML request body
+/// - Dispatches to specific report handlers
+///
+/// ## Errors
+/// Returns 400 for invalid requests, 501 for unsupported reports.
+#[handler]
+pub async fn report(_req: &mut Request, res: &mut Response) {
+    // TODO: Parse REPORT request body and dispatch to appropriate handler
+    // For now, return 501 Not Implemented
+    tracing::warn!("WebDAV REPORT not yet fully implemented");
+    res.status_code(StatusCode::NOT_IMPLEMENTED);
+}
 
 /// ## Summary
 /// Handles `sync-collection` REPORT requests (RFC 6578).
@@ -45,7 +65,7 @@ pub async fn handle_sync_collection(
         }
     };
 
-    write_multistatus_response(res, multistatus);
+    write_multistatus_response(res, &multistatus);
 }
 
 /// ## Summary
@@ -79,8 +99,8 @@ async fn build_sync_collection_response(
 /// Writes a multistatus response to the HTTP response.
 ///
 /// Serializes to XML and sets appropriate headers.
-fn write_multistatus_response(res: &mut Response, multistatus: Multistatus) {
-    let xml = match serialize_multistatus(&multistatus) {
+fn write_multistatus_response(res: &mut Response, multistatus: &Multistatus) {
+    let xml = match serialize_multistatus(multistatus) {
         Ok(xml) => xml,
         Err(e) => {
             tracing::error!("Failed to serialize multistatus: {}", e);

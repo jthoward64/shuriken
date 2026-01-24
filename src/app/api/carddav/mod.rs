@@ -7,4 +7,10 @@ pub mod method;
 #[must_use]
 pub fn routes() -> Router {
     Router::with_path("carddav")
+        // Address book and vCard operations
+        .push(
+            Router::with_path("<**rest>")
+                .put(method::put::put)
+                .post(method::report::report)
+        )
 }

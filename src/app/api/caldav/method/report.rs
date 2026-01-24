@@ -1,11 +1,31 @@
-//! CalDAV REPORT method handlers.
+//! `CalDAV` REPORT method handlers.
 
 use salvo::http::StatusCode;
-use salvo::{Request, Response};
+use salvo::{Request, Response, handler};
 
 use crate::component::db::connection;
 use crate::component::rfc::dav::build::multistatus::serialize_multistatus;
 use crate::component::rfc::dav::core::{CalendarMultiget, CalendarQuery, Multistatus};
+
+/// ## Summary
+/// Main REPORT method dispatcher for `CalDAV`.
+///
+/// Parses the REPORT request body and dispatches to the appropriate handler
+/// based on the report type (`calendar-query`, `calendar-multiget`, etc.).
+///
+/// ## Side Effects
+/// - Parses XML request body
+/// - Dispatches to specific report handlers
+///
+/// ## Errors
+/// Returns 400 for invalid requests, 501 for unsupported reports.
+#[handler]
+pub async fn report(_req: &mut Request, res: &mut Response) {
+    // TODO: Parse REPORT request body and dispatch to appropriate handler
+    // For now, return 501 Not Implemented
+    tracing::warn!("CalDAV REPORT not yet fully implemented");
+    res.status_code(StatusCode::NOT_IMPLEMENTED);
+}
 
 /// ## Summary
 /// Handles `calendar-query` REPORT requests.
@@ -22,8 +42,8 @@ use crate::component::rfc::dav::core::{CalendarMultiget, CalendarQuery, Multista
 pub async fn handle_calendar_query(
     _req: &mut Request,
     res: &mut Response,
-    _query: CalendarQuery,
-    _properties: Vec<crate::component::rfc::dav::core::PropertyName>,
+    query: CalendarQuery,
+    properties: Vec<crate::component::rfc::dav::core::PropertyName>,
 ) {
     let mut conn = match connection::connect().await {
         Ok(conn) => conn,
@@ -35,7 +55,7 @@ pub async fn handle_calendar_query(
     };
 
     // Build response
-    let multistatus = match build_calendar_query_response(&mut conn, &_query, &_properties).await {
+    let multistatus = match build_calendar_query_response(&mut conn, &query, &properties).await {
         Ok(ms) => ms,
         Err(e) => {
             tracing::error!("Failed to build calendar-query response: {}", e);
@@ -44,7 +64,7 @@ pub async fn handle_calendar_query(
         }
     };
 
-    write_multistatus_response(res, multistatus);
+    write_multistatus_response(res, &multistatus);
 }
 
 /// ## Summary
@@ -84,7 +104,7 @@ pub async fn handle_calendar_multiget(
         }
     };
 
-    write_multistatus_response(res, multistatus);
+    write_multistatus_response(res, &multistatus);
 }
 
 /// ## Summary
@@ -139,8 +159,8 @@ async fn build_calendar_multiget_response(
 /// Writes a multistatus response to the HTTP response.
 ///
 /// Serializes to XML and sets appropriate headers.
-fn write_multistatus_response(res: &mut Response, multistatus: Multistatus) {
-    let xml = match serialize_multistatus(&multistatus) {
+fn write_multistatus_response(res: &mut Response, multistatus: &Multistatus) {
+    let xml = match serialize_multistatus(multistatus) {
         Ok(xml) => xml,
         Err(e) => {
             tracing::error!("Failed to serialize multistatus: {}", e);

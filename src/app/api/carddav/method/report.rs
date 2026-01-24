@@ -1,11 +1,31 @@
-//! CardDAV REPORT method handlers.
+//! `CardDAV` REPORT method handlers.
 
 use salvo::http::StatusCode;
-use salvo::{Request, Response};
+use salvo::{Request, Response, handler};
 
 use crate::component::db::connection;
 use crate::component::rfc::dav::build::multistatus::serialize_multistatus;
 use crate::component::rfc::dav::core::{AddressbookMultiget, AddressbookQuery, Multistatus};
+
+/// ## Summary
+/// Main REPORT method dispatcher for `CardDAV`.
+///
+/// Parses the REPORT request body and dispatches to the appropriate handler
+/// based on the report type (`addressbook-query`, `addressbook-multiget`, etc.).
+///
+/// ## Side Effects
+/// - Parses XML request body
+/// - Dispatches to specific report handlers
+///
+/// ## Errors
+/// Returns 400 for invalid requests, 501 for unsupported reports.
+#[handler]
+pub async fn report(_req: &mut Request, res: &mut Response) {
+    // TODO: Parse REPORT request body and dispatch to appropriate handler
+    // For now, return 501 Not Implemented
+    tracing::warn!("CardDAV REPORT not yet fully implemented");
+    res.status_code(StatusCode::NOT_IMPLEMENTED);
+}
 
 /// ## Summary
 /// Handles `addressbook-query` REPORT requests.
@@ -22,8 +42,8 @@ use crate::component::rfc::dav::core::{AddressbookMultiget, AddressbookQuery, Mu
 pub async fn handle_addressbook_query(
     _req: &mut Request,
     res: &mut Response,
-    _query: AddressbookQuery,
-    _properties: Vec<crate::component::rfc::dav::core::PropertyName>,
+    query: AddressbookQuery,
+    properties: Vec<crate::component::rfc::dav::core::PropertyName>,
 ) {
     let mut conn = match connection::connect().await {
         Ok(conn) => conn,
@@ -35,7 +55,7 @@ pub async fn handle_addressbook_query(
     };
 
     // Build response
-    let multistatus = match build_addressbook_query_response(&mut conn, &_query, &_properties).await {
+    let multistatus = match build_addressbook_query_response(&mut conn, &query, &properties).await {
         Ok(ms) => ms,
         Err(e) => {
             tracing::error!("Failed to build addressbook-query response: {}", e);
@@ -44,7 +64,7 @@ pub async fn handle_addressbook_query(
         }
     };
 
-    write_multistatus_response(res, multistatus);
+    write_multistatus_response(res, &multistatus);
 }
 
 /// ## Summary
@@ -84,7 +104,7 @@ pub async fn handle_addressbook_multiget(
         }
     };
 
-    write_multistatus_response(res, multistatus);
+    write_multistatus_response(res, &multistatus);
 }
 
 /// ## Summary
@@ -139,8 +159,8 @@ async fn build_addressbook_multiget_response(
 /// Writes a multistatus response to the HTTP response.
 ///
 /// Serializes to XML and sets appropriate headers.
-fn write_multistatus_response(res: &mut Response, multistatus: Multistatus) {
-    let xml = match serialize_multistatus(&multistatus) {
+fn write_multistatus_response(res: &mut Response, multistatus: &Multistatus) {
+    let xml = match serialize_multistatus(multistatus) {
         Ok(xml) => xml,
         Err(e) => {
             tracing::error!("Failed to serialize multistatus: {}", e);
