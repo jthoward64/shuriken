@@ -979,6 +979,7 @@ dependencies = [
  "itoa",
  "libc",
  "pq-sys",
+ "serde_json",
  "uuid",
 ]
 

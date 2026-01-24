@@ -38,6 +38,7 @@ diesel = { version = "2.3.5", features = [
     "chrono",
     "network-address",
     "uuid",
+    "serde_json",
 ] }
 diesel-async-adapter = { version = "0.1.0", features = [
     "postgres",
