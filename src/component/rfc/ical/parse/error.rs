@@ -142,3 +142,7 @@ impl fmt::Display for ParseErrorKind {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "error_tests.rs"]
+mod tests;
