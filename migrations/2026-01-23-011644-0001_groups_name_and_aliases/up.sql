@@ -6,6 +6,8 @@ CREATE TABLE group_name (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+SELECT diesel_manage_updated_at('group_name');
+
 COMMENT ON TABLE group_name IS 'Group names and aliases';
 COMMENT ON COLUMN group_name.id IS 'UUID v7 primary key';
 COMMENT ON COLUMN group_name.group_id IS 'Reference to the group';

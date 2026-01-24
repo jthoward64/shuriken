@@ -7,6 +7,8 @@ CREATE TABLE membership (
     PRIMARY KEY (user_id, group_id)
 );
 
+SELECT diesel_manage_updated_at('membership');
+
 COMMENT ON TABLE membership IS 'Many-to-many relationship between users and groups';
 COMMENT ON COLUMN membership.user_id IS 'Reference to the user';
 COMMENT ON COLUMN membership.group_id IS 'Reference to the group';

@@ -5,6 +5,8 @@ CREATE TABLE "group" (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+SELECT diesel_manage_updated_at('"group"');
+
 COMMENT ON TABLE "group" IS 'Organizational groups for collaborative sharing of calendars and contacts';
 COMMENT ON COLUMN "group".id IS 'UUID v7 primary key';
 
@@ -16,6 +18,8 @@ CREATE TABLE "user" (
     group_id UUID REFERENCES "group"(id) ON DELETE SET NULL,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+SELECT diesel_manage_updated_at('"user"');
 
 COMMENT ON TABLE "user" IS 'User accounts for the CalDAV/CardDAV server';
 COMMENT ON COLUMN "user".id IS 'UUID v7 primary key';
@@ -32,6 +36,8 @@ CREATE TABLE auth_user (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE(auth_source, auth_id)
 );
+
+SELECT diesel_manage_updated_at('auth_user');
 
 COMMENT ON TABLE auth_user IS 'External authentication provider mappings for users (OAuth, LDAP, etc.)';
 COMMENT ON COLUMN auth_user.id IS 'UUID v7 primary key';
