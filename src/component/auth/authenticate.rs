@@ -75,7 +75,7 @@ async fn authenticate_single_user() -> Result<User> {
     Ok(user)
 }
 
-#[allow(clippy::unused_async)]
+#[expect(clippy::unused_async)]
 async fn authenticate_proxy(req: &salvo::Request) -> Result<User> {
     let _ = req;
     todo!("Implement configuration for proxy authentication")

@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use salvo::Request;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

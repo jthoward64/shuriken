@@ -278,6 +278,24 @@ When reviewing code:
 - Consider mocking external dependencies (HTTP calls, DB queries)
 - Test error paths, not just happy paths
 
+### Clippy Compliance Guidelines
+
+- Doc formatting: Use backticks around technical terms and protocol names (e.g., `WebDAV`, `CalDAV`, `CardDAV`, `QName`, `ETag`). Use backticks for identifiers and literals in docs.
+- Doc sections: For public functions that return `Result`, include a `## Errors` section. For functions that may panic or use `unwrap`/`expect`, include a `## Panics` section with rationale and conditions.
+- Avoid manual string patterns: Prefer `strip_prefix`/`strip_suffix` over `starts_with` + slicing. Use `map_or`, `is_some_and`, and similar helpers to simplify common `Option`/`Result` patterns.
+- Formatting/append: Use `write!`/`writeln!` instead of repeated `format!` concatenations when building strings.
+- Or-patterns: Use unnested or-patterns (`A | B`) rather than duplicating match arms.
+- Wildcards in tests: Avoid `_` catch-alls when matching enums with known variants; explicitly list non-target variants to avoid future-variant pitfalls.
+- Function length: Keep functions under ~50 lines when possible. Split into helpers for parsing, validation, and serialization to avoid `too_many_lines` lints.
+- #[must_use]: Add `#[must_use]` to builder-style methods and pure constructors to signal intent.
+- Dead code: During scaffolding, unused items are OK; prefer module-local visibility or feature gates to reduce noise.
+- Lint suppression: Prefer `#[expect(clippy::lint_name)]` over `#[allow(clippy::lint_name)]` to document intentional deviations. Use `#[expect]` when the lint is temporarily unavoidable (e.g., complex parsers during scaffolding) but plan to refactor later. Use file-level `#![expect(...)]` for pervasive patterns (e.g., `map_err_ignore` in parser modules where error sources are intentionally discarded until richer error types are implemented).
+- Parser complexity: For large parse functions (>50 lines), extract helpers for:
+  - Namespace/attribute collection
+  - Element-specific parsing logic
+  - List/value parsing
+  - This keeps the main parse loop readable and each helper testable in isolation.
+
 ## Cargo & Verification
 
 - Run `cargo check` after completing major feature changes to catch compile errors early
