@@ -1,6 +1,6 @@
 //! Value type parsers for iCalendar (RFC 5545 §3.3).
 //!
-//! Error sources are intentionally discarded during parsing (map_err_ignore)
+//! Error sources are intentionally discarded during parsing (`map_err_ignore`)
 //! until richer error types are implemented for value-level parsing.
 #![expect(
     clippy::map_err_ignore,

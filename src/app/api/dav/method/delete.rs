@@ -69,15 +69,17 @@ pub async fn delete(req: &mut Request, res: &mut Response) {
 ///
 /// ## Errors
 /// Returns database errors if the operation fails.
-#[tracing::instrument(skip(_conn))]
-#[expect(clippy::unused_async)]
+#[tracing::instrument(skip(conn, path))]
 async fn perform_delete(
-    _conn: &mut connection::DbConnection<'_>,
-    _path: &str,
+    conn: &mut connection::DbConnection<'_>,
+    path: &str,
 ) -> anyhow::Result<bool> {
     tracing::debug!("Performing resource deletion");
     // TODO: Parse path to get collection_id and uri
     // For now, this is a stub
+    
+    // Silence unused warnings until implementation is complete
+    let _ = (conn, path);
     
     // Example implementation:
     // 1. Find the instance
