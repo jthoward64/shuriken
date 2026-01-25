@@ -117,3 +117,25 @@ pub async fn update_synctoken(
         .get_result(conn)
         .await
 }
+
+/// ## Summary
+/// Updates writable properties of a collection.
+///
+/// ## Errors
+/// Returns a database error if the update fails.
+pub async fn update_collection_properties(
+    conn: &mut crate::component::db::connection::DbConnection<'_>,
+    collection_id: uuid::Uuid,
+    display_name: Option<&str>,
+    description: Option<&str>,
+) -> diesel::QueryResult<DavCollection> {
+    diesel::update(dav_collection::table)
+        .filter(dav_collection::id.eq(collection_id))
+        .set((
+            dav_collection::display_name.eq(display_name),
+            dav_collection::description.eq(description),
+        ))
+        .returning(DavCollection::as_returning())
+        .get_result(conn)
+        .await
+}

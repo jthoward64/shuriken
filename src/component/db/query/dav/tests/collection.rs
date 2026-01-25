@@ -3,7 +3,9 @@
 //!
 //! Verifies CRUD operations, ownership, sync token behavior, and soft-delete filtering.
 
+#[expect(unused_imports)]
 use super::fixtures::*;
+#[expect(unused_imports)]
 use crate::component::db::query::dav::collection::*;
 
 /// ## Summary

@@ -3,7 +3,9 @@
 //!
 //! Verifies persistence, component tree handling, and transaction semantics.
 
+#[expect(unused_imports)]
 use super::fixtures::*;
+#[expect(unused_imports)]
 use crate::component::db::query::dav::entity::*;
 
 /// ## Summary

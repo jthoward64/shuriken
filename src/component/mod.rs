@@ -1,5 +1,8 @@
 pub mod auth;
+pub mod caldav;
+pub mod carddav;
 pub mod config;
+pub mod dav;
 pub mod db;
 pub mod error;
 pub mod middleware;

@@ -93,6 +93,7 @@ fn set_response_headers_and_body(
 ) {
     // Set ETag header
     if let Ok(etag_value) = HeaderValue::from_str(&instance.etag) {
+        #[expect(clippy::let_underscore_must_use, reason = "Header addition failure is non-fatal")]
         let _ = res.add_header("ETag", etag_value, true);
     }
     
@@ -101,11 +102,13 @@ fn set_response_headers_and_body(
         .format("%a, %d %b %Y %H:%M:%S GMT")
         .to_string();
     if let Ok(lm_value) = HeaderValue::from_str(&last_modified) {
+        #[expect(clippy::let_underscore_must_use, reason = "Header addition failure is non-fatal")]
         let _ = res.add_header("Last-Modified", lm_value, true);
     }
     
     // Set Content-Type header
     if let Ok(ct_value) = HeaderValue::from_str(&instance.content_type) {
+        #[expect(clippy::let_underscore_must_use, reason = "Header addition failure is non-fatal")]
         let _ = res.add_header("Content-Type", ct_value, true);
     }
     
