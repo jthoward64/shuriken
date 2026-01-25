@@ -8,7 +8,6 @@ use crate::component::db::query::dav::instance;
 use crate::component::model::dav::instance::DavInstance;
 
 /// Shared implementation for GET and HEAD handlers.
-#[expect(dead_code)]
 pub(super) async fn handle_get_or_head(req: &mut Request, res: &mut Response, _is_head: bool) {
     // Extract the resource path from the request
     let _path = req.uri().path();
@@ -114,6 +113,7 @@ fn set_response_headers_and_body(
     
     // Set body only for GET (not HEAD)
     if !is_head {
+        #[expect(clippy::expect_used, reason = "stub implementation, acceptable to panic")]
         res.write_body(canonical_bytes.to_vec())
             .expect("valid body");
     }

@@ -24,8 +24,7 @@ mod tests {
                 || status == Some(StatusCode::BAD_REQUEST)
                 || status == Some(StatusCode::NOT_FOUND)
                 || status == Some(StatusCode::INTERNAL_SERVER_ERROR),
-            "Expected 207, 400, 404, or 500, got {:?}",
-            status
+            "Expected 207, 400, 404, or 500, got {status:?}"
         );
     }
 
@@ -65,7 +64,7 @@ mod tests {
         ];
 
         for path in paths {
-            let resp = TestClient::get(format!("http://127.0.0.1:5800{}", path))
+            let resp = TestClient::get(format!("http://127.0.0.1:5800{path}"))
                 .send(&service)
                 .await;
             
@@ -90,8 +89,7 @@ mod tests {
                 || status == Some(StatusCode::BAD_REQUEST)
                 || status == Some(StatusCode::NOT_FOUND)
                 || status == Some(StatusCode::INTERNAL_SERVER_ERROR),
-            "Unexpected status code: {:?}",
-            status
+            "Unexpected status code: {status:?}"
         );
     }
 

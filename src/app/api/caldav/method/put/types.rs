@@ -22,7 +22,6 @@ pub(super) enum PutError {
     DatabaseError(anyhow::Error),
 }
 
-#[expect(dead_code)]
 impl From<anyhow::Error> for PutError {
     fn from(e: anyhow::Error) -> Self {
         Self::DatabaseError(e)

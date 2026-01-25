@@ -8,6 +8,14 @@ use crate::component::rfc::ical::core::{Component, ICalendar, Parameter, Propert
 
 use super::extract::{extract_ical_uid, extract_ical_value};
 
+/// Type alias for the complex return type of database model mappings.
+type DbModels<'a> = (
+    NewDavEntity<'static>,
+    Vec<NewDavComponent<'a>>,
+    Vec<NewDavProperty<'a>>,
+    Vec<NewDavParameter<'static>>,
+);
+
 /// ## Summary
 /// Maps an iCalendar component tree to database models.
 ///
@@ -19,12 +27,7 @@ use super::extract::{extract_ical_uid, extract_ical_value};
 pub fn icalendar_to_db_models<'a>(
     ical: &'a ICalendar,
     entity_type: &str,
-) -> anyhow::Result<(
-    NewDavEntity<'static>,
-    Vec<NewDavComponent<'a>>,
-    Vec<NewDavProperty<'a>>,
-    Vec<NewDavParameter<'static>>,
-)> {
+) -> anyhow::Result<DbModels<'a>> {
     // Extract logical UID from top-level component - leak to get 'static lifetime
     let logical_uid_opt = extract_ical_uid(&ical.root)
         .map(|s| Box::leak(s.into_boxed_str()) as &'static str);

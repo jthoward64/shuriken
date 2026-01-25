@@ -3,7 +3,7 @@
 //!
 //! Verifies collection creation with initial properties.
 
-#[allow(unused_imports)]
+#[expect(unused_imports)]
 use super::helpers::*;
 
 /// ## Summary

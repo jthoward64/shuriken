@@ -1,4 +1,4 @@
-#![allow(clippy::doc_markdown, clippy::unused_async)]
+#![allow(clippy::doc_markdown, clippy::unused_async, clippy::expect_used)]
 //! Test helpers for integration tests.
 //!
 //! Provides utilities for:
@@ -13,6 +13,7 @@ use salvo::prelude::*;
 ///
 /// ## Panics
 /// Panics if the service cannot be created.
+#[expect(dead_code)]
 #[must_use]
 pub fn create_test_service() -> Service {
     // TODO: Wire up actual routes once they're implemented
@@ -21,7 +22,6 @@ pub fn create_test_service() -> Service {
 }
 
 /// Represents an HTTP test response for assertions.
-#[allow(dead_code)]
 pub struct TestResponse {
     pub status: StatusCode,
     pub headers: Vec<(String, String)>,
@@ -30,7 +30,7 @@ pub struct TestResponse {
 
 impl TestResponse {
     /// Asserts that the response status matches the expected code.
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     pub fn assert_status(&self, expected: StatusCode) {
         assert_eq!(
             self.status, expected,
@@ -40,14 +40,14 @@ impl TestResponse {
     }
 
     /// Asserts that a header exists with the expected value.
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     pub fn assert_header(&self, name: &str, expected: &str) {
         let found = self.headers.iter().find(|(k, _)| k.eq_ignore_ascii_case(name));
         assert!(
             found.is_some(),
             "Header '{name}' not found in response"
         );
-        let (_, value) = found.unwrap();
+        let (_, value) = found.expect("Header should exist");
         assert_eq!(
             value, expected,
             "Header '{name}' expected '{expected}' but got '{value}'"
@@ -55,7 +55,7 @@ impl TestResponse {
     }
 
     /// Asserts that the response body contains the expected substring.
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     pub fn assert_body_contains(&self, expected: &str) {
         let body = String::from_utf8_lossy(&self.body);
         assert!(
@@ -65,7 +65,7 @@ impl TestResponse {
     }
 
     /// Returns the body as a UTF-8 string.
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     #[must_use]
     pub fn body_string(&self) -> String {
         String::from_utf8_lossy(&self.body).into_owned()
@@ -73,7 +73,6 @@ impl TestResponse {
 }
 
 /// Database test helper for setup and teardown.
-#[allow(dead_code)]
 pub struct TestDb {
     // TODO: Add connection pool and helpers once DB integration is ready
 }
@@ -83,7 +82,7 @@ impl TestDb {
     ///
     /// ## Panics
     /// Panics if the database cannot be initialized.
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     #[must_use]
     pub fn new() -> Self {
         // TODO: Initialize test DB connection
@@ -91,20 +90,20 @@ impl TestDb {
     }
 
     /// Truncates all tables for a clean test slate.
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     pub async fn truncate_all(&self) {
         // TODO: Implement table truncation
     }
 
     /// Seeds a test principal and returns its ID.
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     pub async fn seed_principal(&self, _name: &str) -> uuid::Uuid {
         // TODO: Insert principal and return ID
         uuid::Uuid::new_v4()
     }
 
     /// Seeds a test collection and returns its ID.
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     pub async fn seed_collection(
         &self,
         _owner_id: uuid::Uuid,
@@ -116,14 +115,14 @@ impl TestDb {
     }
 
     /// Seeds a test entity with a component tree and returns its ID.
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     pub async fn seed_entity(&self, _entity_type: &str, _logical_uid: &str) -> uuid::Uuid {
         // TODO: Insert entity with component tree and return ID
         uuid::Uuid::new_v4()
     }
 
     /// Seeds a test instance linking an entity to a collection.
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     pub async fn seed_instance(
         &self,
         _collection_id: uuid::Uuid,

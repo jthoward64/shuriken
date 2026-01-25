@@ -62,8 +62,8 @@ async fn options_sets_dav_header() {
     assert!(dav_header.is_some(), "DAV header should be present");
     
     let dav_value = dav_header.unwrap().to_str().unwrap();
-    assert!(dav_value.contains("1"), "Should support DAV class 1");
-    assert!(dav_value.contains("3"), "Should support DAV class 3");
+    assert!(dav_value.contains('1'), "Should support DAV class 1");
+    assert!(dav_value.contains('3'), "Should support DAV class 3");
     assert!(dav_value.contains("calendar-access"), "Should support CalDAV");
     assert!(dav_value.contains("addressbook"), "Should support CardDAV");
 }

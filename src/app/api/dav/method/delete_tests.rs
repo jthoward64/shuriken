@@ -48,7 +48,7 @@ async fn test_delete_accepts_any_path() {
     for path in paths {
         let service = salvo::Router::new().push(salvo::Router::with_path("/<**rest>").delete(delete));
         
-        let content = TestClient::delete(format!("http://127.0.0.1:5800{}", path))
+        let content = TestClient::delete(format!("http://127.0.0.1:5800{path}"))
             .send(service)
             .await;
         

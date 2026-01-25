@@ -61,7 +61,7 @@ pub async fn delete(req: &mut Request, res: &mut Response) {
 ///
 /// ## Errors
 /// Returns database errors if the operation fails.
-#[expect(clippy::unused_async, dead_code)]
+#[expect(clippy::unused_async)]
 async fn perform_delete(
     _conn: &mut connection::DbConnection<'_>,
     _path: &str,

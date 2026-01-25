@@ -3,7 +3,7 @@
 //!
 //! Verifies property retrieval, Depth handling, and multistatus responses.
 
-#[allow(unused_imports)]
+#[expect(unused_imports)]
 use super::helpers::*;
 
 /// ## Summary

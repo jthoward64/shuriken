@@ -16,7 +16,6 @@ use crate::component::rfc::dav::core::{
 ///
 /// ## Errors
 /// Returns errors for database failures or property resolution issues.
-#[expect(dead_code)]
 pub(super) async fn build_propfind_response(
     conn: &mut connection::DbConnection<'_>,
     req: &Request,
