@@ -85,9 +85,9 @@ pub enum ReportType {
 pub struct CalendarQuery {
     /// Filter element.
     pub filter: Option<CalendarFilter>,
-    /// Time range for expansion (mutually exclusive with limit_recurrence).
+    /// Time range for expansion (mutually exclusive with `limit_recurrence`).
     pub expand: Option<TimeRange>,
-    /// Time range for limiting recurrence set (mutually exclusive with expand).
+    /// Time range for limiting recurrence set (mutually exclusive with `expand`).
     pub limit_recurrence: Option<TimeRange>,
     /// Limit results.
     pub limit: Option<u32>,

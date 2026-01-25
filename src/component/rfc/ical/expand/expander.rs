@@ -3,7 +3,7 @@
 //! This module implements the RRULE expansion algorithm to generate
 //! individual occurrences from recurrence rules.
 
-use chrono::{DateTime as ChronoDateTime, Datelike, Duration as ChronoDuration, NaiveDate, Timelike, TimeZone, Utc, Weekday as ChronoWeekday};
+use chrono::{DateTime as ChronoDateTime, Datelike, Duration as ChronoDuration, NaiveDate, Timelike, Utc, Weekday as ChronoWeekday};
 use std::collections::HashSet;
 
 use crate::component::rfc::ical::core::{DateTime, RRule, RRuleUntil, Weekday};
