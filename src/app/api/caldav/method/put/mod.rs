@@ -26,7 +26,10 @@ use types::{PutError, PutResult};
 /// ## Errors
 /// Returns 400 for invalid data, 412 for precondition failures, 500 for server errors.
 #[handler]
+#[tracing::instrument(skip(req, res), fields(path = %req.uri().path()))]
 pub async fn put(req: &mut Request, res: &mut Response) {
+    tracing::info!("Handling PUT request for calendar object");
+    
     // Get path before borrowing req mutably
     let path = req.uri().path().to_string();
     
@@ -39,6 +42,8 @@ pub async fn put(req: &mut Request, res: &mut Response) {
             return;
         }
     };
+    
+    tracing::debug!("Request body read successfully ({} bytes)", body.len());
     
     // Get database connection
     let mut conn = match connection::connect().await {
@@ -60,9 +65,17 @@ pub async fn put(req: &mut Request, res: &mut Response) {
         .and_then(|h| h.to_str().ok())
         .map(String::from);
     
+    if if_none_match.is_some() {
+        tracing::debug!("If-None-Match header present");
+    }
+    if if_match.is_some() {
+        tracing::debug!("If-Match header present");
+    }
+    
     // Perform the PUT operation
     match perform_put(&mut conn, &path, &body, if_none_match, if_match).await {
         Ok(PutResult::Created(etag)) => {
+            tracing::info!("Calendar object created with ETag: {}", etag);
             res.status_code(StatusCode::CREATED);
             if let Ok(etag_value) = HeaderValue::from_str(&etag) {
                 if res.add_header("ETag", etag_value, true).is_err() {
@@ -71,6 +84,7 @@ pub async fn put(req: &mut Request, res: &mut Response) {
             }
         }
         Ok(PutResult::Updated(etag)) => {
+            tracing::info!("Calendar object updated with ETag: {}", etag);
             res.status_code(StatusCode::NO_CONTENT);
             if let Ok(etag_value) = HeaderValue::from_str(&etag) {
                 if res.add_header("ETag", etag_value, true).is_err() {
@@ -79,6 +93,7 @@ pub async fn put(req: &mut Request, res: &mut Response) {
             }
         }
         Ok(PutResult::PreconditionFailed) => {
+            tracing::warn!("Precondition failed for PUT request");
             res.status_code(StatusCode::PRECONDITION_FAILED);
         }
         Err(PutError::InvalidCalendarData(msg)) => {
