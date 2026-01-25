@@ -12,6 +12,17 @@ pub fn routes() -> Router {
         .push(
             Router::with_path("<**rest>")
                 .put(method::put::put)
-                .post(method::report::report)
+                .push(
+                    // MKCOL method
+                    Router::new()
+                        .filter_fn(|req, _| req.method().as_str() == "MKCOL")
+                        .goal(method::mkcol::mkcol_extended)
+                )
+                .push(
+                    // REPORT method
+                    Router::new()
+                        .filter_fn(|req, _| req.method().as_str() == "REPORT")
+                        .goal(method::report::report)
+                )
         )
 }

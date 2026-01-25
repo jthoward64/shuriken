@@ -16,7 +16,34 @@ pub fn routes() -> Router {
         .get(method::get_head::get)
         .head(method::get_head::head)
         .delete(method::delete::delete)
-        .post(method::report::report)
-        // PROPFIND is handled as POST for now until custom HTTP method support is added
-        // TODO: Add proper PROPFIND HTTP method routing when Salvo supports it
+        .push(
+            // PROPFIND method
+            Router::new()
+                .filter_fn(|req, _| req.method().as_str() == "PROPFIND")
+                .goal(method::propfind::propfind)
+        )
+        .push(
+            // PROPPATCH method
+            Router::new()
+                .filter_fn(|req, _| req.method().as_str() == "PROPPATCH")
+                .goal(method::proppatch::proppatch)
+        )
+        .push(
+            // COPY method
+            Router::new()
+                .filter_fn(|req, _| req.method().as_str() == "COPY")
+                .goal(method::copy::copy)
+        )
+        .push(
+            // MOVE method
+            Router::new()
+                .filter_fn(|req, _| req.method().as_str() == "MOVE")
+                .goal(method::r#move::r#move)
+        )
+        .push(
+            // REPORT method
+            Router::new()
+                .filter_fn(|req, _| req.method().as_str() == "REPORT")
+                .goal(method::report::report)
+        )
 }
