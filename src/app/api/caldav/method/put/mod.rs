@@ -7,6 +7,7 @@ use salvo::{Request, Response, handler};
 
 use crate::component::caldav::service::object::{PutObjectContext, put_calendar_object};
 use crate::component::db::connection;
+use crate::util::path;
 
 use types::{PutError, PutResult};
 
@@ -128,10 +129,8 @@ async fn perform_put(
     if_match: Option<String>,
 ) -> Result<PutResult, PutError> {
     // Parse path to extract collection_id and uri
-    // For now, use a placeholder UUID for collection_id
-    // TODO: Implement proper path parsing to extract collection_id from the route
-    let collection_id = parse_collection_id_from_path(path)?;
-    let uri = parse_uri_from_path(path)?;
+    let (collection_id, uri) = path::parse_collection_and_uri(path)
+        .map_err(|e| PutError::InvalidCalendarData(format!("Invalid path: {e}")))?;
 
     // Parse iCalendar to extract UID early for context
     let ical_str = std::str::from_utf8(body)
@@ -174,49 +173,4 @@ async fn perform_put(
     }
 }
 
-/// ## Summary
-/// Parses the collection ID from the request path.
-///
-/// ## Errors
-/// Returns an error if the path format is invalid.
-fn parse_collection_id_from_path(path: &str) -> Result<uuid::Uuid, PutError> {
-    // TODO: Implement proper path parsing based on your routing structure
-    // Expected path format: /api/caldav/calendars/{collection_id}/{resource_name}.ics
 
-    let parts: Vec<&str> = path.split('/').collect();
-    if parts.len() < 5 {
-        return Err(PutError::InvalidCalendarData(
-            "path must contain at least 5 segments to extract collection ID (e.g., /api/caldav/calendars/{id}/file.ics)".to_string(),
-        ));
-    }
-
-    // Try to parse the collection_id (assuming it's the 4th segment)
-    parts
-        .get(4)
-        .and_then(|s| uuid::Uuid::parse_str(s).ok())
-        .ok_or_else(|| {
-            PutError::InvalidCalendarData(
-                "could not parse collection_id as UUID from path segment 4".to_string(),
-            )
-        })
-}
-
-/// ## Summary
-/// Parses the resource URI from the request path.
-///
-/// ## Errors
-/// Returns an error if the path format is invalid.
-fn parse_uri_from_path(path: &str) -> Result<String, PutError> {
-    // TODO: Implement proper URI extraction
-    // For now, use the last path segment as the URI
-
-    path.split('/')
-        .next_back()
-        .filter(|s| !s.is_empty())
-        .map(String::from)
-        .ok_or_else(|| {
-            PutError::InvalidCalendarData(
-                "could not extract resource URI from path (last non-empty segment)".to_string(),
-            )
-        })
-}

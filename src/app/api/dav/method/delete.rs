@@ -4,6 +4,7 @@ use salvo::http::StatusCode;
 use salvo::{Request, Response, handler};
 
 use crate::component::db::connection;
+use crate::util::path;
 
 /// ## Summary
 /// Handles DELETE requests for `WebDAV` resources.
@@ -39,11 +40,26 @@ pub async fn delete(req: &mut Request, res: &mut Response) {
         }
     };
 
-    // TODO: Parse path to extract collection_id and uri
+    // Parse path to extract collection_id and uri
+    let (collection_id, uri) = match path::parse_collection_and_uri(&path) {
+        Ok(parsed) => parsed,
+        Err(e) => {
+            tracing::debug!(error = %e, path = %path, "Failed to parse path");
+            res.status_code(StatusCode::NOT_FOUND);
+            return;
+        }
+    };
+
+    tracing::debug!(
+        collection_id = %collection_id,
+        uri = %uri,
+        "Parsed request path"
+    );
+
     // TODO: Check authorization
 
     // Perform the deletion
-    match perform_delete(&mut conn, &path).await {
+    match perform_delete(&mut conn, collection_id, &uri).await {
         Ok(true) => {
             // Successfully deleted
             tracing::info!("Resource deleted successfully");
@@ -72,11 +88,10 @@ pub async fn delete(req: &mut Request, res: &mut Response) {
 #[tracing::instrument(skip_all)]
 async fn perform_delete(
     _conn: &mut connection::DbConnection<'_>,
-    _path: &str,
+    _collection_id: uuid::Uuid,
+    _uri: &str,
 ) -> anyhow::Result<bool> {
     tracing::debug!("Performing resource deletion");
-    // TODO: Parse path to get collection_id and uri
-    // For now, this is a stub
 
     // Example implementation:
     // 1. Find the instance

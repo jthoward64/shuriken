@@ -72,6 +72,30 @@ pub fn extract_collection_id(path: &str) -> anyhow::Result<uuid::Uuid> {
     ))
 }
 
+/// ## Summary
+/// Extracts the path component from a URL or URI string.
+///
+/// Handles both full URLs (e.g., `http://host/path`) and relative paths.
+/// The Destination header in WebDAV COPY/MOVE operations contains full URLs,
+/// this function extracts just the path portion.
+#[must_use]
+pub fn extract_path_from_url(url_or_path: &str) -> String {
+    // If it doesn't contain "://", treat it as a path
+    if !url_or_path.contains("://") {
+        return url_or_path.to_string();
+    }
+
+    // Extract path from full URL
+    // Format: scheme://host[:port]/path
+    url_or_path
+        .split_once("://")
+        .and_then(|(_, rest)| {
+            // Find the first '/' after the host[:port]
+            rest.split_once('/').map(|(_, path)| format!("/{path}"))
+        })
+        .unwrap_or_else(|| "/".into()) // Default to "/" if no path component
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -125,5 +149,47 @@ mod tests {
 
         let parsed_id = extract_collection_id(&path).expect("Should extract");
         assert_eq!(parsed_id, collection_id);
+    }
+
+    #[test]
+    fn test_extract_path_from_url_full_url() {
+        let url = "http://example.com/path/to/resource.ics";
+        let path = extract_path_from_url(url);
+        assert_eq!(path, "/path/to/resource.ics");
+    }
+
+    #[test]
+    fn test_extract_path_from_url_with_port() {
+        let url = "http://example.com:8080/caldav/collection/event.ics";
+        let path = extract_path_from_url(url);
+        assert_eq!(path, "/caldav/collection/event.ics");
+    }
+
+    #[test]
+    fn test_extract_path_from_url_relative_path() {
+        let path_input = "/caldav/collection/event.ics";
+        let result = extract_path_from_url(path_input);
+        assert_eq!(result, path_input);
+    }
+
+    #[test]
+    fn test_extract_path_from_url_https() {
+        let url = "https://example.com/path";
+        let path = extract_path_from_url(url);
+        assert_eq!(path, "/path");
+    }
+
+    #[test]
+    fn test_extract_path_from_url_no_path() {
+        let url = "http://example.com";
+        let path = extract_path_from_url(url);
+        assert_eq!(path, "/");
+    }
+
+    #[test]
+    fn test_extract_path_from_url_no_path_with_port() {
+        let url = "http://example.com:8080";
+        let path = extract_path_from_url(url);
+        assert_eq!(path, "/");
     }
 }
