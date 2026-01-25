@@ -148,15 +148,19 @@ CREATE INDEX idx_group_name_group ON group_name(group_id);
 -- CONSTRAINT ENHANCEMENTS
 -- =============================================================================
 
--- Add check constraint to ensure collection URIs don't contain invalid characters
+-- Add check constraint to ensure collection URIs are valid
+-- Pattern ensures: starts and ends with alphanumeric, can contain dots/dashes/underscores in middle
+-- This prevents path traversal and empty URI components
 ALTER TABLE dav_collection ADD CONSTRAINT chk_dav_collection_uri_format
-  CHECK (uri ~ '^[a-zA-Z0-9_.-]+$');
+  CHECK (uri ~ '^[a-zA-Z0-9]([a-zA-Z0-9_.-]*[a-zA-Z0-9])?$');
 
--- Add check constraint to ensure instance URIs end with .ics or .vcf
+-- Add check constraint to ensure instance URIs end with .ics or .vcf based on content type
+-- Also ensures content_type is one of the valid values
 ALTER TABLE dav_instance ADD CONSTRAINT chk_dav_instance_uri_format
   CHECK (
-    (content_type = 'text/calendar' AND uri ~ '\.ics$') OR
-    (content_type = 'text/vcard' AND uri ~ '\.vcf$')
+    content_type IN ('text/calendar', 'text/vcard') AND
+    ((content_type = 'text/calendar' AND uri ~ '\.ics$') OR
+     (content_type = 'text/vcard' AND uri ~ '\.vcf$'))
   );
 
 -- Add check constraint to ensure entity type matches content in derived indexes
@@ -171,23 +175,23 @@ ALTER TABLE cal_index ADD CONSTRAINT chk_cal_index_component_type
 -- =============================================================================
 
 -- Add collection-level properties for scheduling (Phase 7)
-ALTER TABLE dav_collection ADD COLUMN IF NOT EXISTS supported_components TEXT[] DEFAULT ARRAY['VEVENT'];
+ALTER TABLE dav_collection ADD COLUMN supported_components TEXT[] DEFAULT ARRAY['VEVENT'];
 
 COMMENT ON COLUMN dav_collection.supported_components IS 'Supported component types (VEVENT, VTODO, etc.) for CalDAV collections';
 
 -- Add instance-level scheduling metadata
-ALTER TABLE dav_instance ADD COLUMN IF NOT EXISTS schedule_tag TEXT;
+ALTER TABLE dav_instance ADD COLUMN schedule_tag TEXT;
 
 COMMENT ON COLUMN dav_instance.schedule_tag IS 'Schedule-Tag header for iTIP message correlation (RFC 6638)';
 
 -- Add organizer tracking to cal_index for efficient organizer-based queries
-ALTER TABLE cal_index ADD COLUMN IF NOT EXISTS organizer_cn TEXT;
+ALTER TABLE cal_index ADD COLUMN organizer_cn TEXT;
 
 COMMENT ON COLUMN cal_index.organizer_cn IS 'Common name of organizer for display purposes';
 
 -- Add TRANSP and STATUS to cal_index for free-busy queries (Phase 7)
-ALTER TABLE cal_index ADD COLUMN IF NOT EXISTS transp TEXT CHECK (transp IN ('OPAQUE', 'TRANSPARENT'));
-ALTER TABLE cal_index ADD COLUMN IF NOT EXISTS status TEXT CHECK (status IN ('TENTATIVE', 'CONFIRMED', 'CANCELLED'));
+ALTER TABLE cal_index ADD COLUMN transp TEXT CHECK (transp IN ('OPAQUE', 'TRANSPARENT'));
+ALTER TABLE cal_index ADD COLUMN status TEXT CHECK (status IN ('TENTATIVE', 'CONFIRMED', 'CANCELLED'));
 
 COMMENT ON COLUMN cal_index.transp IS 'Time transparency (OPAQUE = busy, TRANSPARENT = free)';
 COMMENT ON COLUMN cal_index.status IS 'Event status for free-busy filtering';
