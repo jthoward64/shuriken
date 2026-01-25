@@ -522,7 +522,6 @@ fn get_attribute(e: &quick_xml::events::BytesStart<'_>, name: &str) -> ParseResu
 }
 
 /// Parses calendar filter content (nested comp-filters).
-#[expect(clippy::too_many_lines)]
 fn parse_calendar_filter_content(
     reader: &mut Reader<&[u8]>,
     buf: &mut Vec<u8>,
@@ -540,7 +539,7 @@ fn parse_calendar_filter_content(
 
                 if local_name == "comp-filter" && depth == 2 {
                     // Extract name attribute before consuming the element
-                    let name = get_attribute(&e, "name")?.to_owned();
+                    let name = get_attribute(&e, "name")?.clone();
                     let comp_filter = parse_comp_filter_with_name(reader, buf, namespaces, name)?;
                     filter.filters.push(comp_filter);
                 }
@@ -569,7 +568,6 @@ fn parse_calendar_filter_content(
 }
 
 /// Parses a comp-filter element when name is already extracted.
-#[expect(clippy::too_many_lines)]
 fn parse_comp_filter_with_name(
     reader: &mut Reader<&[u8]>,
     buf: &mut Vec<u8>,
@@ -588,12 +586,12 @@ fn parse_comp_filter_with_name(
 
                 match local_name.as_str() {
                     "comp-filter" => {
-                        let name = get_attribute(&e, "name")?.to_owned();
+                        let name = get_attribute(&e, "name")?.clone();
                         let nested = parse_comp_filter_with_name(reader, buf, namespaces, name)?;
                         comp_filter.comp_filters.push(nested);
                     }
                     "prop-filter" => {
-                        let name = get_attribute(&e, "name")?.to_owned();
+                        let name = get_attribute(&e, "name")?.clone();
                         let prop_filter = parse_prop_filter_with_name(reader, buf, namespaces, name)?;
                         comp_filter.prop_filters.push(prop_filter);
                     }
@@ -632,6 +630,7 @@ fn parse_comp_filter_with_name(
 }
 
 /// Parses a prop-filter element when name is already extracted.
+#[expect(clippy::too_many_lines)]
 fn parse_prop_filter_with_name(
     reader: &mut Reader<&[u8]>,
     buf: &mut Vec<u8>,
@@ -663,9 +662,9 @@ fn parse_prop_filter_with_name(
                                 "match-type" => {
                                     match_type = match value {
                                         "equals" => MatchType::Equals,
-                                        "contains" => MatchType::Contains,
                                         "starts-with" => MatchType::StartsWith,
                                         "ends-with" => MatchType::EndsWith,
+                                        // Default to contains per RFC 4791
                                         _ => MatchType::Contains,
                                     };
                                 }
@@ -678,7 +677,7 @@ fn parse_prop_filter_with_name(
                         prop_filter.time_range = Some(parse_time_range(&e)?);
                     }
                     "param-filter" => {
-                        let name = get_attribute(&e, "name")?.to_owned();
+                        let name = get_attribute(&e, "name")?.clone();
                         let param_filter = parse_param_filter_with_name(reader, buf, name)?;
                         prop_filter.param_filters.push(param_filter);
                     }
@@ -714,6 +713,7 @@ fn parse_prop_filter_with_name(
 }
 
 /// Parses a param-filter element when name is already extracted.
+#[expect(clippy::too_many_lines)]
 fn parse_param_filter_with_name(
     reader: &mut Reader<&[u8]>,
     buf: &mut Vec<u8>,
@@ -747,9 +747,9 @@ fn parse_param_filter_with_name(
                             "match-type" => {
                                 match_type = match value {
                                     "equals" => MatchType::Equals,
-                                    "contains" => MatchType::Contains,
                                     "starts-with" => MatchType::StartsWith,
                                     "ends-with" => MatchType::EndsWith,
+                                    // Default to contains per RFC 6352
                                     _ => MatchType::Contains,
                                 };
                             }
@@ -863,7 +863,7 @@ fn parse_addressbook_filter_content(
                 depth += 1;
 
                 if local_name == "prop-filter" && depth == 2 {
-                    let name = get_attribute(&e, "name")?.to_owned();
+                    let name = get_attribute(&e, "name")?.clone();
                     let prop_filter = parse_prop_filter_with_name(reader, buf, namespaces, name)?;
                     prop_filters.push(prop_filter);
                 }

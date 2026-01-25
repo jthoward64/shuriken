@@ -3,8 +3,6 @@
 //! Constructs DAV properties for calendar and addressbook resources
 //! in response to REPORT requests (multiget, query).
 
-#![expect(clippy::uninlined_format_args)]
-
 use crate::component::db::connection::DbConnection;
 use crate::component::db::schema::dav_shadow;
 use crate::component::model::dav::instance::DavInstance;

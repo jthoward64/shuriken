@@ -3,9 +3,6 @@
 //! Implements filter logic for property-filter and text-match
 //! matching against vCard data.
 
-#![expect(clippy::uninlined_format_args)]
-#![expect(clippy::too_many_lines)]
-
 use crate::component::db::connection::DbConnection;
 use crate::component::db::schema::{card_email, card_index, card_phone, dav_instance};
 use crate::component::model::dav::instance::DavInstance;
@@ -251,10 +248,10 @@ fn apply_text_match_email(
     let value = normalize_text_for_collation(&text_match.value, text_match.collation.as_ref());
 
     query = match text_match.match_type {
-        MatchType::Contains => query.filter(card_email::email.ilike(format!("%{}%", value))),
+        MatchType::Contains => query.filter(card_email::email.ilike(format!("%{value}%"))),
         MatchType::Equals => query.filter(card_email::email.ilike(value)),
-        MatchType::StartsWith => query.filter(card_email::email.ilike(format!("{}%", value))),
-        MatchType::EndsWith => query.filter(card_email::email.ilike(format!("%{}", value))),
+        MatchType::StartsWith => query.filter(card_email::email.ilike(format!("{value}%"))),
+        MatchType::EndsWith => query.filter(card_email::email.ilike(format!("%{value}"))),
     };
 
     query
@@ -269,17 +266,17 @@ fn apply_text_match_phone(
     let value = normalize_text_for_collation(&text_match.value, text_match.collation.as_ref());
 
     query = match text_match.match_type {
-        MatchType::Contains => query.filter(card_phone::phone_raw.ilike(format!("%{}%", value))),
+        MatchType::Contains => query.filter(card_phone::phone_raw.ilike(format!("%{value}%"))),
         MatchType::Equals => query.filter(card_phone::phone_raw.ilike(value)),
-        MatchType::StartsWith => query.filter(card_phone::phone_raw.ilike(format!("{}%", value))),
-        MatchType::EndsWith => query.filter(card_phone::phone_raw.ilike(format!("%{}", value))),
+        MatchType::StartsWith => query.filter(card_phone::phone_raw.ilike(format!("{value}%"))),
+        MatchType::EndsWith => query.filter(card_phone::phone_raw.ilike(format!("%{value}"))),
     };
 
     query
 }
 
 /// ## Summary
-/// Applies text-match to card_index query for specific property.
+/// Applies text-match to `card_index` query for specific property.
 fn apply_text_match_card_index(
     mut query: card_index::BoxedQuery<'static, diesel::pg::Pg>,
     text_match: &TextMatch,
@@ -292,26 +289,26 @@ fn apply_text_match_card_index(
     query = match prop_name.as_str() {
         "FN" => {
             match text_match.match_type {
-                MatchType::Contains => query.filter(card_index::fn_.ilike(format!("%{}%", value))),
+                MatchType::Contains => query.filter(card_index::fn_.ilike(format!("%{value}%"))),
                 MatchType::Equals => query.filter(card_index::fn_.ilike(value.clone())),
-                MatchType::StartsWith => query.filter(card_index::fn_.ilike(format!("{}%", value))),
-                MatchType::EndsWith => query.filter(card_index::fn_.ilike(format!("%{}", value))),
+                MatchType::StartsWith => query.filter(card_index::fn_.ilike(format!("{value}%"))),
+                MatchType::EndsWith => query.filter(card_index::fn_.ilike(format!("%{value}"))),
             }
         }
         "ORG" => {
             match text_match.match_type {
-                MatchType::Contains => query.filter(card_index::org.ilike(format!("%{}%", value))),
+                MatchType::Contains => query.filter(card_index::org.ilike(format!("%{value}%"))),
                 MatchType::Equals => query.filter(card_index::org.ilike(value.clone())),
-                MatchType::StartsWith => query.filter(card_index::org.ilike(format!("{}%", value))),
-                MatchType::EndsWith => query.filter(card_index::org.ilike(format!("%{}", value))),
+                MatchType::StartsWith => query.filter(card_index::org.ilike(format!("{value}%"))),
+                MatchType::EndsWith => query.filter(card_index::org.ilike(format!("%{value}"))),
             }
         }
         "TITLE" => {
             match text_match.match_type {
-                MatchType::Contains => query.filter(card_index::title.ilike(format!("%{}%", value))),
+                MatchType::Contains => query.filter(card_index::title.ilike(format!("%{value}%"))),
                 MatchType::Equals => query.filter(card_index::title.ilike(value.clone())),
-                MatchType::StartsWith => query.filter(card_index::title.ilike(format!("{}%", value))),
-                MatchType::EndsWith => query.filter(card_index::title.ilike(format!("%{}", value))),
+                MatchType::StartsWith => query.filter(card_index::title.ilike(format!("{value}%"))),
+                MatchType::EndsWith => query.filter(card_index::title.ilike(format!("%{value}"))),
             }
         }
         _ => query, // Unknown property
@@ -329,10 +326,10 @@ fn apply_text_match_uid(
     let value = normalize_text_for_collation(&text_match.value, text_match.collation.as_ref());
     
     query = match text_match.match_type {
-        MatchType::Contains => query.filter(card_index::uid.ilike(format!("%{}%", value))),
+        MatchType::Contains => query.filter(card_index::uid.ilike(format!("%{value}%"))),
         MatchType::Equals => query.filter(card_index::uid.ilike(value)),
-        MatchType::StartsWith => query.filter(card_index::uid.ilike(format!("{}%", value))),
-        MatchType::EndsWith => query.filter(card_index::uid.ilike(format!("%{}", value))),
+        MatchType::StartsWith => query.filter(card_index::uid.ilike(format!("{value}%"))),
+        MatchType::EndsWith => query.filter(card_index::uid.ilike(format!("%{value}"))),
     };
     
     query
