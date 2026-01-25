@@ -119,7 +119,7 @@ async fn build_sync_collection_response(
     //    - Deleted resources (404 status)
     // 6. Set new sync token in response (collection.synctoken)
     // 7. Apply limit if specified (return 507 if truncated)
-    
+
     Ok(Multistatus::new())
 }
 
@@ -188,9 +188,9 @@ async fn build_expand_property_response(
     //
     // Common use case: Expand principal-URL to get principal properties
     // This is frequently used by CardDAV clients for discovery
-    
+
     tracing::warn!("expand-property not yet fully implemented, returning empty result");
-    
+
     Ok(Multistatus::new())
 }
 
@@ -209,12 +209,18 @@ fn write_multistatus_response(res: &mut Response, multistatus: &Multistatus) {
     };
 
     res.status_code(StatusCode::MULTI_STATUS);
-    #[expect(clippy::let_underscore_must_use, reason = "Header addition failure is non-fatal")]
+    #[expect(
+        clippy::let_underscore_must_use,
+        reason = "Header addition failure is non-fatal"
+    )]
     let _ = res.add_header(
         "Content-Type",
         salvo::http::HeaderValue::from_static("application/xml; charset=utf-8"),
         true,
     );
-    #[expect(clippy::let_underscore_must_use, reason = "Write body failure is non-fatal")]
+    #[expect(
+        clippy::let_underscore_must_use,
+        reason = "Write body failure is non-fatal"
+    )]
     let _ = res.write_body(xml);
 }

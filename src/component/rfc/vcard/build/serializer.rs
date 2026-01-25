@@ -3,9 +3,10 @@
 use super::escape::{escape_component, escape_param_value, escape_text};
 use super::fold::fold_line;
 use crate::component::rfc::vcard::core::{
-    Address, DateAndOrTime, Gender, Organization, StructuredName, VCard, VCardDate,
-    VCardParameter, VCardProperty, VCardTime, VCardUtcOffset, VCardValue,
-};use std::fmt::Write as _;
+    Address, DateAndOrTime, Gender, Organization, StructuredName, VCard, VCardDate, VCardParameter,
+    VCardProperty, VCardTime, VCardUtcOffset, VCardValue,
+};
+use std::fmt::Write as _;
 /// Serializes one or more vCards to a string.
 ///
 /// ## Summary
@@ -231,14 +232,12 @@ fn serialize_value(value: &VCardValue, raw_value: &str, output: &mut String) {
             output.push(';');
             output.push_str(&cpm.uri);
         }
-        VCardValue::Related(rel) => {
-            match rel {
-                crate::component::rfc::vcard::core::Related::Uri(s) => output.push_str(s),
-                crate::component::rfc::vcard::core::Related::Text(s) => {
-                    output.push_str(&escape_text(s));
-                }
+        VCardValue::Related(rel) => match rel {
+            crate::component::rfc::vcard::core::Related::Uri(s) => output.push_str(s),
+            crate::component::rfc::vcard::core::Related::Text(s) => {
+                output.push_str(&escape_text(s));
             }
-        }
+        },
     }
 }
 
@@ -378,7 +377,7 @@ fn serialize_utc_offset(offset: VCardUtcOffset, output: &mut String) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::component::rfc::vcard::core::{VCardVersion, VCard, VCardProperty};
+    use crate::component::rfc::vcard::core::{VCard, VCardProperty, VCardVersion};
 
     #[test]
     fn serialize_simple_vcard() {
@@ -405,7 +404,11 @@ mod tests {
     #[test]
     fn serialize_with_group() {
         let mut card = VCard::new();
-        card.add_property(VCardProperty::grouped_text("item1", "TEL", "+1-555-555-5555"));
+        card.add_property(VCardProperty::grouped_text(
+            "item1",
+            "TEL",
+            "+1-555-555-5555",
+        ));
 
         let output = serialize_single(&card);
         assert!(output.contains("item1.TEL:+1-555-555-5555\r\n"));
@@ -427,7 +430,10 @@ mod tests {
     #[test]
     fn serialize_escapes_text() {
         let mut card = VCard::new();
-        card.add_property(VCardProperty::text("NOTE", "Line1\nLine2; with special, chars"));
+        card.add_property(VCardProperty::text(
+            "NOTE",
+            "Line1\nLine2; with special, chars",
+        ));
 
         let output = serialize_single(&card);
         assert!(output.contains("NOTE:Line1\\nLine2\\; with special\\, chars\r\n"));

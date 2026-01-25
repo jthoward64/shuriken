@@ -25,10 +25,10 @@ use crate::component::db::connection;
 ))]
 pub async fn delete(req: &mut Request, res: &mut Response) {
     tracing::info!("Handling DELETE request");
-    
+
     // Get path before borrowing req mutably
     let path = req.uri().path().to_string();
-    
+
     // Get database connection
     let mut conn = match connection::connect().await {
         Ok(conn) => conn,
@@ -38,10 +38,10 @@ pub async fn delete(req: &mut Request, res: &mut Response) {
             return;
         }
     };
-    
+
     // TODO: Parse path to extract collection_id and uri
     // TODO: Check authorization
-    
+
     // Perform the deletion
     match perform_delete(&mut conn, &path).await {
         Ok(true) => {
@@ -77,7 +77,7 @@ async fn perform_delete(
     tracing::debug!("Performing resource deletion");
     // TODO: Parse path to get collection_id and uri
     // For now, this is a stub
-    
+
     // Example implementation:
     // 1. Find the instance
     // let inst = instance::by_collection_and_uri(collection_id, uri)
@@ -89,33 +89,33 @@ async fn perform_delete(
     // 2. If found, soft-delete it
     // if let Some(inst) = inst {
     //     let now = chrono::Utc::now();
-    //     
+    //
     //     diesel::update(dav_instance::table.find(inst.id))
     //         .set(dav_instance::deleted_at.eq(Some(now)))
     //         .execute(conn)
     //         .await?;
-    //     
+    //
     //     // 3. Create tombstone
     //     let tombstone = NewDavTombstone {
     //         collection_id: inst.collection_id,
     //         uri: &inst.uri,
     //         sync_revision: inst.sync_revision,
     //     };
-    //     
+    //
     //     diesel::insert_into(crate::component::db::schema::dav_tombstone::table)
     //         .values(&tombstone)
     //         .execute(conn)
     //         .await?;
-    //     
+    //
     //     // 4. Bump collection sync token
     //     diesel::update(dav_collection::table.find(inst.collection_id))
     //         .set(dav_collection::synctoken.eq(dav_collection::synctoken + 1))
     //         .execute(conn)
     //         .await?;
-    //     
+    //
     //     return Ok(true);
     // }
-    
+
     // Stub: return not found
     Ok(false)
 }

@@ -46,22 +46,52 @@ fn error_display() {
 
 #[test]
 fn error_kind_display() {
-    assert_eq!(format!("{}", ParseErrorKind::UnexpectedEof), "unexpected end of input");
-    assert_eq!(format!("{}", ParseErrorKind::UnexpectedToken), "unexpected token");
+    assert_eq!(
+        format!("{}", ParseErrorKind::UnexpectedEof),
+        "unexpected end of input"
+    );
+    assert_eq!(
+        format!("{}", ParseErrorKind::UnexpectedToken),
+        "unexpected token"
+    );
     assert_eq!(format!("{}", ParseErrorKind::InvalidValue), "invalid value");
-    assert_eq!(format!("{}", ParseErrorKind::MissingProperty), "missing property");
-    assert_eq!(format!("{}", ParseErrorKind::InvalidPropertyName), "invalid property name");
-    assert_eq!(format!("{}", ParseErrorKind::InvalidParameter), "invalid parameter");
-    assert_eq!(format!("{}", ParseErrorKind::InvalidStructuredValue), "invalid structured value");
-    assert_eq!(format!("{}", ParseErrorKind::InvalidDateTime), "invalid date/time");
-    assert_eq!(format!("{}", ParseErrorKind::UnsupportedVersion), "unsupported version");
-    assert_eq!(format!("{}", ParseErrorKind::EncodingError), "encoding error");
+    assert_eq!(
+        format!("{}", ParseErrorKind::MissingProperty),
+        "missing property"
+    );
+    assert_eq!(
+        format!("{}", ParseErrorKind::InvalidPropertyName),
+        "invalid property name"
+    );
+    assert_eq!(
+        format!("{}", ParseErrorKind::InvalidParameter),
+        "invalid parameter"
+    );
+    assert_eq!(
+        format!("{}", ParseErrorKind::InvalidStructuredValue),
+        "invalid structured value"
+    );
+    assert_eq!(
+        format!("{}", ParseErrorKind::InvalidDateTime),
+        "invalid date/time"
+    );
+    assert_eq!(
+        format!("{}", ParseErrorKind::UnsupportedVersion),
+        "unsupported version"
+    );
+    assert_eq!(
+        format!("{}", ParseErrorKind::EncodingError),
+        "encoding error"
+    );
 }
 
 #[test]
 fn error_kind_equality() {
     assert_eq!(ParseErrorKind::InvalidValue, ParseErrorKind::InvalidValue);
-    assert_ne!(ParseErrorKind::InvalidValue, ParseErrorKind::MissingProperty);
+    assert_ne!(
+        ParseErrorKind::InvalidValue,
+        ParseErrorKind::MissingProperty
+    );
 }
 
 #[test]

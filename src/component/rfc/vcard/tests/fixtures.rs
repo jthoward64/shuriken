@@ -164,8 +164,8 @@ END:VCARD\r\n";
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::component::rfc::vcard::parse::parse_single;
     use crate::component::rfc::vcard::core::VCardVersion;
+    use crate::component::rfc::vcard::parse::parse_single;
 
     #[test]
     fn parse_vcard_author() {

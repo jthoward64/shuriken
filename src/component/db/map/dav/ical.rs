@@ -29,8 +29,8 @@ pub fn icalendar_to_db_models<'a>(
     entity_type: &str,
 ) -> anyhow::Result<DbModels<'a>> {
     // Extract logical UID from top-level component - leak to get 'static lifetime
-    let logical_uid_opt = extract_ical_uid(&ical.root)
-        .map(|s| Box::leak(s.into_boxed_str()) as &'static str);
+    let logical_uid_opt =
+        extract_ical_uid(&ical.root).map(|s| Box::leak(s.into_boxed_str()) as &'static str);
 
     // Leak entity_type to get 'static lifetime
     let entity_type_static = Box::leak(entity_type.to_string().into_boxed_str()) as &'static str;
@@ -94,7 +94,9 @@ fn map_ical_component_recursive<'a>(
                 clippy::cast_possible_wrap,
                 reason = "Property counts per component are bounded by RFC limits (<1000), truncation to i32 is safe"
             )]
-            { prop_ord as i32 },
+            {
+                prop_ord as i32
+            },
             properties,
             parameters,
         )?;
@@ -111,7 +113,9 @@ fn map_ical_component_recursive<'a>(
                 clippy::cast_possible_wrap,
                 reason = "Child component counts are bounded by RFC limits (<100), truncation to i32 is safe"
             )]
-            { child_ord as i32 },
+            {
+                child_ord as i32
+            },
             components,
             properties,
             parameters,
@@ -160,7 +164,9 @@ fn map_ical_property<'a>(
                 clippy::cast_possible_wrap,
                 reason = "Parameter counts per property are bounded by RFC limits (<50), truncation to i32 is safe"
             )]
-            { param_ord as i32 },
+            {
+                param_ord as i32
+            },
             parameters,
         );
     }
@@ -179,7 +185,7 @@ fn map_ical_parameter(
     // Join multiple values with comma if present - leak all strings for 'static
     let name_static = Box::leak(param.name.clone().into_boxed_str()) as &'static str;
     let value_static = Box::leak(param.values.join(",").into_boxed_str()) as &'static str;
-    
+
     parameters.push(NewDavParameter {
         property_id,
         name: name_static,

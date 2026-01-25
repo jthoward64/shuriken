@@ -133,11 +133,7 @@ impl Duration {
             + (self.minutes as i64 * 60)
             + (self.seconds as i64);
 
-        if self.negative {
-            -total
-        } else {
-            total
-        }
+        if self.negative { -total } else { total }
     }
 }
 

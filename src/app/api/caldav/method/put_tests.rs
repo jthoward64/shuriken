@@ -28,7 +28,7 @@ END:VCALENDAR";
             .raw_form(ical_data)
             .send(&service)
             .await;
-        
+
         // Valid responses: 201, 204, 400, 404, 412, or 500
         let status = resp.status_code;
         assert!(
@@ -63,7 +63,7 @@ END:VCALENDAR";
             .raw_form(ical_data)
             .send(&service)
             .await;
-        
+
         assert!(resp.status_code.is_some());
     }
 
@@ -88,7 +88,7 @@ END:VCALENDAR";
             .raw_form(ical_data)
             .send(&service)
             .await;
-        
+
         assert!(resp.status_code.is_some());
     }
 
@@ -103,11 +103,11 @@ END:VCALENDAR";
             .raw_form(invalid_ical)
             .send(&service)
             .await;
-        
+
         // Should return 400, 404, or 500
         let status = resp.status_code;
         assert!(
-            status == Some(StatusCode::BAD_REQUEST) 
+            status == Some(StatusCode::BAD_REQUEST)
                 || status == Some(StatusCode::NOT_FOUND)
                 || status == Some(StatusCode::INTERNAL_SERVER_ERROR),
             "Expected 400, 404, or 500 for invalid iCalendar, got {status:?}"
@@ -141,7 +141,7 @@ END:VCALENDAR";
                 .raw_form(ical_data)
                 .send(&service)
                 .await;
-            
+
             assert!(resp.status_code.is_some());
         }
     }
@@ -154,11 +154,11 @@ END:VCALENDAR";
         let resp = TestClient::put("http://127.0.0.1:5800/calendar/event.ics")
             .send(&service)
             .await;
-        
+
         // Should return 400, 404, or 500 for empty body
         let status = resp.status_code;
         assert!(
-            status == Some(StatusCode::BAD_REQUEST) 
+            status == Some(StatusCode::BAD_REQUEST)
                 || status == Some(StatusCode::NOT_FOUND)
                 || status == Some(StatusCode::INTERNAL_SERVER_ERROR),
             "Expected 400, 404, or 500 for empty body, got {status:?}"

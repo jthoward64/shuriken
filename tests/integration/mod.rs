@@ -18,12 +18,12 @@
 //! Most tests are currently marked `#[ignore]` as they require the HTTP
 //! routing to be fully wired up.
 
+mod copy_move;
+mod delete;
+mod get_head;
 mod helpers;
+mod mkcol;
 mod options;
 mod propfind;
 mod proppatch;
-mod get_head;
 mod put;
-mod delete;
-mod copy_move;
-mod mkcol;

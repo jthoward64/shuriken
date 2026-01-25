@@ -33,11 +33,11 @@ use helpers::build_propfind_response;
 ))]
 pub async fn propfind(req: &mut Request, res: &mut Response) {
     tracing::info!("Handling PROPFIND request");
-    
+
     // Parse Depth header (default to 0 for PROPFIND)
     let depth = parse_depth(req).unwrap_or_else(Depth::default_for_propfind);
     tracing::debug!(depth = ?depth, "Depth header parsed");
-    
+
     // Parse request body
     let body = match req.payload().await {
         Ok(bytes) => bytes.to_vec(),
@@ -47,9 +47,9 @@ pub async fn propfind(req: &mut Request, res: &mut Response) {
             return;
         }
     };
-    
+
     tracing::debug!(bytes = body.len(), "Request body read successfully");
-    
+
     // Parse PROPFIND request (empty body = allprop)
     let propfind_req = match parse_propfind(&body) {
         Ok(req) => req,
@@ -59,9 +59,9 @@ pub async fn propfind(req: &mut Request, res: &mut Response) {
             return;
         }
     };
-    
+
     tracing::debug!("PROPFIND request parsed successfully");
-    
+
     // Get database connection
     let mut conn = match connection::connect().await {
         Ok(conn) => conn,
@@ -71,7 +71,7 @@ pub async fn propfind(req: &mut Request, res: &mut Response) {
             return;
         }
     };
-    
+
     // Build multistatus response
     let multistatus = match build_propfind_response(&mut conn, req, depth, &propfind_req).await {
         Ok(ms) => ms,
@@ -81,9 +81,9 @@ pub async fn propfind(req: &mut Request, res: &mut Response) {
             return;
         }
     };
-    
+
     tracing::debug!("Multistatus response built successfully");
-    
+
     // Serialize to XML
     let xml = match serialize_multistatus(&multistatus) {
         Ok(xml) => xml,
@@ -93,15 +93,21 @@ pub async fn propfind(req: &mut Request, res: &mut Response) {
             return;
         }
     };
-    
+
     // Set response
     res.status_code(StatusCode::MULTI_STATUS);
-    #[expect(clippy::let_underscore_must_use, reason = "Header addition failure is non-fatal")]
+    #[expect(
+        clippy::let_underscore_must_use,
+        reason = "Header addition failure is non-fatal"
+    )]
     let _ = res.add_header(
         "Content-Type",
         salvo::http::HeaderValue::from_static("application/xml; charset=utf-8"),
         true,
     );
-    #[expect(clippy::let_underscore_must_use, reason = "Write body failure is non-fatal")]
+    #[expect(
+        clippy::let_underscore_must_use,
+        reason = "Write body failure is non-fatal"
+    )]
     let _ = res.write_body(xml);
 }

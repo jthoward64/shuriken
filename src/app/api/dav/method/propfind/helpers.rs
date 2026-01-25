@@ -23,12 +23,12 @@ pub(super) async fn build_propfind_response(
     propfind_req: &crate::component::rfc::dav::core::PropfindRequest,
 ) -> anyhow::Result<Multistatus> {
     let path = req.uri().path();
-    
+
     // TODO: Parse path to determine if this is a collection or item
     // TODO: Load resource from database
-    
+
     let mut multistatus = Multistatus::new();
-    
+
     // For now, create a stub response
     // In a real implementation, we would:
     // 1. Parse the path to get collection_id or instance_id
@@ -36,19 +36,19 @@ pub(super) async fn build_propfind_response(
     // 3. Based on depth, load children if this is a collection
     // 4. For each resource, get the requested properties
     // 5. Build PropstatResponse for each resource
-    
+
     // Stub: Return a minimal response for the requested resource
     let href = Href::new(path);
     let properties = get_properties_for_resource(conn, path, propfind_req).await?;
-    
+
     let response = PropstatResponse::ok(href, properties);
     multistatus.add_response(response);
-    
+
     // If depth is 1, add child resources (stub)
     if matches!(depth, Depth::One) {
         // TODO: Query for child resources and add them to multistatus
     }
-    
+
     Ok(multistatus)
 }
 
@@ -64,14 +64,11 @@ async fn get_properties_for_resource(
     propfind_req: &crate::component::rfc::dav::core::PropfindRequest,
 ) -> anyhow::Result<Vec<DavProperty>> {
     let mut properties = Vec::new();
-    
+
     // Handle different PROPFIND types
     if propfind_req.is_allprop() {
         // Return all defined properties
-        properties.push(DavProperty::text(
-            QName::dav("displayname"),
-            "Calendar",
-        ));
+        properties.push(DavProperty::text(QName::dav("displayname"), "Calendar"));
         properties.push(DavProperty {
             name: QName::dav("resourcetype"),
             value: Some(PropertyValue::ResourceType(vec![
@@ -95,7 +92,7 @@ async fn get_properties_for_resource(
         // Return only requested properties
         for prop_name in requested_props {
             let qname = prop_name.qname().clone();
-            
+
             // Resolve each property
             // For now, stub with placeholder values
             match (qname.namespace_uri(), qname.local_name()) {
@@ -131,6 +128,6 @@ async fn get_properties_for_resource(
         // No specific properties requested - this case shouldn't happen
         // as allprop and propname are already handled above
     }
-    
+
     Ok(properties)
 }

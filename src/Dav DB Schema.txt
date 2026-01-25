@@ -1,9 +1,0 @@
-
-Component
-
-Parameter
-- belongs to Component
-
-Property
-- belongs to Parameter
-

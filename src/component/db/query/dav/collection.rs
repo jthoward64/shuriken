@@ -23,17 +23,19 @@ pub fn by_id(id: uuid::Uuid) -> dav_collection::BoxedQuery<'static, diesel::pg::
 /// ## Summary
 /// Returns a query to find collections for a principal.
 #[must_use]
-pub fn by_principal(principal_id: uuid::Uuid) -> dav_collection::BoxedQuery<'static, diesel::pg::Pg> {
-    all()
-        .filter(dav_collection::owner_principal_id.eq(principal_id))
+pub fn by_principal(
+    principal_id: uuid::Uuid,
+) -> dav_collection::BoxedQuery<'static, diesel::pg::Pg> {
+    all().filter(dav_collection::owner_principal_id.eq(principal_id))
 }
 
 /// ## Summary
 /// Returns a query to find non-deleted collections for a principal.
 #[must_use]
-pub fn by_principal_not_deleted(principal_id: uuid::Uuid) -> dav_collection::BoxedQuery<'static, diesel::pg::Pg> {
-    by_principal(principal_id)
-        .filter(dav_collection::deleted_at.is_null())
+pub fn by_principal_not_deleted(
+    principal_id: uuid::Uuid,
+) -> dav_collection::BoxedQuery<'static, diesel::pg::Pg> {
+    by_principal(principal_id).filter(dav_collection::deleted_at.is_null())
 }
 
 /// ## Summary
@@ -52,8 +54,7 @@ pub fn by_uri_and_principal(
 /// Returns a query to find non-deleted collections.
 #[must_use]
 pub fn not_deleted() -> dav_collection::BoxedQuery<'static, diesel::pg::Pg> {
-    all()
-        .filter(dav_collection::deleted_at.is_null())
+    all().filter(dav_collection::deleted_at.is_null())
 }
 
 /// ## Summary
@@ -70,19 +71,19 @@ pub async fn create_collection(
     new_collection: &NewDavCollection<'_>,
 ) -> diesel::QueryResult<DavCollection> {
     tracing::debug!("Creating new DAV collection");
-    
+
     let result = diesel::insert_into(dav_collection::table)
         .values(new_collection)
         .returning(DavCollection::as_returning())
         .get_result(conn)
         .await;
-    
+
     if result.is_ok() {
         tracing::debug!("DAV collection created successfully");
     } else {
         tracing::error!("Failed to create DAV collection");
     }
-    
+
     result
 }
 
@@ -97,11 +98,8 @@ pub async fn get_collection(
     id: uuid::Uuid,
 ) -> diesel::QueryResult<Option<DavCollection>> {
     tracing::trace!("Fetching DAV collection by ID");
-    
-    by_id(id)
-        .first(conn)
-        .await
-        .optional()
+
+    by_id(id).first(conn).await.optional()
 }
 
 /// ## Summary
@@ -113,9 +111,7 @@ pub async fn list_collections(
     conn: &mut crate::component::db::connection::DbConnection<'_>,
     principal_id: uuid::Uuid,
 ) -> diesel::QueryResult<Vec<DavCollection>> {
-    by_principal_not_deleted(principal_id)
-        .load(conn)
-        .await
+    by_principal_not_deleted(principal_id).load(conn).await
 }
 
 /// ## Summary
@@ -129,7 +125,7 @@ pub async fn update_synctoken(
     collection_id: uuid::Uuid,
 ) -> diesel::QueryResult<i64> {
     tracing::debug!("Updating collection sync token");
-    
+
     diesel::update(dav_collection::table)
         .filter(dav_collection::id.eq(collection_id))
         .set(dav_collection::synctoken.eq(dav_collection::synctoken + 1))

@@ -13,25 +13,25 @@
 /// Returns an error if the path format is invalid or `collection_id` cannot be parsed as UUID.
 pub fn parse_collection_and_uri(path: &str) -> anyhow::Result<(uuid::Uuid, String)> {
     let parts: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
-    
+
     // We need at least 2 parts: collection_id and resource name
     if parts.len() < 2 {
         return Err(anyhow::anyhow!(
             "Path must contain at least collection_id and resource name: {path}"
         ));
     }
-    
+
     // Try to find the collection_id (should be a UUID)
     // Typically it's the second-to-last or third-to-last segment
     let resource_uri = parts[parts.len() - 1];
-    
+
     // Search backwards for a UUID
     for i in (0..parts.len() - 1).rev() {
         if let Ok(collection_id) = uuid::Uuid::parse_str(parts[i]) {
             return Ok((collection_id, resource_uri.to_string()));
         }
     }
-    
+
     Err(anyhow::anyhow!(
         "Could not find valid UUID collection_id in path: {path}"
     ))
@@ -59,14 +59,14 @@ pub fn extract_resource_uri(path: &str) -> anyhow::Result<String> {
 /// Returns an error if no valid UUID is found in the path.
 pub fn extract_collection_id(path: &str) -> anyhow::Result<uuid::Uuid> {
     let parts: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
-    
+
     // Search for a UUID in the path segments
     for part in parts {
         if let Ok(collection_id) = uuid::Uuid::parse_str(part) {
             return Ok(collection_id);
         }
     }
-    
+
     Err(anyhow::anyhow!(
         "Could not find valid UUID collection_id in path: {path}"
     ))
@@ -80,7 +80,7 @@ mod tests {
     fn test_parse_collection_and_uri_simple() {
         let collection_id = uuid::Uuid::new_v4();
         let path = format!("/caldav/{collection_id}/event.ics");
-        
+
         let (parsed_id, uri) = parse_collection_and_uri(&path).expect("Should parse");
         assert_eq!(parsed_id, collection_id);
         assert_eq!(uri, "event.ics");
@@ -90,7 +90,7 @@ mod tests {
     fn test_parse_collection_and_uri_with_api_prefix() {
         let collection_id = uuid::Uuid::new_v4();
         let path = format!("/api/caldav/{collection_id}/event.ics");
-        
+
         let (parsed_id, uri) = parse_collection_and_uri(&path).expect("Should parse");
         assert_eq!(parsed_id, collection_id);
         assert_eq!(uri, "event.ics");
@@ -100,7 +100,7 @@ mod tests {
     fn test_parse_collection_and_uri_carddav() {
         let collection_id = uuid::Uuid::new_v4();
         let path = format!("/carddav/{collection_id}/contact.vcf");
-        
+
         let (parsed_id, uri) = parse_collection_and_uri(&path).expect("Should parse");
         assert_eq!(parsed_id, collection_id);
         assert_eq!(uri, "contact.vcf");
@@ -122,7 +122,7 @@ mod tests {
     fn test_extract_collection_id() {
         let collection_id = uuid::Uuid::new_v4();
         let path = format!("/api/caldav/{collection_id}/event.ics");
-        
+
         let parsed_id = extract_collection_id(&path).expect("Should extract");
         assert_eq!(parsed_id, collection_id);
     }

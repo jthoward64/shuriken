@@ -19,7 +19,7 @@ async fn db_instance_create_then_get() {
     // 4. Verify collection_id matches
     // 5. Verify entity_id matches
     // 6. Verify URI is correct
-    
+
     // TODO: Implement once test DB helper is available
 }
 
@@ -35,7 +35,7 @@ async fn db_instance_update_changes_etag() {
     // 4. Retrieve instance
     // 5. Verify etag changed
     // 6. Verify new etag is different from initial
-    
+
     // TODO: Implement once test DB helper is available
 }
 
@@ -52,7 +52,7 @@ async fn db_instance_delete_creates_tombstone() {
     //    - collection_id
     //    - uri
     //    - sync_revision
-    
+
     // TODO: Implement once test DB helper is available
 }
 
@@ -68,7 +68,7 @@ async fn db_instance_delete_idempotent() {
     // 4. Attempt to delete again (second delete)
     // 5. Verify state is identical (no duplicate tombstones)
     // 6. Verify operation succeeds (or returns expected status)
-    
+
     // TODO: Implement once test DB helper is available
 }
 
@@ -82,7 +82,7 @@ async fn db_etag_stable_on_read() {
     // 2. Read instance multiple times
     // 3. Verify etag is identical each time
     // 4. Verify no mutation occurred
-    
+
     // TODO: Implement once test DB helper is available
 }
 
@@ -97,7 +97,7 @@ async fn db_etag_changes_on_semantic_change() {
     // 3. Update with semantically different content
     // 4. Generate new etag from new content
     // 5. Verify new etag differs from initial etag
-    
+
     // TODO: Implement once test DB helper is available
 }
 
@@ -106,10 +106,10 @@ async fn db_etag_changes_on_semantic_change() {
 #[test]
 fn generate_etag_deterministic() {
     let content = b"BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n";
-    
+
     let etag1 = generate_etag(content);
     let etag2 = generate_etag(content);
-    
+
     assert_eq!(etag1, etag2, "ETag should be deterministic");
     assert!(etag1.starts_with('"'), "ETag should be quoted");
     assert!(etag1.ends_with('"'), "ETag should be quoted");
@@ -121,11 +121,14 @@ fn generate_etag_deterministic() {
 fn generate_etag_different_content() {
     let content1 = b"BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n";
     let content2 = b"BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:test\r\nEND:VCALENDAR\r\n";
-    
+
     let etag1 = generate_etag(content1);
     let etag2 = generate_etag(content2);
-    
-    assert_ne!(etag1, etag2, "Different content should produce different ETags");
+
+    assert_ne!(
+        etag1, etag2,
+        "Different content should produce different ETags"
+    );
 }
 
 /// ## Summary
@@ -139,7 +142,7 @@ async fn db_instance_by_collection() {
     // 3. Query instances for collection_1
     // 4. Verify only collection_1 instances are returned
     // 5. Verify correct count
-    
+
     // TODO: Implement once test DB helper is available
 }
 
@@ -154,7 +157,7 @@ async fn db_instance_by_collection_not_deleted() {
     // 3. Query using by_collection_not_deleted()
     // 4. Verify soft-deleted instance is excluded
     // 5. Verify other instances are included
-    
+
     // TODO: Implement once test DB helper is available
 }
 
@@ -168,7 +171,7 @@ async fn db_instance_by_collection_and_uri() {
     // 2. Query by collection_id and specific URI
     // 3. Verify only matching instance is returned
     // 4. Verify URI matches exactly
-    
+
     // TODO: Implement once test DB helper is available
 }
 
@@ -183,7 +186,7 @@ async fn db_instance_by_entity() {
     // 3. Query by entity_id
     // 4. Verify all instances referencing that entity are returned
     // 5. Verify correct count
-    
+
     // TODO: Implement once test DB helper is available
 }
 
@@ -198,7 +201,7 @@ async fn db_instance_sync_revision_updates() {
     // 3. Verify sync_revision increased
     // 4. Update again
     // 5. Verify sync_revision increased again
-    
+
     // TODO: Implement once test DB helper is available
 }
 
@@ -213,7 +216,7 @@ async fn db_instance_last_modified_updates() {
     // 3. Wait briefly (to ensure time difference)
     // 4. Update instance
     // 5. Verify last_modified is later than initial
-    
+
     // TODO: Implement once test DB helper is available
 }
 
@@ -227,6 +230,6 @@ async fn db_instance_content_type() {
     // 2. Create vcard instance with content_type "text/vcard"
     // 3. Retrieve both
     // 4. Verify content_type matches for each
-    
+
     // TODO: Implement once test DB helper is available
 }

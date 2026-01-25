@@ -262,10 +262,12 @@ mod tests {
             .iter()
             .find(|p| p.name == "DTSTART")
             .expect("should have DTSTART");
-        assert!(dtstart
-            .params
-            .iter()
-            .any(|p| p.name == "VALUE" && p.value() == Some("DATE")));
+        assert!(
+            dtstart
+                .params
+                .iter()
+                .any(|p| p.name == "VALUE" && p.value() == Some("DATE"))
+        );
     }
 
     #[test]

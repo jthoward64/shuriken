@@ -68,7 +68,7 @@ pub async fn put_calendar_object(
     ical_bytes: &[u8],
 ) -> Result<PutObjectResult> {
     tracing::debug!("Processing PUT calendar object");
-    
+
     // Verify collection exists
     let _collection = collection::get_collection(conn, ctx.collection_id)
         .await
@@ -78,11 +78,9 @@ pub async fn put_calendar_object(
     tracing::debug!("Collection verified");
 
     // Parse iCalendar data
-    let ical_str = std::str::from_utf8(ical_bytes)
-        .context("iCalendar data is not valid UTF-8")?;
-    
-    let ical = parse(ical_str)
-        .map_err(|e| anyhow::anyhow!("invalid iCalendar: {e}"))?;
+    let ical_str = std::str::from_utf8(ical_bytes).context("iCalendar data is not valid UTF-8")?;
+
+    let ical = parse(ical_str).map_err(|e| anyhow::anyhow!("invalid iCalendar: {e}"))?;
 
     tracing::debug!("iCalendar data parsed successfully");
 
@@ -99,7 +97,8 @@ pub async fn put_calendar_object(
 
     // Handle If-None-Match: * (create-only precondition)
     if let Some(inm) = &ctx.if_none_match
-        && inm == "*" && existing_instance.is_some()
+        && inm == "*"
+        && existing_instance.is_some()
     {
         tracing::warn!("Precondition failed: resource already exists");
         anyhow::bail!("precondition failed: resource already exists");
@@ -149,11 +148,11 @@ pub async fn put_calendar_object(
 
     if let Some(existing_inst) = existing_instance {
         tracing::debug!("Updating existing instance");
-        
+
         // Update existing instance
         // For now, just update the ETag and sync revision
         // Full entity tree replacement will be implemented once proper ID mapping is in place
-        
+
         let sync_revision = existing_inst.sync_revision + 1;
         let _updated_instance = instance::update_instance(
             conn,
@@ -179,20 +178,20 @@ pub async fn put_calendar_object(
         entity::insert_ical_tree(conn, existing_inst.entity_id, &ical)
             .await
             .context("failed to insert component tree")?;
-        
+
         tracing::info!("Calendar object updated successfully");
     } else {
         tracing::debug!("Creating new instance");
-        
+
         // Create new entity and instance
         // For now, create a minimal entity without the full tree
         // Full tree insertion will be implemented once proper ID mapping is in place
-        
+
         let entity_model = crate::component::model::dav::entity::NewDavEntity {
             entity_type: &ctx.entity_type,
             logical_uid: ctx.logical_uid.as_deref(),
         };
-        
+
         let created_entity = entity::create_entity(conn, &entity_model)
             .await
             .context("failed to create entity")?;
@@ -221,7 +220,7 @@ pub async fn put_calendar_object(
         entity::insert_ical_tree(conn, created_entity.id, &ical)
             .await
             .context("failed to insert component tree")?;
-        
+
         tracing::info!("Calendar object created successfully");
     }
 

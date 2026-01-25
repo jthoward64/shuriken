@@ -16,13 +16,13 @@ pub fn routes() -> Router {
                     // MKCALENDAR method
                     Router::new()
                         .filter_fn(|req, _| req.method().as_str() == "MKCALENDAR")
-                        .goal(method::mkcalendar::mkcalendar)
+                        .goal(method::mkcalendar::mkcalendar),
                 )
                 .push(
                     // REPORT method
                     Router::new()
                         .filter_fn(|req, _| req.method().as_str() == "REPORT")
-                        .goal(method::report::report)
-                )
+                        .goal(method::report::report),
+                ),
         )
 }

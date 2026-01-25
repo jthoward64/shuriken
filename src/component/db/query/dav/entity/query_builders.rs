@@ -22,22 +22,22 @@ pub fn by_id(id: uuid::Uuid) -> dav_entity::BoxedQuery<'static, diesel::pg::Pg> 
 /// Returns a query to find entities by logical UID.
 #[must_use]
 pub fn by_logical_uid(uid: &str) -> dav_entity::BoxedQuery<'_, diesel::pg::Pg> {
-    all()
-        .filter(dav_entity::logical_uid.eq(uid))
+    all().filter(dav_entity::logical_uid.eq(uid))
 }
 
 /// ## Summary
 /// Returns a query to find non-deleted entities.
 #[must_use]
 pub fn not_deleted() -> dav_entity::BoxedQuery<'static, diesel::pg::Pg> {
-    all()
-        .filter(dav_entity::deleted_at.is_null())
+    all().filter(dav_entity::deleted_at.is_null())
 }
 
 /// ## Summary
 /// Returns a query to find components for an entity.
 #[must_use]
-pub fn components_for_entity(entity_id: uuid::Uuid) -> dav_component::BoxedQuery<'static, diesel::pg::Pg> {
+pub fn components_for_entity(
+    entity_id: uuid::Uuid,
+) -> dav_component::BoxedQuery<'static, diesel::pg::Pg> {
     dav_component::table
         .filter(dav_component::entity_id.eq(entity_id))
         .filter(dav_component::deleted_at.is_null())
@@ -48,7 +48,9 @@ pub fn components_for_entity(entity_id: uuid::Uuid) -> dav_component::BoxedQuery
 /// ## Summary
 /// Returns a query to find properties for a component.
 #[must_use]
-pub fn properties_for_component(component_id: uuid::Uuid) -> dav_property::BoxedQuery<'static, diesel::pg::Pg> {
+pub fn properties_for_component(
+    component_id: uuid::Uuid,
+) -> dav_property::BoxedQuery<'static, diesel::pg::Pg> {
     dav_property::table
         .filter(dav_property::component_id.eq(component_id))
         .filter(dav_property::deleted_at.is_null())
@@ -59,7 +61,9 @@ pub fn properties_for_component(component_id: uuid::Uuid) -> dav_property::Boxed
 /// ## Summary
 /// Returns a query to find parameters for a property.
 #[must_use]
-pub fn parameters_for_property(property_id: uuid::Uuid) -> dav_parameter::BoxedQuery<'static, diesel::pg::Pg> {
+pub fn parameters_for_property(
+    property_id: uuid::Uuid,
+) -> dav_parameter::BoxedQuery<'static, diesel::pg::Pg> {
     dav_parameter::table
         .filter(dav_parameter::property_id.eq(property_id))
         .filter(dav_parameter::deleted_at.is_null())

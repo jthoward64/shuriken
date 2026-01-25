@@ -44,8 +44,13 @@ pub(super) fn extract_ical_value<'a>(
             let tstz = datetime_to_utc(dt)?;
             Ok(("datetime", None, None, None, None, None, Some(tstz)))
         }
-        Value::Duration(_) | Value::Period(_) | Value::Recur(_) | Value::Time(_)
-        | Value::UtcOffset(_) | Value::Binary(_) | Value::Unknown(_) => {
+        Value::Duration(_)
+        | Value::Period(_)
+        | Value::Recur(_)
+        | Value::Time(_)
+        | Value::UtcOffset(_)
+        | Value::Binary(_)
+        | Value::Unknown(_) => {
             // Store complex types as text (raw value)
             Ok(("text", Some(raw), None, None, None, None, None))
         }
@@ -104,18 +109,26 @@ fn datetime_to_utc(
     let naive = chrono::NaiveDateTime::new(
         chrono::NaiveDate::from_ymd_opt(i32::from(dt.year), u32::from(dt.month), u32::from(dt.day))
             .ok_or_else(|| anyhow::anyhow!("Invalid date"))?,
-        chrono::NaiveTime::from_hms_opt(u32::from(dt.hour), u32::from(dt.minute), u32::from(dt.second))
-            .ok_or_else(|| anyhow::anyhow!("Invalid time"))?,
+        chrono::NaiveTime::from_hms_opt(
+            u32::from(dt.hour),
+            u32::from(dt.minute),
+            u32::from(dt.second),
+        )
+        .ok_or_else(|| anyhow::anyhow!("Invalid time"))?,
     );
 
     match &dt.form {
-        DateTimeForm::Utc => {
-            Ok(chrono::DateTime::from_naive_utc_and_offset(naive, chrono::Utc))
-        }
+        DateTimeForm::Utc => Ok(chrono::DateTime::from_naive_utc_and_offset(
+            naive,
+            chrono::Utc,
+        )),
         DateTimeForm::Floating | DateTimeForm::Zoned { .. } => {
             // Treat as UTC (without timezone info for now)
             // TODO: Handle TZID resolution in the future
-            Ok(chrono::DateTime::from_naive_utc_and_offset(naive, chrono::Utc))
+            Ok(chrono::DateTime::from_naive_utc_and_offset(
+                naive,
+                chrono::Utc,
+            ))
         }
     }
 }
@@ -151,7 +164,7 @@ mod tests {
         let value = Value::Text("Hello World".to_string());
         let (vtype, vtext, vint, vfloat, vbool, vdate, vtstz) =
             extract_ical_value(&value, "Hello World").unwrap();
-        
+
         assert_eq!(vtype, "text");
         assert_eq!(vtext, Some("Hello World"));
         assert_eq!(vint, None);
@@ -164,9 +177,8 @@ mod tests {
     #[test]
     fn extract_ical_integer_value() {
         let value = Value::Integer(42);
-        let (vtype, vtext, vint, _, _, _, _) =
-            extract_ical_value(&value, "42").unwrap();
-        
+        let (vtype, vtext, vint, _, _, _, _) = extract_ical_value(&value, "42").unwrap();
+
         assert_eq!(vtype, "integer");
         assert_eq!(vtext, None);
         assert_eq!(vint, Some(42));
@@ -175,9 +187,8 @@ mod tests {
     #[test]
     fn extract_ical_float_value() {
         let value = Value::Float(42.5);
-        let (vtype, vtext, vint, vfloat, _, _, _) =
-            extract_ical_value(&value, "42.5").unwrap();
-        
+        let (vtype, vtext, vint, vfloat, _, _, _) = extract_ical_value(&value, "42.5").unwrap();
+
         assert_eq!(vtype, "float");
         assert_eq!(vtext, None);
         assert_eq!(vint, None);
@@ -187,9 +198,8 @@ mod tests {
     #[test]
     fn extract_ical_boolean_true() {
         let value = Value::Boolean(true);
-        let (vtype, _, _, _, vbool, _, _) =
-            extract_ical_value(&value, "TRUE").unwrap();
-        
+        let (vtype, _, _, _, vbool, _, _) = extract_ical_value(&value, "TRUE").unwrap();
+
         assert_eq!(vtype, "boolean");
         assert_eq!(vbool, Some(true));
     }
@@ -197,9 +207,8 @@ mod tests {
     #[test]
     fn extract_ical_boolean_false() {
         let value = Value::Boolean(false);
-        let (vtype, _, _, _, vbool, _, _) =
-            extract_ical_value(&value, "FALSE").unwrap();
-        
+        let (vtype, _, _, _, vbool, _, _) = extract_ical_value(&value, "FALSE").unwrap();
+
         assert_eq!(vtype, "boolean");
         assert_eq!(vbool, Some(false));
     }
@@ -211,9 +220,8 @@ mod tests {
             month: 1,
             day: 24,
         });
-        let (vtype, _, _, _, _, vdate, _) =
-            extract_ical_value(&value, "20260124").unwrap();
-        
+        let (vtype, _, _, _, _, vdate, _) = extract_ical_value(&value, "20260124").unwrap();
+
         assert_eq!(vtype, "date");
         assert_eq!(vdate, chrono::NaiveDate::from_ymd_opt(2026, 1, 24));
     }
@@ -229,9 +237,8 @@ mod tests {
             second: 45,
             form: DateTimeForm::Utc,
         });
-        let (vtype, _, _, _, _, _, vtstz) =
-            extract_ical_value(&value, "20260124T123045Z").unwrap();
-        
+        let (vtype, _, _, _, _, _, vtstz) = extract_ical_value(&value, "20260124T123045Z").unwrap();
+
         assert_eq!(vtype, "datetime");
         assert!(vtstz.is_some());
         let dt = vtstz.unwrap();
@@ -257,9 +264,8 @@ mod tests {
             minutes: 30,
             seconds: 0,
         });
-        let (vtype, vtext, _, _, _, _, _) =
-            extract_ical_value(&value, "P1DT2H30M").unwrap();
-        
+        let (vtype, vtext, _, _, _, _, _) = extract_ical_value(&value, "P1DT2H30M").unwrap();
+
         assert_eq!(vtype, "text");
         assert_eq!(vtext, Some("P1DT2H30M"));
     }
@@ -267,9 +273,8 @@ mod tests {
     #[test]
     fn extract_vcard_text_value() {
         let value = VCardValue::Text("John Doe".to_string());
-        let (vtype, vtext, vint, vfloat, vbool, vjson) =
-            extract_vcard_value(&value, "John Doe");
-        
+        let (vtype, vtext, vint, vfloat, vbool, vjson) = extract_vcard_value(&value, "John Doe");
+
         assert_eq!(vtype, "text");
         assert_eq!(vtext, Some("John Doe"));
         assert_eq!(vint, None);
@@ -281,9 +286,8 @@ mod tests {
     #[test]
     fn extract_vcard_integer_value() {
         let value = VCardValue::Integer(100);
-        let (vtype, vtext, vint, _, _, _) =
-            extract_vcard_value(&value, "100");
-        
+        let (vtype, vtext, vint, _, _, _) = extract_vcard_value(&value, "100");
+
         assert_eq!(vtype, "integer");
         assert_eq!(vtext, None);
         assert_eq!(vint, Some(100));
@@ -292,9 +296,8 @@ mod tests {
     #[test]
     fn extract_vcard_float_value() {
         let value = VCardValue::Float(12.34);
-        let (vtype, vtext, vint, vfloat, _, _) =
-            extract_vcard_value(&value, "12.34");
-        
+        let (vtype, vtext, vint, vfloat, _, _) = extract_vcard_value(&value, "12.34");
+
         assert_eq!(vtype, "float");
         assert_eq!(vtext, None);
         assert_eq!(vint, None);
@@ -304,9 +307,8 @@ mod tests {
     #[test]
     fn extract_vcard_boolean_value() {
         let value = VCardValue::Boolean(true);
-        let (vtype, _, _, _, vbool, _) =
-            extract_vcard_value(&value, "true");
-        
+        let (vtype, _, _, _, vbool, _) = extract_vcard_value(&value, "true");
+
         assert_eq!(vtype, "boolean");
         assert_eq!(vbool, Some(true));
     }
@@ -314,7 +316,7 @@ mod tests {
     #[test]
     fn extract_ical_uid_present() {
         use crate::component::rfc::ical::core::{Component, ComponentKind, Property};
-        
+
         let component = Component {
             kind: Some(ComponentKind::Event),
             name: "VEVENT".to_string(),
@@ -334,28 +336,29 @@ mod tests {
             ],
             children: vec![],
         };
-        
-        assert_eq!(extract_ical_uid(&component), Some("unique-id-123".to_string()));
+
+        assert_eq!(
+            extract_ical_uid(&component),
+            Some("unique-id-123".to_string())
+        );
     }
 
     #[test]
     fn extract_ical_uid_missing() {
         use crate::component::rfc::ical::core::{Component, ComponentKind, Property};
-        
+
         let component = Component {
             kind: Some(ComponentKind::Event),
             name: "VEVENT".to_string(),
-            properties: vec![
-                Property {
-                    name: "SUMMARY".to_string(),
-                    params: vec![],
-                    value: Value::Text("Test Event".to_string()),
-                    raw_value: "Test Event".to_string(),
-                },
-            ],
+            properties: vec![Property {
+                name: "SUMMARY".to_string(),
+                params: vec![],
+                value: Value::Text("Test Event".to_string()),
+                raw_value: "Test Event".to_string(),
+            }],
             children: vec![],
         };
-        
+
         assert_eq!(extract_ical_uid(&component), None);
     }
 }

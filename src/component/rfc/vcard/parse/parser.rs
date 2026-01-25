@@ -19,17 +19,17 @@ use crate::component::rfc::vcard::core::{VCard, VCardProperty, VCardValue, VCard
 #[tracing::instrument(skip(input), fields(input_len = input.len()))]
 pub fn parse(input: &str) -> ParseResult<Vec<VCard>> {
     tracing::debug!("Parsing vCard document");
-    
+
     let unfolded = unfold_with_space(input);
     let lines = split_lines(&unfolded);
-    
+
     tracing::trace!(count = lines.len(), "Split lines");
-    
+
     let mut parser = Parser::new(lines);
     let result = parser.parse_document()?;
-    
+
     tracing::debug!(count = result.len(), "Parsed vCards");
-    
+
     Ok(result)
 }
 
@@ -43,7 +43,7 @@ pub fn parse(input: &str) -> ParseResult<Vec<VCard>> {
 #[tracing::instrument(skip(input), fields(input_len = input.len()))]
 pub fn parse_single(input: &str) -> ParseResult<VCard> {
     tracing::debug!("Parsing single vCard");
-    
+
     let cards = parse(input)?;
     cards.into_iter().next().ok_or_else(|| {
         tracing::warn!("No vCard found in document");

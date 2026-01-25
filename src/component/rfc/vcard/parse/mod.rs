@@ -36,7 +36,7 @@ mod values;
 mod error_tests;
 
 pub use error::{ParseError, ParseErrorKind, ParseResult};
-pub use lexer::{parse_content_line, split_lines, unfold, ContentLine};
+pub use lexer::{ContentLine, parse_content_line, split_lines, unfold};
 pub use parser::{parse, parse_single};
 pub use values::{
     parse_address, parse_date, parse_date_and_or_time, parse_gender, parse_organization,

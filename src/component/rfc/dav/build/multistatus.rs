@@ -1,7 +1,7 @@
 //! Multistatus XML serialization.
 
-use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::Writer;
+use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
 
 use crate::component::rfc::dav::core::{Multistatus, PropstatResponse};
 
@@ -171,9 +171,10 @@ fn write_property<W: std::io::Write>(
             // Raw XML content - write element then raw content
             writer.write_event(Event::Start(BytesStart::new(&elem_name)))?;
             // Note: This writes raw XML which should be well-formed
-            writer.get_mut().write_all(xml.as_bytes()).map_err(|e| {
-                quick_xml::Error::Io(std::sync::Arc::new(std::io::Error::other(e)))
-            })?;
+            writer
+                .get_mut()
+                .write_all(xml.as_bytes())
+                .map_err(|e| quick_xml::Error::Io(std::sync::Arc::new(std::io::Error::other(e))))?;
             writer.write_event(Event::End(BytesEnd::new(&elem_name)))?;
         }
         Some(PropertyValue::Empty) | None => {
@@ -212,7 +213,7 @@ fn namespace_prefix(ns: &str) -> &'static str {
 mod tests {
     use super::*;
     use crate::component::rfc::dav::core::{
-        property::PropertyValue, DavProperty, Href, Propstat, QName, Status,
+        DavProperty, Href, Propstat, QName, Status, property::PropertyValue,
     };
 
     #[test]

@@ -23,12 +23,9 @@ type DbModels<'a> = (
 ///
 /// ## Errors
 /// Returns an error if the mapping fails.
-pub fn vcard_to_db_models<'a>(
-    vcard: &'a VCard,
-    entity_type: &str,
-) -> anyhow::Result<DbModels<'a>> {
-    let logical_uid_opt = extract_vcard_uid(vcard)
-        .map(|s| Box::leak(s.into_boxed_str()) as &'static str);
+pub fn vcard_to_db_models<'a>(vcard: &'a VCard, entity_type: &str) -> anyhow::Result<DbModels<'a>> {
+    let logical_uid_opt =
+        extract_vcard_uid(vcard).map(|s| Box::leak(s.into_boxed_str()) as &'static str);
 
     // Leak entity_type to get 'static lifetime
     let entity_type_static = Box::leak(entity_type.to_string().into_boxed_str()) as &'static str;
@@ -64,7 +61,9 @@ pub fn vcard_to_db_models<'a>(
                 clippy::cast_possible_wrap,
                 reason = "vCard property counts are bounded by RFC limits (<500), truncation to i32 is safe"
             )]
-            { ordinal as i32 },
+            {
+                ordinal as i32
+            },
             &mut properties,
             &mut parameters,
         );
@@ -112,7 +111,9 @@ fn map_vcard_property<'a>(
                 clippy::cast_possible_wrap,
                 reason = "Parameter counts per vCard property are bounded by RFC limits (<50), truncation to i32 is safe"
             )]
-            { param_ord as i32 },
+            {
+                param_ord as i32
+            },
             parameters,
         );
     }
@@ -129,7 +130,7 @@ fn map_vcard_parameter(
     // Leak all strings for 'static lifetime
     let name_static = Box::leak(param.name.clone().into_boxed_str()) as &'static str;
     let value_static = Box::leak(param.values.join(",").into_boxed_str()) as &'static str;
-    
+
     parameters.push(NewDavParameter {
         property_id,
         name: name_static,

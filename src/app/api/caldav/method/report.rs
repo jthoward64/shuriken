@@ -41,10 +41,22 @@ pub async fn report(req: &mut Request, res: &mut Response) {
     // Dispatch based on report type
     match req_data.report_type {
         ReportType::CalendarQuery(query) => {
-            crate::app::api::caldav::report::calendar_query::handle(req, res, query, req_data.properties).await;
+            crate::app::api::caldav::report::calendar_query::handle(
+                req,
+                res,
+                query,
+                req_data.properties,
+            )
+            .await;
         }
         ReportType::CalendarMultiget(multiget) => {
-            crate::app::api::caldav::report::calendar_multiget::handle(req, res, multiget, req_data.properties).await;
+            crate::app::api::caldav::report::calendar_multiget::handle(
+                req,
+                res,
+                multiget,
+                req_data.properties,
+            )
+            .await;
         }
         _ => {
             tracing::warn!("Unsupported REPORT type for CalDAV endpoint");

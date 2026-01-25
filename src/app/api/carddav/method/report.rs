@@ -41,10 +41,22 @@ pub async fn report(req: &mut Request, res: &mut Response) {
     // Dispatch based on report type
     match req_data.report_type {
         ReportType::AddressbookQuery(query) => {
-            crate::app::api::carddav::report::addressbook_query::handle(req, res, query, req_data.properties).await;
+            crate::app::api::carddav::report::addressbook_query::handle(
+                req,
+                res,
+                query,
+                req_data.properties,
+            )
+            .await;
         }
         ReportType::AddressbookMultiget(multiget) => {
-            crate::app::api::carddav::report::addressbook_multiget::handle(req, res, multiget, req_data.properties).await;
+            crate::app::api::carddav::report::addressbook_multiget::handle(
+                req,
+                res,
+                multiget,
+                req_data.properties,
+            )
+            .await;
         }
         _ => {
             tracing::warn!("Unsupported REPORT type for CardDAV endpoint");

@@ -13,9 +13,9 @@ fn test_parse_error_new() {
 
 #[test]
 fn test_parse_error_with_context() {
-    let error = ParseError::new(ParseErrorKind::InvalidDate, 3, 2)
-        .with_context("Expected YYYYMMDD format");
-    
+    let error =
+        ParseError::new(ParseErrorKind::InvalidDate, 3, 2).with_context("Expected YYYYMMDD format");
+
     assert_eq!(error.kind, ParseErrorKind::InvalidDate);
     assert_eq!(error.line, 3);
     assert_eq!(error.column, 2);
@@ -46,7 +46,10 @@ fn test_parse_error_display_with_context() {
 fn test_all_error_kinds_display() {
     let kinds = [
         (ParseErrorKind::UnexpectedEof, "unexpected end of input"),
-        (ParseErrorKind::InvalidContentLine, "invalid content line format"),
+        (
+            ParseErrorKind::InvalidContentLine,
+            "invalid content line format",
+        ),
         (ParseErrorKind::MissingPropertyName, "missing property name"),
         (ParseErrorKind::InvalidPropertyName, "invalid property name"),
         (ParseErrorKind::MissingColon, "missing colon separator"),
@@ -58,12 +61,18 @@ fn test_all_error_kinds_display() {
         (ParseErrorKind::InvalidDateTime, "invalid date-time format"),
         (ParseErrorKind::InvalidDuration, "invalid duration format"),
         (ParseErrorKind::InvalidRRule, "invalid recurrence rule"),
-        (ParseErrorKind::InvalidUtcOffset, "invalid UTC offset format"),
+        (
+            ParseErrorKind::InvalidUtcOffset,
+            "invalid UTC offset format",
+        ),
         (ParseErrorKind::MissingBegin, "missing BEGIN line"),
         (ParseErrorKind::MissingEnd, "missing END line"),
         (ParseErrorKind::MismatchedComponent, "mismatched BEGIN/END"),
         (ParseErrorKind::InvalidNesting, "invalid component nesting"),
-        (ParseErrorKind::MissingRequiredProperty, "missing required property"),
+        (
+            ParseErrorKind::MissingRequiredProperty,
+            "missing required property",
+        ),
         (ParseErrorKind::InvalidValue, "invalid property value"),
         (ParseErrorKind::InvalidBoolean, "invalid boolean value"),
         (ParseErrorKind::InvalidInteger, "invalid integer value"),
@@ -71,7 +80,10 @@ fn test_all_error_kinds_display() {
         (ParseErrorKind::InvalidPeriod, "invalid period format"),
         (ParseErrorKind::InvalidFrequency, "invalid frequency"),
         (ParseErrorKind::InvalidWeekday, "invalid weekday"),
-        (ParseErrorKind::UntilCountConflict, "UNTIL and COUNT are mutually exclusive"),
+        (
+            ParseErrorKind::UntilCountConflict,
+            "UNTIL and COUNT are mutually exclusive",
+        ),
     ];
 
     for (kind, expected) in kinds {
@@ -89,10 +101,10 @@ fn test_parse_error_is_error_trait() {
 
 #[test]
 fn test_parse_error_clone() {
-    let original = ParseError::new(ParseErrorKind::InvalidRRule, 7, 8)
-        .with_context("Invalid FREQ value");
+    let original =
+        ParseError::new(ParseErrorKind::InvalidRRule, 7, 8).with_context("Invalid FREQ value");
     let cloned = original.clone();
-    
+
     assert_eq!(cloned.kind, original.kind);
     assert_eq!(cloned.line, original.line);
     assert_eq!(cloned.column, original.column);

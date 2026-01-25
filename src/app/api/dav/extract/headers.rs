@@ -40,8 +40,7 @@ mod tests {
     /// Helper to create a request with a Depth header.
     fn request_with_depth(value: &str) -> Request {
         let mut req = Request::default();
-        req.headers_mut()
-            .insert("Depth", value.parse().unwrap());
+        req.headers_mut().insert("Depth", value.parse().unwrap());
         req
     }
 

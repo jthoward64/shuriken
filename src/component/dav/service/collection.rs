@@ -45,9 +45,9 @@ pub async fn create_collection(
     ctx: &CreateCollectionContext,
 ) -> Result<CreateCollectionResult> {
     // TODO: Check if collection already exists (409 Conflict)
-    
+
     // TODO: Validate collection type is either "calendar" or "addressbook"
-    
+
     let new_collection = NewDavCollection {
         owner_principal_id: ctx.owner_principal_id,
         uri: &ctx.uri,
@@ -56,11 +56,11 @@ pub async fn create_collection(
         description: ctx.description.as_deref(),
         timezone_tzid: None,
     };
-    
+
     let created = collection::create_collection(conn, &new_collection)
         .await
         .context("failed to create collection")?;
-    
+
     Ok(CreateCollectionResult {
         collection_id: created.id,
         uri: created.uri,

@@ -15,26 +15,32 @@ use salvo::{Request, Response, handler};
 #[tracing::instrument(skip(req, res), fields(path = %req.uri().path()))]
 pub async fn options(req: &mut Request, res: &mut Response) {
     tracing::info!("Handling OPTIONS request");
-    
+
     // TODO: Determine if this is a collection or item based on path/database lookup
     // For now, return a generic set of methods
-    
+
     // Standard DAV methods (Phase 3)
     let allow_methods = "OPTIONS, GET, HEAD, PUT, DELETE, PROPFIND";
-    
+
     // DAV compliance classes
     // Class 1: Basic WebDAV (PROPFIND, PROPPATCH, COPY, MOVE, etc.)
     // Class 3: Access control (ACL)
     // calendar-access: CalDAV support
     // addressbook: CardDAV support
     let dav_header = "1, 3, calendar-access, addressbook";
-    
-    #[expect(clippy::let_underscore_must_use, reason = "Header addition failure is non-fatal")]
+
+    #[expect(
+        clippy::let_underscore_must_use,
+        reason = "Header addition failure is non-fatal"
+    )]
     let _ = res.add_header("Allow", HeaderValue::from_static(allow_methods), true);
-    #[expect(clippy::let_underscore_must_use, reason = "Header addition failure is non-fatal")]
+    #[expect(
+        clippy::let_underscore_must_use,
+        reason = "Header addition failure is non-fatal"
+    )]
     let _ = res.add_header("DAV", HeaderValue::from_static(dav_header), true);
     res.status_code(salvo::http::StatusCode::OK);
-    
+
     tracing::debug!("OPTIONS response sent");
 }
 
@@ -46,17 +52,23 @@ pub async fn options(req: &mut Request, res: &mut Response) {
 #[tracing::instrument(skip(req, res), fields(path = %req.uri().path()))]
 pub async fn options_collection(req: &mut Request, res: &mut Response) {
     tracing::info!("Handling OPTIONS request for collection");
-    
+
     // Collection-specific methods include MKCALENDAR, MKCOL (future phases)
     let allow_methods = "OPTIONS, GET, HEAD, PUT, DELETE, PROPFIND, MKCALENDAR, MKCOL";
     let dav_header = "1, 3, calendar-access, addressbook";
-    
-    #[expect(clippy::let_underscore_must_use, reason = "Header addition failure is non-fatal")]
+
+    #[expect(
+        clippy::let_underscore_must_use,
+        reason = "Header addition failure is non-fatal"
+    )]
     let _ = res.add_header("Allow", HeaderValue::from_static(allow_methods), true);
-    #[expect(clippy::let_underscore_must_use, reason = "Header addition failure is non-fatal")]
+    #[expect(
+        clippy::let_underscore_must_use,
+        reason = "Header addition failure is non-fatal"
+    )]
     let _ = res.add_header("DAV", HeaderValue::from_static(dav_header), true);
     res.status_code(salvo::http::StatusCode::OK);
-    
+
     tracing::debug!("OPTIONS collection response sent");
 }
 
@@ -68,16 +80,22 @@ pub async fn options_collection(req: &mut Request, res: &mut Response) {
 #[tracing::instrument(skip(req, res), fields(path = %req.uri().path()))]
 pub async fn options_item(req: &mut Request, res: &mut Response) {
     tracing::info!("Handling OPTIONS request for item");
-    
+
     // Item-specific methods (no MKCALENDAR/MKCOL)
     let allow_methods = "OPTIONS, GET, HEAD, PUT, DELETE";
     let dav_header = "1, 3, calendar-access, addressbook";
-    
-    #[expect(clippy::let_underscore_must_use, reason = "Header addition failure is non-fatal")]
+
+    #[expect(
+        clippy::let_underscore_must_use,
+        reason = "Header addition failure is non-fatal"
+    )]
     let _ = res.add_header("Allow", HeaderValue::from_static(allow_methods), true);
-    #[expect(clippy::let_underscore_must_use, reason = "Header addition failure is non-fatal")]
+    #[expect(
+        clippy::let_underscore_must_use,
+        reason = "Header addition failure is non-fatal"
+    )]
     let _ = res.add_header("DAV", HeaderValue::from_static(dav_header), true);
     res.status_code(salvo::http::StatusCode::OK);
-    
+
     tracing::debug!("OPTIONS item response sent");
 }

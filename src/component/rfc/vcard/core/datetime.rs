@@ -131,7 +131,10 @@ pub struct VCardUtcOffset {
 
 impl VCardUtcOffset {
     /// UTC offset.
-    pub const UTC: Self = Self { hours: 0, minutes: 0 };
+    pub const UTC: Self = Self {
+        hours: 0,
+        minutes: 0,
+    };
 
     /// Creates a new UTC offset.
     #[must_use]

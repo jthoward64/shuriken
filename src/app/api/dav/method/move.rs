@@ -2,8 +2,8 @@
 
 #![allow(clippy::single_match_else)]
 
-use salvo::{handler, Request, Response};
 use salvo::http::StatusCode;
+use salvo::{Request, Response, handler};
 
 use crate::component::db::connection;
 
@@ -25,7 +25,7 @@ use crate::component::db::connection;
 pub async fn r#move(req: &mut Request, res: &mut Response) {
     // Get source path
     let source_path = req.uri().path().to_string();
-    
+
     // Get Destination header
     let destination = match req.headers().get("Destination") {
         Some(dest_header) => match dest_header.to_str() {
@@ -42,13 +42,13 @@ pub async fn r#move(req: &mut Request, res: &mut Response) {
             return;
         }
     };
-    
+
     // Get Overwrite header (default: T)
     let _overwrite = match req.headers().get("Overwrite") {
         Some(header) => header.to_str().unwrap_or("T") == "T",
         None => true,
     };
-    
+
     // Get database connection
     let _conn = match connection::connect().await {
         Ok(conn) => conn,
@@ -58,11 +58,11 @@ pub async fn r#move(req: &mut Request, res: &mut Response) {
             return;
         }
     };
-    
+
     // TODO: Parse source path to extract collection ID and URI
     // TODO: Parse destination to extract target collection ID and URI
     // TODO: Check authorization for both source and destination
-    
+
     // TODO: Load source instance from database
     // TODO: Check if destination exists
     // TODO: If destination exists and overwrite is false, return 412 Precondition Failed
@@ -70,9 +70,12 @@ pub async fn r#move(req: &mut Request, res: &mut Response) {
     // TODO: Soft-delete source instance
     // TODO: Create tombstone for source
     // TODO: Update sync tokens for both source and destination collections
-    
-    tracing::warn!("MOVE not fully implemented for: {} -> {}", source_path, destination);
+
+    tracing::warn!(
+        "MOVE not fully implemented for: {} -> {}",
+        source_path,
+        destination
+    );
     res.status_code(StatusCode::CREATED);
     // TODO: Set Location header to destination
 }
-

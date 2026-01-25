@@ -115,7 +115,11 @@ impl Address {
         .iter()
         .flat_map(|v| v.iter())
         .collect();
-        parts.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ")
+        parts
+            .iter()
+            .map(|s| s.as_str())
+            .collect::<Vec<_>>()
+            .join(", ")
     }
 }
 

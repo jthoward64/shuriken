@@ -29,10 +29,10 @@ use types::{PutError, PutResult};
 #[tracing::instrument(skip(req, res), fields(path = %req.uri().path()))]
 pub async fn put(req: &mut Request, res: &mut Response) {
     tracing::info!("Handling PUT request for vCard object");
-    
+
     // Get path before borrowing req mutably
     let path = req.uri().path().to_string();
-    
+
     // Read request body
     let body = match req.payload().await {
         Ok(bytes) => bytes.to_vec(),
@@ -42,9 +42,9 @@ pub async fn put(req: &mut Request, res: &mut Response) {
             return;
         }
     };
-    
+
     tracing::debug!(bytes = body.len(), "Request body read successfully");
-    
+
     // Get database connection
     let mut conn = match connection::connect().await {
         Ok(conn) => conn,
@@ -54,24 +54,26 @@ pub async fn put(req: &mut Request, res: &mut Response) {
             return;
         }
     };
-    
+
     // Check preconditions
-    let if_none_match = req.headers()
+    let if_none_match = req
+        .headers()
         .get("If-None-Match")
         .and_then(|h| h.to_str().ok())
         .map(String::from);
-    let if_match = req.headers()
+    let if_match = req
+        .headers()
         .get("If-Match")
         .and_then(|h| h.to_str().ok())
         .map(String::from);
-    
+
     if if_none_match.is_some() {
         tracing::debug!("If-None-Match header present");
     }
     if if_match.is_some() {
         tracing::debug!("If-Match header present");
     }
-    
+
     // Perform the PUT operation
     match perform_put(&mut conn, &path, &body, if_none_match, if_match).await {
         Ok(PutResult::Created(etag)) => {
@@ -129,14 +131,14 @@ async fn perform_put(
     // TODO: Implement proper path parsing to extract collection_id from the route
     let collection_id = parse_collection_id_from_path(path)?;
     let uri = parse_uri_from_path(path)?;
-    
+
     // Parse vCard to extract UID early for context
     let vcard_str = std::str::from_utf8(body)
         .map_err(|e| PutError::InvalidVcardData(format!("not valid UTF-8: {e}")))?;
     let vcard = crate::component::rfc::vcard::parse::parse_single(vcard_str)
         .map_err(|e| PutError::InvalidVcardData(format!("invalid vCard: {e}")))?;
     let logical_uid = vcard.uid().map(String::from);
-    
+
     // Create PUT context
     let ctx = PutObjectContext {
         collection_id,
@@ -146,7 +148,7 @@ async fn perform_put(
         if_none_match,
         if_match,
     };
-    
+
     // Call the service layer
     match put_address_object(conn, &ctx, body).await {
         Ok(result) => {
@@ -179,20 +181,22 @@ async fn perform_put(
 fn parse_collection_id_from_path(path: &str) -> Result<uuid::Uuid, PutError> {
     // TODO: Implement proper path parsing based on your routing structure
     // Expected path format: /api/carddav/addressbooks/{collection_id}/{resource_name}.vcf
-    
+
     let parts: Vec<&str> = path.split('/').collect();
     if parts.len() < 5 {
         return Err(PutError::InvalidVcardData(
             "path must contain at least 5 segments to extract collection ID (e.g., /api/carddav/addressbooks/{id}/file.vcf)".to_string(),
         ));
     }
-    
+
     // Try to parse the collection_id (assuming it's the 4th segment)
     parts
         .get(4)
         .and_then(|s| uuid::Uuid::parse_str(s).ok())
         .ok_or_else(|| {
-            PutError::InvalidVcardData("could not parse collection_id as UUID from path segment 4".to_string())
+            PutError::InvalidVcardData(
+                "could not parse collection_id as UUID from path segment 4".to_string(),
+            )
         })
 }
 
@@ -204,12 +208,14 @@ fn parse_collection_id_from_path(path: &str) -> Result<uuid::Uuid, PutError> {
 fn parse_uri_from_path(path: &str) -> Result<String, PutError> {
     // TODO: Implement proper URI extraction
     // For now, use the last path segment as the URI
-    
+
     path.split('/')
         .next_back()
         .filter(|s| !s.is_empty())
         .map(String::from)
         .ok_or_else(|| {
-            PutError::InvalidVcardData("could not extract resource URI from path (last non-empty segment)".to_string())
+            PutError::InvalidVcardData(
+                "could not extract resource URI from path (last non-empty segment)".to_string(),
+            )
         })
 }
