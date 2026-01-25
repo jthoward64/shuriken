@@ -568,53 +568,8 @@ fn parse_calendar_filter_content(
     Ok(filter)
 }
 
-/// Handles Start event for comp-filter parsing.
-fn handle_comp_filter_start(
-    e: &BytesStart<'_>,
-    reader: &mut Reader<&[u8]>,
-    buf: &mut Vec<u8>,
-    namespaces: &[(String, String)],
-    comp_filter: &mut CompFilter,
-    depth: &mut usize,
-) -> ParseResult<()> {
-    let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
-    *depth += 1;
-
-    match local_name.as_str() {
-        "comp-filter" => {
-            let name = get_attribute(e, "name")?.clone();
-            let nested = parse_comp_filter_with_name(reader, buf, namespaces, name)?;
-            comp_filter.comp_filters.push(nested);
-        }
-        "prop-filter" => {
-            let name = get_attribute(e, "name")?.clone();
-            let prop_filter = parse_prop_filter_with_name(reader, buf, namespaces, name)?;
-            comp_filter.prop_filters.push(prop_filter);
-        }
-        "time-range" => {
-            comp_filter.time_range = Some(parse_time_range(e)?);
-        }
-        _ => {}
-    }
-    Ok(())
-}
-
-/// Handles Empty event for comp-filter parsing.
-fn handle_comp_filter_empty(e: &BytesStart<'_>, comp_filter: &mut CompFilter) -> ParseResult<()> {
-    let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
-    match local_name.as_str() {
-        "is-not-defined" => {
-            comp_filter.is_not_defined = true;
-        }
-        "time-range" => {
-            comp_filter.time_range = Some(parse_time_range(e)?);
-        }
-        _ => {}
-    }
-    Ok(())
-}
-
 /// Parses a comp-filter element when name is already extracted.
+#[expect(clippy::too_many_lines)]
 fn parse_comp_filter_with_name(
     reader: &mut Reader<&[u8]>,
     buf: &mut Vec<u8>,
@@ -628,10 +583,37 @@ fn parse_comp_filter_with_name(
         buf.clear();
         match reader.read_event_into(buf) {
             Ok(Event::Start(e)) => {
-                handle_comp_filter_start(&e, reader, buf, namespaces, &mut comp_filter, &mut depth)?;
+                let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
+                depth += 1;
+
+                match local_name.as_str() {
+                    "comp-filter" => {
+                        let name = get_attribute(&e, "name")?.clone();
+                        let nested = parse_comp_filter_with_name(reader, buf, namespaces, name)?;
+                        comp_filter.comp_filters.push(nested);
+                    }
+                    "prop-filter" => {
+                        let name = get_attribute(&e, "name")?.clone();
+                        let prop_filter = parse_prop_filter_with_name(reader, buf, namespaces, name)?;
+                        comp_filter.prop_filters.push(prop_filter);
+                    }
+                    "time-range" => {
+                        comp_filter.time_range = Some(parse_time_range(&e)?);
+                    }
+                    _ => {}
+                }
             }
             Ok(Event::Empty(e)) => {
-                handle_comp_filter_empty(&e, &mut comp_filter)?;
+                let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
+                match local_name.as_str() {
+                    "is-not-defined" => {
+                        comp_filter.is_not_defined = true;
+                    }
+                    "time-range" => {
+                        comp_filter.time_range = Some(parse_time_range(&e)?);
+                    }
+                    _ => {}
+                }
             }
             Ok(Event::End(e)) => {
                 let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
