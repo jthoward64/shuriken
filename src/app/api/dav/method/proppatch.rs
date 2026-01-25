@@ -14,6 +14,7 @@ use crate::component::rfc::dav::core::{
     DavProperty, Multistatus, Propstat, PropstatResponse, Status,
 };
 use crate::component::rfc::dav::parse;
+use crate::util::path;
 
 /// ## Summary
 /// Handles PROPPATCH requests to update `WebDAV` properties.
@@ -62,17 +63,19 @@ pub async fn proppatch(req: &mut Request, res: &mut Response) {
         }
     };
 
-    // TODO: Parse path to extract collection ID
-    // TODO: Check authorization
-    // For now, use a placeholder collection ID
-    let collection_id = match parse_collection_id_from_path(&path) {
+    // Parse path to extract collection ID
+    let collection_id = match path::extract_collection_id(&path) {
         Ok(id) => id,
-        Err(_) => {
-            tracing::error!("Invalid path format for PROPPATCH: {}", path);
+        Err(e) => {
+            tracing::error!(error = %e, path = %path, "Failed to parse collection ID from path");
             res.status_code(StatusCode::BAD_REQUEST);
             return;
         }
     };
+
+    tracing::debug!(collection_id = %collection_id, "Parsed collection ID from path");
+
+    // TODO: Check authorization
 
     // Build multistatus response
     let mut multistatus = Multistatus::new();
@@ -183,14 +186,3 @@ pub async fn proppatch(req: &mut Request, res: &mut Response) {
     }
 }
 
-/// Parses collection ID from path (placeholder implementation).
-fn parse_collection_id_from_path(path: &str) -> Result<uuid::Uuid, String> {
-    // TODO: Implement proper path parsing
-    // For now, try to extract UUID from path segments
-    for segment in path.split('/') {
-        if let Ok(id) = uuid::Uuid::parse_str(segment) {
-            return Ok(id);
-        }
-    }
-    Err("No valid UUID found in path".to_string())
-}

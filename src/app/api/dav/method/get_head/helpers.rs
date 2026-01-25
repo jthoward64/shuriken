@@ -6,17 +6,31 @@ use salvo::{Request, Response};
 use crate::component::db::connection;
 use crate::component::db::query::dav::instance;
 use crate::component::model::dav::instance::DavInstance;
+use crate::util::path;
 
 /// Shared implementation for GET and HEAD handlers.
-pub(super) async fn handle_get_or_head(req: &mut Request, res: &mut Response, _is_head: bool) {
+pub(super) async fn handle_get_or_head(req: &mut Request, res: &mut Response, is_head: bool) {
     // Extract the resource path from the request
-    let _path = req.uri().path();
+    let request_path = req.uri().path();
 
-    // TODO: Parse path to extract collection_id and URI
-    // For now, this is a stub - proper path routing will be added in routing phase
+    // Parse path to extract collection_id and URI
+    let (collection_id, uri) = match path::parse_collection_and_uri(request_path) {
+        Ok(parsed) => parsed,
+        Err(e) => {
+            tracing::debug!(error = %e, path = %request_path, "Failed to parse path");
+            res.status_code(StatusCode::NOT_FOUND);
+            return;
+        }
+    };
+
+    tracing::debug!(
+        collection_id = %collection_id,
+        uri = %uri,
+        "Parsed request path"
+    );
 
     // Get database connection
-    let _conn = match connection::connect().await {
+    let mut conn = match connection::connect().await {
         Ok(conn) => conn,
         Err(e) => {
             tracing::error!("Failed to get database connection: {}", e);
@@ -25,25 +39,33 @@ pub(super) async fn handle_get_or_head(req: &mut Request, res: &mut Response, _i
         }
     };
 
-    // TODO: Extract collection_id and uri from path
-    // This is a placeholder - actual implementation will parse the path
+    // Load instance from database
+    let (instance, canonical_bytes) = match load_instance(&mut conn, collection_id, &uri).await {
+        Ok(Some(data)) => data,
+        Ok(None) => {
+            tracing::debug!(
+                collection_id = %collection_id,
+                uri = %uri,
+                "Resource not found"
+            );
+            res.status_code(StatusCode::NOT_FOUND);
+            return;
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "Database error");
+            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+            return;
+        }
+    };
 
-    // Example: Load instance from database
-    // let instance = match load_instance(&mut conn, collection_id, uri).await {
-    //     Ok(Some(inst)) => inst,
-    //     Ok(None) => {
-    //         res.status_code(StatusCode::NOT_FOUND);
-    //         return;
-    //     }
-    //     Err(e) => {
-    //         tracing::error!("Database error: {}", e);
-    //         res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
-    //         return;
-    //     }
-    // };
+    // Check If-None-Match for conditional GET
+    if !is_head && check_if_none_match(req, &instance.etag) {
+        res.status_code(StatusCode::NOT_MODIFIED);
+        return;
+    }
 
-    // For now, return 404 as this is a stub
-    res.status_code(StatusCode::NOT_FOUND);
+    // Set response headers and body
+    set_response_headers_and_body(res, &instance, &canonical_bytes, is_head);
 }
 
 /// ## Summary
@@ -51,7 +73,6 @@ pub(super) async fn handle_get_or_head(req: &mut Request, res: &mut Response, _i
 ///
 /// ## Errors
 /// Returns database errors if the query fails.
-#[expect(dead_code)]
 async fn load_instance(
     conn: &mut connection::DbConnection<'_>,
     collection_id: uuid::Uuid,
@@ -84,7 +105,6 @@ async fn load_instance(
 ///
 /// ## Side Effects
 /// Sets `ETag`, `Last-Modified`, `Content-Type` headers and response body (for GET).
-#[expect(dead_code)]
 fn set_response_headers_and_body(
     res: &mut Response,
     instance: &DavInstance,
@@ -137,7 +157,6 @@ fn set_response_headers_and_body(
 ///
 /// Returns true if the request should be served with 304 Not Modified.
 #[must_use]
-#[expect(dead_code)]
 fn check_if_none_match(req: &Request, instance_etag: &str) -> bool {
     if let Some(if_none_match) = req.headers().get("If-None-Match")
         && let Ok(value) = if_none_match.to_str()

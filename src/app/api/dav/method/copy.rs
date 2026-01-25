@@ -6,6 +6,7 @@ use salvo::http::StatusCode;
 use salvo::{Request, Response, handler};
 
 use crate::component::db::connection;
+use crate::util::path;
 
 /// ## Summary
 /// Handles COPY requests to duplicate `WebDAV` resources.
@@ -58,8 +59,41 @@ pub async fn copy(req: &mut Request, res: &mut Response) {
         }
     };
 
-    // TODO: Parse source path to extract collection ID and URI
-    // TODO: Parse destination to extract target collection ID and URI
+    // Parse source path to extract collection ID and URI
+    let (source_collection_id, source_uri) = match path::parse_collection_and_uri(&source_path) {
+        Ok(parsed) => parsed,
+        Err(e) => {
+            tracing::error!(error = %e, path = %source_path, "Failed to parse source path");
+            res.status_code(StatusCode::BAD_REQUEST);
+            return;
+        }
+    };
+
+    // Parse destination to extract target collection ID and URI
+    // Note: Destination header contains full URL, extract path first
+    let dest_path = destination
+        .split_once("//")
+        .and_then(|(_, rest)| rest.split_once('/'))
+        .map(|(_, path)| format!("/{path}"))
+        .unwrap_or(destination.clone());
+
+    let (dest_collection_id, dest_uri) = match path::parse_collection_and_uri(&dest_path) {
+        Ok(parsed) => parsed,
+        Err(e) => {
+            tracing::error!(error = %e, path = %dest_path, "Failed to parse destination path");
+            res.status_code(StatusCode::BAD_REQUEST);
+            return;
+        }
+    };
+
+    tracing::debug!(
+        source_collection_id = %source_collection_id,
+        source_uri = %source_uri,
+        dest_collection_id = %dest_collection_id,
+        dest_uri = %dest_uri,
+        "Parsed COPY paths"
+    );
+
     // TODO: Check authorization for both source and destination
 
     // TODO: Load source instance from database
