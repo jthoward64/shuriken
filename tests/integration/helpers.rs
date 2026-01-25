@@ -7,6 +7,8 @@
 //! - Making HTTP requests
 //! - Asserting on responses and database state
 
+use diesel::prelude::*;
+use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use salvo::prelude::*;
 
 /// Creates a test Salvo service instance for integration testing.
@@ -74,62 +76,336 @@ impl TestResponse {
 
 /// Database test helper for setup and teardown.
 pub struct TestDb {
-    // TODO: Add connection pool and helpers once DB integration is ready
+    pool: diesel_async::pooled_connection::bb8::Pool<AsyncPgConnection>,
 }
 
 impl TestDb {
     /// Creates a new test database instance.
     ///
-    /// ## Panics
-    /// Panics if the database cannot be initialized.
+    /// ## Errors
+    /// Returns an error if:
+    /// - DATABASE_URL environment variable is not set
+    /// - The database cannot be initialized or connected
+    ///
+    /// ## Safety Features
+    /// This function modifies the DATABASE_URL for safety:
+    /// - If the database name is not `shuriken_test`, it will be changed to `shuriken_test`
+    /// - If no schema is specified in the URL, `?schema=shuriken_test` will be added to prevent
+    ///   accidentally modifying the `public` schema
+    /// - All modifications are logged as info messages
     #[expect(dead_code)]
-    #[must_use]
-    pub fn new() -> Self {
-        // TODO: Initialize test DB connection
-        Self {}
+    pub async fn new() -> anyhow::Result<Self> {
+        let mut database_url = std::env::var("DATABASE_URL").map_err(|_| {
+            anyhow::anyhow!("DATABASE_URL environment variable must be set for tests")
+        })?;
+
+        // Parse the database URL to check and modify database name
+        if let Some(db_name_start) = database_url.rfind('/') {
+            let after_slash = &database_url[db_name_start + 1..];
+
+            // Split database name from query parameters
+            let (db_name, query_params) = if let Some(query_start) = after_slash.find('?') {
+                (&after_slash[..query_start], &after_slash[query_start..])
+            } else {
+                (after_slash, "")
+            };
+
+            // Check and fix database name
+            let mut needs_db_change = false;
+            if db_name != "shuriken_test" {
+                tracing::info!(
+                    original_db = db_name,
+                    "TestDb: Database name is not 'shuriken_test', changing to 'shuriken_test' for safety"
+                );
+                needs_db_change = true;
+            }
+
+            // Rebuild URL if needed
+            if needs_db_change {
+                let base_url = &database_url[..db_name_start + 1];
+                let new_db_name = if needs_db_change {
+                    "shuriken_test"
+                } else {
+                    db_name
+                };
+
+                database_url = format!("{base_url}{new_db_name}{query_params}");
+            }
+        }
+
+        let config = diesel_async::pooled_connection::AsyncDieselConnectionManager::<
+            AsyncPgConnection,
+        >::new(&database_url);
+
+        let pool = diesel_async::pooled_connection::bb8::Pool::builder()
+            .max_size(5)
+            .build(config)
+            .await?;
+
+        Ok(Self { pool })
+    }
+
+    /// Gets a connection from the test database pool.
+    ///
+    /// ## Errors
+    /// Returns an error if unable to get a connection from the pool.
+    pub async fn get_conn(
+        &self,
+    ) -> Result<
+        diesel_async::pooled_connection::bb8::PooledConnection<'_, AsyncPgConnection>,
+        diesel_async::pooled_connection::bb8::RunError,
+    > {
+        self.pool.get().await
     }
 
     /// Truncates all tables for a clean test slate.
+    ///
+    /// Tables are truncated in reverse dependency order to avoid foreign key violations.
+    /// This order must be maintained when adding new tables to the schema.
+    ///
+    /// ## Errors
+    /// Returns an error if table truncation fails.
+    ///
+    /// ## Note
+    /// If you add or remove tables from the schema, update this list accordingly.
+    /// The order is: indexes → shadows/tombstones → parameters → properties → components →
+    /// instances → entities → collections → groups/memberships → auth_user → users → principals → casbin_rule
     #[expect(dead_code)]
-    pub async fn truncate_all(&self) {
-        // TODO: Implement table truncation
+    pub async fn truncate_all(&self) -> anyhow::Result<()> {
+        let mut conn = self.get_conn().await?;
+
+        // Truncate all tables in a single statement with CASCADE to handle foreign keys
+        // Tables are listed in reverse dependency order for clarity, though CASCADE handles dependencies
+        diesel::sql_query(
+            "TRUNCATE TABLE 
+                card_phone,
+                card_email,
+                card_index,
+                cal_occurrence,
+                cal_index,
+                dav_shadow,
+                dav_tombstone,
+                dav_parameter,
+                dav_property,
+                dav_component,
+                dav_instance,
+                dav_entity,
+                dav_collection,
+                membership,
+                group_name,
+                \"group\",
+                auth_user,
+                \"user\",
+                principal,
+                casbin_rule
+            CASCADE",
+        )
+        .execute(&mut conn)
+        .await?;
+
+        Ok(())
     }
 
     /// Seeds a test principal and returns its ID.
+    ///
+    /// ## Errors
+    /// Returns an error if the principal cannot be inserted.
+    ///
+    /// ## Note
+    /// Uses UUID v7 for principal IDs to match production behavior (time-ordered).
+    /// If you need deterministic test data, consider seeding with fixed data
+    /// and retrieving IDs from the database after insertion.
     #[expect(dead_code)]
-    pub async fn seed_principal(&self, _name: &str) -> uuid::Uuid {
-        // TODO: Insert principal and return ID
-        uuid::Uuid::new_v4()
+    pub async fn seed_principal(
+        &self,
+        principal_type: &str,
+        uri: &str,
+        display_name: Option<&str>,
+    ) -> anyhow::Result<uuid::Uuid> {
+        use shuriken::component::db::schema::principal;
+        use shuriken::component::model::principal::NewPrincipal;
+
+        let mut conn = self.get_conn().await?;
+        let principal_id = uuid::Uuid::now_v7();
+
+        let new_principal = NewPrincipal {
+            id: principal_id,
+            principal_type,
+            uri,
+            display_name,
+        };
+
+        diesel::insert_into(principal::table)
+            .values(&new_principal)
+            .execute(&mut conn)
+            .await?;
+
+        Ok(principal_id)
+    }
+
+    /// Seeds a test user and returns the user ID.
+    ///
+    /// ## Errors
+    /// Returns an error if the user cannot be inserted.
+    #[expect(dead_code)]
+    pub async fn seed_user(
+        &self,
+        name: &str,
+        email: &str,
+        principal_id: uuid::Uuid,
+    ) -> anyhow::Result<uuid::Uuid> {
+        use shuriken::component::db::schema::user;
+        use shuriken::component::model::user::NewUser;
+
+        let mut conn = self.get_conn().await?;
+
+        let new_user = NewUser {
+            name,
+            email,
+            principal_id,
+        };
+
+        let user_id = diesel::insert_into(user::table)
+            .values(&new_user)
+            .returning(user::id)
+            .get_result::<uuid::Uuid>(&mut conn)
+            .await?;
+
+        Ok(user_id)
     }
 
     /// Seeds a test collection and returns its ID.
+    ///
+    /// ## Errors
+    /// Returns an error if the collection cannot be inserted.
     #[expect(dead_code)]
     pub async fn seed_collection(
         &self,
-        _owner_id: uuid::Uuid,
-        _uri: &str,
-        _resource_type: &str,
-    ) -> uuid::Uuid {
-        // TODO: Insert collection and return ID
-        uuid::Uuid::new_v4()
+        owner_principal_id: uuid::Uuid,
+        collection_type: &str,
+        uri: &str,
+        display_name: Option<&str>,
+    ) -> anyhow::Result<uuid::Uuid> {
+        use shuriken::component::db::schema::dav_collection;
+        use shuriken::component::model::dav::collection::NewDavCollection;
+
+        let mut conn = self.get_conn().await?;
+
+        let new_collection = NewDavCollection {
+            owner_principal_id,
+            collection_type,
+            uri,
+            display_name,
+            description: None,
+            timezone_tzid: None,
+        };
+
+        let collection_id = diesel::insert_into(dav_collection::table)
+            .values(&new_collection)
+            .returning(dav_collection::id)
+            .get_result::<uuid::Uuid>(&mut conn)
+            .await?;
+
+        Ok(collection_id)
     }
 
-    /// Seeds a test entity with a component tree and returns its ID.
+    /// Seeds a test entity with an optional logical UID and returns its ID.
+    ///
+    /// ## Errors
+    /// Returns an error if the entity cannot be inserted.
     #[expect(dead_code)]
-    pub async fn seed_entity(&self, _entity_type: &str, _logical_uid: &str) -> uuid::Uuid {
-        // TODO: Insert entity with component tree and return ID
-        uuid::Uuid::new_v4()
+    pub async fn seed_entity(
+        &self,
+        entity_type: &str,
+        logical_uid: Option<&str>,
+    ) -> anyhow::Result<uuid::Uuid> {
+        use shuriken::component::db::schema::dav_entity;
+        use shuriken::component::model::dav::entity::NewDavEntity;
+
+        let mut conn = self.get_conn().await?;
+
+        let new_entity = NewDavEntity {
+            entity_type,
+            logical_uid,
+        };
+
+        let entity_id = diesel::insert_into(dav_entity::table)
+            .values(&new_entity)
+            .returning(dav_entity::id)
+            .get_result::<uuid::Uuid>(&mut conn)
+            .await?;
+
+        Ok(entity_id)
     }
 
     /// Seeds a test instance linking an entity to a collection.
+    ///
+    /// ## Errors
+    /// Returns an error if the instance cannot be inserted.
     #[expect(dead_code)]
     pub async fn seed_instance(
         &self,
-        _collection_id: uuid::Uuid,
-        _entity_id: uuid::Uuid,
-        _uri: &str,
-    ) -> uuid::Uuid {
-        // TODO: Insert instance and return ID
-        uuid::Uuid::new_v4()
+        collection_id: uuid::Uuid,
+        entity_id: uuid::Uuid,
+        uri: &str,
+        content_type: &str,
+        etag: &str,
+        sync_revision: i64,
+    ) -> anyhow::Result<uuid::Uuid> {
+        use shuriken::component::db::schema::dav_instance;
+        use shuriken::component::model::dav::instance::NewDavInstance;
+
+        let mut conn = self.get_conn().await?;
+
+        let new_instance = NewDavInstance {
+            collection_id,
+            entity_id,
+            uri,
+            content_type,
+            etag,
+            sync_revision,
+            last_modified: chrono::Utc::now(),
+        };
+
+        let instance_id = diesel::insert_into(dav_instance::table)
+            .values(&new_instance)
+            .returning(dav_instance::id)
+            .get_result::<uuid::Uuid>(&mut conn)
+            .await?;
+
+        Ok(instance_id)
+    }
+
+    /// Seeds a test component for an entity.
+    ///
+    /// ## Errors
+    /// Returns an error if the component cannot be inserted.
+    #[expect(dead_code)]
+    pub async fn seed_component(
+        &self,
+        entity_id: uuid::Uuid,
+        parent_component_id: Option<uuid::Uuid>,
+        name: &str,
+        ordinal: i32,
+    ) -> anyhow::Result<uuid::Uuid> {
+        use shuriken::component::db::schema::dav_component;
+        use shuriken::component::model::dav::component::NewDavComponent;
+
+        let mut conn = self.get_conn().await?;
+
+        let new_component = NewDavComponent {
+            entity_id,
+            parent_component_id,
+            name,
+            ordinal,
+        };
+
+        let component_id = diesel::insert_into(dav_component::table)
+            .values(&new_component)
+            .returning(dav_component::id)
+            .get_result::<uuid::Uuid>(&mut conn)
+            .await?;
+
+        Ok(component_id)
     }
 }

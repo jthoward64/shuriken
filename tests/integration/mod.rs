@@ -20,6 +20,7 @@
 
 mod copy_move;
 mod delete;
+mod example_test;
 mod get_head;
 mod helpers;
 mod mkcol;
