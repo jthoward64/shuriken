@@ -117,10 +117,19 @@ async fn perform_put(
     let collection_id = parse_collection_id_from_path(path)?;
     let uri = parse_uri_from_path(path)?;
     
+    // Parse vCard to extract UID early for context
+    let vcard_str = std::str::from_utf8(body)
+        .map_err(|e| PutError::InvalidVcardData(format!("not valid UTF-8: {}", e)))?;
+    let vcard = crate::component::rfc::vcard::parse::parse_single(vcard_str)
+        .map_err(|e| PutError::InvalidVcardData(format!("invalid vCard: {}", e)))?;
+    let logical_uid = vcard.uid().map(String::from);
+    
     // Create PUT context
     let ctx = PutObjectContext {
         collection_id,
         uri,
+        entity_type: "addressbook".to_string(),
+        logical_uid,
         if_none_match,
         if_match,
     };
@@ -156,13 +165,12 @@ async fn perform_put(
 /// Returns an error if the path format is invalid.
 fn parse_collection_id_from_path(path: &str) -> Result<uuid::Uuid, PutError> {
     // TODO: Implement proper path parsing based on your routing structure
-    // For now, return a placeholder error
     // Expected path format: /api/carddav/addressbooks/{collection_id}/{resource_name}.vcf
     
     let parts: Vec<&str> = path.split('/').collect();
     if parts.len() < 5 {
         return Err(PutError::InvalidVcardData(
-            "invalid path format".to_string(),
+            "path must contain at least 5 segments to extract collection ID (e.g., /api/carddav/addressbooks/{id}/file.vcf)".to_string(),
         ));
     }
     
@@ -171,7 +179,7 @@ fn parse_collection_id_from_path(path: &str) -> Result<uuid::Uuid, PutError> {
         .get(4)
         .and_then(|s| uuid::Uuid::parse_str(s).ok())
         .ok_or_else(|| {
-            PutError::InvalidVcardData("could not extract collection_id from path".to_string())
+            PutError::InvalidVcardData("could not parse collection_id as UUID from path segment 4".to_string())
         })
 }
 
@@ -189,6 +197,6 @@ fn parse_uri_from_path(path: &str) -> Result<String, PutError> {
         .filter(|s| !s.is_empty())
         .map(String::from)
         .ok_or_else(|| {
-            PutError::InvalidVcardData("could not extract URI from path".to_string())
+            PutError::InvalidVcardData("could not extract resource URI from path (last non-empty segment)".to_string())
         })
 }

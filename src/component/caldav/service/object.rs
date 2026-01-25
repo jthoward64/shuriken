@@ -22,6 +22,10 @@ pub struct PutObjectContext {
     pub collection_id: uuid::Uuid,
     /// URI of the object within the collection (e.g., "event.ics").
     pub uri: String,
+    /// Entity type for the object.
+    pub entity_type: String,
+    /// Logical UID extracted from iCalendar.
+    pub logical_uid: Option<String>,
     /// Precondition: If-None-Match header value.
     pub if_none_match: Option<String>,
     /// Precondition: If-Match header value.
@@ -137,15 +141,9 @@ pub async fn put_calendar_object(
         // For now, create a minimal entity without the full tree
         // Full tree insertion will be implemented once proper ID mapping is in place
         
-        let entity_type_static: &'static str = Box::leak("calendar".to_string().into_boxed_str());
-        let uid_static: Option<&'static str> = uid.as_ref().map(|s| {
-            let leaked: &'static str = Box::leak(s.clone().into_boxed_str());
-            leaked
-        });
-        
         let entity_model = crate::component::model::dav::entity::NewDavEntity {
-            entity_type: entity_type_static,
-            logical_uid: uid_static,
+            entity_type: &ctx.entity_type,
+            logical_uid: ctx.logical_uid.as_deref(),
         };
         
         let created_entity = entity::create_entity(conn, &entity_model)
