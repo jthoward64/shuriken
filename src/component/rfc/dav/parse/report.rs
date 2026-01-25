@@ -651,7 +651,29 @@ fn parse_prop_filter_with_name(
 
                 match local_name.as_str() {
                     "text-match" => {
-                        prop_filter.text_match = Some(parse_text_match_from_elem(reader, buf, &e)?);
+                        // Extract attributes before recursing to avoid borrow conflicts
+                        let mut collation = None;
+                        let mut negate = false;
+                        let mut match_type = MatchType::Contains;
+                        for attr in e.attributes().flatten() {
+                            let key = std::str::from_utf8(attr.key.as_ref())?;
+                            let value = std::str::from_utf8(&attr.value)?;
+                            match key {
+                                "collation" => collation = Some(value.to_owned()),
+                                "negate-condition" => negate = value == "yes" || value == "true",
+                                "match-type" => {
+                                    match_type = match value {
+                                        "equals" => MatchType::Equals,
+                                        "contains" => MatchType::Contains,
+                                        "starts-with" => MatchType::StartsWith,
+                                        "ends-with" => MatchType::EndsWith,
+                                        _ => MatchType::Contains,
+                                    };
+                                }
+                                _ => {}
+                            }
+                        }
+                        prop_filter.text_match = Some(parse_text_match_content(reader, collation, negate, match_type)?);
                     }
                     "time-range" => {
                         prop_filter.time_range = Some(parse_time_range(&e)?);
@@ -713,7 +735,29 @@ fn parse_param_filter_with_name(
                 depth += 1;
 
                 if local_name == "text-match" {
-                    param_filter.text_match = Some(parse_text_match_from_elem(reader, buf, &e)?);
+                    // Extract attributes before recursing to avoid borrow conflicts
+                    let mut collation = None;
+                    let mut negate = false;
+                    let mut match_type = MatchType::Contains;
+                    for attr in e.attributes().flatten() {
+                        let key = std::str::from_utf8(attr.key.as_ref())?;
+                        let value = std::str::from_utf8(&attr.value)?;
+                        match key {
+                            "collation" => collation = Some(value.to_owned()),
+                            "negate-condition" => negate = value == "yes" || value == "true",
+                            "match-type" => {
+                                match_type = match value {
+                                    "equals" => MatchType::Equals,
+                                    "contains" => MatchType::Contains,
+                                    "starts-with" => MatchType::StartsWith,
+                                    "ends-with" => MatchType::EndsWith,
+                                    _ => MatchType::Contains,
+                                };
+                            }
+                            _ => {}
+                        }
+                    }
+                    param_filter.text_match = Some(parse_text_match_content(reader, collation, negate, match_type)?);
                 }
             }
             Ok(Event::Empty(e)) => {
@@ -738,41 +782,13 @@ fn parse_param_filter_with_name(
     Ok(param_filter)
 }
 
-/// Parses a text-match element from attributes and content.
-fn parse_text_match_from_elem(
+/// Parses text-match content (text between tags).
+fn parse_text_match_content(
     reader: &mut Reader<&[u8]>,
-    _parent_buf: &mut Vec<u8>,
-    start_elem: &quick_xml::events::BytesStart<'_>,
+    collation: Option<String>,
+    negate: bool,
+    match_type: MatchType,
 ) -> ParseResult<TextMatch> {
-    let mut collation = None;
-    let mut negate = false;
-    let mut match_type = MatchType::Contains;
-
-    // Parse attributes
-    for attr in start_elem.attributes().flatten() {
-        let key = std::str::from_utf8(attr.key.as_ref())?;
-        let value = std::str::from_utf8(&attr.value)?;
-        
-        match key {
-            "collation" => {
-                collation = Some(value.to_owned());
-            }
-            "negate-condition" => {
-                negate = value == "yes" || value == "true";
-            }
-            "match-type" => {
-                match_type = match value {
-                    "equals" => MatchType::Equals,
-                    "contains" => MatchType::Contains,
-                    "starts-with" => MatchType::StartsWith,
-                    "ends-with" => MatchType::EndsWith,
-                    _ => MatchType::Contains,
-                };
-            }
-            _ => {}
-        }
-    }
-
     // Parse text content - use our own buffer
     let mut text_content = String::new();
     let mut buf = Vec::new();
