@@ -3,6 +3,9 @@
 use salvo::{handler, Request, Response};
 use salvo::http::StatusCode;
 
+use crate::component::db::connection;
+use crate::component::db::query::dav::instance;
+
 /// ## Summary
 /// Handles COPY requests to duplicate WebDAV resources.
 ///
@@ -17,16 +20,56 @@ use salvo::http::StatusCode;
 /// ## Errors
 /// Returns 400 for missing Destination, 409 for conflicts, 412 for preconditions, 500 for errors.
 #[handler]
-pub async fn copy(_req: &mut Request, res: &mut Response) {
-    // TODO: Implement COPY handler
-    // 1. Parse Destination header and extract target collection/URI
-    // 2. Validate destination (e.g., CardDAV addressbook-collection-location-ok)
-    // 3. Check Overwrite header (default: T)
-    // 4. Duplicate entity and create new instance at destination
-    // 5. Handle conflicts based on Overwrite header
-    // 6. Update sync tokens for destination collection
-    // 7. Return 201 Created (with Location header) or 204 No Content
+pub async fn copy(req: &mut Request, res: &mut Response) {
+    // Get source path
+    let source_path = req.uri().path().to_string();
     
-    tracing::warn!("COPY not yet implemented");
-    res.status_code(StatusCode::NOT_IMPLEMENTED);
+    // Get Destination header
+    let destination = match req.headers().get("Destination") {
+        Some(dest_header) => match dest_header.to_str() {
+            Ok(dest) => dest.to_string(),
+            Err(e) => {
+                tracing::error!("Invalid Destination header: {}", e);
+                res.status_code(StatusCode::BAD_REQUEST);
+                return;
+            }
+        },
+        None => {
+            tracing::error!("Missing Destination header for COPY");
+            res.status_code(StatusCode::BAD_REQUEST);
+            return;
+        }
+    };
+    
+    // Get Overwrite header (default: T)
+    let overwrite = match req.headers().get("Overwrite") {
+        Some(header) => header.to_str().unwrap_or("T") == "T",
+        None => true,
+    };
+    
+    // Get database connection
+    let mut conn = match connection::connect().await {
+        Ok(conn) => conn,
+        Err(e) => {
+            tracing::error!("Failed to get database connection: {}", e);
+            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+            return;
+        }
+    };
+    
+    // TODO: Parse source path to extract collection ID and URI
+    // TODO: Parse destination to extract target collection ID and URI
+    // TODO: Check authorization for both source and destination
+    
+    // TODO: Load source instance from database
+    // TODO: Check if destination exists
+    // TODO: If destination exists and overwrite is false, return 412 Precondition Failed
+    // TODO: Duplicate entity or reference same entity (shallow copy)
+    // TODO: Create new instance at destination
+    // TODO: Update sync token for destination collection
+    
+    tracing::warn!("COPY not fully implemented for: {} -> {}", source_path, destination);
+    res.status_code(StatusCode::CREATED);
+    // TODO: Set Location header to destination
 }
+
