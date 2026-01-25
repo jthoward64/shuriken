@@ -36,25 +36,25 @@ pub async fn propfind(req: &mut Request, res: &mut Response) {
     
     // Parse Depth header (default to 0 for PROPFIND)
     let depth = parse_depth(req).unwrap_or_else(Depth::default_for_propfind);
-    tracing::debug!("Depth header: {:?}", depth);
+    tracing::debug!(depth = ?depth, "Depth header parsed");
     
     // Parse request body
     let body = match req.payload().await {
         Ok(bytes) => bytes.to_vec(),
         Err(e) => {
-            tracing::error!("Failed to read request body: {}", e);
+            tracing::error!(error = %e, "Failed to read request body");
             res.status_code(StatusCode::BAD_REQUEST);
             return;
         }
     };
     
-    tracing::debug!("Request body read successfully ({} bytes)", body.len());
+    tracing::debug!(bytes = body.len(), "Request body read successfully");
     
     // Parse PROPFIND request (empty body = allprop)
     let propfind_req = match parse_propfind(&body) {
         Ok(req) => req,
         Err(e) => {
-            tracing::error!("Failed to parse PROPFIND request: {}", e);
+            tracing::error!(error = %e, "Failed to parse PROPFIND request");
             res.status_code(StatusCode::BAD_REQUEST);
             return;
         }
@@ -66,7 +66,7 @@ pub async fn propfind(req: &mut Request, res: &mut Response) {
     let mut conn = match connection::connect().await {
         Ok(conn) => conn,
         Err(e) => {
-            tracing::error!("Failed to get database connection: {}", e);
+            tracing::error!(error = %e, "Failed to get database connection");
             res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
             return;
         }
@@ -76,7 +76,7 @@ pub async fn propfind(req: &mut Request, res: &mut Response) {
     let multistatus = match build_propfind_response(&mut conn, req, depth, &propfind_req).await {
         Ok(ms) => ms,
         Err(e) => {
-            tracing::error!("Failed to build PROPFIND response: {}", e);
+            tracing::error!(error = %e, "Failed to build PROPFIND response");
             res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
             return;
         }
@@ -88,7 +88,7 @@ pub async fn propfind(req: &mut Request, res: &mut Response) {
     let xml = match serialize_multistatus(&multistatus) {
         Ok(xml) => xml,
         Err(e) => {
-            tracing::error!("Failed to serialize multistatus: {}", e);
+            tracing::error!(error = %e, "Failed to serialize multistatus");
             res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
             return;
         }

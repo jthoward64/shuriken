@@ -34,7 +34,7 @@ impl salvo::Handler for AuthMiddleware {
         
         match authenticate(req).await {
             Ok(user) => {
-                tracing::debug!("User authenticated successfully: {}", user.email);
+    tracing::debug!(user_email = %user.email, "User authenticated successfully");
                 depot.insert("user", DepotUser::User(user));
             }
             Err(e) => match e {
@@ -43,7 +43,7 @@ impl salvo::Handler for AuthMiddleware {
                     depot.insert("user", DepotUser::Public);
                 }
                 crate::component::error::Error::AuthenticationError(_) => {
-                    tracing::warn!("Authentication error: {:?}", e);
+                    tracing::warn!(error = ?e, "Authentication error");
                     res.status_code(salvo::http::StatusCode::UNAUTHORIZED);
                     res.body("Unauthorized");
                     ctrl.skip_rest();

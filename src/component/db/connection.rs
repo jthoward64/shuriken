@@ -37,7 +37,7 @@ pub async fn create_pool(database_url: &str, size: u32) -> anyhow::Result<()> {
         .set(pool)
         .expect("Database pool is already set - create_pool() must only be called once at startup");
 
-    tracing::info!("Database connection pool created successfully with size {}", size);
+    tracing::info!(pool_size = size, "Database connection pool created successfully");
 
     Ok(())
 }

@@ -37,19 +37,19 @@ pub async fn put(req: &mut Request, res: &mut Response) {
     let body = match req.payload().await {
         Ok(bytes) => bytes.to_vec(),
         Err(e) => {
-            tracing::error!("Failed to read request body: {}", e);
+            tracing::error!(error = %e, "Failed to read request body");
             res.status_code(StatusCode::BAD_REQUEST);
             return;
         }
     };
     
-    tracing::debug!("Request body read successfully ({} bytes)", body.len());
+    tracing::debug!(bytes = body.len(), "Request body read successfully");
     
     // Get database connection
     let mut conn = match connection::connect().await {
         Ok(conn) => conn,
         Err(e) => {
-            tracing::error!("Failed to get database connection: {}", e);
+            tracing::error!(error = %e, "Failed to get database connection");
             res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
             return;
         }
@@ -75,7 +75,7 @@ pub async fn put(req: &mut Request, res: &mut Response) {
     // Perform the PUT operation
     match perform_put(&mut conn, &path, &body, if_none_match, if_match).await {
         Ok(PutResult::Created(etag)) => {
-            tracing::info!("vCard object created with ETag: {}", etag);
+            tracing::info!(etag = %etag, "vCard object created");
             res.status_code(StatusCode::CREATED);
             if let Ok(etag_value) = HeaderValue::from_str(&etag) {
                 if res.add_header("ETag", etag_value, true).is_err() {
@@ -84,7 +84,7 @@ pub async fn put(req: &mut Request, res: &mut Response) {
             }
         }
         Ok(PutResult::Updated(etag)) => {
-            tracing::info!("vCard object updated with ETag: {}", etag);
+            tracing::info!(etag = %etag, "vCard object updated");
             res.status_code(StatusCode::NO_CONTENT);
             if let Ok(etag_value) = HeaderValue::from_str(&etag) {
                 if res.add_header("ETag", etag_value, true).is_err() {
@@ -96,17 +96,17 @@ pub async fn put(req: &mut Request, res: &mut Response) {
             res.status_code(StatusCode::PRECONDITION_FAILED);
         }
         Err(PutError::InvalidVcardData(msg)) => {
-            tracing::error!("Invalid vCard data: {}", msg);
+            tracing::error!(message = %msg, "Invalid vCard data");
             res.status_code(StatusCode::BAD_REQUEST);
             // TODO: Return proper CardDAV error XML with valid-address-data precondition
         }
         Err(PutError::UidConflict(uid)) => {
-            tracing::error!("UID conflict: {}", uid);
+            tracing::error!(uid = %uid, "UID conflict");
             res.status_code(StatusCode::CONFLICT);
             // TODO: Return proper CardDAV error XML with no-uid-conflict precondition
         }
         Err(PutError::DatabaseError(e)) => {
-            tracing::error!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
         }
     }

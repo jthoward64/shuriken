@@ -109,7 +109,7 @@ pub async fn put_address_object(
         match &existing_instance {
             Some(inst) => {
                 if inst.etag != *im {
-                    tracing::warn!("Precondition failed: ETag mismatch (expected: {}, got: {})", inst.etag, im);
+                    tracing::warn!(expected = %inst.etag, got = %im, "Precondition failed: ETag mismatch");
                     anyhow::bail!("precondition failed: ETag mismatch");
                 }
             }
@@ -124,6 +124,7 @@ pub async fn put_address_object(
     if let Some(ref uid) = ctx.logical_uid {
         match entity::check_uid_conflict(conn, ctx.collection_id, uid, &ctx.uri).await {
             Ok(Some(conflicting_uri)) => {
+                tracing::warn!(uid = %uid, conflicting_uri = %conflicting_uri, "UID conflict detected");
                 anyhow::bail!(
                     "UID conflict: UID '{uid}' is already used by resource '{conflicting_uri}' in this collection"
                 );
@@ -132,7 +133,7 @@ pub async fn put_address_object(
                 // No conflict, proceed
             }
             Err(e) => {
-                tracing::error!("Failed to check UID conflict: {e}");
+                tracing::error!(error = %e, "Failed to check UID conflict");
                 anyhow::bail!("failed to check UID conflict: {e}");
             }
         }

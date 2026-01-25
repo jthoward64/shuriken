@@ -28,7 +28,7 @@ async fn main() -> anyhow::Result<()> {
 
     load_config()?;
 
-    tracing::info!("Configuration loaded: {:?}", get_config());
+    tracing::info!(config = ?get_config(), "Configuration loaded");
 
     connection::create_pool(&get_config().database.url, 4).await?;
 

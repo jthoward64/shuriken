@@ -157,18 +157,28 @@ Instead, log:
 
 ### Basic Usage
 
+Use structured fields instead of string interpolation:
+
 ```rust
-// Simple info log
-tracing::info!("Server started on port 8698");
-
-// With structured fields
+// ✅ Good: Structured fields
 tracing::info!(port = 8698, "Server started");
+tracing::info!(etag = %etag, "Calendar object created");
+tracing::error!(error = %e, uid = %uid, "UID conflict");
 
-// Debug with context
-tracing::debug!("Processing {} items", items.len());
+// ❌ Avoid: String interpolation
+tracing::info!("Server started on port {}", 8698);
+tracing::info!("Calendar object created with ETag: {}", etag);
 
-// Error with context
-tracing::error!("Failed to connect to database: {}", err);
+// With structured fields - values before the format string
+tracing::debug!(bytes = body.len(), "Request body read successfully");
+tracing::error!(expected = %expected_etag, got = %actual_etag, "ETag mismatch");
+
+// Use % for Display and ? for Debug formatting
+tracing::info!(config = ?get_config(), "Configuration loaded");
+tracing::debug!(user_email = %user.email, "User authenticated");
+```
+
+The format string should describe what's happening generally, without request-specific details. Put all variable data in the structured fields before the message string.
 ```
 
 ### Span Context

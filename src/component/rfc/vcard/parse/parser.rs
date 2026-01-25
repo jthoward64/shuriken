@@ -23,12 +23,12 @@ pub fn parse(input: &str) -> ParseResult<Vec<VCard>> {
     let unfolded = unfold_with_space(input);
     let lines = split_lines(&unfolded);
     
-    tracing::trace!("Split {} lines", lines.len());
+    tracing::trace!(count = lines.len(), "Split lines");
     
     let mut parser = Parser::new(lines);
     let result = parser.parse_document()?;
     
-    tracing::debug!("Parsed {} vCard(s)", result.len());
+    tracing::debug!(count = result.len(), "Parsed vCards");
     
     Ok(result)
 }

@@ -28,7 +28,7 @@ pub fn parse(input: &str) -> ParseResult<ICalendar> {
         return Err(ParseError::new(ParseErrorKind::MissingBegin, 1, 1));
     }
 
-    tracing::trace!("Split {} lines", lines.len());
+    tracing::info!(count = lines.len(), "Split lines");
 
     let content_lines: Vec<(usize, ContentLine)> = lines
         .into_iter()
@@ -38,7 +38,7 @@ pub fn parse(input: &str) -> ParseResult<ICalendar> {
         })
         .collect::<ParseResult<_>>()?;
 
-    tracing::trace!("Parsed {} content lines", content_lines.len());
+    tracing::trace!(count = content_lines.len(), "Parsed content lines");
 
     let mut iter = content_lines.into_iter().peekable();
     let root = parse_component(&mut iter, None)?;
