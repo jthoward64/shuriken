@@ -94,7 +94,6 @@ pub async fn mkcol_extended(req: &mut Request, res: &mut Response) {
 }
 
 /// Placeholder function to extract owner principal ID from path.
-#[expect(dead_code)]
 fn extract_owner_from_path(_path: &str) -> Result<uuid::Uuid, String> {
     // TODO: Implement proper path parsing and authentication
     // For now, return a dummy UUID

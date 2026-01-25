@@ -184,7 +184,6 @@ pub async fn proppatch(req: &mut Request, res: &mut Response) {
 }
 
 /// Parses collection ID from path (placeholder implementation).
-#[expect(dead_code)]
 fn parse_collection_id_from_path(path: &str) -> Result<uuid::Uuid, String> {
     // TODO: Implement proper path parsing
     // For now, try to extract UUID from path segments
