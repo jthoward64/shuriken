@@ -26,6 +26,6 @@ pub use proppatch::{PropertyUpdate, ProppatchRequest, SetOrRemove};
 pub use report::{
     AddressbookFilter, AddressbookMultiget, AddressbookQuery, CalendarFilter, CalendarMultiget,
     CalendarQuery, CompFilter, ExpandProperty, ExpandPropertyItem, FilterTest, FreeBusyQuery,
-    MatchType, ParamFilter, PropFilter, ReportRequest, ReportType, SyncCollection, SyncLevel,
+    MatchType, ParamFilter, PropFilter, RecurrenceExpansion, ReportRequest, ReportType, SyncCollection, SyncLevel,
     TextMatch, TimeRange,
 };

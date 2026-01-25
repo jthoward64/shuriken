@@ -6,7 +6,7 @@ use quick_xml::events::Event;
 use super::error::{ParseError, ParseResult};
 use crate::component::rfc::dav::core::{
     AddressbookFilter, AddressbookQuery, CalendarFilter, CalendarQuery, CompFilter, FilterTest,
-    Href, MatchType, Namespace, ParamFilter, PropFilter, PropertyName, QName, ReportRequest,
+    Href, MatchType, Namespace, ParamFilter, PropFilter, PropertyName, QName, RecurrenceExpansion, ReportRequest,
     ReportType, SyncCollection, SyncLevel, TextMatch, TimeRange,
 };
 
@@ -77,8 +77,8 @@ fn parse_calendar_query(xml: &[u8]) -> ParseResult<ReportRequest> {
     let mut namespaces: Vec<(String, String)> = Vec::new();
     let mut properties: Vec<PropertyName> = Vec::new();
     let mut filter: Option<CalendarFilter> = None;
-    let expand: Option<TimeRange> = None;
-    let limit: Option<u32> = None;
+    let mut expand: Option<(TimeRange, RecurrenceExpansion)> = None;
+    let mut limit: Option<u32> = None;
     let mut in_prop = false;
     let mut in_filter = false;
     let mut depth: usize = 0;
@@ -130,6 +130,18 @@ fn parse_calendar_query(xml: &[u8]) -> ParseResult<ReportRequest> {
                 let local_name = std::str::from_utf8(local_name_bytes.as_ref())?.to_owned();
 
                 match local_name.as_str() {
+                    "expand" if !in_filter => {
+                        // Parse <C:expand start="..." end="..."/>
+                        let time_range = parse_time_range(e)?;
+                        expand = Some((time_range, RecurrenceExpansion::Expand));
+                    }
+                    "limit-recurrence-set" if !in_filter => {
+                        // Parse <C:limit-recurrence-set start="..." end="..."/>
+                        if expand.is_none() {
+                            let time_range = parse_time_range(e)?;
+                            expand = Some((time_range, RecurrenceExpansion::LimitRecurrenceSet));
+                        }
+                    }
                     "calendar-data" if in_prop => {
                         let qname = resolve_qname(e, &namespaces)?;
                         properties.push(PropertyName::new(qname));
@@ -575,6 +587,7 @@ fn parse_calendar_filter_content(
 }
 
 /// Parses a comp-filter element when name is already extracted.
+#[expect(clippy::too_many_lines)]
 fn parse_comp_filter_with_name(
     reader: &mut Reader<&[u8]>,
     buf: &mut Vec<u8>,

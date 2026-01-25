@@ -28,6 +28,7 @@
 
 pub mod build;
 pub mod core;
+pub mod expand;
 pub mod parse;
 
 #[cfg(test)]
