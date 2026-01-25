@@ -3,6 +3,7 @@
 use salvo::Router;
 
 pub mod method;
+pub mod report;
 
 #[must_use]
 pub fn routes() -> Router {
