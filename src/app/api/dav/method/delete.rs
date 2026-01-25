@@ -95,6 +95,10 @@ async fn perform_delete(
     //         .execute(conn)
     //         .await?;
     //
+    //     // 2.5. Delete cal_occurrence entries for this entity
+    //     // use crate::component::db::query::caldav::occurrence;
+    //     // occurrence::delete_by_entity_id(conn, inst.entity_id).await?;
+    //
     //     // 3. Create tombstone
     //     let tombstone = NewDavTombstone {
     //         collection_id: inst.collection_id,

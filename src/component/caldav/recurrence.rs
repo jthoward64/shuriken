@@ -1,7 +1,7 @@
 //! Helper functions for extracting and processing recurrence data from iCalendar components.
 
 use crate::component::rfc::ical::core::{Component, DateTime as IcalDateTime};
-use chrono::{DateTime, Duration, NaiveDateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 
 /// Extracted recurrence data from a VEVENT component.
 #[derive(Debug, Clone)]
@@ -11,7 +11,7 @@ pub struct RecurrenceData {
     /// DTSTART in UTC.
     pub dtstart_utc: DateTime<Utc>,
     /// Event duration (DTEND - DTSTART or DURATION).
-    pub duration: Duration,
+    pub duration: chrono::TimeDelta,
     /// EXDATE values in UTC.
     pub exdates: Vec<DateTime<Utc>>,
     /// RDATE values in UTC.
@@ -52,10 +52,10 @@ pub fn extract_recurrence_data(component: &Component) -> Option<RecurrenceData> 
         dtend_utc.signed_duration_since(dtstart_utc)
     } else if let Some(duration_prop) = component.get_property("DURATION") {
         let duration_ical = duration_prop.as_duration()?;
-        ical_duration_to_chrono(duration_ical)?
+        ical_duration_to_chrono(duration_ical)
     } else {
         // RFC 5545: If neither DTEND nor DURATION is present, the event has zero duration
-        Duration::zero()
+        chrono::TimeDelta::zero()
     };
 
     // Extract EXDATE values
@@ -141,35 +141,31 @@ fn ical_datetime_to_utc(dt: &IcalDateTime, tzid: Option<&str>) -> Option<DateTim
 
 /// ## Summary
 /// Converts an iCalendar `Duration` to `chrono::Duration`.
-///
-/// ## Errors
-///
-/// Returns `None` if the duration is invalid.
 #[must_use]
-fn ical_duration_to_chrono(duration: &crate::component::rfc::ical::core::Duration) -> Option<Duration> {
-    let mut total = Duration::zero();
+fn ical_duration_to_chrono(duration: &crate::component::rfc::ical::core::Duration) -> chrono::TimeDelta {
+    let mut total = chrono::TimeDelta::zero();
 
     if duration.weeks > 0 {
-        total = total + Duration::weeks(i64::from(duration.weeks));
+        total += chrono::TimeDelta::weeks(i64::from(duration.weeks));
     }
     if duration.days > 0 {
-        total = total + Duration::days(i64::from(duration.days));
+        total += chrono::TimeDelta::days(i64::from(duration.days));
     }
     if duration.hours > 0 {
-        total = total + Duration::hours(i64::from(duration.hours));
+        total += chrono::TimeDelta::hours(i64::from(duration.hours));
     }
     if duration.minutes > 0 {
-        total = total + Duration::minutes(i64::from(duration.minutes));
+        total += chrono::TimeDelta::minutes(i64::from(duration.minutes));
     }
     if duration.seconds > 0 {
-        total = total + Duration::seconds(i64::from(duration.seconds));
+        total += chrono::TimeDelta::seconds(i64::from(duration.seconds));
     }
 
     if duration.negative {
-        total = -total;
+        -total
+    } else {
+        total
     }
-
-    Some(total)
 }
 
 #[cfg(test)]
@@ -219,7 +215,7 @@ mod tests {
         let data = extract_recurrence_data(&component).expect("should extract data");
         
         assert_eq!(data.rrule, "FREQ=DAILY;COUNT=5");
-        assert_eq!(data.duration, Duration::hours(1));
+        assert_eq!(data.duration, chrono::TimeDelta::hours(1));
         assert_eq!(data.exdates.len(), 0);
         assert_eq!(data.rdates.len(), 0);
     }

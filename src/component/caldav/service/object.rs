@@ -250,7 +250,7 @@ pub async fn put_calendar_object(
 }
 
 /// ## Summary
-/// Expands recurrences for all VEVENT components in the iCalendar and stores them in cal_occurrence.
+/// Expands recurrences for all VEVENT components in the iCalendar and stores them in `cal_occurrence`.
 ///
 /// This function queries the database for VEVENT components that were just inserted,
 /// extracts their RRULE properties, expands the recurrences, and stores the occurrences.
@@ -302,12 +302,14 @@ async fn expand_and_store_occurrences(
 
     for (idx, vevent) in vevent_components.iter().enumerate() {
         // Match with database component (by index for now - not ideal but works for simple cases)
-        if let Some(db_component) = db_components.get(idx) {
-            if let Some(mut occurrences) =
-                expand_component_occurrences(vevent, entity_id, db_component.id).await?
-            {
-                all_occurrences.append(&mut occurrences);
-            }
+        let Some(db_component) = db_components.get(idx) else {
+            continue;
+        };
+
+        if let Some(mut occurrences) =
+            expand_component_occurrences(vevent, entity_id, db_component.id).await?
+        {
+            all_occurrences.append(&mut occurrences);
         }
     }
 
