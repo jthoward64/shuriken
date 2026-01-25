@@ -5,8 +5,10 @@ use quick_xml::events::Event;
 
 use super::error::{ParseError, ParseResult};
 use crate::component::rfc::dav::core::{
-    AddressbookQuery, CalendarFilter, CalendarQuery, Href, Namespace, PropertyName, QName,
-    ReportRequest, SyncCollection, SyncLevel,
+    AddressbookFilter, AddressbookQuery, CalendarFilter, CalendarQuery, CompFilter, 
+    ExpandProperty, ExpandPropertyItem, FilterTest, Href, MatchType, Namespace, 
+    ParamFilter, PropFilter, PropertyName, QName, ReportRequest, SyncCollection, 
+    SyncLevel, TextMatch, TimeRange,
 };
 
 /// Parses a REPORT request body.
@@ -66,6 +68,7 @@ pub fn parse_report(xml: &[u8]) -> ParseResult<ReportRequest> {
 }
 
 /// Parses a calendar-query report.
+#[expect(clippy::too_many_lines)]
 fn parse_calendar_query(xml: &[u8]) -> ParseResult<ReportRequest> {
     let mut reader = Reader::from_reader(xml);
     reader.config_mut().trim_text(true);
@@ -74,24 +77,60 @@ fn parse_calendar_query(xml: &[u8]) -> ParseResult<ReportRequest> {
     let mut namespaces: Vec<(String, String)> = Vec::new();
     let mut properties: Vec<PropertyName> = Vec::new();
     let mut filter: Option<CalendarFilter> = None;
+    let mut expand: Option<TimeRange> = None;
+    let mut limit: Option<u32> = None;
     let mut in_prop = false;
+    let mut in_filter = false;
+    let mut depth: usize = 0;
 
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(ref e) | Event::Empty(ref e)) => {
+            Ok(Event::Start(ref e)) => {
                 collect_namespaces(e, &mut namespaces)?;
                 let local_name_bytes = e.local_name();
                 let local_name = std::str::from_utf8(local_name_bytes.as_ref())?.to_owned();
 
                 match local_name.as_str() {
-                    "prop" => {
+                    "prop" if !in_filter => {
                         in_prop = true;
                     }
                     "filter" => {
-                        // Parse filter separately
-                        filter = Some(CalendarFilter::vcalendar());
+                        in_filter = true;
+                        depth = 1;
                     }
-                    _ if in_prop => {
+                    "comp-filter" if in_filter && depth == 1 => {
+                        // Parse the root comp-filter (VCALENDAR)
+                        let name = get_attribute(e, "name")?;
+                        if name == "VCALENDAR" {
+                            filter = Some(parse_calendar_filter_content(&mut reader, &mut buf, &namespaces)?);
+                        }
+                    }
+                    "calendar-data" if in_prop => {
+                        // Parse calendar-data element for partial retrieval
+                        let qname = resolve_qname(e, &namespaces)?;
+                        properties.push(PropertyName::new(qname));
+                    }
+                    _ if in_prop && !in_filter => {
+                        let qname = resolve_qname(e, &namespaces)?;
+                        properties.push(PropertyName::new(qname));
+                    }
+                    _ if in_filter => {
+                        depth += 1;
+                    }
+                    _ => {}
+                }
+            }
+            Ok(Event::Empty(ref e)) => {
+                collect_namespaces(e, &mut namespaces)?;
+                let local_name_bytes = e.local_name();
+                let local_name = std::str::from_utf8(local_name_bytes.as_ref())?.to_owned();
+
+                match local_name.as_str() {
+                    "calendar-data" if in_prop => {
+                        let qname = resolve_qname(e, &namespaces)?;
+                        properties.push(PropertyName::new(qname));
+                    }
+                    _ if in_prop && !in_filter => {
                         let qname = resolve_qname(e, &namespaces)?;
                         properties.push(PropertyName::new(qname));
                     }
@@ -101,8 +140,18 @@ fn parse_calendar_query(xml: &[u8]) -> ParseResult<ReportRequest> {
             Ok(Event::End(ref e)) => {
                 let local_name_bytes = e.local_name();
                 let local_name = std::str::from_utf8(local_name_bytes.as_ref())?;
-                if local_name == "prop" {
-                    in_prop = false;
+                match local_name {
+                    "prop" if !in_filter => {
+                        in_prop = false;
+                    }
+                    "filter" => {
+                        in_filter = false;
+                        depth = 0;
+                    }
+                    _ if in_filter => {
+                        depth = depth.saturating_sub(1);
+                    }
+                    _ => {}
                 }
             }
             Ok(Event::Eof) => break,
@@ -114,8 +163,8 @@ fn parse_calendar_query(xml: &[u8]) -> ParseResult<ReportRequest> {
 
     let query = CalendarQuery {
         filter,
-        expand: None,
-        limit: None,
+        expand,
+        limit,
     };
 
     Ok(ReportRequest::calendar_query(query, properties))
@@ -190,6 +239,8 @@ fn parse_calendar_multiget(xml: &[u8]) -> ParseResult<ReportRequest> {
 }
 
 /// Parses an addressbook-query report.
+/// Parses an addressbook-query report.
+#[expect(clippy::too_many_lines)]
 fn parse_addressbook_query(xml: &[u8]) -> ParseResult<ReportRequest> {
     let mut reader = Reader::from_reader(xml);
     reader.config_mut().trim_text(true);
@@ -197,20 +248,60 @@ fn parse_addressbook_query(xml: &[u8]) -> ParseResult<ReportRequest> {
     let mut buf = Vec::new();
     let mut namespaces: Vec<(String, String)> = Vec::new();
     let mut properties: Vec<PropertyName> = Vec::new();
+    let mut filter: Option<AddressbookFilter> = None;
+    let mut limit: Option<u32> = None;
     let mut in_prop = false;
+    let mut in_filter = false;
+    let mut depth: usize = 0;
 
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(ref e) | Event::Empty(ref e)) => {
+            Ok(Event::Start(ref e)) => {
                 collect_namespaces(e, &mut namespaces)?;
                 let local_name_bytes = e.local_name();
                 let local_name = std::str::from_utf8(local_name_bytes.as_ref())?.to_owned();
 
                 match local_name.as_str() {
-                    "prop" => {
+                    "prop" if !in_filter => {
                         in_prop = true;
                     }
-                    _ if in_prop => {
+                    "filter" => {
+                        in_filter = true;
+                        depth = 1;
+                        // Parse filter test attribute
+                        let test = get_attribute(e, "test").unwrap_or_else(|_| "anyof".to_string());
+                        let filter_test = if test == "allof" {
+                            FilterTest::AllOf
+                        } else {
+                            FilterTest::AnyOf
+                        };
+                        filter = Some(parse_addressbook_filter_content(&mut reader, &mut buf, &namespaces, filter_test)?);
+                    }
+                    "address-data" if in_prop => {
+                        let qname = resolve_qname(e, &namespaces)?;
+                        properties.push(PropertyName::new(qname));
+                    }
+                    _ if in_prop && !in_filter => {
+                        let qname = resolve_qname(e, &namespaces)?;
+                        properties.push(PropertyName::new(qname));
+                    }
+                    _ if in_filter => {
+                        depth += 1;
+                    }
+                    _ => {}
+                }
+            }
+            Ok(Event::Empty(ref e)) => {
+                collect_namespaces(e, &mut namespaces)?;
+                let local_name_bytes = e.local_name();
+                let local_name = std::str::from_utf8(local_name_bytes.as_ref())?.to_owned();
+
+                match local_name.as_str() {
+                    "address-data" if in_prop => {
+                        let qname = resolve_qname(e, &namespaces)?;
+                        properties.push(PropertyName::new(qname));
+                    }
+                    _ if in_prop && !in_filter => {
                         let qname = resolve_qname(e, &namespaces)?;
                         properties.push(PropertyName::new(qname));
                     }
@@ -220,8 +311,18 @@ fn parse_addressbook_query(xml: &[u8]) -> ParseResult<ReportRequest> {
             Ok(Event::End(ref e)) => {
                 let local_name_bytes = e.local_name();
                 let local_name = std::str::from_utf8(local_name_bytes.as_ref())?;
-                if local_name == "prop" {
-                    in_prop = false;
+                match local_name {
+                    "prop" if !in_filter => {
+                        in_prop = false;
+                    }
+                    "filter" => {
+                        in_filter = false;
+                        depth = 0;
+                    }
+                    _ if in_filter => {
+                        depth = depth.saturating_sub(1);
+                    }
+                    _ => {}
                 }
             }
             Ok(Event::Eof) => break,
@@ -231,7 +332,10 @@ fn parse_addressbook_query(xml: &[u8]) -> ParseResult<ReportRequest> {
         buf.clear();
     }
 
-    let query = AddressbookQuery::new();
+    let query = AddressbookQuery {
+        filter,
+        limit,
+    };
     Ok(ReportRequest::addressbook_query(query, properties))
 }
 
@@ -405,6 +509,390 @@ fn collect_namespaces(
         }
     }
     Ok(())
+}
+
+/// Gets an attribute value from an element.
+fn get_attribute(e: &quick_xml::events::BytesStart<'_>, name: &str) -> ParseResult<String> {
+    for attr in e.attributes().flatten() {
+        let key = std::str::from_utf8(attr.key.as_ref())?;
+        if key == name {
+            return Ok(std::str::from_utf8(&attr.value)?.to_owned());
+        }
+    }
+    Err(ParseError::missing_attribute(name))
+}
+
+/// Parses calendar filter content (nested comp-filters).
+#[expect(clippy::too_many_lines)]
+fn parse_calendar_filter_content(
+    reader: &mut Reader<&[u8]>,
+    buf: &mut Vec<u8>,
+    namespaces: &[(String, String)],
+) -> ParseResult<CalendarFilter> {
+    let mut filter = CalendarFilter::vcalendar();
+    let mut depth = 1;
+
+    loop {
+        buf.clear();
+        match reader.read_event_into(buf) {
+            Ok(Event::Start(e)) => {
+                let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
+                depth += 1;
+
+                if local_name == "comp-filter" && depth == 2 {
+                    // Extract name attribute before consuming the element
+                    let name = get_attribute(&e, "name")?.to_owned();
+                    let comp_filter = parse_comp_filter_with_name(reader, buf, namespaces, name)?;
+                    filter.filters.push(comp_filter);
+                }
+            }
+            Ok(Event::Empty(e)) => {
+                let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
+                if local_name == "comp-filter" && depth == 1 {
+                    let name = get_attribute(&e, "name")?;
+                    filter.filters.push(CompFilter::new(name));
+                }
+            }
+            Ok(Event::End(e)) => {
+                let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
+                depth -= 1;
+                if local_name == "comp-filter" && depth == 0 {
+                    break;
+                }
+            }
+            Ok(Event::Eof) => break,
+            Err(e) => return Err(ParseError::xml(e.to_string())),
+            _ => {}
+        }
+    }
+
+    Ok(filter)
+}
+
+/// Parses a comp-filter element when name is already extracted.
+#[expect(clippy::too_many_lines)]
+fn parse_comp_filter_with_name(
+    reader: &mut Reader<&[u8]>,
+    buf: &mut Vec<u8>,
+    namespaces: &[(String, String)],
+    name: String,
+) -> ParseResult<CompFilter> {
+    let mut comp_filter = CompFilter::new(name);
+    let mut depth = 1;
+
+    loop {
+        buf.clear();
+        match reader.read_event_into(buf) {
+            Ok(Event::Start(e)) => {
+                let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
+                depth += 1;
+
+                match local_name.as_str() {
+                    "comp-filter" => {
+                        let name = get_attribute(&e, "name")?.to_owned();
+                        let nested = parse_comp_filter_with_name(reader, buf, namespaces, name)?;
+                        comp_filter.comp_filters.push(nested);
+                    }
+                    "prop-filter" => {
+                        let name = get_attribute(&e, "name")?.to_owned();
+                        let prop_filter = parse_prop_filter_with_name(reader, buf, namespaces, name)?;
+                        comp_filter.prop_filters.push(prop_filter);
+                    }
+                    "time-range" => {
+                        comp_filter.time_range = Some(parse_time_range(&e)?);
+                    }
+                    _ => {}
+                }
+            }
+            Ok(Event::Empty(e)) => {
+                let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
+                match local_name.as_str() {
+                    "is-not-defined" => {
+                        comp_filter.is_not_defined = true;
+                    }
+                    "time-range" => {
+                        comp_filter.time_range = Some(parse_time_range(&e)?);
+                    }
+                    _ => {}
+                }
+            }
+            Ok(Event::End(e)) => {
+                let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
+                depth -= 1;
+                if local_name == "comp-filter" && depth == 0 {
+                    break;
+                }
+            }
+            Ok(Event::Eof) => break,
+            Err(e) => return Err(ParseError::xml(e.to_string())),
+            _ => {}
+        }
+    }
+
+    Ok(comp_filter)
+}
+
+/// Parses a prop-filter element when name is already extracted.
+fn parse_prop_filter_with_name(
+    reader: &mut Reader<&[u8]>,
+    buf: &mut Vec<u8>,
+    _namespaces: &[(String, String)],
+    name: String,
+) -> ParseResult<PropFilter> {
+    let mut prop_filter = PropFilter::new(name);
+    let mut depth = 1;
+
+    loop {
+        buf.clear();
+        match reader.read_event_into(buf) {
+            Ok(Event::Start(e)) => {
+                let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
+                depth += 1;
+
+                match local_name.as_str() {
+                    "text-match" => {
+                        // Extract attributes before recursing to avoid borrow conflicts
+                        let mut collation = None;
+                        let mut negate = false;
+                        let mut match_type = MatchType::Contains;
+                        for attr in e.attributes().flatten() {
+                            let key = std::str::from_utf8(attr.key.as_ref())?;
+                            let value = std::str::from_utf8(&attr.value)?;
+                            match key {
+                                "collation" => collation = Some(value.to_owned()),
+                                "negate-condition" => negate = value == "yes" || value == "true",
+                                "match-type" => {
+                                    match_type = match value {
+                                        "equals" => MatchType::Equals,
+                                        "contains" => MatchType::Contains,
+                                        "starts-with" => MatchType::StartsWith,
+                                        "ends-with" => MatchType::EndsWith,
+                                        _ => MatchType::Contains,
+                                    };
+                                }
+                                _ => {}
+                            }
+                        }
+                        prop_filter.text_match = Some(parse_text_match_content(reader, collation, negate, match_type)?);
+                    }
+                    "time-range" => {
+                        prop_filter.time_range = Some(parse_time_range(&e)?);
+                    }
+                    "param-filter" => {
+                        let name = get_attribute(&e, "name")?.to_owned();
+                        let param_filter = parse_param_filter_with_name(reader, buf, name)?;
+                        prop_filter.param_filters.push(param_filter);
+                    }
+                    _ => {}
+                }
+            }
+            Ok(Event::Empty(e)) => {
+                let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
+                match local_name.as_str() {
+                    "is-not-defined" => {
+                        prop_filter.is_not_defined = true;
+                    }
+                    "time-range" => {
+                        prop_filter.time_range = Some(parse_time_range(&e)?);
+                    }
+                    _ => {}
+                }
+            }
+            Ok(Event::End(e)) => {
+                let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
+                depth -= 1;
+                if local_name == "prop-filter" && depth == 0 {
+                    break;
+                }
+            }
+            Ok(Event::Eof) => break,
+            Err(e) => return Err(ParseError::xml(e.to_string())),
+            _ => {}
+        }
+    }
+
+    Ok(prop_filter)
+}
+
+/// Parses a param-filter element when name is already extracted.
+fn parse_param_filter_with_name(
+    reader: &mut Reader<&[u8]>,
+    buf: &mut Vec<u8>,
+    name: String,
+) -> ParseResult<ParamFilter> {
+    let mut param_filter = ParamFilter {
+        name,
+        is_not_defined: false,
+        text_match: None,
+    };
+    let mut depth = 1;
+
+    loop {
+        buf.clear();
+        match reader.read_event_into(buf) {
+            Ok(Event::Start(e)) => {
+                let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
+                depth += 1;
+
+                if local_name == "text-match" {
+                    // Extract attributes before recursing to avoid borrow conflicts
+                    let mut collation = None;
+                    let mut negate = false;
+                    let mut match_type = MatchType::Contains;
+                    for attr in e.attributes().flatten() {
+                        let key = std::str::from_utf8(attr.key.as_ref())?;
+                        let value = std::str::from_utf8(&attr.value)?;
+                        match key {
+                            "collation" => collation = Some(value.to_owned()),
+                            "negate-condition" => negate = value == "yes" || value == "true",
+                            "match-type" => {
+                                match_type = match value {
+                                    "equals" => MatchType::Equals,
+                                    "contains" => MatchType::Contains,
+                                    "starts-with" => MatchType::StartsWith,
+                                    "ends-with" => MatchType::EndsWith,
+                                    _ => MatchType::Contains,
+                                };
+                            }
+                            _ => {}
+                        }
+                    }
+                    param_filter.text_match = Some(parse_text_match_content(reader, collation, negate, match_type)?);
+                }
+            }
+            Ok(Event::Empty(e)) => {
+                let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
+                if local_name == "is-not-defined" {
+                    param_filter.is_not_defined = true;
+                }
+            }
+            Ok(Event::End(e)) => {
+                let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
+                depth -= 1;
+                if local_name == "param-filter" && depth == 0 {
+                    break;
+                }
+            }
+            Ok(Event::Eof) => break,
+            Err(e) => return Err(ParseError::xml(e.to_string())),
+            _ => {}
+        }
+    }
+
+    Ok(param_filter)
+}
+
+/// Parses text-match content (text between tags).
+fn parse_text_match_content(
+    reader: &mut Reader<&[u8]>,
+    collation: Option<String>,
+    negate: bool,
+    match_type: MatchType,
+) -> ParseResult<TextMatch> {
+    // Parse text content - use our own buffer
+    let mut text_content = String::new();
+    let mut buf = Vec::new();
+    loop {
+        buf.clear();
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Text(e)) => {
+                let decoded = reader.decoder().decode(e.as_ref())?;
+                text_content.push_str(&decoded);
+            }
+            Ok(Event::End(e)) => {
+                let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
+                if local_name == "text-match" {
+                    break;
+                }
+            }
+            Ok(Event::Eof) => break,
+            Err(e) => return Err(ParseError::xml(e.to_string())),
+            _ => {}
+        }
+    }
+
+    Ok(TextMatch {
+        value: text_content.trim().to_owned(),
+        collation,
+        match_type,
+        negate,
+    })
+}
+
+/// Parses a time-range element.
+fn parse_time_range(elem: &quick_xml::events::BytesStart<'_>) -> ParseResult<TimeRange> {
+    let mut start = None;
+    let mut end = None;
+
+    for attr in elem.attributes().flatten() {
+        let key = std::str::from_utf8(attr.key.as_ref())?;
+        let value = std::str::from_utf8(&attr.value)?;
+        
+        match key {
+            "start" => {
+                start = chrono::DateTime::parse_from_rfc3339(value)
+                    .ok()
+                    .map(|dt| dt.with_timezone(&chrono::Utc));
+            }
+            "end" => {
+                end = chrono::DateTime::parse_from_rfc3339(value)
+                    .ok()
+                    .map(|dt| dt.with_timezone(&chrono::Utc));
+            }
+            _ => {}
+        }
+    }
+
+    Ok(TimeRange { start, end })
+}
+
+/// Parses addressbook filter content (nested prop-filters).
+fn parse_addressbook_filter_content(
+    reader: &mut Reader<&[u8]>,
+    buf: &mut Vec<u8>,
+    namespaces: &[(String, String)],
+    test: FilterTest,
+) -> ParseResult<AddressbookFilter> {
+    let mut prop_filters = Vec::new();
+    let mut depth = 1;
+
+    loop {
+        buf.clear();
+        match reader.read_event_into(buf) {
+            Ok(Event::Start(e)) => {
+                let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
+                depth += 1;
+
+                if local_name == "prop-filter" && depth == 2 {
+                    let name = get_attribute(&e, "name")?.to_owned();
+                    let prop_filter = parse_prop_filter_with_name(reader, buf, namespaces, name)?;
+                    prop_filters.push(prop_filter);
+                }
+            }
+            Ok(Event::Empty(e)) => {
+                let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
+                if local_name == "prop-filter" && depth == 1 {
+                    let name = get_attribute(&e, "name")?;
+                    prop_filters.push(PropFilter::new(name));
+                }
+            }
+            Ok(Event::End(e)) => {
+                let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
+                depth -= 1;
+                if local_name == "filter" && depth == 0 {
+                    break;
+                }
+            }
+            Ok(Event::Eof) => break,
+            Err(e) => return Err(ParseError::xml(e.to_string())),
+            _ => {}
+        }
+    }
+
+    Ok(AddressbookFilter {
+        prop_filters,
+        test,
+    })
 }
 
 /// Resolves a `QName` from an element.

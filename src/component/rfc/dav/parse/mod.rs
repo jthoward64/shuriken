@@ -6,7 +6,7 @@
 mod error;
 pub mod propfind;
 mod proppatch;
-mod report;
+pub mod report;
 
 #[cfg(test)]
 mod error_tests;

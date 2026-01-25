@@ -54,6 +54,15 @@ impl ParseError {
         Self::new(ParseErrorKind::InvalidValue, message)
     }
 
+    /// Creates a missing attribute error.
+    #[must_use]
+    pub fn missing_attribute(name: &str) -> Self {
+        Self::new(
+            ParseErrorKind::MissingAttribute,
+            format!("missing required attribute: {name}"),
+        )
+    }
+
     /// Creates an unsupported namespace error.
     #[must_use]
     pub fn unsupported_namespace(ns: &str) -> Self {
@@ -107,6 +116,8 @@ pub enum ParseErrorKind {
     UnexpectedElement,
     /// Invalid value.
     InvalidValue,
+    /// Missing required attribute.
+    MissingAttribute,
     /// Unsupported namespace.
     UnsupportedNamespace,
     /// Encoding error.
@@ -120,6 +131,7 @@ impl fmt::Display for ParseErrorKind {
             Self::MissingElement => write!(f, "missing element"),
             Self::UnexpectedElement => write!(f, "unexpected element"),
             Self::InvalidValue => write!(f, "invalid value"),
+            Self::MissingAttribute => write!(f, "missing attribute"),
             Self::UnsupportedNamespace => write!(f, "unsupported namespace"),
             Self::EncodingError => write!(f, "encoding error"),
         }

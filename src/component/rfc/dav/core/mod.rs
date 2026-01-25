@@ -23,6 +23,7 @@ pub use propfind::{PropfindRequest, PropfindType};
 pub use proppatch::{PropertyUpdate, ProppatchRequest, SetOrRemove};
 pub use report::{
     AddressbookFilter, AddressbookMultiget, AddressbookQuery, CalendarFilter, CalendarMultiget,
-    CalendarQuery, CompFilter, FilterTest, MatchType, PropFilter, ReportRequest, ReportType,
-    SyncCollection, SyncLevel, TextMatch, TimeRange,
+    CalendarQuery, CompFilter, ExpandProperty, ExpandPropertyItem, FilterTest, FreeBusyQuery,
+    MatchType, ParamFilter, PropFilter, ReportRequest, ReportType, SyncCollection, SyncLevel,
+    TextMatch, TimeRange,
 };
