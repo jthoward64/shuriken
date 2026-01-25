@@ -85,8 +85,10 @@ pub enum ReportType {
 pub struct CalendarQuery {
     /// Filter element.
     pub filter: Option<CalendarFilter>,
-    /// Time range for expansion.
+    /// Time range for expansion (mutually exclusive with `limit_recurrence`).
     pub expand: Option<TimeRange>,
+    /// Time range for limiting recurrence set (mutually exclusive with `expand`).
+    pub limit_recurrence: Option<TimeRange>,
     /// Limit results.
     pub limit: Option<u32>,
 }
@@ -109,6 +111,15 @@ impl CalendarQuery {
     #[must_use]
     pub fn with_expand(mut self, range: TimeRange) -> Self {
         self.expand = Some(range);
+        self.limit_recurrence = None; // Mutually exclusive
+        self
+    }
+
+    /// Sets the limit-recurrence-set range.
+    #[must_use]
+    pub fn with_limit_recurrence(mut self, range: TimeRange) -> Self {
+        self.limit_recurrence = Some(range);
+        self.expand = None; // Mutually exclusive
         self
     }
 
