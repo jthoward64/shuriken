@@ -110,10 +110,10 @@ fn write_multistatus_response(res: &mut Response, multistatus: &Multistatus) {
     };
 
     res.status_code(StatusCode::MULTI_STATUS);
-    res.add_header(
+    let _ = res.add_header(
         "Content-Type",
         salvo::http::HeaderValue::from_static("application/xml; charset=utf-8"),
         true,
     );
-    res.write_body(xml);
+    let _ = res.write_body(xml);
 }

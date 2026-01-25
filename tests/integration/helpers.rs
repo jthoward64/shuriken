@@ -1,4 +1,4 @@
-#![allow(clippy::doc_markdown, clippy::unused_async)]
+#![allow(clippy::doc_markdown, clippy::unused_async, clippy::expect_used)]
 //! Test helpers for integration tests.
 //!
 //! Provides utilities for:
@@ -13,6 +13,7 @@ use salvo::prelude::*;
 ///
 /// ## Panics
 /// Panics if the service cannot be created.
+#[expect(dead_code)]
 #[must_use]
 pub fn create_test_service() -> Service {
     // TODO: Wire up actual routes once they're implemented
@@ -21,7 +22,6 @@ pub fn create_test_service() -> Service {
 }
 
 /// Represents an HTTP test response for assertions.
-#[expect(dead_code)]
 pub struct TestResponse {
     pub status: StatusCode,
     pub headers: Vec<(String, String)>,
@@ -73,7 +73,6 @@ impl TestResponse {
 }
 
 /// Database test helper for setup and teardown.
-#[expect(dead_code)]
 pub struct TestDb {
     // TODO: Add connection pool and helpers once DB integration is ready
 }
