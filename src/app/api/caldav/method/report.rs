@@ -142,17 +142,33 @@ pub async fn handle_calendar_multiget(
 /// ## Errors
 /// Returns database errors or filter evaluation errors.
 async fn build_calendar_query_response(
-    _conn: &mut connection::DbConnection<'_>,
-    _query: &CalendarQuery,
-    _properties: &[crate::component::rfc::dav::core::PropertyName],
+    conn: &mut connection::DbConnection<'_>,
+    query: &CalendarQuery,
+    properties: &[crate::component::rfc::dav::core::PropertyName],
 ) -> anyhow::Result<Multistatus> {
+    use crate::component::rfc::dav::core::PropstatResponse;
+    
     // TODO: Implement filter evaluation
-    // 1. Parse collection path from request
-    // 2. Query instances matching filter criteria
-    // 3. Evaluate time-range filters if present
-    // 4. Evaluate component/property filters
-    // 5. Apply limit if specified
-    // 6. Build response with requested properties
+    // This is a stub implementation that returns an empty multistatus.
+    // Full implementation requires:
+    // 1. Extract collection_id from request path/context
+    // 2. Query instances in the collection
+    // 3. For each instance:
+    //    a. Load calendar data (entity canonical bytes)
+    //    b. Parse iCalendar components
+    //    c. Evaluate comp-filter (match component types: VEVENT, VTODO, etc.)
+    //    d. Evaluate prop-filter (match property values)
+    //    e. Evaluate time-range filter (check if events overlap the range)
+    //    f. If matches, include in response
+    // 4. Apply limit if specified
+    // 5. Build response with requested properties (getetag, calendar-data, etc.)
+    //
+    // Example filter evaluation logic:
+    // - comp-filter name="VEVENT" → only include instances containing VEVENT components
+    // - time-range start="..." end="..." → only include events that overlap the range
+    // - prop-filter name="UID" text-match → only include if UID property matches
+    
+    tracing::warn!("calendar-query filter evaluation not yet implemented, returning empty result");
     
     Ok(Multistatus::new())
 }

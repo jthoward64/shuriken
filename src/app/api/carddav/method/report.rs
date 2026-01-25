@@ -142,17 +142,34 @@ pub async fn handle_addressbook_multiget(
 /// ## Errors
 /// Returns database errors or filter evaluation errors.
 async fn build_addressbook_query_response(
-    _conn: &mut connection::DbConnection<'_>,
-    _query: &AddressbookQuery,
-    _properties: &[crate::component::rfc::dav::core::PropertyName],
+    conn: &mut connection::DbConnection<'_>,
+    query: &AddressbookQuery,
+    properties: &[crate::component::rfc::dav::core::PropertyName],
 ) -> anyhow::Result<Multistatus> {
+    use crate::component::rfc::dav::core::PropstatResponse;
+    
     // TODO: Implement filter evaluation
-    // 1. Parse collection path from request
-    // 2. Query instances matching filter criteria
-    // 3. Evaluate property filters (FN, EMAIL, etc.)
-    // 4. Apply test mode (anyof/allof)
-    // 5. Apply limit if specified
-    // 6. Build response with requested properties
+    // This is a stub implementation that returns an empty multistatus.
+    // Full implementation requires:
+    // 1. Extract collection_id from request path/context
+    // 2. Query instances in the addressbook collection
+    // 3. For each instance:
+    //    a. Load vCard data (entity canonical bytes)
+    //    b. Parse vCard properties
+    //    c. Evaluate prop-filter (match property names: FN, EMAIL, TEL, etc.)
+    //    d. Evaluate text-match (with collation: case-insensitive/unicode-casemap)
+    //    e. Apply filter test mode (anyof vs allof)
+    //    f. If matches, include in response
+    // 4. Apply limit if specified
+    // 5. Build response with requested properties (getetag, address-data, etc.)
+    //
+    // Example filter evaluation logic:
+    // - prop-filter name="FN" text-match collation="i;unicode-casemap" → case-insensitive name match
+    // - prop-filter name="EMAIL" text-match match-type="contains" → email contains substring
+    // - test="anyof" → match if ANY prop-filter matches
+    // - test="allof" → match if ALL prop-filters match
+    
+    tracing::warn!("addressbook-query filter evaluation not yet implemented, returning empty result");
     
     Ok(Multistatus::new())
 }
