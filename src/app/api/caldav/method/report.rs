@@ -1,5 +1,4 @@
 //! CalDAV REPORT method dispatcher.
-#![expect(clippy::doc_markdown, reason = "CalDAV is a proper term, not a code identifier")]
 
 use salvo::http::StatusCode;
 use salvo::{Request, Response, handler};

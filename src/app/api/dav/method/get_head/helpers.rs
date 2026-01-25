@@ -116,9 +116,9 @@ fn set_response_headers_and_body(
     
     // Set body only for GET (not HEAD)
     if !is_head {
-        #[expect(clippy::expect_used, reason = "stub implementation, acceptable to panic")]
-        res.write_body(canonical_bytes.to_vec())
-            .expect("valid body");
+        if let Err(e) = res.write_body(canonical_bytes.to_vec()) {
+            tracing::error!("Failed to write response body: {}", e);
+        }
     }
 }
 

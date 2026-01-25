@@ -7,7 +7,10 @@ use crate::component::rfc::vcard::core::{VCard, VCardValue};
 /// Extracts typed value fields from an iCalendar Value.
 ///
 /// Returns a tuple of (`value_type`, `value_text`, `value_int`, `value_float`, `value_bool`, `value_date`, `value_tstz`).
-#[expect(clippy::type_complexity)]
+#[expect(
+    clippy::type_complexity,
+    reason = "Return tuple mirrors database column types for direct mapping"
+)]
 pub(super) fn extract_ical_value<'a>(
     value: &Value,
     raw: &'a str,
@@ -51,7 +54,10 @@ pub(super) fn extract_ical_value<'a>(
 
 /// ## Summary
 /// Extracts typed value fields from a vCard Value.
-#[expect(clippy::type_complexity)]
+#[expect(
+    clippy::type_complexity,
+    reason = "Return tuple mirrors database column types for direct mapping"
+)]
 pub(super) fn extract_vcard_value<'a>(
     value: &VCardValue,
     raw: &'a str,

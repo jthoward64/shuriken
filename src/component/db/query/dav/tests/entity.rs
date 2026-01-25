@@ -1,4 +1,4 @@
-#![allow(clippy::doc_markdown, clippy::unused_async)]
+#![allow(clippy::unused_async)]
 //! Tests for entity storage operations.
 //!
 //! Verifies persistence, component tree handling, and transaction semantics.
