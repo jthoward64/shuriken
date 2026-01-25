@@ -1,7 +1,7 @@
 //! vCard property types (RFC 6350).
 
-use super::value::VCardValue;
 use super::parameter::VCardParameter;
+use super::value::VCardValue;
 
 /// A vCard property.
 ///
@@ -89,8 +89,7 @@ impl VCardProperty {
     /// Returns the PREF value if present (1-100, lower is preferred).
     #[must_use]
     pub fn pref(&self) -> Option<u8> {
-        self.get_param_value("PREF")
-            .and_then(|v| v.parse().ok())
+        self.get_param_value("PREF").and_then(|v| v.parse().ok())
     }
 
     /// Returns the value as text if it is a text value.

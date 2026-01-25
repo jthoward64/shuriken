@@ -57,11 +57,23 @@ fn error_display() {
 #[test]
 fn error_kind_display() {
     assert_eq!(format!("{}", ParseErrorKind::XmlError), "XML error");
-    assert_eq!(format!("{}", ParseErrorKind::MissingElement), "missing element");
-    assert_eq!(format!("{}", ParseErrorKind::UnexpectedElement), "unexpected element");
+    assert_eq!(
+        format!("{}", ParseErrorKind::MissingElement),
+        "missing element"
+    );
+    assert_eq!(
+        format!("{}", ParseErrorKind::UnexpectedElement),
+        "unexpected element"
+    );
     assert_eq!(format!("{}", ParseErrorKind::InvalidValue), "invalid value");
-    assert_eq!(format!("{}", ParseErrorKind::UnsupportedNamespace), "unsupported namespace");
-    assert_eq!(format!("{}", ParseErrorKind::EncodingError), "encoding error");
+    assert_eq!(
+        format!("{}", ParseErrorKind::UnsupportedNamespace),
+        "unsupported namespace"
+    );
+    assert_eq!(
+        format!("{}", ParseErrorKind::EncodingError),
+        "encoding error"
+    );
 }
 
 #[test]

@@ -16,8 +16,8 @@ fn round_trip(input: &str) -> Result<(), String> {
     let serialized = serialize_single(&vcard1);
 
     // Second parse
-    let vcard2 = parse_single(&serialized)
-        .map_err(|e| format!("Second parse failed: {e}\n{serialized}"))?;
+    let vcard2 =
+        parse_single(&serialized).map_err(|e| format!("Second parse failed: {e}\n{serialized}"))?;
 
     // Compare versions
     if vcard1.version != vcard2.version {
@@ -43,9 +43,7 @@ fn round_trip(input: &str) -> Result<(), String> {
         vcard2.properties.iter().map(|p| p.name.as_str()).collect();
 
     if props1 != props2 {
-        return Err(format!(
-            "Property names mismatch: {props1:?} vs {props2:?}"
-        ));
+        return Err(format!("Property names mismatch: {props1:?} vs {props2:?}"));
     }
 
     Ok(())

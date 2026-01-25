@@ -83,8 +83,7 @@ async fn apply_calendar_filter(
     }
 
     // Union all entity IDs (any component filter matches)
-    let mut matching_entity_ids: Vec<uuid::Uuid> =
-        entity_id_sets.into_iter().flatten().collect();
+    let mut matching_entity_ids: Vec<uuid::Uuid> = entity_id_sets.into_iter().flatten().collect();
     matching_entity_ids.sort_unstable();
     matching_entity_ids.dedup();
 
@@ -113,9 +112,9 @@ async fn apply_comp_filter(
     let mut entity_ids = if let Some(time_range) = &comp_filter.time_range {
         let start = time_range.start;
         let end = time_range.end;
-        
+
         let mut boxed_query = query.into_boxed();
-        
+
         // Apply start constraint: event_end > range_start
         if let Some(range_start) = start {
             boxed_query = boxed_query.filter(
@@ -133,7 +132,7 @@ async fn apply_comp_filter(
                     .or(cal_index::dtstart_utc.lt(range_end)),
             );
         }
-        
+
         boxed_query
             .select(cal_index::entity_id)
             .distinct()
@@ -149,7 +148,8 @@ async fn apply_comp_filter(
 
     // Apply property filters (if present)
     if !comp_filter.prop_filters.is_empty() {
-        let prop_filtered_ids = apply_property_filters(conn, &entity_ids, &comp_filter.prop_filters).await?;
+        let prop_filtered_ids =
+            apply_property_filters(conn, &entity_ids, &comp_filter.prop_filters).await?;
         entity_ids = prop_filtered_ids;
     }
 
@@ -163,14 +163,17 @@ async fn apply_comp_filter(
 ///
 /// ## Errors
 /// Returns database errors if queries fail.
-#[expect(clippy::too_many_lines, reason = "Property filter logic is complex but cohesive")]
+#[expect(
+    clippy::too_many_lines,
+    reason = "Property filter logic is complex but cohesive"
+)]
 async fn apply_property_filters(
     conn: &mut DbConnection<'_>,
     entity_ids: &[uuid::Uuid],
     prop_filters: &[crate::component::rfc::dav::core::PropFilter],
 ) -> anyhow::Result<Vec<uuid::Uuid>> {
     use crate::component::db::schema::{dav_component, dav_property};
-    
+
     if entity_ids.is_empty() {
         return Ok(Vec::new());
     }
@@ -183,7 +186,9 @@ async fn apply_property_filters(
         let matching_entity_ids = if prop_filter.is_not_defined {
             // Property must NOT exist - find entities without this property
             let entities_with_prop: Vec<uuid::Uuid> = dav_component::table
-                .inner_join(dav_property::table.on(dav_property::component_id.eq(dav_component::id)))
+                .inner_join(
+                    dav_property::table.on(dav_property::component_id.eq(dav_component::id)),
+                )
                 .filter(dav_component::entity_id.eq_any(entity_ids))
                 .filter(dav_property::name.eq(&prop_name))
                 .filter(dav_property::deleted_at.is_null())
@@ -204,7 +209,9 @@ async fn apply_property_filters(
             let case_sensitive = text_match.collation.as_deref() == Some("i;octet");
 
             let mut query = dav_component::table
-                .inner_join(dav_property::table.on(dav_property::component_id.eq(dav_component::id)))
+                .inner_join(
+                    dav_property::table.on(dav_property::component_id.eq(dav_component::id)),
+                )
                 .filter(dav_component::entity_id.eq_any(entity_ids))
                 .filter(dav_property::name.eq(&prop_name))
                 .filter(dav_property::deleted_at.is_null())
@@ -216,36 +223,36 @@ async fn apply_property_filters(
                     if case_sensitive {
                         query.filter(dav_property::value_text.eq(&match_value))
                     } else {
-                        query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(
-                            &format!("UPPER(value_text) = '{match_value}'")
-                        ))
+                        query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
+                            "UPPER(value_text) = '{match_value}'"
+                        )))
                     }
                 }
                 crate::component::rfc::dav::core::MatchType::Contains => {
                     if case_sensitive {
                         query.filter(dav_property::value_text.like(format!("%{match_value}%")))
                     } else {
-                        query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(
-                            &format!("UPPER(value_text) LIKE '%{match_value}%'")
-                        ))
+                        query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
+                            "UPPER(value_text) LIKE '%{match_value}%'"
+                        )))
                     }
                 }
                 crate::component::rfc::dav::core::MatchType::StartsWith => {
                     if case_sensitive {
                         query.filter(dav_property::value_text.like(format!("{match_value}%")))
                     } else {
-                        query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(
-                            &format!("UPPER(value_text) LIKE '{match_value}%'")
-                        ))
+                        query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
+                            "UPPER(value_text) LIKE '{match_value}%'"
+                        )))
                     }
                 }
                 crate::component::rfc::dav::core::MatchType::EndsWith => {
                     if case_sensitive {
                         query.filter(dav_property::value_text.like(format!("%{match_value}")))
                     } else {
-                        query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(
-                            &format!("UPPER(value_text) LIKE '%{match_value}'")
-                        ))
+                        query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
+                            "UPPER(value_text) LIKE '%{match_value}'"
+                        )))
                     }
                 }
             };
@@ -258,7 +265,9 @@ async fn apply_property_filters(
         } else {
             // Property must exist (no text match specified)
             dav_component::table
-                .inner_join(dav_property::table.on(dav_property::component_id.eq(dav_component::id)))
+                .inner_join(
+                    dav_property::table.on(dav_property::component_id.eq(dav_component::id)),
+                )
                 .filter(dav_component::entity_id.eq_any(entity_ids))
                 .filter(dav_property::name.eq(&prop_name))
                 .filter(dav_property::deleted_at.is_null())
@@ -283,4 +292,3 @@ async fn apply_property_filters(
 
     Ok(final_ids)
 }
-

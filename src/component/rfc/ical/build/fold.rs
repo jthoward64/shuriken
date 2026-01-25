@@ -10,7 +10,7 @@ const MAX_LINE_OCTETS: usize = 75;
 #[must_use]
 pub fn fold_line(line: &str) -> String {
     let bytes = line.as_bytes();
-    
+
     if bytes.len() <= MAX_LINE_OCTETS {
         return format!("{line}\r\n");
     }
@@ -40,7 +40,7 @@ pub fn fold_line(line: &str) -> String {
 
         // Find a safe break point (not in the middle of a UTF-8 sequence)
         let mut end = pos + max_len;
-        
+
         // Back up if we're in the middle of a UTF-8 character
         while end > pos && !is_char_boundary(bytes, end) {
             end -= 1;
@@ -101,10 +101,10 @@ mod tests {
         // 150 characters
         let line = "X".repeat(150);
         let result = fold_line(&line);
-        
+
         // Should have fold markers
         assert!(result.contains("\r\n "));
-        
+
         // Unfold and verify content preserved
         let unfolded = result.replace("\r\n ", "").replace("\r\n", "");
         assert_eq!(unfolded, line);
@@ -116,13 +116,13 @@ mod tests {
         // 日本語 is 3 bytes per character
         let prefix = "A".repeat(73);
         let line = format!("{prefix}日本語"); // 73 + 9 = 82 bytes
-        
+
         let result = fold_line(&line);
-        
+
         // Verify it can be unfolded to valid UTF-8
         let unfolded = result.replace("\r\n ", "").replace("\r\n", "");
         assert_eq!(unfolded, line);
-        
+
         // Each line segment should be valid UTF-8
         for segment in result.split("\r\n") {
             if !segment.is_empty() {
@@ -137,7 +137,7 @@ mod tests {
         // First line should be exactly 75 bytes
         let line = "A".repeat(80);
         let result = fold_line(&line);
-        
+
         let lines: Vec<&str> = result.split("\r\n").filter(|s| !s.is_empty()).collect();
         assert_eq!(lines.len(), 2);
         assert_eq!(lines[0].len(), 75);

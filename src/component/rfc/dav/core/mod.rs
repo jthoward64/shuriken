@@ -19,9 +19,7 @@ pub use error::DavError;
 pub use href::Href;
 pub use multistatus::{Multistatus, Propstat, PropstatResponse, ResponseDescription, Status};
 pub use namespace::{CALDAV_NS, CARDDAV_NS, CS_NS, DAV_NS, Namespace, QName};
-pub use partial_retrieval::{
-    AddressDataRequest, CalendarDataRequest, ComponentSelection,
-};
+pub use partial_retrieval::{AddressDataRequest, CalendarDataRequest, ComponentSelection};
 pub use property::{DavProperty, PropertyName, PropertyValue};
 pub use propfind::{PropfindRequest, PropfindType};
 pub use proppatch::{PropertyUpdate, ProppatchRequest, SetOrRemove};

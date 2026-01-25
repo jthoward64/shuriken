@@ -100,7 +100,7 @@ async fn load_calendar_data(
     if let Some(bytes) = canonical_bytes {
         // Convert bytes to string
         let data = String::from_utf8_lossy(&bytes).into_owned();
-        
+
         // Apply partial retrieval filtering if specified
         if let Some(request) = prop_name.calendar_data_request() {
             let filtered = filter_calendar_data(&data, request)?;
@@ -140,7 +140,7 @@ async fn load_address_data(
     if let Some(bytes) = canonical_bytes {
         // Convert bytes to string
         let data = String::from_utf8_lossy(&bytes).into_owned();
-        
+
         // Apply partial retrieval filtering if specified
         if let Some(request) = prop_name.address_data_request() {
             let filtered = filter_address_data(&data, request)?;

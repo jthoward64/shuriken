@@ -4,11 +4,11 @@
 #![allow(clippy::single_match_else)]
 #![allow(clippy::unnecessary_wraps)]
 
-use salvo::{handler, Request, Response};
 use salvo::http::StatusCode;
+use salvo::{Request, Response, handler};
 
-use crate::component::db::connection;
 use crate::component::dav::service::collection::{CreateCollectionContext, create_collection};
+use crate::component::db::connection;
 
 /// ## Summary
 /// Handles MKCALENDAR requests to create calendar collections.
@@ -28,7 +28,7 @@ use crate::component::dav::service::collection::{CreateCollectionContext, create
 pub async fn mkcalendar(req: &mut Request, res: &mut Response) {
     // Get path to determine where to create the calendar
     let path = req.uri().path().to_string();
-    
+
     // Get database connection
     let mut conn = match connection::connect().await {
         Ok(conn) => conn,
@@ -38,14 +38,18 @@ pub async fn mkcalendar(req: &mut Request, res: &mut Response) {
             return;
         }
     };
-    
+
     // TODO: Parse path to extract parent and calendar name
     // TODO: Check authorization
     // TODO: Parse optional MKCALENDAR XML body for initial properties
-    
+
     // Extract URI from path (last segment)
-    let uri = path.split('/').next_back().unwrap_or("calendar").to_string();
-    
+    let uri = path
+        .split('/')
+        .next_back()
+        .unwrap_or("calendar")
+        .to_string();
+
     // TODO: Get authenticated user's principal ID
     // For now, use a placeholder
     let owner_principal_id = match extract_owner_from_path(&path) {
@@ -56,7 +60,7 @@ pub async fn mkcalendar(req: &mut Request, res: &mut Response) {
             return;
         }
     };
-    
+
     // Create collection context
     let ctx = CreateCollectionContext {
         owner_principal_id,
@@ -65,11 +69,15 @@ pub async fn mkcalendar(req: &mut Request, res: &mut Response) {
         displayname: None, // TODO: Extract from XML body if present
         description: None, // TODO: Extract from XML body if present
     };
-    
+
     // Create the calendar collection
     match create_collection(&mut conn, &ctx).await {
         Ok(result) => {
-            tracing::info!("Created calendar collection: {} (ID: {})", result.uri, result.collection_id);
+            tracing::info!(
+                "Created calendar collection: {} (ID: {})",
+                result.uri,
+                result.collection_id
+            );
             res.status_code(StatusCode::CREATED);
             // TODO: Set Location header
         }

@@ -9,7 +9,9 @@ use crate::component::model::dav::parameter::{DavParameter, NewDavParameter};
 use crate::component::model::dav::property::{DavProperty, NewDavProperty};
 
 use super::crud;
-use super::query_builders::{by_id, components_for_entity, parameters_for_property, properties_for_component};
+use super::query_builders::{
+    by_id, components_for_entity, parameters_for_property, properties_for_component,
+};
 
 /// ## Summary
 /// Retrieves an entity with its full component tree (components, properties, parameters).
@@ -25,30 +27,23 @@ pub async fn get_entity_with_tree(
         Vec<(DavComponent, Vec<(DavProperty, Vec<DavParameter>)>)>,
     )>,
 > {
-    let entity: Option<DavEntity> = by_id(entity_id)
-        .first(conn)
-        .await
-        .optional()?;
+    let entity: Option<DavEntity> = by_id(entity_id).first(conn).await.optional()?;
 
     let Some(entity) = entity else {
         return Ok(None);
     };
 
-    let components: Vec<DavComponent> = components_for_entity(entity_id)
-        .load(conn)
-        .await?;
+    let components: Vec<DavComponent> = components_for_entity(entity_id).load(conn).await?;
 
     let mut component_tree = Vec::new();
     for component in components {
-        let properties: Vec<DavProperty> = properties_for_component(component.id)
-            .load(conn)
-            .await?;
+        let properties: Vec<DavProperty> =
+            properties_for_component(component.id).load(conn).await?;
 
         let mut property_tree = Vec::new();
         for property in properties {
-            let parameters: Vec<DavParameter> = parameters_for_property(property.id)
-                .load(conn)
-                .await?;
+            let parameters: Vec<DavParameter> =
+                parameters_for_property(property.id).load(conn).await?;
             property_tree.push((property, parameters));
         }
 

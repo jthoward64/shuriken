@@ -2,7 +2,9 @@
 //!
 //! RFC 4791 §9.6 (calendar-data) and RFC 6352 §10.4 (address-data).
 
-use crate::component::rfc::dav::core::{AddressDataRequest, CalendarDataRequest, ComponentSelection};
+use crate::component::rfc::dav::core::{
+    AddressDataRequest, CalendarDataRequest, ComponentSelection,
+};
 
 /// ## Summary
 /// Filters iCalendar data based on component/property selection.
@@ -30,15 +32,15 @@ pub fn filter_calendar_data(
 
     for line in lines {
         let line_upper = line.to_uppercase();
-        
+
         // Track BEGIN/END for components
         if let Some(comp_name) = line_upper.strip_prefix("BEGIN:") {
             let comp = comp_name.trim().to_string();
             current_component_stack.push(comp.clone());
-            
+
             // Determine if we should include this component
             include_current = should_include_component(&current_component_stack, selection);
-            
+
             if include_current {
                 filtered_lines.push(line);
             }
@@ -67,10 +69,7 @@ pub fn filter_calendar_data(
 }
 
 /// Determines if a component should be included based on the selection.
-fn should_include_component(
-    component_stack: &[String],
-    selection: &ComponentSelection,
-) -> bool {
+fn should_include_component(component_stack: &[String], selection: &ComponentSelection) -> bool {
     if component_stack.is_empty() {
         return true;
     }
@@ -80,7 +79,7 @@ fn should_include_component(
         if component_stack.len() == 1 {
             return true;
         }
-        
+
         // Check if the nested component is in the selection
         let nested_comp = &component_stack[1];
         return selection.comps.iter().any(|c| c.name == *nested_comp);
@@ -113,12 +112,18 @@ fn should_include_property(
     // Check if property is in the selection
     if component_stack.len() == 1 && component_stack[0] == "VCALENDAR" {
         // Root VCALENDAR properties
-        return selection.props.iter().any(|p| p.to_uppercase() == prop_name);
+        return selection
+            .props
+            .iter()
+            .any(|p| p.to_uppercase() == prop_name);
     } else if component_stack.len() == 2 && component_stack[0] == "VCALENDAR" {
         // Nested component properties (e.g., VEVENT properties)
         let nested_comp = &component_stack[1];
         if let Some(comp_selection) = selection.comps.iter().find(|c| c.name == *nested_comp) {
-            return comp_selection.props.iter().any(|p| p.to_uppercase() == prop_name);
+            return comp_selection
+                .props
+                .iter()
+                .any(|p| p.to_uppercase() == prop_name);
         }
         false
     } else {
@@ -146,10 +151,10 @@ pub fn filter_address_data(
     // Simple line-based filtering
     let lines: Vec<&str> = vcard_data.lines().collect();
     let mut filtered_lines = Vec::new();
-    
+
     for line in lines {
         let line_upper = line.to_uppercase();
-        
+
         // Always include BEGIN:VCARD, END:VCARD, VERSION, FN (required by spec)
         if line_upper.starts_with("BEGIN:VCARD")
             || line_upper.starts_with("END:VCARD")
@@ -190,18 +195,16 @@ mod tests {
 
     #[test]
     fn test_filter_calendar_vevent_only() {
-        let ical = "BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nSUMMARY:Test\nEND:VEVENT\nEND:VCALENDAR";
-        
+        let ical =
+            "BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nSUMMARY:Test\nEND:VEVENT\nEND:VCALENDAR";
+
         let selection = ComponentSelection::new("VCALENDAR")
             .with_prop("VERSION")
-            .with_comp(
-                ComponentSelection::new("VEVENT")
-                    .with_prop("SUMMARY")
-            );
-        
+            .with_comp(ComponentSelection::new("VEVENT").with_prop("SUMMARY"));
+
         let request = CalendarDataRequest::with_selection(selection);
         let result = filter_calendar_data(ical, &request).unwrap();
-        
+
         assert!(result.contains("BEGIN:VCALENDAR"));
         assert!(result.contains("BEGIN:VEVENT"));
         assert!(result.contains("SUMMARY:Test"));
@@ -222,7 +225,7 @@ mod tests {
         let vcard = "BEGIN:VCARD\nVERSION:4.0\nFN:John Doe\nEMAIL:john@example.com\nTEL:555-1234\nEND:VCARD";
         let request = AddressDataRequest::with_props(vec!["EMAIL".to_string()]);
         let result = filter_address_data(vcard, &request).unwrap();
-        
+
         // Should include BEGIN, END, VERSION, FN (required), and EMAIL (requested)
         assert!(result.contains("BEGIN:VCARD"));
         assert!(result.contains("FN:John Doe"));

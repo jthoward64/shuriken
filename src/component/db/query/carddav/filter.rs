@@ -92,8 +92,7 @@ async fn apply_addressbook_filter(
     };
 
     // Query instances by entity IDs
-    let mut final_query = base_query
-        .filter(dav_instance::entity_id.eq_any(matching_entity_ids));
+    let mut final_query = base_query.filter(dav_instance::entity_id.eq_any(matching_entity_ids));
 
     if let Some(limit) = limit {
         final_query = final_query.limit(i64::from(limit));
@@ -286,30 +285,24 @@ fn apply_text_match_card_index(
 
     // Select the appropriate column based on property name
     query = match prop_name.as_str() {
-        "FN" => {
-            match text_match.match_type {
-                MatchType::Contains => query.filter(card_index::fn_.ilike(format!("%{value}%"))),
-                MatchType::Equals => query.filter(card_index::fn_.ilike(value.clone())),
-                MatchType::StartsWith => query.filter(card_index::fn_.ilike(format!("{value}%"))),
-                MatchType::EndsWith => query.filter(card_index::fn_.ilike(format!("%{value}"))),
-            }
-        }
-        "ORG" => {
-            match text_match.match_type {
-                MatchType::Contains => query.filter(card_index::org.ilike(format!("%{value}%"))),
-                MatchType::Equals => query.filter(card_index::org.ilike(value.clone())),
-                MatchType::StartsWith => query.filter(card_index::org.ilike(format!("{value}%"))),
-                MatchType::EndsWith => query.filter(card_index::org.ilike(format!("%{value}"))),
-            }
-        }
-        "TITLE" => {
-            match text_match.match_type {
-                MatchType::Contains => query.filter(card_index::title.ilike(format!("%{value}%"))),
-                MatchType::Equals => query.filter(card_index::title.ilike(value.clone())),
-                MatchType::StartsWith => query.filter(card_index::title.ilike(format!("{value}%"))),
-                MatchType::EndsWith => query.filter(card_index::title.ilike(format!("%{value}"))),
-            }
-        }
+        "FN" => match text_match.match_type {
+            MatchType::Contains => query.filter(card_index::fn_.ilike(format!("%{value}%"))),
+            MatchType::Equals => query.filter(card_index::fn_.ilike(value.clone())),
+            MatchType::StartsWith => query.filter(card_index::fn_.ilike(format!("{value}%"))),
+            MatchType::EndsWith => query.filter(card_index::fn_.ilike(format!("%{value}"))),
+        },
+        "ORG" => match text_match.match_type {
+            MatchType::Contains => query.filter(card_index::org.ilike(format!("%{value}%"))),
+            MatchType::Equals => query.filter(card_index::org.ilike(value.clone())),
+            MatchType::StartsWith => query.filter(card_index::org.ilike(format!("{value}%"))),
+            MatchType::EndsWith => query.filter(card_index::org.ilike(format!("%{value}"))),
+        },
+        "TITLE" => match text_match.match_type {
+            MatchType::Contains => query.filter(card_index::title.ilike(format!("%{value}%"))),
+            MatchType::Equals => query.filter(card_index::title.ilike(value.clone())),
+            MatchType::StartsWith => query.filter(card_index::title.ilike(format!("{value}%"))),
+            MatchType::EndsWith => query.filter(card_index::title.ilike(format!("%{value}"))),
+        },
         _ => query, // Unknown property
     };
 
@@ -323,14 +316,14 @@ fn apply_text_match_uid(
     text_match: &TextMatch,
 ) -> card_index::BoxedQuery<'static, diesel::pg::Pg> {
     let value = normalize_text_for_collation(&text_match.value, text_match.collation.as_ref());
-    
+
     query = match text_match.match_type {
         MatchType::Contains => query.filter(card_index::uid.ilike(format!("%{value}%"))),
         MatchType::Equals => query.filter(card_index::uid.ilike(value)),
         MatchType::StartsWith => query.filter(card_index::uid.ilike(format!("{value}%"))),
         MatchType::EndsWith => query.filter(card_index::uid.ilike(format!("%{value}"))),
     };
-    
+
     query
 }
 

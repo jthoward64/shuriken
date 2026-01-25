@@ -12,7 +12,7 @@ mod tests {
             PropFilter::new("FN").with_text_match(TextMatch::contains("John")),
             PropFilter::new("EMAIL").with_text_match(TextMatch::contains("@example.com")),
         ];
-        
+
         let filter = AddressbookFilter::anyof(filters.clone());
         assert_eq!(filter.test, FilterTest::AnyOf);
         assert_eq!(filter.prop_filters.len(), 2);
@@ -24,7 +24,7 @@ mod tests {
             PropFilter::new("FN").with_text_match(TextMatch::contains("John")),
             PropFilter::new("EMAIL").with_text_match(TextMatch::contains("@example.com")),
         ];
-        
+
         let filter = AddressbookFilter::allof(filters.clone());
         assert_eq!(filter.test, FilterTest::AllOf);
         assert_eq!(filter.prop_filters.len(), 2);
@@ -35,29 +35,26 @@ mod tests {
         let filter = AddressbookFilter::anyof(vec![
             PropFilter::new("FN").with_text_match(TextMatch::contains("Smith")),
         ]);
-        
-        let query = AddressbookQuery::new()
-            .with_filter(filter)
-            .with_limit(50);
-        
+
+        let query = AddressbookQuery::new().with_filter(filter).with_limit(50);
+
         assert!(query.filter.is_some());
         assert_eq!(query.limit, Some(50));
     }
 
     #[test]
     fn test_prop_filter_email() {
-        let prop_filter = PropFilter::new("EMAIL")
-            .with_text_match(TextMatch::contains("@test.com"));
-        
+        let prop_filter =
+            PropFilter::new("EMAIL").with_text_match(TextMatch::contains("@test.com"));
+
         assert_eq!(prop_filter.name, "EMAIL");
         assert!(prop_filter.text_match.is_some());
     }
 
     #[test]
     fn test_prop_filter_fn() {
-        let prop_filter = PropFilter::new("FN")
-            .with_text_match(TextMatch::equals("John Doe"));
-        
+        let prop_filter = PropFilter::new("FN").with_text_match(TextMatch::equals("John Doe"));
+
         assert_eq!(prop_filter.name, "FN");
         let tm = prop_filter.text_match.unwrap();
         assert_eq!(tm.match_type, MatchType::Equals);
@@ -67,7 +64,7 @@ mod tests {
     fn test_text_match_with_collation() {
         let mut text_match = TextMatch::contains("test");
         text_match.collation = Some("i;unicode-casemap".to_string());
-        
+
         assert_eq!(text_match.collation.as_deref(), Some("i;unicode-casemap"));
     }
 

@@ -66,7 +66,10 @@ pub async fn handle(
 }
 
 /// Helper to write multistatus XML response.
-fn write_multistatus_response(res: &mut Response, multistatus: &crate::component::rfc::dav::core::Multistatus) {
+fn write_multistatus_response(
+    res: &mut Response,
+    multistatus: &crate::component::rfc::dav::core::Multistatus,
+) {
     let xml = match serialize_multistatus(multistatus) {
         Ok(xml) => xml,
         Err(e) => {
@@ -77,12 +80,18 @@ fn write_multistatus_response(res: &mut Response, multistatus: &crate::component
     };
 
     res.status_code(StatusCode::MULTI_STATUS);
-    #[expect(clippy::let_underscore_must_use, reason = "Header addition failure is non-fatal")]
+    #[expect(
+        clippy::let_underscore_must_use,
+        reason = "Header addition failure is non-fatal"
+    )]
     let _ = res.add_header(
         "Content-Type",
         salvo::http::HeaderValue::from_static("application/xml; charset=utf-8"),
         true,
     );
-    #[expect(clippy::let_underscore_must_use, reason = "Write body failure is non-fatal")]
+    #[expect(
+        clippy::let_underscore_must_use,
+        reason = "Write body failure is non-fatal"
+    )]
     let _ = res.write_body(xml);
 }

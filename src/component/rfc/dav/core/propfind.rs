@@ -14,7 +14,9 @@ impl PropfindRequest {
     #[must_use]
     pub fn allprop() -> Self {
         Self {
-            propfind_type: PropfindType::AllProp { include: Vec::new() },
+            propfind_type: PropfindType::AllProp {
+                include: Vec::new(),
+            },
         }
     }
 

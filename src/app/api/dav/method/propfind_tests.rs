@@ -16,7 +16,7 @@ mod tests {
         let resp = TestClient::get("http://127.0.0.1:5800/calendars/user/")
             .send(&service)
             .await;
-        
+
         // Should return either 207 Multi-Status, 400, 404, or 500
         let status = resp.status_code;
         assert!(
@@ -38,7 +38,7 @@ mod tests {
             .add_header("Depth", "0", true)
             .send(&service)
             .await;
-        
+
         assert!(resp.status_code.is_some());
 
         // Test with Depth: 1
@@ -46,7 +46,7 @@ mod tests {
             .add_header("Depth", "1", true)
             .send(&service)
             .await;
-        
+
         assert!(resp.status_code.is_some());
     }
 
@@ -67,7 +67,7 @@ mod tests {
             let resp = TestClient::get(format!("http://127.0.0.1:5800{path}"))
                 .send(&service)
                 .await;
-            
+
             // Should handle all paths without panicking
             assert!(resp.status_code.is_some());
         }
@@ -81,7 +81,7 @@ mod tests {
         let resp = TestClient::get("http://127.0.0.1:5800/test/")
             .send(&service)
             .await;
-        
+
         let status = resp.status_code;
         // Valid responses: 207 Multi-Status, 400 Bad Request, 404 Not Found, 500 Internal Server Error
         assert!(
@@ -103,7 +103,7 @@ mod tests {
             .add_header("Depth", "infinity", true)
             .send(&service)
             .await;
-        
+
         // Should handle infinity depth (may reject it)
         assert!(resp.status_code.is_some());
     }

@@ -42,11 +42,11 @@ impl TestResponse {
     /// Asserts that a header exists with the expected value.
     #[expect(dead_code)]
     pub fn assert_header(&self, name: &str, expected: &str) {
-        let found = self.headers.iter().find(|(k, _)| k.eq_ignore_ascii_case(name));
-        assert!(
-            found.is_some(),
-            "Header '{name}' not found in response"
-        );
+        let found = self
+            .headers
+            .iter()
+            .find(|(k, _)| k.eq_ignore_ascii_case(name));
+        assert!(found.is_some(), "Header '{name}' not found in response");
         let (_, value) = found.expect("Header should exist");
         assert_eq!(
             value, expected,

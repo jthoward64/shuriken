@@ -31,10 +31,10 @@ impl salvo::Handler for AuthMiddleware {
         ctrl: &mut salvo::FlowCtrl,
     ) {
         tracing::trace!("Authenticating request");
-        
+
         match authenticate(req).await {
             Ok(user) => {
-    tracing::debug!(user_email = %user.email, "User authenticated successfully");
+                tracing::debug!(user_email = %user.email, "User authenticated successfully");
                 depot.insert("user", DepotUser::User(user));
             }
             Err(e) => match e {

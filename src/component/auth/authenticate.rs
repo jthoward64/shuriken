@@ -21,7 +21,7 @@ use crate::component::{
 #[tracing::instrument]
 async fn authenticate_single_user() -> Result<User> {
     tracing::debug!("Authenticating single user");
-    
+
     use diesel_async::RunQueryDsl;
 
     let config = get_config();
@@ -97,7 +97,7 @@ async fn authenticate_proxy(req: &salvo::Request) -> Result<User> {
 #[tracing::instrument(skip(req))]
 pub async fn authenticate(req: &salvo::Request) -> Result<User> {
     let config = get_config();
-    
+
     tracing::trace!(auth_method = ?config.auth.method, "Authenticating request");
 
     match config.auth.method {

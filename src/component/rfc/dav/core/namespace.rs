@@ -156,48 +156,108 @@ impl std::fmt::Display for QName {
 pub mod dav_props {
     use super::QName;
 
-    pub fn resourcetype() -> QName { QName::dav("resourcetype") }
-    pub fn displayname() -> QName { QName::dav("displayname") }
-    pub fn getcontenttype() -> QName { QName::dav("getcontenttype") }
-    pub fn getcontentlength() -> QName { QName::dav("getcontentlength") }
-    pub fn getlastmodified() -> QName { QName::dav("getlastmodified") }
-    pub fn getetag() -> QName { QName::dav("getetag") }
-    pub fn creationdate() -> QName { QName::dav("creationdate") }
-    pub fn current_user_principal() -> QName { QName::dav("current-user-principal") }
-    pub fn principal_url() -> QName { QName::dav("principal-URL") }
-    pub fn supported_report_set() -> QName { QName::dav("supported-report-set") }
-    pub fn sync_token() -> QName { QName::dav("sync-token") }
-    pub fn owner() -> QName { QName::dav("owner") }
-    pub fn quota_available_bytes() -> QName { QName::dav("quota-available-bytes") }
-    pub fn quota_used_bytes() -> QName { QName::dav("quota-used-bytes") }
+    pub fn resourcetype() -> QName {
+        QName::dav("resourcetype")
+    }
+    pub fn displayname() -> QName {
+        QName::dav("displayname")
+    }
+    pub fn getcontenttype() -> QName {
+        QName::dav("getcontenttype")
+    }
+    pub fn getcontentlength() -> QName {
+        QName::dav("getcontentlength")
+    }
+    pub fn getlastmodified() -> QName {
+        QName::dav("getlastmodified")
+    }
+    pub fn getetag() -> QName {
+        QName::dav("getetag")
+    }
+    pub fn creationdate() -> QName {
+        QName::dav("creationdate")
+    }
+    pub fn current_user_principal() -> QName {
+        QName::dav("current-user-principal")
+    }
+    pub fn principal_url() -> QName {
+        QName::dav("principal-URL")
+    }
+    pub fn supported_report_set() -> QName {
+        QName::dav("supported-report-set")
+    }
+    pub fn sync_token() -> QName {
+        QName::dav("sync-token")
+    }
+    pub fn owner() -> QName {
+        QName::dav("owner")
+    }
+    pub fn quota_available_bytes() -> QName {
+        QName::dav("quota-available-bytes")
+    }
+    pub fn quota_used_bytes() -> QName {
+        QName::dav("quota-used-bytes")
+    }
 }
 
 /// Common `CalDAV` property names.
 pub mod caldav_props {
     use super::QName;
 
-    pub fn calendar_home_set() -> QName { QName::caldav("calendar-home-set") }
-    pub fn calendar_description() -> QName { QName::caldav("calendar-description") }
-    pub fn calendar_timezone() -> QName { QName::caldav("calendar-timezone") }
-    pub fn supported_calendar_component_set() -> QName { QName::caldav("supported-calendar-component-set") }
-    pub fn supported_calendar_data() -> QName { QName::caldav("supported-calendar-data") }
-    pub fn max_resource_size() -> QName { QName::caldav("max-resource-size") }
-    pub fn calendar_data() -> QName { QName::caldav("calendar-data") }
-    pub fn calendar_user_address_set() -> QName { QName::caldav("calendar-user-address-set") }
-    pub fn schedule_inbox_url() -> QName { QName::caldav("schedule-inbox-URL") }
-    pub fn schedule_outbox_url() -> QName { QName::caldav("schedule-outbox-URL") }
+    pub fn calendar_home_set() -> QName {
+        QName::caldav("calendar-home-set")
+    }
+    pub fn calendar_description() -> QName {
+        QName::caldav("calendar-description")
+    }
+    pub fn calendar_timezone() -> QName {
+        QName::caldav("calendar-timezone")
+    }
+    pub fn supported_calendar_component_set() -> QName {
+        QName::caldav("supported-calendar-component-set")
+    }
+    pub fn supported_calendar_data() -> QName {
+        QName::caldav("supported-calendar-data")
+    }
+    pub fn max_resource_size() -> QName {
+        QName::caldav("max-resource-size")
+    }
+    pub fn calendar_data() -> QName {
+        QName::caldav("calendar-data")
+    }
+    pub fn calendar_user_address_set() -> QName {
+        QName::caldav("calendar-user-address-set")
+    }
+    pub fn schedule_inbox_url() -> QName {
+        QName::caldav("schedule-inbox-URL")
+    }
+    pub fn schedule_outbox_url() -> QName {
+        QName::caldav("schedule-outbox-URL")
+    }
 }
 
 /// Common `CardDAV` property names.
 pub mod carddav_props {
     use super::QName;
 
-    pub fn addressbook_home_set() -> QName { QName::carddav("addressbook-home-set") }
-    pub fn addressbook_description() -> QName { QName::carddav("addressbook-description") }
-    pub fn supported_address_data() -> QName { QName::carddav("supported-address-data") }
-    pub fn max_resource_size() -> QName { QName::carddav("max-resource-size") }
-    pub fn address_data() -> QName { QName::carddav("address-data") }
-    pub fn principal_address() -> QName { QName::carddav("principal-address") }
+    pub fn addressbook_home_set() -> QName {
+        QName::carddav("addressbook-home-set")
+    }
+    pub fn addressbook_description() -> QName {
+        QName::carddav("addressbook-description")
+    }
+    pub fn supported_address_data() -> QName {
+        QName::carddav("supported-address-data")
+    }
+    pub fn max_resource_size() -> QName {
+        QName::carddav("max-resource-size")
+    }
+    pub fn address_data() -> QName {
+        QName::carddav("address-data")
+    }
+    pub fn principal_address() -> QName {
+        QName::carddav("principal-address")
+    }
 }
 
 #[cfg(test)]

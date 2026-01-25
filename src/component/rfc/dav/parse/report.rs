@@ -5,9 +5,9 @@ use quick_xml::events::Event;
 
 use super::error::{ParseError, ParseResult};
 use crate::component::rfc::dav::core::{
-    AddressbookFilter, AddressbookQuery, CalendarFilter, CalendarQuery, CompFilter, FilterTest, Href, MatchType, Namespace, 
-    ParamFilter, PropFilter, PropertyName, QName, ReportRequest, ReportType, SyncCollection, 
-    SyncLevel, TextMatch, TimeRange,
+    AddressbookFilter, AddressbookQuery, CalendarFilter, CalendarQuery, CompFilter, FilterTest,
+    Href, MatchType, Namespace, ParamFilter, PropFilter, PropertyName, QName, ReportRequest,
+    ReportType, SyncCollection, SyncLevel, TextMatch, TimeRange,
 };
 
 /// Parses a REPORT request body.
@@ -102,7 +102,11 @@ fn parse_calendar_query(xml: &[u8]) -> ParseResult<ReportRequest> {
                         // Parse the root comp-filter (VCALENDAR)
                         let name = get_attribute(e, "name")?;
                         if name == "VCALENDAR" {
-                            filter = Some(parse_calendar_filter_content(&mut reader, &mut buf, &namespaces)?);
+                            filter = Some(parse_calendar_filter_content(
+                                &mut reader,
+                                &mut buf,
+                                &namespaces,
+                            )?);
                         }
                     }
                     "calendar-data" if in_prop => {
@@ -275,7 +279,12 @@ fn parse_addressbook_query(xml: &[u8]) -> ParseResult<ReportRequest> {
                         } else {
                             FilterTest::AnyOf
                         };
-                        filter = Some(parse_addressbook_filter_content(&mut reader, &mut buf, &namespaces, filter_test)?);
+                        filter = Some(parse_addressbook_filter_content(
+                            &mut reader,
+                            &mut buf,
+                            &namespaces,
+                            filter_test,
+                        )?);
                     }
                     "address-data" if in_prop => {
                         let qname = resolve_qname(e, &namespaces)?;
@@ -332,10 +341,7 @@ fn parse_addressbook_query(xml: &[u8]) -> ParseResult<ReportRequest> {
         buf.clear();
     }
 
-    let query = AddressbookQuery {
-        filter,
-        limit,
-    };
+    let query = AddressbookQuery { filter, limit };
     Ok(ReportRequest::addressbook_query(query, properties))
 }
 
@@ -593,7 +599,8 @@ fn parse_comp_filter_with_name(
                     }
                     "prop-filter" => {
                         let name = get_attribute(&e, "name")?.clone();
-                        let prop_filter = parse_prop_filter_with_name(reader, buf, namespaces, name)?;
+                        let prop_filter =
+                            parse_prop_filter_with_name(reader, buf, namespaces, name)?;
                         comp_filter.prop_filters.push(prop_filter);
                     }
                     "time-range" => {
@@ -672,7 +679,9 @@ fn parse_prop_filter_with_name(
                                 _ => {}
                             }
                         }
-                        prop_filter.text_match = Some(parse_text_match_content(reader, collation, negate, match_type)?);
+                        prop_filter.text_match = Some(parse_text_match_content(
+                            reader, collation, negate, match_type,
+                        )?);
                     }
                     "time-range" => {
                         prop_filter.time_range = Some(parse_time_range(&e)?);
@@ -757,7 +766,9 @@ fn parse_param_filter_with_name(
                             _ => {}
                         }
                     }
-                    param_filter.text_match = Some(parse_text_match_content(reader, collation, negate, match_type)?);
+                    param_filter.text_match = Some(parse_text_match_content(
+                        reader, collation, negate, match_type,
+                    )?);
                 }
             }
             Ok(Event::Empty(e)) => {
@@ -827,7 +838,7 @@ fn parse_time_range(elem: &quick_xml::events::BytesStart<'_>) -> ParseResult<Tim
     for attr in elem.attributes().flatten() {
         let key = std::str::from_utf8(attr.key.as_ref())?;
         let value = std::str::from_utf8(&attr.value)?;
-        
+
         match key {
             "start" => {
                 start = chrono::DateTime::parse_from_rfc3339(value)
@@ -889,10 +900,7 @@ fn parse_addressbook_filter_content(
         }
     }
 
-    Ok(AddressbookFilter {
-        prop_filters,
-        test,
-    })
+    Ok(AddressbookFilter { prop_filters, test })
 }
 
 /// Resolves a `QName` from an element.
@@ -933,7 +941,7 @@ fn resolve_qname(
 /// Returns parse errors if XML is invalid.
 fn parse_expand_property(xml: &[u8]) -> ParseResult<ReportRequest> {
     use crate::component::rfc::dav::core::{ExpandProperty, ExpandPropertyItem};
-    
+
     let mut reader = Reader::from_reader(xml);
     reader.config_mut().trim_text(true);
 
@@ -955,7 +963,7 @@ fn parse_expand_property(xml: &[u8]) -> ParseResult<ReportRequest> {
                     let name_value = get_attribute(e, "name")?;
                     let qname = QName::dav(name_value);
                     let prop_name = PropertyName::new(qname);
-                    
+
                     // For now, we don't support nested expansion
                     // A full implementation would recursively parse nested <property> elements
                     expand_items.push(ExpandPropertyItem {

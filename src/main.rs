@@ -4,7 +4,7 @@ use shuriken::app::api::routes;
 use shuriken::component::auth::casbin::init_casbin;
 use shuriken::component::config::{get_config, load_config};
 use shuriken::component::db::connection;
-use tracing_subscriber::{fmt, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -13,9 +13,8 @@ async fn main() -> anyhow::Result<()> {
     // RUST_LOG=debug for debug logs
     // RUST_LOG=shuriken=debug for debug logs in shuriken only
     // RUST_LOG=shuriken::component::db=trace for trace logs in db component
-    let env_filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("info"));
-    
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+
     fmt()
         .with_env_filter(env_filter)
         .with_target(true)

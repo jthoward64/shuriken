@@ -24,7 +24,7 @@ END:VCARD";
             .raw_form(vcard_data)
             .send(&service)
             .await;
-        
+
         // Valid responses: 201, 204, 400, 404, 412, or 500
         let status = resp.status_code;
         assert!(
@@ -55,7 +55,7 @@ END:VCARD";
             .raw_form(vcard_data)
             .send(&service)
             .await;
-        
+
         assert!(resp.status_code.is_some());
     }
 
@@ -76,7 +76,7 @@ END:VCARD";
             .raw_form(vcard_data)
             .send(&service)
             .await;
-        
+
         assert!(resp.status_code.is_some());
     }
 
@@ -91,11 +91,11 @@ END:VCARD";
             .raw_form(invalid_vcard)
             .send(&service)
             .await;
-        
+
         // Should return 400, 404, or 500
         let status = resp.status_code;
         assert!(
-            status == Some(StatusCode::BAD_REQUEST) 
+            status == Some(StatusCode::BAD_REQUEST)
                 || status == Some(StatusCode::NOT_FOUND)
                 || status == Some(StatusCode::INTERNAL_SERVER_ERROR),
             "Expected 400, 404, or 500 for invalid vCard, got {status:?}"
@@ -118,7 +118,7 @@ END:VCARD";
             .raw_form(vcard_v3_data)
             .send(&service)
             .await;
-        
+
         assert!(resp.status_code.is_some());
     }
 
@@ -145,7 +145,7 @@ END:VCARD";
                 .raw_form(vcard_data)
                 .send(&service)
                 .await;
-            
+
             assert!(resp.status_code.is_some());
         }
     }
@@ -158,11 +158,11 @@ END:VCARD";
         let resp = TestClient::put("http://127.0.0.1:5800/addressbook/contact.vcf")
             .send(&service)
             .await;
-        
+
         // Should return 400, 404, or 500 for empty body
         let status = resp.status_code;
         assert!(
-            status == Some(StatusCode::BAD_REQUEST) 
+            status == Some(StatusCode::BAD_REQUEST)
                 || status == Some(StatusCode::NOT_FOUND)
                 || status == Some(StatusCode::INTERNAL_SERVER_ERROR),
             "Expected 400, 404, or 500 for empty body, got {status:?}"

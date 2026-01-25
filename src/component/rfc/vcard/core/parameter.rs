@@ -40,7 +40,9 @@ impl VCardParameter {
     #[must_use]
     pub fn has_value(&self, value: &str) -> bool {
         let value_upper = value.to_ascii_uppercase();
-        self.values.iter().any(|v| v.eq_ignore_ascii_case(&value_upper))
+        self.values
+            .iter()
+            .any(|v| v.eq_ignore_ascii_case(&value_upper))
     }
 
     // --- Convenience constructors ---

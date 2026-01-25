@@ -23,20 +23,20 @@ pub async fn create_entity(
     entity: &NewDavEntity<'_>,
 ) -> Result<DavEntity, diesel::result::Error> {
     tracing::debug!("Creating DAV entity");
-    
+
     use crate::component::db::schema::dav_entity;
     let result = diesel::insert_into(dav_entity::table)
         .values(entity)
         .returning(DavEntity::as_returning())
         .get_result(conn)
         .await;
-    
+
     if let Ok(ref entity) = result {
         tracing::debug!(entity_id = %entity.id, "DAV entity created successfully");
     } else {
         tracing::error!("Failed to create DAV entity");
     }
-    
+
     result
 }
 
@@ -51,16 +51,16 @@ pub async fn insert_components(
     components: &[NewDavComponent<'_>],
 ) -> Result<usize, diesel::result::Error> {
     tracing::trace!("Inserting DAV components");
-    
+
     let result = diesel::insert_into(dav_component::table)
         .values(components)
         .execute(conn)
         .await;
-    
+
     if let Ok(count) = result {
         tracing::trace!(inserted = count, "DAV components inserted");
     }
-    
+
     result
 }
 
@@ -75,16 +75,16 @@ pub async fn insert_properties(
     properties: &[NewDavProperty<'_>],
 ) -> Result<usize, diesel::result::Error> {
     tracing::trace!("Inserting DAV properties");
-    
+
     let result = diesel::insert_into(dav_property::table)
         .values(properties)
         .execute(conn)
         .await;
-    
+
     if let Ok(count) = result {
         tracing::trace!(inserted = count, "DAV properties inserted");
     }
-    
+
     result
 }
 
@@ -114,16 +114,17 @@ pub async fn soft_delete_components(
     entity_id: uuid::Uuid,
 ) -> Result<usize, diesel::result::Error> {
     tracing::debug!("Soft-deleting DAV components");
-    
-    let result = diesel::update(dav_component::table.filter(dav_component::entity_id.eq(entity_id)))
-        .set(dav_component::deleted_at.eq(diesel::dsl::now))
-        .execute(conn)
-        .await;
-    
+
+    let result =
+        diesel::update(dav_component::table.filter(dav_component::entity_id.eq(entity_id)))
+            .set(dav_component::deleted_at.eq(diesel::dsl::now))
+            .execute(conn)
+            .await;
+
     if let Ok(count) = result {
         tracing::debug!(deleted = count, "DAV components soft-deleted");
     }
-    
+
     result
 }
 
@@ -141,9 +142,9 @@ pub async fn soft_delete_properties_for_entity(
             dav_property::component_id.eq_any(
                 dav_component::table
                     .filter(dav_component::entity_id.eq(entity_id))
-                    .select(dav_component::id)
-            )
-        )
+                    .select(dav_component::id),
+            ),
+        ),
     )
     .set(dav_property::deleted_at.eq(diesel::dsl::now))
     .execute(conn)
@@ -167,12 +168,12 @@ pub async fn soft_delete_parameters_for_entity(
                         dav_property::component_id.eq_any(
                             dav_component::table
                                 .filter(dav_component::entity_id.eq(entity_id))
-                                .select(dav_component::id)
-                        )
+                                .select(dav_component::id),
+                        ),
                     )
-                    .select(dav_property::id)
-            )
-        )
+                    .select(dav_property::id),
+            ),
+        ),
     )
     .set(dav_parameter::deleted_at.eq(diesel::dsl::now))
     .execute(conn)

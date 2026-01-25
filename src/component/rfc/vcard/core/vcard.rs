@@ -1,8 +1,8 @@
 //! vCard wrapper type.
 
 use super::property::VCardProperty;
-use super::value::VCardValue;
 use super::structured::{Address, Organization, StructuredName};
+use super::value::VCardValue;
 
 /// vCard version.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

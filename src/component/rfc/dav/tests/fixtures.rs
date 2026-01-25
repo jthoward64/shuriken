@@ -174,7 +174,9 @@ mod tests {
         assert!(!result.is_allprop());
         assert!(!result.is_propname());
 
-        let props = result.requested_properties().expect("should have properties");
+        let props = result
+            .requested_properties()
+            .expect("should have properties");
         assert!(!props.is_empty());
 
         // Check for displayname
@@ -187,24 +189,34 @@ mod tests {
     fn parse_propfind_caldav() {
         let result = parse_propfind(PROPFIND_CALDAV).expect("should parse");
 
-        let props = result.requested_properties().expect("should have properties");
+        let props = result
+            .requested_properties()
+            .expect("should have properties");
         assert!(!props.is_empty());
 
         // Check for CalDAV-specific properties
-        assert!(props.iter().any(|p| p.local_name() == "calendar-description"));
+        assert!(
+            props
+                .iter()
+                .any(|p| p.local_name() == "calendar-description")
+        );
     }
 
     #[test]
     fn parse_propfind_carddav() {
         let result = parse_propfind(PROPFIND_CARDDAV).expect("should parse");
 
-        let props = result.requested_properties().expect("should have properties");
+        let props = result
+            .requested_properties()
+            .expect("should have properties");
         assert!(!props.is_empty());
 
         // Check for CardDAV-specific properties
-        assert!(props
-            .iter()
-            .any(|p| p.local_name() == "addressbook-description"));
+        assert!(
+            props
+                .iter()
+                .any(|p| p.local_name() == "addressbook-description")
+        );
     }
 
     #[test]

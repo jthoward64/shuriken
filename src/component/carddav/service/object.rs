@@ -67,7 +67,7 @@ pub async fn put_address_object(
     vcard_bytes: &[u8],
 ) -> Result<PutObjectResult> {
     tracing::debug!("Processing PUT address object");
-    
+
     // Verify collection exists
     let _collection = collection::get_collection(conn, ctx.collection_id)
         .await
@@ -77,9 +77,8 @@ pub async fn put_address_object(
     tracing::debug!("Collection verified");
 
     // Parse vCard data
-    let vcard_str = std::str::from_utf8(vcard_bytes)
-        .context("vCard data is not valid UTF-8")?;
-    
+    let vcard_str = std::str::from_utf8(vcard_bytes).context("vCard data is not valid UTF-8")?;
+
     let vcard = crate::component::rfc::vcard::parse::parse_single(vcard_str)
         .map_err(|e| anyhow::anyhow!("invalid vCard: {e}"))?;
 
@@ -98,7 +97,8 @@ pub async fn put_address_object(
 
     // Handle If-None-Match: * (create-only precondition)
     if let Some(inm) = &ctx.if_none_match
-        && inm == "*" && existing_instance.is_some()
+        && inm == "*"
+        && existing_instance.is_some()
     {
         tracing::warn!("Precondition failed: resource already exists");
         anyhow::bail!("precondition failed: resource already exists");
@@ -151,7 +151,7 @@ pub async fn put_address_object(
         // Update existing instance
         // For now, just update the ETag and sync revision
         // Full entity tree replacement will be implemented once proper ID mapping is in place
-        
+
         let sync_revision = existing_inst.sync_revision + 1;
         let _updated_instance = instance::update_instance(
             conn,
@@ -181,12 +181,12 @@ pub async fn put_address_object(
         // Create new entity and instance
         // For now, create a minimal entity without the full tree
         // Full tree insertion will be implemented once proper ID mapping is in place
-        
+
         let entity_model = crate::component::model::dav::entity::NewDavEntity {
             entity_type: &ctx.entity_type,
             logical_uid: ctx.logical_uid.as_deref(),
         };
-        
+
         let created_entity = entity::create_entity(conn, &entity_model)
             .await
             .context("failed to create entity")?;

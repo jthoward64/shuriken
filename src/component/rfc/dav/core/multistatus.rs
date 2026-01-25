@@ -302,7 +302,9 @@ mod tests {
         let resp = PropstatResponse::with_found_and_not_found(
             "/calendars/user/cal/",
             vec![DavProperty::text(QName::dav("displayname"), "My Calendar")],
-            vec![DavProperty::not_found(QName::caldav("calendar-description"))],
+            vec![DavProperty::not_found(QName::caldav(
+                "calendar-description",
+            ))],
         );
         assert_eq!(resp.propstats.len(), 2);
     }

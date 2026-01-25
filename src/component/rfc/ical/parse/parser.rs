@@ -20,7 +20,7 @@ use crate::component::rfc::ical::core::{
 #[tracing::instrument(skip(input), fields(input_len = input.len()))]
 pub fn parse(input: &str) -> ParseResult<ICalendar> {
     tracing::debug!("Parsing iCalendar document");
-    
+
     let lines = split_lines(input);
 
     if lines.is_empty() {

@@ -353,10 +353,7 @@ pub struct TimeRange {
 impl TimeRange {
     /// Creates a time range with start and end.
     #[must_use]
-    pub fn new(
-        start: chrono::DateTime<chrono::Utc>,
-        end: chrono::DateTime<chrono::Utc>,
-    ) -> Self {
+    pub fn new(start: chrono::DateTime<chrono::Utc>, end: chrono::DateTime<chrono::Utc>) -> Self {
         Self {
             start: Some(start),
             end: Some(end),
@@ -572,8 +569,7 @@ mod tests {
 
     #[test]
     fn calendar_query_with_filter() {
-        let filter = CalendarFilter::vcalendar()
-            .with_comp(CompFilter::new("VEVENT"));
+        let filter = CalendarFilter::vcalendar().with_comp(CompFilter::new("VEVENT"));
 
         let query = CalendarQuery::new().with_filter(filter);
 

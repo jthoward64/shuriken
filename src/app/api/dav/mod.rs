@@ -20,30 +20,30 @@ pub fn routes() -> Router {
             // PROPFIND method
             Router::new()
                 .filter_fn(|req, _| req.method().as_str() == "PROPFIND")
-                .goal(method::propfind::propfind)
+                .goal(method::propfind::propfind),
         )
         .push(
             // PROPPATCH method
             Router::new()
                 .filter_fn(|req, _| req.method().as_str() == "PROPPATCH")
-                .goal(method::proppatch::proppatch)
+                .goal(method::proppatch::proppatch),
         )
         .push(
             // COPY method
             Router::new()
                 .filter_fn(|req, _| req.method().as_str() == "COPY")
-                .goal(method::copy::copy)
+                .goal(method::copy::copy),
         )
         .push(
             // MOVE method
             Router::new()
                 .filter_fn(|req, _| req.method().as_str() == "MOVE")
-                .goal(method::r#move::r#move)
+                .goal(method::r#move::r#move),
         )
         .push(
             // REPORT method
             Router::new()
                 .filter_fn(|req, _| req.method().as_str() == "REPORT")
-                .goal(method::report::report)
+                .goal(method::report::report),
         )
 }

@@ -45,9 +45,7 @@ impl Parameter {
     /// Returns whether the parameter has the specified value (case-insensitive).
     #[must_use]
     pub fn has_value(&self, value: &str) -> bool {
-        self.values
-            .iter()
-            .any(|v| v.eq_ignore_ascii_case(value))
+        self.values.iter().any(|v| v.eq_ignore_ascii_case(value))
     }
 
     /// Creates a TZID parameter.

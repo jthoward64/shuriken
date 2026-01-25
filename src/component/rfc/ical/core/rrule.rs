@@ -337,7 +337,9 @@ impl fmt::Display for RRule {
             parts.push(format!("FREQ={freq}"));
         }
 
-        if let Some(interval) = self.interval && interval != 1 {
+        if let Some(interval) = self.interval
+            && interval != 1
+        {
             parts.push(format!("INTERVAL={interval}"));
         }
 
@@ -424,8 +426,7 @@ mod tests {
 
     #[test]
     fn rrule_display_monthly_nth() {
-        let rrule =
-            RRule::monthly().with_by_day(vec![WeekdayNum::nth(-1, Weekday::Friday)]);
+        let rrule = RRule::monthly().with_by_day(vec![WeekdayNum::nth(-1, Weekday::Friday)]);
         assert_eq!(rrule.to_string(), "FREQ=MONTHLY;BYDAY=-1FR");
     }
 

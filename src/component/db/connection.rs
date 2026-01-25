@@ -21,7 +21,7 @@ static DB_POOL: OnceLock<DbPool> = OnceLock::new();
 #[tracing::instrument(skip(database_url), fields(pool_size = size))]
 pub async fn create_pool(database_url: &str, size: u32) -> anyhow::Result<()> {
     tracing::debug!("Creating database connection pool");
-    
+
     let config = AsyncDieselConnectionManager::<AsyncPgConnection>::new(database_url);
 
     let pool = Pool::builder()
@@ -37,7 +37,10 @@ pub async fn create_pool(database_url: &str, size: u32) -> anyhow::Result<()> {
         .set(pool)
         .expect("Database pool is already set - create_pool() must only be called once at startup");
 
-    tracing::info!(pool_size = size, "Database connection pool created successfully");
+    tracing::info!(
+        pool_size = size,
+        "Database connection pool created successfully"
+    );
 
     Ok(())
 }
@@ -55,19 +58,19 @@ pub async fn create_pool(database_url: &str, size: u32) -> anyhow::Result<()> {
 #[tracing::instrument]
 pub async fn connect() -> Result<DbConnection<'static>, RunError> {
     tracing::trace!("Acquiring database connection from pool");
-    
+
     let result = DB_POOL
         .get()
         .expect("Database pool is not initialized - create_pool() must be called at startup")
         .get()
         .await;
-    
+
     if result.is_ok() {
         tracing::trace!("Database connection acquired successfully");
     } else {
         tracing::error!("Failed to acquire database connection from pool");
     }
-    
+
     result
 }
 
