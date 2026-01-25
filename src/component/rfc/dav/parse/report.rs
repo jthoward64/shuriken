@@ -5,8 +5,7 @@ use quick_xml::events::Event;
 
 use super::error::{ParseError, ParseResult};
 use crate::component::rfc::dav::core::{
-    AddressbookFilter, AddressbookQuery, CalendarFilter, CalendarQuery, CompFilter, 
-    ExpandProperty, ExpandPropertyItem, FilterTest, Href, MatchType, Namespace, 
+    AddressbookFilter, AddressbookQuery, CalendarFilter, CalendarQuery, CompFilter, FilterTest, Href, MatchType, Namespace, 
     ParamFilter, PropFilter, PropertyName, QName, ReportRequest, SyncCollection, 
     SyncLevel, TextMatch, TimeRange,
 };
@@ -77,8 +76,8 @@ fn parse_calendar_query(xml: &[u8]) -> ParseResult<ReportRequest> {
     let mut namespaces: Vec<(String, String)> = Vec::new();
     let mut properties: Vec<PropertyName> = Vec::new();
     let mut filter: Option<CalendarFilter> = None;
-    let mut expand: Option<TimeRange> = None;
-    let mut limit: Option<u32> = None;
+    let expand: Option<TimeRange> = None;
+    let limit: Option<u32> = None;
     let mut in_prop = false;
     let mut in_filter = false;
     let mut depth: usize = 0;
@@ -249,7 +248,7 @@ fn parse_addressbook_query(xml: &[u8]) -> ParseResult<ReportRequest> {
     let mut namespaces: Vec<(String, String)> = Vec::new();
     let mut properties: Vec<PropertyName> = Vec::new();
     let mut filter: Option<AddressbookFilter> = None;
-    let mut limit: Option<u32> = None;
+    let limit: Option<u32> = None;
     let mut in_prop = false;
     let mut in_filter = false;
     let mut depth: usize = 0;

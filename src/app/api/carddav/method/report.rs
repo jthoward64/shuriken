@@ -141,35 +141,39 @@ pub async fn handle_addressbook_multiget(
 ///
 /// ## Errors
 /// Returns database errors or filter evaluation errors.
+#[expect(clippy::unused_async)]
 async fn build_addressbook_query_response(
-    conn: &mut connection::DbConnection<'_>,
-    query: &AddressbookQuery,
-    properties: &[crate::component::rfc::dav::core::PropertyName],
+    _conn: &mut connection::DbConnection<'_>,
+    _query: &AddressbookQuery,
+    _properties: &[crate::component::rfc::dav::core::PropertyName],
 ) -> anyhow::Result<Multistatus> {
-    use crate::component::rfc::dav::core::PropstatResponse;
     
-    // TODO: Implement filter evaluation
-    // This is a stub implementation that returns an empty multistatus.
-    // Full implementation requires:
-    // 1. Extract collection_id from request path/context
-    // 2. Query instances in the addressbook collection
-    // 3. For each instance:
-    //    a. Load vCard data (entity canonical bytes)
-    //    b. Parse vCard properties
-    //    c. Evaluate prop-filter (match property names: FN, EMAIL, TEL, etc.)
-    //    d. Evaluate text-match (with collation: case-insensitive/unicode-casemap)
-    //    e. Apply filter test mode (anyof vs allof)
-    //    f. If matches, include in response
-    // 4. Apply limit if specified
-    // 5. Build response with requested properties (getetag, address-data, etc.)
+    
+    
+    // TODO: Extract collection_id from request context
+    // Same limitation as calendar-query - we need addressbook collection_id
+    // to properly scope the query.
+    
+    tracing::warn!(
+        "addressbook-query requires collection_id from request context - returning empty result"
+    );
+    
+    // Return empty multistatus for now until we have collection context
+    // Once collection_id is available, the implementation would be:
     //
-    // Example filter evaluation logic:
-    // - prop-filter name="FN" text-match collation="i;unicode-casemap" → case-insensitive name match
-    // - prop-filter name="EMAIL" text-match match-type="contains" → email contains substring
-    // - test="anyof" → match if ANY prop-filter matches
-    // - test="allof" → match if ALL prop-filters match
-    
-    tracing::warn!("addressbook-query filter evaluation not yet implemented, returning empty result");
+    // let instances = crate::component::db::query::carddav::filter::find_matching_instances(
+    //     conn,
+    //     collection_id,
+    //     query,
+    // ).await?;
+    //
+    // let mut multistatus = Multistatus::new();
+    // for instance in instances {
+    //     let href = Href::from(format!("/{}", instance.uri));
+    //     let props = build_instance_properties(conn, &instance, properties).await?;
+    //     let response = PropstatResponse::ok(href, props);
+    //     multistatus.add_response(response);
+    // }
     
     Ok(Multistatus::new())
 }
@@ -186,21 +190,45 @@ async fn build_addressbook_multiget_response(
     multiget: &AddressbookMultiget,
     properties: &[crate::component::rfc::dav::core::PropertyName],
 ) -> anyhow::Result<Multistatus> {
+    use diesel::prelude::*;
+    use diesel_async::RunQueryDsl;
+    use crate::component::db::query::dav::instance;
+    use crate::component::db::query::report_property::build_instance_properties;
+    use crate::component::model::dav::instance::DavInstance;
     use crate::component::rfc::dav::core::PropstatResponse;
     
     let mut multistatus = Multistatus::new();
     
     // Process each href
     for href in &multiget.hrefs {
-        // For now, return 404 for all resources since we don't have proper href parsing yet
-        // TODO: Implement proper href parsing and vCard retrieval
-        // 1. Parse href to extract collection_id and resource URI
-        // 2. Query the instance from database
-        // 3. Build properties based on what was requested
-        // 4. Return appropriate propstat (200 for found, 404 for not found)
+        let href_str = href.as_str();
         
-        let response = PropstatResponse::not_found(href.clone());
-        multistatus.add_response(response);
+        // Extract the resource URI from the href
+        // Format: /addressbooks/{username}/{addressbook_name}/{contact_uid}.vcf
+        let uri = href_str.rsplit('/').next().unwrap_or(href_str);
+        
+        // TODO: Extract collection_id from the request context
+        // Same limitation as calendar-multiget - we need collection context.
+        // For now, query by URI across all collections.
+        
+        let instance_opt = instance::all()
+            .filter(crate::component::db::schema::dav_instance::uri.eq(uri))
+            .filter(crate::component::db::schema::dav_instance::deleted_at.is_null())
+            .select(DavInstance::as_select())
+            .first::<DavInstance>(conn)
+            .await
+            .optional()?;
+        
+        if let Some(inst) = instance_opt {
+            // Build requested properties for this instance
+            let props = build_instance_properties(conn, &inst, properties).await?;
+            let response = PropstatResponse::ok(href.clone(), props);
+            multistatus.add_response(response);
+        } else {
+            // Resource not found
+            let response = PropstatResponse::not_found(href.clone());
+            multistatus.add_response(response);
+        }
     }
     
     Ok(multistatus)

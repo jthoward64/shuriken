@@ -141,34 +141,44 @@ pub async fn handle_calendar_multiget(
 ///
 /// ## Errors
 /// Returns database errors or filter evaluation errors.
+#[expect(clippy::unused_async)]
 async fn build_calendar_query_response(
-    conn: &mut connection::DbConnection<'_>,
-    query: &CalendarQuery,
-    properties: &[crate::component::rfc::dav::core::PropertyName],
+    _conn: &mut connection::DbConnection<'_>,
+    _query: &CalendarQuery,
+    _properties: &[crate::component::rfc::dav::core::PropertyName],
 ) -> anyhow::Result<Multistatus> {
-    use crate::component::rfc::dav::core::PropstatResponse;
     
-    // TODO: Implement filter evaluation
-    // This is a stub implementation that returns an empty multistatus.
-    // Full implementation requires:
-    // 1. Extract collection_id from request path/context
-    // 2. Query instances in the collection
-    // 3. For each instance:
-    //    a. Load calendar data (entity canonical bytes)
-    //    b. Parse iCalendar components
-    //    c. Evaluate comp-filter (match component types: VEVENT, VTODO, etc.)
-    //    d. Evaluate prop-filter (match property values)
-    //    e. Evaluate time-range filter (check if events overlap the range)
-    //    f. If matches, include in response
-    // 4. Apply limit if specified
-    // 5. Build response with requested properties (getetag, calendar-data, etc.)
+    
+    
+    // TODO: Extract collection_id from request context
+    // For now, this is a limitation - we need collection_id to properly scope the query.
+    // The filter evaluation requires a collection_id to determine which calendar to search.
     //
-    // Example filter evaluation logic:
-    // - comp-filter name="VEVENT" → only include instances containing VEVENT components
-    // - time-range start="..." end="..." → only include events that overlap the range
-    // - prop-filter name="UID" text-match → only include if UID property matches
+    // Workaround options:
+    // 1. Add collection_id to request handler context (preferred)
+    // 2. Parse from request path in the handler
+    // 3. Support "search all collections" mode (less efficient)
     
-    tracing::warn!("calendar-query filter evaluation not yet implemented, returning empty result");
+    tracing::warn!(
+        "calendar-query requires collection_id from request context - returning empty result"
+    );
+    
+    // Return empty multistatus for now until we have collection context
+    // Once collection_id is available, the implementation would be:
+    //
+    // let instances = crate::component::db::query::caldav::filter::find_matching_instances(
+    //     conn,
+    //     collection_id,
+    //     query,
+    // ).await?;
+    //
+    // let mut multistatus = Multistatus::new();
+    // for instance in instances {
+    //     let href = Href::from(format!("/{}", instance.uri));
+    //     let props = build_instance_properties(conn, &instance, properties).await?;
+    //     let response = PropstatResponse::ok(href, props);
+    //     multistatus.add_response(response);
+    // }
     
     Ok(Multistatus::new())
 }
@@ -188,8 +198,9 @@ async fn build_calendar_multiget_response(
     use diesel::prelude::*;
     use diesel_async::RunQueryDsl;
     use crate::component::db::query::dav::instance;
+    use crate::component::db::query::report_property::build_instance_properties;
     use crate::component::model::dav::instance::DavInstance;
-    use crate::component::rfc::dav::core::{PropstatResponse, DavProperty, PropertyValue, Href};
+    use crate::component::rfc::dav::core::PropstatResponse;
     
     let mut multistatus = Multistatus::new();
     
@@ -197,37 +208,40 @@ async fn build_calendar_multiget_response(
     for href in &multiget.hrefs {
         let href_str = href.as_str();
         
-        // For now, we'll need to parse the href to extract the URI
-        // This is a simplified implementation - in production we'd need proper path parsing
+        // Extract the resource URI from the href
         // Format: /calendars/{username}/{calendar_name}/{event_uid}.ics
+        // For now, we use a simple pattern: take the last path segment as the URI
         let uri = href_str.rsplit('/').next().unwrap_or(href_str);
         
-        // TODO: Extract collection_id from the href path
-        // For now, we'll create a stub response indicating the resource was not found
-        // In a real implementation, we would:
-        // 1. Parse the full href to get principal/collection/resource
-        // 2. Look up the collection_id from the path
-        // 3. Query the instance
-        
-        // Create a 404 response for now since we can't properly parse hrefs yet
-        let response = PropstatResponse::not_found(href.clone());
-        multistatus.add_response(response);
-        
-        // TODO: Once we have proper href parsing:
-        // let instance_opt = instance::by_collection_and_uri(collection_id, uri)
-        //     .select(DavInstance::as_select())
-        //     .first::<DavInstance>(conn)
-        //     .await
-        //     .optional()?;
+        // TODO: Extract collection_id from the request context
+        // We need to add a way to pass collection_id through the request handler.
+        // Options:
+        // 1. Parse the full href path to look up collection by principal/name
+        // 2. Add collection_id to request context (preferred)
+        // 3. Extract from request path parameters
         //
-        // if let Some(inst) = instance_opt {
-        //     let props = build_properties_for_instance(&inst, properties);
-        //     let response = PropstatResponse::ok(href.clone(), props);
-        //     multistatus.add_response(response);
-        // } else {
-        //     let response = PropstatResponse::not_found(href.clone());
-        //     multistatus.add_response(response);
-        // }
+        // For now, we'll attempt to find instances by URI across all collections
+        // (this is not ideal but allows basic functionality)
+        
+        // Query for instance by URI (without collection filter - limitation)
+        let instance_opt = instance::all()
+            .filter(crate::component::db::schema::dav_instance::uri.eq(uri))
+            .filter(crate::component::db::schema::dav_instance::deleted_at.is_null())
+            .select(DavInstance::as_select())
+            .first::<DavInstance>(conn)
+            .await
+            .optional()?;
+        
+        if let Some(inst) = instance_opt {
+            // Build requested properties for this instance
+            let props = build_instance_properties(conn, &inst, properties).await?;
+            let response = PropstatResponse::ok(href.clone(), props);
+            multistatus.add_response(response);
+        } else {
+            // Resource not found
+            let response = PropstatResponse::not_found(href.clone());
+            multistatus.add_response(response);
+        }
     }
     
     Ok(multistatus)
