@@ -232,7 +232,6 @@ pub async fn put_calendar_object(
             .context("failed to update collection sync token")?;
 
         // Insert component tree for the new entity
-        // Insert component tree for the new entity
         entity::insert_ical_tree(conn, created_entity.id, &ical)
             .await
             .context("failed to insert component tree")?;
