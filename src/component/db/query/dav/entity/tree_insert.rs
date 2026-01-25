@@ -1,4 +1,6 @@
-//! Full tree insertion with proper ID mapping.
+//! Component tree insertion functions for storing parsed iCalendar/vCard trees.
+
+#![allow(clippy::too_many_lines)] // Recursive tree insertion logic
 
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;

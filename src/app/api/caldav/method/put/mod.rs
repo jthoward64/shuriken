@@ -103,7 +103,6 @@ pub async fn put(req: &mut Request, res: &mut Response) {
 ///
 /// ## Errors
 /// Returns `PutError` for validation failures, conflicts, or database errors.
-#[expect(clippy::unused_async)]
 async fn perform_put(
     conn: &mut connection::DbConnection<'_>,
     path: &str,
@@ -119,9 +118,9 @@ async fn perform_put(
     
     // Parse iCalendar to extract UID early for context
     let ical_str = std::str::from_utf8(body)
-        .map_err(|e| PutError::InvalidCalendarData(format!("not valid UTF-8: {}", e)))?;
+        .map_err(|e| PutError::InvalidCalendarData(format!("not valid UTF-8: {e}")))?;
     let ical = crate::component::rfc::ical::parse::parse(ical_str)
-        .map_err(|e| PutError::InvalidCalendarData(format!("invalid iCalendar: {}", e)))?;
+        .map_err(|e| PutError::InvalidCalendarData(format!("invalid iCalendar: {e}")))?;
     let logical_uid = ical.root.uid().map(String::from);
     
     // Create PUT context

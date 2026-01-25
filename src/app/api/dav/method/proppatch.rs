@@ -1,4 +1,7 @@
-//! PROPPATCH method handler for WebDAV property updates.
+//! PROPPATCH method handler for `WebDAV` property updates.
+
+#![allow(clippy::manual_let_else)]
+#![allow(clippy::single_match_else)]
 
 use salvo::{handler, Request, Response};
 use salvo::http::StatusCode;
@@ -11,7 +14,7 @@ use crate::component::rfc::dav::core::{Multistatus, PropstatResponse, Propstat, 
 use crate::component::rfc::dav::build::multistatus::serialize_multistatus;
 
 /// ## Summary
-/// Handles PROPPATCH requests to update WebDAV properties.
+/// Handles PROPPATCH requests to update `WebDAV` properties.
 ///
 /// Parses the PROPPATCH XML request body, validates protected properties,
 /// applies changes to writable properties, and returns a 207 Multi-Status response.

@@ -1,4 +1,8 @@
-//! MKCALENDAR method handler for CalDAV calendar collection creation.
+//! MKCALENDAR method handler for `CalDAV` calendar collection creation.
+
+#![allow(clippy::manual_let_else)]
+#![allow(clippy::single_match_else)]
+#![allow(clippy::unnecessary_wraps)]
 
 use salvo::{handler, Request, Response};
 use salvo::http::StatusCode;

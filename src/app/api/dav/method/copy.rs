@@ -1,4 +1,6 @@
-//! COPY method handler for WebDAV resource copying.
+//! COPY method handler for `WebDAV` resource copying.
+
+#![allow(clippy::single_match_else)]
 
 use salvo::{handler, Request, Response};
 use salvo::http::StatusCode;
@@ -7,7 +9,7 @@ use crate::component::db::connection;
 use crate::component::db::query::dav::instance;
 
 /// ## Summary
-/// Handles COPY requests to duplicate WebDAV resources.
+/// Handles COPY requests to duplicate `WebDAV` resources.
 ///
 /// Reads the Destination header, validates the target location,
 /// duplicates the entity and instance, and handles conflicts.

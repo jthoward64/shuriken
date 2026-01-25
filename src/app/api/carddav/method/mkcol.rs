@@ -1,4 +1,8 @@
-//! MKCOL method handler for Extended MKCOL (RFC 5689) for CardDAV.
+//! MKCOL method handler for Extended MKCOL (RFC 5689) for `CardDAV`.
+
+#![allow(clippy::manual_let_else)]
+#![allow(clippy::single_match_else)]
+#![allow(clippy::unnecessary_wraps)]
 
 use salvo::{handler, Request, Response};
 use salvo::http::StatusCode;

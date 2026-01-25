@@ -1,6 +1,10 @@
 //! Address object storage and retrieval service.
 
+#![allow(clippy::too_many_lines)] // Service orchestration functions are inherently complex
+
 use anyhow::{Context, Result};
+use diesel::prelude::*;
+use diesel_async::RunQueryDsl;
 
 use crate::component::db::connection::DbConnection;
 use crate::component::db::query::dav::{collection, entity, instance};
@@ -9,7 +13,7 @@ use crate::component::model::dav::instance::NewDavInstance;
 /// Result of a PUT operation on an address object.
 #[derive(Debug, Clone)]
 pub struct PutObjectResult {
-    /// ETag of the created or updated object.
+    /// `ETag` of the created or updated object.
     pub etag: String,
     /// Whether the object was newly created (true) or updated (false).
     pub created: bool,
@@ -64,15 +68,12 @@ pub async fn put_address_object(
         .context("vCard data is not valid UTF-8")?;
     
     let vcard = crate::component::rfc::vcard::parse::parse_single(vcard_str)
-        .map_err(|e| anyhow::anyhow!("invalid vCard: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("invalid vCard: {e}"))?;
 
     // Extract UID for validation (optional, but recommended)
     let uid = vcard.uid().map(String::from);
 
     // Check if instance already exists
-    use diesel::prelude::*;
-    use diesel_async::RunQueryDsl;
-    
     let existing_instance = instance::by_collection_and_uri(ctx.collection_id, &ctx.uri)
         .select(crate::component::model::dav::instance::DavInstance::as_select())
         .first(conn)
@@ -81,10 +82,10 @@ pub async fn put_address_object(
         .context("failed to check for existing instance")?;
 
     // Handle If-None-Match: * (create-only precondition)
-    if let Some(inm) = &ctx.if_none_match {
-        if inm == "*" && existing_instance.is_some() {
-            anyhow::bail!("precondition failed: resource already exists");
-        }
+    if let Some(inm) = &ctx.if_none_match
+        && inm == "*" && existing_instance.is_some()
+    {
+        anyhow::bail!("precondition failed: resource already exists");
     }
 
     // Handle If-Match (update precondition)
@@ -106,17 +107,15 @@ pub async fn put_address_object(
         match entity::check_uid_conflict(conn, ctx.collection_id, uid, &ctx.uri).await {
             Ok(Some(conflicting_uri)) => {
                 anyhow::bail!(
-                    "UID conflict: UID '{}' is already used by resource '{}' in this collection",
-                    uid,
-                    conflicting_uri
+                    "UID conflict: UID '{uid}' is already used by resource '{conflicting_uri}' in this collection"
                 );
             }
             Ok(None) => {
                 // No conflict, proceed
             }
             Err(e) => {
-                tracing::error!("Failed to check UID conflict: {}", e);
-                anyhow::bail!("failed to check UID conflict: {}", e);
+                tracing::error!("Failed to check UID conflict: {e}");
+                anyhow::bail!("failed to check UID conflict: {e}");
             }
         }
     }

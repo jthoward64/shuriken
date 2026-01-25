@@ -1,7 +1,6 @@
 //! PUT operation result and error types.
 
 /// Result of a PUT operation.
-#[expect(dead_code)]
 pub(super) enum PutResult {
     /// Resource was created with the given `ETag`.
     Created(String),
@@ -12,7 +11,6 @@ pub(super) enum PutResult {
 }
 
 /// Errors that can occur during PUT.
-#[expect(dead_code)]
 pub(super) enum PutError {
     /// Invalid iCalendar data.
     InvalidCalendarData(String),

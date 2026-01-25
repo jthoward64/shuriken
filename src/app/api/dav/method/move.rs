@@ -1,4 +1,6 @@
-//! MOVE method handler for WebDAV resource moving.
+//! MOVE method handler for `WebDAV` resource moving.
+
+#![allow(clippy::single_match_else)]
 
 use salvo::{handler, Request, Response};
 use salvo::http::StatusCode;
@@ -7,7 +9,7 @@ use crate::component::db::connection;
 use crate::component::db::query::dav::instance;
 
 /// ## Summary
-/// Handles MOVE requests to relocate WebDAV resources.
+/// Handles MOVE requests to relocate `WebDAV` resources.
 ///
 /// Reads the Destination header, validates the target location,
 /// creates instance at destination, deletes source with tombstone.

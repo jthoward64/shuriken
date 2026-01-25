@@ -103,7 +103,6 @@ pub async fn put(req: &mut Request, res: &mut Response) {
 ///
 /// ## Errors
 /// Returns `PutError` for validation failures, conflicts, or database errors.
-#[expect(clippy::unused_async)]
 async fn perform_put(
     conn: &mut connection::DbConnection<'_>,
     path: &str,
@@ -119,9 +118,9 @@ async fn perform_put(
     
     // Parse vCard to extract UID early for context
     let vcard_str = std::str::from_utf8(body)
-        .map_err(|e| PutError::InvalidVcardData(format!("not valid UTF-8: {}", e)))?;
+        .map_err(|e| PutError::InvalidVcardData(format!("not valid UTF-8: {e}")))?;
     let vcard = crate::component::rfc::vcard::parse::parse_single(vcard_str)
-        .map_err(|e| PutError::InvalidVcardData(format!("invalid vCard: {}", e)))?;
+        .map_err(|e| PutError::InvalidVcardData(format!("invalid vCard: {e}")))?;
     let logical_uid = vcard.uid().map(String::from);
     
     // Create PUT context
