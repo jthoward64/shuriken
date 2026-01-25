@@ -43,11 +43,7 @@ ALTER TABLE dav_collection DROP CONSTRAINT IF EXISTS chk_dav_collection_uri_form
 -- INDEX OPTIMIZATIONS ROLLBACK
 -- =============================================================================
 
--- Drop group/membership indexes
-DROP INDEX IF EXISTS idx_group_name_group;
-DROP INDEX IF EXISTS idx_group_name_name;
-DROP INDEX IF EXISTS idx_membership_group;
-DROP INDEX IF EXISTS idx_membership_user;
+-- Note: group membership indexes not dropped here as they were created in previous migrations
 
 -- Drop principal/authorization indexes
 DROP INDEX IF EXISTS idx_group_principal;

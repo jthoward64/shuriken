@@ -148,11 +148,9 @@ CREATE INDEX idx_user_email_active ON "user"(email);
 CREATE INDEX idx_user_principal ON "user"(principal_id);
 CREATE INDEX idx_group_principal ON "group"(principal_id);
 
--- Add indexes for group membership queries
-CREATE INDEX idx_membership_user ON membership(user_id);
-CREATE INDEX idx_membership_group ON membership(group_id);
-CREATE INDEX idx_group_name_name ON group_name(name);
-CREATE INDEX idx_group_name_group ON group_name(group_id);
+-- Note: group membership indexes already exist from previous migrations:
+-- idx_membership_user_id, idx_membership_group_id (from 0002_add_memberships_table)
+-- idx_group_name_name, idx_group_name_group_id (from 0001_groups_name_and_aliases)
 
 -- =============================================================================
 -- CONSTRAINT ENHANCEMENTS
