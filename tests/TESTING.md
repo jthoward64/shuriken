@@ -42,6 +42,21 @@ cargo test --test http_integration
 
 ## Test Database Setup
 
+### Important: Database Name and Schema Requirements
+
+**The test infrastructure has safety measures to prevent accidentally running tests against production databases:**
+
+1. **Database Name**: The database name must be `shuriken_test`. If `DATABASE_URL` contains a different database name, it will be automatically changed to `shuriken_test` with an info log message.
+
+2. **Schema Parameter**: If no `schema` parameter is set in the URL, the test infrastructure will add `?schema=shuriken_test` to prevent accidentally modifying the `public` schema.
+
+3. **Required Environment Variable**: `DATABASE_URL` must be explicitly set - there is no default value.
+
+**Recommended DATABASE_URL format:**
+```
+postgres://username:password@host:port/shuriken_test?schema=shuriken_test
+```
+
 ### Using Docker Compose
 
 The easiest way to run tests is using the provided Docker Compose configuration:
@@ -50,10 +65,13 @@ The easiest way to run tests is using the provided Docker Compose configuration:
 # Start PostgreSQL
 docker-compose up -d postgres
 
-# Set the database URL
-export DATABASE_URL=postgres://shuriken:shuriken@localhost:4523/shuriken
+# Create test database (if not already created)
+docker exec -it $(docker-compose ps -q postgres) psql -U shuriken -c "CREATE DATABASE shuriken_test;"
 
-# Run migrations
+# Set the database URL (REQUIRED - with schema parameter)
+export DATABASE_URL=postgres://shuriken:shuriken@localhost:4523/shuriken_test?schema=shuriken_test
+
+# Run migrations on test database
 diesel migration run
 
 # Run tests
@@ -65,11 +83,11 @@ cargo test --test http_integration -- --include-ignored
 You can use any PostgreSQL instance for testing:
 
 ```bash
-# Create a test database
+# Create a test database (name MUST be shuriken_test)
 createdb shuriken_test
 
-# Set the database URL
-export DATABASE_URL=postgres://username:password@localhost:5432/shuriken_test
+# Set the database URL (REQUIRED - with schema parameter)
+export DATABASE_URL=postgres://username:password@localhost:5432/shuriken_test?schema=shuriken_test
 
 # Run migrations
 diesel migration run
@@ -268,20 +286,44 @@ Tests are run automatically in CI/CD pipelines. The CI environment:
 
 ## Troubleshooting
 
+### "DATABASE_URL environment variable must be set for tests"
+
+The `DATABASE_URL` environment variable is required and must be explicitly set before running tests:
+
+```bash
+export DATABASE_URL=postgres://shuriken:shuriken@localhost:4523/shuriken_test?schema=shuriken_test
+```
+
 ### "Failed to create test database"
 
-Make sure PostgreSQL is running and the `DATABASE_URL` environment variable is set correctly:
+Make sure PostgreSQL is running and the `DATABASE_URL` environment variable is set correctly with `shuriken_test` as the database name and schema:
 
 ```bash
 docker-compose up -d postgres
-export DATABASE_URL=postgres://shuriken:shuriken@localhost:4523/shuriken
+# Create the test database
+docker exec -it $(docker-compose ps -q postgres) psql -U shuriken -c "CREATE DATABASE shuriken_test;"
+export DATABASE_URL=postgres://shuriken:shuriken@localhost:4523/shuriken_test?schema=shuriken_test
 ```
+
+### Database Name and Schema Safety
+
+If you see log messages like:
+```
+TestDb: Database name is not 'shuriken_test', changing to 'shuriken_test' for safety
+TestDb: No schema parameter found in DATABASE_URL, adding '?schema=shuriken_test' to avoid modifying public schema
+```
+
+These are safety measures that automatically modify the connection URL to prevent running tests against production databases or the public schema. The modifications are:
+- Database name is changed to `shuriken_test` if different
+- Schema parameter `?schema=shuriken_test` is added if missing
 
 ### "Failed to truncate tables"
 
-Ensure migrations have been run on the test database:
+Ensure migrations have been run on the test database with the correct schema:
 
 ```bash
+# Make sure DATABASE_URL points to shuriken_test with schema parameter
+export DATABASE_URL=postgres://shuriken:shuriken@localhost:4523/shuriken_test?schema=shuriken_test
 diesel migration run
 ```
 

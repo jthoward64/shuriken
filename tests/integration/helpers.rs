@@ -83,11 +83,69 @@ impl TestDb {
     /// Creates a new test database instance.
     ///
     /// ## Errors
-    /// Returns an error if the database cannot be initialized or connected.
+    /// Returns an error if:
+    /// - DATABASE_URL environment variable is not set
+    /// - The database cannot be initialized or connected
+    ///
+    /// ## Safety Features
+    /// This function modifies the DATABASE_URL for safety:
+    /// - If the database name is not `shuriken_test`, it will be changed to `shuriken_test`
+    /// - If no schema is specified in the URL, `?schema=shuriken_test` will be added to prevent
+    ///   accidentally modifying the `public` schema
+    /// - All modifications are logged as info messages
     #[expect(dead_code)]
     pub async fn new() -> anyhow::Result<Self> {
-        let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://shuriken:shuriken@localhost:4523/shuriken".to_string());
+        let mut database_url = std::env::var("DATABASE_URL")
+            .map_err(|_| anyhow::anyhow!("DATABASE_URL environment variable must be set for tests"))?;
+
+        // Parse the database URL to check and modify database name
+        if let Some(db_name_start) = database_url.rfind('/') {
+            let after_slash = &database_url[db_name_start + 1..];
+            
+            // Split database name from query parameters
+            let (db_name, query_params) = if let Some(query_start) = after_slash.find('?') {
+                (&after_slash[..query_start], &after_slash[query_start..])
+            } else {
+                (after_slash, "")
+            };
+            
+            // Check and fix database name
+            let mut needs_db_change = false;
+            if db_name != "shuriken_test" {
+                tracing::info!(
+                    original_db = db_name,
+                    "TestDb: Database name is not 'shuriken_test', changing to 'shuriken_test' for safety"
+                );
+                needs_db_change = true;
+            }
+            
+            // Check if schema parameter exists
+            let has_schema = query_params.contains("schema=");
+            let mut needs_schema_param = false;
+            
+            if !has_schema {
+                tracing::info!(
+                    "TestDb: No schema parameter found in DATABASE_URL, adding '?schema=shuriken_test' to avoid modifying public schema"
+                );
+                needs_schema_param = true;
+            }
+            
+            // Rebuild URL if needed
+            if needs_db_change || needs_schema_param {
+                let base_url = &database_url[..db_name_start + 1];
+                let new_db_name = if needs_db_change { "shuriken_test" } else { db_name };
+                
+                database_url = if needs_schema_param {
+                    if query_params.is_empty() {
+                        format!("{base_url}{new_db_name}?schema=shuriken_test")
+                    } else {
+                        format!("{base_url}{new_db_name}{query_params}&schema=shuriken_test")
+                    }
+                } else {
+                    format!("{base_url}{new_db_name}{query_params}")
+                };
+            }
+        }
 
         let config = diesel_async::pooled_connection::AsyncDieselConnectionManager::<
             AsyncPgConnection,
