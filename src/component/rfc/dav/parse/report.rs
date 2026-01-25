@@ -5,9 +5,8 @@ use quick_xml::events::Event;
 
 use super::error::{ParseError, ParseResult};
 use crate::component::rfc::dav::core::{
-    AddressbookFilter, AddressbookQuery, CalendarFilter, CalendarQuery, CompFilter, 
-    ExpandProperty, ExpandPropertyItem, FilterTest, Href, MatchType, Namespace, 
-    ParamFilter, PropFilter, PropertyName, QName, ReportRequest, SyncCollection, 
+    AddressbookFilter, AddressbookQuery, CalendarFilter, CalendarQuery, CompFilter, FilterTest, Href, MatchType, Namespace, 
+    ParamFilter, PropFilter, PropertyName, QName, ReportRequest, ReportType, SyncCollection, 
     SyncLevel, TextMatch, TimeRange,
 };
 
@@ -54,6 +53,7 @@ pub fn parse_report(xml: &[u8]) -> ParseResult<ReportRequest> {
                     "addressbook-query" => parse_addressbook_query(xml),
                     "addressbook-multiget" => parse_addressbook_multiget(xml),
                     "sync-collection" => parse_sync_collection(xml),
+                    "expand-property" => parse_expand_property(xml),
                     _ => Err(ParseError::unexpected_element(&local_name)),
                 };
             }
@@ -77,8 +77,8 @@ fn parse_calendar_query(xml: &[u8]) -> ParseResult<ReportRequest> {
     let mut namespaces: Vec<(String, String)> = Vec::new();
     let mut properties: Vec<PropertyName> = Vec::new();
     let mut filter: Option<CalendarFilter> = None;
-    let mut expand: Option<TimeRange> = None;
-    let mut limit: Option<u32> = None;
+    let expand: Option<TimeRange> = None;
+    let limit: Option<u32> = None;
     let mut in_prop = false;
     let mut in_filter = false;
     let mut depth: usize = 0;
@@ -249,7 +249,7 @@ fn parse_addressbook_query(xml: &[u8]) -> ParseResult<ReportRequest> {
     let mut namespaces: Vec<(String, String)> = Vec::new();
     let mut properties: Vec<PropertyName> = Vec::new();
     let mut filter: Option<AddressbookFilter> = None;
-    let mut limit: Option<u32> = None;
+    let limit: Option<u32> = None;
     let mut in_prop = false;
     let mut in_filter = false;
     let mut depth: usize = 0;
@@ -523,7 +523,6 @@ fn get_attribute(e: &quick_xml::events::BytesStart<'_>, name: &str) -> ParseResu
 }
 
 /// Parses calendar filter content (nested comp-filters).
-#[expect(clippy::too_many_lines)]
 fn parse_calendar_filter_content(
     reader: &mut Reader<&[u8]>,
     buf: &mut Vec<u8>,
@@ -541,7 +540,7 @@ fn parse_calendar_filter_content(
 
                 if local_name == "comp-filter" && depth == 2 {
                     // Extract name attribute before consuming the element
-                    let name = get_attribute(&e, "name")?.to_owned();
+                    let name = get_attribute(&e, "name")?.clone();
                     let comp_filter = parse_comp_filter_with_name(reader, buf, namespaces, name)?;
                     filter.filters.push(comp_filter);
                 }
@@ -570,7 +569,6 @@ fn parse_calendar_filter_content(
 }
 
 /// Parses a comp-filter element when name is already extracted.
-#[expect(clippy::too_many_lines)]
 fn parse_comp_filter_with_name(
     reader: &mut Reader<&[u8]>,
     buf: &mut Vec<u8>,
@@ -589,12 +587,12 @@ fn parse_comp_filter_with_name(
 
                 match local_name.as_str() {
                     "comp-filter" => {
-                        let name = get_attribute(&e, "name")?.to_owned();
+                        let name = get_attribute(&e, "name")?.clone();
                         let nested = parse_comp_filter_with_name(reader, buf, namespaces, name)?;
                         comp_filter.comp_filters.push(nested);
                     }
                     "prop-filter" => {
-                        let name = get_attribute(&e, "name")?.to_owned();
+                        let name = get_attribute(&e, "name")?.clone();
                         let prop_filter = parse_prop_filter_with_name(reader, buf, namespaces, name)?;
                         comp_filter.prop_filters.push(prop_filter);
                     }
@@ -633,6 +631,7 @@ fn parse_comp_filter_with_name(
 }
 
 /// Parses a prop-filter element when name is already extracted.
+#[expect(clippy::too_many_lines)]
 fn parse_prop_filter_with_name(
     reader: &mut Reader<&[u8]>,
     buf: &mut Vec<u8>,
@@ -664,9 +663,9 @@ fn parse_prop_filter_with_name(
                                 "match-type" => {
                                     match_type = match value {
                                         "equals" => MatchType::Equals,
-                                        "contains" => MatchType::Contains,
                                         "starts-with" => MatchType::StartsWith,
                                         "ends-with" => MatchType::EndsWith,
+                                        // Default to contains per RFC 4791
                                         _ => MatchType::Contains,
                                     };
                                 }
@@ -679,7 +678,7 @@ fn parse_prop_filter_with_name(
                         prop_filter.time_range = Some(parse_time_range(&e)?);
                     }
                     "param-filter" => {
-                        let name = get_attribute(&e, "name")?.to_owned();
+                        let name = get_attribute(&e, "name")?.clone();
                         let param_filter = parse_param_filter_with_name(reader, buf, name)?;
                         prop_filter.param_filters.push(param_filter);
                     }
@@ -715,6 +714,7 @@ fn parse_prop_filter_with_name(
 }
 
 /// Parses a param-filter element when name is already extracted.
+#[expect(clippy::too_many_lines)]
 fn parse_param_filter_with_name(
     reader: &mut Reader<&[u8]>,
     buf: &mut Vec<u8>,
@@ -748,9 +748,9 @@ fn parse_param_filter_with_name(
                             "match-type" => {
                                 match_type = match value {
                                     "equals" => MatchType::Equals,
-                                    "contains" => MatchType::Contains,
                                     "starts-with" => MatchType::StartsWith,
                                     "ends-with" => MatchType::EndsWith,
+                                    // Default to contains per RFC 6352
                                     _ => MatchType::Contains,
                                 };
                             }
@@ -864,7 +864,7 @@ fn parse_addressbook_filter_content(
                 depth += 1;
 
                 if local_name == "prop-filter" && depth == 2 {
-                    let name = get_attribute(&e, "name")?.to_owned();
+                    let name = get_attribute(&e, "name")?.clone();
                     let prop_filter = parse_prop_filter_with_name(reader, buf, namespaces, name)?;
                     prop_filters.push(prop_filter);
                 }
@@ -922,6 +922,63 @@ fn resolve_qname(
         Namespace::new(namespace.to_string()),
         local_name,
     ))
+}
+
+/// Parses an expand-property report.
+///
+/// ## Summary
+/// Parses expand-property REPORT requests per RFC 3253.
+///
+/// ## Errors
+/// Returns parse errors if XML is invalid.
+fn parse_expand_property(xml: &[u8]) -> ParseResult<ReportRequest> {
+    use crate::component::rfc::dav::core::{ExpandProperty, ExpandPropertyItem};
+    
+    let mut reader = Reader::from_reader(xml);
+    reader.config_mut().trim_text(true);
+
+    let mut buf = Vec::new();
+    let mut namespaces: Vec<(String, String)> = Vec::new();
+    let mut properties: Vec<PropertyName> = Vec::new();
+    let mut expand_items: Vec<ExpandPropertyItem> = Vec::new();
+
+    loop {
+        buf.clear();
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref e) | Event::Empty(ref e)) => {
+                collect_namespaces(e, &mut namespaces)?;
+                let local_name_bytes = e.local_name();
+                let local_name = std::str::from_utf8(local_name_bytes.as_ref())?.to_owned();
+
+                if local_name == "property" {
+                    // Parse property element with name attribute
+                    let name_value = get_attribute(e, "name")?;
+                    let qname = QName::dav(name_value);
+                    let prop_name = PropertyName::new(qname);
+                    
+                    // For now, we don't support nested expansion
+                    // A full implementation would recursively parse nested <property> elements
+                    expand_items.push(ExpandPropertyItem {
+                        name: prop_name.clone(),
+                        properties: Vec::new(),
+                    });
+                    properties.push(prop_name);
+                }
+            }
+            Ok(Event::Eof) => break,
+            Err(e) => return Err(ParseError::xml(e.to_string())),
+            _ => {}
+        }
+    }
+
+    let expand_property = ExpandProperty {
+        properties: expand_items,
+    };
+
+    Ok(ReportRequest {
+        report_type: ReportType::ExpandProperty(expand_property),
+        properties,
+    })
 }
 
 #[cfg(test)]

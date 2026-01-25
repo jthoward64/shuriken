@@ -228,6 +228,13 @@ impl PropFilter {
         }
     }
 
+    /// Sets is-not-defined test.
+    #[must_use]
+    pub fn not_defined(mut self) -> Self {
+        self.is_not_defined = true;
+        self
+    }
+
     /// Sets text match.
     #[must_use]
     pub fn with_text_match(mut self, match_: TextMatch) -> Self {
@@ -309,6 +316,13 @@ impl TextMatch {
     #[must_use]
     pub fn negate(mut self) -> Self {
         self.negate = true;
+        self
+    }
+
+    /// Sets collation.
+    #[must_use]
+    pub fn with_collation(mut self, collation: impl Into<String>) -> Self {
+        self.collation = Some(collation.into());
         self
     }
 }
