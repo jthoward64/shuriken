@@ -547,14 +547,14 @@ fn parse_calendar_filter_content(
                 }
             }
             Ok(Event::Empty(e)) => {
-                let local_name = std::str::from_utf8(e.local_name().as_ref())?;
+                let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
                 if local_name == "comp-filter" && depth == 1 {
                     let name = get_attribute(&e, "name")?;
                     filter.filters.push(CompFilter::new(name));
                 }
             }
             Ok(Event::End(e)) => {
-                let local_name = std::str::from_utf8(e.local_name().as_ref())?;
+                let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
                 depth -= 1;
                 if local_name == "comp-filter" && depth == 0 {
                     break;
@@ -605,8 +605,8 @@ fn parse_comp_filter_with_name(
                 }
             }
             Ok(Event::Empty(e)) => {
-                let local_name = std::str::from_utf8(e.local_name().as_ref())?;
-                match local_name {
+                let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
+                match local_name.as_str() {
                     "is-not-defined" => {
                         comp_filter.is_not_defined = true;
                     }
@@ -617,7 +617,7 @@ fn parse_comp_filter_with_name(
                 }
             }
             Ok(Event::End(e)) => {
-                let local_name = std::str::from_utf8(e.local_name().as_ref())?;
+                let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
                 depth -= 1;
                 if local_name == "comp-filter" && depth == 0 {
                     break;
@@ -665,8 +665,8 @@ fn parse_prop_filter_with_name(
                 }
             }
             Ok(Event::Empty(e)) => {
-                let local_name = std::str::from_utf8(e.local_name().as_ref())?;
-                match local_name {
+                let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
+                match local_name.as_str() {
                     "is-not-defined" => {
                         prop_filter.is_not_defined = true;
                     }
@@ -677,7 +677,7 @@ fn parse_prop_filter_with_name(
                 }
             }
             Ok(Event::End(e)) => {
-                let local_name = std::str::from_utf8(e.local_name().as_ref())?;
+                let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
                 depth -= 1;
                 if local_name == "prop-filter" && depth == 0 {
                     break;
@@ -709,7 +709,7 @@ fn parse_param_filter_with_name(
         buf.clear();
         match reader.read_event_into(buf) {
             Ok(Event::Start(e)) => {
-                let local_name = std::str::from_utf8(e.local_name().as_ref())?;
+                let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
                 depth += 1;
 
                 if local_name == "text-match" {
@@ -717,13 +717,13 @@ fn parse_param_filter_with_name(
                 }
             }
             Ok(Event::Empty(e)) => {
-                let local_name = std::str::from_utf8(e.local_name().as_ref())?;
+                let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
                 if local_name == "is-not-defined" {
                     param_filter.is_not_defined = true;
                 }
             }
             Ok(Event::End(e)) => {
-                let local_name = std::str::from_utf8(e.local_name().as_ref())?;
+                let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
                 depth -= 1;
                 if local_name == "param-filter" && depth == 0 {
                     break;
@@ -741,7 +741,7 @@ fn parse_param_filter_with_name(
 /// Parses a text-match element from attributes and content.
 fn parse_text_match_from_elem(
     reader: &mut Reader<&[u8]>,
-    buf: &mut Vec<u8>,
+    _parent_buf: &mut Vec<u8>,
     start_elem: &quick_xml::events::BytesStart<'_>,
 ) -> ParseResult<TextMatch> {
     let mut collation = None;
@@ -773,17 +773,18 @@ fn parse_text_match_from_elem(
         }
     }
 
-    // Parse text content
+    // Parse text content - use our own buffer
     let mut text_content = String::new();
-    buf.clear();
+    let mut buf = Vec::new();
     loop {
-        match reader.read_event_into(buf) {
+        buf.clear();
+        match reader.read_event_into(&mut buf) {
             Ok(Event::Text(e)) => {
                 let decoded = reader.decoder().decode(e.as_ref())?;
                 text_content.push_str(&decoded);
             }
             Ok(Event::End(e)) => {
-                let local_name = std::str::from_utf8(e.local_name().as_ref())?;
+                let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
                 if local_name == "text-match" {
                     break;
                 }
@@ -792,7 +793,6 @@ fn parse_text_match_from_elem(
             Err(e) => return Err(ParseError::xml(e.to_string())),
             _ => {}
         }
-        buf.clear();
     }
 
     Ok(TextMatch {
@@ -854,14 +854,14 @@ fn parse_addressbook_filter_content(
                 }
             }
             Ok(Event::Empty(e)) => {
-                let local_name = std::str::from_utf8(e.local_name().as_ref())?;
+                let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
                 if local_name == "prop-filter" && depth == 1 {
                     let name = get_attribute(&e, "name")?;
                     prop_filters.push(PropFilter::new(name));
                 }
             }
             Ok(Event::End(e)) => {
-                let local_name = std::str::from_utf8(e.local_name().as_ref())?;
+                let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
                 depth -= 1;
                 if local_name == "filter" && depth == 0 {
                     break;
