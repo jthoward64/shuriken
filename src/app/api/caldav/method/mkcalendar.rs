@@ -3,6 +3,9 @@
 use salvo::{handler, Request, Response};
 use salvo::http::StatusCode;
 
+use crate::component::db::connection;
+use crate::component::dav::service::collection::{CreateCollectionContext, create_collection};
+
 /// ## Summary
 /// Handles MKCALENDAR requests to create calendar collections.
 ///
@@ -18,17 +21,69 @@ use salvo::http::StatusCode;
 /// ## Errors
 /// Returns 400 for invalid XML, 403 for authorization failures, 409 if exists, 500 for errors.
 #[handler]
-pub async fn mkcalendar(_req: &mut Request, res: &mut Response) {
-    // TODO: Implement MKCALENDAR handler
-    // 1. Parse path to extract parent collection and calendar name
-    // 2. Check authorization (user must have write access to parent)
-    // 3. Parse optional XML request body for initial properties
-    // 4. Validate that collection doesn't already exist (409 Conflict)
-    // 5. Create calendar collection with resourcetype=DAV:collection+CALDAV:calendar
-    // 6. Apply initial properties (displayname, calendar-description, calendar-timezone, etc.)
-    // 7. Set supported-calendar-component-set (VEVENT, VTODO, etc.)
-    // 8. Return 201 Created
+pub async fn mkcalendar(req: &mut Request, res: &mut Response) {
+    // Get path to determine where to create the calendar
+    let path = req.uri().path().to_string();
     
-    tracing::warn!("MKCALENDAR not yet implemented");
-    res.status_code(StatusCode::NOT_IMPLEMENTED);
+    // Get database connection
+    let mut conn = match connection::connect().await {
+        Ok(conn) => conn,
+        Err(e) => {
+            tracing::error!("Failed to get database connection: {}", e);
+            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+            return;
+        }
+    };
+    
+    // TODO: Parse path to extract parent and calendar name
+    // TODO: Check authorization
+    // TODO: Parse optional MKCALENDAR XML body for initial properties
+    
+    // Extract URI from path (last segment)
+    let uri = path.split('/').last().unwrap_or("calendar").to_string();
+    
+    // TODO: Get authenticated user's principal ID
+    // For now, use a placeholder
+    let owner_principal_id = match extract_owner_from_path(&path) {
+        Ok(id) => id,
+        Err(_) => {
+            tracing::error!("Failed to extract owner from path: {}", path);
+            res.status_code(StatusCode::BAD_REQUEST);
+            return;
+        }
+    };
+    
+    // Create collection context
+    let ctx = CreateCollectionContext {
+        owner_principal_id,
+        uri,
+        collection_type: "calendar".to_string(),
+        displayname: None, // TODO: Extract from XML body if present
+        description: None, // TODO: Extract from XML body if present
+    };
+    
+    // Create the calendar collection
+    match create_collection(&mut conn, &ctx).await {
+        Ok(result) => {
+            tracing::info!("Created calendar collection: {} (ID: {})", result.uri, result.collection_id);
+            res.status_code(StatusCode::CREATED);
+            // TODO: Set Location header
+        }
+        Err(e) => {
+            tracing::error!("Failed to create calendar collection: {}", e);
+            // Check if it's a conflict (already exists)
+            if e.to_string().contains("duplicate") || e.to_string().contains("exists") {
+                res.status_code(StatusCode::CONFLICT);
+            } else {
+                res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+            }
+        }
+    }
+}
+
+/// Placeholder function to extract owner principal ID from path.
+fn extract_owner_from_path(_path: &str) -> Result<uuid::Uuid, String> {
+    // TODO: Implement proper path parsing and authentication
+    // For now, return a dummy UUID
+    Ok(uuid::Uuid::nil())
 }

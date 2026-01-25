@@ -3,6 +3,9 @@
 use salvo::{handler, Request, Response};
 use salvo::http::StatusCode;
 
+use crate::component::db::connection;
+use crate::component::dav::service::collection::{CreateCollectionContext, create_collection};
+
 /// ## Summary
 /// Handles Extended MKCOL requests to create addressbook collections.
 ///
@@ -18,19 +21,69 @@ use salvo::http::StatusCode;
 /// ## Errors
 /// Returns 400 for invalid XML, 403 for authorization failures, 409 if exists, 500 for errors.
 #[handler]
-pub async fn mkcol_extended(_req: &mut Request, res: &mut Response) {
-    // TODO: Implement Extended MKCOL handler (RFC 5689)
-    // 1. Parse path to extract parent collection and addressbook name
-    // 2. Check authorization (user must have write access to parent)
-    // 3. Parse Extended MKCOL XML request body
-    //    - DAV:mkcol containing DAV:set with DAV:prop elements
-    //    - Must include DAV:resourcetype with CARDDAV:addressbook
-    // 4. Validate that collection doesn't already exist (409 Conflict)
-    // 5. Create addressbook collection with resourcetype=DAV:collection+CARDDAV:addressbook
-    // 6. Apply initial properties (displayname, addressbook-description, etc.)
-    // 7. Set supported-address-data (vCard 3.0, vCard 4.0)
-    // 8. Return 201 Created
+pub async fn mkcol_extended(req: &mut Request, res: &mut Response) {
+    // Get path to determine where to create the addressbook
+    let path = req.uri().path().to_string();
     
-    tracing::warn!("Extended MKCOL not yet implemented");
-    res.status_code(StatusCode::NOT_IMPLEMENTED);
+    // Get database connection
+    let mut conn = match connection::connect().await {
+        Ok(conn) => conn,
+        Err(e) => {
+            tracing::error!("Failed to get database connection: {}", e);
+            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+            return;
+        }
+    };
+    
+    // TODO: Parse path to extract parent and addressbook name
+    // TODO: Check authorization
+    // TODO: Parse Extended MKCOL XML body (RFC 5689)
+    
+    // Extract URI from path (last segment)
+    let uri = path.split('/').last().unwrap_or("addressbook").to_string();
+    
+    // TODO: Get authenticated user's principal ID
+    // For now, use a placeholder
+    let owner_principal_id = match extract_owner_from_path(&path) {
+        Ok(id) => id,
+        Err(_) => {
+            tracing::error!("Failed to extract owner from path: {}", path);
+            res.status_code(StatusCode::BAD_REQUEST);
+            return;
+        }
+    };
+    
+    // Create collection context
+    let ctx = CreateCollectionContext {
+        owner_principal_id,
+        uri,
+        collection_type: "addressbook".to_string(),
+        displayname: None, // TODO: Extract from XML body if present
+        description: None, // TODO: Extract from XML body if present
+    };
+    
+    // Create the addressbook collection
+    match create_collection(&mut conn, &ctx).await {
+        Ok(result) => {
+            tracing::info!("Created addressbook collection: {} (ID: {})", result.uri, result.collection_id);
+            res.status_code(StatusCode::CREATED);
+            // TODO: Set Location header
+        }
+        Err(e) => {
+            tracing::error!("Failed to create addressbook collection: {}", e);
+            // Check if it's a conflict (already exists)
+            if e.to_string().contains("duplicate") || e.to_string().contains("exists") {
+                res.status_code(StatusCode::CONFLICT);
+            } else {
+                res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+            }
+        }
+    }
+}
+
+/// Placeholder function to extract owner principal ID from path.
+fn extract_owner_from_path(_path: &str) -> Result<uuid::Uuid, String> {
+    // TODO: Implement proper path parsing and authentication
+    // For now, return a dummy UUID
+    Ok(uuid::Uuid::nil())
 }
