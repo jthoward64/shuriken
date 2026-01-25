@@ -132,7 +132,7 @@ async fn db_collection_different_resource_types() {
 }
 
 /// ## Summary
-/// Test that collection display_name and description can be set.
+/// Test that collection `display_name` and description can be set.
 #[tokio::test]
 #[ignore = "requires postgres"]
 async fn db_collection_display_name_description() {
@@ -146,7 +146,7 @@ async fn db_collection_display_name_description() {
 }
 
 /// ## Summary
-/// Test that collection updated_at is automatically set.
+/// Test that collection `updated_at` is automatically set.
 #[tokio::test]
 #[ignore = "requires postgres"]
 async fn db_collection_updated_at_automatic() {

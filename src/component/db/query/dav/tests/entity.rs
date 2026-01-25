@@ -141,7 +141,7 @@ async fn db_entity_soft_delete_filters() {
 }
 
 /// ## Summary
-/// Test that querying by logical_uid works correctly.
+/// Test that querying by `logical_uid` works correctly.
 #[tokio::test]
 #[ignore = "requires postgres"]
 async fn db_entity_query_by_logical_uid() {

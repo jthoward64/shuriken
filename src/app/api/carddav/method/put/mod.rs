@@ -77,19 +77,19 @@ pub async fn put(req: &mut Request, res: &mut Response) {
         Ok(PutResult::Created(etag)) => {
             tracing::info!(etag = %etag, "vCard object created");
             res.status_code(StatusCode::CREATED);
-            if let Ok(etag_value) = HeaderValue::from_str(&etag) {
-                if res.add_header("ETag", etag_value, true).is_err() {
-                    tracing::warn!("Failed to add ETag header to response");
-                }
+            if let Ok(etag_value) = HeaderValue::from_str(&etag)
+                && res.add_header("ETag", etag_value, true).is_err()
+            {
+                tracing::warn!("Failed to add ETag header to response");
             }
         }
         Ok(PutResult::Updated(etag)) => {
             tracing::info!(etag = %etag, "vCard object updated");
             res.status_code(StatusCode::NO_CONTENT);
-            if let Ok(etag_value) = HeaderValue::from_str(&etag) {
-                if res.add_header("ETag", etag_value, true).is_err() {
-                    tracing::warn!("Failed to add ETag header to response");
-                }
+            if let Ok(etag_value) = HeaderValue::from_str(&etag)
+                && res.add_header("ETag", etag_value, true).is_err()
+            {
+                tracing::warn!("Failed to add ETag header to response");
             }
         }
         Ok(PutResult::PreconditionFailed) => {
