@@ -6,9 +6,14 @@ use anyhow::{Context, Result};
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 
+use crate::component::caldav::recurrence::extract_recurrence_data;
 use crate::component::db::connection::DbConnection;
+use crate::component::db::query::caldav::occurrence;
 use crate::component::db::query::dav::{collection, entity, instance};
 use crate::component::model::dav::instance::NewDavInstance;
+use crate::component::model::dav::occurrence::NewCalOccurrence;
+use crate::component::rfc::ical::core::{Component, ComponentKind};
+use crate::component::rfc::ical::expand::{expand_rrule, ExpansionOptions};
 use crate::component::rfc::ical::parse::parse;
 
 /// Result of a PUT operation on a calendar object.
@@ -174,10 +179,20 @@ pub async fn put_calendar_object(
             .await
             .context("failed to delete old component tree")?;
 
+        // Delete old occurrences for this entity
+        occurrence::delete_by_entity_id(conn, existing_inst.entity_id)
+            .await
+            .context("failed to delete old occurrences")?;
+
         // Insert new component tree
         entity::insert_ical_tree(conn, existing_inst.entity_id, &ical)
             .await
             .context("failed to insert component tree")?;
+
+        // Expand and store recurrences for the updated entity
+        expand_and_store_occurrences(conn, existing_inst.entity_id, &ical)
+            .await
+            .context("failed to expand recurrences")?;
 
         tracing::info!("Calendar object updated successfully");
     } else {
@@ -217,13 +232,142 @@ pub async fn put_calendar_object(
             .context("failed to update collection sync token")?;
 
         // Insert component tree for the new entity
+        // Insert component tree for the new entity
         entity::insert_ical_tree(conn, created_entity.id, &ical)
             .await
             .context("failed to insert component tree")?;
+
+        // Expand and store recurrences for the new entity
+        expand_and_store_occurrences(conn, created_entity.id, &ical)
+            .await
+            .context("failed to expand recurrences")?;
 
         tracing::info!("Calendar object created successfully");
     }
 
     tracing::debug!(created = %created, "PUT calendar object completed successfully");
     Ok(PutObjectResult { etag, created })
+}
+
+/// ## Summary
+/// Expands recurrences for all VEVENT components in the iCalendar and stores them in cal_occurrence.
+///
+/// This function queries the database for VEVENT components that were just inserted,
+/// extracts their RRULE properties, expands the recurrences, and stores the occurrences.
+///
+/// ## Errors
+/// Returns an error if:
+/// - Database queries fail
+/// - Recurrence expansion fails
+/// - Occurrence insertion fails
+async fn expand_and_store_occurrences(
+    conn: &mut DbConnection<'_>,
+    entity_id: uuid::Uuid,
+    ical: &crate::component::rfc::ical::core::ICalendar,
+) -> Result<()> {
+    use crate::component::db::schema::dav_component;
+
+    // Find all VEVENT components in the iCalendar
+    let vevent_components: Vec<&Component> = ical
+        .root
+        .children
+        .iter()
+        .filter(|c| c.kind == Some(ComponentKind::Event))
+        .collect();
+
+    if vevent_components.is_empty() {
+        return Ok(());
+    }
+
+    tracing::debug!(count = vevent_components.len(), "Found VEVENT components");
+
+    // Query all components for this entity that are VEVENTs
+    let db_components: Vec<crate::component::model::dav::component::DavComponent> =
+        dav_component::table
+            .filter(dav_component::entity_id.eq(entity_id))
+            .filter(dav_component::name.eq("VEVENT"))
+            .filter(dav_component::deleted_at.is_null())
+            .select(crate::component::model::dav::component::DavComponent::as_select())
+            .load(conn)
+            .await
+            .context("failed to query VEVENT components")?;
+
+    tracing::debug!(
+        db_count = db_components.len(),
+        "Queried VEVENT components from database"
+    );
+
+    // For each VEVENT component, expand recurrences
+    let mut all_occurrences = Vec::new();
+
+    for (idx, vevent) in vevent_components.iter().enumerate() {
+        // Match with database component (by index for now - not ideal but works for simple cases)
+        if let Some(db_component) = db_components.get(idx) {
+            if let Some(mut occurrences) =
+                expand_component_occurrences(vevent, entity_id, db_component.id).await?
+            {
+                all_occurrences.append(&mut occurrences);
+            }
+        }
+    }
+
+    if !all_occurrences.is_empty() {
+        tracing::debug!(count = all_occurrences.len(), "Inserting recurrence occurrences");
+        occurrence::insert_occurrences(conn, &all_occurrences)
+            .await
+            .context("failed to insert occurrences")?;
+    }
+
+    Ok(())
+}
+
+/// ## Summary
+/// Expands recurrences for a single VEVENT component.
+///
+/// Extracts RRULE, DTSTART, DURATION/DTEND, EXDATE, and RDATE from the component,
+/// expands the recurrence rule, and generates occurrence records.
+///
+/// ## Errors
+/// Returns an error if recurrence expansion fails.
+async fn expand_component_occurrences(
+    component: &Component,
+    entity_id: uuid::Uuid,
+    component_id: uuid::Uuid,
+) -> Result<Option<Vec<NewCalOccurrence>>> {
+    // Extract recurrence data
+    let Some(recurrence_data) = extract_recurrence_data(component) else {
+        // No RRULE, skip
+        return Ok(None);
+    };
+
+    tracing::debug!(
+        rrule = %recurrence_data.rrule,
+        dtstart = %recurrence_data.dtstart_utc,
+        duration = ?recurrence_data.duration,
+        "Expanding recurrence rule"
+    );
+
+    // Expand RRULE with a limit of 1000 occurrences for safety
+    let options = ExpansionOptions::default().with_max_instances(1000);
+
+    let occurrence_dates = expand_rrule(
+        &recurrence_data.rrule,
+        recurrence_data.dtstart_utc,
+        &recurrence_data.exdates,
+        &recurrence_data.rdates,
+        options,
+    )
+    .map_err(|e| anyhow::anyhow!("failed to expand RRULE: {e}"))?;
+
+    tracing::debug!(count = occurrence_dates.len(), "Generated occurrences");
+
+    let occurrences: Vec<NewCalOccurrence> = occurrence_dates
+        .iter()
+        .map(|&start| {
+            let end = start + recurrence_data.duration;
+            NewCalOccurrence::new(entity_id, component_id, start, end)
+        })
+        .collect();
+
+    Ok(Some(occurrences))
 }
