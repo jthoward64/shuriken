@@ -17,12 +17,16 @@ use crate::component::rfc::dav::core::{
 /// ## Errors
 /// Returns an error if the XML is malformed or contains
 /// unsupported elements.
+#[tracing::instrument(skip(xml), fields(xml_len = xml.len()))]
 #[expect(clippy::too_many_lines)]
 pub fn parse_propfind(xml: &[u8]) -> ParseResult<PropfindRequest> {
     if xml.is_empty() {
+        tracing::debug!("Empty PROPFIND body, returning allprop");
         // Empty body means allprop
         return Ok(PropfindRequest::allprop());
     }
+
+    tracing::debug!("Parsing PROPFIND XML request");
 
     let mut reader = Reader::from_reader(xml);
     reader.config_mut().trim_text(true);

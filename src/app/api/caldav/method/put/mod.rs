@@ -26,7 +26,10 @@ use types::{PutError, PutResult};
 /// ## Errors
 /// Returns 400 for invalid data, 412 for precondition failures, 500 for server errors.
 #[handler]
+#[tracing::instrument(skip(req, res), fields(path = %req.uri().path()))]
 pub async fn put(req: &mut Request, res: &mut Response) {
+    tracing::info!("Handling PUT request for calendar object");
+    
     // Get path before borrowing req mutably
     let path = req.uri().path().to_string();
     
@@ -34,17 +37,19 @@ pub async fn put(req: &mut Request, res: &mut Response) {
     let body = match req.payload().await {
         Ok(bytes) => bytes.to_vec(),
         Err(e) => {
-            tracing::error!("Failed to read request body: {}", e);
+            tracing::error!(error = %e, "Failed to read request body");
             res.status_code(StatusCode::BAD_REQUEST);
             return;
         }
     };
     
+    tracing::debug!(bytes = body.len(), "Request body read successfully");
+    
     // Get database connection
     let mut conn = match connection::connect().await {
         Ok(conn) => conn,
         Err(e) => {
-            tracing::error!("Failed to get database connection: {}", e);
+            tracing::error!(error = %e, "Failed to get database connection");
             res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
             return;
         }
@@ -60,9 +65,17 @@ pub async fn put(req: &mut Request, res: &mut Response) {
         .and_then(|h| h.to_str().ok())
         .map(String::from);
     
+    if if_none_match.is_some() {
+        tracing::debug!("If-None-Match header present");
+    }
+    if if_match.is_some() {
+        tracing::debug!("If-Match header present");
+    }
+    
     // Perform the PUT operation
     match perform_put(&mut conn, &path, &body, if_none_match, if_match).await {
         Ok(PutResult::Created(etag)) => {
+            tracing::info!(etag = %etag, "Calendar object created");
             res.status_code(StatusCode::CREATED);
             if let Ok(etag_value) = HeaderValue::from_str(&etag) {
                 if res.add_header("ETag", etag_value, true).is_err() {
@@ -71,6 +84,7 @@ pub async fn put(req: &mut Request, res: &mut Response) {
             }
         }
         Ok(PutResult::Updated(etag)) => {
+            tracing::info!(etag = %etag, "Calendar object updated");
             res.status_code(StatusCode::NO_CONTENT);
             if let Ok(etag_value) = HeaderValue::from_str(&etag) {
                 if res.add_header("ETag", etag_value, true).is_err() {
@@ -79,20 +93,21 @@ pub async fn put(req: &mut Request, res: &mut Response) {
             }
         }
         Ok(PutResult::PreconditionFailed) => {
+            tracing::warn!("Precondition failed for PUT request");
             res.status_code(StatusCode::PRECONDITION_FAILED);
         }
         Err(PutError::InvalidCalendarData(msg)) => {
-            tracing::error!("Invalid calendar data: {}", msg);
+            tracing::error!(message = %msg, "Invalid calendar data");
             res.status_code(StatusCode::BAD_REQUEST);
             // TODO: Return proper CalDAV error XML with valid-calendar-data precondition
         }
         Err(PutError::UidConflict(uid)) => {
-            tracing::error!("UID conflict: {}", uid);
+            tracing::error!(uid = %uid, "UID conflict");
             res.status_code(StatusCode::CONFLICT);
             // TODO: Return proper CalDAV error XML with no-uid-conflict precondition
         }
         Err(PutError::DatabaseError(e)) => {
-            tracing::error!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
         }
     }

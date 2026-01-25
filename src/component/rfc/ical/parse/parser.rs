@@ -17,12 +17,18 @@ use crate::component::rfc::ical::core::{
 /// ## Errors
 ///
 /// Returns an error if the input is not valid iCalendar.
+#[tracing::instrument(skip(input), fields(input_len = input.len()))]
 pub fn parse(input: &str) -> ParseResult<ICalendar> {
+    tracing::debug!("Parsing iCalendar document");
+    
     let lines = split_lines(input);
 
     if lines.is_empty() {
+        tracing::warn!("Empty iCalendar input");
         return Err(ParseError::new(ParseErrorKind::MissingBegin, 1, 1));
     }
+
+    tracing::info!(count = lines.len(), "Split lines");
 
     let content_lines: Vec<(usize, ContentLine)> = lines
         .into_iter()
@@ -32,15 +38,20 @@ pub fn parse(input: &str) -> ParseResult<ICalendar> {
         })
         .collect::<ParseResult<_>>()?;
 
+    tracing::trace!(count = content_lines.len(), "Parsed content lines");
+
     let mut iter = content_lines.into_iter().peekable();
     let root = parse_component(&mut iter, None)?;
 
     // Verify it's a VCALENDAR
     if root.kind != Some(ComponentKind::Calendar) {
+        tracing::warn!("Root component is not VCALENDAR");
         return Err(
             ParseError::new(ParseErrorKind::MissingBegin, 1, 1).with_context("expected VCALENDAR")
         );
     }
+
+    tracing::debug!("iCalendar document parsed successfully");
 
     Ok(ICalendar { root })
 }

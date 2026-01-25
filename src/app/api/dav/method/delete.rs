@@ -19,7 +19,13 @@ use crate::component::db::connection;
 /// ## Errors
 /// Returns 404 if the resource is not found, 500 for database errors.
 #[handler]
+#[tracing::instrument(skip(req, res), fields(
+    method = "DELETE",
+    path = %req.uri().path()
+))]
 pub async fn delete(req: &mut Request, res: &mut Response) {
+    tracing::info!("Handling DELETE request");
+    
     // Get path before borrowing req mutably
     let path = req.uri().path().to_string();
     
@@ -27,7 +33,7 @@ pub async fn delete(req: &mut Request, res: &mut Response) {
     let mut conn = match connection::connect().await {
         Ok(conn) => conn,
         Err(e) => {
-            tracing::error!("Failed to get database connection: {}", e);
+            tracing::error!(error = %e, "Failed to get database connection");
             res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
             return;
         }
@@ -40,14 +46,16 @@ pub async fn delete(req: &mut Request, res: &mut Response) {
     match perform_delete(&mut conn, &path).await {
         Ok(true) => {
             // Successfully deleted
+            tracing::info!("Resource deleted successfully");
             res.status_code(StatusCode::NO_CONTENT);
         }
         Ok(false) => {
             // Resource not found
+            tracing::warn!("Resource not found");
             res.status_code(StatusCode::NOT_FOUND);
         }
         Err(e) => {
-            tracing::error!("Failed to delete resource: {}", e);
+            tracing::error!(error = %e, "Failed to delete resource");
             res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
         }
     }
@@ -61,11 +69,12 @@ pub async fn delete(req: &mut Request, res: &mut Response) {
 ///
 /// ## Errors
 /// Returns database errors if the operation fails.
-#[expect(clippy::unused_async)]
+#[tracing::instrument(skip_all)]
 async fn perform_delete(
     _conn: &mut connection::DbConnection<'_>,
     _path: &str,
 ) -> anyhow::Result<bool> {
+    tracing::debug!("Performing resource deletion");
     // TODO: Parse path to get collection_id and uri
     // For now, this is a stub
     

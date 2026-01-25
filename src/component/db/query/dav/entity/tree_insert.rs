@@ -19,12 +19,17 @@ use crate::component::rfc::vcard::core::VCard;
 ///
 /// ## Errors
 /// Returns a database error if any insert fails.
+#[tracing::instrument(skip(conn, ical))]
 pub async fn insert_ical_tree(
     conn: &mut crate::component::db::connection::DbConnection<'_>,
     entity_id: uuid::Uuid,
     ical: &ICalendar,
 ) -> diesel::QueryResult<()> {
+    tracing::debug!("Inserting iCalendar component tree");
+    
     insert_component_recursive(conn, entity_id, &ical.root, None, 0).await?;
+    
+    tracing::debug!("iCalendar component tree inserted successfully");
     Ok(())
 }
 
@@ -36,6 +41,7 @@ pub async fn insert_ical_tree(
 ///
 /// ## Errors
 /// Returns a database error if any insert fails.
+#[tracing::instrument(skip(conn, vcard), fields(property_count = vcard.properties.len()))]
 #[expect(
     clippy::cast_possible_truncation,
     clippy::cast_possible_wrap,
@@ -46,6 +52,8 @@ pub async fn insert_vcard_tree(
     entity_id: uuid::Uuid,
     vcard: &VCard,
 ) -> diesel::QueryResult<()> {
+    tracing::debug!("Inserting vCard property tree");
+    
     // Insert root VCARD component
     let new_component = NewDavComponent {
         entity_id,
@@ -61,6 +69,8 @@ pub async fn insert_vcard_tree(
         .await?;
 
     let component_id = inserted_component.id;
+    
+    tracing::trace!(component_id = %component_id, "Root VCARD component created");
 
     // Insert all vCard properties
     for (prop_ord, vcard_prop) in vcard.properties.iter().enumerate() {
@@ -104,6 +114,7 @@ pub async fn insert_vcard_tree(
         }
     }
 
+    tracing::debug!("vCard property tree inserted successfully");
     Ok(())
 }
 

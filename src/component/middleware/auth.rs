@@ -19,6 +19,10 @@ pub enum DepotUser {
 /// Returns an HTTP 401 Unauthorized response if authentication fails.
 #[salvo::async_trait]
 impl salvo::Handler for AuthMiddleware {
+    #[tracing::instrument(skip(self, req, depot, res, ctrl), fields(
+        method = %req.method(),
+        path = %req.uri().path()
+    ))]
     async fn handle(
         &self,
         req: &mut salvo::Request,
@@ -26,15 +30,20 @@ impl salvo::Handler for AuthMiddleware {
         res: &mut salvo::Response,
         ctrl: &mut salvo::FlowCtrl,
     ) {
+        tracing::trace!("Authenticating request");
+        
         match authenticate(req).await {
             Ok(user) => {
+    tracing::debug!(user_email = %user.email, "User authenticated successfully");
                 depot.insert("user", DepotUser::User(user));
             }
             Err(e) => match e {
                 crate::component::error::Error::NotAuthenticated => {
+                    tracing::debug!("Request not authenticated, treating as public");
                     depot.insert("user", DepotUser::Public);
                 }
                 crate::component::error::Error::AuthenticationError(_) => {
+                    tracing::warn!(error = ?e, "Authentication error");
                     res.status_code(salvo::http::StatusCode::UNAUTHORIZED);
                     res.body("Unauthorized");
                     ctrl.skip_rest();

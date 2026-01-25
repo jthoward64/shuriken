@@ -20,6 +20,7 @@ pub struct PutObjectResult {
 }
 
 /// Context for PUT operations.
+#[derive(Debug)]
 pub struct PutObjectContext {
     /// Collection ID where the object will be stored.
     pub collection_id: uuid::Uuid,
@@ -52,16 +53,28 @@ pub struct PutObjectContext {
 /// - UID conflict is detected
 /// - Preconditions fail
 /// - Database operations fail
+#[tracing::instrument(skip(conn, vcard_bytes), fields(
+    collection_id = %ctx.collection_id,
+    uri = %ctx.uri,
+    entity_type = %ctx.entity_type,
+    logical_uid = ?ctx.logical_uid,
+    has_if_none_match = ctx.if_none_match.is_some(),
+    has_if_match = ctx.if_match.is_some()
+))]
 pub async fn put_address_object(
     conn: &mut DbConnection<'_>,
     ctx: &PutObjectContext,
     vcard_bytes: &[u8],
 ) -> Result<PutObjectResult> {
+    tracing::debug!("Processing PUT address object");
+    
     // Verify collection exists
     let _collection = collection::get_collection(conn, ctx.collection_id)
         .await
         .context("failed to query collection")?
         .ok_or_else(|| anyhow::anyhow!("collection not found"))?;
+
+    tracing::debug!("Collection verified");
 
     // Parse vCard data
     let vcard_str = std::str::from_utf8(vcard_bytes)
@@ -69,6 +82,8 @@ pub async fn put_address_object(
     
     let vcard = crate::component::rfc::vcard::parse::parse_single(vcard_str)
         .map_err(|e| anyhow::anyhow!("invalid vCard: {e}"))?;
+
+    tracing::debug!("vCard data parsed successfully");
 
     // Extract UID for validation (optional, but recommended)
     let _uid = vcard.uid().map(String::from);
@@ -85,6 +100,7 @@ pub async fn put_address_object(
     if let Some(inm) = &ctx.if_none_match
         && inm == "*" && existing_instance.is_some()
     {
+        tracing::warn!("Precondition failed: resource already exists");
         anyhow::bail!("precondition failed: resource already exists");
     }
 
@@ -93,10 +109,12 @@ pub async fn put_address_object(
         match &existing_instance {
             Some(inst) => {
                 if inst.etag != *im {
+                    tracing::warn!(expected = %inst.etag, got = %im, "Precondition failed: ETag mismatch");
                     anyhow::bail!("precondition failed: ETag mismatch");
                 }
             }
             None => {
+                tracing::warn!("Precondition failed: resource does not exist");
                 anyhow::bail!("precondition failed: resource does not exist");
             }
         }
@@ -106,6 +124,7 @@ pub async fn put_address_object(
     if let Some(ref uid) = ctx.logical_uid {
         match entity::check_uid_conflict(conn, ctx.collection_id, uid, &ctx.uri).await {
             Ok(Some(conflicting_uri)) => {
+                tracing::warn!(uid = %uid, conflicting_uri = %conflicting_uri, "UID conflict detected");
                 anyhow::bail!(
                     "UID conflict: UID '{uid}' is already used by resource '{conflicting_uri}' in this collection"
                 );
@@ -114,7 +133,7 @@ pub async fn put_address_object(
                 // No conflict, proceed
             }
             Err(e) => {
-                tracing::error!("Failed to check UID conflict: {e}");
+                tracing::error!(error = %e, "Failed to check UID conflict");
                 anyhow::bail!("failed to check UID conflict: {e}");
             }
         }

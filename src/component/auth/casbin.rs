@@ -14,12 +14,17 @@ static ENFORCER: OnceLock<casbin::Enforcer> = OnceLock::new();
 ///
 /// ## Errors
 /// Returns an error if the enforcer initialization fails or if the enforcer is already initialized.
+#[tracing::instrument]
 pub async fn init_casbin() -> Result<()> {
+    tracing::debug!("Initializing Casbin enforcer");
+    
     let pool = get_pool();
 
     let model = casbin::DefaultModel::from_str(include_str!("casbin_model.conf")).await?;
+    tracing::debug!("Casbin model loaded");
 
     let adapter = diesel_async_adapter::DieselAdapter::with_pool(pool).await?;
+    tracing::debug!("Casbin adapter created");
 
     // casbin::Enforcer::new(model, adapter).await
     let enforcer = casbin::Enforcer::new(model, adapter).await?;
@@ -27,6 +32,8 @@ pub async fn init_casbin() -> Result<()> {
         tracing::error!("Casbin enforcer already initialized - this is a programming error");
         Error::InvariantViolation("Casbin enforcer already initialized".into())
     })?;
+    
+    tracing::info!("Casbin enforcer initialized successfully");
     Ok(())
 }
 

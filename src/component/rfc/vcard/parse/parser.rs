@@ -16,11 +16,21 @@ use crate::component::rfc::vcard::core::{VCard, VCardProperty, VCardValue, VCard
 /// ## Errors
 /// Returns a parse error if the document is malformed or contains
 /// invalid property values.
+#[tracing::instrument(skip(input), fields(input_len = input.len()))]
 pub fn parse(input: &str) -> ParseResult<Vec<VCard>> {
+    tracing::debug!("Parsing vCard document");
+    
     let unfolded = unfold_with_space(input);
     let lines = split_lines(&unfolded);
+    
+    tracing::trace!(count = lines.len(), "Split lines");
+    
     let mut parser = Parser::new(lines);
-    parser.parse_document()
+    let result = parser.parse_document()?;
+    
+    tracing::debug!(count = result.len(), "Parsed vCards");
+    
+    Ok(result)
 }
 
 /// Parses a single vCard from input.
@@ -30,9 +40,13 @@ pub fn parse(input: &str) -> ParseResult<Vec<VCard>> {
 ///
 /// ## Errors
 /// Returns an error if the document contains no vCards or is malformed.
+#[tracing::instrument(skip(input), fields(input_len = input.len()))]
 pub fn parse_single(input: &str) -> ParseResult<VCard> {
+    tracing::debug!("Parsing single vCard");
+    
     let cards = parse(input)?;
     cards.into_iter().next().ok_or_else(|| {
+        tracing::warn!("No vCard found in document");
         ParseError::new(
             ParseErrorKind::UnexpectedEof,
             1,

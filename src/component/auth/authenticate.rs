@@ -18,7 +18,10 @@ use crate::component::{
 /// ## Errors
 ///
 /// Returns an error if the user cannot be created or retrieved from the database.
+#[tracing::instrument]
 async fn authenticate_single_user() -> Result<User> {
+    tracing::debug!("Authenticating single user");
+    
     use diesel_async::RunQueryDsl;
 
     let config = get_config();
@@ -41,8 +44,11 @@ async fn authenticate_single_user() -> Result<User> {
         .await
         .optional()?
     {
+        tracing::debug!(user_email = %user.email, "Single user already exists");
         return Ok(user);
     }
+
+    tracing::debug!(email = %single_user_config.email, "Creating single user");
 
     // If not, create the user
     let principal_id = uuid::Uuid::now_v7();
@@ -72,6 +78,8 @@ async fn authenticate_single_user() -> Result<User> {
         .get_result::<User>(&mut conn)
         .await?;
 
+    tracing::info!(user_id = %user.id, user_email = %user.email, "Single user created");
+
     Ok(user)
 }
 
@@ -86,8 +94,11 @@ async fn authenticate_proxy(req: &salvo::Request) -> Result<User> {
 ///
 /// ## Errors
 /// Returns an error if authentication fails.
+#[tracing::instrument(skip(req))]
 pub async fn authenticate(req: &salvo::Request) -> Result<User> {
     let config = get_config();
+    
+    tracing::trace!(auth_method = ?config.auth.method, "Authenticating request");
 
     match config.auth.method {
         AuthMethod::SingleUser => authenticate_single_user().await,

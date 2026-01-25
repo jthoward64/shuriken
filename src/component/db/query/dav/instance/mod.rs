@@ -66,15 +66,31 @@ pub fn by_entity(entity_id: uuid::Uuid) -> dav_instance::BoxedQuery<'static, die
 ///
 /// ## Errors
 /// Returns a database error if the insert fails.
+#[tracing::instrument(skip(conn, new_instance), fields(
+    collection_id = %new_instance.collection_id,
+    entity_id = %new_instance.entity_id,
+    uri = new_instance.uri,
+    etag = new_instance.etag
+))]
 pub async fn create_instance(
     conn: &mut crate::component::db::connection::DbConnection<'_>,
     new_instance: &NewDavInstance<'_>,
 ) -> diesel::QueryResult<DavInstance> {
-    diesel::insert_into(dav_instance::table)
+    tracing::debug!("Creating new DAV instance");
+    
+    let result = diesel::insert_into(dav_instance::table)
         .values(new_instance)
         .returning(DavInstance::as_returning())
         .get_result(conn)
-        .await
+        .await;
+    
+    if result.is_ok() {
+        tracing::debug!("DAV instance created successfully");
+    } else {
+        tracing::error!("Failed to create DAV instance");
+    }
+    
+    result
 }
 
 /// ## Summary
@@ -82,6 +98,7 @@ pub async fn create_instance(
 ///
 /// ## Errors
 /// Returns a database error if the update fails.
+#[tracing::instrument(skip(conn, etag))]
 pub async fn update_instance(
     conn: &mut crate::component::db::connection::DbConnection<'_>,
     instance_id: uuid::Uuid,
@@ -89,7 +106,9 @@ pub async fn update_instance(
     sync_revision: i64,
     last_modified: chrono::DateTime<chrono::Utc>,
 ) -> diesel::QueryResult<DavInstance> {
-    diesel::update(dav_instance::table)
+    tracing::debug!(sync_revision, "Updating DAV instance");
+    
+    let result = diesel::update(dav_instance::table)
         .filter(dav_instance::id.eq(instance_id))
         .set((
             dav_instance::etag.eq(etag),
@@ -98,7 +117,13 @@ pub async fn update_instance(
         ))
         .returning(DavInstance::as_returning())
         .get_result(conn)
-        .await
+        .await;
+    
+    if result.is_ok() {
+        tracing::debug!("DAV instance updated successfully");
+    }
+    
+    result
 }
 
 /// ## Summary
@@ -106,16 +131,25 @@ pub async fn update_instance(
 ///
 /// ## Errors
 /// Returns a database error if the update fails.
+#[tracing::instrument(skip(conn))]
 pub async fn soft_delete_instance(
     conn: &mut crate::component::db::connection::DbConnection<'_>,
     instance_id: uuid::Uuid,
 ) -> diesel::QueryResult<DavInstance> {
-    diesel::update(dav_instance::table)
+    tracing::debug!("Soft-deleting DAV instance");
+    
+    let result = diesel::update(dav_instance::table)
         .filter(dav_instance::id.eq(instance_id))
         .set(dav_instance::deleted_at.eq(diesel::dsl::now))
         .returning(DavInstance::as_returning())
         .get_result(conn)
-        .await
+        .await;
+    
+    if result.is_ok() {
+        tracing::debug!("DAV instance soft-deleted successfully");
+    }
+    
+    result
 }
 
 /// ## Summary

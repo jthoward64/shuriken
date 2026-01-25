@@ -21,6 +21,7 @@ pub struct PutObjectResult {
 }
 
 /// Context for PUT operations.
+#[derive(Debug)]
 pub struct PutObjectContext {
     /// Collection ID where the object will be stored.
     pub collection_id: uuid::Uuid,
@@ -53,16 +54,28 @@ pub struct PutObjectContext {
 /// - UID conflict is detected
 /// - Preconditions fail
 /// - Database operations fail
+#[tracing::instrument(skip(conn, ical_bytes), fields(
+    collection_id = %ctx.collection_id,
+    uri = %ctx.uri,
+    entity_type = %ctx.entity_type,
+    logical_uid = ?ctx.logical_uid,
+    has_if_none_match = ctx.if_none_match.is_some(),
+    has_if_match = ctx.if_match.is_some()
+))]
 pub async fn put_calendar_object(
     conn: &mut DbConnection<'_>,
     ctx: &PutObjectContext,
     ical_bytes: &[u8],
 ) -> Result<PutObjectResult> {
+    tracing::debug!("Processing PUT calendar object");
+    
     // Verify collection exists
     let _collection = collection::get_collection(conn, ctx.collection_id)
         .await
         .context("failed to query collection")?
         .ok_or_else(|| anyhow::anyhow!("collection not found"))?;
+
+    tracing::debug!("Collection verified");
 
     // Parse iCalendar data
     let ical_str = std::str::from_utf8(ical_bytes)
@@ -70,6 +83,8 @@ pub async fn put_calendar_object(
     
     let ical = parse(ical_str)
         .map_err(|e| anyhow::anyhow!("invalid iCalendar: {e}"))?;
+
+    tracing::debug!("iCalendar data parsed successfully");
 
     // Extract UID for validation (optional, but recommended)
     let _uid = ical.root.uid().map(String::from);
@@ -86,6 +101,7 @@ pub async fn put_calendar_object(
     if let Some(inm) = &ctx.if_none_match
         && inm == "*" && existing_instance.is_some()
     {
+        tracing::warn!("Precondition failed: resource already exists");
         anyhow::bail!("precondition failed: resource already exists");
     }
 
@@ -94,10 +110,12 @@ pub async fn put_calendar_object(
         match &existing_instance {
             Some(inst) => {
                 if inst.etag != *im {
+                    tracing::warn!(expected = %inst.etag, got = %im, "Precondition failed: ETag mismatch");
                     anyhow::bail!("precondition failed: ETag mismatch");
                 }
             }
             None => {
+                tracing::warn!("Precondition failed: resource does not exist");
                 anyhow::bail!("precondition failed: resource does not exist");
             }
         }
@@ -107,15 +125,16 @@ pub async fn put_calendar_object(
     if let Some(ref uid) = ctx.logical_uid {
         match entity::check_uid_conflict(conn, ctx.collection_id, uid, &ctx.uri).await {
             Ok(Some(conflicting_uri)) => {
+                tracing::warn!(uid = %uid, conflicting_uri = %conflicting_uri, "UID conflict detected");
                 anyhow::bail!(
                     "UID conflict: UID '{uid}' is already used by resource '{conflicting_uri}' in this collection"
                 );
             }
             Ok(None) => {
-                // No conflict, proceed
+                tracing::trace!("No UID conflict detected");
             }
             Err(e) => {
-                tracing::error!("Failed to check UID conflict: {e}");
+                tracing::error!(error = %e, "Failed to check UID conflict");
                 anyhow::bail!("failed to check UID conflict: {e}");
             }
         }
@@ -126,10 +145,14 @@ pub async fn put_calendar_object(
     // Generate ETag from canonical bytes
     let etag = instance::generate_etag(ical_bytes);
 
+    tracing::debug!(etag = %etag, "Generated ETag");
+
     // TODO: Use a transaction for atomic updates
     // For now, we'll do sequential operations
 
     if let Some(existing_inst) = existing_instance {
+        tracing::debug!("Updating existing instance");
+        
         // Update existing instance
         // For now, just update the ETag and sync revision
         // Full entity tree replacement will be implemented once proper ID mapping is in place
@@ -159,7 +182,11 @@ pub async fn put_calendar_object(
         entity::insert_ical_tree(conn, existing_inst.entity_id, &ical)
             .await
             .context("failed to insert component tree")?;
+        
+        tracing::info!("Calendar object updated successfully");
     } else {
+        tracing::debug!("Creating new instance");
+        
         // Create new entity and instance
         // For now, create a minimal entity without the full tree
         // Full tree insertion will be implemented once proper ID mapping is in place
@@ -197,7 +224,10 @@ pub async fn put_calendar_object(
         entity::insert_ical_tree(conn, created_entity.id, &ical)
             .await
             .context("failed to insert component tree")?;
+        
+        tracing::info!("Calendar object created successfully");
     }
 
+    tracing::debug!(created = %created, "PUT calendar object completed successfully");
     Ok(PutObjectResult { etag, created })
 }

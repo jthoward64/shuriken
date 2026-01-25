@@ -18,7 +18,10 @@ static DB_POOL: OnceLock<DbPool> = OnceLock::new();
 /// ## Panics
 /// Panics if the database pool is already initialized. This is a programming error
 /// and indicates `create_pool()` was called multiple times.
+#[tracing::instrument(skip(database_url), fields(pool_size = size))]
 pub async fn create_pool(database_url: &str, size: u32) -> anyhow::Result<()> {
+    tracing::debug!("Creating database connection pool");
+    
     let config = AsyncDieselConnectionManager::<AsyncPgConnection>::new(database_url);
 
     let pool = Pool::builder()
@@ -34,6 +37,8 @@ pub async fn create_pool(database_url: &str, size: u32) -> anyhow::Result<()> {
         .set(pool)
         .expect("Database pool is already set - create_pool() must only be called once at startup");
 
+    tracing::info!(pool_size = size, "Database connection pool created successfully");
+
     Ok(())
 }
 
@@ -47,12 +52,23 @@ pub async fn create_pool(database_url: &str, size: u32) -> anyhow::Result<()> {
 /// ## Errors
 ///
 /// Returns a `PoolError` if unable to get a connection from the pool.
+#[tracing::instrument]
 pub async fn connect() -> Result<DbConnection<'static>, RunError> {
-    DB_POOL
+    tracing::trace!("Acquiring database connection from pool");
+    
+    let result = DB_POOL
         .get()
         .expect("Database pool is not initialized - create_pool() must be called at startup")
         .get()
-        .await
+        .await;
+    
+    if result.is_ok() {
+        tracing::trace!("Database connection acquired successfully");
+    } else {
+        tracing::error!("Failed to acquire database connection from pool");
+    }
+    
+    result
 }
 
 /// ## Summary

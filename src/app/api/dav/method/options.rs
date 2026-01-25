@@ -12,7 +12,10 @@ use salvo::{Request, Response, handler};
 /// ## Side Effects
 /// Sets the `Allow` and `DAV` headers on the response.
 #[handler]
-pub async fn options(_req: &mut Request, res: &mut Response) {
+#[tracing::instrument(skip(req, res), fields(path = %req.uri().path()))]
+pub async fn options(req: &mut Request, res: &mut Response) {
+    tracing::info!("Handling OPTIONS request");
+    
     // TODO: Determine if this is a collection or item based on path/database lookup
     // For now, return a generic set of methods
     
@@ -31,6 +34,8 @@ pub async fn options(_req: &mut Request, res: &mut Response) {
     #[expect(clippy::let_underscore_must_use, reason = "Header addition failure is non-fatal")]
     let _ = res.add_header("DAV", HeaderValue::from_static(dav_header), true);
     res.status_code(salvo::http::StatusCode::OK);
+    
+    tracing::debug!("OPTIONS response sent");
 }
 
 /// ## Summary
@@ -38,7 +43,10 @@ pub async fn options(_req: &mut Request, res: &mut Response) {
 ///
 /// Collections support additional methods like MKCALENDAR, MKCOL.
 #[handler]
-pub async fn options_collection(_req: &mut Request, res: &mut Response) {
+#[tracing::instrument(skip(req, res), fields(path = %req.uri().path()))]
+pub async fn options_collection(req: &mut Request, res: &mut Response) {
+    tracing::info!("Handling OPTIONS request for collection");
+    
     // Collection-specific methods include MKCALENDAR, MKCOL (future phases)
     let allow_methods = "OPTIONS, GET, HEAD, PUT, DELETE, PROPFIND, MKCALENDAR, MKCOL";
     let dav_header = "1, 3, calendar-access, addressbook";
@@ -48,6 +56,8 @@ pub async fn options_collection(_req: &mut Request, res: &mut Response) {
     #[expect(clippy::let_underscore_must_use, reason = "Header addition failure is non-fatal")]
     let _ = res.add_header("DAV", HeaderValue::from_static(dav_header), true);
     res.status_code(salvo::http::StatusCode::OK);
+    
+    tracing::debug!("OPTIONS collection response sent");
 }
 
 /// ## Summary
@@ -55,7 +65,10 @@ pub async fn options_collection(_req: &mut Request, res: &mut Response) {
 ///
 /// Items support basic CRUD operations but not collection creation.
 #[handler]
-pub async fn options_item(_req: &mut Request, res: &mut Response) {
+#[tracing::instrument(skip(req, res), fields(path = %req.uri().path()))]
+pub async fn options_item(req: &mut Request, res: &mut Response) {
+    tracing::info!("Handling OPTIONS request for item");
+    
     // Item-specific methods (no MKCALENDAR/MKCOL)
     let allow_methods = "OPTIONS, GET, HEAD, PUT, DELETE";
     let dav_header = "1, 3, calendar-access, addressbook";
@@ -65,4 +78,6 @@ pub async fn options_item(_req: &mut Request, res: &mut Response) {
     #[expect(clippy::let_underscore_must_use, reason = "Header addition failure is non-fatal")]
     let _ = res.add_header("DAV", HeaderValue::from_static(dav_header), true);
     res.status_code(salvo::http::StatusCode::OK);
+    
+    tracing::debug!("OPTIONS item response sent");
 }
