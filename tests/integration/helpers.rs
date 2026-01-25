@@ -130,27 +130,34 @@ impl TestDb {
     pub async fn truncate_all(&self) -> anyhow::Result<()> {
         let mut conn = self.get_conn().await?;
         
-        // Truncate in reverse dependency order to avoid foreign key violations
-        diesel::sql_query("TRUNCATE TABLE card_phone CASCADE").execute(&mut conn).await?;
-        diesel::sql_query("TRUNCATE TABLE card_email CASCADE").execute(&mut conn).await?;
-        diesel::sql_query("TRUNCATE TABLE card_index CASCADE").execute(&mut conn).await?;
-        diesel::sql_query("TRUNCATE TABLE cal_occurrence CASCADE").execute(&mut conn).await?;
-        diesel::sql_query("TRUNCATE TABLE cal_index CASCADE").execute(&mut conn).await?;
-        diesel::sql_query("TRUNCATE TABLE dav_shadow CASCADE").execute(&mut conn).await?;
-        diesel::sql_query("TRUNCATE TABLE dav_tombstone CASCADE").execute(&mut conn).await?;
-        diesel::sql_query("TRUNCATE TABLE dav_parameter CASCADE").execute(&mut conn).await?;
-        diesel::sql_query("TRUNCATE TABLE dav_property CASCADE").execute(&mut conn).await?;
-        diesel::sql_query("TRUNCATE TABLE dav_component CASCADE").execute(&mut conn).await?;
-        diesel::sql_query("TRUNCATE TABLE dav_instance CASCADE").execute(&mut conn).await?;
-        diesel::sql_query("TRUNCATE TABLE dav_entity CASCADE").execute(&mut conn).await?;
-        diesel::sql_query("TRUNCATE TABLE dav_collection CASCADE").execute(&mut conn).await?;
-        diesel::sql_query("TRUNCATE TABLE membership CASCADE").execute(&mut conn).await?;
-        diesel::sql_query("TRUNCATE TABLE group_name CASCADE").execute(&mut conn).await?;
-        diesel::sql_query("TRUNCATE TABLE \"group\" CASCADE").execute(&mut conn).await?;
-        diesel::sql_query("TRUNCATE TABLE auth_user CASCADE").execute(&mut conn).await?;
-        diesel::sql_query("TRUNCATE TABLE \"user\" CASCADE").execute(&mut conn).await?;
-        diesel::sql_query("TRUNCATE TABLE principal CASCADE").execute(&mut conn).await?;
-        diesel::sql_query("TRUNCATE TABLE casbin_rule CASCADE").execute(&mut conn).await?;
+        // Truncate all tables in a single statement with CASCADE to handle foreign keys
+        // Tables are listed in reverse dependency order for clarity, though CASCADE handles dependencies
+        diesel::sql_query(
+            "TRUNCATE TABLE 
+                card_phone,
+                card_email,
+                card_index,
+                cal_occurrence,
+                cal_index,
+                dav_shadow,
+                dav_tombstone,
+                dav_parameter,
+                dav_property,
+                dav_component,
+                dav_instance,
+                dav_entity,
+                dav_collection,
+                membership,
+                group_name,
+                \"group\",
+                auth_user,
+                \"user\",
+                principal,
+                casbin_rule
+            CASCADE"
+        )
+        .execute(&mut conn)
+        .await?;
         
         Ok(())
     }
