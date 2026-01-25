@@ -67,7 +67,6 @@ pub async fn report(req: &mut Request, res: &mut Response) {
 ///
 /// ## Errors
 /// Returns 400 for invalid filters, 404 for missing collections, 500 for server errors.
-#[expect(dead_code)]
 pub async fn handle_calendar_query(
     _req: &mut Request,
     res: &mut Response,
@@ -107,7 +106,6 @@ pub async fn handle_calendar_query(
 ///
 /// ## Errors
 /// Returns 400 for invalid hrefs, 500 for server errors.
-#[expect(dead_code)]
 pub async fn handle_calendar_multiget(
     _req: &mut Request,
     res: &mut Response,
@@ -143,7 +141,6 @@ pub async fn handle_calendar_multiget(
 ///
 /// ## Errors
 /// Returns database errors or filter evaluation errors.
-#[expect(clippy::unused_async)]
 async fn build_calendar_query_response(
     _conn: &mut connection::DbConnection<'_>,
     _query: &CalendarQuery,
@@ -167,21 +164,57 @@ async fn build_calendar_query_response(
 ///
 /// ## Errors
 /// Returns database errors if queries fail.
-#[expect(clippy::unused_async)]
 async fn build_calendar_multiget_response(
-    _conn: &mut connection::DbConnection<'_>,
-    _multiget: &CalendarMultiget,
-    _properties: &[crate::component::rfc::dav::core::PropertyName],
+    conn: &mut connection::DbConnection<'_>,
+    multiget: &CalendarMultiget,
+    properties: &[crate::component::rfc::dav::core::PropertyName],
 ) -> anyhow::Result<Multistatus> {
-    // TODO: Implement multiget logic
-    // 1. For each href in multiget.hrefs:
-    //    a. Parse href to get collection_id and uri
-    //    b. Query instance by collection_id and uri
-    //    c. Fetch requested properties
-    //    d. Add to multistatus response
-    // 2. Return 404 for missing resources
+    use diesel::prelude::*;
+    use diesel_async::RunQueryDsl;
+    use crate::component::db::query::dav::instance;
+    use crate::component::model::dav::instance::DavInstance;
+    use crate::component::rfc::dav::core::{PropstatResponse, DavProperty, PropertyValue, Href};
     
-    Ok(Multistatus::new())
+    let mut multistatus = Multistatus::new();
+    
+    // Process each href
+    for href in &multiget.hrefs {
+        let href_str = href.as_str();
+        
+        // For now, we'll need to parse the href to extract the URI
+        // This is a simplified implementation - in production we'd need proper path parsing
+        // Format: /calendars/{username}/{calendar_name}/{event_uid}.ics
+        let uri = href_str.rsplit('/').next().unwrap_or(href_str);
+        
+        // TODO: Extract collection_id from the href path
+        // For now, we'll create a stub response indicating the resource was not found
+        // In a real implementation, we would:
+        // 1. Parse the full href to get principal/collection/resource
+        // 2. Look up the collection_id from the path
+        // 3. Query the instance
+        
+        // Create a 404 response for now since we can't properly parse hrefs yet
+        let response = PropstatResponse::not_found(href.clone());
+        multistatus.add_response(response);
+        
+        // TODO: Once we have proper href parsing:
+        // let instance_opt = instance::by_collection_and_uri(collection_id, uri)
+        //     .select(DavInstance::as_select())
+        //     .first::<DavInstance>(conn)
+        //     .await
+        //     .optional()?;
+        //
+        // if let Some(inst) = instance_opt {
+        //     let props = build_properties_for_instance(&inst, properties);
+        //     let response = PropstatResponse::ok(href.clone(), props);
+        //     multistatus.add_response(response);
+        // } else {
+        //     let response = PropstatResponse::not_found(href.clone());
+        //     multistatus.add_response(response);
+        // }
+    }
+    
+    Ok(multistatus)
 }
 
 /// ## Summary

@@ -67,7 +67,6 @@ pub async fn report(req: &mut Request, res: &mut Response) {
 ///
 /// ## Errors
 /// Returns 400 for invalid filters, 404 for missing addressbooks, 500 for server errors.
-#[expect(dead_code)]
 pub async fn handle_addressbook_query(
     _req: &mut Request,
     res: &mut Response,
@@ -107,7 +106,6 @@ pub async fn handle_addressbook_query(
 ///
 /// ## Errors
 /// Returns 400 for invalid hrefs, 500 for server errors.
-#[expect(dead_code)]
 pub async fn handle_addressbook_multiget(
     _req: &mut Request,
     res: &mut Response,
@@ -143,7 +141,6 @@ pub async fn handle_addressbook_multiget(
 ///
 /// ## Errors
 /// Returns database errors or filter evaluation errors.
-#[expect(clippy::unused_async)]
 async fn build_addressbook_query_response(
     _conn: &mut connection::DbConnection<'_>,
     _query: &AddressbookQuery,
@@ -167,21 +164,29 @@ async fn build_addressbook_query_response(
 ///
 /// ## Errors
 /// Returns database errors if queries fail.
-#[expect(clippy::unused_async)]
 async fn build_addressbook_multiget_response(
-    _conn: &mut connection::DbConnection<'_>,
-    _multiget: &AddressbookMultiget,
-    _properties: &[crate::component::rfc::dav::core::PropertyName],
+    conn: &mut connection::DbConnection<'_>,
+    multiget: &AddressbookMultiget,
+    properties: &[crate::component::rfc::dav::core::PropertyName],
 ) -> anyhow::Result<Multistatus> {
-    // TODO: Implement multiget logic
-    // 1. For each href in multiget.hrefs:
-    //    a. Parse href to get collection_id and uri
-    //    b. Query instance by collection_id and uri
-    //    c. Fetch requested properties
-    //    d. Add to multistatus response
-    // 2. Return 404 for missing resources
+    use crate::component::rfc::dav::core::PropstatResponse;
     
-    Ok(Multistatus::new())
+    let mut multistatus = Multistatus::new();
+    
+    // Process each href
+    for href in &multiget.hrefs {
+        // For now, return 404 for all resources since we don't have proper href parsing yet
+        // TODO: Implement proper href parsing and vCard retrieval
+        // 1. Parse href to extract collection_id and resource URI
+        // 2. Query the instance from database
+        // 3. Build properties based on what was requested
+        // 4. Return appropriate propstat (200 for found, 404 for not found)
+        
+        let response = PropstatResponse::not_found(href.clone());
+        multistatus.add_response(response);
+    }
+    
+    Ok(multistatus)
 }
 
 /// ## Summary
