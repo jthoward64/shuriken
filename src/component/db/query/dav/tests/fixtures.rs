@@ -1,4 +1,5 @@
-#![allow(clippy::doc_markdown, clippy::unused_async, dead_code)]
+#![allow(clippy::doc_markdown, clippy::unused_async)]
+#![expect(dead_code, reason = "Test fixtures may have unused code")]
 //! Test fixtures for DAV database tests.
 //!
 //! Provides helpers for creating test data: principals, collections, entities, and instances.
