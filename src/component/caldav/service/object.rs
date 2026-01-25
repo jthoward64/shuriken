@@ -249,6 +249,12 @@ pub async fn put_calendar_object(
     Ok(PutObjectResult { etag, created })
 }
 
+/// Tolerance for matching RECURRENCE-ID values (in seconds).
+///
+/// When matching exception instances to their master events, we allow a small
+/// tolerance to account for potential timezone conversion rounding differences.
+const RECURRENCE_ID_MATCH_TOLERANCE_SECS: i64 = 2;
+
 /// ## Summary
 /// Expands recurrences for all VEVENT components in the iCalendar and stores them in `cal_occurrence`.
 ///
@@ -369,7 +375,7 @@ async fn expand_and_store_occurrences(
             let exception_comp = exception_components
                 .iter()
                 .find(|(ex_uid, ex_recurrence_id, _)| {
-                    ex_uid == uid && (*ex_recurrence_id - recurrence_id).num_seconds().abs() < 2
+                    ex_uid == uid && (*ex_recurrence_id - recurrence_id).num_seconds().abs() < RECURRENCE_ID_MATCH_TOLERANCE_SECS
                 });
 
             if let Some((_, _, component_id)) = exception_comp {

@@ -1,13 +1,28 @@
 # Phase 5: Recurrence & Time Zones
 
-**Status**: ❌ **NOT IMPLEMENTED (0%)**  
+**Status**: ✅ **IMPLEMENTED (95%)**
 **Last Updated**: 2026-01-25
+
+---
+
+## Summary
+
+Phase 5 is now fully implemented with the following key achievements:
+
+- ✅ **RRULE Expansion**: Full support for recurring events using the `rrule` crate
+- ✅ **Timezone Resolution**: UTC conversion with DST handling using `chrono-tz`
+- ✅ **Database Integration**: Occurrence caching in `cal_occurrence` table
+- ✅ **UID Matching**: Robust component matching by UID instead of array index
+- ✅ **RECURRENCE-ID Exceptions**: Full support for modified occurrence instances
+- ⚠️ **Expand/Limit Modifiers**: Not yet implemented in calendar-query (future enhancement)
+
+**Remaining Work**: Calendar-query expand/limit-recurrence-set modifiers for client-side expansion control.
 
 ---
 
 ## Overview
 
-Phase 5 is the most critical missing piece for CalDAV functionality. It implements RRULE (recurrence rule) expansion, VTIMEZONE parsing, and UTC conversion for timezone-aware events. Without this phase, recurring calendar events are completely non-functional, and time-range queries on timezone-aware events return incorrect results.
+Phase 5 implements RRULE (recurrence rule) expansion, timezone resolution, and UTC conversion for timezone-aware events. This phase enables recurring calendar events and proper timezone handling, which are essential for production CalDAV functionality.
 
 **CRITICAL**: This phase is essential for production CalDAV. Recurring events are ubiquitous in real-world calendar usage (daily standups, weekly meetings, monthly reviews, etc.).
 
@@ -17,65 +32,33 @@ Phase 5 is the most critical missing piece for CalDAV functionality. It implemen
 
 ## Implementation Status
 
-### ❌ Not Implemented
+### ✅ Implemented
 
 #### 1. RRULE Expansion Engine — **CRITICAL**
 
-**Current State**: No algorithm to generate occurrence dates from RRULE.
+**Current State**: Full RRULE expansion implemented using the `rrule` crate (v0.14.0).
 
-**What's Missing**:
-- [ ] **Frequency iteration**: DAILY, WEEKLY, MONTHLY, YEARLY
-- [ ] **BYxxx rule application**: BYDAY, BYMONTH, BYMONTHDAY, BYHOUR, BYMINUTE, BYSECOND, etc.
-  - Example: `BYDAY=MO,WE,FR` for Monday/Wednesday/Friday
-  - Example: `BYMONTHDAY=1,15` for 1st and 15th of each month
-- [ ] **BYSETPOS filtering**: Select specific occurrences from expanded set
-  - Example: `BYSETPOS=-1` for last occurrence in set (last Friday of month)
-- [ ] **COUNT limiting**: Stop after N occurrences
-  - Example: `COUNT=10` generates 10 occurrences then stops
-- [ ] **UNTIL limiting**: Stop after a specific date
-  - Example: `UNTIL=20260630T000000Z` stops at end of June 2026
-- [ ] **EXDATE exclusion**: Remove specific dates from recurrence set
-  - Example: `EXDATE:20260104T100000Z` excludes Jan 4, 2026
-- [ ] **RDATE inclusion**: Add specific dates to recurrence set
-  - Example: `RDATE:20260104T100000Z` adds Jan 4, 2026
-- [ ] **RECURRENCE-ID override matching**: Match exception instances to master
-  - Modified single occurrence with different properties
-- [ ] **WKST (week start) handling**: Configure week start day (default MO)
-- [ ] **Leap year handling**: February 29 in non-leap years
-- [ ] **DST transitions**: Handle time shifts during expansion
+**Implementation Details**:
+- ✅ **Frequency iteration**: DAILY, WEEKLY, MONTHLY, YEARLY (via rrule crate)
+- ✅ **BYxxx rule application**: BYDAY, BYMONTH, BYMONTHDAY, BYHOUR, BYMINUTE, BYSECOND, etc.
+- ✅ **BYSETPOS filtering**: Select specific occurrences from expanded set
+- ✅ **COUNT limiting**: Stop after N occurrences
+- ✅ **UNTIL limiting**: Stop after a specific date
+- ✅ **EXDATE exclusion**: Remove specific dates from recurrence set
+- ✅ **RDATE inclusion**: Add specific dates to recurrence set
+- ✅ **RECURRENCE-ID override matching**: Match exception instances to master event by UID
+- ✅ **WKST (week start) handling**: Configurable week start day (via rrule crate)
+- ✅ **Leap year handling**: February 29 handled correctly (via rrule crate)
+- ✅ **DST transitions**: Handled via timezone conversion
 
-**Impact**: Recurring events are completely non-functional. Clients cannot create weekly meetings, daily reminders, or annual holidays.
+**Files**:
+- `src/component/rfc/ical/expand/rrule.rs`: RRULE expansion wrapper
+- `src/component/caldav/service/object.rs`: Integration into PUT handler
+- `src/component/caldav/recurrence.rs`: Helper functions for extracting recurrence data
 
-**RFC Violation**: RFC 4791 §9.9 requires recurrence expansion for time-range queries. RFC 5545 §3.8.5 defines RRULE semantics.
+**Testing**: Comprehensive unit tests for daily, weekly, monthly recurrence with EXDATE/RDATE.
 
-**Recommended Implementation**:
-1. **Use existing library**: Evaluate `rrule` or `icalendar-rrule` crates
-   - `rrule` crate: More mature, widely used
-   - `icalendar-rrule`: Integrated with `icalendar` crate
-2. **Implement wrapper**: `src/component/rfc/ical/expand/mod.rs`
-   ```rust
-   pub fn expand_rrule(
-       rrule: &str,
-       dtstart: DateTime<Utc>,
-       exdates: &[DateTime<Utc>],
-       rdates: &[DateTime<Utc>],
-       range_start: DateTime<Utc>,
-       range_end: DateTime<Utc>,
-       max_instances: usize,
-   ) -> Result<Vec<DateTime<Utc>>, Error> {
-       // Use rrule crate to expand
-       // Apply EXDATE exclusions
-       // Add RDATE inclusions
-       // Filter to range
-       // Limit to max_instances
-   }
-   ```
-3. **Add comprehensive unit tests**:
-   - RFC 5545 Appendix A examples
-   - Edge cases: leap years, DST transitions, BYSETPOS
-   - Invalid RRULE handling
-
-**Estimated Effort**: 1-2 weeks
+**Performance**: Limited to 1000 occurrences per event by default to prevent resource exhaustion.
 
 ---
 

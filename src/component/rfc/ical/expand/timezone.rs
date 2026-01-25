@@ -11,15 +11,15 @@ pub enum ConversionError {
     /// Unknown or invalid timezone identifier.
     #[error("Unknown timezone: {0}")]
     UnknownTimezone(String),
-    
+
     /// Ambiguous time during DST fold.
     #[error("Ambiguous time (DST fold): {0}")]
     AmbiguousTime(String),
-    
+
     /// Non-existent time during DST gap.
     #[error("Non-existent time (DST gap): {0}")]
     NonExistentTime(String),
-    
+
     /// Invalid datetime format.
     #[error("Invalid datetime: {0}")]
     InvalidDateTime(String),
@@ -42,7 +42,7 @@ impl TimeZoneResolver {
             cache: HashMap::new(),
         }
     }
-    
+
     /// ## Summary
     /// Resolves a timezone identifier to a `chrono_tz::Tz`.
     ///
@@ -61,17 +61,17 @@ impl TimeZoneResolver {
         if let Some(tz) = self.cache.get(tzid) {
             return Ok(*tz);
         }
-        
+
         // Normalize common CalDAV timezone identifiers
         let normalized = normalize_tzid(tzid);
-        
+
         // Try parsing as IANA timezone
         let tz = Tz::from_str(&normalized)
             .map_err(|_e| ConversionError::UnknownTimezone(tzid.to_string()))?;
-        
+
         // Cache the result
         self.cache.insert(tzid.to_string(), tz);
-        
+
         Ok(tz)
     }
 }
@@ -93,7 +93,7 @@ fn normalize_tzid(tzid: &str) -> String {
         .or_else(|| tzid.strip_prefix("/softwarestudio.org/"))
         .unwrap_or(tzid)
         .to_string();
-    
+
     // Handle Windows timezone names (common in Outlook)
     if normalized == "Eastern Standard Time" {
         normalized = "America/New_York".to_string();
@@ -104,7 +104,7 @@ fn normalize_tzid(tzid: &str) -> String {
     } else if normalized == "Mountain Standard Time" {
         normalized = "America/Denver".to_string();
     }
-    
+
     normalized
 }
 
@@ -131,7 +131,7 @@ pub fn convert_to_utc(
 ) -> Result<DateTime<Utc>, ConversionError> {
     // Resolve the timezone
     let tz = resolver.resolve(tzid)?;
-    
+
     // Convert local time to UTC
     // Handle DST ambiguity
     match tz.from_local_datetime(&local_time) {
@@ -188,21 +188,21 @@ pub fn convert_to_utc_lenient(
 mod tests {
     use super::*;
     use chrono::TimeZone;
-    
+
     #[test]
     fn test_resolve_standard_timezone() {
         let mut resolver = TimeZoneResolver::new();
-        
+
         let tz = resolver.resolve("America/New_York").expect("should resolve");
         assert_eq!(tz, Tz::America__New_York);
     }
-    
+
     #[test]
     fn test_normalize_windows_timezone() {
         assert_eq!(normalize_tzid("Eastern Standard Time"), "America/New_York");
         assert_eq!(normalize_tzid("Pacific Standard Time"), "America/Los_Angeles");
     }
-    
+
     #[test]
     fn test_normalize_mozilla_prefix() {
         assert_eq!(
@@ -210,53 +210,53 @@ mod tests {
             "America/New_York"
         );
     }
-    
+
     #[test]
     fn test_convert_to_utc_basic() {
         let mut resolver = TimeZoneResolver::new();
-        
+
         // 2026-01-15 10:00:00 in New York
         let local = NaiveDateTime::new(
             chrono::NaiveDate::from_ymd_opt(2026, 1, 15).unwrap(),
             chrono::NaiveTime::from_hms_opt(10, 0, 0).unwrap(),
         );
-        
+
         let utc = convert_to_utc(local, "America/New_York", &mut resolver)
             .expect("conversion should succeed");
-        
+
         // In January, EST is UTC-5
         let expected = Utc.with_ymd_and_hms(2026, 1, 15, 15, 0, 0).unwrap();
         assert_eq!(utc, expected);
     }
-    
+
     #[test]
     fn test_convert_to_utc_dst() {
         let mut resolver = TimeZoneResolver::new();
-        
+
         // 2026-07-15 10:00:00 in New York (EDT, UTC-4)
         let local = NaiveDateTime::new(
             chrono::NaiveDate::from_ymd_opt(2026, 7, 15).unwrap(),
             chrono::NaiveTime::from_hms_opt(10, 0, 0).unwrap(),
         );
-        
+
         let utc = convert_to_utc(local, "America/New_York", &mut resolver)
             .expect("conversion should succeed");
-        
+
         // In July, EDT is UTC-4
         let expected = Utc.with_ymd_and_hms(2026, 7, 15, 14, 0, 0).unwrap();
         assert_eq!(utc, expected);
     }
-    
+
     #[test]
     fn test_timezone_caching() {
         let mut resolver = TimeZoneResolver::new();
-        
+
         // First resolution
         resolver.resolve("America/New_York").expect("should resolve");
-        
+
         // Cache should contain the timezone
         assert!(resolver.cache.contains_key("America/New_York"));
-        
+
         // Second resolution should use cache
         resolver.resolve("America/New_York").expect("should resolve from cache");
     }
