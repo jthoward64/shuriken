@@ -41,4 +41,18 @@ The previous consolidated files (AUDIT-SUMMARY.md, Implementation-Checklist.md, 
 
 ## Migration Notes
 
-The old files in this directory are kept for reference but are no longer maintained. All updates should be made to the files in `documenataion/project-status/`.
+The old files in this directory have been **archived** with an `ARCHIVED-` prefix:
+- `ARCHIVED-AUDIT-SUMMARY.md` (replaced by Overall.md)
+- `ARCHIVED-Implementation-Checklist.md` (content integrated into phase files)
+- `ARCHIVED-Implementation-Status.md` (split into phase-by-phase files)
+
+These archived files are kept for historical reference only and are **no longer maintained**. 
+
+**All updates should be made to the files in `documenataion/project-status/`.**
+
+## Quick Start
+
+For the current project status, start with:
+1. **[Overall.md](../documenataion/project-status/Overall.md)** — Get the big picture
+2. **[Phase 5.md](../documenataion/project-status/Phase%205.md)** — See the critical blocker (Recurrence & Timezones)
+3. **Individual Phase Files** — Drill into specific areas of interest
