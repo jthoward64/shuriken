@@ -95,20 +95,21 @@ impl TestDb {
     /// - All modifications are logged as info messages
     #[expect(dead_code)]
     pub async fn new() -> anyhow::Result<Self> {
-        let mut database_url = std::env::var("DATABASE_URL")
-            .map_err(|_| anyhow::anyhow!("DATABASE_URL environment variable must be set for tests"))?;
+        let mut database_url = std::env::var("DATABASE_URL").map_err(|_| {
+            anyhow::anyhow!("DATABASE_URL environment variable must be set for tests")
+        })?;
 
         // Parse the database URL to check and modify database name
         if let Some(db_name_start) = database_url.rfind('/') {
             let after_slash = &database_url[db_name_start + 1..];
-            
+
             // Split database name from query parameters
             let (db_name, query_params) = if let Some(query_start) = after_slash.find('?') {
                 (&after_slash[..query_start], &after_slash[query_start..])
             } else {
                 (after_slash, "")
             };
-            
+
             // Check and fix database name
             let mut needs_db_change = false;
             if db_name != "shuriken_test" {
@@ -118,32 +119,17 @@ impl TestDb {
                 );
                 needs_db_change = true;
             }
-            
-            // Check if schema parameter exists
-            let has_schema = query_params.contains("schema=");
-            let mut needs_schema_param = false;
-            
-            if !has_schema {
-                tracing::info!(
-                    "TestDb: No schema parameter found in DATABASE_URL, adding '?schema=shuriken_test' to avoid modifying public schema"
-                );
-                needs_schema_param = true;
-            }
-            
+
             // Rebuild URL if needed
-            if needs_db_change || needs_schema_param {
+            if needs_db_change {
                 let base_url = &database_url[..db_name_start + 1];
-                let new_db_name = if needs_db_change { "shuriken_test" } else { db_name };
-                
-                database_url = if needs_schema_param {
-                    if query_params.is_empty() {
-                        format!("{base_url}{new_db_name}?schema=shuriken_test")
-                    } else {
-                        format!("{base_url}{new_db_name}{query_params}&schema=shuriken_test")
-                    }
+                let new_db_name = if needs_db_change {
+                    "shuriken_test"
                 } else {
-                    format!("{base_url}{new_db_name}{query_params}")
+                    db_name
                 };
+
+                database_url = format!("{base_url}{new_db_name}{query_params}");
             }
         }
 
@@ -187,7 +173,7 @@ impl TestDb {
     #[expect(dead_code)]
     pub async fn truncate_all(&self) -> anyhow::Result<()> {
         let mut conn = self.get_conn().await?;
-        
+
         // Truncate all tables in a single statement with CASCADE to handle foreign keys
         // Tables are listed in reverse dependency order for clarity, though CASCADE handles dependencies
         diesel::sql_query(
@@ -212,11 +198,11 @@ impl TestDb {
                 \"user\",
                 principal,
                 casbin_rule
-            CASCADE"
+            CASCADE",
         )
         .execute(&mut conn)
         .await?;
-        
+
         Ok(())
     }
 
@@ -241,7 +227,7 @@ impl TestDb {
 
         let mut conn = self.get_conn().await?;
         let principal_id = uuid::Uuid::now_v7();
-        
+
         let new_principal = NewPrincipal {
             id: principal_id,
             principal_type,
@@ -272,7 +258,7 @@ impl TestDb {
         use shuriken::component::model::user::NewUser;
 
         let mut conn = self.get_conn().await?;
-        
+
         let new_user = NewUser {
             name,
             email,
@@ -304,7 +290,7 @@ impl TestDb {
         use shuriken::component::model::dav::collection::NewDavCollection;
 
         let mut conn = self.get_conn().await?;
-        
+
         let new_collection = NewDavCollection {
             owner_principal_id,
             collection_type,
@@ -337,7 +323,7 @@ impl TestDb {
         use shuriken::component::model::dav::entity::NewDavEntity;
 
         let mut conn = self.get_conn().await?;
-        
+
         let new_entity = NewDavEntity {
             entity_type,
             logical_uid,
@@ -370,7 +356,7 @@ impl TestDb {
         use shuriken::component::model::dav::instance::NewDavInstance;
 
         let mut conn = self.get_conn().await?;
-        
+
         let new_instance = NewDavInstance {
             collection_id,
             entity_id,
@@ -406,7 +392,7 @@ impl TestDb {
         use shuriken::component::model::dav::component::NewDavComponent;
 
         let mut conn = self.get_conn().await?;
-        
+
         let new_component = NewDavComponent {
             entity_id,
             parent_component_id,
