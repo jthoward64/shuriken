@@ -67,7 +67,7 @@ impl TimeZoneResolver {
         
         // Try parsing as IANA timezone
         let tz = Tz::from_str(&normalized)
-            .map_err(|_| ConversionError::UnknownTimezone(tzid.to_string()))?;
+            .map_err(|_e| ConversionError::UnknownTimezone(tzid.to_string()))?;
         
         // Cache the result
         self.cache.insert(tzid.to_string(), tz);
@@ -140,8 +140,7 @@ pub fn convert_to_utc(
             // RFC 5545 doesn't specify behavior, but common practice is to
             // shift forward to the next valid time
             Err(ConversionError::NonExistentTime(format!(
-                "{} in timezone {}",
-                local_time, tzid
+                "{local_time} in timezone {tzid}"
             )))
         }
         LocalResult::Single(dt) => {

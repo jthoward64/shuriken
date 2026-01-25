@@ -30,8 +30,8 @@ pub fn by_component_id(component_id: Uuid) -> cal_occurrence::BoxedQuery<'static
 /// Returns a query for occurrences within a time range.
 ///
 /// Matches occurrences that overlap with the given time range:
-/// - Occurrence starts before range_end
-/// - Occurrence ends after range_start
+/// - Occurrence starts before `range_end`
+/// - Occurrence ends after `range_start`
 #[must_use]
 pub fn by_time_range(
     range_start: DateTime<Utc>,

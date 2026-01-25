@@ -101,7 +101,7 @@ pub fn extract_recurrence_data(component: &Component) -> Option<RecurrenceData> 
 /// - The datetime format is invalid
 /// - The timezone cannot be resolved
 #[must_use]
-fn ical_datetime_to_utc(dt: &IcalDateTime, tzid: Option<&str>) -> Option<DateTime<Utc>> {
+pub fn ical_datetime_to_utc(dt: &IcalDateTime, tzid: Option<&str>) -> Option<DateTime<Utc>> {
     let naive = NaiveDateTime::new(
         chrono::NaiveDate::from_ymd_opt(i32::from(dt.year), u32::from(dt.month), u32::from(dt.day))?,
         chrono::NaiveTime::from_hms_opt(u32::from(dt.hour), u32::from(dt.minute), u32::from(dt.second))?,
@@ -142,7 +142,7 @@ fn ical_datetime_to_utc(dt: &IcalDateTime, tzid: Option<&str>) -> Option<DateTim
 /// ## Summary
 /// Converts an iCalendar `Duration` to `chrono::Duration`.
 #[must_use]
-fn ical_duration_to_chrono(duration: &crate::component::rfc::ical::core::Duration) -> chrono::TimeDelta {
+pub fn ical_duration_to_chrono(duration: &crate::component::rfc::ical::core::Duration) -> chrono::TimeDelta {
     let mut total = chrono::TimeDelta::zero();
 
     if duration.weeks > 0 {

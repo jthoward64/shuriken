@@ -575,6 +575,7 @@ fn parse_calendar_filter_content(
 }
 
 /// Parses a comp-filter element when name is already extracted.
+#[expect(clippy::too_many_lines)]
 fn parse_comp_filter_with_name(
     reader: &mut Reader<&[u8]>,
     buf: &mut Vec<u8>,

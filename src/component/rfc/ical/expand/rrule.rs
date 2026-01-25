@@ -20,7 +20,7 @@ pub enum ExpansionError {
 }
 
 /// Options for recurrence expansion.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ExpansionOptions {
     /// Maximum number of occurrences to generate.
     pub max_instances: usize,
@@ -113,9 +113,9 @@ pub fn expand_rrule(
             let end_dt = end.with_timezone(&end_tz);
             builder = builder.before(end_dt);
         }
-        builder.all(options.max_instances as u16)
+        builder.all(u16::try_from(options.max_instances).unwrap_or(u16::MAX))
     } else {
-        rrule_set.all(options.max_instances as u16)
+        rrule_set.all(u16::try_from(options.max_instances).unwrap_or(u16::MAX))
     };
     
     // Convert from rrule DateTime to chrono DateTime<Utc>
@@ -138,10 +138,12 @@ pub fn expand_rrule(
     
     // Add RDATE occurrences
     for rdate in rdates {
+        let in_range = options.range_start.is_none_or(|start| *rdate >= start)
+            && options.range_end.is_none_or(|end| *rdate < end);
+        
         if !exdate_set.contains(rdate) 
             && !occurrences.contains(rdate)
-            && (options.range_start.is_none() || *rdate >= options.range_start.unwrap())
-            && (options.range_end.is_none() || *rdate < options.range_end.unwrap())
+            && in_range
         {
             occurrences.push(*rdate);
         }
