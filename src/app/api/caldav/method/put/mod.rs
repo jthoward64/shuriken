@@ -5,8 +5,8 @@ mod types;
 use salvo::http::{HeaderValue, StatusCode};
 use salvo::{Request, Response, handler};
 
+use crate::component::caldav::service::object::{PutObjectContext, put_calendar_object};
 use crate::component::db::connection;
-use crate::component::db::query::dav::instance;
 
 use types::{PutError, PutResult};
 
@@ -51,8 +51,14 @@ pub async fn put(req: &mut Request, res: &mut Response) {
     };
     
     // Check preconditions
-    let if_none_match = req.headers().get("If-None-Match");
-    let if_match = req.headers().get("If-Match");
+    let if_none_match = req.headers()
+        .get("If-None-Match")
+        .and_then(|h| h.to_str().ok())
+        .map(String::from);
+    let if_match = req.headers()
+        .get("If-Match")
+        .and_then(|h| h.to_str().ok())
+        .map(String::from);
     
     // Perform the PUT operation
     match perform_put(&mut conn, &path, &body, if_none_match, if_match).await {
@@ -99,50 +105,90 @@ pub async fn put(req: &mut Request, res: &mut Response) {
 /// Returns `PutError` for validation failures, conflicts, or database errors.
 #[expect(clippy::unused_async)]
 async fn perform_put(
-    _conn: &mut connection::DbConnection<'_>,
-    _path: &str,
+    conn: &mut connection::DbConnection<'_>,
+    path: &str,
     body: &[u8],
-    if_none_match: Option<&salvo::http::HeaderValue>,
-    if_match: Option<&salvo::http::HeaderValue>,
+    if_none_match: Option<String>,
+    if_match: Option<String>,
 ) -> Result<PutResult, PutError> {
-    // TODO: Parse path to get collection_id and uri
-    // TODO: Check authorization
+    // Parse path to extract collection_id and uri
+    // For now, use a placeholder UUID for collection_id
+    // TODO: Implement proper path parsing to extract collection_id from the route
+    let collection_id = parse_collection_id_from_path(path)?;
+    let uri = parse_uri_from_path(path)?;
     
-    // Parse iCalendar data
-    // TODO: Use icalendar parser from RFC module
-    let _ical_data = std::str::from_utf8(body)
-        .map_err(|e| PutError::InvalidCalendarData(e.to_string()))?;
+    // Create PUT context
+    let ctx = PutObjectContext {
+        collection_id,
+        uri,
+        if_none_match,
+        if_match,
+    };
     
-    // TODO: Validate calendar data
-    // - Must be valid iCalendar
-    // - Must have exactly one VCALENDAR
-    // - Must have at least one component (VEVENT, VTODO, etc.)
-    // - Extract UID
+    // Call the service layer
+    match put_calendar_object(conn, &ctx, body).await {
+        Ok(result) => {
+            if result.created {
+                Ok(PutResult::Created(result.etag))
+            } else {
+                Ok(PutResult::Updated(result.etag))
+            }
+        }
+        Err(e) => {
+            let err_msg = e.to_string();
+            if err_msg.contains("invalid iCalendar") || err_msg.contains("not valid UTF-8") {
+                Err(PutError::InvalidCalendarData(err_msg))
+            } else if err_msg.contains("precondition failed") {
+                Ok(PutResult::PreconditionFailed)
+            } else if err_msg.contains("UID conflict") {
+                Err(PutError::UidConflict(err_msg))
+            } else {
+                Err(PutError::DatabaseError(e))
+            }
+        }
+    }
+}
+
+/// ## Summary
+/// Parses the collection ID from the request path.
+///
+/// ## Errors
+/// Returns an error if the path format is invalid.
+fn parse_collection_id_from_path(path: &str) -> Result<uuid::Uuid, PutError> {
+    // TODO: Implement proper path parsing based on your routing structure
+    // For now, return a placeholder error
+    // Expected path format: /api/caldav/calendars/{collection_id}/{resource_name}.ics
     
-    // Check If-None-Match: * (create-only)
-    if let Some(inm) = if_none_match
-        && inm.to_str().unwrap_or("") == "*" {
-        // TODO: Check if resource already exists
-        // If exists, return PreconditionFailed
+    let parts: Vec<&str> = path.split('/').collect();
+    if parts.len() < 5 {
+        return Err(PutError::InvalidCalendarData(
+            "invalid path format".to_string(),
+        ));
     }
     
-    // Check If-Match (update precondition)
-    if let Some(im) = if_match {
-        let _required_etag = im.to_str().unwrap_or("");
-        // TODO: Check if current resource ETag matches
-        // If not, return PreconditionFailed
-    }
+    // Try to parse the collection_id (assuming it's the 4th segment)
+    parts
+        .get(4)
+        .and_then(|s| uuid::Uuid::parse_str(s).ok())
+        .ok_or_else(|| {
+            PutError::InvalidCalendarData("could not extract collection_id from path".to_string())
+        })
+}
+
+/// ## Summary
+/// Parses the resource URI from the request path.
+///
+/// ## Errors
+/// Returns an error if the path format is invalid.
+fn parse_uri_from_path(path: &str) -> Result<String, PutError> {
+    // TODO: Implement proper URI extraction
+    // For now, use the last path segment as the URI
     
-    // TODO: Store entity and instance in database
-    // 1. Extract UID from iCalendar
-    // 2. Check for UID conflicts in the collection
-    // 3. Create or update entity
-    // 4. Create or update instance with generated ETag
-    // 5. Bump collection sync token
-    
-    // Generate ETag from canonical bytes
-    let etag = instance::generate_etag(body);
-    
-    // Stub: Return created
-    Ok(PutResult::Created(etag))
+    path.split('/')
+        .last()
+        .filter(|s| !s.is_empty())
+        .map(String::from)
+        .ok_or_else(|| {
+            PutError::InvalidCalendarData("could not extract URI from path".to_string())
+        })
 }
