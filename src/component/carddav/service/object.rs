@@ -69,7 +69,7 @@ pub async fn put_address_object(
     tracing::debug!("Processing PUT address object");
 
     // Verify collection exists
-    let _collection = collection::get_collection(conn, ctx.collection_id)
+    let collection_data = collection::get_collection(conn, ctx.collection_id)
         .await
         .context("failed to query collection")?
         .ok_or_else(|| anyhow::anyhow!("collection not found"))?;
@@ -188,14 +188,14 @@ pub async fn put_address_object(
             .await
             .context("failed to create entity")?;
 
-        // Create instance
+        // Create instance using the collection data we already fetched
         let new_instance = NewDavInstance {
             collection_id: ctx.collection_id,
             entity_id: created_entity.id,
             uri: &ctx.uri,
             content_type: "text/vcard",
             etag: &etag,
-            sync_revision: 1, // TODO: Get next sync revision from collection
+            sync_revision: collection_data.synctoken + 1,
             last_modified: chrono::Utc::now(),
         };
 

@@ -1,10 +1,12 @@
 //! Collection creation and management service.
 
 use anyhow::{Context, Result};
+use diesel::prelude::*;
+use diesel_async::RunQueryDsl;
 
 use crate::component::db::connection::DbConnection;
 use crate::component::db::query::dav::collection;
-use crate::component::model::dav::collection::NewDavCollection;
+use crate::component::model::dav::collection::{DavCollection, NewDavCollection};
 
 /// Context for collection creation.
 pub struct CreateCollectionContext {
@@ -44,9 +46,24 @@ pub async fn create_collection(
     conn: &mut DbConnection<'_>,
     ctx: &CreateCollectionContext,
 ) -> Result<CreateCollectionResult> {
-    // TODO: Check if collection already exists (409 Conflict)
+    // Validate collection type
+    if ctx.collection_type != "calendar" && ctx.collection_type != "addressbook" {
+        anyhow::bail!(
+            "invalid collection type '{}': must be 'calendar' or 'addressbook'",
+            ctx.collection_type
+        );
+    }
 
-    // TODO: Validate collection type is either "calendar" or "addressbook"
+    // Check if collection already exists with same URI and owner
+    let existing: Option<DavCollection> = collection::by_uri_and_principal(&ctx.uri, ctx.owner_principal_id)
+        .first(conn)
+        .await
+        .optional()
+        .context("failed to check for existing collection")?;
+
+    if existing.is_some() {
+        anyhow::bail!("collection with URI '{}' already exists", ctx.uri);
+    }
 
     let new_collection = NewDavCollection {
         owner_principal_id: ctx.owner_principal_id,
