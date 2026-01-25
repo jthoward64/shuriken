@@ -6,7 +6,7 @@
 //!
 //! ## Running Tests
 //!
-//! Tests require a running Postgres instance with the DATABASE_URL environment
+//! Tests require a running Postgres instance with the `DATABASE_URL` environment
 //! variable set. Run migrations before testing:
 //!
 //! ```sh

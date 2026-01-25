@@ -112,10 +112,7 @@ fn should_include_property(
     // Check if property is in the selection
     if component_stack.len() == 1 && component_stack[0] == "VCALENDAR" {
         // Root VCALENDAR properties
-        return selection
-            .props
-            .iter()
-            .any(|p| p.to_uppercase() == prop_name);
+        selection.props.iter().any(|p| p.to_uppercase() == prop_name)
     } else if component_stack.len() == 2 && component_stack[0] == "VCALENDAR" {
         // Nested component properties (e.g., VEVENT properties)
         let nested_comp = &component_stack[1];

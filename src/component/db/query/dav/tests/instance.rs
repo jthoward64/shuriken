@@ -102,7 +102,7 @@ async fn db_etag_changes_on_semantic_change() {
 }
 
 /// ## Summary
-/// Test that generate_etag produces consistent output for same input.
+/// Test that `generate_etag` produces consistent output for same input.
 #[test]
 fn generate_etag_deterministic() {
     let content = b"BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n";
@@ -116,7 +116,7 @@ fn generate_etag_deterministic() {
 }
 
 /// ## Summary
-/// Test that generate_etag produces different output for different input.
+/// Test that `generate_etag` produces different output for different input.
 #[test]
 fn generate_etag_different_content() {
     let content1 = b"BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n";
@@ -191,7 +191,7 @@ async fn db_instance_by_entity() {
 }
 
 /// ## Summary
-/// Test that sync_revision is tracked correctly on instance updates.
+/// Test that `sync_revision` is tracked correctly on instance updates.
 #[tokio::test]
 #[ignore = "requires postgres"]
 async fn db_instance_sync_revision_updates() {
@@ -206,7 +206,7 @@ async fn db_instance_sync_revision_updates() {
 }
 
 /// ## Summary
-/// Test that last_modified timestamp is updated on instance modification.
+/// Test that `last_modified` timestamp is updated on instance modification.
 #[tokio::test]
 #[ignore = "requires postgres"]
 async fn db_instance_last_modified_updates() {
@@ -221,7 +221,7 @@ async fn db_instance_last_modified_updates() {
 }
 
 /// ## Summary
-/// Test that content_type is stored correctly.
+/// Test that `content_type` is stored correctly.
 #[tokio::test]
 #[ignore = "requires postgres"]
 async fn db_instance_content_type() {

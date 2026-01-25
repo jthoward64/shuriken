@@ -10,7 +10,7 @@ use crate::component::rfc::dav::core::{CalendarMultiget, PropertyName};
 /// ## Summary
 /// Handles `calendar-multiget` REPORT requests.
 ///
-/// Thin handler: extracts collection_id → calls service → serializes response.
+/// Thin handler: extracts `collection_id` → calls service → serializes response.
 ///
 /// ## Side Effects
 /// - Queries the database via service layer

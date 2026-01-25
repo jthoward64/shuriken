@@ -10,7 +10,7 @@ use crate::component::rfc::dav::core::{AddressbookQuery, PropertyName};
 /// ## Summary
 /// Handles `addressbook-query` REPORT requests.
 ///
-/// Thin handler: extracts collection_id → calls service → serializes response.
+/// Thin handler: extracts `collection_id` → calls service → serializes response.
 ///
 /// ## Side Effects
 /// - Queries the database via service layer

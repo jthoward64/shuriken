@@ -106,17 +106,14 @@ pub async fn put_calendar_object(
 
     // Handle If-Match (update precondition)
     if let Some(im) = &ctx.if_match {
-        match &existing_instance {
-            Some(inst) => {
-                if inst.etag != *im {
-                    tracing::warn!(expected = %inst.etag, got = %im, "Precondition failed: ETag mismatch");
-                    anyhow::bail!("precondition failed: ETag mismatch");
-                }
+        if let Some(inst) = &existing_instance {
+            if inst.etag != *im {
+                tracing::warn!(expected = %inst.etag, got = %im, "Precondition failed: ETag mismatch");
+                anyhow::bail!("precondition failed: ETag mismatch");
             }
-            None => {
-                tracing::warn!("Precondition failed: resource does not exist");
-                anyhow::bail!("precondition failed: resource does not exist");
-            }
+        } else {
+            tracing::warn!("Precondition failed: resource does not exist");
+            anyhow::bail!("precondition failed: resource does not exist");
         }
     }
 

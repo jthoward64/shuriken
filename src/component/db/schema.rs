@@ -14,7 +14,7 @@ pub mod sql_types {
 }
 
 diesel::table! {
-    /// External authentication provider mappings for users (OAuth, LDAP, etc.)
+    /// External authentication provider mappings for users (`OAuth`, LDAP, etc.)
     auth_user (id) {
         /// UUID v7 primary key
         id -> Uuid,
@@ -464,7 +464,7 @@ diesel::table! {
 }
 
 diesel::table! {
-    /// Per-collection resource identity that references a canonical dav_entity
+    /// Per-collection resource identity that references a canonical `dav_entity`
     dav_instance (id) {
         /// UUID v7 primary key
         id -> Uuid,

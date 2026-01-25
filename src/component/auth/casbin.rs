@@ -28,7 +28,7 @@ pub async fn init_casbin() -> Result<()> {
 
     // casbin::Enforcer::new(model, adapter).await
     let enforcer = casbin::Enforcer::new(model, adapter).await?;
-    ENFORCER.set(enforcer).map_err(|_| {
+    ENFORCER.set(enforcer).map_err(|_already_set| {
         tracing::error!("Casbin enforcer already initialized - this is a programming error");
         Error::InvariantViolation("Casbin enforcer already initialized".into())
     })?;

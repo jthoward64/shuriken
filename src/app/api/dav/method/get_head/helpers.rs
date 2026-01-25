@@ -125,10 +125,10 @@ fn set_response_headers_and_body(
     res.status_code(StatusCode::OK);
 
     // Set body only for GET (not HEAD)
-    if !is_head {
-        if let Err(e) = res.write_body(canonical_bytes.to_vec()) {
-            tracing::error!("Failed to write response body: {}", e);
-        }
+    if !is_head
+        && let Err(e) = res.write_body(canonical_bytes.to_vec())
+    {
+        tracing::error!("Failed to write response body: {}", e);
     }
 }
 
