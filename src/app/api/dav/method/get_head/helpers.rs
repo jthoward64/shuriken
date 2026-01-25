@@ -8,7 +8,18 @@ use crate::component::db::query::dav::instance;
 use crate::component::model::dav::instance::DavInstance;
 use crate::util::path;
 
+/// ## Summary
 /// Shared implementation for GET and HEAD handlers.
+///
+/// Parses the request path to extract collection ID and resource URI,
+/// loads the resource from the database, and returns appropriate response.
+///
+/// ## Parameters
+/// - `is_head`: If true, response body is omitted (HEAD request); if false, includes body (GET request)
+///
+/// ## Side Effects
+/// - Sets HTTP status code and headers on response
+/// - For GET requests, writes response body
 pub(super) async fn handle_get_or_head(req: &mut Request, res: &mut Response, is_head: bool) {
     // Extract the resource path from the request
     let request_path = req.uri().path();

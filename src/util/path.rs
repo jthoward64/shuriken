@@ -93,7 +93,7 @@ pub fn extract_path_from_url(url_or_path: &str) -> String {
             // Find the first '/' after the host[:port]
             rest.split_once('/').map(|(_, path)| format!("/{path}"))
         })
-        .unwrap_or_else(|| "/".to_string()) // Default to "/" if no path component
+        .unwrap_or_else(|| "/".into()) // Default to "/" if no path component
 }
 
 #[cfg(test)]
