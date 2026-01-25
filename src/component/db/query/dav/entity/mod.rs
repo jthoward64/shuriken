@@ -3,6 +3,8 @@
 mod crud;
 mod query_builders;
 mod tree;
+mod tree_insert;
+mod uid_conflict;
 
 // Re-export public APIs
 pub use crud::{
@@ -24,6 +26,8 @@ pub use query_builders::{
     properties_for_component,
 };
 pub use tree::{get_entity_with_tree, replace_entity_tree};
+pub use tree_insert::{insert_ical_tree, insert_vcard_tree};
+pub use uid_conflict::check_uid_conflict;
 
 #[cfg(test)]
 mod query_builder_tests;

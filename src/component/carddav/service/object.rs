@@ -102,11 +102,23 @@ pub async fn put_address_object(
     }
 
     // Check for UID conflicts in this collection (same UID, different URI)
-    if let Some(uid) = &uid {
-        // Query for other instances in this collection with the same logical_uid
-        // TODO: Implement uid_conflict_check once we have proper entity->instance queries
-        // For now, we allow UID reuse (which is actually correct for overwriting the same resource)
-        let _ = uid; // Suppress unused warning
+    if let Some(ref uid) = ctx.logical_uid {
+        match entity::check_uid_conflict(conn, ctx.collection_id, uid, &ctx.uri).await {
+            Ok(Some(conflicting_uri)) => {
+                anyhow::bail!(
+                    "UID conflict: UID '{}' is already used by resource '{}' in this collection",
+                    uid,
+                    conflicting_uri
+                );
+            }
+            Ok(None) => {
+                // No conflict, proceed
+            }
+            Err(e) => {
+                tracing::error!("Failed to check UID conflict: {}", e);
+                anyhow::bail!("failed to check UID conflict: {}", e);
+            }
+        }
     }
 
     let created = existing_instance.is_none();
@@ -138,7 +150,15 @@ pub async fn put_address_object(
             .await
             .context("failed to update collection sync token")?;
 
-        // TODO: Update the entity tree with new vCard content
+        // Delete old component tree
+        entity::replace_entity_tree(conn, existing_inst.entity_id, &[], &[], &[])
+            .await
+            .context("failed to delete old component tree")?;
+
+        // Insert new vCard tree
+        entity::insert_vcard_tree(conn, existing_inst.entity_id, &vcard)
+            .await
+            .context("failed to insert vCard tree")?;
     } else {
         // Create new entity and instance
         // For now, create a minimal entity without the full tree
@@ -173,7 +193,10 @@ pub async fn put_address_object(
             .await
             .context("failed to update collection sync token")?;
 
-        // TODO: Insert component tree (components, properties, parameters)
+        // Insert vCard tree for the new entity
+        entity::insert_vcard_tree(conn, created_entity.id, &vcard)
+            .await
+            .context("failed to insert vCard tree")?;
     }
 
     Ok(PutObjectResult { etag, created })
