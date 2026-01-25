@@ -71,14 +71,7 @@ pub async fn copy(req: &mut Request, res: &mut Response) {
 
     // Parse destination to extract target collection ID and URI
     // Note: Destination header contains full URL, extract path first
-    let dest_path = match path::extract_path_from_url(&destination) {
-        Ok(path) => path,
-        Err(e) => {
-            tracing::error!(error = %e, destination = %destination, "Failed to extract path from destination URL");
-            res.status_code(StatusCode::BAD_REQUEST);
-            return;
-        }
-    };
+    let dest_path = path::extract_path_from_url(&destination);
 
     let (dest_collection_id, dest_uri) = match path::parse_collection_and_uri(&dest_path) {
         Ok(parsed) => parsed,
