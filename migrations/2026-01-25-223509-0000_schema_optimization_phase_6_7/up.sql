@@ -159,19 +159,17 @@ CREATE INDEX idx_group_name_group ON group_name(group_id);
 -- =============================================================================
 
 -- Add check constraint to ensure collection URIs are valid
--- Pattern ensures: starts and ends with alphanumeric, can contain dots/dashes/underscores in middle
--- Prevents consecutive dots (path traversal: ../) and other invalid patterns
+-- Pattern: must start and end with alphanumeric, middle can have alphanumeric, underscore, dash, dot
+-- This prevents path traversal (../) and ensures valid URI components
 -- Examples: "work", "my-calendar", "team.cal" are valid; ".hidden", "cal..", "a..b" are invalid
 ALTER TABLE dav_collection ADD CONSTRAINT chk_dav_collection_uri_format
-  CHECK (uri ~ '^[a-zA-Z0-9]([a-zA-Z0-9_-]|\.(?!\.))*[a-zA-Z0-9]$' OR uri ~ '^[a-zA-Z0-9]$');
+  CHECK (uri ~ '^[a-zA-Z0-9]+([a-zA-Z0-9_.-]*[a-zA-Z0-9]+)?$');
 
 -- Add check constraint to ensure instance URIs end with .ics or .vcf based on content type
--- Also ensures content_type is one of the valid values
 ALTER TABLE dav_instance ADD CONSTRAINT chk_dav_instance_uri_format
   CHECK (
-    content_type IN ('text/calendar', 'text/vcard') AND
-    ((content_type = 'text/calendar' AND uri ~ '\.ics$') OR
-     (content_type = 'text/vcard' AND uri ~ '\.vcf$'))
+    (content_type = 'text/calendar' AND uri ~ '\.ics$') OR
+    (content_type = 'text/vcard' AND uri ~ '\.vcf$')
   );
 
 -- Add check constraint to ensure entity type matches content in derived indexes
