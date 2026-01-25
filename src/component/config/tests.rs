@@ -2,8 +2,10 @@
 
 use super::*;
 
-#[test]
+#[test_log::test]
 fn test_auth_method_serialization() {
+    tracing::debug!("Testing auth method serialization");
+    
     // Test that AuthMethod variants can be constructed
     let single_user = AuthMethod::SingleUser;
     let proxy = AuthMethod::Proxy;
@@ -11,6 +13,8 @@ fn test_auth_method_serialization() {
     // Verify Debug trait
     assert!(format!("{single_user:?}").contains("SingleUser"));
     assert!(format!("{proxy:?}").contains("Proxy"));
+    
+    tracing::debug!("Auth method serialization test passed");
 }
 
 #[test]
