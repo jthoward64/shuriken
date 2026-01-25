@@ -13,6 +13,11 @@ CREATE TABLE dav_schedule_message (
   sender TEXT NOT NULL,
   recipient TEXT NOT NULL,
   method TEXT NOT NULL CHECK (method IN ('REQUEST', 'REPLY', 'CANCEL', 'REFRESH', 'COUNTER', 'DECLINECOUNTER', 'ADD')),
+  -- RFC 5546 §3.2: iTIP Methods for scheduling
+  -- REQUEST: Initial invite or update, REPLY: Response from attendee
+  -- CANCEL: Cancellation notice, REFRESH: Request for updated copy
+  -- COUNTER: Attendee proposes changes, DECLINECOUNTER: Organizer rejects counter
+  -- ADD: Add instances to recurring event
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'delivered', 'failed')),
   ical_data TEXT NOT NULL,
   diagnostics JSONB,
@@ -52,6 +57,11 @@ CREATE TABLE cal_attendee (
   partstat TEXT NOT NULL DEFAULT 'NEEDS-ACTION' CHECK (partstat IN (
     'NEEDS-ACTION', 'ACCEPTED', 'DECLINED', 'TENTATIVE', 'DELEGATED', 'COMPLETED', 'IN-PROCESS'
   )),
+  -- RFC 5545 §3.2.12: PARTSTAT (Participation Status) parameter values
+  -- NEEDS-ACTION: No response yet, ACCEPTED: Accepted invitation
+  -- DECLINED: Declined invitation, TENTATIVE: Tentatively accepted
+  -- DELEGATED: Delegated to another attendee, COMPLETED: Completed (for TODOs)
+  -- IN-PROCESS: In progress (for TODOs)
   role TEXT CHECK (role IN ('CHAIR', 'REQ-PARTICIPANT', 'OPT-PARTICIPANT', 'NON-PARTICIPANT')),
   rsvp BOOLEAN,
   cn TEXT,
@@ -150,9 +160,10 @@ CREATE INDEX idx_group_name_group ON group_name(group_id);
 
 -- Add check constraint to ensure collection URIs are valid
 -- Pattern ensures: starts and ends with alphanumeric, can contain dots/dashes/underscores in middle
--- This prevents path traversal and empty URI components
+-- Prevents consecutive dots (path traversal: ../) and other invalid patterns
+-- Examples: "work", "my-calendar", "team.cal" are valid; ".hidden", "cal..", "a..b" are invalid
 ALTER TABLE dav_collection ADD CONSTRAINT chk_dav_collection_uri_format
-  CHECK (uri ~ '^[a-zA-Z0-9]([a-zA-Z0-9_.-]*[a-zA-Z0-9])?$');
+  CHECK (uri ~ '^[a-zA-Z0-9]([a-zA-Z0-9_-]|\.(?!\.))*[a-zA-Z0-9]$' OR uri ~ '^[a-zA-Z0-9]$');
 
 -- Add check constraint to ensure instance URIs end with .ics or .vcf based on content type
 -- Also ensures content_type is one of the valid values
