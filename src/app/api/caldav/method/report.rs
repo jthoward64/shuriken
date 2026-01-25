@@ -5,7 +5,7 @@ use salvo::{Request, Response, handler};
 
 use crate::component::db::connection;
 use crate::component::rfc::dav::build::multistatus::serialize_multistatus;
-use crate::component::rfc::dav::core::{CalendarMultiget, CalendarQuery, Multistatus};
+use crate::component::rfc::dav::core::{CalendarMultiget, CalendarQuery, Multistatus, ReportType};
 
 /// ## Summary
 /// Main REPORT method dispatcher for `CalDAV`.
@@ -20,11 +20,40 @@ use crate::component::rfc::dav::core::{CalendarMultiget, CalendarQuery, Multista
 /// ## Errors
 /// Returns 400 for invalid requests, 501 for unsupported reports.
 #[handler]
-pub async fn report(_req: &mut Request, res: &mut Response) {
-    // TODO: Parse REPORT request body and dispatch to appropriate handler
-    // For now, return 501 Not Implemented
-    tracing::warn!("CalDAV REPORT not yet fully implemented");
-    res.status_code(StatusCode::NOT_IMPLEMENTED);
+pub async fn report(req: &mut Request, res: &mut Response) {
+    // Read request body
+    let body = match req.payload().await {
+        Ok(body) => body,
+        Err(e) => {
+            tracing::error!("Failed to read request body: {}", e);
+            res.status_code(StatusCode::BAD_REQUEST);
+            return;
+        }
+    };
+
+    // Parse REPORT request
+    let req_data = match crate::component::rfc::dav::parse::report::parse_report(body) {
+        Ok(parsed_report) => parsed_report,
+        Err(e) => {
+            tracing::error!("Failed to parse REPORT request: {}", e);
+            res.status_code(StatusCode::BAD_REQUEST);
+            return;
+        }
+    };
+
+    // Dispatch based on report type
+    match req_data.report_type {
+        ReportType::CalendarQuery(query) => {
+            handle_calendar_query(req, res, query, req_data.properties).await;
+        }
+        ReportType::CalendarMultiget(multiget) => {
+            handle_calendar_multiget(req, res, multiget, req_data.properties).await;
+        }
+        _ => {
+            tracing::warn!("Unsupported REPORT type for CalDAV endpoint");
+            res.status_code(StatusCode::NOT_IMPLEMENTED);
+        }
+    }
 }
 
 /// ## Summary
