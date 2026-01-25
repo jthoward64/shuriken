@@ -80,13 +80,24 @@ pub enum ReportType {
     PrincipalPropertySearch(PrincipalPropertySearch),
 }
 
+/// Recurrence expansion mode for calendar-query.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RecurrenceExpansion {
+    /// Return separate responses for each occurrence within the range.
+    /// Removes RRULE properties from expanded instances.
+    Expand,
+    /// Limit occurrence generation to the range but return master event.
+    /// Keeps RRULE properties.
+    LimitRecurrenceSet,
+}
+
 /// `CalDAV` `calendar-query` filter.
 #[derive(Debug, Clone, Default)]
 pub struct CalendarQuery {
     /// Filter element.
     pub filter: Option<CalendarFilter>,
-    /// Time range for expansion.
-    pub expand: Option<TimeRange>,
+    /// Time range for expansion/limiting (with expansion mode).
+    pub expand: Option<(TimeRange, RecurrenceExpansion)>,
     /// Limit results.
     pub limit: Option<u32>,
 }
@@ -108,7 +119,14 @@ impl CalendarQuery {
     /// Sets the expand range.
     #[must_use]
     pub fn with_expand(mut self, range: TimeRange) -> Self {
-        self.expand = Some(range);
+        self.expand = Some((range, RecurrenceExpansion::Expand));
+        self
+    }
+
+    /// Sets the limit-recurrence-set range.
+    #[must_use]
+    pub fn with_limit_recurrence_set(mut self, range: TimeRange) -> Self {
+        self.expand = Some((range, RecurrenceExpansion::LimitRecurrenceSet));
         self
     }
 

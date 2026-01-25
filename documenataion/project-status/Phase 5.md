@@ -1,22 +1,23 @@
 # Phase 5: Recurrence & Time Zones
 
-**Status**: ✅ **IMPLEMENTED (95%)**
+**Status**: ✅ **IMPLEMENTED (100%)**
 **Last Updated**: 2026-01-25
 
 ---
 
 ## Summary
 
-Phase 5 is now fully implemented with the following key achievements:
+Phase 5 is now **completely implemented** with the following key achievements:
 
 - ✅ **RRULE Expansion**: Full support for recurring events using the `rrule` crate
 - ✅ **Timezone Resolution**: UTC conversion with DST handling using `chrono-tz`
 - ✅ **Database Integration**: Occurrence caching in `cal_occurrence` table
 - ✅ **UID Matching**: Robust component matching by UID instead of array index
 - ✅ **RECURRENCE-ID Exceptions**: Full support for modified occurrence instances
-- ⚠️ **Expand/Limit Modifiers**: Not yet implemented in calendar-query (future enhancement)
+- ✅ **Expand Modifier**: Calendar-query `<C:expand>` generates separate responses for each occurrence
+- ✅ **Limit-Recurrence-Set**: Calendar-query `<C:limit-recurrence-set>` filters occurrences to time range
 
-**Remaining Work**: Calendar-query expand/limit-recurrence-set modifiers for client-side expansion control.
+**Status**: Ready for production use. All RFC 4791 recurrence features implemented.
 
 ---
 
@@ -214,33 +215,27 @@ match tz.from_local_datetime(&local_time) {
 
 ---
 
-#### 5. `expand` and `limit-recurrence-set` Handling — **MEDIUM PRIORITY**
+#### 5. `expand` and `limit-recurrence-set` Handling — ✅ **IMPLEMENTED**
 
-**Current State**: Calendar-query ignores `<C:expand>` and `<C:limit-recurrence-set>` modifiers.
+**Current State**: Fully implemented in calendar-query report handler.
 
-**What's Missing** (RFC 4791 §9.6.4 and §9.6.5):
-- `<C:expand start="..." end="..."/>`: Return expanded instances instead of master event
-  - Each occurrence becomes a separate `<D:response>` with unique href (master + RECURRENCE-ID)
-  - RRULE property removed from expanded instances
-  - DTSTART adjusted to occurrence time
-- `<C:limit-recurrence-set start="..." end="..."/>`: Limit recurrence range
-  - Only generate occurrences within specified range
+**Implementation Details** (RFC 4791 §9.6.4 and §9.6.5):
+- ✅ `<C:expand start="..." end="..."/>`: Returns expanded instances instead of master event
+  - Each occurrence becomes a separate `<D:response>` with unique href (master + occurrence timestamp)
+  - RRULE/EXDATE/RDATE properties removed from expanded instances
+  - DTSTART/DTEND adjusted to occurrence times
+  - RECURRENCE-ID added for exception instances
+- ✅ `<C:limit-recurrence-set start="..." end="..."/>`: Limits recurrence range
+  - Only generates occurrences within specified range
+  - Returns master event (not expanded)
   - Reduces payload size for large recurrence sets
 
-**Impact**: Clients requesting expanded output receive unexpanded master events, requiring client-side expansion.
+**Files**:
+- `src/component/rfc/dav/core/report.rs`: Added `RecurrenceExpansion` enum
+- `src/component/rfc/dav/parse/report.rs`: Parse `<C:expand>` and `<C:limit-recurrence-set>`
+- `src/component/caldav/service/report.rs`: Expansion logic in `execute_calendar_query`
 
-**Recommended Implementation**:
-1. Parse `<C:expand>` and `<C:limit-recurrence-set>` from calendar-query request
-2. If `<C:expand>` present:
-   - Generate occurrences for each matching event
-   - Build separate `<D:response>` for each occurrence
-   - Adjust DTSTART/DTEND to occurrence times
-   - Remove RRULE/EXDATE/RDATE properties
-3. If `<C:limit-recurrence-set>` present:
-   - Filter occurrences to specified range
-   - Return master event with limited RRULE
-
-**Estimated Effort**: 3-4 days
+**RFC Compliance**: Full compliance with RFC 4791 §9.6.4-5.
 
 ---
 
