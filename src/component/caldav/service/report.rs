@@ -1,5 +1,6 @@
 //! CalDAV REPORT service layer.
-//!
+#![expect(clippy::doc_markdown, reason = "CalDAV is a proper term, not a code identifier")]
+
 //! Business logic for calendar-query and calendar-multiget reports.
 
 use crate::component::db::connection::DbConnection;

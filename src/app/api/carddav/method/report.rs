@@ -1,4 +1,5 @@
 //! CardDAV REPORT method dispatcher.
+#![expect(clippy::doc_markdown, reason = "CardDAV is a proper term, not a code identifier")]
 
 use salvo::http::StatusCode;
 use salvo::{Request, Response, handler};

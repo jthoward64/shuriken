@@ -100,4 +100,40 @@ mod tests {
         assert!(range.start.is_none());
         assert_eq!(range.end.unwrap(), end);
     }
+
+    #[test]
+    fn test_comp_filter_with_prop_filter() {
+        let prop_filter = PropFilter::new("SUMMARY");
+        let comp_filter = CompFilter::new("VEVENT").with_prop_filter(prop_filter);
+        
+        assert_eq!(comp_filter.prop_filters.len(), 1);
+        assert_eq!(comp_filter.prop_filters[0].name, "SUMMARY");
+    }
+
+    #[test]
+    fn test_prop_filter_is_not_defined() {
+        let prop_filter = PropFilter::new("LOCATION").not_defined();
+        
+        assert_eq!(prop_filter.name, "LOCATION");
+        assert!(prop_filter.is_not_defined);
+    }
+
+    #[test]
+    fn test_prop_filter_text_match_equals() {
+        let text_match = TextMatch::equals("Important Meeting");
+        let prop_filter = PropFilter::new("SUMMARY").with_text_match(text_match);
+        
+        let tm = prop_filter.text_match.unwrap();
+        assert_eq!(tm.value, "Important Meeting");
+        assert_eq!(tm.match_type, MatchType::Equals);
+    }
+
+    #[test]
+    fn test_prop_filter_text_match_case_sensitive() {
+        let text_match = TextMatch::contains("Meeting").with_collation("i;octet");
+        let prop_filter = PropFilter::new("SUMMARY").with_text_match(text_match);
+        
+        let tm = prop_filter.text_match.unwrap();
+        assert_eq!(tm.collation, Some("i;octet".to_string()));
+    }
 }

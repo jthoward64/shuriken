@@ -10,7 +10,7 @@
 /// - `/api/caldav/{collection_id}/{resource}.ics`
 ///
 /// ## Errors
-/// Returns an error if the path format is invalid or collection_id cannot be parsed as UUID.
+/// Returns an error if the path format is invalid or `collection_id` cannot be parsed as UUID.
 pub fn parse_collection_and_uri(path: &str) -> anyhow::Result<(uuid::Uuid, String)> {
     let parts: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
     
