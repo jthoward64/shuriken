@@ -196,6 +196,12 @@ pub async fn put_calendar_object(
             .await
             .context("failed to create entity")?;
 
+        // Get current collection to determine next sync revision
+        let current_collection = collection::get_collection(conn, ctx.collection_id)
+            .await
+            .context("failed to get collection")?
+            .context("collection not found")?;
+
         // Create instance
         let new_instance = NewDavInstance {
             collection_id: ctx.collection_id,
@@ -203,7 +209,7 @@ pub async fn put_calendar_object(
             uri: &ctx.uri,
             content_type: "text/calendar",
             etag: &etag,
-            sync_revision: 1, // TODO: Get next sync revision from collection
+            sync_revision: current_collection.synctoken + 1,
             last_modified: chrono::Utc::now(),
         };
 
