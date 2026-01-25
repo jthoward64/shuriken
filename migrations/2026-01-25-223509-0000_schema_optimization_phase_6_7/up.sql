@@ -193,7 +193,7 @@ COMMENT ON COLUMN cal_index.transp IS 'Time transparency (OPAQUE = busy, TRANSPA
 COMMENT ON COLUMN cal_index.status IS 'Event status for free-busy filtering';
 
 -- Add indexes for new cal_index columns
-CREATE INDEX idx_cal_index_organizer ON cal_index(organizer) WHERE deleted_at IS NULL;
+CREATE INDEX idx_cal_index_organizer_cn ON cal_index(organizer_cn) WHERE deleted_at IS NULL;
 CREATE INDEX idx_cal_index_transp ON cal_index(transp) WHERE deleted_at IS NULL;
 CREATE INDEX idx_cal_index_status ON cal_index(status) WHERE deleted_at IS NULL;
 

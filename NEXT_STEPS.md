@@ -413,7 +413,7 @@ async fn test_attendee_queries() {
 
 ### 6. Update Documentation
 
-#### `documenataion/project-status/Phase 7.md`
+#### `documentation/project-status/Phase 7.md`
 Update schema section:
 ```markdown
 ### Schema Changes ✅ IMPLEMENTED
@@ -426,7 +426,7 @@ Update schema section:
 - [x] `cal_index.transp`, `cal_index.status` - Free-busy metadata
 ```
 
-#### `documenataion/project-planning/Architecture-Plan.md`
+#### `documentation/project-planning/Architecture-Plan.md`
 Add sections:
 ```markdown
 ### Attendee Tracking

@@ -17,7 +17,7 @@ ALTER TABLE dav_entity RESET (fillfactor);
 -- Drop indexes for new cal_index columns
 DROP INDEX IF EXISTS idx_cal_index_status;
 DROP INDEX IF EXISTS idx_cal_index_transp;
-DROP INDEX IF EXISTS idx_cal_index_organizer;
+DROP INDEX IF EXISTS idx_cal_index_organizer_cn;
 
 -- Drop new columns from cal_index
 ALTER TABLE cal_index DROP COLUMN IF EXISTS status;

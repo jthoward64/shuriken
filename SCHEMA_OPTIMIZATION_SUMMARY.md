@@ -377,11 +377,11 @@ Set to 90% for frequently updated tables:
 
 ## Documentation Updates Needed
 
-1. Update `documenataion/project-status/Phase 7.md`:
+1. Update `documentation/project-status/Phase 7.md`:
    - Mark `dav_schedule_message` table as implemented
    - Update schema changes section
 
-2. Update `documenataion/project-planning/Architecture-Plan.md`:
+2. Update `documentation/project-planning/Architecture-Plan.md`:
    - Add attendee tracking architecture
    - Add timezone caching architecture
 
