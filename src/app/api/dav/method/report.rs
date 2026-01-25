@@ -68,7 +68,6 @@ pub async fn report(req: &mut Request, res: &mut Response) {
 ///
 /// ## Errors
 /// Returns 400 for invalid sync tokens, 404 for missing collections, 500 for server errors.
-#[expect(dead_code)]
 pub async fn handle_sync_collection(
     _req: &mut Request,
     res: &mut Response,
@@ -135,7 +134,6 @@ async fn build_sync_collection_response(
 ///
 /// ## Errors
 /// Returns 400 for invalid requests, 500 for server errors.
-#[expect(dead_code)]
 pub async fn handle_expand_property(
     _req: &mut Request,
     res: &mut Response,

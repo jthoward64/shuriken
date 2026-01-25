@@ -16,7 +16,6 @@ use crate::component::rfc::dav::core::{
 ///
 /// ## Errors
 /// Returns errors for database failures or property resolution issues.
-#[expect(dead_code)]
 pub(super) async fn build_propfind_response(
     conn: &mut connection::DbConnection<'_>,
     req: &Request,
@@ -59,7 +58,6 @@ pub(super) async fn build_propfind_response(
 /// ## Errors
 /// Returns errors if property resolution fails.
 #[expect(clippy::unused_async, clippy::too_many_lines)]
-#[expect(dead_code)]
 async fn get_properties_for_resource(
     _conn: &mut connection::DbConnection<'_>,
     _path: &str,

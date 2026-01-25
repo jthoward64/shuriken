@@ -1,5 +1,11 @@
 //! vCard value parsers.
-#![expect(clippy::map_err_ignore)]
+//!
+//! Error sources are intentionally discarded during parsing (map_err_ignore)
+//! until richer error types are implemented for value-level parsing.
+#![expect(
+    clippy::map_err_ignore,
+    reason = "Value parsers intentionally discard error sources pending richer error types"
+)]
 
 use chrono::NaiveDate;
 

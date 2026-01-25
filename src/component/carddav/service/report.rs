@@ -1,5 +1,4 @@
 //! CardDAV REPORT service layer.
-#![expect(clippy::doc_markdown, reason = "CardDAV is a proper term, not a code identifier")]
 
 //! Business logic for addressbook-query and addressbook-multiget reports.
 

@@ -1,4 +1,4 @@
-#![allow(clippy::doc_markdown, clippy::unused_async)]
+#![allow(clippy::unused_async)]
 #![expect(dead_code, reason = "Test fixtures may have unused code")]
 //! Test fixtures for DAV database tests.
 //!

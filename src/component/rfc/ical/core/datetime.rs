@@ -41,14 +41,21 @@ impl UtcOffset {
 
     /// Returns hours component (may be negative).
     #[must_use]
-    #[expect(clippy::cast_possible_truncation)]
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "UTC offsets are bounded to ±14 hours per RFC 5545, truncation to i8 is safe"
+    )]
     pub const fn hours(self) -> i8 {
         (self.seconds / 3600) as i8
     }
 
     /// Returns minutes component (always positive).
     #[must_use]
-    #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "Minutes component is always 0-59 per RFC 5545, truncation and sign loss to u8 are safe"
+    )]
     pub const fn minutes(self) -> u8 {
         ((self.seconds.abs() % 3600) / 60) as u8
     }
@@ -164,7 +171,10 @@ pub struct DateTime {
 impl DateTime {
     /// Creates a floating DATE-TIME.
     #[must_use]
-    #[expect(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "Constructor mirrors RFC 5545 DATE-TIME components"
+    )]
     pub fn floating(year: u16, month: u8, day: u8, hour: u8, minute: u8, second: u8) -> Self {
         Self {
             year,
@@ -179,7 +189,10 @@ impl DateTime {
 
     /// Creates a UTC DATE-TIME.
     #[must_use]
-    #[expect(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "Constructor mirrors RFC 5545 DATE-TIME components"
+    )]
     pub fn utc(year: u16, month: u8, day: u8, hour: u8, minute: u8, second: u8) -> Self {
         Self {
             year,
@@ -194,7 +207,10 @@ impl DateTime {
 
     /// Creates a zoned DATE-TIME.
     #[must_use]
-    #[expect(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "Constructor mirrors RFC 5545 DATE-TIME components plus TZID"
+    )]
     pub fn zoned(
         year: u16,
         month: u8,

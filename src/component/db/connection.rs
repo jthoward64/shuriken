@@ -16,7 +16,8 @@ static DB_POOL: OnceLock<DbPool> = OnceLock::new();
 /// Returns an error if the pool cannot be created with the provided database URL.
 ///
 /// ## Panics
-/// Panics if the database pool is already initialized.
+/// Panics if the database pool is already initialized. This is a programming error
+/// and indicates `create_pool()` was called multiple times.
 pub async fn create_pool(database_url: &str, size: u32) -> anyhow::Result<()> {
     let config = AsyncDieselConnectionManager::<AsyncPgConnection>::new(database_url);
 
@@ -29,8 +30,9 @@ pub async fn create_pool(database_url: &str, size: u32) -> anyhow::Result<()> {
         .build(config)
         .await?;
 
-    #[expect(clippy::expect_used)]
-    DB_POOL.set(pool).expect("Database pool is already set");
+    DB_POOL
+        .set(pool)
+        .expect("Database pool is already set - create_pool() must only be called once at startup");
 
     Ok(())
 }
@@ -39,16 +41,16 @@ pub async fn create_pool(database_url: &str, size: u32) -> anyhow::Result<()> {
 ///
 /// ## Panics
 ///
-/// Panics if the database pool is not initialized.
+/// Panics if the database pool is not initialized. This indicates a programming error
+/// where the connection was accessed before `create_pool()` was called.
 ///
 /// ## Errors
 ///
 /// Returns a `PoolError` if unable to get a connection from the pool.
 pub async fn connect() -> Result<DbConnection<'static>, RunError> {
-    #[expect(clippy::expect_used)]
     DB_POOL
         .get()
-        .expect("Database pool is not initialized")
+        .expect("Database pool is not initialized - create_pool() must be called at startup")
         .get()
         .await
 }
@@ -57,11 +59,12 @@ pub async fn connect() -> Result<DbConnection<'static>, RunError> {
 /// Get a reference to the global database pool.
 ///
 /// ## Panics
-/// Panics if the database pool is not initialized.
+/// Panics if the database pool is not initialized. This indicates a programming error
+/// where the pool was accessed before `create_pool()` was called.
+#[must_use]
 pub fn get_pool() -> DbPool {
-    #[expect(clippy::expect_used)]
     DB_POOL
         .get()
-        .expect("Database pool is not initialized")
+        .expect("Database pool is not initialized - create_pool() must be called at startup")
         .clone()
 }

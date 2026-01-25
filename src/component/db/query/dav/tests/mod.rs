@@ -1,4 +1,4 @@
-#![allow(clippy::doc_markdown, clippy::unused_async)]
+#![allow(clippy::unused_async)]
 //! Database query tests for DAV operations.
 //!
 //! These tests verify entity/instance storage, collection management,

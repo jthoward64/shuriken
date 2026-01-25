@@ -59,7 +59,11 @@ pub fn vcard_to_db_models<'a>(
         map_vcard_property(
             prop,
             component_id,
-            #[expect(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+            #[expect(
+                clippy::cast_possible_truncation,
+                clippy::cast_possible_wrap,
+                reason = "vCard property counts are bounded by RFC limits (<500), truncation to i32 is safe"
+            )]
             { ordinal as i32 },
             &mut properties,
             &mut parameters,
@@ -103,7 +107,11 @@ fn map_vcard_property<'a>(
         map_vcard_parameter(
             param,
             property_id,
-            #[expect(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+            #[expect(
+                clippy::cast_possible_truncation,
+                clippy::cast_possible_wrap,
+                reason = "Parameter counts per vCard property are bounded by RFC limits (<50), truncation to i32 is safe"
+            )]
             { param_ord as i32 },
             parameters,
         );

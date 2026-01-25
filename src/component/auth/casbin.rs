@@ -23,10 +23,10 @@ pub async fn init_casbin() -> Result<()> {
 
     // casbin::Enforcer::new(model, adapter).await
     let enforcer = casbin::Enforcer::new(model, adapter).await?;
-    #[expect(clippy::map_err_ignore)]
-    ENFORCER
-        .set(enforcer)
-        .map_err(|_| Error::InvariantViolation("Casbin enforcer already initialized".into()))?;
+    ENFORCER.set(enforcer).map_err(|_| {
+        tracing::error!("Casbin enforcer already initialized - this is a programming error");
+        Error::InvariantViolation("Casbin enforcer already initialized".into())
+    })?;
     Ok(())
 }
 
@@ -34,8 +34,11 @@ pub async fn init_casbin() -> Result<()> {
 /// Get a reference to the global Casbin enforcer.
 ///
 /// ## Panics
-/// Panics if the Casbin enforcer is not initialized.
+/// Panics if the Casbin enforcer is not initialized. This should only happen if
+/// `init_casbin()` was not called during application startup.
+#[must_use]
 pub fn get_enforcer() -> &'static casbin::Enforcer {
-    #[expect(clippy::expect_used)]
-    ENFORCER.get().expect("Casbin enforcer is not initialized")
+    ENFORCER
+        .get()
+        .expect("Casbin enforcer is not initialized - init_casbin() must be called at startup")
 }

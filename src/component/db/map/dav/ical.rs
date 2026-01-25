@@ -62,7 +62,10 @@ pub fn icalendar_to_db_models<'a>(
 
 /// ## Summary
 /// Recursively maps an iCalendar component and its children to database models.
-#[expect(clippy::too_many_arguments)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Accumulator pattern for building component tree requires these parameters"
+)]
 fn map_ical_component_recursive<'a>(
     component: &'a Component,
     entity_id: uuid::Uuid,
@@ -86,7 +89,11 @@ fn map_ical_component_recursive<'a>(
         map_ical_property(
             prop,
             component_id,
-            #[expect(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+            #[expect(
+                clippy::cast_possible_truncation,
+                clippy::cast_possible_wrap,
+                reason = "Property counts per component are bounded by RFC limits (<1000), truncation to i32 is safe"
+            )]
             { prop_ord as i32 },
             properties,
             parameters,
@@ -99,7 +106,11 @@ fn map_ical_component_recursive<'a>(
             child,
             entity_id,
             Some(component_id),
-            #[expect(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+            #[expect(
+                clippy::cast_possible_truncation,
+                clippy::cast_possible_wrap,
+                reason = "Child component counts are bounded by RFC limits (<100), truncation to i32 is safe"
+            )]
             { child_ord as i32 },
             components,
             properties,
@@ -144,7 +155,11 @@ fn map_ical_property<'a>(
         map_ical_parameter(
             param,
             property_id,
-            #[expect(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+            #[expect(
+                clippy::cast_possible_truncation,
+                clippy::cast_possible_wrap,
+                reason = "Parameter counts per property are bounded by RFC limits (<50), truncation to i32 is safe"
+            )]
             { param_ord as i32 },
             parameters,
         );

@@ -1,4 +1,4 @@
-#![allow(clippy::doc_markdown, clippy::unused_async)]
+#![allow(clippy::unused_async)]
 //! Tests for PROPPATCH method.
 //!
 //! Verifies property modification, protected properties, and partial success handling.

@@ -1,5 +1,11 @@
 //! Value type parsers for iCalendar (RFC 5545 §3.3).
-#![expect(clippy::map_err_ignore)]
+//!
+//! Error sources are intentionally discarded during parsing (map_err_ignore)
+//! until richer error types are implemented for value-level parsing.
+#![expect(
+    clippy::map_err_ignore,
+    reason = "Value parsers intentionally discard error sources pending richer error types"
+)]
 
 use super::error::{ParseError, ParseErrorKind, ParseResult};
 use crate::component::rfc::ical::core::{
@@ -235,7 +241,10 @@ fn parse_duration_components(
 }
 
 /// Extracts a number from the duration string.
-#[expect(clippy::too_many_arguments)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Duration parser helper requires these parameters for state tracking"
+)]
 fn extract_duration_number(
     s: &str,
     num_start: Option<usize>,
@@ -260,7 +269,10 @@ fn extract_duration_number(
 }
 
 /// Applies a parsed component value to the duration.
-#[expect(clippy::too_many_arguments)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Duration parser helper requires these parameters for state tracking"
+)]
 fn apply_duration_component(
     dur: &mut Duration,
     c: char,

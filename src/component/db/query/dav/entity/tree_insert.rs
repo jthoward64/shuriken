@@ -36,7 +36,11 @@ pub async fn insert_ical_tree(
 ///
 /// ## Errors
 /// Returns a database error if any insert fails.
-#[expect(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    reason = "Property/parameter counts are bounded by RFC limits, truncation safe"
+)]
 pub async fn insert_vcard_tree(
     conn: &mut crate::component::db::connection::DbConnection<'_>,
     entity_id: uuid::Uuid,
@@ -104,7 +108,11 @@ pub async fn insert_vcard_tree(
 }
 
 /// Recursively inserts a component and its children.
-#[expect(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    reason = "Component tree depth and property counts are bounded by RFC limits, truncation safe"
+)]
 fn insert_component_recursive<'a>(
     conn: &'a mut crate::component::db::connection::DbConnection<'_>,
     entity_id: uuid::Uuid,

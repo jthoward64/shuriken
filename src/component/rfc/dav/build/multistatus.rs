@@ -12,12 +12,8 @@ use crate::component::rfc::dav::core::{Multistatus, PropstatResponse};
 /// `WebDAV` XML for the response body.
 ///
 /// ## Errors
-/// Returns an error if XML writing fails.
-///
-/// ## Panics
-/// Panics if the generated XML is not valid UTF-8 (should never happen with
-/// well-formed input).
-#[expect(clippy::expect_used)]
+/// Returns an error if XML writing fails or if the generated XML is not valid UTF-8
+/// (which should never happen with well-formed input).
 pub fn serialize_multistatus(multistatus: &Multistatus) -> Result<String, quick_xml::Error> {
     let mut writer = Writer::new(Vec::new());
 
@@ -50,7 +46,13 @@ pub fn serialize_multistatus(multistatus: &Multistatus) -> Result<String, quick_
     writer.write_event(Event::End(BytesEnd::new("D:multistatus")))?;
 
     let result = writer.into_inner();
-    Ok(String::from_utf8(result).expect("valid UTF-8"))
+    String::from_utf8(result).map_err(|e| {
+        tracing::error!("Generated invalid UTF-8 in multistatus XML: {}", e);
+        quick_xml::Error::Io(std::sync::Arc::new(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "Invalid UTF-8 in XML output",
+        )))
+    })
 }
 
 /// Writes a single response element.

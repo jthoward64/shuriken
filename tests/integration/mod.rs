@@ -1,4 +1,4 @@
-#![allow(clippy::doc_markdown, clippy::unused_async)]
+#![allow(clippy::unused_async)]
 //! Integration tests for CalDAV/CardDAV HTTP methods.
 //!
 //! These tests verify protocol-level correctness by running the Salvo app

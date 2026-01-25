@@ -8,3 +8,27 @@ type-complexity-threshold = 200
 
 allow-unwrap-in-tests = true
 allow-expect-in-tests = true
+
+# Allow common CalDAV/CardDAV/WebDAV terms in documentation
+doc-valid-idents = [
+    "CalDAV",
+    "CardDAV",
+    "WebDAV",
+    "iCalendar",
+    "vCard",
+    "VEVENT",
+    "VTODO",
+    "VJOURNAL",
+    "VFREEBUSY",
+    "VTIMEZONE",
+    "VALARM",
+    "VCALENDAR",
+    "iPhone",
+    "iOS",
+    "macOS",
+    "ETag",
+    "ETags",
+    "CTag",
+    "iTIP",
+    "iMIP",
+]

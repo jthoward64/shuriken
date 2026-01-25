@@ -1,4 +1,4 @@
-#![allow(clippy::doc_markdown, clippy::unused_async)]
+#![allow(clippy::unused_async)]
 //! Tests for instance operations.
 //!
 //! Verifies instance CRUD, ETag generation and stability, tombstone creation, and idempotency.
