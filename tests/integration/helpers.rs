@@ -7,6 +7,7 @@
 //! - Making HTTP requests
 //! - Asserting on responses and database state
 
+use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use salvo::prelude::*;
 
@@ -115,8 +116,16 @@ impl TestDb {
 
     /// Truncates all tables for a clean test slate.
     ///
+    /// Tables are truncated in reverse dependency order to avoid foreign key violations.
+    /// This order must be maintained when adding new tables to the schema.
+    ///
     /// ## Errors
     /// Returns an error if table truncation fails.
+    ///
+    /// ## Note
+    /// If you add or remove tables from the schema, update this list accordingly.
+    /// The order is: indexes → shadows/tombstones → parameters → properties → components →
+    /// instances → entities → collections → groups/memberships → auth_user → users → principals → casbin_rule
     #[expect(dead_code)]
     pub async fn truncate_all(&self) -> anyhow::Result<()> {
         let mut conn = self.get_conn().await?;
@@ -150,6 +159,11 @@ impl TestDb {
     ///
     /// ## Errors
     /// Returns an error if the principal cannot be inserted.
+    ///
+    /// ## Note
+    /// Uses UUID v7 for principal IDs to match production behavior (time-ordered).
+    /// If you need deterministic test data, consider seeding with fixed data
+    /// and retrieving IDs from the database after insertion.
     #[expect(dead_code)]
     pub async fn seed_principal(
         &self,
