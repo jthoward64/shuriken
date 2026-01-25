@@ -83,10 +83,12 @@ pub async fn propfind(req: &mut Request, res: &mut Response) {
     
     // Set response
     res.status_code(StatusCode::MULTI_STATUS);
+    #[expect(clippy::let_underscore_must_use, reason = "Header addition failure is non-fatal")]
     let _ = res.add_header(
         "Content-Type",
         salvo::http::HeaderValue::from_static("application/xml; charset=utf-8"),
         true,
     );
+    #[expect(clippy::let_underscore_must_use, reason = "Write body failure is non-fatal")]
     let _ = res.write_body(xml);
 }

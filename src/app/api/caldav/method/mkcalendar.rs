@@ -44,7 +44,7 @@ pub async fn mkcalendar(req: &mut Request, res: &mut Response) {
     // TODO: Parse optional MKCALENDAR XML body for initial properties
     
     // Extract URI from path (last segment)
-    let uri = path.split('/').last().unwrap_or("calendar").to_string();
+    let uri = path.split('/').next_back().unwrap_or("calendar").to_string();
     
     // TODO: Get authenticated user's principal ID
     // For now, use a placeholder
@@ -86,6 +86,7 @@ pub async fn mkcalendar(req: &mut Request, res: &mut Response) {
 }
 
 /// Placeholder function to extract owner principal ID from path.
+#[expect(dead_code)]
 fn extract_owner_from_path(_path: &str) -> Result<uuid::Uuid, String> {
     // TODO: Implement proper path parsing and authentication
     // For now, return a dummy UUID

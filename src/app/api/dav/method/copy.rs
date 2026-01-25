@@ -6,7 +6,6 @@ use salvo::{handler, Request, Response};
 use salvo::http::StatusCode;
 
 use crate::component::db::connection;
-use crate::component::db::query::dav::instance;
 
 /// ## Summary
 /// Handles COPY requests to duplicate `WebDAV` resources.
@@ -44,13 +43,13 @@ pub async fn copy(req: &mut Request, res: &mut Response) {
     };
     
     // Get Overwrite header (default: T)
-    let overwrite = match req.headers().get("Overwrite") {
+    let _overwrite = match req.headers().get("Overwrite") {
         Some(header) => header.to_str().unwrap_or("T") == "T",
         None => true,
     };
     
     // Get database connection
-    let mut conn = match connection::connect().await {
+    let _conn = match connection::connect().await {
         Ok(conn) => conn,
         Err(e) => {
             tracing::error!("Failed to get database connection: {}", e);

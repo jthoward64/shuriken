@@ -47,6 +47,7 @@ pub async fn check_uid_conflict(
 
 #[cfg(test)]
 mod tests {
+    #[expect(unused_imports)]
     use super::*;
 
     #[test]

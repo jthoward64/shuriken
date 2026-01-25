@@ -192,7 +192,7 @@ fn parse_uri_from_path(path: &str) -> Result<String, PutError> {
     // For now, use the last path segment as the URI
     
     path.split('/')
-        .last()
+        .next_back()
         .filter(|s| !s.is_empty())
         .map(String::from)
         .ok_or_else(|| {

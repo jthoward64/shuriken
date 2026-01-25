@@ -72,7 +72,7 @@ pub async fn put_calendar_object(
         .map_err(|e| anyhow::anyhow!("invalid iCalendar: {e}"))?;
 
     // Extract UID for validation (optional, but recommended)
-    let uid = ical.root.uid().map(String::from);
+    let _uid = ical.root.uid().map(String::from);
 
     // Check if instance already exists
     let existing_instance = instance::by_collection_and_uri(ctx.collection_id, &ctx.uri)

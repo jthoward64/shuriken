@@ -3,8 +3,9 @@
 //!
 //! Verifies instance CRUD, ETag generation and stability, tombstone creation, and idempotency.
 
+#[expect(unused_imports)]
 use super::fixtures::*;
-use crate::component::db::query::dav::instance::*;
+use crate::component::db::query::dav::instance::generate_etag;
 
 /// ## Summary
 /// Test that an instance can be created and retrieved, referencing entity and collection.

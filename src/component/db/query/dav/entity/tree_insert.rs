@@ -190,6 +190,7 @@ fn insert_component_recursive<'a>(
 
 #[cfg(test)]
 mod tests {
+    #[expect(unused_imports)]
     use super::*;
 
     #[test]

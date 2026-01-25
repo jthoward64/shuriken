@@ -35,7 +35,6 @@ pub fn parse_depth(req: &Request) -> Option<Depth> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use salvo::prelude::*;
 
     /// ## Summary
     /// Helper to create a request with a Depth header.
