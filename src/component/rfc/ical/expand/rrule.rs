@@ -113,8 +113,10 @@ pub fn expand_rrule(
             let end_dt = end.with_timezone(&end_tz);
             builder = builder.before(end_dt);
         }
+        // Convert max_instances to u16 for rrule crate (caps at u16::MAX if larger)
         builder.all(u16::try_from(options.max_instances).unwrap_or(u16::MAX))
     } else {
+        // Convert max_instances to u16 for rrule crate (caps at u16::MAX if larger)
         rrule_set.all(u16::try_from(options.max_instances).unwrap_or(u16::MAX))
     };
 
