@@ -1,4 +1,4 @@
-//! Unit tests for CardDAV filter evaluation.
+//! Unit tests for `CardDAV` filter evaluation.
 
 #[cfg(test)]
 mod tests {

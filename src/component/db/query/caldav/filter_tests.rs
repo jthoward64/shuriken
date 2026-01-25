@@ -1,4 +1,4 @@
-//! Unit tests for CalDAV filter evaluation.
+//! Unit tests for `CalDAV` filter evaluation.
 
 #[cfg(test)]
 mod tests {

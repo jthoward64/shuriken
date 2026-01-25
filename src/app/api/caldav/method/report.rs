@@ -213,14 +213,11 @@ async fn build_calendar_multiget_response(
         let href_str = href.as_str();
         
         // Extract the resource URI from the href
-        let uri = match crate::util::path::extract_resource_uri(href_str) {
-            Ok(u) => u,
-            Err(_) => {
-                // Invalid href format, return 404
-                let response = PropstatResponse::not_found(href.clone());
-                multistatus.add_response(response);
-                continue;
-            }
+        let Ok(uri) = crate::util::path::extract_resource_uri(href_str) else {
+            // Invalid href format, return 404
+            let response = PropstatResponse::not_found(href.clone());
+            multistatus.add_response(response);
+            continue;
         };
         
         // Query for instance by collection and URI
