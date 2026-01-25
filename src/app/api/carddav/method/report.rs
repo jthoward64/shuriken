@@ -68,11 +68,21 @@ pub async fn report(req: &mut Request, res: &mut Response) {
 /// ## Errors
 /// Returns 400 for invalid filters, 404 for missing addressbooks, 500 for server errors.
 pub async fn handle_addressbook_query(
-    _req: &mut Request,
+    req: &mut Request,
     res: &mut Response,
     query: AddressbookQuery,
     properties: Vec<crate::component::rfc::dav::core::PropertyName>,
 ) {
+    // Extract collection_id from request path
+    let collection_id = match crate::util::path::extract_collection_id(req.uri().path()) {
+        Ok(id) => id,
+        Err(e) => {
+            tracing::error!("Failed to extract collection_id from path: {}", e);
+            res.status_code(StatusCode::BAD_REQUEST);
+            return;
+        }
+    };
+
     let mut conn = match connection::connect().await {
         Ok(conn) => conn,
         Err(e) => {
@@ -83,7 +93,7 @@ pub async fn handle_addressbook_query(
     };
 
     // Build response
-    let multistatus = match build_addressbook_query_response(&mut conn, &query, &properties).await {
+    let multistatus = match build_addressbook_query_response(&mut conn, collection_id, &query, &properties).await {
         Ok(ms) => ms,
         Err(e) => {
             tracing::error!("Failed to build addressbook-query response: {}", e);
@@ -107,11 +117,21 @@ pub async fn handle_addressbook_query(
 /// ## Errors
 /// Returns 400 for invalid hrefs, 500 for server errors.
 pub async fn handle_addressbook_multiget(
-    _req: &mut Request,
+    req: &mut Request,
     res: &mut Response,
     multiget: AddressbookMultiget,
     properties: Vec<crate::component::rfc::dav::core::PropertyName>,
 ) {
+    // Extract collection_id from request path
+    let collection_id = match crate::util::path::extract_collection_id(req.uri().path()) {
+        Ok(id) => id,
+        Err(e) => {
+            tracing::error!("Failed to extract collection_id from path: {}", e);
+            res.status_code(StatusCode::BAD_REQUEST);
+            return;
+        }
+    };
+
     let mut conn = match connection::connect().await {
         Ok(conn) => conn,
         Err(e) => {
@@ -122,7 +142,7 @@ pub async fn handle_addressbook_multiget(
     };
 
     // Build response
-    let multistatus = match build_addressbook_multiget_response(&mut conn, &multiget, &properties).await {
+    let multistatus = match build_addressbook_multiget_response(&mut conn, collection_id, &multiget, &properties).await {
         Ok(ms) => ms,
         Err(e) => {
             tracing::error!("Failed to build addressbook-multiget response: {}", e);
@@ -141,41 +161,29 @@ pub async fn handle_addressbook_multiget(
 ///
 /// ## Errors
 /// Returns database errors or filter evaluation errors.
-#[expect(clippy::unused_async)]
 async fn build_addressbook_query_response(
-    _conn: &mut connection::DbConnection<'_>,
-    _query: &AddressbookQuery,
-    _properties: &[crate::component::rfc::dav::core::PropertyName],
+    conn: &mut connection::DbConnection<'_>,
+    collection_id: uuid::Uuid,
+    query: &AddressbookQuery,
+    properties: &[crate::component::rfc::dav::core::PropertyName],
 ) -> anyhow::Result<Multistatus> {
+    use crate::component::db::query::carddav::filter::find_matching_instances;
+    use crate::component::db::query::report_property::build_instance_properties;
+    use crate::component::rfc::dav::core::{Href, PropstatResponse};
     
+    // Find instances matching the filter
+    let instances = find_matching_instances(conn, collection_id, query).await?;
     
+    // Build multistatus response
+    let mut multistatus = Multistatus::new();
+    for instance in instances {
+        let href = Href::new(format!("/{}", instance.uri));
+        let props = build_instance_properties(conn, &instance, properties).await?;
+        let response = PropstatResponse::ok(href, props);
+        multistatus.add_response(response);
+    }
     
-    // TODO: Extract collection_id from request context
-    // Same limitation as calendar-query - we need addressbook collection_id
-    // to properly scope the query.
-    
-    tracing::warn!(
-        "addressbook-query requires collection_id from request context - returning empty result"
-    );
-    
-    // Return empty multistatus for now until we have collection context
-    // Once collection_id is available, the implementation would be:
-    //
-    // let instances = crate::component::db::query::carddav::filter::find_matching_instances(
-    //     conn,
-    //     collection_id,
-    //     query,
-    // ).await?;
-    //
-    // let mut multistatus = Multistatus::new();
-    // for instance in instances {
-    //     let href = Href::from(format!("/{}", instance.uri));
-    //     let props = build_instance_properties(conn, &instance, properties).await?;
-    //     let response = PropstatResponse::ok(href, props);
-    //     multistatus.add_response(response);
-    // }
-    
-    Ok(Multistatus::new())
+    Ok(multistatus)
 }
 
 /// ## Summary
@@ -187,6 +195,7 @@ async fn build_addressbook_query_response(
 /// Returns database errors if queries fail.
 async fn build_addressbook_multiget_response(
     conn: &mut connection::DbConnection<'_>,
+    collection_id: uuid::Uuid,
     multiget: &AddressbookMultiget,
     properties: &[crate::component::rfc::dav::core::PropertyName],
 ) -> anyhow::Result<Multistatus> {
@@ -204,16 +213,18 @@ async fn build_addressbook_multiget_response(
         let href_str = href.as_str();
         
         // Extract the resource URI from the href
-        // Format: /addressbooks/{username}/{addressbook_name}/{contact_uid}.vcf
-        let uri = href_str.rsplit('/').next().unwrap_or(href_str);
+        let uri = match crate::util::path::extract_resource_uri(href_str) {
+            Ok(u) => u,
+            Err(_) => {
+                // Invalid href format, return 404
+                let response = PropstatResponse::not_found(href.clone());
+                multistatus.add_response(response);
+                continue;
+            }
+        };
         
-        // TODO: Extract collection_id from the request context
-        // Same limitation as calendar-multiget - we need collection context.
-        // For now, query by URI across all collections.
-        
-        let instance_opt = instance::all()
-            .filter(crate::component::db::schema::dav_instance::uri.eq(uri))
-            .filter(crate::component::db::schema::dav_instance::deleted_at.is_null())
+        // Query for instance by collection and URI
+        let instance_opt = instance::by_collection_and_uri(collection_id, &uri)
             .select(DavInstance::as_select())
             .first::<DavInstance>(conn)
             .await

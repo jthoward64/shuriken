@@ -68,11 +68,21 @@ pub async fn report(req: &mut Request, res: &mut Response) {
 /// ## Errors
 /// Returns 400 for invalid filters, 404 for missing collections, 500 for server errors.
 pub async fn handle_calendar_query(
-    _req: &mut Request,
+    req: &mut Request,
     res: &mut Response,
     query: CalendarQuery,
     properties: Vec<crate::component::rfc::dav::core::PropertyName>,
 ) {
+    // Extract collection_id from request path
+    let collection_id = match crate::util::path::extract_collection_id(req.uri().path()) {
+        Ok(id) => id,
+        Err(e) => {
+            tracing::error!("Failed to extract collection_id from path: {}", e);
+            res.status_code(StatusCode::BAD_REQUEST);
+            return;
+        }
+    };
+
     let mut conn = match connection::connect().await {
         Ok(conn) => conn,
         Err(e) => {
@@ -83,7 +93,7 @@ pub async fn handle_calendar_query(
     };
 
     // Build response
-    let multistatus = match build_calendar_query_response(&mut conn, &query, &properties).await {
+    let multistatus = match build_calendar_query_response(&mut conn, collection_id, &query, &properties).await {
         Ok(ms) => ms,
         Err(e) => {
             tracing::error!("Failed to build calendar-query response: {}", e);
@@ -107,11 +117,21 @@ pub async fn handle_calendar_query(
 /// ## Errors
 /// Returns 400 for invalid hrefs, 500 for server errors.
 pub async fn handle_calendar_multiget(
-    _req: &mut Request,
+    req: &mut Request,
     res: &mut Response,
     multiget: CalendarMultiget,
     properties: Vec<crate::component::rfc::dav::core::PropertyName>,
 ) {
+    // Extract collection_id from request path
+    let collection_id = match crate::util::path::extract_collection_id(req.uri().path()) {
+        Ok(id) => id,
+        Err(e) => {
+            tracing::error!("Failed to extract collection_id from path: {}", e);
+            res.status_code(StatusCode::BAD_REQUEST);
+            return;
+        }
+    };
+
     let mut conn = match connection::connect().await {
         Ok(conn) => conn,
         Err(e) => {
@@ -122,7 +142,7 @@ pub async fn handle_calendar_multiget(
     };
 
     // Build response
-    let multistatus = match build_calendar_multiget_response(&mut conn, &multiget, &properties).await {
+    let multistatus = match build_calendar_multiget_response(&mut conn, collection_id, &multiget, &properties).await {
         Ok(ms) => ms,
         Err(e) => {
             tracing::error!("Failed to build calendar-multiget response: {}", e);
@@ -141,46 +161,29 @@ pub async fn handle_calendar_multiget(
 ///
 /// ## Errors
 /// Returns database errors or filter evaluation errors.
-#[expect(clippy::unused_async)]
 async fn build_calendar_query_response(
-    _conn: &mut connection::DbConnection<'_>,
-    _query: &CalendarQuery,
-    _properties: &[crate::component::rfc::dav::core::PropertyName],
+    conn: &mut connection::DbConnection<'_>,
+    collection_id: uuid::Uuid,
+    query: &CalendarQuery,
+    properties: &[crate::component::rfc::dav::core::PropertyName],
 ) -> anyhow::Result<Multistatus> {
+    use crate::component::db::query::caldav::filter::find_matching_instances;
+    use crate::component::db::query::report_property::build_instance_properties;
+    use crate::component::rfc::dav::core::{Href, PropstatResponse};
     
+    // Find instances matching the filter
+    let instances = find_matching_instances(conn, collection_id, query).await?;
     
+    // Build multistatus response
+    let mut multistatus = Multistatus::new();
+    for instance in instances {
+        let href = Href::new(format!("/{}", instance.uri));
+        let props = build_instance_properties(conn, &instance, properties).await?;
+        let response = PropstatResponse::ok(href, props);
+        multistatus.add_response(response);
+    }
     
-    // TODO: Extract collection_id from request context
-    // For now, this is a limitation - we need collection_id to properly scope the query.
-    // The filter evaluation requires a collection_id to determine which calendar to search.
-    //
-    // Workaround options:
-    // 1. Add collection_id to request handler context (preferred)
-    // 2. Parse from request path in the handler
-    // 3. Support "search all collections" mode (less efficient)
-    
-    tracing::warn!(
-        "calendar-query requires collection_id from request context - returning empty result"
-    );
-    
-    // Return empty multistatus for now until we have collection context
-    // Once collection_id is available, the implementation would be:
-    //
-    // let instances = crate::component::db::query::caldav::filter::find_matching_instances(
-    //     conn,
-    //     collection_id,
-    //     query,
-    // ).await?;
-    //
-    // let mut multistatus = Multistatus::new();
-    // for instance in instances {
-    //     let href = Href::from(format!("/{}", instance.uri));
-    //     let props = build_instance_properties(conn, &instance, properties).await?;
-    //     let response = PropstatResponse::ok(href, props);
-    //     multistatus.add_response(response);
-    // }
-    
-    Ok(Multistatus::new())
+    Ok(multistatus)
 }
 
 /// ## Summary
@@ -192,6 +195,7 @@ async fn build_calendar_query_response(
 /// Returns database errors if queries fail.
 async fn build_calendar_multiget_response(
     conn: &mut connection::DbConnection<'_>,
+    collection_id: uuid::Uuid,
     multiget: &CalendarMultiget,
     properties: &[crate::component::rfc::dav::core::PropertyName],
 ) -> anyhow::Result<Multistatus> {
@@ -209,24 +213,18 @@ async fn build_calendar_multiget_response(
         let href_str = href.as_str();
         
         // Extract the resource URI from the href
-        // Format: /calendars/{username}/{calendar_name}/{event_uid}.ics
-        // For now, we use a simple pattern: take the last path segment as the URI
-        let uri = href_str.rsplit('/').next().unwrap_or(href_str);
+        let uri = match crate::util::path::extract_resource_uri(href_str) {
+            Ok(u) => u,
+            Err(_) => {
+                // Invalid href format, return 404
+                let response = PropstatResponse::not_found(href.clone());
+                multistatus.add_response(response);
+                continue;
+            }
+        };
         
-        // TODO: Extract collection_id from the request context
-        // We need to add a way to pass collection_id through the request handler.
-        // Options:
-        // 1. Parse the full href path to look up collection by principal/name
-        // 2. Add collection_id to request context (preferred)
-        // 3. Extract from request path parameters
-        //
-        // For now, we'll attempt to find instances by URI across all collections
-        // (this is not ideal but allows basic functionality)
-        
-        // Query for instance by URI (without collection filter - limitation)
-        let instance_opt = instance::all()
-            .filter(crate::component::db::schema::dav_instance::uri.eq(uri))
-            .filter(crate::component::db::schema::dav_instance::deleted_at.is_null())
+        // Query for instance by collection and URI
+        let instance_opt = instance::by_collection_and_uri(collection_id, &uri)
             .select(DavInstance::as_select())
             .first::<DavInstance>(conn)
             .await

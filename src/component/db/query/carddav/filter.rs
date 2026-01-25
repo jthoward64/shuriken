@@ -64,7 +64,7 @@ async fn apply_addressbook_filter(
     let mut entity_id_sets: Vec<Vec<uuid::Uuid>> = Vec::new();
 
     for prop_filter in &filter.prop_filters {
-        let entity_ids = evaluate_prop_filter(conn, &base_query, prop_filter).await?;
+        let entity_ids = evaluate_prop_filter(conn, prop_filter).await?;
         entity_id_sets.push(entity_ids);
     }
 
@@ -114,7 +114,6 @@ async fn apply_addressbook_filter(
 /// Returns database errors if queries fail.
 async fn evaluate_prop_filter(
     conn: &mut DbConnection<'_>,
-    _base_query: &dav_instance::BoxedQuery<'static, diesel::pg::Pg>,
     prop_filter: &PropFilter,
 ) -> anyhow::Result<Vec<uuid::Uuid>> {
     let prop_name = prop_filter.name.to_uppercase();

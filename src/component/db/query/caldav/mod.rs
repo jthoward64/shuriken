@@ -3,3 +3,6 @@ pub mod calendar;
 pub mod event_index;
 pub mod filter;
 pub mod freebusy;
+
+#[cfg(test)]
+mod filter_tests;
