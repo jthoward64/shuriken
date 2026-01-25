@@ -80,7 +80,7 @@ pub fn extract_collection_id(path: &str) -> anyhow::Result<uuid::Uuid> {
 /// this function extracts just the path portion.
 ///
 /// ## Errors
-/// Returns an error if the path cannot be extracted or is empty.
+/// Returns an error if the URL format is invalid.
 pub fn extract_path_from_url(url_or_path: &str) -> anyhow::Result<String> {
     // If it doesn't contain "://", treat it as a path
     if !url_or_path.contains("://") {
@@ -89,11 +89,15 @@ pub fn extract_path_from_url(url_or_path: &str) -> anyhow::Result<String> {
 
     // Extract path from full URL
     // Format: scheme://host[:port]/path
-    url_or_path
+    let path = url_or_path
         .split_once("://")
-        .and_then(|(_, rest)| rest.split_once('/'))
-        .map(|(_, path)| format!("/{path}"))
-        .ok_or_else(|| anyhow::anyhow!("Could not extract path from URL: {url_or_path}"))
+        .and_then(|(_, rest)| {
+            // Find the first '/' after the host[:port]
+            rest.split_once('/').map(|(_, path)| format!("/{path}"))
+        })
+        .unwrap_or_else(|| "/".to_string()); // Default to "/" if no path component
+
+    Ok(path)
 }
 
 #[cfg(test)]
@@ -177,5 +181,19 @@ mod tests {
         let url = "https://example.com/path";
         let path = extract_path_from_url(url).expect("Should extract path");
         assert_eq!(path, "/path");
+    }
+
+    #[test]
+    fn test_extract_path_from_url_no_path() {
+        let url = "http://example.com";
+        let path = extract_path_from_url(url).expect("Should return /");
+        assert_eq!(path, "/");
+    }
+
+    #[test]
+    fn test_extract_path_from_url_no_path_with_port() {
+        let url = "http://example.com:8080";
+        let path = extract_path_from_url(url).expect("Should return /");
+        assert_eq!(path, "/");
     }
 }

@@ -58,8 +58,9 @@ pub(super) async fn handle_get_or_head(req: &mut Request, res: &mut Response, is
         }
     };
 
-    // Check If-None-Match for conditional GET
-    if !is_head && check_if_none_match(req, &instance.etag) {
+    // Check If-None-Match for conditional GET/HEAD
+    // Both GET and HEAD should support conditional requests and return 304 Not Modified
+    if check_if_none_match(req, &instance.etag) {
         res.status_code(StatusCode::NOT_MODIFIED);
         return;
     }
