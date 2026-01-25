@@ -1,40 +1,90 @@
 //! DAV property types.
 
 use super::namespace::QName;
+use super::partial_retrieval::{AddressDataRequest, CalendarDataRequest};
 
-/// A property name (without value).
+/// A property name (without value), with optional partial retrieval specification.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct PropertyName(pub QName);
+pub enum PropertyName {
+    /// Simple property name.
+    Simple(QName),
+    /// Calendar-data with optional partial retrieval.
+    CalendarData(CalendarDataRequest),
+    /// Address-data with optional partial retrieval.
+    AddressData(AddressDataRequest),
+}
 
 impl PropertyName {
-    /// Creates a new property name.
+    /// Creates a new simple property name.
     #[must_use]
     pub fn new(qname: QName) -> Self {
-        Self(qname)
+        Self::Simple(qname)
+    }
+
+    /// Creates calendar-data property with partial retrieval.
+    #[must_use]
+    pub fn calendar_data(request: CalendarDataRequest) -> Self {
+        Self::CalendarData(request)
+    }
+
+    /// Creates address-data property with partial retrieval.
+    #[must_use]
+    pub fn address_data(request: AddressDataRequest) -> Self {
+        Self::AddressData(request)
     }
 
     /// Returns the qualified name.
     #[must_use]
-    pub fn qname(&self) -> &QName {
-        &self.0
+    pub fn qname(&self) -> QName {
+        match self {
+            Self::Simple(qname) => qname.clone(),
+            Self::CalendarData(_) => QName::new("urn:ietf:params:xml:ns:caldav", "calendar-data"),
+            Self::AddressData(_) => QName::new("urn:ietf:params:xml:ns:carddav", "address-data"),
+        }
     }
 
     /// Returns the namespace URI.
     #[must_use]
     pub fn namespace(&self) -> &str {
-        self.0.namespace_uri()
+        match self {
+            Self::Simple(qname) => qname.namespace_uri(),
+            Self::CalendarData(_) => "urn:ietf:params:xml:ns:caldav",
+            Self::AddressData(_) => "urn:ietf:params:xml:ns:carddav",
+        }
     }
 
     /// Returns the local name.
     #[must_use]
     pub fn local_name(&self) -> &str {
-        self.0.local_name()
+        match self {
+            Self::Simple(qname) => qname.local_name(),
+            Self::CalendarData(_) => "calendar-data",
+            Self::AddressData(_) => "address-data",
+        }
+    }
+
+    /// Returns the calendar-data request if this is a calendar-data property.
+    #[must_use]
+    pub fn calendar_data_request(&self) -> Option<&CalendarDataRequest> {
+        match self {
+            Self::CalendarData(req) => Some(req),
+            _ => None,
+        }
+    }
+
+    /// Returns the address-data request if this is an address-data property.
+    #[must_use]
+    pub fn address_data_request(&self) -> Option<&AddressDataRequest> {
+        match self {
+            Self::AddressData(req) => Some(req),
+            _ => None,
+        }
     }
 }
 
 impl From<QName> for PropertyName {
     fn from(qname: QName) -> Self {
-        Self(qname)
+        Self::Simple(qname)
     }
 }
 
