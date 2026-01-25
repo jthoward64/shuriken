@@ -27,9 +27,16 @@ use helpers::build_propfind_response;
 /// ## Errors
 /// Returns 400 for malformed requests, 404 for missing resources, 500 for server errors.
 #[handler]
+#[tracing::instrument(skip(req, res), fields(
+    method = "PROPFIND",
+    path = %req.uri().path()
+))]
 pub async fn propfind(req: &mut Request, res: &mut Response) {
+    tracing::info!("Handling PROPFIND request");
+    
     // Parse Depth header (default to 0 for PROPFIND)
     let depth = parse_depth(req).unwrap_or_else(Depth::default_for_propfind);
+    tracing::debug!("Depth header: {:?}", depth);
     
     // Parse request body
     let body = match req.payload().await {
@@ -41,6 +48,8 @@ pub async fn propfind(req: &mut Request, res: &mut Response) {
         }
     };
     
+    tracing::debug!("Request body read successfully ({} bytes)", body.len());
+    
     // Parse PROPFIND request (empty body = allprop)
     let propfind_req = match parse_propfind(&body) {
         Ok(req) => req,
@@ -50,6 +59,8 @@ pub async fn propfind(req: &mut Request, res: &mut Response) {
             return;
         }
     };
+    
+    tracing::debug!("PROPFIND request parsed successfully");
     
     // Get database connection
     let mut conn = match connection::connect().await {
@@ -70,6 +81,8 @@ pub async fn propfind(req: &mut Request, res: &mut Response) {
             return;
         }
     };
+    
+    tracing::debug!("Multistatus response built successfully");
     
     // Serialize to XML
     let xml = match serialize_multistatus(&multistatus) {

@@ -61,15 +61,29 @@ pub fn not_deleted() -> dav_collection::BoxedQuery<'static, diesel::pg::Pg> {
 ///
 /// ## Errors
 /// Returns a database error if the insert fails.
+#[tracing::instrument(skip(conn, new_collection), fields(
+    uri = new_collection.uri,
+    collection_type = new_collection.collection_type
+))]
 pub async fn create_collection(
     conn: &mut crate::component::db::connection::DbConnection<'_>,
     new_collection: &NewDavCollection<'_>,
 ) -> diesel::QueryResult<DavCollection> {
-    diesel::insert_into(dav_collection::table)
+    tracing::debug!("Creating new DAV collection");
+    
+    let result = diesel::insert_into(dav_collection::table)
         .values(new_collection)
         .returning(DavCollection::as_returning())
         .get_result(conn)
-        .await
+        .await;
+    
+    if result.is_ok() {
+        tracing::debug!("DAV collection created successfully");
+    } else {
+        tracing::error!("Failed to create DAV collection");
+    }
+    
+    result
 }
 
 /// ## Summary
@@ -77,10 +91,13 @@ pub async fn create_collection(
 ///
 /// ## Errors
 /// Returns a database error if the query fails.
+#[tracing::instrument(skip(conn))]
 pub async fn get_collection(
     conn: &mut crate::component::db::connection::DbConnection<'_>,
     id: uuid::Uuid,
 ) -> diesel::QueryResult<Option<DavCollection>> {
+    tracing::trace!("Fetching DAV collection by ID");
+    
     by_id(id)
         .first(conn)
         .await
@@ -106,10 +123,13 @@ pub async fn list_collections(
 ///
 /// ## Errors
 /// Returns a database error if the update fails.
+#[tracing::instrument(skip(conn))]
 pub async fn update_synctoken(
     conn: &mut crate::component::db::connection::DbConnection<'_>,
     collection_id: uuid::Uuid,
 ) -> diesel::QueryResult<i64> {
+    tracing::debug!("Updating collection sync token");
+    
     diesel::update(dav_collection::table)
         .filter(dav_collection::id.eq(collection_id))
         .set(dav_collection::synctoken.eq(dav_collection::synctoken + 1))

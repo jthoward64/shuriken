@@ -66,15 +66,31 @@ pub fn by_entity(entity_id: uuid::Uuid) -> dav_instance::BoxedQuery<'static, die
 ///
 /// ## Errors
 /// Returns a database error if the insert fails.
+#[tracing::instrument(skip(conn, new_instance), fields(
+    collection_id = %new_instance.collection_id,
+    entity_id = %new_instance.entity_id,
+    uri = new_instance.uri,
+    etag = new_instance.etag
+))]
 pub async fn create_instance(
     conn: &mut crate::component::db::connection::DbConnection<'_>,
     new_instance: &NewDavInstance<'_>,
 ) -> diesel::QueryResult<DavInstance> {
-    diesel::insert_into(dav_instance::table)
+    tracing::debug!("Creating new DAV instance");
+    
+    let result = diesel::insert_into(dav_instance::table)
         .values(new_instance)
         .returning(DavInstance::as_returning())
         .get_result(conn)
-        .await
+        .await;
+    
+    if result.is_ok() {
+        tracing::debug!("DAV instance created successfully");
+    } else {
+        tracing::error!("Failed to create DAV instance");
+    }
+    
+    result
 }
 
 /// ## Summary
