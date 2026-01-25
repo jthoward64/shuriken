@@ -134,8 +134,12 @@ pub async fn put_calendar_object(
         .await
         .context("failed to update instance")?;
 
+        // Update the collection sync token
+        let _new_synctoken = collection::update_synctoken(conn, ctx.collection_id)
+            .await
+            .context("failed to update collection sync token")?;
+
         // TODO: Update the entity tree with new iCalendar content
-        // TODO: Bump collection sync token
     } else {
         // Create new entity and instance
         // For now, create a minimal entity without the full tree
@@ -165,8 +169,12 @@ pub async fn put_calendar_object(
             .await
             .context("failed to create instance")?;
 
+        // Update the collection sync token
+        let _new_synctoken = collection::update_synctoken(conn, ctx.collection_id)
+            .await
+            .context("failed to update collection sync token")?;
+
         // TODO: Insert component tree (components, properties, parameters)
-        // TODO: Bump collection sync token
     }
 
     Ok(PutObjectResult { etag, created })
