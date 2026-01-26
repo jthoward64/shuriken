@@ -231,16 +231,23 @@ async fn perform_move(
             .map_err(|e| MoveError::DatabaseError(anyhow::Error::from(e)))?;
     }
 
-    // Get destination collection to determine new sync revision
-    let dest_collection = collection::get_collection(conn, dest_collection_id)
+    // Update sync tokens for both collections first, then use the new values
+    let new_dest_synctoken = collection::update_synctoken(conn, dest_collection_id)
         .await
-        .map_err(|e| MoveError::DatabaseError(anyhow::Error::from(e)))?
-        .ok_or_else(|| {
-            MoveError::DatabaseError(anyhow::anyhow!("Destination collection not found"))
-        })?;
+        .map_err(|e| MoveError::DatabaseError(anyhow::Error::from(e)))?;
 
-    // Create new instance at destination
-    let new_sync_revision = dest_collection.synctoken + 1;
+    let new_source_synctoken = collection::update_synctoken(conn, source_collection_id)
+        .await
+        .map_err(|e| MoveError::DatabaseError(anyhow::Error::from(e)))?;
+
+    tracing::debug!(
+        new_dest_synctoken,
+        new_source_synctoken,
+        "Updated sync tokens for both collections"
+    );
+
+    // Create new instance at destination with updated sync revision
+    let new_sync_revision = new_dest_synctoken;
     // Keep the same ETag since content hasn't changed
     let new_etag = &source_instance.etag;
     let now = chrono::Utc::now();
@@ -261,14 +268,6 @@ async fn perform_move(
 
     tracing::debug!("Created new instance at destination");
 
-    // Get source collection to determine tombstone sync revision
-    let source_collection = collection::get_collection(conn, source_collection_id)
-        .await
-        .map_err(|e| MoveError::DatabaseError(anyhow::Error::from(e)))?
-        .ok_or_else(|| {
-            MoveError::DatabaseError(anyhow::anyhow!("Source collection not found"))
-        })?;
-
     // Soft-delete source instance
     instance::soft_delete_instance(conn, source_instance.id)
         .await
@@ -276,12 +275,12 @@ async fn perform_move(
 
     tracing::debug!("Soft-deleted source instance");
 
-    // Create tombstone for source
+    // Create tombstone for source with updated synctoken
     let tombstone = NewDavTombstone {
         collection_id: source_collection_id,
         uri: source_uri,
         entity_id: Some(source_instance.entity_id),
-        synctoken: source_collection.synctoken + 1,
+        synctoken: new_source_synctoken,
         sync_revision: source_instance.sync_revision,
         deleted_at: now,
         last_etag: Some(&source_instance.etag),
@@ -293,17 +292,6 @@ async fn perform_move(
         .map_err(|e| MoveError::DatabaseError(anyhow::Error::from(e)))?;
 
     tracing::debug!("Created tombstone for source");
-
-    // Update sync tokens for both collections
-    collection::update_synctoken(conn, source_collection_id)
-        .await
-        .map_err(|e| MoveError::DatabaseError(anyhow::Error::from(e)))?;
-
-    collection::update_synctoken(conn, dest_collection_id)
-        .await
-        .map_err(|e| MoveError::DatabaseError(anyhow::Error::from(e)))?;
-
-    tracing::debug!("Updated sync tokens for both collections");
 
     Ok(result)
 }
