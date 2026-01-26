@@ -1,9 +1,12 @@
 use std::sync::OnceLock;
 
-use diesel_async::AsyncPgConnection;
 use diesel::result::ConnectionError;
+use diesel_async::AsyncPgConnection;
 use diesel_async::pooled_connection::AsyncDieselConnectionManager;
-use diesel_async::pooled_connection::{PoolError, bb8::{Pool, PooledConnection, RunError}};
+use diesel_async::pooled_connection::{
+    PoolError,
+    bb8::{Pool, PooledConnection, RunError},
+};
 
 pub type DbPool = Pool<AsyncPgConnection>;
 pub type DbConnection<'pool> = PooledConnection<'pool, AsyncPgConnection>;
@@ -34,7 +37,10 @@ pub async fn create_pool(database_url: &str, size: u32) -> anyhow::Result<()> {
         .build(config)
         .await?;
 
-    #[expect(clippy::expect_used, reason = "Startup invariant - pool must only be set once")]
+    #[expect(
+        clippy::expect_used,
+        reason = "Startup invariant - pool must only be set once"
+    )]
     DB_POOL
         .set(pool)
         .expect("Database pool is already set - create_pool() must only be called once at startup");
@@ -58,7 +64,6 @@ pub async fn create_pool(database_url: &str, size: u32) -> anyhow::Result<()> {
 ///
 /// Returns a `PoolError` if unable to get a connection from the pool.
 #[tracing::instrument]
-#[expect(clippy::expect_used, reason = "Startup invariant - pool must be initialized")]
 pub async fn connect() -> Result<DbConnection<'static>, RunError> {
     tracing::trace!("Acquiring database connection from pool");
 
@@ -89,7 +94,10 @@ pub async fn connect() -> Result<DbConnection<'static>, RunError> {
 /// Panics if the database pool is not initialized. This indicates a programming error
 /// where the pool was accessed before `create_pool()` was called.
 #[must_use]
-#[expect(clippy::expect_used, reason = "Startup invariant - pool must be initialized")]
+#[expect(
+    clippy::expect_used,
+    reason = "Startup invariant - pool must be initialized"
+)]
 pub fn get_pool() -> DbPool {
     DB_POOL
         .get()

@@ -2,7 +2,8 @@
 
 use anyhow::{Context, Result};
 use diesel::prelude::*;
-use diesel_async::RunQueryDsl;
+use diesel_async::scoped_futures::ScopedFutureExt;
+use diesel_async::{AsyncConnection, RunQueryDsl};
 
 use crate::component::db::connection::DbConnection;
 use crate::component::db::query::dav::collection;
@@ -54,32 +55,49 @@ pub async fn create_collection(
         );
     }
 
-    // Check if collection already exists with same URI and owner
-    let existing: Option<DavCollection> = collection::by_uri_and_principal(&ctx.uri, ctx.owner_principal_id)
-        .first(conn)
-        .await
-        .optional()
-        .context("failed to check for existing collection")?;
+    let owner_principal_id = ctx.owner_principal_id;
+    let uri = ctx.uri.clone();
+    let collection_type = ctx.collection_type.clone();
+    let displayname = ctx.displayname.clone();
+    let description = ctx.description.clone();
 
-    if existing.is_some() {
-        anyhow::bail!("collection with URI '{}' already exists", ctx.uri);
-    }
+    conn.transaction::<_, anyhow::Error, _>(move |tx| {
+        let uri = uri.clone();
+        let collection_type = collection_type.clone();
+        let displayname = displayname.clone();
+        let description = description.clone();
 
-    let new_collection = NewDavCollection {
-        owner_principal_id: ctx.owner_principal_id,
-        uri: &ctx.uri,
-        collection_type: &ctx.collection_type,
-        display_name: ctx.displayname.as_deref(),
-        description: ctx.description.as_deref(),
-        timezone_tzid: None,
-    };
+        async move {
+            // Check if collection already exists with same URI and owner
+            let existing: Option<DavCollection> = collection::by_uri_and_principal(&uri, owner_principal_id)
+                .first(tx)
+                .await
+                .optional()
+                .context("failed to check for existing collection")?;
 
-    let created = collection::create_collection(conn, &new_collection)
-        .await
-        .context("failed to create collection")?;
+            if existing.is_some() {
+                anyhow::bail!("collection with URI '{}' already exists", uri);
+            }
 
-    Ok(CreateCollectionResult {
-        collection_id: created.id,
-        uri: created.uri,
+            let new_collection = NewDavCollection {
+                owner_principal_id,
+                uri: &uri,
+                collection_type: &collection_type,
+                display_name: displayname.as_deref(),
+                description: description.as_deref(),
+                timezone_tzid: None,
+            };
+
+            let created = collection::create_collection(tx, &new_collection)
+                .await
+                .context("failed to create collection")?;
+
+            Ok(CreateCollectionResult {
+                collection_id: created.id,
+                uri: created.uri,
+            })
+        }
+        .scope_boxed()
     })
+    .await
 }

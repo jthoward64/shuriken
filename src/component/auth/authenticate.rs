@@ -2,6 +2,8 @@ use diesel::{
     ExpressionMethods, OptionalExtension, SelectableHelper,
     query_dsl::methods::{FilterDsl, SelectDsl},
 };
+use diesel_async::scoped_futures::ScopedFutureExt;
+use diesel_async::AsyncConnection;
 
 use crate::component::{
     config::{AuthMethod, get_config},
@@ -35,52 +37,63 @@ async fn authenticate_single_user() -> Result<User> {
             ))?;
 
     let mut conn = connect().await?;
+    let single_user_name = single_user_config.name.clone();
+    let single_user_email = single_user_config.email.clone();
 
-    // Check if the user already exists
-    if let Some(user) = schema::user::table
-        .filter(schema::user::email.eq(&single_user_config.email))
-        .select(User::as_select())
-        .first::<User>(&mut conn)
-        .await
-        .optional()?
-    {
-        tracing::debug!(user_email = %user.email, "Single user already exists");
-        return Ok(user);
-    }
+    conn.transaction::<_, Error, _>(move |tx| {
+        let single_user_name = single_user_name.clone();
+        let single_user_email = single_user_email.clone();
 
-    tracing::debug!(email = %single_user_config.email, "Creating single user");
+        async move {
+            // Check if the user already exists
+            if let Some(user) = schema::user::table
+                .filter(schema::user::email.eq(&single_user_email))
+                .select(User::as_select())
+                .first::<User>(tx)
+                .await
+                .optional()?
+            {
+                tracing::debug!(user_email = %user.email, "Single user already exists");
+                return Ok(user);
+            }
 
-    // If not, create the user
-    let principal_id = uuid::Uuid::now_v7();
-    let principal_uri = format!("/principals/users/{principal_id}");
+            tracing::debug!(email = %single_user_email, "Creating single user");
 
-    let new_principal = NewPrincipal {
-        id: principal_id,
-        principal_type: PrincipalType::User.as_str(),
-        uri: principal_uri.as_str(),
-        display_name: Some(single_user_config.name.as_str()),
-    };
+            // If not, create the user
+            let principal_id = uuid::Uuid::now_v7();
+            let principal_uri = format!("/principals/users/{principal_id}");
 
-    let _principal_row_count = diesel::insert_into(schema::principal::table)
-        .values(&new_principal)
-        .execute(&mut conn)
-        .await?;
+            let new_principal = NewPrincipal {
+                id: principal_id,
+                principal_type: PrincipalType::User.as_str(),
+                uri: principal_uri.as_str(),
+                display_name: Some(single_user_name.as_str()),
+            };
 
-    let new_user = NewUser {
-        name: single_user_config.name.as_str(),
-        email: single_user_config.email.as_str(),
-        principal_id,
-    };
+            let _principal_row_count = diesel::insert_into(schema::principal::table)
+                .values(&new_principal)
+                .execute(tx)
+                .await?;
 
-    let user = diesel::insert_into(schema::user::table)
-        .values(&new_user)
-        .returning(User::as_select())
-        .get_result::<User>(&mut conn)
-        .await?;
+            let new_user = NewUser {
+                name: single_user_name.as_str(),
+                email: single_user_email.as_str(),
+                principal_id,
+            };
 
-    tracing::info!(user_id = %user.id, user_email = %user.email, "Single user created");
+            let user = diesel::insert_into(schema::user::table)
+                .values(&new_user)
+                .returning(User::as_select())
+                .get_result::<User>(tx)
+                .await?;
 
-    Ok(user)
+            tracing::info!(user_id = %user.id, user_email = %user.email, "Single user created");
+
+            Ok(user)
+        }
+        .scope_boxed()
+    })
+    .await
 }
 
 #[expect(clippy::unused_async)]
