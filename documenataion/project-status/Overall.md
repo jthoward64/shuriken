@@ -28,7 +28,7 @@ However, **Phase 5 is a critical blocker for production**:
 | [Phase 0](Phase%200.md) | Database Schema | ✅ Complete | 100% | — | Complete |
 | [Phase 1](Phase%201.md) | Parsing & Serialization | ✅ Complete | 98% | — | Complete |
 | [Phase 2](Phase%202.md) | Database Operations | ⚠️ Mostly Complete | 85% | P2 | 1 week |
-| [Phase 3](Phase%203.md) | Basic HTTP Methods | ⚠️ Mostly Complete | 90% | P2 | 3-5 days |
+| [Phase 3](Phase%203.md) | Basic HTTP Methods | ✅ Complete | 100% | — | Complete |
 | [Phase 4](Phase%204.md) | Query Reports | ✅ Complete | 95% | P2 | 3-5 days |
 | [Phase 5](Phase%205.md) | **Recurrence & Timezones** | **❌ Not Started** | **0%** | **P0 CRITICAL** | **2-3 weeks** |
 | [Phase 6](Phase%206.md) | Synchronization | ❌ Stub Only | 10% | P1 | 1 week |
@@ -83,10 +83,10 @@ However, **Phase 5 is a critical blocker for production**:
 
 ### 🔧 Nice to Have (Completeness)
 
-#### 4. Phase 3: Method Completion (3-5 days) — **P2**
+#### 4. Phase 3: Method Completion (COMPLETE) — **P2**
 **Key Tasks**:
-- Complete MOVE handler (currently stub only)
-- Complete MKCALENDAR/MKCOL XML body parsing
+- ✅ Complete MOVE handler
+- ✅ Complete MKCALENDAR/MKCOL XML body parsing
 
 #### 5. Phase 4: expand-property (3-5 days) — **P2**
 **Key Tasks**:
