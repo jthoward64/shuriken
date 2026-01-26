@@ -1,0 +1,36 @@
+# 10. Free-Busy Queries
+
+## 10.1 CALDAV:free-busy-query Report
+
+**Processing**:
+
+1. Identify all VEVENTs overlapping time range
+2. Check TRANSP property (OPAQUE vs TRANSPARENT)
+3. Check STATUS (CANCELLED events don't block)
+4. Aggregate into FREEBUSY periods with FBTYPE
+5. Merge adjacent/overlapping periods
+
+**FBTYPE Values**:
+- `FREE`: Available
+- `BUSY`: Blocked
+- `BUSY-TENTATIVE`: Tentatively blocked
+- `BUSY-UNAVAILABLE`: Unavailable
+
+## 10.2 Response Format
+
+```
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Shuriken//CalDAV//EN
+METHOD:REPLY
+BEGIN:VFREEBUSY
+DTSTAMP:20060104T120000Z
+DTSTART:20060104T000000Z
+DTEND:20060105T000000Z
+FREEBUSY;FBTYPE=BUSY:20060104T090000Z/20060104T100000Z
+FREEBUSY;FBTYPE=BUSY-TENTATIVE:20060104T140000Z/20060104T150000Z
+END:VFREEBUSY
+END:VCALENDAR
+```
+
+---
