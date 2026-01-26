@@ -122,7 +122,7 @@ pub fn get_config_from_depot(depot: &salvo::Depot) -> AppResult<Arc<Settings>> {
     depot
         .obtain::<Arc<Settings>>()
         .cloned()
-        .map_err(|_| AppError::InvariantViolation("Configuration not found in depot".into()))
+        .map_err(|_err| AppError::InvariantViolation("Configuration not found in depot".into()))
 }
 
 #[cfg(test)]

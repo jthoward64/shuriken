@@ -29,6 +29,10 @@ use crate::util::path;
 /// ## Errors
 /// Returns 400 for missing Destination, 409 for conflicts, 412 for preconditions, 500 for errors.
 #[handler]
+#[expect(
+    clippy::needless_borrow,
+    reason = "Salvo handler provides depot by reference"
+)]
 pub async fn r#move(req: &mut Request, res: &mut Response, depot: &Depot) {
     // Get source path
     let source_path = req.uri().path().to_string();
@@ -85,7 +89,7 @@ pub async fn r#move(req: &mut Request, res: &mut Response, depot: &Depot) {
     }
 
     // Get database provider from depot
-    let provider = match connection::get_db_from_depot(&depot) {
+    let provider = match connection::get_db_from_depot(depot) {
         Ok(provider) => provider,
         Err(e) => {
             tracing::error!(error = %e, "Failed to get database provider");

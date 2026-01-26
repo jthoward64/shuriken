@@ -4,24 +4,21 @@ use shuriken::app::api::routes;
 use shuriken::component::auth::casbin::{CasbinEnforcerHandler, init_casbin};
 use shuriken::component::config::{ConfigHandler, load_config};
 use shuriken::component::db::connection::{self, DbProviderHandler};
-use tracing_subscriber::{EnvFilter, fmt};
+use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, reload, util::SubscriberInitExt};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Initialize tracing with environment variable support
-    // RUST_LOG can be used to control log levels, e.g.:
-    // RUST_LOG=debug for debug logs
-    // RUST_LOG=shuriken=debug for debug logs in shuriken only
-    // RUST_LOG=shuriken::component::db=trace for trace logs in db component
-    let env_filter: EnvFilter =
-        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    let (filter_layer, filter_handle) = reload::Layer::new(EnvFilter::new("debug"));
 
-    fmt()
-        .with_env_filter(env_filter)
-        .with_target(true)
-        .with_thread_ids(true)
-        .with_file(true)
-        .with_line_number(true)
+    tracing_subscriber::registry()
+        .with(filter_layer)
+        .with(
+            fmt::layer()
+                .with_target(true)
+                .with_thread_ids(true)
+                .with_file(true)
+                .with_line_number(true),
+        )
         .init();
 
     tracing::info!("Starting Shuriken CalDAV/CardDAV server");
@@ -29,6 +26,14 @@ async fn main() -> anyhow::Result<()> {
     let config = load_config()?;
 
     tracing::info!(config = ?config, "Configuration loaded");
+
+    if let Ok(filter) = EnvFilter::try_new(config.logging.level.as_str()) {
+        if let Err(e) = filter_handle.modify(|current| *current = filter) {
+            tracing::warn!(error = %e, "Failed to update log filter from config");
+        }
+    } else {
+        tracing::warn!(level = %config.logging.level, "Invalid log level in config, keeping debug");
+    }
 
     let pool = connection::create_pool(
         &config.database.url,

@@ -100,6 +100,9 @@ fn test_settings_structure() {
             host: "127.0.0.1".to_string(),
             port: 8698,
         },
+        logging: LoggingConfig {
+            level: "debug".to_string(),
+        },
     };
 
     assert_eq!(settings.database.url, "postgresql://test");
@@ -124,6 +127,9 @@ fn test_settings_debug() {
         server: ServerConfig {
             host: "127.0.0.1".to_string(),
             port: 8698,
+        },
+        logging: LoggingConfig {
+            level: "info".to_string(),
         },
     };
 

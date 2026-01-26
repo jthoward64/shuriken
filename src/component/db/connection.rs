@@ -85,5 +85,5 @@ pub fn get_db_from_depot(
     depot
         .obtain::<Arc<dyn DbProvider + Send + Sync>>()
         .cloned()
-        .map_err(|_| AppError::InvariantViolation("Database provider not found in depot".into()))
+        .map_err(|_err| AppError::InvariantViolation("Database provider not found in depot".into()))
 }
