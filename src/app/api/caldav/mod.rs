@@ -2,6 +2,8 @@
 
 use salvo::Router;
 
+use crate::app::api::dav::method::options as dav_options;
+
 pub mod method;
 pub mod report;
 
@@ -11,6 +13,7 @@ pub fn routes() -> Router {
         // Collection and calendar object operations
         .push(
             Router::with_path("<**rest>")
+                .options(dav_options::options)
                 .put(method::put::put)
                 .push(
                     // MKCALENDAR method

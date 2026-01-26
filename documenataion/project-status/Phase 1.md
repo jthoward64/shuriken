@@ -1,7 +1,7 @@
 # Phase 1: Core Parsing & Serialization
 
-**Status**: ⚠️ **MOSTLY COMPLETE (~95%)** — See Known Gaps below  
-**Last Updated**: 2026-01-25 (RFC Compliance Review)
+**Status**: ⚠️ **MOSTLY COMPLETE (~99%)** — See Known Gaps below  
+**Last Updated**: 2026-01-25 (RFC Compliance Review; verified against current code)
 
 ---
 
@@ -105,58 +105,18 @@ Phase 1 provides RFC-compliant parsers and serializers for:
 
 ## ⚠️ Known Gaps (RFC Compliance Review 2026-01-25)
 
-### High Priority (Affects Filter Correctness)
-
-1. **text-match `negate` attribute not evaluated** — RFC 4791 §9.7.5, RFC 6352 §10.5.4
-   - The `negate` field is parsed but never used in query evaluation
-   - Location: `src/component/db/query/{caldav,carddav}/filter.rs`
-
-2. **CalDAV default collation should be `i;ascii-casemap`** — RFC 4791 §9.7.5
-   - Currently defaults to `i;unicode-casemap` for both CalDAV and CardDAV
-   - CardDAV correctly defaults to `i;unicode-casemap` per RFC 6352 §10.5.4
-   - Location: `src/component/db/query/text_match.rs`
-
-3. **time-range parses RFC 3339 instead of iCalendar format** — RFC 4791 §9.9
-   - RFC requires `20060104T000000Z` format, code uses `2006-01-04T00:00:00Z`
-   - Location: `src/component/rfc/dav/parse/report.rs` line 858
-
 ### Medium Priority (Missing Features)
 
-4. **param-filter not evaluated** — RFC 4791 §9.7.3, RFC 6352 §10.5.2
-   - Parsed correctly but `param_filters` field is ignored in query execution
-   - Requires querying `dav_parameter` table
-
-5. **CardDAV prop-filter missing `test` attribute** — RFC 6352 §10.5.1
-   - The `test="anyof|allof"` attribute on `prop-filter` is not parsed
-   - Currently assumes `anyof` behavior
-
-6. **vCard RELATED property not parsed to typed value** — RFC 6350 §6.6.6
-   - Falls through to default text handling instead of `VCardValue::Related`
-   - Location: `src/component/rfc/vcard/parse/parser.rs`
-
-7. **vCard REV property not parsed to Timestamp** — RFC 6350 §6.7.4
-   - Falls through to default text handling instead of `VCardValue::Timestamp`
+1. **iCalendar VALARM dedicated tests/fixtures**
+   - Parser/serializer supports `VALARM`, but there are no focused fixtures/tests yet
 
 ### Low Priority (Edge Cases)
-
-8. **vCard truncated time formats** — RFC 6350 §4.3.2
-   - Missing `-MMSS` (minute-second only) and `--SS` (second only) formats
-   - Location: `src/component/rfc/vcard/parse/values.rs`
-
-9. **vCard month-only date** — RFC 6350 §4.3.1
-   - `--MM` format (month without day) not supported
-
-10. **CalDAV prop-filter time-range not evaluated** — RFC 4791 §9.7.2
-    - time-range on properties like COMPLETED, CREATED is parsed but not evaluated
-
-11. **iCalendar BINARY value not Base64 decoded** — RFC 5545 §3.3.1
-    - Stored as raw text instead of being decoded to bytes
 
 ---
 
 ## Test Coverage
 
-**Unit tests**: ~100+ tests for parsing/serialization
+**Unit tests**: 490+ tests across parsing/serialization and filter modules
 
 **Strengths**:
 - Value type parsing well tested
@@ -166,10 +126,7 @@ Phase 1 provides RFC-compliant parsers and serializers for:
 - Text-match collation and pattern matching
 
 **Gaps**:
-- text-match negate attribute handling
-- param-filter evaluation
-- vCard RELATED/REV typed parsing
-- Truncated time/date edge cases
+- Dedicated iCalendar `VALARM` fixtures/tests
 
 ---
 
@@ -177,14 +134,14 @@ Phase 1 provides RFC-compliant parsers and serializers for:
 
 | RFC | Status | Notes |
 |-----|--------|-------|
-| RFC 5545 (iCalendar) | ✅ ~98% | Minor: BINARY base64 decoding |
-| RFC 6350 (vCard 4.0) | ⚠️ ~95% | RELATED/REV not typed, truncated time gaps |
+| RFC 5545 (iCalendar) | ✅ ~99% | BINARY base64 decoding supported |
+| RFC 6350 (vCard 4.0) | ✅ ~98% | RELATED/REV typed parsing and truncated date/time forms supported |
 | RFC 2426 (vCard 3.0) | ✅ ~98% | Full support |
 | RFC 6868 (Caret Encoding) | ✅ 100% | Fully implemented |
 | RFC 4918 (WebDAV XML) | ✅ 100% | All relevant elements parsed |
-| RFC 4791 (CalDAV XML) | ⚠️ ~90% | negate, param-filter, time-range format, default collation |
-| RFC 6352 (CardDAV XML) | ⚠️ ~92% | negate, param-filter, prop-filter test attr |
-| RFC 4790 (Collation) | ⚠️ ~95% | CalDAV should default to ascii-casemap |
+| RFC 4791 (CalDAV XML) | ⚠️ ~98% | Remaining: VALARM fixtures/tests |
+| RFC 6352 (CardDAV XML) | ✅ ~98% | REPORT limit parsing supported |
+| RFC 4790 (Collation) | ✅ ~98% | Collations supported; CalDAV defaults to `i;ascii-casemap` in filter evaluation |
 
 **Issue**: DATE-TIME, DATE, and PERIOD lists were only parsing the first value  
 **Fixed**: Implemented DateTimeList, DateList, and PeriodList value types with proper parsing and serialization  
@@ -202,10 +159,6 @@ Phase 1 provides RFC-compliant parsers and serializers for:
 ## ❌ Not Implemented
 
 - [ ] iCalendar VALARM dedicated tests/fixtures
-- [ ] Partial date/time format validation in vCard
-- [ ] text-match `negate` attribute evaluation
-- [ ] `param-filter` query evaluation
-- [ ] CalDAV time-range iCalendar date format
 
 ---
 
@@ -213,14 +166,14 @@ Phase 1 provides RFC-compliant parsers and serializers for:
 
 | RFC | Status | Notes |
 |-----|--------|-------|
-| RFC 5545 (iCalendar) | ✅ ~98% | Minor: BINARY base64 |
-| RFC 6350 (vCard 4.0) | ⚠️ ~95% | RELATED/REV typed parsing, truncated time |
+| RFC 5545 (iCalendar) | ✅ ~99% | BINARY base64 decoding supported |
+| RFC 6350 (vCard 4.0) | ✅ ~98% | RELATED/REV typed parsing; truncated date/time supported |
 | RFC 2426 (vCard 3.0) | ✅ ~98% | Full support |
 | RFC 6868 (Parameter Encoding) | ✅ 100% | Caret encoding implemented |
 | RFC 4918 (WebDAV) | ✅ 100% | XML parsing complete |
-| RFC 4791 (CalDAV) | ⚠️ ~90% | negate, param-filter, time-range format |
-| RFC 6352 (CardDAV) | ⚠️ ~92% | negate, param-filter |
-| RFC 4790 (Collation) | ⚠️ ~95% | CalDAV default collation |
+| RFC 4791 (CalDAV) | ⚠️ ~98% | Remaining: VALARM fixtures/tests |
+| RFC 6352 (CardDAV) | ✅ ~98% | REPORT limit parsing supported |
+| RFC 4790 (Collation) | ✅ ~98% | Supported collations; CalDAV defaults to `i;ascii-casemap` |
 
 ---
 

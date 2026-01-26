@@ -68,7 +68,14 @@ pub fn parse_report(xml: &[u8]) -> ParseResult<ReportRequest> {
 }
 
 /// Parses a calendar-query report.
-#[expect(clippy::too_many_lines)]
+#[expect(
+    clippy::too_many_lines,
+    reason = "Calendar-query parsing requires a single state machine loop"
+)]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "XML parsing state machine balances multiple nested elements"
+)]
 fn parse_calendar_query(xml: &[u8]) -> ParseResult<ReportRequest> {
     let mut reader = Reader::from_reader(xml);
     reader.config_mut().trim_text(true);
@@ -78,7 +85,10 @@ fn parse_calendar_query(xml: &[u8]) -> ParseResult<ReportRequest> {
     let mut properties: Vec<PropertyName> = Vec::new();
     let mut filter: Option<CalendarFilter> = None;
     let mut expand: Option<(TimeRange, RecurrenceExpansion)> = None;
-    let limit: Option<u32> = None;
+    let mut limit: Option<u32> = None;
+    let mut in_limit = false;
+    let mut in_nresults = false;
+    let mut limit_buf = String::new();
     let mut in_prop = false;
     let mut in_filter = false;
     let mut depth: usize = 0;
@@ -91,6 +101,14 @@ fn parse_calendar_query(xml: &[u8]) -> ParseResult<ReportRequest> {
                 let local_name = std::str::from_utf8(local_name_bytes.as_ref())?.to_owned();
 
                 match local_name.as_str() {
+                    "limit" if !in_filter => {
+                        in_limit = true;
+                        limit_buf.clear();
+                    }
+                    "nresults" if in_limit => {
+                        in_nresults = true;
+                        limit_buf.clear();
+                    }
                     "prop" if !in_filter => {
                         in_prop = true;
                     }
@@ -153,10 +171,25 @@ fn parse_calendar_query(xml: &[u8]) -> ParseResult<ReportRequest> {
                     _ => {}
                 }
             }
+            Ok(Event::Text(ref e)) => {
+                if in_nresults {
+                    let decoded = reader.decoder().decode(e.as_ref())?;
+                    limit_buf.push_str(&decoded);
+                }
+            }
             Ok(Event::End(ref e)) => {
                 let local_name_bytes = e.local_name();
                 let local_name = std::str::from_utf8(local_name_bytes.as_ref())?;
                 match local_name {
+                    "nresults" if in_limit => {
+                        in_nresults = false;
+                    }
+                    "limit" if in_limit => {
+                        in_limit = false;
+                        if !limit_buf.trim().is_empty() {
+                            limit = Some(parse_nresults_value(&limit_buf)?);
+                        }
+                    }
                     "prop" if !in_filter => {
                         in_prop = false;
                     }
@@ -265,7 +298,10 @@ fn parse_addressbook_query(xml: &[u8]) -> ParseResult<ReportRequest> {
     let mut namespaces: Vec<(String, String)> = Vec::new();
     let mut properties: Vec<PropertyName> = Vec::new();
     let mut filter: Option<AddressbookFilter> = None;
-    let limit: Option<u32> = None;
+    let mut limit: Option<u32> = None;
+    let mut in_limit = false;
+    let mut in_nresults = false;
+    let mut limit_buf = String::new();
     let mut in_prop = false;
     let mut in_filter = false;
     let mut depth: usize = 0;
@@ -278,6 +314,14 @@ fn parse_addressbook_query(xml: &[u8]) -> ParseResult<ReportRequest> {
                 let local_name = std::str::from_utf8(local_name_bytes.as_ref())?.to_owned();
 
                 match local_name.as_str() {
+                    "limit" if !in_filter => {
+                        in_limit = true;
+                        limit_buf.clear();
+                    }
+                    "nresults" if in_limit => {
+                        in_nresults = true;
+                        limit_buf.clear();
+                    }
                     "prop" if !in_filter => {
                         in_prop = true;
                     }
@@ -329,10 +373,25 @@ fn parse_addressbook_query(xml: &[u8]) -> ParseResult<ReportRequest> {
                     _ => {}
                 }
             }
+            Ok(Event::Text(ref e)) => {
+                if in_nresults {
+                    let decoded = reader.decoder().decode(e.as_ref())?;
+                    limit_buf.push_str(&decoded);
+                }
+            }
             Ok(Event::End(ref e)) => {
                 let local_name_bytes = e.local_name();
                 let local_name = std::str::from_utf8(local_name_bytes.as_ref())?;
                 match local_name {
+                    "nresults" if in_limit => {
+                        in_nresults = false;
+                    }
+                    "limit" if in_limit => {
+                        in_limit = false;
+                        if !limit_buf.trim().is_empty() {
+                            limit = Some(parse_nresults_value(&limit_buf)?);
+                        }
+                    }
                     "prop" if !in_filter => {
                         in_prop = false;
                     }
@@ -437,9 +496,13 @@ fn parse_sync_collection(xml: &[u8]) -> ParseResult<ReportRequest> {
     let mut properties: Vec<PropertyName> = Vec::new();
     let mut sync_token = String::new();
     let mut sync_level = SyncLevel::One;
+    let mut limit: Option<u32> = None;
     let mut in_prop = false;
     let mut in_sync_token = false;
     let mut in_sync_level = false;
+    let mut in_limit = false;
+    let mut in_nresults = false;
+    let mut limit_buf = String::new();
 
     loop {
         match reader.read_event_into(&mut buf) {
@@ -449,6 +512,14 @@ fn parse_sync_collection(xml: &[u8]) -> ParseResult<ReportRequest> {
                 let local_name = std::str::from_utf8(local_name_bytes.as_ref())?.to_owned();
 
                 match local_name.as_str() {
+                    "limit" => {
+                        in_limit = true;
+                        limit_buf.clear();
+                    }
+                    "nresults" if in_limit => {
+                        in_nresults = true;
+                        limit_buf.clear();
+                    }
                     "prop" => {
                         in_prop = true;
                     }
@@ -472,11 +543,23 @@ fn parse_sync_collection(xml: &[u8]) -> ParseResult<ReportRequest> {
                 if in_sync_token || in_sync_level {
                     text_buf.push_str(&decoded);
                 }
+                if in_nresults {
+                    limit_buf.push_str(&decoded);
+                }
             }
             Ok(Event::End(ref e)) => {
                 let local_name_bytes = e.local_name();
                 let local_name = std::str::from_utf8(local_name_bytes.as_ref())?;
                 match local_name {
+                    "nresults" if in_limit => {
+                        in_nresults = false;
+                    }
+                    "limit" if in_limit => {
+                        in_limit = false;
+                        if !limit_buf.trim().is_empty() {
+                            limit = Some(parse_nresults_value(&limit_buf)?);
+                        }
+                    }
                     "prop" => {
                         in_prop = false;
                     }
@@ -504,7 +587,7 @@ fn parse_sync_collection(xml: &[u8]) -> ParseResult<ReportRequest> {
     let sync = SyncCollection {
         sync_token,
         sync_level,
-        limit: None,
+        limit,
     };
 
     Ok(ReportRequest::sync_collection(sync, properties))
@@ -556,6 +639,20 @@ fn parse_filter_test_attribute(e: &quick_xml::events::BytesStart<'_>) -> FilterT
         }
     }
     FilterTest::AnyOf // Default per RFC 6352
+}
+
+/// Parses the `<nresults>` value inside a `limit` element.
+fn parse_nresults_value(value: &str) -> ParseResult<u32> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Err(ParseError::invalid_value("missing nresults value"));
+    }
+    match trimmed.parse::<u32>() {
+        Ok(value) => Ok(value),
+        Err(err) => Err(ParseError::invalid_value(format!(
+            "invalid nresults value: {trimmed} ({err})"
+        ))),
+    }
 }
 
 /// Parses calendar filter content (nested comp-filters).
@@ -870,6 +967,8 @@ fn parse_text_match_content(
 fn parse_time_range(elem: &quick_xml::events::BytesStart<'_>) -> ParseResult<TimeRange> {
     let mut start = None;
     let mut end = None;
+    let mut saw_start = false;
+    let mut saw_end = false;
 
     for attr in elem.attributes().flatten() {
         let key = std::str::from_utf8(attr.key.as_ref())?;
@@ -877,13 +976,43 @@ fn parse_time_range(elem: &quick_xml::events::BytesStart<'_>) -> ParseResult<Tim
 
         match key {
             "start" => {
-                start = parse_icalendar_utc_datetime(value);
+                saw_start = true;
+                start = match parse_icalendar_utc_datetime(value) {
+                    Some(parsed) => Some(parsed),
+                    None => {
+                        return Err(ParseError::invalid_value(format!(
+                            "invalid time-range start: {value}"
+                        )));
+                    }
+                };
             }
             "end" => {
-                end = parse_icalendar_utc_datetime(value);
+                saw_end = true;
+                end = match parse_icalendar_utc_datetime(value) {
+                    Some(parsed) => Some(parsed),
+                    None => {
+                        return Err(ParseError::invalid_value(format!(
+                            "invalid time-range end: {value}"
+                        )));
+                    }
+                };
             }
             _ => {}
         }
+    }
+
+    if !saw_start && !saw_end {
+        return Err(ParseError::invalid_value(
+            "time-range must include start or end",
+        ));
+    }
+
+    if let (Some(range_start), Some(range_end)) = (start, end)
+        && range_end <= range_start
+    {
+        return Err(ParseError::invalid_value(
+            "time-range end must be greater than start",
+        ));
     }
 
     Ok(TimeRange { start, end })
@@ -1112,6 +1241,30 @@ mod tests {
     }
 
     #[test]
+    fn parse_sync_collection_report_with_limit() {
+        let xml = br#"<?xml version="1.0" encoding="utf-8"?>
+<D:sync-collection xmlns:D="DAV:">
+  <D:sync-token>http://example.com/sync/456</D:sync-token>
+  <D:sync-level>1</D:sync-level>
+  <D:limit>
+    <D:nresults>25</D:nresults>
+  </D:limit>
+  <D:prop>
+    <D:getetag/>
+  </D:prop>
+</D:sync-collection>"#;
+
+        let req = parse_report(xml).unwrap();
+
+        match req.report_type {
+            ReportType::SyncCollection(sync) => {
+                assert_eq!(sync.limit, Some(25));
+            }
+            _ => panic!("wrong report type"),
+        }
+    }
+
+    #[test]
     fn parse_calendar_query_report() {
         let xml = br#"<?xml version="1.0" encoding="utf-8"?>
 <C:calendar-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
@@ -1131,6 +1284,102 @@ mod tests {
         match req.report_type {
             ReportType::CalendarQuery(query) => {
                 assert!(query.filter.is_some());
+            }
+            _ => panic!("wrong report type"),
+        }
+    }
+
+    #[test]
+    fn parse_calendar_query_report_invalid_time_range_format() {
+        let xml = br#"<?xml version="1.0" encoding="utf-8"?>
+<C:calendar-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+    <D:prop>
+        <D:getetag/>
+        <C:calendar-data/>
+    </D:prop>
+    <C:filter>
+        <C:comp-filter name="VCALENDAR">
+            <C:comp-filter name="VEVENT">
+                <C:time-range start="2006-01-04T14:00:00Z"/>
+            </C:comp-filter>
+        </C:comp-filter>
+    </C:filter>
+</C:calendar-query>"#;
+
+        let result = parse_report(xml);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_calendar_query_report_time_range_missing_attributes() {
+        let xml = br#"<?xml version="1.0" encoding="utf-8"?>
+<C:calendar-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+    <D:prop>
+        <D:getetag/>
+        <C:calendar-data/>
+    </D:prop>
+    <C:filter>
+        <C:comp-filter name="VCALENDAR">
+            <C:comp-filter name="VEVENT">
+                <C:time-range/>
+            </C:comp-filter>
+        </C:comp-filter>
+    </C:filter>
+</C:calendar-query>"#;
+
+        let result = parse_report(xml);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_calendar_query_report_with_limit() {
+        let xml = br#"<?xml version="1.0" encoding="utf-8"?>
+<C:calendar-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+    <D:prop>
+        <D:getetag/>
+        <C:calendar-data/>
+    </D:prop>
+    <C:limit>
+        <C:nresults>10</C:nresults>
+    </C:limit>
+    <C:filter>
+        <C:comp-filter name="VCALENDAR">
+            <C:comp-filter name="VEVENT"/>
+        </C:comp-filter>
+    </C:filter>
+</C:calendar-query>"#;
+
+        let req = parse_report(xml).unwrap();
+
+        match req.report_type {
+            ReportType::CalendarQuery(query) => {
+                assert_eq!(query.limit, Some(10));
+            }
+            _ => panic!("wrong report type"),
+        }
+    }
+
+    #[test]
+    fn parse_addressbook_query_report_with_limit() {
+        let xml = br#"<?xml version="1.0" encoding="utf-8"?>
+<C:addressbook-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:carddav">
+    <D:prop>
+        <D:getetag/>
+        <C:address-data/>
+    </D:prop>
+    <C:limit>
+        <C:nresults>5</C:nresults>
+    </C:limit>
+    <C:filter test="anyof">
+        <C:prop-filter name="FN"/>
+    </C:filter>
+</C:addressbook-query>"#;
+
+        let req = parse_report(xml).unwrap();
+
+        match req.report_type {
+            ReportType::AddressbookQuery(query) => {
+                assert_eq!(query.limit, Some(5));
             }
             _ => panic!("wrong report type"),
         }

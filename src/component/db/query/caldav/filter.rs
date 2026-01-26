@@ -8,7 +8,7 @@ use crate::component::db::query::text_match::{build_like_pattern, normalize_for_
 use crate::component::db::schema::{cal_index, dav_instance, dav_parameter};
 use crate::component::model::dav::instance::DavInstance;
 use crate::component::rfc::dav::core::{
-    CalendarFilter, CalendarQuery, CompFilter, MatchType, ParamFilter,
+    CalendarFilter, CalendarQuery, CompFilter, MatchType, ParamFilter, TimeRange,
 };
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
@@ -285,6 +285,12 @@ async fn apply_property_filters(
                 .filter(dav_property::deleted_at.is_null())
                 .into_boxed();
 
+            if let Some(time_range) = &prop_filter.time_range
+                && let Some(filter_sql) = build_property_time_range_sql(time_range)
+            {
+                query = query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&filter_sql));
+            }
+
             // Apply text matching based on collation and match type
             if collation.case_sensitive {
                 // i;octet - case-sensitive comparison
@@ -327,6 +333,25 @@ async fn apply_property_filters(
             } else {
                 matched_ids
             }
+        } else if let Some(time_range) = &prop_filter.time_range {
+            let mut query = dav_component::table
+                .inner_join(
+                    dav_property::table.on(dav_property::component_id.eq(dav_component::id)),
+                )
+                .filter(dav_component::entity_id.eq_any(entity_ids))
+                .filter(dav_property::name.eq(&prop_name))
+                .filter(dav_property::deleted_at.is_null())
+                .into_boxed();
+
+            if let Some(filter_sql) = build_property_time_range_sql(time_range) {
+                query = query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&filter_sql));
+            }
+
+            query
+                .select(dav_component::entity_id)
+                .distinct()
+                .load::<uuid::Uuid>(conn)
+                .await?
         } else {
             // Property must exist (no text match specified)
             dav_component::table
@@ -370,6 +395,43 @@ async fn apply_property_filters(
     }
 
     Ok(final_ids)
+}
+
+/// ## Summary
+/// Builds a SQL filter for property-level time-range evaluation.
+///
+/// Matches values stored in either `value_tstz` or `value_date`.
+fn build_property_time_range_sql(time_range: &TimeRange) -> Option<String> {
+    let start = time_range.start;
+    let end = time_range.end;
+
+    if start.is_none() && end.is_none() {
+        return None;
+    }
+
+    let mut tstz_parts = vec!["value_tstz IS NOT NULL".to_string()];
+    if let Some(range_start) = start {
+        let start_str = range_start.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+        tstz_parts.push(format!("value_tstz >= '{start_str}'"));
+    }
+    if let Some(range_end) = end {
+        let end_str = range_end.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+        tstz_parts.push(format!("value_tstz < '{end_str}'"));
+    }
+
+    let mut date_parts = vec!["value_date IS NOT NULL".to_string()];
+    if let Some(range_start) = start {
+        let start_date = range_start.date_naive().format("%Y-%m-%d");
+        date_parts.push(format!("value_date >= '{start_date}'"));
+    }
+    if let Some(range_end) = end {
+        let end_date = range_end.date_naive().format("%Y-%m-%d");
+        date_parts.push(format!("value_date < '{end_date}'"));
+    }
+
+    let tstz_clause = format!("({})", tstz_parts.join(" AND "));
+    let date_clause = format!("({})", date_parts.join(" AND "));
+    Some(format!("({tstz_clause} OR {date_clause})"))
 }
 
 /// ## Summary
