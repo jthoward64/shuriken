@@ -4,11 +4,57 @@ use uuid::Uuid;
 
 use crate::component::caldav::recurrence::ical_datetime_to_utc;
 use crate::component::model::caldav::cal_index::NewCalIndex;
-use crate::component::model::dav::component::DavComponent;
-use crate::component::rfc::ical::core::Component;
+use crate::component::rfc::ical::core::{Component, ICalendar};
 
 /// ## Summary
-/// Builds a `NewCalIndex` from a parsed iCalendar component and its database ID.
+/// Builds calendar index entries for all indexable components in an iCalendar document.
+///
+/// Walks through the component tree and builds index entries for VEVENT, VTODO, and VJOURNAL
+/// components. Returns a vector of index entries ready for batch insertion.
+///
+/// Note: Uses a placeholder UUID for component_id since we don't have access to the database
+/// component IDs yet. This will be improved in a future iteration.
+#[must_use]
+pub fn build_cal_indexes(
+    entity_id: Uuid,
+    ical: &ICalendar,
+) -> Vec<NewCalIndex> {
+    let mut indexes = Vec::new();
+    build_indexes_recursive(entity_id, &ical.root, &mut indexes);
+    indexes
+}
+
+/// Recursively builds index entries for a component and its children.
+fn build_indexes_recursive(
+    entity_id: Uuid,
+    component: &Component,
+    indexes: &mut Vec<NewCalIndex>,
+) {
+    // Build index for this component if it's schedulable
+    if let Some(component_kind) = component.kind
+        && component_kind.is_schedulable()
+    {
+        // Use a deterministic component ID based on the UID and component type
+        // This is a temporary approach until we have proper component ID mapping
+        let uid = component.uid().unwrap_or("unknown");
+        let component_id = uuid::Uuid::new_v5(
+            &entity_id,
+            format!("{}-{}", component.name, uid).as_bytes(),
+        );
+
+        if let Some(index) = build_cal_index(entity_id, component_id, component) {
+            indexes.push(index);
+        }
+    }
+
+    // Recurse into children
+    for child in &component.children {
+        build_indexes_recursive(entity_id, child, indexes);
+    }
+}
+
+/// ## Summary
+/// Builds a `NewCalIndex` from a parsed iCalendar component.
 ///
 /// Extracts indexable properties (UID, DTSTART, DTEND, SUMMARY, LOCATION, ORGANIZER, etc.)
 /// from the component for efficient calendar-query operations.
@@ -16,7 +62,7 @@ use crate::component::rfc::ical::core::Component;
 /// ## Errors
 /// Returns `None` if the component lacks required properties or the component type is unsupported.
 #[must_use]
-pub fn build_cal_index(
+fn build_cal_index(
     entity_id: Uuid,
     component_id: Uuid,
     component: &Component,
@@ -108,46 +154,4 @@ pub fn build_cal_index(
         location,
         sequence,
     })
-}
-
-/// ## Summary
-/// Builds calendar index entries for all indexable components in an entity.
-///
-/// Walks through the component tree and builds index entries for VEVENT, VTODO, and VJOURNAL
-/// components. Returns a vector of index entries ready for batch insertion.
-#[must_use]
-pub fn build_cal_indexes_for_entity(
-    entity_id: Uuid,
-    components: &[DavComponent],
-    ical: &Component,
-) -> Vec<NewCalIndex> {
-    let mut indexes = Vec::new();
-
-    // Walk through all components in the iCalendar tree
-    build_indexes_recursive(entity_id, components, ical, &mut indexes);
-
-    indexes
-}
-
-/// Recursively builds index entries for a component and its children.
-fn build_indexes_recursive(
-    entity_id: Uuid,
-    db_components: &[DavComponent],
-    ical_component: &Component,
-    indexes: &mut Vec<NewCalIndex>,
-) {
-    // Find the database component ID for this iCalendar component
-    // This is a simplified approach - in a full implementation, we'd need proper ID mapping
-    if let Some(db_comp) = db_components.iter().find(|c| {
-        c.name == ical_component.name
-    }) {
-        if let Some(index) = build_cal_index(entity_id, db_comp.id, ical_component) {
-            indexes.push(index);
-        }
-    }
-
-    // Recurse into children
-    for child in &ical_component.children {
-        build_indexes_recursive(entity_id, db_components, child, indexes);
-    }
 }

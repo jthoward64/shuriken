@@ -7,6 +7,8 @@ use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 
 use crate::component::db::connection::DbConnection;
+use crate::component::db::map::carddav::build_card_index;
+use crate::component::db::query::carddav::card_index;
 use crate::component::db::query::dav::{collection, entity, instance};
 use crate::component::model::dav::instance::NewDavInstance;
 
@@ -170,10 +172,21 @@ pub async fn put_address_object(
             .await
             .context("failed to delete old component tree")?;
 
+        // Delete old index entry for this entity
+        card_index::delete_by_entity_id(conn, existing_inst.entity_id)
+            .await
+            .context("failed to delete old index entry")?;
+
         // Insert new vCard tree
         entity::insert_vcard_tree(conn, existing_inst.entity_id, &vcard)
             .await
             .context("failed to insert vCard tree")?;
+
+        // Build and insert card index entry
+        let card_idx = build_card_index(existing_inst.entity_id, &vcard);
+        card_index::insert(conn, &card_idx)
+            .await
+            .context("failed to insert card index entry")?;
     } else {
         // Create new entity and instance
         // For now, create a minimal entity without the full tree
@@ -212,6 +225,12 @@ pub async fn put_address_object(
         entity::insert_vcard_tree(conn, created_entity.id, &vcard)
             .await
             .context("failed to insert vCard tree")?;
+
+        // Build and insert card index entry
+        let card_idx = build_card_index(created_entity.id, &vcard);
+        card_index::insert(conn, &card_idx)
+            .await
+            .context("failed to insert card index entry")?;
     }
 
     Ok(PutObjectResult { etag, created })
