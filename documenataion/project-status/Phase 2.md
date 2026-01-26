@@ -40,6 +40,7 @@ Phase 2 establishes the database layer for CalDAV/CardDAV content storage. It im
 - [x] `cal_index` populated on PUT via `build_cal_indexes()`
 - [x] `cal_occurrence` populated on PUT via `expand_and_store_occurrences()`
 - [x] Occurrence deletion on entity update
+- [x] Integration tests for `cal_index`, `cal_occurrence`, `card_index`
 
 #### Transactions
 
@@ -50,23 +51,7 @@ Phase 2 establishes the database layer for CalDAV/CardDAV content storage. It im
 
 ### ❌ NOT Implemented / Critical Gaps
 
-#### 1. `card_index` Population Unverified
-
-**Status**: Code exists but not confirmed working
-
-**Evidence**: `src/component/db/map/carddav.rs` exists with extraction logic.
-
-**Impact**: CardDAV queries may not work correctly.
-
-#### 2. Tombstone Creation on DELETE Unverified
-
-**Status**: Code structure exists
-
-**Evidence**: `dav_tombstone` table and query functions exist.
-
-**Impact**: Sync protocol may miss deletions.
-
-#### 3. TZID Resolution Incomplete
+#### 1. TZID Resolution Incomplete
 
 **Status**: Partial
 
@@ -84,11 +69,12 @@ Phase 2 establishes the database layer for CalDAV/CardDAV content storage. It im
 ### 🟡 Medium Priority
 
 #### 1. Confirm Tree Fidelity and Shadow Role
-Tree reconstruction is now used for GET/HEAD. Decide whether `dav_shadow` stays as debug-only,
-and add tests to confirm tree→content parity (ordering, parameters, folding).
+~~Tree reconstruction is used for GET/HEAD, and `dav_shadow` remains debug-only until removal.
+Add and maintain tests that validate tree→content parity (ordering, parameters, folding)
+without relying on `dav_shadow`.~~
 
 #### 2. Add Integration Tests for Index Population
-Verify `cal_index`, `card_index`, `cal_occurrence` are correctly populated.
+~~Verify `cal_index`, `card_index`, `cal_occurrence` are correctly populated.~~
 
 ---
 
@@ -109,8 +95,6 @@ Verify `cal_index`, `card_index`, `cal_occurrence` are correctly populated.
 
 | Task | Effort |
 |------|--------|
-| Verify index population | 1-2 days |
-| Verify tombstone creation | 1 day |
 | Tree reconstruction OR removal | 3-5 days |
 
 **Total**: ~1 week to complete Phase 2 properly

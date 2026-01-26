@@ -82,6 +82,186 @@ async fn put_creates_vcard() {
 }
 
 // ============================================================================
+// Index Population Tests
+// ============================================================================
+
+/// ## Summary
+/// Test that PUT populates `cal_index` and `cal_occurrence` for recurring events.
+#[tokio::test]
+#[ignore = "requires database seeding"]
+async fn put_populates_cal_index_and_occurrences() {
+    use chrono::{NaiveDateTime, Utc};
+    use diesel::prelude::*;
+    use diesel_async::RunQueryDsl;
+    use shuriken::component::db::schema::{cal_index, cal_occurrence, dav_instance};
+
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .truncate_all()
+        .await
+        .expect("Failed to truncate tables");
+
+    let principal_id = test_db
+        .seed_principal("user", "/principals/index-alice/", Some("Index Alice"))
+        .await
+        .expect("Failed to seed principal");
+
+    let collection_id = test_db
+        .seed_collection(principal_id, "calendar", "indexcal", Some("Index Calendar"))
+        .await
+        .expect("Failed to seed collection");
+
+    let service = create_test_service();
+
+    let uid = "index-event@example.com";
+    let summary = "Index Event";
+    let uri = format!("/api/caldav/{collection_id}/index-event.ics");
+    let ical = sample_recurring_event(uid, summary, "FREQ=DAILY;COUNT=3");
+
+    let response = TestRequest::put(&uri)
+        .if_none_match("*")
+        .icalendar_body(&ical)
+        .send(service)
+        .await;
+
+    response.assert_status(StatusCode::CREATED);
+
+    let mut conn = test_db.get_conn().await.expect("Failed to get DB conn");
+
+    let entity_id = dav_instance::table
+        .filter(dav_instance::collection_id.eq(collection_id))
+        .filter(dav_instance::uri.eq(&uri))
+        .select(dav_instance::entity_id)
+        .first::<uuid::Uuid>(&mut conn)
+        .await
+        .expect("Failed to fetch entity_id for instance");
+
+    let (component_type, idx_uid, idx_summary, dtstart_utc, dtend_utc) = cal_index::table
+        .filter(cal_index::entity_id.eq(entity_id))
+        .select((
+            cal_index::component_type,
+            cal_index::uid,
+            cal_index::summary,
+            cal_index::dtstart_utc,
+            cal_index::dtend_utc,
+        ))
+        .first::<(
+            String,
+            Option<String>,
+            Option<String>,
+            Option<chrono::DateTime<Utc>>,
+            Option<chrono::DateTime<Utc>>,
+        )>(&mut conn)
+        .await
+        .expect("Failed to fetch cal_index entry");
+
+    assert_eq!(component_type, "VEVENT");
+    assert_eq!(idx_uid.as_deref(), Some(uid));
+    assert_eq!(idx_summary.as_deref(), Some(summary));
+
+    let dtstart_naive = NaiveDateTime::parse_from_str("20260126T100000Z", "%Y%m%dT%H%M%SZ")
+        .expect("Failed to parse DTSTART");
+    let dtend_naive = NaiveDateTime::parse_from_str("20260126T110000Z", "%Y%m%dT%H%M%SZ")
+        .expect("Failed to parse DTEND");
+
+    let dtstart_expected = chrono::DateTime::<Utc>::from_naive_utc_and_offset(dtstart_naive, Utc);
+    let dtend_expected = chrono::DateTime::<Utc>::from_naive_utc_and_offset(dtend_naive, Utc);
+
+    assert_eq!(dtstart_utc, Some(dtstart_expected));
+    assert_eq!(dtend_utc, Some(dtend_expected));
+
+    let occurrence_count = cal_occurrence::table
+        .filter(cal_occurrence::entity_id.eq(entity_id))
+        .filter(cal_occurrence::deleted_at.is_null())
+        .count()
+        .get_result::<i64>(&mut conn)
+        .await
+        .expect("Failed to count occurrences");
+
+    assert_eq!(occurrence_count, 3);
+}
+
+/// ## Summary
+/// Test that PUT populates `card_index` for vCards.
+#[tokio::test]
+#[ignore = "requires database seeding"]
+async fn put_populates_card_index() {
+    use diesel::prelude::*;
+    use diesel_async::RunQueryDsl;
+    use shuriken::component::db::schema::{card_index, dav_instance};
+
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .truncate_all()
+        .await
+        .expect("Failed to truncate tables");
+
+    let principal_id = test_db
+        .seed_principal("user", "/principals/index-bob/", Some("Index Bob"))
+        .await
+        .expect("Failed to seed principal");
+
+    let collection_id = test_db
+        .seed_collection(principal_id, "addressbook", "indexbook", Some("Index Book"))
+        .await
+        .expect("Failed to seed collection");
+
+    let service = create_test_service();
+
+    let uid = "index-contact@example.com";
+    let fn_name = "Index Contact";
+    let email = "index@example.com";
+    let uri = format!("/api/carddav/{collection_id}/index-contact.vcf");
+    let vcard = sample_vcard(uid, fn_name, email);
+
+    let response = TestRequest::put(&uri)
+        .if_none_match("*")
+        .vcard_body(&vcard)
+        .send(service)
+        .await;
+
+    response.assert_status(StatusCode::CREATED);
+
+    let mut conn = test_db.get_conn().await.expect("Failed to get DB conn");
+
+    let entity_id = dav_instance::table
+        .filter(dav_instance::collection_id.eq(collection_id))
+        .filter(dav_instance::uri.eq(&uri))
+        .select(dav_instance::entity_id)
+        .first::<uuid::Uuid>(&mut conn)
+        .await
+        .expect("Failed to fetch entity_id for instance");
+
+    let (idx_uid, idx_fn, idx_family, idx_given, idx_org, idx_title) = card_index::table
+        .filter(card_index::entity_id.eq(entity_id))
+        .select((
+            card_index::uid,
+            card_index::fn_,
+            card_index::n_family,
+            card_index::n_given,
+            card_index::org,
+            card_index::title,
+        ))
+        .first::<(
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+        )>(&mut conn)
+        .await
+        .expect("Failed to fetch card_index entry");
+
+    assert_eq!(idx_uid.as_deref(), Some(uid));
+    assert_eq!(idx_fn.as_deref(), Some(fn_name));
+    assert_eq!(idx_family, None);
+    assert_eq!(idx_given, None);
+    assert_eq!(idx_org, None);
+    assert_eq!(idx_title, None);
+}
+
+// ============================================================================
 // If-None-Match Precondition Tests
 // ============================================================================
 

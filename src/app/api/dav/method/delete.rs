@@ -3,7 +3,14 @@
 use salvo::http::StatusCode;
 use salvo::{Request, Response, handler};
 
+use diesel_async::AsyncConnection;
+use diesel_async::scoped_futures::ScopedFutureExt;
+
 use crate::component::db::connection;
+use crate::component::db::query::caldav::{event_index, occurrence};
+use crate::component::db::query::carddav::card_index;
+use crate::component::db::query::dav::{collection, instance};
+use crate::component::model::dav::instance::DavInstance;
 use crate::util::path;
 
 /// ## Summary
@@ -61,25 +68,45 @@ pub async fn delete(req: &mut Request, res: &mut Response) {
         "Parsed request path"
     );
 
+    let if_match = req
+        .headers()
+        .get("If-Match")
+        .and_then(|h| h.to_str().ok())
+        .map(String::from);
+
     // TODO: Check authorization
 
     // Perform the deletion
-    match perform_delete(&mut conn, collection_id, &uri).await {
-        Ok(true) => {
+    match perform_delete(&mut conn, collection_id, &uri, if_match.as_deref()).await {
+        Ok(DeleteOutcome::Deleted) => {
             // Successfully deleted
             tracing::info!("Resource deleted successfully");
             res.status_code(StatusCode::NO_CONTENT);
         }
-        Ok(false) => {
+        Ok(DeleteOutcome::NotFound) => {
             // Resource not found
             tracing::warn!("Resource not found");
             res.status_code(StatusCode::NOT_FOUND);
+        }
+        Ok(DeleteOutcome::PreconditionFailed) => {
+            tracing::warn!("Precondition failed: ETag mismatch");
+            res.status_code(StatusCode::PRECONDITION_FAILED);
         }
         Err(e) => {
             tracing::error!(error = %e, "Failed to delete resource");
             res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
         }
     }
+}
+
+/// Result of a DELETE operation.
+enum DeleteOutcome {
+    /// Resource was deleted successfully.
+    Deleted,
+    /// Resource was not found.
+    NotFound,
+    /// Preconditions failed (ETag mismatch).
+    PreconditionFailed,
 }
 
 /// ## Summary
@@ -90,56 +117,62 @@ pub async fn delete(req: &mut Request, res: &mut Response) {
 ///
 /// ## Errors
 /// Returns database errors if the operation fails.
-#[tracing::instrument(skip_all)]
+#[tracing::instrument(skip(conn))]
 async fn perform_delete(
-    _conn: &mut connection::DbConnection<'_>,
-    _collection_id: uuid::Uuid,
-    _uri: &str,
-) -> anyhow::Result<bool> {
+    conn: &mut connection::DbConnection<'_>,
+    collection_id: uuid::Uuid,
+    uri: &str,
+    if_match: Option<&str>,
+) -> anyhow::Result<DeleteOutcome> {
     tracing::debug!("Performing resource deletion");
 
-    // Example implementation:
-    // 1. Find the instance
-    // let inst = instance::by_collection_and_uri(collection_id, uri)
-    //     .select(DavInstance::as_select())
-    //     .first::<DavInstance>(conn)
-    //     .await
-    //     .optional()?;
-    //
-    // 2. If found, soft-delete it
-    // if let Some(inst) = inst {
-    //     let now = chrono::Utc::now();
-    //
-    //     diesel::update(dav_instance::table.find(inst.id))
-    //         .set(dav_instance::deleted_at.eq(Some(now)))
-    //         .execute(conn)
-    //         .await?;
-    //
-    //     // 2.5. Delete cal_occurrence entries for this entity
-    //     // use crate::component::db::query::caldav::occurrence;
-    //     // occurrence::delete_by_entity_id(conn, inst.entity_id).await?;
-    //
-    //     // 3. Create tombstone
-    //     let tombstone = NewDavTombstone {
-    //         collection_id: inst.collection_id,
-    //         uri: &inst.uri,
-    //         sync_revision: inst.sync_revision,
-    //     };
-    //
-    //     diesel::insert_into(crate::component::db::schema::dav_tombstone::table)
-    //         .values(&tombstone)
-    //         .execute(conn)
-    //         .await?;
-    //
-    //     // 4. Bump collection sync token
-    //     diesel::update(dav_collection::table.find(inst.collection_id))
-    //         .set(dav_collection::synctoken.eq(dav_collection::synctoken + 1))
-    //         .execute(conn)
-    //         .await?;
-    //
-    //     return Ok(true);
-    // }
+    let uri = uri.to_string();
+    let if_match = if_match.map(str::to_string);
 
-    // Stub: return not found
-    Ok(false)
+    conn.transaction::<_, anyhow::Error, _>(move |tx| {
+        let uri = uri.clone();
+        let if_match = if_match.clone();
+
+        async move {
+            use diesel::prelude::*;
+            use diesel_async::RunQueryDsl;
+
+            let instance_row: Option<DavInstance> =
+                instance::by_collection_and_uri(collection_id, &uri)
+                    .select(DavInstance::as_select())
+                    .first::<DavInstance>(tx)
+                    .await
+                    .optional()?;
+
+            let Some(inst) = instance_row else {
+                return Ok(DeleteOutcome::NotFound);
+            };
+
+            if let Some(ref expected) = if_match
+                && inst.etag != *expected
+            {
+                return Ok(DeleteOutcome::PreconditionFailed);
+            }
+
+            let new_synctoken = collection::update_synctoken(tx, collection_id).await?;
+
+            if inst.content_type.starts_with("text/calendar") {
+                occurrence::delete_by_entity_id(tx, inst.entity_id).await?;
+                event_index::delete_by_entity_id(tx, inst.entity_id).await?;
+            } else if inst.content_type.starts_with("text/vcard") {
+                card_index::delete_by_entity_id(tx, inst.entity_id).await?;
+            } else {
+                tracing::debug!(
+                    content_type = %inst.content_type,
+                    "No index cleanup for content type"
+                );
+            }
+
+            instance::delete_instance_with_tombstone(tx, inst.id, new_synctoken).await?;
+
+            Ok(DeleteOutcome::Deleted)
+        }
+        .scope_boxed()
+    })
+    .await
 }

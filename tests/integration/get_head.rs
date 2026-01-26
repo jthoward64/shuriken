@@ -111,6 +111,201 @@ async fn get_vcard_content_type() {
         .assert_header_contains("Content-Type", "text/vcard");
 }
 
+// ============================================================================
+// Component Tree Serialization Tests
+// ============================================================================
+
+/// ## Summary
+/// Test that GET serializes calendar content from the component tree.
+#[tokio::test]
+#[ignore = "requires database seeding"]
+async fn get_calendar_object_uses_component_tree() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .truncate_all()
+        .await
+        .expect("Failed to truncate tables");
+
+    let principal_id = test_db
+        .seed_principal("user", "/principals/tree-user/", Some("Tree User"))
+        .await
+        .expect("Failed to seed principal");
+
+    let collection_id = test_db
+        .seed_collection(principal_id, "calendar", "treecal", Some("Tree Calendar"))
+        .await
+        .expect("Failed to seed collection");
+
+    let entity_id = test_db
+        .seed_entity("calendar", Some("tree-event-001@example.com"))
+        .await
+        .expect("Failed to seed entity");
+
+    let uri = format!("/api/caldav/{collection_id}/tree-event.ics");
+    let _instance_id = test_db
+        .seed_instance(
+            collection_id,
+            entity_id,
+            &uri,
+            "text/calendar",
+            "\"tree-etag-001\"",
+            1,
+        )
+        .await
+        .expect("Failed to seed instance");
+
+    let calendar_root = test_db
+        .seed_component(entity_id, None, "VCALENDAR", 0)
+        .await
+        .expect("Failed to seed VCALENDAR component");
+
+    let event_component = test_db
+        .seed_component(entity_id, Some(calendar_root), "VEVENT", 0)
+        .await
+        .expect("Failed to seed VEVENT component");
+
+    test_db
+        .seed_property(calendar_root, "VERSION", Some("2.0"), 0)
+        .await
+        .expect("Failed to seed VERSION property");
+    test_db
+        .seed_property(calendar_root, "PRODID", Some("-//Shuriken//EN"), 1)
+        .await
+        .expect("Failed to seed PRODID property");
+
+    test_db
+        .seed_property(
+            event_component,
+            "UID",
+            Some("tree-event-001@example.com"),
+            0,
+        )
+        .await
+        .expect("Failed to seed UID property");
+    test_db
+        .seed_property(event_component, "DTSTAMP", Some("20240101T120000Z"), 1)
+        .await
+        .expect("Failed to seed DTSTAMP property");
+    test_db
+        .seed_property(event_component, "DTSTART", Some("20240115T140000Z"), 2)
+        .await
+        .expect("Failed to seed DTSTART property");
+    test_db
+        .seed_property(event_component, "DTEND", Some("20240115T150000Z"), 3)
+        .await
+        .expect("Failed to seed DTEND property");
+    test_db
+        .seed_property(event_component, "SUMMARY", Some("Tree Meeting"), 4)
+        .await
+        .expect("Failed to seed SUMMARY property");
+
+    let service = create_test_service();
+
+    let response = TestRequest::get(&uri).send(service).await;
+
+    let response = response.assert_status(StatusCode::OK);
+
+    let expected = concat!(
+        "BEGIN:VCALENDAR\r\n",
+        "VERSION:2.0\r\n",
+        "PRODID:-//Shuriken//EN\r\n",
+        "BEGIN:VEVENT\r\n",
+        "UID:tree-event-001@example.com\r\n",
+        "DTSTAMP:20240101T120000Z\r\n",
+        "DTSTART:20240115T140000Z\r\n",
+        "DTEND:20240115T150000Z\r\n",
+        "SUMMARY:Tree Meeting\r\n",
+        "END:VEVENT\r\n",
+        "END:VCALENDAR\r\n",
+    );
+
+    assert_eq!(response.body_string(), expected);
+}
+
+/// ## Summary
+/// Test that GET serializes vCard content from the component tree.
+#[tokio::test]
+#[ignore = "requires database seeding"]
+async fn get_vcard_uses_component_tree() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .truncate_all()
+        .await
+        .expect("Failed to truncate tables");
+
+    let principal_id = test_db
+        .seed_principal("user", "/principals/tree-vcard/", Some("Tree VCard"))
+        .await
+        .expect("Failed to seed principal");
+
+    let collection_id = test_db
+        .seed_collection(principal_id, "addressbook", "treebook", Some("Tree Book"))
+        .await
+        .expect("Failed to seed collection");
+
+    let entity_id = test_db
+        .seed_entity("vcard", Some("tree-contact-001@example.com"))
+        .await
+        .expect("Failed to seed entity");
+
+    let uri = format!("/api/carddav/{collection_id}/tree-contact.vcf");
+    let _instance_id = test_db
+        .seed_instance(
+            collection_id,
+            entity_id,
+            &uri,
+            "text/vcard",
+            "\"tree-vcard-etag-001\"",
+            1,
+        )
+        .await
+        .expect("Failed to seed instance");
+
+    let vcard_root = test_db
+        .seed_component(entity_id, None, "VCARD", 0)
+        .await
+        .expect("Failed to seed VCARD component");
+
+    test_db
+        .seed_property(vcard_root, "VERSION", Some("4.0"), 0)
+        .await
+        .expect("Failed to seed VERSION property");
+    test_db
+        .seed_property(vcard_root, "N", Some("Doe;Jane;;;"), 1)
+        .await
+        .expect("Failed to seed N property");
+    test_db
+        .seed_property(vcard_root, "FN", Some("Jane Doe"), 2)
+        .await
+        .expect("Failed to seed FN property");
+    test_db
+        .seed_property(vcard_root, "EMAIL", Some("jane@example.com"), 3)
+        .await
+        .expect("Failed to seed EMAIL property");
+    test_db
+        .seed_property(vcard_root, "UID", Some("tree-contact-001@example.com"), 4)
+        .await
+        .expect("Failed to seed UID property");
+
+    let service = create_test_service();
+
+    let response = TestRequest::get(&uri).send(service).await;
+
+    let response = response.assert_status(StatusCode::OK);
+
+    let expected = concat!(
+        "BEGIN:VCARD\r\n",
+        "VERSION:4.0\r\n",
+        "FN:Jane Doe\r\n",
+        "N:Doe;Jane;;;\r\n",
+        "EMAIL:jane@example.com\r\n",
+        "UID:tree-contact-001@example.com\r\n",
+        "END:VCARD\r\n",
+    );
+
+    assert_eq!(response.body_string(), expected);
+}
+
 /// ## Summary
 /// Test that GET on non-existent resource returns 404.
 #[tokio::test]

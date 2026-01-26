@@ -7,6 +7,127 @@ use salvo::http::StatusCode;
 
 use super::helpers::*;
 
+async fn setup_calendar_index_cleanup(test_db: &TestDb) -> anyhow::Result<(uuid::Uuid, String)> {
+    let principal_id = test_db
+        .seed_principal("user", "/principals/cal-clean/", Some("Cal Clean"))
+        .await?;
+
+    let collection_id = test_db
+        .seed_collection(principal_id, "calendar", "clean-cal", None)
+        .await?;
+
+    let service = create_test_service();
+
+    let uri = format!("/api/caldav/{collection_id}/clean-event.ics");
+    let ical = sample_recurring_event(
+        "clean-event@example.com",
+        "Clean Event",
+        "FREQ=DAILY;COUNT=3",
+    );
+
+    let response = TestRequest::put(&uri)
+        .if_none_match("*")
+        .icalendar_body(&ical)
+        .send(service)
+        .await;
+
+    response.assert_status(StatusCode::CREATED);
+
+    Ok((collection_id, uri))
+}
+
+async fn setup_card_index_cleanup(test_db: &TestDb) -> anyhow::Result<(uuid::Uuid, String)> {
+    let principal_id = test_db
+        .seed_principal("user", "/principals/card-clean/", Some("Card Clean"))
+        .await?;
+
+    let collection_id = test_db
+        .seed_collection(principal_id, "addressbook", "clean-book", None)
+        .await?;
+
+    let service = create_test_service();
+
+    let uri = format!("/api/carddav/{collection_id}/clean-contact.vcf");
+    let vcard = sample_vcard(
+        "clean-contact@example.com",
+        "Clean Contact",
+        "clean@example.com",
+    );
+
+    let response = TestRequest::put(&uri)
+        .if_none_match("*")
+        .vcard_body(&vcard)
+        .send(service)
+        .await;
+
+    response.assert_status(StatusCode::CREATED);
+
+    Ok((collection_id, uri))
+}
+
+async fn fetch_entity_id(
+    test_db: &TestDb,
+    collection_id: uuid::Uuid,
+    resource_uri: &str,
+) -> anyhow::Result<uuid::Uuid> {
+    use diesel::prelude::*;
+    use diesel_async::RunQueryDsl;
+    use shuriken::component::db::schema::dav_instance;
+
+    let mut conn = test_db.get_conn().await?;
+
+    let entity_id = dav_instance::table
+        .filter(dav_instance::collection_id.eq(collection_id))
+        .filter(dav_instance::uri.eq(resource_uri))
+        .select(dav_instance::entity_id)
+        .first::<uuid::Uuid>(&mut conn)
+        .await?;
+
+    Ok(entity_id)
+}
+
+async fn fetch_calendar_index_stats(
+    test_db: &TestDb,
+    entity_id: uuid::Uuid,
+) -> anyhow::Result<(i64, i64)> {
+    use diesel::prelude::*;
+    use diesel_async::RunQueryDsl;
+    use shuriken::component::db::schema::{cal_index, cal_occurrence};
+
+    let mut conn = test_db.get_conn().await?;
+
+    let cal_index_count = cal_index::table
+        .filter(cal_index::entity_id.eq(entity_id))
+        .count()
+        .get_result::<i64>(&mut conn)
+        .await?;
+
+    let occurrence_count = cal_occurrence::table
+        .filter(cal_occurrence::entity_id.eq(entity_id))
+        .filter(cal_occurrence::deleted_at.is_null())
+        .count()
+        .get_result::<i64>(&mut conn)
+        .await?;
+
+    Ok((cal_index_count, occurrence_count))
+}
+
+async fn fetch_card_index_count(test_db: &TestDb, entity_id: uuid::Uuid) -> anyhow::Result<i64> {
+    use diesel::prelude::*;
+    use diesel_async::RunQueryDsl;
+    use shuriken::component::db::schema::card_index;
+
+    let mut conn = test_db.get_conn().await?;
+
+    let card_index_count = card_index::table
+        .filter(card_index::entity_id.eq(entity_id))
+        .count()
+        .get_result::<i64>(&mut conn)
+        .await?;
+
+    Ok(card_index_count)
+}
+
 // ============================================================================
 // Basic DELETE Tests
 // ============================================================================
@@ -125,6 +246,111 @@ async fn delete_creates_tombstone() {
         new_synctoken > initial_synctoken,
         "Sync token should increase after DELETE"
     );
+}
+
+// ============================================================================
+// Index Cleanup Tests
+// ============================================================================
+
+/// ## Summary
+/// Test that DELETE removes calendar index rows and occurrences.
+#[tokio::test]
+#[ignore = "requires database seeding"]
+async fn delete_cleans_calendar_indexes() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .truncate_all()
+        .await
+        .expect("Failed to truncate tables");
+
+    let (collection_id, uri) = setup_calendar_index_cleanup(&test_db)
+        .await
+        .expect("Failed to seed calendar cleanup fixture");
+
+    let entity_id = fetch_entity_id(&test_db, collection_id, "clean-event.ics")
+        .await
+        .expect("Failed to fetch entity_id for instance");
+
+    let (cal_index_count, occurrence_count) = fetch_calendar_index_stats(&test_db, entity_id)
+        .await
+        .expect("Failed to count calendar index rows");
+
+    assert!(
+        cal_index_count > 0,
+        "cal_index should be populated before DELETE"
+    );
+    assert_eq!(occurrence_count, 3, "Expected 3 occurrences before DELETE");
+
+    let service = create_test_service();
+    let response = TestRequest::delete(&uri).send(service).await;
+    response.assert_status(StatusCode::NO_CONTENT);
+
+    let (cal_index_count, occurrence_count) = fetch_calendar_index_stats(&test_db, entity_id)
+        .await
+        .expect("Failed to count calendar index rows after DELETE");
+
+    assert_eq!(
+        cal_index_count, 0,
+        "cal_index rows should be removed after DELETE"
+    );
+    assert_eq!(
+        occurrence_count, 0,
+        "Occurrences should be removed after DELETE"
+    );
+
+    let tombstone_exists = test_db
+        .tombstone_exists(collection_id, "clean-event.ics")
+        .await
+        .expect("Failed to check tombstone");
+    assert!(tombstone_exists, "Tombstone should exist after DELETE");
+}
+
+/// ## Summary
+/// Test that DELETE removes card index rows.
+#[tokio::test]
+#[ignore = "requires database seeding"]
+async fn delete_cleans_card_index() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .truncate_all()
+        .await
+        .expect("Failed to truncate tables");
+
+    let (collection_id, uri) = setup_card_index_cleanup(&test_db)
+        .await
+        .expect("Failed to seed card cleanup fixture");
+
+    let entity_id = fetch_entity_id(&test_db, collection_id, "clean-contact.vcf")
+        .await
+        .expect("Failed to fetch entity_id for instance");
+
+    let card_index_count = fetch_card_index_count(&test_db, entity_id)
+        .await
+        .expect("Failed to count card_index rows");
+
+    assert_eq!(
+        card_index_count, 1,
+        "card_index should be populated before DELETE"
+    );
+
+    let service = create_test_service();
+    let response = TestRequest::delete(&uri).send(service).await;
+    response.assert_status(StatusCode::NO_CONTENT);
+
+    let card_index_count = fetch_card_index_count(&test_db, entity_id)
+        .await
+        .expect("Failed to count card_index rows after DELETE");
+
+    assert_eq!(
+        card_index_count, 0,
+        "card_index rows should be removed after DELETE"
+    );
+
+    let tombstone_exists = test_db
+        .tombstone_exists(collection_id, "clean-contact.vcf")
+        .await
+        .expect("Failed to check tombstone");
+    assert!(tombstone_exists, "Tombstone should exist after DELETE");
 }
 
 // ============================================================================
