@@ -83,10 +83,10 @@ Shuriken has made **excellent progress** with Phases 0-5 complete, including:
 
 ### 🔧 Nice to Have (Completeness)
 
-#### 4. Phase 3: Method Completion (3-5 days) — **P2**
+#### 4. Phase 3: Method Completion (COMPLETE) — **P2**
 **Key Tasks**:
-- Complete MOVE handler (currently stub only)
-- Complete MKCALENDAR/MKCOL XML body parsing
+- ✅ Complete MOVE handler
+- ✅ Complete MKCALENDAR/MKCOL XML body parsing
 
 #### 5. Phase 7: Free-Busy (1 week) — **P2**
 **Key Tasks**:
@@ -109,8 +109,8 @@ Shuriken has made **excellent progress** with Phases 0-5 complete, including:
 ## RFC Compliance Status
 
 ### ✅ Fully Compliant
-- **RFC 5545** (iCalendar) — 98%
-- **RFC 6350** (vCard) — 98%
+- **RFC 5545** (iCalendar) — 100%
+- **RFC 6350** (vCard) — 100%
 - **RFC 6868** (Parameter Encoding) — 100%
 - **RFC 6352** (CardDAV queries) — 95%
 
@@ -152,14 +152,14 @@ Shuriken has made **excellent progress** with Phases 0-5 complete, including:
 
 ## Estimated Effort to Functional Parity
 
-**Phase 5 (Recurrence)**: 2-3 weeks  
+**Phase 5 (Timezone Completion)**: 1-2 weeks  
 **Phase 6 (Sync)**: 1 week  
 **Phase 9 (Discovery)**: 1 week  
 
-**Total**: **4-5 weeks** to reach production-ready state
+**Total**: **3-4 weeks** to reach production-ready state
 
 With these three phases complete, Shuriken would have:
-- ✅ Working recurring events (daily, weekly, monthly, etc.)
+- ✅ Working recurring events (daily, weekly, monthly, etc.) with accurate timezone handling
 - ✅ Efficient incremental sync (no full re-downloads)
 - ✅ Client auto-configuration (well-known URIs)
 - ✅ All core CalDAV/CardDAV functionality
@@ -201,9 +201,12 @@ With these three phases complete, Shuriken would have:
 - **RFC 4918 §9.9**: MOVE method — Incomplete (Phase 3)
 
 ### Minor Divergences
-- **RFC 5545**: RRULE list handling — Only first value parsed (Phase 1)
 - **RFC 4791 §5.3.1**: MKCALENDAR body parsing — Framework only (Phase 3)
 - **RFC 5689**: Extended MKCOL body parsing — Framework only (Phase 3)
+
+### ✅ Recently Fixed (2026-01-25)
+- **RFC 5545**: List value handling — ~~Only first value parsed~~ Now fully implemented (DateTimeList, DateList, PeriodList)
+- **RFC 5545 §3.1**: Line unfolding — ~~Incorrectly added spaces~~ Now correctly removes single whitespace per spec
 
 ---
 
