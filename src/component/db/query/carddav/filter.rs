@@ -180,7 +180,25 @@ async fn evaluate_arbitrary_property_filter(
 
     if let Some(text_match) = &prop_filter.text_match {
         // Property must exist and match text
-        apply_text_match_to_property(conn, &prop_name, text_match).await
+        let matched_ids = apply_text_match_to_property(conn, &prop_name, text_match).await?;
+
+        // Handle negate attribute: if true, return entities that DON'T match
+        if text_match.negate {
+            let all_vcard_ids: Vec<uuid::Uuid> = dav_component::table
+                .filter(dav_component::name.eq("VCARD"))
+                .filter(dav_component::deleted_at.is_null())
+                .select(dav_component::entity_id)
+                .distinct()
+                .load::<uuid::Uuid>(conn)
+                .await?;
+
+            Ok(all_vcard_ids
+                .into_iter()
+                .filter(|id| !matched_ids.contains(id))
+                .collect())
+        } else {
+            Ok(matched_ids)
+        }
     } else {
         // Property must exist (no text match specified)
         let entity_ids = dav_component::table
@@ -287,6 +305,29 @@ async fn evaluate_email_filter(
 
     if let Some(text_match) = &prop_filter.text_match {
         query = apply_text_match_email(query, text_match);
+
+        let matched_ids = query
+            .select(card_email::entity_id)
+            .distinct()
+            .load::<uuid::Uuid>(conn)
+            .await?;
+
+        // Handle negate attribute
+        if text_match.negate {
+            let all_card_ids: Vec<uuid::Uuid> = card_index::table
+                .filter(card_index::deleted_at.is_null())
+                .select(card_index::entity_id)
+                .distinct()
+                .load::<uuid::Uuid>(conn)
+                .await?;
+
+            return Ok(all_card_ids
+                .into_iter()
+                .filter(|id| !matched_ids.contains(id))
+                .collect());
+        }
+
+        return Ok(matched_ids);
     }
 
     let entity_ids = query
@@ -335,6 +376,29 @@ async fn evaluate_phone_filter(
 
     if let Some(text_match) = &prop_filter.text_match {
         query = apply_text_match_phone(query, text_match);
+
+        let matched_ids = query
+            .select(card_phone::entity_id)
+            .distinct()
+            .load::<uuid::Uuid>(conn)
+            .await?;
+
+        // Handle negate attribute
+        if text_match.negate {
+            let all_card_ids: Vec<uuid::Uuid> = card_index::table
+                .filter(card_index::deleted_at.is_null())
+                .select(card_index::entity_id)
+                .distinct()
+                .load::<uuid::Uuid>(conn)
+                .await?;
+
+            return Ok(all_card_ids
+                .into_iter()
+                .filter(|id| !matched_ids.contains(id))
+                .collect());
+        }
+
+        return Ok(matched_ids);
     }
 
     let entity_ids = query
@@ -368,6 +432,29 @@ async fn evaluate_card_index_filter(
 
     if let Some(text_match) = &prop_filter.text_match {
         query = apply_text_match_card_index(query, text_match, &prop_name);
+
+        let matched_ids = query
+            .select(card_index::entity_id)
+            .distinct()
+            .load::<uuid::Uuid>(conn)
+            .await?;
+
+        // Handle negate: return entities that DON'T match
+        if text_match.negate {
+            let matched_set: std::collections::HashSet<_> = matched_ids.into_iter().collect();
+            let all_card_ids = card_index::table
+                .filter(card_index::deleted_at.is_null())
+                .select(card_index::entity_id)
+                .distinct()
+                .load::<uuid::Uuid>(conn)
+                .await?;
+            return Ok(all_card_ids
+                .into_iter()
+                .filter(|id| !matched_set.contains(id))
+                .collect());
+        }
+
+        return Ok(matched_ids);
     }
 
     let entity_ids = query
@@ -399,6 +486,29 @@ async fn evaluate_uid_filter(
 
     if let Some(text_match) = &prop_filter.text_match {
         query = apply_text_match_uid(query, text_match);
+
+        let matched_ids = query
+            .select(card_index::entity_id)
+            .distinct()
+            .load::<uuid::Uuid>(conn)
+            .await?;
+
+        // Handle negate: return entities that DON'T match
+        if text_match.negate {
+            let matched_set: std::collections::HashSet<_> = matched_ids.into_iter().collect();
+            let all_card_ids = card_index::table
+                .filter(card_index::deleted_at.is_null())
+                .select(card_index::entity_id)
+                .distinct()
+                .load::<uuid::Uuid>(conn)
+                .await?;
+            return Ok(all_card_ids
+                .into_iter()
+                .filter(|id| !matched_set.contains(id))
+                .collect());
+        }
+
+        return Ok(matched_ids);
     }
 
     let entity_ids = query

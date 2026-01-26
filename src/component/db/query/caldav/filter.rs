@@ -305,11 +305,22 @@ async fn apply_property_filters(
                 };
             }
 
-            query
+            let matched_ids = query
                 .select(dav_component::entity_id)
                 .distinct()
                 .load::<uuid::Uuid>(conn)
-                .await?
+                .await?;
+
+            // Handle negate: return entities that DON'T match
+            if text_match.negate {
+                entity_ids
+                    .iter()
+                    .filter(|id| !matched_ids.contains(id))
+                    .copied()
+                    .collect()
+            } else {
+                matched_ids
+            }
         } else {
             // Property must exist (no text match specified)
             dav_component::table
