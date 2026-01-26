@@ -112,6 +112,7 @@ pub fn split_lines(input: &str) -> Vec<(usize, String)> {
         if line.starts_with([' ', '\t']) {
             // RFC 5545 §3.1: remove CRLF + single whitespace character
             // Both space and tab are handled the same way (skip first character)
+            // Safety: starts_with check guarantees line is not empty
             let continuation = &line[1..];
             if let Some((_, prev)) = lines.last_mut() {
                 // RFC 5545 §3.1: unfold by removing CRLF + whitespace (no space added)
