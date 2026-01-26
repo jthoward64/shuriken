@@ -218,6 +218,7 @@ async fn build_expand_property_response(
                                 href,
                                 &prop_item.properties,
                                 &mut visited,
+                                1, // Start at depth 1
                             ).await?;
                             
                             // If we have nested properties, wrap them in the original property
@@ -250,6 +251,7 @@ async fn build_expand_property_response(
                                     href,
                                     &prop_item.properties,
                                     &mut visited,
+                                    1, // Start at depth 1
                                 ).await?;
                                 
                                 if !nested_props.is_empty() {
@@ -381,6 +383,7 @@ fn fetch_nested_properties<'a>(
     href: &'a str,
     nested_props: &'a [crate::component::rfc::dav::core::ExpandPropertyItem],
     visited: &'a mut std::collections::HashSet<String>,
+    depth: usize,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<Vec<crate::component::rfc::dav::core::DavProperty>>> + Send + 'a>> {
     Box::pin(async move {
         use crate::component::rfc::dav::core::{DavProperty, PropertyValue};
@@ -389,8 +392,8 @@ fn fetch_nested_properties<'a>(
         
         // Recursion depth limit
         const MAX_DEPTH: usize = 10;
-        if visited.len() > MAX_DEPTH {
-            tracing::warn!("Maximum expansion depth reached, stopping recursion");
+        if depth >= MAX_DEPTH {
+            tracing::warn!("Maximum expansion depth ({}) reached, stopping recursion", MAX_DEPTH);
             return Ok(properties);
         }
         
@@ -409,6 +412,7 @@ fn fetch_nested_properties<'a>(
                                         nested_href,
                                         &prop_item.properties,
                                         visited,
+                                        depth + 1,
                                     ).await?;
                                     
                                     if !deeper_props.is_empty() {
