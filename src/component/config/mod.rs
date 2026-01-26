@@ -74,9 +74,10 @@ impl Settings {
 /// Panics if the global configuration has already been initialized. This is a programming error
 /// and indicates `load_config()` was called multiple times.
 pub fn load_config() -> Result<()> {
-    dotenv::dotenv().ok();
+    dotenvy::dotenv().ok();
 
     let settings = Settings::load()?;
+    #[expect(clippy::expect_used, reason = "Critical initialization step")]
     CONFIG.set(settings).expect(
         "Failed to set global configuration - load_config() must only be called once at startup",
     );
@@ -91,6 +92,7 @@ pub fn load_config() -> Result<()> {
 /// This indicates a programming error where the configuration was accessed before initialization.
 #[must_use]
 pub fn get_config() -> &'static Settings {
+    #[expect(clippy::expect_used, reason = "Critical initialization step")]
     CONFIG
         .get()
         .expect("Configuration not loaded - load_config() must be called at startup")

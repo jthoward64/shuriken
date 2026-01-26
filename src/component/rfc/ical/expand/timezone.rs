@@ -94,6 +94,7 @@ fn normalize_tzid(tzid: &str) -> String {
         .unwrap_or(tzid)
         .to_string();
 
+    // TODO: Replace this if/else chain with data from icu
     // Handle Windows timezone names (common in Outlook)
     if normalized == "Eastern Standard Time" {
         normalized = "America/New_York".to_string();
@@ -103,6 +104,8 @@ fn normalize_tzid(tzid: &str) -> String {
         normalized = "America/Chicago".to_string();
     } else if normalized == "Mountain Standard Time" {
         normalized = "America/Denver".to_string();
+    } else {
+        // Not handled
     }
 
     normalized
@@ -193,14 +196,19 @@ mod tests {
     fn test_resolve_standard_timezone() {
         let mut resolver = TimeZoneResolver::new();
 
-        let tz = resolver.resolve("America/New_York").expect("should resolve");
+        let tz = resolver
+            .resolve("America/New_York")
+            .expect("should resolve");
         assert_eq!(tz, Tz::America__New_York);
     }
 
     #[test]
     fn test_normalize_windows_timezone() {
         assert_eq!(normalize_tzid("Eastern Standard Time"), "America/New_York");
-        assert_eq!(normalize_tzid("Pacific Standard Time"), "America/Los_Angeles");
+        assert_eq!(
+            normalize_tzid("Pacific Standard Time"),
+            "America/Los_Angeles"
+        );
     }
 
     #[test]
@@ -252,12 +260,16 @@ mod tests {
         let mut resolver = TimeZoneResolver::new();
 
         // First resolution
-        resolver.resolve("America/New_York").expect("should resolve");
+        resolver
+            .resolve("America/New_York")
+            .expect("should resolve");
 
         // Cache should contain the timezone
         assert!(resolver.cache.contains_key("America/New_York"));
 
         // Second resolution should use cache
-        resolver.resolve("America/New_York").expect("should resolve from cache");
+        resolver
+            .resolve("America/New_York")
+            .expect("should resolve from cache");
     }
 }

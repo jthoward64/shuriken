@@ -172,7 +172,7 @@ Use `#[diesel::dsl::auto_type]` to avoid complex explicit return types. Extract 
 ### Authorization & Configuration
 - **casbin**: Authorization enforcement library for ACL
 - **config**: Configuration management from environment variables and files
-- **dotenv**: Load environment variables from .env files
+- **dotenvy**: Load environment variables from .env files
 
 ### Parsing & Quality
 - **pest**: Parser combinator for custom DSL parsing if needed

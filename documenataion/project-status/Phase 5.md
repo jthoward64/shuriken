@@ -1,23 +1,22 @@
 # Phase 5: Recurrence & Time Zones
 
-**Status**: ✅ **IMPLEMENTED (100%)**
-**Last Updated**: 2026-01-25
+**Status**: ⚠️ **PARTIAL (~70%)**  
+**Last Updated**: 2026-01-25 (Corrected Assessment)
 
 ---
 
 ## Summary
 
-Phase 5 is now **completely implemented** with the following key achievements:
+Phase 5 is **partially implemented** with the following status:
 
-- ✅ **RRULE Expansion**: Full support for recurring events using the `rrule` crate
-- ✅ **Timezone Resolution**: UTC conversion with DST handling using `chrono-tz`
-- ✅ **Database Integration**: Occurrence caching in `cal_occurrence` table
-- ✅ **UID Matching**: Robust component matching by UID instead of array index
-- ✅ **RECURRENCE-ID Exceptions**: Full support for modified occurrence instances
-- ✅ **Expand Modifier**: Calendar-query `<C:expand>` generates separate responses for each occurrence
-- ✅ **Limit-Recurrence-Set**: Calendar-query `<C:limit-recurrence-set>` filters occurrences to time range
+- ✅ **RRULE Expansion**: Working via `rrule` crate
+- ✅ **IANA Timezone Resolution**: UTC conversion using `chrono-tz` with IANA names
+- ✅ **Database Integration**: `cal_occurrence` table populated on PUT
+- ✅ **EXDATE/RDATE**: Handled during expansion
+- ❌ **VTIMEZONE Parsing**: NOT implemented — only IANA timezone strings work
+- ⚠️ **RECURRENCE-ID Exceptions**: Parsing exists, full replacement logic unclear
 
-**Status**: Ready for production use. All RFC 4791 recurrence features implemented.
+**Key Gap**: Custom VTIMEZONE components sent by clients are NOT parsed. Only IANA timezone identifiers (e.g., `America/New_York`) work via `chrono-tz` lookup.
 
 ---
 
@@ -25,9 +24,7 @@ Phase 5 is now **completely implemented** with the following key achievements:
 
 Phase 5 implements RRULE (recurrence rule) expansion, timezone resolution, and UTC conversion for timezone-aware events. This phase enables recurring calendar events and proper timezone handling, which are essential for production CalDAV functionality.
 
-**CRITICAL**: This phase is essential for production CalDAV. Recurring events are ubiquitous in real-world calendar usage (daily standups, weekly meetings, monthly reviews, etc.).
-
-**Complexity**: HIGH — Recurrence expansion is algorithmically complex with many edge cases.
+**CRITICAL**: This phase is essential for production CalDAV. Recurring events are ubiquitous in real-world calendar usage.
 
 ---
 
@@ -35,77 +32,48 @@ Phase 5 implements RRULE (recurrence rule) expansion, timezone resolution, and U
 
 ### ✅ Implemented
 
-#### 1. RRULE Expansion Engine — **CRITICAL**
+#### 1. RRULE Expansion Engine
+
+**Location**: `src/component/rfc/ical/expand/rrule.rs`
 
 **Current State**: Full RRULE expansion implemented using the `rrule` crate (v0.14.0).
 
-**Implementation Details**:
-- ✅ **Frequency iteration**: DAILY, WEEKLY, MONTHLY, YEARLY (via rrule crate)
-- ✅ **BYxxx rule application**: BYDAY, BYMONTH, BYMONTHDAY, BYHOUR, BYMINUTE, BYSECOND, etc.
-- ✅ **BYSETPOS filtering**: Select specific occurrences from expanded set
-- ✅ **COUNT limiting**: Stop after N occurrences
-- ✅ **UNTIL limiting**: Stop after a specific date
-- ✅ **EXDATE exclusion**: Remove specific dates from recurrence set
-- ✅ **RDATE inclusion**: Add specific dates to recurrence set
-- ✅ **RECURRENCE-ID override matching**: Match exception instances to master event by UID
-- ✅ **WKST (week start) handling**: Configurable week start day (via rrule crate)
-- ✅ **Leap year handling**: February 29 handled correctly (via rrule crate)
-- ✅ **DST transitions**: Handled via timezone conversion
+**Features Working**:
+- ✅ Frequency iteration: DAILY, WEEKLY, MONTHLY, YEARLY
+- ✅ BYxxx rule application: BYDAY, BYMONTH, BYMONTHDAY, etc.
+- ✅ COUNT limiting: Stop after N occurrences
+- ✅ UNTIL limiting: Stop after specific date
+- ✅ EXDATE exclusion: Remove specific dates
+- ✅ RDATE inclusion: Add specific dates
+- ✅ Performance limiting: 1000 occurrences max per event
 
-**Files**:
-- `src/component/rfc/ical/expand/rrule.rs`: RRULE expansion wrapper
-- `src/component/caldav/service/object.rs`: Integration into PUT handler
-- `src/component/caldav/recurrence.rs`: Helper functions for extracting recurrence data
+#### 2. `cal_occurrence` Table
 
-**Testing**: Comprehensive unit tests for daily, weekly, monthly recurrence with EXDATE/RDATE.
+**Location**: Schema exists in `src/component/db/schema.rs` (lines 143-157)
 
-**Performance**: Limited to 1000 occurrences per event by default to prevent resource exhaustion.
+**Current State**: Table created and populated on PUT.
 
----
+**Evidence**: `expand_and_store_occurrences()` called in `src/component/caldav/service/object.rs`
 
-#### 2. `cal_occurrence` Table — **CRITICAL**
+#### 3. IANA Timezone Resolution
 
-**Current State**: Table does not exist in schema.
+**Location**: `src/component/rfc/ical/expand/timezone.rs`
 
-**What's Missing**:
-- Database table for caching expanded occurrences
-- Indexes for efficient time-range queries
-- Cascade delete on instance deletion
+**Current State**: `TimeZoneResolver` uses `chrono-tz` crate for IANA timezone lookup.
 
-**Impact**: Without cached occurrences, queries must expand RRULE on every request, which is extremely expensive for large recurrence sets (e.g., daily for 10 years = 3650 occurrences).
-
-**Recommended Table Structure**:
-```sql
-CREATE TABLE cal_occurrence (
-    id UUID PRIMARY KEY DEFAULT uuidv7(),
-    instance_id UUID NOT NULL REFERENCES dav_instance(id) ON DELETE CASCADE,
-    dtstart_utc TIMESTAMPTZ NOT NULL,
-    dtend_utc TIMESTAMPTZ NOT NULL,
-    sequence INTEGER DEFAULT 0,  -- For iCalendar SEQUENCE property
-    recurrence_id_utc TIMESTAMPTZ,  -- For exception instances
-    is_exception BOOLEAN DEFAULT FALSE,  -- TRUE for RECURRENCE-ID instances
-    INDEX idx_cal_occurrence_timerange (instance_id, dtstart_utc, dtend_utc),
-    INDEX idx_cal_occurrence_instance (instance_id)
-);
-
-COMMENT ON TABLE cal_occurrence IS 'Expanded occurrences of recurring calendar events';
-COMMENT ON COLUMN cal_occurrence.instance_id IS 'References the master event instance';
-COMMENT ON COLUMN cal_occurrence.dtstart_utc IS 'Start time in UTC for this occurrence';
-COMMENT ON COLUMN cal_occurrence.dtend_utc IS 'End time in UTC for this occurrence';
-COMMENT ON COLUMN cal_occurrence.recurrence_id_utc IS 'RECURRENCE-ID for exception instances';
+**How It Works**:
+```rust
+let tz: Tz = "America/New_York".parse()?;
+let utc_time = local_time.with_timezone(&tz);
 ```
 
-**Implementation Steps**:
-1. Create migration: `migrations/YYYY-MM-DD-create-cal-occurrence/up.sql`
-2. Update `src/component/db/schema.rs` (run `diesel migration run`)
-3. Add model: `src/component/db/model/dav/occurrence.rs`
-4. Add query functions: `src/component/db/query/dav/occurrence.rs`
-
-**Estimated Effort**: 1 day
+**Limitation**: Only works when TZID exactly matches an IANA name. Does NOT parse VTIMEZONE blocks.
 
 ---
 
-#### 3. VTIMEZONE Parser — **HIGH PRIORITY**
+### ❌ NOT Implemented
+
+#### VTIMEZONE Component Parsing — **HIGH PRIORITY**
 
 **Current State**: No parsing of VTIMEZONE components.
 
@@ -113,91 +81,76 @@ COMMENT ON COLUMN cal_occurrence.recurrence_id_utc IS 'RECURRENCE-ID for excepti
 - [ ] STANDARD/DAYLIGHT block parsing
 - [ ] TZOFFSETFROM/TZOFFSETTO extraction
 - [ ] DST transition date calculation
-- [ ] RRULE support in VTIMEZONE (for recurring DST rules)
-- [ ] Timezone cache (avoid re-parsing for every event)
+- [ ] RRULE support within VTIMEZONE blocks
+- [ ] Mapping custom TZID to parsed timezone
 
-**Impact**: Cannot convert local times to UTC for time-range queries. `cal_index.dtstart_utc` is populated incorrectly for TZID-bearing events.
+**Impact**: Events with custom VTIMEZONE definitions (common from Outlook, older clients) have incorrect UTC times in `cal_index.dtstart_utc`.
 
-**RFC Violation**: RFC 4791 §4.1 requires VTIMEZONE inclusion for every unique TZID in a calendar collection.
+**RFC Violation**: RFC 5545 §3.6.5 requires VTIMEZONE processing for referenced TZIDs.
 
-**Implementation Options**:
+**Example Failure Case**:
+```ical
+BEGIN:VTIMEZONE
+TZID:Custom Eastern Time
+BEGIN:STANDARD
+DTSTART:20071104T020000
+RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU
+TZOFFSETFROM:-0400
+TZOFFSETTO:-0500
+TZNAME:EST
+END:STANDARD
+...
+END:VTIMEZONE
 
-**Option A: Use `chrono-tz` crate** (RECOMMENDED)
-- Pros: Uses IANA timezone database, handles DST automatically
-- Cons: Doesn't parse VTIMEZONE components (must map TZID to IANA name)
-- Example:
-  ```rust
-  use chrono_tz::Tz;
-  let tz: Tz = "America/New_York".parse()?;
-  let utc_time = local_time.with_timezone(&tz).with_timezone(&Utc);
-  ```
+BEGIN:VEVENT
+DTSTART;TZID=Custom Eastern Time:20250120T090000
+...
+END:VEVENT
+```
 
-**Option B: Parse VTIMEZONE components**
-- Pros: RFC-compliant, supports custom timezones
-- Cons: Complex DST calculation logic, must handle historical timezone changes
-- Example:
-  ```rust
-  // Parse VTIMEZONE
-  let vtimezone = parse_vtimezone(ical_str)?;
-  // Extract STANDARD/DAYLIGHT rules
-  let std_offset = vtimezone.standard_offset();
-  let dst_offset = vtimezone.daylight_offset();
-  // Calculate UTC time
-  let utc_time = local_time + offset;
-  ```
-
-**Recommended Approach**: Use `chrono-tz` for IANA timezones, fall back to VTIMEZONE parsing for custom timezones.
-
-**Implementation Files**:
-- `src/component/rfc/ical/timezone/mod.rs`: Timezone resolution
-- `src/component/rfc/ical/timezone/vtimezone.rs`: VTIMEZONE parser (if needed)
-- `src/component/rfc/ical/timezone/cache.rs`: Timezone cache
-
-**Estimated Effort**: 3-5 days
+This event would fail to resolve the timezone because "Custom Eastern Time" is not an IANA name.
 
 ---
 
-#### 4. UTC Conversion Utilities — **HIGH PRIORITY**
+### ⚠️ Partially Implemented
 
-**Current State**: No logic to convert DATE-TIME values to UTC.
+#### RECURRENCE-ID Exception Handling
 
-**What's Missing**:
-- [ ] TZID → timezone definition lookup
-- [ ] Local time → UTC conversion with DST handling
-- [ ] DST gap handling (non-existent times)
-  - Example: 2:30 AM on DST start day doesn't exist
-  - Solution: Shift forward to 3:00 AM
-- [ ] DST fold handling (ambiguous times)
-  - Example: 1:30 AM on DST end day occurs twice
-  - Solution: Use TZOFFSETFROM/TZOFFSETTO to disambiguate
+**Current State**: Parsing exists but full replacement logic needs verification.
 
-**Impact**: `cal_index.dtstart_utc` is populated incorrectly for TZID-bearing events, causing time-range queries to fail.
+**What Works**:
+- RECURRENCE-ID property is parsed
+- Exception instances identified
 
-**Recommended Function**:
-```rust
-pub fn convert_to_utc(
-    local_time: NaiveDateTime,
-    tzid: &str,
-    vtimezones: &HashMap<String, VTimeZone>,
-) -> Result<DateTime<Utc>, Error> {
-    // Lookup timezone by TZID
-    let tz = resolve_timezone(tzid, vtimezones)?;
-    
-    // Convert to UTC
-    let utc_time = tz.from_local_datetime(&local_time)
-        .single()  // Handle DST ambiguity
-        .ok_or(Error::AmbiguousTime)?;
-    
-    Ok(utc_time.with_timezone(&Utc))
-}
-```
+**Unclear**:
+- Whether exception replaces the occurrence in query results
+- Whether `cal_occurrence` properly reflects exceptions
 
-**DST Gap/Fold Handling**:
-```rust
-match tz.from_local_datetime(&local_time) {
-    LocalResult::None => {
-        // DST gap: time doesn't exist
-        // Shift forward to next valid time
+---
+
+## RFC Compliance
+
+| RFC Requirement | Status | Notes |
+|-----------------|--------|-------|
+| RFC 5545 §3.3.10: RRULE property | ✅ | Via rrule crate |
+| RFC 5545 §3.8.5.3: EXDATE | ✅ | Exclusions applied |
+| RFC 5545 §3.8.5.2: RDATE | ✅ | Additions included |
+| RFC 5545 §3.6.5: VTIMEZONE | ❌ | NOT parsed |
+| RFC 5545 §3.8.4.4: RECURRENCE-ID | ⚠️ | Parsed, full logic unclear |
+| RFC 4791 §9.6: Time-range queries | ✅ | Uses cal_occurrence |
+
+---
+
+## Effort Estimate
+
+| Task | Effort |
+|------|--------|
+| Implement VTIMEZONE parser | 5-7 days |
+| VTIMEZONE RRULE DST transitions | 2-3 days |
+| Verify RECURRENCE-ID exception flow | 1-2 days |
+| Add comprehensive recurrence tests | 2-3 days |
+
+**Total**: ~2 weeks to complete Phase 5 properly
         let shifted = local_time + Duration::hours(1);
         tz.from_local_datetime(&shifted).single().ok_or(Error::InvalidTime)?
     }

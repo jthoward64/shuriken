@@ -1,6 +1,5 @@
 //! Models for card index table.
 
-use chrono::{DateTime, Utc};
 use diesel::prelude::*;
 use uuid::Uuid;
 
@@ -9,7 +8,7 @@ use crate::component::db::schema::card_index;
 /// Card index entry.
 ///
 /// Denormalized index for efficient addressbook-query operations.
-/// 
+///
 /// Note: The `search_tsv` field is managed by database triggers and not included in the Rust model.
 #[derive(Debug, Clone, Identifiable)]
 #[diesel(table_name = card_index)]

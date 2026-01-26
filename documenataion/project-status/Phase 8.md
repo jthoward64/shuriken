@@ -1,17 +1,15 @@
 # Phase 8: Authorization Integration
 
-**Status**: ⚠️ **PARTIAL (40%)**  
-**Last Updated**: 2026-01-25
+**Status**: ⚠️ **PARTIAL (~25%)**  
+**Last Updated**: 2026-01-25 (Corrected Assessment)
 
 ---
 
 ## Overview
 
-Phase 8 integrates Casbin-based authorization throughout the system and exposes ACL discovery properties to clients. While authorization enforcement works correctly (requests are blocked when unauthorized), clients cannot discover what permissions they have, leading to poor UX (e.g., showing "Delete" buttons when delete is forbidden). This phase also covers sharing calendars/addressbooks with other users and groups.
+Phase 8 integrates Casbin-based authorization throughout the system and exposes ACL discovery properties to clients. While authorization infrastructure exists (Casbin enforcer, model, policies), handlers do NOT actually call the authorization functions, meaning any authenticated user can access any resource.
 
-**Key Achievement**: Casbin enforcement is functional and correctly blocks unauthorized actions.
-
-**Critical Gap**: ACL properties are missing, preventing clients from discovering permissions.
+**Critical Gap**: `authorize::require()` exists but is NOT CALLED in handlers. Authorization is not enforced.
 
 ---
 
@@ -19,35 +17,23 @@ Phase 8 integrates Casbin-based authorization throughout the system and exposes 
 
 ### ✅ Implemented Features
 
-#### Casbin Integration (`src/component/auth/`)
+#### Casbin Infrastructure (`src/component/auth/`)
 
 - [x] **Casbin enforcer initialization** — ReBAC model loading
   - Loads model from `casbin_model.conf`
   - Loads policies from `casbin_rule` table
-  - Auto-reloads on policy changes (if using adapter with watch)
   
 - [x] **ReBAC model** (`casbin_model.conf`) — Role-based access control
   - **Roles**: `freebusy`, `reader`, `writer`, `owner`
-  - **Type-based permissions**: Separate permissions per resource type (calendar, calendar_event, addressbook, vcard)
-  - **Flat group model**: No nested groups (simplifies expansion)
-  - **Example Policy**:
-    ```
-    p, role:reader, calendar, read
-    p, role:writer, calendar, read
-    p, role:writer, calendar, write
-    p, role:owner, calendar, read
-    p, role:owner, calendar, write
-    p, role:owner, calendar, admin
-    ```
-  
-- [x] **Subject expansion** — User → {user, groups, public}
-  - Enforcement expands user to `{user} ∪ groups(user) ∪ {public}`
-  - Allows sharing with individual users, groups, or "public"
-  - Example: User `alice` in group `team` → `{alice, team, public}`
-  
-- [x] **Basic authorization checks** — Permission enforcement
-  - `authorize::require(depot, object_id, action)` function
-  - Subject/object/action triplets: `(user, resource, read)`
+  - **Type-based permissions**: Separate permissions per resource type
+  - **Flat group model**: No nested groups
+
+- [x] **Subject expansion logic** — User → {user, groups, public}
+  - Code exists in `src/component/auth/subject.rs`
+
+- [x] **Authorization function** — `authorize::require()`
+  - Function exists in `src/component/auth/authorize.rs`
+  - Takes depot, object_id, action
   - Returns 403 Forbidden on authorization failure
 
 #### Middleware (`src/component/middleware/auth.rs`)
@@ -55,29 +41,47 @@ Phase 8 integrates Casbin-based authorization throughout the system and exposes 
 - [x] **Authentication middleware** — Identity extraction
   - `DepotUser::User(uuid)`: Authenticated user
   - `DepotUser::Public`: Unauthenticated user
-  - Basic Auth parsing (username/password)
-  - Session token validation (if implemented)
+  - Basic Auth parsing
 
-#### Authorization in Handlers
+---
 
-- [x] **PROPFIND** — Checks read permission before serving properties
-- [x] **PROPPATCH** — Checks write permission before modifying properties
-- [x] **GET/HEAD** — Checks read permission before serving content
-- [x] **PUT** — Checks write permission before creating/updating resources
-- [x] **DELETE** — Checks write permission before deleting resources
-- [x] **COPY** — Checks write permission on destination collection
-- [x] **MOVE** — Checks write permission on source and destination (when implemented)
-- [x] **Reports** (calendar-query, addressbook-query) — Checks read permission on collection
+### ❌ NOT Implemented — CRITICAL
+
+#### Authorization in Handlers — **NOT WIRED**
+
+**Evidence**: Searched all handlers for `authorize::require` calls. None found.
+
+**Impact**: ANY authenticated user can:
+- Read any calendar/addressbook (privacy breach)
+- Modify any resource (data integrity violation)
+- Delete any resource (data loss risk)
+
+**What's Missing**:
+- [ ] PROPFIND — Must check read permission before serving properties
+- [ ] PROPPATCH — Must check write permission before modifying properties
+- [ ] GET/HEAD — Must check read permission before serving content
+- [ ] PUT — Must check write permission before creating/updating resources
+- [ ] DELETE — Must check write permission before deleting resources
+- [ ] COPY — Must check write permission on destination collection
+- [ ] MOVE — Must check write permission on source and destination
+- [ ] Reports — Must check read permission on collection
+
+**Fix Required**: Each handler must:
+```rust
+use crate::component::auth::authorize;
+
+// In handler, before any DB operations:
+let user = depot.get::<DepotUser>("user")?;
+authorize::require(user, resource_id, Action::Read).await?;
+```
 
 ---
 
 ### ❌ Not Implemented
 
-#### 1. ACL Discovery Properties (RFC 3744)
+#### ACL Discovery Properties (RFC 3744)
 
 **Current State**: Clients cannot discover what permissions they have.
-
-**What's Missing**:
 
 ##### `DAV:current-user-privilege-set` (RFC 3744 §5.4)
 

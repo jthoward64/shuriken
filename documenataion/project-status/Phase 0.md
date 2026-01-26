@@ -1,7 +1,7 @@
 # Phase 0: Database Schema and Architecture
 
 **Status**: ✅ **COMPLETE (100%)**  
-**Last Updated**: 2026-01-25
+**Last Updated**: 2026-01-25 (Corrected Assessment)
 
 ---
 
@@ -18,7 +18,7 @@ Phase 0 establishes the foundational database schema for Shuriken's CalDAV/CardD
 
 ## Implementation Status
 
-### ✅ Completed Features
+### ✅ All Tables Implemented
 
 #### Core Identity Tables
 - [x] **`user`** — User accounts with email, name, principal_id
@@ -31,130 +31,116 @@ Phase 0 establishes the foundational database schema for Shuriken's CalDAV/CardD
 
 #### DAV Storage Tables
 - [x] **`dav_collection`** — Collections (calendars/addressbooks) with sync tokens
-  - Supports calendar and addressbook resource types
-  - Tracks sync token for WebDAV sync protocol
-  - Owner principal reference
 - [x] **`dav_entity`** — Canonical content entities (shareable across collections)
-  - Stores the actual iCalendar/vCard data
-  - Single source of truth for content
-  - Enables content sharing without duplication
 - [x] **`dav_instance`** — Per-collection resource instances with ETags
-  - Links entities to collections
-  - Tracks ETags for conditional requests
-  - Maintains sync revision for change detection
 - [x] **`dav_component`** — Component tree for iCalendar/vCard content
-  - Hierarchical structure (VCALENDAR → VEVENT, VCARD, etc.)
-  - Preserves component relationships
 - [x] **`dav_property`** — Properties with typed value columns
-  - Text, integer, float, datetime, boolean values
-  - Separate columns for deterministic serialization
 - [x] **`dav_parameter`** — Parameters associated with properties
-  - Supports RFC 6868 parameter encoding
 - [x] **`dav_tombstone`** — Deletion tombstones for sync correctness
-  - Tracks deleted instances for sync protocol
-  - Enables clients to detect deletions
-- [x] **`dav_shadow`** — Debug/compat payload storage
-  - Stores original inbound/outbound payloads
-  - Useful for debugging and compatibility testing
+- [x] **`dav_shadow`** — Debug/compat payload storage (raw bytes)
 
 #### Derived Index Tables
-- [x] **`cal_index`** — CalDAV query index
-  - uid, component_type, dtstart_utc, dtend_utc
-  - all_day, recurrence_id_utc, rrule_text
-  - organizer, summary, timezone_tzid
-  - Optimizes calendar-query performance
-- [x] **`card_index`** — CardDAV query index
-  - uid, fn (formatted name), version, kind
-  - Supports full-text search
+- [x] **`cal_index`** — CalDAV query index (uid, dtstart_utc, dtend_utc, rrule_text, etc.)
+- [x] **`cal_occurrence`** — Expanded recurrence occurrences (entity_id, start_utc, end_utc)
+- [x] **`cal_timezone`** — VTIMEZONE cache (unused currently)
+- [x] **`cal_attendee`** — Attendee index for scheduling queries
+- [x] **`card_index`** — CardDAV query index (uid, fn, n_family, n_given, etc.)
 - [x] **`card_email`** — Indexed vCard email addresses
-  - Enables email-based contact queries
 - [x] **`card_phone`** — Indexed vCard phone numbers
-  - Enables phone-based contact queries
 
 #### Schema Features
-- [x] **UUID v7 primary keys** — Time-ordered, globally unique identifiers
-  - Native PostgreSQL 17 `uuidv7()` function
-  - Creation timestamp extractable via `uuid_extract_timestamp(id)`
+- [x] **UUID v7 primary keys** — Native PostgreSQL 17 `uuidv7()` function
 - [x] **Soft deletes** — `deleted_at` columns for undo windows
-  - Supports pending purge workflows
-  - Enables data recovery
 - [x] **Auto-updated timestamps** — `updated_at` via `diesel_manage_updated_at()`
-  - Automatic tracking of modification times
 - [x] **Foreign key constraints** — Referential integrity enforcement
-- [x] **Check constraints** — Collection type validation and business rules
+- [x] **Check constraints** — Collection type validation
 
 ---
 
-## ❌ Missing Elements
+## ⚠️ Schema Usage Issues (Not Schema Bugs)
 
-### **CRITICAL**: `cal_occurrence` Table
+### 1. `dav_shadow` Used Instead of Component Tree
 
-**Status**: Not created  
-**Impact**: Recurring event queries must expand RRULE on every request (expensive and doesn't scale)  
-**Blocks**: Phase 5 (Recurrence & Time Zones)
+**Observation**: GET responses read from `dav_shadow.raw_canonical` rather than reconstructing from `dav_component`/`dav_property`/`dav_parameter`.
 
-**Required Structure**:
+**Impact**: The component tree tables exist but aren't used for output serialization.
+
+**Options**:
+- (A) Implement proper tree→content reconstruction
+- (B) Remove component tree, keep only shadow + indexes (simpler)
+
+### 2. `cal_timezone` Table Unused
+
+**Observation**: Table exists but timezone resolution uses only `chrono-tz` IANA lookup.
+
+**Impact**: Custom VTIMEZONE components aren't cached or used.
+
+### 3. `card_index.search_tsv` Not Populated
+
+**Observation**: Full-text search column exists but isn't populated on insert.
+
+**Impact**: Can't do efficient text search across contacts.
+
+---
+
+## Database Improvement Recommendations
+
+### 🔴 High Priority
+
+#### 1. Add Composite Indexes for Time-Range Queries
 ```sql
-CREATE TABLE cal_occurrence (
-    id UUID PRIMARY KEY DEFAULT uuidv7(),
-    instance_id UUID NOT NULL REFERENCES dav_instance(id),
-    dtstart_utc TIMESTAMPTZ NOT NULL,
-    dtend_utc TIMESTAMPTZ NOT NULL,
-    sequence INTEGER DEFAULT 0,
-    deleted_at TIMESTAMPTZ
-);
+CREATE INDEX idx_cal_occurrence_entity_time 
+  ON cal_occurrence (entity_id, start_utc, end_utc) 
+  WHERE deleted_at IS NULL;
 
-CREATE INDEX idx_cal_occurrence_timerange ON cal_occurrence (dtstart_utc, dtend_utc) WHERE deleted_at IS NULL;
-CREATE INDEX idx_cal_occurrence_instance ON cal_occurrence (instance_id) WHERE deleted_at IS NULL;
+CREATE INDEX idx_cal_index_entity_time
+  ON cal_index (entity_id, dtstart_utc, dtend_utc)
+  WHERE deleted_at IS NULL;
 ```
 
-**Purpose**: Cache expanded event occurrences for efficient time-range queries on recurring events
+#### 2. Add `collection_id` to Index Tables
+```sql
+-- Denormalize for faster queries without joins
+ALTER TABLE cal_index ADD COLUMN collection_id UUID REFERENCES dav_collection(id);
+ALTER TABLE cal_occurrence ADD COLUMN collection_id UUID REFERENCES dav_collection(id);
+ALTER TABLE card_index ADD COLUMN collection_id UUID REFERENCES dav_collection(id);
+```
+
+### 🟡 Medium Priority
+
+#### 3. Simplify Entity/Instance If Sharing Unused
+If content sharing across collections isn't needed, merge entity fields into instance.
+
+#### 4. Consider JSONB for Properties
+Current 5 typed columns are complex. JSONB would be more flexible.
+
+### 🟢 Low Priority
+
+#### 5. Partition `cal_occurrence` for Scale
+Range partition by `start_utc` for large deployments.
+
+#### 6. Add GIN Index for Contact Search
+```sql
+CREATE INDEX idx_card_index_search ON card_index USING GIN (search_tsv);
+```
+
+---
+
+## Architecture Decision: Component Tree vs Raw Storage
+
+The current schema has **both** patterns but only uses raw storage.
+
+**Recommendation**: Pick one approach:
+- **Option A**: Commit to component tree (enables property-level operations)
+- **Option B**: Raw storage + indexes only (simpler, perfect fidelity)
+
+For MVP, Option B is recommended.
 
 ---
 
 ## RFC Compliance
 
-- ✅ **RFC 4791 §4.1** — Entity/instance separation supports one UID per resource
-- ✅ **RFC 6578** — Tombstones and sync revision tracking ready for WebDAV sync
+- ✅ **RFC 4791 §4.1** — Entity/instance separation supports one UID per collection
+- ✅ **RFC 6578** — Tombstones and sync revision tracking ready
 - ✅ **RFC 3744** — Principal-based ACL model supports WebDAV ACL
-
----
-
-## Architecture Decisions
-
-### Entity/Instance Separation
-
-The schema separates **content** (entities) from **instances** (collection memberships):
-
-- **Entity** = Canonical iCalendar/vCard content (single source of truth)
-- **Instance** = Membership in a collection (can have multiple per entity)
-
-This design enables:
-1. Content sharing without duplication
-2. Per-collection ETags and sync revisions
-3. Efficient storage for shared resources
-
-### Derived Indexes
-
-Rather than querying the normalized component/property tree for every search, we maintain denormalized indexes:
-
-- `cal_index` — Flattened calendar event metadata
-- `card_index` — Flattened contact metadata
-- `card_email`, `card_phone` — Searchable contact fields
-
-These indexes are populated on PUT and cleaned on DELETE.
-
-### Soft Deletes
-
-Soft deletes (`deleted_at` columns) provide:
-- Undo windows for user mistakes
-- Pending purge workflows
-- Tombstone tracking for sync protocol
-
----
-
-## Next Phase: Phase 1
-
-Phase 1 focuses on parsing and serializing iCalendar, vCard, and WebDAV XML formats to work with this database schema.
-
-**Status**: ✅ Complete (98%)
+- ✅ **RFC 5545** — Component tree can represent full iCalendar structure

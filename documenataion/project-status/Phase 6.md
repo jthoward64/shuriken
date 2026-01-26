@@ -1,7 +1,7 @@
 # Phase 6: Synchronization
 
-**Status**: ❌ **STUB ONLY (10%)**  
-**Last Updated**: 2026-01-25
+**Status**: ❌ **STUB ONLY (~5%)**  
+**Last Updated**: 2026-01-25 (Corrected Assessment)
 
 ---
 
@@ -9,9 +9,68 @@
 
 Phase 6 implements RFC 6578 sync-collection support for efficient incremental synchronization. Instead of clients polling with full PROPFIND or calendar-query requests, sync-collection allows clients to request only resources that have changed since a previous sync token. This dramatically reduces bandwidth and server load for clients that sync frequently.
 
-**Key Achievement**: Database schema supports sync tokens and tombstones correctly.
+**Critical Gap**: `build_sync_collection_response()` in [report.rs](src/app/api/dav/method/report.rs#L107-L120) returns `Multistatus::new()` (empty) with a full TODO comment. No actual implementation exists.
 
-**Critical Gap**: All sync-collection report logic is marked TODO — no actual change detection or response building.
+---
+
+## Implementation Status
+
+### ✅ Implemented Features
+
+#### Schema Support
+
+- [x] **`dav_instance.sync_revision`** — Monotonic revision counter
+  - Auto-incremented on every create/update/delete
+  - Type: `BIGINT`
+  
+- [x] **`dav_tombstone`** — Deletion tombstones
+  - Created on soft delete
+  - Contains `sync_revision` of deletion
+  - Tracks deleted resource URI for incremental sync
+  
+- [x] **`dav_collection.sync_token`** — Collection-level sync token
+
+#### Request Parsing
+
+- [x] **`sync-collection` report XML parsing** — RFC 6578 §3
+  - Parsing exists in `src/component/rfc/dav/parse/report.rs`
+  - `<D:sync-token>` extraction
+  - `<D:sync-level>` parsing
+  - `<D:limit>` support
+  - `<D:prop>` requested properties
+
+---
+
+### ❌ NOT Implemented
+
+#### sync-collection Report Logic — **CRITICAL**
+
+**Evidence**: `src/app/api/dav/method/report.rs` lines 107-120:
+```rust
+pub async fn build_sync_collection_response(
+    _request: &SyncCollectionRequest,
+    _collection_id: Uuid,
+    _conn: &mut DbConnection<'_>,
+) -> Result<Multistatus> {
+    // TODO: Implement sync-collection report
+    // 1. Parse and validate sync-token from request
+    // 2. Query dav_instance for changes since token
+    // 3. Query dav_tombstone for deletions since token
+    // 4. Build multistatus with changed/deleted resources
+    // 5. Return new sync-token
+
+    Ok(Multistatus::new())
+}
+```
+
+**Missing Implementation**:
+1. Token validation (parse as BIGINT, check not future, check retention window)
+2. Change detection (query instances with `sync_revision > baseline`)
+3. Tombstone query (deleted resources)
+4. Multistatus response building
+5. New sync token generation
+
+**Impact**: Clients cannot efficiently sync. Must use full PROPFIND + calendar-query each time, which is extremely inefficient for large calendars.
 
 ---
 
