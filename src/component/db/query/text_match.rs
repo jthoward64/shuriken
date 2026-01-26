@@ -5,6 +5,8 @@
 
 use icu::casemap::CaseMapper;
 
+use crate::component::rfc::dav::core::PreconditionError;
+
 /// Error type for collation operations.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CollationError {
@@ -25,6 +27,32 @@ impl std::fmt::Display for CollationError {
 }
 
 impl std::error::Error for CollationError {}
+
+impl CollationError {
+    /// Converts this error to a `CalDAV` precondition error.
+    ///
+    /// Use this when the error occurred during `CalDAV` `calendar-query` processing.
+    #[must_use]
+    pub fn into_caldav_precondition(self) -> PreconditionError {
+        match self {
+            Self::UnsupportedCollation(collation) => {
+                PreconditionError::CalendarSupportedCollation(collation)
+            }
+        }
+    }
+
+    /// Converts this error to a `CardDAV` precondition error.
+    ///
+    /// Use this when the error occurred during `CardDAV` `addressbook-query` processing.
+    #[must_use]
+    pub fn into_carddav_precondition(self) -> PreconditionError {
+        match self {
+            Self::UnsupportedCollation(collation) => {
+                PreconditionError::CardSupportedCollation(collation)
+            }
+        }
+    }
+}
 
 /// Result of normalizing text for collation.
 pub struct CollationResult {

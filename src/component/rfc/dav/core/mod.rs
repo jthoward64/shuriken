@@ -9,6 +9,7 @@ mod href;
 mod multistatus;
 mod namespace;
 mod partial_retrieval;
+pub mod precondition;
 pub mod property;
 mod propfind;
 mod proppatch;
@@ -16,6 +17,7 @@ mod report;
 
 pub use depth::Depth;
 pub use error::DavError;
+pub use precondition::PreconditionError;
 pub use href::Href;
 pub use multistatus::{Multistatus, Propstat, PropstatResponse, ResponseDescription, Status};
 pub use namespace::{CALDAV_NS, CARDDAV_NS, CS_NS, DAV_NS, Namespace, QName};
