@@ -35,11 +35,11 @@ fn build_indexes_recursive(
         && component_kind.is_schedulable()
     {
         // Use a deterministic component ID based on the UID and component type
-        // This is a temporary approach until we have proper component ID mapping
-        let uid = component.uid().unwrap_or("unknown");
+        // If UID is missing, use the entity ID to ensure uniqueness
+        let uid = component.uid().unwrap_or("no-uid");
         let component_id = uuid::Uuid::new_v5(
             &entity_id,
-            format!("{}-{}", component.name, uid).as_bytes(),
+            format!("{}-{}-{}", component.name, uid, entity_id).as_bytes(),
         );
 
         if let Some(index) = build_cal_index(entity_id, component_id, component) {
@@ -95,12 +95,12 @@ fn build_cal_index(
             ical_datetime_to_utc(dt, tzid)
         });
 
-    // Extract all-day flag
+    // Extract all-day flag (only if VALUE=DATE is explicitly set)
     let all_day = component
         .get_property("DTSTART")
         .and_then(|prop| {
-            let value_type = prop.get_param_value("VALUE");
-            Some(value_type == Some("DATE"))
+            prop.get_param_value("VALUE")
+                .map(|value_type| value_type == "DATE")
         });
 
     // Extract RRULE
