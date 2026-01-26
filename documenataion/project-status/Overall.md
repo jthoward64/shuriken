@@ -1,8 +1,8 @@
 # Shuriken CalDAV/CardDAV Implementation: Overall Status
 
 **Last Updated**: 2026-01-25  
-**Overall Progress**: ~50% complete through planned Phase 5  
-**Production Ready**: ❌ No (Phase 5 required)
+**Overall Progress**: ~60% complete through planned Phase 5  
+**Production Ready**: ❌ No (Phase 5 timezone work required)
 
 ---
 
@@ -12,12 +12,13 @@ Shuriken has made **excellent progress** on foundational work through Phase 4, w
 - ✅ RFC-compliant parsing/serialization for iCalendar, vCard, and WebDAV XML
 - ✅ Well-designed database schema with proper entity/instance separation
 - ✅ Core HTTP methods (OPTIONS, PROPFIND, GET, PUT, DELETE, COPY) working
-- ✅ Query reports functional for non-recurring events
+- ✅ Query reports functional with efficient index-based queries
+- ✅ **Derived indexes automatically populated** (cal_index, card_index)
+- ✅ **RRULE expansion integrated** (cal_occurrence table populated)
 
-However, **Phase 5 is a critical blocker for production**:
-- ❌ No RRULE expansion (recurring events don't work)
-- ❌ No timezone handling (TZID events broken)
-- ❌ `cal_occurrence` table missing from schema
+**Remaining Critical Work for Production**:
+- ⚠️ Complete timezone handling (TZID resolution with DST)
+- ⚠️ Verify recurrence exception handling (EXDATE/RDATE/RECURRENCE-ID)
 
 ---
 
@@ -26,11 +27,11 @@ However, **Phase 5 is a critical blocker for production**:
 | Phase | Name | Status | Completion | Priority | Est. Effort |
 |-------|------|--------|------------|----------|-------------|
 | [Phase 0](Phase%200.md) | Database Schema | ✅ Complete | 100% | — | Complete |
-| [Phase 1](Phase%201.md) | Parsing & Serialization | ✅ Complete | 98% | — | Complete |
-| [Phase 2](Phase%202.md) | Database Operations | ⚠️ Mostly Complete | 85% | P2 | 1 week |
+| [Phase 1](Phase%201.md) | Parsing & Serialization | ✅ Complete | 100% | — | Complete |
+| [Phase 2](Phase%202.md) | Database Operations | ✅ Complete | 100% | — | Complete |
 | [Phase 3](Phase%203.md) | Basic HTTP Methods | ✅ Complete | 100% | — | Complete |
 | [Phase 4](Phase%204.md) | Query Reports | ✅ Complete | 95% | P2 | 3-5 days |
-| [Phase 5](Phase%205.md) | **Recurrence & Timezones** | **❌ Not Started** | **0%** | **P0 CRITICAL** | **2-3 weeks** |
+| [Phase 5](Phase%205.md) | **Recurrence & Timezones** | **⚠️ Partial** | **60%** | **P0 CRITICAL** | **1-2 weeks** |
 | [Phase 6](Phase%206.md) | Synchronization | ❌ Stub Only | 10% | P1 | 1 week |
 | [Phase 7](Phase%207.md) | Free-Busy & Scheduling | ❌ Not Started | 0% | P2-P3 | 2-3 weeks |
 | [Phase 8](Phase%208.md) | Authorization | ⚠️ Partial | 40% | P3 | 3-5 days |
@@ -42,15 +43,16 @@ However, **Phase 5 is a critical blocker for production**:
 
 ### 🚨 Must Have (Blocks Production)
 
-#### 1. Phase 5: Recurrence & Timezones (2-3 weeks) — **P0**
-**Why Critical**: Recurring events are ubiquitous in real-world calendar use. Without RRULE expansion, the server cannot handle daily standups, weekly meetings, annual birthdays, etc.
+#### 1. Phase 5: Complete Timezone Handling (1-2 weeks) — **P0**
+**Why Critical**: Accurate timezone conversion is essential for global calendar use. Without proper TZID resolution and DST handling, events will display at incorrect times.
 
 **Key Tasks**:
-- Create `cal_occurrence` table migration
-- Implement RRULE expansion engine (or integrate library like `rrule` crate)
-- Implement VTIMEZONE parsing and timezone resolution
-- Implement UTC conversion utilities with DST handling
-- Wire expansion into PUT handler and calendar-query report
+- ✅ ~~Create `cal_occurrence` table migration~~ (Complete)
+- ✅ ~~Implement RRULE expansion engine~~ (Complete - using `rrule` crate)
+- ✅ ~~Wire expansion into PUT handler~~ (Complete)
+- ⚠️ Complete VTIMEZONE parsing and timezone resolution
+- ⚠️ Implement full UTC conversion utilities with DST handling
+- ⚠️ Verify EXDATE/RDATE/RECURRENCE-ID handling
 
 **Blockers**: None (foundational work complete)
 
@@ -113,8 +115,8 @@ However, **Phase 5 is a critical blocker for production**:
 ## RFC Compliance Status
 
 ### ✅ Fully Compliant
-- **RFC 5545** (iCalendar) — 98%
-- **RFC 6350** (vCard) — 98%
+- **RFC 5545** (iCalendar) — 100%
+- **RFC 6350** (vCard) — 100%
 - **RFC 6868** (Parameter Encoding) — 100%
 - **RFC 6352** (CardDAV queries) — 95%
 
@@ -156,14 +158,14 @@ However, **Phase 5 is a critical blocker for production**:
 
 ## Estimated Effort to Functional Parity
 
-**Phase 5 (Recurrence)**: 2-3 weeks  
+**Phase 5 (Timezone Completion)**: 1-2 weeks  
 **Phase 6 (Sync)**: 1 week  
 **Phase 9 (Discovery)**: 1 week  
 
-**Total**: **4-5 weeks** to reach production-ready state
+**Total**: **3-4 weeks** to reach production-ready state
 
 With these three phases complete, Shuriken would have:
-- ✅ Working recurring events (daily, weekly, monthly, etc.)
+- ✅ Working recurring events (daily, weekly, monthly, etc.) with accurate timezone handling
 - ✅ Efficient incremental sync (no full re-downloads)
 - ✅ Client auto-configuration (well-known URIs)
 - ✅ All core CalDAV/CardDAV functionality
@@ -210,9 +212,12 @@ With these three phases complete, Shuriken would have:
 - **RFC 4918 §9.9**: MOVE method — Incomplete (Phase 3)
 
 ### Minor Divergences
-- **RFC 5545**: RRULE list handling — Only first value parsed (Phase 1)
 - **RFC 4791 §5.3.1**: MKCALENDAR body parsing — Framework only (Phase 3)
 - **RFC 5689**: Extended MKCOL body parsing — Framework only (Phase 3)
+
+### ✅ Recently Fixed (2026-01-25)
+- **RFC 5545**: List value handling — ~~Only first value parsed~~ Now fully implemented (DateTimeList, DateList, PeriodList)
+- **RFC 5545 §3.1**: Line unfolding — ~~Incorrectly added spaces~~ Now correctly removes single whitespace per spec
 
 ---
 

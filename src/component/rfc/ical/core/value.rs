@@ -99,8 +99,12 @@ pub enum Value {
     CalAddress(String),
     /// DATE value.
     Date(Date),
+    /// DATE list (multiple DATE values, e.g., EXDATE, RDATE).
+    DateList(Vec<Date>),
     /// DATE-TIME value.
     DateTime(DateTime),
+    /// DATE-TIME list (multiple DATE-TIME values, e.g., EXDATE, RDATE).
+    DateTimeList(Vec<DateTime>),
     /// DURATION value.
     Duration(Duration),
     /// FLOAT value.
@@ -109,6 +113,8 @@ pub enum Value {
     Integer(i32),
     /// PERIOD value.
     Period(Period),
+    /// PERIOD list (multiple PERIOD values, e.g., FREEBUSY).
+    PeriodList(Vec<Period>),
     /// RECUR value (recurrence rule).
     Recur(Box<super::RRule>),
     /// TEXT value (unescaped).
@@ -162,6 +168,33 @@ impl Value {
         }
     }
 
+    /// Returns this value as a date list, if it is a date list value.
+    #[must_use]
+    pub fn as_date_list(&self) -> Option<&[Date]> {
+        match self {
+            Self::DateList(dl) => Some(dl),
+            _ => None,
+        }
+    }
+
+    /// Returns this value as a date-time list, if it is a date-time list value.
+    #[must_use]
+    pub fn as_datetime_list(&self) -> Option<&[DateTime]> {
+        match self {
+            Self::DateTimeList(dtl) => Some(dtl),
+            _ => None,
+        }
+    }
+
+    /// Returns this value as a period list, if it is a period list value.
+    #[must_use]
+    pub fn as_period_list(&self) -> Option<&[Period]> {
+        match self {
+            Self::PeriodList(pl) => Some(pl),
+            _ => None,
+        }
+    }
+
     /// Returns this value as a duration, if it is a duration value.
     #[must_use]
     pub fn as_duration(&self) -> Option<&Duration> {
@@ -185,6 +218,15 @@ impl Value {
     pub fn as_recur(&self) -> Option<&super::RRule> {
         match self {
             Self::Recur(r) => Some(r),
+            _ => None,
+        }
+    }
+
+    /// Returns this value as a period, if it is a period value.
+    #[must_use]
+    pub fn as_period(&self) -> Option<&Period> {
+        match self {
+            Self::Period(p) => Some(p),
             _ => None,
         }
     }

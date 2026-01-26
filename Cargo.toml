@@ -77,7 +77,7 @@ tracing-log = "0.2"
 tracing-futures = "0.2"
 tracing-unwrap = "1.0"
 reqwest-tracing = "0.5"
-uuid = { version = "1.19.0", features = ["v4", "v7", "serde", "fast-rng"] }
+uuid = { version = "1.19.0", features = ["v4", "v5", "v7", "serde", "fast-rng"] }
 serde = { version = "1.0", features = ["derive"] }
 dotenv = "0.15.0"
 casbin = "2.19.1"
