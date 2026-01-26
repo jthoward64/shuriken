@@ -26,7 +26,7 @@ However, **Phase 5 is a critical blocker for production**:
 | Phase | Name | Status | Completion | Priority | Est. Effort |
 |-------|------|--------|------------|----------|-------------|
 | [Phase 0](Phase%200.md) | Database Schema | ✅ Complete | 100% | — | Complete |
-| [Phase 1](Phase%201.md) | Parsing & Serialization | ✅ Complete | 98% | — | Complete |
+| [Phase 1](Phase%201.md) | Parsing & Serialization | ✅ Complete | 100% | — | Complete |
 | [Phase 2](Phase%202.md) | Database Operations | ⚠️ Mostly Complete | 85% | P2 | 1 week |
 | [Phase 3](Phase%203.md) | Basic HTTP Methods | ⚠️ Mostly Complete | 90% | P2 | 3-5 days |
 | [Phase 4](Phase%204.md) | Query Reports | ✅ Complete | 95% | P2 | 3-5 days |
@@ -113,8 +113,8 @@ However, **Phase 5 is a critical blocker for production**:
 ## RFC Compliance Status
 
 ### ✅ Fully Compliant
-- **RFC 5545** (iCalendar) — 98%
-- **RFC 6350** (vCard) — 98%
+- **RFC 5545** (iCalendar) — 100%
+- **RFC 6350** (vCard) — 100%
 - **RFC 6868** (Parameter Encoding) — 100%
 - **RFC 6352** (CardDAV queries) — 95%
 
@@ -210,9 +210,12 @@ With these three phases complete, Shuriken would have:
 - **RFC 4918 §9.9**: MOVE method — Incomplete (Phase 3)
 
 ### Minor Divergences
-- **RFC 5545**: RRULE list handling — Only first value parsed (Phase 1)
 - **RFC 4791 §5.3.1**: MKCALENDAR body parsing — Framework only (Phase 3)
 - **RFC 5689**: Extended MKCOL body parsing — Framework only (Phase 3)
+
+### ✅ Recently Fixed (2026-01-25)
+- **RFC 5545**: List value handling — ~~Only first value parsed~~ Now fully implemented (DateTimeList, DateList, PeriodList)
+- **RFC 5545 §3.1**: Line unfolding — ~~Incorrectly added spaces~~ Now correctly removes single whitespace per spec
 
 ---
 

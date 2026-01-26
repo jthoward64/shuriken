@@ -517,8 +517,8 @@ END:VCALENDAR\r\n";
                 }
             }
             Err(e) => {
-                eprintln!("Serialized output:\n{}", output);
-                panic!("Failed to reparse: {:?}", e);
+                eprintln!("Serialized output:\n{output}");
+                panic!("Failed to reparse: {e:?}");
             }
         }
     }
