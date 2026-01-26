@@ -1,7 +1,7 @@
 # Phase 1: Core Parsing & Serialization
 
-**Status**: ⚠️ **MOSTLY COMPLETE (~90%)**  
-**Last Updated**: 2026-01-25 (Corrected Assessment)
+**Status**: ✅ **COMPLETE (~98%)**  
+**Last Updated**: 2026-01-25 (VTIMEZONE Parsing Implemented)
 
 ---
 
@@ -57,32 +57,41 @@ Phase 1 provides RFC-compliant parsers and serializers for:
 
 ---
 
-## ❌ Missing/Incomplete
+## ✅ Recently Completed
 
-### 1. VTIMEZONE Component Parsing — **HIGH PRIORITY**
+### 1. VTIMEZONE Component Parsing — **COMPLETED**
 
-**Status**: Not implemented
+**Status**: ✅ Implemented
 
 **What exists**:
-- `TimeZoneResolver` in `src/component/rfc/ical/expand/timezone.rs`
-- Uses `chrono-tz` for IANA timezone lookup
+- `VTimezone` struct in `src/component/rfc/ical/expand/vtimezone.rs`
+- Parses VTIMEZONE components from iCalendar data
+- Extracts STANDARD/DAYLIGHT observances with TZOFFSETFROM/TZOFFSETTO
+- RRULE-based DST transition calculation for recurring rules
+- `TimeZoneResolver` integration for custom/proprietary TZID handling
+- Uses `chrono-tz` for IANA timezone lookup as fallback
 - Uses ICU4X for Windows timezone ID → IANA mapping (`WindowsParser`)
 - Uses ICU4X for IANA alias canonicalization (`IanaParserExtended`)
 
-**What's missing**:
-- [ ] VTIMEZONE STANDARD/DAYLIGHT block parsing
-- [ ] TZOFFSETFROM/TZOFFSETTO extraction
-- [ ] RRULE-based DST transition calculation
-- [ ] Custom/proprietary TZID handling beyond simple normalization
+**Capabilities**:
+- [x] VTIMEZONE STANDARD/DAYLIGHT block parsing
+- [x] TZOFFSETFROM/TZOFFSETTO extraction
+- [x] RRULE-based DST transition calculation (FREQ=YEARLY;BYMONTH;BYDAY)
+- [x] Custom/proprietary TZID handling via VTIMEZONE registration
+- [x] UTC offset calculation at any datetime
+- [x] Local-to-UTC and UTC-to-local conversion
 
-**Impact**: Events with custom VTIMEZONE components or non-IANA TZIDs may have incorrect UTC times.
+---
 
-### 2. Text-Match on Arbitrary Properties — **MEDIUM PRIORITY**
+## ❌ Missing/Incomplete
+
+### 1. Text-Match on Arbitrary Properties — **MEDIUM PRIORITY**
 
 **Status**: Partial
 
 **What exists**:
 - Text-match filtering for indexed properties (FN, EMAIL, etc.)
+- ICU4X `CaseMapper::fold_string()` for RFC 4790 `i;unicode-casemap` collation
 
 **What's missing**:
 - [ ] Property filters on non-indexed properties require parsing vCard/iCalendar data

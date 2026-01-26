@@ -34,8 +34,10 @@ pub enum ConversionError {
 /// Maintains a cache of resolved timezones and provides fallback
 /// to VTIMEZONE component parsing if needed.
 pub struct TimeZoneResolver {
-    /// Cache of resolved timezones by TZID.
+    /// Cache of resolved IANA timezones by TZID.
     cache: HashMap<String, Tz>,
+    /// Cache of parsed VTIMEZONE components by TZID.
+    vtimezones: HashMap<String, super::vtimezone::VTimezone>,
 }
 
 impl TimeZoneResolver {
@@ -44,7 +46,31 @@ impl TimeZoneResolver {
     pub fn new() -> Self {
         Self {
             cache: HashMap::new(),
+            vtimezones: HashMap::new(),
         }
+    }
+
+    /// ## Summary
+    /// Registers a parsed VTIMEZONE component for use by this resolver.
+    ///
+    /// This allows custom/proprietary timezones defined in iCalendar data
+    /// to be used for datetime conversion.
+    pub fn register_vtimezone(&mut self, vtimezone: super::vtimezone::VTimezone) {
+        self.vtimezones.insert(vtimezone.tzid.clone(), vtimezone);
+    }
+
+    /// ## Summary
+    /// Returns the registered VTIMEZONE for a TZID, if any.
+    #[must_use]
+    pub fn get_vtimezone(&self, tzid: &str) -> Option<&super::vtimezone::VTimezone> {
+        self.vtimezones.get(tzid)
+    }
+
+    /// ## Summary
+    /// Checks if a TZID has a registered VTIMEZONE.
+    #[must_use]
+    pub fn has_vtimezone(&self, tzid: &str) -> bool {
+        self.vtimezones.contains_key(tzid)
     }
 
     /// ## Summary
@@ -124,14 +150,17 @@ fn normalize_tzid(tzid: &str) -> String {
 /// ## Summary
 /// Converts a local datetime to UTC using the specified timezone.
 ///
+/// First checks for a registered VTIMEZONE with the given TZID, then
+/// falls back to IANA timezone resolution via `chrono-tz`.
+///
 /// Handles DST gaps (non-existent times) and folds (ambiguous times)
 /// according to RFC 5545 semantics.
 ///
 /// ## Errors
 ///
 /// Returns an error if:
-/// - The timezone cannot be resolved
-/// - The datetime is non-existent (DST gap)
+/// - The timezone cannot be resolved (no VTIMEZONE registered and not an IANA timezone)
+/// - The datetime is non-existent (DST gap) when using IANA timezone
 /// - The datetime is ambiguous (DST fold) and cannot be disambiguated
 ///
 /// ## Side Effects
@@ -142,7 +171,14 @@ pub fn convert_to_utc(
     tzid: &str,
     resolver: &mut TimeZoneResolver,
 ) -> Result<DateTime<Utc>, ConversionError> {
-    // Resolve the timezone
+    // First, check if we have a custom VTIMEZONE for this TZID
+    if let Some(vtimezone) = resolver.get_vtimezone(tzid) {
+        // Use the VTIMEZONE to calculate UTC
+        let utc_naive = vtimezone.to_utc(local_time);
+        return Ok(DateTime::from_naive_utc_and_offset(utc_naive, Utc));
+    }
+
+    // Fall back to IANA timezone resolution
     let tz = resolver.resolve(tzid)?;
 
     // Convert local time to UTC
