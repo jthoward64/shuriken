@@ -78,7 +78,7 @@ fn parse_calendar_query(xml: &[u8]) -> ParseResult<ReportRequest> {
     let mut properties: Vec<PropertyName> = Vec::new();
     let mut filter: Option<CalendarFilter> = None;
     let mut expand: Option<(TimeRange, RecurrenceExpansion)> = None;
-    let mut limit: Option<u32> = None;
+    let limit: Option<u32> = None;
     let mut in_prop = false;
     let mut in_filter = false;
     let mut depth: usize = 0;

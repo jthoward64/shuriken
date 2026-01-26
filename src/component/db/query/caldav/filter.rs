@@ -113,31 +113,88 @@ async fn apply_comp_filter(
         let start = time_range.start;
         let end = time_range.end;
 
-        let mut boxed_query = query.into_boxed();
+        // For time-range queries, we need to check both:
+        // 1. Non-recurring events in cal_index
+        // 2. Recurring event occurrences in cal_occurrence
+        
+        let mut non_recurring_ids = Vec::new();
+        let mut recurring_ids = Vec::new();
 
-        // Apply start constraint: event_end > range_start
-        if let Some(range_start) = start {
-            boxed_query = boxed_query.filter(
-                cal_index::dtend_utc
-                    .is_null()
-                    .or(cal_index::dtend_utc.gt(range_start)),
-            );
+        // Query non-recurring events from cal_index (rrule_text IS NULL)
+        if start.is_some() || end.is_some() {
+            let mut boxed_query = query.clone()
+                .filter(cal_index::rrule_text.is_null())
+                .into_boxed();
+
+            // Apply start constraint: event_end > range_start
+            if let Some(range_start) = start {
+                boxed_query = boxed_query.filter(
+                    cal_index::dtend_utc
+                        .is_null()
+                        .or(cal_index::dtend_utc.gt(range_start)),
+                );
+            }
+
+            // Apply end constraint: event_start < range_end
+            if let Some(range_end) = end {
+                boxed_query = boxed_query.filter(
+                    cal_index::dtstart_utc
+                        .is_null()
+                        .or(cal_index::dtstart_utc.lt(range_end)),
+                );
+            }
+
+            non_recurring_ids = boxed_query
+                .select(cal_index::entity_id)
+                .distinct()
+                .load::<uuid::Uuid>(conn)
+                .await?;
         }
 
-        // Apply end constraint: event_start < range_end
-        if let Some(range_end) = end {
-            boxed_query = boxed_query.filter(
-                cal_index::dtstart_utc
-                    .is_null()
-                    .or(cal_index::dtstart_utc.lt(range_end)),
-            );
+        // Query recurring events from cal_occurrence table
+        if start.is_some() || end.is_some() {
+            use crate::component::db::schema::cal_occurrence;
+            
+            // First, get all recurring event entity IDs
+            let recurring_event_ids: Vec<uuid::Uuid> = query.clone()
+                .filter(cal_index::rrule_text.is_not_null())
+                .select(cal_index::entity_id)
+                .distinct()
+                .load::<uuid::Uuid>(conn)
+                .await?;
+
+            if !recurring_event_ids.is_empty() {
+                // Query occurrences within time range
+                let mut occ_query = cal_occurrence::table
+                    .filter(cal_occurrence::entity_id.eq_any(&recurring_event_ids))
+                    .filter(cal_occurrence::deleted_at.is_null())
+                    .into_boxed();
+
+                // Apply start constraint: occurrence_end > range_start
+                if let Some(range_start) = start {
+                    occ_query = occ_query.filter(cal_occurrence::end_utc.gt(range_start));
+                }
+
+                // Apply end constraint: occurrence_start < range_end
+                if let Some(range_end) = end {
+                    occ_query = occ_query.filter(cal_occurrence::start_utc.lt(range_end));
+                }
+
+                recurring_ids = occ_query
+                    .select(cal_occurrence::entity_id)
+                    .distinct()
+                    .load::<uuid::Uuid>(conn)
+                    .await?;
+            }
         }
 
-        boxed_query
-            .select(cal_index::entity_id)
-            .distinct()
-            .load::<uuid::Uuid>(conn)
-            .await?
+        // Union non-recurring and recurring event IDs
+        let mut combined_ids = non_recurring_ids;
+        combined_ids.extend(recurring_ids);
+        combined_ids.sort_unstable();
+        combined_ids.dedup();
+        
+        combined_ids
     } else {
         query
             .select(cal_index::entity_id)

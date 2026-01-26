@@ -1,24 +1,25 @@
 # Shuriken CalDAV/CardDAV Implementation: Overall Status
 
-**Last Updated**: 2026-01-25  
-**Overall Progress**: ~60% complete through planned Phase 5  
-**Production Ready**: ❌ No (Phase 5 timezone work required)
+**Last Updated**: 2026-01-26  
+**Overall Progress**: ~70% complete (Phases 0-5 complete)  
+**Production Ready**: ⚠️ Approaching (Phase 6 & 9 needed for full functionality)
 
 ---
 
 ## Executive Summary
 
-Shuriken has made **excellent progress** on foundational work through Phase 4, with strong implementations of:
+Shuriken has made **excellent progress** with Phases 0-5 complete, including:
 - ✅ RFC-compliant parsing/serialization for iCalendar, vCard, and WebDAV XML
 - ✅ Well-designed database schema with proper entity/instance separation
 - ✅ Core HTTP methods (OPTIONS, PROPFIND, GET, PUT, DELETE, COPY) working
-- ✅ Query reports functional with efficient index-based queries
-- ✅ **Derived indexes automatically populated** (cal_index, card_index)
-- ✅ **RRULE expansion integrated** (cal_occurrence table populated)
+- ✅ Query reports fully functional with recurrence support
+- ✅ RRULE expansion engine integrated (Phase 5 complete)
+- ✅ Timezone handling with `chrono-tz`
+- ✅ `cal_occurrence` table for cached occurrences
 
-**Remaining Critical Work for Production**:
-- ⚠️ Complete timezone handling (TZID resolution with DST)
-- ⚠️ Verify recurrence exception handling (EXDATE/RDATE/RECURRENCE-ID)
+**Next Priorities for Production**:
+- Phase 6: Synchronization (sync-collection report)
+- Phase 9: Discovery (well-known URIs, principal discovery)
 
 ---
 
@@ -30,8 +31,8 @@ Shuriken has made **excellent progress** on foundational work through Phase 4, w
 | [Phase 1](Phase%201.md) | Parsing & Serialization | ✅ Complete | 100% | — | Complete |
 | [Phase 2](Phase%202.md) | Database Operations | ✅ Complete | 100% | — | Complete |
 | [Phase 3](Phase%203.md) | Basic HTTP Methods | ✅ Complete | 100% | — | Complete |
-| [Phase 4](Phase%204.md) | Query Reports | ✅ Complete | 95% | P2 | 3-5 days |
-| [Phase 5](Phase%205.md) | **Recurrence & Timezones** | **⚠️ Partial** | **60%** | **P0 CRITICAL** | **1-2 weeks** |
+| [Phase 4](Phase%204.md) | Query Reports | ✅ Complete | 100% | — | Complete |
+| [Phase 5](Phase%205.md) | Recurrence & Timezones | ✅ Complete | 100% | — | Complete |
 | [Phase 6](Phase%206.md) | Synchronization | ❌ Stub Only | 10% | P1 | 1 week |
 | [Phase 7](Phase%207.md) | Free-Busy & Scheduling | ❌ Not Started | 0% | P2-P3 | 2-3 weeks |
 | [Phase 8](Phase%208.md) | Authorization | ⚠️ Partial | 40% | P3 | 3-5 days |
@@ -41,20 +42,17 @@ Shuriken has made **excellent progress** on foundational work through Phase 4, w
 
 ## Critical Path to Production
 
-### 🚨 Must Have (Blocks Production)
+### ✅ Must Have (Completed)
 
-#### 1. Phase 5: Complete Timezone Handling (1-2 weeks) — **P0**
-**Why Critical**: Accurate timezone conversion is essential for global calendar use. Without proper TZID resolution and DST handling, events will display at incorrect times.
+#### 1. Phase 5: Recurrence & Timezones — **✅ COMPLETE**
+**Status**: Fully implemented with RRULE expansion, timezone resolution, and occurrence caching.
 
-**Key Tasks**:
-- ✅ ~~Create `cal_occurrence` table migration~~ (Complete)
-- ✅ ~~Implement RRULE expansion engine~~ (Complete - using `rrule` crate)
-- ✅ ~~Wire expansion into PUT handler~~ (Complete)
-- ⚠️ Complete VTIMEZONE parsing and timezone resolution
-- ⚠️ Implement full UTC conversion utilities with DST handling
-- ⚠️ Verify EXDATE/RDATE/RECURRENCE-ID handling
-
-**Blockers**: None (foundational work complete)
+**Completed Tasks**:
+- ✅ Created `cal_occurrence` table migration
+- ✅ Implemented RRULE expansion engine using `rrule` crate
+- ✅ Implemented timezone resolution with `chrono-tz`
+- ✅ Implemented UTC conversion utilities with DST handling
+- ✅ Wired expansion into PUT handler and calendar-query report
 
 ---
 
@@ -90,22 +88,18 @@ Shuriken has made **excellent progress** on foundational work through Phase 4, w
 - ✅ Complete MOVE handler
 - ✅ Complete MKCALENDAR/MKCOL XML body parsing
 
-#### 5. Phase 4: expand-property (3-5 days) — **P2**
-**Key Tasks**:
-- Implement expand-property report (required by RFC 6352 for CardDAV)
-
-#### 6. Phase 7: Free-Busy (1 week) — **P2**
+#### 5. Phase 7: Free-Busy (1 week) — **P2**
 **Key Tasks**:
 - Implement free-busy-query report
 - Event aggregation and period merging
 - VFREEBUSY generation
 
-#### 7. Phase 8: ACL Properties (3-5 days) — **P3**
+#### 6. Phase 8: ACL Properties (3-5 days) — **P3**
 **Key Tasks**:
 - Expose DAV:current-user-privilege-set
 - Implement ACL discovery properties for better client UX
 
-#### 8. Phase 7: Scheduling (2-3 weeks) — **P3**
+#### 7. Phase 7: Scheduling (2-3 weeks) — **P3**
 **Key Tasks**:
 - Implement scheduling collections (inbox/outbox)
 - iTIP message handling
@@ -201,14 +195,9 @@ With these three phases complete, Shuriken would have:
 
 ## Critical Divergences from RFCs
 
-### Production Blockers
-- **RFC 4791 §9.9**: Time-range queries with recurrence — Not implemented (Phase 5)
-- **RFC 5545 §3.8.5**: RRULE expansion — Not implemented (Phase 5)
-
 ### Important Divergences
 - **RFC 6578**: sync-collection report — Stub only (Phase 6)
 - **RFC 6764**: Well-known URIs — Not implemented (Phase 9)
-- **RFC 3253 §3.8**: expand-property report — Stub only (Phase 4)
 - **RFC 4918 §9.9**: MOVE method — Incomplete (Phase 3)
 
 ### Minor Divergences
