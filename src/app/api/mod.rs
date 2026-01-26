@@ -7,12 +7,16 @@ use salvo::Router;
 
 use crate::component::middleware::auth::AuthMiddleware;
 
-#[must_use]
-pub fn routes() -> Router {
-    Router::with_path("api")
+/// ## Summary
+/// Constructs the main API router with all protocol handlers.
+///
+/// ## Errors
+/// Returns an error if any child route handler fails to initialize.
+pub fn routes() -> anyhow::Result<Router> {
+    Ok(Router::with_path("api")
         .hoop(AuthMiddleware)
         .push(app_specific::routes())
-        .push(caldav::routes())
-        .push(carddav::routes())
-        .push(dav::routes())
+        .push(caldav::routes()?)
+        .push(carddav::routes()?)
+        .push(dav::routes()))
 }

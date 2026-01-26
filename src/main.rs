@@ -37,7 +37,7 @@ async fn main() -> anyhow::Result<()> {
 
     let acceptor = TcpListener::new("0.0.0.0:8698").bind().await;
 
-    let router = Router::new().push(routes());
+    let router = Router::new().push(routes()?);
 
     tracing::info!("Server listening on 0.0.0.0:8698");
 

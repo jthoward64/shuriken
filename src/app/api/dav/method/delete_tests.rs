@@ -8,7 +8,7 @@ use super::delete::delete;
 #[tokio::test]
 async fn test_delete_returns_not_found_for_stub() {
     // Create a test request for any path
-    let service = salvo::Router::new().push(salvo::Router::with_path("/<**rest>").delete(delete));
+    let service = salvo::Router::new().push(salvo::Router::with_path("/{**rest}").delete(delete));
 
     let content = TestClient::delete("http://127.0.0.1:5800/test.ics")
         .send(service)
@@ -21,7 +21,7 @@ async fn test_delete_returns_not_found_for_stub() {
 #[tokio::test]
 async fn test_delete_handles_database_connection() {
     // Test that handler attempts to connect to database
-    let service = salvo::Router::new().push(salvo::Router::with_path("/<**rest>").delete(delete));
+    let service = salvo::Router::new().push(salvo::Router::with_path("/{**rest}").delete(delete));
 
     let content = TestClient::delete("http://127.0.0.1:5800/calendars/user/test.ics")
         .send(service)
@@ -47,7 +47,7 @@ async fn test_delete_accepts_any_path() {
 
     for path in paths {
         let service =
-            salvo::Router::new().push(salvo::Router::with_path("/<**rest>").delete(delete));
+            salvo::Router::new().push(salvo::Router::with_path("/{**rest}").delete(delete));
 
         let content = TestClient::delete(format!("http://127.0.0.1:5800{path}"))
             .send(service)
@@ -62,7 +62,7 @@ async fn test_delete_accepts_any_path() {
 async fn test_delete_expected_success_status() {
     // When implemented, DELETE should return 204 No Content on success
     // For now, verify the handler is callable
-    let service = salvo::Router::new().push(salvo::Router::with_path("/<**rest>").delete(delete));
+    let service = salvo::Router::new().push(salvo::Router::with_path("/{**rest}").delete(delete));
 
     let content = TestClient::delete("http://127.0.0.1:5800/test.ics")
         .send(service)

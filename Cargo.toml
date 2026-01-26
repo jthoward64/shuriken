@@ -93,6 +93,7 @@ sha2 = "0.10.8"
 hex = "0.4.3"
 rrule = "0.14.0"
 icu = "2.1.1"
+tracing-test = { version = "0.2.5", features = ["no-env-filter"] }
 
 [dev-dependencies]
 test-log = { version = "0.2", features = ["trace"] }

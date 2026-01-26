@@ -8,7 +8,7 @@ use super::get_head::{get, head};
 #[tokio::test]
 async fn test_get_returns_not_found_for_stub() {
     // Create a test request
-    let service = salvo::Router::new().push(salvo::Router::with_path("/<**rest>").get(get));
+    let service = salvo::Router::new().push(salvo::Router::with_path("/{**rest}").get(get));
 
     let content = TestClient::get("http://127.0.0.1:5800/test.ics")
         .send(service)
@@ -21,7 +21,7 @@ async fn test_get_returns_not_found_for_stub() {
 #[tokio::test]
 async fn test_head_returns_not_found_for_stub() {
     // Create a test request
-    let service = salvo::Router::new().push(salvo::Router::with_path("/<**rest>").head(head));
+    let service = salvo::Router::new().push(salvo::Router::with_path("/{**rest}").head(head));
 
     let content = TestClient::head("http://127.0.0.1:5800/test.ics")
         .send(service)
@@ -34,7 +34,7 @@ async fn test_head_returns_not_found_for_stub() {
 #[tokio::test]
 async fn test_get_handles_database_connection() {
     // Test that handler attempts to connect to database
-    let service = salvo::Router::new().push(salvo::Router::with_path("/<**rest>").get(get));
+    let service = salvo::Router::new().push(salvo::Router::with_path("/{**rest}").get(get));
 
     let content = TestClient::get("http://127.0.0.1:5800/calendars/user/test.ics")
         .send(service)
@@ -50,7 +50,7 @@ async fn test_get_handles_database_connection() {
 #[tokio::test]
 async fn test_head_handles_database_connection() {
     // Test that handler attempts to connect to database
-    let service = salvo::Router::new().push(salvo::Router::with_path("/<**rest>").head(head));
+    let service = salvo::Router::new().push(salvo::Router::with_path("/{**rest}").head(head));
 
     let content = TestClient::head("http://127.0.0.1:5800/calendars/user/test.ics")
         .send(service)
@@ -74,7 +74,7 @@ async fn test_get_accepts_various_paths() {
     ];
 
     for path in paths {
-        let service = salvo::Router::new().push(salvo::Router::with_path("/<**rest>").get(get));
+        let service = salvo::Router::new().push(salvo::Router::with_path("/{**rest}").get(get));
 
         let content = TestClient::get(format!("http://127.0.0.1:5800{path}"))
             .send(service)
@@ -96,7 +96,7 @@ async fn test_head_accepts_various_paths() {
     ];
 
     for path in paths {
-        let service = salvo::Router::new().push(salvo::Router::with_path("/<**rest>").head(head));
+        let service = salvo::Router::new().push(salvo::Router::with_path("/{**rest}").head(head));
 
         let content = TestClient::head(format!("http://127.0.0.1:5800{path}"))
             .send(service)
@@ -110,7 +110,7 @@ async fn test_head_accepts_various_paths() {
 #[tokio::test]
 async fn test_get_expected_success_status() {
     // When implemented, GET should return 200 OK with body on success
-    let service = salvo::Router::new().push(salvo::Router::with_path("/<**rest>").get(get));
+    let service = salvo::Router::new().push(salvo::Router::with_path("/{**rest}").get(get));
 
     let content = TestClient::get("http://127.0.0.1:5800/test.ics")
         .send(service)
@@ -133,7 +133,7 @@ async fn test_get_expected_success_status() {
 #[tokio::test]
 async fn test_head_expected_success_status() {
     // When implemented, HEAD should return 200 OK without body on success
-    let service = salvo::Router::new().push(salvo::Router::with_path("/<**rest>").head(head));
+    let service = salvo::Router::new().push(salvo::Router::with_path("/{**rest}").head(head));
 
     let content = TestClient::head("http://127.0.0.1:5800/test.ics")
         .send(service)
@@ -156,7 +156,7 @@ async fn test_head_expected_success_status() {
 #[tokio::test]
 async fn test_head_should_not_return_body() {
     // HEAD requests should not include response body
-    let service = salvo::Router::new().push(salvo::Router::with_path("/<**rest>").head(head));
+    let service = salvo::Router::new().push(salvo::Router::with_path("/{**rest}").head(head));
 
     let content = TestClient::head("http://127.0.0.1:5800/test.ics")
         .send(service)

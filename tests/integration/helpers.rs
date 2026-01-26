@@ -52,11 +52,13 @@ fn get_db_lock() -> &'static Mutex<()> {
 ///
 /// ## Panics
 /// Panics if the service cannot be created.
+#[expect(clippy::expect_used, reason = "Service creation failure is fatal")]
 #[must_use]
 pub fn create_test_service() -> &'static Service {
     TEST_SERVICE.get_or_init(|| {
         // Create the full router with all API routes
-        let router = Router::new().push(shuriken::app::api::routes());
+        let router =
+            Router::new().push(shuriken::app::api::routes().expect("API routes should be valid"));
         Service::new(router)
     })
 }

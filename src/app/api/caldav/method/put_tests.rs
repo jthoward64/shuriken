@@ -10,7 +10,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_put_calendar_returns_expected_status() {
-        let router = Router::new().push(Router::with_path("/<**rest>").put(put));
+        let router = Router::new().push(Router::with_path("/{**rest}").put(put));
         let service = Service::new(router);
 
         let ical_data = r"BEGIN:VCALENDAR
@@ -44,7 +44,7 @@ END:VCALENDAR";
 
     #[tokio::test]
     async fn test_put_calendar_handles_if_match() {
-        let router = Router::new().push(Router::with_path("/<**rest>").put(put));
+        let router = Router::new().push(Router::with_path("/{**rest}").put(put));
         let service = Service::new(router);
 
         let ical_data = r"BEGIN:VCALENDAR
@@ -69,7 +69,7 @@ END:VCALENDAR";
 
     #[tokio::test]
     async fn test_put_calendar_handles_if_none_match() {
-        let router = Router::new().push(Router::with_path("/<**rest>").put(put));
+        let router = Router::new().push(Router::with_path("/{**rest}").put(put));
         let service = Service::new(router);
 
         let ical_data = r"BEGIN:VCALENDAR
@@ -94,7 +94,7 @@ END:VCALENDAR";
 
     #[tokio::test]
     async fn test_put_calendar_rejects_invalid_icalendar() {
-        let router = Router::new().push(Router::with_path("/<**rest>").put(put));
+        let router = Router::new().push(Router::with_path("/{**rest}").put(put));
         let service = Service::new(router);
 
         let invalid_ical = "This is not valid iCalendar data";
@@ -116,7 +116,7 @@ END:VCALENDAR";
 
     #[tokio::test]
     async fn test_put_calendar_accepts_various_paths() {
-        let router = Router::new().push(Router::with_path("/<**rest>").put(put));
+        let router = Router::new().push(Router::with_path("/{**rest}").put(put));
         let service = Service::new(router);
 
         let ical_data = r"BEGIN:VCALENDAR
@@ -148,7 +148,7 @@ END:VCALENDAR";
 
     #[tokio::test]
     async fn test_put_calendar_empty_body_returns_error() {
-        let router = Router::new().push(Router::with_path("/<**rest>").put(put));
+        let router = Router::new().push(Router::with_path("/{**rest}").put(put));
         let service = Service::new(router);
 
         let resp = TestClient::put("http://127.0.0.1:5800/calendar/event.ics")

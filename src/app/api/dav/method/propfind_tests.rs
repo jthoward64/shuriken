@@ -10,7 +10,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_propfind_returns_multistatus_or_error() {
-        let router = Router::new().push(Router::with_path("/<**rest>").get(propfind));
+        let router = Router::new().push(Router::with_path("/{**rest}").get(propfind));
         let service = Service::new(router);
 
         let resp = TestClient::get("http://127.0.0.1:5800/calendars/user/")
@@ -30,7 +30,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_propfind_handles_depth_header() {
-        let router = Router::new().push(Router::with_path("/<**rest>").get(propfind));
+        let router = Router::new().push(Router::with_path("/{**rest}").get(propfind));
         let service = Service::new(router);
 
         // Test with Depth: 0
@@ -52,7 +52,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_propfind_accepts_various_paths() {
-        let router = Router::new().push(Router::with_path("/<**rest>").get(propfind));
+        let router = Router::new().push(Router::with_path("/{**rest}").get(propfind));
         let service = Service::new(router);
 
         let paths = vec![
@@ -75,7 +75,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_propfind_expected_status_codes() {
-        let router = Router::new().push(Router::with_path("/<**rest>").get(propfind));
+        let router = Router::new().push(Router::with_path("/{**rest}").get(propfind));
         let service = Service::new(router);
 
         let resp = TestClient::get("http://127.0.0.1:5800/test/")
@@ -95,7 +95,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_propfind_depth_infinity() {
-        let router = Router::new().push(Router::with_path("/<**rest>").get(propfind));
+        let router = Router::new().push(Router::with_path("/{**rest}").get(propfind));
         let service = Service::new(router);
 
         // Test with Depth: infinity

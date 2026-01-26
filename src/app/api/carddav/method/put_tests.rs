@@ -10,7 +10,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_put_vcard_returns_expected_status() {
-        let router = Router::new().push(Router::with_path("/<**rest>").put(put));
+        let router = Router::new().push(Router::with_path("/{**rest}").put(put));
         let service = Service::new(router);
 
         let vcard_data = r"BEGIN:VCARD
@@ -40,7 +40,7 @@ END:VCARD";
 
     #[tokio::test]
     async fn test_put_vcard_handles_if_match() {
-        let router = Router::new().push(Router::with_path("/<**rest>").put(put));
+        let router = Router::new().push(Router::with_path("/{**rest}").put(put));
         let service = Service::new(router);
 
         let vcard_data = r"BEGIN:VCARD
@@ -61,7 +61,7 @@ END:VCARD";
 
     #[tokio::test]
     async fn test_put_vcard_handles_if_none_match() {
-        let router = Router::new().push(Router::with_path("/<**rest>").put(put));
+        let router = Router::new().push(Router::with_path("/{**rest}").put(put));
         let service = Service::new(router);
 
         let vcard_data = r"BEGIN:VCARD
@@ -82,7 +82,7 @@ END:VCARD";
 
     #[tokio::test]
     async fn test_put_vcard_rejects_invalid_vcard() {
-        let router = Router::new().push(Router::with_path("/<**rest>").put(put));
+        let router = Router::new().push(Router::with_path("/{**rest}").put(put));
         let service = Service::new(router);
 
         let invalid_vcard = "This is not valid vCard data";
@@ -104,7 +104,7 @@ END:VCARD";
 
     #[tokio::test]
     async fn test_put_vcard_version_3() {
-        let router = Router::new().push(Router::with_path("/<**rest>").put(put));
+        let router = Router::new().push(Router::with_path("/{**rest}").put(put));
         let service = Service::new(router);
 
         let vcard_v3_data = r"BEGIN:VCARD
@@ -124,7 +124,7 @@ END:VCARD";
 
     #[tokio::test]
     async fn test_put_vcard_accepts_various_paths() {
-        let router = Router::new().push(Router::with_path("/<**rest>").put(put));
+        let router = Router::new().push(Router::with_path("/{**rest}").put(put));
         let service = Service::new(router);
 
         let vcard_data = r"BEGIN:VCARD
@@ -152,7 +152,7 @@ END:VCARD";
 
     #[tokio::test]
     async fn test_put_vcard_empty_body_returns_error() {
-        let router = Router::new().push(Router::with_path("/<**rest>").put(put));
+        let router = Router::new().push(Router::with_path("/{**rest}").put(put));
         let service = Service::new(router);
 
         let resp = TestClient::put("http://127.0.0.1:5800/addressbook/contact.vcf")
