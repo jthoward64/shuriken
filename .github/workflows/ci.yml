@@ -14,6 +14,8 @@ jobs:
   build-check-clippy:
     name: Build, Check, and Clippy
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
     - name: Checkout repository
@@ -60,6 +62,8 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     services:
       postgres:
