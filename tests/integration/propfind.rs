@@ -16,11 +16,6 @@ use super::helpers::*;
 #[tokio::test]
 async fn propfind_returns_multistatus() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -40,18 +35,14 @@ async fn propfind_returns_multistatus() {
         .await;
 
     response.assert_status(StatusCode::MULTI_STATUS);
-}
+
+    }
 
 /// ## Summary
 /// Test that PROPFIND response is valid XML.
 #[tokio::test]
 async fn propfind_returns_valid_xml() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -85,11 +76,6 @@ async fn propfind_returns_valid_xml() {
 #[tokio::test]
 async fn propfind_depth0_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -143,11 +129,6 @@ async fn propfind_depth0_collection() {
 #[tokio::test]
 async fn propfind_depth1_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -201,11 +182,6 @@ async fn propfind_depth1_collection() {
 #[tokio::test]
 async fn propfind_depth_infinity() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -237,11 +213,6 @@ async fn propfind_depth_infinity() {
 #[tokio::test]
 async fn propfind_default_depth() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -262,7 +233,8 @@ async fn propfind_default_depth() {
 
     // Should succeed with some default depth
     response.assert_status(StatusCode::MULTI_STATUS);
-}
+
+    }
 
 // ============================================================================
 // Property Request Tests
@@ -273,11 +245,6 @@ async fn propfind_default_depth() {
 #[tokio::test]
 async fn propfind_known_props_200() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -313,11 +280,6 @@ async fn propfind_known_props_200() {
 #[tokio::test]
 async fn propfind_unknown_props_404() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -347,11 +309,6 @@ async fn propfind_unknown_props_404() {
 #[tokio::test]
 async fn propfind_mixed_props() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -398,11 +355,6 @@ async fn propfind_mixed_props() {
 #[tokio::test]
 async fn propfind_allprop_request() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -437,11 +389,6 @@ async fn propfind_allprop_request() {
 #[tokio::test]
 async fn propfind_propname() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -479,11 +426,6 @@ async fn propfind_propname() {
 #[tokio::test]
 async fn propfind_calendar_resourcetype() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -514,11 +456,6 @@ async fn propfind_calendar_resourcetype() {
 #[tokio::test]
 async fn propfind_addressbook_resourcetype() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/bob/", Some("Bob"))
         .await
@@ -553,7 +490,6 @@ async fn propfind_addressbook_resourcetype() {
 #[tokio::test]
 async fn propfind_getetag() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db.truncate_all().await.expect("Failed to seed tables");
 
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
@@ -602,11 +538,6 @@ async fn propfind_getetag() {
 #[tokio::test]
 async fn propfind_sync_token() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -655,11 +586,6 @@ async fn propfind_nonexistent_404() {
 #[tokio::test]
 async fn propfind_invalid_xml_400() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -679,4 +605,5 @@ async fn propfind_invalid_xml_400() {
         .await;
 
     response.assert_status(StatusCode::BAD_REQUEST);
-}
+
+    }

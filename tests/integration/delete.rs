@@ -137,11 +137,6 @@ async fn fetch_card_index_count(test_db: &TestDb, entity_id: uuid::Uuid) -> anyh
 #[tokio::test]
 async fn delete_calendar_object() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -175,18 +170,14 @@ async fn delete_calendar_object() {
     let response = TestRequest::delete(&uri).send(service).await;
 
     response.assert_status(StatusCode::NO_CONTENT);
-}
+
+    }
 
 /// ## Summary
 /// Test that DELETE creates a tombstone and bumps sync token.
 #[tokio::test]
 async fn delete_creates_tombstone() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -255,11 +246,6 @@ async fn delete_creates_tombstone() {
 #[tokio::test]
 async fn delete_cleans_calendar_indexes() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let (collection_id, uri) = setup_calendar_index_cleanup(&test_db)
         .await
         .expect("Failed to seed calendar cleanup fixture");
@@ -307,11 +293,6 @@ async fn delete_cleans_calendar_indexes() {
 #[tokio::test]
 async fn delete_cleans_card_index() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let (collection_id, uri) = setup_card_index_cleanup(&test_db)
         .await
         .expect("Failed to seed card cleanup fixture");
@@ -376,11 +357,6 @@ async fn delete_nonexistent_404() {
 #[tokio::test]
 async fn delete_idempotent() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -435,11 +411,6 @@ async fn delete_idempotent() {
 #[tokio::test]
 async fn delete_if_match_success() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -467,18 +438,14 @@ async fn delete_if_match_success() {
     let response = TestRequest::delete(&uri).if_match(etag).send(service).await;
 
     response.assert_status(StatusCode::NO_CONTENT);
-}
+
+    }
 
 /// ## Summary
 /// Test that DELETE with mismatched If-Match returns 412.
 #[tokio::test]
 async fn delete_if_match_mismatch_412() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -533,11 +500,6 @@ async fn delete_if_match_mismatch_412() {
 #[tokio::test]
 async fn delete_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -588,11 +550,6 @@ async fn delete_collection() {
 #[tokio::test]
 async fn delete_collection_no_orphans() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -658,11 +615,6 @@ async fn delete_collection_no_orphans() {
 #[tokio::test]
 async fn delete_bumps_synctoken() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await

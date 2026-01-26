@@ -8,6 +8,10 @@ use salvo::Depot;
 use salvo::http::StatusCode;
 use salvo::{Request, Response, handler};
 
+use crate::app::api::dav::extract::auth::{
+    check_authorization, get_auth_context, load_instance_resource,
+};
+use crate::component::auth::{Action, ResourceId, ResourceType};
 use crate::component::db::connection::{self, DbConnection};
 use crate::component::db::query::dav::{collection, instance};
 use crate::component::model::dav::instance::NewDavInstance;
@@ -29,10 +33,6 @@ use crate::util::path;
 /// ## Errors
 /// Returns 400 for missing Destination, 409 for conflicts, 412 for preconditions, 500 for errors.
 #[handler]
-#[expect(
-    clippy::needless_borrow,
-    reason = "Salvo handler provides depot by reference"
-)]
 pub async fn r#move(req: &mut Request, res: &mut Response, depot: &Depot) {
     // Get source path
     let source_path = req.uri().path().to_string();
@@ -115,7 +115,19 @@ pub async fn r#move(req: &mut Request, res: &mut Response, depot: &Depot) {
         "Parsed MOVE paths"
     );
 
-    // TODO: Check authorization for both source and destination
+    // Check authorization: need Write on source (unbind) and Write on destination (bind)
+    if let Err(status) = check_move_authorization(
+        depot,
+        &mut conn,
+        source_collection_id,
+        &source_uri,
+        dest_collection_id,
+    )
+    .await
+    {
+        res.status_code(status);
+        return;
+    }
 
     // Perform the move operation
     match perform_move(
@@ -330,4 +342,48 @@ async fn perform_move(
         .scope_boxed()
     })
     .await
+}
+
+/// ## Summary
+/// Checks if the current user has permission for the MOVE operation.
+///
+/// MOVE requires Write permission on both source (unbind) and destination (bind).
+///
+/// ## Errors
+/// Returns `StatusCode::FORBIDDEN` if authorization is denied.
+/// Returns `StatusCode::INTERNAL_SERVER_ERROR` for database or auth errors.
+async fn check_move_authorization(
+    depot: &Depot,
+    conn: &mut DbConnection<'_>,
+    source_collection_id: uuid::Uuid,
+    source_uri: &str,
+    dest_collection_id: uuid::Uuid,
+) -> Result<(), StatusCode> {
+    let (subjects, authorizer) = get_auth_context(depot, conn).await?;
+
+    // Check Write on source (unbind requires write)
+    if let Some((inst, resource_type)) =
+        load_instance_resource(conn, source_collection_id, source_uri).await?
+    {
+        let source_resource = ResourceId::new(resource_type, inst.entity_id);
+        check_authorization(
+            &authorizer,
+            &subjects,
+            &source_resource,
+            Action::Write,
+            "MOVE source",
+        )?;
+    }
+    // If source doesn't exist, let the handler return NOT_FOUND
+
+    // Check Write on destination collection
+    // TODO: Determine collection type (calendar vs addressbook) from DB
+    let dest_resource = ResourceId::new(ResourceType::Calendar, dest_collection_id);
+    check_authorization(
+        &authorizer,
+        &subjects,
+        &dest_resource,
+        Action::Write,
+        "MOVE destination",
+    )
 }

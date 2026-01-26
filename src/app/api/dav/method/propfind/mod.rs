@@ -5,7 +5,11 @@ mod helpers;
 use salvo::http::StatusCode;
 use salvo::{Depot, Request, Response, handler};
 
+use crate::app::api::dav::extract::auth::{
+    check_authorization, get_auth_context, load_instance_resource,
+};
 use crate::app::api::dav::extract::headers::{Depth, parse_depth};
+use crate::component::auth::{Action, ResourceId, ResourceType};
 use crate::component::db::connection;
 use crate::component::rfc::dav::build::multistatus::serialize_multistatus;
 use crate::component::rfc::dav::parse::propfind::parse_propfind;
@@ -89,6 +93,12 @@ pub async fn propfind(req: &mut Request, res: &mut Response, depot: &Depot) {
         }
     };
 
+    // Check authorization: need read permission on the target resource
+    if let Err(status) = check_propfind_authorization(depot, &mut conn, req.uri().path()).await {
+        res.status_code(status);
+        return;
+    }
+
     // Build multistatus response
     let multistatus = match build_propfind_response(&mut conn, req, depth, &propfind_req).await {
         Ok(ms) => ms,
@@ -127,4 +137,45 @@ pub async fn propfind(req: &mut Request, res: &mut Response, depot: &Depot) {
         reason = "Write body failure is non-fatal"
     )]
     let _ = res.write_body(xml);
+}
+
+/// ## Summary
+/// Checks if the current user has read permission for the PROPFIND operation.
+///
+/// For collections: checks Read permission on the collection.
+/// For instances: checks Read permission on the entity.
+///
+/// ## Errors
+/// Returns `StatusCode::FORBIDDEN` if authorization is denied.
+/// Returns `StatusCode::INTERNAL_SERVER_ERROR` for database or auth errors.
+async fn check_propfind_authorization(
+    depot: &Depot,
+    conn: &mut connection::DbConnection<'_>,
+    path: &str,
+) -> Result<(), StatusCode> {
+    let (subjects, authorizer) = get_auth_context(depot, conn).await?;
+
+    // Try to parse as collection+uri first
+    let resource = if let Ok((collection_id, uri)) = path::parse_collection_and_uri(path) {
+        // Check if there's a specific instance
+        if let Some((inst, resource_type)) =
+            load_instance_resource(conn, collection_id, &uri).await?
+        {
+            ResourceId::new(resource_type, inst.entity_id)
+        } else {
+            // PROPFIND on collection (uri may be empty or instance not found)
+            // TODO: Determine collection type (calendar vs addressbook) from DB
+            ResourceId::new(ResourceType::Calendar, collection_id)
+        }
+    } else if let Ok(collection_id) = path::extract_collection_id(path) {
+        // PROPFIND directly on a collection
+        // TODO: Determine collection type (calendar vs addressbook) from DB
+        ResourceId::new(ResourceType::Calendar, collection_id)
+    } else {
+        // Could be a principal URL or root - allow for now
+        // Full implementation needs to handle these cases
+        return Ok(());
+    };
+
+    check_authorization(&authorizer, &subjects, &resource, Action::Read, "PROPFIND")
 }

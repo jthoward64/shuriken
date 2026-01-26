@@ -3,6 +3,9 @@
 use salvo::http::{HeaderValue, StatusCode};
 use salvo::{Depot, Request, Response};
 
+use crate::component::auth::{
+    Action, ResourceId, ResourceType, authorizer_from_depot, get_subjects_from_depot,
+};
 use crate::component::db::connection;
 use crate::component::db::map::dav::{serialize_ical_tree, serialize_vcard_tree};
 use crate::component::db::query::dav::{entity, instance};
@@ -90,6 +93,8 @@ async fn get_collection_instance(
             return None;
         }
     };
+
+    // Load the instance first to determine its type
     let (instance, canonical_bytes) = match load_instance(&mut conn, collection_id, &uri).await {
         Ok(Some(data)) => data,
         Ok(None) => {
@@ -107,7 +112,50 @@ async fn get_collection_instance(
             return None;
         }
     };
+
+    // Authorization check: require read access on the instance
+    if let Err(e) = check_read_authorization(depot, &mut conn, &instance).await {
+        tracing::debug!(error = %e, instance_id = %instance.id, "Authorization denied");
+        res.status_code(StatusCode::FORBIDDEN);
+        return None;
+    }
+
     Some((instance, canonical_bytes))
+}
+
+/// Check read authorization for a DAV instance.
+///
+/// Determines the resource type from content-type and checks if the user
+/// has read permission on the instance (or its parent collection).
+async fn check_read_authorization(
+    depot: &salvo::Depot,
+    conn: &mut connection::DbConnection<'_>,
+    instance: &DavInstance,
+) -> Result<(), crate::component::error::AppError> {
+    // Get expanded subjects (user + groups + public)
+    let subjects = get_subjects_from_depot(depot, conn).await?;
+
+    // Determine resource type from content-type
+    let resource_type = if instance.content_type.starts_with("text/calendar") {
+        ResourceType::CalendarEvent
+    } else if instance.content_type.starts_with("text/vcard") {
+        ResourceType::Vcard
+    } else {
+        // Unknown content type - treat as calendar event (safer default)
+        tracing::warn!(
+            content_type = %instance.content_type,
+            "Unknown content type, defaulting to CalendarEvent for authorization"
+        );
+        ResourceType::CalendarEvent
+    };
+
+    let resource = ResourceId::new(resource_type, instance.entity_id);
+
+    // Check authorization
+    let authorizer = authorizer_from_depot(depot)?;
+    authorizer.require(&subjects, &resource, Action::Read)?;
+
+    Ok(())
 }
 
 /// ## Summary

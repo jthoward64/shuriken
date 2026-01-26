@@ -4,6 +4,7 @@
 //! Verifies property modification, protected properties, and partial success handling.
 
 use salvo::http::StatusCode;
+use tracing_test::traced_test;
 
 use super::helpers::*;
 
@@ -13,14 +14,10 @@ use super::helpers::*;
 
 /// ## Summary
 /// Test that PROPPATCH returns 207 Multi-Status.
+#[traced_test]
 #[tokio::test]
 async fn proppatch_returns_multistatus() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -51,11 +48,6 @@ async fn proppatch_returns_multistatus() {
 #[tokio::test]
 async fn proppatch_set_protected_prop_403() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -93,11 +85,6 @@ async fn proppatch_set_protected_prop_403() {
 #[tokio::test]
 async fn proppatch_remove_protected_prop_403() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -139,11 +126,6 @@ async fn proppatch_remove_protected_prop_403() {
 #[tokio::test]
 async fn proppatch_set_displayname_200() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -184,11 +166,6 @@ async fn proppatch_set_displayname_200() {
 #[tokio::test]
 async fn proppatch_set_calendar_description() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -225,11 +202,6 @@ async fn proppatch_set_calendar_description() {
 #[tokio::test]
 async fn proppatch_remove_displayname() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -266,11 +238,6 @@ async fn proppatch_remove_displayname() {
 #[tokio::test]
 async fn proppatch_set_multiple_props() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -312,11 +279,6 @@ async fn proppatch_set_multiple_props() {
 #[tokio::test]
 async fn proppatch_partial_success_207() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -379,11 +341,6 @@ async fn proppatch_nonexistent_404() {
 #[tokio::test]
 async fn proppatch_invalid_xml_400() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -409,11 +366,6 @@ async fn proppatch_invalid_xml_400() {
 #[tokio::test]
 async fn proppatch_empty_body_error() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await

@@ -7,16 +7,17 @@
 //! Test helpers for integration tests.
 //!
 //! Provides utilities for:
-//! - Setting up test database
+//! - Setting up isolated test databases (one per test)
 //! - Creating test Salvo service
 //! - Making HTTP requests
 //! - Asserting on responses and database state
 //!
-//! ## Database Lock
-//! The `TestDb` struct internally holds a mutex guard that serializes database
-//! access across tests. This prevents race conditions when tests run in parallel
-//! (e.g., truncating tables while another test is reading). The lock is automatically
-//! acquired when calling `TestDb::new()` and released when the `TestDb` is dropped.
+//! ## Database Isolation
+//! Each test gets its own unique database, created on demand and dropped automatically
+//! when the TestDb goes out of scope using async drop. This allows tests to run in
+//! parallel without contention.
+
+use std::sync::{Arc, OnceLock};
 
 use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
@@ -24,26 +25,30 @@ use salvo::http::header::HeaderName;
 use salvo::http::{Method, ReqBody, StatusCode};
 use salvo::prelude::*;
 use salvo::test::{RequestBuilder, ResponseExt, TestClient};
-use shuriken::component::config::load_config;
-use std::sync::OnceLock;
-use tokio::sync::{Mutex, MutexGuard};
+use shuriken::component::auth::casbin::CasbinEnforcerHandler;
+use shuriken::component::config::{Settings, load_config};
+use shuriken::component::db::connection::{DbConnection, DbProviderHandler};
 
 /// Static reference to shared test service (initialized once per test run)
 static TEST_SERVICE: OnceLock<Service> = OnceLock::new();
-static CONFIG_INIT: OnceLock<()> = OnceLock::new();
+static CONFIG_INIT: OnceLock<Settings> = OnceLock::new();
 
-/// Static mutex to serialize database access across tests.
-///
-/// This prevents race conditions when tests run in parallel:
-/// - Truncate operations don't conflict with each other
-/// - Seeding and querying don't race
-///
-/// Use `with_test_db()` to acquire this lock automatically.
-static DB_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+/// Base database URL for tests.
+/// - CI (GitHub Actions): postgres on localhost:5432
+/// - Local development: postgres on localhost:4524 (docker-compose test container)
+fn get_base_database_url() -> String {
+    // Check for explicit override first
+    if let Ok(url) = std::env::var("TEST_DATABASE_URL") {
+        return url;
+    }
 
-/// Gets the database lock mutex.
-fn get_db_lock() -> &'static Mutex<()> {
-    DB_LOCK.get_or_init(|| Mutex::new(()))
+    // Check if running in CI (GitHub Actions sets this)
+    if std::env::var("CI").is_ok() || std::env::var("GITHUB_ACTIONS").is_ok() {
+        "postgres://shuriken:shuriken@localhost:5432".to_string()
+    } else {
+        // Local development - use docker-compose test container on port 4524
+        "postgres://shuriken:shuriken@localhost:4524".to_string()
+    }
 }
 
 /// Creates a test Salvo service instance for integration testing.
@@ -52,20 +57,65 @@ fn get_db_lock() -> &'static Mutex<()> {
 /// Returns a shared test service that includes all API routes.
 /// The service is initialized once and reused across tests.
 ///
+/// **Note**: This service does NOT include a database provider. Use
+/// `create_fresh_auth_test_service()` for tests that need database access.
+///
 /// ## Panics
 /// Panics if the service cannot be created.
 #[expect(clippy::expect_used, reason = "Service creation failure is fatal")]
 #[must_use]
 pub fn create_test_service() -> &'static Service {
     TEST_SERVICE.get_or_init(|| {
-        CONFIG_INIT.get_or_init(|| {
-            load_config().expect("Failed to load config for tests");
-        });
+        CONFIG_INIT.get_or_init(|| load_config().expect("Failed to load config for tests"));
         // Create the full router with all API routes
         let router =
             Router::new().push(shuriken::app::api::routes().expect("API routes should be valid"));
         Service::new(router)
     })
+}
+
+/// Creates a test service with database and casbin support.
+///
+/// This is the recommended service for integration tests that need full
+/// database access. The service is created fresh each time to allow test
+/// isolation (especially for casbin policies).
+///
+/// ## Parameters
+/// - `database_url`: The connection URL for the test database
+///
+/// ## Panics
+/// Panics if the service or enforcer cannot be created.
+#[expect(clippy::expect_used, reason = "Service creation failure is fatal")]
+pub async fn create_db_test_service(database_url: &str) -> Service {
+    let config =
+        CONFIG_INIT.get_or_init(|| load_config().expect("Failed to load config for tests"));
+
+    // Create the database pool
+    let pool = shuriken::component::db::connection::create_pool(
+        database_url,
+        u32::from(config.database.max_connections),
+    )
+    .await
+    .expect("Failed to create database pool for test service");
+
+    // Initialize Casbin enforcer - loads policies from current DB state
+    let enforcer = shuriken::component::auth::casbin::init_casbin(pool.clone())
+        .await
+        .expect("Failed to initialize Casbin enforcer for tests");
+
+    // Create router with all handlers (matching main.rs setup)
+    // Note: AuthMiddleware is already included in routes() at the /api level
+    let router = Router::new()
+        .hoop(DbProviderHandler { provider: pool })
+        .hoop(shuriken::component::config::ConfigHandler {
+            settings: config.clone(),
+        })
+        .hoop(CasbinEnforcerHandler {
+            enforcer: Arc::new(enforcer),
+        })
+        .push(shuriken::app::api::routes().expect("API routes should be valid"));
+
+    Service::new(router)
 }
 
 /// Test request builder for constructing HTTP requests.
@@ -468,75 +518,64 @@ impl TestResponse {
 
 /// Database test helper for setup and teardown.
 ///
-/// ## Note on Concurrency
-/// This struct holds a mutex guard that serializes database access across tests.
-/// When the `TestDb` instance is dropped, the lock is released. This prevents
-/// race conditions when tests run in parallel.
+/// ## Database Isolation
+/// Each `TestDb` instance creates a unique database with a UUID-based name.
+/// The database is automatically dropped when the TestDb is dropped via async drop.
+/// This allows tests to run in parallel without contention.
 #[expect(clippy::doc_markdown)]
 pub struct TestDb {
     pool: diesel_async::pooled_connection::bb8::Pool<AsyncPgConnection>,
-    /// Lock guard that serializes database access. Held for the lifetime of TestDb.
-    _lock_guard: MutexGuard<'static, ()>,
+    /// The unique name of this test's database (for cleanup)
+    db_name: String,
+    /// Base URL without database name (for admin connections)
+    base_url: String,
 }
 
 impl TestDb {
-    /// Creates a new test database instance.
+    /// Creates a new isolated test database.
+    ///
+    /// This creates a unique database for this test run, runs migrations on it,
+    /// and returns a connection pool to that database.
     ///
     /// ## Errors
     /// Returns an error if:
-    /// - `DATABASE_URL` environment variable is not set
-    /// - The database cannot be initialized or connected
+    /// - Cannot connect to the postgres admin database
+    /// - Cannot create the test database
+    /// - Cannot run migrations
     ///
-    /// ## Safety Features
-    /// This function modifies the `DATABASE_URL` for safety:
-    /// - If the database name is not `shuriken_test`, it will be changed to `shuriken_test`
-    /// - All modifications are logged as info messages
-    ///
-    /// ## Concurrency
-    /// This function acquires a mutex lock that is held until the `TestDb` is dropped.
-    /// This serializes database access across tests to prevent race conditions.
+    /// ## Cleanup
+    /// Call `cleanup()` when the test is done to drop the database.
     pub async fn new() -> anyhow::Result<Self> {
-        // Acquire the database lock before doing anything
-        let lock_guard = get_db_lock().lock().await;
+        let base_url = get_base_database_url();
 
-        let mut database_url = std::env::var("DATABASE_URL").map_err(|e| {
-            anyhow::anyhow!("DATABASE_URL environment variable must be set for tests: {e}")
-        })?;
+        // Generate a unique database name using UUID
+        let db_name = format!("shuriken_test_{}", uuid::Uuid::now_v7().simple());
+        let database_url = format!("{base_url}/{db_name}");
 
-        // Parse the database URL to check and modify database name
-        if let Some(db_name_start) = database_url.rfind('/') {
-            let after_slash = &database_url[db_name_start + 1..];
+        // Connect to the default postgres database to create our test database
+        let admin_url = format!("{base_url}/postgres");
+        let admin_config = diesel_async::pooled_connection::AsyncDieselConnectionManager::<
+            AsyncPgConnection,
+        >::new(&admin_url);
+        let admin_pool = diesel_async::pooled_connection::bb8::Pool::builder()
+            .max_size(1)
+            .build(admin_config)
+            .await?;
 
-            // Split database name from query parameters
-            let (db_name, query_params) = if let Some(query_start) = after_slash.find('?') {
-                (&after_slash[..query_start], &after_slash[query_start..])
-            } else {
-                (after_slash, "")
-            };
-
-            // Check and fix database name
-            let mut needs_db_change = false;
-            if db_name != "shuriken_test" {
-                tracing::info!(
-                    original_db = db_name,
-                    "TestDb: Database name is not 'shuriken_test', changing to 'shuriken_test' for safety"
-                );
-                needs_db_change = true;
-            }
-
-            // Rebuild URL if needed
-            if needs_db_change {
-                let base_url = &database_url[..=db_name_start];
-                let new_db_name = if needs_db_change {
-                    "shuriken_test"
-                } else {
-                    db_name
-                };
-
-                database_url = format!("{base_url}{new_db_name}{query_params}");
-            }
+        // Create the test database
+        {
+            let mut admin_conn = admin_pool.get().await?;
+            // Use format! since database names can't be parameterized in SQL
+            let create_db_sql = format!("CREATE DATABASE \"{db_name}\"");
+            diesel::sql_query(&create_db_sql)
+                .execute(&mut admin_conn)
+                .await?;
         }
 
+        // Run migrations on the new database
+        Self::run_migrations(&database_url).await?;
+
+        // Create pool for the test database
         let config = diesel_async::pooled_connection::AsyncDieselConnectionManager::<
             AsyncPgConnection,
         >::new(&database_url);
@@ -548,68 +587,42 @@ impl TestDb {
 
         Ok(Self {
             pool,
-            _lock_guard: lock_guard,
+            db_name,
+            base_url,
         })
     }
 
-    /// Gets a connection from the test database pool.
-    ///
-    /// ## Errors
-    /// Returns an error if unable to get a connection from the pool.
-    pub async fn get_conn(
-        &self,
-    ) -> Result<
-        diesel_async::pooled_connection::bb8::PooledConnection<'_, AsyncPgConnection>,
-        diesel_async::pooled_connection::bb8::RunError,
-    > {
-        self.pool.get().await
-    }
+    /// Runs diesel migrations on the given database URL.
+    async fn run_migrations(database_url: &str) -> anyhow::Result<()> {
+        use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 
-    /// Truncates all tables for a clean test slate.
-    ///
-    /// Tables are truncated in reverse dependency order to avoid foreign key violations.
-    /// This order must be maintained when adding new tables to the schema.
-    ///
-    /// ## Errors
-    /// Returns an error if table truncation fails.
-    ///
-    /// ## Note
-    /// If you add or remove tables from the schema, update this list accordingly.
-    /// The order is: indexes → shadows/tombstones → parameters → properties → components →
-    /// instances → entities → collections → groups/memberships → `auth_user` → users → principals → `casbin_rule`
-    pub async fn truncate_all(&self) -> anyhow::Result<()> {
-        let mut conn = self.get_conn().await?;
+        const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
-        // Truncate all tables in a single statement with CASCADE to handle foreign keys
-        // Tables are listed in reverse dependency order for clarity, though CASCADE handles dependencies
-        diesel::sql_query(
-            "TRUNCATE TABLE 
-                card_phone,
-                card_email,
-                card_index,
-                cal_occurrence,
-                cal_index,
-                dav_shadow,
-                dav_tombstone,
-                dav_parameter,
-                dav_property,
-                dav_component,
-                dav_instance,
-                dav_entity,
-                dav_collection,
-                membership,
-                group_name,
-                \"group\",
-                auth_user,
-                \"user\",
-                principal,
-                casbin_rule
-            CASCADE",
-        )
-        .execute(&mut conn)
-        .await?;
+        // Diesel migrations require a sync connection, so we run this in a blocking task
+        let url = database_url.to_string();
+        tokio::task::spawn_blocking(move || {
+            let mut conn = diesel::PgConnection::establish(&url)?;
+            conn.run_pending_migrations(MIGRATIONS)
+                .map_err(|e| anyhow::anyhow!("Failed to run migrations: {e}"))?;
+            Ok::<_, anyhow::Error>(())
+        })
+        .await??;
 
         Ok(())
+    }
+
+    /// Gets the database URL for this test database.
+    #[must_use]
+    pub fn url(&self) -> String {
+        format!("{}/{}", self.base_url, self.db_name)
+    }
+
+    /// Gets a database connection from the pool.
+    ///
+    /// ## Errors
+    /// Returns an error if a connection cannot be obtained from the pool.
+    pub async fn get_conn(&self) -> anyhow::Result<DbConnection<'_>> {
+        Ok(self.pool.get().await?)
     }
 
     /// Seeds a test principal and returns its ID.
@@ -829,7 +842,7 @@ impl TestDb {
             component_id,
             name,
             group: None,
-            value_type: "text",
+            value_type: "TEXT",
             value_text,
             value_int: None,
             value_float: None,
@@ -848,6 +861,53 @@ impl TestDb {
             .await?;
 
         Ok(property_id)
+    }
+
+    /// Seeds a minimal valid iCalendar event for an entity.
+    ///
+    /// Creates a VCALENDAR component with VERSION and PRODID properties,
+    /// and a VEVENT component with UID, DTSTART, DTEND, and SUMMARY.
+    ///
+    /// ## Errors
+    /// Returns an error if any component or property cannot be inserted.
+    pub async fn seed_minimal_icalendar_event(
+        &self,
+        entity_id: uuid::Uuid,
+        uid: &str,
+        summary: &str,
+    ) -> anyhow::Result<()> {
+        // Create VCALENDAR component (root)
+        let vcalendar_id = self.seed_component(entity_id, None, "VCALENDAR", 0).await?;
+
+        // Add VERSION property
+        self.seed_property(vcalendar_id, "VERSION", Some("2.0"), 0)
+            .await?;
+
+        // Add PRODID property
+        self.seed_property(vcalendar_id, "PRODID", Some("-//Test//Shuriken//EN"), 1)
+            .await?;
+
+        // Create VEVENT component (child of VCALENDAR)
+        let vevent_id = self
+            .seed_component(entity_id, Some(vcalendar_id), "VEVENT", 0)
+            .await?;
+
+        // Add UID property
+        self.seed_property(vevent_id, "UID", Some(uid), 0).await?;
+
+        // Add DTSTART property
+        self.seed_property(vevent_id, "DTSTART", Some("20250101T100000Z"), 1)
+            .await?;
+
+        // Add DTEND property
+        self.seed_property(vevent_id, "DTEND", Some("20250101T110000Z"), 2)
+            .await?;
+
+        // Add SUMMARY property
+        self.seed_property(vevent_id, "SUMMARY", Some(summary), 3)
+            .await?;
+
+        Ok(())
     }
 
     /// Seeds a test group and returns the group ID.
@@ -1378,4 +1438,282 @@ pub fn addressbook_multiget_report(hrefs: &[String]) -> String {
 {href_elements}
 </CARD:addressbook-multiget>"#
     )
+}
+
+// ============================================================================
+// Casbin Rule Seeding Helpers
+// ============================================================================
+
+use std::sync::atomic::{AtomicI32, Ordering};
+
+/// Atomic counter for generating casbin rule IDs in tests.
+static CASBIN_RULE_ID: AtomicI32 = AtomicI32::new(1);
+
+/// Gets the next casbin rule ID for test seeding.
+fn next_casbin_rule_id() -> i32 {
+    CASBIN_RULE_ID.fetch_add(1, Ordering::Relaxed)
+}
+
+impl TestDb {
+    /// Seeds a casbin policy rule (p, role, `obj_type`, act).
+    ///
+    /// Example: `seed_policy("read", "calendar_event", "read")` allows read action
+    /// if subject has at least "read" role on a `calendar_event`.
+    ///
+    /// ## Errors
+    /// Returns an error if the rule cannot be inserted.
+    pub async fn seed_policy(&self, role: &str, obj_type: &str, act: &str) -> anyhow::Result<()> {
+        use shuriken::component::db::schema::casbin_rule;
+
+        let mut conn = self.get_conn().await?;
+
+        diesel::insert_into(casbin_rule::table)
+            .values((
+                casbin_rule::id.eq(next_casbin_rule_id()),
+                casbin_rule::ptype.eq("p"),
+                casbin_rule::v0.eq(role),
+                casbin_rule::v1.eq(obj_type),
+                casbin_rule::v2.eq(act),
+                casbin_rule::v3.eq(""),
+                casbin_rule::v4.eq(""),
+                casbin_rule::v5.eq(""),
+            ))
+            .execute(&mut conn)
+            .await?;
+
+        Ok(())
+    }
+
+    /// Seeds a casbin grouping rule g(principal, resource, role) for sharing.
+    ///
+    /// Example: `seed_grant("user:alice", "cal:uuid", "owner")` grants alice owner role on the calendar.
+    ///
+    /// ## Errors
+    /// Returns an error if the rule cannot be inserted.
+    pub async fn seed_grant(
+        &self,
+        principal: &str,
+        resource: &str,
+        role: &str,
+    ) -> anyhow::Result<()> {
+        use shuriken::component::db::schema::casbin_rule;
+
+        let mut conn = self.get_conn().await?;
+
+        diesel::insert_into(casbin_rule::table)
+            .values((
+                casbin_rule::id.eq(next_casbin_rule_id()),
+                casbin_rule::ptype.eq("g"),
+                casbin_rule::v0.eq(principal),
+                casbin_rule::v1.eq(resource),
+                casbin_rule::v2.eq(role),
+                casbin_rule::v3.eq(""),
+                casbin_rule::v4.eq(""),
+                casbin_rule::v5.eq(""),
+            ))
+            .execute(&mut conn)
+            .await?;
+
+        Ok(())
+    }
+
+    /// Seeds a casbin g2 rule (resource, type) for resource typing.
+    ///
+    /// Example: `seed_resource_type("cal:uuid", "calendar")` types the resource as a calendar.
+    ///
+    /// ## Errors
+    /// Returns an error if the rule cannot be inserted.
+    pub async fn seed_resource_type(
+        &self,
+        resource: &str,
+        resource_type: &str,
+    ) -> anyhow::Result<()> {
+        use shuriken::component::db::schema::casbin_rule;
+
+        let mut conn = self.get_conn().await?;
+
+        diesel::insert_into(casbin_rule::table)
+            .values((
+                casbin_rule::id.eq(next_casbin_rule_id()),
+                casbin_rule::ptype.eq("g2"),
+                casbin_rule::v0.eq(resource),
+                casbin_rule::v1.eq(resource_type),
+                casbin_rule::v2.eq(""),
+                casbin_rule::v3.eq(""),
+                casbin_rule::v4.eq(""),
+                casbin_rule::v5.eq(""),
+            ))
+            .execute(&mut conn)
+            .await?;
+
+        Ok(())
+    }
+
+    /// Seeds a casbin g4 rule (child, parent) for containment.
+    ///
+    /// Example: `seed_containment("evt:uuid", "cal:uuid")` indicates the event is in the calendar.
+    ///
+    /// ## Errors
+    /// Returns an error if the rule cannot be inserted.
+    pub async fn seed_containment(&self, child: &str, parent: &str) -> anyhow::Result<()> {
+        use shuriken::component::db::schema::casbin_rule;
+
+        let mut conn = self.get_conn().await?;
+
+        diesel::insert_into(casbin_rule::table)
+            .values((
+                casbin_rule::id.eq(next_casbin_rule_id()),
+                casbin_rule::ptype.eq("g4"),
+                casbin_rule::v0.eq(child),
+                casbin_rule::v1.eq(parent),
+                casbin_rule::v2.eq(""),
+                casbin_rule::v3.eq(""),
+                casbin_rule::v4.eq(""),
+                casbin_rule::v5.eq(""),
+            ))
+            .execute(&mut conn)
+            .await?;
+
+        Ok(())
+    }
+
+    /// Seeds a casbin g5 rule (higher, lower) for role hierarchy.
+    ///
+    /// Example: `seed_role_hierarchy("owner", "admin")` means owner implies admin.
+    ///
+    /// ## Errors
+    /// Returns an error if the rule cannot be inserted.
+    pub async fn seed_role_hierarchy(&self, higher: &str, lower: &str) -> anyhow::Result<()> {
+        use shuriken::component::db::schema::casbin_rule;
+
+        let mut conn = self.get_conn().await?;
+
+        diesel::insert_into(casbin_rule::table)
+            .values((
+                casbin_rule::id.eq(next_casbin_rule_id()),
+                casbin_rule::ptype.eq("g5"),
+                casbin_rule::v0.eq(higher),
+                casbin_rule::v1.eq(lower),
+                casbin_rule::v2.eq(""),
+                casbin_rule::v3.eq(""),
+                casbin_rule::v4.eq(""),
+                casbin_rule::v5.eq(""),
+            ))
+            .execute(&mut conn)
+            .await?;
+
+        Ok(())
+    }
+
+    /// Seeds default policies and role hierarchy for testing.
+    ///
+    /// This sets up the basic permission model so tests can just seed grants.
+    ///
+    /// ## Errors
+    /// Returns an error if seeding fails.
+    pub async fn seed_default_policies(&self) -> anyhow::Result<()> {
+        // Role hierarchy: owner > admin > edit-share > edit > read-share > read > read-freebusy
+        self.seed_role_hierarchy("owner", "admin").await?;
+        self.seed_role_hierarchy("admin", "edit-share").await?;
+        self.seed_role_hierarchy("edit-share", "edit").await?;
+        self.seed_role_hierarchy("edit", "read-share").await?;
+        self.seed_role_hierarchy("read-share", "read").await?;
+        self.seed_role_hierarchy("read", "read-freebusy").await?;
+
+        // Policies: what role is required for each action on each type
+        // Calendar
+        self.seed_policy("read", "calendar", "read").await?;
+        self.seed_policy("edit", "calendar", "write").await?;
+        self.seed_policy("read-freebusy", "calendar", "read_freebusy")
+            .await?;
+
+        // Calendar event
+        self.seed_policy("read", "calendar_event", "read").await?;
+        self.seed_policy("edit", "calendar_event", "write").await?;
+        self.seed_policy("read-freebusy", "calendar_event", "read_freebusy")
+            .await?;
+
+        // Addressbook
+        self.seed_policy("read", "addressbook", "read").await?;
+        self.seed_policy("edit", "addressbook", "write").await?;
+
+        // Vcard
+        self.seed_policy("read", "vcard", "read").await?;
+        self.seed_policy("edit", "vcard", "write").await?;
+
+        Ok(())
+    }
+}
+impl Drop for TestDb {
+    fn drop(&mut self) {
+        // AsyncDrop will handle cleanup, nothing to do here
+    }
+}
+
+impl std::future::AsyncDrop for TestDb {
+    async fn drop(self: std::pin::Pin<&mut Self>) {
+        let db_name = self.db_name.clone();
+        let base_url = self.base_url.clone();
+
+        // Small delay to ensure connections are fully released
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        eprintln!("[AsyncDrop] Cleaning up database: {}", db_name);
+
+        // Connect to admin database to drop the test database
+        let admin_url = format!("{}/postgres", base_url);
+        let admin_config = diesel_async::pooled_connection::AsyncDieselConnectionManager::<
+            AsyncPgConnection,
+        >::new(&admin_url);
+
+        match diesel_async::pooled_connection::bb8::Pool::builder()
+            .max_size(1)
+            .build(admin_config)
+            .await
+        {
+            Ok(admin_pool) => {
+                match admin_pool.get().await {
+                    Ok(mut admin_conn) => {
+                        eprintln!("[AsyncDrop] Got admin connection for {}", db_name);
+
+                        // Force disconnect any remaining connections
+                        let terminate_sql = format!(
+                            "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{}'",
+                            db_name
+                        );
+                        match diesel::sql_query(&terminate_sql)
+                            .execute(&mut admin_conn)
+                            .await
+                        {
+                            Ok(count) => eprintln!("[AsyncDrop] Terminated {} connections", count),
+                            Err(e) => {
+                                eprintln!("[AsyncDrop] Failed to terminate connections: {}", e)
+                            }
+                        }
+
+                        // Drop the database
+                        let drop_db_sql =
+                            format!("DROP DATABASE IF EXISTS \"{}\" WITH (FORCE)", db_name);
+                        match diesel::sql_query(&drop_db_sql)
+                            .execute(&mut admin_conn)
+                            .await
+                        {
+                            Ok(_) => {
+                                eprintln!("[AsyncDrop] Successfully dropped database: {}", db_name)
+                            }
+                            Err(e) => {
+                                eprintln!("[AsyncDrop] Failed to drop database {}: {}", db_name, e)
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("[AsyncDrop] Failed to get admin connection: {}", e);
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("[AsyncDrop] Failed to create admin pool: {}", e);
+            }
+        }
+    }
 }

@@ -17,11 +17,6 @@ use super::helpers::*;
 #[expect(clippy::too_many_lines)]
 async fn move_rename_item_updates_href() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -88,11 +83,6 @@ async fn move_rename_item_updates_href() {
 #[tokio::test]
 async fn move_within_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -141,11 +131,6 @@ async fn move_within_collection() {
 #[tokio::test]
 async fn move_across_collections() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -198,7 +183,8 @@ async fn move_across_collections() {
         .send(create_test_service())
         .await;
     get_response.assert_status(StatusCode::OK);
-}
+
+    }
 
 // ============================================================================
 // COPY Basic Tests
@@ -209,11 +195,6 @@ async fn move_across_collections() {
 #[tokio::test]
 async fn copy_duplicates_resource() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -269,11 +250,6 @@ async fn copy_duplicates_resource() {
 #[tokio::test]
 async fn copy_does_not_create_tombstone() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -329,11 +305,6 @@ async fn copy_does_not_create_tombstone() {
 #[expect(clippy::too_many_lines)]
 async fn move_destination_exists_overwrite_false_412() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -391,7 +362,8 @@ async fn move_destination_exists_overwrite_false_412() {
         .await;
 
     response.assert_status(StatusCode::PRECONDITION_FAILED);
-}
+
+    }
 
 /// ## Summary
 /// Test that MOVE with existing destination and Overwrite:T succeeds.
@@ -399,11 +371,6 @@ async fn move_destination_exists_overwrite_false_412() {
 #[expect(clippy::too_many_lines)]
 async fn move_destination_exists_overwrite_true_succeeds() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -478,11 +445,6 @@ async fn move_destination_exists_overwrite_true_succeeds() {
 #[expect(clippy::too_many_lines)]
 async fn move_generates_tombstone() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -552,11 +514,6 @@ async fn move_generates_tombstone() {
 #[tokio::test]
 async fn move_without_destination_400() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -591,7 +548,8 @@ async fn move_without_destination_400() {
     let response = TestRequest::move_resource(&source_uri).send(service).await;
 
     response.assert_status(StatusCode::BAD_REQUEST);
-}
+
+    }
 
 /// ## Summary
 /// Test that MOVE on non-existent resource returns 404.

@@ -7,8 +7,12 @@ use salvo::http::StatusCode;
 use salvo::writing::Text;
 use salvo::{Depot, Request, Response, handler};
 
+use crate::component::auth::{
+    Action, ResourceId, ResourceType, authorizer_from_depot, get_subjects_from_depot,
+};
 use crate::component::db::connection;
 use crate::component::db::query::dav::collection;
+use crate::component::error::AppError;
 use crate::component::rfc::dav::build::multistatus::serialize_multistatus;
 use crate::component::rfc::dav::core::{
     DavProperty, Multistatus, Propstat, PropstatResponse, Status,
@@ -89,7 +93,13 @@ pub async fn proppatch(req: &mut Request, res: &mut Response, depot: &Depot) {
 
     tracing::debug!(collection_id = %collection_id, "Parsed collection ID from path");
 
-    // TODO: Check authorization
+    // Check authorization: need write permission on the collection
+    if let Err(status) =
+        check_proppatch_authorization(depot, &mut conn, collection_id).await
+    {
+        res.status_code(status);
+        return;
+    }
 
     // Build multistatus response
     let mut multistatus = Multistatus::new();
@@ -196,6 +206,53 @@ pub async fn proppatch(req: &mut Request, res: &mut Response, depot: &Depot) {
         Err(e) => {
             tracing::error!("Failed to serialize multistatus: {}", e);
             res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    }
+}
+
+/// ## Summary
+/// Checks if the current user has write permission for the PROPPATCH operation.
+///
+/// ## Errors
+/// Returns `StatusCode::FORBIDDEN` if authorization is denied.
+/// Returns `StatusCode::INTERNAL_SERVER_ERROR` for database or auth errors.
+async fn check_proppatch_authorization(
+    depot: &Depot,
+    conn: &mut connection::DbConnection<'_>,
+    collection_id: uuid::Uuid,
+) -> Result<(), StatusCode> {
+    // Get expanded subjects for the current user
+    let subjects = get_subjects_from_depot(depot, conn)
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "Failed to get subjects from depot");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    // PROPPATCH on a collection requires write permission
+    // TODO: Determine collection type (calendar vs addressbook) from DB
+    let resource = ResourceId::new(ResourceType::Calendar, collection_id);
+
+    // Get the authorizer
+    let authorizer = authorizer_from_depot(depot).map_err(|e| {
+        tracing::error!(error = %e, "Failed to get authorizer");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    // Check write permission
+    match authorizer.require(&subjects, &resource, Action::Write) {
+        Ok(_level) => Ok(()),
+        Err(AppError::AuthorizationError(msg)) => {
+            tracing::warn!(
+                collection_id = %collection_id,
+                reason = %msg,
+                "Authorization denied for PROPPATCH"
+            );
+            Err(StatusCode::FORBIDDEN)
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "Authorization check failed");
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }

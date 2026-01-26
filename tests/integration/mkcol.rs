@@ -16,11 +16,6 @@ use super::helpers::*;
 #[tokio::test]
 async fn mkcalendar_creates_calendar_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let _principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -53,11 +48,6 @@ async fn mkcalendar_creates_calendar_collection() {
 #[tokio::test]
 async fn mkcalendar_initial_props_applied() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let _principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -101,11 +91,6 @@ async fn mkcalendar_initial_props_applied() {
 #[tokio::test]
 async fn mkcalendar_on_existing_uri_conflict() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -140,11 +125,6 @@ async fn mkcalendar_on_existing_uri_conflict() {
 #[tokio::test]
 async fn mkcol_extended_creates_addressbook() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let _principal_id = test_db
         .seed_principal("user", "/principals/bob/", Some("Bob"))
         .await
@@ -180,11 +160,6 @@ async fn mkcol_extended_creates_addressbook() {
 #[tokio::test]
 async fn mkcol_extended_applies_initial_props() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let _principal_id = test_db
         .seed_principal("user", "/principals/bob/", Some("Bob"))
         .await
@@ -220,11 +195,6 @@ async fn mkcol_extended_applies_initial_props() {
 #[tokio::test]
 async fn mkcol_extended_rejects_bad_body() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let _principal_id = test_db
         .seed_principal("user", "/principals/bob/", Some("Bob"))
         .await
@@ -239,7 +209,8 @@ async fn mkcol_extended_rejects_bad_body() {
         .await;
 
     response.assert_status(StatusCode::BAD_REQUEST);
-}
+
+    }
 
 // ============================================================================
 // Plain MKCOL Tests
@@ -250,11 +221,6 @@ async fn mkcol_extended_rejects_bad_body() {
 #[tokio::test]
 async fn mkcol_creates_plain_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let _principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -287,11 +253,6 @@ async fn mkcol_creates_plain_collection() {
 #[tokio::test]
 async fn mkcol_on_existing_uri_conflict() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -326,11 +287,6 @@ async fn mkcol_on_existing_uri_conflict() {
 #[tokio::test]
 async fn mkcalendar_protected_props_rejected() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let _principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await

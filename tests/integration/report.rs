@@ -17,11 +17,6 @@ use super::helpers::*;
 #[tokio::test]
 async fn calendar_query_returns_multistatus() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -57,18 +52,14 @@ async fn calendar_query_returns_multistatus() {
         .await;
 
     response.assert_status(StatusCode::MULTI_STATUS);
-}
+
+    }
 
 /// ## Summary
 /// Test that calendar-query with time-range filter returns matching events.
 #[tokio::test]
 async fn calendar_query_time_range_filter() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -120,18 +111,14 @@ async fn calendar_query_time_range_filter() {
         .await;
 
     response.assert_status(StatusCode::MULTI_STATUS);
-}
+
+    }
 
 /// ## Summary
 /// Test that calendar-query returns calendar-data when requested.
 #[tokio::test]
 async fn calendar_query_returns_calendar_data() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -180,11 +167,6 @@ async fn calendar_query_returns_calendar_data() {
 #[tokio::test]
 async fn calendar_multiget_returns_resources() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -242,11 +224,6 @@ async fn calendar_multiget_returns_resources() {
 #[tokio::test]
 async fn calendar_multiget_missing_resource_404() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -281,11 +258,6 @@ async fn calendar_multiget_missing_resource_404() {
 #[tokio::test]
 async fn addressbook_query_returns_multistatus() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/bob/", Some("Bob"))
         .await
@@ -326,18 +298,14 @@ async fn addressbook_query_returns_multistatus() {
         .await;
 
     response.assert_status(StatusCode::MULTI_STATUS);
-}
+
+    }
 
 /// ## Summary
 /// Test that addressbook-query returns address-data when requested.
 #[tokio::test]
 async fn addressbook_query_returns_address_data() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/bob/", Some("Bob"))
         .await
@@ -391,11 +359,6 @@ async fn addressbook_query_returns_address_data() {
 #[tokio::test]
 async fn addressbook_multiget_returns_vcards() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/bob/", Some("Bob"))
         .await
@@ -457,11 +420,6 @@ async fn addressbook_multiget_returns_vcards() {
 #[tokio::test]
 async fn sync_collection_returns_multistatus() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -480,18 +438,14 @@ async fn sync_collection_returns_multistatus() {
         .await;
 
     response.assert_status(StatusCode::MULTI_STATUS);
-}
+
+    }
 
 /// ## Summary
 /// Test that sync-collection returns sync-token in response.
 #[tokio::test]
 async fn sync_collection_returns_sync_token() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -519,11 +473,6 @@ async fn sync_collection_returns_sync_token() {
 #[tokio::test]
 async fn sync_collection_initial_sync() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -576,11 +525,6 @@ async fn sync_collection_initial_sync() {
 #[tokio::test]
 async fn sync_collection_delta_sync() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -622,7 +566,8 @@ async fn sync_collection_delta_sync() {
     // Extract sync-token from response (would need parsing)
     // For now, test that response structure is correct
     initial_response.assert_body_contains("sync-token");
-}
+
+    }
 
 // ============================================================================
 // Error Cases
@@ -647,11 +592,6 @@ async fn report_nonexistent_404() {
 #[tokio::test]
 async fn report_invalid_xml_400() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -670,18 +610,14 @@ async fn report_invalid_xml_400() {
         .await;
 
     response.assert_status(StatusCode::BAD_REQUEST);
-}
+
+    }
 
 /// ## Summary
 /// Test that unsupported REPORT type returns appropriate error.
 #[tokio::test]
 async fn report_unsupported_type() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await

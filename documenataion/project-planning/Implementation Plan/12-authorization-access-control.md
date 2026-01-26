@@ -19,6 +19,35 @@ DAV:all
 └── DAV:unlock
 ```
 
+**RFC 3744 alignment notes**:
+- `DAV:read` MUST control `OPTIONS`, `GET`, and `PROPFIND`.
+- `DAV:write` aggregates `DAV:bind`, `DAV:unbind`, `DAV:write-properties`, `DAV:write-content`.
+- `DAV:write-acl` is required only if you implement the `ACL` method.
+- `DAV:current-user-privilege-set` MUST list only **non-abstract** privileges from `DAV:supported-privilege-set`.
+
+### 12.1.1 WebDAV Privilege Mapping (Shuriken)
+
+Shuriken does **not** expose generic `DAV:acl` mutation. Instead it maps WebDAV privileges
+to its internal permission levels for enforcement and for `DAV:current-user-privilege-set`.
+
+**Collection privilege mapping** (calendar/addressbook):
+
+| Shuriken level | WebDAV privileges to report | Enforcement intent |
+|---------------|-----------------------------|--------------------|
+| `read-freebusy` | `DAV:read` (limited) + `CALDAV:read-free-busy` | Permit discovery needed to locate free-busy targets; deny item body reads |
+| `read` | `DAV:read` | Read-only access to collection and members |
+| `read-share` | `DAV:read` + app-specific share capability | Same as `read`, plus share grants up to `read` |
+| `edit` | `DAV:read`, `DAV:write-content`, `DAV:bind`, `DAV:unbind` | Create/update/delete members; no ACL mutation |
+| `edit-share` | same as `edit` + app-specific share capability | Share grants up to `read` or `edit` |
+| `admin` | `DAV:read`, `DAV:write-content`, `DAV:write-properties`, `DAV:bind`, `DAV:unbind` | Full resource management; share grants below `admin` |
+| `owner` | same as `admin` | Owner semantics; treat as resource owner |
+
+**Notes**:
+- `DAV:write-acl` SHOULD NOT be advertised unless you implement full ACL mutation semantics.
+- `DAV:write-properties` should be gated (safe subset) and typically requires `admin` or `owner`.
+- If you do not implement `LOCK`, omit `DAV:unlock` from `current-user-privilege-set`.
+- When denying a request for insufficient privileges, return `403 Forbidden` with `DAV:need-privileges` in the body (RFC 3744 §7.1.1).
+
 ## 12.2 CalDAV Privileges
 
 - `CALDAV:read-free-busy`: Can query free-busy (even without full read)
@@ -45,7 +74,7 @@ Permissions are **additive** across scopes: a user’s effective permission for 
 - `read-share` (can share at `read`)
 - `edit`
 - `edit-share` (can share at `read` or `edit`)
-- `admin` (can share at `read`, `read-share`, `edit`, `edit-share`)
+- `admin` (can share at `read`, `read-share`, `edit`, `edit-share` and see access of other users)
 - `owner` (all permissions)
 
 **Operational meaning**:
@@ -59,7 +88,8 @@ Sharing is modeled as the ability to create/update ACL/share policy entries for 
 **Enforcement Flow**:
 1. Extract user principal from authentication
 2. Expand to `{user} ∪ groups(user) ∪ {public}`
-3. Check Casbin policy for action on resource
+3. Resolve resource typing (`g2`) and containment (`g4`)
+4. Check Casbin policy for action on resource
 4. Allow or deny
 
 ### 12.3.2 Collection vs Item Permission Resolution (Additive)
@@ -86,6 +116,33 @@ This is a pragmatic mapping used for enforcement and for deriving `DAV:current-u
 - `read`: allow read operations (`PROPFIND`, `REPORT` queries, `GET` on items).
 - `edit` (and above): allow write-content operations (`PUT`, `DELETE`, and rename via `MOVE` where supported) and writable `PROPPATCH` on supported properties.
 - Share-capable levels: allow the specific “share/ACL mutation” endpoints your app exposes; do not equate this to unconstrained `DAV:write-acl` unless you actually implement generic WebDAV ACL mutation.
+
+**Method-to-privilege expectations (RFC 3744 Appendix B)**:
+- `OPTIONS` → `DAV:read`
+- `GET`/`HEAD` → `DAV:read`
+- `PROPFIND` → `DAV:read` (+ `DAV:read-acl` when requesting `DAV:acl`)
+- `PROPPATCH` → `DAV:write-properties`
+- `PUT` (existing target) → `DAV:write-content`
+- `PUT` (new target) → `DAV:bind` on parent collection
+- `DELETE` → `DAV:unbind` on parent collection
+- `MOVE` → `DAV:unbind` on source collection + `DAV:bind` on destination collection
+- `COPY` → `DAV:read` + `DAV:write-content`/`DAV:write-properties` on destination (or `DAV:bind` when new)
+- `REPORT` → `DAV:read` on all referenced resources
+
+### 12.3.7 Architecture Adjustments (Phase 3)
+
+To align with WebDAV ACL semantics while preserving Shuriken’s permission model:
+
+- **Centralize authorization** in a single service that accepts:
+    - `principal_set` (expanded user + groups + public),
+    - `resource_id` + `resource_type`,
+    - `action` (`read`, `write`, `read_freebusy`, `share_grant:*`).
+- **Expose a method-to-action mapper** per handler (OPTIONS/PROPFIND/GET/PUT/DELETE/MOVE/COPY/REPORT),
+    so enforcement logic is consistent across protocols.
+- **Generate `current-user-privilege-set`** from the *effective* permission (collection + item),
+    using the mapping in 12.1.1, without implying support for `DAV:write-acl`.
+- **Keep ACL discovery stable**: `supported-privilege-set` should reflect the WebDAV hierarchy,
+    even if enforcement is powered by Casbin roles.
 
 ### 12.3.4 Permission Matrix (Practical)
 
@@ -286,6 +343,10 @@ Many clients PROPFIND these properties to decide which actions are permitted and
 - `DAV:current-user-principal` (often requested alongside ACL properties)
 
 At minimum, return consistent values for `DAV:current-user-privilege-set` and enforce the same privileges across all methods.
+
+If you do not implement ACL mutation, return a stable, read-only `DAV:acl` representation or
+respond with `404 Not Found` for `DAV:acl` and `DAV:write-acl` related properties. Avoid
+advertising `DAV:write-acl` in `current-user-privilege-set` unless it is truly supported.
 
 For properties you do not support, return a `207 Multi-Status` with a `404 Not Found` `propstat` for those properties rather than failing the entire PROPFIND.
 

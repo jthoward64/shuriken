@@ -611,8 +611,6 @@ diesel::table! {
         component_id -> Uuid,
         /// Property name (e.g., DTSTART, FN, TEL)
         name -> Text,
-        /// vCard property group prefix (e.g., item1 in item1.TEL)
-        group_name -> Nullable<Text>,
         /// Canonical value type for deterministic serialization
         value_type -> Text,
         /// The `value_text` column of the `dav_property` table.
@@ -673,6 +671,8 @@ diesel::table! {
         updated_at -> Timestamptz,
         /// Soft-delete timestamp (rare; usually delete entity)
         deleted_at -> Nullable<Timestamptz>,
+        /// vCard property group prefix (e.g., item1 in item1.TEL)
+        group_name -> Nullable<Text>,
     }
 }
 

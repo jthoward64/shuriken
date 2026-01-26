@@ -18,6 +18,7 @@
 //! Most tests are currently marked `#[ignore]` as they require the HTTP
 //! routing to be fully wired up.
 
+mod authorization;
 mod copy_move;
 mod delete;
 mod example_test;

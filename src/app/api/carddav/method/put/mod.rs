@@ -5,8 +5,14 @@ mod types;
 use salvo::http::{HeaderValue, StatusCode};
 use salvo::{Depot, Request, Response, handler};
 
+use crate::component::auth::{
+    Action, ResourceId, ResourceType, authorizer_from_depot, get_subjects_from_depot,
+};
 use crate::component::carddav::service::object::{PutObjectContext, put_address_object};
 use crate::component::db::connection;
+use crate::component::db::query::dav::instance;
+use crate::component::error::AppError;
+use crate::component::model::dav::instance::DavInstance;
 use crate::util::path;
 
 use types::{PutError, PutResult};
@@ -89,6 +95,12 @@ pub async fn put(req: &mut Request, res: &mut Response, depot: &Depot) {
     }
     if if_match.is_some() {
         tracing::debug!("If-Match header present");
+    }
+
+    // Check authorization: need write permission
+    if let Err(status) = check_put_authorization(depot, &mut conn, &path).await {
+        res.status_code(status);
+        return;
     }
 
     // Perform the PUT operation
@@ -184,6 +196,84 @@ async fn perform_put(
             } else {
                 Err(PutError::DatabaseError(e))
             }
+        }
+    }
+}
+
+/// ## Summary
+/// Checks if the current user has write permission for the PUT operation.
+///
+/// For updates: checks Write permission on the existing Vcard resource.
+/// For creates: checks Write permission on the Addressbook collection.
+///
+/// ## Errors
+/// Returns `StatusCode::FORBIDDEN` if authorization is denied.
+/// Returns `StatusCode::INTERNAL_SERVER_ERROR` for database or auth errors.
+async fn check_put_authorization(
+    depot: &Depot,
+    conn: &mut connection::DbConnection<'_>,
+    path: &str,
+) -> Result<(), StatusCode> {
+    use diesel::prelude::*;
+    use diesel_async::RunQueryDsl;
+
+    // Parse path to extract collection_id and uri
+    let (collection_id, uri) = match path::parse_collection_and_uri(path) {
+        Ok(parsed) => parsed,
+        Err(e) => {
+            tracing::debug!(error = %e, path = %path, "Failed to parse path for authorization");
+            // Let the main handler deal with path parsing errors
+            return Ok(());
+        }
+    };
+
+    // Get expanded subjects for the current user
+    let subjects = get_subjects_from_depot(depot, conn)
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "Failed to get subjects from depot");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    // Try to load existing instance to determine if this is create or update
+    let existing: Option<DavInstance> = instance::by_collection_and_uri(collection_id, &uri)
+        .select(DavInstance::as_select())
+        .first::<DavInstance>(conn)
+        .await
+        .optional()
+        .map_err(|e| {
+            tracing::error!(error = %e, "Failed to check existing instance for authorization");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    let resource = if let Some(inst) = existing {
+        // Update: check permission on the entity
+        ResourceId::new(ResourceType::Vcard, inst.entity_id)
+    } else {
+        // Create: check permission on the collection
+        ResourceId::new(ResourceType::Addressbook, collection_id)
+    };
+
+    // Get the authorizer
+    let authorizer = authorizer_from_depot(depot).map_err(|e| {
+        tracing::error!(error = %e, "Failed to get authorizer");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    // Check write permission
+    match authorizer.require(&subjects, &resource, Action::Write) {
+        Ok(_level) => Ok(()),
+        Err(AppError::AuthorizationError(msg)) => {
+            tracing::warn!(
+                resource = %resource,
+                reason = %msg,
+                "Authorization denied for PUT"
+            );
+            Err(StatusCode::FORBIDDEN)
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "Authorization check failed");
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }

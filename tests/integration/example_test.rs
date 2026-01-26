@@ -15,11 +15,6 @@ async fn example_seed_principal() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     // Clean slate for test
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     // Seed a test principal
     let principal_id = test_db
         .seed_principal("user", "/principals/testuser/", Some("Test User"))
@@ -36,11 +31,6 @@ async fn example_seed_principal() {
 #[ignore = "requires running database"]
 async fn example_seed_calendar_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     // 1. Create principal
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
@@ -108,11 +98,6 @@ async fn example_seed_calendar_collection() {
 #[ignore = "requires running database"]
 async fn example_seed_addressbook_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     // 1. Create principal
     let principal_id = test_db
         .seed_principal("user", "/principals/bob/", Some("Bob"))

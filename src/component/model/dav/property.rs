@@ -11,8 +11,6 @@ pub struct DavProperty {
     pub id: uuid::Uuid,
     pub component_id: uuid::Uuid,
     pub name: String,
-    #[diesel(column_name = group_name)]
-    pub group: Option<String>,
     pub value_type: String,
     pub value_text: Option<String>,
     pub value_int: Option<i64>,
@@ -25,6 +23,8 @@ pub struct DavProperty {
     pub ordinal: i32,
     pub updated_at: chrono::DateTime<chrono::Utc>,
     pub deleted_at: Option<chrono::DateTime<chrono::Utc>>,
+    #[diesel(column_name = group_name)]
+    pub group: Option<String>,
 }
 
 /// Insert struct for creating new DAV properties

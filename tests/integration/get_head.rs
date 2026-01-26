@@ -16,11 +16,6 @@ use super::helpers::*;
 #[tokio::test]
 async fn get_calendar_object_content_type() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     // Seed test data
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
@@ -66,11 +61,6 @@ async fn get_calendar_object_content_type() {
 #[tokio::test]
 async fn get_vcard_content_type() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/bob/", Some("Bob"))
         .await
@@ -122,11 +112,6 @@ async fn get_vcard_content_type() {
 )]
 async fn get_calendar_object_uses_component_tree() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/tree-user/", Some("Tree User"))
         .await
@@ -232,11 +217,6 @@ async fn get_calendar_object_uses_component_tree() {
 )]
 async fn get_vcard_uses_component_tree() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/tree-vcard/", Some("Tree VCard"))
         .await
@@ -333,11 +313,6 @@ async fn get_nonexistent_404() {
 #[tokio::test]
 async fn head_matches_get_headers() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -396,7 +371,8 @@ async fn head_matches_get_headers() {
 
     // HEAD body should be empty
     head_response.assert_body_empty();
-}
+
+    }
 
 /// ## Summary
 /// Test that HEAD on non-existent resource returns 404.
@@ -421,11 +397,6 @@ async fn head_nonexistent_404() {
 #[tokio::test]
 async fn get_etag_present_and_strong() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -483,11 +454,6 @@ async fn get_etag_present_and_strong() {
 #[tokio::test]
 async fn get_if_none_match_304() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -530,11 +496,6 @@ async fn get_if_none_match_304() {
 #[tokio::test]
 async fn get_if_none_match_different_etag_returns_200() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -572,18 +533,14 @@ async fn get_if_none_match_different_etag_returns_200() {
         .await;
 
     response.assert_status(StatusCode::OK);
-}
+
+    }
 
 /// ## Summary
 /// Test that If-Match with mismatched ETag returns 412.
 #[tokio::test]
 async fn get_if_match_412() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -628,11 +585,6 @@ async fn get_if_match_412() {
 #[tokio::test]
 async fn get_if_match_success() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -661,7 +613,8 @@ async fn get_if_match_success() {
     let response = TestRequest::get(&uri).if_match(etag).send(service).await;
 
     response.assert_status(StatusCode::OK);
-}
+
+    }
 
 // ============================================================================
 // Collection GET Tests
@@ -698,11 +651,6 @@ async fn get_on_collection_path() {
 #[tokio::test]
 async fn get_last_modified_header() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -745,11 +693,6 @@ async fn get_last_modified_header() {
 #[tokio::test]
 async fn get_content_length_accurate() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await

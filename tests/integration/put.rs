@@ -16,11 +16,6 @@ use super::helpers::*;
 #[tokio::test]
 async fn put_creates_calendar_object() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -43,18 +38,14 @@ async fn put_creates_calendar_object() {
         .await;
 
     response.assert_status(StatusCode::CREATED);
-}
+
+    }
 
 /// ## Summary
 /// Test that PUT creates a new vCard.
 #[tokio::test]
 async fn put_creates_vcard() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/bob/", Some("Bob"))
         .await
@@ -77,7 +68,8 @@ async fn put_creates_vcard() {
         .await;
 
     response.assert_status(StatusCode::CREATED);
-}
+
+    }
 
 // ============================================================================
 // Index Population Tests
@@ -97,11 +89,6 @@ async fn put_populates_cal_index_and_occurrences() {
     use shuriken::component::db::schema::{cal_index, cal_occurrence, dav_instance};
 
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/index-alice/", Some("Index Alice"))
         .await
@@ -195,11 +182,6 @@ async fn put_populates_card_index() {
     use shuriken::component::db::schema::{card_index, dav_instance};
 
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/index-bob/", Some("Index Bob"))
         .await
@@ -274,11 +256,6 @@ async fn put_populates_card_index() {
 #[tokio::test]
 async fn put_create_if_none_match_star_ok() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -310,11 +287,6 @@ async fn put_create_if_none_match_star_ok() {
 #[tokio::test]
 async fn put_create_if_none_match_star_fails_when_exists() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -354,7 +326,8 @@ async fn put_create_if_none_match_star_fails_when_exists() {
         .await;
 
     response.assert_status(StatusCode::PRECONDITION_FAILED);
-}
+
+    }
 
 // ============================================================================
 // If-Match Precondition Tests
@@ -365,11 +338,6 @@ async fn put_create_if_none_match_star_fails_when_exists() {
 #[tokio::test]
 async fn put_update_if_match_success() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -415,11 +383,6 @@ async fn put_update_if_match_success() {
 #[tokio::test]
 async fn put_update_if_match_mismatch_412() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -459,7 +422,8 @@ async fn put_update_if_match_mismatch_412() {
         .await;
 
     response.assert_status(StatusCode::PRECONDITION_FAILED);
-}
+
+    }
 
 // ============================================================================
 // Content Validation Tests
@@ -470,11 +434,6 @@ async fn put_update_if_match_mismatch_412() {
 #[tokio::test]
 async fn put_invalid_ical_rejected() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -510,11 +469,6 @@ async fn put_invalid_ical_rejected() {
 #[tokio::test]
 async fn put_invalid_vcard_rejected() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/bob/", Some("Bob"))
         .await
@@ -554,11 +508,6 @@ async fn put_invalid_vcard_rejected() {
 #[tokio::test]
 async fn put_uid_conflict_rejected() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -602,7 +551,8 @@ async fn put_uid_conflict_rejected() {
 
     // Should return 403 Forbidden with no-uid-conflict precondition
     response.assert_status(StatusCode::FORBIDDEN);
-}
+
+    }
 
 // ============================================================================
 // Sync Token Tests
@@ -613,11 +563,6 @@ async fn put_uid_conflict_rejected() {
 #[tokio::test]
 async fn put_bumps_synctoken() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -668,11 +613,6 @@ async fn put_bumps_synctoken() {
 #[tokio::test]
 async fn put_returns_etag() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -711,11 +651,6 @@ async fn put_returns_etag() {
 #[tokio::test]
 async fn put_updates_etag() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await
@@ -779,11 +714,6 @@ async fn put_updates_etag() {
 #[tokio::test]
 async fn put_status_codes() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to truncate tables");
-
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
         .await

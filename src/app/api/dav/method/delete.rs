@@ -6,6 +6,10 @@ use salvo::{Depot, Request, Response, handler};
 use diesel_async::AsyncConnection;
 use diesel_async::scoped_futures::ScopedFutureExt;
 
+use crate::app::api::dav::extract::auth::{
+    check_authorization, get_auth_context, load_instance_resource,
+};
+use crate::component::auth::{Action, ResourceId};
 use crate::component::db::connection;
 use crate::component::db::query::caldav::{event_index, occurrence};
 use crate::component::db::query::carddav::card_index;
@@ -83,7 +87,11 @@ pub async fn delete(req: &mut Request, res: &mut Response, depot: &Depot) {
         .and_then(|h| h.to_str().ok())
         .map(String::from);
 
-    // TODO: Check authorization
+    // Check authorization: need write permission on the resource
+    if let Err(status) = check_delete_authorization(depot, &mut conn, collection_id, &uri).await {
+        res.status_code(status);
+        return;
+    }
 
     // Perform the deletion
     match perform_delete(&mut conn, collection_id, &uri, if_match.as_deref()).await {
@@ -184,4 +192,32 @@ async fn perform_delete(
         .scope_boxed()
     })
     .await
+}
+
+/// ## Summary
+/// Checks if the current user has write permission for the DELETE operation.
+///
+/// Loads the instance to determine resource type and `entity_id`, then checks
+/// authorization for the Write action.
+///
+/// ## Errors
+/// Returns `StatusCode::NOT_FOUND` if the instance doesn't exist.
+/// Returns `StatusCode::FORBIDDEN` if authorization is denied.
+/// Returns `StatusCode::INTERNAL_SERVER_ERROR` for database or auth errors.
+async fn check_delete_authorization(
+    depot: &Depot,
+    conn: &mut connection::DbConnection<'_>,
+    collection_id: uuid::Uuid,
+    uri: &str,
+) -> Result<(), StatusCode> {
+    let (subjects, authorizer) = get_auth_context(depot, conn).await?;
+
+    let Some((inst, resource_type)) = load_instance_resource(conn, collection_id, uri).await?
+    else {
+        // Let the main handler return NOT_FOUND for consistency
+        return Ok(());
+    };
+
+    let resource = ResourceId::new(resource_type, inst.entity_id);
+    check_authorization(&authorizer, &subjects, &resource, Action::Write, "DELETE")
 }
