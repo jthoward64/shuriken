@@ -38,7 +38,7 @@ Phase 3 implements the core HTTP methods required for WebDAV/CalDAV/CardDAV comp
 
 #### GET/HEAD Handler (`src/app/api/dav/method/get_head/`)
 
-- [x] Resource retrieval from `dav_shadow` table
+- [x] ~~Resource retrieval from `dav_shadow` table~~
 - [x] ETag and Last-Modified headers
 - [x] Conditional GET (If-None-Match → 304)
 - [x] Content-Type handling

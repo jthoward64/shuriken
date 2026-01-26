@@ -165,6 +165,13 @@ Use `#[diesel::dsl::auto_type]` to avoid complex explicit return types. Extract 
 - **chrono** & **chrono-tz**: Date/time handling with timezone support
 - **uuid**: Unique identifiers for resources (using v7 for time-ordered IDs)
 
+### Internationalization (i18n)
+- **icu**: ICU4X for internationalization data and algorithms
+  - Use `icu::time::zone::WindowsParser` for Windows timezone ID → BCP-47 timezone mapping
+  - Use `icu::time::zone::iana::IanaParserExtended` for IANA timezone canonicalization and alias resolution
+  - Use `icu::casemap::CaseMapper::fold_string()` for Unicode case folding (RFC 4790 `i;unicode-casemap` collation)
+  - Prefer ICU over handwritten mapping tables for i18n data (timezones, locales, case folding, etc.)
+
 ### Networking & HTTP
 - **reqwest**: HTTP client for making external requests (public .ics subscriptions)
 - **ipnetwork**: IP address/network utilities for access control
@@ -344,7 +351,7 @@ The database schema is organized into several key areas:
 - `dav_property` - Properties for components with typed value columns
 - `dav_parameter` - Parameters associated with properties
 - `dav_tombstone` - Deletion tombstones for sync correctness after purge
-- `dav_shadow` - Debug shadow storage of inbound/outbound payloads
+- `dav_shadow` - Debug ONLY shadow storage of inbound/outbound payloads
 
 **Derived Indexes for Queries:**
 - `cal_index` - CalDAV query index (time-range, UID lookups, etc.)

@@ -1,7 +1,11 @@
 //! Timezone resolution and UTC conversion for iCalendar date-times.
+//!
+//! Uses ICU4X for Windows timezone ID to IANA mapping and timezone canonicalization.
 
 use chrono::{DateTime, LocalResult, NaiveDateTime, TimeZone, Utc};
 use chrono_tz::Tz;
+use icu::time::zone::WindowsParser;
+use icu::time::zone::iana::IanaParserExtended;
 use std::collections::HashMap;
 use std::str::FromStr;
 
@@ -84,31 +88,37 @@ impl Default for TimeZoneResolver {
 
 /// Normalizes common CalDAV/iCalendar timezone identifiers to IANA names.
 ///
+/// Uses ICU4X for Windows timezone ID mapping and IANA canonicalization.
 /// Many calendar clients use non-standard TZID values that need to be
 /// mapped to standard IANA timezone names.
 fn normalize_tzid(tzid: &str) -> String {
     // Strip common prefixes
-    let mut normalized = tzid
+    let stripped = tzid
         .strip_prefix("/mozilla.org/")
         .or_else(|| tzid.strip_prefix("/softwarestudio.org/"))
-        .unwrap_or(tzid)
-        .to_string();
+        .unwrap_or(tzid);
 
-    // TODO: Replace this if/else chain with data from icu
-    // Handle Windows timezone names (common in Outlook)
-    if normalized == "Eastern Standard Time" {
-        normalized = "America/New_York".to_string();
-    } else if normalized == "Pacific Standard Time" {
-        normalized = "America/Los_Angeles".to_string();
-    } else if normalized == "Central Standard Time" {
-        normalized = "America/Chicago".to_string();
-    } else if normalized == "Mountain Standard Time" {
-        normalized = "America/Denver".to_string();
-    } else {
-        // Not handled
+    // Try Windows timezone mapping first using ICU
+    let windows_parser = WindowsParser::new();
+    if let Some(tz) = windows_parser.parse(stripped, None) {
+        // Get the canonical IANA name from the BCP-47 timezone ID
+        let iana_parser = IanaParserExtended::new();
+        for entry in iana_parser.iter() {
+            if entry.time_zone == tz {
+                return entry.canonical.to_string();
+            }
+        }
     }
 
-    normalized
+    // Try IANA parser for canonicalization (handles aliases like Europe/Kiev -> Europe/Kyiv)
+    let iana_parser = IanaParserExtended::new();
+    let parsed = iana_parser.parse(stripped);
+    if parsed.time_zone != icu::time::TimeZone::UNKNOWN {
+        return parsed.canonical.to_string();
+    }
+
+    // Return as-is if not recognized
+    stripped.to_string()
 }
 
 /// ## Summary
@@ -271,5 +281,25 @@ mod tests {
         resolver
             .resolve("America/New_York")
             .expect("should resolve from cache");
+    }
+
+    #[test]
+    fn test_normalize_additional_windows_timezones() {
+        // Test additional Windows timezone mappings via ICU
+        assert_eq!(normalize_tzid("Central Standard Time"), "America/Chicago");
+        assert_eq!(normalize_tzid("Mountain Standard Time"), "America/Denver");
+        // GMT Standard Time should map to Europe/London
+        assert_eq!(normalize_tzid("GMT Standard Time"), "Europe/London");
+        // W. Europe Standard Time should map to Europe/Berlin
+        assert_eq!(normalize_tzid("W. Europe Standard Time"), "Europe/Berlin");
+    }
+
+    #[test]
+    fn test_normalize_iana_alias() {
+        // Test that IANA aliases are canonicalized
+        // Europe/Kiev was renamed to Europe/Kyiv
+        assert_eq!(normalize_tzid("Europe/Kiev"), "Europe/Kyiv");
+        // US/Eastern is an alias for America/New_York
+        assert_eq!(normalize_tzid("US/Eastern"), "America/New_York");
     }
 }

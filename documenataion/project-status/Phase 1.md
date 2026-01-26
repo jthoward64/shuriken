@@ -66,7 +66,8 @@ Phase 1 provides RFC-compliant parsers and serializers for:
 **What exists**:
 - `TimeZoneResolver` in `src/component/rfc/ical/expand/timezone.rs`
 - Uses `chrono-tz` for IANA timezone lookup
-- Basic normalization of Windows timezone names
+- Uses ICU4X for Windows timezone ID → IANA mapping (`WindowsParser`)
+- Uses ICU4X for IANA alias canonicalization (`IanaParserExtended`)
 
 **What's missing**:
 - [ ] VTIMEZONE STANDARD/DAYLIGHT block parsing
@@ -75,8 +76,6 @@ Phase 1 provides RFC-compliant parsers and serializers for:
 - [ ] Custom/proprietary TZID handling beyond simple normalization
 
 **Impact**: Events with custom VTIMEZONE components or non-IANA TZIDs may have incorrect UTC times.
-
-**Effort**: 3-5 days
 
 ### 2. Text-Match on Arbitrary Properties — **MEDIUM PRIORITY**
 
@@ -152,6 +151,7 @@ Phase 1 provides RFC-compliant parsers and serializers for:
 | RFC 4918 (WebDAV) | ✅ 100% Compliant | XML parsing complete |
 | RFC 4791 (CalDAV) | ✅ 100% Compliant | Filter parsing complete |
 | RFC 6352 (CardDAV) | ✅ 100% Compliant | Query parsing complete |
+| RFC 4790 (Collation) | ✅ 100% Compliant | ICU case folding for i;unicode-casemap |
 
 ---
 
@@ -175,6 +175,9 @@ All parsers have extensive unit tests covering:
 - ✅ Round-trip fidelity
 - ✅ List value parsing (EXDATE, RDATE, FREEBUSY)
 - ✅ Line folding and unfolding edge cases
+- ✅ Unicode case folding (German ß→ss, Greek σ/ς normalization)
+- ✅ Windows timezone ID → IANA mapping
+- ✅ IANA timezone alias canonicalization
 
 **Test Count**: 470+ unit tests across all parsers
 

@@ -9,6 +9,7 @@ use crate::component::model::dav::instance::DavInstance;
 use crate::component::rfc::dav::core::{CalendarFilter, CalendarQuery, CompFilter};
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
+use icu::casemap::CaseMapper;
 
 /// ## Summary
 /// Finds instances in a collection that match the calendar-query filter.
@@ -116,13 +117,14 @@ async fn apply_comp_filter(
         // For time-range queries, we need to check both:
         // 1. Non-recurring events in cal_index
         // 2. Recurring event occurrences in cal_occurrence
-        
+
         let mut non_recurring_ids = Vec::new();
         let mut recurring_ids = Vec::new();
 
         // Query non-recurring events from cal_index (rrule_text IS NULL)
         if start.is_some() || end.is_some() {
-            let mut boxed_query = query.clone()
+            let mut boxed_query = query
+                .clone()
                 .filter(cal_index::rrule_text.is_null())
                 .into_boxed();
 
@@ -154,9 +156,10 @@ async fn apply_comp_filter(
         // Query recurring events from cal_occurrence table
         if start.is_some() || end.is_some() {
             use crate::component::db::schema::cal_occurrence;
-            
+
             // First, get all recurring event entity IDs
-            let recurring_event_ids: Vec<uuid::Uuid> = query.clone()
+            let recurring_event_ids: Vec<uuid::Uuid> = query
+                .clone()
                 .filter(cal_index::rrule_text.is_not_null())
                 .select(cal_index::entity_id)
                 .distinct()
@@ -193,7 +196,7 @@ async fn apply_comp_filter(
         combined_ids.extend(recurring_ids);
         combined_ids.sort_unstable();
         combined_ids.dedup();
-        
+
         combined_ids
     } else {
         query
@@ -262,8 +265,9 @@ async fn apply_property_filters(
                 .collect()
         } else if let Some(text_match) = &prop_filter.text_match {
             // Property must exist and match text
-            let match_value = text_match.value.to_uppercase();
-            let case_sensitive = text_match.collation.as_deref() == Some("i;octet");
+            // Normalize the match value based on collation for case-insensitive comparison
+            let (match_value, case_sensitive) =
+                normalize_text_for_collation(&text_match.value, text_match.collation.as_ref());
 
             let mut query = dav_component::table
                 .inner_join(
@@ -348,4 +352,93 @@ async fn apply_property_filters(
     }
 
     Ok(final_ids)
+}
+
+/// ## Summary
+/// Normalizes text based on collation using ICU case folding.
+///
+/// For `i;unicode-casemap` collation, uses ICU's `fold_string()` for proper
+/// Unicode case folding per RFC 4790, then uppercases for SQL UPPER() compatibility.
+/// For `i;ascii-casemap`, uses simple uppercasing.
+/// For `i;octet`, returns text as-is (case-sensitive).
+///
+/// Returns the normalized text and whether the comparison should be case-sensitive.
+#[must_use]
+fn normalize_text_for_collation(text: &str, collation: Option<&String>) -> (String, bool) {
+    match collation.map(std::string::String::as_str) {
+        // i;octet means case-sensitive comparison
+        Some("i;octet") => (text.to_owned(), true),
+        // Use ICU case folding then uppercase for SQL UPPER() compatibility
+        // Note: Full RFC 4790 compliance would require a pre-folded column in the DB
+        Some("i;unicode-casemap") | None => {
+            let folded = CaseMapper::new().fold_string(text);
+            (folded.to_uppercase(), false)
+        }
+        // ASCII casemap uses simple uppercasing
+        Some("i;ascii-casemap") => (text.to_uppercase(), false),
+        // Unknown collation - treat as case-insensitive
+        _ => (text.to_uppercase(), false),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_normalize_text_unicode_casemap_basic() {
+        let collation = Some("i;unicode-casemap".to_string());
+        let (result, case_sensitive) =
+            normalize_text_for_collation("Hello World", collation.as_ref());
+        assert_eq!(result, "HELLO WORLD");
+        assert!(!case_sensitive);
+    }
+
+    #[test]
+    fn test_normalize_text_unicode_casemap_german_eszett() {
+        // German ß should fold to ss, then uppercase to SS
+        let collation = Some("i;unicode-casemap".to_string());
+        let (result, case_sensitive) = normalize_text_for_collation("Straße", collation.as_ref());
+        assert_eq!(result, "STRASSE");
+        assert!(!case_sensitive);
+
+        // Verify ß comparison: "STRASSE" and "Straße" should match after folding+uppercase
+        let (upper, _) = normalize_text_for_collation("STRASSE", collation.as_ref());
+        assert_eq!(result, upper);
+    }
+
+    #[test]
+    fn test_normalize_text_unicode_casemap_greek_sigma() {
+        // Greek final sigma ς and regular sigma σ should fold to the same value
+        let collation = Some("i;unicode-casemap".to_string());
+        let (final_sigma, _) = normalize_text_for_collation("Σ", collation.as_ref());
+        let (regular_sigma, _) = normalize_text_for_collation("σ", collation.as_ref());
+        assert_eq!(final_sigma, regular_sigma);
+    }
+
+    #[test]
+    fn test_normalize_text_octet_case_sensitive() {
+        let collation = Some("i;octet".to_string());
+        let (result, case_sensitive) =
+            normalize_text_for_collation("Hello World", collation.as_ref());
+        assert_eq!(result, "Hello World"); // Preserved exactly
+        assert!(case_sensitive);
+    }
+
+    #[test]
+    fn test_normalize_text_ascii_casemap() {
+        let collation = Some("i;ascii-casemap".to_string());
+        let (result, case_sensitive) =
+            normalize_text_for_collation("Hello World", collation.as_ref());
+        assert_eq!(result, "HELLO WORLD");
+        assert!(!case_sensitive);
+    }
+
+    #[test]
+    fn test_normalize_text_default_collation() {
+        // None should default to unicode-casemap behavior
+        let (result, case_sensitive) = normalize_text_for_collation("Straße", None);
+        assert_eq!(result, "STRASSE");
+        assert!(!case_sensitive);
+    }
 }

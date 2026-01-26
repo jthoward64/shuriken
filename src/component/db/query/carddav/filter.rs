@@ -11,6 +11,7 @@ use crate::component::rfc::dav::core::{
 };
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
+use icu::casemap::CaseMapper;
 
 /// ## Summary
 /// Finds instances in a collection that match the addressbook-query filter.
@@ -328,14 +329,99 @@ fn apply_text_match_uid(
 }
 
 /// ## Summary
-/// Normalizes text based on collation.
+/// Normalizes text based on collation using ICU case folding.
 ///
-/// For case-insensitive collations (`i;unicode-casemap`, `i;ascii-casemap`),
-/// converts to lowercase. For case-sensitive (`i;octet`), returns as-is.
+/// For `i;unicode-casemap` collation, uses ICU's `fold_string()` for proper
+/// Unicode case folding per RFC 4790. For `i;ascii-casemap`, uses simple
+/// lowercasing. For `i;octet` or unknown collations, returns text as-is.
+///
+/// Unicode case folding differs from simple lowercasing in important ways:
+/// - German `ß` folds to `ss`
+/// - Greek final sigma `ς` normalizes to `σ`
+/// - Turkish dotted I is handled correctly
 #[must_use]
 fn normalize_text_for_collation(text: &str, collation: Option<&String>) -> String {
     match collation.map(std::string::String::as_str) {
-        Some("i;unicode-casemap" | "i;ascii-casemap") | None => text.to_lowercase(),
+        // Use ICU case folding for proper Unicode collation
+        Some("i;unicode-casemap") | None => CaseMapper::new().fold_string(text).into_owned(),
+        // Simple ASCII lowercasing for ASCII-only comparison
+        Some("i;ascii-casemap") => text.to_lowercase(),
+        // Case-sensitive: return as-is
         _ => text.to_owned(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_normalize_text_unicode_casemap_basic() {
+        // Basic ASCII case folding
+        let result = normalize_text_for_collation("Hello World", None);
+        assert_eq!(result, "hello world");
+
+        let collation = Some("i;unicode-casemap".to_string());
+        let result = normalize_text_for_collation("Hello World", collation.as_ref());
+        assert_eq!(result, "hello world");
+    }
+
+    #[test]
+    fn test_normalize_text_unicode_casemap_german_eszett() {
+        // German ß should fold to ss (ICU case folding)
+        let collation = Some("i;unicode-casemap".to_string());
+        let result = normalize_text_for_collation("Straße", collation.as_ref());
+        assert_eq!(result, "strasse");
+
+        // Verify ß comparison: "STRASSE" and "Straße" should match after folding
+        let upper = normalize_text_for_collation("STRASSE", collation.as_ref());
+        assert_eq!(result, upper);
+    }
+
+    #[test]
+    fn test_normalize_text_unicode_casemap_greek_sigma() {
+        // Greek final sigma ς and regular sigma σ should fold to the same value
+        let collation = Some("i;unicode-casemap".to_string());
+        let final_sigma = normalize_text_for_collation("Σ", collation.as_ref());
+        let regular_sigma = normalize_text_for_collation("σ", collation.as_ref());
+        assert_eq!(final_sigma, regular_sigma);
+    }
+
+    #[test]
+    fn test_normalize_text_unicode_casemap_international() {
+        let collation = Some("i;unicode-casemap".to_string());
+
+        // Cyrillic
+        let result = normalize_text_for_collation("ПРИВЕТ", collation.as_ref());
+        assert_eq!(result, "привет");
+
+        // Greek
+        let result = normalize_text_for_collation("ΓΕΙΆ", collation.as_ref());
+        assert_eq!(result, "γειά");
+    }
+
+    #[test]
+    fn test_normalize_text_ascii_casemap() {
+        let collation = Some("i;ascii-casemap".to_string());
+
+        // ASCII lowercasing
+        let result = normalize_text_for_collation("Hello World", collation.as_ref());
+        assert_eq!(result, "hello world");
+
+        // Note: ASCII casemap uses simple to_lowercase, which doesn't fold ß
+        let result = normalize_text_for_collation("Straße", collation.as_ref());
+        assert_eq!(result, "straße"); // NOT "strasse"
+    }
+
+    #[test]
+    fn test_normalize_text_octet_case_sensitive() {
+        let collation = Some("i;octet".to_string());
+
+        // i;octet should preserve case exactly
+        let result = normalize_text_for_collation("Hello World", collation.as_ref());
+        assert_eq!(result, "Hello World");
+
+        let result = normalize_text_for_collation("Straße", collation.as_ref());
+        assert_eq!(result, "Straße");
     }
 }

@@ -57,22 +57,14 @@ Shuriken has a **solid foundation** but the previous status was significantly ov
 #### 1. Authorization Not Wired — **P0 (Security Critical)**
 **Current State**: `authorize::require()` exists but handlers don't call it. Any request can access any resource.
 
-**Effort**: 3-5 days
-
 #### 2. No Database Transactions — **P0 (Data Integrity)**
 **Current State**: PUT handlers have explicit `// TODO: Use a transaction for atomic updates` comments. A failure mid-operation leaves inconsistent state.
-
-**Effort**: 2-3 days
 
 #### 3. sync-collection Returns Empty — **P1**
 **Current State**: `build_sync_collection_response()` returns `Multistatus::new()` with TODO comments. Clients cannot sync.
 
-**Effort**: 1 week
-
 #### 4. Well-Known URIs Missing — **P1**
 **Current State**: No `/.well-known/caldav` or `/.well-known/carddav` endpoints. Clients cannot auto-discover.
-
-**Effort**: 2-3 days
 
 ---
 
@@ -120,7 +112,7 @@ Shuriken has a **solid foundation** but the previous status was significantly ov
 ### 🔴 Critical Changes
 
 #### 1. Remove `dav_shadow` Dependency
-**Problem**: GET responses read raw bytes from `dav_shadow.raw_canonical` instead of reconstructing from component tree.
+**Problem**: GET responses read raw bytes from `dav_shadow.raw_canonical` instead of reconstructing from component tree. `dav_shadow` is meant as a debug-only resource and will be removed eventually.
 **Impact**: The component tree (`dav_component`, `dav_property`, `dav_parameter`) is unused for output.
 **Recommendation**: Either:
 - (A) Delete component tree tables and store only raw bytes (simpler)
