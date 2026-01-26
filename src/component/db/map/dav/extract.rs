@@ -46,12 +46,18 @@ pub(super) fn extract_ical_value<'a>(
         }
         Value::Duration(_)
         | Value::Period(_)
+        | Value::PeriodList(_)
         | Value::Recur(_)
         | Value::Time(_)
         | Value::UtcOffset(_)
         | Value::Binary(_)
         | Value::Unknown(_) => {
             // Store complex types as text (raw value)
+            Ok(("text", Some(raw), None, None, None, None, None))
+        }
+        Value::DateList(_) | Value::DateTimeList(_) => {
+            // Store list types as text (raw value) for now
+            // TODO: Consider storing first element or handling lists specially
             Ok(("text", Some(raw), None, None, None, None, None))
         }
     }
