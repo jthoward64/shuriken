@@ -5,7 +5,10 @@
 use salvo::http::StatusCode;
 use salvo::{Request, Response, handler};
 
-use crate::component::db::connection;
+use crate::component::db::connection::{self, DbConnection};
+use crate::component::db::query::dav::{collection, instance};
+use crate::component::model::dav::instance::NewDavInstance;
+use crate::component::model::dav::tombstone::NewDavTombstone;
 use crate::util::path;
 
 /// ## Summary
@@ -45,13 +48,13 @@ pub async fn r#move(req: &mut Request, res: &mut Response) {
     };
 
     // Get Overwrite header (default: T)
-    let _overwrite = match req.headers().get("Overwrite") {
+    let overwrite = match req.headers().get("Overwrite") {
         Some(header) => header.to_str().unwrap_or("T") == "T",
         None => true,
     };
 
     // Get database connection
-    let _conn = match connection::connect().await {
+    let mut conn = match connection::connect().await {
         Ok(conn) => conn,
         Err(e) => {
             tracing::error!("Failed to get database connection: {}", e);
@@ -93,19 +96,202 @@ pub async fn r#move(req: &mut Request, res: &mut Response) {
 
     // TODO: Check authorization for both source and destination
 
-    // TODO: Load source instance from database
-    // TODO: Check if destination exists
-    // TODO: If destination exists and overwrite is false, return 412 Precondition Failed
-    // TODO: Create new instance at destination (references same entity)
-    // TODO: Soft-delete source instance
-    // TODO: Create tombstone for source
-    // TODO: Update sync tokens for both source and destination collections
+    // Perform the move operation
+    match perform_move(
+        &mut conn,
+        source_collection_id,
+        &source_uri,
+        dest_collection_id,
+        &dest_uri,
+        overwrite,
+    )
+    .await
+    {
+        Ok(MoveResult::Created) => {
+            res.status_code(StatusCode::CREATED);
+            if let Err(e) = res.add_header("Location", &destination, true) {
+                tracing::error!(error = %e, "Failed to set Location header");
+            }
+        }
+        Ok(MoveResult::NoContent) => {
+            res.status_code(StatusCode::NO_CONTENT);
+        }
+        Err(MoveError::SourceNotFound) => {
+            tracing::warn!("Source resource not found for MOVE");
+            res.status_code(StatusCode::NOT_FOUND);
+        }
+        Err(MoveError::DestinationExists) => {
+            tracing::warn!("Destination exists and overwrite is false");
+            res.status_code(StatusCode::PRECONDITION_FAILED);
+        }
+        Err(MoveError::DatabaseError(e)) => {
+            tracing::error!(error = %e, "Database error during MOVE");
+            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    }
+}
 
-    tracing::warn!(
-        "MOVE not fully implemented for: {} -> {}",
-        source_path,
-        destination
+/// Result of a MOVE operation.
+enum MoveResult {
+    /// Resource was created at destination (201 Created).
+    Created,
+    /// Resource was replaced at destination (204 No Content).
+    NoContent,
+}
+
+/// Errors that can occur during a MOVE operation.
+enum MoveError {
+    /// Source resource was not found.
+    SourceNotFound,
+    /// Destination exists and overwrite is false.
+    DestinationExists,
+    /// Database operation failed.
+    DatabaseError(anyhow::Error),
+}
+
+impl From<diesel::result::Error> for MoveError {
+    fn from(e: diesel::result::Error) -> Self {
+        match e {
+            diesel::result::Error::NotFound => Self::SourceNotFound,
+            _ => Self::DatabaseError(anyhow::Error::from(e)),
+        }
+    }
+}
+
+/// ## Summary
+/// Performs the MOVE operation by creating a new instance at destination
+/// and soft-deleting the source instance with a tombstone.
+///
+/// ## Side Effects
+/// - Creates new instance at destination
+/// - Soft-deletes source instance
+/// - Creates tombstone for source
+/// - Updates sync tokens for both collections
+///
+/// ## Errors
+/// Returns `MoveError` if source not found, destination exists (and overwrite is false),
+/// or database operations fail.
+#[tracing::instrument(skip(conn))]
+#[expect(clippy::too_many_arguments)]
+#[expect(clippy::too_many_lines)]
+async fn perform_move(
+    conn: &mut DbConnection<'_>,
+    source_collection_id: uuid::Uuid,
+    source_uri: &str,
+    dest_collection_id: uuid::Uuid,
+    dest_uri: &str,
+    overwrite: bool,
+) -> Result<MoveResult, MoveError> {
+    use diesel::prelude::*;
+    use diesel_async::RunQueryDsl;
+
+    tracing::debug!("Performing MOVE operation");
+
+    // Load source instance
+    let source_instance = instance::by_collection_and_uri(source_collection_id, source_uri)
+        .select(crate::component::model::dav::instance::DavInstance::as_select())
+        .first(conn)
+        .await?;
+
+    tracing::debug!(
+        source_instance_id = %source_instance.id,
+        entity_id = %source_instance.entity_id,
+        "Loaded source instance"
     );
-    res.status_code(StatusCode::CREATED);
-    // TODO: Set Location header to destination
+
+    // Check if destination exists
+    let dest_exists = instance::by_collection_and_uri(dest_collection_id, dest_uri)
+        .select(diesel::dsl::count(crate::component::db::schema::dav_instance::id))
+        .first::<i64>(conn)
+        .await
+        .map_err(|e| MoveError::DatabaseError(anyhow::Error::from(e)))?
+        > 0;
+
+    if dest_exists && !overwrite {
+        return Err(MoveError::DestinationExists);
+    }
+
+    // Determine result status
+    let result = if dest_exists {
+        MoveResult::NoContent
+    } else {
+        MoveResult::Created
+    };
+
+    // If destination exists and overwrite is true, soft-delete it first
+    if dest_exists {
+        let dest_instance = instance::by_collection_and_uri(dest_collection_id, dest_uri)
+            .select(crate::component::model::dav::instance::DavInstance::as_select())
+            .first(conn)
+            .await
+            .map_err(|e| MoveError::DatabaseError(anyhow::Error::from(e)))?;
+
+        instance::soft_delete_instance(conn, dest_instance.id)
+            .await
+            .map_err(|e| MoveError::DatabaseError(anyhow::Error::from(e)))?;
+    }
+
+    // Update sync tokens for both collections first, then use the new values
+    let new_dest_synctoken = collection::update_synctoken(conn, dest_collection_id)
+        .await
+        .map_err(|e| MoveError::DatabaseError(anyhow::Error::from(e)))?;
+
+    let new_source_synctoken = collection::update_synctoken(conn, source_collection_id)
+        .await
+        .map_err(|e| MoveError::DatabaseError(anyhow::Error::from(e)))?;
+
+    tracing::debug!(
+        new_dest_synctoken,
+        new_source_synctoken,
+        "Updated sync tokens for both collections"
+    );
+
+    // Create new instance at destination with updated sync revision
+    let new_sync_revision = new_dest_synctoken;
+    // Keep the same ETag since content hasn't changed
+    let new_etag = &source_instance.etag;
+    let now = chrono::Utc::now();
+
+    let new_instance = NewDavInstance {
+        collection_id: dest_collection_id,
+        entity_id: source_instance.entity_id,
+        uri: dest_uri,
+        content_type: &source_instance.content_type,
+        etag: new_etag,
+        sync_revision: new_sync_revision,
+        last_modified: now,
+    };
+
+    instance::create_instance(conn, &new_instance)
+        .await
+        .map_err(|e| MoveError::DatabaseError(anyhow::Error::from(e)))?;
+
+    tracing::debug!("Created new instance at destination");
+
+    // Soft-delete source instance
+    instance::soft_delete_instance(conn, source_instance.id)
+        .await
+        .map_err(|e| MoveError::DatabaseError(anyhow::Error::from(e)))?;
+
+    tracing::debug!("Soft-deleted source instance");
+
+    // Create tombstone for source with updated synctoken
+    let tombstone = NewDavTombstone {
+        collection_id: source_collection_id,
+        uri: source_uri,
+        entity_id: Some(source_instance.entity_id),
+        synctoken: new_source_synctoken,
+        sync_revision: source_instance.sync_revision,
+        deleted_at: now,
+        last_etag: Some(&source_instance.etag),
+        logical_uid: None,
+    };
+
+    instance::create_tombstone(conn, &tombstone)
+        .await
+        .map_err(|e| MoveError::DatabaseError(anyhow::Error::from(e)))?;
+
+    tracing::debug!("Created tombstone for source");
+
+    Ok(result)
 }
