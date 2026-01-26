@@ -1,4 +1,4 @@
-#![allow(clippy::unused_async)]
+#![allow(clippy::unused_async, unused_must_use)]
 //! Tests for MKCALENDAR and MKCOL (Extended MKCOL) methods.
 //!
 //! Verifies collection creation with initial properties.

@@ -1,4 +1,4 @@
-#![allow(clippy::unused_async)]
+#![allow(clippy::unused_async, unused_must_use)]
 //! Tests for PUT method.
 //!
 //! Verifies resource creation/update, precondition handling, and side effects.

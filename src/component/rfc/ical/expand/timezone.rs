@@ -217,6 +217,7 @@ pub fn convert_to_utc(
 /// ## Side Effects
 ///
 /// Updates the timezone resolver's cache if a new timezone is resolved.
+#[expect(dead_code, reason = "Scaffolded for future use")]
 pub fn convert_to_utc_lenient(
     local_time: NaiveDateTime,
     tzid: &str,

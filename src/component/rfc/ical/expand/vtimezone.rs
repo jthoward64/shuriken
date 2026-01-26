@@ -224,7 +224,7 @@ impl VTimezone {
         let last_modified = component
             .get_property("LAST-MODIFIED")
             .and_then(|p| p.as_datetime())
-            .and_then(|dt| ical_to_naive(dt));
+            .and_then(ical_to_naive);
 
         let tzurl = component
             .get_property("TZURL")
@@ -354,18 +354,17 @@ impl VTimezone {
         // Check explicit RDATEs first
         let mut best: Option<NaiveDateTime> = Some(obs.dtstart);
         for rdate in &obs.rdates {
-            if *rdate <= dt && best.map_or(true, |b| *rdate > b) {
+            if *rdate <= dt && best.is_none_or(|b| *rdate > b) {
                 best = Some(*rdate);
             }
         }
 
         // Handle RRULE
-        if let Some(rrule) = &obs.rrule {
-            if let Some(occurrence) = self.calculate_rrule_occurrence(obs, rrule, dt) {
-                if best.map_or(true, |b| occurrence > b) {
-                    best = Some(occurrence);
-                }
-            }
+        if let Some(rrule) = &obs.rrule
+            && let Some(occurrence) = self.calculate_rrule_occurrence(obs, rrule, dt)
+            && best.is_none_or(|b| occurrence > b)
+        {
+            best = Some(occurrence);
         }
 
         best
@@ -415,10 +414,10 @@ impl VTimezone {
         for year in start_year..=end_year {
             if let Some(occurrence) =
                 calculate_nth_weekday_of_month(year, bymonth, weekday, week_ord, obs.dtstart.time())
+                && occurrence <= dt
+                && best.is_none_or(|b| occurrence > b)
             {
-                if occurrence <= dt && (best.is_none() || occurrence > best.unwrap()) {
-                    best = Some(occurrence);
-                }
+                best = Some(occurrence);
             }
         }
 

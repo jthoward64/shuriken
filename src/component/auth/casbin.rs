@@ -44,6 +44,7 @@ pub async fn init_casbin() -> Result<()> {
 /// Panics if the Casbin enforcer is not initialized. This should only happen if
 /// `init_casbin()` was not called during application startup.
 #[must_use]
+#[expect(clippy::expect_used, reason = "Startup invariant - enforcer must be initialized")]
 pub fn get_enforcer() -> &'static casbin::Enforcer {
     ENFORCER
         .get()

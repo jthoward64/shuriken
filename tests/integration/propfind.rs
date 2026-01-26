@@ -1,4 +1,4 @@
-#![allow(clippy::unused_async)]
+#![allow(clippy::unused_async, unused_must_use)]
 //! Tests for PROPFIND method.
 //!
 //! Verifies property retrieval, Depth handling, and multistatus responses.

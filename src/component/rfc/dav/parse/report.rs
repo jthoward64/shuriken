@@ -545,15 +545,14 @@ fn get_attribute(e: &quick_xml::events::BytesStart<'_>, name: &str) -> ParseResu
 /// Default is `anyof` per RFC 6352 §10.5.2.
 fn parse_filter_test_attribute(e: &quick_xml::events::BytesStart<'_>) -> FilterTest {
     for attr in e.attributes().flatten() {
-        if let Ok(key) = std::str::from_utf8(attr.key.as_ref()) {
-            if key == "test" {
-                if let Ok(value) = std::str::from_utf8(&attr.value) {
-                    return match value {
-                        "allof" => FilterTest::AllOf,
-                        _ => FilterTest::AnyOf,
-                    };
-                }
-            }
+        if let Ok(key) = std::str::from_utf8(attr.key.as_ref())
+            && key == "test"
+            && let Ok(value) = std::str::from_utf8(&attr.value)
+        {
+            return match value {
+                "allof" => FilterTest::AllOf,
+                _ => FilterTest::AnyOf,
+            };
         }
     }
     FilterTest::AnyOf // Default per RFC 6352

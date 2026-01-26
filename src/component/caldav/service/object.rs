@@ -290,6 +290,11 @@ const RECURRENCE_ID_MATCH_TOLERANCE_SECS: i64 = 2;
 /// - Database queries fail
 /// - Recurrence expansion fails
 /// - Occurrence insertion fails
+#[expect(
+    clippy::cognitive_complexity,
+    clippy::type_complexity,
+    reason = "Complex but well-structured recurrence expansion logic"
+)]
 async fn expand_and_store_occurrences(
     conn: &mut DbConnection<'_>,
     entity_id: uuid::Uuid,

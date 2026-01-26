@@ -1,4 +1,9 @@
-#![allow(clippy::unused_async, clippy::expect_used)]
+#![allow(
+    clippy::unused_async,
+    clippy::expect_used,
+    dead_code,
+    clippy::too_many_arguments
+)]
 //! Test helpers for integration tests.
 //!
 //! Provides utilities for:
@@ -483,13 +488,12 @@ impl TestDb {
     /// ## Concurrency
     /// This function acquires a mutex lock that is held until the `TestDb` is dropped.
     /// This serializes database access across tests to prevent race conditions.
-    #[expect(dead_code)]
     pub async fn new() -> anyhow::Result<Self> {
         // Acquire the database lock before doing anything
         let lock_guard = get_db_lock().lock().await;
 
-        let mut database_url = std::env::var("DATABASE_URL").map_err(|_| {
-            anyhow::anyhow!("DATABASE_URL environment variable must be set for tests")
+        let mut database_url = std::env::var("DATABASE_URL").map_err(|e| {
+            anyhow::anyhow!("DATABASE_URL environment variable must be set for tests: {e}")
         })?;
 
         // Parse the database URL to check and modify database name
@@ -566,7 +570,6 @@ impl TestDb {
     /// If you add or remove tables from the schema, update this list accordingly.
     /// The order is: indexes → shadows/tombstones → parameters → properties → components →
     /// instances → entities → collections → groups/memberships → `auth_user` → users → principals → `casbin_rule`
-    #[expect(dead_code)]
     pub async fn truncate_all(&self) -> anyhow::Result<()> {
         let mut conn = self.get_conn().await?;
 
@@ -611,7 +614,6 @@ impl TestDb {
     /// Uses UUID v7 for principal IDs to match production behavior (time-ordered).
     /// If you need deterministic test data, consider seeding with fixed data
     /// and retrieving IDs from the database after insertion.
-    #[expect(dead_code)]
     pub async fn seed_principal(
         &self,
         principal_type: &str,
@@ -643,7 +645,6 @@ impl TestDb {
     ///
     /// ## Errors
     /// Returns an error if the user cannot be inserted.
-    #[expect(dead_code)]
     pub async fn seed_user(
         &self,
         name: &str,
@@ -674,7 +675,6 @@ impl TestDb {
     ///
     /// ## Errors
     /// Returns an error if the collection cannot be inserted.
-    #[expect(dead_code)]
     pub async fn seed_collection(
         &self,
         owner_principal_id: uuid::Uuid,
@@ -709,7 +709,6 @@ impl TestDb {
     ///
     /// ## Errors
     /// Returns an error if the entity cannot be inserted.
-    #[expect(dead_code)]
     pub async fn seed_entity(
         &self,
         entity_type: &str,
@@ -738,7 +737,6 @@ impl TestDb {
     ///
     /// ## Errors
     /// Returns an error if the instance cannot be inserted.
-    #[expect(dead_code)]
     pub async fn seed_instance(
         &self,
         collection_id: uuid::Uuid,
@@ -776,7 +774,6 @@ impl TestDb {
     ///
     /// ## Errors
     /// Returns an error if the component cannot be inserted.
-    #[expect(dead_code)]
     pub async fn seed_component(
         &self,
         entity_id: uuid::Uuid,
@@ -809,7 +806,6 @@ impl TestDb {
     ///
     /// ## Errors
     /// Returns an error if the property cannot be inserted.
-    #[expect(dead_code)]
     pub async fn seed_property(
         &self,
         component_id: uuid::Uuid,
@@ -850,7 +846,6 @@ impl TestDb {
     ///
     /// ## Errors
     /// Returns an error if the group cannot be inserted.
-    #[expect(dead_code)]
     pub async fn seed_group(&self, principal_id: uuid::Uuid) -> anyhow::Result<uuid::Uuid> {
         use shuriken::component::db::schema::group;
         use shuriken::component::model::group::NewGroup;
@@ -875,7 +870,6 @@ impl TestDb {
     ///
     /// ## Errors
     /// Returns an error if the group name cannot be inserted.
-    #[expect(dead_code)]
     pub async fn seed_group_name(
         &self,
         group_id: uuid::Uuid,
@@ -907,7 +901,6 @@ impl TestDb {
     ///
     /// ## Returns
     /// Returns a generated UUID for tracking purposes since membership uses composite primary key.
-    #[expect(dead_code)]
     pub async fn seed_membership(
         &self,
         user_id: uuid::Uuid,
@@ -934,7 +927,6 @@ impl TestDb {
     ///
     /// ## Errors
     /// Returns an error if the collection cannot be found.
-    #[expect(dead_code)]
     pub async fn get_collection_synctoken(&self, collection_id: uuid::Uuid) -> anyhow::Result<i64> {
         use shuriken::component::db::schema::dav_collection;
 
@@ -953,7 +945,6 @@ impl TestDb {
     ///
     /// ## Errors
     /// Returns an error if the database query fails.
-    #[expect(dead_code)]
     pub async fn tombstone_exists(
         &self,
         collection_id: uuid::Uuid,
@@ -977,7 +968,6 @@ impl TestDb {
     ///
     /// ## Errors
     /// Returns an error if the database query fails.
-    #[expect(dead_code)]
     pub async fn instance_exists(&self, uri: &str) -> anyhow::Result<bool> {
         use shuriken::component::db::schema::dav_instance;
 
@@ -997,7 +987,6 @@ impl TestDb {
     ///
     /// ## Errors
     /// Returns an error if the instance cannot be found.
-    #[expect(dead_code)]
     pub async fn get_instance_by_uri(
         &self,
         uri: &str,
@@ -1023,7 +1012,6 @@ impl TestDb {
     ///
     /// ## Errors
     /// Returns an error if the collection cannot be found.
-    #[expect(dead_code)]
     pub async fn get_collection(
         &self,
         collection_id: uuid::Uuid,
@@ -1048,7 +1036,6 @@ impl TestDb {
     ///
     /// ## Errors
     /// Returns an error if the database query fails.
-    #[expect(dead_code)]
     pub async fn count_collection_instances(
         &self,
         collection_id: uuid::Uuid,

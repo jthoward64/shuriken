@@ -1,4 +1,4 @@
-#![allow(clippy::unused_async)]
+#![allow(clippy::unused_async, unused_must_use)]
 //! Tests for OPTIONS method.
 //!
 //! Verifies that OPTIONS returns correct Allow and DAV headers.

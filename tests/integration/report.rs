@@ -1,4 +1,4 @@
-#![allow(clippy::unused_async)]
+#![allow(clippy::unused_async, unused_must_use)]
 //! Tests for REPORT method.
 //!
 //! Verifies calendar-query, calendar-multiget, addressbook-query,

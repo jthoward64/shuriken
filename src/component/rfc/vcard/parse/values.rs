@@ -291,7 +291,7 @@ pub fn parse_date(value: &str, line_num: usize) -> ParseResult<VCardDate> {
             let month: u32 = rest.parse().map_err(|_| {
                 ParseError::new(ParseErrorKind::InvalidDateTime, line_num, "invalid month")
             })?;
-            if month < 1 || month > 12 {
+            if !(1..=12).contains(&month) {
                 return Err(ParseError::new(
                     ParseErrorKind::InvalidDateTime,
                     line_num,
@@ -901,7 +901,13 @@ mod tests {
     fn parse_time_truncated_minute_second_basic() {
         // RFC 6350 §4.3.2: -MMSS format (minute and second, basic)
         let (time, offset) = parse_time("-1530", 1).unwrap();
-        assert_eq!(time, VCardTime::MinuteSecond { minute: 15, second: 30 });
+        assert_eq!(
+            time,
+            VCardTime::MinuteSecond {
+                minute: 15,
+                second: 30
+            }
+        );
         assert!(offset.is_none());
     }
 
@@ -909,7 +915,13 @@ mod tests {
     fn parse_time_truncated_minute_second_extended() {
         // RFC 6350 §4.3.2: -MM:SS format (minute and second, extended)
         let (time, offset) = parse_time("-15:30", 1).unwrap();
-        assert_eq!(time, VCardTime::MinuteSecond { minute: 15, second: 30 });
+        assert_eq!(
+            time,
+            VCardTime::MinuteSecond {
+                minute: 15,
+                second: 30
+            }
+        );
         assert!(offset.is_none());
     }
 
@@ -917,7 +929,13 @@ mod tests {
     fn parse_time_truncated_minute_only() {
         // RFC 6350 §4.3.2: -MM format (minute only)
         let (time, offset) = parse_time("-15", 1).unwrap();
-        assert_eq!(time, VCardTime::MinuteSecond { minute: 15, second: 0 });
+        assert_eq!(
+            time,
+            VCardTime::MinuteSecond {
+                minute: 15,
+                second: 0
+            }
+        );
         assert!(offset.is_none());
     }
 

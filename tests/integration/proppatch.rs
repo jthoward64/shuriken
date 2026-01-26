@@ -1,4 +1,4 @@
-#![allow(clippy::unused_async)]
+#![allow(clippy::unused_async, unused_must_use)]
 //! Tests for PROPPATCH method.
 //!
 //! Verifies property modification, protected properties, and partial success handling.

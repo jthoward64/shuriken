@@ -1,4 +1,4 @@
-#![allow(clippy::unused_async)]
+#![allow(clippy::unused_async, unused_must_use)]
 //! Tests for DELETE method.
 //!
 //! Verifies resource deletion, tombstone creation, and idempotency.

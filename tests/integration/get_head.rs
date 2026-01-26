@@ -1,4 +1,4 @@
-#![allow(clippy::unused_async)]
+#![allow(clippy::unused_async, unused_must_use)]
 //! Tests for GET and HEAD methods.
 //!
 //! Verifies resource retrieval, ETag handling, and conditional requests.

@@ -1,4 +1,4 @@
-#![allow(clippy::unused_async)]
+#![allow(clippy::unused_async, unused_must_use)]
 //! Tests for COPY and MOVE methods.
 //!
 //! Verifies destination rules, href updates, and tombstone generation.
@@ -67,7 +67,9 @@ async fn move_rename_item_updates_href() {
     );
 
     // Verify resource exists at destination
-    let get_response = TestRequest::get(&dest_uri).send(create_test_service()).await;
+    let get_response = TestRequest::get(&dest_uri)
+        .send(create_test_service())
+        .await;
     get_response.assert_status(StatusCode::OK);
 
     // Verify source no longer exists (404 or 410)
@@ -195,7 +197,9 @@ async fn move_across_collections() {
     );
 
     // Verify resource exists at destination
-    let get_response = TestRequest::get(&dest_uri).send(create_test_service()).await;
+    let get_response = TestRequest::get(&dest_uri)
+        .send(create_test_service())
+        .await;
     get_response.assert_status(StatusCode::OK);
 }
 
@@ -258,7 +262,9 @@ async fn copy_duplicates_resource() {
         .await;
     source_get.assert_status(StatusCode::OK);
 
-    let dest_get = TestRequest::get(&dest_uri).send(create_test_service()).await;
+    let dest_get = TestRequest::get(&dest_uri)
+        .send(create_test_service())
+        .await;
     dest_get.assert_status(StatusCode::OK);
 }
 
@@ -591,9 +597,7 @@ async fn move_without_destination_400() {
     let service = create_test_service();
 
     // MOVE without Destination header
-    let response = TestRequest::move_resource(&source_uri)
-        .send(service)
-        .await;
+    let response = TestRequest::move_resource(&source_uri).send(service).await;
 
     response.assert_status(StatusCode::BAD_REQUEST);
 }
@@ -620,12 +624,11 @@ async fn move_nonexistent_404() {
 async fn copy_nonexistent_404() {
     let service = create_test_service();
 
-    let response = TestRequest::copy(
-        "/api/caldav/00000000-0000-0000-0000-000000000000/nonexistent.ics",
-    )
-    .destination("/api/caldav/00000000-0000-0000-0000-000000000000/dest.ics")
-    .send(service)
-    .await;
+    let response =
+        TestRequest::copy("/api/caldav/00000000-0000-0000-0000-000000000000/nonexistent.ics")
+            .destination("/api/caldav/00000000-0000-0000-0000-000000000000/dest.ics")
+            .send(service)
+            .await;
 
     response.assert_status(StatusCode::NOT_FOUND);
 }
