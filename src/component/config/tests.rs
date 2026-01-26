@@ -21,6 +21,7 @@ fn test_auth_method_serialization() {
 fn test_database_config_clone() {
     let config = DatabaseConfig {
         url: "postgresql://localhost/test".to_string(),
+        max_connections: 4,
     };
 
     let cloned = config.clone();
@@ -85,6 +86,7 @@ fn test_settings_structure() {
     let settings = Settings {
         database: DatabaseConfig {
             url: "postgresql://test".to_string(),
+            max_connections: 8,
         },
         auth: AuthConfig {
             method: AuthMethod::SingleUser,
@@ -93,6 +95,10 @@ fn test_settings_structure() {
                 name: "Test".to_string(),
                 email: "test@test.com".to_string(),
             }),
+        },
+        server: ServerConfig {
+            host: "127.0.0.1".to_string(),
+            port: 8698,
         },
     };
 
@@ -108,11 +114,16 @@ fn test_settings_debug() {
     let settings = Settings {
         database: DatabaseConfig {
             url: "test_url".to_string(),
+            max_connections: 8,
         },
         auth: AuthConfig {
             method: AuthMethod::Proxy,
             proxy: Some(ProxyAuthConfig {}),
             single_user: None,
+        },
+        server: ServerConfig {
+            host: "127.0.0.1".to_string(),
+            port: 8698,
         },
     };
 

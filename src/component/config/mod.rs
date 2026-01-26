@@ -1,15 +1,18 @@
-use std::sync::OnceLock;
+use std::sync::Arc;
 
 use anyhow::Result;
 use config::Config;
+use salvo::async_trait;
 use serde::Deserialize;
 
-static CONFIG: OnceLock<Settings> = OnceLock::new();
+use crate::component::error::{AppError, AppResult};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Settings {
     pub database: DatabaseConfig,
     pub auth: AuthConfig,
+    pub server: ServerConfig,
+    pub logging: LoggingConfig,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -38,6 +41,18 @@ pub struct SingleUserAuthConfig {
 #[derive(Debug, Clone, Deserialize)]
 pub struct DatabaseConfig {
     pub url: String,
+    pub max_connections: u8,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ServerConfig {
+    pub host: String,
+    pub port: u16,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct LoggingConfig {
+    pub level: String,
 }
 
 impl Settings {
@@ -49,6 +64,10 @@ impl Settings {
     /// Returns an error if building the configuration or deserializing it fails.
     pub fn load() -> Result<Self> {
         Ok(Config::builder()
+            .set_default("server.host", "0.0.0.0")?
+            .set_default("server.port", 8698)?
+            .set_default("database.max_connections", 4)?
+            .set_default("logging.level", "debug")?
             // Env file
             .add_source(
                 config::Environment::default()
@@ -65,37 +84,45 @@ impl Settings {
 }
 
 /// ## Summary
-/// Loads configuration from environment variables and `.env` file, then stores it globally.
+/// Loads configuration from environment variables and `.env` file.
 ///
 /// ## Errors
 /// Returns an error if loading or deserializing the configuration fails.
-///
-/// ## Panics
-/// Panics if the global configuration has already been initialized. This is a programming error
-/// and indicates `load_config()` was called multiple times.
-pub fn load_config() -> Result<()> {
+pub fn load_config() -> Result<Settings> {
     dotenvy::dotenv().ok();
 
-    let settings = Settings::load()?;
-    #[expect(clippy::expect_used, reason = "Critical initialization step")]
-    CONFIG.set(settings).expect(
-        "Failed to set global configuration - load_config() must only be called once at startup",
-    );
-    Ok(())
+    Settings::load()
+}
+
+pub struct ConfigHandler {
+    pub settings: Settings,
+}
+
+#[async_trait]
+impl salvo::Handler for ConfigHandler {
+    #[tracing::instrument(skip(self, _req, depot, _res, _ctrl))]
+    async fn handle(
+        &self,
+        _req: &mut salvo::Request,
+        depot: &mut salvo::Depot,
+        _res: &mut salvo::Response,
+        _ctrl: &mut salvo::FlowCtrl,
+    ) {
+        let settings: Arc<Settings> = Arc::new(self.settings.clone());
+        depot.inject(settings);
+    }
 }
 
 /// ## Summary
-/// Retrieves the globally loaded configuration.
+/// Retrieves the application configuration from the depot.
 ///
-/// ## Panics
-/// Panics if the global configuration has not been initialized via `load_config()`.
-/// This indicates a programming error where the configuration was accessed before initialization.
-#[must_use]
-pub fn get_config() -> &'static Settings {
-    #[expect(clippy::expect_used, reason = "Critical initialization step")]
-    CONFIG
-        .get()
-        .expect("Configuration not loaded - load_config() must be called at startup")
+/// ## Errors
+/// Returns an error if the configuration is not found in the depot.
+pub fn get_config_from_depot(depot: &salvo::Depot) -> AppResult<Arc<Settings>> {
+    depot
+        .obtain::<Arc<Settings>>()
+        .cloned()
+        .map_err(|_| AppError::InvariantViolation("Configuration not found in depot".into()))
 }
 
 #[cfg(test)]

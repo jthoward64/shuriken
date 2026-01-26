@@ -14,7 +14,6 @@ use super::helpers::*;
 /// ## Summary
 /// Test that PROPFIND returns 207 Multi-Status.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn propfind_returns_multistatus() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -46,7 +45,6 @@ async fn propfind_returns_multistatus() {
 /// ## Summary
 /// Test that PROPFIND response is valid XML.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn propfind_returns_valid_xml() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -85,7 +83,6 @@ async fn propfind_returns_valid_xml() {
 /// ## Summary
 /// Test that PROPFIND Depth:0 on a collection returns only the collection.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn propfind_depth0_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -144,7 +141,6 @@ async fn propfind_depth0_collection() {
 /// ## Summary
 /// Test that PROPFIND Depth:1 returns collection and immediate members.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn propfind_depth1_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -203,7 +199,6 @@ async fn propfind_depth1_collection() {
 /// ## Summary
 /// Test that PROPFIND Depth:infinity is rejected or supported consistently.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn propfind_depth_infinity() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -240,7 +235,6 @@ async fn propfind_depth_infinity() {
 /// ## Summary
 /// Test that missing Depth header defaults appropriately.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn propfind_default_depth() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -277,7 +271,6 @@ async fn propfind_default_depth() {
 /// ## Summary
 /// Test that known properties return 200 propstat.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn propfind_known_props_200() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -318,7 +311,6 @@ async fn propfind_known_props_200() {
 /// ## Summary
 /// Test that unknown properties return 404 propstat.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn propfind_unknown_props_404() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -353,7 +345,6 @@ async fn propfind_unknown_props_404() {
 /// ## Summary
 /// Test that mixed known/unknown properties return 207 with separate propstats.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn propfind_mixed_props() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -405,7 +396,6 @@ async fn propfind_mixed_props() {
 /// ## Summary
 /// Test that PROPFIND allprop returns reasonable set of properties.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn propfind_allprop_request() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -445,7 +435,6 @@ async fn propfind_allprop_request() {
 /// ## Summary
 /// Test that PROPFIND propname returns property names without values.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn propfind_propname() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -488,7 +477,6 @@ async fn propfind_propname() {
 /// ## Summary
 /// Test that calendar collections advertise calendar-access resource type.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn propfind_calendar_resourcetype() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -524,7 +512,6 @@ async fn propfind_calendar_resourcetype() {
 /// ## Summary
 /// Test that addressbook collections advertise addressbook resource type.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn propfind_addressbook_resourcetype() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -564,7 +551,6 @@ async fn propfind_addressbook_resourcetype() {
 /// ## Summary
 /// Test that PROPFIND returns getetag for resources.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn propfind_getetag() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db.truncate_all().await.expect("Failed to seed tables");
@@ -614,7 +600,6 @@ async fn propfind_getetag() {
 /// ## Summary
 /// Test that PROPFIND returns sync-token for collections.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn propfind_sync_token() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -668,7 +653,6 @@ async fn propfind_nonexistent_404() {
 /// ## Summary
 /// Test that PROPFIND with invalid XML returns 400.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn propfind_invalid_xml_400() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db

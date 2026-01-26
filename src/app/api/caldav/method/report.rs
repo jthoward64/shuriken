@@ -1,7 +1,7 @@
 //! CalDAV REPORT method dispatcher.
 
 use salvo::http::StatusCode;
-use salvo::{Request, Response, handler};
+use salvo::{Depot, Request, Response, handler};
 
 use crate::component::rfc::dav::core::ReportType;
 
@@ -17,7 +17,7 @@ use crate::component::rfc::dav::core::ReportType;
 /// ## Errors
 /// Returns 400 for invalid requests, 501 for unsupported reports.
 #[handler]
-pub async fn report(req: &mut Request, res: &mut Response) {
+pub async fn report(req: &mut Request, res: &mut Response, depot: &Depot) {
     // Read request body
     let body = match req.payload().await {
         Ok(body) => body,
@@ -46,6 +46,7 @@ pub async fn report(req: &mut Request, res: &mut Response) {
                 res,
                 query,
                 req_data.properties,
+                depot,
             )
             .await;
         }
@@ -55,6 +56,7 @@ pub async fn report(req: &mut Request, res: &mut Response) {
                 res,
                 multiget,
                 req_data.properties,
+                depot,
             )
             .await;
         }

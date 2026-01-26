@@ -14,7 +14,6 @@ use super::helpers::*;
 /// ## Summary
 /// Test that MKCALENDAR creates a calendar collection.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn mkcalendar_creates_calendar_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -52,7 +51,6 @@ async fn mkcalendar_creates_calendar_collection() {
 /// ## Summary
 /// Test that MKCALENDAR applies initial properties from request body.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn mkcalendar_initial_props_applied() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -101,7 +99,6 @@ async fn mkcalendar_initial_props_applied() {
 /// ## Summary
 /// Test that MKCALENDAR on existing URI returns 405 or 409.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn mkcalendar_on_existing_uri_conflict() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -141,7 +138,6 @@ async fn mkcalendar_on_existing_uri_conflict() {
 /// ## Summary
 /// Test that Extended MKCOL creates an addressbook.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn mkcol_extended_creates_addressbook() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -182,7 +178,6 @@ async fn mkcol_extended_creates_addressbook() {
 /// ## Summary
 /// Test that Extended MKCOL applies initial properties.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn mkcol_extended_applies_initial_props() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -223,7 +218,6 @@ async fn mkcol_extended_applies_initial_props() {
 /// ## Summary
 /// Test that Extended MKCOL with invalid XML returns 400.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn mkcol_extended_rejects_bad_body() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -254,7 +248,6 @@ async fn mkcol_extended_rejects_bad_body() {
 /// ## Summary
 /// Test that plain MKCOL (without body) creates a collection.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn mkcol_creates_plain_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -292,7 +285,6 @@ async fn mkcol_creates_plain_collection() {
 /// ## Summary
 /// Test that MKCOL on existing URI returns conflict.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn mkcol_on_existing_uri_conflict() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -332,7 +324,6 @@ async fn mkcol_on_existing_uri_conflict() {
 /// ## Summary
 /// Test that MKCALENDAR with protected properties returns appropriate error.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn mkcalendar_protected_props_rejected() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db

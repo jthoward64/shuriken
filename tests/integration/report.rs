@@ -15,7 +15,6 @@ use super::helpers::*;
 /// ## Summary
 /// Test that calendar-query REPORT returns 207.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn calendar_query_returns_multistatus() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -63,7 +62,6 @@ async fn calendar_query_returns_multistatus() {
 /// ## Summary
 /// Test that calendar-query with time-range filter returns matching events.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn calendar_query_time_range_filter() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -127,7 +125,6 @@ async fn calendar_query_time_range_filter() {
 /// ## Summary
 /// Test that calendar-query returns calendar-data when requested.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn calendar_query_returns_calendar_data() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -181,7 +178,6 @@ async fn calendar_query_returns_calendar_data() {
 /// ## Summary
 /// Test that calendar-multiget returns requested resources.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn calendar_multiget_returns_resources() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -244,7 +240,6 @@ async fn calendar_multiget_returns_resources() {
 /// ## Summary
 /// Test that calendar-multiget returns 404 for missing resources.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn calendar_multiget_missing_resource_404() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -284,7 +279,6 @@ async fn calendar_multiget_missing_resource_404() {
 /// ## Summary
 /// Test that addressbook-query REPORT returns 207.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn addressbook_query_returns_multistatus() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -337,7 +331,6 @@ async fn addressbook_query_returns_multistatus() {
 /// ## Summary
 /// Test that addressbook-query returns address-data when requested.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn addressbook_query_returns_address_data() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -396,7 +389,6 @@ async fn addressbook_query_returns_address_data() {
 /// ## Summary
 /// Test that addressbook-multiget returns requested vcards.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn addressbook_multiget_returns_vcards() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -463,7 +455,6 @@ async fn addressbook_multiget_returns_vcards() {
 /// ## Summary
 /// Test that sync-collection REPORT returns 207.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn sync_collection_returns_multistatus() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -494,7 +485,6 @@ async fn sync_collection_returns_multistatus() {
 /// ## Summary
 /// Test that sync-collection returns sync-token in response.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn sync_collection_returns_sync_token() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -527,7 +517,6 @@ async fn sync_collection_returns_sync_token() {
 /// ## Summary
 /// Test that sync-collection with initial sync returns all resources.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn sync_collection_initial_sync() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -585,7 +574,6 @@ async fn sync_collection_initial_sync() {
 /// ## Summary
 /// Test that sync-collection with token returns only changes.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn sync_collection_delta_sync() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -657,7 +645,6 @@ async fn report_nonexistent_404() {
 /// ## Summary
 /// Test that REPORT with invalid XML returns 400.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn report_invalid_xml_400() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -688,7 +675,6 @@ async fn report_invalid_xml_400() {
 /// ## Summary
 /// Test that unsupported REPORT type returns appropriate error.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn report_unsupported_type() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db

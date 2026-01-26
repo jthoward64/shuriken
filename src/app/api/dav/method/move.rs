@@ -4,6 +4,7 @@
 
 use diesel_async::AsyncConnection;
 use diesel_async::scoped_futures::ScopedFutureExt;
+use salvo::Depot;
 use salvo::http::StatusCode;
 use salvo::{Request, Response, handler};
 
@@ -28,7 +29,7 @@ use crate::util::path;
 /// ## Errors
 /// Returns 400 for missing Destination, 409 for conflicts, 412 for preconditions, 500 for errors.
 #[handler]
-pub async fn r#move(req: &mut Request, res: &mut Response) {
+pub async fn r#move(req: &mut Request, res: &mut Response, depot: &Depot) {
     // Get source path
     let source_path = req.uri().path().to_string();
 
@@ -83,11 +84,20 @@ pub async fn r#move(req: &mut Request, res: &mut Response) {
         return;
     }
 
-    // Get database connection
-    let mut conn = match connection::connect().await {
+    // Get database provider from depot
+    let provider = match connection::get_db_from_depot(&depot) {
+        Ok(provider) => provider,
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to get database provider");
+            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+            return;
+        }
+    };
+
+    let mut conn = match provider.get_connection().await {
         Ok(conn) => conn,
         Err(e) => {
-            tracing::error!("Failed to get database connection: {}", e);
+            tracing::error!(error = %e, "Failed to get database connection");
             res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
             return;
         }

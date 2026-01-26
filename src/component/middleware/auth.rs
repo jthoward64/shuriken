@@ -37,21 +37,21 @@ impl salvo::Handler for AuthMiddleware {
             return;
         }
 
-        match authenticate(req).await {
+        match authenticate(req, depot).await {
             Ok(user) => {
                 tracing::debug!(user_email = %user.email, "User authenticated successfully");
                 depot.insert("user", DepotUser::User(user));
             }
             Err(e) => match e {
-                crate::component::error::Error::NotAuthenticated => {
+                crate::component::error::AppError::NotAuthenticated => {
                     tracing::debug!("Request not authenticated, treating as public");
                     depot.insert("user", DepotUser::Public);
                 }
-                crate::component::error::Error::PoolError(_) => {
+                crate::component::error::AppError::PoolError(_) => {
                     tracing::warn!(error = ?e, "Database pool unavailable, treating as public");
                     depot.insert("user", DepotUser::Public);
                 }
-                crate::component::error::Error::AuthenticationError(_) => {
+                crate::component::error::AppError::AuthenticationError(_) => {
                     tracing::warn!(error = ?e, "Authentication error");
                     res.status_code(salvo::http::StatusCode::UNAUTHORIZED);
                     res.body("Unauthorized");

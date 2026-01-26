@@ -14,7 +14,6 @@ use super::helpers::*;
 /// ## Summary
 /// Test that PROPPATCH returns 207 Multi-Status.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn proppatch_returns_multistatus() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -50,7 +49,6 @@ async fn proppatch_returns_multistatus() {
 /// ## Summary
 /// Test that attempting to set a protected property returns 403.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn proppatch_set_protected_prop_403() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -93,7 +91,6 @@ async fn proppatch_set_protected_prop_403() {
 /// ## Summary
 /// Test that attempting to remove a protected property returns 403.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn proppatch_remove_protected_prop_403() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -140,7 +137,6 @@ async fn proppatch_remove_protected_prop_403() {
 /// ## Summary
 /// Test that setting DAV:displayname succeeds and persists.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn proppatch_set_displayname_200() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -186,7 +182,6 @@ async fn proppatch_set_displayname_200() {
 /// ## Summary
 /// Test that setting calendar-description property succeeds.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn proppatch_set_calendar_description() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -228,7 +223,6 @@ async fn proppatch_set_calendar_description() {
 /// ## Summary
 /// Test that removing a writable property succeeds.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn proppatch_remove_displayname() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -270,7 +264,6 @@ async fn proppatch_remove_displayname() {
 /// ## Summary
 /// Test that setting multiple properties in one request works.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn proppatch_set_multiple_props() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -317,7 +310,6 @@ async fn proppatch_set_multiple_props() {
 /// ## Summary
 /// Test that partial success is handled correctly.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn proppatch_partial_success_207() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -385,7 +377,6 @@ async fn proppatch_nonexistent_404() {
 /// ## Summary
 /// Test that PROPPATCH with invalid XML returns 400.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn proppatch_invalid_xml_400() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -416,7 +407,6 @@ async fn proppatch_invalid_xml_400() {
 /// ## Summary
 /// Test that PROPPATCH without body returns appropriate error.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn proppatch_empty_body_error() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db

@@ -6,12 +6,12 @@ use diesel_async::AsyncConnection;
 use diesel_async::scoped_futures::ScopedFutureExt;
 
 use crate::component::{
-    config::{AuthMethod, get_config},
+    config::{AuthMethod, get_config_from_depot},
     db::{
-        connection::{DbConnection, connect},
+        connection::{DbConnection, get_db_from_depot},
         schema,
     },
-    error::{Error, Result},
+    error::{AppError, AppResult},
     model::principal::{NewPrincipal, PrincipalType},
     model::user::{NewUser, User},
 };
@@ -24,26 +24,27 @@ use crate::component::{
 ///
 /// Returns an error if the user cannot be created or retrieved from the database.
 #[tracing::instrument]
-async fn authenticate_single_user() -> Result<User> {
+async fn authenticate_single_user(depot: &salvo::Depot) -> AppResult<User> {
     tracing::debug!("Authenticating single user");
 
     use diesel_async::RunQueryDsl;
 
-    let config = get_config();
+    let config = get_config_from_depot(depot)?;
     let single_user_config =
         config
             .auth
             .single_user
             .as_ref()
-            .ok_or(Error::InvalidConfiguration(
+            .ok_or(AppError::InvalidConfiguration(
                 "Single user config is missing".to_string(),
             ))?;
 
-    let mut conn = connect().await?;
+    let provider = get_db_from_depot(depot)?;
+    let mut conn = provider.get_connection().await?;
     let single_user_name = single_user_config.name.clone();
     let single_user_email = single_user_config.email.clone();
 
-    conn.transaction::<_, Error, _>(move |tx| {
+    conn.transaction::<_, AppError, _>(move |tx| {
         let single_user_name = single_user_name.clone();
         let single_user_email = single_user_email.clone();
 
@@ -77,7 +78,11 @@ async fn authenticate_single_user() -> Result<User> {
 ///
 /// ## Errors
 /// Returns an error if database inserts fail.
-async fn create_single_user(conn: &mut DbConnection<'_>, name: &str, email: &str) -> Result<User> {
+async fn create_single_user(
+    conn: &mut DbConnection<'_>,
+    name: &str,
+    email: &str,
+) -> AppResult<User> {
     use diesel_async::RunQueryDsl;
 
     let principal_id = uuid::Uuid::now_v7();
@@ -113,7 +118,7 @@ async fn create_single_user(conn: &mut DbConnection<'_>, name: &str, email: &str
 }
 
 #[expect(clippy::unused_async)]
-async fn authenticate_proxy(req: &salvo::Request) -> Result<User> {
+async fn authenticate_proxy(req: &salvo::Request) -> AppResult<User> {
     let _ = req;
     todo!("Implement configuration for proxy authentication")
 }
@@ -124,13 +129,13 @@ async fn authenticate_proxy(req: &salvo::Request) -> Result<User> {
 /// ## Errors
 /// Returns an error if authentication fails.
 #[tracing::instrument(skip(req))]
-pub async fn authenticate(req: &salvo::Request) -> Result<User> {
-    let config = get_config();
+pub async fn authenticate(req: &salvo::Request, depot: &salvo::Depot) -> AppResult<User> {
+    let config = get_config_from_depot(depot)?;
 
     tracing::trace!(auth_method = ?config.auth.method, "Authenticating request");
 
     match config.auth.method {
-        AuthMethod::SingleUser => authenticate_single_user().await,
+        AuthMethod::SingleUser => authenticate_single_user(depot).await,
         AuthMethod::Proxy => authenticate_proxy(req).await,
     }
 }

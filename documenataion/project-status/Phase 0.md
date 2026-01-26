@@ -59,15 +59,11 @@ Phase 0 establishes the foundational database schema for Shuriken's CalDAV/CardD
 
 ## ⚠️ Schema Usage Issues (Not Schema Bugs)
 
-### 1. `dav_shadow` Used Instead of Component Tree
+### 1. `dav_shadow` Currently Unused (Component Tree Is Active)
 
-**Observation**: GET responses read from `dav_shadow.raw_canonical` rather than reconstructing from `dav_component`/`dav_property`/`dav_parameter`.
+**Observation**: GET/HEAD responses reconstruct from `dav_component`/`dav_property`/`dav_parameter` via `get_entity_with_tree()` and serializers; `dav_shadow` is not used in request handling.
 
-**Impact**: The component tree tables exist but aren't used for output serialization.
-
-**Options**:
-- (A) Implement proper tree→content reconstruction
-- (B) Remove component tree, keep only shadow + indexes (simpler)
+**Impact**: The component tree is the canonical source of truth for output serialization; `dav_shadow` is currently unused storage.
 
 ### 2. `cal_timezone` Table Unused
 
@@ -128,13 +124,11 @@ CREATE INDEX idx_card_index_search ON card_index USING GIN (search_tsv);
 
 ## Architecture Decision: Component Tree vs Raw Storage
 
-The current schema has **both** patterns but only uses raw storage.
+The current implementation uses the **component tree** as the canonical source of truth.
 
-**Recommendation**: Pick one approach:
-- **Option A**: Commit to component tree (enables property-level operations)
-- **Option B**: Raw storage + indexes only (simpler, perfect fidelity)
-
-For MVP, Option B is recommended.
+**Recommendation**:
+- **Option A (current)**: Keep component tree as canonical and remove/repurpose `dav_shadow`.
+- **Option B**: If you decide to simplify, remove tree tables and keep only raw storage + indexes.
 
 ---
 

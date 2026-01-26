@@ -1,8 +1,8 @@
 use casbin::CoreApi;
 
 use crate::component::{
-    auth::casbin::get_enforcer,
-    error::{Error, Result},
+    auth::casbin::get_enforcer_from_depot,
+    error::{AppError, AppResult},
 };
 
 /// ## Summary
@@ -13,17 +13,17 @@ use crate::component::{
 /// ## Errors
 /// Returns `Error::AuthorizationError` when access is denied.
 /// Propagates `Error::CasbinError` for Casbin evaluation errors.
-pub fn require(sub: &str, obj: &str, act: &str) -> Result<()> {
-    let enforcer = get_enforcer();
+pub fn require(depot: &salvo::Depot, sub: &str, obj: &str, act: &str) -> AppResult<()> {
+    let enforcer = get_enforcer_from_depot(depot)?;
 
     let allowed = enforcer
         .enforce((sub, obj, act))
-        .map_err(Error::CasbinError)?;
+        .map_err(AppError::CasbinError)?;
 
     if allowed {
         Ok(())
     } else {
-        Err(Error::AuthorizationError(format!(
+        Err(AppError::AuthorizationError(format!(
             "Denied: sub={sub} obj={obj} act={act}"
         )))
     }

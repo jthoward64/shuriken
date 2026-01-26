@@ -1,9 +1,9 @@
 use salvo::conn::TcpListener;
 use salvo::{Listener, Router};
 use shuriken::app::api::routes;
-use shuriken::component::auth::casbin::init_casbin;
-use shuriken::component::config::{get_config, load_config};
-use shuriken::component::db::connection;
+use shuriken::component::auth::casbin::{CasbinEnforcerHandler, init_casbin};
+use shuriken::component::config::{ConfigHandler, load_config};
+use shuriken::component::db::connection::{self, DbProviderHandler};
 use tracing_subscriber::{EnvFilter, fmt};
 
 #[tokio::main]
@@ -13,7 +13,8 @@ async fn main() -> anyhow::Result<()> {
     // RUST_LOG=debug for debug logs
     // RUST_LOG=shuriken=debug for debug logs in shuriken only
     // RUST_LOG=shuriken::component::db=trace for trace logs in db component
-    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    let env_filter: EnvFilter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
     fmt()
         .with_env_filter(env_filter)
@@ -25,21 +26,34 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("Starting Shuriken CalDAV/CardDAV server");
 
-    load_config()?;
+    let config = load_config()?;
 
-    tracing::info!(config = ?get_config(), "Configuration loaded");
+    tracing::info!(config = ?config, "Configuration loaded");
 
-    connection::create_pool(&get_config().database.url, 4).await?;
+    let pool = connection::create_pool(
+        &config.database.url,
+        u32::from(config.database.max_connections),
+    )
+    .await?;
 
-    init_casbin().await?;
+    let enforcer = init_casbin(pool.clone()).await?;
 
     tracing::info!("Database connection pool created.");
 
-    let acceptor = TcpListener::new("0.0.0.0:8698").bind().await;
+    let bind_addr = format!("{}:{}", config.server.host, config.server.port);
+    let acceptor = TcpListener::new(bind_addr.clone()).bind().await;
 
-    let router = Router::new().push(routes()?);
+    let router = Router::new()
+        .hoop(DbProviderHandler { provider: pool })
+        .hoop(ConfigHandler {
+            settings: config.clone(),
+        })
+        .hoop(CasbinEnforcerHandler {
+            enforcer: std::sync::Arc::new(enforcer),
+        })
+        .push(routes()?);
 
-    tracing::info!("Server listening on 0.0.0.0:8698");
+    tracing::info!("Server listening on {bind_addr}");
 
     salvo::Server::new(acceptor).serve(router).await;
 

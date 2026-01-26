@@ -1,17 +1,14 @@
-use std::sync::OnceLock;
-
-use diesel::result::ConnectionError;
 use diesel_async::AsyncPgConnection;
 use diesel_async::pooled_connection::AsyncDieselConnectionManager;
-use diesel_async::pooled_connection::{
-    PoolError,
-    bb8::{Pool, PooledConnection, RunError},
-};
+use diesel_async::pooled_connection::bb8::{Pool, PooledConnection};
+use salvo::async_trait;
+use std::sync::Arc;
+
+use crate::component::db::DbProvider;
+use crate::component::error::{AppError, AppResult};
 
 pub type DbPool = Pool<AsyncPgConnection>;
 pub type DbConnection<'pool> = PooledConnection<'pool, AsyncPgConnection>;
-
-static DB_POOL: OnceLock<DbPool> = OnceLock::new();
 
 /// ## Summary
 /// Creates a new database connection pool.
@@ -23,7 +20,7 @@ static DB_POOL: OnceLock<DbPool> = OnceLock::new();
 /// Panics if the database pool is already initialized. This is a programming error
 /// and indicates `create_pool()` was called multiple times.
 #[tracing::instrument(skip(database_url), fields(pool_size = size))]
-pub async fn create_pool(database_url: &str, size: u32) -> anyhow::Result<()> {
+pub async fn create_pool(database_url: &str, size: u32) -> anyhow::Result<DbPool> {
     tracing::debug!("Creating database connection pool");
 
     let config = AsyncDieselConnectionManager::<AsyncPgConnection>::new(database_url);
@@ -37,70 +34,56 @@ pub async fn create_pool(database_url: &str, size: u32) -> anyhow::Result<()> {
         .build(config)
         .await?;
 
-    #[expect(
-        clippy::expect_used,
-        reason = "Startup invariant - pool must only be set once"
-    )]
-    DB_POOL
-        .set(pool)
-        .expect("Database pool is already set - create_pool() must only be called once at startup");
-
     tracing::info!(
         pool_size = size,
         "Database connection pool created successfully"
     );
 
-    Ok(())
+    Ok(pool)
 }
 
-/// Get a connection from the database pool.
-///
-/// ## Panics
-///
-/// Panics if the database pool is not initialized. This indicates a programming error
-/// where the connection was accessed before `create_pool()` was called.
-///
-/// ## Errors
-///
-/// Returns a `PoolError` if unable to get a connection from the pool.
-#[tracing::instrument]
-pub async fn connect() -> Result<DbConnection<'static>, RunError> {
-    tracing::trace!("Acquiring database connection from pool");
-
-    let Some(pool) = DB_POOL.get() else {
-        return Err(RunError::User(PoolError::ConnectionError(
-            ConnectionError::BadConnection(
-                "Database pool is not initialized - create_pool() must be called at startup"
-                    .to_string(),
-            ),
-        )));
-    };
-
-    let result = pool.get().await;
-
-    if result.is_ok() {
-        tracing::trace!("Database connection acquired successfully");
-    } else {
-        tracing::error!("Failed to acquire database connection from pool");
+impl DbProvider for DbPool {
+    #[tracing::instrument(skip(self))]
+    fn get_connection<'a>(
+        &'a self,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = AppResult<DbConnection<'a>>> + Send + 'a>>
+    {
+        Box::pin(async move {
+            let conn = self.get().await?;
+            Ok(conn)
+        })
     }
+}
 
-    result
+pub struct DbProviderHandler<T: DbProvider + Send + Sync + Clone> {
+    pub provider: T,
+}
+#[async_trait]
+impl<T: DbProvider + Send + Sync + Clone + 'static> salvo::Handler for DbProviderHandler<T> {
+    #[tracing::instrument(skip(self, _req, depot, _res, _ctrl))]
+    async fn handle(
+        &self,
+        _req: &mut salvo::Request,
+        depot: &mut salvo::Depot,
+        _res: &mut salvo::Response,
+        _ctrl: &mut salvo::FlowCtrl,
+    ) {
+        // Insert a reference to the pool into the depot
+        let provider: Arc<dyn DbProvider + Send + Sync> = Arc::new(self.provider.clone());
+        depot.inject(provider);
+    }
 }
 
 /// ## Summary
-/// Get a reference to the global database pool.
+/// Retrieves the database provider from the depot.
 ///
-/// ## Panics
-/// Panics if the database pool is not initialized. This indicates a programming error
-/// where the pool was accessed before `create_pool()` was called.
-#[must_use]
-#[expect(
-    clippy::expect_used,
-    reason = "Startup invariant - pool must be initialized"
-)]
-pub fn get_pool() -> DbPool {
-    DB_POOL
-        .get()
-        .expect("Database pool is not initialized - create_pool() must be called at startup")
-        .clone()
+/// ## Errors
+/// Returns an error if the database provider is not found in the depot.
+pub fn get_db_from_depot(
+    depot: &salvo::Depot,
+) -> AppResult<Arc<dyn DbProvider + Send + Sync + 'static>> {
+    depot
+        .obtain::<Arc<dyn DbProvider + Send + Sync>>()
+        .cloned()
+        .map_err(|_| AppError::InvariantViolation("Database provider not found in depot".into()))
 }

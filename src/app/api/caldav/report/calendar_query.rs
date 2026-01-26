@@ -1,7 +1,7 @@
 //! Handler for `calendar-query` REPORT.
 
 use salvo::http::StatusCode;
-use salvo::{Request, Response};
+use salvo::{Depot, Request, Response};
 
 use crate::component::db::connection;
 use crate::component::rfc::dav::build::multistatus::serialize_multistatus;
@@ -23,6 +23,7 @@ pub async fn handle(
     res: &mut Response,
     query: CalendarQuery,
     properties: Vec<PropertyName>,
+    depot: &Depot,
 ) {
     // Extract collection_id from request path
     let collection_id = match crate::util::path::extract_collection_id(req.uri().path()) {
@@ -40,10 +41,19 @@ pub async fn handle(
     }
 
     // Get database connection
-    let mut conn = match connection::connect().await {
+    let provider = match connection::get_db_from_depot(depot) {
+        Ok(provider) => provider,
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to get database provider");
+            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+            return;
+        }
+    };
+
+    let mut conn = match provider.get_connection().await {
         Ok(conn) => conn,
         Err(e) => {
-            tracing::error!("Failed to get database connection: {}", e);
+            tracing::error!(error = %e, "Failed to get database connection");
             res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
             return;
         }

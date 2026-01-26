@@ -4,7 +4,7 @@
 #![allow(clippy::single_match_else)]
 
 use salvo::http::StatusCode;
-use salvo::{Request, Response, handler};
+use salvo::{Depot, Request, Response, handler};
 
 use crate::component::dav::service::collection::{CreateCollectionContext, create_collection};
 use crate::component::db::connection;
@@ -25,15 +25,24 @@ use crate::component::rfc::dav::parse::{MkcolRequest, parse_mkcol};
 /// ## Errors
 /// Returns 400 for invalid XML, 403 for authorization failures, 409 if exists, 500 for errors.
 #[handler]
-pub async fn mkcol_extended(req: &mut Request, res: &mut Response) {
+pub async fn mkcol_extended(req: &mut Request, res: &mut Response, depot: &Depot) {
     // Get path to determine where to create the addressbook
     let path = req.uri().path().to_string();
 
     // Get database connection
-    let mut conn = match connection::connect().await {
+    let provider = match connection::get_db_from_depot(depot) {
+        Ok(provider) => provider,
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to get database provider");
+            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+            return;
+        }
+    };
+
+    let mut conn = match provider.get_connection().await {
         Ok(conn) => conn,
         Err(e) => {
-            tracing::error!("Failed to get database connection: {}", e);
+            tracing::error!(error = %e, "Failed to get database connection");
             res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
             return;
         }

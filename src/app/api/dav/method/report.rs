@@ -1,7 +1,7 @@
 //! `WebDAV` sync-collection REPORT handler.
 
 use salvo::http::StatusCode;
-use salvo::{Request, Response, handler};
+use salvo::{Depot, Request, Response, handler};
 
 use crate::component::db::connection;
 use crate::component::rfc::dav::build::multistatus::serialize_multistatus;
@@ -20,7 +20,7 @@ use crate::component::rfc::dav::core::{ExpandProperty, Multistatus, ReportType, 
 /// ## Errors
 /// Returns 400 for invalid requests, 501 for unsupported reports.
 #[handler]
-pub async fn report(req: &mut Request, res: &mut Response) {
+pub async fn report(req: &mut Request, res: &mut Response, depot: &Depot) {
     // Read request body
     let body = match req.payload().await {
         Ok(body) => body,
@@ -44,10 +44,10 @@ pub async fn report(req: &mut Request, res: &mut Response) {
     // Dispatch based on report type
     match req_data.report_type {
         ReportType::SyncCollection(sync) => {
-            handle_sync_collection(req, res, sync, req_data.properties).await;
+            handle_sync_collection(req, res, sync, req_data.properties, depot).await;
         }
         ReportType::ExpandProperty(expand) => {
-            handle_expand_property(req, res, expand, req_data.properties).await;
+            handle_expand_property(req, res, expand, req_data.properties, depot).await;
         }
         _ => {
             tracing::warn!("Unsupported REPORT type for WebDAV endpoint");
@@ -68,16 +68,27 @@ pub async fn report(req: &mut Request, res: &mut Response) {
 ///
 /// ## Errors
 /// Returns 400 for invalid sync tokens, 404 for missing collections, 500 for server errors.
+#[expect(dead_code, reason = "Scaffolded REPORT handler not wired yet")]
 pub async fn handle_sync_collection(
     _req: &mut Request,
     res: &mut Response,
     sync: SyncCollection,
     properties: Vec<crate::component::rfc::dav::core::PropertyName>,
+    depot: &Depot,
 ) {
-    let mut conn = match connection::connect().await {
+    let provider = match connection::get_db_from_depot(depot) {
+        Ok(provider) => provider,
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to get database provider");
+            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+            return;
+        }
+    };
+
+    let mut conn = match provider.get_connection().await {
         Ok(conn) => conn,
         Err(e) => {
-            tracing::error!("Failed to get database connection: {}", e);
+            tracing::error!(error = %e, "Failed to get database connection");
             res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
             return;
         }
@@ -134,16 +145,27 @@ async fn build_sync_collection_response(
 ///
 /// ## Errors
 /// Returns 400 for invalid requests, 500 for server errors.
+#[expect(dead_code, reason = "Scaffolded REPORT handler not wired yet")]
 pub async fn handle_expand_property(
     req: &mut Request,
     res: &mut Response,
     expand: ExpandProperty,
     properties: Vec<crate::component::rfc::dav::core::PropertyName>,
+    depot: &Depot,
 ) {
-    let mut conn = match connection::connect().await {
+    let provider = match connection::get_db_from_depot(depot) {
+        Ok(provider) => provider,
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to get database provider");
+            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+            return;
+        }
+    };
+
+    let mut conn = match provider.get_connection().await {
         Ok(conn) => conn,
         Err(e) => {
-            tracing::error!("Failed to get database connection: {}", e);
+            tracing::error!(error = %e, "Failed to get database connection");
             res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
             return;
         }

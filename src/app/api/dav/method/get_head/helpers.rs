@@ -1,7 +1,7 @@
 //! Helper functions for GET and HEAD request processing.
 
 use salvo::http::{HeaderValue, StatusCode};
-use salvo::{Request, Response};
+use salvo::{Depot, Request, Response};
 
 use crate::component::db::connection;
 use crate::component::db::map::dav::{serialize_ical_tree, serialize_vcard_tree};
@@ -21,7 +21,12 @@ use crate::util::path;
 /// ## Side Effects
 /// - Sets HTTP status code and headers on response
 /// - For GET requests, writes response body
-pub(super) async fn handle_get_or_head(req: &mut Request, res: &mut Response, is_head: bool) {
+pub(super) async fn handle_get_or_head(
+    req: &mut Request,
+    res: &mut Response,
+    is_head: bool,
+    depot: &Depot,
+) {
     // Extract the resource path from the request
     let request_path = req.uri().path();
 
@@ -46,33 +51,10 @@ pub(super) async fn handle_get_or_head(req: &mut Request, res: &mut Response, is
         "Parsed request path"
     );
 
-    // Get database connection
-    let mut conn = match connection::connect().await {
-        Ok(conn) => conn,
-        Err(e) => {
-            tracing::error!("Failed to get database connection: {}", e);
-            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
-            return;
-        }
-    };
-
-    // Load instance from database
-    let (instance, canonical_bytes) = match load_instance(&mut conn, collection_id, &uri).await {
-        Ok(Some(data)) => data,
-        Ok(None) => {
-            tracing::debug!(
-                collection_id = %collection_id,
-                uri = %uri,
-                "Resource not found"
-            );
-            res.status_code(StatusCode::NOT_FOUND);
-            return;
-        }
-        Err(e) => {
-            tracing::error!(error = %e, "Database error");
-            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
-            return;
-        }
+    let Some((instance, canonical_bytes)) =
+        get_collection_instance(res, depot, collection_id, uri).await
+    else {
+        return;
     };
 
     // Check If-None-Match for conditional GET/HEAD
@@ -84,6 +66,48 @@ pub(super) async fn handle_get_or_head(req: &mut Request, res: &mut Response, is
 
     // Set response headers and body
     set_response_headers_and_body(res, &instance, &canonical_bytes, is_head);
+}
+
+async fn get_collection_instance(
+    res: &mut Response,
+    depot: &Depot,
+    collection_id: uuid::Uuid,
+    uri: String,
+) -> Option<(DavInstance, Vec<u8>)> {
+    let provider = match connection::get_db_from_depot(depot) {
+        Ok(provider) => provider,
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to get database provider");
+            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+            return None;
+        }
+    };
+    let mut conn = match provider.get_connection().await {
+        Ok(conn) => conn,
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to get database connection");
+            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+            return None;
+        }
+    };
+    let (instance, canonical_bytes) = match load_instance(&mut conn, collection_id, &uri).await {
+        Ok(Some(data)) => data,
+        Ok(None) => {
+            tracing::debug!(
+                collection_id = %collection_id,
+                uri = %uri,
+                "Resource not found"
+            );
+            res.status_code(StatusCode::NOT_FOUND);
+            return None;
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "Database error");
+            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+            return None;
+        }
+    };
+    Some((instance, canonical_bytes))
 }
 
 /// ## Summary

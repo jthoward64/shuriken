@@ -14,7 +14,6 @@ use super::helpers::*;
 /// ## Summary
 /// Test that PUT creates a new calendar object.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn put_creates_calendar_object() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -49,7 +48,6 @@ async fn put_creates_calendar_object() {
 /// ## Summary
 /// Test that PUT creates a new vCard.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn put_creates_vcard() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -88,7 +86,10 @@ async fn put_creates_vcard() {
 /// ## Summary
 /// Test that PUT populates `cal_index` and `cal_occurrence` for recurring events.
 #[tokio::test]
-#[ignore = "requires database seeding"]
+#[expect(
+    clippy::too_many_lines,
+    reason = "Integration test exercises multiple assertions in one flow"
+)]
 async fn put_populates_cal_index_and_occurrences() {
     use chrono::{NaiveDateTime, Utc};
     use diesel::prelude::*;
@@ -184,7 +185,10 @@ async fn put_populates_cal_index_and_occurrences() {
 /// ## Summary
 /// Test that PUT populates `card_index` for vCards.
 #[tokio::test]
-#[ignore = "requires database seeding"]
+#[expect(
+    clippy::too_many_lines,
+    reason = "Integration test exercises multiple assertions in one flow"
+)]
 async fn put_populates_card_index() {
     use diesel::prelude::*;
     use diesel_async::RunQueryDsl;
@@ -268,7 +272,6 @@ async fn put_populates_card_index() {
 /// ## Summary
 /// Test that PUT with If-None-Match:* succeeds when resource doesn't exist.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn put_create_if_none_match_star_ok() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -305,7 +308,6 @@ async fn put_create_if_none_match_star_ok() {
 /// ## Summary
 /// Test that PUT with If-None-Match:* fails when resource exists.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn put_create_if_none_match_star_fails_when_exists() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -361,7 +363,6 @@ async fn put_create_if_none_match_star_fails_when_exists() {
 /// ## Summary
 /// Test that PUT update with correct If-Match succeeds.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn put_update_if_match_success() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -412,7 +413,6 @@ async fn put_update_if_match_success() {
 /// ## Summary
 /// Test that PUT with mismatched If-Match returns 412.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn put_update_if_match_mismatch_412() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -468,7 +468,6 @@ async fn put_update_if_match_mismatch_412() {
 /// ## Summary
 /// Test that PUT with invalid iCalendar returns validation error.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn put_invalid_ical_rejected() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -509,7 +508,6 @@ async fn put_invalid_ical_rejected() {
 /// ## Summary
 /// Test that PUT with invalid vCard returns validation error.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn put_invalid_vcard_rejected() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -554,7 +552,6 @@ async fn put_invalid_vcard_rejected() {
 /// ## Summary
 /// Test that PUT with duplicate UID returns no-uid-conflict error.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn put_uid_conflict_rejected() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -614,7 +611,6 @@ async fn put_uid_conflict_rejected() {
 /// ## Summary
 /// Test that PUT bumps collection sync token.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn put_bumps_synctoken() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -670,7 +666,6 @@ async fn put_bumps_synctoken() {
 /// ## Summary
 /// Test that PUT returns ETag in response.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn put_returns_etag() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -714,7 +709,6 @@ async fn put_returns_etag() {
 /// ## Summary
 /// Test that PUT updates ETag on modification.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn put_updates_etag() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -783,7 +777,6 @@ async fn put_updates_etag() {
 /// ## Summary
 /// Test that PUT returns 201 for new resources and 204 for updates.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn put_status_codes() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db

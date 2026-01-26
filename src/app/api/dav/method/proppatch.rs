@@ -5,7 +5,7 @@
 
 use salvo::http::StatusCode;
 use salvo::writing::Text;
-use salvo::{Request, Response, handler};
+use salvo::{Depot, Request, Response, handler};
 
 use crate::component::db::connection;
 use crate::component::db::query::dav::collection;
@@ -29,7 +29,7 @@ use crate::util::path;
 /// ## Errors
 /// Returns 400 for invalid XML, 403 for protected properties, 500 for server errors.
 #[handler]
-pub async fn proppatch(req: &mut Request, res: &mut Response) {
+pub async fn proppatch(req: &mut Request, res: &mut Response, depot: &Depot) {
     // Get path to determine the resource
     let path = req.uri().path().to_string();
 
@@ -69,10 +69,19 @@ pub async fn proppatch(req: &mut Request, res: &mut Response) {
     }
 
     // Get database connection
-    let mut conn = match connection::connect().await {
+    let provider = match connection::get_db_from_depot(depot) {
+        Ok(provider) => provider,
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to get database provider");
+            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+            return;
+        }
+    };
+
+    let mut conn = match provider.get_connection().await {
         Ok(conn) => conn,
         Err(e) => {
-            tracing::error!("Failed to get database connection: {}", e);
+            tracing::error!(error = %e, "Failed to get database connection");
             res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
             return;
         }

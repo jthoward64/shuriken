@@ -135,7 +135,6 @@ async fn fetch_card_index_count(test_db: &TestDb, entity_id: uuid::Uuid) -> anyh
 /// ## Summary
 /// Test that DELETE on a calendar object succeeds.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn delete_calendar_object() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -181,7 +180,6 @@ async fn delete_calendar_object() {
 /// ## Summary
 /// Test that DELETE creates a tombstone and bumps sync token.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn delete_creates_tombstone() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -255,7 +253,6 @@ async fn delete_creates_tombstone() {
 /// ## Summary
 /// Test that DELETE removes calendar index rows and occurrences.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn delete_cleans_calendar_indexes() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -308,7 +305,6 @@ async fn delete_cleans_calendar_indexes() {
 /// ## Summary
 /// Test that DELETE removes card index rows.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn delete_cleans_card_index() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -378,7 +374,6 @@ async fn delete_nonexistent_404() {
 /// ## Summary
 /// Test that DELETE on already-deleted resource is handled appropriately.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn delete_idempotent() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -438,7 +433,6 @@ async fn delete_idempotent() {
 /// ## Summary
 /// Test that DELETE with correct If-Match succeeds.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn delete_if_match_success() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -478,7 +472,6 @@ async fn delete_if_match_success() {
 /// ## Summary
 /// Test that DELETE with mismatched If-Match returns 412.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn delete_if_match_mismatch_412() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -538,7 +531,6 @@ async fn delete_if_match_mismatch_412() {
 /// ## Summary
 /// Test that DELETE on collection is handled appropriately.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn delete_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -594,7 +586,6 @@ async fn delete_collection() {
 /// ## Summary
 /// Test that DELETE collection does not leave orphaned instances.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn delete_collection_no_orphans() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -665,7 +656,6 @@ async fn delete_collection_no_orphans() {
 /// ## Summary
 /// Test that DELETE bumps collection sync token.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn delete_bumps_synctoken() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db

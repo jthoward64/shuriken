@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum Error {
+pub enum AppError {
     #[error("Database error: {0}")]
     DatabaseError(#[from] diesel::result::Error),
     #[error("Pool error: {0}")]
@@ -27,4 +27,4 @@ pub enum Error {
     InvariantViolation(String),
 }
 
-pub type Result<T> = std::result::Result<T, Error>;
+pub type AppResult<T> = std::result::Result<T, AppError>;

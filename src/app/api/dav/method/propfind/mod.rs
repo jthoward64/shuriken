@@ -3,7 +3,7 @@
 mod helpers;
 
 use salvo::http::StatusCode;
-use salvo::{Request, Response, handler};
+use salvo::{Depot, Request, Response, handler};
 
 use crate::app::api::dav::extract::headers::{Depth, parse_depth};
 use crate::component::db::connection;
@@ -32,7 +32,7 @@ use helpers::build_propfind_response;
     method = "PROPFIND",
     path = %req.uri().path()
 ))]
-pub async fn propfind(req: &mut Request, res: &mut Response) {
+pub async fn propfind(req: &mut Request, res: &mut Response, depot: &Depot) {
     tracing::info!("Handling PROPFIND request");
 
     // Parse Depth header (default to 0 for PROPFIND)
@@ -71,7 +71,16 @@ pub async fn propfind(req: &mut Request, res: &mut Response) {
     tracing::debug!("PROPFIND request parsed successfully");
 
     // Get database connection
-    let mut conn = match connection::connect().await {
+    let provider = match connection::get_db_from_depot(depot) {
+        Ok(provider) => provider,
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to get database provider");
+            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+            return;
+        }
+    };
+
+    let mut conn = match provider.get_connection().await {
         Ok(conn) => conn,
         Err(e) => {
             tracing::error!(error = %e, "Failed to get database connection");

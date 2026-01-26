@@ -1,24 +1,21 @@
-use std::sync::OnceLock;
+use std::sync::Arc;
 
 use casbin::CoreApi;
+use salvo::async_trait;
 
 use crate::component::{
-    db::connection::get_pool,
-    error::{Error, Result},
+    db::connection::DbPool,
+    error::{AppError, AppResult},
 };
-
-static ENFORCER: OnceLock<casbin::Enforcer> = OnceLock::new();
 
 /// ## Summary
 /// Initialize a Casbin enforcer with a Diesel adapter using the provided connection pool.
 ///
 /// ## Errors
 /// Returns an error if the enforcer initialization fails or if the enforcer is already initialized.
-#[tracing::instrument]
-pub async fn init_casbin() -> Result<()> {
+#[tracing::instrument(skip(pool))]
+pub async fn init_casbin(pool: DbPool) -> AppResult<casbin::Enforcer> {
     tracing::debug!("Initializing Casbin enforcer");
-
-    let pool = get_pool();
 
     let model = casbin::DefaultModel::from_str(include_str!("casbin_model.conf")).await?;
     tracing::debug!("Casbin model loaded");
@@ -28,28 +25,36 @@ pub async fn init_casbin() -> Result<()> {
 
     // casbin::Enforcer::new(model, adapter).await
     let enforcer = casbin::Enforcer::new(model, adapter).await?;
-    ENFORCER.set(enforcer).map_err(|_already_set| {
-        tracing::error!("Casbin enforcer already initialized - this is a programming error");
-        Error::InvariantViolation("Casbin enforcer already initialized".into())
-    })?;
-
     tracing::info!("Casbin enforcer initialized successfully");
-    Ok(())
+    Ok(enforcer)
+}
+
+pub struct CasbinEnforcerHandler {
+    pub enforcer: Arc<casbin::Enforcer>,
+}
+
+#[async_trait]
+impl salvo::Handler for CasbinEnforcerHandler {
+    #[tracing::instrument(skip(self, _req, depot, _res, _ctrl))]
+    async fn handle(
+        &self,
+        _req: &mut salvo::Request,
+        depot: &mut salvo::Depot,
+        _res: &mut salvo::Response,
+        _ctrl: &mut salvo::FlowCtrl,
+    ) {
+        depot.inject(self.enforcer.clone());
+    }
 }
 
 /// ## Summary
-/// Get a reference to the global Casbin enforcer.
+/// Retrieves the Casbin enforcer from the depot.
 ///
-/// ## Panics
-/// Panics if the Casbin enforcer is not initialized. This should only happen if
-/// `init_casbin()` was not called during application startup.
-#[must_use]
-#[expect(
-    clippy::expect_used,
-    reason = "Startup invariant - enforcer must be initialized"
-)]
-pub fn get_enforcer() -> &'static casbin::Enforcer {
-    ENFORCER
-        .get()
-        .expect("Casbin enforcer is not initialized - init_casbin() must be called at startup")
+/// ## Errors
+/// Returns an error if the Casbin enforcer is not found in the depot.
+pub fn get_enforcer_from_depot(depot: &salvo::Depot) -> AppResult<Arc<casbin::Enforcer>> {
+    depot
+        .obtain::<Arc<casbin::Enforcer>>()
+        .cloned()
+        .map_err(|_| AppError::InvariantViolation("Casbin enforcer not found in depot".into()))
 }

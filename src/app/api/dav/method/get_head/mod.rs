@@ -2,7 +2,7 @@
 
 mod helpers;
 
-use salvo::{Request, Response, handler};
+use salvo::{Depot, Request, Response, handler};
 
 use helpers::handle_get_or_head;
 
@@ -20,9 +20,9 @@ use helpers::handle_get_or_head;
 /// Returns 404 if the resource is not found, 500 for database errors.
 #[handler]
 #[tracing::instrument(skip(req, res), fields(path = %req.uri().path()))]
-pub async fn get(req: &mut Request, res: &mut Response) {
+pub async fn get(req: &mut Request, res: &mut Response, depot: &Depot) {
     tracing::info!("Handling GET request");
-    handle_get_or_head(req, res, false).await;
+    handle_get_or_head(req, res, false, depot).await;
 }
 
 /// ## Summary
@@ -38,7 +38,7 @@ pub async fn get(req: &mut Request, res: &mut Response) {
 /// Returns 404 if the resource is not found, 500 for database errors.
 #[handler]
 #[tracing::instrument(skip(req, res), fields(path = %req.uri().path()))]
-pub async fn head(req: &mut Request, res: &mut Response) {
+pub async fn head(req: &mut Request, res: &mut Response, depot: &Depot) {
     tracing::info!("Handling HEAD request");
-    handle_get_or_head(req, res, true).await;
+    handle_get_or_head(req, res, true, depot).await;
 }

@@ -14,7 +14,6 @@ use super::helpers::*;
 /// ## Summary
 /// Test that GET on a calendar object returns correct Content-Type.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn get_calendar_object_content_type() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -65,7 +64,6 @@ async fn get_calendar_object_content_type() {
 /// ## Summary
 /// Test that GET on a vcard returns correct Content-Type.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn get_vcard_content_type() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -118,7 +116,10 @@ async fn get_vcard_content_type() {
 /// ## Summary
 /// Test that GET serializes calendar content from the component tree.
 #[tokio::test]
-#[ignore = "requires database seeding"]
+#[expect(
+    clippy::too_many_lines,
+    reason = "Integration test exercises multiple assertions in one flow"
+)]
 async fn get_calendar_object_uses_component_tree() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -225,7 +226,10 @@ async fn get_calendar_object_uses_component_tree() {
 /// ## Summary
 /// Test that GET serializes vCard content from the component tree.
 #[tokio::test]
-#[ignore = "requires database seeding"]
+#[expect(
+    clippy::too_many_lines,
+    reason = "Integration test exercises multiple assertions in one flow"
+)]
 async fn get_vcard_uses_component_tree() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -327,7 +331,6 @@ async fn get_nonexistent_404() {
 /// ## Summary
 /// Test that HEAD returns same headers as GET without body.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn head_matches_get_headers() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -416,7 +419,6 @@ async fn head_nonexistent_404() {
 /// ## Summary
 /// Test that GET returns strong ETag.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn get_etag_present_and_strong() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -479,7 +481,6 @@ async fn get_etag_present_and_strong() {
 /// ## Summary
 /// Test that If-None-Match with matching ETag returns 304.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn get_if_none_match_304() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -527,7 +528,6 @@ async fn get_if_none_match_304() {
 /// ## Summary
 /// Test that If-None-Match with non-matching ETag returns 200.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn get_if_none_match_different_etag_returns_200() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -577,7 +577,6 @@ async fn get_if_none_match_different_etag_returns_200() {
 /// ## Summary
 /// Test that If-Match with mismatched ETag returns 412.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn get_if_match_412() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -627,7 +626,6 @@ async fn get_if_match_412() {
 /// ## Summary
 /// Test that If-Match with matching ETag returns 200.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn get_if_match_success() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -698,7 +696,6 @@ async fn get_on_collection_path() {
 /// ## Summary
 /// Test that Last-Modified header is present.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn get_last_modified_header() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -746,7 +743,6 @@ async fn get_last_modified_header() {
 /// ## Summary
 /// Test that Content-Length header matches actual body length.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn get_content_length_accurate() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db

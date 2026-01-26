@@ -14,7 +14,6 @@ use super::helpers::*;
 /// ## Summary
 /// Test that MOVE renames a resource and updates href.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 #[expect(clippy::too_many_lines)]
 async fn move_rename_item_updates_href() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
@@ -87,7 +86,6 @@ async fn move_rename_item_updates_href() {
 /// ## Summary
 /// Test that MOVE within same collection updates instance.uri.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn move_within_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -141,7 +139,6 @@ async fn move_within_collection() {
 /// ## Summary
 /// Test that MOVE across collections creates new instance.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn move_across_collections() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -210,7 +207,6 @@ async fn move_across_collections() {
 /// ## Summary
 /// Test that COPY duplicates a resource to destination.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn copy_duplicates_resource() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -271,7 +267,6 @@ async fn copy_duplicates_resource() {
 /// ## Summary
 /// Test that COPY does not create tombstone (source still exists).
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn copy_does_not_create_tombstone() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -331,7 +326,6 @@ async fn copy_does_not_create_tombstone() {
 /// ## Summary
 /// Test that MOVE with existing destination and Overwrite:F returns 412.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 #[expect(clippy::too_many_lines)]
 async fn move_destination_exists_overwrite_false_412() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
@@ -402,7 +396,6 @@ async fn move_destination_exists_overwrite_false_412() {
 /// ## Summary
 /// Test that MOVE with existing destination and Overwrite:T succeeds.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 #[expect(clippy::too_many_lines)]
 async fn move_destination_exists_overwrite_true_succeeds() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
@@ -482,7 +475,6 @@ async fn move_destination_exists_overwrite_true_succeeds() {
 /// ## Summary
 /// Test that MOVE generates tombstone for source resource.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 #[expect(clippy::too_many_lines)]
 async fn move_generates_tombstone() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
@@ -558,7 +550,6 @@ async fn move_generates_tombstone() {
 /// ## Summary
 /// Test that MOVE without Destination header returns 400.
 #[tokio::test]
-#[ignore = "requires database seeding"]
 async fn move_without_destination_400() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
