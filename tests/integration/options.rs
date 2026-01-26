@@ -175,9 +175,7 @@ async fn options_on_nonexistent_resource_succeeds() {
 async fn options_on_api_root() {
     let service = create_test_service();
 
-    let response = TestRequest::options("/api/")
-        .send(service)
-        .await;
+    let response = TestRequest::options("/api/").send(service).await;
 
     // Should return a valid response (may vary based on implementation)
     assert!(

@@ -28,12 +28,7 @@ async fn delete_calendar_object() {
         .expect("Failed to seed principal");
 
     let collection_id = test_db
-        .seed_collection(
-            principal_id,
-            "calendar",
-            "personal",
-            Some("Personal"),
-        )
+        .seed_collection(principal_id, "calendar", "personal", Some("Personal"))
         .await
         .expect("Failed to seed collection");
 
@@ -331,12 +326,7 @@ async fn delete_collection() {
         .expect("Failed to seed principal");
 
     let collection_id = test_db
-        .seed_collection(
-            principal_id,
-            "calendar",
-            "to-delete",
-            Some("To Delete"),
-        )
+        .seed_collection(principal_id, "calendar", "to-delete", Some("To Delete"))
         .await
         .expect("Failed to seed collection");
 
@@ -360,10 +350,9 @@ async fn delete_collection() {
 
     let service = create_test_service();
 
-    let response =
-        TestRequest::delete(&format!("/api/caldav/{collection_id}/"))
-            .send(service)
-            .await;
+    let response = TestRequest::delete(&format!("/api/caldav/{collection_id}/"))
+        .send(service)
+        .await;
 
     // DELETE on collection might be:
     // - 204 No Content (recursive delete supported)
@@ -426,10 +415,9 @@ async fn delete_collection_no_orphans() {
 
     let service = create_test_service();
 
-    let response =
-        TestRequest::delete(&format!("/api/caldav/{collection_id}/"))
-            .send(service)
-            .await;
+    let response = TestRequest::delete(&format!("/api/caldav/{collection_id}/"))
+        .send(service)
+        .await;
 
     // If delete succeeded, verify no orphans
     if response.status == StatusCode::NO_CONTENT {
@@ -437,7 +425,10 @@ async fn delete_collection_no_orphans() {
             .count_collection_instances(collection_id)
             .await
             .expect("Failed to count instances");
-        assert_eq!(remaining, 0, "No instances should remain after collection delete");
+        assert_eq!(
+            remaining, 0,
+            "No instances should remain after collection delete"
+        );
     }
 }
 

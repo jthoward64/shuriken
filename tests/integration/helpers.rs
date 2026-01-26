@@ -94,7 +94,10 @@ impl TestRequest {
     /// Creates a new PROPPATCH request.
     #[must_use]
     pub fn proppatch(path: &str) -> Self {
-        Self::new(Method::from_bytes(b"PROPPATCH").expect("Valid method"), path)
+        Self::new(
+            Method::from_bytes(b"PROPPATCH").expect("Valid method"),
+            path,
+        )
     }
 
     /// Creates a new MKCOL request.
@@ -244,7 +247,9 @@ impl TestRequest {
         let mut response = client.send(service).await;
 
         // Extract status code
-        let status = response.status_code.unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+        let status = response
+            .status_code
+            .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
 
         // Extract headers
         let headers: Vec<(String, String)> = response
@@ -807,10 +812,7 @@ impl TestDb {
     /// ## Errors
     /// Returns an error if the group cannot be inserted.
     #[expect(dead_code)]
-    pub async fn seed_group(
-        &self,
-        principal_id: uuid::Uuid,
-    ) -> anyhow::Result<uuid::Uuid> {
+    pub async fn seed_group(&self, principal_id: uuid::Uuid) -> anyhow::Result<uuid::Uuid> {
         use shuriken::component::db::schema::group;
         use shuriken::component::model::group::NewGroup;
 
@@ -1008,7 +1010,10 @@ impl TestDb {
     /// ## Errors
     /// Returns an error if the database query fails.
     #[expect(dead_code)]
-    pub async fn count_collection_instances(&self, collection_id: uuid::Uuid) -> anyhow::Result<i64> {
+    pub async fn count_collection_instances(
+        &self,
+        collection_id: uuid::Uuid,
+    ) -> anyhow::Result<i64> {
         use shuriken::component::db::schema::dav_instance;
 
         let mut conn = self.get_conn().await?;
@@ -1340,4 +1345,3 @@ pub fn addressbook_multiget_report(hrefs: &[String]) -> String {
 </CARD:addressbook-multiget>"#
     )
 }
-
