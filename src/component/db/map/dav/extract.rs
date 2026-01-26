@@ -1,6 +1,7 @@
 //! Value extraction utilities for iCalendar and vCard.
 
 use crate::component::rfc::ical::core::{Component, Value};
+use crate::component::rfc::ical::expand::TimeZoneResolver;
 use crate::component::rfc::vcard::core::{VCard, VCardValue};
 
 /// ## Summary
@@ -14,6 +15,7 @@ use crate::component::rfc::vcard::core::{VCard, VCardValue};
 pub(super) fn extract_ical_value<'a>(
     value: &Value,
     raw: &'a str,
+    resolver: &mut TimeZoneResolver,
 ) -> anyhow::Result<(
     &'static str,
     Option<&'a str>,
@@ -41,7 +43,7 @@ pub(super) fn extract_ical_value<'a>(
         }
         Value::DateTime(dt) => {
             // Convert to UTC if possible
-            let tstz = datetime_to_utc(dt)?;
+            let tstz = datetime_to_utc(dt, resolver)?;
             Ok(("datetime", None, None, None, None, None, Some(tstz)))
         }
         Value::Duration(_)
@@ -115,8 +117,10 @@ pub(super) fn extract_vcard_value<'a>(
 /// Converts an iCalendar `DateTime` to UTC.
 fn datetime_to_utc(
     dt: &crate::component::rfc::ical::core::DateTime,
+    resolver: &mut TimeZoneResolver,
 ) -> anyhow::Result<chrono::DateTime<chrono::Utc>> {
     use crate::component::rfc::ical::core::DateTimeForm;
+    use crate::component::rfc::ical::expand::convert_to_utc;
 
     let naive = chrono::NaiveDateTime::new(
         chrono::NaiveDate::from_ymd_opt(i32::from(dt.year), u32::from(dt.month), u32::from(dt.day))
@@ -129,20 +133,19 @@ fn datetime_to_utc(
         .ok_or_else(|| anyhow::anyhow!("Invalid time"))?,
     );
 
-    match &dt.form {
-        DateTimeForm::Utc => Ok(chrono::DateTime::from_naive_utc_and_offset(
+    if matches!(dt.form, DateTimeForm::Utc | DateTimeForm::Floating) {
+        return Ok(chrono::DateTime::from_naive_utc_and_offset(
             naive,
             chrono::Utc,
-        )),
-        DateTimeForm::Floating | DateTimeForm::Zoned { .. } => {
-            // Treat as UTC (without timezone info for now)
-            // TODO: Handle TZID resolution in the future
-            Ok(chrono::DateTime::from_naive_utc_and_offset(
-                naive,
-                chrono::Utc,
-            ))
-        }
+        ));
     }
+
+    if let DateTimeForm::Zoned { tzid } = &dt.form {
+        return convert_to_utc(naive, tzid, resolver)
+            .map_err(|err| anyhow::anyhow!("TZID conversion failed: {err}"));
+    }
+
+    Err(anyhow::anyhow!("Unsupported datetime form"))
 }
 
 /// ## Summary
@@ -171,11 +174,26 @@ mod tests {
     use crate::component::rfc::ical::core::{Date, DateTime, DateTimeForm};
     use chrono::{Datelike, Timelike};
 
+    type IcalValueTuple<'a> = (
+        &'static str,
+        Option<&'a str>,
+        Option<i64>,
+        Option<f64>,
+        Option<bool>,
+        Option<chrono::NaiveDate>,
+        Option<chrono::DateTime<chrono::Utc>>,
+    );
+
+    fn extract_ical_value_for_test<'a>(value: &Value, raw: &'a str) -> IcalValueTuple<'a> {
+        let mut resolver = TimeZoneResolver::new();
+        extract_ical_value(value, raw, &mut resolver).unwrap()
+    }
+
     #[test]
     fn extract_ical_text_value() {
         let value = Value::Text("Hello World".to_string());
         let (vtype, vtext, vint, vfloat, vbool, vdate, vtstz) =
-            extract_ical_value(&value, "Hello World").unwrap();
+            extract_ical_value_for_test(&value, "Hello World");
 
         assert_eq!(vtype, "text");
         assert_eq!(vtext, Some("Hello World"));
@@ -189,7 +207,7 @@ mod tests {
     #[test]
     fn extract_ical_integer_value() {
         let value = Value::Integer(42);
-        let (vtype, vtext, vint, _, _, _, _) = extract_ical_value(&value, "42").unwrap();
+        let (vtype, vtext, vint, _, _, _, _) = extract_ical_value_for_test(&value, "42");
 
         assert_eq!(vtype, "integer");
         assert_eq!(vtext, None);
@@ -199,7 +217,7 @@ mod tests {
     #[test]
     fn extract_ical_float_value() {
         let value = Value::Float(42.5);
-        let (vtype, vtext, vint, vfloat, _, _, _) = extract_ical_value(&value, "42.5").unwrap();
+        let (vtype, vtext, vint, vfloat, _, _, _) = extract_ical_value_for_test(&value, "42.5");
 
         assert_eq!(vtype, "float");
         assert_eq!(vtext, None);
@@ -210,7 +228,7 @@ mod tests {
     #[test]
     fn extract_ical_boolean_true() {
         let value = Value::Boolean(true);
-        let (vtype, _, _, _, vbool, _, _) = extract_ical_value(&value, "TRUE").unwrap();
+        let (vtype, _, _, _, vbool, _, _) = extract_ical_value_for_test(&value, "TRUE");
 
         assert_eq!(vtype, "boolean");
         assert_eq!(vbool, Some(true));
@@ -219,7 +237,7 @@ mod tests {
     #[test]
     fn extract_ical_boolean_false() {
         let value = Value::Boolean(false);
-        let (vtype, _, _, _, vbool, _, _) = extract_ical_value(&value, "FALSE").unwrap();
+        let (vtype, _, _, _, vbool, _, _) = extract_ical_value_for_test(&value, "FALSE");
 
         assert_eq!(vtype, "boolean");
         assert_eq!(vbool, Some(false));
@@ -232,7 +250,7 @@ mod tests {
             month: 1,
             day: 24,
         });
-        let (vtype, _, _, _, _, vdate, _) = extract_ical_value(&value, "20260124").unwrap();
+        let (vtype, _, _, _, _, vdate, _) = extract_ical_value_for_test(&value, "20260124");
 
         assert_eq!(vtype, "date");
         assert_eq!(vdate, chrono::NaiveDate::from_ymd_opt(2026, 1, 24));
@@ -249,7 +267,7 @@ mod tests {
             second: 45,
             form: DateTimeForm::Utc,
         });
-        let (vtype, _, _, _, _, _, vtstz) = extract_ical_value(&value, "20260124T123045Z").unwrap();
+        let (vtype, _, _, _, _, _, vtstz) = extract_ical_value_for_test(&value, "20260124T123045Z");
 
         assert_eq!(vtype, "datetime");
         assert!(vtstz.is_some());
@@ -276,7 +294,7 @@ mod tests {
             minutes: 30,
             seconds: 0,
         });
-        let (vtype, vtext, _, _, _, _, _) = extract_ical_value(&value, "P1DT2H30M").unwrap();
+        let (vtype, vtext, _, _, _, _, _) = extract_ical_value_for_test(&value, "P1DT2H30M");
 
         assert_eq!(vtype, "text");
         assert_eq!(vtext, Some("P1DT2H30M"));

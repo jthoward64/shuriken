@@ -1,6 +1,7 @@
 //! Helper functions for extracting and processing recurrence data from iCalendar components.
 
 use crate::component::rfc::ical::core::{Component, DateTime as IcalDateTime};
+use crate::component::rfc::ical::expand::TimeZoneResolver;
 use chrono::{DateTime, NaiveDateTime, Utc};
 
 /// Extracted recurrence data from a VEVENT component.
@@ -34,6 +35,27 @@ pub struct RecurrenceData {
 /// - DTEND/DURATION is missing or invalid
 #[must_use]
 pub fn extract_recurrence_data(component: &Component) -> Option<RecurrenceData> {
+    let mut resolver = TimeZoneResolver::new();
+    extract_recurrence_data_with_resolver(component, &mut resolver)
+}
+
+/// ## Summary
+/// Extracts recurrence data from a VEVENT component with a timezone resolver.
+///
+/// Parses RRULE, DTSTART, DTEND/DURATION, EXDATE, and RDATE properties.
+/// Converts all date-times to UTC if TZID is present.
+///
+/// ## Errors
+///
+/// Returns `None` if:
+/// - Component has no RRULE property
+/// - DTSTART is missing or invalid
+/// - DTEND/DURATION is missing or invalid
+#[must_use]
+pub fn extract_recurrence_data_with_resolver(
+    component: &Component,
+    resolver: &mut TimeZoneResolver,
+) -> Option<RecurrenceData> {
     // Check for RRULE property
     let rrule_prop = component.get_property("RRULE")?;
     let rrule_text = rrule_prop.as_text()?.to_string();
@@ -42,13 +64,13 @@ pub fn extract_recurrence_data(component: &Component) -> Option<RecurrenceData> 
     let dtstart_prop = component.get_property("DTSTART")?;
     let tzid = dtstart_prop.get_param_value("TZID").map(String::from);
     let dtstart_ical = dtstart_prop.as_datetime()?;
-    let dtstart_utc = ical_datetime_to_utc(dtstart_ical, tzid.as_deref())?;
+    let dtstart_utc = ical_datetime_to_utc_with_resolver(dtstart_ical, tzid.as_deref(), resolver)?;
 
     // Calculate duration from DTEND or DURATION
     let duration = if let Some(dtend_prop) = component.get_property("DTEND") {
         let dtend_ical = dtend_prop.as_datetime()?;
         let dtend_tzid = dtend_prop.get_param_value("TZID");
-        let dtend_utc = ical_datetime_to_utc(dtend_ical, dtend_tzid)?;
+        let dtend_utc = ical_datetime_to_utc_with_resolver(dtend_ical, dtend_tzid, resolver)?;
         dtend_utc.signed_duration_since(dtstart_utc)
     } else if let Some(duration_prop) = component.get_property("DURATION") {
         let duration_ical = duration_prop.as_duration()?;
@@ -65,7 +87,7 @@ pub fn extract_recurrence_data(component: &Component) -> Option<RecurrenceData> 
         .filter_map(|prop| {
             let tzid = prop.get_param_value("TZID");
             let dt = prop.as_datetime()?;
-            ical_datetime_to_utc(dt, tzid)
+            ical_datetime_to_utc_with_resolver(dt, tzid, resolver)
         })
         .collect();
 
@@ -76,7 +98,7 @@ pub fn extract_recurrence_data(component: &Component) -> Option<RecurrenceData> 
         .filter_map(|prop| {
             let tzid = prop.get_param_value("TZID");
             let dt = prop.as_datetime()?;
-            ical_datetime_to_utc(dt, tzid)
+            ical_datetime_to_utc_with_resolver(dt, tzid, resolver)
         })
         .collect();
 
@@ -102,6 +124,26 @@ pub fn extract_recurrence_data(component: &Component) -> Option<RecurrenceData> 
 /// - The timezone cannot be resolved
 #[must_use]
 pub fn ical_datetime_to_utc(dt: &IcalDateTime, tzid: Option<&str>) -> Option<DateTime<Utc>> {
+    let mut resolver = TimeZoneResolver::new();
+    ical_datetime_to_utc_with_resolver(dt, tzid, &mut resolver)
+}
+
+/// ## Summary
+/// Converts an iCalendar `DateTime` to `chrono::DateTime<Utc>` using a resolver.
+///
+/// Handles both UTC and local time with TZID parameter.
+///
+/// ## Errors
+///
+/// Returns `None` if:
+/// - The datetime format is invalid
+/// - The timezone cannot be resolved
+#[must_use]
+pub fn ical_datetime_to_utc_with_resolver(
+    dt: &IcalDateTime,
+    tzid: Option<&str>,
+    resolver: &mut TimeZoneResolver,
+) -> Option<DateTime<Utc>> {
     let naive = NaiveDateTime::new(
         chrono::NaiveDate::from_ymd_opt(
             i32::from(dt.year),
@@ -122,9 +164,7 @@ pub fn ical_datetime_to_utc(dt: &IcalDateTime, tzid: Option<&str>) -> Option<Dat
         crate::component::rfc::ical::core::DateTimeForm::Floating => {
             if let Some(tzid_str) = tzid {
                 // Convert using timezone
-                let mut resolver = crate::component::rfc::ical::expand::TimeZoneResolver::new();
-                crate::component::rfc::ical::expand::convert_to_utc(naive, tzid_str, &mut resolver)
-                    .ok()
+                crate::component::rfc::ical::expand::convert_to_utc(naive, tzid_str, resolver).ok()
             } else {
                 // Treat as floating time (interpret as UTC)
                 Some(DateTime::<Utc>::from_naive_utc_and_offset(naive, Utc))
@@ -132,8 +172,7 @@ pub fn ical_datetime_to_utc(dt: &IcalDateTime, tzid: Option<&str>) -> Option<Dat
         }
         crate::component::rfc::ical::core::DateTimeForm::Zoned { tzid: dt_tzid } => {
             // Use the TZID from the datetime form
-            let mut resolver = crate::component::rfc::ical::expand::TimeZoneResolver::new();
-            crate::component::rfc::ical::expand::convert_to_utc(naive, dt_tzid, &mut resolver).ok()
+            crate::component::rfc::ical::expand::convert_to_utc(naive, dt_tzid, resolver).ok()
         }
     }
 }

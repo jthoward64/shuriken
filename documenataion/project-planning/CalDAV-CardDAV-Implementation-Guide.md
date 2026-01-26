@@ -2848,7 +2848,7 @@ Permissions are **additive** across scopes: a user’s effective permission for 
 - `edit`
 - `edit-share` (can share at `read` or `edit`)
 - `admin` (can share at `read`, `read-share`, `edit`, `edit-share`)
-- `owner`
+- `owner` (all permissions)
 
 **Operational meaning**:
 - `read-freebusy`: Can execute free-busy queries for the calendar user/collection (`CALDAV:free-busy-query`) but cannot read event bodies.
@@ -2877,6 +2877,8 @@ Use `p_effective` for all authorization checks on that item.
 Practical implications:
 - If a user has `edit` on a calendar, a per-event entry of `read` does not reduce what they can do; they still have `edit`.
 - If you expose ACLs, avoid emitting contradictory lower per-item entries that confuse clients; prefer representing the effective result.
+- Keep individual permission grants recorded to maintain fidelity if a user loses access to a parent collection. For example a user with
+  read access to foo/bar who is later granted write access to foo, should not lose read access to foo/bar if their access to foo is later removed
 
 #### 12.3.3 Suggested Mapping to WebDAV/CalDAV/CardDAV Operations
 

@@ -8,5 +8,6 @@ mod timezone;
 mod vtimezone;
 
 pub use rrule::{ExpansionError, ExpansionOptions, expand_rrule};
+pub use timezone::build_timezone_resolver;
 pub use timezone::{ConversionError, TimeZoneResolver, convert_to_utc};
 pub use vtimezone::{Observance, ObservanceKind, UtcOffset, VTimezone, VTimezoneError};

@@ -9,7 +9,8 @@ use diesel_async::scoped_futures::ScopedFutureExt;
 use diesel_async::{AsyncConnection, RunQueryDsl};
 
 use crate::component::caldav::recurrence::{
-    extract_recurrence_data, ical_datetime_to_utc, ical_duration_to_chrono,
+    extract_recurrence_data_with_resolver, ical_datetime_to_utc_with_resolver,
+    ical_duration_to_chrono,
 };
 use crate::component::db::connection::DbConnection;
 use crate::component::db::map::caldav::build_cal_indexes;
@@ -18,7 +19,9 @@ use crate::component::db::query::dav::{collection, entity, instance};
 use crate::component::model::dav::instance::NewDavInstance;
 use crate::component::model::dav::occurrence::NewCalOccurrence;
 use crate::component::rfc::ical::core::{Component, ComponentKind};
-use crate::component::rfc::ical::expand::{ExpansionOptions, expand_rrule};
+use crate::component::rfc::ical::expand::{
+    ExpansionOptions, TimeZoneResolver, build_timezone_resolver, expand_rrule,
+};
 use crate::component::rfc::ical::parse::parse;
 
 /// Result of a PUT operation on a calendar object.
@@ -91,6 +94,9 @@ pub async fn put_calendar_object(
     let ical_str = std::str::from_utf8(ical_bytes).context("iCalendar data is not valid UTF-8")?;
 
     let ical = parse(ical_str).map_err(|e| anyhow::anyhow!("invalid iCalendar: {e}"))?;
+
+    let mut tz_resolver = build_timezone_resolver(&ical)
+        .map_err(|e| anyhow::anyhow!("invalid VTIMEZONE component: {e}"))?;
 
     tracing::debug!("iCalendar data parsed successfully");
 
@@ -206,13 +212,14 @@ pub async fn put_calendar_object(
                     .context("failed to insert component tree")?;
 
                 // Build and insert calendar index entries
-                let cal_indexes = build_cal_indexes(existing_inst.entity_id, &ical);
+                let cal_indexes =
+                    build_cal_indexes(existing_inst.entity_id, &ical, &mut tz_resolver);
                 event_index::insert_batch(tx, &cal_indexes)
                     .await
                     .context("failed to insert calendar index entries")?;
 
                 // Expand and store recurrences for the updated entity
-                expand_and_store_occurrences(tx, existing_inst.entity_id, &ical)
+                expand_and_store_occurrences(tx, existing_inst.entity_id, &ical, &mut tz_resolver)
                     .await
                     .context("failed to expand recurrences")?;
 
@@ -259,13 +266,13 @@ pub async fn put_calendar_object(
                     .context("failed to insert component tree")?;
 
                 // Build and insert calendar index entries
-                let cal_indexes = build_cal_indexes(created_entity.id, &ical);
+                let cal_indexes = build_cal_indexes(created_entity.id, &ical, &mut tz_resolver);
                 event_index::insert_batch(tx, &cal_indexes)
                     .await
                     .context("failed to insert calendar index entries")?;
 
                 // Expand and store recurrences for the new entity
-                expand_and_store_occurrences(tx, created_entity.id, &ical)
+                expand_and_store_occurrences(tx, created_entity.id, &ical, &mut tz_resolver)
                     .await
                     .context("failed to expand recurrences")?;
 
@@ -314,6 +321,7 @@ async fn expand_and_store_occurrences(
     conn: &mut DbConnection<'_>,
     entity_id: uuid::Uuid,
     ical: &crate::component::rfc::ical::core::ICalendar,
+    resolver: &mut TimeZoneResolver,
 ) -> Result<()> {
     use crate::component::db::schema::cal_index;
     use std::collections::HashMap;
@@ -397,7 +405,7 @@ async fn expand_and_store_occurrences(
         };
 
         if let Some(mut occurrences) =
-            expand_component_occurrences(vevent, entity_id, component_id)?
+            expand_component_occurrences(vevent, entity_id, component_id, resolver)?
         {
             all_occurrences.append(&mut occurrences);
         }
@@ -406,7 +414,7 @@ async fn expand_and_store_occurrences(
     // Handle RECURRENCE-ID exceptions
     // Exception occurrences are stored separately with recurrence_id_utc set
     for vevent in &vevent_components {
-        if let Some(recurrence_id) = extract_recurrence_id(vevent) {
+        if let Some(recurrence_id) = extract_recurrence_id(vevent, resolver) {
             let Some(uid_prop) = vevent.get_property("UID") else {
                 continue;
             };
@@ -426,9 +434,13 @@ async fn expand_and_store_occurrences(
 
             if let Some((_, _, component_id)) = exception_comp {
                 // Extract DTSTART and duration for the exception
-                if let Some(occ) =
-                    create_exception_occurrence(vevent, entity_id, *component_id, recurrence_id)?
-                {
+                if let Some(occ) = create_exception_occurrence(
+                    vevent,
+                    entity_id,
+                    *component_id,
+                    recurrence_id,
+                    resolver,
+                )? {
                     all_occurrences.push(occ);
                 }
             }
@@ -460,9 +472,10 @@ fn expand_component_occurrences(
     component: &Component,
     entity_id: uuid::Uuid,
     component_id: uuid::Uuid,
+    resolver: &mut TimeZoneResolver,
 ) -> Result<Option<Vec<NewCalOccurrence>>> {
     // Extract recurrence data
-    let Some(recurrence_data) = extract_recurrence_data(component) else {
+    let Some(recurrence_data) = extract_recurrence_data_with_resolver(component, resolver) else {
         // No RRULE, skip
         return Ok(None);
     };
@@ -505,11 +518,14 @@ fn expand_component_occurrences(
 /// ## Errors
 ///
 /// Returns `None` if RECURRENCE-ID is not present or cannot be parsed.
-fn extract_recurrence_id(component: &Component) -> Option<DateTime<Utc>> {
+fn extract_recurrence_id(
+    component: &Component,
+    resolver: &mut TimeZoneResolver,
+) -> Option<DateTime<Utc>> {
     let recurrence_id_prop = component.get_property("RECURRENCE-ID")?;
     let tzid = recurrence_id_prop.get_param_value("TZID");
     let recurrence_id_ical = recurrence_id_prop.as_datetime()?;
-    ical_datetime_to_utc(recurrence_id_ical, tzid)
+    ical_datetime_to_utc_with_resolver(recurrence_id_ical, tzid, resolver)
 }
 
 /// ## Summary
@@ -526,6 +542,7 @@ fn create_exception_occurrence(
     entity_id: uuid::Uuid,
     component_id: uuid::Uuid,
     recurrence_id: DateTime<Utc>,
+    resolver: &mut TimeZoneResolver,
 ) -> Result<Option<NewCalOccurrence>> {
     // Extract DTSTART
     let Some(dtstart_prop) = component.get_property("DTSTART") else {
@@ -535,7 +552,7 @@ fn create_exception_occurrence(
     let Some(dtstart_ical) = dtstart_prop.as_datetime() else {
         return Ok(None);
     };
-    let Some(dtstart_utc) = ical_datetime_to_utc(dtstart_ical, tzid) else {
+    let Some(dtstart_utc) = ical_datetime_to_utc_with_resolver(dtstart_ical, tzid, resolver) else {
         return Ok(None);
     };
 
@@ -545,7 +562,7 @@ fn create_exception_occurrence(
             .as_datetime()
             .ok_or_else(|| anyhow::anyhow!("invalid DTEND"))?;
         let dtend_tzid = dtend_prop.get_param_value("TZID");
-        ical_datetime_to_utc(dtend_ical, dtend_tzid)
+        ical_datetime_to_utc_with_resolver(dtend_ical, dtend_tzid, resolver)
             .ok_or_else(|| anyhow::anyhow!("failed to convert DTEND to UTC"))?
     } else if let Some(duration_prop) = component.get_property("DURATION") {
         let duration_ical = duration_prop

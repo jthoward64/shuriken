@@ -62,22 +62,6 @@ Phase 2 establishes the database layer for CalDAV/CardDAV content storage. It im
 
 ---
 
-## Database Improvement Recommendations
-
-### 🔴 Critical
-
-### 🟡 Medium Priority
-
-#### 1. Confirm Tree Fidelity and Shadow Role
-~~Tree reconstruction is used for GET/HEAD, and `dav_shadow` remains debug-only until removal.
-Add and maintain tests that validate tree→content parity (ordering, parameters, folding)
-without relying on `dav_shadow`.~~
-
-#### 2. Add Integration Tests for Index Population
-~~Verify `cal_index`, `card_index`, `cal_occurrence` are correctly populated.~~
-
----
-
 ## RFC Compliance
 
 | Requirement | Status | Notes |

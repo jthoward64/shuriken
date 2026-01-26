@@ -2,9 +2,10 @@
 
 use uuid::Uuid;
 
-use crate::component::caldav::recurrence::ical_datetime_to_utc;
+use crate::component::caldav::recurrence::ical_datetime_to_utc_with_resolver;
 use crate::component::model::caldav::cal_index::NewCalIndex;
 use crate::component::rfc::ical::core::{Component, ICalendar};
+use crate::component::rfc::ical::expand::TimeZoneResolver;
 
 /// ## Summary
 /// Builds calendar index entries for all indexable components in an `iCalendar` document.
@@ -15,14 +16,23 @@ use crate::component::rfc::ical::core::{Component, ICalendar};
 /// Note: Uses a placeholder UUID for `component_id` since we don't have access to the database
 /// component IDs yet. This will be improved in a future iteration.
 #[must_use]
-pub fn build_cal_indexes(entity_id: Uuid, ical: &ICalendar) -> Vec<NewCalIndex> {
+pub fn build_cal_indexes(
+    entity_id: Uuid,
+    ical: &ICalendar,
+    resolver: &mut TimeZoneResolver,
+) -> Vec<NewCalIndex> {
     let mut indexes = Vec::new();
-    build_indexes_recursive(entity_id, &ical.root, &mut indexes);
+    build_indexes_recursive(entity_id, &ical.root, resolver, &mut indexes);
     indexes
 }
 
 /// Recursively builds index entries for a component and its children.
-fn build_indexes_recursive(entity_id: Uuid, component: &Component, indexes: &mut Vec<NewCalIndex>) {
+fn build_indexes_recursive(
+    entity_id: Uuid,
+    component: &Component,
+    resolver: &mut TimeZoneResolver,
+    indexes: &mut Vec<NewCalIndex>,
+) {
     // Build index for this component if it's schedulable
     if let Some(component_kind) = component.kind
         && component_kind.is_schedulable()
@@ -35,14 +45,14 @@ fn build_indexes_recursive(entity_id: Uuid, component: &Component, indexes: &mut
             format!("{}-{}-{}", component.name, uid, entity_id).as_bytes(),
         );
 
-        if let Some(index) = build_cal_index(entity_id, component_id, component) {
+        if let Some(index) = build_cal_index(entity_id, component_id, component, resolver) {
             indexes.push(index);
         }
     }
 
     // Recurse into children
     for child in &component.children {
-        build_indexes_recursive(entity_id, child, indexes);
+        build_indexes_recursive(entity_id, child, resolver, indexes);
     }
 }
 
@@ -60,6 +70,7 @@ fn build_cal_index(
     entity_id: Uuid,
     component_id: Uuid,
     component: &Component,
+    resolver: &mut TimeZoneResolver,
 ) -> Option<NewCalIndex> {
     let component_kind = component.kind?;
 
@@ -75,14 +86,14 @@ fn build_cal_index(
     let dtstart_utc = component.get_property("DTSTART").and_then(|prop| {
         let tzid = prop.get_param_value("TZID");
         let dt = prop.as_datetime()?;
-        ical_datetime_to_utc(dt, tzid)
+        ical_datetime_to_utc_with_resolver(dt, tzid, resolver)
     });
 
     // Extract DTEND
     let dtend_utc = component.get_property("DTEND").and_then(|prop| {
         let tzid = prop.get_param_value("TZID");
         let dt = prop.as_datetime()?;
-        ical_datetime_to_utc(dt, tzid)
+        ical_datetime_to_utc_with_resolver(dt, tzid, resolver)
     });
 
     // Extract all-day flag (only if VALUE=DATE is explicitly set)
@@ -101,7 +112,7 @@ fn build_cal_index(
     let recurrence_id_utc = component.get_property("RECURRENCE-ID").and_then(|prop| {
         let tzid = prop.get_param_value("TZID");
         let dt = prop.as_datetime()?;
-        ical_datetime_to_utc(dt, tzid)
+        ical_datetime_to_utc_with_resolver(dt, tzid, resolver)
     });
 
     // Extract ORGANIZER

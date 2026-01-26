@@ -5,6 +5,7 @@ use crate::component::model::dav::entity::NewDavEntity;
 use crate::component::model::dav::parameter::NewDavParameter;
 use crate::component::model::dav::property::NewDavProperty;
 use crate::component::rfc::ical::core::{Component, ICalendar, Parameter, Property};
+use crate::component::rfc::ical::expand::{TimeZoneResolver, build_timezone_resolver};
 
 use super::extract::{extract_ical_uid, extract_ical_value};
 
@@ -47,6 +48,9 @@ pub fn icalendar_to_db_models<'a>(
     // Placeholder entity_id - will be replaced after insert
     let entity_id = uuid::Uuid::nil();
 
+    let mut tz_resolver = build_timezone_resolver(ical)
+        .map_err(|e| anyhow::anyhow!("invalid VTIMEZONE component: {e}"))?;
+
     map_ical_component_recursive(
         &ical.root,
         entity_id,
@@ -55,6 +59,7 @@ pub fn icalendar_to_db_models<'a>(
         &mut components,
         &mut properties,
         &mut parameters,
+        &mut tz_resolver,
     )?;
 
     Ok((entity, components, properties, parameters))
@@ -74,6 +79,7 @@ fn map_ical_component_recursive<'a>(
     components: &mut Vec<NewDavComponent<'a>>,
     properties: &mut Vec<NewDavProperty<'a>>,
     parameters: &mut Vec<NewDavParameter<'static>>,
+    resolver: &mut TimeZoneResolver,
 ) -> anyhow::Result<()> {
     let component_id = uuid::Uuid::nil(); // Placeholder
 
@@ -99,6 +105,7 @@ fn map_ical_component_recursive<'a>(
             },
             properties,
             parameters,
+            resolver,
         )?;
     }
 
@@ -119,6 +126,7 @@ fn map_ical_component_recursive<'a>(
             components,
             properties,
             parameters,
+            resolver,
         )?;
     }
 
@@ -127,17 +135,22 @@ fn map_ical_component_recursive<'a>(
 
 /// ## Summary
 /// Maps an iCalendar property to a database property model.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Accumulator pattern plus timezone resolver requires these parameters"
+)]
 fn map_ical_property<'a>(
     prop: &'a Property,
     component_id: uuid::Uuid,
     ordinal: i32,
     properties: &mut Vec<NewDavProperty<'a>>,
     parameters: &mut Vec<NewDavParameter<'static>>,
+    resolver: &mut TimeZoneResolver,
 ) -> anyhow::Result<()> {
     let property_id = uuid::Uuid::nil(); // Placeholder
 
     let (value_type, value_text, value_int, value_float, value_bool, value_date, value_tstz) =
-        extract_ical_value(&prop.value, &prop.raw_value)?;
+        extract_ical_value(&prop.value, &prop.raw_value, resolver)?;
 
     properties.push(NewDavProperty {
         component_id,

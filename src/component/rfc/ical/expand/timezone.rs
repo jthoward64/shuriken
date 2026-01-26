@@ -9,6 +9,9 @@ use icu::time::zone::iana::IanaParserExtended;
 use std::collections::HashMap;
 use std::str::FromStr;
 
+use super::vtimezone::{VTimezone, VTimezoneError};
+use crate::component::rfc::ical::core::ICalendar;
+
 /// Error during timezone conversion.
 #[derive(Debug, thiserror::Error)]
 pub enum ConversionError {
@@ -38,6 +41,22 @@ pub struct TimeZoneResolver {
     cache: HashMap<String, Tz>,
     /// Cache of parsed VTIMEZONE components by TZID.
     vtimezones: HashMap<String, super::vtimezone::VTimezone>,
+}
+
+/// ## Summary
+/// Builds a `TimeZoneResolver` with `VTIMEZONE` components registered.
+///
+/// ## Errors
+/// Returns an error if any `VTIMEZONE` component is invalid.
+pub fn build_timezone_resolver(ical: &ICalendar) -> Result<TimeZoneResolver, VTimezoneError> {
+    let mut resolver = TimeZoneResolver::new();
+
+    for tz_component in ical.timezones() {
+        let vtimezone = VTimezone::parse(tz_component)?;
+        resolver.register_vtimezone(vtimezone);
+    }
+
+    Ok(resolver)
 }
 
 impl TimeZoneResolver {
