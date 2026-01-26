@@ -90,8 +90,6 @@ impl TestDb {
     /// ## Safety Features
     /// This function modifies the DATABASE_URL for safety:
     /// - If the database name is not `shuriken_test`, it will be changed to `shuriken_test`
-    /// - If no schema is specified in the URL, `?schema=shuriken_test` will be added to prevent
-    ///   accidentally modifying the `public` schema
     /// - All modifications are logged as info messages
     #[expect(dead_code)]
     pub async fn new() -> anyhow::Result<Self> {
