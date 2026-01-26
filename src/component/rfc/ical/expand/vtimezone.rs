@@ -376,7 +376,10 @@ impl VTimezone {
     ///
     /// This is a simplified implementation that handles common timezone `RRULE`s:
     /// - `FREQ=YEARLY` with `BYMONTH` and `BYDAY`
-    #[expect(clippy::unused_self, reason = "Method may need self in future for context")]
+    #[expect(
+        clippy::unused_self,
+        reason = "Method may need self in future for context"
+    )]
     fn calculate_rrule_occurrence(
         &self,
         obs: &Observance,

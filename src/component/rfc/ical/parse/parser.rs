@@ -369,7 +369,7 @@ fn parse_value(
         ValueType::Uri | ValueType::CalAddress => Ok(Value::Uri(raw.to_string())),
         ValueType::Binary => {
             // RFC 5545 §3.3.1: Base64 decode
-            use base64::{engine::general_purpose::STANDARD, Engine};
+            use base64::{Engine, engine::general_purpose::STANDARD};
             let decoded = STANDARD.decode(raw).map_err(|e| {
                 ParseError::new(ParseErrorKind::InvalidValue, line_num, 1)
                     .with_context(format!("invalid Base64 encoding: {e}"))
@@ -635,7 +635,7 @@ END:VCALENDAR\r\n";
 
         let exdate = event.get_property("EXDATE").unwrap();
         let datetime_list = exdate.value.as_datetime_list().unwrap();
-        
+
         assert_eq!(datetime_list.len(), 3);
         assert_eq!(datetime_list[0].day, 25);
         assert_eq!(datetime_list[1].day, 27);
@@ -662,7 +662,7 @@ END:VCALENDAR\r\n";
 
         let rdate = event.get_property("RDATE").unwrap();
         let date_list = rdate.value.as_date_list().unwrap();
-        
+
         assert_eq!(date_list.len(), 3);
         assert_eq!(date_list[0].day, 25);
         assert_eq!(date_list[1].day, 27);
@@ -685,13 +685,16 @@ END:VFREEBUSY\r\n\
 END:VCALENDAR\r\n";
 
         let ical = parse(input).unwrap();
-        let freebusy = ical.root.children.iter()
+        let freebusy = ical
+            .root
+            .children
+            .iter()
             .find(|c| c.kind == Some(ComponentKind::FreeBusy))
             .unwrap();
 
         let freebusy_prop = freebusy.get_property("FREEBUSY").unwrap();
         let period_list = freebusy_prop.value.as_period_list().unwrap();
-        
+
         assert_eq!(period_list.len(), 2);
         // First period: 09:00-10:00
         assert_eq!(period_list[0].start().hour, 9);

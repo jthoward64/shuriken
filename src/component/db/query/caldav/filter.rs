@@ -129,9 +129,7 @@ async fn apply_comp_filter(
 
         // Query non-recurring events from cal_index (rrule_text IS NULL)
         if start.is_some() || end.is_some() {
-            let mut boxed_query = query
-                .filter(cal_index::rrule_text.is_null())
-                .into_boxed();
+            let mut boxed_query = query.filter(cal_index::rrule_text.is_null()).into_boxed();
 
             // Apply start constraint: event_end > range_start
             if let Some(range_start) = start {
