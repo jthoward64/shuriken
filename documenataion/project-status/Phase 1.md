@@ -105,11 +105,6 @@ Phase 1 provides RFC-compliant parsers and serializers for:
 
 ## ⚠️ Known Gaps (RFC Compliance Review 2026-01-25)
 
-### Medium Priority (Missing Features)
-
-1. **iCalendar VALARM dedicated tests/fixtures**
-   - Parser/serializer supports `VALARM`, but there are no focused fixtures/tests yet
-
 ### Low Priority (Edge Cases)
 
 ---
@@ -126,7 +121,6 @@ Phase 1 provides RFC-compliant parsers and serializers for:
 - Text-match collation and pattern matching
 
 **Gaps**:
-- Dedicated iCalendar `VALARM` fixtures/tests
 
 ---
 
@@ -139,7 +133,7 @@ Phase 1 provides RFC-compliant parsers and serializers for:
 | RFC 2426 (vCard 3.0) | ✅ ~98% | Full support |
 | RFC 6868 (Caret Encoding) | ✅ 100% | Fully implemented |
 | RFC 4918 (WebDAV XML) | ✅ 100% | All relevant elements parsed |
-| RFC 4791 (CalDAV XML) | ⚠️ ~98% | Remaining: VALARM fixtures/tests |
+| RFC 4791 (CalDAV XML) | ✅ ~98% | No Phase 1 gaps |
 | RFC 6352 (CardDAV XML) | ✅ ~98% | REPORT limit parsing supported |
 | RFC 4790 (Collation) | ✅ ~98% | Collations supported; CalDAV defaults to `i;ascii-casemap` in filter evaluation |
 
@@ -158,8 +152,6 @@ Phase 1 provides RFC-compliant parsers and serializers for:
 
 ## ❌ Not Implemented
 
-- [ ] iCalendar VALARM dedicated tests/fixtures
-
 ---
 
 ## RFC Compliance Status
@@ -171,7 +163,7 @@ Phase 1 provides RFC-compliant parsers and serializers for:
 | RFC 2426 (vCard 3.0) | ✅ ~98% | Full support |
 | RFC 6868 (Parameter Encoding) | ✅ 100% | Caret encoding implemented |
 | RFC 4918 (WebDAV) | ✅ 100% | XML parsing complete |
-| RFC 4791 (CalDAV) | ⚠️ ~98% | Remaining: VALARM fixtures/tests |
+| RFC 4791 (CalDAV) | ✅ ~98% | No Phase 1 gaps |
 | RFC 6352 (CardDAV) | ✅ ~98% | REPORT limit parsing supported |
 | RFC 4790 (Collation) | ✅ ~98% | Supported collations; CalDAV defaults to `i;ascii-casemap` |
 

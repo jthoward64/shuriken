@@ -103,6 +103,16 @@ fn round_trip_vevent_with_alarm() {
 }
 
 #[test]
+fn round_trip_vevent_with_alarm_repeat() {
+    round_trip(VEVENT_WITH_ALARM_REPEAT).expect("round trip should succeed");
+}
+
+#[test]
+fn round_trip_vtodo_with_alarm_audio() {
+    round_trip(VTODO_WITH_ALARM_AUDIO).expect("round trip should succeed");
+}
+
+#[test]
 fn round_trip_vevent_with_timezone() {
     round_trip(VEVENT_WITH_TIMEZONE).expect("round trip should succeed");
 }

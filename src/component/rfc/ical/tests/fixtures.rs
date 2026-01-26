@@ -91,6 +91,46 @@ END:VALARM\r\n\
 END:VEVENT\r\n\
 END:VCALENDAR\r\n";
 
+/// VEVENT with VALARM (repeat + duration)
+pub const VEVENT_WITH_ALARM_REPEAT: &str = "\
+BEGIN:VCALENDAR\r\n\
+VERSION:2.0\r\n\
+PRODID:-//Example//Example//EN\r\n\
+BEGIN:VEVENT\r\n\
+UID:19970901T130000Z-123412@example.com\r\n\
+DTSTAMP:19970901T130000Z\r\n\
+DTSTART:19970903T163000Z\r\n\
+DTEND:19970903T190000Z\r\n\
+SUMMARY:Meeting with repeating alarm\r\n\
+BEGIN:VALARM\r\n\
+ACTION:DISPLAY\r\n\
+TRIGGER;RELATED=START:-PT10M\r\n\
+REPEAT:2\r\n\
+DURATION:PT5M\r\n\
+DESCRIPTION:Reminder: Meeting soon\r\n\
+END:VALARM\r\n\
+END:VEVENT\r\n\
+END:VCALENDAR\r\n";
+
+/// VTODO with AUDIO VALARM
+pub const VTODO_WITH_ALARM_AUDIO: &str = "\
+BEGIN:VCALENDAR\r\n\
+VERSION:2.0\r\n\
+PRODID:-//Example//Example//EN\r\n\
+BEGIN:VTODO\r\n\
+UID:19970901T130000Z-123413@example.com\r\n\
+DTSTAMP:19970901T130000Z\r\n\
+DUE:19970903T090000Z\r\n\
+SUMMARY:Submit Tax Returns\r\n\
+STATUS:NEEDS-ACTION\r\n\
+BEGIN:VALARM\r\n\
+ACTION:AUDIO\r\n\
+TRIGGER;VALUE=DATE-TIME:19970903T083000Z\r\n\
+ATTACH;FMTTYPE=audio/basic:http://example.com/alarm.wav\r\n\
+END:VALARM\r\n\
+END:VTODO\r\n\
+END:VCALENDAR\r\n";
+
 /// VEVENT with VTIMEZONE
 pub const VEVENT_WITH_TIMEZONE: &str = "\
 BEGIN:VCALENDAR\r\n\
@@ -229,6 +269,31 @@ mod tests {
         let events = ical.events();
         let event = events[0];
         assert_eq!(event.children.len(), 1);
+    }
+
+    #[test]
+    fn parse_vevent_with_alarm_repeat() {
+        let ical = parse(VEVENT_WITH_ALARM_REPEAT).expect("should parse");
+        let events = ical.events();
+        let event = events[0];
+        let alarm = event.alarms()[0];
+        assert!(alarm.get_property("REPEAT").is_some());
+        assert!(alarm.get_property("DURATION").is_some());
+        let trigger = alarm.get_property("TRIGGER").expect("trigger present");
+        assert!(trigger.params.iter().any(|p| p.name == "RELATED"));
+    }
+
+    #[test]
+    fn parse_vtodo_with_alarm_audio() {
+        let ical = parse(VTODO_WITH_ALARM_AUDIO).expect("should parse");
+        let todos = ical.todos();
+        let todo = todos[0];
+        let alarm = todo.alarms()[0];
+        let action = alarm.get_property("ACTION").expect("action present");
+        assert_eq!(action.as_text(), Some("AUDIO"));
+        assert!(alarm.get_property("ATTACH").is_some());
+        let trigger = alarm.get_property("TRIGGER").expect("trigger present");
+        assert!(trigger.params.iter().any(|p| p.name == "VALUE"));
     }
 
     #[test]
