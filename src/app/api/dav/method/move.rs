@@ -48,7 +48,7 @@ pub async fn r#move(req: &mut Request, res: &mut Response) {
     };
 
     // Get Overwrite header (default: T)
-    let _overwrite = match req.headers().get("Overwrite") {
+    let overwrite = match req.headers().get("Overwrite") {
         Some(header) => header.to_str().unwrap_or("T") == "T",
         None => true,
     };
@@ -103,14 +103,15 @@ pub async fn r#move(req: &mut Request, res: &mut Response) {
         &source_uri,
         dest_collection_id,
         &dest_uri,
-        _overwrite,
+        overwrite,
     )
     .await
     {
         Ok(MoveResult::Created) => {
             res.status_code(StatusCode::CREATED);
-            res.add_header("Location", &destination, true)
-                .expect("Failed to set Location header");
+            if let Err(e) = res.add_header("Location", &destination, true) {
+                tracing::error!(error = %e, "Failed to set Location header");
+            }
         }
         Ok(MoveResult::NoContent) => {
             res.status_code(StatusCode::NO_CONTENT);
@@ -171,6 +172,8 @@ impl From<diesel::result::Error> for MoveError {
 /// Returns `MoveError` if source not found, destination exists (and overwrite is false),
 /// or database operations fail.
 #[tracing::instrument(skip(conn))]
+#[expect(clippy::too_many_arguments)]
+#[expect(clippy::too_many_lines)]
 async fn perform_move(
     conn: &mut DbConnection<'_>,
     source_collection_id: uuid::Uuid,

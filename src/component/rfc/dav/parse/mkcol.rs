@@ -25,6 +25,7 @@ pub struct MkcolRequest {
 ///
 /// ## Errors
 /// Returns an error if the XML is malformed.
+#[expect(clippy::too_many_lines)]
 pub fn parse_mkcol(xml: &[u8]) -> ParseResult<MkcolRequest> {
     if xml.is_empty() {
         // Empty body is valid - no initial properties

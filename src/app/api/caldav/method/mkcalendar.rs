@@ -8,7 +8,7 @@ use salvo::{Request, Response, handler};
 
 use crate::component::dav::service::collection::{CreateCollectionContext, create_collection};
 use crate::component::db::connection;
-use crate::component::rfc::dav::parse::parse_mkcol;
+use crate::component::rfc::dav::parse::{parse_mkcol, MkcolRequest};
 
 /// ## Summary
 /// Handles MKCALENDAR requests to create calendar collections.
@@ -46,7 +46,7 @@ pub async fn mkcalendar(req: &mut Request, res: &mut Response) {
     let body = req.payload().await;
     let parsed_request = match body {
         Ok(bytes) if !bytes.is_empty() => {
-            match parse_mkcol(&bytes) {
+            match parse_mkcol(bytes) {
                 Ok(request) => request,
                 Err(e) => {
                     tracing::error!("Failed to parse MKCALENDAR body: {}", e);
@@ -57,7 +57,7 @@ pub async fn mkcalendar(req: &mut Request, res: &mut Response) {
         }
         Ok(_) => {
             // Empty body - no initial properties
-            Default::default()
+            MkcolRequest::default()
         }
         Err(e) => {
             tracing::error!("Failed to read request body: {}", e);
@@ -117,6 +117,7 @@ pub async fn mkcalendar(req: &mut Request, res: &mut Response) {
 }
 
 /// Placeholder function to extract owner principal ID from path.
+#[expect(clippy::unnecessary_wraps)]
 fn extract_owner_from_path(_path: &str) -> Result<uuid::Uuid, String> {
     // TODO: Implement proper path parsing and authentication
     // For now, return a dummy UUID
