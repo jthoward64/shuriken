@@ -116,10 +116,10 @@ jobs:
 
     - name: Run database migrations
       env:
-        DATABASE_URL: postgres://shuriken:shuriken@localhost:5432/shuriken_test?schema=shuriken_test
+        DATABASE_URL: postgres://shuriken:shuriken@localhost:5432/shuriken_test
       run: diesel migration run
 
     - name: Run tests
       env:
-        DATABASE_URL: postgres://shuriken:shuriken@localhost:5432/shuriken_test?schema=shuriken_test
+        DATABASE_URL: postgres://shuriken:shuriken@localhost:5432/shuriken_test
       run: cargo test --all-targets

@@ -45,7 +45,6 @@ Continuous integration workflow for building, checking, and testing the project.
 
 The test job requires a PostgreSQL database with:
 - Database name: `shuriken_test`
-- Schema: `shuriken_test`
 - Connection via `DATABASE_URL` environment variable
 
 The workflow automatically:
