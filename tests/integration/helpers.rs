@@ -24,9 +24,9 @@ use salvo::http::header::HeaderName;
 use salvo::http::{Method, ReqBody, StatusCode};
 use salvo::prelude::*;
 use salvo::test::{RequestBuilder, ResponseExt, TestClient};
+use shuriken::component::config::load_config;
 use std::sync::OnceLock;
 use tokio::sync::{Mutex, MutexGuard};
-use shuriken::component::config::load_config;
 
 /// Static reference to shared test service (initialized once per test run)
 static TEST_SERVICE: OnceLock<Service> = OnceLock::new();
