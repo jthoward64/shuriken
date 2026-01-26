@@ -9,7 +9,7 @@ use super::values::{
     parse_period, parse_rrule, parse_utc_offset, unescape_text,
 };
 use crate::component::rfc::ical::core::{
-    Component, ComponentKind, ContentLine, Date, DateTime, ICalendar, Property, Value,
+    Component, ComponentKind, ContentLine, Date, DateTime, ICalendar, Period, Property, Value,
 };
 
 /// Parses an iCalendar document from a string.
@@ -319,11 +319,10 @@ fn parse_value(
                     .split(',')
                     .map(|s| parse_datetime(s.trim(), tzid, line_num, 1))
                     .collect::<ParseResult<_>>()?;
-                // For now, just take the first one. TODO: handle lists properly
-                if let Some(dt) = dts.into_iter().next() {
-                    Ok(Value::DateTime(dt))
-                } else {
+                if dts.is_empty() {
                     Ok(Value::Unknown(raw.to_string()))
+                } else {
+                    Ok(Value::DateTimeList(dts))
                 }
             } else {
                 Ok(Value::DateTime(parse_datetime(raw, tzid, line_num, 1)?))
@@ -336,10 +335,10 @@ fn parse_value(
                     .split(',')
                     .map(|s| parse_date(s.trim(), line_num, 1))
                     .collect::<ParseResult<_>>()?;
-                if let Some(d) = dates.into_iter().next() {
-                    Ok(Value::Date(d))
-                } else {
+                if dates.is_empty() {
                     Ok(Value::Unknown(raw.to_string()))
+                } else {
+                    Ok(Value::DateList(dates))
                 }
             } else {
                 Ok(Value::Date(parse_date(raw, line_num, 1)?))
@@ -349,14 +348,15 @@ fn parse_value(
         ValueType::Period => {
             // Handle comma-separated periods (FREEBUSY)
             if raw.contains(',') {
-                // Just parse the first one for now
-                let first = raw.split(',').next().unwrap_or(raw);
-                Ok(Value::Period(parse_period(
-                    first.trim(),
-                    tzid,
-                    line_num,
-                    1,
-                )?))
+                let periods: Vec<Period> = raw
+                    .split(',')
+                    .map(|s| parse_period(s.trim(), tzid, line_num, 1))
+                    .collect::<ParseResult<_>>()?;
+                if periods.is_empty() {
+                    Ok(Value::Unknown(raw.to_string()))
+                } else {
+                    Ok(Value::PeriodList(periods))
+                }
             } else {
                 Ok(Value::Period(parse_period(raw, tzid, line_num, 1)?))
             }
@@ -608,5 +608,90 @@ END:VCALENDAR\r\n";
 
         let x_apple = event.get_property("X-APPLE-STRUCTURED-LOCATION").unwrap();
         assert!(x_apple.raw_value.contains("geo:"));
+    }
+
+    #[test]
+    fn parse_datetime_list() {
+        let input = "\
+BEGIN:VCALENDAR\r\n\
+VERSION:2.0\r\n\
+PRODID:-//Test//Test//EN\r\n\
+BEGIN:VEVENT\r\n\
+UID:exdate@example.com\r\n\
+DTSTAMP:20260123T120000Z\r\n\
+DTSTART:20260123T090000Z\r\n\
+RRULE:FREQ=DAILY;COUNT=10\r\n\
+EXDATE:20260125T090000Z,20260127T090000Z,20260129T090000Z\r\n\
+SUMMARY:Event with excluded dates\r\n\
+END:VEVENT\r\n\
+END:VCALENDAR\r\n";
+
+        let ical = parse(input).unwrap();
+        let event = &ical.events()[0];
+
+        let exdate = event.get_property("EXDATE").unwrap();
+        let datetime_list = exdate.value.as_datetime_list().unwrap();
+        
+        assert_eq!(datetime_list.len(), 3);
+        assert_eq!(datetime_list[0].day, 25);
+        assert_eq!(datetime_list[1].day, 27);
+        assert_eq!(datetime_list[2].day, 29);
+    }
+
+    #[test]
+    fn parse_date_list() {
+        let input = "\
+BEGIN:VCALENDAR\r\n\
+VERSION:2.0\r\n\
+PRODID:-//Test//Test//EN\r\n\
+BEGIN:VEVENT\r\n\
+UID:rdate@example.com\r\n\
+DTSTAMP:20260123T120000Z\r\n\
+DTSTART;VALUE=DATE:20260123\r\n\
+RDATE;VALUE=DATE:20260125,20260127,20260130\r\n\
+SUMMARY:Event with additional dates\r\n\
+END:VEVENT\r\n\
+END:VCALENDAR\r\n";
+
+        let ical = parse(input).unwrap();
+        let event = &ical.events()[0];
+
+        let rdate = event.get_property("RDATE").unwrap();
+        let date_list = rdate.value.as_date_list().unwrap();
+        
+        assert_eq!(date_list.len(), 3);
+        assert_eq!(date_list[0].day, 25);
+        assert_eq!(date_list[1].day, 27);
+        assert_eq!(date_list[2].day, 30);
+    }
+
+    #[test]
+    fn parse_period_list() {
+        let input = "\
+BEGIN:VCALENDAR\r\n\
+VERSION:2.0\r\n\
+PRODID:-//Test//Test//EN\r\n\
+BEGIN:VFREEBUSY\r\n\
+UID:freebusy@example.com\r\n\
+DTSTAMP:20260123T120000Z\r\n\
+DTSTART:20260123T000000Z\r\n\
+DTEND:20260124T000000Z\r\n\
+FREEBUSY:20260123T090000Z/20260123T100000Z,20260123T140000Z/20260123T160000Z\r\n\
+END:VFREEBUSY\r\n\
+END:VCALENDAR\r\n";
+
+        let ical = parse(input).unwrap();
+        let freebusy = ical.root.children.iter()
+            .find(|c| c.kind == Some(ComponentKind::FreeBusy))
+            .unwrap();
+
+        let freebusy_prop = freebusy.get_property("FREEBUSY").unwrap();
+        let period_list = freebusy_prop.value.as_period_list().unwrap();
+        
+        assert_eq!(period_list.len(), 2);
+        // First period: 09:00-10:00
+        assert_eq!(period_list[0].start().hour, 9);
+        // Second period: 14:00-16:00
+        assert_eq!(period_list[1].start().hour, 14);
     }
 }

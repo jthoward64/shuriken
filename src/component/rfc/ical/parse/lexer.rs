@@ -97,8 +97,8 @@ pub fn unfold_with_space(input: &str) -> String {
 /// Splits input into content lines, merging folded continuations.
 ///
 /// Handles both CRLF and bare LF line endings. Lines starting with SP/HTAB are
-/// treated as continuations of the previous line with a single space inserted
-/// to preserve separation.
+/// treated as continuations of the previous line. Per RFC 5545 §3.1, unfolding
+/// removes the CRLF and the whitespace character (no space is inserted).
 #[must_use]
 pub fn split_lines(input: &str) -> Vec<(usize, String)> {
     let mut lines: Vec<(usize, String)> = Vec::new();
@@ -110,9 +110,12 @@ pub fn split_lines(input: &str) -> Vec<(usize, String)> {
         }
 
         if line.starts_with([' ', '\t']) {
-            let continuation = line.trim_start_matches([' ', '\t']);
+            // RFC 5545 §3.1: remove CRLF + single whitespace character
+            // Both space and tab are handled the same way (skip first character)
+            // Safety: starts_with check guarantees line is not empty
+            let continuation = &line[1..];
             if let Some((_, prev)) = lines.last_mut() {
-                prev.push(' ');
+                // RFC 5545 §3.1: unfold by removing CRLF + whitespace (no space added)
                 prev.push_str(continuation);
             } else {
                 lines.push((i + 1, continuation.to_string()));
@@ -120,7 +123,6 @@ pub fn split_lines(input: &str) -> Vec<(usize, String)> {
         } else if !line.contains(':') {
             // Lenient: treat lines without a colon as folded continuations.
             if let Some((_, prev)) = lines.last_mut() {
-                prev.push(' ');
                 prev.push_str(line);
             } else {
                 lines.push((i + 1, line.to_string()));
