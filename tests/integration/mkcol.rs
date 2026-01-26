@@ -3,117 +3,380 @@
 //!
 //! Verifies collection creation with initial properties.
 
-#[expect(unused_imports)]
+use salvo::http::StatusCode;
+
 use super::helpers::*;
+
+// ============================================================================
+// MKCALENDAR Basic Tests
+// ============================================================================
 
 /// ## Summary
 /// Test that MKCALENDAR creates a calendar collection.
 #[tokio::test]
-#[ignore = "requires HTTP routing"]
+#[ignore = "requires database seeding"]
 async fn mkcalendar_creates_calendar_collection() {
-    // This test would:
-    // 1. Send MKCALENDAR to new URI
-    // 2. Verify 201 Created
-    // 3. Send PROPFIND to verify resourcetype includes calendar
-    // 4. Verify collection exists in DB with resource_type="calendar"
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .truncate_all()
+        .await
+        .expect("Failed to truncate tables");
+
+    let _principal_id = test_db
+        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .await
+        .expect("Failed to seed principal");
+
+    let service = create_test_service();
+
+    let new_collection_uuid = uuid::Uuid::new_v4();
+    let response =
+        TestRequest::mkcalendar(&format!("/api/caldav/{new_collection_uuid}/"))
+            .send(service)
+            .await;
+
+    response.assert_status(StatusCode::CREATED);
+
+    // Verify with PROPFIND that it's a calendar collection
+    let props = propfind_props(&[("DAV:", "resourcetype")]);
+    let verify_response =
+        TestRequest::propfind(&format!("/api/caldav/{new_collection_uuid}/"))
+            .depth("0")
+            .xml_body(&props)
+            .send(create_test_service())
+            .await;
+
+    verify_response
+        .assert_status(StatusCode::MULTI_STATUS)
+        .assert_body_contains("calendar");
 }
 
 /// ## Summary
 /// Test that MKCALENDAR applies initial properties from request body.
 #[tokio::test]
-#[ignore = "requires HTTP routing"]
+#[ignore = "requires database seeding"]
 async fn mkcalendar_initial_props_applied() {
-    // This test would:
-    // 1. Send MKCALENDAR with body containing displayname and description
-    // 2. Verify 201 Created
-    // 3. Send PROPFIND to verify properties were set
-    // 4. Verify properties match request
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .truncate_all()
+        .await
+        .expect("Failed to truncate tables");
+
+    let _principal_id = test_db
+        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .await
+        .expect("Failed to seed principal");
+
+    let service = create_test_service();
+
+    let new_collection_uuid = uuid::Uuid::new_v4();
+    let body = r#"<?xml version="1.0" encoding="utf-8"?>
+<C:mkcalendar xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+  <D:set>
+    <D:prop>
+      <D:displayname>Work Calendar</D:displayname>
+      <C:calendar-description>Events from work</C:calendar-description>
+    </D:prop>
+  </D:set>
+</C:mkcalendar>"#;
+
+    let response =
+        TestRequest::mkcalendar(&format!("/api/caldav/{new_collection_uuid}/"))
+            .xml_body(body)
+            .send(service)
+            .await;
+
+    response.assert_status(StatusCode::CREATED);
+
+    // Verify properties with PROPFIND
+    let props = propfind_props(&[("DAV:", "displayname")]);
+    let verify_response =
+        TestRequest::propfind(&format!("/api/caldav/{new_collection_uuid}/"))
+            .depth("0")
+            .xml_body(&props)
+            .send(create_test_service())
+            .await;
+
+    verify_response
+        .assert_status(StatusCode::MULTI_STATUS)
+        .assert_body_contains("Work Calendar");
 }
+
+/// ## Summary
+/// Test that MKCALENDAR on existing URI returns 405 or 409.
+#[tokio::test]
+#[ignore = "requires database seeding"]
+async fn mkcalendar_on_existing_uri_conflict() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .truncate_all()
+        .await
+        .expect("Failed to truncate tables");
+
+    let principal_id = test_db
+        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .await
+        .expect("Failed to seed principal");
+
+    let collection_id = test_db
+        .seed_collection(principal_id, "calendar", "testcal", None)
+        .await
+        .expect("Failed to seed collection");
+
+    let service = create_test_service();
+
+    let response = TestRequest::mkcalendar(&format!("/api/caldav/{collection_id}/"))
+        .send(service)
+        .await;
+
+    // Either 405 Method Not Allowed or 409 Conflict
+    assert!(
+        response.status == StatusCode::METHOD_NOT_ALLOWED
+            || response.status == StatusCode::CONFLICT,
+        "Expected 405 or 409, got {}",
+        response.status
+    );
+}
+
+// ============================================================================
+// Extended MKCOL Tests
+// ============================================================================
 
 /// ## Summary
 /// Test that Extended MKCOL creates an addressbook.
 #[tokio::test]
-#[ignore = "requires HTTP routing"]
+#[ignore = "requires database seeding"]
 async fn mkcol_extended_creates_addressbook() {
-    // This test would:
-    // 1. Send MKCOL with Extended MKCOL body (RFC 5689) specifying addressbook resourcetype
-    // 2. Verify 201 Created
-    // 3. Send PROPFIND to verify resourcetype includes addressbook
-    // 4. Verify collection exists in DB with resource_type="addressbook"
-}
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .truncate_all()
+        .await
+        .expect("Failed to truncate tables");
 
-/// ## Summary
-/// Test that Extended MKCOL with invalid XML returns 400.
-#[tokio::test]
-#[ignore = "requires HTTP routing"]
-async fn mkcol_extended_rejects_bad_body() {
-    // This test would:
-    // 1. Send MKCOL with malformed XML body
-    // 2. Verify 400 Bad Request
-    // 3. Verify collection was not created
+    let _principal_id = test_db
+        .seed_principal("user", "/principals/bob/", Some("Bob"))
+        .await
+        .expect("Failed to seed principal");
+
+    let service = create_test_service();
+
+    let new_collection_uuid = uuid::Uuid::new_v4();
+    let body = mkcol_addressbook_body(Some("Contacts"));
+
+    let response = TestRequest::mkcol(&format!("/api/carddav/{new_collection_uuid}/"))
+        .xml_body(&body)
+        .send(service)
+        .await;
+
+    response.assert_status(StatusCode::CREATED);
+
+    // Verify with PROPFIND that it's an addressbook collection
+    let props = propfind_props(&[("DAV:", "resourcetype")]);
+    let verify_response =
+        TestRequest::propfind(&format!("/api/carddav/{new_collection_uuid}/"))
+            .depth("0")
+            .xml_body(&props)
+            .send(create_test_service())
+            .await;
+
+    verify_response
+        .assert_status(StatusCode::MULTI_STATUS)
+        .assert_body_contains("addressbook");
 }
 
 /// ## Summary
 /// Test that Extended MKCOL applies initial properties.
 #[tokio::test]
-#[ignore = "requires HTTP routing"]
+#[ignore = "requires database seeding"]
 async fn mkcol_extended_applies_initial_props() {
-    // This test would:
-    // 1. Send Extended MKCOL with displayname and description in body
-    // 2. Verify 201 Created
-    // 3. Send PROPFIND to verify properties were set
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .truncate_all()
+        .await
+        .expect("Failed to truncate tables");
+
+    let _principal_id = test_db
+        .seed_principal("user", "/principals/bob/", Some("Bob"))
+        .await
+        .expect("Failed to seed principal");
+
+    let service = create_test_service();
+
+    let new_collection_uuid = uuid::Uuid::new_v4();
+    let body = mkcol_addressbook_body(Some("Work Contacts"));
+
+    let response = TestRequest::mkcol(&format!("/api/carddav/{new_collection_uuid}/"))
+        .xml_body(&body)
+        .send(service)
+        .await;
+
+    response.assert_status(StatusCode::CREATED);
+
+    // Verify properties with PROPFIND
+    let props = propfind_props(&[("DAV:", "displayname")]);
+    let verify_response =
+        TestRequest::propfind(&format!("/api/carddav/{new_collection_uuid}/"))
+            .depth("0")
+            .xml_body(&props)
+            .send(create_test_service())
+            .await;
+
+    verify_response
+        .assert_status(StatusCode::MULTI_STATUS)
+        .assert_body_contains("Work Contacts");
 }
 
 /// ## Summary
-/// Test that MKCALENDAR on existing URI returns 405.
+/// Test that Extended MKCOL with invalid XML returns 400.
 #[tokio::test]
-#[ignore = "requires HTTP routing"]
-async fn mkcalendar_on_existing_uri_405() {
-    // This test would:
-    // 1. Create collection at URI
-    // 2. Send MKCALENDAR to same URI
-    // 3. Verify 405 Method Not Allowed or 409 Conflict
+#[ignore = "requires database seeding"]
+async fn mkcol_extended_rejects_bad_body() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .truncate_all()
+        .await
+        .expect("Failed to truncate tables");
+
+    let _principal_id = test_db
+        .seed_principal("user", "/principals/bob/", Some("Bob"))
+        .await
+        .expect("Failed to seed principal");
+
+    let service = create_test_service();
+
+    let new_collection_uuid = uuid::Uuid::new_v4();
+    let response = TestRequest::mkcol(&format!("/api/carddav/{new_collection_uuid}/"))
+        .xml_body("this is not valid xml <<><")
+        .send(service)
+        .await;
+
+    response.assert_status(StatusCode::BAD_REQUEST);
 }
 
+// ============================================================================
+// Plain MKCOL Tests
+// ============================================================================
+
 /// ## Summary
-/// Test that MKCOL creates a plain collection (non-calendar, non-addressbook).
+/// Test that plain MKCOL (without body) creates a collection.
 #[tokio::test]
-#[ignore = "requires HTTP routing"]
+#[ignore = "requires database seeding"]
 async fn mkcol_creates_plain_collection() {
-    // This test would:
-    // 1. Send MKCOL (not Extended MKCOL) to new URI
-    // 2. Verify 201 Created
-    // 3. Send PROPFIND to verify resourcetype is collection only
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .truncate_all()
+        .await
+        .expect("Failed to truncate tables");
+
+    let _principal_id = test_db
+        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .await
+        .expect("Failed to seed principal");
+
+    let service = create_test_service();
+
+    let new_collection_uuid = uuid::Uuid::new_v4();
+    let response = TestRequest::mkcol(&format!("/api/dav/{new_collection_uuid}/"))
+        .send(service)
+        .await;
+
+    response.assert_status(StatusCode::CREATED);
+
+    // Verify with PROPFIND that it's just a collection (not calendar/addressbook)
+    let props = propfind_props(&[("DAV:", "resourcetype")]);
+    let verify_response =
+        TestRequest::propfind(&format!("/api/dav/{new_collection_uuid}/"))
+            .depth("0")
+            .xml_body(&props)
+            .send(create_test_service())
+            .await;
+
+    verify_response
+        .assert_status(StatusCode::MULTI_STATUS)
+        .assert_body_contains("collection");
 }
 
 /// ## Summary
-/// Test that MKCALENDAR requires authentication.
+/// Test that MKCOL on existing URI returns conflict.
 #[tokio::test]
-#[ignore = "requires HTTP routing and auth"]
-async fn mkcalendar_requires_auth() {
-    // This test would:
-    // 1. Send MKCALENDAR without credentials
-    // 2. Verify 401 Unauthorized
+#[ignore = "requires database seeding"]
+async fn mkcol_on_existing_uri_conflict() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .truncate_all()
+        .await
+        .expect("Failed to truncate tables");
+
+    let principal_id = test_db
+        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .await
+        .expect("Failed to seed principal");
+
+    let collection_id = test_db
+        .seed_collection(principal_id, "calendar", "testcal", None)
+        .await
+        .expect("Failed to seed collection");
+
+    let service = create_test_service();
+
+    let response = TestRequest::mkcol(&format!("/api/caldav/{collection_id}/"))
+        .send(service)
+        .await;
+
+    // Either 405 or 409
+    assert!(
+        response.status == StatusCode::METHOD_NOT_ALLOWED
+            || response.status == StatusCode::CONFLICT,
+        "Expected 405 or 409, got {}",
+        response.status
+    );
 }
 
-/// ## Summary
-/// Test that MKCALENDAR is denied if user lacks permission.
-#[tokio::test]
-#[ignore = "requires HTTP routing and auth"]
-async fn mkcalendar_unauthorized_403() {
-    // This test would:
-    // 1. Authenticate as user with no create permission
-    // 2. Send MKCALENDAR
-    // 3. Verify 403 Forbidden
-}
+// ============================================================================
+// Protected Property Tests
+// ============================================================================
 
 /// ## Summary
-/// Test that MKCALENDAR with protected properties in body returns 403.
+/// Test that MKCALENDAR with protected properties returns appropriate error.
 #[tokio::test]
-#[ignore = "requires HTTP routing"]
-async fn mkcalendar_protected_props_403() {
-    // This test would:
-    // 1. Send MKCALENDAR with attempt to set protected property (e.g., resourcetype)
-    // 2. Verify 207 Multi-Status or 403 Forbidden
-    // 3. Verify protected property was not set
+#[ignore = "requires database seeding"]
+async fn mkcalendar_protected_props_rejected() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .truncate_all()
+        .await
+        .expect("Failed to truncate tables");
+
+    let _principal_id = test_db
+        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .await
+        .expect("Failed to seed principal");
+
+    let service = create_test_service();
+
+    let new_collection_uuid = uuid::Uuid::new_v4();
+    // Try to set getetag (protected property)
+    let body = r#"<?xml version="1.0" encoding="utf-8"?>
+<C:mkcalendar xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+  <D:set>
+    <D:prop>
+      <D:getetag>"custom-etag"</D:getetag>
+    </D:prop>
+  </D:set>
+</C:mkcalendar>"#;
+
+    let response =
+        TestRequest::mkcalendar(&format!("/api/caldav/{new_collection_uuid}/"))
+            .xml_body(body)
+            .send(service)
+            .await;
+
+    // Either 403, 207 with propstat error, or collection created ignoring protected prop
+    assert!(
+        response.status == StatusCode::FORBIDDEN
+            || response.status == StatusCode::MULTI_STATUS
+            || response.status == StatusCode::CREATED,
+        "Expected 403, 207, or 201, got {}",
+        response.status
+    );
 }

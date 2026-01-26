@@ -58,7 +58,7 @@ async fn example_seed_calendar_collection() {
         .seed_collection(
             principal_id,
             "calendar",
-            "/calendars/alice/personal/",
+            "testcal",
             Some("Personal Calendar"),
         )
         .await
@@ -87,7 +87,7 @@ async fn example_seed_calendar_collection() {
         .seed_instance(
             collection_id,
             entity_id,
-            "/calendars/alice/personal/event-123.ics",
+            "testcal",
             "text/calendar",
             "\"abc123\"",
             1,

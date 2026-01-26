@@ -17,6 +17,7 @@ pub struct DavCollection {
     pub synctoken: i64,
     pub updated_at: chrono::DateTime<chrono::Utc>,
     pub deleted_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub supported_components: Option<Vec<Option<String>>>,
 }
 
 /// Insert struct for creating new DAV collections

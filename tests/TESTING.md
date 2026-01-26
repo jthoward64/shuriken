@@ -9,6 +9,30 @@ The test infrastructure provides utilities for:
 - Seeding test data (principals, users, collections, entities, instances, components)
 - Running integration tests against a test database
 - Making HTTP requests to the test Salvo service
+- Asserting on HTTP responses and database state
+
+## Test Coverage
+
+### Integration Tests by HTTP Method
+
+| Module | Method | Description | Tests |
+|--------|--------|-------------|-------|
+| `options.rs` | OPTIONS | WebDAV compliance headers | Allow header, DAV header, compliance levels |
+| `get_head.rs` | GET/HEAD | Resource retrieval | Calendar/vCard retrieval, conditional GET, ETag handling |
+| `put.rs` | PUT | Resource creation/update | If-Match, If-None-Match, ETag response |
+| `delete.rs` | DELETE | Resource deletion | Item deletion, collection deletion, tombstones |
+| `propfind.rs` | PROPFIND | Property discovery | Depth 0/1, allprop, propname, known/unknown props |
+| `proppatch.rs` | PROPPATCH | Property modification | Set/remove, protected properties, partial success |
+| `mkcol.rs` | MKCALENDAR/MKCOL | Collection creation | Calendar/addressbook creation, extended MKCOL |
+| `copy_move.rs` | COPY/MOVE | Resource operations | Rename, copy, Destination header |
+| `report.rs` | REPORT | Query operations | calendar-query, multiget, sync-collection |
+
+### Test Patterns
+
+- **Happy path tests**: Verify successful operations return correct status codes and content
+- **Error cases**: Verify 4xx/5xx responses for invalid requests, missing resources
+- **Conditional requests**: Verify If-Match/If-None-Match/If-Modified-Since handling
+- **WebDAV compliance**: Verify proper multistatus responses, property handling
 
 ## Test Types
 
@@ -95,6 +119,71 @@ cargo test --test http_integration -- --include-ignored
 ```
 
 ## Test Helpers
+
+The test infrastructure provides several helper classes and functions:
+
+### TestRequest - HTTP Request Builder
+
+A builder pattern for constructing HTTP requests:
+
+```rust
+use crate::integration::helpers::*;
+
+// Simple request
+let response = TestRequest::get("/api/caldav/resource.ics")
+    .send(service)
+    .await;
+
+// With headers and body
+let response = TestRequest::put("/api/caldav/collection/event.ics")
+    .if_none_match("*")
+    .icalendar_body(&sample_icalendar_event("uid@example.com", "Meeting"))
+    .send(service)
+    .await;
+
+// WebDAV methods
+let response = TestRequest::propfind("/api/caldav/collection/")
+    .depth("1")
+    .xml_body(propfind_allprop())
+    .send(service)
+    .await;
+```
+
+**Available methods:**
+- `get(path)`, `head(path)`, `put(path)`, `delete(path)`, `options(path)`
+- `propfind(path)`, `proppatch(path)`, `report(path)`
+- `mkcol(path)`, `mkcalendar(path)`, `copy(path)`, `move_to(path)`
+
+**Builder methods:**
+- `header(name, value)` - Add custom header
+- `depth(value)` - Set Depth header
+- `if_match(etag)` - Set If-Match header
+- `if_none_match(etag)` - Set If-None-Match header
+- `destination(uri)` - Set Destination header
+- `content_type(mime)` - Set Content-Type header
+- `body(bytes)` - Set raw body
+- `xml_body(str)` - Set XML body with proper content type
+- `icalendar_body(str)` - Set iCalendar body
+- `vcard_body(str)` - Set vCard body
+
+### TestResponse - Response Assertions
+
+Chain-able assertions for HTTP responses:
+
+```rust
+// Basic assertions
+let response = response
+    .assert_status(StatusCode::MULTI_STATUS)
+    .assert_header_exists("ETag")
+    .assert_body_contains("displayname");
+
+// Access response data
+let etag = response.get_etag();
+let body = response.body_string();
+let count = response.count_multistatus_responses();
+```
+
+### TestDb - Database Operations
 
 The test infrastructure provides the `TestDb` helper class for database operations:
 
@@ -199,6 +288,37 @@ See `tests/integration/example_test.rs` for complete examples of:
 - Creating a full calendar collection hierarchy
 - Creating an addressbook collection
 - Working with entities, components, and instances
+
+### Sample Data Generators
+
+The helpers module provides functions to generate sample CalDAV/CardDAV data:
+
+```rust
+// iCalendar data
+let ical = sample_icalendar_event("uid@example.com", "Team Meeting");
+
+// vCard data
+let vcard = sample_vcard("John Doe", "john@example.com");
+
+// PROPFIND bodies
+let allprop = propfind_allprop();
+let propname = propfind_propname();
+let specific = propfind_specific_props();
+
+// PROPPATCH body
+let proppatch = proppatch_set_displayname("New Name");
+
+// REPORT bodies
+let query = calendar_query_report();
+let multiget = calendar_multiget_report(&hrefs);
+let sync = sync_collection_report_initial();
+let sync_delta = sync_collection_report("sync-token-123");
+
+// MKCALENDAR/MKCOL bodies
+let mkcal = mkcalendar_body("Work Calendar");
+let mkcol_calendar = extended_mkcol_calendar("My Calendar");
+let mkcol_addressbook = extended_mkcol_addressbook("My Contacts");
+```
 
 ## Writing New Tests
 
