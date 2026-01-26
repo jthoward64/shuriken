@@ -1,23 +1,25 @@
 # Shuriken CalDAV/CardDAV Implementation: Overall Status
 
-**Last Updated**: 2026-01-25  
-**Overall Progress**: ~50% complete through planned Phase 5  
-**Production Ready**: ❌ No (Phase 5 required)
+**Last Updated**: 2026-01-26  
+**Overall Progress**: ~65% complete through Phase 5  
+**Production Ready**: ⚠️ Approaching (Phase 6 & 9 needed for full functionality)
 
 ---
 
 ## Executive Summary
 
-Shuriken has made **excellent progress** on foundational work through Phase 4, with strong implementations of:
+Shuriken has made **excellent progress** with Phases 0-5 complete, including:
 - ✅ RFC-compliant parsing/serialization for iCalendar, vCard, and WebDAV XML
 - ✅ Well-designed database schema with proper entity/instance separation
 - ✅ Core HTTP methods (OPTIONS, PROPFIND, GET, PUT, DELETE, COPY) working
-- ✅ Query reports functional for non-recurring events
+- ✅ Query reports fully functional with recurrence support
+- ✅ RRULE expansion engine integrated (Phase 5 complete)
+- ✅ Timezone handling with `chrono-tz`
+- ✅ `cal_occurrence` table for cached occurrences
 
-However, **Phase 5 is a critical blocker for production**:
-- ❌ No RRULE expansion (recurring events don't work)
-- ❌ No timezone handling (TZID events broken)
-- ❌ `cal_occurrence` table missing from schema
+**Next Priorities for Production**:
+- Phase 6: Synchronization (sync-collection report)
+- Phase 9: Discovery (well-known URIs, principal discovery)
 
 ---
 
@@ -29,8 +31,8 @@ However, **Phase 5 is a critical blocker for production**:
 | [Phase 1](Phase%201.md) | Parsing & Serialization | ✅ Complete | 98% | — | Complete |
 | [Phase 2](Phase%202.md) | Database Operations | ⚠️ Mostly Complete | 85% | P2 | 1 week |
 | [Phase 3](Phase%203.md) | Basic HTTP Methods | ⚠️ Mostly Complete | 90% | P2 | 3-5 days |
-| [Phase 4](Phase%204.md) | Query Reports | ✅ Complete | 98% | — | Complete |
-| [Phase 5](Phase%205.md) | **Recurrence & Timezones** | **❌ Not Started** | **0%** | **P0 CRITICAL** | **2-3 weeks** |
+| [Phase 4](Phase%204.md) | Query Reports | ✅ Complete | 100% | — | Complete |
+| [Phase 5](Phase%205.md) | Recurrence & Timezones | ✅ Complete | 100% | — | Complete |
 | [Phase 6](Phase%206.md) | Synchronization | ❌ Stub Only | 10% | P1 | 1 week |
 | [Phase 7](Phase%207.md) | Free-Busy & Scheduling | ❌ Not Started | 0% | P2-P3 | 2-3 weeks |
 | [Phase 8](Phase%208.md) | Authorization | ⚠️ Partial | 40% | P3 | 3-5 days |
@@ -40,19 +42,17 @@ However, **Phase 5 is a critical blocker for production**:
 
 ## Critical Path to Production
 
-### 🚨 Must Have (Blocks Production)
+### ✅ Must Have (Completed)
 
-#### 1. Phase 5: Recurrence & Timezones (2-3 weeks) — **P0**
-**Why Critical**: Recurring events are ubiquitous in real-world calendar use. Without RRULE expansion, the server cannot handle daily standups, weekly meetings, annual birthdays, etc.
+#### 1. Phase 5: Recurrence & Timezones — **✅ COMPLETE**
+**Status**: Fully implemented with RRULE expansion, timezone resolution, and occurrence caching.
 
-**Key Tasks**:
-- Create `cal_occurrence` table migration
-- Implement RRULE expansion engine (or integrate library like `rrule` crate)
-- Implement VTIMEZONE parsing and timezone resolution
-- Implement UTC conversion utilities with DST handling
-- Wire expansion into PUT handler and calendar-query report
-
-**Blockers**: None (foundational work complete)
+**Completed Tasks**:
+- ✅ Created `cal_occurrence` table migration
+- ✅ Implemented RRULE expansion engine using `rrule` crate
+- ✅ Implemented timezone resolution with `chrono-tz`
+- ✅ Implemented UTC conversion utilities with DST handling
+- ✅ Wired expansion into PUT handler and calendar-query report
 
 ---
 
@@ -194,10 +194,6 @@ With these three phases complete, Shuriken would have:
 ---
 
 ## Critical Divergences from RFCs
-
-### Production Blockers
-- **RFC 4791 §9.9**: Time-range queries with recurrence — Not implemented (Phase 5)
-- **RFC 5545 §3.8.5**: RRULE expansion — Not implemented (Phase 5)
 
 ### Important Divergences
 - **RFC 6578**: sync-collection report — Stub only (Phase 6)
