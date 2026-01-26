@@ -48,6 +48,9 @@ pub fn normalize_for_sql_upper(text: &str, collation: Option<&String>) -> Collat
             case_sensitive: false,
         },
         // Unknown collation - treat as case-insensitive
+        // TODO:         If the client chooses a collation not supported by the server, the
+        //    server MUST respond with a CALDAV:supported-collation precondition
+        //    error response.
         _ => CollationResult {
             value: text.to_uppercase(),
             case_sensitive: false,
@@ -175,9 +178,6 @@ mod tests {
         assert_eq!(build_like_pattern("test", &MatchType::EndsWith), "%test");
 
         // With special chars
-        assert_eq!(
-            build_like_pattern("100%", &MatchType::Contains),
-            "%100\\%%"
-        );
+        assert_eq!(build_like_pattern("100%", &MatchType::Contains), "%100\\%%");
     }
 }

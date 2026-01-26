@@ -6,8 +6,8 @@ use quick_xml::events::Event;
 use super::error::{ParseError, ParseResult};
 use crate::component::rfc::dav::core::{
     AddressbookFilter, AddressbookQuery, CalendarFilter, CalendarQuery, CompFilter, FilterTest,
-    Href, MatchType, Namespace, ParamFilter, PropFilter, PropertyName, QName, RecurrenceExpansion, ReportRequest,
-    ReportType, SyncCollection, SyncLevel, TextMatch, TimeRange,
+    Href, MatchType, Namespace, ParamFilter, PropFilter, PropertyName, QName, RecurrenceExpansion,
+    ReportRequest, ReportType, SyncCollection, SyncLevel, TextMatch, TimeRange,
 };
 
 /// Parses a REPORT request body.
@@ -844,6 +844,8 @@ fn parse_text_match_content(
 }
 
 /// Parses a time-range element.
+///
+/// RFC 4791 §9.9 specifies iCalendar DATE-TIME format: `YYYYMMDDTHHMMSSZ`
 fn parse_time_range(elem: &quick_xml::events::BytesStart<'_>) -> ParseResult<TimeRange> {
     let mut start = None;
     let mut end = None;
@@ -854,20 +856,47 @@ fn parse_time_range(elem: &quick_xml::events::BytesStart<'_>) -> ParseResult<Tim
 
         match key {
             "start" => {
-                start = chrono::DateTime::parse_from_rfc3339(value)
-                    .ok()
-                    .map(|dt| dt.with_timezone(&chrono::Utc));
+                start = parse_icalendar_utc_datetime(value);
             }
             "end" => {
-                end = chrono::DateTime::parse_from_rfc3339(value)
-                    .ok()
-                    .map(|dt| dt.with_timezone(&chrono::Utc));
+                end = parse_icalendar_utc_datetime(value);
             }
             _ => {}
         }
     }
 
     Ok(TimeRange { start, end })
+}
+
+/// Parses an iCalendar UTC DATE-TIME value to chrono.
+///
+/// Format: `YYYYMMDDTHHMMSSZ` (e.g., `20060104T140000Z`)
+///
+/// Per RFC 4791 §9.9, time-range values MUST be UTC (end with 'Z').
+fn parse_icalendar_utc_datetime(s: &str) -> Option<chrono::DateTime<chrono::Utc>> {
+    // Must end with Z for UTC
+    let s = s.strip_suffix('Z')?;
+
+    // Must be exactly 15 characters: YYYYMMDDTHHMMSS
+    if s.len() != 15 {
+        return None;
+    }
+
+    // Must have T at position 8
+    if s.as_bytes().get(8) != Some(&b'T') {
+        return None;
+    }
+
+    let year = s[0..4].parse::<i32>().ok()?;
+    let month = s[4..6].parse::<u32>().ok()?;
+    let day = s[6..8].parse::<u32>().ok()?;
+    let hour = s[9..11].parse::<u32>().ok()?;
+    let minute = s[11..13].parse::<u32>().ok()?;
+    let second = s[13..15].parse::<u32>().ok()?;
+
+    chrono::NaiveDate::from_ymd_opt(year, month, day)
+        .and_then(|d| d.and_hms_opt(hour, minute, second))
+        .map(|dt| chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(dt, chrono::Utc))
 }
 
 /// Parses addressbook filter content (nested prop-filters).
@@ -1004,6 +1033,8 @@ fn parse_expand_property(xml: &[u8]) -> ParseResult<ReportRequest> {
 
 #[cfg(test)]
 mod tests {
+    use chrono::{Datelike, Timelike};
+
     use super::*;
     use crate::component::rfc::dav::core::ReportType;
 
@@ -1098,5 +1129,39 @@ mod tests {
             }
             _ => panic!("wrong report type"),
         }
+    }
+
+    #[test]
+    fn parse_icalendar_datetime_valid() {
+        let dt = super::parse_icalendar_utc_datetime("20060104T140000Z");
+        assert!(dt.is_some());
+        let dt = dt.unwrap();
+        assert_eq!(dt.year(), 2006);
+        assert_eq!(dt.month(), 1);
+        assert_eq!(dt.day(), 4);
+        assert_eq!(dt.hour(), 14);
+        assert_eq!(dt.minute(), 0);
+        assert_eq!(dt.second(), 0);
+    }
+
+    #[test]
+    fn parse_icalendar_datetime_missing_z() {
+        // Must have trailing Z
+        let dt = super::parse_icalendar_utc_datetime("20060104T140000");
+        assert!(dt.is_none());
+    }
+
+    #[test]
+    fn parse_icalendar_datetime_rfc3339_format() {
+        // RFC 3339 format should not be parsed
+        let dt = super::parse_icalendar_utc_datetime("2006-01-04T14:00:00Z");
+        assert!(dt.is_none());
+    }
+
+    #[test]
+    fn parse_icalendar_datetime_invalid() {
+        // Wrong length
+        let dt = super::parse_icalendar_utc_datetime("20060104Z");
+        assert!(dt.is_none());
     }
 }

@@ -266,8 +266,12 @@ async fn apply_property_filters(
                 .collect()
         } else if let Some(text_match) = &prop_filter.text_match {
             // Property must exist and match text
-            let collation =
-                normalize_for_sql_upper(&text_match.value, text_match.collation.as_ref());
+            // CalDAV defaults to i;ascii-casemap per RFC 4791 Section 7.5
+            let effective_collation = text_match
+                .collation
+                .clone()
+                .unwrap_or_else(|| "i;ascii-casemap".to_string());
+            let collation = normalize_for_sql_upper(&text_match.value, Some(&effective_collation));
             let pattern = build_like_pattern(&collation.value, &text_match.match_type);
 
             let mut query = dav_component::table
@@ -283,13 +287,14 @@ async fn apply_property_filters(
             if collation.case_sensitive {
                 // i;octet - case-sensitive comparison
                 query = match text_match.match_type {
-                    MatchType::Equals => query.filter(dav_property::value_text.eq(&collation.value)),
-                    MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
-                        query.filter(dav_property::value_text.like(build_like_pattern(
-                            &collation.value,
-                            &text_match.match_type,
-                        )))
+                    MatchType::Equals => {
+                        query.filter(dav_property::value_text.eq(&collation.value))
                     }
+                    MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => query
+                        .filter(
+                            dav_property::value_text
+                                .like(build_like_pattern(&collation.value, &text_match.match_type)),
+                        ),
                 };
             } else {
                 // Case-insensitive: use SQL UPPER() with pre-uppercased pattern
@@ -297,11 +302,10 @@ async fn apply_property_filters(
                     MatchType::Equals => query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(
                         &format!("UPPER(value_text) = '{}'", collation.value),
                     )),
-                    MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
-                        query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
+                    MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => query
+                        .filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
                             "UPPER(value_text) LIKE '{pattern}'"
-                        )))
-                    }
+                        ))),
                 };
             }
 
