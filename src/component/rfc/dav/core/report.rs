@@ -231,6 +231,10 @@ pub struct PropFilter {
     pub time_range: Option<TimeRange>,
     /// Parameter filters.
     pub param_filters: Vec<ParamFilter>,
+    /// Test mode for param-filters (`anyof` or `allof`).
+    ///
+    /// Default is `anyof` per RFC 6352 §10.5.2.
+    pub test: FilterTest,
 }
 
 impl PropFilter {
@@ -243,6 +247,7 @@ impl PropFilter {
             text_match: None,
             time_range: None,
             param_filters: Vec::new(),
+            test: FilterTest::AnyOf, // Default per RFC 6352
         }
     }
 

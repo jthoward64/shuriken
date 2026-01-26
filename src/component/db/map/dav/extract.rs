@@ -65,6 +65,8 @@ pub(super) fn extract_ical_value<'a>(
 
 /// ## Summary
 /// Extracts typed value fields from a vCard Value.
+///
+/// Returns a tuple of (`value_type`, `value_text`, `value_int`, `value_float`, `value_bool`, `value_date`, `value_tstz`).
 #[expect(
     clippy::type_complexity,
     reason = "Return tuple mirrors database column types for direct mapping"
@@ -78,7 +80,8 @@ pub(super) fn extract_vcard_value<'a>(
     Option<i64>,
     Option<f64>,
     Option<bool>,
-    Option<&'a serde_json::Value>,
+    Option<chrono::NaiveDate>,
+    Option<chrono::DateTime<chrono::Utc>>,
 ) {
     match value {
         VCardValue::Text(_)
@@ -86,7 +89,6 @@ pub(super) fn extract_vcard_value<'a>(
         | VCardValue::Uri(_)
         | VCardValue::LanguageTag(_)
         | VCardValue::DateAndOrTime(_)
-        | VCardValue::Timestamp(_)
         | VCardValue::StructuredName(_)
         | VCardValue::Address(_)
         | VCardValue::Organization(_)
@@ -97,11 +99,15 @@ pub(super) fn extract_vcard_value<'a>(
         | VCardValue::Binary(_)
         | VCardValue::Unknown(_) => {
             // Store text and structured types as text (raw)
-            ("text", Some(raw), None, None, None, None)
+            ("text", Some(raw), None, None, None, None, None)
         }
-        VCardValue::Integer(i) => ("integer", None, Some(*i), None, None, None),
-        VCardValue::Float(f) => ("float", None, None, Some(*f), None, None),
-        VCardValue::Boolean(b) => ("boolean", None, None, None, Some(*b), None),
+        VCardValue::Timestamp(ts) => {
+            // Store timestamp in value_tstz column
+            ("timestamp", None, None, None, None, None, Some(ts.datetime))
+        }
+        VCardValue::Integer(i) => ("integer", None, Some(*i), None, None, None, None),
+        VCardValue::Float(f) => ("float", None, None, Some(*f), None, None, None),
+        VCardValue::Boolean(b) => ("boolean", None, None, None, Some(*b), None, None),
     }
 }
 
@@ -279,20 +285,22 @@ mod tests {
     #[test]
     fn extract_vcard_text_value() {
         let value = VCardValue::Text("John Doe".to_string());
-        let (vtype, vtext, vint, vfloat, vbool, vjson) = extract_vcard_value(&value, "John Doe");
+        let (vtype, vtext, vint, vfloat, vbool, vdate, vtstz) =
+            extract_vcard_value(&value, "John Doe");
 
         assert_eq!(vtype, "text");
         assert_eq!(vtext, Some("John Doe"));
         assert_eq!(vint, None);
         assert_eq!(vfloat, None);
         assert_eq!(vbool, None);
-        assert_eq!(vjson, None);
+        assert_eq!(vdate, None);
+        assert_eq!(vtstz, None);
     }
 
     #[test]
     fn extract_vcard_integer_value() {
         let value = VCardValue::Integer(100);
-        let (vtype, vtext, vint, _, _, _) = extract_vcard_value(&value, "100");
+        let (vtype, vtext, vint, _, _, _, _) = extract_vcard_value(&value, "100");
 
         assert_eq!(vtype, "integer");
         assert_eq!(vtext, None);
@@ -302,7 +310,7 @@ mod tests {
     #[test]
     fn extract_vcard_float_value() {
         let value = VCardValue::Float(12.34);
-        let (vtype, vtext, vint, vfloat, _, _) = extract_vcard_value(&value, "12.34");
+        let (vtype, vtext, vint, vfloat, _, _, _) = extract_vcard_value(&value, "12.34");
 
         assert_eq!(vtype, "float");
         assert_eq!(vtext, None);
@@ -313,10 +321,29 @@ mod tests {
     #[test]
     fn extract_vcard_boolean_value() {
         let value = VCardValue::Boolean(true);
-        let (vtype, _, _, _, vbool, _) = extract_vcard_value(&value, "true");
+        let (vtype, _, _, _, vbool, _, _) = extract_vcard_value(&value, "true");
 
         assert_eq!(vtype, "boolean");
         assert_eq!(vbool, Some(true));
+    }
+
+    #[test]
+    fn extract_vcard_timestamp_value() {
+        use crate::component::rfc::vcard::core::Timestamp;
+        use chrono::{TimeZone, Utc};
+
+        let dt = Utc.with_ymd_and_hms(2024, 1, 15, 12, 30, 0).unwrap();
+        let value = VCardValue::Timestamp(Timestamp { datetime: dt });
+        let (vtype, vtext, vint, vfloat, vbool, vdate, vtstz) =
+            extract_vcard_value(&value, "20240115T123000Z");
+
+        assert_eq!(vtype, "timestamp");
+        assert_eq!(vtext, None);
+        assert_eq!(vint, None);
+        assert_eq!(vfloat, None);
+        assert_eq!(vbool, None);
+        assert_eq!(vdate, None);
+        assert_eq!(vtstz, Some(dt));
     }
 
     #[test]

@@ -83,7 +83,7 @@ fn map_vcard_property<'a>(
 ) {
     let property_id = uuid::Uuid::nil(); // Placeholder
 
-    let (value_type, value_text, value_int, value_float, value_bool, value_json) =
+    let (value_type, value_text, value_int, value_float, value_bool, value_date, value_tstz) =
         extract_vcard_value(&prop.value, &prop.raw_value);
 
     properties.push(NewDavProperty {
@@ -94,10 +94,10 @@ fn map_vcard_property<'a>(
         value_int,
         value_float,
         value_bool,
-        value_date: None,
-        value_tstz: None,
+        value_date,
+        value_tstz,
         value_bytes: None,
-        value_json,
+        value_json: None,
         ordinal,
     });
 

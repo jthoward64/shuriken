@@ -338,6 +338,9 @@ fn serialize_date(date: &VCardDate, output: &mut String) {
         VCardDate::MonthDay { month, day } => {
             write!(output, "--{month:02}{day:02}").ok();
         }
+        VCardDate::Month(month) => {
+            write!(output, "--{month:02}").ok();
+        }
         VCardDate::Day(day) => {
             write!(output, "---{day:02}").ok();
         }

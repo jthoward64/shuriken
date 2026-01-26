@@ -368,9 +368,13 @@ fn parse_value(
         ValueType::UtcOffset => Ok(Value::UtcOffset(parse_utc_offset(raw, line_num, 1)?)),
         ValueType::Uri | ValueType::CalAddress => Ok(Value::Uri(raw.to_string())),
         ValueType::Binary => {
-            // Base64 decode
-            // For now, just store as unknown
-            Ok(Value::Unknown(raw.to_string()))
+            // RFC 5545 §3.3.1: Base64 decode
+            use base64::{engine::general_purpose::STANDARD, Engine};
+            let decoded = STANDARD.decode(raw).map_err(|e| {
+                ParseError::new(ParseErrorKind::InvalidValue, line_num, 1)
+                    .with_context(format!("invalid Base64 encoding: {e}"))
+            })?;
+            Ok(Value::Binary(decoded))
         }
         ValueType::Time => {
             let time = super::values::parse_time(raw, line_num, 1)?;
@@ -693,5 +697,34 @@ END:VCALENDAR\r\n";
         assert_eq!(period_list[0].start().hour, 9);
         // Second period: 14:00-16:00
         assert_eq!(period_list[1].start().hour, 14);
+    }
+
+    #[test]
+    fn parse_binary_base64() {
+        // RFC 5545 §3.3.1: BINARY type with Base64 encoding
+        // "Hello World" in Base64 is "SGVsbG8gV29ybGQ="
+        let input = "\
+BEGIN:VCALENDAR\r\n\
+VERSION:2.0\r\n\
+PRODID:-//Test//Test//EN\r\n\
+BEGIN:VEVENT\r\n\
+UID:binary-test@example.com\r\n\
+DTSTAMP:20260123T120000Z\r\n\
+DTSTART:20260123T140000Z\r\n\
+ATTACH;ENCODING=BASE64;VALUE=BINARY:SGVsbG8gV29ybGQ=\r\n\
+SUMMARY:Binary Test\r\n\
+END:VEVENT\r\n\
+END:VCALENDAR\r\n";
+
+        let ical = parse(input).unwrap();
+        let event = &ical.events()[0];
+        let attach = event.get_property("ATTACH").unwrap();
+
+        match &attach.value {
+            Value::Binary(data) => {
+                assert_eq!(data, b"Hello World");
+            }
+            other => panic!("expected Binary, got {:?}", other),
+        }
     }
 }

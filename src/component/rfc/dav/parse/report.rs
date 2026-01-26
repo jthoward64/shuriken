@@ -540,6 +540,25 @@ fn get_attribute(e: &quick_xml::events::BytesStart<'_>, name: &str) -> ParseResu
     Err(ParseError::missing_attribute(name))
 }
 
+/// Parses the `test` attribute from a filter element.
+///
+/// Default is `anyof` per RFC 6352 §10.5.2.
+fn parse_filter_test_attribute(e: &quick_xml::events::BytesStart<'_>) -> FilterTest {
+    for attr in e.attributes().flatten() {
+        if let Ok(key) = std::str::from_utf8(attr.key.as_ref()) {
+            if key == "test" {
+                if let Ok(value) = std::str::from_utf8(&attr.value) {
+                    return match value {
+                        "allof" => FilterTest::AllOf,
+                        _ => FilterTest::AnyOf,
+                    };
+                }
+            }
+        }
+    }
+    FilterTest::AnyOf // Default per RFC 6352
+}
+
 /// Parses calendar filter content (nested comp-filters).
 fn parse_calendar_filter_content(
     reader: &mut Reader<&[u8]>,
@@ -612,8 +631,9 @@ fn parse_comp_filter_with_name(
                     }
                     "prop-filter" => {
                         let name = get_attribute(&e, "name")?.clone();
+                        let test = parse_filter_test_attribute(&e);
                         let prop_filter =
-                            parse_prop_filter_with_name(reader, buf, namespaces, name)?;
+                            parse_prop_filter_with_name(reader, buf, namespaces, name, test)?;
                         comp_filter.prop_filters.push(prop_filter);
                     }
                     "time-range" => {
@@ -657,8 +677,10 @@ fn parse_prop_filter_with_name(
     buf: &mut Vec<u8>,
     _namespaces: &[(String, String)],
     name: String,
+    test: FilterTest,
 ) -> ParseResult<PropFilter> {
     let mut prop_filter = PropFilter::new(name);
+    prop_filter.test = test;
     let mut depth = 1;
 
     loop {
@@ -918,7 +940,9 @@ fn parse_addressbook_filter_content(
 
                 if local_name == "prop-filter" && depth == 2 {
                     let name = get_attribute(&e, "name")?.clone();
-                    let prop_filter = parse_prop_filter_with_name(reader, buf, namespaces, name)?;
+                    let test = parse_filter_test_attribute(&e);
+                    let prop_filter =
+                        parse_prop_filter_with_name(reader, buf, namespaces, name, test)?;
                     prop_filters.push(prop_filter);
                 }
             }
@@ -926,7 +950,10 @@ fn parse_addressbook_filter_content(
                 let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
                 if local_name == "prop-filter" && depth == 1 {
                     let name = get_attribute(&e, "name")?;
-                    prop_filters.push(PropFilter::new(name));
+                    let test = parse_filter_test_attribute(&e);
+                    let mut pf = PropFilter::new(name);
+                    pf.test = test;
+                    prop_filters.push(pf);
                 }
             }
             Ok(Event::End(e)) => {

@@ -4,10 +4,14 @@
 //! and property-filter matching against calendar data.
 
 use crate::component::db::connection::DbConnection;
-use crate::component::db::query::text_match::{build_like_pattern, normalize_for_sql_upper};
-use crate::component::db::schema::{cal_index, dav_instance};
+use crate::component::db::query::text_match::{
+    CollationError, build_like_pattern, normalize_for_sql_upper,
+};
+use crate::component::db::schema::{cal_index, dav_instance, dav_parameter};
 use crate::component::model::dav::instance::DavInstance;
-use crate::component::rfc::dav::core::{CalendarFilter, CalendarQuery, CompFilter, MatchType};
+use crate::component::rfc::dav::core::{
+    CalendarFilter, CalendarQuery, CompFilter, MatchType, ParamFilter,
+};
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 
@@ -271,7 +275,7 @@ async fn apply_property_filters(
                 .collation
                 .clone()
                 .unwrap_or_else(|| "i;ascii-casemap".to_string());
-            let collation = normalize_for_sql_upper(&text_match.value, Some(&effective_collation));
+            let collation = normalize_for_sql_upper(&text_match.value, Some(&effective_collation))?;
             let pattern = build_like_pattern(&collation.value, &text_match.match_type);
 
             let mut query = dav_component::table
@@ -340,6 +344,20 @@ async fn apply_property_filters(
                 .await?
         };
 
+        // Apply param-filters if present
+        let matching_entity_ids = if !prop_filter.param_filters.is_empty() {
+            apply_param_filters(
+                conn,
+                &matching_entity_ids,
+                &prop_name,
+                &prop_filter.param_filters,
+                prop_filter.test.clone(),
+            )
+            .await?
+        } else {
+            matching_entity_ids
+        };
+
         result_sets.push(matching_entity_ids);
     }
 
@@ -356,6 +374,205 @@ async fn apply_property_filters(
     Ok(final_ids)
 }
 
+/// ## Summary
+/// Applies param-filters to further filter entity IDs.
+///
+/// Filters entities to only those that have properties matching the given
+/// property name where the property has parameters matching the param-filters.
+/// Uses `test` to determine if param-filters are ANDed (`allof`) or ORed (`anyof`).
+///
+/// ## Errors
+/// Returns database errors if queries fail.
+async fn apply_param_filters(
+    conn: &mut DbConnection<'_>,
+    entity_ids: &[uuid::Uuid],
+    prop_name: &str,
+    param_filters: &[ParamFilter],
+    test: crate::component::rfc::dav::core::FilterTest,
+) -> anyhow::Result<Vec<uuid::Uuid>> {
+    use crate::component::db::schema::{dav_component, dav_property};
+    use crate::component::rfc::dav::core::FilterTest;
+
+    if entity_ids.is_empty() || param_filters.is_empty() {
+        return Ok(entity_ids.to_vec());
+    }
+
+    // Get all property IDs for the given property name and entities
+    let prop_ids: Vec<(uuid::Uuid, uuid::Uuid)> = dav_component::table
+        .inner_join(dav_property::table.on(dav_property::component_id.eq(dav_component::id)))
+        .filter(dav_component::entity_id.eq_any(entity_ids))
+        .filter(dav_property::name.eq(prop_name))
+        .filter(dav_property::deleted_at.is_null())
+        .filter(dav_component::deleted_at.is_null())
+        .select((dav_component::entity_id, dav_property::id))
+        .load::<(uuid::Uuid, uuid::Uuid)>(conn)
+        .await?;
+
+    if prop_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let all_prop_ids: std::collections::HashSet<uuid::Uuid> =
+        prop_ids.iter().map(|(_, prop_id)| *prop_id).collect();
+
+    // Collect matching property IDs for each param-filter
+    let mut param_result_sets: Vec<std::collections::HashSet<uuid::Uuid>> = Vec::new();
+
+    for param_filter in param_filters {
+        let param_name = param_filter.name.to_uppercase();
+        let props_matching_param = evaluate_single_param_filter(
+            conn,
+            &all_prop_ids.iter().copied().collect::<Vec<_>>(),
+            &param_name,
+            param_filter,
+        )
+        .await?;
+        param_result_sets.push(props_matching_param);
+    }
+
+    // Combine results based on test mode
+    let matching_prop_ids: std::collections::HashSet<uuid::Uuid> = match test {
+        FilterTest::AllOf => {
+            // Intersection: property must match ALL param-filters
+            if param_result_sets.is_empty() {
+                all_prop_ids
+            } else {
+                let mut result = param_result_sets[0].clone();
+                for set in &param_result_sets[1..] {
+                    result.retain(|id| set.contains(id));
+                }
+                result
+            }
+        }
+        FilterTest::AnyOf => {
+            // Union: property must match ANY param-filter
+            param_result_sets.into_iter().flatten().collect()
+        }
+    };
+
+    // Return entity IDs that have at least one matching property
+    let matching_entities: Vec<uuid::Uuid> = prop_ids
+        .into_iter()
+        .filter(|(_, prop_id)| matching_prop_ids.contains(prop_id))
+        .map(|(entity_id, _)| entity_id)
+        .collect();
+
+    let mut result: Vec<uuid::Uuid> = matching_entities.into_iter().collect();
+    result.sort_unstable();
+    result.dedup();
+    Ok(result)
+}
+
+/// ## Summary
+/// Evaluates a single param-filter against property IDs.
+///
+/// Returns property IDs that match the param-filter.
+///
+/// ## Errors
+/// Returns database errors if queries fail.
+async fn evaluate_single_param_filter(
+    conn: &mut DbConnection<'_>,
+    prop_ids: &[uuid::Uuid],
+    param_name: &str,
+    param_filter: &ParamFilter,
+) -> anyhow::Result<std::collections::HashSet<uuid::Uuid>> {
+    // CalDAV defaults to i;ascii-casemap per RFC 4791 Section 7.5
+    fn get_effective_collation(text_match: &crate::component::rfc::dav::core::TextMatch) -> String {
+        text_match
+            .collation
+            .clone()
+            .unwrap_or_else(|| "i;ascii-casemap".to_string())
+    }
+
+    if prop_ids.is_empty() {
+        return Ok(std::collections::HashSet::new());
+    }
+
+    if param_filter.is_not_defined {
+        // Parameter must NOT exist - find properties without this parameter
+        let props_with_param: Vec<uuid::Uuid> = dav_parameter::table
+            .filter(dav_parameter::property_id.eq_any(prop_ids))
+            .filter(dav_parameter::name.eq(param_name))
+            .filter(dav_parameter::deleted_at.is_null())
+            .select(dav_parameter::property_id)
+            .distinct()
+            .load::<uuid::Uuid>(conn)
+            .await?;
+
+        let props_with_param_set: std::collections::HashSet<_> =
+            props_with_param.into_iter().collect();
+
+        // Return properties that DON'T have this parameter
+        Ok(prop_ids
+            .iter()
+            .filter(|id| !props_with_param_set.contains(id))
+            .copied()
+            .collect())
+    } else if let Some(text_match) = &param_filter.text_match {
+        // Parameter must exist and match text
+        let effective_collation = get_effective_collation(text_match);
+        let collation = normalize_for_sql_upper(&text_match.value, Some(&effective_collation))?;
+        let pattern = build_like_pattern(&collation.value, &text_match.match_type);
+
+        let mut query = dav_parameter::table
+            .filter(dav_parameter::property_id.eq_any(prop_ids))
+            .filter(dav_parameter::name.eq(param_name))
+            .filter(dav_parameter::deleted_at.is_null())
+            .into_boxed();
+
+        // Apply text matching
+        if collation.case_sensitive {
+            query = match text_match.match_type {
+                MatchType::Equals => query.filter(dav_parameter::value.eq(&collation.value)),
+                MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
+                    query.filter(dav_parameter::value.like(&pattern))
+                }
+            };
+        } else {
+            query = match text_match.match_type {
+                MatchType::Equals => query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(
+                    &format!("UPPER(value) = '{}'", collation.value),
+                )),
+                MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
+                    query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
+                        "UPPER(value) LIKE '{pattern}'"
+                    )))
+                }
+            };
+        }
+
+        let matched_prop_ids: Vec<uuid::Uuid> = query
+            .select(dav_parameter::property_id)
+            .distinct()
+            .load::<uuid::Uuid>(conn)
+            .await?;
+
+        // Handle negate: return properties that DON'T match
+        if text_match.negate {
+            let matched_set: std::collections::HashSet<_> = matched_prop_ids.into_iter().collect();
+            Ok(prop_ids
+                .iter()
+                .filter(|id| !matched_set.contains(id))
+                .copied()
+                .collect())
+        } else {
+            Ok(matched_prop_ids.into_iter().collect())
+        }
+    } else {
+        // Parameter must exist (no text match specified)
+        let props_with_param: Vec<uuid::Uuid> = dav_parameter::table
+            .filter(dav_parameter::property_id.eq_any(prop_ids))
+            .filter(dav_parameter::name.eq(param_name))
+            .filter(dav_parameter::deleted_at.is_null())
+            .select(dav_parameter::property_id)
+            .distinct()
+            .load::<uuid::Uuid>(conn)
+            .await?;
+
+        Ok(props_with_param.into_iter().collect())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::component::db::query::text_match::normalize_for_sql_upper;
@@ -363,7 +580,7 @@ mod tests {
     #[test]
     fn test_normalize_text_unicode_casemap_basic() {
         let collation = Some("i;unicode-casemap".to_string());
-        let result = normalize_for_sql_upper("Hello World", collation.as_ref());
+        let result = normalize_for_sql_upper("Hello World", collation.as_ref()).unwrap();
         assert_eq!(result.value, "HELLO WORLD");
         assert!(!result.case_sensitive);
     }
@@ -372,12 +589,12 @@ mod tests {
     fn test_normalize_text_unicode_casemap_german_eszett() {
         // German ß should fold to ss, then uppercase to SS
         let collation = Some("i;unicode-casemap".to_string());
-        let result = normalize_for_sql_upper("Straße", collation.as_ref());
+        let result = normalize_for_sql_upper("Straße", collation.as_ref()).unwrap();
         assert_eq!(result.value, "STRASSE");
         assert!(!result.case_sensitive);
 
         // Verify ß comparison: "STRASSE" and "Straße" should match after folding+uppercase
-        let upper = normalize_for_sql_upper("STRASSE", collation.as_ref());
+        let upper = normalize_for_sql_upper("STRASSE", collation.as_ref()).unwrap();
         assert_eq!(result.value, upper.value);
     }
 
@@ -385,15 +602,15 @@ mod tests {
     fn test_normalize_text_unicode_casemap_greek_sigma() {
         // Greek final sigma ς and regular sigma σ should fold to the same value
         let collation = Some("i;unicode-casemap".to_string());
-        let final_sigma = normalize_for_sql_upper("Σ", collation.as_ref());
-        let regular_sigma = normalize_for_sql_upper("σ", collation.as_ref());
+        let final_sigma = normalize_for_sql_upper("Σ", collation.as_ref()).unwrap();
+        let regular_sigma = normalize_for_sql_upper("σ", collation.as_ref()).unwrap();
         assert_eq!(final_sigma.value, regular_sigma.value);
     }
 
     #[test]
     fn test_normalize_text_octet_case_sensitive() {
         let collation = Some("i;octet".to_string());
-        let result = normalize_for_sql_upper("Hello World", collation.as_ref());
+        let result = normalize_for_sql_upper("Hello World", collation.as_ref()).unwrap();
         assert_eq!(result.value, "Hello World"); // Preserved exactly
         assert!(result.case_sensitive);
     }
@@ -401,7 +618,7 @@ mod tests {
     #[test]
     fn test_normalize_text_ascii_casemap() {
         let collation = Some("i;ascii-casemap".to_string());
-        let result = normalize_for_sql_upper("Hello World", collation.as_ref());
+        let result = normalize_for_sql_upper("Hello World", collation.as_ref()).unwrap();
         assert_eq!(result.value, "HELLO WORLD");
         assert!(!result.case_sensitive);
     }
@@ -409,7 +626,7 @@ mod tests {
     #[test]
     fn test_normalize_text_default_collation() {
         // None should default to unicode-casemap behavior
-        let result = normalize_for_sql_upper("Straße", None);
+        let result = normalize_for_sql_upper("Straße", None).unwrap();
         assert_eq!(result.value, "STRASSE");
         assert!(!result.case_sensitive);
     }

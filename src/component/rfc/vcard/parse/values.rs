@@ -261,7 +261,10 @@ pub fn parse_date(value: &str, line_num: usize) -> ParseResult<VCardDate> {
     }
 
     if let Some(rest) = s.strip_prefix("--") {
-        // Month-day: --MM-DD or --MMDD
+        // RFC 6350 §4.3.1 truncated date forms:
+        // --MM-DD (month and day, extended)
+        // --MMDD (month and day, basic)
+        // --MM (month only)
         if rest.contains('-') {
             let parts: Vec<&str> = rest.split('-').collect();
             if parts.len() == 2 {
@@ -275,6 +278,7 @@ pub fn parse_date(value: &str, line_num: usize) -> ParseResult<VCardDate> {
             }
             // Fall through if parts.len() != 2
         } else if rest.len() == 4 {
+            // --MMDD (basic format month-day)
             let month: u32 = rest[..2].parse().map_err(|_| {
                 ParseError::new(ParseErrorKind::InvalidDateTime, line_num, "invalid month")
             })?;
@@ -282,6 +286,19 @@ pub fn parse_date(value: &str, line_num: usize) -> ParseResult<VCardDate> {
                 ParseError::new(ParseErrorKind::InvalidDateTime, line_num, "invalid day")
             })?;
             return Ok(VCardDate::MonthDay { month, day });
+        } else if rest.len() == 2 {
+            // --MM (month only)
+            let month: u32 = rest.parse().map_err(|_| {
+                ParseError::new(ParseErrorKind::InvalidDateTime, line_num, "invalid month")
+            })?;
+            if month < 1 || month > 12 {
+                return Err(ParseError::new(
+                    ParseErrorKind::InvalidDateTime,
+                    line_num,
+                    "month out of range",
+                ));
+            }
+            return Ok(VCardDate::Month(month));
         } else {
             // Invalid month-day format, fall through
         }
@@ -396,6 +413,94 @@ pub fn parse_time(
 #[expect(clippy::too_many_lines)]
 fn parse_time_value(s: &str, line_num: usize) -> ParseResult<VCardTime> {
     use chrono::NaiveTime;
+
+    // RFC 6350 §4.3.2: Truncated forms
+    // --SS (second only, truncated hour and minute)
+    if let Some(sec_str) = s.strip_prefix("--") {
+        let second: u32 = sec_str.parse().map_err(|_| {
+            ParseError::new(ParseErrorKind::InvalidDateTime, line_num, "invalid second")
+        })?;
+        if second > 59 {
+            return Err(ParseError::new(
+                ParseErrorKind::InvalidDateTime,
+                line_num,
+                "second out of range",
+            ));
+        }
+        return Ok(VCardTime::Second(second));
+    }
+
+    // -MM or -MMSS or -MM:SS (minute with optional second, truncated hour)
+    if let Some(rest) = s.strip_prefix('-') {
+        // Extended format: -MM:SS
+        if rest.contains(':') {
+            let parts: Vec<&str> = rest.split(':').collect();
+            if parts.len() == 2 {
+                let minute: u32 = parts[0].parse().map_err(|_| {
+                    ParseError::new(ParseErrorKind::InvalidDateTime, line_num, "invalid minute")
+                })?;
+                let second: u32 = parts[1].parse().map_err(|_| {
+                    ParseError::new(ParseErrorKind::InvalidDateTime, line_num, "invalid second")
+                })?;
+                if minute > 59 || second > 59 {
+                    return Err(ParseError::new(
+                        ParseErrorKind::InvalidDateTime,
+                        line_num,
+                        "minute or second out of range",
+                    ));
+                }
+                return Ok(VCardTime::MinuteSecond { minute, second });
+            }
+            return Err(ParseError::new(
+                ParseErrorKind::InvalidDateTime,
+                line_num,
+                "invalid truncated time format",
+            ));
+        }
+
+        // Basic format: -MM or -MMSS
+        match rest.len() {
+            2 => {
+                // -MM (minute only, but RFC says minute with optional second)
+                // We represent minute-only as MinuteSecond with second=0
+                let minute: u32 = rest.parse().map_err(|_| {
+                    ParseError::new(ParseErrorKind::InvalidDateTime, line_num, "invalid minute")
+                })?;
+                if minute > 59 {
+                    return Err(ParseError::new(
+                        ParseErrorKind::InvalidDateTime,
+                        line_num,
+                        "minute out of range",
+                    ));
+                }
+                return Ok(VCardTime::MinuteSecond { minute, second: 0 });
+            }
+            4 => {
+                // -MMSS
+                let minute: u32 = rest[..2].parse().map_err(|_| {
+                    ParseError::new(ParseErrorKind::InvalidDateTime, line_num, "invalid minute")
+                })?;
+                let second: u32 = rest[2..4].parse().map_err(|_| {
+                    ParseError::new(ParseErrorKind::InvalidDateTime, line_num, "invalid second")
+                })?;
+                if minute > 59 || second > 59 {
+                    return Err(ParseError::new(
+                        ParseErrorKind::InvalidDateTime,
+                        line_num,
+                        "minute or second out of range",
+                    ));
+                }
+                return Ok(VCardTime::MinuteSecond { minute, second });
+            }
+            _ => {
+                return Err(ParseError::new(
+                    ParseErrorKind::InvalidDateTime,
+                    line_num,
+                    "invalid truncated time format",
+                ));
+            }
+        }
+    }
 
     // Extended format: HH:MM:SS or HH:MM
     if s.contains(':') {
@@ -599,6 +704,64 @@ pub fn parse_date_and_or_time(
     Ok(DateAndOrTime::Date(date))
 }
 
+/// Parses a timestamp value for the REV property.
+///
+/// Format: `YYYYMMDDTHHMMSSZ` or `YYYY-MM-DDTHH:MM:SSZ` (both supported).
+///
+/// Per RFC 6350 §6.7.4, REV must be a UTC timestamp.
+///
+/// ## Errors
+/// Returns an error if the string is not a valid timestamp format.
+pub fn parse_timestamp(
+    s: &str,
+    line_num: usize,
+) -> ParseResult<crate::component::rfc::vcard::core::Timestamp> {
+    // Try iCalendar format first: YYYYMMDDTHHMMSSZ
+    if let Some(ts) = parse_icalendar_timestamp(s) {
+        return Ok(crate::component::rfc::vcard::core::Timestamp::new(ts));
+    }
+
+    // Try ISO 8601 / RFC 3339 format: YYYY-MM-DDTHH:MM:SSZ
+    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(s) {
+        return Ok(crate::component::rfc::vcard::core::Timestamp::new(
+            dt.with_timezone(&chrono::Utc),
+        ));
+    }
+
+    Err(ParseError::new(
+        ParseErrorKind::InvalidValue,
+        line_num,
+        "invalid timestamp",
+    ))
+}
+
+/// Parses iCalendar-format timestamp: `YYYYMMDDTHHMMSSZ`
+fn parse_icalendar_timestamp(s: &str) -> Option<chrono::DateTime<chrono::Utc>> {
+    // Must end with Z for UTC
+    let s = s.strip_suffix('Z')?;
+
+    // Must be exactly 15 characters: YYYYMMDDTHHMMSS
+    if s.len() != 15 {
+        return None;
+    }
+
+    // Must have T at position 8
+    if s.as_bytes().get(8) != Some(&b'T') {
+        return None;
+    }
+
+    let year = s[0..4].parse::<i32>().ok()?;
+    let month = s[4..6].parse::<u32>().ok()?;
+    let day = s[6..8].parse::<u32>().ok()?;
+    let hour = s[9..11].parse::<u32>().ok()?;
+    let minute = s[11..13].parse::<u32>().ok()?;
+    let second = s[13..15].parse::<u32>().ok()?;
+
+    chrono::NaiveDate::from_ymd_opt(year, month, day)
+        .and_then(|d| d.and_hms_opt(hour, minute, second))
+        .map(|dt| chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(dt, chrono::Utc))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -678,6 +841,13 @@ mod tests {
     }
 
     #[test]
+    fn parse_date_month_only() {
+        // RFC 6350 §4.3.1: --MM format (month only)
+        let date = parse_date("--06", 1).unwrap();
+        assert_eq!(date, VCardDate::Month(6));
+    }
+
+    #[test]
     fn parse_date_year_only() {
         let date = parse_date("1990", 1).unwrap();
         assert_eq!(date, VCardDate::Year(1990));
@@ -717,5 +887,45 @@ mod tests {
     fn parse_datetime_text() {
         let dt = parse_date_and_or_time("circa 1800", Some("text"), 1).unwrap();
         assert!(matches!(dt, DateAndOrTime::Text(_)));
+    }
+
+    #[test]
+    fn parse_time_truncated_second_only() {
+        // RFC 6350 §4.3.2: --SS format (second only)
+        let (time, offset) = parse_time("--30", 1).unwrap();
+        assert_eq!(time, VCardTime::Second(30));
+        assert!(offset.is_none());
+    }
+
+    #[test]
+    fn parse_time_truncated_minute_second_basic() {
+        // RFC 6350 §4.3.2: -MMSS format (minute and second, basic)
+        let (time, offset) = parse_time("-1530", 1).unwrap();
+        assert_eq!(time, VCardTime::MinuteSecond { minute: 15, second: 30 });
+        assert!(offset.is_none());
+    }
+
+    #[test]
+    fn parse_time_truncated_minute_second_extended() {
+        // RFC 6350 §4.3.2: -MM:SS format (minute and second, extended)
+        let (time, offset) = parse_time("-15:30", 1).unwrap();
+        assert_eq!(time, VCardTime::MinuteSecond { minute: 15, second: 30 });
+        assert!(offset.is_none());
+    }
+
+    #[test]
+    fn parse_time_truncated_minute_only() {
+        // RFC 6350 §4.3.2: -MM format (minute only)
+        let (time, offset) = parse_time("-15", 1).unwrap();
+        assert_eq!(time, VCardTime::MinuteSecond { minute: 15, second: 0 });
+        assert!(offset.is_none());
+    }
+
+    #[test]
+    fn parse_time_truncated_with_offset() {
+        // RFC 6350 §4.3.2: truncated time with UTC offset
+        let (time, offset) = parse_time("--30Z", 1).unwrap();
+        assert_eq!(time, VCardTime::Second(30));
+        assert_eq!(offset, Some(VCardUtcOffset::UTC));
     }
 }

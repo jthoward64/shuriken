@@ -4,7 +4,7 @@ use super::error::{ParseError, ParseErrorKind, ParseResult};
 use super::lexer::{ContentLine, parse_content_line, split_lines, unfold_with_space};
 use super::values::{
     parse_address, parse_client_pid_map, parse_date_and_or_time, parse_gender, parse_organization,
-    parse_structured_name, unescape_text,
+    parse_structured_name, parse_timestamp, unescape_text,
 };
 use crate::component::rfc::vcard::core::{VCard, VCardProperty, VCardValue, VCardVersion};
 
@@ -172,6 +172,17 @@ impl Parser {
         value_type: Option<&str>,
         line_num: usize,
     ) -> ParseResult<VCardValue> {
+        // Handle RELATED specially - it can be URI (default) or text
+        if name == "RELATED" {
+            use crate::component::rfc::vcard::core::Related;
+            return match value_type {
+                Some(vt) if vt.eq_ignore_ascii_case("text") => {
+                    Ok(VCardValue::Related(Related::Text(unescape_text(raw_value))))
+                }
+                _ => Ok(VCardValue::Related(Related::Uri(raw_value.to_string()))),
+            };
+        }
+
         // Handle explicit VALUE parameter
         if let Some(vt) = value_type {
             return self.parse_typed_value(raw_value, vt, line_num);
@@ -198,6 +209,10 @@ impl Parser {
             "BDAY" | "ANNIVERSARY" | "DEATHDATE" => {
                 let dt = parse_date_and_or_time(raw_value, value_type, line_num)?;
                 Ok(VCardValue::DateAndOrTime(dt))
+            }
+            "REV" => {
+                let ts = parse_timestamp(raw_value, line_num)?;
+                Ok(VCardValue::Timestamp(ts))
             }
             "CLIENTPIDMAP" => {
                 let cpm = parse_client_pid_map(raw_value, line_num)?;

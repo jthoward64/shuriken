@@ -6,7 +6,7 @@ use chrono::{NaiveDate, NaiveTime};
 
 /// A vCard date value with optional truncation (RFC 6350 §4.3.1).
 ///
-/// Supports full dates and truncated forms like --MM-DD or ---DD.
+/// Supports full dates and truncated forms like --MM-DD, --MM, or ---DD.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VCardDate {
     /// Full date (YYYY-MM-DD).
@@ -17,6 +17,8 @@ pub enum VCardDate {
     Year(i32),
     /// Month and day, no year (--MM-DD).
     MonthDay { month: u32, day: u32 },
+    /// Month only, no year or day (--MM).
+    Month(u32),
     /// Day only (---DD).
     Day(u32),
 }
@@ -46,6 +48,12 @@ impl VCardDate {
         Self::MonthDay { month, day }
     }
 
+    /// Creates a month-only date.
+    #[must_use]
+    pub fn month(month: u32) -> Self {
+        Self::Month(month)
+    }
+
     /// Creates a day-only date.
     #[must_use]
     pub fn day(day: u32) -> Self {
@@ -58,7 +66,7 @@ impl VCardDate {
         match self {
             Self::Full(d) => Some(d.year()),
             Self::YearMonth { year, .. } | Self::Year(year) => Some(*year),
-            Self::MonthDay { .. } | Self::Day(_) => None,
+            Self::MonthDay { .. } | Self::Month(_) | Self::Day(_) => None,
         }
     }
 
@@ -67,7 +75,9 @@ impl VCardDate {
     pub fn month_value(&self) -> Option<u32> {
         match self {
             Self::Full(d) => Some(d.month()),
-            Self::YearMonth { month, .. } | Self::MonthDay { month, .. } => Some(*month),
+            Self::YearMonth { month, .. } | Self::MonthDay { month, .. } | Self::Month(month) => {
+                Some(*month)
+            }
             Self::Year(_) | Self::Day(_) => None,
         }
     }
@@ -78,7 +88,7 @@ impl VCardDate {
         match self {
             Self::Full(d) => Some(d.day()),
             Self::MonthDay { day, .. } | Self::Day(day) => Some(*day),
-            Self::Year(_) | Self::YearMonth { .. } => None,
+            Self::Year(_) | Self::YearMonth { .. } | Self::Month(_) => None,
         }
     }
 }
