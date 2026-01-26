@@ -7,7 +7,10 @@ use diesel_async::scoped_futures::ScopedFutureExt;
 
 use crate::component::{
     config::{AuthMethod, get_config},
-    db::{connection::connect, schema},
+    db::{
+        connection::{DbConnection, connect},
+        schema,
+    },
     error::{Error, Result},
     model::principal::{NewPrincipal, PrincipalType},
     model::user::{NewUser, User},
@@ -58,42 +61,55 @@ async fn authenticate_single_user() -> Result<User> {
             }
 
             tracing::debug!(email = %single_user_email, "Creating single user");
-
-            // If not, create the user
-            let principal_id = uuid::Uuid::now_v7();
-            let principal_uri = format!("/principals/users/{principal_id}");
-
-            let new_principal = NewPrincipal {
-                id: principal_id,
-                principal_type: PrincipalType::User.as_str(),
-                uri: principal_uri.as_str(),
-                display_name: Some(single_user_name.as_str()),
-            };
-
-            let _principal_row_count = diesel::insert_into(schema::principal::table)
-                .values(&new_principal)
-                .execute(tx)
-                .await?;
-
-            let new_user = NewUser {
-                name: single_user_name.as_str(),
-                email: single_user_email.as_str(),
-                principal_id,
-            };
-
-            let user = diesel::insert_into(schema::user::table)
-                .values(&new_user)
-                .returning(User::as_select())
-                .get_result::<User>(tx)
-                .await?;
-
-            tracing::info!(user_id = %user.id, user_email = %user.email, "Single user created");
-
-            Ok(user)
+            create_single_user(tx, &single_user_name, &single_user_email).await
         }
         .scope_boxed()
     })
     .await
+}
+
+/// ## Summary
+/// Creates the configured single user and principal.
+///
+/// ## Side Effects
+/// - Inserts a principal row
+/// - Inserts a user row
+///
+/// ## Errors
+/// Returns an error if database inserts fail.
+async fn create_single_user(conn: &mut DbConnection<'_>, name: &str, email: &str) -> Result<User> {
+    use diesel_async::RunQueryDsl;
+
+    let principal_id = uuid::Uuid::now_v7();
+    let principal_uri = format!("/principals/users/{principal_id}");
+
+    let new_principal = NewPrincipal {
+        id: principal_id,
+        principal_type: PrincipalType::User.as_str(),
+        uri: principal_uri.as_str(),
+        display_name: Some(name),
+    };
+
+    let _principal_row_count = diesel::insert_into(schema::principal::table)
+        .values(&new_principal)
+        .execute(conn)
+        .await?;
+
+    let new_user = NewUser {
+        name,
+        email,
+        principal_id,
+    };
+
+    let user = diesel::insert_into(schema::user::table)
+        .values(&new_user)
+        .returning(User::as_select())
+        .get_result::<User>(conn)
+        .await?;
+
+    tracing::info!(user_id = %user.id, user_email = %user.email, "Single user created");
+
+    Ok(user)
 }
 
 #[expect(clippy::unused_async)]

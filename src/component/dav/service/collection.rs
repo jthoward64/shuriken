@@ -77,7 +77,7 @@ pub async fn create_collection(
                     .context("failed to check for existing collection")?;
 
             if existing.is_some() {
-                anyhow::bail!("collection with URI '{}' already exists", uri);
+                anyhow::bail!("collection with URI '{uri}' already exists");
             }
 
             let new_collection = NewDavCollection {
