@@ -88,7 +88,7 @@ fn test_status_codes() {
 
     // 403 Forbidden
     assert_eq!(
-        PreconditionError::ValidCalendarData("".into()).status_code(),
+        PreconditionError::ValidCalendarData(String::new()).status_code(),
         StatusCode::FORBIDDEN
     );
     assert_eq!(
@@ -157,7 +157,7 @@ fn test_namespaces() {
         ns::CALDAV
     );
     assert_eq!(
-        PreconditionError::ValidCalendarData("".into()).namespace(),
+        PreconditionError::ValidCalendarData(String::new()).namespace(),
         ns::CALDAV
     );
 
@@ -167,7 +167,7 @@ fn test_namespaces() {
         ns::CARDDAV
     );
     assert_eq!(
-        PreconditionError::ValidAddressData("".into()).namespace(),
+        PreconditionError::ValidAddressData(String::new()).namespace(),
         ns::CARDDAV
     );
 }

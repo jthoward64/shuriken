@@ -460,6 +460,7 @@ impl TestResponse {
 /// This struct holds a mutex guard that serializes database access across tests.
 /// When the `TestDb` instance is dropped, the lock is released. This prevents
 /// race conditions when tests run in parallel.
+#[expect(clippy::doc_markdown)]
 pub struct TestDb {
     pool: diesel_async::pooled_connection::bb8::Pool<AsyncPgConnection>,
     /// Lock guard that serializes database access. Held for the lifetime of TestDb.
@@ -471,11 +472,11 @@ impl TestDb {
     ///
     /// ## Errors
     /// Returns an error if:
-    /// - DATABASE_URL environment variable is not set
+    /// - `DATABASE_URL` environment variable is not set
     /// - The database cannot be initialized or connected
     ///
     /// ## Safety Features
-    /// This function modifies the DATABASE_URL for safety:
+    /// This function modifies the `DATABASE_URL` for safety:
     /// - If the database name is not `shuriken_test`, it will be changed to `shuriken_test`
     /// - All modifications are logged as info messages
     ///
@@ -514,7 +515,7 @@ impl TestDb {
 
             // Rebuild URL if needed
             if needs_db_change {
-                let base_url = &database_url[..db_name_start + 1];
+                let base_url = &database_url[..=db_name_start];
                 let new_db_name = if needs_db_change {
                     "shuriken_test"
                 } else {
@@ -564,7 +565,7 @@ impl TestDb {
     /// ## Note
     /// If you add or remove tables from the schema, update this list accordingly.
     /// The order is: indexes → shadows/tombstones → parameters → properties → components →
-    /// instances → entities → collections → groups/memberships → auth_user → users → principals → casbin_rule
+    /// instances → entities → collections → groups/memberships → `auth_user` → users → principals → `casbin_rule`
     #[expect(dead_code)]
     pub async fn truncate_all(&self) -> anyhow::Result<()> {
         let mut conn = self.get_conn().await?;
@@ -1075,7 +1076,7 @@ impl TestDb {
 #[must_use]
 pub fn sample_icalendar_event(uid: &str, summary: &str) -> String {
     format!(
-        r#"BEGIN:VCALENDAR
+        r"BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//Shuriken//Test//EN
 BEGIN:VEVENT
@@ -1086,7 +1087,7 @@ DTEND:20260126T110000Z
 SUMMARY:{summary}
 END:VEVENT
 END:VCALENDAR
-"#
+"
     )
 }
 
@@ -1094,7 +1095,7 @@ END:VCALENDAR
 #[must_use]
 pub fn sample_recurring_event(uid: &str, summary: &str, rrule: &str) -> String {
     format!(
-        r#"BEGIN:VCALENDAR
+        r"BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//Shuriken//Test//EN
 BEGIN:VEVENT
@@ -1106,7 +1107,7 @@ SUMMARY:{summary}
 RRULE:{rrule}
 END:VEVENT
 END:VCALENDAR
-"#
+"
     )
 }
 
@@ -1114,13 +1115,13 @@ END:VCALENDAR
 #[must_use]
 pub fn sample_vcard(uid: &str, fn_name: &str, email: &str) -> String {
     format!(
-        r#"BEGIN:VCARD
+        r"BEGIN:VCARD
 VERSION:4.0
 UID:{uid}
 FN:{fn_name}
 EMAIL:{email}
 END:VCARD
-"#
+"
     )
 }
 

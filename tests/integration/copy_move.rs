@@ -15,6 +15,7 @@ use super::helpers::*;
 /// Test that MOVE renames a resource and updates href.
 #[tokio::test]
 #[ignore = "requires database seeding"]
+#[expect(clippy::too_many_lines)]
 async fn move_rename_item_updates_href() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -325,6 +326,7 @@ async fn copy_does_not_create_tombstone() {
 /// Test that MOVE with existing destination and Overwrite:F returns 412.
 #[tokio::test]
 #[ignore = "requires database seeding"]
+#[expect(clippy::too_many_lines)]
 async fn move_destination_exists_overwrite_false_412() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -395,6 +397,7 @@ async fn move_destination_exists_overwrite_false_412() {
 /// Test that MOVE with existing destination and Overwrite:T succeeds.
 #[tokio::test]
 #[ignore = "requires database seeding"]
+#[expect(clippy::too_many_lines)]
 async fn move_destination_exists_overwrite_true_succeeds() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -474,6 +477,7 @@ async fn move_destination_exists_overwrite_true_succeeds() {
 /// Test that MOVE generates tombstone for source resource.
 #[tokio::test]
 #[ignore = "requires database seeding"]
+#[expect(clippy::too_many_lines)]
 async fn move_generates_tombstone() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db

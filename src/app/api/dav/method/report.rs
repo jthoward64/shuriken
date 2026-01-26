@@ -171,7 +171,7 @@ pub async fn handle_expand_property(
 ///
 /// ## Errors
 /// Returns database errors if queries fail.
-#[expect(clippy::unused_async)]
+#[expect(clippy::too_many_lines)]
 async fn build_expand_property_response(
     conn: &mut connection::DbConnection<'_>,
     req: &Request,
@@ -209,7 +209,10 @@ async fn build_expand_property_response(
                 match value {
                     PropertyValue::Href(href) => {
                         // Recursively expand the href if it hasn't been visited
-                        if !visited.contains(href) {
+                        if visited.contains(href) {
+                            tracing::warn!("Cycle detected for href: {}, skipping", href);
+                            expanded_properties.push(property);
+                        } else {
                             visited.insert(href.clone());
                             
                             // Fetch nested properties for this href
@@ -222,7 +225,9 @@ async fn build_expand_property_response(
                             ).await?;
                             
                             // If we have nested properties, wrap them in the original property
-                            if !nested_props.is_empty() {
+                            if nested_props.is_empty() {
+                                expanded_properties.push(property);
+                            } else {
                                 // Create a property with nested response
                                 expanded_properties.push(DavProperty {
                                     name: prop_name.qname(),
@@ -230,12 +235,7 @@ async fn build_expand_property_response(
                                         format_nested_response(href, &nested_props)
                                     )),
                                 });
-                            } else {
-                                expanded_properties.push(property);
                             }
-                        } else {
-                            tracing::warn!("Cycle detected for href: {}, skipping", href);
-                            expanded_properties.push(property);
                         }
                     }
                     PropertyValue::HrefSet(hrefs) => {
@@ -243,30 +243,31 @@ async fn build_expand_property_response(
                         let mut expanded_hrefs = Vec::new();
                         
                         for href in hrefs {
-                            if !visited.contains(href) {
-                                visited.insert(href.clone());
-                                
-                                let nested_props = fetch_nested_properties(
-                                    conn,
-                                    href,
-                                    &prop_item.properties,
-                                    &mut visited,
-                                    1, // Start at depth 1
-                                ).await?;
-                                
-                                if !nested_props.is_empty() {
-                                    expanded_hrefs.push(format_nested_response(href, &nested_props));
-                                }
+                            if visited.contains(href) {
+                                continue;
+                            }
+                            visited.insert(href.clone());
+                            
+                            let nested_props = fetch_nested_properties(
+                                conn,
+                                href,
+                                &prop_item.properties,
+                                &mut visited,
+                                1, // Start at depth 1
+                            ).await?;
+                            
+                            if !nested_props.is_empty() {
+                                expanded_hrefs.push(format_nested_response(href, &nested_props));
                             }
                         }
                         
-                        if !expanded_hrefs.is_empty() {
+                        if expanded_hrefs.is_empty() {
+                            expanded_properties.push(property);
+                        } else {
                             expanded_properties.push(DavProperty {
                                 name: prop_name.qname(),
                                 value: Some(PropertyValue::Xml(expanded_hrefs.join("\n"))),
                             });
-                        } else {
-                            expanded_properties.push(property);
                         }
                     }
                     _ => {
@@ -299,6 +300,7 @@ async fn build_expand_property_response(
 /// ## Errors
 /// Returns database errors if queries fail.
 #[expect(clippy::unused_async)]
+#[expect(clippy::too_many_lines)]
 async fn fetch_property(
     _conn: &mut connection::DbConnection<'_>,
     path: &str,
@@ -311,15 +313,12 @@ async fn fetch_property(
     // Stub implementation: Return common properties based on path patterns
     // In a full implementation, this would query the database
     let property = match (qname.namespace_uri(), qname.local_name()) {
-        ("DAV:", "current-user-principal") => {
-            Some(DavProperty::href(qname, "/principals/user/"))
-        }
-        ("DAV:", "principal-URL") => {
+        ("DAV:", "current-user-principal" | "principal-URL") => {
             Some(DavProperty::href(qname, "/principals/user/"))
         }
         ("DAV:", "displayname") => {
             // Extract display name based on path
-            let name = path.split('/').last().unwrap_or("Resource");
+            let name = path.split('/').next_back().unwrap_or("Resource");
             Some(DavProperty::text(qname, name))
         }
         ("DAV:", "resourcetype") => {
@@ -378,6 +377,7 @@ async fn fetch_property(
 ///
 /// ## Errors
 /// Returns database errors if queries fail.
+#[expect(clippy::type_complexity)]
 fn fetch_nested_properties<'a>(
     conn: &'a mut connection::DbConnection<'_>,
     href: &'a str,
@@ -385,13 +385,14 @@ fn fetch_nested_properties<'a>(
     visited: &'a mut std::collections::HashSet<String>,
     depth: usize,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<Vec<crate::component::rfc::dav::core::DavProperty>>> + Send + 'a>> {
+    // Recursion depth limit
+    const MAX_DEPTH: usize = 10;
+    
     Box::pin(async move {
         use crate::component::rfc::dav::core::{DavProperty, PropertyValue};
         
         let mut properties = Vec::new();
         
-        // Recursion depth limit
-        const MAX_DEPTH: usize = 10;
         if depth >= MAX_DEPTH {
             tracing::warn!("Maximum expansion depth ({}) reached, stopping recursion", MAX_DEPTH);
             return Ok(properties);
@@ -400,41 +401,32 @@ fn fetch_nested_properties<'a>(
         for prop_item in nested_props {
             if let Some(property) = fetch_property(conn, href, &prop_item.name).await? {
                 // Check if this property should be recursively expanded
-                if !prop_item.properties.is_empty() {
-                    if let Some(value) = &property.value {
-                        match value {
-                            PropertyValue::Href(nested_href) => {
-                                if !visited.contains(nested_href) {
-                                    visited.insert(nested_href.clone());
-                                    
-                                    let deeper_props = fetch_nested_properties(
-                                        conn,
-                                        nested_href,
-                                        &prop_item.properties,
-                                        visited,
-                                        depth + 1,
-                                    ).await?;
-                                    
-                                    if !deeper_props.is_empty() {
-                                        properties.push(DavProperty {
-                                            name: prop_item.name.qname(),
-                                            value: Some(PropertyValue::Xml(
-                                                format_nested_response(nested_href, &deeper_props)
-                                            )),
-                                        });
-                                    } else {
-                                        properties.push(property);
-                                    }
-                                } else {
-                                    properties.push(property);
-                                }
-                            }
-                            _ => {
-                                properties.push(property);
-                            }
-                        }
-                    } else {
+                if prop_item.properties.is_empty() {
+                    properties.push(property);
+                } else if let Some(PropertyValue::Href(nested_href)) = &property.value {
+                    if visited.contains(nested_href) {
                         properties.push(property);
+                    } else {
+                        visited.insert(nested_href.clone());
+                        
+                        let deeper_props = fetch_nested_properties(
+                            conn,
+                            nested_href,
+                            &prop_item.properties,
+                            visited,
+                            depth + 1,
+                        ).await?;
+                        
+                        if deeper_props.is_empty() {
+                            properties.push(property);
+                        } else {
+                            properties.push(DavProperty {
+                                name: prop_item.name.qname(),
+                                value: Some(PropertyValue::Xml(
+                                    format_nested_response(nested_href, &deeper_props)
+                                )),
+                            });
+                        }
                     }
                 } else {
                     properties.push(property);
@@ -448,13 +440,15 @@ fn fetch_nested_properties<'a>(
 
 /// ## Summary
 /// Formats a nested response with href and properties as XML.
+#[expect(clippy::let_underscore_must_use, reason = "Write to String is infallible")]
 fn format_nested_response(
     href: &str,
     properties: &[crate::component::rfc::dav::core::DavProperty],
 ) -> String {
+    use std::fmt::Write;
     use crate::component::rfc::dav::core::PropertyValue;
     
-    let mut xml = format!("<D:response><D:href>{}</D:href><D:propstat><D:prop>", href);
+    let mut xml = format!("<D:response><D:href>{href}</D:href><D:propstat><D:prop>");
     
     for prop in properties {
         let ns = prop.name.namespace_uri();
@@ -474,24 +468,24 @@ fn format_nested_response(
         if let Some(value) = &prop.value {
             match value {
                 PropertyValue::Text(text) => {
-                    xml.push_str(&format!("<{}:{}>{}</{}:{}>", prefix, name, text, prefix, name));
+                    let _ = write!(xml, "<{prefix}:{name}>{text}</{prefix}:{name}>");
                 }
                 PropertyValue::Href(href) => {
-                    xml.push_str(&format!("<{}:{}><D:href>{}</D:href></{}:{}>", prefix, name, href, prefix, name));
+                    let _ = write!(xml, "<{prefix}:{name}><D:href>{href}</D:href></{prefix}:{name}>");
                 }
                 PropertyValue::Empty => {
-                    xml.push_str(&format!("<{}:{}/>", prefix, name));
+                    let _ = write!(xml, "<{prefix}:{name}/>");
                 }
                 PropertyValue::Xml(content) => {
-                    xml.push_str(&format!("<{}:{}>{}</{}:{}>", prefix, name, content, prefix, name));
+                    let _ = write!(xml, "<{prefix}:{name}>{content}</{prefix}:{name}>");
                 }
                 _ => {
                     // For complex types, just use empty element for now
-                    xml.push_str(&format!("<{}:{}/>", prefix, name));
+                    let _ = write!(xml, "<{prefix}:{name}/>");
                 }
             }
         } else {
-            xml.push_str(&format!("<{}:{}/>", prefix, name));
+            let _ = write!(xml, "<{prefix}:{name}/>");
         }
     }
     

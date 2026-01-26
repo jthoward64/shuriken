@@ -137,27 +137,31 @@ async fn evaluate_prop_filter(
     };
 
     // Apply param-filters if present
-    if !prop_filter.param_filters.is_empty() {
+    if prop_filter.param_filters.is_empty() {
+        Ok(entity_ids)
+    } else {
         apply_param_filters(
             conn,
             &entity_ids,
             &prop_name,
             &prop_filter.param_filters,
-            prop_filter.test.clone(),
+            prop_filter.test,
         )
         .await
-    } else {
-        Ok(entity_ids)
     }
 }
 
 /// ## Summary
-/// Evaluates arbitrary vCard property filter against `dav_property` table.
+/// Evaluates arbitrary `vCard` property filter against `dav_property` table.
 ///
-/// Supports any vCard property including ADR, NOTE, BDAY, PHOTO, etc.
+/// Supports any `vCard` property including ADR, NOTE, BDAY, PHOTO, etc.
 ///
 /// ## Errors
 /// Returns database errors if queries fail.
+#[expect(
+    clippy::too_many_lines,
+    reason = "Arbitrary property filter logic handles multiple filter modes cohesively"
+)]
 async fn evaluate_arbitrary_property_filter(
     conn: &mut DbConnection<'_>,
     prop_filter: &PropFilter,
@@ -539,10 +543,14 @@ async fn evaluate_uid_filter(
 ///
 /// Filters entities to only those that have properties matching the given
 /// property name where the property has parameters matching the param-filters.
-/// Uses `test` to determine if param-filters are ANDed (`allof`) or ORed (`anyof`).
+/// Uses `test` to determine if param-filters are AND-combined (`allof`) or OR-combined (`anyof`).
 ///
 /// ## Errors
 /// Returns database errors if queries fail.
+#[expect(
+    clippy::too_many_lines,
+    reason = "Parameter filter logic requires cohesive handling of multiple filter modes"
+)]
 async fn apply_param_filters(
     conn: &mut DbConnection<'_>,
     entity_ids: &[uuid::Uuid],
@@ -628,6 +636,10 @@ async fn apply_param_filters(
 ///
 /// ## Errors
 /// Returns database errors if queries fail.
+#[expect(
+    clippy::too_many_lines,
+    reason = "Single param-filter evaluation has multiple code paths for match types"
+)]
 async fn evaluate_single_param_filter(
     conn: &mut DbConnection<'_>,
     prop_ids: &[uuid::Uuid],

@@ -359,7 +359,13 @@ impl PreconditionError {
     }
 
     /// Returns the XML element name for this precondition.
+    ///
+    /// Note: Some CalDAV and CardDAV preconditions share the same element name
+    /// (e.g., `no-uid-conflict`, `max-resource-size`, `supported-filter`,
+    /// `supported-collation`) but use different namespaces. The `namespace()`
+    /// method distinguishes them.
     #[must_use]
+    #[expect(clippy::match_same_arms)]
     pub fn element_name(&self) -> &'static str {
         match self {
             // DAV: namespace
@@ -392,7 +398,7 @@ impl PreconditionError {
             Self::MaxAttendeesPerInstance => "max-attendees-per-instance",
             Self::CalendarSupportedFilter => "supported-filter",
             Self::CalendarSupportedCollation(_) => "supported-collation",
-            Self::ValidTimezone => "valid-calendar-data",
+            Self::ValidTimezone => "valid-timezone",
             Self::UniqueSchedulingObjectResource(_) => "unique-scheduling-object-resource",
             Self::SameOrganizerInAllComponents => "same-organizer-in-all-components",
             Self::AllowedOrganizerSchedulingObjectChange => {
@@ -503,6 +509,8 @@ impl PreconditionError {
             ns_decls.push_str(" xmlns:C=\"urn:ietf:params:xml:ns:caldav\"");
         } else if self.namespace() == ns::CARDDAV {
             ns_decls.push_str(" xmlns:CARD=\"urn:ietf:params:xml:ns:carddav\"");
+        } else {
+            // DAV: namespace already declared
         }
 
         // Build the inner content based on variant

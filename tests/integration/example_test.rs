@@ -1,7 +1,7 @@
 #![allow(clippy::unused_async)]
 //! Example test demonstrating test infrastructure usage.
 //!
-//! This test serves as a template showing how to use the TestDb helpers
+//! This test serves as a template showing how to use the `TestDb` helpers
 //! to seed data and verify database state in integration tests.
 
 use super::helpers::*;

@@ -13,7 +13,7 @@ use crate::component::model::carddav::card_index::NewCardIndex;
 ///
 /// ## Errors
 /// Returns an error if the database operation fails.
-pub async fn insert<'a>(conn: &mut DbConnection<'_>, index: &NewCardIndex<'a>) -> QueryResult<()> {
+pub async fn insert(conn: &mut DbConnection<'_>, index: &NewCardIndex<'_>) -> QueryResult<()> {
     diesel::insert_into(card_index::table)
         .values(index)
         .execute(conn)

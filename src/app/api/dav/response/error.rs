@@ -65,10 +65,7 @@ mod tests {
         // Just verify the function compiles and the logic is sound
         // Actual HTTP response testing would require integration tests
         let err = PreconditionError::CalendarSupportedCollation("i;unknown".into());
-        assert_eq!(
-            err.status_code(),
-            salvo::http::StatusCode::FORBIDDEN
-        );
+        assert_eq!(err.status_code(), salvo::http::StatusCode::FORBIDDEN);
         assert!(err.to_xml().contains("supported-collation"));
     }
 }

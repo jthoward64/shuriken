@@ -15,7 +15,7 @@ use crate::component::db::schema::cal_timezone;
 pub struct CalTimezone {
     /// UUID v7 primary key.
     pub id: Uuid,
-    /// Timezone identifier (e.g., America/New_York).
+    /// Timezone identifier (e.g., `America/New_York`).
     pub tzid: String,
     /// Full VTIMEZONE component data.
     pub vtimezone_data: String,
@@ -31,7 +31,7 @@ pub struct CalTimezone {
 #[derive(Debug, Clone, Insertable)]
 #[diesel(table_name = cal_timezone)]
 pub struct NewCalTimezone<'a> {
-    /// Timezone identifier (e.g., America/New_York).
+    /// Timezone identifier (e.g., `America/New_York`).
     pub tzid: &'a str,
     /// Full VTIMEZONE component data.
     pub vtimezone_data: &'a str,

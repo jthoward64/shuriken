@@ -4,9 +4,7 @@
 //! and property-filter matching against calendar data.
 
 use crate::component::db::connection::DbConnection;
-use crate::component::db::query::text_match::{
-    CollationError, build_like_pattern, normalize_for_sql_upper,
-};
+use crate::component::db::query::text_match::{build_like_pattern, normalize_for_sql_upper};
 use crate::component::db::schema::{cal_index, dav_instance, dav_parameter};
 use crate::component::model::dav::instance::DavInstance;
 use crate::component::rfc::dav::core::{
@@ -98,10 +96,14 @@ async fn apply_calendar_filter(
 /// ## Summary
 /// Applies a component filter to find matching entity IDs.
 ///
-/// Filters by component type (VEVENT, VTODO, etc.), time-range, and properties.
+/// Filters by component type (`VEVENT`, `VTODO`, etc.), time-range, and properties.
 ///
 /// ## Errors
 /// Returns errors if the filter structure is invalid.
+#[expect(
+    clippy::too_many_lines,
+    reason = "Component filter logic handles multiple filter types cohesively"
+)]
 async fn apply_comp_filter(
     conn: &mut DbConnection<'_>,
     comp_filter: &CompFilter,
@@ -128,7 +130,6 @@ async fn apply_comp_filter(
         // Query non-recurring events from cal_index (rrule_text IS NULL)
         if start.is_some() || end.is_some() {
             let mut boxed_query = query
-                .clone()
                 .filter(cal_index::rrule_text.is_null())
                 .into_boxed();
 
@@ -163,7 +164,6 @@ async fn apply_comp_filter(
 
             // First, get all recurring event entity IDs
             let recurring_event_ids: Vec<uuid::Uuid> = query
-                .clone()
                 .filter(cal_index::rrule_text.is_not_null())
                 .select(cal_index::entity_id)
                 .distinct()
@@ -345,17 +345,17 @@ async fn apply_property_filters(
         };
 
         // Apply param-filters if present
-        let matching_entity_ids = if !prop_filter.param_filters.is_empty() {
+        let matching_entity_ids = if prop_filter.param_filters.is_empty() {
+            matching_entity_ids
+        } else {
             apply_param_filters(
                 conn,
                 &matching_entity_ids,
                 &prop_name,
                 &prop_filter.param_filters,
-                prop_filter.test.clone(),
+                prop_filter.test,
             )
             .await?
-        } else {
-            matching_entity_ids
         };
 
         result_sets.push(matching_entity_ids);
@@ -379,10 +379,14 @@ async fn apply_property_filters(
 ///
 /// Filters entities to only those that have properties matching the given
 /// property name where the property has parameters matching the param-filters.
-/// Uses `test` to determine if param-filters are ANDed (`allof`) or ORed (`anyof`).
+/// Uses `test` to determine if param-filters are AND-combined (`allof`) or OR-combined (`anyof`).
 ///
 /// ## Errors
 /// Returns database errors if queries fail.
+#[expect(
+    clippy::too_many_lines,
+    reason = "Parameter filter logic requires cohesive handling of multiple filter modes"
+)]
 async fn apply_param_filters(
     conn: &mut DbConnection<'_>,
     entity_ids: &[uuid::Uuid],
@@ -470,6 +474,10 @@ async fn apply_param_filters(
 ///
 /// ## Errors
 /// Returns database errors if queries fail.
+#[expect(
+    clippy::too_many_lines,
+    reason = "Single param-filter evaluation has multiple code paths for match types"
+)]
 async fn evaluate_single_param_filter(
     conn: &mut DbConnection<'_>,
     prop_ids: &[uuid::Uuid],

@@ -18,13 +18,12 @@ pub fn build_card_index(entity_id: Uuid, vcard: &VCard) -> NewCardIndex<'_> {
     // Extract N (structured name) components
     let (n_family, n_given) = vcard
         .name()
-        .map(|name| {
+        .map_or((None, None), |name| {
             (
                 name.family.first().map(String::as_str),
                 name.given.first().map(String::as_str),
             )
-        })
-        .unwrap_or((None, None));
+        });
     
     // Extract ORG (organization) - use the main name
     let org = vcard

@@ -55,9 +55,12 @@ impl UtcOffset {
         Duration::seconds(i64::from(self.seconds))
     }
 
-    /// Parses a UTC offset from iCalendar format (e.g., "+0500", "-0800", "+053000").
+    /// Parses a UTC offset from `iCalendar` format (e.g., "+0500", "-0800", "+053000").
     ///
-    /// Format: (+/-)HHMM or (+/-)HHMMSS
+    /// Format: `(+/-)HHMM` or `(+/-)HHMMSS`
+    ///
+    /// ## Errors
+    /// Returns [`VTimezoneError::InvalidValue`] if the offset string is malformed.
     pub fn parse(s: &str) -> Result<Self, VTimezoneError> {
         let s = s.trim();
         if s.len() < 5 {
@@ -90,7 +93,7 @@ impl UtcOffset {
     }
 }
 
-/// Converts an iCalendar DateTime to chrono NaiveDateTime.
+/// Converts an `iCalendar` `DateTime` to chrono `NaiveDateTime`.
 fn ical_to_naive(dt: &ICalDateTime) -> Option<NaiveDateTime> {
     use chrono::NaiveDate;
     let date = NaiveDate::from_ymd_opt(i32::from(dt.year), u32::from(dt.month), u32::from(dt.day))?;
@@ -301,7 +304,7 @@ impl VTimezone {
     ///
     /// This uses the observance rules to determine which offset applies.
     /// For datetimes before all observances, returns the first observance's
-    /// offset_from (the offset before any transitions).
+    /// `offset_from` (the offset before any transitions).
     #[must_use]
     pub fn offset_at(&self, local_dt: NaiveDateTime) -> UtcOffset {
         // Find the most recent observance transition before this datetime
@@ -369,10 +372,11 @@ impl VTimezone {
     }
 
     /// ## Summary
-    /// Calculates the most recent RRULE occurrence at or before a given datetime.
+    /// Calculates the most recent `RRULE` occurrence at or before a given datetime.
     ///
-    /// This is a simplified implementation that handles common timezone RRULEs:
-    /// - FREQ=YEARLY with BYMONTH and BYDAY
+    /// This is a simplified implementation that handles common timezone `RRULE`s:
+    /// - `FREQ=YEARLY` with `BYMONTH` and `BYDAY`
+    #[expect(clippy::unused_self, reason = "Method may need self in future for context")]
     fn calculate_rrule_occurrence(
         &self,
         obs: &Observance,
@@ -493,12 +497,18 @@ fn calculate_nth_weekday_of_month(
         return None;
     }
 
+    #[expect(
+        clippy::cast_sign_loss,
+        clippy::cast_possible_wrap,
+        reason = "Values are validated to be within safe ranges"
+    )]
     if week_ord > 0 {
         // Find first occurrence of weekday in month
         let first_of_month = NaiveDate::from_ymd_opt(year, month, 1)?;
         let first_weekday = first_of_month.weekday();
 
         // Days until the target weekday
+        // Note: num_days_from_monday() returns 0-6 (safe as i32)
         let days_until = (weekday.num_days_from_monday() as i32
             - first_weekday.num_days_from_monday() as i32
             + 7)
@@ -523,12 +533,13 @@ fn calculate_nth_weekday_of_month(
         let last_weekday = last_of_month.weekday();
 
         // Days back to target weekday
+        // Note: num_days_from_monday() returns 0-6 (safe as i32)
         let days_back = (last_weekday.num_days_from_monday() as i32
             - weekday.num_days_from_monday() as i32
             + 7)
             % 7;
 
-        // Day of month for last occurrence
+        // Day of month for last occurrence (day() returns 1-31, safe as i32)
         let last_occurrence = last_of_month.day() as i32 - days_back;
 
         // Day for nth from end occurrence

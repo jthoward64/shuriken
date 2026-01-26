@@ -66,7 +66,7 @@ pub struct CollationResult {
 /// Normalizes text based on collation using ICU case folding.
 ///
 /// For `i;unicode-casemap` collation, uses ICU's `fold_string()` for proper
-/// Unicode case folding per RFC 4790. For SQL compatibility with UPPER(), we
+/// Unicode case folding per RFC 4790. For SQL compatibility with `UPPER()`, we
 /// fold then uppercase. For `i;ascii-casemap`, uses simple uppercasing.
 /// For `i;octet`, returns text as-is (case-sensitive).
 ///
@@ -128,9 +128,7 @@ pub fn normalize_for_ilike(
 ) -> Result<String, CollationError> {
     match collation.map(std::string::String::as_str) {
         // Use ICU case folding for proper Unicode collation
-        Some("i;unicode-casemap") | None => {
-            Ok(CaseMapper::new().fold_string(text).into_owned())
-        }
+        Some("i;unicode-casemap") | None => Ok(CaseMapper::new().fold_string(text).into_owned()),
         // Simple ASCII lowercasing for ASCII-only comparison
         Some("i;ascii-casemap") => Ok(text.to_lowercase()),
         // Case-sensitive: return as-is

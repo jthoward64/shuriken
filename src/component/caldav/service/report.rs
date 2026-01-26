@@ -261,6 +261,8 @@ fn expand_occurrence_ical(
             component.properties.retain(|p| p.name != "DURATION");
             let dtend_value = occurrence.end_utc.format("%Y%m%dT%H%M%SZ").to_string();
             component.properties.push(Property::text("DTEND", &dtend_value));
+        } else {
+            // Neither DTEND nor DURATION - add DTEND for the occurrence
         }
 
         // Add RECURRENCE-ID if this is an exception

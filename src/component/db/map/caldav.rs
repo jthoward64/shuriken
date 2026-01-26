@@ -7,12 +7,12 @@ use crate::component::model::caldav::cal_index::NewCalIndex;
 use crate::component::rfc::ical::core::{Component, ICalendar};
 
 /// ## Summary
-/// Builds calendar index entries for all indexable components in an iCalendar document.
+/// Builds calendar index entries for all indexable components in an `iCalendar` document.
 ///
-/// Walks through the component tree and builds index entries for VEVENT, VTODO, and VJOURNAL
+/// Walks through the component tree and builds index entries for `VEVENT`, `VTODO`, and `VJOURNAL`
 /// components. Returns a vector of index entries ready for batch insertion.
 ///
-/// Note: Uses a placeholder UUID for component_id since we don't have access to the database
+/// Note: Uses a placeholder UUID for `component_id` since we don't have access to the database
 /// component IDs yet. This will be improved in a future iteration.
 #[must_use]
 pub fn build_cal_indexes(
@@ -62,6 +62,7 @@ fn build_indexes_recursive(
 /// ## Errors
 /// Returns `None` if the component lacks required properties or the component type is unsupported.
 #[must_use]
+#[expect(clippy::too_many_lines)]
 fn build_cal_index(
     entity_id: Uuid,
     component_id: Uuid,

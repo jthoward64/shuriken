@@ -724,7 +724,7 @@ END:VCALENDAR\r\n";
             Value::Binary(data) => {
                 assert_eq!(data, b"Hello World");
             }
-            other => panic!("expected Binary, got {:?}", other),
+            other => panic!("expected Binary, got {other:?}"),
         }
     }
 }

@@ -165,6 +165,7 @@ impl Parser {
         })
     }
 
+    #[expect(clippy::too_many_lines, reason = "Parser dispatch requires handling many property types")]
     fn parse_property_value(
         &self,
         name: &str,

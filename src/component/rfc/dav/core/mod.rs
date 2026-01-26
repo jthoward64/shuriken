@@ -17,17 +17,17 @@ mod report;
 
 pub use depth::Depth;
 pub use error::DavError;
-pub use precondition::PreconditionError;
 pub use href::Href;
 pub use multistatus::{Multistatus, Propstat, PropstatResponse, ResponseDescription, Status};
 pub use namespace::{CALDAV_NS, CARDDAV_NS, CS_NS, DAV_NS, Namespace, QName};
 pub use partial_retrieval::{AddressDataRequest, CalendarDataRequest, ComponentSelection};
+pub use precondition::PreconditionError;
 pub use property::{DavProperty, PropertyName, PropertyValue};
 pub use propfind::{PropfindRequest, PropfindType};
 pub use proppatch::{PropertyUpdate, ProppatchRequest, SetOrRemove};
 pub use report::{
     AddressbookFilter, AddressbookMultiget, AddressbookQuery, CalendarFilter, CalendarMultiget,
     CalendarQuery, CompFilter, ExpandProperty, ExpandPropertyItem, FilterTest, FreeBusyQuery,
-    MatchType, ParamFilter, PropFilter, RecurrenceExpansion, ReportRequest, ReportType, SyncCollection, SyncLevel,
-    TextMatch, TimeRange,
+    MatchType, ParamFilter, PropFilter, RecurrenceExpansion, ReportRequest, ReportType,
+    SyncCollection, SyncLevel, TextMatch, TimeRange,
 };
