@@ -4,6 +4,7 @@
 //! using the `quick-xml` crate.
 
 mod error;
+mod mkcol;
 pub mod propfind;
 mod proppatch;
 pub mod report;
@@ -12,6 +13,7 @@ pub mod report;
 mod error_tests;
 
 pub use error::{ParseError, ParseResult};
+pub use mkcol::{parse_mkcol, MkcolRequest};
 pub use propfind::parse_propfind;
 pub use proppatch::parse_proppatch;
 pub use report::parse_report;

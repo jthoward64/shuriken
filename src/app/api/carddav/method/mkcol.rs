@@ -2,13 +2,13 @@
 
 #![allow(clippy::manual_let_else)]
 #![allow(clippy::single_match_else)]
-#![allow(clippy::unnecessary_wraps)]
 
 use salvo::http::StatusCode;
 use salvo::{Request, Response, handler};
 
 use crate::component::dav::service::collection::{CreateCollectionContext, create_collection};
 use crate::component::db::connection;
+use crate::component::rfc::dav::parse::parse_mkcol;
 
 /// ## Summary
 /// Handles Extended MKCOL requests to create addressbook collections.
@@ -41,7 +41,30 @@ pub async fn mkcol_extended(req: &mut Request, res: &mut Response) {
 
     // TODO: Parse path to extract parent and addressbook name
     // TODO: Check authorization
-    // TODO: Parse Extended MKCOL XML body (RFC 5689)
+
+    // Parse Extended MKCOL XML body (RFC 5689)
+    let body = req.payload().await;
+    let parsed_request = match body {
+        Ok(bytes) if !bytes.is_empty() => {
+            match parse_mkcol(&bytes) {
+                Ok(request) => request,
+                Err(e) => {
+                    tracing::error!("Failed to parse Extended MKCOL body: {}", e);
+                    res.status_code(StatusCode::BAD_REQUEST);
+                    return;
+                }
+            }
+        }
+        Ok(_) => {
+            // Empty body - no initial properties
+            Default::default()
+        }
+        Err(e) => {
+            tracing::error!("Failed to read request body: {}", e);
+            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+            return;
+        }
+    };
 
     // Extract URI from path (last segment)
     let uri = path
@@ -66,8 +89,8 @@ pub async fn mkcol_extended(req: &mut Request, res: &mut Response) {
         owner_principal_id,
         uri,
         collection_type: "addressbook".to_string(),
-        displayname: None, // TODO: Extract from XML body if present
-        description: None, // TODO: Extract from XML body if present
+        displayname: parsed_request.displayname,
+        description: parsed_request.description,
     };
 
     // Create the addressbook collection
