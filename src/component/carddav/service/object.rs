@@ -4,7 +4,8 @@
 
 use anyhow::{Context, Result};
 use diesel::prelude::*;
-use diesel_async::RunQueryDsl;
+use diesel_async::scoped_futures::ScopedFutureExt;
+use diesel_async::{AsyncConnection, RunQueryDsl};
 
 use crate::component::db::connection::DbConnection;
 use crate::component::db::map::carddav::build_card_index;
@@ -143,95 +144,107 @@ pub async fn put_address_object(
     // Generate ETag from canonical bytes
     let etag = instance::generate_etag(vcard_bytes);
 
-    // TODO: Use a transaction for atomic updates
-    // For now, we'll do sequential operations
+    let collection_id = ctx.collection_id;
+    let uri = ctx.uri.clone();
+    let entity_type = ctx.entity_type.clone();
+    let logical_uid = ctx.logical_uid.clone();
+    let etag_for_tx = etag.clone();
+    let collection_synctoken = collection_data.synctoken;
 
-    if let Some(existing_inst) = existing_instance {
-        // Update existing instance
-        // For now, just update the ETag and sync revision
-        // Full entity tree replacement will be implemented once proper ID mapping is in place
+    conn.transaction::<_, anyhow::Error, _>(move |tx| {
+        async move {
+            if let Some(existing_inst) = existing_instance {
+                // Update existing instance
+                // For now, just update the ETag and sync revision
+                // Full entity tree replacement will be implemented once proper ID mapping is in place
 
-        let sync_revision = existing_inst.sync_revision + 1;
-        let _updated_instance = instance::update_instance(
-            conn,
-            existing_inst.id,
-            &etag,
-            sync_revision,
-            chrono::Utc::now(),
-        )
-        .await
-        .context("failed to update instance")?;
+                let sync_revision = existing_inst.sync_revision + 1;
+                let _updated_instance = instance::update_instance(
+                    tx,
+                    existing_inst.id,
+                    &etag_for_tx,
+                    sync_revision,
+                    chrono::Utc::now(),
+                )
+                .await
+                .context("failed to update instance")?;
 
-        // Update the collection sync token
-        let _new_synctoken = collection::update_synctoken(conn, ctx.collection_id)
-            .await
-            .context("failed to update collection sync token")?;
+                // Update the collection sync token
+                let _new_synctoken = collection::update_synctoken(tx, collection_id)
+                    .await
+                    .context("failed to update collection sync token")?;
 
-        // Delete old component tree
-        entity::replace_entity_tree(conn, existing_inst.entity_id, &[], &[], &[])
-            .await
-            .context("failed to delete old component tree")?;
+                // Delete old component tree
+                entity::replace_entity_tree(tx, existing_inst.entity_id, &[], &[], &[])
+                    .await
+                    .context("failed to delete old component tree")?;
 
-        // Delete old index entry for this entity
-        card_index::delete_by_entity_id(conn, existing_inst.entity_id)
-            .await
-            .context("failed to delete old index entry")?;
+                // Delete old index entry for this entity
+                card_index::delete_by_entity_id(tx, existing_inst.entity_id)
+                    .await
+                    .context("failed to delete old index entry")?;
 
-        // Insert new vCard tree
-        entity::insert_vcard_tree(conn, existing_inst.entity_id, &vcard)
-            .await
-            .context("failed to insert vCard tree")?;
+                // Insert new vCard tree
+                entity::insert_vcard_tree(tx, existing_inst.entity_id, &vcard)
+                    .await
+                    .context("failed to insert vCard tree")?;
 
-        // Build and insert card index entry
-        let card_idx = build_card_index(existing_inst.entity_id, &vcard);
-        card_index::insert(conn, &card_idx)
-            .await
-            .context("failed to insert card index entry")?;
-    } else {
-        // Create new entity and instance
-        // For now, create a minimal entity without the full tree
-        // Full tree insertion will be implemented once proper ID mapping is in place
+                // Build and insert card index entry
+                let card_idx = build_card_index(existing_inst.entity_id, &vcard);
+                card_index::insert(tx, &card_idx)
+                    .await
+                    .context("failed to insert card index entry")?;
+            } else {
+                // Create new entity and instance
+                // For now, create a minimal entity without the full tree
+                // Full tree insertion will be implemented once proper ID mapping is in place
 
-        let entity_model = crate::component::model::dav::entity::NewDavEntity {
-            entity_type: &ctx.entity_type,
-            logical_uid: ctx.logical_uid.as_deref(),
-        };
+                let entity_model = crate::component::model::dav::entity::NewDavEntity {
+                    entity_type: entity_type.as_str(),
+                    logical_uid: logical_uid.as_deref(),
+                };
 
-        let created_entity = entity::create_entity(conn, &entity_model)
-            .await
-            .context("failed to create entity")?;
+                let created_entity = entity::create_entity(tx, &entity_model)
+                    .await
+                    .context("failed to create entity")?;
 
-        // Create instance using the collection data we already fetched
-        let new_instance = NewDavInstance {
-            collection_id: ctx.collection_id,
-            entity_id: created_entity.id,
-            uri: &ctx.uri,
-            content_type: "text/vcard",
-            etag: &etag,
-            sync_revision: collection_data.synctoken + 1,
-            last_modified: chrono::Utc::now(),
-        };
+                // Create instance using the collection data we already fetched
+                let new_instance = NewDavInstance {
+                    collection_id,
+                    entity_id: created_entity.id,
+                    uri: &uri,
+                    content_type: "text/vcard",
+                    etag: &etag_for_tx,
+                    sync_revision: collection_synctoken + 1,
+                    last_modified: chrono::Utc::now(),
+                };
 
-        let _created_instance = instance::create_instance(conn, &new_instance)
-            .await
-            .context("failed to create instance")?;
+                let _created_instance = instance::create_instance(tx, &new_instance)
+                    .await
+                    .context("failed to create instance")?;
 
-        // Update the collection sync token
-        let _new_synctoken = collection::update_synctoken(conn, ctx.collection_id)
-            .await
-            .context("failed to update collection sync token")?;
+                // Update the collection sync token
+                let _new_synctoken = collection::update_synctoken(tx, collection_id)
+                    .await
+                    .context("failed to update collection sync token")?;
 
-        // Insert vCard tree for the new entity
-        entity::insert_vcard_tree(conn, created_entity.id, &vcard)
-            .await
-            .context("failed to insert vCard tree")?;
+                // Insert vCard tree for the new entity
+                entity::insert_vcard_tree(tx, created_entity.id, &vcard)
+                    .await
+                    .context("failed to insert vCard tree")?;
 
-        // Build and insert card index entry
-        let card_idx = build_card_index(created_entity.id, &vcard);
-        card_index::insert(conn, &card_idx)
-            .await
-            .context("failed to insert card index entry")?;
-    }
+                // Build and insert card index entry
+                let card_idx = build_card_index(created_entity.id, &vcard);
+                card_index::insert(tx, &card_idx)
+                    .await
+                    .context("failed to insert card index entry")?;
+            }
+
+            Ok(())
+        }
+        .scope_boxed()
+    })
+    .await?;
 
     Ok(PutObjectResult { etag, created })
 }

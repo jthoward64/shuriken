@@ -821,6 +821,7 @@ impl TestDb {
         let new_property = NewDavProperty {
             component_id,
             name,
+            group: None,
             value_type: "text",
             value_text,
             value_int: None,

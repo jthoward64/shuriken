@@ -4,20 +4,19 @@
 //! in response to REPORT requests (multiget, query).
 
 use crate::component::db::connection::DbConnection;
-use crate::component::db::schema::dav_shadow;
+use crate::component::db::map::dav::{serialize_ical_tree, serialize_vcard_tree};
+use crate::component::db::query::dav::entity;
 use crate::component::model::dav::instance::DavInstance;
 use crate::component::rfc::dav::core::{DavProperty, PropertyName, QName};
 use crate::component::rfc::filter::{filter_address_data, filter_calendar_data};
-use diesel::prelude::*;
-use diesel_async::RunQueryDsl;
 
 /// ## Summary
 /// Builds properties for a DAV instance based on requested property names.
 ///
 /// Supports:
 /// - `getetag` - Returns the instance's `ETag`
-/// - `calendar-data` - Returns iCalendar data from shadow table (with optional partial retrieval)
-/// - `address-data` - Returns vCard data from shadow table (with optional partial retrieval)
+/// - `calendar-data` - Returns iCalendar data reconstructed from component tree (with optional partial retrieval)
+/// - `address-data` - Returns vCard data reconstructed from component tree (with optional partial retrieval)
 ///
 /// ## Errors
 /// Returns database errors if queries fail.
@@ -74,7 +73,7 @@ pub async fn build_instance_properties(
 }
 
 /// ## Summary
-/// Loads calendar data (iCalendar) from the shadow table for an instance.
+/// Loads calendar data (iCalendar) from the component tree for an instance.
 ///
 /// Applies partial retrieval filtering if specified in the property name.
 ///
@@ -85,36 +84,26 @@ async fn load_calendar_data(
     instance: &DavInstance,
     prop_name: &PropertyName,
 ) -> anyhow::Result<Option<String>> {
-    // Query the shadow table for canonical bytes
-    let canonical_bytes: Option<Vec<u8>> = dav_shadow::table
-        .filter(dav_shadow::entity_id.eq(instance.entity_id))
-        .filter(dav_shadow::direction.eq("outbound"))
-        .filter(dav_shadow::deleted_at.is_null())
-        .select(dav_shadow::raw_canonical)
-        .order(dav_shadow::updated_at.desc())
-        .first::<Option<Vec<u8>>>(conn)
-        .await
-        .optional()?
-        .flatten();
+    let tree = entity::get_entity_with_tree(conn, instance.entity_id)
+        .await?
+        .map(|(_, tree)| tree);
 
-    if let Some(bytes) = canonical_bytes {
-        // Convert bytes to string
-        let data = String::from_utf8_lossy(&bytes).into_owned();
+    let Some(tree) = tree else {
+        return Ok(None);
+    };
 
-        // Apply partial retrieval filtering if specified
-        if let Some(request) = prop_name.calendar_data_request() {
-            let filtered = filter_calendar_data(&data, request)?;
-            Ok(Some(filtered))
-        } else {
-            Ok(Some(data))
-        }
+    let data = serialize_ical_tree(tree)?;
+
+    if let Some(request) = prop_name.calendar_data_request() {
+        let filtered = filter_calendar_data(&data, request)?;
+        Ok(Some(filtered))
     } else {
-        Ok(None)
+        Ok(Some(data))
     }
 }
 
 /// ## Summary
-/// Loads address data (vCard) from the shadow table for an instance.
+/// Loads address data (vCard) from the component tree for an instance.
 ///
 /// Applies partial retrieval filtering if specified in the property name.
 ///
@@ -125,30 +114,20 @@ async fn load_address_data(
     instance: &DavInstance,
     prop_name: &PropertyName,
 ) -> anyhow::Result<Option<String>> {
-    // Query the shadow table for canonical bytes
-    let canonical_bytes: Option<Vec<u8>> = dav_shadow::table
-        .filter(dav_shadow::entity_id.eq(instance.entity_id))
-        .filter(dav_shadow::direction.eq("outbound"))
-        .filter(dav_shadow::deleted_at.is_null())
-        .select(dav_shadow::raw_canonical)
-        .order(dav_shadow::updated_at.desc())
-        .first::<Option<Vec<u8>>>(conn)
-        .await
-        .optional()?
-        .flatten();
+    let tree = entity::get_entity_with_tree(conn, instance.entity_id)
+        .await?
+        .map(|(_, tree)| tree);
 
-    if let Some(bytes) = canonical_bytes {
-        // Convert bytes to string
-        let data = String::from_utf8_lossy(&bytes).into_owned();
+    let Some(tree) = tree else {
+        return Ok(None);
+    };
 
-        // Apply partial retrieval filtering if specified
-        if let Some(request) = prop_name.address_data_request() {
-            let filtered = filter_address_data(&data, request)?;
-            Ok(Some(filtered))
-        } else {
-            Ok(Some(data))
-        }
+    let data = serialize_vcard_tree(&tree)?;
+
+    if let Some(request) = prop_name.address_data_request() {
+        let filtered = filter_address_data(&data, request)?;
+        Ok(Some(filtered))
     } else {
-        Ok(None)
+        Ok(Some(data))
     }
 }

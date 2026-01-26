@@ -51,6 +51,23 @@ pub fn vcard_to_db_models<'a>(vcard: &'a VCard, entity_type: &str) -> anyhow::Re
         ordinal: 0,
     });
 
+    // Store VERSION explicitly (parser keeps it separate)
+    properties.push(NewDavProperty {
+        component_id,
+        name: "VERSION",
+        group: None,
+        value_type: "text",
+        value_text: Some(vcard.version.as_str()),
+        value_int: None,
+        value_float: None,
+        value_bool: None,
+        value_date: None,
+        value_tstz: None,
+        value_bytes: None,
+        value_json: None,
+        ordinal: 0,
+    });
+
     // Map all properties
     for (ordinal, prop) in vcard.properties.iter().enumerate() {
         map_vcard_property(
@@ -62,7 +79,7 @@ pub fn vcard_to_db_models<'a>(vcard: &'a VCard, entity_type: &str) -> anyhow::Re
                 reason = "vCard property counts are bounded by RFC limits (<500), truncation to i32 is safe"
             )]
             {
-                ordinal as i32
+                (ordinal + 1) as i32
             },
             &mut properties,
             &mut parameters,
@@ -89,6 +106,7 @@ fn map_vcard_property<'a>(
     properties.push(NewDavProperty {
         component_id,
         name: &prop.name,
+        group: prop.group.as_deref(),
         value_type,
         value_text,
         value_int,

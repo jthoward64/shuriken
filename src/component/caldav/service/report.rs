@@ -5,7 +5,7 @@
 use crate::component::db::connection::DbConnection;
 use crate::component::db::query::caldav::filter::find_matching_instances;
 use crate::component::db::query::caldav::occurrence;
-use crate::component::db::query::dav::instance;
+use crate::component::db::query::dav::{entity, instance};
 use crate::component::db::query::report_property::build_instance_properties;
 use crate::component::model::dav::instance::DavInstance;
 use crate::component::model::dav::occurrence::CalOccurrence;
@@ -13,7 +13,7 @@ use crate::component::rfc::dav::core::{
     CalendarMultiget, CalendarQuery, Href, Multistatus, PropertyName, PropstatResponse, RecurrenceExpansion,
 };
 use crate::component::rfc::ical::core::{ComponentKind, ICalendar, Property};
-use crate::component::rfc::ical::{build, parse};
+use crate::component::rfc::ical::build;
 use chrono::Utc;
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
@@ -130,30 +130,14 @@ async fn execute_calendar_query_with_expansion(
     expansion_mode: RecurrenceExpansion,
     properties: &[PropertyName],
 ) -> anyhow::Result<Multistatus> {
-    use crate::component::db::schema::dav_shadow;
-
     let mut multistatus = Multistatus::new();
 
     for instance in instances {
-        // Load calendar data from shadow table
-        let calendar_data: Option<Vec<u8>> = dav_shadow::table
-            .filter(dav_shadow::entity_id.eq(instance.entity_id))
-            .filter(dav_shadow::direction.eq("outbound"))
-            .filter(dav_shadow::deleted_at.is_null())
-            .select(dav_shadow::raw_canonical)
-            .order(dav_shadow::updated_at.desc())
-            .first::<Option<Vec<u8>>>(conn)
-            .await
-            .optional()?
-            .flatten();
-
-        let Some(bytes) = calendar_data else {
+        let Some((_, tree)) = entity::get_entity_with_tree(conn, instance.entity_id).await? else {
             continue;
         };
 
-        let data = String::from_utf8_lossy(&bytes).into_owned();
-        let ical = parse::parse(&data)
-            .map_err(|e| anyhow::anyhow!("Failed to parse iCalendar: {e}"))?;
+        let ical = crate::component::db::map::dav::ical_from_tree(tree)?;
 
         // Check if any VEVENT has RRULE
         let has_recurrence = ical.root.children.iter()

@@ -11,6 +11,8 @@ pub struct DavProperty {
     pub id: uuid::Uuid,
     pub component_id: uuid::Uuid,
     pub name: String,
+    #[diesel(column_name = group_name)]
+    pub group: Option<String>,
     pub value_type: String,
     pub value_text: Option<String>,
     pub value_int: Option<i64>,
@@ -31,6 +33,8 @@ pub struct DavProperty {
 pub struct NewDavProperty<'a> {
     pub component_id: uuid::Uuid,
     pub name: &'a str,
+    #[diesel(column_name = group_name)]
+    pub group: Option<&'a str>,
     pub value_type: &'a str,
     pub value_text: Option<&'a str>,
     pub value_int: Option<i64>,

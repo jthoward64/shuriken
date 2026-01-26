@@ -132,6 +132,7 @@ pub fn test_property<'a>(
     NewDavProperty {
         component_id,
         name,
+        group: None,
         value_type: "text",
         ordinal,
         value_text: text_value,

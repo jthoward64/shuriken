@@ -72,11 +72,35 @@ pub async fn insert_vcard_tree(
 
     tracing::trace!(component_id = %component_id, "Root VCARD component created");
 
+    // Insert VERSION property explicitly (vCard parser stores version separately)
+    let version_property = NewDavProperty {
+        component_id,
+        name: "VERSION",
+        group: None,
+        value_type: "text",
+        value_text: Some(vcard.version.as_str()),
+        value_int: None,
+        value_float: None,
+        value_bool: None,
+        value_date: None,
+        value_tstz: None,
+        value_bytes: None,
+        value_json: None,
+        ordinal: 0,
+    };
+
+    let _version_property: DavProperty = diesel::insert_into(dav_property::table)
+        .values(&version_property)
+        .returning(DavProperty::as_returning())
+        .get_result(conn)
+        .await?;
+
     // Insert all vCard properties
     for (prop_ord, vcard_prop) in vcard.properties.iter().enumerate() {
         let new_property = NewDavProperty {
             component_id,
             name: &vcard_prop.name,
+            group: vcard_prop.group.as_deref(),
             value_type: "text",
             value_text: Some(&vcard_prop.raw_value),
             value_int: None,
@@ -86,7 +110,7 @@ pub async fn insert_vcard_tree(
             value_tstz: None,
             value_bytes: None,
             value_json: None,
-            ordinal: prop_ord as i32,
+            ordinal: (prop_ord + 1) as i32,
         };
 
         let inserted_property: DavProperty = diesel::insert_into(dav_property::table)
@@ -154,6 +178,7 @@ fn insert_component_recursive<'a>(
             let new_property = NewDavProperty {
                 component_id,
                 name: &prop.name,
+                group: None,
                 value_type: "text",
                 value_text: Some(&prop.raw_value),
                 value_int: None,

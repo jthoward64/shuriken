@@ -4,7 +4,8 @@ use salvo::http::{HeaderValue, StatusCode};
 use salvo::{Request, Response};
 
 use crate::component::db::connection;
-use crate::component::db::query::dav::instance;
+use crate::component::db::map::dav::{serialize_ical_tree, serialize_vcard_tree};
+use crate::component::db::query::dav::{entity, instance};
 use crate::component::model::dav::instance::DavInstance;
 use crate::util::path;
 
@@ -104,10 +105,19 @@ async fn load_instance(
         return Ok(None);
     };
 
-    // Load the canonical bytes from the entity
-    // TODO: Add query function to load canonical_bytes from dav_entity
-    // For now, return empty bytes as placeholder
-    let canonical_bytes = Vec::new();
+    let Some((_, tree)) = entity::get_entity_with_tree(conn, inst.entity_id).await? else {
+        return Ok(None);
+    };
+
+    let canonical_text = if inst.content_type.starts_with("text/calendar") {
+        serialize_ical_tree(tree)?
+    } else if inst.content_type.starts_with("text/vcard") {
+        serialize_vcard_tree(&tree)?
+    } else {
+        anyhow::bail!("unsupported content type: {}", inst.content_type);
+    };
+
+    let canonical_bytes = canonical_text.into_bytes();
 
     Ok(Some((inst, canonical_bytes)))
 }

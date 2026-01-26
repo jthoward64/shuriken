@@ -5,9 +5,12 @@
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use diesel::prelude::*;
-use diesel_async::RunQueryDsl;
+use diesel_async::scoped_futures::ScopedFutureExt;
+use diesel_async::{AsyncConnection, RunQueryDsl};
 
-use crate::component::caldav::recurrence::{extract_recurrence_data, ical_datetime_to_utc, ical_duration_to_chrono};
+use crate::component::caldav::recurrence::{
+    extract_recurrence_data, ical_datetime_to_utc, ical_duration_to_chrono,
+};
 use crate::component::db::connection::DbConnection;
 use crate::component::db::map::caldav::build_cal_indexes;
 use crate::component::db::query::caldav::{event_index, occurrence};
@@ -15,7 +18,7 @@ use crate::component::db::query::dav::{collection, entity, instance};
 use crate::component::model::dav::instance::NewDavInstance;
 use crate::component::model::dav::occurrence::NewCalOccurrence;
 use crate::component::rfc::ical::core::{Component, ComponentKind};
-use crate::component::rfc::ical::expand::{expand_rrule, ExpansionOptions};
+use crate::component::rfc::ical::expand::{ExpansionOptions, expand_rrule};
 use crate::component::rfc::ical::parse::parse;
 
 /// Result of a PUT operation on a calendar object.
@@ -150,118 +153,130 @@ pub async fn put_calendar_object(
 
     tracing::debug!(etag = %etag, "Generated ETag");
 
-    // TODO: Use a transaction for atomic updates
-    // For now, we'll do sequential operations
+    let collection_id = ctx.collection_id;
+    let uri = ctx.uri.clone();
+    let entity_type = ctx.entity_type.clone();
+    let logical_uid = ctx.logical_uid.clone();
+    let etag_for_tx = etag.clone();
+    let collection_synctoken = collection_data.synctoken;
 
-    if let Some(existing_inst) = existing_instance {
-        tracing::debug!("Updating existing instance");
+    conn.transaction::<_, anyhow::Error, _>(move |tx| {
+        async move {
+            if let Some(existing_inst) = existing_instance {
+                tracing::debug!("Updating existing instance");
 
-        // Update existing instance
-        // For now, just update the ETag and sync revision
-        // Full entity tree replacement will be implemented once proper ID mapping is in place
+                // Update existing instance
+                // For now, just update the ETag and sync revision
+                // Full entity tree replacement will be implemented once proper ID mapping is in place
 
-        let sync_revision = existing_inst.sync_revision + 1;
-        let _updated_instance = instance::update_instance(
-            conn,
-            existing_inst.id,
-            &etag,
-            sync_revision,
-            chrono::Utc::now(),
-        )
-        .await
-        .context("failed to update instance")?;
+                let sync_revision = existing_inst.sync_revision + 1;
+                let _updated_instance = instance::update_instance(
+                    tx,
+                    existing_inst.id,
+                    &etag_for_tx,
+                    sync_revision,
+                    chrono::Utc::now(),
+                )
+                .await
+                .context("failed to update instance")?;
 
-        // Update the collection sync token
-        let _new_synctoken = collection::update_synctoken(conn, ctx.collection_id)
-            .await
-            .context("failed to update collection sync token")?;
+                // Update the collection sync token
+                let _new_synctoken = collection::update_synctoken(tx, collection_id)
+                    .await
+                    .context("failed to update collection sync token")?;
 
-        // Delete old component tree
-        entity::replace_entity_tree(conn, existing_inst.entity_id, &[], &[], &[])
-            .await
-            .context("failed to delete old component tree")?;
+                // Delete old component tree
+                entity::replace_entity_tree(tx, existing_inst.entity_id, &[], &[], &[])
+                    .await
+                    .context("failed to delete old component tree")?;
 
-        // Delete old occurrences for this entity
-        occurrence::delete_by_entity_id(conn, existing_inst.entity_id)
-            .await
-            .context("failed to delete old occurrences")?;
+                // Delete old occurrences for this entity
+                occurrence::delete_by_entity_id(tx, existing_inst.entity_id)
+                    .await
+                    .context("failed to delete old occurrences")?;
 
-        // Delete old index entries for this entity
-        event_index::delete_by_entity_id(conn, existing_inst.entity_id)
-            .await
-            .context("failed to delete old index entries")?;
+                // Delete old index entries for this entity
+                event_index::delete_by_entity_id(tx, existing_inst.entity_id)
+                    .await
+                    .context("failed to delete old index entries")?;
 
-        // Insert new component tree
-        entity::insert_ical_tree(conn, existing_inst.entity_id, &ical)
-            .await
-            .context("failed to insert component tree")?;
+                // Insert new component tree
+                entity::insert_ical_tree(tx, existing_inst.entity_id, &ical)
+                    .await
+                    .context("failed to insert component tree")?;
 
-        // Build and insert calendar index entries
-        let cal_indexes = build_cal_indexes(existing_inst.entity_id, &ical);
-        event_index::insert_batch(conn, &cal_indexes)
-            .await
-            .context("failed to insert calendar index entries")?;
+                // Build and insert calendar index entries
+                let cal_indexes = build_cal_indexes(existing_inst.entity_id, &ical);
+                event_index::insert_batch(tx, &cal_indexes)
+                    .await
+                    .context("failed to insert calendar index entries")?;
 
-        // Expand and store recurrences for the updated entity
-        expand_and_store_occurrences(conn, existing_inst.entity_id, &ical)
-            .await
-            .context("failed to expand recurrences")?;
+                // Expand and store recurrences for the updated entity
+                expand_and_store_occurrences(tx, existing_inst.entity_id, &ical)
+                    .await
+                    .context("failed to expand recurrences")?;
 
-        tracing::info!("Calendar object updated successfully");
-    } else {
-        tracing::debug!("Creating new instance");
+                tracing::info!("Calendar object updated successfully");
+            } else {
+                tracing::debug!("Creating new instance");
 
-        // Create new entity and instance
-        // For now, create a minimal entity without the full tree
-        // Full tree insertion will be implemented once proper ID mapping is in place
+                // Create new entity and instance
+                // For now, create a minimal entity without the full tree
+                // Full tree insertion will be implemented once proper ID mapping is in place
 
-        let entity_model = crate::component::model::dav::entity::NewDavEntity {
-            entity_type: &ctx.entity_type,
-            logical_uid: ctx.logical_uid.as_deref(),
-        };
+                let entity_model = crate::component::model::dav::entity::NewDavEntity {
+                    entity_type: entity_type.as_str(),
+                    logical_uid: logical_uid.as_deref(),
+                };
 
-        let created_entity = entity::create_entity(conn, &entity_model)
-            .await
-            .context("failed to create entity")?;
+                let created_entity = entity::create_entity(tx, &entity_model)
+                    .await
+                    .context("failed to create entity")?;
 
-        // Create instance using the collection data we already fetched
-        let new_instance = NewDavInstance {
-            collection_id: ctx.collection_id,
-            entity_id: created_entity.id,
-            uri: &ctx.uri,
-            content_type: "text/calendar",
-            etag: &etag,
-            sync_revision: collection_data.synctoken + 1,
-            last_modified: chrono::Utc::now(),
-        };
+                // Create instance using the collection data we already fetched
+                let new_instance = NewDavInstance {
+                    collection_id,
+                    entity_id: created_entity.id,
+                    uri: &uri,
+                    content_type: "text/calendar",
+                    etag: &etag_for_tx,
+                    sync_revision: collection_synctoken + 1,
+                    last_modified: chrono::Utc::now(),
+                };
 
-        let _created_instance = instance::create_instance(conn, &new_instance)
-            .await
-            .context("failed to create instance")?;
+                let _created_instance = instance::create_instance(tx, &new_instance)
+                    .await
+                    .context("failed to create instance")?;
 
-        // Update the collection sync token
-        let _new_synctoken = collection::update_synctoken(conn, ctx.collection_id)
-            .await
-            .context("failed to update collection sync token")?;
+                // Update the collection sync token
+                let _new_synctoken = collection::update_synctoken(tx, collection_id)
+                    .await
+                    .context("failed to update collection sync token")?;
 
-        // Insert component tree for the new entity
-        entity::insert_ical_tree(conn, created_entity.id, &ical)
-            .await
-            .context("failed to insert component tree")?;
+                // Insert component tree for the new entity
+                entity::insert_ical_tree(tx, created_entity.id, &ical)
+                    .await
+                    .context("failed to insert component tree")?;
 
-        // Build and insert calendar index entries
-        let cal_indexes = build_cal_indexes(created_entity.id, &ical);
-        event_index::insert_batch(conn, &cal_indexes)
-            .await
-            .context("failed to insert calendar index entries")?;
+                // Build and insert calendar index entries
+                let cal_indexes = build_cal_indexes(created_entity.id, &ical);
+                event_index::insert_batch(tx, &cal_indexes)
+                    .await
+                    .context("failed to insert calendar index entries")?;
 
-        // Expand and store recurrences for the new entity
-        expand_and_store_occurrences(conn, created_entity.id, &ical)
-            .await
-            .context("failed to expand recurrences")?;
+                // Expand and store recurrences for the new entity
+                expand_and_store_occurrences(tx, created_entity.id, &ical)
+                    .await
+                    .context("failed to expand recurrences")?;
 
-        tracing::info!("Calendar object created successfully");
-    }
+                tracing::info!("Calendar object created successfully");
+            }
+
+            Ok(())
+        }
+        .scope_boxed()
+    })
+    .await?;
 
     tracing::debug!(created = %created, "PUT calendar object completed successfully");
     Ok(PutObjectResult { etag, created })
@@ -318,13 +333,18 @@ async fn expand_and_store_occurrences(
     tracing::debug!(count = vevent_components.len(), "Found VEVENT components");
 
     // Query cal_index to get component IDs with their UIDs and RECURRENCE-IDs
-    let cal_index_entries: Vec<(uuid::Uuid, Option<String>, Option<DateTime<Utc>>)> = cal_index::table
-        .filter(cal_index::entity_id.eq(entity_id))
-        .filter(cal_index::component_type.eq("VEVENT"))
-        .select((cal_index::component_id, cal_index::uid, cal_index::recurrence_id_utc))
-        .load(conn)
-        .await
-        .context("failed to query cal_index for VEVENTs")?;
+    let cal_index_entries: Vec<(uuid::Uuid, Option<String>, Option<DateTime<Utc>>)> =
+        cal_index::table
+            .filter(cal_index::entity_id.eq(entity_id))
+            .filter(cal_index::component_type.eq("VEVENT"))
+            .select((
+                cal_index::component_id,
+                cal_index::uid,
+                cal_index::recurrence_id_utc,
+            ))
+            .load(conn)
+            .await
+            .context("failed to query cal_index for VEVENTs")?;
 
     tracing::debug!(
         cal_index_count = cal_index_entries.len(),
@@ -395,15 +415,20 @@ async fn expand_and_store_occurrences(
             };
 
             // Find the exception component in the database
-            let exception_comp = exception_components
-                .iter()
-                .find(|(ex_uid, ex_recurrence_id, _)| {
-                    ex_uid == uid && (*ex_recurrence_id - recurrence_id).num_seconds().abs() < RECURRENCE_ID_MATCH_TOLERANCE_SECS
-                });
+            let exception_comp =
+                exception_components
+                    .iter()
+                    .find(|(ex_uid, ex_recurrence_id, _)| {
+                        ex_uid == uid
+                            && (*ex_recurrence_id - recurrence_id).num_seconds().abs()
+                                < RECURRENCE_ID_MATCH_TOLERANCE_SECS
+                    });
 
             if let Some((_, _, component_id)) = exception_comp {
                 // Extract DTSTART and duration for the exception
-                if let Some(occ) = create_exception_occurrence(vevent, entity_id, *component_id, recurrence_id)? {
+                if let Some(occ) =
+                    create_exception_occurrence(vevent, entity_id, *component_id, recurrence_id)?
+                {
                     all_occurrences.push(occ);
                 }
             }
@@ -411,7 +436,10 @@ async fn expand_and_store_occurrences(
     }
 
     if !all_occurrences.is_empty() {
-        tracing::debug!(count = all_occurrences.len(), "Inserting recurrence occurrences");
+        tracing::debug!(
+            count = all_occurrences.len(),
+            "Inserting recurrence occurrences"
+        );
         occurrence::insert_occurrences(conn, &all_occurrences)
             .await
             .context("failed to insert occurrences")?;
@@ -513,12 +541,15 @@ fn create_exception_occurrence(
 
     // Calculate end time from DTEND or DURATION
     let dtend_utc = if let Some(dtend_prop) = component.get_property("DTEND") {
-        let dtend_ical = dtend_prop.as_datetime().ok_or_else(|| anyhow::anyhow!("invalid DTEND"))?;
+        let dtend_ical = dtend_prop
+            .as_datetime()
+            .ok_or_else(|| anyhow::anyhow!("invalid DTEND"))?;
         let dtend_tzid = dtend_prop.get_param_value("TZID");
         ical_datetime_to_utc(dtend_ical, dtend_tzid)
             .ok_or_else(|| anyhow::anyhow!("failed to convert DTEND to UTC"))?
     } else if let Some(duration_prop) = component.get_property("DURATION") {
-        let duration_ical = duration_prop.as_duration()
+        let duration_ical = duration_prop
+            .as_duration()
             .ok_or_else(|| anyhow::anyhow!("invalid DURATION"))?;
         let duration = ical_duration_to_chrono(duration_ical);
         dtstart_utc + duration

@@ -210,8 +210,8 @@ fn test_vcard_to_db_models_simple() {
     assert_eq!(components.len(), 1);
     assert_eq!(components[0].name, "VCARD");
 
-    // Check properties
-    assert_eq!(properties.len(), 3);
+    // Check properties (VERSION + 3 from vCard)
+    assert_eq!(properties.len(), 4);
 
     // Check parameters (1 from EMAIL property)
     assert_eq!(parameters.len(), 1);

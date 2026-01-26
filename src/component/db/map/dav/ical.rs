@@ -142,6 +142,7 @@ fn map_ical_property<'a>(
     properties.push(NewDavProperty {
         component_id,
         name: &prop.name,
+        group: None,
         value_type,
         value_text,
         value_int,
