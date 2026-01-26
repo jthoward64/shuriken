@@ -30,22 +30,22 @@ pub async fn delete(req: &mut Request, res: &mut Response) {
     // Get path before borrowing req mutably
     let path = req.uri().path().to_string();
 
-    // Get database connection
-    let mut conn = match connection::connect().await {
-        Ok(conn) => conn,
-        Err(e) => {
-            tracing::error!(error = %e, "Failed to get database connection");
-            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
-            return;
-        }
-    };
-
     // Parse path to extract collection_id and uri
     let (collection_id, uri) = match path::parse_collection_and_uri(&path) {
         Ok(parsed) => parsed,
         Err(e) => {
             tracing::debug!(error = %e, path = %path, "Failed to parse path");
             res.status_code(StatusCode::NOT_FOUND);
+            return;
+        }
+    };
+
+    // Get database connection
+    let mut conn = match connection::connect().await {
+        Ok(conn) => conn,
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to get database connection");
+            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
             return;
         }
     };

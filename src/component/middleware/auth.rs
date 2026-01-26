@@ -32,6 +32,11 @@ impl salvo::Handler for AuthMiddleware {
     ) {
         tracing::trace!("Authenticating request");
 
+        if req.method() == salvo::http::Method::OPTIONS {
+            depot.insert("user", DepotUser::Public);
+            return;
+        }
+
         match authenticate(req).await {
             Ok(user) => {
                 tracing::debug!(user_email = %user.email, "User authenticated successfully");

@@ -26,9 +26,11 @@ use salvo::prelude::*;
 use salvo::test::{RequestBuilder, ResponseExt, TestClient};
 use std::sync::OnceLock;
 use tokio::sync::{Mutex, MutexGuard};
+use shuriken::component::config::load_config;
 
 /// Static reference to shared test service (initialized once per test run)
 static TEST_SERVICE: OnceLock<Service> = OnceLock::new();
+static CONFIG_INIT: OnceLock<()> = OnceLock::new();
 
 /// Static mutex to serialize database access across tests.
 ///
@@ -56,6 +58,9 @@ fn get_db_lock() -> &'static Mutex<()> {
 #[must_use]
 pub fn create_test_service() -> &'static Service {
     TEST_SERVICE.get_or_init(|| {
+        CONFIG_INIT.get_or_init(|| {
+            load_config().expect("Failed to load config for tests");
+        });
         // Create the full router with all API routes
         let router =
             Router::new().push(shuriken::app::api::routes().expect("API routes should be valid"));

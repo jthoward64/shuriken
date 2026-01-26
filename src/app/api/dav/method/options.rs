@@ -1,7 +1,5 @@
 //! OPTIONS method handler for `WebDAV` resources.
 
-use core::panic;
-
 use salvo::http::HeaderValue;
 use salvo::{Request, Response, handler};
 
@@ -17,8 +15,6 @@ use salvo::{Request, Response, handler};
 #[tracing::instrument(skip(req, res), fields(path = %req.uri().path()))]
 pub async fn options(req: &mut Request, res: &mut Response) {
     tracing::info!("Handling OPTIONS request");
-
-    panic!("TEST!");
 
     // TODO: Determine if this is a collection or item based on path/database lookup
     // For now, return a generic set of methods

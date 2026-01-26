@@ -1,8 +1,9 @@
 use std::sync::OnceLock;
 
 use diesel_async::AsyncPgConnection;
+use diesel::result::ConnectionError;
 use diesel_async::pooled_connection::AsyncDieselConnectionManager;
-use diesel_async::pooled_connection::bb8::{Pool, PooledConnection, RunError};
+use diesel_async::pooled_connection::{PoolError, bb8::{Pool, PooledConnection, RunError}};
 
 pub type DbPool = Pool<AsyncPgConnection>;
 pub type DbConnection<'pool> = PooledConnection<'pool, AsyncPgConnection>;
@@ -61,11 +62,16 @@ pub async fn create_pool(database_url: &str, size: u32) -> anyhow::Result<()> {
 pub async fn connect() -> Result<DbConnection<'static>, RunError> {
     tracing::trace!("Acquiring database connection from pool");
 
-    let result = DB_POOL
-        .get()
-        .expect("Database pool is not initialized - create_pool() must be called at startup")
-        .get()
-        .await;
+    let Some(pool) = DB_POOL.get() else {
+        return Err(RunError::User(PoolError::ConnectionError(
+            ConnectionError::BadConnection(
+                "Database pool is not initialized - create_pool() must be called at startup"
+                    .to_string(),
+            ),
+        )));
+    };
+
+    let result = pool.get().await;
 
     if result.is_ok() {
         tracing::trace!("Database connection acquired successfully");
