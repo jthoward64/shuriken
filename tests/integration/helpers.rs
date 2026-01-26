@@ -6,6 +6,12 @@
 //! - Creating test Salvo service
 //! - Making HTTP requests
 //! - Asserting on responses and database state
+//!
+//! ## Database Lock
+//! The `TestDb` struct internally holds a mutex guard that serializes database
+//! access across tests. This prevents race conditions when tests run in parallel
+//! (e.g., truncating tables while another test is reading). The lock is automatically
+//! acquired when calling `TestDb::new()` and released when the `TestDb` is dropped.
 
 use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
@@ -14,9 +20,24 @@ use salvo::http::{Method, ReqBody, StatusCode};
 use salvo::prelude::*;
 use salvo::test::{RequestBuilder, ResponseExt, TestClient};
 use std::sync::OnceLock;
+use tokio::sync::{Mutex, MutexGuard};
 
 /// Static reference to shared test service (initialized once per test run)
 static TEST_SERVICE: OnceLock<Service> = OnceLock::new();
+
+/// Static mutex to serialize database access across tests.
+///
+/// This prevents race conditions when tests run in parallel:
+/// - Truncate operations don't conflict with each other
+/// - Seeding and querying don't race
+///
+/// Use `with_test_db()` to acquire this lock automatically.
+static DB_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
+/// Gets the database lock mutex.
+fn get_db_lock() -> &'static Mutex<()> {
+    DB_LOCK.get_or_init(|| Mutex::new(()))
+}
 
 /// Creates a test Salvo service instance for integration testing.
 ///
@@ -434,8 +455,15 @@ impl TestResponse {
 }
 
 /// Database test helper for setup and teardown.
+///
+/// ## Note on Concurrency
+/// This struct holds a mutex guard that serializes database access across tests.
+/// When the `TestDb` instance is dropped, the lock is released. This prevents
+/// race conditions when tests run in parallel.
 pub struct TestDb {
     pool: diesel_async::pooled_connection::bb8::Pool<AsyncPgConnection>,
+    /// Lock guard that serializes database access. Held for the lifetime of TestDb.
+    _lock_guard: MutexGuard<'static, ()>,
 }
 
 impl TestDb {
@@ -450,8 +478,15 @@ impl TestDb {
     /// This function modifies the DATABASE_URL for safety:
     /// - If the database name is not `shuriken_test`, it will be changed to `shuriken_test`
     /// - All modifications are logged as info messages
+    ///
+    /// ## Concurrency
+    /// This function acquires a mutex lock that is held until the `TestDb` is dropped.
+    /// This serializes database access across tests to prevent race conditions.
     #[expect(dead_code)]
     pub async fn new() -> anyhow::Result<Self> {
+        // Acquire the database lock before doing anything
+        let lock_guard = get_db_lock().lock().await;
+
         let mut database_url = std::env::var("DATABASE_URL").map_err(|_| {
             anyhow::anyhow!("DATABASE_URL environment variable must be set for tests")
         })?;
@@ -499,7 +534,10 @@ impl TestDb {
             .build(config)
             .await?;
 
-        Ok(Self { pool })
+        Ok(Self {
+            pool,
+            _lock_guard: lock_guard,
+        })
     }
 
     /// Gets a connection from the test database pool.

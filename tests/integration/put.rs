@@ -28,12 +28,7 @@ async fn put_creates_calendar_object() {
         .expect("Failed to seed principal");
 
     let collection_id = test_db
-        .seed_collection(
-            principal_id,
-            "calendar",
-            "testcal",
-            Some("Personal"),
-        )
+        .seed_collection(principal_id, "calendar", "testcal", Some("Personal"))
         .await
         .expect("Failed to seed collection");
 
@@ -68,12 +63,7 @@ async fn put_creates_vcard() {
         .expect("Failed to seed principal");
 
     let collection_id = test_db
-        .seed_collection(
-            principal_id,
-            "addressbook",
-            "/addressbooks/bob/contacts/",
-            Some("Contacts"),
-        )
+        .seed_collection(principal_id, "addressbook", "contacts", Some("Contacts"))
         .await
         .expect("Failed to seed collection");
 
@@ -127,7 +117,9 @@ async fn put_create_if_none_match_star_ok() {
         .send(service)
         .await;
 
-    response.assert_status(StatusCode::CREATED).assert_header_exists("ETag");
+    response
+        .assert_status(StatusCode::CREATED)
+        .assert_header_exists("ETag");
 }
 
 /// ## Summary

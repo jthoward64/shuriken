@@ -410,12 +410,7 @@ async fn addressbook_multiget_returns_vcards() {
         .expect("Failed to seed principal");
 
     let collection_id = test_db
-        .seed_collection(
-            principal_id,
-            "addressbook",
-            "/addressbooks/bob/abmg/",
-            None,
-        )
+        .seed_collection(principal_id, "addressbook", "/addressbooks/bob/abmg/", None)
         .await
         .expect("Failed to seed collection");
 
@@ -427,14 +422,15 @@ async fn addressbook_multiget_returns_vcards() {
             .await
             .expect("Failed to seed entity");
 
-        let uri = format!("/api/carddav/{collection_id}/contact-{i}.vcf");
-        hrefs.push(uri.clone());
+        let instance_uri = format!("contact-{i}.vcf");
+        let href = format!("/api/carddav/{collection_id}/{instance_uri}");
+        hrefs.push(href);
 
         let _instance_id = test_db
             .seed_instance(
                 collection_id,
                 entity_id,
-                &uri,
+                &instance_uri,
                 "text/vcard",
                 &format!("\"abmg-{i}-etag\""),
                 1,
@@ -650,11 +646,10 @@ async fn sync_collection_delta_sync() {
 async fn report_nonexistent_404() {
     let service = create_test_service();
 
-    let response =
-        TestRequest::report("/api/caldav/00000000-0000-0000-0000-000000000000/")
-            .xml_body(calendar_query_report())
-            .send(service)
-            .await;
+    let response = TestRequest::report("/api/caldav/00000000-0000-0000-0000-000000000000/")
+        .xml_body(calendar_query_report())
+        .send(service)
+        .await;
 
     response.assert_status(StatusCode::NOT_FOUND);
 }

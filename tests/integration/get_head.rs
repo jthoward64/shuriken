@@ -29,12 +29,7 @@ async fn get_calendar_object_content_type() {
         .expect("Failed to seed principal");
 
     let collection_id = test_db
-        .seed_collection(
-            principal_id,
-            "calendar",
-            "testcal",
-            Some("Personal"),
-        )
+        .seed_collection(principal_id, "calendar", "testcal", Some("Personal"))
         .await
         .expect("Failed to seed collection");
 
@@ -84,12 +79,7 @@ async fn get_vcard_content_type() {
         .expect("Failed to seed principal");
 
     let collection_id = test_db
-        .seed_collection(
-            principal_id,
-            "addressbook",
-            "/addressbooks/bob/contacts/",
-            Some("Contacts"),
-        )
+        .seed_collection(principal_id, "addressbook", "contacts", Some("Contacts"))
         .await
         .expect("Failed to seed collection");
 
@@ -156,12 +146,7 @@ async fn head_matches_get_headers() {
         .expect("Failed to seed principal");
 
     let collection_id = test_db
-        .seed_collection(
-            principal_id,
-            "calendar",
-            "testcal",
-            Some("Personal"),
-        )
+        .seed_collection(principal_id, "calendar", "testcal", Some("Personal"))
         .await
         .expect("Failed to seed collection");
 
@@ -276,7 +261,9 @@ async fn get_etag_present_and_strong() {
 
     let response = TestRequest::get(&uri).send(service).await;
 
-    let response = response.assert_status(StatusCode::OK).assert_header_exists("ETag");
+    let response = response
+        .assert_status(StatusCode::OK)
+        .assert_header_exists("ETag");
 
     // Verify ETag is strong (not weak)
     let etag = response.get_etag().expect("ETag should be present");
@@ -494,10 +481,9 @@ async fn get_on_collection_path() {
     let service = create_test_service();
 
     // GET on a collection path
-    let response =
-        TestRequest::get("/api/caldav/00000000-0000-0000-0000-000000000001/")
-            .send(service)
-            .await;
+    let response = TestRequest::get("/api/caldav/00000000-0000-0000-0000-000000000001/")
+        .send(service)
+        .await;
 
     // Either 405 Method Not Allowed or some form of listing is acceptable
     // Document the actual behavior

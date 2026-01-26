@@ -87,7 +87,7 @@ async fn example_seed_calendar_collection() {
         .seed_instance(
             collection_id,
             entity_id,
-            "testcal",
+            "testcal.ics",
             "text/calendar",
             "\"abc123\"",
             1,
@@ -124,7 +124,7 @@ async fn example_seed_addressbook_collection() {
         .seed_collection(
             principal_id,
             "addressbook",
-            "/addressbooks/bob/contacts/",
+            "contacts",
             Some("Contacts"),
         )
         .await
@@ -147,7 +147,7 @@ async fn example_seed_addressbook_collection() {
         .seed_instance(
             collection_id,
             entity_id,
-            "/addressbooks/bob/contacts/contact-456.vcf",
+            "contact-456.vcf",
             "text/vcard",
             "\"def456\"",
             1,
