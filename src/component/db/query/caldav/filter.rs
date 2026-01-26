@@ -4,12 +4,12 @@
 //! and property-filter matching against calendar data.
 
 use crate::component::db::connection::DbConnection;
+use crate::component::db::query::text_match::{build_like_pattern, normalize_for_sql_upper};
 use crate::component::db::schema::{cal_index, dav_instance};
 use crate::component::model::dav::instance::DavInstance;
-use crate::component::rfc::dav::core::{CalendarFilter, CalendarQuery, CompFilter};
+use crate::component::rfc::dav::core::{CalendarFilter, CalendarQuery, CompFilter, MatchType};
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
-use icu::casemap::CaseMapper;
 
 /// ## Summary
 /// Finds instances in a collection that match the calendar-query filter.
@@ -220,6 +220,7 @@ async fn apply_comp_filter(
 /// Applies property filters to entity IDs.
 ///
 /// Queries `dav_property` table to match properties by name and value.
+/// Supports arbitrary iCalendar properties including X-* extensions.
 ///
 /// ## Errors
 /// Returns database errors if queries fail.
@@ -265,9 +266,9 @@ async fn apply_property_filters(
                 .collect()
         } else if let Some(text_match) = &prop_filter.text_match {
             // Property must exist and match text
-            // Normalize the match value based on collation for case-insensitive comparison
-            let (match_value, case_sensitive) =
-                normalize_text_for_collation(&text_match.value, text_match.collation.as_ref());
+            let collation =
+                normalize_for_sql_upper(&text_match.value, text_match.collation.as_ref());
+            let pattern = build_like_pattern(&collation.value, &text_match.match_type);
 
             let mut query = dav_component::table
                 .inner_join(
@@ -278,45 +279,31 @@ async fn apply_property_filters(
                 .filter(dav_property::deleted_at.is_null())
                 .into_boxed();
 
-            // Apply text matching based on match type
-            query = match text_match.match_type {
-                crate::component::rfc::dav::core::MatchType::Equals => {
-                    if case_sensitive {
-                        query.filter(dav_property::value_text.eq(&match_value))
-                    } else {
-                        query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
-                            "UPPER(value_text) = '{match_value}'"
+            // Apply text matching based on collation and match type
+            if collation.case_sensitive {
+                // i;octet - case-sensitive comparison
+                query = match text_match.match_type {
+                    MatchType::Equals => query.filter(dav_property::value_text.eq(&collation.value)),
+                    MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
+                        query.filter(dav_property::value_text.like(build_like_pattern(
+                            &collation.value,
+                            &text_match.match_type,
                         )))
                     }
-                }
-                crate::component::rfc::dav::core::MatchType::Contains => {
-                    if case_sensitive {
-                        query.filter(dav_property::value_text.like(format!("%{match_value}%")))
-                    } else {
+                };
+            } else {
+                // Case-insensitive: use SQL UPPER() with pre-uppercased pattern
+                query = match text_match.match_type {
+                    MatchType::Equals => query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(
+                        &format!("UPPER(value_text) = '{}'", collation.value),
+                    )),
+                    MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
                         query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
-                            "UPPER(value_text) LIKE '%{match_value}%'"
+                            "UPPER(value_text) LIKE '{pattern}'"
                         )))
                     }
-                }
-                crate::component::rfc::dav::core::MatchType::StartsWith => {
-                    if case_sensitive {
-                        query.filter(dav_property::value_text.like(format!("{match_value}%")))
-                    } else {
-                        query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
-                            "UPPER(value_text) LIKE '{match_value}%'"
-                        )))
-                    }
-                }
-                crate::component::rfc::dav::core::MatchType::EndsWith => {
-                    if case_sensitive {
-                        query.filter(dav_property::value_text.like(format!("%{match_value}")))
-                    } else {
-                        query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
-                            "UPPER(value_text) LIKE '%{match_value}'"
-                        )))
-                    }
-                }
-            };
+                };
+            }
 
             query
                 .select(dav_component::entity_id)
@@ -354,91 +341,61 @@ async fn apply_property_filters(
     Ok(final_ids)
 }
 
-/// ## Summary
-/// Normalizes text based on collation using ICU case folding.
-///
-/// For `i;unicode-casemap` collation, uses ICU's `fold_string()` for proper
-/// Unicode case folding per RFC 4790, then uppercases for SQL UPPER() compatibility.
-/// For `i;ascii-casemap`, uses simple uppercasing.
-/// For `i;octet`, returns text as-is (case-sensitive).
-///
-/// Returns the normalized text and whether the comparison should be case-sensitive.
-#[must_use]
-fn normalize_text_for_collation(text: &str, collation: Option<&String>) -> (String, bool) {
-    match collation.map(std::string::String::as_str) {
-        // i;octet means case-sensitive comparison
-        Some("i;octet") => (text.to_owned(), true),
-        // Use ICU case folding then uppercase for SQL UPPER() compatibility
-        // Note: Full RFC 4790 compliance would require a pre-folded column in the DB
-        Some("i;unicode-casemap") | None => {
-            let folded = CaseMapper::new().fold_string(text);
-            (folded.to_uppercase(), false)
-        }
-        // ASCII casemap uses simple uppercasing
-        Some("i;ascii-casemap") => (text.to_uppercase(), false),
-        // Unknown collation - treat as case-insensitive
-        _ => (text.to_uppercase(), false),
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::component::db::query::text_match::normalize_for_sql_upper;
 
     #[test]
     fn test_normalize_text_unicode_casemap_basic() {
         let collation = Some("i;unicode-casemap".to_string());
-        let (result, case_sensitive) =
-            normalize_text_for_collation("Hello World", collation.as_ref());
-        assert_eq!(result, "HELLO WORLD");
-        assert!(!case_sensitive);
+        let result = normalize_for_sql_upper("Hello World", collation.as_ref());
+        assert_eq!(result.value, "HELLO WORLD");
+        assert!(!result.case_sensitive);
     }
 
     #[test]
     fn test_normalize_text_unicode_casemap_german_eszett() {
         // German ß should fold to ss, then uppercase to SS
         let collation = Some("i;unicode-casemap".to_string());
-        let (result, case_sensitive) = normalize_text_for_collation("Straße", collation.as_ref());
-        assert_eq!(result, "STRASSE");
-        assert!(!case_sensitive);
+        let result = normalize_for_sql_upper("Straße", collation.as_ref());
+        assert_eq!(result.value, "STRASSE");
+        assert!(!result.case_sensitive);
 
         // Verify ß comparison: "STRASSE" and "Straße" should match after folding+uppercase
-        let (upper, _) = normalize_text_for_collation("STRASSE", collation.as_ref());
-        assert_eq!(result, upper);
+        let upper = normalize_for_sql_upper("STRASSE", collation.as_ref());
+        assert_eq!(result.value, upper.value);
     }
 
     #[test]
     fn test_normalize_text_unicode_casemap_greek_sigma() {
         // Greek final sigma ς and regular sigma σ should fold to the same value
         let collation = Some("i;unicode-casemap".to_string());
-        let (final_sigma, _) = normalize_text_for_collation("Σ", collation.as_ref());
-        let (regular_sigma, _) = normalize_text_for_collation("σ", collation.as_ref());
-        assert_eq!(final_sigma, regular_sigma);
+        let final_sigma = normalize_for_sql_upper("Σ", collation.as_ref());
+        let regular_sigma = normalize_for_sql_upper("σ", collation.as_ref());
+        assert_eq!(final_sigma.value, regular_sigma.value);
     }
 
     #[test]
     fn test_normalize_text_octet_case_sensitive() {
         let collation = Some("i;octet".to_string());
-        let (result, case_sensitive) =
-            normalize_text_for_collation("Hello World", collation.as_ref());
-        assert_eq!(result, "Hello World"); // Preserved exactly
-        assert!(case_sensitive);
+        let result = normalize_for_sql_upper("Hello World", collation.as_ref());
+        assert_eq!(result.value, "Hello World"); // Preserved exactly
+        assert!(result.case_sensitive);
     }
 
     #[test]
     fn test_normalize_text_ascii_casemap() {
         let collation = Some("i;ascii-casemap".to_string());
-        let (result, case_sensitive) =
-            normalize_text_for_collation("Hello World", collation.as_ref());
-        assert_eq!(result, "HELLO WORLD");
-        assert!(!case_sensitive);
+        let result = normalize_for_sql_upper("Hello World", collation.as_ref());
+        assert_eq!(result.value, "HELLO WORLD");
+        assert!(!result.case_sensitive);
     }
 
     #[test]
     fn test_normalize_text_default_collation() {
         // None should default to unicode-casemap behavior
-        let (result, case_sensitive) = normalize_text_for_collation("Straße", None);
-        assert_eq!(result, "STRASSE");
-        assert!(!case_sensitive);
+        let result = normalize_for_sql_upper("Straße", None);
+        assert_eq!(result.value, "STRASSE");
+        assert!(!result.case_sensitive);
     }
 }
