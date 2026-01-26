@@ -14,7 +14,7 @@ Security analysis workflow using GitHub's CodeQL scanner.
   - Weekly schedule (Sunday at 1:30 AM UTC)
 - **Actions:**
   - Scans Rust codebase for security vulnerabilities
-  - Builds the project with all targets
+  - Uses CodeQL Action v4 with `none` build mode (Rust-specific requirement)
   - Uploads results to GitHub Security tab
 
 ### CI (`ci.yml`)
