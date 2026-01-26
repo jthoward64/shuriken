@@ -28,3 +28,4 @@ mod options;
 mod propfind;
 mod proppatch;
 mod put;
+mod report;

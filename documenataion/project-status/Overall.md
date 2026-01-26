@@ -29,7 +29,7 @@ However, **Phase 5 is a critical blocker for production**:
 | [Phase 1](Phase%201.md) | Parsing & Serialization | ✅ Complete | 98% | — | Complete |
 | [Phase 2](Phase%202.md) | Database Operations | ⚠️ Mostly Complete | 85% | P2 | 1 week |
 | [Phase 3](Phase%203.md) | Basic HTTP Methods | ⚠️ Mostly Complete | 90% | P2 | 3-5 days |
-| [Phase 4](Phase%204.md) | Query Reports | ✅ Complete | 95% | P2 | 3-5 days |
+| [Phase 4](Phase%204.md) | Query Reports | ✅ Complete | 98% | — | Complete |
 | [Phase 5](Phase%205.md) | **Recurrence & Timezones** | **❌ Not Started** | **0%** | **P0 CRITICAL** | **2-3 weeks** |
 | [Phase 6](Phase%206.md) | Synchronization | ❌ Stub Only | 10% | P1 | 1 week |
 | [Phase 7](Phase%207.md) | Free-Busy & Scheduling | ❌ Not Started | 0% | P2-P3 | 2-3 weeks |
@@ -88,22 +88,18 @@ However, **Phase 5 is a critical blocker for production**:
 - Complete MOVE handler (currently stub only)
 - Complete MKCALENDAR/MKCOL XML body parsing
 
-#### 5. Phase 4: expand-property (3-5 days) — **P2**
-**Key Tasks**:
-- Implement expand-property report (required by RFC 6352 for CardDAV)
-
-#### 6. Phase 7: Free-Busy (1 week) — **P2**
+#### 5. Phase 7: Free-Busy (1 week) — **P2**
 **Key Tasks**:
 - Implement free-busy-query report
 - Event aggregation and period merging
 - VFREEBUSY generation
 
-#### 7. Phase 8: ACL Properties (3-5 days) — **P3**
+#### 6. Phase 8: ACL Properties (3-5 days) — **P3**
 **Key Tasks**:
 - Expose DAV:current-user-privilege-set
 - Implement ACL discovery properties for better client UX
 
-#### 8. Phase 7: Scheduling (2-3 weeks) — **P3**
+#### 7. Phase 7: Scheduling (2-3 weeks) — **P3**
 **Key Tasks**:
 - Implement scheduling collections (inbox/outbox)
 - iTIP message handling
@@ -206,7 +202,6 @@ With these three phases complete, Shuriken would have:
 ### Important Divergences
 - **RFC 6578**: sync-collection report — Stub only (Phase 6)
 - **RFC 6764**: Well-known URIs — Not implemented (Phase 9)
-- **RFC 3253 §3.8**: expand-property report — Stub only (Phase 4)
 - **RFC 4918 §9.9**: MOVE method — Incomplete (Phase 3)
 
 ### Minor Divergences
