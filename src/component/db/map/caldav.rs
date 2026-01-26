@@ -15,21 +15,14 @@ use crate::component::rfc::ical::core::{Component, ICalendar};
 /// Note: Uses a placeholder UUID for `component_id` since we don't have access to the database
 /// component IDs yet. This will be improved in a future iteration.
 #[must_use]
-pub fn build_cal_indexes(
-    entity_id: Uuid,
-    ical: &ICalendar,
-) -> Vec<NewCalIndex> {
+pub fn build_cal_indexes(entity_id: Uuid, ical: &ICalendar) -> Vec<NewCalIndex> {
     let mut indexes = Vec::new();
     build_indexes_recursive(entity_id, &ical.root, &mut indexes);
     indexes
 }
 
 /// Recursively builds index entries for a component and its children.
-fn build_indexes_recursive(
-    entity_id: Uuid,
-    component: &Component,
-    indexes: &mut Vec<NewCalIndex>,
-) {
+fn build_indexes_recursive(entity_id: Uuid, component: &Component, indexes: &mut Vec<NewCalIndex>) {
     // Build index for this component if it's schedulable
     if let Some(component_kind) = component.kind
         && component_kind.is_schedulable()
@@ -69,7 +62,7 @@ fn build_cal_index(
     component: &Component,
 ) -> Option<NewCalIndex> {
     let component_kind = component.kind?;
-    
+
     // Only index schedulable components (VEVENT, VTODO, VJOURNAL)
     if !component_kind.is_schedulable() {
         return None;
@@ -79,30 +72,24 @@ fn build_cal_index(
     let uid = component.uid().map(String::from);
 
     // Extract DTSTART
-    let dtstart_utc = component
-        .get_property("DTSTART")
-        .and_then(|prop| {
-            let tzid = prop.get_param_value("TZID");
-            let dt = prop.as_datetime()?;
-            ical_datetime_to_utc(dt, tzid)
-        });
+    let dtstart_utc = component.get_property("DTSTART").and_then(|prop| {
+        let tzid = prop.get_param_value("TZID");
+        let dt = prop.as_datetime()?;
+        ical_datetime_to_utc(dt, tzid)
+    });
 
     // Extract DTEND
-    let dtend_utc = component
-        .get_property("DTEND")
-        .and_then(|prop| {
-            let tzid = prop.get_param_value("TZID");
-            let dt = prop.as_datetime()?;
-            ical_datetime_to_utc(dt, tzid)
-        });
+    let dtend_utc = component.get_property("DTEND").and_then(|prop| {
+        let tzid = prop.get_param_value("TZID");
+        let dt = prop.as_datetime()?;
+        ical_datetime_to_utc(dt, tzid)
+    });
 
     // Extract all-day flag (only if VALUE=DATE is explicitly set)
-    let all_day = component
-        .get_property("DTSTART")
-        .and_then(|prop| {
-            prop.get_param_value("VALUE")
-                .map(|value_type| value_type == "DATE")
-        });
+    let all_day = component.get_property("DTSTART").and_then(|prop| {
+        prop.get_param_value("VALUE")
+            .map(|value_type| value_type == "DATE")
+    });
 
     // Extract RRULE
     let rrule_text = component
@@ -111,13 +98,11 @@ fn build_cal_index(
         .map(String::from);
 
     // Extract RECURRENCE-ID
-    let recurrence_id_utc = component
-        .get_property("RECURRENCE-ID")
-        .and_then(|prop| {
-            let tzid = prop.get_param_value("TZID");
-            let dt = prop.as_datetime()?;
-            ical_datetime_to_utc(dt, tzid)
-        });
+    let recurrence_id_utc = component.get_property("RECURRENCE-ID").and_then(|prop| {
+        let tzid = prop.get_param_value("TZID");
+        let dt = prop.as_datetime()?;
+        ical_datetime_to_utc(dt, tzid)
+    });
 
     // Extract ORGANIZER
     let organizer = component

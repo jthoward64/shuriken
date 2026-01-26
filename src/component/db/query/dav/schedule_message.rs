@@ -30,9 +30,7 @@ pub fn by_collection(
 /// ## Summary
 /// Returns a query to find scheduling messages by recipient.
 #[must_use]
-pub fn by_recipient(
-    recipient: &str,
-) -> dav_schedule_message::BoxedQuery<'_, diesel::pg::Pg> {
+pub fn by_recipient(recipient: &str) -> dav_schedule_message::BoxedQuery<'_, diesel::pg::Pg> {
     all().filter(dav_schedule_message::recipient.eq(recipient))
 }
 
@@ -48,18 +46,14 @@ pub fn by_recipient_not_deleted(
 /// ## Summary
 /// Returns a query to find scheduling messages by status.
 #[must_use]
-pub fn by_status(
-    status: &str,
-) -> dav_schedule_message::BoxedQuery<'_, diesel::pg::Pg> {
+pub fn by_status(status: &str) -> dav_schedule_message::BoxedQuery<'_, diesel::pg::Pg> {
     all().filter(dav_schedule_message::status.eq(status))
 }
 
 /// ## Summary
 /// Returns a query to find non-deleted scheduling messages by status.
 #[must_use]
-pub fn by_status_not_deleted(
-    status: &str,
-) -> dav_schedule_message::BoxedQuery<'_, diesel::pg::Pg> {
+pub fn by_status_not_deleted(status: &str) -> dav_schedule_message::BoxedQuery<'_, diesel::pg::Pg> {
     by_status(status).filter(dav_schedule_message::deleted_at.is_null())
 }
 

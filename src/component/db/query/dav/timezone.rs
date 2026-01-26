@@ -21,17 +21,13 @@ pub fn by_id(id: uuid::Uuid) -> cal_timezone::BoxedQuery<'static, diesel::pg::Pg
 /// ## Summary
 /// Returns a query to find a timezone by TZID.
 #[must_use]
-pub fn by_tzid(
-    tzid: &str,
-) -> cal_timezone::BoxedQuery<'_, diesel::pg::Pg> {
+pub fn by_tzid(tzid: &str) -> cal_timezone::BoxedQuery<'_, diesel::pg::Pg> {
     all().filter(cal_timezone::tzid.eq(tzid))
 }
 
 /// ## Summary
 /// Returns a query to find a timezone by IANA name.
 #[must_use]
-pub fn by_iana_name(
-    iana_name: &str,
-) -> cal_timezone::BoxedQuery<'_, diesel::pg::Pg> {
+pub fn by_iana_name(iana_name: &str) -> cal_timezone::BoxedQuery<'_, diesel::pg::Pg> {
     all().filter(cal_timezone::iana_name.eq(iana_name))
 }

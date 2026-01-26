@@ -150,14 +150,15 @@ pub async fn handle_expand_property(
     };
 
     // Build response
-    let multistatus = match build_expand_property_response(&mut conn, req, &expand, &properties).await {
-        Ok(ms) => ms,
-        Err(e) => {
-            tracing::error!("Failed to build expand-property response: {}", e);
-            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
-            return;
-        }
-    };
+    let multistatus =
+        match build_expand_property_response(&mut conn, req, &expand, &properties).await {
+            Ok(ms) => ms,
+            Err(e) => {
+                tracing::error!("Failed to build expand-property response: {}", e);
+                res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+                return;
+            }
+        };
 
     write_multistatus_response(res, &multistatus);
 }
@@ -178,30 +179,30 @@ async fn build_expand_property_response(
     expand: &ExpandProperty,
     _properties: &[crate::component::rfc::dav::core::PropertyName],
 ) -> anyhow::Result<Multistatus> {
+    use crate::component::rfc::dav::core::{DavProperty, Href, PropertyValue, PropstatResponse};
     use std::collections::HashSet;
-    use crate::component::rfc::dav::core::{DavProperty, Href, PropstatResponse, PropertyValue};
 
     tracing::info!("Processing expand-property request");
 
     // Track visited resources for cycle detection
     let mut visited = HashSet::new();
-    
+
     // Get the target resource path from the request
     let target_path = req.uri().path();
     let target_href = Href::new(target_path);
-    
+
     // Mark the target as visited
     visited.insert(target_path.to_string());
 
     // Start building the multistatus response
     let mut multistatus = Multistatus::new();
-    
+
     // Process each property to expand
     let mut expanded_properties = Vec::new();
-    
+
     for prop_item in &expand.properties {
         let prop_name = &prop_item.name;
-        
+
         // Fetch the property value for the target resource
         if let Some(property) = fetch_property(conn, target_path, prop_name).await? {
             // Check if this property contains an href that should be expanded
@@ -214,7 +215,7 @@ async fn build_expand_property_response(
                             expanded_properties.push(property);
                         } else {
                             visited.insert(href.clone());
-                            
+
                             // Fetch nested properties for this href
                             let nested_props = fetch_nested_properties(
                                 conn,
@@ -222,8 +223,9 @@ async fn build_expand_property_response(
                                 &prop_item.properties,
                                 &mut visited,
                                 1, // Start at depth 1
-                            ).await?;
-                            
+                            )
+                            .await?;
+
                             // If we have nested properties, wrap them in the original property
                             if nested_props.is_empty() {
                                 expanded_properties.push(property);
@@ -231,9 +233,10 @@ async fn build_expand_property_response(
                                 // Create a property with nested response
                                 expanded_properties.push(DavProperty {
                                     name: prop_name.qname(),
-                                    value: Some(PropertyValue::Xml(
-                                        format_nested_response(href, &nested_props)
-                                    )),
+                                    value: Some(PropertyValue::Xml(format_nested_response(
+                                        href,
+                                        &nested_props,
+                                    ))),
                                 });
                             }
                         }
@@ -241,26 +244,27 @@ async fn build_expand_property_response(
                     PropertyValue::HrefSet(hrefs) => {
                         // Handle multiple hrefs
                         let mut expanded_hrefs = Vec::new();
-                        
+
                         for href in hrefs {
                             if visited.contains(href) {
                                 continue;
                             }
                             visited.insert(href.clone());
-                            
+
                             let nested_props = fetch_nested_properties(
                                 conn,
                                 href,
                                 &prop_item.properties,
                                 &mut visited,
                                 1, // Start at depth 1
-                            ).await?;
-                            
+                            )
+                            .await?;
+
                             if !nested_props.is_empty() {
                                 expanded_hrefs.push(format_nested_response(href, &nested_props));
                             }
                         }
-                        
+
                         if expanded_hrefs.is_empty() {
                             expanded_properties.push(property);
                         } else {
@@ -284,13 +288,13 @@ async fn build_expand_property_response(
             expanded_properties.push(DavProperty::not_found(prop_name.qname()));
         }
     }
-    
+
     // Add the response for the target resource
     let response = PropstatResponse::ok(target_href, expanded_properties);
     multistatus.add_response(response);
-    
+
     tracing::info!("Expand-property response built successfully");
-    
+
     Ok(multistatus)
 }
 
@@ -307,9 +311,9 @@ async fn fetch_property(
     prop_name: &crate::component::rfc::dav::core::PropertyName,
 ) -> anyhow::Result<Option<crate::component::rfc::dav::core::DavProperty>> {
     use crate::component::rfc::dav::core::{DavProperty, PropertyValue, QName};
-    
+
     let qname = prop_name.qname();
-    
+
     // Stub implementation: Return common properties based on path patterns
     // In a full implementation, this would query the database
     let property = match (qname.namespace_uri(), qname.local_name()) {
@@ -362,11 +366,15 @@ async fn fetch_property(
         }
         _ => {
             // Unknown property
-            tracing::debug!("Unknown property requested: {}:{}", qname.namespace_uri(), qname.local_name());
+            tracing::debug!(
+                "Unknown property requested: {}:{}",
+                qname.namespace_uri(),
+                qname.local_name()
+            );
             None
         }
     };
-    
+
     Ok(property)
 }
 
@@ -384,20 +392,30 @@ fn fetch_nested_properties<'a>(
     nested_props: &'a [crate::component::rfc::dav::core::ExpandPropertyItem],
     visited: &'a mut std::collections::HashSet<String>,
     depth: usize,
-) -> std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<Vec<crate::component::rfc::dav::core::DavProperty>>> + Send + 'a>> {
+) -> std::pin::Pin<
+    Box<
+        dyn std::future::Future<
+                Output = anyhow::Result<Vec<crate::component::rfc::dav::core::DavProperty>>,
+            > + Send
+            + 'a,
+    >,
+> {
     // Recursion depth limit
     const MAX_DEPTH: usize = 10;
-    
+
     Box::pin(async move {
         use crate::component::rfc::dav::core::{DavProperty, PropertyValue};
-        
+
         let mut properties = Vec::new();
-        
+
         if depth >= MAX_DEPTH {
-            tracing::warn!("Maximum expansion depth ({}) reached, stopping recursion", MAX_DEPTH);
+            tracing::warn!(
+                "Maximum expansion depth ({}) reached, stopping recursion",
+                MAX_DEPTH
+            );
             return Ok(properties);
         }
-        
+
         for prop_item in nested_props {
             if let Some(property) = fetch_property(conn, href, &prop_item.name).await? {
                 // Check if this property should be recursively expanded
@@ -408,23 +426,25 @@ fn fetch_nested_properties<'a>(
                         properties.push(property);
                     } else {
                         visited.insert(nested_href.clone());
-                        
+
                         let deeper_props = fetch_nested_properties(
                             conn,
                             nested_href,
                             &prop_item.properties,
                             visited,
                             depth + 1,
-                        ).await?;
-                        
+                        )
+                        .await?;
+
                         if deeper_props.is_empty() {
                             properties.push(property);
                         } else {
                             properties.push(DavProperty {
                                 name: prop_item.name.qname(),
-                                value: Some(PropertyValue::Xml(
-                                    format_nested_response(nested_href, &deeper_props)
-                                )),
+                                value: Some(PropertyValue::Xml(format_nested_response(
+                                    nested_href,
+                                    &deeper_props,
+                                ))),
                             });
                         }
                     }
@@ -433,27 +453,30 @@ fn fetch_nested_properties<'a>(
                 }
             }
         }
-        
+
         Ok(properties)
     })
 }
 
 /// ## Summary
 /// Formats a nested response with href and properties as XML.
-#[expect(clippy::let_underscore_must_use, reason = "Write to String is infallible")]
+#[expect(
+    clippy::let_underscore_must_use,
+    reason = "Write to String is infallible"
+)]
 fn format_nested_response(
     href: &str,
     properties: &[crate::component::rfc::dav::core::DavProperty],
 ) -> String {
-    use std::fmt::Write;
     use crate::component::rfc::dav::core::PropertyValue;
-    
+    use std::fmt::Write;
+
     let mut xml = format!("<D:response><D:href>{href}</D:href><D:propstat><D:prop>");
-    
+
     for prop in properties {
         let ns = prop.name.namespace_uri();
         let name = prop.name.local_name();
-        
+
         // Use appropriate prefix based on namespace
         let prefix = if ns == "DAV:" {
             "D"
@@ -464,14 +487,17 @@ fn format_nested_response(
         } else {
             "D"
         };
-        
+
         if let Some(value) = &prop.value {
             match value {
                 PropertyValue::Text(text) => {
                     let _ = write!(xml, "<{prefix}:{name}>{text}</{prefix}:{name}>");
                 }
                 PropertyValue::Href(href) => {
-                    let _ = write!(xml, "<{prefix}:{name}><D:href>{href}</D:href></{prefix}:{name}>");
+                    let _ = write!(
+                        xml,
+                        "<{prefix}:{name}><D:href>{href}</D:href></{prefix}:{name}>"
+                    );
                 }
                 PropertyValue::Empty => {
                     let _ = write!(xml, "<{prefix}:{name}/>");
@@ -488,9 +514,9 @@ fn format_nested_response(
             let _ = write!(xml, "<{prefix}:{name}/>");
         }
     }
-    
+
     xml.push_str("</D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>");
-    
+
     xml
 }
 

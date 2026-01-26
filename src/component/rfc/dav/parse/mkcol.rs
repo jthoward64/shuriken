@@ -1,7 +1,7 @@
 //! MKCALENDAR and Extended MKCOL request XML parsing.
 
-use quick_xml::events::Event;
 use quick_xml::Reader;
+use quick_xml::events::Event;
 
 use super::error::{ParseError, ParseResult};
 

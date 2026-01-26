@@ -30,21 +30,19 @@ async fn mkcalendar_creates_calendar_collection() {
     let service = create_test_service();
 
     let new_collection_uuid = uuid::Uuid::new_v4();
-    let response =
-        TestRequest::mkcalendar(&format!("/api/caldav/{new_collection_uuid}/"))
-            .send(service)
-            .await;
+    let response = TestRequest::mkcalendar(&format!("/api/caldav/{new_collection_uuid}/"))
+        .send(service)
+        .await;
 
     response.assert_status(StatusCode::CREATED);
 
     // Verify with PROPFIND that it's a calendar collection
     let props = propfind_props(&[("DAV:", "resourcetype")]);
-    let verify_response =
-        TestRequest::propfind(&format!("/api/caldav/{new_collection_uuid}/"))
-            .depth("0")
-            .xml_body(&props)
-            .send(create_test_service())
-            .await;
+    let verify_response = TestRequest::propfind(&format!("/api/caldav/{new_collection_uuid}/"))
+        .depth("0")
+        .xml_body(&props)
+        .send(create_test_service())
+        .await;
 
     verify_response
         .assert_status(StatusCode::MULTI_STATUS)
@@ -80,22 +78,20 @@ async fn mkcalendar_initial_props_applied() {
   </D:set>
 </C:mkcalendar>"#;
 
-    let response =
-        TestRequest::mkcalendar(&format!("/api/caldav/{new_collection_uuid}/"))
-            .xml_body(body)
-            .send(service)
-            .await;
+    let response = TestRequest::mkcalendar(&format!("/api/caldav/{new_collection_uuid}/"))
+        .xml_body(body)
+        .send(service)
+        .await;
 
     response.assert_status(StatusCode::CREATED);
 
     // Verify properties with PROPFIND
     let props = propfind_props(&[("DAV:", "displayname")]);
-    let verify_response =
-        TestRequest::propfind(&format!("/api/caldav/{new_collection_uuid}/"))
-            .depth("0")
-            .xml_body(&props)
-            .send(create_test_service())
-            .await;
+    let verify_response = TestRequest::propfind(&format!("/api/caldav/{new_collection_uuid}/"))
+        .depth("0")
+        .xml_body(&props)
+        .send(create_test_service())
+        .await;
 
     verify_response
         .assert_status(StatusCode::MULTI_STATUS)
@@ -172,12 +168,11 @@ async fn mkcol_extended_creates_addressbook() {
 
     // Verify with PROPFIND that it's an addressbook collection
     let props = propfind_props(&[("DAV:", "resourcetype")]);
-    let verify_response =
-        TestRequest::propfind(&format!("/api/carddav/{new_collection_uuid}/"))
-            .depth("0")
-            .xml_body(&props)
-            .send(create_test_service())
-            .await;
+    let verify_response = TestRequest::propfind(&format!("/api/carddav/{new_collection_uuid}/"))
+        .depth("0")
+        .xml_body(&props)
+        .send(create_test_service())
+        .await;
 
     verify_response
         .assert_status(StatusCode::MULTI_STATUS)
@@ -214,12 +209,11 @@ async fn mkcol_extended_applies_initial_props() {
 
     // Verify properties with PROPFIND
     let props = propfind_props(&[("DAV:", "displayname")]);
-    let verify_response =
-        TestRequest::propfind(&format!("/api/carddav/{new_collection_uuid}/"))
-            .depth("0")
-            .xml_body(&props)
-            .send(create_test_service())
-            .await;
+    let verify_response = TestRequest::propfind(&format!("/api/carddav/{new_collection_uuid}/"))
+        .depth("0")
+        .xml_body(&props)
+        .send(create_test_service())
+        .await;
 
     verify_response
         .assert_status(StatusCode::MULTI_STATUS)
@@ -284,12 +278,11 @@ async fn mkcol_creates_plain_collection() {
 
     // Verify with PROPFIND that it's just a collection (not calendar/addressbook)
     let props = propfind_props(&[("DAV:", "resourcetype")]);
-    let verify_response =
-        TestRequest::propfind(&format!("/api/dav/{new_collection_uuid}/"))
-            .depth("0")
-            .xml_body(&props)
-            .send(create_test_service())
-            .await;
+    let verify_response = TestRequest::propfind(&format!("/api/dav/{new_collection_uuid}/"))
+        .depth("0")
+        .xml_body(&props)
+        .send(create_test_service())
+        .await;
 
     verify_response
         .assert_status(StatusCode::MULTI_STATUS)
@@ -365,11 +358,10 @@ async fn mkcalendar_protected_props_rejected() {
   </D:set>
 </C:mkcalendar>"#;
 
-    let response =
-        TestRequest::mkcalendar(&format!("/api/caldav/{new_collection_uuid}/"))
-            .xml_body(body)
-            .send(service)
-            .await;
+    let response = TestRequest::mkcalendar(&format!("/api/caldav/{new_collection_uuid}/"))
+        .xml_body(body)
+        .send(service)
+        .await;
 
     // Either 403, 207 with propstat error, or collection created ignoring protected prop
     assert!(

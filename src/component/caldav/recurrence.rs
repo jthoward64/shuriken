@@ -103,8 +103,16 @@ pub fn extract_recurrence_data(component: &Component) -> Option<RecurrenceData> 
 #[must_use]
 pub fn ical_datetime_to_utc(dt: &IcalDateTime, tzid: Option<&str>) -> Option<DateTime<Utc>> {
     let naive = NaiveDateTime::new(
-        chrono::NaiveDate::from_ymd_opt(i32::from(dt.year), u32::from(dt.month), u32::from(dt.day))?,
-        chrono::NaiveTime::from_hms_opt(u32::from(dt.hour), u32::from(dt.minute), u32::from(dt.second))?,
+        chrono::NaiveDate::from_ymd_opt(
+            i32::from(dt.year),
+            u32::from(dt.month),
+            u32::from(dt.day),
+        )?,
+        chrono::NaiveTime::from_hms_opt(
+            u32::from(dt.hour),
+            u32::from(dt.minute),
+            u32::from(dt.second),
+        )?,
     );
 
     match &dt.form {
@@ -115,12 +123,8 @@ pub fn ical_datetime_to_utc(dt: &IcalDateTime, tzid: Option<&str>) -> Option<Dat
             if let Some(tzid_str) = tzid {
                 // Convert using timezone
                 let mut resolver = crate::component::rfc::ical::expand::TimeZoneResolver::new();
-                crate::component::rfc::ical::expand::convert_to_utc(
-                    naive,
-                    tzid_str,
-                    &mut resolver,
-                )
-                .ok()
+                crate::component::rfc::ical::expand::convert_to_utc(naive, tzid_str, &mut resolver)
+                    .ok()
             } else {
                 // Treat as floating time (interpret as UTC)
                 Some(DateTime::<Utc>::from_naive_utc_and_offset(naive, Utc))
@@ -129,12 +133,7 @@ pub fn ical_datetime_to_utc(dt: &IcalDateTime, tzid: Option<&str>) -> Option<Dat
         crate::component::rfc::ical::core::DateTimeForm::Zoned { tzid: dt_tzid } => {
             // Use the TZID from the datetime form
             let mut resolver = crate::component::rfc::ical::expand::TimeZoneResolver::new();
-            crate::component::rfc::ical::expand::convert_to_utc(
-                naive,
-                dt_tzid,
-                &mut resolver,
-            )
-            .ok()
+            crate::component::rfc::ical::expand::convert_to_utc(naive, dt_tzid, &mut resolver).ok()
         }
     }
 }
@@ -142,7 +141,9 @@ pub fn ical_datetime_to_utc(dt: &IcalDateTime, tzid: Option<&str>) -> Option<Dat
 /// ## Summary
 /// Converts an iCalendar `Duration` to `chrono::Duration`.
 #[must_use]
-pub fn ical_duration_to_chrono(duration: &crate::component::rfc::ical::core::Duration) -> chrono::TimeDelta {
+pub fn ical_duration_to_chrono(
+    duration: &crate::component::rfc::ical::core::Duration,
+) -> chrono::TimeDelta {
     let mut total = chrono::TimeDelta::zero();
 
     if duration.weeks > 0 {
@@ -161,25 +162,23 @@ pub fn ical_duration_to_chrono(duration: &crate::component::rfc::ical::core::Dur
         total += chrono::TimeDelta::seconds(i64::from(duration.seconds));
     }
 
-    if duration.negative {
-        -total
-    } else {
-        total
-    }
+    if duration.negative { -total } else { total }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::component::rfc::ical::core::{Component, ComponentKind, DateTimeForm, Property, Value};
+    use crate::component::rfc::ical::core::{
+        Component, ComponentKind, DateTimeForm, Property, Value,
+    };
 
     #[test]
     fn test_extract_recurrence_data_with_dtend() {
         let mut component = Component::new(ComponentKind::Event);
-        
+
         // Add RRULE
         component.add_property(Property::text("RRULE", "FREQ=DAILY;COUNT=5"));
-        
+
         // Add DTSTART (20260101T100000Z)
         component.add_property(Property {
             name: "DTSTART".to_string(),
@@ -195,7 +194,7 @@ mod tests {
             }),
             raw_value: "20260101T100000Z".to_string(),
         });
-        
+
         // Add DTEND (20260101T110000Z)
         component.add_property(Property {
             name: "DTEND".to_string(),
@@ -213,7 +212,7 @@ mod tests {
         });
 
         let data = extract_recurrence_data(&component).expect("should extract data");
-        
+
         assert_eq!(data.rrule, "FREQ=DAILY;COUNT=5");
         assert_eq!(data.duration, chrono::TimeDelta::hours(1));
         assert_eq!(data.exdates.len(), 0);

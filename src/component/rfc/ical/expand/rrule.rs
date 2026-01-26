@@ -85,7 +85,11 @@ pub fn expand_rrule(
     options: ExpansionOptions,
 ) -> Result<Vec<DateTime<Utc>>, ExpansionError> {
     // Parse the RRULE string using the rrule crate
-    let rrule_string = format!("DTSTART:{}\nRRULE:{}", dtstart.format("%Y%m%dT%H%M%SZ"), rrule_text);
+    let rrule_string = format!(
+        "DTSTART:{}\nRRULE:{}",
+        dtstart.format("%Y%m%dT%H%M%SZ"),
+        rrule_text
+    );
 
     let rrule_set = rrule_string
         .parse::<rrule::RRuleSet>()
@@ -143,10 +147,7 @@ pub fn expand_rrule(
         let in_range = options.range_start.is_none_or(|start| *rdate >= start)
             && options.range_end.is_none_or(|end| *rdate < end);
 
-        if !exdate_set.contains(rdate)
-            && !occurrences.contains(rdate)
-            && in_range
-        {
+        if !exdate_set.contains(rdate) && !occurrences.contains(rdate) && in_range {
             occurrences.push(*rdate);
         }
     }
@@ -173,12 +174,15 @@ mod tests {
         let rrule = "FREQ=DAILY;COUNT=5";
 
         let options = ExpansionOptions::default();
-        let occurrences = expand_rrule(rrule, dtstart, &[], &[], options)
-            .expect("expansion should succeed");
+        let occurrences =
+            expand_rrule(rrule, dtstart, &[], &[], options).expect("expansion should succeed");
 
         assert_eq!(occurrences.len(), 5);
         assert_eq!(occurrences[0], dtstart);
-        assert_eq!(occurrences[1], Utc.with_ymd_and_hms(2026, 1, 2, 10, 0, 0).unwrap());
+        assert_eq!(
+            occurrences[1],
+            Utc.with_ymd_and_hms(2026, 1, 2, 10, 0, 0).unwrap()
+        );
     }
 
     #[test]
@@ -187,8 +191,8 @@ mod tests {
         let rrule = "FREQ=WEEKLY;BYDAY=MO,WE,FR;COUNT=6";
 
         let options = ExpansionOptions::default();
-        let occurrences = expand_rrule(rrule, dtstart, &[], &[], options)
-            .expect("expansion should succeed");
+        let occurrences =
+            expand_rrule(rrule, dtstart, &[], &[], options).expect("expansion should succeed");
 
         assert_eq!(occurrences.len(), 6);
         // Should get Mon, Wed, Fri, Mon, Wed, Fri
@@ -205,8 +209,8 @@ mod tests {
         ];
 
         let options = ExpansionOptions::default();
-        let occurrences = expand_rrule(rrule, dtstart, &exdates, &[], options)
-            .expect("expansion should succeed");
+        let occurrences =
+            expand_rrule(rrule, dtstart, &exdates, &[], options).expect("expansion should succeed");
 
         // Should have 5 - 2 = 3 occurrences
         assert_eq!(occurrences.len(), 3);
@@ -225,8 +229,8 @@ mod tests {
         ];
 
         let options = ExpansionOptions::default();
-        let occurrences = expand_rrule(rrule, dtstart, &[], &rdates, options)
-            .expect("expansion should succeed");
+        let occurrences =
+            expand_rrule(rrule, dtstart, &[], &rdates, options).expect("expansion should succeed");
 
         // Should have 2 + 2 = 4 occurrences
         assert_eq!(occurrences.len(), 4);
@@ -243,8 +247,8 @@ mod tests {
         let range_end = Utc.with_ymd_and_hms(2026, 1, 7, 0, 0, 0).unwrap();
 
         let options = ExpansionOptions::with_range(range_start, range_end);
-        let occurrences = expand_rrule(rrule, dtstart, &[], &[], options)
-            .expect("expansion should succeed");
+        let occurrences =
+            expand_rrule(rrule, dtstart, &[], &[], options).expect("expansion should succeed");
 
         // Should only get occurrences from Jan 3-6
         assert!(occurrences.len() <= 4);

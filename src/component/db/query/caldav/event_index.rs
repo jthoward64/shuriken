@@ -30,7 +30,7 @@ pub async fn insert_batch(conn: &mut DbConnection<'_>, indexes: &[NewCalIndex]) 
     if indexes.is_empty() {
         return Ok(());
     }
-    
+
     diesel::insert_into(cal_index::table)
         .values(indexes)
         .execute(conn)

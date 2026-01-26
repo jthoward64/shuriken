@@ -8,7 +8,7 @@ use salvo::{Request, Response, handler};
 
 use crate::component::dav::service::collection::{CreateCollectionContext, create_collection};
 use crate::component::db::connection;
-use crate::component::rfc::dav::parse::{parse_mkcol, MkcolRequest};
+use crate::component::rfc::dav::parse::{MkcolRequest, parse_mkcol};
 
 /// ## Summary
 /// Handles MKCALENDAR requests to create calendar collections.
@@ -45,16 +45,14 @@ pub async fn mkcalendar(req: &mut Request, res: &mut Response) {
     // Parse optional MKCALENDAR XML body for initial properties
     let body = req.payload().await;
     let parsed_request = match body {
-        Ok(bytes) if !bytes.is_empty() => {
-            match parse_mkcol(bytes) {
-                Ok(request) => request,
-                Err(e) => {
-                    tracing::error!("Failed to parse MKCALENDAR body: {}", e);
-                    res.status_code(StatusCode::BAD_REQUEST);
-                    return;
-                }
+        Ok(bytes) if !bytes.is_empty() => match parse_mkcol(bytes) {
+            Ok(request) => request,
+            Err(e) => {
+                tracing::error!("Failed to parse MKCALENDAR body: {}", e);
+                res.status_code(StatusCode::BAD_REQUEST);
+                return;
             }
-        }
+        },
         Ok(_) => {
             // Empty body - no initial properties
             MkcolRequest::default()

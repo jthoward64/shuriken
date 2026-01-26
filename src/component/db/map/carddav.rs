@@ -14,22 +14,18 @@ use crate::component::rfc::vcard::VCard;
 pub fn build_card_index(entity_id: Uuid, vcard: &VCard) -> NewCardIndex<'_> {
     let uid = vcard.uid();
     let fn_ = vcard.formatted_name();
-    
+
     // Extract N (structured name) components
-    let (n_family, n_given) = vcard
-        .name()
-        .map_or((None, None), |name| {
-            (
-                name.family.first().map(String::as_str),
-                name.given.first().map(String::as_str),
-            )
-        });
-    
+    let (n_family, n_given) = vcard.name().map_or((None, None), |name| {
+        (
+            name.family.first().map(String::as_str),
+            name.given.first().map(String::as_str),
+        )
+    });
+
     // Extract ORG (organization) - use the main name
-    let org = vcard
-        .organization()
-        .map(|org| org.name.as_str());
-    
+    let org = vcard.organization().map(|org| org.name.as_str());
+
     let title = vcard.title();
 
     NewCardIndex {

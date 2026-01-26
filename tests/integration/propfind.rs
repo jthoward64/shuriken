@@ -28,12 +28,7 @@ async fn propfind_returns_multistatus() {
         .expect("Failed to seed principal");
 
     let collection_id = test_db
-        .seed_collection(
-            principal_id,
-            "calendar",
-            "testcal",
-            Some("Personal"),
-        )
+        .seed_collection(principal_id, "calendar", "testcal", Some("Personal"))
         .await
         .expect("Failed to seed collection");
 
@@ -572,10 +567,7 @@ async fn propfind_addressbook_resourcetype() {
 #[ignore = "requires database seeding"]
 async fn propfind_getetag() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .truncate_all()
-        .await
-        .expect("Failed to seed tables");
+    test_db.truncate_all().await.expect("Failed to seed tables");
 
     let principal_id = test_db
         .seed_principal("user", "/principals/alice/", Some("Alice"))
@@ -664,12 +656,11 @@ async fn propfind_sync_token() {
 async fn propfind_nonexistent_404() {
     let service = create_test_service();
 
-    let response =
-        TestRequest::propfind("/api/caldav/00000000-0000-0000-0000-000000000000/")
-            .depth("0")
-            .xml_body(propfind_allprop())
-            .send(service)
-            .await;
+    let response = TestRequest::propfind("/api/caldav/00000000-0000-0000-0000-000000000000/")
+        .depth("0")
+        .xml_body(propfind_allprop())
+        .send(service)
+        .await;
 
     response.assert_status(StatusCode::NOT_FOUND);
 }

@@ -242,12 +242,7 @@ async fn proppatch_remove_displayname() {
         .expect("Failed to seed principal");
 
     let collection_id = test_db
-        .seed_collection(
-            principal_id,
-            "calendar",
-            "testcal",
-            Some("Original Name"),
-        )
+        .seed_collection(principal_id, "calendar", "testcal", Some("Original Name"))
         .await
         .expect("Failed to seed collection");
 
@@ -379,11 +374,10 @@ async fn proppatch_nonexistent_404() {
     let service = create_test_service();
 
     let body = proppatch_set(&[("DAV:", "displayname", "Test")]);
-    let response =
-        TestRequest::proppatch("/api/caldav/00000000-0000-0000-0000-000000000000/")
-            .xml_body(&body)
-            .send(service)
-            .await;
+    let response = TestRequest::proppatch("/api/caldav/00000000-0000-0000-0000-000000000000/")
+        .xml_body(&body)
+        .send(service)
+        .await;
 
     response.assert_status(StatusCode::NOT_FOUND);
 }

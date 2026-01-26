@@ -13,7 +13,7 @@ pub mod report;
 mod error_tests;
 
 pub use error::{ParseError, ParseResult};
-pub use mkcol::{parse_mkcol, MkcolRequest};
+pub use mkcol::{MkcolRequest, parse_mkcol};
 pub use propfind::parse_propfind;
 pub use proppatch::parse_proppatch;
 pub use report::parse_report;

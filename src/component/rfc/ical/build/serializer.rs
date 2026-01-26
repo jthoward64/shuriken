@@ -434,7 +434,7 @@ END:VCALENDAR\r\n";
         // Parse again and verify list is preserved
         let reparsed = parse::parse(&output).unwrap();
         let event = &reparsed.events()[0];
-        
+
         let exdate = event.get_property("EXDATE").unwrap();
         let datetime_list = exdate.value.as_datetime_list().unwrap();
         assert_eq!(datetime_list.len(), 3);
@@ -461,7 +461,7 @@ END:VCALENDAR\r\n";
         // Parse again and verify list is preserved
         let reparsed = parse::parse(&output).unwrap();
         let event = &reparsed.events()[0];
-        
+
         let rdate = event.get_property("RDATE").unwrap();
         let date_list = rdate.value.as_date_list().unwrap();
         assert_eq!(date_list.len(), 3);
@@ -483,25 +483,31 @@ END:VFREEBUSY\r\n\
 END:VCALENDAR\r\n";
 
         let parsed = parse::parse(input).unwrap();
-        
+
         // First, verify the original parse worked
-        let freebusy = parsed.root.children.iter()
+        let freebusy = parsed
+            .root
+            .children
+            .iter()
             .find(|c| c.kind == Some(ComponentKind::FreeBusy))
             .unwrap();
         let freebusy_prop = freebusy.get_property("FREEBUSY").unwrap();
         let period_list = freebusy_prop.value.as_period_list().unwrap();
         assert_eq!(period_list.len(), 2);
-        
+
         let output = serialize(&parsed);
-        
+
         // For debugging, let's just check the output contains FREEBUSY
         assert!(output.contains("FREEBUSY"));
-        
+
         // Parse again - this is where it might fail
         // Let's make this test more lenient for now
         match parse::parse(&output) {
             Ok(reparsed) => {
-                let freebusy2 = reparsed.root.children.iter()
+                let freebusy2 = reparsed
+                    .root
+                    .children
+                    .iter()
                     .find(|c| c.kind == Some(ComponentKind::FreeBusy))
                     .unwrap();
                 let freebusy_prop2 = freebusy2.get_property("FREEBUSY").unwrap();

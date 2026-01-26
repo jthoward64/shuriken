@@ -2,8 +2,8 @@ use diesel::{
     ExpressionMethods, OptionalExtension, SelectableHelper,
     query_dsl::methods::{FilterDsl, SelectDsl},
 };
-use diesel_async::scoped_futures::ScopedFutureExt;
 use diesel_async::AsyncConnection;
+use diesel_async::scoped_futures::ScopedFutureExt;
 
 use crate::component::{
     config::{AuthMethod, get_config},

@@ -69,11 +69,12 @@ pub async fn create_collection(
 
         async move {
             // Check if collection already exists with same URI and owner
-            let existing: Option<DavCollection> = collection::by_uri_and_principal(&uri, owner_principal_id)
-                .first(tx)
-                .await
-                .optional()
-                .context("failed to check for existing collection")?;
+            let existing: Option<DavCollection> =
+                collection::by_uri_and_principal(&uri, owner_principal_id)
+                    .first(tx)
+                    .await
+                    .optional()
+                    .context("failed to check for existing collection")?;
 
             if existing.is_some() {
                 anyhow::bail!("collection with URI '{}' already exists", uri);
