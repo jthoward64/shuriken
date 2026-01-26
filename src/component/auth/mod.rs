@@ -24,6 +24,9 @@ pub mod resource;
 pub mod service;
 pub mod subject;
 
+#[cfg(test)]
+mod casbin_test;
+
 // Re-export commonly used types at module level
 pub use action::{Action, HttpMethod, MethodContext, action_for_method};
 pub use authorize::{

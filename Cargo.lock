@@ -404,6 +404,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "bstr"
+version = "1.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "63044e1ae8e69f3b5a92c736ca6269b8d12fa7efe39bf34ddb06d102cf0e2cab"
+dependencies = [
+ "memchr",
+ "serde",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -468,6 +478,7 @@ dependencies = [
  "async-trait",
  "fixedbitset",
  "getrandom 0.3.4",
+ "globset",
  "hashlink 0.9.1",
  "once_cell",
  "parking_lot",
@@ -1472,6 +1483,19 @@ name = "gimli"
 version = "0.32.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e629b9b98ef3dd8afe6ca2bd0f89306cec16d43d907889945bc5d6687f2f13c7"
+
+[[package]]
+name = "globset"
+version = "0.4.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "52dfc19153a48bde0cbd630453615c8151bce3a5adfac7a0aebfbf0a1e1f57e3"
+dependencies = [
+ "aho-corasick",
+ "bstr",
+ "log",
+ "regex-automata",
+ "regex-syntax",
+]
 
 [[package]]
 name = "h2"
@@ -4173,7 +4197,6 @@ dependencies = [
  "hex",
  "icu",
  "ipnetwork",
- "pest",
  "quick-xml",
  "reqwest 0.13.1",
  "reqwest-tracing",
@@ -4182,6 +4205,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "string-adapter",
  "test-log",
  "thiserror 2.0.18",
  "tokio",
@@ -4310,6 +4334,19 @@ name = "str-buf"
 version = "3.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ceb97b7225c713c2fd4db0153cb6b3cab244eb37900c3f634ed4d43310d8c34"
+
+[[package]]
+name = "string-adapter"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05a360b2ad196c06f6bfe5a760ef3326f099d73bd0dce7dad9fddfa3e9823097"
+dependencies = [
+ "async-trait",
+ "casbin",
+ "once_cell",
+ "regex",
+ "tokio",
+]
 
 [[package]]
 name = "stringprep"

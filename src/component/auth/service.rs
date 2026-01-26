@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 
-use casbin::CoreApi;
+use casbin::{CoreApi, MgmtApi, RbacApi};
 
 use crate::component::error::{AppError, AppResult};
 
@@ -82,7 +82,12 @@ impl Authorizer {
     /// This implements the enforcement flow from Section 12.3.1:
     /// 1. For each subject in the expanded set
     /// 2. Check Casbin policy for action on resource
-    /// 3. Return `Allowed` with the highest permission level found
+    /// 3. If direct check fails, verify role hierarchy (owner > admin > ... > read)
+    /// 4. Return `Allowed` with the highest permission level found
+    ///
+    /// Role hierarchy is enforced via g5 edges using Casbin's `GetImplicitRolesForUser()`.
+    /// A subject with a higher role (e.g., "owner") implicitly has permissions for lower
+    /// roles (e.g., "read") without needing explicit grants for each level.
     ///
     /// ## Errors
     ///
@@ -100,22 +105,105 @@ impl Authorizer {
         for subject in subjects {
             let sub = subject.casbin_subject();
 
+            // First, try direct enforcement (exact role matching)
             let allowed = self
                 .enforcer
                 .enforce((&sub, &obj, &act))
                 .map_err(AppError::CasbinError)?;
 
             if allowed {
-                // We found a subject that's allowed.
-                // TODO: In the future, we could query for the effective permission level
-                // by checking which roles the subject has on the resource.
-                // For now, return the minimum level for the action.
+                let level = action.minimum_level();
+                return Ok(AuthzResult::Allowed(level));
+            }
+
+            // If direct enforcement failed, check role hierarchy
+            // Get the roles granted to this subject on this resource
+            let granted_roles = self.enforcer.get_roles_for_user(&sub, Some(&obj));
+
+            if granted_roles.is_empty() {
+                continue; // No roles granted, try next subject
+            }
+
+            // Check if any granted role satisfies the action via role hierarchy
+            if self.check_role_hierarchy(&granted_roles, &obj, &act)? {
                 let level = action.minimum_level();
                 return Ok(AuthzResult::Allowed(level));
             }
         }
 
         Ok(AuthzResult::Denied)
+    }
+
+    /// Check if any granted role satisfies the action via role hierarchy.
+    ///
+    /// This uses Casbin's role hierarchy (g5) to determine if a higher role
+    /// (e.g., "owner") implies permission for a lower role (e.g., "read").
+    ///
+    /// ## Algorithm
+    /// 1. Get the resource type from g2
+    /// 2. Get all policies for this resource type and action
+    /// 3. For each policy's required role, check if any granted role implies it via g5
+    ///
+    /// ## Errors
+    ///
+    /// Returns `CasbinError` if Casbin evaluation fails.
+    fn check_role_hierarchy(
+        &self,
+        granted_roles: &[String],
+        obj: &str,
+        act: &str,
+    ) -> AppResult<bool> {
+        // Get the resource type from g2
+        let obj_types = self.enforcer.get_roles_for_user(obj, Some("g2"));
+
+        for obj_type in obj_types {
+            // Get all policies to find what roles are defined for this type/action
+            let all_policies = self.enforcer.get_policy();
+
+            // Find policies that match this object type and action
+            for policy in all_policies {
+                // Policy format: [role, obj_type, action]
+                if policy.len() >= 3 && policy[1] == obj_type && policy[2] == act {
+                    let required_role = &policy[0];
+
+                    // Check if any granted role implies the required role via g5
+                    for granted_role in granted_roles {
+                        if self.role_implies(granted_role, required_role)? {
+                            return Ok(true);
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(false)
+    }
+
+    /// Check if `higher_role` implies `lower_role` via the g5 role hierarchy.
+    ///
+    /// Uses Casbin's `GetImplicitRolesForUser()` to traverse the role hierarchy.
+    /// For example, "owner" implies "read" if g5 edges form a path: owner → ... → read
+    ///
+    /// ## Returns
+    /// - `true` if higher_role == lower_role (exact match)
+    /// - `true` if higher_role transitively implies lower_role via g5
+    /// - `false` otherwise
+    ///
+    /// ## Errors
+    ///
+    /// Returns `CasbinError` if Casbin evaluation fails.
+    fn role_implies(&self, higher_role: &str, lower_role: &str) -> AppResult<bool> {
+        // Exact match
+        if higher_role == lower_role {
+            return Ok(true);
+        }
+
+        // Get all roles that this role implies (direct + transitive via g5)
+        let implied_roles = self
+            .enforcer
+            .get_implicit_roles_for_user(higher_role, Some("g5"));
+
+        Ok(implied_roles.contains(&lower_role.to_string()))
     }
 
     /// Check and require permission, returning an error if denied.

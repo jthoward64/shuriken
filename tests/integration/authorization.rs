@@ -303,11 +303,6 @@ async fn delete_returns_204_with_write_permission() {
 
     // Expect 204 No Content since write permission is granted
     response.assert_status(StatusCode::NO_CONTENT);
-
-    test_db
-        .cleanup()
-        .await
-        .expect("Failed to cleanup test database");
 }
 
 // ============================================================================
@@ -367,11 +362,6 @@ END:VCALENDAR";
 
     // Expect 403 Forbidden since no write permission on collection
     response.assert_status(StatusCode::FORBIDDEN);
-
-    test_db
-        .cleanup()
-        .await
-        .expect("Failed to cleanup test database");
 }
 
 /// ## Summary
@@ -454,11 +444,6 @@ END:VCALENDAR";
 
     // Expect 403 Forbidden since only read (not write) permission
     response.assert_status(StatusCode::FORBIDDEN);
-
-    test_db
-        .cleanup()
-        .await
-        .expect("Failed to cleanup test database");
 }
 
 // ============================================================================
@@ -538,11 +523,6 @@ async fn propfind_returns_403_without_permission() {
 
     // Expect 403 Forbidden
     response.assert_status(StatusCode::FORBIDDEN);
-
-    test_db
-        .cleanup()
-        .await
-        .expect("Failed to cleanup test database");
 }
 
 // ============================================================================
@@ -627,9 +607,225 @@ async fn proppatch_returns_403_without_write_permission() {
 
     // Expect 403 Forbidden since only read permission
     response.assert_status(StatusCode::FORBIDDEN);
+}
+
+// ============================================================================
+// Role Hierarchy Tests
+// ============================================================================
+
+/// ## Summary
+/// Test that role hierarchy is respected: a principal with "owner" role
+/// can access resources requiring "read" role via g5 hierarchy.
+///
+/// Role hierarchy: owner > admin > edit-share > edit > read-share > read > read-freebusy
+#[traced_test]
+#[tokio::test]
+async fn get_returns_200_with_owner_role_for_read_action() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+
+    // Seed default policies (role hierarchy, action policies)
+    test_db
+        .seed_default_policies()
+        .await
+        .expect("Failed to seed default policies");
+
+    // Create a principal and collection
+    let principal_id = test_db
+        .seed_principal("user", "/principals/bob/", Some("Bob"))
+        .await
+        .expect("Failed to seed principal");
+
+    let collection_id = test_db
+        .seed_collection(principal_id, "calendar", "bobcal", Some("Bob Cal"))
+        .await
+        .expect("Failed to seed collection");
+
+    // Create an entity and instance
+    let entity_id = test_db
+        .seed_entity("icalendar", Some("owner-hierarchy@example.com"))
+        .await
+        .expect("Failed to seed entity");
+
+    // Seed minimal iCalendar event tree
+    test_db
+        .seed_minimal_icalendar_event(
+            entity_id,
+            "owner-hierarchy@example.com",
+            "Owner Hierarchy Event",
+        )
+        .await
+        .expect("Failed to seed iCalendar event");
+
+    let instance_uri = "owner-hierarchy.ics";
+    let request_path = format!("/api/caldav/{collection_id}/{instance_uri}");
+    let _instance_id = test_db
+        .seed_instance(
+            collection_id,
+            entity_id,
+            instance_uri,
+            "text/calendar",
+            "\"owner-etag\"",
+            1,
+        )
+        .await
+        .expect("Failed to seed instance");
+
+    // Grant "owner" role (highest in hierarchy)
+    let resource_str = format!("evt:{entity_id}");
+    test_db
+        .seed_resource_type(&resource_str, "calendar_event")
+        .await
+        .expect("Failed to seed resource type");
 
     test_db
-        .cleanup()
+        .seed_grant("public", &resource_str, "owner")
         .await
-        .expect("Failed to cleanup test database");
+        .expect("Failed to seed grant with owner role");
+
+    let service = create_db_test_service(&test_db.url()).await;
+
+    // Policy requires "read" role, but we have "owner" role.
+    // With role hierarchy (owner > ... > read), this should succeed.
+    let response = TestRequest::get(&request_path).send(&service).await;
+
+    // Expect 200 OK because owner role implies read via g5 hierarchy
+    response.assert_status(StatusCode::OK);
+}
+
+/// ## Summary
+/// Test that role hierarchy works for "edit" role accessing read-only resources.
+/// Edit role should allow read access via hierarchy: edit > read-share > read
+#[traced_test]
+#[tokio::test]
+async fn get_returns_200_with_edit_role_for_read_action() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+
+    test_db
+        .seed_default_policies()
+        .await
+        .expect("Failed to seed default policies");
+
+    let principal_id = test_db
+        .seed_principal("user", "/principals/carol/", Some("Carol"))
+        .await
+        .expect("Failed to seed principal");
+
+    let collection_id = test_db
+        .seed_collection(principal_id, "calendar", "carolcal", Some("Carol Cal"))
+        .await
+        .expect("Failed to seed collection");
+
+    let entity_id = test_db
+        .seed_entity("icalendar", Some("edit-hierarchy@example.com"))
+        .await
+        .expect("Failed to seed entity");
+
+    test_db
+        .seed_minimal_icalendar_event(
+            entity_id,
+            "edit-hierarchy@example.com",
+            "Edit Hierarchy Event",
+        )
+        .await
+        .expect("Failed to seed iCalendar event");
+
+    let instance_uri = "edit-hierarchy.ics";
+    let request_path = format!("/api/caldav/{collection_id}/{instance_uri}");
+    let _instance_id = test_db
+        .seed_instance(
+            collection_id,
+            entity_id,
+            instance_uri,
+            "text/calendar",
+            "\"edit-etag\"",
+            1,
+        )
+        .await
+        .expect("Failed to seed instance");
+
+    // Grant "edit" role
+    let resource_str = format!("evt:{entity_id}");
+    test_db
+        .seed_resource_type(&resource_str, "calendar_event")
+        .await
+        .expect("Failed to seed resource type");
+
+    test_db
+        .seed_grant("public", &resource_str, "edit")
+        .await
+        .expect("Failed to seed grant with edit role");
+
+    let service = create_db_test_service(&test_db.url()).await;
+
+    // Policy requires "read" role, we have "edit" role.
+    // With role hierarchy (edit > read-share > read), this should succeed.
+    let response = TestRequest::get(&request_path).send(&service).await;
+
+    response.assert_status(StatusCode::OK);
+}
+
+/// ## Summary
+/// Test that "edit" role can perform write actions (exact match, not hierarchy).
+#[traced_test]
+#[tokio::test]
+async fn delete_returns_204_with_edit_role() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+
+    test_db
+        .seed_default_policies()
+        .await
+        .expect("Failed to seed default policies");
+
+    let principal_id = test_db
+        .seed_principal("user", "/principals/dave/", Some("Dave"))
+        .await
+        .expect("Failed to seed principal");
+
+    let collection_id = test_db
+        .seed_collection(principal_id, "calendar", "davecal", Some("Dave Cal"))
+        .await
+        .expect("Failed to seed collection");
+
+    let entity_id = test_db
+        .seed_entity("icalendar", Some("edit-write@example.com"))
+        .await
+        .expect("Failed to seed entity");
+
+    test_db
+        .seed_minimal_icalendar_event(entity_id, "edit-write@example.com", "Edit Write Event")
+        .await
+        .expect("Failed to seed iCalendar event");
+
+    let instance_uri = "edit-write.ics";
+    let request_path = format!("/api/caldav/{collection_id}/{instance_uri}");
+    let _instance_id = test_db
+        .seed_instance(
+            collection_id,
+            entity_id,
+            instance_uri,
+            "text/calendar",
+            "\"edit-write-etag\"",
+            1,
+        )
+        .await
+        .expect("Failed to seed instance");
+
+    // Grant "edit" role
+    let resource_str = format!("evt:{entity_id}");
+    test_db
+        .seed_resource_type(&resource_str, "calendar_event")
+        .await
+        .expect("Failed to seed resource type");
+
+    test_db
+        .seed_grant("public", &resource_str, "edit")
+        .await
+        .expect("Failed to seed grant with edit role");
+
+    let service = create_db_test_service(&test_db.url()).await;
+
+    // Policy requires "edit" role for write, we have "edit" role (exact match).
+    let response = TestRequest::delete(&request_path).send(&service).await;
+
+    response.assert_status(StatusCode::NO_CONTENT);
 }
