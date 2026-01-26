@@ -256,7 +256,24 @@ pub fn convert_to_utc_lenient(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::component::rfc::ical::core::{Component, ComponentKind, DateTime, Property};
     use chrono::TimeZone;
+
+    fn build_fixed_vtimezone(tzid: &str, offset: &str) -> Component {
+        let mut timezone = Component::new(ComponentKind::Timezone);
+        timezone.add_property(Property::text("TZID", tzid));
+
+        let mut standard = Component::new(ComponentKind::Standard);
+        standard.add_property(Property::datetime(
+            "DTSTART",
+            DateTime::floating(2026, 1, 1, 0, 0, 0),
+        ));
+        standard.add_property(Property::text("TZOFFSETFROM", offset));
+        standard.add_property(Property::text("TZOFFSETTO", offset));
+
+        timezone.add_child(standard);
+        timezone
+    }
 
     #[test]
     fn test_resolve_standard_timezone() {
@@ -318,6 +335,34 @@ mod tests {
 
         // In July, EDT is UTC-4
         let expected = Utc.with_ymd_and_hms(2026, 7, 15, 14, 0, 0).unwrap();
+        assert_eq!(utc, expected);
+    }
+
+    #[test]
+    fn test_build_timezone_resolver_registers_vtimezone() {
+        let mut calendar = crate::component::rfc::ical::core::ICalendar::default();
+        calendar.add_timezone(build_fixed_vtimezone("Test/Fixed", "+0200"));
+
+        let resolver = build_timezone_resolver(&calendar).expect("valid VTIMEZONE");
+        assert!(resolver.has_vtimezone("Test/Fixed"));
+    }
+
+    #[test]
+    fn test_convert_to_utc_prefers_vtimezone() {
+        let mut calendar = crate::component::rfc::ical::core::ICalendar::default();
+        calendar.add_timezone(build_fixed_vtimezone("Test/Fixed", "+0200"));
+
+        let mut resolver = build_timezone_resolver(&calendar).expect("valid VTIMEZONE");
+
+        let local = NaiveDateTime::new(
+            chrono::NaiveDate::from_ymd_opt(2026, 1, 15).unwrap(),
+            chrono::NaiveTime::from_hms_opt(10, 0, 0).unwrap(),
+        );
+
+        let utc =
+            convert_to_utc(local, "Test/Fixed", &mut resolver).expect("conversion should succeed");
+
+        let expected = Utc.with_ymd_and_hms(2026, 1, 15, 8, 0, 0).unwrap();
         assert_eq!(utc, expected);
     }
 

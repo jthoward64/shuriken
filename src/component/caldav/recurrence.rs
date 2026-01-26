@@ -208,8 +208,27 @@ pub fn ical_duration_to_chrono(
 mod tests {
     use super::*;
     use crate::component::rfc::ical::core::{
-        Component, ComponentKind, DateTimeForm, Property, Value,
+        Component, ComponentKind, DateTime, DateTimeForm, Parameter, Property, Value,
     };
+    use chrono::TimeZone;
+
+    fn register_fixed_timezone(resolver: &mut TimeZoneResolver) {
+        let mut timezone = Component::new(ComponentKind::Timezone);
+        timezone.add_property(Property::text("TZID", "Test/Fixed"));
+
+        let mut standard = Component::new(ComponentKind::Standard);
+        standard.add_property(Property::datetime(
+            "DTSTART",
+            DateTime::floating(2026, 1, 1, 0, 0, 0),
+        ));
+        standard.add_property(Property::text("TZOFFSETFROM", "+0200"));
+        standard.add_property(Property::text("TZOFFSETTO", "+0200"));
+        timezone.add_child(standard);
+
+        let vtimezone = crate::component::rfc::ical::expand::VTimezone::parse(&timezone)
+            .expect("valid VTIMEZONE");
+        resolver.register_vtimezone(vtimezone);
+    }
 
     #[test]
     fn test_extract_recurrence_data_with_dtend() {
@@ -262,5 +281,52 @@ mod tests {
     fn test_extract_recurrence_data_no_rrule() {
         let component = Component::new(ComponentKind::Event);
         assert!(extract_recurrence_data(&component).is_none());
+    }
+
+    #[test]
+    fn test_extract_recurrence_data_with_timezone_resolver() {
+        let mut component = Component::new(ComponentKind::Event);
+
+        component.add_property(Property::text("RRULE", "FREQ=DAILY;COUNT=2"));
+
+        component.add_property(Property {
+            name: "DTSTART".to_string(),
+            params: vec![Parameter::tzid("Test/Fixed")],
+            value: Value::DateTime(IcalDateTime {
+                year: 2026,
+                month: 1,
+                day: 15,
+                hour: 10,
+                minute: 0,
+                second: 0,
+                form: DateTimeForm::Floating,
+            }),
+            raw_value: "20260115T100000".to_string(),
+        });
+
+        component.add_property(Property {
+            name: "DTEND".to_string(),
+            params: vec![Parameter::tzid("Test/Fixed")],
+            value: Value::DateTime(IcalDateTime {
+                year: 2026,
+                month: 1,
+                day: 15,
+                hour: 11,
+                minute: 0,
+                second: 0,
+                form: DateTimeForm::Floating,
+            }),
+            raw_value: "20260115T110000".to_string(),
+        });
+
+        let mut resolver = TimeZoneResolver::new();
+        register_fixed_timezone(&mut resolver);
+
+        let data = extract_recurrence_data_with_resolver(&component, &mut resolver)
+            .expect("should extract data");
+
+        let expected = Utc.with_ymd_and_hms(2026, 1, 15, 8, 0, 0).unwrap();
+        assert_eq!(data.dtstart_utc, expected);
+        assert_eq!(data.duration, chrono::TimeDelta::hours(1));
     }
 }

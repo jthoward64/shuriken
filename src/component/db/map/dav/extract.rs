@@ -171,8 +171,10 @@ pub(super) fn extract_vcard_uid(vcard: &VCard) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::component::rfc::ical::core::{Date, DateTime, DateTimeForm};
-    use chrono::{Datelike, Timelike};
+    use crate::component::rfc::ical::core::{
+        Component, ComponentKind, Date, DateTime, DateTimeForm, Property,
+    };
+    use chrono::{Datelike, TimeZone, Timelike};
 
     type IcalValueTuple<'a> = (
         &'static str,
@@ -298,6 +300,46 @@ mod tests {
 
         assert_eq!(vtype, "text");
         assert_eq!(vtext, Some("P1DT2H30M"));
+    }
+
+    #[test]
+    fn extract_ical_datetime_zoned_uses_vtimezone() {
+        let mut timezone = Component::new(ComponentKind::Timezone);
+        timezone.add_property(Property::text("TZID", "Test/Fixed"));
+
+        let mut standard = Component::new(ComponentKind::Standard);
+        standard.add_property(Property::datetime(
+            "DTSTART",
+            DateTime::floating(2026, 1, 1, 0, 0, 0),
+        ));
+        standard.add_property(Property::text("TZOFFSETFROM", "+0200"));
+        standard.add_property(Property::text("TZOFFSETTO", "+0200"));
+        timezone.add_child(standard);
+
+        let vtimezone = crate::component::rfc::ical::expand::VTimezone::parse(&timezone)
+            .expect("valid VTIMEZONE");
+
+        let mut resolver = TimeZoneResolver::new();
+        resolver.register_vtimezone(vtimezone);
+
+        let value = Value::DateTime(DateTime {
+            year: 2026,
+            month: 1,
+            day: 15,
+            hour: 10,
+            minute: 0,
+            second: 0,
+            form: DateTimeForm::Zoned {
+                tzid: "Test/Fixed".to_string(),
+            },
+        });
+
+        let (vtype, _, _, _, _, _, vtstz) =
+            extract_ical_value(&value, "20260115T100000", &mut resolver).unwrap();
+
+        assert_eq!(vtype, "datetime");
+        let expected = chrono::Utc.with_ymd_and_hms(2026, 1, 15, 8, 0, 0).unwrap();
+        assert_eq!(vtstz, Some(expected));
     }
 
     #[test]
