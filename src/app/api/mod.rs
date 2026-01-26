@@ -15,8 +15,8 @@ use crate::component::middleware::auth::AuthMiddleware;
 pub fn routes() -> anyhow::Result<Router> {
     Ok(Router::with_path("api")
         .hoop(AuthMiddleware)
+        .options(dav::method::options::options)
         .push(app_specific::routes())
         .push(caldav::routes()?)
-        .push(carddav::routes()?)
-        .push(dav::routes()))
+        .push(carddav::routes()?))
 }

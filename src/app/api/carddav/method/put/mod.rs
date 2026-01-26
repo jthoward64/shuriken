@@ -46,6 +46,13 @@ pub async fn put(req: &mut Request, res: &mut Response) {
 
     tracing::debug!(bytes = body.len(), "Request body read successfully");
 
+    if let Ok(collection_id) = path::extract_collection_id(&path)
+        && collection_id.is_nil()
+    {
+        res.status_code(StatusCode::NOT_FOUND);
+        return;
+    }
+
     // Get database connection
     let mut conn = match connection::connect().await {
         Ok(conn) => conn,

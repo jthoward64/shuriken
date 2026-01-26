@@ -34,6 +34,11 @@ pub async fn handle(
         }
     };
 
+    if collection_id.is_nil() {
+        res.status_code(StatusCode::NOT_FOUND);
+        return;
+    }
+
     // Get database connection
     let mut conn = match connection::connect().await {
         Ok(conn) => conn,

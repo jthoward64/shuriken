@@ -3,7 +3,7 @@
 use reqwest::Method;
 use salvo::{Router, routing::MethodFilter};
 
-use crate::app::api::dav::method::options as dav_options;
+use crate::app::api::dav;
 
 pub mod method;
 pub mod report;
@@ -13,7 +13,7 @@ pub fn routes() -> anyhow::Result<Router> {
         // Address book and vCard operations
         .push(
             Router::with_path("{**rest}")
-                .options(dav_options::options)
+                .push(dav::routes())
                 .put(method::put::put)
                 .push(
                     // MKCOL method

@@ -9,6 +9,7 @@ use crate::app::api::dav::extract::headers::{Depth, parse_depth};
 use crate::component::db::connection;
 use crate::component::rfc::dav::build::multistatus::serialize_multistatus;
 use crate::component::rfc::dav::parse::propfind::parse_propfind;
+use crate::util::path;
 
 use helpers::build_propfind_response;
 
@@ -37,6 +38,13 @@ pub async fn propfind(req: &mut Request, res: &mut Response) {
     // Parse Depth header (default to 0 for PROPFIND)
     let depth = parse_depth(req).unwrap_or_else(Depth::default_for_propfind);
     tracing::debug!(depth = ?depth, "Depth header parsed");
+
+    if let Ok(collection_id) = path::extract_collection_id(req.uri().path())
+        && collection_id.is_nil()
+    {
+        res.status_code(StatusCode::NOT_FOUND);
+        return;
+    }
 
     // Parse request body
     let body = match req.payload().await {

@@ -53,16 +53,6 @@ pub async fn r#move(req: &mut Request, res: &mut Response) {
         None => true,
     };
 
-    // Get database connection
-    let mut conn = match connection::connect().await {
-        Ok(conn) => conn,
-        Err(e) => {
-            tracing::error!("Failed to get database connection: {}", e);
-            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
-            return;
-        }
-    };
-
     // Parse source path to extract collection ID and URI
     let (source_collection_id, source_uri) = match path::parse_collection_and_uri(&source_path) {
         Ok(parsed) => parsed,
@@ -82,6 +72,21 @@ pub async fn r#move(req: &mut Request, res: &mut Response) {
         Err(e) => {
             tracing::error!(error = %e, path = %dest_path, "Failed to parse destination path");
             res.status_code(StatusCode::BAD_REQUEST);
+            return;
+        }
+    };
+
+    if source_collection_id.is_nil() || dest_collection_id.is_nil() {
+        res.status_code(StatusCode::NOT_FOUND);
+        return;
+    }
+
+    // Get database connection
+    let mut conn = match connection::connect().await {
+        Ok(conn) => conn,
+        Err(e) => {
+            tracing::error!("Failed to get database connection: {}", e);
+            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
             return;
         }
     };

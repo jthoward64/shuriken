@@ -11,7 +11,7 @@ pub mod response;
 
 #[must_use]
 pub fn routes() -> Router {
-    Router::with_path("{**rest}")
+    Router::new()
         .options(method::options::options)
         .get(method::get_head::get)
         .head(method::get_head::head)
@@ -39,11 +39,5 @@ pub fn routes() -> Router {
             Router::new()
                 .filter_fn(|req, _| req.method().as_str() == "MOVE")
                 .goal(method::r#move::r#move),
-        )
-        .push(
-            // REPORT method
-            Router::new()
-                .filter_fn(|req, _| req.method().as_str() == "REPORT")
-                .goal(method::report::report),
         )
 }

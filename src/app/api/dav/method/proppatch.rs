@@ -53,22 +53,27 @@ pub async fn proppatch(req: &mut Request, res: &mut Response) {
         }
     };
 
-    // Get database connection
-    let mut conn = match connection::connect().await {
-        Ok(conn) => conn,
-        Err(e) => {
-            tracing::error!("Failed to get database connection: {}", e);
-            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
-            return;
-        }
-    };
-
     // Parse path to extract collection ID
     let collection_id = match path::extract_collection_id(&path) {
         Ok(id) => id,
         Err(e) => {
             tracing::error!(error = %e, path = %path, "Failed to parse collection ID from path");
             res.status_code(StatusCode::BAD_REQUEST);
+            return;
+        }
+    };
+
+    if collection_id.is_nil() {
+        res.status_code(StatusCode::NOT_FOUND);
+        return;
+    }
+
+    // Get database connection
+    let mut conn = match connection::connect().await {
+        Ok(conn) => conn,
+        Err(e) => {
+            tracing::error!("Failed to get database connection: {}", e);
+            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
             return;
         }
     };
@@ -185,4 +190,3 @@ pub async fn proppatch(req: &mut Request, res: &mut Response) {
         }
     }
 }
-

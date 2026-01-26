@@ -35,6 +35,11 @@ pub(super) async fn handle_get_or_head(req: &mut Request, res: &mut Response, is
         }
     };
 
+    if collection_id.is_nil() {
+        res.status_code(StatusCode::NOT_FOUND);
+        return;
+    }
+
     tracing::debug!(
         collection_id = %collection_id,
         uri = %uri,
@@ -167,9 +172,7 @@ fn set_response_headers_and_body(
     res.status_code(StatusCode::OK);
 
     // Set body only for GET (not HEAD)
-    if !is_head
-        && let Err(e) = res.write_body(canonical_bytes.to_vec())
-    {
+    if !is_head && let Err(e) = res.write_body(canonical_bytes.to_vec()) {
         tracing::error!("Failed to write response body: {}", e);
     }
 }

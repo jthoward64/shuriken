@@ -47,6 +47,10 @@ impl salvo::Handler for AuthMiddleware {
                     tracing::debug!("Request not authenticated, treating as public");
                     depot.insert("user", DepotUser::Public);
                 }
+                crate::component::error::Error::PoolError(_) => {
+                    tracing::warn!(error = ?e, "Database pool unavailable, treating as public");
+                    depot.insert("user", DepotUser::Public);
+                }
                 crate::component::error::Error::AuthenticationError(_) => {
                     tracing::warn!(error = ?e, "Authentication error");
                     res.status_code(salvo::http::StatusCode::UNAUTHORIZED);
