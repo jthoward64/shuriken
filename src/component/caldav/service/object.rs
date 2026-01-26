@@ -9,7 +9,8 @@ use diesel_async::RunQueryDsl;
 
 use crate::component::caldav::recurrence::{extract_recurrence_data, ical_datetime_to_utc, ical_duration_to_chrono};
 use crate::component::db::connection::DbConnection;
-use crate::component::db::query::caldav::occurrence;
+use crate::component::db::map::caldav::build_cal_indexes;
+use crate::component::db::query::caldav::{event_index, occurrence};
 use crate::component::db::query::dav::{collection, entity, instance};
 use crate::component::model::dav::instance::NewDavInstance;
 use crate::component::model::dav::occurrence::NewCalOccurrence;
@@ -185,10 +186,21 @@ pub async fn put_calendar_object(
             .await
             .context("failed to delete old occurrences")?;
 
+        // Delete old index entries for this entity
+        event_index::delete_by_entity_id(conn, existing_inst.entity_id)
+            .await
+            .context("failed to delete old index entries")?;
+
         // Insert new component tree
         entity::insert_ical_tree(conn, existing_inst.entity_id, &ical)
             .await
             .context("failed to insert component tree")?;
+
+        // Build and insert calendar index entries
+        let cal_indexes = build_cal_indexes(existing_inst.entity_id, &ical);
+        event_index::insert_batch(conn, &cal_indexes)
+            .await
+            .context("failed to insert calendar index entries")?;
 
         // Expand and store recurrences for the updated entity
         expand_and_store_occurrences(conn, existing_inst.entity_id, &ical)
@@ -236,6 +248,12 @@ pub async fn put_calendar_object(
         entity::insert_ical_tree(conn, created_entity.id, &ical)
             .await
             .context("failed to insert component tree")?;
+
+        // Build and insert calendar index entries
+        let cal_indexes = build_cal_indexes(created_entity.id, &ical);
+        event_index::insert_batch(conn, &cal_indexes)
+            .await
+            .context("failed to insert calendar index entries")?;
 
         // Expand and store recurrences for the new entity
         expand_and_store_occurrences(conn, created_entity.id, &ical)
