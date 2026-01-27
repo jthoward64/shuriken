@@ -3,6 +3,8 @@
 use salvo::http::StatusCode;
 use salvo::{Depot, Request, Response, handler};
 
+use crate::app::api::dav::extract::auth::{get_auth_context, resource_id_for};
+use crate::component::auth::{Action, ResourceType};
 use crate::component::db::connection;
 use crate::component::rfc::dav::build::multistatus::serialize_multistatus;
 use crate::component::rfc::dav::core::{ExpandProperty, Multistatus, ReportType, SyncCollection};
@@ -94,6 +96,32 @@ pub async fn handle_sync_collection(
         }
     };
 
+    // Check authorization: user must have Read permission on the collection
+    let (subjects, authorizer) = match get_auth_context(depot, &mut conn).await {
+        Ok(ctx) => ctx,
+        Err(status) => {
+            res.status_code(status);
+            return;
+        }
+    };
+
+    // Extract collection ID from request path to build resource ID
+    let collection_id = match crate::util::path::extract_collection_id(_req.uri().path()) {
+        Ok(id) if !id.is_nil() => id,
+        _ => {
+            tracing::warn!("Failed to extract collection ID from path");
+            res.status_code(StatusCode::BAD_REQUEST);
+            return;
+        }
+    };
+
+    let resource = resource_id_for(ResourceType::Calendar, collection_id, None);
+    if let Err(e) = authorizer.require(&subjects, &resource, Action::Read) {
+        tracing::debug!(error = %e, "Authorization denied for sync-collection REPORT");
+        res.status_code(StatusCode::FORBIDDEN);
+        return;
+    }
+
     // Build response
     let multistatus = match build_sync_collection_response(&mut conn, &sync, &properties).await {
         Ok(ms) => ms,
@@ -170,6 +198,32 @@ pub async fn handle_expand_property(
             return;
         }
     };
+
+    // Check authorization: user must have Read permission on the collection
+    let (subjects, authorizer) = match get_auth_context(depot, &mut conn).await {
+        Ok(ctx) => ctx,
+        Err(status) => {
+            res.status_code(status);
+            return;
+        }
+    };
+
+    // Extract collection ID from request path to build resource ID
+    let collection_id = match crate::util::path::extract_collection_id(req.uri().path()) {
+        Ok(id) if !id.is_nil() => id,
+        _ => {
+            tracing::warn!("Failed to extract collection ID from path");
+            res.status_code(StatusCode::BAD_REQUEST);
+            return;
+        }
+    };
+
+    let resource = resource_id_for(ResourceType::Calendar, collection_id, None);
+    if let Err(e) = authorizer.require(&subjects, &resource, Action::Read) {
+        tracing::debug!(error = %e, "Authorization denied for expand-property REPORT");
+        res.status_code(StatusCode::FORBIDDEN);
+        return;
+    }
 
     // Build response
     let multistatus =

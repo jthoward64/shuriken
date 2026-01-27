@@ -52,8 +52,7 @@ async fn calendar_query_returns_multistatus() {
         .await;
 
     response.assert_status(StatusCode::MULTI_STATUS);
-
-    }
+}
 
 /// ## Summary
 /// Test that calendar-query with time-range filter returns matching events.
@@ -111,8 +110,7 @@ async fn calendar_query_time_range_filter() {
         .await;
 
     response.assert_status(StatusCode::MULTI_STATUS);
-
-    }
+}
 
 /// ## Summary
 /// Test that calendar-query returns calendar-data when requested.
@@ -298,8 +296,7 @@ async fn addressbook_query_returns_multistatus() {
         .await;
 
     response.assert_status(StatusCode::MULTI_STATUS);
-
-    }
+}
 
 /// ## Summary
 /// Test that addressbook-query returns address-data when requested.
@@ -438,8 +435,7 @@ async fn sync_collection_returns_multistatus() {
         .await;
 
     response.assert_status(StatusCode::MULTI_STATUS);
-
-    }
+}
 
 /// ## Summary
 /// Test that sync-collection returns sync-token in response.
@@ -566,8 +562,7 @@ async fn sync_collection_delta_sync() {
     // Extract sync-token from response (would need parsing)
     // For now, test that response structure is correct
     initial_response.assert_body_contains("sync-token");
-
-    }
+}
 
 // ============================================================================
 // Error Cases
@@ -610,8 +605,7 @@ async fn report_invalid_xml_400() {
         .await;
 
     response.assert_status(StatusCode::BAD_REQUEST);
-
-    }
+}
 
 /// ## Summary
 /// Test that unsupported REPORT type returns appropriate error.

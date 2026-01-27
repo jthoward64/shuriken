@@ -219,5 +219,4 @@ async fn options_ignores_accept_header() {
         .await;
 
     response.assert_status(StatusCode::OK);
-
 }

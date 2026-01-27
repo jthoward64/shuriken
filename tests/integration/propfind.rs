@@ -35,8 +35,7 @@ async fn propfind_returns_multistatus() {
         .await;
 
     response.assert_status(StatusCode::MULTI_STATUS);
-
-    }
+}
 
 /// ## Summary
 /// Test that PROPFIND response is valid XML.
@@ -233,8 +232,7 @@ async fn propfind_default_depth() {
 
     // Should succeed with some default depth
     response.assert_status(StatusCode::MULTI_STATUS);
-
-    }
+}
 
 // ============================================================================
 // Property Request Tests
@@ -605,5 +603,4 @@ async fn propfind_invalid_xml_400() {
         .await;
 
     response.assert_status(StatusCode::BAD_REQUEST);
-
-    }
+}

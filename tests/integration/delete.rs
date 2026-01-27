@@ -170,8 +170,7 @@ async fn delete_calendar_object() {
     let response = TestRequest::delete(&uri).send(service).await;
 
     response.assert_status(StatusCode::NO_CONTENT);
-
-    }
+}
 
 /// ## Summary
 /// Test that DELETE creates a tombstone and bumps sync token.
@@ -438,8 +437,7 @@ async fn delete_if_match_success() {
     let response = TestRequest::delete(&uri).if_match(etag).send(service).await;
 
     response.assert_status(StatusCode::NO_CONTENT);
-
-    }
+}
 
 /// ## Summary
 /// Test that DELETE with mismatched If-Match returns 412.

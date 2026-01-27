@@ -120,7 +120,10 @@ async fn create_single_user(
 #[expect(clippy::unused_async)]
 async fn authenticate_proxy(req: &salvo::Request) -> AppResult<User> {
     let _ = req;
-    todo!("Implement configuration for proxy authentication")
+
+    Err(AppError::InvalidConfiguration(
+        "Proxy authentication is not configured".to_string(),
+    ))
 }
 
 /// ## Summary

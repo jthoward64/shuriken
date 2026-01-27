@@ -209,8 +209,7 @@ async fn mkcol_extended_rejects_bad_body() {
         .await;
 
     response.assert_status(StatusCode::BAD_REQUEST);
-
-    }
+}
 
 // ============================================================================
 // Plain MKCOL Tests

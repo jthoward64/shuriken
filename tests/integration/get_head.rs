@@ -371,8 +371,7 @@ async fn head_matches_get_headers() {
 
     // HEAD body should be empty
     head_response.assert_body_empty();
-
-    }
+}
 
 /// ## Summary
 /// Test that HEAD on non-existent resource returns 404.
@@ -533,8 +532,7 @@ async fn get_if_none_match_different_etag_returns_200() {
         .await;
 
     response.assert_status(StatusCode::OK);
-
-    }
+}
 
 /// ## Summary
 /// Test that If-Match with mismatched ETag returns 412.
@@ -613,8 +611,7 @@ async fn get_if_match_success() {
     let response = TestRequest::get(&uri).if_match(etag).send(service).await;
 
     response.assert_status(StatusCode::OK);
-
-    }
+}
 
 // ============================================================================
 // Collection GET Tests

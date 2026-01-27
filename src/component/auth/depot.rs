@@ -100,13 +100,15 @@ pub async fn get_subjects_from_depot(
     depot: &salvo::Depot,
     conn: &mut DbConnection<'_>,
 ) -> AppResult<ExpandedSubjects> {
-    let depot_user = depot
-        .get::<DepotUser>("user")
-        .map_err(|_e| AppError::NotAuthenticated)?;
+    let depot_user = depot.get::<DepotUser>("user");
 
     match depot_user {
-        DepotUser::User(user) => get_expanded_subjects(conn, user).await,
-        DepotUser::Public => Ok(public_subjects()),
+        Ok(DepotUser::User(user)) => get_expanded_subjects(conn, user).await,
+        Ok(DepotUser::Public) => Ok(public_subjects()),
+        Err(_missing) => {
+            tracing::warn!("Depot missing user context; defaulting to public subjects");
+            Ok(public_subjects())
+        }
     }
 }
 

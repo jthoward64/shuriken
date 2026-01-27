@@ -5,6 +5,8 @@
 
 use std::cmp::Ordering;
 
+use crate::component::error::AppError;
+
 /// Permission levels in Shuriken's ACL model.
 ///
 /// Levels are ordered from lowest to highest. A principal with a higher level
@@ -119,6 +121,20 @@ impl PermissionLevel {
             Some(ceiling) => target.ordinal() <= ceiling.ordinal(),
             None => false,
         }
+    }
+
+    /// Ensure the grantor is allowed to grant the target level.
+    ///
+    /// ## Errors
+    /// Returns `AuthorizationError` when the grant would exceed the grantor's share ceiling.
+    pub fn ensure_can_grant(self, target: Self) -> Result<(), AppError> {
+        if self.can_grant(target) {
+            return Ok(());
+        }
+
+        Err(AppError::AuthorizationError(format!(
+            "Grantor level {self} cannot grant {target}",
+        )))
     }
 
     /// Returns the WebDAV privileges to report for `DAV:current-user-privilege-set`.
@@ -294,5 +310,19 @@ mod tests {
         // Owner can grant up to Admin
         assert!(PermissionLevel::Owner.can_grant(PermissionLevel::Admin));
         assert!(!PermissionLevel::Owner.can_grant(PermissionLevel::Owner));
+    }
+
+    #[test]
+    fn ensure_can_grant_errors() {
+        assert!(
+            PermissionLevel::EditShare
+                .ensure_can_grant(PermissionLevel::Edit)
+                .is_ok()
+        );
+        assert!(
+            PermissionLevel::EditShare
+                .ensure_can_grant(PermissionLevel::EditShare)
+                .is_err()
+        );
     }
 }

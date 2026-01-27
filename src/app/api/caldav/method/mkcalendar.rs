@@ -6,6 +6,8 @@
 use salvo::http::StatusCode;
 use salvo::{Depot, Request, Response, handler};
 
+use crate::app::api::dav::extract::auth::{get_auth_context, resource_id_for};
+use crate::component::auth::{Action, ResourceType};
 use crate::component::dav::service::collection::{CreateCollectionContext, create_collection};
 use crate::component::db::connection;
 use crate::component::rfc::dav::parse::{MkcolRequest, parse_mkcol};
@@ -48,8 +50,30 @@ pub async fn mkcalendar(req: &mut Request, res: &mut Response, depot: &Depot) {
         }
     };
 
-    // TODO: Parse path to extract parent and calendar name
-    // TODO: Check authorization
+    // Check authorization: user must have Edit (write) permission on parent collection
+    let (subjects, authorizer) = match get_auth_context(depot, &mut conn).await {
+        Ok(ctx) => ctx,
+        Err(status) => {
+            res.status_code(status);
+            return;
+        }
+    };
+
+    // Build a resource ID for the parent collection (user's calendars namespace)
+    let parent_resource = match extract_resource_type_from_path(&path) {
+        Some(resource_type) => resource_id_for(resource_type, uuid::Uuid::nil(), None),
+        None => {
+            tracing::warn!(path = %path, "Cannot determine resource type from path");
+            res.status_code(StatusCode::BAD_REQUEST);
+            return;
+        }
+    };
+
+    if let Err(e) = authorizer.require(&subjects, &parent_resource, Action::Edit) {
+        tracing::debug!(error = %e, "Authorization denied for MKCALENDAR");
+        res.status_code(StatusCode::FORBIDDEN);
+        return;
+    }
 
     // Parse optional MKCALENDAR XML body for initial properties
     let body = req.payload().await;
@@ -120,6 +144,17 @@ pub async fn mkcalendar(req: &mut Request, res: &mut Response, depot: &Depot) {
                 res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
             }
         }
+    }
+}
+
+/// Extract resource type from path.
+fn extract_resource_type_from_path(path: &str) -> Option<ResourceType> {
+    if path.contains("/calendars/") {
+        Some(ResourceType::Calendar)
+    } else if path.contains("/addressbooks/") {
+        Some(ResourceType::Addressbook)
+    } else {
+        None
     }
 }
 

@@ -183,8 +183,7 @@ async fn move_across_collections() {
         .send(create_test_service())
         .await;
     get_response.assert_status(StatusCode::OK);
-
-    }
+}
 
 // ============================================================================
 // COPY Basic Tests
@@ -362,8 +361,7 @@ async fn move_destination_exists_overwrite_false_412() {
         .await;
 
     response.assert_status(StatusCode::PRECONDITION_FAILED);
-
-    }
+}
 
 /// ## Summary
 /// Test that MOVE with existing destination and Overwrite:T succeeds.
@@ -548,8 +546,7 @@ async fn move_without_destination_400() {
     let response = TestRequest::move_resource(&source_uri).send(service).await;
 
     response.assert_status(StatusCode::BAD_REQUEST);
-
-    }
+}
 
 /// ## Summary
 /// Test that MOVE on non-existent resource returns 404.

@@ -38,8 +38,7 @@ async fn put_creates_calendar_object() {
         .await;
 
     response.assert_status(StatusCode::CREATED);
-
-    }
+}
 
 /// ## Summary
 /// Test that PUT creates a new vCard.
@@ -68,8 +67,7 @@ async fn put_creates_vcard() {
         .await;
 
     response.assert_status(StatusCode::CREATED);
-
-    }
+}
 
 // ============================================================================
 // Index Population Tests
@@ -326,8 +324,7 @@ async fn put_create_if_none_match_star_fails_when_exists() {
         .await;
 
     response.assert_status(StatusCode::PRECONDITION_FAILED);
-
-    }
+}
 
 // ============================================================================
 // If-Match Precondition Tests
@@ -422,8 +419,7 @@ async fn put_update_if_match_mismatch_412() {
         .await;
 
     response.assert_status(StatusCode::PRECONDITION_FAILED);
-
-    }
+}
 
 // ============================================================================
 // Content Validation Tests
@@ -551,8 +547,7 @@ async fn put_uid_conflict_rejected() {
 
     // Should return 403 Forbidden with no-uid-conflict precondition
     response.assert_status(StatusCode::FORBIDDEN);
-
-    }
+}
 
 // ============================================================================
 // Sync Token Tests

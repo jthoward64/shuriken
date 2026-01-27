@@ -18,13 +18,7 @@
 pub fn generate_slug(name: &str) -> String {
     name.to_lowercase()
         .chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() {
-                c
-            } else {
-                '-'
-            }
-        })
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
         .collect::<String>()
         .split('-')
         .filter(|s| !s.is_empty())
@@ -63,6 +57,9 @@ mod tests {
 
     #[test]
     fn test_complex() {
-        assert_eq!(generate_slug("Work & Personal @ Home"), "work-personal-home");
+        assert_eq!(
+            generate_slug("Work & Personal @ Home"),
+            "work-personal-home"
+        );
     }
 }

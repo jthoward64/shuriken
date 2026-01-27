@@ -127,15 +127,28 @@ impl ResourceId {
             if i == 1 {
                 // Owner segment
                 segments.push(PathSegment::Owner(part.to_string()));
-            } else if *part == "**" {
-                // Recursive glob
+                continue;
+            }
+
+            if *part == "**" {
+                // Recursive glob must terminate the path
+                if i + 1 != parts.len() {
+                    return None;
+                }
                 segments.push(PathSegment::Glob { recursive: true });
                 break;
-            } else if *part == "*" {
-                // Single-level glob
+            }
+
+            if *part == "*" {
+                // Single-level glob must terminate the path
+                if i + 1 != parts.len() {
+                    return None;
+                }
                 segments.push(PathSegment::Glob { recursive: false });
                 break;
-            } else if i == parts.len() - 1 {
+            }
+
+            if i == parts.len() - 1 {
                 // Last segment - could be item or collection
                 if part.ends_with('/') {
                     // Collection (trailing slash)
@@ -145,10 +158,15 @@ impl ResourceId {
                     // Item
                     segments.push(PathSegment::Item(part.to_string()));
                 }
-            } else {
-                // Collection segment
-                segments.push(PathSegment::Collection(part.to_string()));
+                continue;
             }
+
+            // Collection segment; reject likely item-looking segments that are not terminal
+            if part.contains('.') {
+                return None;
+            }
+
+            segments.push(PathSegment::Collection(part.to_string()));
         }
 
         Some(Self { segments })
@@ -348,5 +366,16 @@ mod tests {
         assert!(ResourceId::parse("").is_none());
         assert!(ResourceId::parse("/").is_none());
         assert!(ResourceId::parse("/invalid").is_none());
+    }
+
+    #[test]
+    fn glob_must_be_terminal() {
+        assert!(ResourceId::parse("/calendars/alice/**/extra").is_none());
+        assert!(ResourceId::parse("/calendars/alice/*/extra").is_none());
+    }
+
+    #[test]
+    fn item_must_be_terminal() {
+        assert!(ResourceId::parse("/calendars/alice/work.ics/extra").is_none());
     }
 }
