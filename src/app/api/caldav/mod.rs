@@ -9,7 +9,7 @@ pub mod method;
 pub mod report;
 
 pub fn routes() -> anyhow::Result<Router> {
-    Ok(Router::with_path("caldav")
+    Ok(Router::with_path("calendar")
         // Collection and calendar object operations
         .push(
             Router::with_path("{**rest}")

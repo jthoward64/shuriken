@@ -9,7 +9,7 @@ pub mod method;
 pub mod report;
 
 pub fn routes() -> anyhow::Result<Router> {
-    Ok(Router::with_path("carddav")
+    Ok(Router::with_path("addressbook")
         // Address book and vCard operations
         .push(
             Router::with_path("{**rest}")

@@ -6,11 +6,11 @@ use salvo::http::StatusCode;
 use salvo::{Depot, Request, Response, handler};
 
 use crate::app::api::dav::extract::auth::{
-    check_authorization, get_auth_context, load_instance_resource, resource_id_for,
+    check_authorization, get_auth_context,
 };
 use crate::app::api::dav::extract::headers::{Depth, parse_depth};
 use crate::component::auth::get_resource_id_from_depot;
-use crate::component::auth::{Action, ResourceType};
+use crate::component::auth::Action;
 use crate::component::db::connection;
 use crate::component::rfc::dav::build::multistatus::serialize_multistatus;
 use crate::component::rfc::dav::parse::propfind::parse_propfind;
@@ -152,26 +152,15 @@ pub async fn propfind(req: &mut Request, res: &mut Response, depot: &Depot) {
 async fn check_propfind_authorization(
     depot: &Depot,
     conn: &mut connection::DbConnection<'_>,
-    path: &str,
+    _path: &str,
 ) -> Result<(), StatusCode> {
     let (subjects, authorizer) = get_auth_context(depot, conn).await?;
 
-    // Prefer ResourceId from depot populated by middleware
-    let resource = if let Ok(rid) = get_resource_id_from_depot(depot) {
-        rid.clone()
-    } else if let Ok((collection_id, uri)) = path::parse_collection_and_uri(path) {
-        if let Some((inst, resource_type)) =
-            load_instance_resource(conn, collection_id, &uri).await?
-        {
-            resource_id_for(resource_type, collection_id, Some(&inst.slug))
-        } else {
-            resource_id_for(ResourceType::Calendar, collection_id, None)
-        }
-    } else if let Ok(collection_id) = path::extract_collection_id(path) {
-        resource_id_for(ResourceType::Calendar, collection_id, None)
-    } else {
-        return Ok(());
-    };
+    // Get ResourceId from depot (populated by slug_resolver middleware)
+    let resource = get_resource_id_from_depot(depot).map_err(|e| {
+        tracing::error!(error = %e, "ResourceId not found in depot; slug_resolver middleware may not have run");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
-    check_authorization(&authorizer, &subjects, &resource, Action::Read, "PROPFIND")
+    check_authorization(&authorizer, &subjects, resource, Action::Read, "PROPFIND")
 }

@@ -8,9 +8,7 @@ use salvo::Depot;
 use salvo::http::StatusCode;
 use salvo::{Request, Response, handler};
 
-use crate::app::api::dav::extract::auth::{
-    check_authorization, get_auth_context, load_instance_resource, resource_id_for,
-};
+use crate::app::api::dav::extract::auth::{check_authorization, get_auth_context, resource_id_for};
 use crate::component::auth::depot::{
     get_parsed_collection_id_from_depot, get_parsed_instance_slug_from_depot,
 };
@@ -370,29 +368,26 @@ async fn perform_move(
 async fn check_move_authorization(
     depot: &Depot,
     conn: &mut DbConnection<'_>,
-    source_collection_id: uuid::Uuid,
-    source_uri: &str,
+    _source_collection_id: uuid::Uuid,
+    _source_uri: &str,
     dest_collection_id: uuid::Uuid,
 ) -> Result<(), StatusCode> {
     let (subjects, authorizer) = get_auth_context(depot, conn).await?;
 
+    // Get ResourceId from depot (populated by slug_resolver middleware)
+    let source_resource = get_resource_id_from_depot(depot).map_err(|e| {
+        tracing::error!(error = %e, "ResourceId not found in depot; slug_resolver middleware may not have run");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
     // Check Write on source (unbind requires write)
-    if let Ok(rid) = get_resource_id_from_depot(depot) {
-        check_authorization(&authorizer, &subjects, rid, Action::Edit, "MOVE source")?;
-    } else if let Some((inst, resource_type)) =
-        load_instance_resource(conn, source_collection_id, source_uri).await?
-    {
-        let source_resource =
-            resource_id_for(resource_type, source_collection_id, Some(&inst.slug));
-        check_authorization(
-            &authorizer,
-            &subjects,
-            &source_resource,
-            Action::Edit,
-            "MOVE source",
-        )?;
-    }
-    // If source doesn't exist, let the handler return NOT_FOUND
+    check_authorization(
+        &authorizer,
+        &subjects,
+        source_resource,
+        Action::Edit,
+        "MOVE source",
+    )?;
 
     // Check Write on destination collection
     // TODO: Determine collection type (calendar vs addressbook) from DB

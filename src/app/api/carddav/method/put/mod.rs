@@ -5,15 +5,12 @@ mod types;
 use salvo::http::{HeaderValue, StatusCode};
 use salvo::{Depot, Request, Response, handler};
 
-use crate::app::api::dav::extract::auth::resource_id_for;
 use crate::component::auth::{
-    Action, ResourceType, authorizer_from_depot, get_subjects_from_depot,
+    Action, authorizer_from_depot, get_resource_id_from_depot, get_subjects_from_depot,
 };
 use crate::component::carddav::service::object::{PutObjectContext, put_address_object};
 use crate::component::db::connection;
-use crate::component::db::query::dav::instance;
 use crate::component::error::AppError;
-use crate::component::model::dav::instance::DavInstance;
 use crate::util::path;
 
 use types::{PutError, PutResult};
@@ -213,45 +210,19 @@ async fn perform_put(
 async fn check_put_authorization(
     depot: &Depot,
     conn: &mut connection::DbConnection<'_>,
-    path: &str,
+    _path: &str,
 ) -> Result<(), StatusCode> {
-    use diesel::prelude::*;
-    use diesel_async::RunQueryDsl;
-
-    // Parse path to extract collection_id and uri
-    let (collection_id, uri) = match path::parse_collection_and_uri(path) {
-        Ok(parsed) => parsed,
-        Err(e) => {
-            tracing::debug!(error = %e, path = %path, "Failed to parse path for authorization");
-            // Let the main handler deal with path parsing errors
-            return Ok(());
-        }
-    };
-
     // Get expanded subjects for the current user
     let subjects = get_subjects_from_depot(depot, conn).await.map_err(|e| {
         tracing::error!(error = %e, "Failed to get subjects from depot");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    // Try to load existing instance to determine if this is create or update
-    let existing: Option<DavInstance> = instance::by_collection_and_uri(collection_id, &uri)
-        .select(DavInstance::as_select())
-        .first::<DavInstance>(conn)
-        .await
-        .optional()
-        .map_err(|e| {
-            tracing::error!(error = %e, "Failed to check existing instance for authorization");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-
-    let resource = if let Some(_inst) = existing {
-        // Update: check permission on the entity URI within the collection
-        resource_id_for(ResourceType::Addressbook, collection_id, Some(&uri))
-    } else {
-        // Create: check permission on the collection
-        resource_id_for(ResourceType::Addressbook, collection_id, None)
-    };
+    // Get ResourceId from depot (populated by slug_resolver middleware)
+    let resource = get_resource_id_from_depot(depot).map_err(|e| {
+        tracing::error!(error = %e, "ResourceId not found in depot; slug_resolver middleware may not have run");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     // Get the authorizer
     let authorizer = authorizer_from_depot(depot).map_err(|e| {
@@ -260,7 +231,7 @@ async fn check_put_authorization(
     })?;
 
     // Check edit permission
-    match authorizer.require(&subjects, &resource, Action::Edit) {
+    match authorizer.require(&subjects, resource, Action::Edit) {
         Ok(_level) => Ok(()),
         Err(AppError::AuthorizationError(msg)) => {
             tracing::warn!(

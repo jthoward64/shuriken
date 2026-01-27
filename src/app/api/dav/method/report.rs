@@ -4,7 +4,7 @@ use salvo::http::StatusCode;
 use salvo::{Depot, Request, Response, handler};
 
 use crate::app::api::dav::extract::auth::{get_auth_context, resource_id_for};
-use crate::component::auth::{Action, ResourceType};
+use crate::component::auth::{Action, ResourceType, get_resource_id_from_depot};
 use crate::component::db::connection;
 use crate::component::rfc::dav::build::multistatus::serialize_multistatus;
 use crate::component::rfc::dav::core::{ExpandProperty, Multistatus, ReportType, SyncCollection};
@@ -115,7 +115,13 @@ pub async fn handle_sync_collection(
         }
     };
 
-    let resource = resource_id_for(ResourceType::Calendar, collection_id, None);
+    // Prefer ResourceId from depot if available (resolved by slug_resolver middleware)
+    let resource = if let Ok(rid) = get_resource_id_from_depot(depot) {
+        rid.clone()
+    } else {
+        resource_id_for(ResourceType::Calendar, collection_id, None)
+    };
+    
     if let Err(e) = authorizer.require(&subjects, &resource, Action::Read) {
         tracing::debug!(error = %e, "Authorization denied for sync-collection REPORT");
         res.status_code(StatusCode::FORBIDDEN);
@@ -218,7 +224,13 @@ pub async fn handle_expand_property(
         }
     };
 
-    let resource = resource_id_for(ResourceType::Calendar, collection_id, None);
+    // Prefer ResourceId from depot if available (resolved by slug_resolver middleware)
+    let resource = if let Ok(rid) = get_resource_id_from_depot(depot) {
+        rid.clone()
+    } else {
+        resource_id_for(ResourceType::Calendar, collection_id, None)
+    };
+    
     if let Err(e) = authorizer.require(&subjects, &resource, Action::Read) {
         tracing::debug!(error = %e, "Authorization denied for expand-property REPORT");
         res.status_code(StatusCode::FORBIDDEN);

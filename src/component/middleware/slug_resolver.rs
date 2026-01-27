@@ -5,11 +5,11 @@
 /// and stores resolved entities in the request depot for downstream handlers to use.
 ///
 /// For a path like `/calendars/alice/my-calendar/event-1.ics`:
-/// - Resolves "alice" (owner) → Principal
-/// - Resolves "my-calendar" (collection) → DavCollection
-/// - Resolves "event-1" (instance) → DavInstance
-/// - Stores Principal, DavCollection, DavInstance in depot
-/// - Stores pre-constructed ResourceId for authorization checks
+/// - Resolves "alice" (owner) → `Principal`
+/// - Resolves "my-calendar" (collection) → `DavCollection`
+/// - Resolves "event-1" (instance) → `DavInstance`
+/// - Stores `Principal`, `DavCollection`, `DavInstance` in depot
+/// - Stores pre-constructed `ResourceId` for authorization checks
 ///
 /// Both slug paths and UUID paths are supported and normalized.
 /// File extensions (.ics, .vcf) are optional for slug paths.
@@ -31,7 +31,7 @@ use crate::component::model::principal::Principal;
 /// Depot keys for storing resolved path entities
 pub mod depot_keys {
     pub const OWNER_PRINCIPAL: &str = "__owner_principal";
-    // COLLECTION now stores a Vec<DavCollection> ordered by precedence
+    // COLLECTION now stores a `Vec<DavCollection>` ordered by precedence
     // (most-specific/deepest first, then parents up to root).
     pub const COLLECTION: &str = "__collection";
     pub const INSTANCE: &str = "__instance";
@@ -56,12 +56,11 @@ pub async fn resolve_path_and_load_entities(
     debug!(path = %path, "Resolving path via ResourceId parser");
 
     // Parse the path using auth's ResourceId
-    let resource = match ResourceId::parse(path) {
-        Some(r) => r,
-        None => {
-            debug!("Path does not parse into ResourceId; skipping resolution");
-            return Ok(());
-        }
+    let resource = if let Some(r) = ResourceId::parse(path) {
+        r
+    } else {
+        debug!("Path does not parse into ResourceId; skipping resolution");
+        return Ok(());
     };
     debug!(resource = %resource, "Parsed ResourceId");
 
@@ -85,12 +84,9 @@ pub async fn resolve_path_and_load_entities(
     }
 
     // Resolve owner principal
-    let owner_str = match owner_opt {
-        Some(s) => s,
-        None => {
-            warn!("Owner segment missing in ResourceId");
-            return Ok(());
-        }
+    let Some(owner_str) = owner_opt else {
+        warn!("Owner segment missing in ResourceId");
+        return Ok(());
     };
     let owner_principal = resolve_principal(conn, &owner_str).await?;
 
@@ -104,6 +100,31 @@ pub async fn resolve_path_and_load_entities(
 
     // Resolve collection if present
     // Resolve nested collection chain if present
+    let collection_entity =
+        load_collection_hierarchy(depot, conn, collection_segments, owner_principal).await?;
+
+    // Resolve instance if present
+    if let (Some(inst_slug), Some(coll)) = (item_opt.as_ref(), &collection_entity) {
+        let inst = resolve_instance(conn, coll.id, inst_slug).await?;
+        if let Some(ref i) = inst {
+            debug!(instance_id = %i.id, slug = %i.slug, "Resolved instance");
+            depot.insert(depot_keys::INSTANCE, i.clone());
+            depot.insert(depot_keys::PARSED_INSTANCE_SLUG, i.slug.clone());
+        }
+    }
+
+    // Store parsed ResourceId for authorization
+    depot.insert(depot_keys::RESOURCE_ID, resource);
+
+    Ok(())
+}
+
+async fn load_collection_hierarchy(
+    depot: &mut Depot,
+    conn: &mut DbConnection<'_>,
+    collection_segments: Vec<String>,
+    owner_principal: Option<Principal>,
+) -> Result<Option<DavCollection>, anyhow::Error> {
     let collection_entity = if let (false, Some(principal)) =
         (collection_segments.is_empty(), &owner_principal)
     {
@@ -151,21 +172,7 @@ pub async fn resolve_path_and_load_entities(
     } else {
         None
     };
-
-    // Resolve instance if present
-    if let (Some(inst_slug), Some(coll)) = (item_opt.as_ref(), &collection_entity) {
-        let inst = resolve_instance(conn, coll.id, inst_slug).await?;
-        if let Some(ref i) = inst {
-            debug!(instance_id = %i.id, slug = %i.slug, "Resolved instance");
-            depot.insert(depot_keys::INSTANCE, i.clone());
-            depot.insert(depot_keys::PARSED_INSTANCE_SLUG, i.slug.clone());
-        }
-    }
-
-    // Store parsed ResourceId for authorization
-    depot.insert(depot_keys::RESOURCE_ID, resource);
-
-    Ok(())
+    Ok(collection_entity)
 }
 
 /// Test-friendly resolver that accepts a raw path string.
@@ -533,3 +540,52 @@ mod tests {
     // Integration tests with database
     // (Integration tests moved to tests/integration/slug_resolver.rs)
 }
+
+/// ## Summary
+/// Salvo handler wrapper for path resolution middleware.
+///
+/// Resolves slug-based paths and populates the depot with ResourceId and entity data
+/// for downstream handlers to use in authorization and request processing.
+#[salvo::async_trait]
+impl salvo::Handler for SlugResolverHandler {
+    async fn handle(
+        &self,
+        req: &mut salvo::Request,
+        depot: &mut Depot,
+        _res: &mut salvo::Response,
+        _ctrl: &mut salvo::FlowCtrl,
+    ) {
+        let path = req.uri().path();
+        tracing::debug!(path = %path, "SlugResolverHandler executing");
+
+        let db_provider = match crate::component::db::connection::get_db_from_depot(depot) {
+            Ok(provider) => provider,
+            Err(e) => {
+                tracing::debug!(error = %e, "Database provider not available in slug_resolver middleware");
+                return;
+            }
+        };
+
+        let mut conn = match db_provider.get_connection().await {
+            Ok(conn) => conn,
+            Err(e) => {
+                tracing::debug!(error = %e, "Failed to get database connection in slug_resolver middleware");
+                return;
+            }
+        };
+
+        match resolve_path_and_load_entities(req, depot, &mut conn).await {
+            Ok(()) => {
+                tracing::debug!(path = %path, "Path resolved successfully");
+            }
+            Err(e) => {
+                tracing::debug!(error = %e, path = %path, "Path resolution failed; continuing without depot entities");
+            }
+        }
+    }
+}
+
+/// ## Summary
+/// Middleware handler for path resolution.
+/// Use this as a handler in routes to resolve paths and populate the depot.
+pub struct SlugResolverHandler;

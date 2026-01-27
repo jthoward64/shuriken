@@ -39,8 +39,16 @@ pub async fn get_auth_context(
 /// ## Summary
 /// Loads an instance and determines its resource type.
 ///
+/// ## Deprecated
+/// This function is no longer used. Handlers should retrieve ResourceId from depot
+/// populated by the slug_resolver middleware. Kept for reference only.
+///
 /// ## Errors
 /// Returns `StatusCode::INTERNAL_SERVER_ERROR` for database errors.
+#[expect(
+    dead_code,
+    reason = "Deprecated in favor of depot-based resource resolution"
+)]
 pub async fn load_instance_resource(
     conn: &mut DbConnection<'_>,
     collection_id: uuid::Uuid,
@@ -67,6 +75,9 @@ pub async fn load_instance_resource(
 
 /// ## Summary
 /// Determines resource type from content-type header.
+///
+/// ## Deprecated
+/// This function is no longer used directly. Kept for reference only.
 #[must_use]
 pub fn resource_type_from_content_type(content_type: &str) -> ResourceType {
     if content_type.starts_with("text/calendar") {

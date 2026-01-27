@@ -6,9 +6,7 @@ use salvo::{Depot, Request, Response, handler};
 use diesel_async::AsyncConnection;
 use diesel_async::scoped_futures::ScopedFutureExt;
 
-use crate::app::api::dav::extract::auth::{
-    check_authorization, get_auth_context, load_instance_resource, resource_id_for,
-};
+use crate::app::api::dav::extract::auth::{check_authorization, get_auth_context};
 use crate::component::auth::Action;
 use crate::component::auth::depot::{
     get_parsed_collection_id_from_depot, get_parsed_instance_slug_from_depot,
@@ -217,21 +215,16 @@ async fn perform_delete(
 async fn check_delete_authorization(
     depot: &Depot,
     conn: &mut connection::DbConnection<'_>,
-    collection_id: uuid::Uuid,
-    slug: &str,
+    _collection_id: uuid::Uuid,
+    _slug: &str,
 ) -> Result<(), StatusCode> {
     let (subjects, authorizer) = get_auth_context(depot, conn).await?;
 
-    // Prefer ResourceId from depot if available
-    let resource = if let Ok(rid) = get_resource_id_from_depot(depot) {
-        rid.clone()
-    } else if let Some((inst, resource_type)) =
-        load_instance_resource(conn, collection_id, slug).await?
-    {
-        resource_id_for(resource_type, collection_id, Some(&inst.slug))
-    } else {
-        // Let the main handler return NOT_FOUND for consistency
-        return Ok(());
-    };
+    // Get ResourceId from depot (populated by slug_resolver middleware)
+    let resource = get_resource_id_from_depot(depot).map_err(|e| {
+        tracing::error!(error = %e, "ResourceId not found in depot; slug_resolver middleware may not have run");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
     check_authorization(&authorizer, &subjects, &resource, Action::Delete, "DELETE")
 }

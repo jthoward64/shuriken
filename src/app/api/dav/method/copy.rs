@@ -5,9 +5,7 @@
 use salvo::http::StatusCode;
 use salvo::{Depot, Request, Response, handler};
 
-use crate::app::api::dav::extract::auth::{
-    check_authorization, get_auth_context, load_instance_resource, resource_id_for,
-};
+use crate::app::api::dav::extract::auth::{check_authorization, get_auth_context, resource_id_for};
 use crate::component::auth::depot::{
     get_parsed_collection_id_from_depot, get_parsed_instance_slug_from_depot,
 };
@@ -168,29 +166,26 @@ pub async fn copy(req: &mut Request, res: &mut Response, depot: &Depot) {
 async fn check_copy_authorization(
     depot: &Depot,
     conn: &mut connection::DbConnection<'_>,
-    source_collection_id: uuid::Uuid,
-    source_uri: &str,
+    _source_collection_id: uuid::Uuid,
+    _source_uri: &str,
     dest_collection_id: uuid::Uuid,
 ) -> Result<(), StatusCode> {
     let (subjects, authorizer) = get_auth_context(depot, conn).await?;
 
-    // Check Read on source (if it exists), prefer ResourceId from depot
-    if let Ok(rid) = get_resource_id_from_depot(depot) {
-        check_authorization(&authorizer, &subjects, rid, Action::Read, "COPY source")?;
-    } else if let Some((_inst, resource_type)) =
-        load_instance_resource(conn, source_collection_id, source_uri).await?
-    {
-        let source_resource =
-            resource_id_for(resource_type, source_collection_id, Some(source_uri));
-        check_authorization(
-            &authorizer,
-            &subjects,
-            &source_resource,
-            Action::Read,
-            "COPY source",
-        )?;
-    }
-    // If source doesn't exist, let the handler return NOT_FOUND
+    // Get ResourceId from depot (populated by slug_resolver middleware)
+    let source_resource = get_resource_id_from_depot(depot).map_err(|e| {
+        tracing::error!(error = %e, "ResourceId not found in depot; slug_resolver middleware may not have run");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    // Check Read on source
+    check_authorization(
+        &authorizer,
+        &subjects,
+        source_resource,
+        Action::Read,
+        "COPY source",
+    )?;
 
     // Check Write on destination collection
     // TODO: Determine collection type (calendar vs addressbook) from DB

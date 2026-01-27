@@ -7,11 +7,10 @@ use salvo::http::StatusCode;
 use salvo::writing::Text;
 use salvo::{Depot, Request, Response, handler};
 
-use crate::app::api::dav::extract::auth::resource_id_for;
 use crate::component::auth::depot::get_parsed_collection_id_from_depot;
 use crate::component::auth::get_resource_id_from_depot;
 use crate::component::auth::{
-    Action, ResourceType, authorizer_from_depot, get_subjects_from_depot,
+    Action, authorizer_from_depot, get_subjects_from_depot,
 };
 use crate::component::db::connection;
 use crate::component::db::query::dav::collection;
@@ -223,31 +222,29 @@ pub async fn proppatch(req: &mut Request, res: &mut Response, depot: &Depot) {
 async fn check_proppatch_authorization(
     depot: &Depot,
     conn: &mut connection::DbConnection<'_>,
-    collection_id: uuid::Uuid,
+    _collection_id: uuid::Uuid,
 ) -> Result<(), StatusCode> {
     let subjects = get_subjects_from_depot(depot, conn).await.map_err(|e| {
         tracing::error!(error = %e, "Failed to get subjects from depot");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    // Prefer ResourceId from depot if available
-    let resource = if let Ok(rid) = get_resource_id_from_depot(depot) {
-        rid.clone()
-    } else {
-        // TODO: Determine collection type (calendar vs addressbook) from DB
-        resource_id_for(ResourceType::Calendar, collection_id, None)
-    };
+    // Get ResourceId from depot (populated by slug_resolver middleware)
+    let resource = get_resource_id_from_depot(depot).map_err(|e| {
+        tracing::error!(error = %e, "ResourceId not found in depot; slug_resolver middleware may not have run");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     let authorizer = authorizer_from_depot(depot).map_err(|e| {
         tracing::error!(error = %e, "Failed to get authorizer");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    match authorizer.require(&subjects, &resource, Action::Edit) {
+    match authorizer.require(&subjects, resource, Action::Edit) {
         Ok(_level) => Ok(()),
         Err(AppError::AuthorizationError(msg)) => {
             tracing::warn!(
-                collection_id = %collection_id,
+                resource = %resource,
                 reason = %msg,
                 "Authorization denied for PROPPATCH"
             );
