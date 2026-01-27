@@ -7,7 +7,7 @@ use salvo::http::StatusCode;
 
 use crate::component::auth::{
     Action, Authorizer, ExpandedSubjects, PathSegment, ResourceId, ResourceType,
-    authorizer_from_depot, get_resource_id_from_depot, get_subjects_from_depot,
+    authorizer_from_depot, get_subjects_from_depot,
 };
 use crate::component::db::connection::DbConnection;
 use crate::component::db::query::dav::instance;
@@ -34,29 +34,6 @@ pub async fn get_auth_context(
     })?;
 
     Ok((subjects, authorizer))
-}
-
-/// ## Summary
-/// Gets the ResourceId from the depot (populated by slug resolver middleware).
-///
-/// Falls back to constructing a ResourceId from collection_id if not found in depot.
-///
-/// ## Errors
-/// Returns `StatusCode::INTERNAL_SERVER_ERROR` if ResourceId cannot be obtained.
-pub fn get_or_build_resource_id(
-    depot: &Depot,
-    resource_type: ResourceType,
-    collection_id: uuid::Uuid,
-    uri: Option<&str>,
-) -> Result<ResourceId, StatusCode> {
-    // Try to get pre-resolved ResourceId from depot first
-    if let Ok(resource_id) = get_resource_id_from_depot(depot) {
-        return Ok(resource_id.clone());
-    }
-
-    // Fallback: build ResourceId using legacy UUID-based approach
-    tracing::debug!("ResourceId not in depot, constructing from collection_id");
-    Ok(resource_id_for(resource_type, collection_id, uri))
 }
 
 /// ## Summary

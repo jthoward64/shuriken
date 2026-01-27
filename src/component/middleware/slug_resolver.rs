@@ -18,9 +18,11 @@ use diesel_async::RunQueryDsl;
 use salvo::Depot;
 use tracing::{debug, warn};
 
-use crate::component::auth::{PathSegment, ResourceId, ResourceType};
+#[cfg(test)]
+use crate::component::auth::ResourceType;
+use crate::component::auth::{PathSegment, ResourceId};
 use crate::component::db::connection::DbConnection;
-use crate::component::db::query::dav::{collection, instance};
+use crate::component::db::query::dav::instance;
 use crate::component::db::schema::{dav_collection, dav_instance, principal};
 use crate::component::model::dav::collection::DavCollection;
 use crate::component::model::dav::instance::DavInstance;
@@ -314,36 +316,8 @@ async fn resolve_principal(
         .map_err(Into::into)
 }
 
-/// Resolve a collection by slug or UUID.
-async fn resolve_collection(
-    conn: &mut DbConnection<'_>,
-    owner_principal_id: uuid::Uuid,
-    identifier: &str,
-) -> anyhow::Result<Option<DavCollection>> {
-    // Try parsing as UUID first
-    if let Ok(uuid) = uuid::Uuid::parse_str(identifier) {
-        return dav_collection::table
-            .filter(dav_collection::id.eq(uuid))
-            .filter(dav_collection::owner_principal_id.eq(owner_principal_id))
-            .filter(dav_collection::deleted_at.is_null())
-            .select(DavCollection::as_select())
-            .first(conn)
-            .await
-            .optional()
-            .map_err(Into::into);
-    }
-
-    // Otherwise treat as slug
-    collection::by_slug_and_principal(identifier, owner_principal_id)
-        .filter(dav_collection::deleted_at.is_null())
-        .select(DavCollection::as_select())
-        .first(conn)
-        .await
-        .optional()
-        .map_err(Into::into)
-}
-
 /// Resolve an instance by slug or UUID.
+#[cfg_attr(test, allow(dead_code))]
 async fn resolve_instance(
     conn: &mut DbConnection<'_>,
     collection_id: uuid::Uuid,
@@ -372,6 +346,7 @@ async fn resolve_instance(
 }
 
 /// Build a ResourceId for authorization from resolved entities.
+#[cfg(test)]
 fn build_resource_id(
     resource_type: ResourceType,
     principal: &Principal,

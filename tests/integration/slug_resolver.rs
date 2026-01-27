@@ -63,6 +63,36 @@ async fn resolve_calendar_collection_path() {
     assert_eq!(collection.slug, "work");
 }
 
+/// Resolves a nested calendar collection path and verifies child resolution.
+#[tokio::test]
+#[ignore = "requires running database"]
+async fn resolve_nested_calendar_collection_path() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+
+    let principal_id = test_db
+        .seed_principal("user", "alice", Some("Alice"))
+        .await
+        .expect("Failed to seed principal");
+    let parent_id = test_db
+        .seed_collection(principal_id, "calendar", "work", Some("Work"))
+        .await
+        .expect("Failed to seed parent collection");
+    let child_id = test_db
+        .seed_child_collection(principal_id, "calendar", "team", Some("Team"), parent_id)
+        .await
+        .expect("Failed to seed child collection");
+
+    let mut conn = test_db.get_conn().await.expect("conn");
+    let (_owner, collection_opt, _instance, _rid) =
+        resolve_path_for_testing("/calendars/alice/work/team/**", &mut conn)
+            .await
+            .expect("resolve ok");
+
+    let collection = collection_opt.expect("collection present");
+    assert_eq!(collection.id, child_id);
+    assert_eq!(collection.slug, "team");
+}
+
 /// Resolves a calendar instance path and verifies instance resolution.
 #[tokio::test]
 #[ignore = "requires running database"]
@@ -104,4 +134,42 @@ async fn resolve_calendar_instance_path() {
     let instance = instance_opt.expect("instance present");
     assert_eq!(instance.id, instance_id);
     assert_eq!(instance.slug, "event-1");
+}
+
+/// Resolves a nested calendar instance path and verifies instance resolution under child collection.
+#[tokio::test]
+#[ignore = "requires running database"]
+async fn resolve_nested_calendar_instance_path() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+
+    let principal_id = test_db
+        .seed_principal("user", "alice", Some("Alice"))
+        .await
+        .expect("Failed to seed principal");
+    let parent_id = test_db
+        .seed_collection(principal_id, "calendar", "work", Some("Work"))
+        .await
+        .expect("Failed to seed parent collection");
+    let child_id = test_db
+        .seed_child_collection(principal_id, "calendar", "team", Some("Team"), parent_id)
+        .await
+        .expect("Failed to seed child collection");
+    let entity_id = test_db
+        .seed_entity("icalendar", Some("uid-2"))
+        .await
+        .expect("Failed to seed entity");
+    let instance_id = test_db
+        .seed_instance(child_id, entity_id, "standup", "text/calendar", "etag2", 1)
+        .await
+        .expect("Failed to seed instance");
+
+    let mut conn = test_db.get_conn().await.expect("conn");
+    let (_owner, _collection, instance_opt, _rid) =
+        resolve_path_for_testing("/calendars/alice/work/team/standup.ics", &mut conn)
+            .await
+            .expect("resolve ok");
+
+    let instance = instance_opt.expect("instance present");
+    assert_eq!(instance.id, instance_id);
+    assert_eq!(instance.slug, "standup");
 }

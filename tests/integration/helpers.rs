@@ -725,6 +725,43 @@ impl TestDb {
         Ok(collection_id)
     }
 
+    /// Seeds a child collection with a parent_collection_id and returns its ID.
+    pub async fn seed_child_collection(
+        &self,
+        owner_principal_id: uuid::Uuid,
+        collection_type: &str,
+        slug: &str,
+        display_name: Option<&str>,
+        parent_collection_id: uuid::Uuid,
+    ) -> anyhow::Result<uuid::Uuid> {
+        use shuriken::component::db::schema::dav_collection;
+        use shuriken::component::model::dav::collection::NewDavCollection;
+
+        let mut conn = self.get_conn().await?;
+
+        let new_collection = NewDavCollection {
+            owner_principal_id,
+            collection_type,
+            slug,
+            display_name,
+            description: None,
+            timezone_tzid: None,
+        };
+
+        let collection_id = diesel::insert_into(dav_collection::table)
+            .values(&new_collection)
+            .returning(dav_collection::id)
+            .get_result::<uuid::Uuid>(&mut conn)
+            .await?;
+
+        diesel::update(dav_collection::table.filter(dav_collection::id.eq(collection_id)))
+            .set(dav_collection::parent_collection_id.eq(parent_collection_id))
+            .execute(&mut conn)
+            .await?;
+
+        Ok(collection_id)
+    }
+
     /// Seeds a test entity with an optional logical UID and returns its ID.
     ///
     /// ## Errors
