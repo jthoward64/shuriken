@@ -45,12 +45,11 @@ pub async fn resolve_path_and_load_entities(
     let path = req.uri().path();
 
     // Parse ResourceId first
-    let location = match ResourceLocation::parse(path) {
-        Some(r) => r,
-        None => {
-            debug!("Path does not conform to known ResourceId format");
-            return Ok(());
-        }
+    let location = if let Some(r) = ResourceLocation::parse(path) {
+        r
+    } else {
+        debug!("Path does not conform to known ResourceId format");
+        return Ok(());
     };
 
     // Extract identifiers from ResourceId segments
@@ -78,30 +77,25 @@ pub async fn resolve_path_and_load_entities(
         }
     }
 
-    let resource_type = match resource_type_opt {
-        Some(rt) => rt,
-        None => {
-            warn!("No resource type segment found in path");
-            return Ok(());
-        }
+    let resource_type = if let Some(rt) = resource_type_opt {
+        rt
+    } else {
+        warn!("No resource type segment found in path");
+        return Ok(());
     };
 
     // Resolve principal
-    let owner_principal = match owner_opt {
-        Some(ref owner) => match resolve_principal(conn, owner).await? {
-            Some(p) => {
-                depot.insert(depot_keys::OWNER_PRINCIPAL, p.clone());
-                p
-            }
-            None => {
-                warn!("Owner principal not found for identifier: {}", owner);
-                return Ok(());
-            }
-        },
-        None => {
-            warn!("No owner segment found in path");
+    let owner_principal = if let Some(ref owner) = owner_opt {
+        if let Some(p) = resolve_principal(conn, owner).await? {
+            depot.insert(depot_keys::OWNER_PRINCIPAL, p.clone());
+            p
+        } else {
+            warn!("Owner principal not found for identifier: {}", owner);
             return Ok(());
         }
+    } else {
+        warn!("No owner segment found in path");
+        return Ok(());
     };
 
     // Resolve collection(s) if present
@@ -297,15 +291,12 @@ async fn fetch_collection_by_slug(
                     .first(conn)
                     .await
                     .optional()?;
-                match found {
-                    Some(c) => {
-                        current_parent = Some(c.id);
-                        resolved = Some(c);
-                    }
-                    None => {
-                        resolved = None;
-                        break;
-                    }
+                if let Some(c) = found {
+                    current_parent = Some(c.id);
+                    resolved = Some(c);
+                } else {
+                    resolved = None;
+                    break;
                 }
             }
 
@@ -408,7 +399,7 @@ fn build_resource_id(
 /// ## Summary
 /// Salvo handler wrapper for path resolution middleware.
 ///
-/// Resolves slug-based paths and populates the depot with ResourceId and entity data
+/// Resolves slug-based paths and populates the depot with `ResourceId` and entity data
 /// for downstream handlers to use in authorization and request processing.
 #[salvo::async_trait]
 impl salvo::Handler for SlugResolverHandler {

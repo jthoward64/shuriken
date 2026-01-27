@@ -63,7 +63,7 @@ pub fn by_uri_and_principal(
     let slug = uri
         .trim_end_matches('/')
         .split('/')
-        .last()
+        .next_back()
         .unwrap_or(uri)
         .to_string();
     all()

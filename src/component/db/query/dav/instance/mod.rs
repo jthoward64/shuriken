@@ -61,7 +61,7 @@ pub fn by_collection_and_uri(
         .trim_end_matches(".ics")
         .trim_end_matches(".vcf")
         .split('/')
-        .last()
+        .next_back()
         .unwrap_or(uri)
         .to_string();
 

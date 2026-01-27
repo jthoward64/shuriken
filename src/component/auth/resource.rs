@@ -215,6 +215,7 @@ impl ResourceLocation {
         path
     }
 
+    #[must_use]
     pub fn to_url(&self, serve_origin: &str) -> String {
         let path = self.to_path();
         format!(
@@ -242,13 +243,12 @@ impl ResourceLocation {
     /// Returns the resource type if present in the path.
     #[must_use]
     pub fn resource_type(&self) -> Option<ResourceType> {
-        self.segments.first().and_then(|seg| {
-            if let PathSegment::ResourceType(rt) = seg {
-                Some(*rt)
-            } else {
-                None
-            }
-        })
+        let seg = self.segments.first()?;
+        if let PathSegment::ResourceType(rt) = seg {
+            Some(*rt)
+        } else {
+            None
+        }
     }
 
     /// Returns the owner if present in the path.

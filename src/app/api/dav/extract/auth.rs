@@ -40,8 +40,8 @@ pub async fn get_auth_context(
 /// Loads an instance and determines its resource type.
 ///
 /// ## Deprecated
-/// This function is no longer used. Handlers should retrieve ResourceId from depot
-/// populated by the slug_resolver middleware. Kept for reference only.
+/// This function is no longer used. Handlers should retrieve `ResourceId` from depot
+/// populated by the `slug_resolver` middleware. Kept for reference only.
 ///
 /// ## Errors
 /// Returns `StatusCode::INTERNAL_SERVER_ERROR` for database errors.
