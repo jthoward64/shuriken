@@ -119,18 +119,17 @@ pub async fn resolve_path_and_load_entities(
     let instance_entity = if let (Some(inst_slug), Some(coll_with_parent)) =
         (item_opt.as_ref(), &collection_entity)
     {
-        match resolve_instance(conn, coll_with_parent.collection.id, inst_slug).await? {
-            Some(inst) => {
-                depot.insert(depot_keys::INSTANCE, inst.clone());
-                Some(inst)
-            }
-            None => {
-                warn!(
-                    "Instance not found for slug: {} in collection ID: {}",
-                    inst_slug, coll_with_parent.collection.id
-                );
-                return Ok(());
-            }
+        if let Some(inst) =
+            resolve_instance(conn, coll_with_parent.collection.id, inst_slug).await?
+        {
+            depot.insert(depot_keys::INSTANCE, inst.clone());
+            Some(inst)
+        } else {
+            warn!(
+                "Instance not found for slug: {} in collection ID: {}",
+                inst_slug, coll_with_parent.collection.id
+            );
+            return Ok(());
         }
     } else {
         None
@@ -159,49 +158,6 @@ pub async fn resolve_path_and_load_entities(
     Ok(())
 }
 
-/// Parse API-style DAV paths into `(ResourceType, collection_id, item_slug)`.
-#[must_use]
-fn parse_api_dav_path(
-    path: &str,
-) -> (
-    Option<crate::component::auth::ResourceType>,
-    Option<uuid::Uuid>,
-    Option<String>,
-) {
-    let parts: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
-    if parts.is_empty() {
-        return (None, None, None);
-    }
-    // Find caldav or carddav segment, allowing optional "api" and "dav" prefixes
-    let mut idx: Option<usize> = None;
-    for (i, p) in parts.iter().enumerate() {
-        if *p == "caldav" || *p == "carddav" {
-            idx = Some(i);
-            break;
-        }
-    }
-    let Some(i) = idx else {
-        return (None, None, None);
-    };
-    let rt = if parts[i] == "caldav" {
-        crate::component::auth::ResourceType::Calendar
-    } else {
-        crate::component::auth::ResourceType::Addressbook
-    };
-    // Next segment must be UUID collection id
-    if i + 1 >= parts.len() {
-        return (Some(rt), None, None);
-    }
-    let collection_id = uuid::Uuid::parse_str(parts[i + 1]).ok();
-    // Optional item slug
-    let item_slug = if i + 2 < parts.len() {
-        Some(parts.last().unwrap().to_string())
-    } else {
-        None
-    };
-    (Some(rt), collection_id, item_slug)
-}
-
 async fn load_collection_hierarchy(
     conn: &mut DbConnection<'_>,
     collection_segments: Vec<String>,
@@ -228,18 +184,15 @@ async fn load_collection_hierarchy(
             .first(conn)
             .await
             .optional()?;
-        match found {
-            Some(c) => {
-                current_parent = Some(c.id);
-                resolved = Some(DavCollectionWithParent {
-                    collection: c,
-                    parent_collection: resolved.map(|r| Box::new(r.collection.clone())),
-                });
-            }
-            None => {
-                resolved = None;
-                break;
-            }
+        if let Some(c) = found {
+            current_parent = Some(c.id);
+            resolved = Some(DavCollectionWithParent {
+                collection: c,
+                parent_collection: resolved.map(|r| Box::new(r.collection.clone())),
+            });
+        } else {
+            resolved = None;
+            break;
         }
     }
 

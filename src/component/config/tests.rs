@@ -99,6 +99,7 @@ fn test_settings_structure() {
         server: ServerConfig {
             host: "127.0.0.1".to_string(),
             port: 8698,
+            serve_origin: None,
         },
         logging: LoggingConfig {
             level: "debug".to_string(),
@@ -127,6 +128,7 @@ fn test_settings_debug() {
         server: ServerConfig {
             host: "127.0.0.1".to_string(),
             port: 8698,
+            serve_origin: None,
         },
         logging: LoggingConfig {
             level: "info".to_string(),

@@ -6,7 +6,7 @@ use salvo::http::{HeaderValue, StatusCode};
 use salvo::{Depot, Request, Response, handler};
 
 use crate::component::auth::{
-    Action, authorizer_from_depot, get_resource_id_from_depot, get_subjects_from_depot,
+    Action, authorizer_from_depot, get_resolved_location_from_depot, get_subjects_from_depot,
 };
 use crate::component::carddav::service::object::{PutObjectContext, put_address_object};
 use crate::component::db::connection;
@@ -218,9 +218,9 @@ async fn check_put_authorization(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    // Get ResourceId from depot (populated by slug_resolver middleware)
-    let resource = get_resource_id_from_depot(depot).map_err(|e| {
-        tracing::error!(error = %e, "ResourceId not found in depot; slug_resolver middleware may not have run");
+    // Get ResourceLocation from depot (populated by slug_resolver middleware)
+    let resource = get_resolved_location_from_depot(depot).map_err(|e| {
+        tracing::error!(error = %e, "ResourceLocation not found in depot; slug_resolver middleware may not have run");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 

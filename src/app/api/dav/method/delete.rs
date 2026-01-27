@@ -7,11 +7,10 @@ use diesel_async::AsyncConnection;
 use diesel_async::scoped_futures::ScopedFutureExt;
 
 use crate::app::api::dav::extract::auth::{check_authorization, get_auth_context};
-use crate::component::auth::Action;
-use crate::component::auth::depot::{
-    get_parsed_collection_id_from_depot, get_parsed_instance_slug_from_depot,
+use crate::component::auth::{
+    Action, get_instance_from_depot, get_resolved_location_from_depot,
+    get_terminal_collection_from_depot,
 };
-use crate::component::auth::get_resource_id_from_depot;
 use crate::component::db::connection;
 use crate::component::db::query::caldav::{event_index, occurrence};
 use crate::component::db::query::carddav::card_index;
@@ -45,10 +44,10 @@ pub async fn delete(req: &mut Request, res: &mut Response, depot: &Depot) {
 
     // Prefer middleware-resolved values from depot; fallback to path parsing
     let (collection_id, slug) = match (
-        get_parsed_collection_id_from_depot(depot),
-        get_parsed_instance_slug_from_depot(depot),
+        get_terminal_collection_from_depot(depot),
+        get_instance_from_depot(depot),
     ) {
-        (Ok(cid), Ok(s)) => (cid, s),
+        (Ok(coll), Ok(inst)) => (coll.id, inst.slug.clone()),
         _ => match path::parse_collection_and_uri(&path) {
             Ok(parsed) => parsed,
             Err(e) => {
@@ -221,11 +220,11 @@ async fn check_delete_authorization(
 ) -> Result<(), StatusCode> {
     let (subjects, authorizer) = get_auth_context(depot, conn).await?;
 
-    // Get ResourceId from depot (populated by slug_resolver middleware)
-    let resource = get_resource_id_from_depot(depot).map_err(|e| {
-        tracing::error!(error = %e, "ResourceId not found in depot; slug_resolver middleware may not have run");
+    // Get ResourceLocation from depot (populated by slug_resolver middleware)
+    let resource = get_resolved_location_from_depot(depot).map_err(|e| {
+        tracing::error!(error = %e, "ResourceLocation not found in depot; slug_resolver middleware may not have run");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    check_authorization(&authorizer, &subjects, &resource, Action::Delete, "DELETE")
+    check_authorization(&authorizer, &subjects, resource, Action::Delete, "DELETE")
 }

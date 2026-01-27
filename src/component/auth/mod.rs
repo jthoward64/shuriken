@@ -32,7 +32,11 @@ pub use action::{Action, HttpMethod, MethodContext, action_for_method};
 pub use authorize::{
     Authorizer, AuthzResult, authorizer_from_depot, handler_check, handler_require,
 };
-pub use depot::{get_expanded_subjects, get_subjects_from_depot, get_user_from_depot};
+pub use depot::{
+    get_collection_chain_from_depot, get_expanded_subjects, get_instance_from_depot,
+    get_owner_principal_from_depot, get_resolved_location_from_depot, get_subjects_from_depot,
+    get_terminal_collection_from_depot, get_user_from_depot,
+};
 pub use permission::{PermissionLevel, WebDavPrivilege};
 pub use privilege::{PrivilegeSetBuilder, privileges_for_level, supported_privilege_set_xml};
 pub use resource::{PathSegment, ResourceLocation, ResourceType};

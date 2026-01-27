@@ -1,16 +1,15 @@
 //! PROPPATCH method handler for `WebDAV` property updates.
 
-#![allow(clippy::manual_let_else)]
-#![allow(clippy::single_match_else)]
+#![expect(clippy::manual_let_else)]
+#![expect(clippy::single_match_else)]
 
 use salvo::http::StatusCode;
 use salvo::writing::Text;
 use salvo::{Depot, Request, Response, handler};
 
-use crate::component::auth::depot::get_parsed_collection_id_from_depot;
-use crate::component::auth::get_resource_id_from_depot;
 use crate::component::auth::{
-    Action, authorizer_from_depot, get_subjects_from_depot,
+    Action, authorizer_from_depot, get_resolved_location_from_depot, get_subjects_from_depot,
+    get_terminal_collection_from_depot,
 };
 use crate::component::db::connection;
 use crate::component::db::query::dav::collection;
@@ -60,8 +59,8 @@ pub async fn proppatch(req: &mut Request, res: &mut Response, depot: &Depot) {
     };
 
     // Prefer middleware-resolved collection ID from depot
-    let collection_id = match get_parsed_collection_id_from_depot(depot) {
-        Ok(id) => id,
+    let collection_id = match get_terminal_collection_from_depot(depot) {
+        Ok(coll) => coll.id,
         Err(_) => match path::extract_collection_id(&path) {
             Ok(id) => id,
             Err(e) => {
@@ -229,9 +228,9 @@ async fn check_proppatch_authorization(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    // Get ResourceId from depot (populated by slug_resolver middleware)
-    let resource = get_resource_id_from_depot(depot).map_err(|e| {
-        tracing::error!(error = %e, "ResourceId not found in depot; slug_resolver middleware may not have run");
+    // Get ResourceLocation from depot (populated by slug_resolver middleware)
+    let resource = get_resolved_location_from_depot(depot).map_err(|e| {
+        tracing::error!(error = %e, "ResourceLocation not found in depot; slug_resolver middleware may not have run");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 

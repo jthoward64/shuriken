@@ -4,12 +4,9 @@ use salvo::http::{HeaderValue, StatusCode};
 use salvo::{Depot, Request, Response};
 
 use crate::app::api::dav::extract::auth::resource_id_for;
-use crate::component::auth::depot::{
-    get_instance_from_depot, get_parsed_collection_id_from_depot,
-    get_parsed_instance_slug_from_depot,
-};
 use crate::component::auth::{
-    Action, ResourceType, authorizer_from_depot, get_subjects_from_depot,
+    Action, ResourceType, authorizer_from_depot, get_instance_from_depot, get_subjects_from_depot,
+    get_terminal_collection_from_depot,
 };
 use crate::component::db::connection;
 use crate::component::db::map::dav::{serialize_ical_tree, serialize_vcard_tree};
@@ -40,13 +37,13 @@ pub(super) async fn handle_get_or_head(
 
     // Prefer middleware-resolved values from depot
     let (collection_id, slug) = match (
-        get_parsed_collection_id_from_depot(depot),
-        get_parsed_instance_slug_from_depot(depot),
+        get_terminal_collection_from_depot(depot),
+        get_instance_from_depot(depot),
     ) {
-        (Ok(cid), Ok(s)) => (cid, s),
-        (Ok(cid), Err(_)) => {
+        (Ok(coll), Ok(inst)) => (coll.id, inst.slug.clone()),
+        (Ok(coll), Err(_)) => {
             // No instance slug; GET/HEAD requires an instance target
-            tracing::debug!(collection_id = %cid, "Instance slug missing in depot for GET/HEAD");
+            tracing::debug!(collection_id = %coll.id, "Instance slug missing in depot for GET/HEAD");
             res.status_code(StatusCode::NOT_FOUND);
             return;
         }
@@ -72,7 +69,7 @@ pub(super) async fn handle_get_or_head(
     );
 
     // If middleware already loaded instance, reuse it
-    let maybe_inst = get_instance_from_depot(depot).cloned();
+    let maybe_inst = get_instance_from_depot(depot).ok().cloned();
     let (instance, canonical_bytes) = if let Some(inst) = maybe_inst {
         match load_entity_bytes_for_instance(depot, &inst).await {
             Ok(Some(bytes)) => (inst, bytes),

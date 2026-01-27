@@ -21,7 +21,7 @@ use crate::component::rfc::dav::core::PreconditionError;
 /// let err = PreconditionError::CalendarSupportedCollation("i;unknown".into());
 /// write_precondition_error(res, &err);
 /// ```
-#[allow(dead_code)]
+#[allow(dead_code, reason = "Scaffolded error helpers not yet used")]
 pub fn write_precondition_error(res: &mut Response, error: &PreconditionError) {
     res.status_code(error.status_code());
 
@@ -46,7 +46,7 @@ pub fn write_precondition_error(res: &mut Response, error: &PreconditionError) {
 }
 
 /// Extension trait for `Response` to simplify precondition error handling.
-#[allow(dead_code)]
+#[expect(dead_code, reason = "Scaffolded error helpers not yet used")]
 pub trait PreconditionErrorExt {
     /// Writes a precondition error to the response.
     fn precondition_error(&mut self, error: &PreconditionError);

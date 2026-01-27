@@ -1,15 +1,15 @@
 //! COPY method handler for `WebDAV` resource copying.
 
-#![allow(clippy::single_match_else)]
+#![expect(clippy::single_match_else)]
 
 use salvo::http::StatusCode;
 use salvo::{Depot, Request, Response, handler};
 
 use crate::app::api::dav::extract::auth::{check_authorization, get_auth_context, resource_id_for};
-use crate::component::auth::depot::{
-    get_parsed_collection_id_from_depot, get_parsed_instance_slug_from_depot,
+use crate::component::auth::{
+    Action, ResourceType, get_instance_from_depot, get_resolved_location_from_depot,
+    get_terminal_collection_from_depot,
 };
-use crate::component::auth::{Action, ResourceType, get_resource_id_from_depot};
 use crate::component::db::connection;
 use crate::util::path;
 
@@ -56,10 +56,10 @@ pub async fn copy(req: &mut Request, res: &mut Response, depot: &Depot) {
 
     // Parse source path to extract collection ID and URI (prefer middleware)
     let (source_collection_id, source_uri) = match (
-        get_parsed_collection_id_from_depot(depot),
-        get_parsed_instance_slug_from_depot(depot),
+        get_terminal_collection_from_depot(depot),
+        get_instance_from_depot(depot),
     ) {
-        (Ok(cid), Ok(slug)) => (cid, slug),
+        (Ok(coll), Ok(inst)) => (coll.id, inst.slug.clone()),
         _ => match path::parse_collection_and_uri(&source_path) {
             Ok(parsed) => parsed,
             Err(e) => {
@@ -172,9 +172,9 @@ async fn check_copy_authorization(
 ) -> Result<(), StatusCode> {
     let (subjects, authorizer) = get_auth_context(depot, conn).await?;
 
-    // Get ResourceId from depot (populated by slug_resolver middleware)
-    let source_resource = get_resource_id_from_depot(depot).map_err(|e| {
-        tracing::error!(error = %e, "ResourceId not found in depot; slug_resolver middleware may not have run");
+    // Get ResourceLocation from depot (populated by slug_resolver middleware)
+    let source_resource = get_resolved_location_from_depot(depot).map_err(|e| {
+        tracing::error!(error = %e, "ResourceLocation not found in depot; slug_resolver middleware may not have run");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 

@@ -61,6 +61,7 @@ impl ServerConfig {
 
     /// ## Summary
     /// Returns the server origin URL.
+    #[must_use]
     pub fn origin(&self) -> String {
         if let Some(origin) = &self.serve_origin {
             origin.clone()

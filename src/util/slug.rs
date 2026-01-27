@@ -4,7 +4,6 @@
 /// Generates stable, URL-safe slugs from resource names. Slugs are lowercase,
 /// alphanumeric with hyphens, and don't change even if the resource name changes.
 
-/// ## Summary
 /// Generate a URL-safe slug from a name.
 ///
 /// Converts to lowercase, replaces spaces and special characters with hyphens,
