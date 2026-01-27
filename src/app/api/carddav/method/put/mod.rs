@@ -31,7 +31,7 @@ use types::{PutError, PutResult};
 /// ## Errors
 /// Returns 400 for invalid data, 412 for precondition failures, 500 for server errors.
 #[handler]
-#[tracing::instrument(skip(req, res), fields(path = %req.uri().path()))]
+#[tracing::instrument(skip_all, fields(path = %req.uri().path()))]
 pub async fn put(req: &mut Request, res: &mut Response, depot: &Depot) {
     tracing::info!("Handling PUT request for vCard object");
 

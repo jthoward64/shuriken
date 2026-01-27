@@ -944,6 +944,32 @@ impl TestDb {
         Ok(user_id)
     }
 
+    /// Seeds a single-user that matches the authenticated user in single-user mode.
+    ///
+    /// This creates a principal and user with the email from config (`your.email@example.com`),
+    /// so that `authenticate_single_user` will find and use this seeded user instead of
+    /// creating a new one.
+    ///
+    /// Returns the principal ID (which can be used for seeding collections and policies).
+    ///
+    /// ## Errors
+    /// Returns an error if the principal or user cannot be inserted.
+    pub async fn seed_authenticated_user(&self) -> anyhow::Result<uuid::Uuid> {
+        // These values match what config.toml has for single_user
+        const SINGLE_USER_NAME: &str = "Test User";
+        const SINGLE_USER_EMAIL: &str = "your.email@example.com";
+        const SINGLE_USER_SLUG: &str = "testuser";
+
+        let principal_id = self
+            .seed_principal("user", SINGLE_USER_SLUG, Some(SINGLE_USER_NAME))
+            .await?;
+
+        self.seed_user(SINGLE_USER_NAME, SINGLE_USER_EMAIL, principal_id)
+            .await?;
+
+        Ok(principal_id)
+    }
+
     /// Seeds a test collection and returns its ID.
     ///
     /// ## Errors
@@ -1745,13 +1771,167 @@ fn next_casbin_rule_id() -> i32 {
 }
 
 impl TestDb {
-    /// Seeds a casbin policy rule (p, role, `obj_type`, act).
+    /// Seeds a casbin access policy rule `p(subject, path, role)`.
     ///
-    /// Example: `seed_policy("read", "calendar_event", "read")` allows read action
-    /// if subject has at least "read" role on a `calendar_event`.
+    /// This grants a subject a specific role on a resource path pattern.
+    ///
+    /// Example: `seed_access_policy("principal:alice-uuid", "/cal/alice-uuid/**", "owner")`
+    /// grants alice owner role on all resources under her calendar namespace.
+    ///
+    /// ## Path Patterns
+    /// - `/**` matches any depth (for entire namespaces)
+    /// - `/*` matches single level (for collections with items)
     ///
     /// ## Errors
     /// Returns an error if the rule cannot be inserted.
+    pub async fn seed_access_policy(
+        &self,
+        subject: &str,
+        path: &str,
+        role: &str,
+    ) -> anyhow::Result<()> {
+        use shuriken::component::db::schema::casbin_rule;
+
+        let mut conn = self.get_conn().await?;
+
+        diesel::insert_into(casbin_rule::table)
+            .values((
+                casbin_rule::id.eq(next_casbin_rule_id()),
+                casbin_rule::ptype.eq("p"),
+                casbin_rule::v0.eq(subject),
+                casbin_rule::v1.eq(path),
+                casbin_rule::v2.eq(role),
+                casbin_rule::v3.eq(""),
+                casbin_rule::v4.eq(""),
+                casbin_rule::v5.eq(""),
+            ))
+            .execute(&mut conn)
+            .await?;
+
+        Ok(())
+    }
+
+    /// Seeds a casbin role-to-permission mapping `g2(role, permission)`.
+    ///
+    /// This defines what permissions a role grants.
+    ///
+    /// Example: `seed_role_permission("owner", "edit")` means the owner role grants edit permission.
+    ///
+    /// ## Errors
+    /// Returns an error if the rule cannot be inserted.
+    pub async fn seed_role_permission(&self, role: &str, permission: &str) -> anyhow::Result<()> {
+        use shuriken::component::db::schema::casbin_rule;
+
+        let mut conn = self.get_conn().await?;
+
+        diesel::insert_into(casbin_rule::table)
+            .values((
+                casbin_rule::id.eq(next_casbin_rule_id()),
+                casbin_rule::ptype.eq("g2"),
+                casbin_rule::v0.eq(role),
+                casbin_rule::v1.eq(permission),
+                casbin_rule::v2.eq(""),
+                casbin_rule::v3.eq(""),
+                casbin_rule::v4.eq(""),
+                casbin_rule::v5.eq(""),
+            ))
+            .execute(&mut conn)
+            .await?;
+
+        Ok(())
+    }
+
+    /// Seeds all standard role-to-permission mappings (g2 rules).
+    ///
+    /// This sets up the complete permission model matching the Casbin model config.
+    ///
+    /// ## Roles and Permissions
+    /// - `reader-freebusy`: `read_freebusy`
+    /// - `reader`: `read_freebusy`, `read`
+    /// - `editor-basic`: `read_freebusy`, `read`, `edit`
+    /// - `editor`: `read_freebusy`, `read`, `edit`, `delete`
+    /// - `share-manager`: `read_freebusy`, `read`, `edit`, `delete`, `share_read`, `share_edit`
+    /// - `owner`: all permissions including `admin`
+    ///
+    /// ## Errors
+    /// Returns an error if seeding fails.
+    pub async fn seed_default_role_permissions(&self) -> anyhow::Result<()> {
+        // reader-freebusy
+        self.seed_role_permission("reader-freebusy", "read_freebusy")
+            .await?;
+
+        // reader
+        self.seed_role_permission("reader", "read_freebusy").await?;
+        self.seed_role_permission("reader", "read").await?;
+
+        // editor-basic
+        self.seed_role_permission("editor-basic", "read_freebusy")
+            .await?;
+        self.seed_role_permission("editor-basic", "read").await?;
+        self.seed_role_permission("editor-basic", "edit").await?;
+
+        // editor
+        self.seed_role_permission("editor", "read_freebusy").await?;
+        self.seed_role_permission("editor", "read").await?;
+        self.seed_role_permission("editor", "edit").await?;
+        self.seed_role_permission("editor", "delete").await?;
+
+        // share-manager
+        self.seed_role_permission("share-manager", "read_freebusy")
+            .await?;
+        self.seed_role_permission("share-manager", "read").await?;
+        self.seed_role_permission("share-manager", "edit").await?;
+        self.seed_role_permission("share-manager", "delete").await?;
+        self.seed_role_permission("share-manager", "share_read")
+            .await?;
+        self.seed_role_permission("share-manager", "share_edit")
+            .await?;
+
+        // owner
+        self.seed_role_permission("owner", "read_freebusy").await?;
+        self.seed_role_permission("owner", "read").await?;
+        self.seed_role_permission("owner", "edit").await?;
+        self.seed_role_permission("owner", "delete").await?;
+        self.seed_role_permission("owner", "share_read").await?;
+        self.seed_role_permission("owner", "share_edit").await?;
+        self.seed_role_permission("owner", "admin").await?;
+
+        Ok(())
+    }
+
+    /// Grants a principal owner access to a collection.
+    ///
+    /// This is a convenience method that seeds an access policy granting
+    /// owner role on the collection path pattern.
+    ///
+    /// ## Errors
+    /// Returns an error if seeding fails.
+    pub async fn seed_collection_owner(
+        &self,
+        principal_id: uuid::Uuid,
+        collection_id: uuid::Uuid,
+        resource_type: &str,
+    ) -> anyhow::Result<()> {
+        let subject = format!("principal:{principal_id}");
+        let type_prefix = match resource_type {
+            "calendar" => "cal",
+            "addressbook" => "card",
+            _ => resource_type,
+        };
+        // Pattern: /{type}/{owner_id}/{collection_id}/**
+        let path = format!("/{type_prefix}/{principal_id}/{collection_id}/**");
+        self.seed_access_policy(&subject, &path, "owner").await
+    }
+
+    // =========================================================================
+    // Legacy helpers (deprecated - use new helpers above)
+    // =========================================================================
+
+    /// Seeds a casbin policy rule (p, role, `obj_type`, act).
+    ///
+    /// ## Deprecated
+    /// Use `seed_access_policy` instead. This helper has incorrect semantics.
+    #[deprecated(note = "Use seed_access_policy instead")]
     pub async fn seed_policy(&self, role: &str, obj_type: &str, act: &str) -> anyhow::Result<()> {
         use shuriken::component::db::schema::casbin_rule;
 
@@ -1776,10 +1956,9 @@ impl TestDb {
 
     /// Seeds a casbin grouping rule g(principal, resource, role) for sharing.
     ///
-    /// Example: `seed_grant("user:alice", "cal:uuid", "owner")` grants alice owner role on the calendar.
-    ///
-    /// ## Errors
-    /// Returns an error if the rule cannot be inserted.
+    /// ## Deprecated
+    /// Use `seed_access_policy` instead. The `g` ptype is not used in the current model.
+    #[deprecated(note = "Use seed_access_policy instead")]
     pub async fn seed_grant(
         &self,
         principal: &str,
@@ -1809,10 +1988,14 @@ impl TestDb {
 
     /// Seeds a casbin g2 rule (resource, type) for resource typing.
     ///
+    /// ## Deprecated
+    /// Use `seed_role_permission` instead. This helper has incorrect semantics.
+    ///
     /// Example: `seed_resource_type("cal:uuid", "calendar")` types the resource as a calendar.
     ///
     /// ## Errors
     /// Returns an error if the rule cannot be inserted.
+    #[deprecated(note = "Use seed_role_permission instead - this has wrong semantics")]
     pub async fn seed_resource_type(
         &self,
         resource: &str,
@@ -1897,10 +2080,13 @@ impl TestDb {
 
     /// Seeds default policies and role hierarchy for testing.
     ///
-    /// This sets up the basic permission model so tests can just seed grants.
+    /// ## Deprecated
+    /// Use `seed_default_role_permissions` instead.
     ///
     /// ## Errors
     /// Returns an error if seeding fails.
+    #[deprecated(note = "Use seed_default_role_permissions instead")]
+    #[expect(deprecated)]
     pub async fn seed_default_policies(&self) -> anyhow::Result<()> {
         // Role hierarchy: owner > admin > edit-share > edit > read-share > read > read-freebusy
         self.seed_role_hierarchy("owner", "admin").await?;

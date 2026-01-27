@@ -1,5 +1,7 @@
 //! DB <-> CalDAV mapping helpers.
 
+use std::collections::HashMap;
+
 use uuid::Uuid;
 
 use crate::component::caldav::recurrence::ical_datetime_to_utc_with_resolver;
@@ -11,18 +13,21 @@ use crate::component::rfc::ical::expand::TimeZoneResolver;
 /// Builds calendar index entries for all indexable components in an `iCalendar` document.
 ///
 /// Walks through the component tree and builds index entries for `VEVENT`, `VTODO`, and `VJOURNAL`
-/// components. Returns a vector of index entries ready for batch insertion.
+/// components. Uses the `component_map` returned from tree insertion to look up real database
+/// component IDs. Returns a vector of index entries ready for batch insertion.
 ///
-/// Note: Uses a placeholder UUID for `component_id` since we don't have access to the database
-/// component IDs yet. This will be improved in a future iteration.
+/// ## Parameters
+/// - `component_map`: `HashMap` from tree insertion mapping `(component_name, uid)` to `component_id`
 #[must_use]
+#[allow(clippy::implicit_hasher)]
 pub fn build_cal_indexes(
     entity_id: Uuid,
     ical: &ICalendar,
+    component_map: &HashMap<(String, Option<String>), Uuid>,
     resolver: &mut TimeZoneResolver,
 ) -> Vec<NewCalIndex> {
     let mut indexes = Vec::new();
-    build_indexes_recursive(entity_id, &ical.root, resolver, &mut indexes);
+    build_indexes_recursive(entity_id, &ical.root, component_map, resolver, &mut indexes);
     indexes
 }
 
@@ -30,6 +35,7 @@ pub fn build_cal_indexes(
 fn build_indexes_recursive(
     entity_id: Uuid,
     component: &Component,
+    component_map: &HashMap<(String, Option<String>), Uuid>,
     resolver: &mut TimeZoneResolver,
     indexes: &mut Vec<NewCalIndex>,
 ) {
@@ -37,22 +43,26 @@ fn build_indexes_recursive(
     if let Some(component_kind) = component.kind
         && component_kind.is_schedulable()
     {
-        // Use a deterministic component ID based on the UID and component type
-        // If UID is missing, use the entity ID to ensure uniqueness
-        let uid = component.uid().unwrap_or("no-uid");
-        let component_id = uuid::Uuid::new_v5(
-            &entity_id,
-            format!("{}-{}-{}", component.name, uid, entity_id).as_bytes(),
-        );
+        // Look up the real component ID from the database mapping
+        let uid = component.uid().map(String::from);
+        let key = (component.name.clone(), uid.clone());
 
-        if let Some(index) = build_cal_index(entity_id, component_id, component, resolver) {
-            indexes.push(index);
+        if let Some(&component_id) = component_map.get(&key) {
+            if let Some(index) = build_cal_index(entity_id, component_id, component, resolver) {
+                indexes.push(index);
+            }
+        } else {
+            tracing::warn!(
+                "Component {:?} with UID {:?} not found in component map, skipping index",
+                component.name,
+                uid
+            );
         }
     }
 
     // Recurse into children
     for child in &component.children {
-        build_indexes_recursive(entity_id, child, resolver, indexes);
+        build_indexes_recursive(entity_id, child, component_map, resolver, indexes);
     }
 }
 

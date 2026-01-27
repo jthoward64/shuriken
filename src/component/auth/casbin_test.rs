@@ -83,6 +83,8 @@ g2, owner, admin
             .expect("Failed to create enforcer")
     }
 
+    // Note: The actual path formats here are not necessarily the same as in the actual app, the casbin model doesn't care about exact formats as long as they are consistent.
+
     #[tokio::test]
     async fn test_owner_permissions() {
         let e = create_test_enforcer().await;

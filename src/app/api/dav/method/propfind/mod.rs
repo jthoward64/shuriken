@@ -30,7 +30,7 @@ use helpers::build_propfind_response;
 /// ## Errors
 /// Returns 400 for malformed requests, 404 for missing resources, 500 for server errors.
 #[handler]
-#[tracing::instrument(skip(req, res), fields(
+#[tracing::instrument(skip_all, fields(
     method = "PROPFIND",
     path = %req.uri().path()
 ))]

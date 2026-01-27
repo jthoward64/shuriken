@@ -16,20 +16,35 @@ use super::helpers::*;
 #[test_log::test(tokio::test)]
 async fn put_creates_calendar_object() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
-        .await
-        .expect("Failed to seed principal");
 
-    let _collection_id = test_db
+    // Seed the role→permission mappings (g2 rules)
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+
+    // Seed the authenticated user (matches config email)
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
+
+    let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", Some("Personal"))
         .await
         .expect("Failed to seed collection");
 
+    // Grant owner access to the authenticated user on their collection
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
     let service = create_db_test_service(&test_db.url()).await;
 
     let ical = sample_icalendar_event("new-event@example.com", "Test Event");
-    let uri = caldav_item_path("alice", "testcal", "new-event.ics");
+    // Use the authenticated user's slug for the path
+    let uri = caldav_item_path("testuser", "testcal", "new-event.ics");
 
     let response = TestRequest::put(&uri)
         .if_none_match("*")

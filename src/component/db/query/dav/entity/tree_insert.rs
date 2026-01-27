@@ -2,6 +2,8 @@
 
 #![allow(clippy::too_many_lines)] // Recursive tree insertion logic
 
+use std::collections::HashMap;
+
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 
@@ -12,10 +14,16 @@ use crate::component::model::dav::property::{DavProperty, NewDavProperty};
 use crate::component::rfc::ical::core::ICalendar;
 use crate::component::rfc::vcard::core::VCard;
 
+/// Type alias for the component ID mapping returned by tree insertion.
+/// Maps `(component_name, uid)` tuples to their database `component_id` values.
+pub type ComponentIdMap = HashMap<(String, Option<String>), uuid::Uuid>;
+
 /// ## Summary
 /// Inserts an iCalendar component tree with proper ID mapping.
 ///
 /// Processes components recursively, ensuring each level gets proper parent IDs.
+/// Returns a `HashMap` mapping `(component_name, uid)` tuples to their database component IDs.
+/// This allows calendar indexing to reference real component IDs.
 ///
 /// ## Errors
 /// Returns a database error if any insert fails.
@@ -24,13 +32,14 @@ pub async fn insert_ical_tree(
     conn: &mut crate::component::db::connection::DbConnection<'_>,
     entity_id: uuid::Uuid,
     ical: &ICalendar,
-) -> diesel::QueryResult<()> {
+) -> diesel::QueryResult<ComponentIdMap> {
     tracing::debug!("Inserting iCalendar component tree");
 
-    insert_component_recursive(conn, entity_id, &ical.root, None, 0).await?;
+    let mut component_map = HashMap::new();
+    insert_component_recursive(conn, entity_id, &ical.root, None, 0, &mut component_map).await?;
 
     tracing::debug!("iCalendar component tree inserted successfully");
-    Ok(())
+    Ok(component_map)
 }
 
 /// ## Summary
@@ -77,7 +86,7 @@ pub async fn insert_vcard_tree(
         component_id,
         name: "VERSION",
         group: None,
-        value_type: "text",
+        value_type: "TEXT",
         value_text: Some(vcard.version.as_str()),
         value_int: None,
         value_float: None,
@@ -101,7 +110,7 @@ pub async fn insert_vcard_tree(
             component_id,
             name: &vcard_prop.name,
             group: vcard_prop.group.as_deref(),
-            value_type: "text",
+            value_type: "TEXT",
             value_text: Some(&vcard_prop.raw_value),
             value_int: None,
             value_float: None,
@@ -143,10 +152,12 @@ pub async fn insert_vcard_tree(
 }
 
 /// Recursively inserts a component and its children.
+/// Builds a mapping of `(component_name, uid)` to `component_id` for indexing.
 #[expect(
     clippy::cast_possible_truncation,
     clippy::cast_possible_wrap,
-    reason = "Component tree depth and property counts are bounded by RFC limits, truncation safe"
+    clippy::too_many_arguments,
+    reason = "Component tree depth and property counts are bounded by RFC limits, truncation safe; component_map accumulator required for mapping"
 )]
 fn insert_component_recursive<'a>(
     conn: &'a mut crate::component::db::connection::DbConnection<'_>,
@@ -154,6 +165,7 @@ fn insert_component_recursive<'a>(
     component: &'a crate::component::rfc::ical::core::Component,
     parent_id: Option<uuid::Uuid>,
     ordinal: i32,
+    component_map: &'a mut ComponentIdMap,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = diesel::QueryResult<()>> + Send + 'a>> {
     Box::pin(async move {
         // Insert this component
@@ -172,6 +184,13 @@ fn insert_component_recursive<'a>(
 
         let component_id = inserted_component.id;
 
+        // Store component ID mapping for indexable components
+        if let Some(kind) = component.kind && kind.is_schedulable() {
+            let uid = component.uid().map(String::from);
+            let key = (component.name.clone(), uid);
+            component_map.insert(key, component_id);
+        }
+
         // Insert properties for this component
         for (prop_ord, prop) in component.properties.iter().enumerate() {
             // Use raw_value for text storage
@@ -179,7 +198,7 @@ fn insert_component_recursive<'a>(
                 component_id,
                 name: &prop.name,
                 group: None,
-                value_type: "text",
+                value_type: "TEXT",
                 value_text: Some(&prop.raw_value),
                 value_int: None,
                 value_float: None,
@@ -224,6 +243,7 @@ fn insert_component_recursive<'a>(
                 child,
                 Some(component_id),
                 child_ord as i32,
+                component_map,
             )
             .await?;
         }

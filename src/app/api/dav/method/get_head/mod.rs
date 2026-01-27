@@ -19,7 +19,7 @@ use helpers::handle_get_or_head;
 /// ## Errors
 /// Returns 404 if the resource is not found, 500 for database errors.
 #[handler]
-#[tracing::instrument(skip(req, res), fields(path = %req.uri().path()))]
+#[tracing::instrument(skip_all, fields(path = %req.uri().path()))]
 pub async fn get(req: &mut Request, res: &mut Response, depot: &Depot) {
     tracing::info!("Handling GET request");
     handle_get_or_head(req, res, false, depot).await;
@@ -37,7 +37,7 @@ pub async fn get(req: &mut Request, res: &mut Response, depot: &Depot) {
 /// ## Errors
 /// Returns 404 if the resource is not found, 500 for database errors.
 #[handler]
-#[tracing::instrument(skip(req, res), fields(path = %req.uri().path()))]
+#[tracing::instrument(skip_all, fields(path = %req.uri().path()))]
 pub async fn head(req: &mut Request, res: &mut Response, depot: &Depot) {
     tracing::info!("Handling HEAD request");
     handle_get_or_head(req, res, true, depot).await;

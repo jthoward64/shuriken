@@ -32,7 +32,7 @@ use crate::util::path;
 /// ## Errors
 /// Returns 404 if the resource is not found, 500 for database errors.
 #[handler]
-#[tracing::instrument(skip(req, res), fields(
+#[tracing::instrument(skip_all, fields(
     method = "DELETE",
     path = %req.uri().path()
 ))]

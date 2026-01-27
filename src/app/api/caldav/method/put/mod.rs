@@ -5,7 +5,6 @@ mod types;
 use salvo::http::{HeaderValue, StatusCode};
 use salvo::{Depot, Request, Response, handler};
 
-use crate::app::api::dav::extract::auth::resource_id_for;
 use crate::component::auth::{
     Action, ResourceType, authorizer_from_depot, depot::get_terminal_collection_from_depot,
     get_subjects_from_depot,
@@ -35,7 +34,7 @@ use types::{PutError, PutResult};
 /// ## Errors
 /// Returns 400 for invalid data, 412 for precondition failures, 500 for server errors.
 #[handler]
-#[tracing::instrument(skip(req, res), fields(path = %req.uri().path()))]
+#[tracing::instrument(skip_all, fields(path = %req.uri().path()))]
 pub async fn put(req: &mut Request, res: &mut Response, depot: &Depot) {
     tracing::info!("Handling PUT request for calendar object");
 
@@ -192,7 +191,7 @@ async fn perform_put(
     let ctx = PutObjectContext {
         collection_id,
         slug: slug.to_string(),
-        entity_type: "calendar".to_string(),
+        entity_type: "icalendar".to_string(),
         logical_uid,
         if_none_match,
         if_match,
@@ -237,8 +236,17 @@ async fn check_put_authorization(
     collection_id: uuid::Uuid,
     slug: &str,
 ) -> Result<(), StatusCode> {
+    use crate::component::auth::{
+        PathSegment, ResourceLocation, depot::get_owner_principal_from_depot,
+    };
     use diesel::prelude::*;
     use diesel_async::RunQueryDsl;
+
+    // Get the owner principal from depot (set by slug resolver)
+    let owner_principal = get_owner_principal_from_depot(depot).map_err(|e| {
+        tracing::error!(error = %e, "Owner principal not found in depot");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     // Get expanded subjects for the current user
     let subjects = get_subjects_from_depot(depot, conn).await.map_err(|e| {
@@ -257,12 +265,23 @@ async fn check_put_authorization(
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
+    // Build resource path: /{type}/{owner_id}/{collection_id}/{item_or_glob}
     let resource = if let Some(_inst) = existing {
-        // Update: check permission on the entity slug within the collection
-        resource_id_for(ResourceType::Calendar, collection_id, Some(slug))
+        // Update: check permission on the specific item
+        ResourceLocation::from_segments(vec![
+            PathSegment::ResourceType(ResourceType::Calendar),
+            PathSegment::Owner(owner_principal.id.to_string()),
+            PathSegment::Collection(collection_id.to_string()),
+            PathSegment::Item(slug.to_string()),
+        ])
     } else {
-        // Create: check permission on the collection root
-        resource_id_for(ResourceType::Calendar, collection_id, None)
+        // Create: check permission on the collection (with glob)
+        ResourceLocation::from_segments(vec![
+            PathSegment::ResourceType(ResourceType::Calendar),
+            PathSegment::Owner(owner_principal.id.to_string()),
+            PathSegment::Collection(collection_id.to_string()),
+            PathSegment::Glob { recursive: true },
+        ])
     };
 
     // Get the authorizer

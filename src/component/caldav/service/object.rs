@@ -206,14 +206,14 @@ pub async fn put_calendar_object(
                     .await
                     .context("failed to delete old index entries")?;
 
-                // Insert new component tree
-                entity::insert_ical_tree(tx, existing_inst.entity_id, &ical)
+                // Insert new component tree and get component ID mapping
+                let component_map = entity::insert_ical_tree(tx, existing_inst.entity_id, &ical)
                     .await
                     .context("failed to insert component tree")?;
 
-                // Build and insert calendar index entries
+                // Build and insert calendar index entries using real component IDs
                 let cal_indexes =
-                    build_cal_indexes(existing_inst.entity_id, &ical, &mut tz_resolver);
+                    build_cal_indexes(existing_inst.entity_id, &ical, &component_map, &mut tz_resolver);
                 event_index::insert_batch(tx, &cal_indexes)
                     .await
                     .context("failed to insert calendar index entries")?;
@@ -260,13 +260,13 @@ pub async fn put_calendar_object(
                     .await
                     .context("failed to update collection sync token")?;
 
-                // Insert component tree for the new entity
-                entity::insert_ical_tree(tx, created_entity.id, &ical)
+                // Insert component tree for the new entity and get component ID mapping
+                let component_map = entity::insert_ical_tree(tx, created_entity.id, &ical)
                     .await
                     .context("failed to insert component tree")?;
 
-                // Build and insert calendar index entries
-                let cal_indexes = build_cal_indexes(created_entity.id, &ical, &mut tz_resolver);
+                // Build and insert calendar index entries using real component IDs
+                let cal_indexes = build_cal_indexes(created_entity.id, &ical, &component_map, &mut tz_resolver);
                 event_index::insert_batch(tx, &cal_indexes)
                     .await
                     .context("failed to insert calendar index entries")?;

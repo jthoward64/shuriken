@@ -49,7 +49,7 @@ API handlers are instrumented with `#[tracing::instrument]` to track:
 Example:
 ```rust
 #[handler]
-#[tracing::instrument(skip(req, res), fields(path = %req.uri().path()))]
+#[tracing::instrument(skip_all, fields(path = %req.uri().path()))]
 pub async fn put(req: &mut Request, res: &mut Response) {
     tracing::info!("Handling PUT request");
     // ... handler logic

@@ -133,7 +133,7 @@ pub fn test_property<'a>(
         component_id,
         name,
         group: None,
-        value_type: "text",
+        value_type: "TEXT",
         ordinal,
         value_text: text_value,
         value_int: None,

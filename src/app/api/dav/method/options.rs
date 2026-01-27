@@ -12,7 +12,7 @@ use salvo::{Request, Response, handler};
 /// ## Side Effects
 /// Sets the `Allow` and `DAV` headers on the response.
 #[handler]
-#[tracing::instrument(skip(req, res), fields(path = %req.uri().path()))]
+#[tracing::instrument(skip_all, fields(path = %req.uri().path()))]
 pub async fn options(req: &mut Request, res: &mut Response) {
     tracing::info!("Handling OPTIONS request");
 
@@ -49,7 +49,7 @@ pub async fn options(req: &mut Request, res: &mut Response) {
 ///
 /// Collections support additional methods like MKCALENDAR, MKCOL.
 #[handler]
-#[tracing::instrument(skip(req, res), fields(path = %req.uri().path()))]
+#[tracing::instrument(skip_all, fields(path = %req.uri().path()))]
 pub async fn options_collection(req: &mut Request, res: &mut Response) {
     tracing::info!("Handling OPTIONS request for collection");
 
@@ -77,7 +77,7 @@ pub async fn options_collection(req: &mut Request, res: &mut Response) {
 ///
 /// Items support basic CRUD operations but not collection creation.
 #[handler]
-#[tracing::instrument(skip(req, res), fields(path = %req.uri().path()))]
+#[tracing::instrument(skip_all, fields(path = %req.uri().path()))]
 pub async fn options_item(req: &mut Request, res: &mut Response) {
     tracing::info!("Handling OPTIONS request for item");
 
