@@ -5,7 +5,7 @@ mod dav;
 
 use salvo::Router;
 
-use crate::component::middleware::{auth::AuthMiddleware, slug_resolver::SlugResolverHandler};
+use crate::component::middleware::auth::AuthMiddleware;
 
 /// ## Summary
 /// Constructs the main API router with all protocol handlers.
@@ -16,10 +16,6 @@ pub fn routes() -> anyhow::Result<Router> {
     Ok(Router::with_path("api")
         .hoop(AuthMiddleware)
         .push(app_specific::routes())
-        .push(
-            Router::with_path("dav")
-                .hoop(SlugResolverHandler)
-                .push(caldav::routes()?)
-                .push(carddav::routes()?),
-        ))
+        .push(caldav::routes()?)
+        .push(carddav::routes()?))
 }

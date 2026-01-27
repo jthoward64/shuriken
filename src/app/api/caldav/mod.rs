@@ -3,13 +3,14 @@
 use reqwest::Method;
 use salvo::{Router, routing::MethodFilter};
 
-use crate::app::api::dav;
+use crate::{app::api::dav, component::middleware::slug_resolver::SlugResolverHandler};
 
 pub mod method;
 pub mod report;
 
 pub fn routes() -> anyhow::Result<Router> {
-    Ok(Router::with_path("calendar")
+    Ok(Router::with_path("caldav")
+        .hoop(SlugResolverHandler)
         // Collection and calendar object operations
         .push(
             Router::with_path("{**rest}")

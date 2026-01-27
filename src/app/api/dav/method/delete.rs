@@ -59,6 +59,7 @@ pub async fn delete(req: &mut Request, res: &mut Response, depot: &Depot) {
         },
     };
 
+    // Check early if collection_id is nil before attempting database connection
     if collection_id.is_nil() {
         res.status_code(StatusCode::NOT_FOUND);
         return;

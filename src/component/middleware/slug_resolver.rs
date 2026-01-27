@@ -53,55 +53,100 @@ pub async fn resolve_path_and_load_entities(
     conn: &mut DbConnection<'_>,
 ) -> anyhow::Result<()> {
     let path = req.uri().path();
-    debug!(path = %path, "Resolving path via ResourceId parser");
+    debug!(path = %path, "Resolving path via ResourceId or API DAV parser");
 
-    // Parse the path using auth's ResourceId
-    let resource = if let Some(r) = ResourceId::parse(path) {
-        r
+    // Try canonical ResourceId parse first
+    let resource_opt = ResourceId::parse(path);
+
+    // Fallback: parse API DAV style paths like
+    // /api/dav/{caldav|carddav}/{collection_id}/{item?}
+    // or /api/{caldav|carddav}/{collection_id}/{item?}
+    let (resource_type_opt, collection_id_opt, item_slug_opt) = if resource_opt.is_none() {
+        parse_api_dav_path(path)
     } else {
-        debug!("Path does not parse into ResourceId; skipping resolution");
-        return Ok(());
+        (None, None, None)
     };
-    debug!(resource = %resource, "Parsed ResourceId");
 
-    // Extract identifiers directly from ResourceId
+    if resource_opt.is_none() && resource_type_opt.is_none() {
+        debug!("Path does not parse into ResourceId or API DAV style; skipping resolution");
+        return Ok(());
+    }
+
+    // Extract identifiers either from ResourceId or API DAV
     let mut owner_opt: Option<String> = None;
     let mut collection_segments: Vec<String> = Vec::new();
     let mut item_opt: Option<String> = None;
-    for seg in resource.segments() {
-        match seg {
-            PathSegment::Owner(s) => owner_opt = Some(s.clone()),
-            PathSegment::Collection(s) => collection_segments.push(s.clone()),
-            PathSegment::Item(s) => {
-                let cleaned = s
-                    .trim_end_matches(".ics")
-                    .trim_end_matches(".vcf")
-                    .to_string();
-                item_opt = Some(cleaned);
+    let mut resource_type_for_api: Option<crate::component::auth::ResourceType> = None;
+    let mut collection_id_for_api: Option<uuid::Uuid> = None;
+
+    if let Some(resource) = &resource_opt {
+        debug!(resource = %resource, "Parsed ResourceId");
+        for seg in resource.segments() {
+            match seg {
+                PathSegment::Owner(s) => owner_opt = Some(s.clone()),
+                PathSegment::Collection(s) => collection_segments.push(s.clone()),
+                PathSegment::Item(s) => {
+                    let cleaned = s
+                        .trim_end_matches(".ics")
+                        .trim_end_matches(".vcf")
+                        .to_string();
+                    item_opt = Some(cleaned);
+                }
+                PathSegment::ResourceType(_) | PathSegment::Glob { .. } => {}
             }
-            PathSegment::ResourceType(_) | PathSegment::Glob { .. } => {}
+        }
+    } else if let (Some(rt), Some(cid)) = (resource_type_opt, collection_id_opt) {
+        resource_type_for_api = Some(rt);
+        collection_id_for_api = Some(cid);
+        if let Some(item) = item_slug_opt {
+            let cleaned = item
+                .trim_end_matches(".ics")
+                .trim_end_matches(".vcf")
+                .to_string();
+            item_opt = Some(cleaned);
         }
     }
 
-    // Resolve owner principal
-    let Some(owner_str) = owner_opt else {
-        warn!("Owner segment missing in ResourceId");
-        return Ok(());
+    // Resolve owner principal (by slug or by collection owner if API path)
+    let owner_principal = if let Some(ref owner_str) = owner_opt {
+        resolve_principal(conn, owner_str).await?
+    } else if let Some(cid) = collection_id_for_api {
+        let coll = dav_collection::table
+            .filter(dav_collection::id.eq(cid))
+            .filter(dav_collection::deleted_at.is_null())
+            .select(DavCollection::as_select())
+            .first(conn)
+            .await
+            .optional()?;
+        match coll {
+            Some(c) => resolve_principal_by_id(conn, c.owner_principal_id).await?,
+            None => None,
+        }
+    } else {
+        None
     };
-    let owner_principal = resolve_principal(conn, &owner_str).await?;
 
     if let Some(ref principal) = owner_principal {
         debug!(principal_id = %principal.id, slug = %principal.slug, "Resolved owner principal");
         depot.insert(depot_keys::OWNER_PRINCIPAL, principal.clone());
     } else {
-        warn!(owner = %owner_str, "Owner principal not found");
+        if let Some(ref owner_slug) = owner_opt {
+            warn!(owner = %owner_slug, "Owner principal not found");
+        } else if let Some(cid) = collection_id_for_api {
+            warn!(collection_id = %cid, "Owner principal not found for collection id");
+        } else {
+            warn!("Owner principal not found");
+        }
         return Ok(()); // Principal not found, handlers will return 404
     }
 
-    // Resolve collection if present
-    // Resolve nested collection chain if present
-    let collection_entity =
-        load_collection_hierarchy(depot, conn, collection_segments, owner_principal).await?;
+    // Resolve collection chain either by slug segments or by collection id
+    let collection_entity = if collection_id_for_api.is_some() {
+        let coll = load_collection_chain_by_id(depot, conn, collection_id_for_api.unwrap()).await?;
+        coll
+    } else {
+        load_collection_hierarchy(depot, conn, collection_segments, owner_principal.clone()).await?
+    };
 
     // Resolve instance if present
     if let (Some(inst_slug), Some(coll)) = (item_opt.as_ref(), &collection_entity) {
@@ -113,10 +158,133 @@ pub async fn resolve_path_and_load_entities(
         }
     }
 
-    // Store parsed ResourceId for authorization
+    // Store constructed ResourceId for authorization
+    let resource = if let Some(r) = resource_opt {
+        r
+    } else {
+        // Build ResourceId from API path using resolved principal + chain
+        if let (Some(principal), Some(rt)) = (owner_principal.clone(), resource_type_for_api) {
+            let mut segments = Vec::new();
+            segments.push(PathSegment::ResourceType(rt));
+            segments.push(PathSegment::Owner(principal.slug.clone()));
+            // Build collection segments from chain stored in depot (root-first)
+            if let Ok(chain) = depot.get::<Vec<DavCollection>>(depot_keys::COLLECTION) {
+                let mut chain_clone: Vec<DavCollection> = chain.clone();
+                // Currently stored deepest-first; reverse to root-first for ResourceId path
+                chain_clone.reverse();
+                for c in &chain_clone {
+                    segments.push(PathSegment::Collection(c.slug.clone()));
+                }
+            }
+            if let Some(item) = &item_opt {
+                segments.push(PathSegment::Item(item.clone()));
+            }
+            ResourceId::from_segments(segments)
+        } else {
+            // Insufficient data to construct ResourceId
+            return Ok(());
+        }
+    };
     depot.insert(depot_keys::RESOURCE_ID, resource);
 
     Ok(())
+}
+
+/// Parse API-style DAV paths into `(ResourceType, collection_id, item_slug)`.
+#[must_use]
+fn parse_api_dav_path(
+    path: &str,
+) -> (
+    Option<crate::component::auth::ResourceType>,
+    Option<uuid::Uuid>,
+    Option<String>,
+) {
+    let parts: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+    if parts.is_empty() {
+        return (None, None, None);
+    }
+    // Find caldav or carddav segment, allowing optional "api" and "dav" prefixes
+    let mut idx: Option<usize> = None;
+    for (i, p) in parts.iter().enumerate() {
+        if *p == "caldav" || *p == "carddav" {
+            idx = Some(i);
+            break;
+        }
+    }
+    let Some(i) = idx else {
+        return (None, None, None);
+    };
+    let rt = if parts[i] == "caldav" {
+        crate::component::auth::ResourceType::Calendar
+    } else {
+        crate::component::auth::ResourceType::Addressbook
+    };
+    // Next segment must be UUID collection id
+    if i + 1 >= parts.len() {
+        return (Some(rt), None, None);
+    }
+    let collection_id = uuid::Uuid::parse_str(parts[i + 1]).ok();
+    // Optional item slug
+    let item_slug = if i + 2 < parts.len() {
+        Some(parts.last().unwrap().to_string())
+    } else {
+        None
+    };
+    (Some(rt), collection_id, item_slug)
+}
+
+async fn resolve_principal_by_id(
+    conn: &mut DbConnection<'_>,
+    principal_id: uuid::Uuid,
+) -> anyhow::Result<Option<Principal>> {
+    let row = principal::table
+        .filter(principal::id.eq(principal_id))
+        .select(Principal::as_select())
+        .first(conn)
+        .await
+        .optional()?;
+    Ok(row)
+}
+
+async fn load_collection_chain_by_id(
+    depot: &mut Depot,
+    conn: &mut DbConnection<'_>,
+    collection_id: uuid::Uuid,
+) -> anyhow::Result<Option<DavCollection>> {
+    // Load starting collection
+    let mut current = dav_collection::table
+        .filter(dav_collection::id.eq(collection_id))
+        .filter(dav_collection::deleted_at.is_null())
+        .select(DavCollection::as_select())
+        .first(conn)
+        .await
+        .optional()?;
+
+    let mut chain: Vec<DavCollection> = Vec::new();
+    while let Some(coll) = current {
+        chain.push(coll.clone());
+        if let Some(parent_id) = coll.parent_collection_id {
+            current = dav_collection::table
+                .filter(dav_collection::id.eq(parent_id))
+                .filter(dav_collection::deleted_at.is_null())
+                .select(DavCollection::as_select())
+                .first(conn)
+                .await
+                .optional()?;
+        } else {
+            break;
+        }
+    }
+
+    if let Some(last) = chain.as_slice().first() {
+        // `chain` is deepest-first because we started from requested collection
+        debug!(collection_id = %last.id, slug = %last.slug, depth = chain.len(), "Resolved collection chain by id");
+        depot.insert(depot_keys::COLLECTION, chain.clone());
+        depot.insert(depot_keys::PARSED_COLLECTION_ID, last.id);
+        Ok(Some(last.clone()))
+    } else {
+        Ok(None)
+    }
 }
 
 async fn load_collection_hierarchy(

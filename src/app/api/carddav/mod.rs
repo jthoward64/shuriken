@@ -3,13 +3,14 @@
 use reqwest::Method;
 use salvo::{Router, routing::MethodFilter};
 
-use crate::app::api::dav;
+use crate::{app::api::dav, component::middleware::slug_resolver::SlugResolverHandler};
 
 pub mod method;
 pub mod report;
 
 pub fn routes() -> anyhow::Result<Router> {
-    Ok(Router::with_path("addressbook")
+    Ok(Router::with_path("carddav")
+        .hoop(SlugResolverHandler)
         // Address book and vCard operations
         .push(
             Router::with_path("{**rest}")
