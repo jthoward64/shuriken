@@ -212,8 +212,12 @@ pub async fn put_calendar_object(
                     .context("failed to insert component tree")?;
 
                 // Build and insert calendar index entries using real component IDs
-                let cal_indexes =
-                    build_cal_indexes(existing_inst.entity_id, &ical, &component_map, &mut tz_resolver);
+                let cal_indexes = build_cal_indexes(
+                    existing_inst.entity_id,
+                    &ical,
+                    &component_map,
+                    &mut tz_resolver,
+                );
                 event_index::insert_batch(tx, &cal_indexes)
                     .await
                     .context("failed to insert calendar index entries")?;
@@ -266,7 +270,8 @@ pub async fn put_calendar_object(
                     .context("failed to insert component tree")?;
 
                 // Build and insert calendar index entries using real component IDs
-                let cal_indexes = build_cal_indexes(created_entity.id, &ical, &component_map, &mut tz_resolver);
+                let cal_indexes =
+                    build_cal_indexes(created_entity.id, &ical, &component_map, &mut tz_resolver);
                 event_index::insert_batch(tx, &cal_indexes)
                     .await
                     .context("failed to insert calendar index entries")?;

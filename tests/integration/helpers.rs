@@ -17,10 +17,7 @@
 //! when the TestDb goes out of scope using async drop. This allows tests to run in
 //! parallel without contention.
 
-use std::sync::{Arc, OnceLock};
-
-/// Ensures stale test databases are cleaned up exactly once per test run.
-static STALE_DB_CLEANUP: OnceLock<()> = OnceLock::new();
+use std::sync::{Arc, Mutex, OnceLock, TryLockError};
 
 use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
@@ -28,10 +25,147 @@ use salvo::http::header::HeaderName;
 use salvo::http::{Method, ReqBody, StatusCode};
 use salvo::prelude::*;
 use salvo::test::{RequestBuilder, ResponseExt, TestClient};
+use tokio::sync::{OnceCell, broadcast};
+
+use shuriken::component::db::connection::DbConnection;
+
+/// Pooled database connection for reuse across tests.
+struct PooledConnection {
+    db_name: String,
+    pool: diesel_async::pooled_connection::bb8::Pool<AsyncPgConnection>,
+}
+
+/// Pool of test databases that are reused across tests.
+struct DbPool {
+    connections: Vec<Mutex<Option<PooledConnection>>>,
+    notify: broadcast::Sender<()>,
+}
+
+/// Locks a mutex and recovers from poisoning.
+fn lock_pool(pool: &Arc<Mutex<DbPool>>) -> std::sync::MutexGuard<'_, DbPool> {
+    match pool.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => {
+            pool.clear_poison();
+            poisoned.into_inner()
+        }
+    }
+}
+
+/// Locks a pooled connection mutex and recovers from poisoning.
+fn lock_connection(
+    mutex: &Mutex<Option<PooledConnection>>,
+) -> std::sync::MutexGuard<'_, Option<PooledConnection>> {
+    match mutex.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => {
+            mutex.clear_poison();
+            poisoned.into_inner()
+        }
+    }
+}
+
+/// Tries to lock a pooled connection mutex, tolerating poisoning.
+fn try_lock_connection(
+    mutex: &Mutex<Option<PooledConnection>>,
+) -> Option<std::sync::MutexGuard<'_, Option<PooledConnection>>> {
+    match mutex.try_lock() {
+        Ok(guard) => Some(guard),
+        Err(TryLockError::Poisoned(poisoned)) => {
+            mutex.clear_poison();
+            Some(poisoned.into_inner())
+        }
+        Err(TryLockError::WouldBlock) => None,
+    }
+}
+
+/// Global database pool for test isolation.
+static DB_POOL: OnceCell<Arc<Mutex<DbPool>>> = OnceCell::const_new();
+
+/// Initializes the database pool with 20 pre-created test databases.
+async fn init_db_pool() -> anyhow::Result<Arc<Mutex<DbPool>>> {
+    let base_url = get_base_database_url();
+    let admin_url = format!("{base_url}/postgres");
+
+    const DB_POOL_SIZE: usize = 5;
+
+    eprintln!("[TestDb] Initializing pool of {DB_POOL_SIZE} test databases...");
+
+    // Create admin connection for database management
+    let admin_config = diesel_async::pooled_connection::AsyncDieselConnectionManager::<
+        AsyncPgConnection,
+    >::new(&admin_url);
+    let admin_pool = diesel_async::pooled_connection::bb8::Pool::builder()
+        .max_size(1)
+        .build(admin_config)
+        .await?;
+
+    let mut connections = Vec::with_capacity(DB_POOL_SIZE);
+
+    for i in 1..=DB_POOL_SIZE {
+        let db_name = format!("shuriken_test_{i}");
+        let database_url = format!("{base_url}/{db_name}");
+
+        // Create or recreate the database
+        {
+            let mut admin_conn = admin_pool.get().await?;
+
+            // Drop if exists and recreate
+            let drop_sql = format!("DROP DATABASE IF EXISTS \"{db_name}\" WITH (FORCE)");
+            let _ = diesel::sql_query(&drop_sql).execute(&mut admin_conn).await;
+
+            let create_sql = format!("CREATE DATABASE \"{db_name}\"");
+            diesel::sql_query(&create_sql)
+                .execute(&mut admin_conn)
+                .await?;
+        }
+
+        // Run migrations
+        run_migrations(&database_url).await?;
+
+        // Create connection pool
+        let config = diesel_async::pooled_connection::AsyncDieselConnectionManager::<
+            AsyncPgConnection,
+        >::new(&database_url);
+        let pool = diesel_async::pooled_connection::bb8::Pool::builder()
+            .max_size(5)
+            .build(config)
+            .await?;
+
+        connections.push(Mutex::new(Some(PooledConnection { db_name, pool })));
+        eprintln!("[TestDb] Created shuriken_test_{i}");
+    }
+
+    let (notify, _) = broadcast::channel(100);
+
+    Ok(Arc::new(Mutex::new(DbPool {
+        connections,
+        notify,
+    })))
+}
+
+/// Runs diesel migrations on the given database URL.
+async fn run_migrations(database_url: &str) -> anyhow::Result<()> {
+    use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
+
+    const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
+
+    let url = database_url.to_string();
+    tokio::task::spawn_blocking(move || {
+        let mut conn = diesel::PgConnection::establish(&url)?;
+        conn.run_pending_migrations(MIGRATIONS)
+            .map_err(|e| anyhow::anyhow!("Failed to run migrations: {e}"))?;
+        Ok::<_, anyhow::Error>(())
+    })
+    .await??;
+
+    Ok(())
+}
+
 use shuriken::component::auth::casbin::CasbinEnforcerHandler;
 use shuriken::component::auth::{ResourceLocation, ResourceType};
 use shuriken::component::config::{Settings, load_config};
-use shuriken::component::db::connection::{DbConnection, DbProviderHandler};
+use shuriken::component::db::connection::DbProviderHandler;
 
 // ============================================================================
 // Path Construction Helpers
@@ -691,174 +825,97 @@ impl TestResponse {
     }
 }
 
-/// Helper struct for querying stale database names from pg_database.
+/// Helper struct for querying database names from pg_database.
 #[derive(QueryableByName)]
 struct StaleDbRow {
     #[diesel(sql_type = diesel::sql_types::Text)]
     datname: String,
 }
 
+/// Helper struct for querying table names for truncation.
+#[derive(QueryableByName)]
+struct TruncateRow {
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    tablename: String,
+}
+
 /// Database test helper for setup and teardown.
 ///
 /// ## Database Isolation
-/// Each `TestDb` instance creates a unique database with a UUID-based name.
-/// The database is automatically dropped when the TestDb is dropped via async drop.
+/// Each `TestDb` instance acquires one of 20 pooled databases.
+/// The database is truncated on drop and returned to the pool for reuse.
 /// This allows tests to run in parallel without contention.
 #[expect(clippy::doc_markdown)]
 pub struct TestDb {
     pool: diesel_async::pooled_connection::bb8::Pool<AsyncPgConnection>,
-    /// The unique name of this test's database (for cleanup)
     db_name: String,
-    /// Base URL without database name (for admin connections)
-    base_url: String,
+    pool_index: usize,
 }
 
 impl TestDb {
-    /// Creates a new isolated test database.
+    /// Acquires a test database from the pool.
     ///
-    /// This creates a unique database for this test run, runs migrations on it,
-    /// and returns a connection pool to that database.
+    /// Waits for an available database if all are in use.
     ///
     /// ## Errors
-    /// Returns an error if:
-    /// - Cannot connect to the postgres admin database
-    /// - Cannot create the test database
-    /// - Cannot run migrations
-    ///
-    /// ## Cleanup
-    /// Call `cleanup()` when the test is done to drop the database.
+    /// Returns an error if pool initialization fails.
     pub async fn new() -> anyhow::Result<Self> {
-        let base_url = get_base_database_url();
+        // Initialize pool on first use
+        let pool_arc = DB_POOL
+            .get_or_try_init(|| async { init_db_pool().await })
+            .await?
+            .clone();
 
-        // Clean up stale test databases from previous failed runs (once per test run)
-        STALE_DB_CLEANUP.get_or_init(|| {
-            // Use a new runtime context since we're in a sync init
-            let url = base_url.clone();
-            std::thread::spawn(move || {
-                let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
-                rt.block_on(async {
-                    if let Err(e) = Self::cleanup_stale_databases(&url).await {
-                        eprintln!("[TestDb] Warning: Failed to cleanup stale databases: {e}");
+        loop {
+            // Try to acquire a connection
+            let mut receiver = {
+                let pool = lock_pool(&pool_arc);
+                pool.notify.subscribe()
+            };
+
+            {
+                let pool = lock_pool(&pool_arc);
+
+                for (index, conn_mutex) in pool.connections.iter().enumerate() {
+                    if let Some(mut conn_guard) = try_lock_connection(conn_mutex) {
+                        if let Some(pooled) = conn_guard.take() {
+                            // Truncate all tables before returning
+                            Self::truncate_database(&pooled.pool).await?;
+
+                            return Ok(Self {
+                                pool: pooled.pool.clone(),
+                                db_name: pooled.db_name.clone(),
+                                pool_index: index,
+                            });
+                        }
                     }
-                });
-            })
-            .join()
-            .expect("Cleanup thread panicked");
-        });
-
-        // Generate a unique database name using UUID
-        let db_name = format!("shuriken_test_{}", uuid::Uuid::now_v7().simple());
-        let database_url = format!("{base_url}/{db_name}");
-
-        // Connect to the default postgres database to create our test database
-        let admin_url = format!("{base_url}/postgres");
-        let admin_config = diesel_async::pooled_connection::AsyncDieselConnectionManager::<
-            AsyncPgConnection,
-        >::new(&admin_url);
-        let admin_pool = diesel_async::pooled_connection::bb8::Pool::builder()
-            .max_size(1)
-            .build(admin_config)
-            .await?;
-
-        // Create the test database
-        {
-            let mut admin_conn = admin_pool.get().await?;
-            // Use format! since database names can't be parameterized in SQL
-            let create_db_sql = format!("CREATE DATABASE \"{db_name}\"");
-            diesel::sql_query(&create_db_sql)
-                .execute(&mut admin_conn)
-                .await?;
-        }
-
-        // Run migrations on the new database
-        Self::run_migrations(&database_url).await?;
-
-        // Create pool for the test database
-        let config = diesel_async::pooled_connection::AsyncDieselConnectionManager::<
-            AsyncPgConnection,
-        >::new(&database_url);
-
-        let pool = diesel_async::pooled_connection::bb8::Pool::builder()
-            .max_size(5)
-            .build(config)
-            .await?;
-
-        Ok(Self {
-            pool,
-            db_name,
-            base_url,
-        })
-    }
-
-    /// Runs diesel migrations on the given database URL.
-    async fn run_migrations(database_url: &str) -> anyhow::Result<()> {
-        use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
-
-        const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
-
-        // Diesel migrations require a sync connection, so we run this in a blocking task
-        let url = database_url.to_string();
-        tokio::task::spawn_blocking(move || {
-            let mut conn = diesel::PgConnection::establish(&url)?;
-            conn.run_pending_migrations(MIGRATIONS)
-                .map_err(|e| anyhow::anyhow!("Failed to run migrations: {e}"))?;
-            Ok::<_, anyhow::Error>(())
-        })
-        .await??;
-
-        Ok(())
-    }
-
-    /// Cleans up stale test databases from previous failed test runs.
-    ///
-    /// This finds all databases matching the `shuriken_test_*` pattern and drops them.
-    /// Called once per test run via `OnceLock` to avoid race conditions.
-    async fn cleanup_stale_databases(base_url: &str) -> anyhow::Result<()> {
-        let admin_url = format!("{base_url}/postgres");
-        let admin_config = diesel_async::pooled_connection::AsyncDieselConnectionManager::<
-            AsyncPgConnection,
-        >::new(&admin_url);
-        let admin_pool = diesel_async::pooled_connection::bb8::Pool::builder()
-            .max_size(1)
-            .build(admin_config)
-            .await?;
-
-        let mut admin_conn = admin_pool.get().await?;
-
-        // Find all stale test databases
-        let stale_dbs: Vec<String> = diesel::sql_query(
-            "SELECT datname FROM pg_database WHERE datname LIKE 'shuriken_test_%'",
-        )
-        .load::<StaleDbRow>(&mut admin_conn)
-        .await?
-        .into_iter()
-        .map(|row| row.datname)
-        .collect();
-
-        if stale_dbs.is_empty() {
-            return Ok(());
-        }
-
-        eprintln!(
-            "[TestDb] Cleaning up {} stale test database(s) from previous runs",
-            stale_dbs.len()
-        );
-
-        for db_name in stale_dbs {
-            // Terminate any active connections
-            let terminate_sql = format!(
-                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{db_name}'"
-            );
-            let _ = diesel::sql_query(&terminate_sql)
-                .execute(&mut admin_conn)
-                .await;
-
-            // Drop the database
-            let drop_sql = format!("DROP DATABASE IF EXISTS \"{db_name}\" WITH (FORCE)");
-            match diesel::sql_query(&drop_sql).execute(&mut admin_conn).await {
-                Ok(_) => eprintln!("[TestDb] Dropped stale database: {db_name}"),
-                Err(e) => eprintln!("[TestDb] Warning: Failed to drop {db_name}: {e}"),
+                }
             }
+
+            // No connection available, wait for notification
+            let _ = receiver.recv().await;
+        }
+    }
+
+    /// Truncates all tables in the database.
+    async fn truncate_database(
+        pool: &diesel_async::pooled_connection::bb8::Pool<AsyncPgConnection>,
+    ) -> anyhow::Result<()> {
+        let mut conn = pool.get().await?;
+
+        // Get all table names
+        let tables: Vec<String> =
+            diesel::sql_query("SELECT tablename FROM pg_tables WHERE schemaname = 'public'")
+                .load::<TruncateRow>(&mut conn)
+                .await?
+                .into_iter()
+                .map(|row| row.tablename)
+                .collect();
+
+        // Truncate all tables
+        for table in tables {
+            let truncate_sql = format!("TRUNCATE TABLE \"{table}\" CASCADE");
+            diesel::sql_query(&truncate_sql).execute(&mut conn).await?;
         }
 
         Ok(())
@@ -867,7 +924,7 @@ impl TestDb {
     /// Gets the database URL for this test database.
     #[must_use]
     pub fn url(&self) -> String {
-        format!("{}/{}", self.base_url, self.db_name)
+        format!("{}/{}", get_base_database_url(), self.db_name)
     }
 
     /// Gets a database connection from the pool.
@@ -2120,76 +2177,23 @@ impl TestDb {
         Ok(())
     }
 }
+
 impl Drop for TestDb {
     fn drop(&mut self) {
-        // AsyncDrop will handle cleanup, nothing to do here
-    }
-}
+        // Return the connection to the pool
+        let pool_arc = DB_POOL.get().expect("Pool should be initialized");
+        let pool = lock_pool(pool_arc);
 
-impl std::future::AsyncDrop for TestDb {
-    async fn drop(self: std::pin::Pin<&mut Self>) {
-        let db_name = self.db_name.clone();
-        let base_url = self.base_url.clone();
+        let conn_mutex = &pool.connections[self.pool_index];
+        let mut conn_guard = lock_connection(conn_mutex);
 
-        // Small delay to ensure connections are fully released
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        // Return the connection to the pool
+        *conn_guard = Some(PooledConnection {
+            db_name: self.db_name.clone(),
+            pool: self.pool.clone(),
+        });
 
-        eprintln!("[AsyncDrop] Cleaning up database: {}", db_name);
-
-        // Connect to admin database to drop the test database
-        let admin_url = format!("{}/postgres", base_url);
-        let admin_config = diesel_async::pooled_connection::AsyncDieselConnectionManager::<
-            AsyncPgConnection,
-        >::new(&admin_url);
-
-        match diesel_async::pooled_connection::bb8::Pool::builder()
-            .max_size(1)
-            .build(admin_config)
-            .await
-        {
-            Ok(admin_pool) => {
-                match admin_pool.get().await {
-                    Ok(mut admin_conn) => {
-                        eprintln!("[AsyncDrop] Got admin connection for {}", db_name);
-
-                        // Force disconnect any remaining connections
-                        let terminate_sql = format!(
-                            "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{}'",
-                            db_name
-                        );
-                        match diesel::sql_query(&terminate_sql)
-                            .execute(&mut admin_conn)
-                            .await
-                        {
-                            Ok(count) => eprintln!("[AsyncDrop] Terminated {} connections", count),
-                            Err(e) => {
-                                eprintln!("[AsyncDrop] Failed to terminate connections: {}", e)
-                            }
-                        }
-
-                        // Drop the database
-                        let drop_db_sql =
-                            format!("DROP DATABASE IF EXISTS \"{}\" WITH (FORCE)", db_name);
-                        match diesel::sql_query(&drop_db_sql)
-                            .execute(&mut admin_conn)
-                            .await
-                        {
-                            Ok(_) => {
-                                eprintln!("[AsyncDrop] Successfully dropped database: {}", db_name)
-                            }
-                            Err(e) => {
-                                eprintln!("[AsyncDrop] Failed to drop database {}: {}", db_name, e)
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("[AsyncDrop] Failed to get admin connection: {}", e);
-                    }
-                }
-            }
-            Err(e) => {
-                eprintln!("[AsyncDrop] Failed to create admin pool: {}", e);
-            }
-        }
+        // Notify waiting tests
+        let _ = pool.notify.send(());
     }
 }

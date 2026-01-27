@@ -185,7 +185,9 @@ fn insert_component_recursive<'a>(
         let component_id = inserted_component.id;
 
         // Store component ID mapping for indexable components
-        if let Some(kind) = component.kind && kind.is_schedulable() {
+        if let Some(kind) = component.kind
+            && kind.is_schedulable()
+        {
             let uid = component.uid().map(String::from);
             let key = (component.name.clone(), uid);
             component_map.insert(key, component_id);
