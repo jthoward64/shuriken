@@ -90,31 +90,32 @@ pub fn resource_type_from_content_type(content_type: &str) -> ResourceType {
     }
 }
 
-/// Build a canonical resource identifier from pieces we have in DAV handlers.
-///
-/// This uses the new path-segment-based `ResourceId` abstraction. We don't yet
-/// have owner/collection names at this layer, so we embed the collection UUID
-/// as both the owner and collection segment to produce a stable, matchable path.
-#[must_use]
-pub fn resource_id_for(
-    resource_type: ResourceType,
-    collection_id: uuid::Uuid,
-    uri: Option<&str>,
-) -> ResourceLocation {
-    let mut segments = vec![
-        PathSegment::ResourceType(resource_type),
-        PathSegment::Owner(collection_id.to_string()),
-        PathSegment::Collection(collection_id.to_string()),
-    ];
+// Replace with ResouceLocation:
+// /// Build a canonical resource identifier from pieces we have in DAV handlers.
+// ///
+// /// This uses the new path-segment-based `ResourceId` abstraction. We don't yet
+// /// have owner/collection names at this layer, so we embed the collection UUID
+// /// as both the owner and collection segment to produce a stable, matchable path.
+// #[must_use]
+// pub fn resource_id_for(
+//     resource_type: ResourceType,
+//     collection_id: uuid::Uuid,
+//     uri: Option<&str>,
+// ) -> ResourceLocation {
+//     let mut segments = vec![
+//         PathSegment::ResourceType(resource_type),
+//         PathSegment::Owner(collection_id.to_string()),
+//         PathSegment::Collection(collection_id.to_string()),
+//     ];
 
-    if let Some(uri) = uri {
-        segments.push(PathSegment::Item(uri.to_string()));
-    } else {
-        segments.push(PathSegment::Glob { recursive: true });
-    }
+//     if let Some(uri) = uri {
+//         segments.push(PathSegment::Item(uri.to_string()));
+//     } else {
+//         segments.push(PathSegment::Glob { recursive: true });
+//     }
 
-    ResourceLocation::from_segments(segments)
-}
+//     ResourceLocation::from_segments(segments)
+// }
 
 /// ## Summary
 /// Checks authorization and returns an appropriate HTTP status on denial.

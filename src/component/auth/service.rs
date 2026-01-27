@@ -85,7 +85,7 @@ impl Authorizer {
         resource: &ResourceLocation,
         action: Action,
     ) -> AppResult<AuthzResult> {
-        let path = resource.to_resource_path();
+        let path = resource.to_resource_path(false)?;
         let act = action.as_casbin_action();
 
         // Check each subject until we find one that's allowed

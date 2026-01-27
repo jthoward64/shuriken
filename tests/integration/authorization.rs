@@ -3,6 +3,22 @@
 //!
 //! Verifies that handlers correctly return 403 Forbidden when authorization
 //! is denied and 200 OK (or appropriate success codes) when authorized.
+//!
+//! ## Authorization Model
+//! The authorization model is path-based using Casbin policies:
+//! - `seed_default_role_permissions()` sets up role→permission mappings (g2 rules)
+//! - `seed_access_policy(subject, path_pattern, role)` grants a subject a role on a path
+//! - `seed_collection_owner(principal_id, collection_id, type)` is a convenience for owner access
+//!
+//! ## Path Patterns
+//! - `/cal/{owner_slug}/{collection_slug}/**` - matches all items in a calendar collection
+//! - `/card/{owner_slug}/{collection_slug}/**` - matches all items in an addressbook collection
+//!
+//! ## Roles and Permissions
+//! - `reader`: read, read_freebusy
+//! - `editor-basic`: read, read_freebusy, edit
+//! - `editor`: read, read_freebusy, edit, delete
+//! - `owner`: all permissions including admin
 
 use salvo::http::StatusCode;
 use tracing_test::traced_test;
@@ -16,21 +32,21 @@ use super::helpers::*;
 /// ## Summary
 /// Test that GET returns 403 Forbidden when no permission is granted.
 #[traced_test]
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn get_returns_403_without_permission() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
-    // Seed default policies (role hierarchy, action policies)
+    // Seed role→permission mappings (g2 rules)
     test_db
-        .seed_default_policies()
+        .seed_default_role_permissions()
         .await
-        .expect("Failed to seed default policies");
+        .expect("Failed to seed role permissions");
 
-    // Create a principal and collection
+    // Create an authenticated user (slug: "testuser")
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", Some("Personal"))
@@ -49,9 +65,7 @@ async fn get_returns_403_without_permission() {
         .await
         .expect("Failed to seed iCalendar event");
 
-    // URI stored in DB is just the filename; request path includes collection
-    let instance_uri = "event-123.ics";
-    let request_path = format!("/api/caldav/{collection_id}/{instance_uri}");
+    let instance_uri = "event-123";
     let _instance_id = test_db
         .seed_instance(
             collection_id,
@@ -64,16 +78,11 @@ async fn get_returns_403_without_permission() {
         .await
         .expect("Failed to seed instance");
 
-    // Seed resource type for the entity (required for casbin matching)
-    let resource_str = format!("evt:{entity_id}");
-    test_db
-        .seed_resource_type(&resource_str, "calendar_event")
-        .await
-        .expect("Failed to seed resource type");
-
-    // NO grant is seeded - request should be denied
+    // NO access policy is seeded - request should be denied
     let service = create_db_test_service(&test_db.url()).await;
 
+    // Use path helper for proper URL construction
+    let request_path = caldav_item_path("testuser", "testcal", "event-123.ics");
     let response = TestRequest::get(&request_path).send(&service).await;
 
     // Debug: print body if not the expected status
@@ -88,21 +97,21 @@ async fn get_returns_403_without_permission() {
 /// ## Summary
 /// Test that GET returns 200 OK when read permission is granted.
 #[traced_test]
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn get_returns_200_with_read_permission() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
-    // Seed default policies
+    // Seed role→permission mappings
     test_db
-        .seed_default_policies()
+        .seed_default_role_permissions()
         .await
-        .expect("Failed to seed default policies");
+        .expect("Failed to seed role permissions");
 
-    // Create a principal and collection
+    // Create an authenticated user
     let principal_id = test_db
-        .seed_principal("user", "bob", Some("Bob"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "bobcal", Some("Bob Calendar"))
@@ -121,8 +130,7 @@ async fn get_returns_200_with_read_permission() {
         .await
         .expect("Failed to seed iCalendar event");
 
-    let instance_uri = "event-456.ics";
-    let request_path = format!("/api/caldav/{collection_id}/{instance_uri}");
+    let instance_uri = "event-456";
     let _instance_id = test_db
         .seed_instance(
             collection_id,
@@ -135,21 +143,22 @@ async fn get_returns_200_with_read_permission() {
         .await
         .expect("Failed to seed instance");
 
-    // Seed resource type for the entity
-    let resource_str = format!("evt:{entity_id}");
+    // // Grant reader access to the authenticated user on their collection
+    // // Use UUID-based path pattern to match what slug_resolver produces
+    // let path_pattern = format!("/cal/{principal_id}/{collection_id}/**");
+    let path_pattern = cal_collection_glob("testuser", "bobcal", true);
     test_db
-        .seed_resource_type(&resource_str, "calendar_event")
+        .seed_access_policy(
+            &format!("principal:{principal_id}"),
+            &path_pattern,
+            "reader",
+        )
         .await
-        .expect("Failed to seed resource type");
-
-    // Grant read permission to the public principal
-    test_db
-        .seed_grant("public", &resource_str, "read")
-        .await
-        .expect("Failed to seed grant");
+        .expect("Failed to seed access policy");
 
     let service = create_db_test_service(&test_db.url()).await;
 
+    let request_path = caldav_item_path("testuser", "bobcal", "event-456.ics");
     let response = TestRequest::get(&request_path).send(&service).await;
 
     // Expect 200 OK since read permission is granted
@@ -161,21 +170,21 @@ async fn get_returns_200_with_read_permission() {
 // ============================================================================
 
 /// ## Summary
-/// Test that DELETE returns 403 Forbidden when no write permission is granted.
+/// Test that DELETE returns 403 Forbidden when only read permission is granted.
 #[traced_test]
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn delete_returns_403_without_write_permission() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     test_db
-        .seed_default_policies()
+        .seed_default_role_permissions()
         .await
-        .expect("Failed to seed default policies");
+        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
-        .seed_principal("user", "charlie", Some("Charlie"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "charliecal", Some("Charlie Cal"))
@@ -193,8 +202,7 @@ async fn delete_returns_403_without_write_permission() {
         .await
         .expect("Failed to seed iCalendar event");
 
-    let instance_uri = "event-789.ics";
-    let request_path = format!("/api/caldav/{collection_id}/{instance_uri}");
+    let instance_uri = "event-789";
     let _instance_id = test_db
         .seed_instance(
             collection_id,
@@ -207,21 +215,19 @@ async fn delete_returns_403_without_write_permission() {
         .await
         .expect("Failed to seed instance");
 
-    // Seed resource type
-    let resource_str = format!("evt:{entity_id}");
+    // Grant only READ permission (reader role) - delete should be denied
     test_db
-        .seed_resource_type(&resource_str, "calendar_event")
+        .seed_access_policy(
+            &format!("principal:{principal_id}"),
+            &cal_collection_glob("testuser", "charliecal", true),
+            "reader",
+        )
         .await
-        .expect("Failed to seed resource type");
-
-    // Grant only READ permission (not write) - delete should be denied
-    test_db
-        .seed_grant("public", &resource_str, "read")
-        .await
-        .expect("Failed to seed grant");
+        .expect("Failed to seed access policy");
 
     let service = create_db_test_service(&test_db.url()).await;
 
+    let request_path = caldav_item_path("testuser", "charliecal", "event-789.ics");
     let response = TestRequest::delete(&request_path).send(&service).await;
 
     // Debug: print body if not expected status
@@ -233,26 +239,26 @@ async fn delete_returns_403_without_write_permission() {
         );
     }
 
-    // Expect 403 Forbidden since only read (not write) permission is granted
+    // Expect 403 Forbidden since only read (not delete) permission is granted
     response.assert_status(StatusCode::FORBIDDEN);
 }
 
 /// ## Summary
-/// Test that DELETE returns 204 No Content when write permission is granted.
+/// Test that DELETE returns 204 No Content when editor permission is granted.
 #[traced_test]
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn delete_returns_204_with_write_permission() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     test_db
-        .seed_default_policies()
+        .seed_default_role_permissions()
         .await
-        .expect("Failed to seed default policies");
+        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
-        .seed_principal("user", "dana", Some("Dana"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "danacal", Some("Dana Cal"))
@@ -270,8 +276,7 @@ async fn delete_returns_204_with_write_permission() {
         .await
         .expect("Failed to seed iCalendar event");
 
-    let instance_uri = "event-del.ics";
-    let request_path = format!("/api/caldav/{collection_id}/{instance_uri}");
+    let instance_uri = "event-del";
     let _instance_id = test_db
         .seed_instance(
             collection_id,
@@ -284,24 +289,22 @@ async fn delete_returns_204_with_write_permission() {
         .await
         .expect("Failed to seed instance");
 
-    // Seed resource type
-    let resource_str = format!("evt:{entity_id}");
+    // Grant editor permission (includes delete) - delete should succeed
     test_db
-        .seed_resource_type(&resource_str, "calendar_event")
+        .seed_access_policy(
+            &format!("principal:{principal_id}"),
+            &cal_collection_glob("testuser", "danacal", true),
+            "editor",
+        )
         .await
-        .expect("Failed to seed resource type");
-
-    // Grant edit permission - delete should succeed
-    test_db
-        .seed_grant("public", &resource_str, "edit")
-        .await
-        .expect("Failed to seed grant");
+        .expect("Failed to seed access policy");
 
     let service = create_db_test_service(&test_db.url()).await;
 
+    let request_path = caldav_item_path("testuser", "danacal", "event-del.ics");
     let response = TestRequest::delete(&request_path).send(&service).await;
 
-    // Expect 204 No Content since write permission is granted
+    // Expect 204 No Content since editor permission includes delete
     response.assert_status(StatusCode::NO_CONTENT);
 }
 
@@ -312,34 +315,27 @@ async fn delete_returns_204_with_write_permission() {
 /// ## Summary
 /// Test that PUT (create new resource) returns 403 when no write permission on collection.
 #[traced_test]
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn put_new_returns_403_without_collection_write_permission() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     test_db
-        .seed_default_policies()
+        .seed_default_role_permissions()
         .await
-        .expect("Failed to seed default policies");
+        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
-        .seed_principal("user", "eve", Some("Eve"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
-    let collection_id = test_db
+    let _collection_id = test_db
         .seed_collection(principal_id, "calendar", "evecal", Some("Eve Cal"))
         .await
         .expect("Failed to seed collection");
 
-    // Seed resource type for collection
-    let collection_resource = format!("cal:{collection_id}");
-    test_db
-        .seed_resource_type(&collection_resource, "calendar")
-        .await
-        .expect("Failed to seed collection resource type");
-
     // NO write permission granted on collection
-    let request_path = format!("/api/caldav/{collection_id}/new-event.ics");
+    let request_path = caldav_item_path("testuser", "evecal", "new-event.ics");
 
     let ics_body = r"BEGIN:VCALENDAR
 VERSION:2.0
@@ -365,21 +361,21 @@ END:VCALENDAR";
 }
 
 /// ## Summary
-/// Test that PUT (update existing resource) returns 403 when no write permission.
+/// Test that PUT (update existing resource) returns 403 when only read permission.
 #[traced_test]
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn put_update_returns_403_without_write_permission() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     test_db
-        .seed_default_policies()
+        .seed_default_role_permissions()
         .await
-        .expect("Failed to seed default policies");
+        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
-        .seed_principal("user", "frank", Some("Frank"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "frankcal", Some("Frank Cal"))
@@ -397,8 +393,7 @@ async fn put_update_returns_403_without_write_permission() {
         .await
         .expect("Failed to seed iCalendar event");
 
-    let instance_uri = "existing.ics";
-    let request_path = format!("/api/caldav/{collection_id}/{instance_uri}");
+    let instance_uri = "existing";
     let _instance_id = test_db
         .seed_instance(
             collection_id,
@@ -411,17 +406,15 @@ async fn put_update_returns_403_without_write_permission() {
         .await
         .expect("Failed to seed instance");
 
-    // Seed resource type but only with read permission
-    let resource_str = format!("evt:{entity_id}");
+    // Grant only reader permission - PUT should be denied
     test_db
-        .seed_resource_type(&resource_str, "calendar_event")
+        .seed_access_policy(
+            &format!("principal:{principal_id}"),
+            &cal_collection_glob("testuser", "frankcal", true),
+            "reader",
+        )
         .await
-        .expect("Failed to seed resource type");
-
-    test_db
-        .seed_grant("public", &resource_str, "read")
-        .await
-        .expect("Failed to seed grant");
+        .expect("Failed to seed access policy");
 
     let ics_body = r"BEGIN:VCALENDAR
 VERSION:2.0
@@ -436,13 +429,14 @@ END:VCALENDAR";
 
     let service = create_db_test_service(&test_db.url()).await;
 
+    let request_path = caldav_item_path("testuser", "frankcal", "existing.ics");
     let response = TestRequest::put(&request_path)
         .header("Content-Type", "text/calendar")
         .body(ics_body)
         .send(&service)
         .await;
 
-    // Expect 403 Forbidden since only read (not write) permission
+    // Expect 403 Forbidden since only read (not edit) permission
     response.assert_status(StatusCode::FORBIDDEN);
 }
 
@@ -453,19 +447,19 @@ END:VCALENDAR";
 /// ## Summary
 /// Test that PROPFIND on a resource returns 403 when no permission.
 #[traced_test]
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn propfind_returns_403_without_permission() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     test_db
-        .seed_default_policies()
+        .seed_default_role_permissions()
         .await
-        .expect("Failed to seed default policies");
+        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
-        .seed_principal("user", "grace", Some("Grace"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "gracecal", Some("Grace Cal"))
@@ -483,8 +477,7 @@ async fn propfind_returns_403_without_permission() {
         .await
         .expect("Failed to seed iCalendar event");
 
-    let instance_uri = "propfind-event.ics";
-    let request_path = format!("/api/caldav/{collection_id}/{instance_uri}");
+    let instance_uri = "propfind-event";
     let _instance_id = test_db
         .seed_instance(
             collection_id,
@@ -497,13 +490,6 @@ async fn propfind_returns_403_without_permission() {
         .await
         .expect("Failed to seed instance");
 
-    // Seed resource type for the entity (required for casbin matching)
-    let resource_str = format!("evt:{entity_id}");
-    test_db
-        .seed_resource_type(&resource_str, "calendar_event")
-        .await
-        .expect("Failed to seed resource type");
-
     // NO permission granted
     let service = create_db_test_service(&test_db.url()).await;
 
@@ -514,6 +500,7 @@ async fn propfind_returns_403_without_permission() {
   </D:prop>
 </D:propfind>"#;
 
+    let request_path = caldav_item_path("testuser", "gracecal", "propfind-event.ics");
     let response = TestRequest::propfind(&request_path)
         .header("Content-Type", "application/xml")
         .header("Depth", "0")
@@ -530,21 +517,21 @@ async fn propfind_returns_403_without_permission() {
 // ============================================================================
 
 /// ## Summary
-/// Test that PROPPATCH returns 403 when no write permission.
+/// Test that PROPPATCH returns 403 when only read permission.
 #[traced_test]
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn proppatch_returns_403_without_write_permission() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     test_db
-        .seed_default_policies()
+        .seed_default_role_permissions()
         .await
-        .expect("Failed to seed default policies");
+        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
-        .seed_principal("user", "henry", Some("Henry"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "henrycal", Some("Henry Cal"))
@@ -562,8 +549,7 @@ async fn proppatch_returns_403_without_write_permission() {
         .await
         .expect("Failed to seed iCalendar event");
 
-    let instance_uri = "proppatch-event.ics";
-    let request_path = format!("/api/caldav/{collection_id}/{instance_uri}");
+    let instance_uri = "proppatch-event";
     let _instance_id = test_db
         .seed_instance(
             collection_id,
@@ -576,17 +562,15 @@ async fn proppatch_returns_403_without_write_permission() {
         .await
         .expect("Failed to seed instance");
 
-    // Grant only read permission
-    let resource_str = format!("evt:{entity_id}");
+    // Grant only reader permission
     test_db
-        .seed_resource_type(&resource_str, "calendar_event")
+        .seed_access_policy(
+            &format!("principal:{principal_id}"),
+            &cal_collection_glob("testuser", "henrycal", true),
+            "reader",
+        )
         .await
-        .expect("Failed to seed resource type");
-
-    test_db
-        .seed_grant("public", &resource_str, "read")
-        .await
-        .expect("Failed to seed grant");
+        .expect("Failed to seed access policy");
 
     let service = create_db_test_service(&test_db.url()).await;
 
@@ -599,6 +583,7 @@ async fn proppatch_returns_403_without_write_permission() {
   </D:set>
 </D:propertyupdate>"#;
 
+    let request_path = caldav_item_path("testuser", "henrycal", "proppatch-event.ics");
     let response = TestRequest::proppatch(&request_path)
         .header("Content-Type", "application/xml")
         .body(proppatch_body)
@@ -610,30 +595,28 @@ async fn proppatch_returns_403_without_write_permission() {
 }
 
 // ============================================================================
-// Role Hierarchy Tests
+// Role Permission Tests
 // ============================================================================
 
 /// ## Summary
-/// Test that role hierarchy is respected: a principal with "owner" role
-/// can access resources requiring "read" role via g5 hierarchy.
-///
-/// Role hierarchy: owner > admin > edit-share > edit > read-share > read > read-freebusy
+/// Test that owner role includes read permission.
+/// Owner role should allow read access via role→permission mapping.
 #[traced_test]
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn get_returns_200_with_owner_role_for_read_action() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
-    // Seed default policies (role hierarchy, action policies)
+    // Seed role→permission mappings
     test_db
-        .seed_default_policies()
+        .seed_default_role_permissions()
         .await
-        .expect("Failed to seed default policies");
+        .expect("Failed to seed role permissions");
 
-    // Create a principal and collection
+    // Create an authenticated user
     let principal_id = test_db
-        .seed_principal("user", "bob", Some("Bob"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "bobcal", Some("Bob Cal"))
@@ -656,8 +639,7 @@ async fn get_returns_200_with_owner_role_for_read_action() {
         .await
         .expect("Failed to seed iCalendar event");
 
-    let instance_uri = "owner-hierarchy.ics";
-    let request_path = format!("/api/caldav/{collection_id}/{instance_uri}");
+    let instance_uri = "owner-hierarchy";
     let _instance_id = test_db
         .seed_instance(
             collection_id,
@@ -670,45 +652,39 @@ async fn get_returns_200_with_owner_role_for_read_action() {
         .await
         .expect("Failed to seed instance");
 
-    // Grant "owner" role (highest in hierarchy)
-    let resource_str = format!("evt:{entity_id}");
+    // Grant owner access using the convenience method
     test_db
-        .seed_resource_type(&resource_str, "calendar_event")
+        .seed_collection_owner(principal_id, collection_id, "calendar")
         .await
-        .expect("Failed to seed resource type");
-
-    test_db
-        .seed_grant("public", &resource_str, "owner")
-        .await
-        .expect("Failed to seed grant with owner role");
+        .expect("Failed to seed collection owner");
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    // Policy requires "read" role, but we have "owner" role.
-    // With role hierarchy (owner > ... > read), this should succeed.
+    // Owner role includes read permission via g2 mapping
+    let request_path = caldav_item_path("testuser", "bobcal", "owner-hierarchy.ics");
     let response = TestRequest::get(&request_path).send(&service).await;
 
-    // Expect 200 OK because owner role implies read via g5 hierarchy
+    // Expect 200 OK because owner role includes read permission
     response.assert_status(StatusCode::OK);
 }
 
 /// ## Summary
-/// Test that role hierarchy works for "edit" role accessing read-only resources.
-/// Edit role should allow read access via hierarchy: edit > read-share > read
+/// Test that editor-basic role includes read permission.
+/// Editor-basic role should allow read access via role→permission mapping.
 #[traced_test]
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn get_returns_200_with_edit_role_for_read_action() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     test_db
-        .seed_default_policies()
+        .seed_default_role_permissions()
         .await
-        .expect("Failed to seed default policies");
+        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
-        .seed_principal("user", "carol", Some("Carol"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "carolcal", Some("Carol Cal"))
@@ -729,8 +705,7 @@ async fn get_returns_200_with_edit_role_for_read_action() {
         .await
         .expect("Failed to seed iCalendar event");
 
-    let instance_uri = "edit-hierarchy.ics";
-    let request_path = format!("/api/caldav/{collection_id}/{instance_uri}");
+    let instance_uri = "edit-hierarchy";
     let _instance_id = test_db
         .seed_instance(
             collection_id,
@@ -743,43 +718,41 @@ async fn get_returns_200_with_edit_role_for_read_action() {
         .await
         .expect("Failed to seed instance");
 
-    // Grant "edit" role
-    let resource_str = format!("evt:{entity_id}");
+    // Grant editor-basic role (includes read, edit but not delete)
     test_db
-        .seed_resource_type(&resource_str, "calendar_event")
+        .seed_access_policy(
+            &format!("principal:{principal_id}"),
+            &cal_collection_glob("testuser", "carolcal", true),
+            "editor-basic",
+        )
         .await
-        .expect("Failed to seed resource type");
-
-    test_db
-        .seed_grant("public", &resource_str, "edit")
-        .await
-        .expect("Failed to seed grant with edit role");
+        .expect("Failed to seed access policy");
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    // Policy requires "read" role, we have "edit" role.
-    // With role hierarchy (edit > read-share > read), this should succeed.
+    // Editor-basic role includes read permission via g2 mapping
+    let request_path = caldav_item_path("testuser", "carolcal", "edit-hierarchy.ics");
     let response = TestRequest::get(&request_path).send(&service).await;
 
     response.assert_status(StatusCode::OK);
 }
 
 /// ## Summary
-/// Test that "edit" role can perform write actions (exact match, not hierarchy).
+/// Test that editor role can perform delete actions.
 #[traced_test]
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn delete_returns_204_with_edit_role() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     test_db
-        .seed_default_policies()
+        .seed_default_role_permissions()
         .await
-        .expect("Failed to seed default policies");
+        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
-        .seed_principal("user", "dave", Some("Dave"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "davecal", Some("Dave Cal"))
@@ -796,8 +769,7 @@ async fn delete_returns_204_with_edit_role() {
         .await
         .expect("Failed to seed iCalendar event");
 
-    let instance_uri = "edit-write.ics";
-    let request_path = format!("/api/caldav/{collection_id}/{instance_uri}");
+    let instance_uri = "edit-write";
     let _instance_id = test_db
         .seed_instance(
             collection_id,
@@ -810,21 +782,20 @@ async fn delete_returns_204_with_edit_role() {
         .await
         .expect("Failed to seed instance");
 
-    // Grant "edit" role
-    let resource_str = format!("evt:{entity_id}");
+    // Grant editor role (includes delete)
     test_db
-        .seed_resource_type(&resource_str, "calendar_event")
+        .seed_access_policy(
+            &format!("principal:{principal_id}"),
+            &cal_collection_glob("testuser", "davecal", true),
+            "editor",
+        )
         .await
-        .expect("Failed to seed resource type");
-
-    test_db
-        .seed_grant("public", &resource_str, "edit")
-        .await
-        .expect("Failed to seed grant with edit role");
+        .expect("Failed to seed access policy");
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    // Policy requires "edit" role for write, we have "edit" role (exact match).
+    // Editor role includes delete permission via g2 mapping
+    let request_path = caldav_item_path("testuser", "davecal", "edit-write.ics");
     let response = TestRequest::delete(&request_path).send(&service).await;
 
     response.assert_status(StatusCode::NO_CONTENT);

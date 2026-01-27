@@ -188,6 +188,7 @@ pub fn caldav_collection_path(owner: &str, collection: &str) -> String {
         collection,
     )
     .to_full_path()
+    .expect("Failed to build caldav collection path")
 }
 
 /// Constructs a full CalDAV API path for an item.
@@ -205,6 +206,7 @@ pub fn caldav_item_path(owner: &str, collection: &str, item: &str) -> String {
         item.to_string(),
     )
     .to_full_path()
+    .expect("Failed to build caldav item path")
 }
 
 /// Constructs a full CardDAV API path for a collection.
@@ -221,6 +223,7 @@ pub fn carddav_collection_path(owner: &str, collection: &str) -> String {
         collection,
     )
     .to_full_path()
+    .expect("Failed to build carddav collection path")
 }
 
 /// Constructs a full CardDAV API path for an item.
@@ -238,6 +241,7 @@ pub fn carddav_item_path(owner: &str, collection: &str, item: &str) -> String {
         item.to_string(),
     )
     .to_full_path()
+    .expect("Failed to build carddav item path")
 }
 
 /// Constructs a resource path for calendar resources (without DAV prefix).
@@ -256,14 +260,16 @@ pub fn cal_path(owner: &str, collection: &str, item: Option<&str>) -> String {
             collection,
             item.to_string(),
         )
-        .to_resource_path()
+        .to_resource_path(false)
+        .expect("Failed to build cal path")
     } else {
         ResourceLocation::from_segments_collection(
             ResourceType::Calendar,
             owner.to_string(),
             collection,
         )
-        .to_resource_path()
+        .to_resource_path(false)
+        .expect("Failed to build cal path")
     }
 }
 
@@ -283,14 +289,16 @@ pub fn card_path(owner: &str, collection: &str, item: Option<&str>) -> String {
             collection,
             item.to_string(),
         )
-        .to_resource_path()
+        .to_resource_path(false)
+        .expect("Failed to build card path")
     } else {
         ResourceLocation::from_segments_collection(
             ResourceType::Addressbook,
             owner.to_string(),
             collection,
         )
-        .to_resource_path()
+        .to_resource_path(false)
+        .expect("Failed to build card path")
     }
 }
 
@@ -298,7 +306,8 @@ pub fn card_path(owner: &str, collection: &str, item: Option<&str>) -> String {
 #[must_use]
 pub fn cal_owner_glob(owner: &str, recursive: bool) -> String {
     ResourceLocation::from_segments_owner_glob(ResourceType::Calendar, owner.to_string(), recursive)
-        .to_resource_path()
+        .to_resource_path(true)
+        .expect("Failed to build cal owner glob")
 }
 
 /// Constructs a resource path for a calendar collection with glob (e.g., `/cal/alice/work/**`).
@@ -310,7 +319,8 @@ pub fn cal_collection_glob(owner: &str, collection: &str, recursive: bool) -> St
         collection,
         recursive,
     )
-    .to_resource_path()
+    .to_resource_path(true)
+    .expect("Failed to build cal collection glob")
 }
 
 /// Constructs a resource path for an addressbook owner with glob (e.g., `/card/bob/**`).
@@ -321,7 +331,8 @@ pub fn card_owner_glob(owner: &str, recursive: bool) -> String {
         owner.to_string(),
         recursive,
     )
-    .to_resource_path()
+    .to_resource_path(true)
+    .expect("Failed to build card owner glob")
 }
 
 /// Constructs a resource path for an addressbook collection with glob (e.g., `/card/bob/contacts/**`).
@@ -333,7 +344,8 @@ pub fn card_collection_glob(owner: &str, collection: &str, recursive: bool) -> S
         collection,
         recursive,
     )
-    .to_resource_path()
+    .to_resource_path(true)
+    .expect("Failed to build card collection glob")
 }
 
 // ============================================================================
@@ -400,12 +412,9 @@ pub async fn create_db_test_service(database_url: &str) -> Service {
         CONFIG_INIT.get_or_init(|| load_config().expect("Failed to load config for tests"));
 
     // Create the database pool
-    let pool = shuriken::component::db::connection::create_pool(
-        database_url,
-        u32::from(config.database.max_connections),
-    )
-    .await
-    .expect("Failed to create database pool for test service");
+    let pool = shuriken::component::db::connection::create_pool(database_url, 1u32)
+        .await
+        .expect("Failed to create database pool for test service");
 
     // Initialize Casbin enforcer - loads policies from current DB state
     let enforcer = shuriken::component::auth::casbin::init_casbin(pool.clone())

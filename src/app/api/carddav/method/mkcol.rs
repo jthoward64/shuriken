@@ -6,8 +6,8 @@
 use salvo::http::StatusCode;
 use salvo::{Depot, Request, Response, handler};
 
-use crate::app::api::dav::extract::auth::{get_auth_context, resource_id_for};
-use crate::component::auth::{Action, ResourceType};
+use crate::app::api::dav::extract::auth::get_auth_context;
+use crate::component::auth::{Action, get_resolved_location_from_depot};
 use crate::component::dav::service::collection::{CreateCollectionContext, create_collection};
 use crate::component::db::connection;
 use crate::component::rfc::dav::parse::{MkcolRequest, parse_mkcol};
@@ -59,17 +59,18 @@ pub async fn mkcol_extended(req: &mut Request, res: &mut Response, depot: &Depot
         }
     };
 
-    // Build a resource ID for the parent collection (user's addressbooks namespace)
-    let parent_resource = match extract_resource_type_from_path(&path) {
-        Some(resource_type) => resource_id_for(resource_type, uuid::Uuid::nil(), None),
-        None => {
-            tracing::warn!(path = %path, "Cannot determine resource type from path");
+    // Get the resolved resource location from depot (populated by slug_resolver)
+    let parent_resource = match get_resolved_location_from_depot(depot) {
+        Ok(loc) => loc,
+        Err(_) => {
+            // If slug_resolver didn't resolve, we can't authorize
+            tracing::warn!(path = %path, "Resource location not found in depot");
             res.status_code(StatusCode::BAD_REQUEST);
             return;
         }
     };
 
-    if let Err(e) = authorizer.require(&subjects, &parent_resource, Action::Edit) {
+    if let Err(e) = authorizer.require(&subjects, parent_resource, Action::Edit) {
         tracing::debug!(error = %e, "Authorization denied for MKCOL");
         res.status_code(StatusCode::FORBIDDEN);
         return;
@@ -148,7 +149,8 @@ pub async fn mkcol_extended(req: &mut Request, res: &mut Response, depot: &Depot
 }
 
 /// Extract resource type from path.
-fn extract_resource_type_from_path(path: &str) -> Option<ResourceType> {
+fn extract_resource_type_from_path(path: &str) -> Option<crate::component::auth::ResourceType> {
+    use crate::component::auth::ResourceType;
     if path.contains("/calendars/") {
         Some(ResourceType::Calendar)
     } else if path.contains("/addressbooks/") {

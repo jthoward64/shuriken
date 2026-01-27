@@ -56,5 +56,5 @@ pub fn get_enforcer_from_depot(depot: &salvo::Depot) -> AppResult<Arc<casbin::En
     depot
         .obtain::<Arc<casbin::Enforcer>>()
         .cloned()
-        .map_err(|_err| AppError::InvariantViolation("Casbin enforcer not found in depot".into()))
+        .map_err(|_err| AppError::InvariantViolation("Casbin enforcer not found in depot"))
 }

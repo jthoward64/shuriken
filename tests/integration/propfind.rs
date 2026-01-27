@@ -13,9 +13,13 @@ use super::helpers::*;
 
 /// ## Summary
 /// Test that PROPFIND returns 207 Multi-Status.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn propfind_returns_multistatus() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -26,12 +30,17 @@ async fn propfind_returns_multistatus() {
         .await
         .expect("Failed to seed collection");
 
-    let service = create_test_service();
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
 
-    let response = TestRequest::propfind(&format!("/api/caldav/{collection_id}/"))
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let response = TestRequest::propfind(&caldav_collection_path("alice", "testcal"))
         .depth("0")
         .xml_body(propfind_allprop())
-        .send(service)
+        .send(&service)
         .await;
 
     response.assert_status(StatusCode::MULTI_STATUS);
@@ -39,9 +48,13 @@ async fn propfind_returns_multistatus() {
 
 /// ## Summary
 /// Test that PROPFIND response is valid XML.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn propfind_returns_valid_xml() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -52,12 +65,17 @@ async fn propfind_returns_valid_xml() {
         .await
         .expect("Failed to seed collection");
 
-    let service = create_test_service();
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
 
-    let response = TestRequest::propfind(&format!("/api/caldav/{collection_id}/"))
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let response = TestRequest::propfind(&caldav_collection_path("alice", "testcal"))
         .depth("0")
         .xml_body(propfind_allprop())
-        .send(service)
+        .send(&service)
         .await;
 
     response
@@ -72,18 +90,27 @@ async fn propfind_returns_valid_xml() {
 
 /// ## Summary
 /// Test that PROPFIND Depth:0 on a collection returns only the collection.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn propfind_depth0_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+    test_db
+        .seed_default_role_permissions()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed role permissions");
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
         .await
         .expect("Failed to seed collection");
+
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
 
     // Add some items to the collection
     for i in 0..3 {
@@ -96,7 +123,7 @@ async fn propfind_depth0_collection() {
             .seed_instance(
                 collection_id,
                 entity_id,
-                &format!("/api/caldav/{collection_id}/item-{i}.ics"),
+                &format!("item-{i}"),
                 "text/calendar",
                 &format!("\"item-{i}\""),
                 1,
@@ -105,12 +132,12 @@ async fn propfind_depth0_collection() {
             .expect("Failed to seed instance");
     }
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::propfind(&format!("/api/caldav/{collection_id}/"))
+    let response = TestRequest::propfind(&caldav_collection_path("testuser", "testcal"))
         .depth("0")
         .xml_body(propfind_allprop())
-        .send(service)
+        .send(&service)
         .await;
 
     let response = response.assert_status(StatusCode::MULTI_STATUS);
@@ -125,9 +152,13 @@ async fn propfind_depth0_collection() {
 
 /// ## Summary
 /// Test that PROPFIND Depth:1 returns collection and immediate members.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn propfind_depth1_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -137,6 +168,11 @@ async fn propfind_depth1_collection() {
         .seed_collection(principal_id, "calendar", "testcal", None)
         .await
         .expect("Failed to seed collection");
+
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
 
     // Add 3 items to the collection
     for i in 0..3 {
@@ -149,7 +185,7 @@ async fn propfind_depth1_collection() {
             .seed_instance(
                 collection_id,
                 entity_id,
-                &format!("/api/caldav/{collection_id}/item-{i}.ics"),
+                &format!("item-{i}"),
                 "text/calendar",
                 &format!("\"item-{i}\""),
                 1,
@@ -158,12 +194,12 @@ async fn propfind_depth1_collection() {
             .expect("Failed to seed instance");
     }
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::propfind(&format!("/api/caldav/{collection_id}/"))
+    let response = TestRequest::propfind(&caldav_collection_path("alice", "testcal"))
         .depth("1")
         .xml_body(propfind_allprop())
-        .send(service)
+        .send(&service)
         .await;
 
     let response = response.assert_status(StatusCode::MULTI_STATUS);
@@ -178,9 +214,13 @@ async fn propfind_depth1_collection() {
 
 /// ## Summary
 /// Test that PROPFIND Depth:infinity is rejected or supported consistently.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn propfind_depth_infinity() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -191,12 +231,17 @@ async fn propfind_depth_infinity() {
         .await
         .expect("Failed to seed collection");
 
-    let service = create_test_service();
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
 
-    let response = TestRequest::propfind(&format!("/api/caldav/{collection_id}/"))
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let response = TestRequest::propfind(&caldav_collection_path("alice", "testcal"))
         .depth("infinity")
         .xml_body(propfind_allprop())
-        .send(service)
+        .send(&service)
         .await;
 
     // Either supported (207) or rejected (403)
@@ -209,9 +254,13 @@ async fn propfind_depth_infinity() {
 
 /// ## Summary
 /// Test that missing Depth header defaults appropriately.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn propfind_default_depth() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -222,12 +271,17 @@ async fn propfind_default_depth() {
         .await
         .expect("Failed to seed collection");
 
-    let service = create_test_service();
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
 
     // Send without Depth header
-    let response = TestRequest::propfind(&format!("/api/caldav/{collection_id}/"))
+    let response = TestRequest::propfind(&caldav_collection_path("alice", "testcal"))
         .xml_body(propfind_allprop())
-        .send(service)
+        .send(&service)
         .await;
 
     // Should succeed with some default depth
@@ -240,9 +294,13 @@ async fn propfind_default_depth() {
 
 /// ## Summary
 /// Test that known properties return 200 propstat.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn propfind_known_props_200() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -258,13 +316,18 @@ async fn propfind_known_props_200() {
         .await
         .expect("Failed to seed collection");
 
-    let service = create_test_service();
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
 
     let props = propfind_props(&[("DAV:", "displayname"), ("DAV:", "resourcetype")]);
-    let response = TestRequest::propfind(&format!("/api/caldav/{collection_id}/"))
+    let response = TestRequest::propfind(&caldav_collection_path("alice", "testcal"))
         .depth("0")
         .xml_body(&props)
-        .send(service)
+        .send(&service)
         .await;
 
     response
@@ -275,9 +338,13 @@ async fn propfind_known_props_200() {
 
 /// ## Summary
 /// Test that unknown properties return 404 propstat.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn propfind_unknown_props_404() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -288,13 +355,18 @@ async fn propfind_unknown_props_404() {
         .await
         .expect("Failed to seed collection");
 
-    let service = create_test_service();
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
 
     let props = propfind_props(&[("http://custom.example.com/", "nonexistent-property")]);
-    let response = TestRequest::propfind(&format!("/api/caldav/{collection_id}/"))
+    let response = TestRequest::propfind(&caldav_collection_path("alice", "testcal"))
         .depth("0")
         .xml_body(&props)
-        .send(service)
+        .send(&service)
         .await;
 
     response
@@ -304,9 +376,13 @@ async fn propfind_unknown_props_404() {
 
 /// ## Summary
 /// Test that mixed known/unknown properties return 207 with separate propstats.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn propfind_mixed_props() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -317,7 +393,12 @@ async fn propfind_mixed_props() {
         .await
         .expect("Failed to seed collection");
 
-    let service = create_test_service();
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
 
     // Request both a known and unknown property
     let body = r#"<?xml version="1.0" encoding="utf-8"?>
@@ -328,10 +409,10 @@ async fn propfind_mixed_props() {
   </D:prop>
 </D:propfind>"#;
 
-    let response = TestRequest::propfind(&format!("/api/caldav/{collection_id}/"))
+    let response = TestRequest::propfind(&caldav_collection_path("alice", "testcal"))
         .depth("0")
         .xml_body(body)
-        .send(service)
+        .send(&service)
         .await;
 
     let response = response.assert_status(StatusCode::MULTI_STATUS);
@@ -350,9 +431,13 @@ async fn propfind_mixed_props() {
 
 /// ## Summary
 /// Test that PROPFIND allprop returns reasonable set of properties.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn propfind_allprop_request() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -368,12 +453,17 @@ async fn propfind_allprop_request() {
         .await
         .expect("Failed to seed collection");
 
-    let service = create_test_service();
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
 
-    let response = TestRequest::propfind(&format!("/api/caldav/{collection_id}/"))
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let response = TestRequest::propfind(&caldav_collection_path("alice", "testcal"))
         .depth("0")
         .xml_body(propfind_allprop())
-        .send(service)
+        .send(&service)
         .await;
 
     response
@@ -384,9 +474,13 @@ async fn propfind_allprop_request() {
 
 /// ## Summary
 /// Test that PROPFIND propname returns property names without values.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn propfind_propname() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -397,17 +491,22 @@ async fn propfind_propname() {
         .await
         .expect("Failed to seed collection");
 
-    let service = create_test_service();
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
 
     let body = r#"<?xml version="1.0" encoding="utf-8"?>
 <D:propfind xmlns:D="DAV:">
   <D:propname/>
 </D:propfind>"#;
 
-    let response = TestRequest::propfind(&format!("/api/caldav/{collection_id}/"))
+    let response = TestRequest::propfind(&caldav_collection_path("alice", "testcal"))
         .depth("0")
         .xml_body(body)
-        .send(service)
+        .send(&service)
         .await;
 
     response
@@ -421,9 +520,13 @@ async fn propfind_propname() {
 
 /// ## Summary
 /// Test that calendar collections advertise calendar-access resource type.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn propfind_calendar_resourcetype() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -434,13 +537,18 @@ async fn propfind_calendar_resourcetype() {
         .await
         .expect("Failed to seed collection");
 
-    let service = create_test_service();
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
 
     let props = propfind_props(&[("DAV:", "resourcetype")]);
-    let response = TestRequest::propfind(&format!("/api/caldav/{collection_id}/"))
+    let response = TestRequest::propfind(&caldav_collection_path("alice", "testcal"))
         .depth("0")
         .xml_body(&props)
-        .send(service)
+        .send(&service)
         .await;
 
     response
@@ -451,9 +559,13 @@ async fn propfind_calendar_resourcetype() {
 
 /// ## Summary
 /// Test that addressbook collections advertise addressbook resource type.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn propfind_addressbook_resourcetype() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "bob", Some("Bob"))
         .await
@@ -464,13 +576,18 @@ async fn propfind_addressbook_resourcetype() {
         .await
         .expect("Failed to seed collection");
 
-    let service = create_test_service();
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "addressbook")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
 
     let props = propfind_props(&[("DAV:", "resourcetype")]);
-    let response = TestRequest::propfind(&format!("/api/carddav/{collection_id}/"))
+    let response = TestRequest::propfind(&carddav_collection_path("bob", "addr"))
         .depth("0")
         .xml_body(&props)
-        .send(service)
+        .send(&service)
         .await;
 
     response
@@ -485,9 +602,13 @@ async fn propfind_addressbook_resourcetype() {
 
 /// ## Summary
 /// Test that PROPFIND returns getetag for resources.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn propfind_getetag() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
@@ -498,6 +619,11 @@ async fn propfind_getetag() {
         .seed_collection(principal_id, "calendar", "testcal", None)
         .await
         .expect("Failed to seed collection");
+
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
 
     let entity_id = test_db
         .seed_entity("icalendar", Some("etag-test@example.com"))
@@ -508,7 +634,7 @@ async fn propfind_getetag() {
         .seed_instance(
             collection_id,
             entity_id,
-            &format!("/api/caldav/{collection_id}/etag-test.ics"),
+            "etag-test",
             "text/calendar",
             "\"test-etag-123\"",
             1,
@@ -516,13 +642,13 @@ async fn propfind_getetag() {
         .await
         .expect("Failed to seed instance");
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
 
     let props = propfind_props(&[("DAV:", "getetag")]);
-    let response = TestRequest::propfind(&format!("/api/caldav/{collection_id}/"))
+    let response = TestRequest::propfind(&caldav_collection_path("alice", "testcal"))
         .depth("1")
         .xml_body(&props)
-        .send(service)
+        .send(&service)
         .await;
 
     response
@@ -533,9 +659,13 @@ async fn propfind_getetag() {
 
 /// ## Summary
 /// Test that PROPFIND returns sync-token for collections.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn propfind_sync_token() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -546,13 +676,18 @@ async fn propfind_sync_token() {
         .await
         .expect("Failed to seed collection");
 
-    let service = create_test_service();
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
 
     let props = propfind_props(&[("DAV:", "sync-token")]);
-    let response = TestRequest::propfind(&format!("/api/caldav/{collection_id}/"))
+    let response = TestRequest::propfind(&caldav_collection_path("alice", "testcal"))
         .depth("0")
         .xml_body(&props)
-        .send(service)
+        .send(&service)
         .await;
 
     response
@@ -566,24 +701,37 @@ async fn propfind_sync_token() {
 
 /// ## Summary
 /// Test that PROPFIND on non-existent resource returns 404.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn propfind_nonexistent_404() {
-    let service = create_test_service();
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
 
-    let response = TestRequest::propfind("/api/caldav/00000000-0000-0000-0000-000000000000/")
-        .depth("0")
-        .xml_body(propfind_allprop())
-        .send(service)
-        .await;
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let response = TestRequest::propfind(&caldav_collection_path(
+        "nonexistent-user",
+        "nonexistent-cal",
+    ))
+    .depth("0")
+    .xml_body(propfind_allprop())
+    .send(&service)
+    .await;
 
     response.assert_status(StatusCode::NOT_FOUND);
 }
 
 /// ## Summary
 /// Test that PROPFIND with invalid XML returns 400.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn propfind_invalid_xml_400() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -594,12 +742,17 @@ async fn propfind_invalid_xml_400() {
         .await
         .expect("Failed to seed collection");
 
-    let service = create_test_service();
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
 
-    let response = TestRequest::propfind(&format!("/api/caldav/{collection_id}/"))
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let response = TestRequest::propfind(&caldav_collection_path("alice", "testcal"))
         .depth("0")
         .xml_body("this is not valid xml <><><")
-        .send(service)
+        .send(&service)
         .await;
 
     response.assert_status(StatusCode::BAD_REQUEST);

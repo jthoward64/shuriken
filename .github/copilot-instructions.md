@@ -64,6 +64,11 @@
 - **Test strategy**:
     - Unit tests: RFC parsers, validators, header parsing, multistatus building.
     - Integration tests: in-process Salvo `Service` tests and/or real Postgres-backed tests for DB + sync-token/ETag semantics.
+- **Logging in Tests**
+    - Integration tests have logging enabled via `test_log` crate.
+    - Use `#[test_log::test]` attribute on any test functions to capture logs (or `#[test_log::test(tokio::test)]` for async tests).
+    - Logs are only output if the test fails unless you pass `-- --nocapture` to `cargo test`.
+    - `test_log` supports the RUST_LOG environment variable for log level control (e.g., `RUST_LOG=debug` or `RUST_LOG=shuriken=info`).
 
 ## Dependencies & Usage
 

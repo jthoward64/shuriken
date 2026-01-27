@@ -142,11 +142,11 @@ pub async fn resolve_path_and_load_entities(
             coll_with_parent.collection.id.to_string(),
         ));
 
+        // Only add Item segment if there's an actual instance
         if let Some(inst) = &instance_entity {
             segments.push(PathSegment::Item(inst.id.to_string()));
-        } else {
-            segments.push(PathSegment::Glob { recursive: true });
         }
+        // Otherwise, segments ends with Collection (representing the collection itself)
     }
 
     let resolved_location = ResourceLocation::from_segments(segments);

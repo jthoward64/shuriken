@@ -8,7 +8,7 @@ use super::helpers::*;
 
 /// ## Summary
 /// Example test showing how to use the test infrastructure to seed a principal.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 #[ignore = "requires running database"]
 async fn example_seed_principal() {
     // Create test database connection
@@ -27,7 +27,7 @@ async fn example_seed_principal() {
 
 /// ## Summary
 /// Example test showing how to seed a complete calendar collection hierarchy.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 #[ignore = "requires running database"]
 async fn example_seed_calendar_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
@@ -94,7 +94,7 @@ async fn example_seed_calendar_collection() {
 
 /// ## Summary
 /// Example test showing how to seed an addressbook collection.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 #[ignore = "requires running database"]
 async fn example_seed_addressbook_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");

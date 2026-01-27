@@ -13,31 +13,40 @@ use super::helpers::*;
 
 /// ## Summary
 /// Test that MOVE renames a resource and updates href.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 #[expect(clippy::too_many_lines)]
 async fn move_rename_item_updates_href() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+    test_db
+        .seed_default_role_permissions()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed role permissions");
+
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "move-test", None)
         .await
         .expect("Failed to seed collection");
 
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
     let entity_id = test_db
         .seed_entity("icalendar", Some("move-test@example.com"))
         .await
         .expect("Failed to seed entity");
 
-    let source_uri = format!("/api/caldav/{collection_id}/source-event.ics");
     let _instance_id = test_db
         .seed_instance(
             collection_id,
             entity_id,
-            &source_uri,
+            "source-event",
             "text/calendar",
             "\"source-etag\"",
             1,
@@ -45,12 +54,13 @@ async fn move_rename_item_updates_href() {
         .await
         .expect("Failed to seed instance");
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
 
-    let dest_uri = format!("/api/caldav/{collection_id}/renamed-event.ics");
+    let source_uri = caldav_item_path("testuser", "move-test", "source-event.ics");
+    let dest_uri = caldav_item_path("testuser", "move-test", "renamed-event.ics");
     let response = TestRequest::move_resource(&source_uri)
         .destination(&dest_uri)
-        .send(service)
+        .send(&service)
         .await;
 
     // Either 201 Created or 204 No Content
@@ -61,15 +71,11 @@ async fn move_rename_item_updates_href() {
     );
 
     // Verify resource exists at destination
-    let get_response = TestRequest::get(&dest_uri)
-        .send(create_test_service())
-        .await;
+    let get_response = TestRequest::get(&dest_uri).send(&service).await;
     get_response.assert_status(StatusCode::OK);
 
     // Verify source no longer exists (404 or 410)
-    let source_response = TestRequest::get(&source_uri)
-        .send(create_test_service())
-        .await;
+    let source_response = TestRequest::get(&source_uri).send(&service).await;
     assert!(
         source_response.status == StatusCode::NOT_FOUND
             || source_response.status == StatusCode::GONE,
@@ -80,30 +86,39 @@ async fn move_rename_item_updates_href() {
 
 /// ## Summary
 /// Test that MOVE within same collection updates instance.uri.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn move_within_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+    test_db
+        .seed_default_role_permissions()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed role permissions");
+
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "within-test", None)
         .await
         .expect("Failed to seed collection");
 
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
     let entity_id = test_db
         .seed_entity("icalendar", Some("within-test@example.com"))
         .await
         .expect("Failed to seed entity");
 
-    let source_uri = format!("/api/caldav/{collection_id}/original.ics");
     let _instance_id = test_db
         .seed_instance(
             collection_id,
             entity_id,
-            &source_uri,
+            "original",
             "text/calendar",
             "\"orig-etag\"",
             1,
@@ -111,12 +126,13 @@ async fn move_within_collection() {
         .await
         .expect("Failed to seed instance");
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
 
-    let dest_uri = format!("/api/caldav/{collection_id}/new-name.ics");
+    let source_uri = caldav_item_path("testuser", "within-test", "original.ics");
+    let dest_uri = caldav_item_path("testuser", "within-test", "new-name.ics");
     let response = TestRequest::move_resource(&source_uri)
         .destination(&dest_uri)
-        .send(service)
+        .send(&service)
         .await;
 
     assert!(
@@ -128,13 +144,18 @@ async fn move_within_collection() {
 
 /// ## Summary
 /// Test that MOVE across collections creates new instance.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn move_across_collections() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+    test_db
+        .seed_default_role_permissions()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed role permissions");
+
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
 
     let collection_a = test_db
         .seed_collection(principal_id, "calendar", "coll-a", None)
@@ -146,17 +167,26 @@ async fn move_across_collections() {
         .await
         .expect("Failed to seed collection B");
 
+    test_db
+        .seed_collection_owner(principal_id, collection_a, "calendar")
+        .await
+        .expect("Failed to seed collection A owner");
+
+    test_db
+        .seed_collection_owner(principal_id, collection_b, "calendar")
+        .await
+        .expect("Failed to seed collection B owner");
+
     let entity_id = test_db
         .seed_entity("icalendar", Some("cross-move@example.com"))
         .await
         .expect("Failed to seed entity");
 
-    let source_uri = format!("/api/caldav/{collection_a}/cross-event.ics");
     let _instance_id = test_db
         .seed_instance(
             collection_a,
             entity_id,
-            &source_uri,
+            "cross-event",
             "text/calendar",
             "\"cross-etag\"",
             1,
@@ -164,12 +194,13 @@ async fn move_across_collections() {
         .await
         .expect("Failed to seed instance");
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
 
-    let dest_uri = format!("/api/caldav/{collection_b}/moved-event.ics");
+    let source_uri = caldav_item_path("testuser", "coll-a", "cross-event.ics");
+    let dest_uri = caldav_item_path("testuser", "coll-b", "moved-event.ics");
     let response = TestRequest::move_resource(&source_uri)
         .destination(&dest_uri)
-        .send(service)
+        .send(&service)
         .await;
 
     assert!(
@@ -179,9 +210,7 @@ async fn move_across_collections() {
     );
 
     // Verify resource exists at destination
-    let get_response = TestRequest::get(&dest_uri)
-        .send(create_test_service())
-        .await;
+    let get_response = TestRequest::get(&dest_uri).send(&service).await;
     get_response.assert_status(StatusCode::OK);
 }
 
@@ -191,30 +220,39 @@ async fn move_across_collections() {
 
 /// ## Summary
 /// Test that COPY duplicates a resource to destination.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn copy_duplicates_resource() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+    test_db
+        .seed_default_role_permissions()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed role permissions");
+
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "copy-test", None)
         .await
         .expect("Failed to seed collection");
 
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
     let entity_id = test_db
         .seed_entity("icalendar", Some("copy-test@example.com"))
         .await
         .expect("Failed to seed entity");
 
-    let source_uri = format!("/api/caldav/{collection_id}/source-copy.ics");
     let _instance_id = test_db
         .seed_instance(
             collection_id,
             entity_id,
-            &source_uri,
+            "source-copy",
             "text/calendar",
             "\"copy-etag\"",
             1,
@@ -222,54 +260,60 @@ async fn copy_duplicates_resource() {
         .await
         .expect("Failed to seed instance");
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
 
-    let dest_uri = format!("/api/caldav/{collection_id}/copy-target.ics");
+    let source_uri = caldav_item_path("testuser", "copy-test", "source-copy.ics");
+    let dest_uri = caldav_item_path("testuser", "copy-test", "copy-target.ics");
     let response = TestRequest::copy(&source_uri)
         .destination(&dest_uri)
-        .send(service)
+        .send(&service)
         .await;
 
     response.assert_status(StatusCode::CREATED);
 
     // Verify resource exists at both source and destination
-    let source_get = TestRequest::get(&source_uri)
-        .send(create_test_service())
-        .await;
+    let source_get = TestRequest::get(&source_uri).send(&service).await;
     source_get.assert_status(StatusCode::OK);
 
-    let dest_get = TestRequest::get(&dest_uri)
-        .send(create_test_service())
-        .await;
+    let dest_get = TestRequest::get(&dest_uri).send(&service).await;
     dest_get.assert_status(StatusCode::OK);
 }
 
 /// ## Summary
 /// Test that COPY does not create tombstone (source still exists).
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn copy_does_not_create_tombstone() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+    test_db
+        .seed_default_role_permissions()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed role permissions");
+
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "notomb", None)
         .await
         .expect("Failed to seed collection");
 
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
     let entity_id = test_db
         .seed_entity("icalendar", Some("no-tomb@example.com"))
         .await
         .expect("Failed to seed entity");
 
-    let source_uri = format!("/api/caldav/{collection_id}/no-tomb.ics");
     let _instance_id = test_db
         .seed_instance(
             collection_id,
             entity_id,
-            &source_uri,
+            "no-tomb",
             "text/calendar",
             "\"no-tomb-etag\"",
             1,
@@ -277,20 +321,19 @@ async fn copy_does_not_create_tombstone() {
         .await
         .expect("Failed to seed instance");
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
 
-    let dest_uri = format!("/api/caldav/{collection_id}/copied.ics");
+    let source_uri = caldav_item_path("testuser", "notomb", "no-tomb.ics");
+    let dest_uri = caldav_item_path("testuser", "notomb", "copied.ics");
     let response = TestRequest::copy(&source_uri)
         .destination(&dest_uri)
-        .send(service)
+        .send(&service)
         .await;
 
     response.assert_status(StatusCode::CREATED);
 
     // Verify source still accessible (no tombstone needed for COPY source)
-    let source_get = TestRequest::get(&source_uri)
-        .send(create_test_service())
-        .await;
+    let source_get = TestRequest::get(&source_uri).send(&service).await;
     source_get.assert_status(StatusCode::OK);
 }
 
@@ -300,19 +343,29 @@ async fn copy_does_not_create_tombstone() {
 
 /// ## Summary
 /// Test that MOVE with existing destination and Overwrite:F returns 412.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 #[expect(clippy::too_many_lines)]
 async fn move_destination_exists_overwrite_false_412() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+    test_db
+        .seed_default_role_permissions()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed role permissions");
+
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "conflict-test", None)
         .await
         .expect("Failed to seed collection");
+
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
 
     // Create source resource
     let source_entity_id = test_db
@@ -320,12 +373,11 @@ async fn move_destination_exists_overwrite_false_412() {
         .await
         .expect("Failed to seed source entity");
 
-    let source_uri = format!("/api/caldav/{collection_id}/source.ics");
     let _source_instance = test_db
         .seed_instance(
             collection_id,
             source_entity_id,
-            &source_uri,
+            "source",
             "text/calendar",
             "\"src-etag\"",
             1,
@@ -339,25 +391,26 @@ async fn move_destination_exists_overwrite_false_412() {
         .await
         .expect("Failed to seed dest entity");
 
-    let dest_uri = format!("/api/caldav/{collection_id}/dest.ics");
     let _dest_instance = test_db
         .seed_instance(
             collection_id,
             dest_entity_id,
-            &dest_uri,
+            "dest",
             "text/calendar",
             "\"dst-etag\"",
-            1,
+            2,
         )
         .await
         .expect("Failed to seed dest instance");
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
 
+    let source_uri = caldav_item_path("testuser", "conflict-test", "source.ics");
+    let dest_uri = caldav_item_path("testuser", "conflict-test", "dest.ics");
     let response = TestRequest::move_resource(&source_uri)
         .destination(&dest_uri)
         .overwrite(false)
-        .send(service)
+        .send(&service)
         .await;
 
     response.assert_status(StatusCode::PRECONDITION_FAILED);
@@ -365,19 +418,29 @@ async fn move_destination_exists_overwrite_false_412() {
 
 /// ## Summary
 /// Test that MOVE with existing destination and Overwrite:T succeeds.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 #[expect(clippy::too_many_lines)]
 async fn move_destination_exists_overwrite_true_succeeds() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+    test_db
+        .seed_default_role_permissions()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed role permissions");
+
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "overwrite-test", None)
         .await
         .expect("Failed to seed collection");
+
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
 
     // Create source resource
     let source_entity_id = test_db
@@ -385,12 +448,11 @@ async fn move_destination_exists_overwrite_true_succeeds() {
         .await
         .expect("Failed to seed source entity");
 
-    let source_uri = format!("/api/caldav/{collection_id}/src-ow.ics");
     let _source_instance = test_db
         .seed_instance(
             collection_id,
             source_entity_id,
-            &source_uri,
+            "src-ow",
             "text/calendar",
             "\"src-ow-etag\"",
             1,
@@ -404,25 +466,26 @@ async fn move_destination_exists_overwrite_true_succeeds() {
         .await
         .expect("Failed to seed dest entity");
 
-    let dest_uri = format!("/api/caldav/{collection_id}/dst-ow.ics");
     let _dest_instance = test_db
         .seed_instance(
             collection_id,
             dest_entity_id,
-            &dest_uri,
+            "dst-ow",
             "text/calendar",
             "\"dst-ow-etag\"",
-            1,
+            2,
         )
         .await
         .expect("Failed to seed dest instance");
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
 
+    let source_uri = caldav_item_path("testuser", "overwrite-test", "src-ow.ics");
+    let dest_uri = caldav_item_path("testuser", "overwrite-test", "dst-ow.ics");
     let response = TestRequest::move_resource(&source_uri)
         .destination(&dest_uri)
         .overwrite(true)
-        .send(service)
+        .send(&service)
         .await;
 
     // 201 Created or 204 No Content
@@ -439,31 +502,40 @@ async fn move_destination_exists_overwrite_true_succeeds() {
 
 /// ## Summary
 /// Test that MOVE generates tombstone for source resource.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 #[expect(clippy::too_many_lines)]
 async fn move_generates_tombstone() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+    test_db
+        .seed_default_role_permissions()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed role permissions");
+
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "tomb-test", None)
         .await
         .expect("Failed to seed collection");
 
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
     let entity_id = test_db
         .seed_entity("icalendar", Some("tomb-test@example.com"))
         .await
         .expect("Failed to seed entity");
 
-    let source_uri = format!("/api/caldav/{collection_id}/tomb-src.ics");
     let _instance_id = test_db
         .seed_instance(
             collection_id,
             entity_id,
-            &source_uri,
+            "tomb-src",
             "text/calendar",
             "\"tomb-etag\"",
             1,
@@ -471,21 +543,23 @@ async fn move_generates_tombstone() {
         .await
         .expect("Failed to seed instance");
 
+    let service = create_db_test_service(&test_db.url()).await;
+
     // Get initial sync-token
     let props = propfind_props(&[("DAV:", "sync-token")]);
-    let initial_sync = TestRequest::propfind(&format!("/api/caldav/{collection_id}/"))
+    let collection_path = caldav_collection_path("testuser", "tomb-test");
+    let initial_sync = TestRequest::propfind(&collection_path)
         .depth("0")
         .xml_body(&props)
-        .send(create_test_service())
+        .send(&service)
         .await;
     initial_sync.assert_status(StatusCode::MULTI_STATUS);
 
-    let service = create_test_service();
-
-    let dest_uri = format!("/api/caldav/{collection_id}/tomb-dst.ics");
+    let source_uri = caldav_item_path("testuser", "tomb-test", "tomb-src.ics");
+    let dest_uri = caldav_item_path("testuser", "tomb-test", "tomb-dst.ics");
     let response = TestRequest::move_resource(&source_uri)
         .destination(&dest_uri)
-        .send(service)
+        .send(&service)
         .await;
 
     assert!(
@@ -495,10 +569,10 @@ async fn move_generates_tombstone() {
     );
 
     // Verify sync-token changed (tombstone created)
-    let new_sync = TestRequest::propfind(&format!("/api/caldav/{collection_id}/"))
+    let new_sync = TestRequest::propfind(&collection_path)
         .depth("0")
         .xml_body(&props)
-        .send(create_test_service())
+        .send(&service)
         .await;
     new_sync.assert_status(StatusCode::MULTI_STATUS);
 }
@@ -509,30 +583,39 @@ async fn move_generates_tombstone() {
 
 /// ## Summary
 /// Test that MOVE without Destination header returns 400.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn move_without_destination_400() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+    test_db
+        .seed_default_role_permissions()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed role permissions");
+
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "nodest", None)
         .await
         .expect("Failed to seed collection");
 
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
     let entity_id = test_db
         .seed_entity("icalendar", Some("no-dest@example.com"))
         .await
         .expect("Failed to seed entity");
 
-    let source_uri = format!("/api/caldav/{collection_id}/no-dest.ics");
     let _instance_id = test_db
         .seed_instance(
             collection_id,
             entity_id,
-            &source_uri,
+            "no-dest",
             "text/calendar",
             "\"no-dest-etag\"",
             1,
@@ -540,41 +623,85 @@ async fn move_without_destination_400() {
         .await
         .expect("Failed to seed instance");
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
 
     // MOVE without Destination header
-    let response = TestRequest::move_resource(&source_uri).send(service).await;
+    let source_uri = caldav_item_path("testuser", "nodest", "no-dest.ics");
+    let response = TestRequest::move_resource(&source_uri).send(&service).await;
 
     response.assert_status(StatusCode::BAD_REQUEST);
 }
 
 /// ## Summary
 /// Test that MOVE on non-existent resource returns 404.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn move_nonexistent_404() {
-    let service = create_test_service();
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
 
-    let response = TestRequest::move_resource(
-        "/api/caldav/00000000-0000-0000-0000-000000000000/nonexistent.ics",
-    )
-    .destination("/api/caldav/00000000-0000-0000-0000-000000000000/dest.ics")
-    .send(service)
-    .await;
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
+
+    let collection_id = test_db
+        .seed_collection(principal_id, "calendar", "nonexistent-coll", None)
+        .await
+        .expect("Failed to seed collection");
+
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let source_uri = caldav_item_path("testuser", "nonexistent-coll", "nonexistent.ics");
+    let dest_uri = caldav_item_path("testuser", "nonexistent-coll", "dest.ics");
+    let response = TestRequest::move_resource(&source_uri)
+        .destination(&dest_uri)
+        .send(&service)
+        .await;
 
     response.assert_status(StatusCode::NOT_FOUND);
 }
 
 /// ## Summary
 /// Test that COPY on non-existent resource returns 404.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn copy_nonexistent_404() {
-    let service = create_test_service();
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
 
-    let response =
-        TestRequest::copy("/api/caldav/00000000-0000-0000-0000-000000000000/nonexistent.ics")
-            .destination("/api/caldav/00000000-0000-0000-0000-000000000000/dest.ics")
-            .send(service)
-            .await;
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
+
+    let collection_id = test_db
+        .seed_collection(principal_id, "calendar", "copy-nonexistent-coll", None)
+        .await
+        .expect("Failed to seed collection");
+
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let source_uri = caldav_item_path("testuser", "copy-nonexistent-coll", "nonexistent.ics");
+    let dest_uri = caldav_item_path("testuser", "copy-nonexistent-coll", "dest.ics");
+    let response = TestRequest::copy(&source_uri)
+        .destination(&dest_uri)
+        .send(&service)
+        .await;
 
     response.assert_status(StatusCode::NOT_FOUND);
 }

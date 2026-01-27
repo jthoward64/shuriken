@@ -14,9 +14,13 @@ use super::helpers::*;
 
 /// ## Summary
 /// Test that calendar-query REPORT returns 207.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn calendar_query_returns_multistatus() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -44,11 +48,11 @@ async fn calendar_query_returns_multistatus() {
         .await
         .expect("Failed to seed instance");
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
 
     let response = TestRequest::report(&caldav_collection_path("alice", "testcal"))
         .xml_body(calendar_query_report())
-        .send(service)
+        .send(&service)
         .await;
 
     response.assert_status(StatusCode::MULTI_STATUS);
@@ -56,9 +60,13 @@ async fn calendar_query_returns_multistatus() {
 
 /// ## Summary
 /// Test that calendar-query with time-range filter returns matching events.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn calendar_query_time_range_filter() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -87,7 +95,7 @@ async fn calendar_query_time_range_filter() {
         .await
         .expect("Failed to seed instance");
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
 
     let body = r#"<?xml version="1.0" encoding="utf-8"?>
 <C:calendar-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
@@ -106,7 +114,7 @@ async fn calendar_query_time_range_filter() {
 
     let response = TestRequest::report(&caldav_collection_path("alice", "testcal"))
         .xml_body(body)
-        .send(service)
+        .send(&service)
         .await;
 
     response.assert_status(StatusCode::MULTI_STATUS);
@@ -114,9 +122,13 @@ async fn calendar_query_time_range_filter() {
 
 /// ## Summary
 /// Test that calendar-query returns calendar-data when requested.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn calendar_query_returns_calendar_data() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -144,11 +156,11 @@ async fn calendar_query_returns_calendar_data() {
         .await
         .expect("Failed to seed instance");
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
 
     let response = TestRequest::report(&caldav_collection_path("alice", "testcal"))
         .xml_body(calendar_query_report())
-        .send(service)
+        .send(&service)
         .await;
 
     response
@@ -162,9 +174,13 @@ async fn calendar_query_returns_calendar_data() {
 
 /// ## Summary
 /// Test that calendar-multiget returns requested resources.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn calendar_multiget_returns_resources() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -200,12 +216,12 @@ async fn calendar_multiget_returns_resources() {
             .expect("Failed to seed instance");
     }
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
 
     let body = calendar_multiget_report(&hrefs);
     let response = TestRequest::report(&caldav_collection_path("alice", "testcal"))
         .xml_body(&body)
-        .send(service)
+        .send(&service)
         .await;
 
     let response = response.assert_status(StatusCode::MULTI_STATUS);
@@ -220,9 +236,13 @@ async fn calendar_multiget_returns_resources() {
 
 /// ## Summary
 /// Test that calendar-multiget returns 404 for missing resources.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn calendar_multiget_missing_resource_404() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -233,14 +253,14 @@ async fn calendar_multiget_missing_resource_404() {
         .await
         .expect("Failed to seed collection");
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
 
     let hrefs = vec![caldav_item_path("alice", "testcal", "nonexistent.ics")];
     let body = calendar_multiget_report(&hrefs);
 
     let response = TestRequest::report(&caldav_collection_path("alice", "testcal"))
         .xml_body(&body)
-        .send(service)
+        .send(&service)
         .await;
 
     response
@@ -254,9 +274,13 @@ async fn calendar_multiget_missing_resource_404() {
 
 /// ## Summary
 /// Test that addressbook-query REPORT returns 207.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn addressbook_query_returns_multistatus() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "bob", Some("Bob"))
         .await
@@ -284,11 +308,11 @@ async fn addressbook_query_returns_multistatus() {
         .await
         .expect("Failed to seed instance");
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
 
     let response = TestRequest::report(&carddav_collection_path("bob", "contacts"))
         .xml_body(addressbook_query_report())
-        .send(service)
+        .send(&service)
         .await;
 
     response.assert_status(StatusCode::MULTI_STATUS);
@@ -296,9 +320,13 @@ async fn addressbook_query_returns_multistatus() {
 
 /// ## Summary
 /// Test that addressbook-query returns address-data when requested.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn addressbook_query_returns_address_data() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "bob", Some("Bob"))
         .await
@@ -326,11 +354,11 @@ async fn addressbook_query_returns_address_data() {
         .await
         .expect("Failed to seed instance");
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
 
     let response = TestRequest::report(&carddav_collection_path("bob", "addrdata"))
         .xml_body(addressbook_query_report())
-        .send(service)
+        .send(&service)
         .await;
 
     response
@@ -344,9 +372,13 @@ async fn addressbook_query_returns_address_data() {
 
 /// ## Summary
 /// Test that addressbook-multiget returns requested vcards.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn addressbook_multiget_returns_vcards() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "bob", Some("Bob"))
         .await
@@ -382,12 +414,12 @@ async fn addressbook_multiget_returns_vcards() {
             .expect("Failed to seed instance");
     }
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
 
     let body = addressbook_multiget_report(&hrefs);
     let response = TestRequest::report(&carddav_collection_path("bob", "abmg"))
         .xml_body(&body)
-        .send(service)
+        .send(&service)
         .await;
 
     let response = response.assert_status(StatusCode::MULTI_STATUS);
@@ -405,9 +437,13 @@ async fn addressbook_multiget_returns_vcards() {
 
 /// ## Summary
 /// Test that sync-collection REPORT returns 207.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn sync_collection_returns_multistatus() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -418,11 +454,11 @@ async fn sync_collection_returns_multistatus() {
         .await
         .expect("Failed to seed collection");
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
 
     let response = TestRequest::report(&caldav_collection_path("alice", "testcal"))
         .xml_body(sync_collection_report_initial())
-        .send(service)
+        .send(&service)
         .await;
 
     response.assert_status(StatusCode::MULTI_STATUS);
@@ -430,9 +466,13 @@ async fn sync_collection_returns_multistatus() {
 
 /// ## Summary
 /// Test that sync-collection returns sync-token in response.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn sync_collection_returns_sync_token() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -443,11 +483,11 @@ async fn sync_collection_returns_sync_token() {
         .await
         .expect("Failed to seed collection");
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
 
     let response = TestRequest::report(&caldav_collection_path("alice", "testcal"))
         .xml_body(sync_collection_report_initial())
-        .send(service)
+        .send(&service)
         .await;
 
     response
@@ -457,9 +497,13 @@ async fn sync_collection_returns_sync_token() {
 
 /// ## Summary
 /// Test that sync-collection with initial sync returns all resources.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn sync_collection_initial_sync() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -490,12 +534,12 @@ async fn sync_collection_initial_sync() {
             .expect("Failed to seed instance");
     }
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
 
     // Empty sync-token means initial sync
     let response = TestRequest::report(&caldav_collection_path("alice", "testcal"))
         .xml_body(sync_collection_report_initial())
-        .send(service)
+        .send(&service)
         .await;
 
     let response = response.assert_status(StatusCode::MULTI_STATUS);
@@ -509,9 +553,13 @@ async fn sync_collection_initial_sync() {
 
 /// ## Summary
 /// Test that sync-collection with token returns only changes.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn sync_collection_delta_sync() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -540,12 +588,12 @@ async fn sync_collection_delta_sync() {
         .await
         .expect("Failed to seed instance");
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
 
     // Get initial sync-token
     let initial_response = TestRequest::report(&caldav_collection_path("alice", "testcal"))
         .xml_body(sync_collection_report_initial())
-        .send(service)
+        .send(&service)
         .await;
 
     let initial_response = initial_response.assert_status(StatusCode::MULTI_STATUS);
@@ -561,13 +609,18 @@ async fn sync_collection_delta_sync() {
 
 /// ## Summary
 /// Test that REPORT on non-existent resource returns 404.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn report_nonexistent_404() {
-    let service = create_test_service();
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+    let service = create_db_test_service(&test_db.url()).await;
 
     let response = TestRequest::report(&caldav_collection_path("nonexistent", "unknown"))
         .xml_body(calendar_query_report())
-        .send(service)
+        .send(&service)
         .await;
 
     response.assert_status(StatusCode::NOT_FOUND);
@@ -575,9 +628,13 @@ async fn report_nonexistent_404() {
 
 /// ## Summary
 /// Test that REPORT with invalid XML returns 400.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn report_invalid_xml_400() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -588,11 +645,11 @@ async fn report_invalid_xml_400() {
         .await
         .expect("Failed to seed collection");
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
 
     let response = TestRequest::report(&caldav_collection_path("alice", "testcal"))
         .xml_body("this is not valid xml <><><")
-        .send(service)
+        .send(&service)
         .await;
 
     response.assert_status(StatusCode::BAD_REQUEST);
@@ -600,9 +657,13 @@ async fn report_invalid_xml_400() {
 
 /// ## Summary
 /// Test that unsupported REPORT type returns appropriate error.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn report_unsupported_type() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -613,7 +674,7 @@ async fn report_unsupported_type() {
         .await
         .expect("Failed to seed collection");
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
 
     // Send an unknown report type
     let body = r#"<?xml version="1.0" encoding="utf-8"?>
@@ -622,7 +683,7 @@ async fn report_unsupported_type() {
 
     let response = TestRequest::report(&caldav_collection_path("alice", "testcal"))
         .xml_body(body)
-        .send(service)
+        .send(&service)
         .await;
 
     // Either 400 or 501 or 403

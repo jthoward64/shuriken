@@ -13,29 +13,40 @@ use super::helpers::*;
 
 /// ## Summary
 /// Test that MKCALENDAR creates a calendar collection.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn mkcalendar_creates_calendar_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    let _principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+    test_db
+        .seed_default_role_permissions()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed role permissions");
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
 
-    let service = create_test_service();
+    // Grant owner access to the testuser's calendar namespace
+    test_db
+        .seed_access_policy(&format!("principal:{principal_id}"), "/cal/testuser/**", "owner")
+        .await
+        .expect("Failed to seed access policy");
 
-    let new_collection_uuid = uuid::Uuid::new_v4();
-    let response = TestRequest::mkcalendar(&format!("/api/caldav/{new_collection_uuid}/"))
-        .send(service)
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let new_collection_slug = "new-calendar";
+    let path = caldav_collection_path("testuser", new_collection_slug);
+    let response = TestRequest::mkcalendar(&path)
+        .send(&service)
         .await;
 
     response.assert_status(StatusCode::CREATED);
 
     // Verify with PROPFIND that it's a calendar collection
     let props = propfind_props(&[("DAV:", "resourcetype")]);
-    let verify_response = TestRequest::propfind(&format!("/api/caldav/{new_collection_uuid}/"))
+    let verify_response = TestRequest::propfind(&path)
         .depth("0")
         .xml_body(&props)
-        .send(create_test_service())
+        .send(&service)
         .await;
 
     verify_response
@@ -45,17 +56,28 @@ async fn mkcalendar_creates_calendar_collection() {
 
 /// ## Summary
 /// Test that MKCALENDAR applies initial properties from request body.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn mkcalendar_initial_props_applied() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    let _principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+    test_db
+        .seed_default_role_permissions()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed role permissions");
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
 
-    let service = create_test_service();
+    // Grant owner access to the testuser's calendar namespace
+    test_db
+        .seed_access_policy(&format!("principal:{principal_id}"), "/cal/testuser/**", "owner")
+        .await
+        .expect("Failed to seed access policy");
 
-    let new_collection_uuid = uuid::Uuid::new_v4();
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let new_collection_slug = "work-calendar";
+    let path = caldav_collection_path("testuser", new_collection_slug);
     let body = r#"<?xml version="1.0" encoding="utf-8"?>
 <C:mkcalendar xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
   <D:set>
@@ -66,19 +88,19 @@ async fn mkcalendar_initial_props_applied() {
   </D:set>
 </C:mkcalendar>"#;
 
-    let response = TestRequest::mkcalendar(&format!("/api/caldav/{new_collection_uuid}/"))
+    let response = TestRequest::mkcalendar(&path)
         .xml_body(body)
-        .send(service)
+        .send(&service)
         .await;
 
     response.assert_status(StatusCode::CREATED);
 
     // Verify properties with PROPFIND
     let props = propfind_props(&[("DAV:", "displayname")]);
-    let verify_response = TestRequest::propfind(&format!("/api/caldav/{new_collection_uuid}/"))
+    let verify_response = TestRequest::propfind(&path)
         .depth("0")
         .xml_body(&props)
-        .send(create_test_service())
+        .send(&service)
         .await;
 
     verify_response
@@ -88,23 +110,34 @@ async fn mkcalendar_initial_props_applied() {
 
 /// ## Summary
 /// Test that MKCALENDAR on existing URI returns 405 or 409.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn mkcalendar_on_existing_uri_conflict() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+    test_db
+        .seed_default_role_permissions()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed role permissions");
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
         .await
         .expect("Failed to seed collection");
 
-    let service = create_test_service();
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
 
-    let response = TestRequest::mkcalendar(&format!("/api/caldav/{collection_id}/"))
-        .send(service)
+    let service = create_db_test_service(&test_db.url()).await;
+
+    // Try to create a collection with the same slug
+    let path = caldav_collection_path("testuser", "testcal");
+    let response = TestRequest::mkcalendar(&path)
+        .send(&service)
         .await;
 
     // Either 405 Method Not Allowed or 409 Conflict
@@ -122,32 +155,43 @@ async fn mkcalendar_on_existing_uri_conflict() {
 
 /// ## Summary
 /// Test that Extended MKCOL creates an addressbook.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn mkcol_extended_creates_addressbook() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    let _principal_id = test_db
-        .seed_principal("user", "bob", Some("Bob"))
+    test_db
+        .seed_default_role_permissions()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed role permissions");
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
 
-    let service = create_test_service();
+    // Grant owner access to the testuser's addressbook namespace
+    test_db
+        .seed_access_policy(&format!("principal:{principal_id}"), "/card/testuser/**", "owner")
+        .await
+        .expect("Failed to seed access policy");
 
-    let new_collection_uuid = uuid::Uuid::new_v4();
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let new_collection_slug = "contacts";
+    let path = carddav_collection_path("testuser", new_collection_slug);
     let body = mkcol_addressbook_body(Some("Contacts"));
 
-    let response = TestRequest::mkcol(&format!("/api/carddav/{new_collection_uuid}/"))
+    let response = TestRequest::mkcol(&path)
         .xml_body(&body)
-        .send(service)
+        .send(&service)
         .await;
 
     response.assert_status(StatusCode::CREATED);
 
     // Verify with PROPFIND that it's an addressbook collection
     let props = propfind_props(&[("DAV:", "resourcetype")]);
-    let verify_response = TestRequest::propfind(&format!("/api/carddav/{new_collection_uuid}/"))
+    let verify_response = TestRequest::propfind(&path)
         .depth("0")
         .xml_body(&props)
-        .send(create_test_service())
+        .send(&service)
         .await;
 
     verify_response
@@ -157,32 +201,43 @@ async fn mkcol_extended_creates_addressbook() {
 
 /// ## Summary
 /// Test that Extended MKCOL applies initial properties.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn mkcol_extended_applies_initial_props() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    let _principal_id = test_db
-        .seed_principal("user", "bob", Some("Bob"))
+    test_db
+        .seed_default_role_permissions()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed role permissions");
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
 
-    let service = create_test_service();
+    // Grant owner access to the testuser's addressbook namespace
+    test_db
+        .seed_access_policy(&format!("principal:{principal_id}"), "/card/testuser/**", "owner")
+        .await
+        .expect("Failed to seed access policy");
 
-    let new_collection_uuid = uuid::Uuid::new_v4();
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let new_collection_slug = "work-contacts";
+    let path = carddav_collection_path("testuser", new_collection_slug);
     let body = mkcol_addressbook_body(Some("Work Contacts"));
 
-    let response = TestRequest::mkcol(&format!("/api/carddav/{new_collection_uuid}/"))
+    let response = TestRequest::mkcol(&path)
         .xml_body(&body)
-        .send(service)
+        .send(&service)
         .await;
 
     response.assert_status(StatusCode::CREATED);
 
     // Verify properties with PROPFIND
     let props = propfind_props(&[("DAV:", "displayname")]);
-    let verify_response = TestRequest::propfind(&format!("/api/carddav/{new_collection_uuid}/"))
+    let verify_response = TestRequest::propfind(&path)
         .depth("0")
         .xml_body(&props)
-        .send(create_test_service())
+        .send(&service)
         .await;
 
     verify_response
@@ -192,20 +247,31 @@ async fn mkcol_extended_applies_initial_props() {
 
 /// ## Summary
 /// Test that Extended MKCOL with invalid XML returns 400.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn mkcol_extended_rejects_bad_body() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    let _principal_id = test_db
-        .seed_principal("user", "bob", Some("Bob"))
+    test_db
+        .seed_default_role_permissions()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed role permissions");
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
 
-    let service = create_test_service();
+    // Grant owner access to the testuser's addressbook namespace
+    test_db
+        .seed_access_policy(&format!("principal:{principal_id}"), "/card/testuser/**", "owner")
+        .await
+        .expect("Failed to seed access policy");
 
-    let new_collection_uuid = uuid::Uuid::new_v4();
-    let response = TestRequest::mkcol(&format!("/api/carddav/{new_collection_uuid}/"))
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let new_collection_slug = "bad-xml-test";
+    let path = carddav_collection_path("testuser", new_collection_slug);
+    let response = TestRequest::mkcol(&path)
         .xml_body("this is not valid xml <<><")
-        .send(service)
+        .send(&service)
         .await;
 
     response.assert_status(StatusCode::BAD_REQUEST);
@@ -217,29 +283,40 @@ async fn mkcol_extended_rejects_bad_body() {
 
 /// ## Summary
 /// Test that plain MKCOL (without body) creates a collection.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn mkcol_creates_plain_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    let _principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+    test_db
+        .seed_default_role_permissions()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed role permissions");
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
 
-    let service = create_test_service();
+    // Grant owner access to the testuser's calendar namespace (use cal for generic DAV collections)
+    test_db
+        .seed_access_policy(&format!("principal:{principal_id}"), "/cal/testuser/**", "owner")
+        .await
+        .expect("Failed to seed access policy");
 
-    let new_collection_uuid = uuid::Uuid::new_v4();
-    let response = TestRequest::mkcol(&format!("/api/dav/{new_collection_uuid}/"))
-        .send(service)
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let new_collection_slug = "plain-collection";
+    let path = caldav_collection_path("testuser", new_collection_slug);
+    let response = TestRequest::mkcol(&path)
+        .send(&service)
         .await;
 
     response.assert_status(StatusCode::CREATED);
 
     // Verify with PROPFIND that it's just a collection (not calendar/addressbook)
     let props = propfind_props(&[("DAV:", "resourcetype")]);
-    let verify_response = TestRequest::propfind(&format!("/api/dav/{new_collection_uuid}/"))
+    let verify_response = TestRequest::propfind(&path)
         .depth("0")
         .xml_body(&props)
-        .send(create_test_service())
+        .send(&service)
         .await;
 
     verify_response
@@ -249,23 +326,34 @@ async fn mkcol_creates_plain_collection() {
 
 /// ## Summary
 /// Test that MKCOL on existing URI returns conflict.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn mkcol_on_existing_uri_conflict() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+    test_db
+        .seed_default_role_permissions()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed role permissions");
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
         .await
         .expect("Failed to seed collection");
 
-    let service = create_test_service();
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
 
-    let response = TestRequest::mkcol(&format!("/api/caldav/{collection_id}/"))
-        .send(service)
+    let service = create_db_test_service(&test_db.url()).await;
+
+    // Try to create a collection with the same slug
+    let path = caldav_collection_path("testuser", "testcal");
+    let response = TestRequest::mkcol(&path)
+        .send(&service)
         .await;
 
     // Either 405 or 409
@@ -283,17 +371,28 @@ async fn mkcol_on_existing_uri_conflict() {
 
 /// ## Summary
 /// Test that MKCALENDAR with protected properties returns appropriate error.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn mkcalendar_protected_props_rejected() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    let _principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+    test_db
+        .seed_default_role_permissions()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed role permissions");
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
 
-    let service = create_test_service();
+    // Grant owner access to the testuser's calendar namespace
+    test_db
+        .seed_access_policy(&format!("principal:{principal_id}"), "/cal/testuser/**", "owner")
+        .await
+        .expect("Failed to seed access policy");
 
-    let new_collection_uuid = uuid::Uuid::new_v4();
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let new_collection_slug = "protected-props-test";
+    let path = caldav_collection_path("testuser", new_collection_slug);
     // Try to set getetag (protected property)
     let body = r#"<?xml version="1.0" encoding="utf-8"?>
 <C:mkcalendar xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
@@ -304,9 +403,9 @@ async fn mkcalendar_protected_props_rejected() {
   </D:set>
 </C:mkcalendar>"#;
 
-    let response = TestRequest::mkcalendar(&format!("/api/caldav/{new_collection_uuid}/"))
+    let response = TestRequest::mkcalendar(&path)
         .xml_body(body)
-        .send(service)
+        .send(&service)
         .await;
 
     // Either 403, 207 with propstat error, or collection created ignoring protected prop

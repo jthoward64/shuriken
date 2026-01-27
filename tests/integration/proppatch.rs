@@ -15,9 +15,13 @@ use super::helpers::*;
 /// ## Summary
 /// Test that PROPPATCH returns 207 Multi-Status.
 #[traced_test]
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn proppatch_returns_multistatus() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -28,12 +32,17 @@ async fn proppatch_returns_multistatus() {
         .await
         .expect("Failed to seed collection");
 
-    let service = create_test_service();
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
 
     let body = proppatch_set(&[("DAV:", "displayname", "New Name")]);
     let response = TestRequest::proppatch(&format!("/api/caldav/{collection_id}/"))
         .xml_body(&body)
-        .send(service)
+        .send(&service)
         .await;
 
     response.assert_status(StatusCode::MULTI_STATUS);
@@ -45,9 +54,13 @@ async fn proppatch_returns_multistatus() {
 
 /// ## Summary
 /// Test that attempting to set a protected property returns 403.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn proppatch_set_protected_prop_403() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -58,7 +71,12 @@ async fn proppatch_set_protected_prop_403() {
         .await
         .expect("Failed to seed collection");
 
-    let service = create_test_service();
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
 
     // resourcetype is a protected property
     let body = r#"<?xml version="1.0" encoding="utf-8"?>
@@ -72,7 +90,7 @@ async fn proppatch_set_protected_prop_403() {
 
     let response = TestRequest::proppatch(&format!("/api/caldav/{collection_id}/"))
         .xml_body(body)
-        .send(service)
+        .send(&service)
         .await;
 
     response
@@ -82,9 +100,13 @@ async fn proppatch_set_protected_prop_403() {
 
 /// ## Summary
 /// Test that attempting to remove a protected property returns 403.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn proppatch_remove_protected_prop_403() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -95,7 +117,12 @@ async fn proppatch_remove_protected_prop_403() {
         .await
         .expect("Failed to seed collection");
 
-    let service = create_test_service();
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
 
     // getetag is a protected property
     let body = r#"<?xml version="1.0" encoding="utf-8"?>
@@ -109,7 +136,7 @@ async fn proppatch_remove_protected_prop_403() {
 
     let response = TestRequest::proppatch(&format!("/api/caldav/{collection_id}/"))
         .xml_body(body)
-        .send(service)
+        .send(&service)
         .await;
 
     response
@@ -123,9 +150,13 @@ async fn proppatch_remove_protected_prop_403() {
 
 /// ## Summary
 /// Test that setting DAV:displayname succeeds and persists.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn proppatch_set_displayname_200() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -136,12 +167,17 @@ async fn proppatch_set_displayname_200() {
         .await
         .expect("Failed to seed collection");
 
-    let service = create_test_service();
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
 
     let body = proppatch_set(&[("DAV:", "displayname", "My Work Calendar")]);
     let response = TestRequest::proppatch(&format!("/api/caldav/{collection_id}/"))
         .xml_body(&body)
-        .send(service)
+        .send(&service)
         .await;
 
     response
@@ -153,7 +189,7 @@ async fn proppatch_set_displayname_200() {
     let verify_response = TestRequest::propfind(&format!("/api/caldav/{collection_id}/"))
         .depth("0")
         .xml_body(&props)
-        .send(create_test_service())
+        .send(&service)
         .await;
 
     verify_response
@@ -163,9 +199,13 @@ async fn proppatch_set_displayname_200() {
 
 /// ## Summary
 /// Test that setting calendar-description property succeeds.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn proppatch_set_calendar_description() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -176,7 +216,12 @@ async fn proppatch_set_calendar_description() {
         .await
         .expect("Failed to seed collection");
 
-    let service = create_test_service();
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
 
     let body = r#"<?xml version="1.0" encoding="utf-8"?>
 <D:propertyupdate xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
@@ -189,7 +234,7 @@ async fn proppatch_set_calendar_description() {
 
     let response = TestRequest::proppatch(&format!("/api/caldav/{collection_id}/"))
         .xml_body(body)
-        .send(service)
+        .send(&service)
         .await;
 
     response
@@ -199,9 +244,13 @@ async fn proppatch_set_calendar_description() {
 
 /// ## Summary
 /// Test that removing a writable property succeeds.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn proppatch_remove_displayname() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -212,7 +261,12 @@ async fn proppatch_remove_displayname() {
         .await
         .expect("Failed to seed collection");
 
-    let service = create_test_service();
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
 
     let body = r#"<?xml version="1.0" encoding="utf-8"?>
 <D:propertyupdate xmlns:D="DAV:">
@@ -225,7 +279,7 @@ async fn proppatch_remove_displayname() {
 
     let response = TestRequest::proppatch(&format!("/api/caldav/{collection_id}/"))
         .xml_body(body)
-        .send(service)
+        .send(&service)
         .await;
 
     response
@@ -235,9 +289,13 @@ async fn proppatch_remove_displayname() {
 
 /// ## Summary
 /// Test that setting multiple properties in one request works.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn proppatch_set_multiple_props() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -248,7 +306,12 @@ async fn proppatch_set_multiple_props() {
         .await
         .expect("Failed to seed collection");
 
-    let service = create_test_service();
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
 
     let body = r#"<?xml version="1.0" encoding="utf-8"?>
 <D:propertyupdate xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
@@ -262,7 +325,7 @@ async fn proppatch_set_multiple_props() {
 
     let response = TestRequest::proppatch(&format!("/api/caldav/{collection_id}/"))
         .xml_body(body)
-        .send(service)
+        .send(&service)
         .await;
 
     response
@@ -276,9 +339,13 @@ async fn proppatch_set_multiple_props() {
 
 /// ## Summary
 /// Test that partial success is handled correctly.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn proppatch_partial_success_207() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -289,7 +356,12 @@ async fn proppatch_partial_success_207() {
         .await
         .expect("Failed to seed collection");
 
-    let service = create_test_service();
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
 
     // Mix writable (displayname) and protected (resourcetype) properties
     let body = r#"<?xml version="1.0" encoding="utf-8"?>
@@ -304,7 +376,7 @@ async fn proppatch_partial_success_207() {
 
     let response = TestRequest::proppatch(&format!("/api/caldav/{collection_id}/"))
         .xml_body(body)
-        .send(service)
+        .send(&service)
         .await;
 
     let response = response.assert_status(StatusCode::MULTI_STATUS);
@@ -323,14 +395,20 @@ async fn proppatch_partial_success_207() {
 
 /// ## Summary
 /// Test that PROPPATCH on non-existent resource returns 404.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn proppatch_nonexistent_404() {
-    let service = create_test_service();
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+
+    let service = create_db_test_service(&test_db.url()).await;
 
     let body = proppatch_set(&[("DAV:", "displayname", "Test")]);
     let response = TestRequest::proppatch("/api/caldav/00000000-0000-0000-0000-000000000000/")
         .xml_body(&body)
-        .send(service)
+        .send(&service)
         .await;
 
     response.assert_status(StatusCode::NOT_FOUND);
@@ -338,9 +416,13 @@ async fn proppatch_nonexistent_404() {
 
 /// ## Summary
 /// Test that PROPPATCH with invalid XML returns 400.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn proppatch_invalid_xml_400() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -351,11 +433,16 @@ async fn proppatch_invalid_xml_400() {
         .await
         .expect("Failed to seed collection");
 
-    let service = create_test_service();
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
 
     let response = TestRequest::proppatch(&format!("/api/caldav/{collection_id}/"))
         .xml_body("this is not valid xml <><><")
-        .send(service)
+        .send(&service)
         .await;
 
     response.assert_status(StatusCode::BAD_REQUEST);
@@ -363,9 +450,13 @@ async fn proppatch_invalid_xml_400() {
 
 /// ## Summary
 /// Test that PROPPATCH without body returns appropriate error.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn proppatch_empty_body_error() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -376,10 +467,15 @@ async fn proppatch_empty_body_error() {
         .await
         .expect("Failed to seed collection");
 
-    let service = create_test_service();
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
 
     let response = TestRequest::proppatch(&format!("/api/caldav/{collection_id}/"))
-        .send(service)
+        .send(&service)
         .await;
 
     // Either 400 Bad Request or 415 Unsupported Media Type

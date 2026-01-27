@@ -325,7 +325,7 @@ let mkcol_addressbook = extended_mkcol_addressbook("My Contacts");
 ### Basic Test Structure
 
 ```rust
-#[tokio::test]
+#[test_log::test(tokio::test)]
 #[ignore = "requires running database"]
 async fn my_test() {
     // 1. Create test database
@@ -356,7 +356,7 @@ async fn my_test() {
 For HTTP endpoint tests (once routing is fully implemented):
 
 ```rust
-#[tokio::test]
+#[test_log::test(tokio::test)]
 #[ignore = "requires HTTP routing"]
 async fn test_calendar_propfind() {
     // 1. Set up test database

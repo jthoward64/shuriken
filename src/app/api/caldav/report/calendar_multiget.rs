@@ -3,8 +3,8 @@
 use salvo::http::StatusCode;
 use salvo::{Depot, Request, Response};
 
-use crate::app::api::dav::extract::auth::{get_auth_context, resource_id_for};
-use crate::component::auth::{Action, ResourceType, get_resolved_location_from_depot};
+use crate::app::api::dav::extract::auth::get_auth_context;
+use crate::component::auth::{Action, get_resolved_location_from_depot};
 use crate::component::db::connection;
 use crate::component::rfc::dav::build::multistatus::serialize_multistatus;
 use crate::component::rfc::dav::core::{CalendarMultiget, PropertyName};
@@ -71,10 +71,18 @@ pub async fn handle(
     };
 
     // Prefer ResourceLocation from depot if available (resolved by slug_resolver middleware)
-    let resource = if let Ok(loc) = get_resolved_location_from_depot(depot) {
-        loc.clone()
-    } else {
-        resource_id_for(ResourceType::Calendar, collection_id, None)
+    let resource = match get_resolved_location_from_depot(depot) {
+        Ok(loc) => loc.clone(),
+        Err(_) => {
+            // Fallback: Build a minimal resource location from collection ID for auth checks
+            // Using PathSegments to construct a valid ResourceLocation
+            use crate::component::auth::{PathSegment, ResourceLocation, ResourceType};
+            let segments = vec![
+                PathSegment::ResourceType(ResourceType::Calendar),
+                PathSegment::Collection(collection_id.to_string()),
+            ];
+            ResourceLocation::from_segments(segments)
+        }
     };
 
     if let Err(e) = authorizer.require(&subjects, &resource, Action::Read) {

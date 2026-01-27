@@ -275,12 +275,11 @@ async fn check_put_authorization(
             PathSegment::Item(slug.to_string()),
         ])
     } else {
-        // Create: check permission on the collection (with glob)
+        // Create: check permission on the collection (concrete path, no glob)
         ResourceLocation::from_segments(vec![
             PathSegment::ResourceType(ResourceType::Calendar),
             PathSegment::Owner(owner_principal.id.to_string()),
             PathSegment::Collection(collection_id.to_string()),
-            PathSegment::Glob { recursive: true },
         ])
     };
 

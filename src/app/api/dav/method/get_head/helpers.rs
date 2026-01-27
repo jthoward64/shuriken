@@ -3,7 +3,7 @@
 use salvo::http::{HeaderValue, StatusCode};
 use salvo::{Depot, Request, Response};
 
-use crate::app::api::dav::extract::auth::resource_id_for;
+use crate::component::auth::get_resolved_location_from_depot;
 use crate::component::auth::{
     Action, ResourceType, authorizer_from_depot, get_instance_from_depot, get_subjects_from_depot,
     get_terminal_collection_from_depot,
@@ -206,7 +206,20 @@ async fn check_read_authorization(
         ResourceType::Calendar
     };
 
-    let resource = resource_id_for(resource_type, instance.collection_id, Some(&instance.slug));
+    // Use resolved ResourceLocation from depot if available, otherwise build from instance
+    let resource = match get_resolved_location_from_depot(depot) {
+        Ok(loc) => loc.clone(),
+        Err(_) => {
+            // Fallback: Build resource location from instance data
+            use crate::component::auth::{PathSegment, ResourceLocation};
+            let segments = vec![
+                PathSegment::ResourceType(resource_type),
+                PathSegment::Collection(instance.collection_id.to_string()),
+                PathSegment::Item(instance.slug.clone()),
+            ];
+            ResourceLocation::from_segments(segments)
+        }
+    };
 
     // Check authorization
     let authorizer = authorizer_from_depot(depot)?;

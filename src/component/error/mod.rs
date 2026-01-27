@@ -24,7 +24,10 @@ pub enum AppError {
     InvalidConfiguration(String),
 
     #[error("Invariant violation: {0}")]
-    InvariantViolation(String),
+    InvariantViolation(&'static str),
+
+    #[error("Parse error: {0}")]
+    ParseError(String),
 }
 
 pub type AppResult<T> = std::result::Result<T, AppError>;

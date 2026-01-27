@@ -13,9 +13,14 @@ use super::helpers::*;
 
 /// ## Summary
 /// Test that GET on a calendar object returns correct Content-Type.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn get_calendar_object_content_type() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+
     // Seed test data
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
@@ -27,6 +32,11 @@ async fn get_calendar_object_content_type() {
         .await
         .expect("Failed to seed collection");
 
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
     let entity_id = test_db
         .seed_entity("icalendar", Some("event-123@example.com"))
         .await
@@ -36,7 +46,7 @@ async fn get_calendar_object_content_type() {
         .seed_instance(
             collection_id,
             entity_id,
-            &format!("/api/caldav/{collection_id}/event-123.ics"),
+            "event-123",
             "text/calendar",
             "\"abc123\"",
             1,
@@ -44,11 +54,10 @@ async fn get_calendar_object_content_type() {
         .await
         .expect("Failed to seed instance");
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::get(&format!("/api/caldav/{collection_id}/event-123.ics"))
-        .send(service)
-        .await;
+    let uri = caldav_item_path("alice", "testcal", "event-123.ics");
+    let response = TestRequest::get(&uri).send(&service).await;
 
     // Expect 200 OK with correct content type
     response
@@ -58,9 +67,14 @@ async fn get_calendar_object_content_type() {
 
 /// ## Summary
 /// Test that GET on a vcard returns correct Content-Type.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn get_vcard_content_type() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+
     let principal_id = test_db
         .seed_principal("user", "bob", Some("Bob"))
         .await
@@ -71,6 +85,11 @@ async fn get_vcard_content_type() {
         .await
         .expect("Failed to seed collection");
 
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "addressbook")
+        .await
+        .expect("Failed to seed collection owner");
+
     let entity_id = test_db
         .seed_entity("vcard", Some("contact-456@example.com"))
         .await
@@ -80,7 +99,7 @@ async fn get_vcard_content_type() {
         .seed_instance(
             collection_id,
             entity_id,
-            &format!("/api/carddav/{collection_id}/contact-456.vcf"),
+            "contact-456",
             "text/vcard",
             "\"def456\"",
             1,
@@ -88,11 +107,10 @@ async fn get_vcard_content_type() {
         .await
         .expect("Failed to seed instance");
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::get(&format!("/api/carddav/{collection_id}/contact-456.vcf"))
-        .send(service)
-        .await;
+    let uri = carddav_item_path("bob", "contacts", "contact-456.vcf");
+    let response = TestRequest::get(&uri).send(&service).await;
 
     response
         .assert_status(StatusCode::OK)
@@ -105,13 +123,18 @@ async fn get_vcard_content_type() {
 
 /// ## Summary
 /// Test that GET serializes calendar content from the component tree.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 #[expect(
     clippy::too_many_lines,
     reason = "Integration test exercises multiple assertions in one flow"
 )]
 async fn get_calendar_object_uses_component_tree() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+
     let principal_id = test_db
         .seed_principal("user", "tree-user", Some("Tree User"))
         .await
@@ -122,17 +145,21 @@ async fn get_calendar_object_uses_component_tree() {
         .await
         .expect("Failed to seed collection");
 
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
     let entity_id = test_db
         .seed_entity("calendar", Some("tree-event-001@example.com"))
         .await
         .expect("Failed to seed entity");
 
-    let uri = format!("/api/caldav/{collection_id}/tree-event.ics");
     let _instance_id = test_db
         .seed_instance(
             collection_id,
             entity_id,
-            &uri,
+            "tree-event",
             "text/calendar",
             "\"tree-etag-001\"",
             1,
@@ -185,9 +212,10 @@ async fn get_calendar_object_uses_component_tree() {
         .await
         .expect("Failed to seed SUMMARY property");
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::get(&uri).send(service).await;
+    let uri = caldav_item_path("tree-user", "treecal", "tree-event.ics");
+    let response = TestRequest::get(&uri).send(&service).await;
 
     let response = response.assert_status(StatusCode::OK);
 
@@ -210,13 +238,18 @@ async fn get_calendar_object_uses_component_tree() {
 
 /// ## Summary
 /// Test that GET serializes vCard content from the component tree.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 #[expect(
     clippy::too_many_lines,
     reason = "Integration test exercises multiple assertions in one flow"
 )]
 async fn get_vcard_uses_component_tree() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+
     let principal_id = test_db
         .seed_principal("user", "tree-vcard", Some("Tree VCard"))
         .await
@@ -227,17 +260,21 @@ async fn get_vcard_uses_component_tree() {
         .await
         .expect("Failed to seed collection");
 
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "addressbook")
+        .await
+        .expect("Failed to seed collection owner");
+
     let entity_id = test_db
         .seed_entity("vcard", Some("tree-contact-001@example.com"))
         .await
         .expect("Failed to seed entity");
 
-    let uri = format!("/api/carddav/{collection_id}/tree-contact.vcf");
     let _instance_id = test_db
         .seed_instance(
             collection_id,
             entity_id,
-            &uri,
+            "tree-contact",
             "text/vcard",
             "\"tree-vcard-etag-001\"",
             1,
@@ -271,9 +308,10 @@ async fn get_vcard_uses_component_tree() {
         .await
         .expect("Failed to seed UID property");
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::get(&uri).send(service).await;
+    let uri = carddav_item_path("tree-vcard", "treebook", "tree-contact.vcf");
+    let response = TestRequest::get(&uri).send(&service).await;
 
     let response = response.assert_status(StatusCode::OK);
 
@@ -292,14 +330,22 @@ async fn get_vcard_uses_component_tree() {
 
 /// ## Summary
 /// Test that GET on non-existent resource returns 404.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn get_nonexistent_404() {
-    let service = create_test_service();
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
 
-    let response =
-        TestRequest::get("/api/caldav/00000000-0000-0000-0000-000000000000/nonexistent.ics")
-            .send(service)
-            .await;
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let uri = caldav_item_path(
+        "nonexistent-owner",
+        "nonexistent-collection",
+        "nonexistent.ics",
+    );
+    let response = TestRequest::get(&uri).send(&service).await;
 
     response.assert_status(StatusCode::NOT_FOUND);
 }
@@ -310,9 +356,14 @@ async fn get_nonexistent_404() {
 
 /// ## Summary
 /// Test that HEAD returns same headers as GET without body.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn head_matches_get_headers() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -323,17 +374,21 @@ async fn head_matches_get_headers() {
         .await
         .expect("Failed to seed collection");
 
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
     let entity_id = test_db
         .seed_entity("icalendar", Some("event-789@example.com"))
         .await
         .expect("Failed to seed entity");
 
-    let uri = format!("/api/caldav/{collection_id}/event-789.ics");
     let _instance_id = test_db
         .seed_instance(
             collection_id,
             entity_id,
-            &uri,
+            "event-789",
             "text/calendar",
             "\"xyz789\"",
             1,
@@ -341,13 +396,15 @@ async fn head_matches_get_headers() {
         .await
         .expect("Failed to seed instance");
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let uri = caldav_item_path("alice", "testcal", "event-789.ics");
 
     // Send GET request
-    let get_response = TestRequest::get(&uri).send(service).await;
+    let get_response = TestRequest::get(&uri).send(&service).await;
 
     // Send HEAD request
-    let head_response = TestRequest::head(&uri).send(service).await;
+    let head_response = TestRequest::head(&uri).send(&service).await;
 
     // Status should match
     assert_eq!(
@@ -375,14 +432,22 @@ async fn head_matches_get_headers() {
 
 /// ## Summary
 /// Test that HEAD on non-existent resource returns 404.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn head_nonexistent_404() {
-    let service = create_test_service();
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
 
-    let response =
-        TestRequest::head("/api/caldav/00000000-0000-0000-0000-000000000000/nonexistent.ics")
-            .send(service)
-            .await;
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let uri = caldav_item_path(
+        "nonexistent-owner",
+        "nonexistent-collection",
+        "nonexistent.ics",
+    );
+    let response = TestRequest::head(&uri).send(&service).await;
 
     response.assert_status(StatusCode::NOT_FOUND);
 }
@@ -393,9 +458,14 @@ async fn head_nonexistent_404() {
 
 /// ## Summary
 /// Test that GET returns strong ETag.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn get_etag_present_and_strong() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -406,17 +476,21 @@ async fn get_etag_present_and_strong() {
         .await
         .expect("Failed to seed collection");
 
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
     let entity_id = test_db
         .seed_entity("icalendar", Some("etag-test@example.com"))
         .await
         .expect("Failed to seed entity");
 
-    let uri = format!("/api/caldav/{collection_id}/etag-test.ics");
     let _instance_id = test_db
         .seed_instance(
             collection_id,
             entity_id,
-            &uri,
+            "etag-test",
             "text/calendar",
             "\"strong-etag-123\"",
             1,
@@ -424,9 +498,10 @@ async fn get_etag_present_and_strong() {
         .await
         .expect("Failed to seed instance");
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::get(&uri).send(service).await;
+    let uri = caldav_item_path("alice", "testcal", "etag-test.ics");
+    let response = TestRequest::get(&uri).send(&service).await;
 
     let response = response
         .assert_status(StatusCode::OK)
@@ -450,9 +525,14 @@ async fn get_etag_present_and_strong() {
 
 /// ## Summary
 /// Test that If-None-Match with matching ETag returns 304.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn get_if_none_match_304() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -463,28 +543,41 @@ async fn get_if_none_match_304() {
         .await
         .expect("Failed to seed collection");
 
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
     let entity_id = test_db
         .seed_entity("icalendar", Some("cond-test@example.com"))
         .await
         .expect("Failed to seed entity");
 
-    let uri = format!("/api/caldav/{collection_id}/cond-test.ics");
     let etag = "\"cond-etag-456\"";
     let _instance_id = test_db
-        .seed_instance(collection_id, entity_id, &uri, "text/calendar", etag, 1)
+        .seed_instance(
+            collection_id,
+            entity_id,
+            "cond-test",
+            "text/calendar",
+            etag,
+            1,
+        )
         .await
         .expect("Failed to seed instance");
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let uri = caldav_item_path("alice", "testcal", "cond-test.ics");
 
     // First GET to verify resource exists
-    let response = TestRequest::get(&uri).send(service).await;
+    let response = TestRequest::get(&uri).send(&service).await;
     response.assert_status(StatusCode::OK);
 
     // Second GET with If-None-Match
     let response = TestRequest::get(&uri)
         .if_none_match(etag)
-        .send(service)
+        .send(&service)
         .await;
 
     response.assert_status(StatusCode::NOT_MODIFIED);
@@ -492,9 +585,14 @@ async fn get_if_none_match_304() {
 
 /// ## Summary
 /// Test that If-None-Match with non-matching ETag returns 200.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn get_if_none_match_different_etag_returns_200() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -505,17 +603,21 @@ async fn get_if_none_match_different_etag_returns_200() {
         .await
         .expect("Failed to seed collection");
 
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
     let entity_id = test_db
         .seed_entity("icalendar", Some("cond-test-2@example.com"))
         .await
         .expect("Failed to seed entity");
 
-    let uri = format!("/api/caldav/{collection_id}/cond-test-2.ics");
     let _instance_id = test_db
         .seed_instance(
             collection_id,
             entity_id,
-            &uri,
+            "cond-test-2",
             "text/calendar",
             "\"actual-etag\"",
             1,
@@ -523,12 +625,14 @@ async fn get_if_none_match_different_etag_returns_200() {
         .await
         .expect("Failed to seed instance");
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let uri = caldav_item_path("alice", "testcal", "cond-test-2.ics");
 
     // GET with different ETag should return 200
     let response = TestRequest::get(&uri)
         .if_none_match("\"different-etag\"")
-        .send(service)
+        .send(&service)
         .await;
 
     response.assert_status(StatusCode::OK);
@@ -536,9 +640,14 @@ async fn get_if_none_match_different_etag_returns_200() {
 
 /// ## Summary
 /// Test that If-Match with mismatched ETag returns 412.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn get_if_match_412() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -549,17 +658,21 @@ async fn get_if_match_412() {
         .await
         .expect("Failed to seed collection");
 
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
     let entity_id = test_db
         .seed_entity("icalendar", Some("match-test@example.com"))
         .await
         .expect("Failed to seed entity");
 
-    let uri = format!("/api/caldav/{collection_id}/match-test.ics");
     let _instance_id = test_db
         .seed_instance(
             collection_id,
             entity_id,
-            &uri,
+            "match-test",
             "text/calendar",
             "\"real-etag\"",
             1,
@@ -567,12 +680,14 @@ async fn get_if_match_412() {
         .await
         .expect("Failed to seed instance");
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let uri = caldav_item_path("alice", "testcal", "match-test.ics");
 
     // GET with wrong If-Match should return 412
     let response = TestRequest::get(&uri)
         .if_match("\"wrong-etag\"")
-        .send(service)
+        .send(&service)
         .await;
 
     response.assert_status(StatusCode::PRECONDITION_FAILED);
@@ -580,9 +695,14 @@ async fn get_if_match_412() {
 
 /// ## Summary
 /// Test that If-Match with matching ETag returns 200.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn get_if_match_success() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -593,22 +713,35 @@ async fn get_if_match_success() {
         .await
         .expect("Failed to seed collection");
 
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
     let entity_id = test_db
         .seed_entity("icalendar", Some("match-test-2@example.com"))
         .await
         .expect("Failed to seed entity");
 
-    let uri = format!("/api/caldav/{collection_id}/match-test-2.ics");
     let etag = "\"correct-etag\"";
     let _instance_id = test_db
-        .seed_instance(collection_id, entity_id, &uri, "text/calendar", etag, 1)
+        .seed_instance(
+            collection_id,
+            entity_id,
+            "match-test-2",
+            "text/calendar",
+            etag,
+            1,
+        )
         .await
         .expect("Failed to seed instance");
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let uri = caldav_item_path("alice", "testcal", "match-test-2.ics");
 
     // GET with correct If-Match should return 200
-    let response = TestRequest::get(&uri).if_match(etag).send(service).await;
+    let response = TestRequest::get(&uri).if_match(etag).send(&service).await;
 
     response.assert_status(StatusCode::OK);
 }
@@ -619,14 +752,19 @@ async fn get_if_match_success() {
 
 /// ## Summary
 /// Test that GET on collection may return 405 or directory listing.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn get_on_collection_path() {
-    let service = create_test_service();
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
 
-    // GET on a collection path
-    let response = TestRequest::get("/api/caldav/00000000-0000-0000-0000-000000000001/")
-        .send(service)
-        .await;
+    let service = create_db_test_service(&test_db.url()).await;
+
+    // GET on a collection path that doesn't exist
+    let uri = caldav_collection_path("nonexistent-owner", "nonexistent-collection");
+    let response = TestRequest::get(&uri).send(&service).await;
 
     // Either 405 Method Not Allowed or some form of listing is acceptable
     // Document the actual behavior
@@ -645,9 +783,14 @@ async fn get_on_collection_path() {
 
 /// ## Summary
 /// Test that Last-Modified header is present.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn get_last_modified_header() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -658,17 +801,21 @@ async fn get_last_modified_header() {
         .await
         .expect("Failed to seed collection");
 
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
     let entity_id = test_db
         .seed_entity("icalendar", Some("lm-test@example.com"))
         .await
         .expect("Failed to seed entity");
 
-    let uri = format!("/api/caldav/{collection_id}/lm-test.ics");
     let _instance_id = test_db
         .seed_instance(
             collection_id,
             entity_id,
-            &uri,
+            "lm-test",
             "text/calendar",
             "\"lm-etag\"",
             1,
@@ -676,9 +823,10 @@ async fn get_last_modified_header() {
         .await
         .expect("Failed to seed instance");
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::get(&uri).send(service).await;
+    let uri = caldav_item_path("alice", "testcal", "lm-test.ics");
+    let response = TestRequest::get(&uri).send(&service).await;
 
     response
         .assert_status(StatusCode::OK)
@@ -687,9 +835,14 @@ async fn get_last_modified_header() {
 
 /// ## Summary
 /// Test that Content-Length header matches actual body length.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn get_content_length_accurate() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+
     let principal_id = test_db
         .seed_principal("user", "alice", Some("Alice"))
         .await
@@ -700,17 +853,21 @@ async fn get_content_length_accurate() {
         .await
         .expect("Failed to seed collection");
 
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
     let entity_id = test_db
         .seed_entity("icalendar", Some("cl-test@example.com"))
         .await
         .expect("Failed to seed entity");
 
-    let uri = format!("/api/caldav/{collection_id}/cl-test.ics");
     let _instance_id = test_db
         .seed_instance(
             collection_id,
             entity_id,
-            &uri,
+            "cl-test",
             "text/calendar",
             "\"cl-etag\"",
             1,
@@ -718,9 +875,10 @@ async fn get_content_length_accurate() {
         .await
         .expect("Failed to seed instance");
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::get(&uri).send(service).await;
+    let uri = caldav_item_path("alice", "testcal", "cl-test.ics");
+    let response = TestRequest::get(&uri).send(&service).await;
 
     let response = response.assert_status(StatusCode::OK);
 
