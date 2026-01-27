@@ -183,7 +183,7 @@ impl ResourceLocation {
     /// assert_eq!(resource.to_path(), "/calendars/alice/personal/work.ics");
     /// ```
     #[must_use]
-    pub fn to_path(&self) -> String {
+    pub fn to_resource_path(&self) -> String {
         let mut path = String::from("/");
         for (i, segment) in self.segments.iter().enumerate() {
             match segment {
@@ -216,14 +216,15 @@ impl ResourceLocation {
     }
 
     #[must_use]
+    pub fn to_full_path(&self) -> String {
+        let path = self.to_resource_path();
+        format!("{DAV_ROUTE_PREFIX}/{path}")
+    }
+
+    #[must_use]
     pub fn to_url(&self, serve_origin: &str) -> String {
-        let path = self.to_path();
-        format!(
-            "{}{}/{}",
-            serve_origin.trim_end_matches('/'),
-            DAV_ROUTE_PREFIX,
-            path
-        )
+        let path = self.to_full_path();
+        format!("{}{}", serve_origin.trim_end_matches('/'), path)
     }
 
     /// Returns the segments of this resource path.
@@ -237,7 +238,7 @@ impl ResourceLocation {
     /// This is an alias for `to_path()`.
     #[must_use]
     pub fn path(&self) -> String {
-        self.to_path()
+        self.to_resource_path()
     }
 
     /// Returns the resource type if present in the path.
@@ -266,7 +267,7 @@ impl ResourceLocation {
 
 impl std::fmt::Display for ResourceLocation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.to_path())
+        write!(f, "{}", self.to_resource_path())
     }
 }
 
@@ -286,7 +287,10 @@ mod tests {
         assert_eq!(resource.segments().len(), 4);
         assert_eq!(resource.resource_type(), Some(ResourceType::Calendar));
         assert_eq!(resource.owner(), Some("alice"));
-        assert_eq!(resource.to_path(), "/calendars/alice/personal/work.ics");
+        assert_eq!(
+            resource.to_resource_path(),
+            "/calendars/alice/personal/work.ics"
+        );
     }
 
     #[test]
@@ -297,7 +301,7 @@ mod tests {
             resource.segments()[2],
             PathSegment::Glob { recursive: true }
         );
-        assert_eq!(resource.to_path(), "/calendars/alice/**");
+        assert_eq!(resource.to_resource_path(), "/calendars/alice/**");
     }
 
     #[test]
@@ -308,7 +312,7 @@ mod tests {
             resource.segments()[3],
             PathSegment::Glob { recursive: false }
         );
-        assert_eq!(resource.to_path(), "/addressbooks/bob/contacts/*");
+        assert_eq!(resource.to_resource_path(), "/addressbooks/bob/contacts/*");
     }
 
     #[test]
@@ -316,7 +320,10 @@ mod tests {
         let resource = ResourceLocation::parse("/addressbooks/charlie/work/contact.vcf").unwrap();
         assert_eq!(resource.resource_type(), Some(ResourceType::Addressbook));
         assert_eq!(resource.owner(), Some("charlie"));
-        assert_eq!(resource.to_path(), "/addressbooks/charlie/work/contact.vcf");
+        assert_eq!(
+            resource.to_resource_path(),
+            "/addressbooks/charlie/work/contact.vcf"
+        );
     }
 
     #[test]
@@ -331,7 +338,11 @@ mod tests {
 
         for path in paths {
             let resource = ResourceLocation::parse(path).unwrap();
-            assert_eq!(resource.to_path(), path, "Roundtrip failed for {path}");
+            assert_eq!(
+                resource.to_resource_path(),
+                path,
+                "Roundtrip failed for {path}"
+            );
         }
     }
 
@@ -345,7 +356,7 @@ mod tests {
         ];
 
         let resource = ResourceLocation::from_segments(segments);
-        assert_eq!(resource.to_path(), "/calendars/alice/personal/**");
+        assert_eq!(resource.to_resource_path(), "/calendars/alice/personal/**");
     }
 
     #[test]
@@ -358,7 +369,10 @@ mod tests {
         ];
 
         let resource = ResourceLocation::from_segments(segments);
-        assert_eq!(resource.to_path(), "/calendars/alice/personal/work.ics");
+        assert_eq!(
+            resource.to_resource_path(),
+            "/calendars/alice/personal/work.ics"
+        );
     }
 
     #[test]
@@ -370,7 +384,7 @@ mod tests {
         ];
 
         let resource = ResourceLocation::from_segments(segments);
-        assert_eq!(resource.to_path(), "/addressbooks/bob/contacts/");
+        assert_eq!(resource.to_resource_path(), "/addressbooks/bob/contacts/");
     }
 
     #[test]
