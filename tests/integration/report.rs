@@ -18,7 +18,7 @@ use super::helpers::*;
 async fn calendar_query_returns_multistatus() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -36,7 +36,7 @@ async fn calendar_query_returns_multistatus() {
         .seed_instance(
             collection_id,
             entity_id,
-            &format!("/api/caldav/{collection_id}/event.ics"),
+            "event",
             "text/calendar",
             "\"query-etag\"",
             1,
@@ -46,7 +46,7 @@ async fn calendar_query_returns_multistatus() {
 
     let service = create_test_service();
 
-    let response = TestRequest::report(&format!("/api/caldav/{collection_id}/"))
+    let response = TestRequest::report(&caldav_collection_path("alice", "testcal"))
         .xml_body(calendar_query_report())
         .send(service)
         .await;
@@ -60,7 +60,7 @@ async fn calendar_query_returns_multistatus() {
 async fn calendar_query_time_range_filter() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -79,7 +79,7 @@ async fn calendar_query_time_range_filter() {
         .seed_instance(
             collection_id,
             entity_id,
-            &format!("/api/caldav/{collection_id}/time-range.ics"),
+            "time-range",
             "text/calendar",
             "\"tr-etag\"",
             1,
@@ -104,7 +104,7 @@ async fn calendar_query_time_range_filter() {
   </C:filter>
 </C:calendar-query>"#;
 
-    let response = TestRequest::report(&format!("/api/caldav/{collection_id}/"))
+    let response = TestRequest::report(&caldav_collection_path("alice", "testcal"))
         .xml_body(body)
         .send(service)
         .await;
@@ -118,7 +118,7 @@ async fn calendar_query_time_range_filter() {
 async fn calendar_query_returns_calendar_data() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -136,7 +136,7 @@ async fn calendar_query_returns_calendar_data() {
         .seed_instance(
             collection_id,
             entity_id,
-            &format!("/api/caldav/{collection_id}/caldata.ics"),
+            "caldata",
             "text/calendar",
             "\"caldata-etag\"",
             1,
@@ -146,7 +146,7 @@ async fn calendar_query_returns_calendar_data() {
 
     let service = create_test_service();
 
-    let response = TestRequest::report(&format!("/api/caldav/{collection_id}/"))
+    let response = TestRequest::report(&caldav_collection_path("alice", "testcal"))
         .xml_body(calendar_query_report())
         .send(service)
         .await;
@@ -166,7 +166,7 @@ async fn calendar_query_returns_calendar_data() {
 async fn calendar_multiget_returns_resources() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -183,14 +183,15 @@ async fn calendar_multiget_returns_resources() {
             .await
             .expect("Failed to seed entity");
 
-        let uri = format!("/api/caldav/{collection_id}/event-{i}.ics");
-        hrefs.push(uri.clone());
+        let slug = format!("event-{i}");
+        let href = caldav_item_path("alice", "testcal", &format!("{slug}.ics"));
+        hrefs.push(href);
 
         let _instance_id = test_db
             .seed_instance(
                 collection_id,
                 entity_id,
-                &uri,
+                &slug,
                 "text/calendar",
                 &format!("\"mg-{i}-etag\""),
                 1,
@@ -202,7 +203,7 @@ async fn calendar_multiget_returns_resources() {
     let service = create_test_service();
 
     let body = calendar_multiget_report(&hrefs);
-    let response = TestRequest::report(&format!("/api/caldav/{collection_id}/"))
+    let response = TestRequest::report(&caldav_collection_path("alice", "testcal"))
         .xml_body(&body)
         .send(service)
         .await;
@@ -223,21 +224,21 @@ async fn calendar_multiget_returns_resources() {
 async fn calendar_multiget_missing_resource_404() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
-    let collection_id = test_db
+    let _collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
         .await
         .expect("Failed to seed collection");
 
     let service = create_test_service();
 
-    let hrefs = vec![format!("/api/caldav/{collection_id}/nonexistent.ics")];
+    let hrefs = vec![caldav_item_path("alice", "testcal", "nonexistent.ics")];
     let body = calendar_multiget_report(&hrefs);
 
-    let response = TestRequest::report(&format!("/api/caldav/{collection_id}/"))
+    let response = TestRequest::report(&caldav_collection_path("alice", "testcal"))
         .xml_body(&body)
         .send(service)
         .await;
@@ -257,17 +258,12 @@ async fn calendar_multiget_missing_resource_404() {
 async fn addressbook_query_returns_multistatus() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/bob/", Some("Bob"))
+        .seed_principal("user", "bob", Some("Bob"))
         .await
         .expect("Failed to seed principal");
 
     let collection_id = test_db
-        .seed_collection(
-            principal_id,
-            "addressbook",
-            "/addressbooks/bob/contacts/",
-            None,
-        )
+        .seed_collection(principal_id, "addressbook", "contacts", None)
         .await
         .expect("Failed to seed collection");
 
@@ -280,7 +276,7 @@ async fn addressbook_query_returns_multistatus() {
         .seed_instance(
             collection_id,
             entity_id,
-            &format!("/api/carddav/{collection_id}/contact.vcf"),
+            "contact",
             "text/vcard",
             "\"vcard-etag\"",
             1,
@@ -290,7 +286,7 @@ async fn addressbook_query_returns_multistatus() {
 
     let service = create_test_service();
 
-    let response = TestRequest::report(&format!("/api/carddav/{collection_id}/"))
+    let response = TestRequest::report(&carddav_collection_path("bob", "contacts"))
         .xml_body(addressbook_query_report())
         .send(service)
         .await;
@@ -304,17 +300,12 @@ async fn addressbook_query_returns_multistatus() {
 async fn addressbook_query_returns_address_data() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/bob/", Some("Bob"))
+        .seed_principal("user", "bob", Some("Bob"))
         .await
         .expect("Failed to seed principal");
 
     let collection_id = test_db
-        .seed_collection(
-            principal_id,
-            "addressbook",
-            "/addressbooks/bob/addrdata/",
-            None,
-        )
+        .seed_collection(principal_id, "addressbook", "addrdata", None)
         .await
         .expect("Failed to seed collection");
 
@@ -327,7 +318,7 @@ async fn addressbook_query_returns_address_data() {
         .seed_instance(
             collection_id,
             entity_id,
-            &format!("/api/carddav/{collection_id}/addr.vcf"),
+            "addr",
             "text/vcard",
             "\"addr-etag\"",
             1,
@@ -337,7 +328,7 @@ async fn addressbook_query_returns_address_data() {
 
     let service = create_test_service();
 
-    let response = TestRequest::report(&format!("/api/carddav/{collection_id}/"))
+    let response = TestRequest::report(&carddav_collection_path("bob", "addrdata"))
         .xml_body(addressbook_query_report())
         .send(service)
         .await;
@@ -357,12 +348,12 @@ async fn addressbook_query_returns_address_data() {
 async fn addressbook_multiget_returns_vcards() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/bob/", Some("Bob"))
+        .seed_principal("user", "bob", Some("Bob"))
         .await
         .expect("Failed to seed principal");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "addressbook", "/addressbooks/bob/abmg/", None)
+        .seed_collection(principal_id, "addressbook", "abmg", None)
         .await
         .expect("Failed to seed collection");
 
@@ -374,15 +365,15 @@ async fn addressbook_multiget_returns_vcards() {
             .await
             .expect("Failed to seed entity");
 
-        let instance_uri = format!("contact-{i}.vcf");
-        let href = format!("/api/carddav/{collection_id}/{instance_uri}");
+        let slug = format!("contact-{i}");
+        let href = carddav_item_path("bob", "abmg", &format!("{slug}.vcf"));
         hrefs.push(href);
 
         let _instance_id = test_db
             .seed_instance(
                 collection_id,
                 entity_id,
-                &instance_uri,
+                &slug,
                 "text/vcard",
                 &format!("\"abmg-{i}-etag\""),
                 1,
@@ -394,7 +385,7 @@ async fn addressbook_multiget_returns_vcards() {
     let service = create_test_service();
 
     let body = addressbook_multiget_report(&hrefs);
-    let response = TestRequest::report(&format!("/api/carddav/{collection_id}/"))
+    let response = TestRequest::report(&carddav_collection_path("bob", "abmg"))
         .xml_body(&body)
         .send(service)
         .await;
@@ -418,18 +409,18 @@ async fn addressbook_multiget_returns_vcards() {
 async fn sync_collection_returns_multistatus() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
-    let collection_id = test_db
+    let _collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
         .await
         .expect("Failed to seed collection");
 
     let service = create_test_service();
 
-    let response = TestRequest::report(&format!("/api/caldav/{collection_id}/"))
+    let response = TestRequest::report(&caldav_collection_path("alice", "testcal"))
         .xml_body(sync_collection_report_initial())
         .send(service)
         .await;
@@ -443,18 +434,18 @@ async fn sync_collection_returns_multistatus() {
 async fn sync_collection_returns_sync_token() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
-    let collection_id = test_db
+    let _collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
         .await
         .expect("Failed to seed collection");
 
     let service = create_test_service();
 
-    let response = TestRequest::report(&format!("/api/caldav/{collection_id}/"))
+    let response = TestRequest::report(&caldav_collection_path("alice", "testcal"))
         .xml_body(sync_collection_report_initial())
         .send(service)
         .await;
@@ -470,7 +461,7 @@ async fn sync_collection_returns_sync_token() {
 async fn sync_collection_initial_sync() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -490,7 +481,7 @@ async fn sync_collection_initial_sync() {
             .seed_instance(
                 collection_id,
                 entity_id,
-                &format!("/api/caldav/{collection_id}/init-{i}.ics"),
+                &format!("init-{i}"),
                 "text/calendar",
                 &format!("\"init-{i}-etag\""),
                 1,
@@ -502,7 +493,7 @@ async fn sync_collection_initial_sync() {
     let service = create_test_service();
 
     // Empty sync-token means initial sync
-    let response = TestRequest::report(&format!("/api/caldav/{collection_id}/"))
+    let response = TestRequest::report(&caldav_collection_path("alice", "testcal"))
         .xml_body(sync_collection_report_initial())
         .send(service)
         .await;
@@ -522,7 +513,7 @@ async fn sync_collection_initial_sync() {
 async fn sync_collection_delta_sync() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -541,7 +532,7 @@ async fn sync_collection_delta_sync() {
         .seed_instance(
             collection_id,
             entity_id,
-            &format!("/api/caldav/{collection_id}/delta-1.ics"),
+            "delta-1",
             "text/calendar",
             "\"delta-1-etag\"",
             1,
@@ -552,7 +543,7 @@ async fn sync_collection_delta_sync() {
     let service = create_test_service();
 
     // Get initial sync-token
-    let initial_response = TestRequest::report(&format!("/api/caldav/{collection_id}/"))
+    let initial_response = TestRequest::report(&caldav_collection_path("alice", "testcal"))
         .xml_body(sync_collection_report_initial())
         .send(service)
         .await;
@@ -574,7 +565,7 @@ async fn sync_collection_delta_sync() {
 async fn report_nonexistent_404() {
     let service = create_test_service();
 
-    let response = TestRequest::report("/api/caldav/00000000-0000-0000-0000-000000000000/")
+    let response = TestRequest::report(&caldav_collection_path("nonexistent", "unknown"))
         .xml_body(calendar_query_report())
         .send(service)
         .await;
@@ -588,18 +579,18 @@ async fn report_nonexistent_404() {
 async fn report_invalid_xml_400() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
-    let collection_id = test_db
+    let _collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
         .await
         .expect("Failed to seed collection");
 
     let service = create_test_service();
 
-    let response = TestRequest::report(&format!("/api/caldav/{collection_id}/"))
+    let response = TestRequest::report(&caldav_collection_path("alice", "testcal"))
         .xml_body("this is not valid xml <><><")
         .send(service)
         .await;
@@ -613,11 +604,11 @@ async fn report_invalid_xml_400() {
 async fn report_unsupported_type() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
-    let collection_id = test_db
+    let _collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
         .await
         .expect("Failed to seed collection");
@@ -629,7 +620,7 @@ async fn report_unsupported_type() {
 <X:unknown-report xmlns:X="http://custom.example.com/">
 </X:unknown-report>"#;
 
-    let response = TestRequest::report(&format!("/api/caldav/{collection_id}/"))
+    let response = TestRequest::report(&caldav_collection_path("alice", "testcal"))
         .xml_body(body)
         .send(service)
         .await;

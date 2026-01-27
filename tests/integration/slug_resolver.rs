@@ -3,7 +3,7 @@
 //!
 //! Uses `tests/integration/helpers.rs` for database setup and request utilities.
 
-use super::helpers::TestDb;
+use super::helpers::{TestDb, cal_collection_glob, cal_owner_glob, cal_path};
 use shuriken::component::auth::ResourceLocation;
 use shuriken::component::middleware::slug_resolver::resolve_path_for_testing;
 
@@ -21,7 +21,7 @@ async fn resolve_owner_only_calendar_path() {
 
     let mut conn = test_db.get_conn().await.expect("conn");
     let (owner, _collection, _instance, resource_id) =
-        resolve_path_for_testing("/calendars/alice/**", &mut conn)
+        resolve_path_for_testing(&cal_owner_glob("alice", true), &mut conn)
             .await
             .expect("resolve ok");
 
@@ -53,7 +53,7 @@ async fn resolve_calendar_collection_path() {
 
     let mut conn = test_db.get_conn().await.expect("conn");
     let (_owner, collection_opt, _instance, _rid) =
-        resolve_path_for_testing("/calendars/alice/work/**", &mut conn)
+        resolve_path_for_testing(&cal_collection_glob("alice", "work", true), &mut conn)
             .await
             .expect("resolve ok");
 
@@ -84,7 +84,7 @@ async fn resolve_nested_calendar_collection_path() {
 
     let mut conn = test_db.get_conn().await.expect("conn");
     let (_owner, collection_opt, _instance, _rid) =
-        resolve_path_for_testing("/calendars/alice/work/team/**", &mut conn)
+        resolve_path_for_testing(&cal_collection_glob("alice", "work/team", true), &mut conn)
             .await
             .expect("resolve ok");
 
@@ -126,7 +126,7 @@ async fn resolve_calendar_instance_path() {
 
     let mut conn = test_db.get_conn().await.expect("conn");
     let (_owner, _collection, instance_opt, _rid) =
-        resolve_path_for_testing("/calendars/alice/work/event-1.ics", &mut conn)
+        resolve_path_for_testing(&cal_path("alice", "work", Some("event-1.ics")), &mut conn)
             .await
             .expect("resolve ok");
 
@@ -164,10 +164,12 @@ async fn resolve_nested_calendar_instance_path() {
         .expect("Failed to seed instance");
 
     let mut conn = test_db.get_conn().await.expect("conn");
-    let (_owner, _collection, instance_opt, _rid) =
-        resolve_path_for_testing("/calendars/alice/work/team/standup.ics", &mut conn)
-            .await
-            .expect("resolve ok");
+    let (_owner, _collection, instance_opt, _rid) = resolve_path_for_testing(
+        &cal_path("alice", "work/team", Some("standup.ics")),
+        &mut conn,
+    )
+    .await
+    .expect("resolve ok");
 
     let instance = instance_opt.expect("instance present");
     assert_eq!(instance.id, instance_id);

@@ -84,6 +84,86 @@ impl ResourceLocation {
         Self { segments }
     }
 
+    /// Create a resource location for a principal (owner only).
+    #[must_use]
+    pub fn from_segments_principal(resource_type: ResourceType, owner: String) -> Self {
+        let segments = vec![
+            PathSegment::ResourceType(resource_type),
+            PathSegment::Owner(owner),
+        ];
+        Self { segments }
+    }
+
+    /// Create a resource location for a collection.
+    #[must_use]
+    pub fn from_segments_collection(
+        resource_type: ResourceType,
+        owner: String,
+        collection: &str,
+    ) -> Self {
+        let mut segments = Vec::with_capacity(3);
+        segments.push(PathSegment::ResourceType(resource_type));
+        segments.push(PathSegment::Owner(owner));
+        // Split collection path into multiple segments if needed
+        for col in collection.split('/').filter(|s| !s.is_empty()) {
+            segments.push(PathSegment::Collection(col.to_string()));
+        }
+        Self { segments }
+    }
+
+    /// Create a resource location for an item.
+    #[must_use]
+    pub fn from_segments_item(
+        resource_type: ResourceType,
+        owner: String,
+        collection: &str,
+        item: String,
+    ) -> Self {
+        let mut segments = Vec::with_capacity(4);
+        segments.push(PathSegment::ResourceType(resource_type));
+        segments.push(PathSegment::Owner(owner));
+        // Split collection path into multiple segments if needed
+        for col in collection.split('/').filter(|s| !s.is_empty()) {
+            segments.push(PathSegment::Collection(col.to_string()));
+        }
+        segments.push(PathSegment::Item(item));
+        Self { segments }
+    }
+
+    /// Create a resource location for a glob pattern on an owner (e.g., `/cal/alice/**`).
+    #[must_use]
+    pub fn from_segments_owner_glob(
+        resource_type: ResourceType,
+        owner: String,
+        recursive: bool,
+    ) -> Self {
+        let segments = vec![
+            PathSegment::ResourceType(resource_type),
+            PathSegment::Owner(owner),
+            PathSegment::Glob { recursive },
+        ];
+        Self { segments }
+    }
+
+    /// Create a resource location for a glob pattern on a collection (e.g., `/cal/alice/work/**`).
+    #[must_use]
+    pub fn from_segments_collection_glob(
+        resource_type: ResourceType,
+        owner: String,
+        collection: &str,
+        recursive: bool,
+    ) -> Self {
+        let mut segments = Vec::with_capacity(4);
+        segments.push(PathSegment::ResourceType(resource_type));
+        segments.push(PathSegment::Owner(owner));
+        // Split collection path into multiple segments if needed
+        for col in collection.split('/').filter(|s| !s.is_empty()) {
+            segments.push(PathSegment::Collection(col.to_string()));
+        }
+        segments.push(PathSegment::Glob { recursive });
+        Self { segments }
+    }
+
     /// Parse a path string into a resource identifier.
     ///
     /// ## Examples
@@ -218,7 +298,7 @@ impl ResourceLocation {
     #[must_use]
     pub fn to_full_path(&self) -> String {
         let path = self.to_resource_path();
-        format!("{DAV_ROUTE_PREFIX}/{path}")
+        format!("{DAV_ROUTE_PREFIX}{path}")
     }
 
     #[must_use]
@@ -280,64 +360,78 @@ impl From<Vec<PathSegment>> for ResourceLocation {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::api::DAV_ROUTE_PREFIX;
+
+    /// Helper to build a calendar resource path segment.
+    fn cal(suffix: &str) -> String {
+        format!("/{CALDAV_ROUTE_COMPONENT}/{suffix}")
+    }
+
+    /// Helper to build a card resource path segment.
+    fn card(suffix: &str) -> String {
+        format!("/{CARDDAV_ROUTE_COMPONENT}/{suffix}")
+    }
+
+    /// Helper to build a full DAV path from a resource path.
+    fn full_path(resource_path: &str) -> String {
+        format!("{DAV_ROUTE_PREFIX}{resource_path}")
+    }
 
     #[test]
     fn parse_simple_path() {
-        let resource = ResourceLocation::parse("/calendars/alice/personal/work.ics").unwrap();
+        let path = cal("alice/personal/work.ics");
+        let resource = ResourceLocation::parse(&path).unwrap();
         assert_eq!(resource.segments().len(), 4);
         assert_eq!(resource.resource_type(), Some(ResourceType::Calendar));
         assert_eq!(resource.owner(), Some("alice"));
-        assert_eq!(
-            resource.to_resource_path(),
-            "/calendars/alice/personal/work.ics"
-        );
+        assert_eq!(resource.to_full_path(), full_path(&path));
     }
 
     #[test]
     fn parse_recursive_glob() {
-        let resource = ResourceLocation::parse("/calendars/alice/**").unwrap();
+        let path = cal("alice/**");
+        let resource = ResourceLocation::parse(&path).unwrap();
         assert_eq!(resource.segments().len(), 3);
         assert_eq!(
             resource.segments()[2],
             PathSegment::Glob { recursive: true }
         );
-        assert_eq!(resource.to_resource_path(), "/calendars/alice/**");
+        assert_eq!(resource.to_full_path(), full_path(&path));
     }
 
     #[test]
     fn parse_single_glob() {
-        let resource = ResourceLocation::parse("/addressbooks/bob/contacts/*").unwrap();
+        let path = card("bob/contacts/*");
+        let resource = ResourceLocation::parse(&path).unwrap();
         assert_eq!(resource.segments().len(), 4);
         assert_eq!(
             resource.segments()[3],
             PathSegment::Glob { recursive: false }
         );
-        assert_eq!(resource.to_resource_path(), "/addressbooks/bob/contacts/*");
+        assert_eq!(resource.to_full_path(), full_path(&path));
     }
 
     #[test]
     fn parse_addressbook_path() {
-        let resource = ResourceLocation::parse("/addressbooks/charlie/work/contact.vcf").unwrap();
+        let path = card("charlie/work/contact.vcf");
+        let resource = ResourceLocation::parse(&path).unwrap();
         assert_eq!(resource.resource_type(), Some(ResourceType::Addressbook));
         assert_eq!(resource.owner(), Some("charlie"));
-        assert_eq!(
-            resource.to_resource_path(),
-            "/addressbooks/charlie/work/contact.vcf"
-        );
+        assert_eq!(resource.to_full_path(), full_path(&path));
     }
 
     #[test]
     fn roundtrip_conversion() {
         let paths = [
-            "/calendars/alice/personal/work.ics",
-            "/calendars/bob/**",
-            "/addressbooks/charlie/contacts/*",
-            "/calendars/team/shared/meeting.ics",
-            "/calendars/team/shared/",
+            cal("alice/personal/work.ics"),
+            cal("bob/**"),
+            card("charlie/contacts/*"),
+            cal("team/shared/meeting.ics"),
+            cal("team/shared/"),
         ];
 
         for path in paths {
-            let resource = ResourceLocation::parse(path).unwrap();
+            let resource = ResourceLocation::parse(&path).unwrap();
             assert_eq!(
                 resource.to_resource_path(),
                 path,
@@ -348,43 +442,37 @@ mod tests {
 
     #[test]
     fn create_from_segments_glob() {
-        let segments = vec![
+        let resource = ResourceLocation::from_segments(vec![
             PathSegment::ResourceType(ResourceType::Calendar),
             PathSegment::Owner("alice".to_string()),
             PathSegment::Collection("personal".to_string()),
             PathSegment::Glob { recursive: true },
-        ];
-
-        let resource = ResourceLocation::from_segments(segments);
-        assert_eq!(resource.to_resource_path(), "/calendars/alice/personal/**");
+        ]);
+        let expected = cal("alice/personal/**");
+        assert_eq!(resource.to_resource_path(), expected);
     }
 
     #[test]
     fn create_from_segments_item() {
-        let segments = vec![
+        let resource = ResourceLocation::from_segments(vec![
             PathSegment::ResourceType(ResourceType::Calendar),
             PathSegment::Owner("alice".to_string()),
             PathSegment::Collection("personal".to_string()),
             PathSegment::Item("work.ics".to_string()),
-        ];
-
-        let resource = ResourceLocation::from_segments(segments);
-        assert_eq!(
-            resource.to_resource_path(),
-            "/calendars/alice/personal/work.ics"
-        );
+        ]);
+        let expected = cal("alice/personal/work.ics");
+        assert_eq!(resource.to_resource_path(), expected);
     }
 
     #[test]
     fn create_from_segments_collection() {
-        let segments = vec![
+        let resource = ResourceLocation::from_segments(vec![
             PathSegment::ResourceType(ResourceType::Addressbook),
             PathSegment::Owner("bob".to_string()),
             PathSegment::Collection("contacts".to_string()),
-        ];
-
-        let resource = ResourceLocation::from_segments(segments);
-        assert_eq!(resource.to_resource_path(), "/addressbooks/bob/contacts/");
+        ]);
+        let expected = card("bob/contacts/");
+        assert_eq!(resource.to_resource_path(), expected);
     }
 
     #[test]
@@ -396,12 +484,15 @@ mod tests {
 
     #[test]
     fn glob_must_be_terminal() {
-        assert!(ResourceLocation::parse("/calendars/alice/**/extra").is_none());
-        assert!(ResourceLocation::parse("/calendars/alice/*/extra").is_none());
+        let path1 = cal("alice/**/extra");
+        let path2 = cal("alice/*/extra");
+        assert!(ResourceLocation::parse(&path1).is_none());
+        assert!(ResourceLocation::parse(&path2).is_none());
     }
 
     #[test]
     fn item_must_be_terminal() {
-        assert!(ResourceLocation::parse("/calendars/alice/work.ics/extra").is_none());
+        let path = cal("alice/work.ics/extra");
+        assert!(ResourceLocation::parse(&path).is_none());
     }
 }

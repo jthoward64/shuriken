@@ -18,6 +18,7 @@ use diesel_async::RunQueryDsl;
 use salvo::Depot;
 use tracing::{debug, warn};
 
+use crate::app::api::DAV_ROUTE_PREFIX;
 #[cfg(test)]
 use crate::component::auth::ResourceType;
 use crate::component::auth::depot::depot_keys;
@@ -45,7 +46,9 @@ pub async fn resolve_path_and_load_entities(
     let path = req.uri().path();
 
     // Parse ResourceId first
-    let location = if let Some(r) = ResourceLocation::parse(path) {
+    let location = if let Some(r) =
+        ResourceLocation::parse(path.strip_prefix(DAV_ROUTE_PREFIX).unwrap_or(path))
+    {
         r
     } else {
         debug!("Path does not conform to known ResourceId format");

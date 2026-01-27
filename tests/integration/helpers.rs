@@ -26,8 +26,180 @@ use salvo::http::{Method, ReqBody, StatusCode};
 use salvo::prelude::*;
 use salvo::test::{RequestBuilder, ResponseExt, TestClient};
 use shuriken::component::auth::casbin::CasbinEnforcerHandler;
+use shuriken::component::auth::{ResourceLocation, ResourceType};
 use shuriken::component::config::{Settings, load_config};
 use shuriken::component::db::connection::{DbConnection, DbProviderHandler};
+
+// ============================================================================
+// Path Construction Helpers
+// ============================================================================
+//
+// These helpers construct paths using ResourceLocation to ensure consistency
+// with route constants. All path building goes through ResourceLocation.
+
+/// Constructs a full CalDAV API path for a collection.
+///
+/// ## Example
+/// ```ignore
+/// caldav_collection_path("alice", "work") // => "/api/dav/cal/alice/work/"
+/// ```
+#[must_use]
+pub fn caldav_collection_path(owner: &str, collection: &str) -> String {
+    ResourceLocation::from_segments_collection(
+        ResourceType::Calendar,
+        owner.to_string(),
+        collection,
+    )
+    .to_full_path()
+}
+
+/// Constructs a full CalDAV API path for an item.
+///
+/// ## Example
+/// ```ignore
+/// caldav_item_path("alice", "work", "event.ics") // => "/api/dav/cal/alice/work/event.ics"
+/// ```
+#[must_use]
+pub fn caldav_item_path(owner: &str, collection: &str, item: &str) -> String {
+    ResourceLocation::from_segments_item(
+        ResourceType::Calendar,
+        owner.to_string(),
+        collection,
+        item.to_string(),
+    )
+    .to_full_path()
+}
+
+/// Constructs a full CardDAV API path for a collection.
+///
+/// ## Example
+/// ```ignore
+/// carddav_collection_path("bob", "contacts") // => "/api/dav/card/bob/contacts/"
+/// ```
+#[must_use]
+pub fn carddav_collection_path(owner: &str, collection: &str) -> String {
+    ResourceLocation::from_segments_collection(
+        ResourceType::Addressbook,
+        owner.to_string(),
+        collection,
+    )
+    .to_full_path()
+}
+
+/// Constructs a full CardDAV API path for an item.
+///
+/// ## Example
+/// ```ignore
+/// carddav_item_path("bob", "contacts", "john.vcf") // => "/api/dav/card/bob/contacts/john.vcf"
+/// ```
+#[must_use]
+pub fn carddav_item_path(owner: &str, collection: &str, item: &str) -> String {
+    ResourceLocation::from_segments_item(
+        ResourceType::Addressbook,
+        owner.to_string(),
+        collection,
+        item.to_string(),
+    )
+    .to_full_path()
+}
+
+/// Constructs a resource path for calendar resources (without DAV prefix).
+///
+/// ## Example
+/// ```ignore
+/// cal_path("alice", "work", Some("event.ics")) // => "/cal/alice/work/event.ics"
+/// cal_path("alice", "work", None) // => "/cal/alice/work/"
+/// ```
+#[must_use]
+pub fn cal_path(owner: &str, collection: &str, item: Option<&str>) -> String {
+    if let Some(item) = item {
+        ResourceLocation::from_segments_item(
+            ResourceType::Calendar,
+            owner.to_string(),
+            collection,
+            item.to_string(),
+        )
+        .to_resource_path()
+    } else {
+        ResourceLocation::from_segments_collection(
+            ResourceType::Calendar,
+            owner.to_string(),
+            collection,
+        )
+        .to_resource_path()
+    }
+}
+
+/// Constructs a resource path for addressbook resources (without DAV prefix).
+///
+/// ## Example
+/// ```ignore
+/// card_path("bob", "contacts", Some("john.vcf")) // => "/card/bob/contacts/john.vcf"
+/// card_path("bob", "contacts", None) // => "/card/bob/contacts/"
+/// ```
+#[must_use]
+pub fn card_path(owner: &str, collection: &str, item: Option<&str>) -> String {
+    if let Some(item) = item {
+        ResourceLocation::from_segments_item(
+            ResourceType::Addressbook,
+            owner.to_string(),
+            collection,
+            item.to_string(),
+        )
+        .to_resource_path()
+    } else {
+        ResourceLocation::from_segments_collection(
+            ResourceType::Addressbook,
+            owner.to_string(),
+            collection,
+        )
+        .to_resource_path()
+    }
+}
+
+/// Constructs a resource path for a calendar owner with glob (e.g., `/cal/alice/**`).
+#[must_use]
+pub fn cal_owner_glob(owner: &str, recursive: bool) -> String {
+    ResourceLocation::from_segments_owner_glob(ResourceType::Calendar, owner.to_string(), recursive)
+        .to_resource_path()
+}
+
+/// Constructs a resource path for a calendar collection with glob (e.g., `/cal/alice/work/**`).
+#[must_use]
+pub fn cal_collection_glob(owner: &str, collection: &str, recursive: bool) -> String {
+    ResourceLocation::from_segments_collection_glob(
+        ResourceType::Calendar,
+        owner.to_string(),
+        collection,
+        recursive,
+    )
+    .to_resource_path()
+}
+
+/// Constructs a resource path for an addressbook owner with glob (e.g., `/card/bob/**`).
+#[must_use]
+pub fn card_owner_glob(owner: &str, recursive: bool) -> String {
+    ResourceLocation::from_segments_owner_glob(
+        ResourceType::Addressbook,
+        owner.to_string(),
+        recursive,
+    )
+    .to_resource_path()
+}
+
+/// Constructs a resource path for an addressbook collection with glob (e.g., `/card/bob/contacts/**`).
+#[must_use]
+pub fn card_collection_glob(owner: &str, collection: &str, recursive: bool) -> String {
+    ResourceLocation::from_segments_collection_glob(
+        ResourceType::Addressbook,
+        owner.to_string(),
+        collection,
+        recursive,
+    )
+    .to_resource_path()
+}
+
+// ============================================================================
 
 /// Static reference to shared test service (initialized once per test run)
 static TEST_SERVICE: OnceLock<Service> = OnceLock::new();
