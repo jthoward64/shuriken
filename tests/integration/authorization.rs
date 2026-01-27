@@ -28,7 +28,7 @@ async fn get_returns_403_without_permission() {
 
     // Create a principal and collection
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -100,7 +100,7 @@ async fn get_returns_200_with_read_permission() {
 
     // Create a principal and collection
     let principal_id = test_db
-        .seed_principal("user", "/principals/bob/", Some("Bob"))
+        .seed_principal("user", "bob", Some("Bob"))
         .await
         .expect("Failed to seed principal");
 
@@ -173,7 +173,7 @@ async fn delete_returns_403_without_write_permission() {
         .expect("Failed to seed default policies");
 
     let principal_id = test_db
-        .seed_principal("user", "/principals/charlie/", Some("Charlie"))
+        .seed_principal("user", "charlie", Some("Charlie"))
         .await
         .expect("Failed to seed principal");
 
@@ -250,7 +250,7 @@ async fn delete_returns_204_with_write_permission() {
         .expect("Failed to seed default policies");
 
     let principal_id = test_db
-        .seed_principal("user", "/principals/dana/", Some("Dana"))
+        .seed_principal("user", "dana", Some("Dana"))
         .await
         .expect("Failed to seed principal");
 
@@ -322,7 +322,7 @@ async fn put_new_returns_403_without_collection_write_permission() {
         .expect("Failed to seed default policies");
 
     let principal_id = test_db
-        .seed_principal("user", "/principals/eve/", Some("Eve"))
+        .seed_principal("user", "eve", Some("Eve"))
         .await
         .expect("Failed to seed principal");
 
@@ -377,7 +377,7 @@ async fn put_update_returns_403_without_write_permission() {
         .expect("Failed to seed default policies");
 
     let principal_id = test_db
-        .seed_principal("user", "/principals/frank/", Some("Frank"))
+        .seed_principal("user", "frank", Some("Frank"))
         .await
         .expect("Failed to seed principal");
 
@@ -463,7 +463,7 @@ async fn propfind_returns_403_without_permission() {
         .expect("Failed to seed default policies");
 
     let principal_id = test_db
-        .seed_principal("user", "/principals/grace/", Some("Grace"))
+        .seed_principal("user", "grace", Some("Grace"))
         .await
         .expect("Failed to seed principal");
 
@@ -542,7 +542,7 @@ async fn proppatch_returns_403_without_write_permission() {
         .expect("Failed to seed default policies");
 
     let principal_id = test_db
-        .seed_principal("user", "/principals/henry/", Some("Henry"))
+        .seed_principal("user", "henry", Some("Henry"))
         .await
         .expect("Failed to seed principal");
 
@@ -631,7 +631,7 @@ async fn get_returns_200_with_owner_role_for_read_action() {
 
     // Create a principal and collection
     let principal_id = test_db
-        .seed_principal("user", "/principals/bob/", Some("Bob"))
+        .seed_principal("user", "bob", Some("Bob"))
         .await
         .expect("Failed to seed principal");
 
@@ -706,7 +706,7 @@ async fn get_returns_200_with_edit_role_for_read_action() {
         .expect("Failed to seed default policies");
 
     let principal_id = test_db
-        .seed_principal("user", "/principals/carol/", Some("Carol"))
+        .seed_principal("user", "carol", Some("Carol"))
         .await
         .expect("Failed to seed principal");
 
@@ -777,7 +777,7 @@ async fn delete_returns_204_with_edit_role() {
         .expect("Failed to seed default policies");
 
     let principal_id = test_db
-        .seed_principal("user", "/principals/dave/", Some("Dave"))
+        .seed_principal("user", "dave", Some("Dave"))
         .await
         .expect("Failed to seed principal");
 

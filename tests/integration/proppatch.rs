@@ -19,7 +19,7 @@ use super::helpers::*;
 async fn proppatch_returns_multistatus() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -49,7 +49,7 @@ async fn proppatch_returns_multistatus() {
 async fn proppatch_set_protected_prop_403() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -86,7 +86,7 @@ async fn proppatch_set_protected_prop_403() {
 async fn proppatch_remove_protected_prop_403() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -127,7 +127,7 @@ async fn proppatch_remove_protected_prop_403() {
 async fn proppatch_set_displayname_200() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -167,7 +167,7 @@ async fn proppatch_set_displayname_200() {
 async fn proppatch_set_calendar_description() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -203,7 +203,7 @@ async fn proppatch_set_calendar_description() {
 async fn proppatch_remove_displayname() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -239,7 +239,7 @@ async fn proppatch_remove_displayname() {
 async fn proppatch_set_multiple_props() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -280,7 +280,7 @@ async fn proppatch_set_multiple_props() {
 async fn proppatch_partial_success_207() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -342,7 +342,7 @@ async fn proppatch_nonexistent_404() {
 async fn proppatch_invalid_xml_400() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -367,7 +367,7 @@ async fn proppatch_invalid_xml_400() {
 async fn proppatch_empty_body_error() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 

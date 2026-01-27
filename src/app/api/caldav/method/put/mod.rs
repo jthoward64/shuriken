@@ -7,7 +7,8 @@ use salvo::{Depot, Request, Response, handler};
 
 use crate::app::api::dav::extract::auth::resource_id_for;
 use crate::component::auth::{
-    Action, ResourceType, authorizer_from_depot, get_subjects_from_depot,
+    Action, ResourceType, authorizer_from_depot, depot::get_terminal_collection_from_depot,
+    get_subjects_from_depot,
 };
 use crate::component::caldav::service::object::{PutObjectContext, put_calendar_object};
 use crate::component::db::connection;
@@ -41,6 +42,26 @@ pub async fn put(req: &mut Request, res: &mut Response, depot: &Depot) {
     // Get path before borrowing req mutably
     let path = req.uri().path().to_string();
 
+    // Get the collection from the depot (set by SlugResolverHandler)
+    let collection = match get_terminal_collection_from_depot(depot) {
+        Ok(c) => c.clone(),
+        Err(e) => {
+            tracing::error!(error = %e, "Terminal collection not found in depot");
+            res.status_code(StatusCode::NOT_FOUND);
+            return;
+        }
+    };
+
+    // Extract the resource slug from the path (last segment without extension)
+    let slug = match path::extract_resource_uri(&path) {
+        Ok(uri) => uri.trim_end_matches(".ics").to_string(),
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to extract resource URI from path");
+            res.status_code(StatusCode::BAD_REQUEST);
+            return;
+        }
+    };
+
     // Read request body
     let body = match req.payload().await {
         Ok(bytes) => bytes.to_vec(),
@@ -52,13 +73,6 @@ pub async fn put(req: &mut Request, res: &mut Response, depot: &Depot) {
     };
 
     tracing::debug!(bytes = body.len(), "Request body read successfully");
-
-    if let Ok(collection_id) = path::extract_collection_id(&path)
-        && collection_id.is_nil()
-    {
-        res.status_code(StatusCode::NOT_FOUND);
-        return;
-    }
 
     // Get database connection
     let provider = match connection::get_db_from_depot(depot) {
@@ -99,13 +113,22 @@ pub async fn put(req: &mut Request, res: &mut Response, depot: &Depot) {
     }
 
     // Check authorization: need write permission
-    if let Err(status) = check_put_authorization(depot, &mut conn, &path).await {
+    if let Err(status) = check_put_authorization(depot, &mut conn, collection.id, &slug).await {
         res.status_code(status);
         return;
     }
 
     // Perform the PUT operation
-    match perform_put(&mut conn, &path, &body, if_none_match, if_match).await {
+    match perform_put(
+        &mut conn,
+        collection.id,
+        &slug,
+        &body,
+        if_none_match,
+        if_match,
+    )
+    .await
+    {
         Ok(PutResult::Created(etag)) => {
             tracing::info!(etag = %etag, "Calendar object created");
             res.status_code(StatusCode::CREATED);
@@ -152,15 +175,12 @@ pub async fn put(req: &mut Request, res: &mut Response, depot: &Depot) {
 /// Returns `PutError` for validation failures, conflicts, or database errors.
 async fn perform_put(
     conn: &mut connection::DbConnection<'_>,
-    path: &str,
+    collection_id: uuid::Uuid,
+    slug: &str,
     body: &[u8],
     if_none_match: Option<String>,
     if_match: Option<String>,
 ) -> Result<PutResult, PutError> {
-    // Parse path to extract collection_id and uri
-    let (collection_id, uri) = path::parse_collection_and_uri(path)
-        .map_err(|e| PutError::InvalidCalendarData(format!("Invalid path: {e}")))?;
-
     // Parse iCalendar to extract UID early for context
     let ical_str = std::str::from_utf8(body)
         .map_err(|e| PutError::InvalidCalendarData(format!("not valid UTF-8: {e}")))?;
@@ -171,7 +191,7 @@ async fn perform_put(
     // Create PUT context
     let ctx = PutObjectContext {
         collection_id,
-        slug: uri.trim_end_matches(".ics").to_string(),
+        slug: slug.to_string(),
         entity_type: "calendar".to_string(),
         logical_uid,
         if_none_match,
@@ -214,20 +234,11 @@ async fn perform_put(
 async fn check_put_authorization(
     depot: &Depot,
     conn: &mut connection::DbConnection<'_>,
-    path: &str,
+    collection_id: uuid::Uuid,
+    slug: &str,
 ) -> Result<(), StatusCode> {
     use diesel::prelude::*;
     use diesel_async::RunQueryDsl;
-
-    // Parse path to extract collection_id and uri
-    let (collection_id, uri) = match path::parse_collection_and_uri(path) {
-        Ok(parsed) => parsed,
-        Err(e) => {
-            tracing::debug!(error = %e, path = %path, "Failed to parse path for authorization");
-            // Let the main handler deal with path parsing errors
-            return Ok(());
-        }
-    };
 
     // Get expanded subjects for the current user
     let subjects = get_subjects_from_depot(depot, conn).await.map_err(|e| {
@@ -236,7 +247,7 @@ async fn check_put_authorization(
     })?;
 
     // Try to load existing instance to determine if this is create or update
-    let existing: Option<DavInstance> = instance::by_collection_and_uri(collection_id, &uri)
+    let existing: Option<DavInstance> = instance::by_collection_and_uri(collection_id, slug)
         .select(DavInstance::as_select())
         .first::<DavInstance>(conn)
         .await
@@ -247,8 +258,8 @@ async fn check_put_authorization(
         })?;
 
     let resource = if let Some(_inst) = existing {
-        // Update: check permission on the entity URI within the collection
-        resource_id_for(ResourceType::Calendar, collection_id, Some(&uri))
+        // Update: check permission on the entity slug within the collection
+        resource_id_for(ResourceType::Calendar, collection_id, Some(slug))
     } else {
         // Create: check permission on the collection root
         resource_id_for(ResourceType::Calendar, collection_id, None)

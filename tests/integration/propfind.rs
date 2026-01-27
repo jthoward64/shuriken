@@ -17,7 +17,7 @@ use super::helpers::*;
 async fn propfind_returns_multistatus() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -43,7 +43,7 @@ async fn propfind_returns_multistatus() {
 async fn propfind_returns_valid_xml() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -76,7 +76,7 @@ async fn propfind_returns_valid_xml() {
 async fn propfind_depth0_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -129,7 +129,7 @@ async fn propfind_depth0_collection() {
 async fn propfind_depth1_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -182,7 +182,7 @@ async fn propfind_depth1_collection() {
 async fn propfind_depth_infinity() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -213,7 +213,7 @@ async fn propfind_depth_infinity() {
 async fn propfind_default_depth() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -244,7 +244,7 @@ async fn propfind_default_depth() {
 async fn propfind_known_props_200() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -279,7 +279,7 @@ async fn propfind_known_props_200() {
 async fn propfind_unknown_props_404() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -308,7 +308,7 @@ async fn propfind_unknown_props_404() {
 async fn propfind_mixed_props() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -354,7 +354,7 @@ async fn propfind_mixed_props() {
 async fn propfind_allprop_request() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -388,7 +388,7 @@ async fn propfind_allprop_request() {
 async fn propfind_propname() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -425,7 +425,7 @@ async fn propfind_propname() {
 async fn propfind_calendar_resourcetype() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -455,7 +455,7 @@ async fn propfind_calendar_resourcetype() {
 async fn propfind_addressbook_resourcetype() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/bob/", Some("Bob"))
+        .seed_principal("user", "bob", Some("Bob"))
         .await
         .expect("Failed to seed principal");
 
@@ -490,7 +490,7 @@ async fn propfind_getetag() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -537,7 +537,7 @@ async fn propfind_getetag() {
 async fn propfind_sync_token() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -585,7 +585,7 @@ async fn propfind_nonexistent_404() {
 async fn propfind_invalid_xml_400() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 

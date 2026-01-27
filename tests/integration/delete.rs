@@ -9,7 +9,7 @@ use super::helpers::*;
 
 async fn setup_calendar_index_cleanup(test_db: &TestDb) -> anyhow::Result<(uuid::Uuid, String)> {
     let principal_id = test_db
-        .seed_principal("user", "/principals/cal-clean/", Some("Cal Clean"))
+        .seed_principal("user", "cal-clean", Some("Cal Clean"))
         .await?;
 
     let collection_id = test_db
@@ -38,7 +38,7 @@ async fn setup_calendar_index_cleanup(test_db: &TestDb) -> anyhow::Result<(uuid:
 
 async fn setup_card_index_cleanup(test_db: &TestDb) -> anyhow::Result<(uuid::Uuid, String)> {
     let principal_id = test_db
-        .seed_principal("user", "/principals/card-clean/", Some("Card Clean"))
+        .seed_principal("user", "card-clean", Some("Card Clean"))
         .await?;
 
     let collection_id = test_db
@@ -138,7 +138,7 @@ async fn fetch_card_index_count(test_db: &TestDb, entity_id: uuid::Uuid) -> anyh
 async fn delete_calendar_object() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -178,7 +178,7 @@ async fn delete_calendar_object() {
 async fn delete_creates_tombstone() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -357,7 +357,7 @@ async fn delete_nonexistent_404() {
 async fn delete_idempotent() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -411,7 +411,7 @@ async fn delete_idempotent() {
 async fn delete_if_match_success() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -445,7 +445,7 @@ async fn delete_if_match_success() {
 async fn delete_if_match_mismatch_412() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -499,7 +499,7 @@ async fn delete_if_match_mismatch_412() {
 async fn delete_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -549,7 +549,7 @@ async fn delete_collection() {
 async fn delete_collection_no_orphans() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -614,7 +614,7 @@ async fn delete_collection_no_orphans() {
 async fn delete_bumps_synctoken() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 

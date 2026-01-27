@@ -137,10 +137,16 @@ pub fn authorizer_from_depot(depot: &salvo::Depot) -> AppResult<Authorizer> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::component::auth::ResourceType;
 
     #[test]
     fn authz_result_require() {
-        let resource = ResourceLocation::parse("/calendars/alice/personal/work.ics").unwrap();
+        let resource = ResourceLocation::from_segments_item(
+            ResourceType::Calendar,
+            "alice".to_string(),
+            "personal",
+            "work.ics".to_string(),
+        );
         let action = Action::Read;
 
         let allowed = AuthzResult::Allowed;

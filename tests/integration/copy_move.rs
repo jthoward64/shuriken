@@ -18,7 +18,7 @@ use super::helpers::*;
 async fn move_rename_item_updates_href() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -84,7 +84,7 @@ async fn move_rename_item_updates_href() {
 async fn move_within_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -132,7 +132,7 @@ async fn move_within_collection() {
 async fn move_across_collections() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -195,7 +195,7 @@ async fn move_across_collections() {
 async fn copy_duplicates_resource() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -250,7 +250,7 @@ async fn copy_duplicates_resource() {
 async fn copy_does_not_create_tombstone() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -305,7 +305,7 @@ async fn copy_does_not_create_tombstone() {
 async fn move_destination_exists_overwrite_false_412() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -370,7 +370,7 @@ async fn move_destination_exists_overwrite_false_412() {
 async fn move_destination_exists_overwrite_true_succeeds() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -444,7 +444,7 @@ async fn move_destination_exists_overwrite_true_succeeds() {
 async fn move_generates_tombstone() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -513,7 +513,7 @@ async fn move_generates_tombstone() {
 async fn move_without_destination_400() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 

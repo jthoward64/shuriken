@@ -19,6 +19,9 @@
 
 use std::sync::{Arc, OnceLock};
 
+/// Ensures stale test databases are cleaned up exactly once per test run.
+static STALE_DB_CLEANUP: OnceLock<()> = OnceLock::new();
+
 use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use salvo::http::header::HeaderName;
@@ -688,6 +691,13 @@ impl TestResponse {
     }
 }
 
+/// Helper struct for querying stale database names from pg_database.
+#[derive(QueryableByName)]
+struct StaleDbRow {
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    datname: String,
+}
+
 /// Database test helper for setup and teardown.
 ///
 /// ## Database Isolation
@@ -719,6 +729,22 @@ impl TestDb {
     /// Call `cleanup()` when the test is done to drop the database.
     pub async fn new() -> anyhow::Result<Self> {
         let base_url = get_base_database_url();
+
+        // Clean up stale test databases from previous failed runs (once per test run)
+        STALE_DB_CLEANUP.get_or_init(|| {
+            // Use a new runtime context since we're in a sync init
+            let url = base_url.clone();
+            std::thread::spawn(move || {
+                let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+                rt.block_on(async {
+                    if let Err(e) = Self::cleanup_stale_databases(&url).await {
+                        eprintln!("[TestDb] Warning: Failed to cleanup stale databases: {e}");
+                    }
+                });
+            })
+            .join()
+            .expect("Cleanup thread panicked");
+        });
 
         // Generate a unique database name using UUID
         let db_name = format!("shuriken_test_{}", uuid::Uuid::now_v7().simple());
@@ -779,6 +805,61 @@ impl TestDb {
             Ok::<_, anyhow::Error>(())
         })
         .await??;
+
+        Ok(())
+    }
+
+    /// Cleans up stale test databases from previous failed test runs.
+    ///
+    /// This finds all databases matching the `shuriken_test_*` pattern and drops them.
+    /// Called once per test run via `OnceLock` to avoid race conditions.
+    async fn cleanup_stale_databases(base_url: &str) -> anyhow::Result<()> {
+        let admin_url = format!("{base_url}/postgres");
+        let admin_config = diesel_async::pooled_connection::AsyncDieselConnectionManager::<
+            AsyncPgConnection,
+        >::new(&admin_url);
+        let admin_pool = diesel_async::pooled_connection::bb8::Pool::builder()
+            .max_size(1)
+            .build(admin_config)
+            .await?;
+
+        let mut admin_conn = admin_pool.get().await?;
+
+        // Find all stale test databases
+        let stale_dbs: Vec<String> = diesel::sql_query(
+            "SELECT datname FROM pg_database WHERE datname LIKE 'shuriken_test_%'",
+        )
+        .load::<StaleDbRow>(&mut admin_conn)
+        .await?
+        .into_iter()
+        .map(|row| row.datname)
+        .collect();
+
+        if stale_dbs.is_empty() {
+            return Ok(());
+        }
+
+        eprintln!(
+            "[TestDb] Cleaning up {} stale test database(s) from previous runs",
+            stale_dbs.len()
+        );
+
+        for db_name in stale_dbs {
+            // Terminate any active connections
+            let terminate_sql = format!(
+                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{db_name}'"
+            );
+            let _ = diesel::sql_query(&terminate_sql)
+                .execute(&mut admin_conn)
+                .await;
+
+            // Drop the database
+            let drop_sql = format!("DROP DATABASE IF EXISTS \"{db_name}\" WITH (FORCE)");
+            match diesel::sql_query(&drop_sql).execute(&mut admin_conn).await {
+                Ok(_) => eprintln!("[TestDb] Dropped stale database: {db_name}"),
+                Err(e) => eprintln!("[TestDb] Warning: Failed to drop {db_name}: {e}"),
+            }
+        }
 
         Ok(())
     }

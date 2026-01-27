@@ -13,28 +13,28 @@ use super::helpers::*;
 
 /// ## Summary
 /// Test that PUT creates a new calendar object.
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn put_creates_calendar_object() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
-    let collection_id = test_db
+    let _collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", Some("Personal"))
         .await
         .expect("Failed to seed collection");
 
-    let service = create_test_service();
+    let service = create_db_test_service(&test_db.url()).await;
 
     let ical = sample_icalendar_event("new-event@example.com", "Test Event");
-    let uri = format!("/api/caldav/{collection_id}/new-event.ics");
+    let uri = caldav_item_path("alice", "testcal", "new-event.ics");
 
     let response = TestRequest::put(&uri)
         .if_none_match("*")
         .icalendar_body(&ical)
-        .send(service)
+        .send(&service)
         .await;
 
     response.assert_status(StatusCode::CREATED);
@@ -46,7 +46,7 @@ async fn put_creates_calendar_object() {
 async fn put_creates_vcard() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/bob/", Some("Bob"))
+        .seed_principal("user", "bob", Some("Bob"))
         .await
         .expect("Failed to seed principal");
 
@@ -58,7 +58,7 @@ async fn put_creates_vcard() {
     let service = create_test_service();
 
     let vcard = sample_vcard("new-contact@example.com", "Jane Doe", "jane@example.com");
-    let uri = format!("/api/carddav/{collection_id}/new-contact.vcf");
+    let uri = carddav_item_path("bob", "contacts", "new-contact.vcf");
 
     let response = TestRequest::put(&uri)
         .if_none_match("*")
@@ -88,7 +88,7 @@ async fn put_populates_cal_index_and_occurrences() {
 
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/index-alice/", Some("Index Alice"))
+        .seed_principal("user", "index-alice", Some("Index Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -181,7 +181,7 @@ async fn put_populates_card_index() {
 
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/index-bob/", Some("Index Bob"))
+        .seed_principal("user", "index-bob", Some("Index Bob"))
         .await
         .expect("Failed to seed principal");
 
@@ -255,7 +255,7 @@ async fn put_populates_card_index() {
 async fn put_create_if_none_match_star_ok() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -286,7 +286,7 @@ async fn put_create_if_none_match_star_ok() {
 async fn put_create_if_none_match_star_fails_when_exists() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -336,7 +336,7 @@ async fn put_create_if_none_match_star_fails_when_exists() {
 async fn put_update_if_match_success() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -381,7 +381,7 @@ async fn put_update_if_match_success() {
 async fn put_update_if_match_mismatch_412() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -431,7 +431,7 @@ async fn put_update_if_match_mismatch_412() {
 async fn put_invalid_ical_rejected() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -466,7 +466,7 @@ async fn put_invalid_ical_rejected() {
 async fn put_invalid_vcard_rejected() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/bob/", Some("Bob"))
+        .seed_principal("user", "bob", Some("Bob"))
         .await
         .expect("Failed to seed principal");
 
@@ -505,7 +505,7 @@ async fn put_invalid_vcard_rejected() {
 async fn put_uid_conflict_rejected() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -559,7 +559,7 @@ async fn put_uid_conflict_rejected() {
 async fn put_bumps_synctoken() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -609,7 +609,7 @@ async fn put_bumps_synctoken() {
 async fn put_returns_etag() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -644,10 +644,11 @@ async fn put_returns_etag() {
 /// ## Summary
 /// Test that PUT updates ETag on modification.
 #[tokio::test]
+#[test_log::test]
 async fn put_updates_etag() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -710,7 +711,7 @@ async fn put_updates_etag() {
 async fn put_status_codes() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     let principal_id = test_db
-        .seed_principal("user", "/principals/alice/", Some("Alice"))
+        .seed_principal("user", "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
