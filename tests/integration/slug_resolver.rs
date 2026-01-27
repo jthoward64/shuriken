@@ -4,7 +4,7 @@
 //! Uses `tests/integration/helpers.rs` for database setup and request utilities.
 
 use super::helpers::TestDb;
-use shuriken::component::auth::ResourceId;
+use shuriken::component::auth::ResourceLocation;
 use shuriken::component::middleware::slug_resolver::resolve_path_for_testing;
 
 /// Resolves a calendar owner-only path and verifies principal resolution.
@@ -31,7 +31,7 @@ async fn resolve_owner_only_calendar_path() {
     assert_eq!(principal.slug, "alice");
 
     // Verify ResourceId shape
-    let resource_id: ResourceId = resource_id.expect("resource id present");
+    let resource_id: ResourceLocation = resource_id.expect("resource id present");
     assert!(resource_id.segments().len() >= 3);
 }
 

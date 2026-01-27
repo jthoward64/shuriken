@@ -7,7 +7,7 @@ pub use super::service::{Authorizer, AuthzResult, authorizer_from_depot};
 
 use crate::component::error::AppResult;
 
-use super::{action::Action, resource::ResourceId, subject::ExpandedSubjects};
+use super::{action::Action, resource::ResourceLocation, subject::ExpandedSubjects};
 
 /// Require ${action} access to a resource.
 ///
@@ -19,7 +19,7 @@ use super::{action::Action, resource::ResourceId, subject::ExpandedSubjects};
 pub fn handler_require(
     depot: &salvo::Depot,
     subjects: &ExpandedSubjects,
-    resource: &ResourceId,
+    resource: &ResourceLocation,
     action: Action,
 ) -> AppResult<()> {
     authorizer_from_depot(depot)?.require(subjects, resource, action)
@@ -33,7 +33,7 @@ pub fn handler_require(
 pub fn handler_check(
     depot: &salvo::Depot,
     subjects: &ExpandedSubjects,
-    resource: &ResourceId,
+    resource: &ResourceLocation,
     action: Action,
 ) -> AppResult<AuthzResult> {
     authorizer_from_depot(depot)?.check(subjects, resource, action)

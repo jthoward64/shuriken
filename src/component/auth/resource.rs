@@ -4,6 +4,8 @@
 //! Resources are identified by their path components, which can be converted to
 //! path strings for Casbin enforcement.
 
+use crate::app::api::{CALDAV_ROUTE_COMPONENT, CARDDAV_ROUTE_COMPONENT, DAV_ROUTE_PREFIX};
+
 /// Resource type for DAV collections.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ResourceType {
@@ -18,8 +20,8 @@ impl ResourceType {
     #[must_use]
     pub const fn as_path_segment(&self) -> &'static str {
         match self {
-            Self::Calendar => "calendars",
-            Self::Addressbook => "addressbooks",
+            Self::Calendar => CALDAV_ROUTE_COMPONENT,
+            Self::Addressbook => CARDDAV_ROUTE_COMPONENT,
         }
     }
 
@@ -27,8 +29,8 @@ impl ResourceType {
     #[must_use]
     pub fn from_path_segment(s: &str) -> Option<Self> {
         match s {
-            "calendars" => Some(Self::Calendar),
-            "addressbooks" => Some(Self::Addressbook),
+            CALDAV_ROUTE_COMPONENT => Some(Self::Calendar),
+            CARDDAV_ROUTE_COMPONENT => Some(Self::Addressbook),
             _ => None,
         }
     }
@@ -71,11 +73,11 @@ impl PathSegment {
 /// - `/calendars/alice/**` → `[ResourceType(Calendar), Owner("alice"), Glob { recursive: true }]`
 /// - `/addressbooks/bob/contacts/*` → `[ResourceType(Addressbook), Owner("bob"), Collection("contacts"), Glob { recursive: false }]`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ResourceId {
+pub struct ResourceLocation {
     segments: Vec<PathSegment>,
 }
 
-impl ResourceId {
+impl ResourceLocation {
     /// Create a new resource identifier from path segments.
     #[must_use]
     pub fn from_segments(segments: Vec<PathSegment>) -> Self {
@@ -213,6 +215,16 @@ impl ResourceId {
         path
     }
 
+    pub fn to_url(&self, serve_origin: &str) -> String {
+        let path = self.to_path();
+        format!(
+            "{}{}/{}",
+            serve_origin.trim_end_matches('/'),
+            DAV_ROUTE_PREFIX,
+            path
+        )
+    }
+
     /// Returns the segments of this resource path.
     #[must_use]
     pub fn segments(&self) -> &[PathSegment] {
@@ -252,13 +264,13 @@ impl ResourceId {
     }
 }
 
-impl std::fmt::Display for ResourceId {
+impl std::fmt::Display for ResourceLocation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.to_path())
     }
 }
 
-impl From<Vec<PathSegment>> for ResourceId {
+impl From<Vec<PathSegment>> for ResourceLocation {
     fn from(segments: Vec<PathSegment>) -> Self {
         Self::from_segments(segments)
     }
@@ -270,7 +282,7 @@ mod tests {
 
     #[test]
     fn parse_simple_path() {
-        let resource = ResourceId::parse("/calendars/alice/personal/work.ics").unwrap();
+        let resource = ResourceLocation::parse("/calendars/alice/personal/work.ics").unwrap();
         assert_eq!(resource.segments().len(), 4);
         assert_eq!(resource.resource_type(), Some(ResourceType::Calendar));
         assert_eq!(resource.owner(), Some("alice"));
@@ -279,7 +291,7 @@ mod tests {
 
     #[test]
     fn parse_recursive_glob() {
-        let resource = ResourceId::parse("/calendars/alice/**").unwrap();
+        let resource = ResourceLocation::parse("/calendars/alice/**").unwrap();
         assert_eq!(resource.segments().len(), 3);
         assert_eq!(
             resource.segments()[2],
@@ -290,7 +302,7 @@ mod tests {
 
     #[test]
     fn parse_single_glob() {
-        let resource = ResourceId::parse("/addressbooks/bob/contacts/*").unwrap();
+        let resource = ResourceLocation::parse("/addressbooks/bob/contacts/*").unwrap();
         assert_eq!(resource.segments().len(), 4);
         assert_eq!(
             resource.segments()[3],
@@ -301,7 +313,7 @@ mod tests {
 
     #[test]
     fn parse_addressbook_path() {
-        let resource = ResourceId::parse("/addressbooks/charlie/work/contact.vcf").unwrap();
+        let resource = ResourceLocation::parse("/addressbooks/charlie/work/contact.vcf").unwrap();
         assert_eq!(resource.resource_type(), Some(ResourceType::Addressbook));
         assert_eq!(resource.owner(), Some("charlie"));
         assert_eq!(resource.to_path(), "/addressbooks/charlie/work/contact.vcf");
@@ -318,7 +330,7 @@ mod tests {
         ];
 
         for path in paths {
-            let resource = ResourceId::parse(path).unwrap();
+            let resource = ResourceLocation::parse(path).unwrap();
             assert_eq!(resource.to_path(), path, "Roundtrip failed for {path}");
         }
     }
@@ -332,7 +344,7 @@ mod tests {
             PathSegment::Glob { recursive: true },
         ];
 
-        let resource = ResourceId::from_segments(segments);
+        let resource = ResourceLocation::from_segments(segments);
         assert_eq!(resource.to_path(), "/calendars/alice/personal/**");
     }
 
@@ -345,7 +357,7 @@ mod tests {
             PathSegment::Item("work.ics".to_string()),
         ];
 
-        let resource = ResourceId::from_segments(segments);
+        let resource = ResourceLocation::from_segments(segments);
         assert_eq!(resource.to_path(), "/calendars/alice/personal/work.ics");
     }
 
@@ -357,25 +369,25 @@ mod tests {
             PathSegment::Collection("contacts".to_string()),
         ];
 
-        let resource = ResourceId::from_segments(segments);
+        let resource = ResourceLocation::from_segments(segments);
         assert_eq!(resource.to_path(), "/addressbooks/bob/contacts/");
     }
 
     #[test]
     fn invalid_path_returns_none() {
-        assert!(ResourceId::parse("").is_none());
-        assert!(ResourceId::parse("/").is_none());
-        assert!(ResourceId::parse("/invalid").is_none());
+        assert!(ResourceLocation::parse("").is_none());
+        assert!(ResourceLocation::parse("/").is_none());
+        assert!(ResourceLocation::parse("/invalid").is_none());
     }
 
     #[test]
     fn glob_must_be_terminal() {
-        assert!(ResourceId::parse("/calendars/alice/**/extra").is_none());
-        assert!(ResourceId::parse("/calendars/alice/*/extra").is_none());
+        assert!(ResourceLocation::parse("/calendars/alice/**/extra").is_none());
+        assert!(ResourceLocation::parse("/calendars/alice/*/extra").is_none());
     }
 
     #[test]
     fn item_must_be_terminal() {
-        assert!(ResourceId::parse("/calendars/alice/work.ics/extra").is_none());
+        assert!(ResourceLocation::parse("/calendars/alice/work.ics/extra").is_none());
     }
 }

@@ -6,7 +6,7 @@ use salvo::Depot;
 use salvo::http::StatusCode;
 
 use crate::component::auth::{
-    Action, Authorizer, ExpandedSubjects, PathSegment, ResourceId, ResourceType,
+    Action, Authorizer, ExpandedSubjects, PathSegment, ResourceLocation, ResourceType,
     authorizer_from_depot, get_subjects_from_depot,
 };
 use crate::component::db::connection::DbConnection;
@@ -100,7 +100,7 @@ pub fn resource_id_for(
     resource_type: ResourceType,
     collection_id: uuid::Uuid,
     uri: Option<&str>,
-) -> ResourceId {
+) -> ResourceLocation {
     let mut segments = vec![
         PathSegment::ResourceType(resource_type),
         PathSegment::Owner(collection_id.to_string()),
@@ -113,7 +113,7 @@ pub fn resource_id_for(
         segments.push(PathSegment::Glob { recursive: true });
     }
 
-    ResourceId::from_segments(segments)
+    ResourceLocation::from_segments(segments)
 }
 
 /// ## Summary
@@ -125,7 +125,7 @@ pub fn resource_id_for(
 pub fn check_authorization(
     authorizer: &Authorizer,
     subjects: &ExpandedSubjects,
-    resource: &ResourceId,
+    resource: &ResourceLocation,
     action: Action,
     operation_name: &str,
 ) -> Result<(), StatusCode> {

@@ -21,6 +21,12 @@ pub struct DavCollection {
     pub parent_collection_id: Option<uuid::Uuid>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DavCollectionWithParent {
+    pub collection: DavCollection,
+    pub parent_collection: Option<Box<DavCollection>>,
+}
+
 /// Insert struct for creating new DAV collections
 #[derive(Debug, Clone, Insertable)]
 #[diesel(table_name = schema::dav_collection)]

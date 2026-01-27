@@ -9,7 +9,7 @@ use casbin::CoreApi;
 
 use crate::component::error::{AppError, AppResult};
 
-use super::{action::Action, resource::ResourceId, subject::ExpandedSubjects};
+use super::{action::Action, resource::ResourceLocation, subject::ExpandedSubjects};
 
 /// Result of an authorization check.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,7 +32,7 @@ impl AuthzResult {
     /// ## Errors
     ///
     /// Returns `AuthorizationError` if access is denied.
-    pub fn require(self, resource: &ResourceId, action: &Action) -> AppResult<()> {
+    pub fn require(self, resource: &ResourceLocation, action: &Action) -> AppResult<()> {
         match self {
             Self::Allowed => Ok(()),
             Self::Denied => Err(AppError::AuthorizationError(format!(
@@ -82,7 +82,7 @@ impl Authorizer {
     pub fn check(
         &self,
         subjects: &ExpandedSubjects,
-        resource: &ResourceId,
+        resource: &ResourceLocation,
         action: Action,
     ) -> AppResult<AuthzResult> {
         let path = resource.to_path();
@@ -116,7 +116,7 @@ impl Authorizer {
     pub fn require(
         &self,
         subjects: &ExpandedSubjects,
-        resource: &ResourceId,
+        resource: &ResourceLocation,
         action: Action,
     ) -> AppResult<()> {
         self.check(subjects, resource, action)?
@@ -140,7 +140,7 @@ mod tests {
 
     #[test]
     fn authz_result_require() {
-        let resource = ResourceId::parse("/calendars/alice/personal/work.ics").unwrap();
+        let resource = ResourceLocation::parse("/calendars/alice/personal/work.ics").unwrap();
         let action = Action::Read;
 
         let allowed = AuthzResult::Allowed;

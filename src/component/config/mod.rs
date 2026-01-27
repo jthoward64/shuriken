@@ -48,6 +48,26 @@ pub struct DatabaseConfig {
 pub struct ServerConfig {
     pub host: String,
     pub port: u16,
+    pub serve_origin: Option<String>,
+}
+
+impl ServerConfig {
+    /// ## Summary
+    /// Returns the server address as a string in the format "host:port".
+    #[must_use]
+    pub fn address(&self) -> String {
+        format!("{}:{}", self.host, self.port)
+    }
+
+    /// ## Summary
+    /// Returns the server origin URL.
+    pub fn origin(&self) -> String {
+        if let Some(origin) = &self.serve_origin {
+            origin.clone()
+        } else {
+            format!("http://{}", self.address())
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]

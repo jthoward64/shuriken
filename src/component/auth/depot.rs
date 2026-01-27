@@ -15,6 +15,17 @@ use crate::component::{
 
 use super::subject::ExpandedSubjects;
 
+pub mod depot_keys {
+    pub const AUTHENTICATED_PRINCIPAL: &str = "__authenticated_principal";
+
+    pub const RESOLVED_LOCATION: &str = "__resolved_location";
+
+    pub const OWNER_PRINCIPAL: &str = "__owner_principal";
+    pub const COLLECTION_CHAIN: &str = "__collection_chain";
+    pub const TERMINAL_COLLECTION: &str = "__terminal_collection";
+    pub const INSTANCE: &str = "__instance";
+}
+
 /// Get the authenticated user from the depot.
 ///
 /// ## Errors
@@ -24,7 +35,7 @@ pub fn get_user_from_depot(
     depot: &salvo::Depot,
 ) -> AppResult<&crate::component::model::user::User> {
     let depot_user = depot
-        .get::<DepotUser>("user")
+        .get::<DepotUser>(depot_keys::AUTHENTICATED_PRINCIPAL)
         .map_err(|_e| AppError::NotAuthenticated)?;
 
     match depot_user {
@@ -112,25 +123,6 @@ pub async fn get_subjects_from_depot(
     }
 }
 
-/// Get the resolved ResourceId from the depot.
-///
-/// The slug resolver middleware should populate this when it resolves the request path.
-///
-/// ## Errors
-///
-/// Returns an error if no ResourceId is found in the depot.
-pub fn get_resource_id_from_depot(depot: &salvo::Depot) -> AppResult<&super::ResourceId> {
-    depot
-        .get::<super::ResourceId>(
-            crate::component::middleware::slug_resolver::depot_keys::RESOURCE_ID,
-        )
-        .map_err(|_| {
-            AppError::NotFound(
-                "ResourceId not found in depot - slug resolver may not have run".to_string(),
-            )
-        })
-}
-
 /// Get the resolved owner `Principal` from the depot.
 ///
 /// ## Errors
@@ -139,14 +131,23 @@ pub fn get_owner_principal_from_depot(
     depot: &salvo::Depot,
 ) -> AppResult<&crate::component::model::principal::Principal> {
     depot
-        .get::<crate::component::model::principal::Principal>(
-            crate::component::middleware::slug_resolver::depot_keys::OWNER_PRINCIPAL,
-        )
+        .get::<crate::component::model::principal::Principal>(depot_keys::OWNER_PRINCIPAL)
         .map_err(|_| AppError::NotFound("Owner principal not found in depot".to_string()))
 }
 
-/// Get the precedence-ordered collection chain from the depot.
-/// Deepest collection first, then parents up to root.
+/// Get the resolved resource location from the depot.
+///
+/// ## Errors
+/// Returns `NotFound` if the location is not present.
+pub fn get_resolved_location_from_depot(
+    depot: &salvo::Depot,
+) -> AppResult<&crate::component::auth::ResourceLocation> {
+    depot
+        .get::<crate::component::auth::ResourceLocation>(depot_keys::RESOLVED_LOCATION)
+        .map_err(|_| AppError::NotFound("Resolved location not found in depot".to_string()))
+}
+
+/// Get the resolved collection chain from the depot.
 ///
 /// ## Errors
 /// Returns `NotFound` if the collection chain is not present.
@@ -155,45 +156,33 @@ pub fn get_collection_chain_from_depot(
 ) -> AppResult<&Vec<crate::component::model::dav::collection::DavCollection>> {
     depot
         .get::<Vec<crate::component::model::dav::collection::DavCollection>>(
-            crate::component::middleware::slug_resolver::depot_keys::COLLECTION,
+            depot_keys::COLLECTION_CHAIN,
         )
         .map_err(|_| AppError::NotFound("Collection chain not found in depot".to_string()))
 }
 
-/// Get the final resolved collection id from the depot.
+/// Get the resolved terminal collection from the depot.
 ///
 /// ## Errors
-/// Returns `NotFound` if the id is not present.
-pub fn get_parsed_collection_id_from_depot(depot: &salvo::Depot) -> AppResult<uuid::Uuid> {
+/// Returns `NotFound` if the terminal collection is not present.
+pub fn get_terminal_collection_from_depot(
+    depot: &salvo::Depot,
+) -> AppResult<&crate::component::model::dav::collection::DavCollection> {
     depot
-        .get::<uuid::Uuid>(
-            crate::component::middleware::slug_resolver::depot_keys::PARSED_COLLECTION_ID,
+        .get::<crate::component::model::dav::collection::DavCollection>(
+            depot_keys::TERMINAL_COLLECTION,
         )
-        .map(|id| *id)
-        .map_err(|_| AppError::NotFound("Collection id not found in depot".to_string()))
+        .map_err(|_| AppError::NotFound("Terminal collection not found in depot".to_string()))
 }
 
-/// Get the parsed instance slug from the depot if present.
+/// Get the resolved instance from the depot.
 ///
 /// ## Errors
-/// Returns `NotFound` if the slug is not present.
-pub fn get_parsed_instance_slug_from_depot(depot: &salvo::Depot) -> AppResult<String> {
-    depot
-        .get::<String>(
-            crate::component::middleware::slug_resolver::depot_keys::PARSED_INSTANCE_SLUG,
-        )
-        .map(|s| s.clone())
-        .map_err(|_| AppError::NotFound("Instance slug not found in depot".to_string()))
-}
-
-/// Get the resolved instance from the depot if present.
-#[must_use]
+/// Returns `NotFound` if the instance is not present.
 pub fn get_instance_from_depot(
     depot: &salvo::Depot,
-) -> Option<&crate::component::model::dav::instance::DavInstance> {
+) -> AppResult<&crate::component::model::dav::instance::DavInstance> {
     depot
-        .get::<crate::component::model::dav::instance::DavInstance>(
-            crate::component::middleware::slug_resolver::depot_keys::INSTANCE,
-        )
-        .ok()
+        .get::<crate::component::model::dav::instance::DavInstance>(depot_keys::INSTANCE)
+        .map_err(|_| AppError::NotFound("Instance not found in depot".to_string()))
 }

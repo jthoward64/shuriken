@@ -20,25 +20,14 @@ use tracing::{debug, warn};
 
 #[cfg(test)]
 use crate::component::auth::ResourceType;
-use crate::component::auth::{PathSegment, ResourceId};
+use crate::component::auth::depot::depot_keys;
+use crate::component::auth::{PathSegment, ResourceLocation};
 use crate::component::db::connection::DbConnection;
 use crate::component::db::query::dav::instance;
 use crate::component::db::schema::{dav_collection, dav_instance, principal};
-use crate::component::model::dav::collection::DavCollection;
+use crate::component::model::dav::collection::{DavCollection, DavCollectionWithParent};
 use crate::component::model::dav::instance::DavInstance;
 use crate::component::model::principal::Principal;
-
-/// Depot keys for storing resolved path entities
-pub mod depot_keys {
-    pub const OWNER_PRINCIPAL: &str = "__owner_principal";
-    // COLLECTION now stores a `Vec<DavCollection>` ordered by precedence
-    // (most-specific/deepest first, then parents up to root).
-    pub const COLLECTION: &str = "__collection";
-    pub const INSTANCE: &str = "__instance";
-    pub const RESOURCE_ID: &str = "__resource_id";
-    pub const PARSED_COLLECTION_ID: &str = "__parsed_collection_id";
-    pub const PARSED_INSTANCE_SLUG: &str = "__parsed_instance_slug";
-}
 
 /// Resolves path components and preloads entities into the depot.
 ///
@@ -47,145 +36,125 @@ pub mod depot_keys {
 ///
 /// ## Errors
 /// Returns an error if database operations fail during entity resolution.
+#[tracing::instrument(skip_all, fields(path = %req.uri().path()))]
 pub async fn resolve_path_and_load_entities(
     req: &salvo::Request,
     depot: &mut Depot,
     conn: &mut DbConnection<'_>,
 ) -> anyhow::Result<()> {
     let path = req.uri().path();
-    debug!(path = %path, "Resolving path via ResourceId or API DAV parser");
 
-    // Try canonical ResourceId parse first
-    let resource_opt = ResourceId::parse(path);
-
-    // Fallback: parse API DAV style paths like
-    // /api/dav/{caldav|carddav}/{collection_id}/{item?}
-    // or /api/{caldav|carddav}/{collection_id}/{item?}
-    let (resource_type_opt, collection_id_opt, item_slug_opt) = if resource_opt.is_none() {
-        parse_api_dav_path(path)
-    } else {
-        (None, None, None)
+    // Parse ResourceId first
+    let location = match ResourceLocation::parse(path) {
+        Some(r) => r,
+        None => {
+            debug!("Path does not conform to known ResourceId format");
+            return Ok(());
+        }
     };
 
-    if resource_opt.is_none() && resource_type_opt.is_none() {
-        debug!("Path does not parse into ResourceId or API DAV style; skipping resolution");
-        return Ok(());
-    }
-
-    // Extract identifiers either from ResourceId or API DAV
+    // Extract identifiers from ResourceId segments
+    let mut resource_type_opt: Option<crate::component::auth::ResourceType> = None;
     let mut owner_opt: Option<String> = None;
     let mut collection_segments: Vec<String> = Vec::new();
     let mut item_opt: Option<String> = None;
-    let mut resource_type_for_api: Option<crate::component::auth::ResourceType> = None;
-    let mut collection_id_for_api: Option<uuid::Uuid> = None;
 
-    if let Some(resource) = &resource_opt {
-        debug!(resource = %resource, "Parsed ResourceId");
-        for seg in resource.segments() {
-            match seg {
-                PathSegment::Owner(s) => owner_opt = Some(s.clone()),
-                PathSegment::Collection(s) => collection_segments.push(s.clone()),
-                PathSegment::Item(s) => {
-                    let cleaned = s
-                        .trim_end_matches(".ics")
-                        .trim_end_matches(".vcf")
-                        .to_string();
-                    item_opt = Some(cleaned);
-                }
-                PathSegment::ResourceType(_) | PathSegment::Glob { .. } => {}
+    for seg in location.segments() {
+        match seg {
+            PathSegment::ResourceType(rt) => resource_type_opt = Some(*rt),
+            PathSegment::Owner(s) => owner_opt = Some(s.clone()),
+            PathSegment::Collection(s) => collection_segments.push(s.clone()),
+            PathSegment::Item(s) => {
+                let cleaned = s
+                    .trim_end_matches(".ics")
+                    .trim_end_matches(".vcf")
+                    .to_string();
+                item_opt = Some(cleaned);
             }
-        }
-    } else if let (Some(rt), Some(cid)) = (resource_type_opt, collection_id_opt) {
-        resource_type_for_api = Some(rt);
-        collection_id_for_api = Some(cid);
-        if let Some(item) = item_slug_opt {
-            let cleaned = item
-                .trim_end_matches(".ics")
-                .trim_end_matches(".vcf")
-                .to_string();
-            item_opt = Some(cleaned);
+            PathSegment::Glob { .. } => {
+                tracing::error!("Glob segments are not supported in slug resolution");
+                return Ok(());
+            }
         }
     }
 
-    // Resolve owner principal (by slug or by collection owner if API path)
-    let owner_principal = if let Some(ref owner_str) = owner_opt {
-        resolve_principal(conn, owner_str).await?
-    } else if let Some(cid) = collection_id_for_api {
-        let coll = dav_collection::table
-            .filter(dav_collection::id.eq(cid))
-            .filter(dav_collection::deleted_at.is_null())
-            .select(DavCollection::as_select())
-            .first(conn)
-            .await
-            .optional()?;
-        match coll {
-            Some(c) => resolve_principal_by_id(conn, c.owner_principal_id).await?,
-            None => None,
+    let resource_type = match resource_type_opt {
+        Some(rt) => rt,
+        None => {
+            warn!("No resource type segment found in path");
+            return Ok(());
+        }
+    };
+
+    // Resolve principal
+    let owner_principal = match owner_opt {
+        Some(ref owner) => match resolve_principal(conn, owner).await? {
+            Some(p) => {
+                depot.insert(depot_keys::OWNER_PRINCIPAL, p.clone());
+                p
+            }
+            None => {
+                warn!("Owner principal not found for identifier: {}", owner);
+                return Ok(());
+            }
+        },
+        None => {
+            warn!("No owner segment found in path");
+            return Ok(());
+        }
+    };
+
+    // Resolve collection(s) if present
+    let collection_entity =
+        load_collection_hierarchy(conn, collection_segments, owner_principal.clone()).await?;
+    if let Some(ref coll_with_parent) = collection_entity {
+        depot.insert(depot_keys::COLLECTION_CHAIN, coll_with_parent.clone());
+        depot.insert(
+            depot_keys::TERMINAL_COLLECTION,
+            coll_with_parent.collection.clone(),
+        );
+    }
+
+    // Resolve instance if present
+    let instance_entity = if let (Some(inst_slug), Some(coll_with_parent)) =
+        (item_opt.as_ref(), &collection_entity)
+    {
+        match resolve_instance(conn, coll_with_parent.collection.id, inst_slug).await? {
+            Some(inst) => {
+                depot.insert(depot_keys::INSTANCE, inst.clone());
+                Some(inst)
+            }
+            None => {
+                warn!(
+                    "Instance not found for slug: {} in collection ID: {}",
+                    inst_slug, coll_with_parent.collection.id
+                );
+                return Ok(());
+            }
         }
     } else {
         None
     };
 
-    if let Some(ref principal) = owner_principal {
-        debug!(principal_id = %principal.id, slug = %principal.slug, "Resolved owner principal");
-        depot.insert(depot_keys::OWNER_PRINCIPAL, principal.clone());
-    } else {
-        if let Some(ref owner_slug) = owner_opt {
-            warn!(owner = %owner_slug, "Owner principal not found");
-        } else if let Some(cid) = collection_id_for_api {
-            warn!(collection_id = %cid, "Owner principal not found for collection id");
+    // Build and store normalized ResourceLocation
+    let mut segments = vec![
+        PathSegment::ResourceType(resource_type),
+        PathSegment::Owner(owner_principal.id.to_string()),
+    ];
+    if let Some(coll_with_parent) = &collection_entity {
+        segments.push(PathSegment::Collection(
+            coll_with_parent.collection.id.to_string(),
+        ));
+
+        if let Some(inst) = &instance_entity {
+            segments.push(PathSegment::Item(inst.id.to_string()));
         } else {
-            warn!("Owner principal not found");
-        }
-        return Ok(()); // Principal not found, handlers will return 404
-    }
-
-    // Resolve collection chain either by slug segments or by collection id
-    let collection_entity = if collection_id_for_api.is_some() {
-        let coll = load_collection_chain_by_id(depot, conn, collection_id_for_api.unwrap()).await?;
-        coll
-    } else {
-        load_collection_hierarchy(depot, conn, collection_segments, owner_principal.clone()).await?
-    };
-
-    // Resolve instance if present
-    if let (Some(inst_slug), Some(coll)) = (item_opt.as_ref(), &collection_entity) {
-        let inst = resolve_instance(conn, coll.id, inst_slug).await?;
-        if let Some(ref i) = inst {
-            debug!(instance_id = %i.id, slug = %i.slug, "Resolved instance");
-            depot.insert(depot_keys::INSTANCE, i.clone());
-            depot.insert(depot_keys::PARSED_INSTANCE_SLUG, i.slug.clone());
+            segments.push(PathSegment::Glob { recursive: true });
         }
     }
 
-    // Store constructed ResourceId for authorization
-    let resource = if let Some(r) = resource_opt {
-        r
-    } else {
-        // Build ResourceId from API path using resolved principal + chain
-        if let (Some(principal), Some(rt)) = (owner_principal.clone(), resource_type_for_api) {
-            let mut segments = Vec::new();
-            segments.push(PathSegment::ResourceType(rt));
-            segments.push(PathSegment::Owner(principal.slug.clone()));
-            // Build collection segments from chain stored in depot (root-first)
-            if let Ok(chain) = depot.get::<Vec<DavCollection>>(depot_keys::COLLECTION) {
-                let mut chain_clone: Vec<DavCollection> = chain.clone();
-                // Currently stored deepest-first; reverse to root-first for ResourceId path
-                chain_clone.reverse();
-                for c in &chain_clone {
-                    segments.push(PathSegment::Collection(c.slug.clone()));
-                }
-            }
-            if let Some(item) = &item_opt {
-                segments.push(PathSegment::Item(item.clone()));
-            }
-            ResourceId::from_segments(segments)
-        } else {
-            // Insufficient data to construct ResourceId
-            return Ok(());
-        }
-    };
-    depot.insert(depot_keys::RESOURCE_ID, resource);
+    let resolved_location = ResourceLocation::from_segments(segments);
+    depot.insert(depot_keys::RESOLVED_LOCATION, resolved_location);
 
     Ok(())
 }
@@ -233,114 +202,48 @@ fn parse_api_dav_path(
     (Some(rt), collection_id, item_slug)
 }
 
-async fn resolve_principal_by_id(
-    conn: &mut DbConnection<'_>,
-    principal_id: uuid::Uuid,
-) -> anyhow::Result<Option<Principal>> {
-    let row = principal::table
-        .filter(principal::id.eq(principal_id))
-        .select(Principal::as_select())
-        .first(conn)
-        .await
-        .optional()?;
-    Ok(row)
-}
-
-async fn load_collection_chain_by_id(
-    depot: &mut Depot,
-    conn: &mut DbConnection<'_>,
-    collection_id: uuid::Uuid,
-) -> anyhow::Result<Option<DavCollection>> {
-    // Load starting collection
-    let mut current = dav_collection::table
-        .filter(dav_collection::id.eq(collection_id))
-        .filter(dav_collection::deleted_at.is_null())
-        .select(DavCollection::as_select())
-        .first(conn)
-        .await
-        .optional()?;
-
-    let mut chain: Vec<DavCollection> = Vec::new();
-    while let Some(coll) = current {
-        chain.push(coll.clone());
-        if let Some(parent_id) = coll.parent_collection_id {
-            current = dav_collection::table
-                .filter(dav_collection::id.eq(parent_id))
-                .filter(dav_collection::deleted_at.is_null())
-                .select(DavCollection::as_select())
-                .first(conn)
-                .await
-                .optional()?;
-        } else {
-            break;
-        }
-    }
-
-    if let Some(last) = chain.as_slice().first() {
-        // `chain` is deepest-first because we started from requested collection
-        debug!(collection_id = %last.id, slug = %last.slug, depth = chain.len(), "Resolved collection chain by id");
-        depot.insert(depot_keys::COLLECTION, chain.clone());
-        depot.insert(depot_keys::PARSED_COLLECTION_ID, last.id);
-        Ok(Some(last.clone()))
-    } else {
-        Ok(None)
-    }
-}
-
 async fn load_collection_hierarchy(
-    depot: &mut Depot,
     conn: &mut DbConnection<'_>,
     collection_segments: Vec<String>,
-    owner_principal: Option<Principal>,
-) -> Result<Option<DavCollection>, anyhow::Error> {
-    let collection_entity = if let (false, Some(principal)) =
-        (collection_segments.is_empty(), &owner_principal)
-    {
-        let mut current_parent: Option<uuid::Uuid> = None;
-        let mut chain: Vec<DavCollection> = Vec::new();
-        for slug in &collection_segments {
-            let mut query = dav_collection::table
-                .filter(dav_collection::owner_principal_id.eq(principal.id))
-                .filter(dav_collection::slug.eq(slug.as_str()))
-                .filter(dav_collection::deleted_at.is_null())
-                .into_boxed();
+    principal: Principal,
+) -> Result<Option<DavCollectionWithParent>, anyhow::Error> {
+    let mut current_parent: Option<uuid::Uuid> = None;
+    let mut resolved: Option<DavCollectionWithParent> = None;
+    for slug in &collection_segments {
+        let mut query = dav_collection::table
+            .filter(dav_collection::owner_principal_id.eq(principal.id))
+            .filter(dav_collection::slug.eq(slug.as_str()))
+            .filter(dav_collection::deleted_at.is_null())
+            .into_boxed();
 
-            query = if let Some(parent_id) = current_parent {
-                query.filter(dav_collection::parent_collection_id.eq(parent_id))
-            } else {
-                query.filter(dav_collection::parent_collection_id.is_null())
-            };
+        // Enforce proper parent linkage
+        query = if let Some(parent_id) = current_parent {
+            query.filter(dav_collection::parent_collection_id.eq(parent_id))
+        } else {
+            query.filter(dav_collection::parent_collection_id.is_null())
+        };
 
-            let found = query
-                .select(DavCollection::as_select())
-                .first(conn)
-                .await
-                .optional()?;
-            match found {
-                Some(c) => {
-                    current_parent = Some(c.id);
-                    chain.push(c);
-                }
-                None => {
-                    break;
-                }
+        let found = query
+            .select(DavCollection::as_select())
+            .first(conn)
+            .await
+            .optional()?;
+        match found {
+            Some(c) => {
+                current_parent = Some(c.id);
+                resolved = Some(DavCollectionWithParent {
+                    collection: c,
+                    parent_collection: resolved.map(|r| Box::new(r.collection.clone())),
+                });
+            }
+            None => {
+                resolved = None;
+                break;
             }
         }
+    }
 
-        if let Some(last) = chain.last() {
-            debug!(collection_id = %last.id, slug = %last.slug, depth = chain.len(), "Resolved collection chain");
-            let mut precedence = chain.clone();
-            precedence.reverse();
-            depot.insert(depot_keys::COLLECTION, precedence);
-            depot.insert(depot_keys::PARSED_COLLECTION_ID, last.id);
-            Some(last.clone())
-        } else {
-            None
-        }
-    } else {
-        None
-    };
-    Ok(collection_entity)
+    Ok(resolved)
 }
 
 /// Test-friendly resolver that accepts a raw path string.
@@ -358,9 +261,9 @@ pub async fn resolve_path_for_testing(
     Option<Principal>,
     Option<DavCollection>,
     Option<DavInstance>,
-    Option<ResourceId>,
+    Option<ResourceLocation>,
 )> {
-    let resource = match ResourceId::parse(path) {
+    let resource = match ResourceLocation::parse(path) {
         Some(r) => r,
         None => return Ok((None, None, None, None)),
     };
@@ -492,7 +395,6 @@ async fn resolve_principal(
 }
 
 /// Resolve an instance by slug or UUID.
-#[cfg_attr(test, allow(dead_code))]
 async fn resolve_instance(
     conn: &mut DbConnection<'_>,
     collection_id: uuid::Uuid,
@@ -520,14 +422,14 @@ async fn resolve_instance(
         .map_err(Into::into)
 }
 
-/// Build a ResourceId for authorization from resolved entities.
+/// Build a `ResourceId` for authorization from resolved entities.
 #[cfg(test)]
 fn build_resource_id(
     resource_type: ResourceType,
     principal: &Principal,
     collection: Option<&DavCollection>,
     instance_slug: Option<&str>,
-) -> ResourceId {
+) -> ResourceLocation {
     let mut segments = vec![
         PathSegment::ResourceType(resource_type),
         PathSegment::Owner(principal.slug.clone()),
@@ -547,8 +449,57 @@ fn build_resource_id(
         segments.push(PathSegment::Glob { recursive: true });
     }
 
-    ResourceId::from_segments(segments)
+    ResourceLocation::from_segments(segments)
 }
+
+/// ## Summary
+/// Salvo handler wrapper for path resolution middleware.
+///
+/// Resolves slug-based paths and populates the depot with ResourceId and entity data
+/// for downstream handlers to use in authorization and request processing.
+#[salvo::async_trait]
+impl salvo::Handler for SlugResolverHandler {
+    async fn handle(
+        &self,
+        req: &mut salvo::Request,
+        depot: &mut Depot,
+        _res: &mut salvo::Response,
+        _ctrl: &mut salvo::FlowCtrl,
+    ) {
+        let path = req.uri().path();
+        tracing::debug!(path = %path, "SlugResolverHandler executing");
+
+        let db_provider = match crate::component::db::connection::get_db_from_depot(depot) {
+            Ok(provider) => provider,
+            Err(e) => {
+                tracing::debug!(error = %e, "Database provider not available in slug_resolver middleware");
+                return;
+            }
+        };
+
+        let mut conn = match db_provider.get_connection().await {
+            Ok(conn) => conn,
+            Err(e) => {
+                tracing::debug!(error = %e, "Failed to get database connection in slug_resolver middleware");
+                return;
+            }
+        };
+
+        match resolve_path_and_load_entities(req, depot, &mut conn).await {
+            Ok(()) => {
+                tracing::debug!(path = %path, "Path resolved successfully");
+            }
+            Err(e) => {
+                tracing::debug!(error = %e, path = %path, "Path resolution failed; continuing without depot entities");
+            }
+        }
+    }
+}
+
+/// ## Summary
+/// Middleware handler for path resolution.
+/// Use this as a handler in routes to resolve paths and populate the depot.
+pub struct SlugResolverHandler;
 
 #[cfg(test)]
 mod tests {
@@ -708,52 +659,3 @@ mod tests {
     // Integration tests with database
     // (Integration tests moved to tests/integration/slug_resolver.rs)
 }
-
-/// ## Summary
-/// Salvo handler wrapper for path resolution middleware.
-///
-/// Resolves slug-based paths and populates the depot with ResourceId and entity data
-/// for downstream handlers to use in authorization and request processing.
-#[salvo::async_trait]
-impl salvo::Handler for SlugResolverHandler {
-    async fn handle(
-        &self,
-        req: &mut salvo::Request,
-        depot: &mut Depot,
-        _res: &mut salvo::Response,
-        _ctrl: &mut salvo::FlowCtrl,
-    ) {
-        let path = req.uri().path();
-        tracing::debug!(path = %path, "SlugResolverHandler executing");
-
-        let db_provider = match crate::component::db::connection::get_db_from_depot(depot) {
-            Ok(provider) => provider,
-            Err(e) => {
-                tracing::debug!(error = %e, "Database provider not available in slug_resolver middleware");
-                return;
-            }
-        };
-
-        let mut conn = match db_provider.get_connection().await {
-            Ok(conn) => conn,
-            Err(e) => {
-                tracing::debug!(error = %e, "Failed to get database connection in slug_resolver middleware");
-                return;
-            }
-        };
-
-        match resolve_path_and_load_entities(req, depot, &mut conn).await {
-            Ok(()) => {
-                tracing::debug!(path = %path, "Path resolved successfully");
-            }
-            Err(e) => {
-                tracing::debug!(error = %e, path = %path, "Path resolution failed; continuing without depot entities");
-            }
-        }
-    }
-}
-
-/// ## Summary
-/// Middleware handler for path resolution.
-/// Use this as a handler in routes to resolve paths and populate the depot.
-pub struct SlugResolverHandler;

@@ -729,6 +729,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "const-str"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "93e19f68b180ebff43d6d42005c4b5f046c65fcac28369ba8b3beaad633f9ec0"
+
+[[package]]
 name = "content_inspector"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4188,6 +4194,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "config",
+ "const-str",
  "diesel",
  "diesel-async",
  "diesel-async-adapter",
