@@ -1711,7 +1711,7 @@ g2, owner, admin
 
     #[tokio::test]
     async fn test_role_permission_completeness() {
-        let e = create_test_enforcer().await;
+        create_test_enforcer().await;
 
         // Verify each role has exactly the expected permissions, no more, no less
         let role_permissions = [

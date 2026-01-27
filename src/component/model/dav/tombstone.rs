@@ -10,13 +10,13 @@ use crate::component::db::schema;
 pub struct DavTombstone {
     pub id: uuid::Uuid,
     pub collection_id: uuid::Uuid,
-    pub uri: String,
     pub entity_id: Option<uuid::Uuid>,
     pub synctoken: i64,
     pub sync_revision: i64,
     pub deleted_at: chrono::DateTime<chrono::Utc>,
     pub last_etag: Option<String>,
     pub logical_uid: Option<String>,
+    pub uri_variants: Vec<Option<String>>,
 }
 
 /// Insert struct for creating new DAV tombstones
@@ -24,11 +24,11 @@ pub struct DavTombstone {
 #[diesel(table_name = schema::dav_tombstone)]
 pub struct NewDavTombstone<'a> {
     pub collection_id: uuid::Uuid,
-    pub uri: &'a str,
     pub entity_id: Option<uuid::Uuid>,
     pub synctoken: i64,
     pub sync_revision: i64,
     pub deleted_at: chrono::DateTime<chrono::Utc>,
     pub last_etag: Option<&'a str>,
     pub logical_uid: Option<&'a str>,
+    pub uri_variants: Vec<String>,
 }

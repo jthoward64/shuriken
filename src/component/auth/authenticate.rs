@@ -86,12 +86,12 @@ async fn create_single_user(
     use diesel_async::RunQueryDsl;
 
     let principal_id = uuid::Uuid::now_v7();
-    let principal_uri = format!("/principals/users/{principal_id}");
+    let principal_slug = crate::util::slug::generate_slug(email);
 
     let new_principal = NewPrincipal {
         id: principal_id,
         principal_type: PrincipalType::User.as_str(),
-        uri: principal_uri.as_str(),
+        slug: principal_slug.as_str(),
         display_name: Some(name),
     };
 

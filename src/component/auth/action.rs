@@ -1,34 +1,42 @@
 //! Authorization actions for Casbin enforcement.
 //!
-//! Actions are the operations that can be performed on resources. They map to
-//! HTTP methods and WebDAV privileges per RFC 3744 Appendix B.
-
-use super::permission::PermissionLevel;
+//! Actions are the operations that can be performed on resources. They map directly
+//! to the permission types in the Casbin model.
 
 /// Actions that can be performed on resources.
 ///
-/// These are used as the `act` parameter in Casbin enforcement requests.
+/// These are used as the `act` parameter in Casbin enforcement requests and
+/// map directly to the permissions defined in the g2 role mappings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Action {
     /// Read free-busy information only (CalDAV).
     ReadFreebusy,
     /// Read items and metadata (GET, PROPFIND, REPORT queries).
     Read,
-    /// Create/update/delete items (PUT, DELETE, MOVE).
-    Write,
-    /// Grant a specific permission level to another principal.
-    ShareGrant(PermissionLevel),
+    /// Edit/update items (PUT for existing resources).
+    Edit,
+    /// Delete items (DELETE).
+    Delete,
+    /// Share resource with read permissions.
+    ShareRead,
+    /// Share resource with edit permissions.
+    ShareEdit,
+    /// Administrative actions (manage ACLs, collection properties).
+    Admin,
 }
 
 impl Action {
     /// Returns the Casbin action string for this action.
     #[must_use]
-    pub fn as_casbin_action(&self) -> String {
+    pub const fn as_casbin_action(&self) -> &'static str {
         match self {
-            Self::ReadFreebusy => "read_freebusy".to_string(),
-            Self::Read => "read".to_string(),
-            Self::Write => "write".to_string(),
-            Self::ShareGrant(level) => format!("share_grant:{}", level.as_casbin_role()),
+            Self::ReadFreebusy => "read_freebusy",
+            Self::Read => "read",
+            Self::Edit => "edit",
+            Self::Delete => "delete",
+            Self::ShareRead => "share_read",
+            Self::ShareEdit => "share_edit",
+            Self::Admin => "admin",
         }
     }
 
@@ -38,26 +46,12 @@ impl Action {
         match action {
             "read_freebusy" => Some(Self::ReadFreebusy),
             "read" => Some(Self::Read),
-            "write" => Some(Self::Write),
-            _ if action.starts_with("share_grant:") => {
-                let level_str = action.strip_prefix("share_grant:")?;
-                let level = PermissionLevel::from_casbin_role(level_str)?;
-                Some(Self::ShareGrant(level))
-            }
+            "edit" => Some(Self::Edit),
+            "delete" => Some(Self::Delete),
+            "share_read" => Some(Self::ShareRead),
+            "share_edit" => Some(Self::ShareEdit),
+            "admin" => Some(Self::Admin),
             _ => None,
-        }
-    }
-
-    /// Returns the minimum permission level required for this action.
-    ///
-    /// This is used for quick checks when the resource type is known.
-    #[must_use]
-    pub const fn minimum_level(&self) -> PermissionLevel {
-        match self {
-            Self::ReadFreebusy => PermissionLevel::ReadFreebusy,
-            Self::Read => PermissionLevel::Read,
-            Self::Write => PermissionLevel::Edit,
-            Self::ShareGrant(_) => PermissionLevel::ReadShare, // Lowest share-capable level
         }
     }
 }
@@ -70,18 +64,17 @@ impl std::fmt::Display for Action {
 
 /// Maps HTTP methods to authorization actions per RFC 3744 Appendix B.
 ///
-/// ## Method-to-Privilege Expectations
+/// ## Method-to-Action Mapping
 ///
-/// - `OPTIONS` → `DAV:read`
-/// - `GET`/`HEAD` → `DAV:read`
-/// - `PROPFIND` → `DAV:read` (+ `DAV:read-acl` when requesting `DAV:acl`)
-/// - `PROPPATCH` → `DAV:write-properties`
-/// - `PUT` (existing target) → `DAV:write-content`
-/// - `PUT` (new target) → `DAV:bind` on parent collection
-/// - `DELETE` → `DAV:unbind` on parent collection
-/// - `MOVE` → `DAV:unbind` on source + `DAV:bind` on destination
-/// - `COPY` → `DAV:read` + `DAV:write-content`/`DAV:write-properties`
-/// - `REPORT` → `DAV:read` on all referenced resources
+/// - `OPTIONS`, `GET`, `HEAD`, `PROPFIND`, `REPORT` → `Read`
+/// - `PROPPATCH` → `Edit` (modifies properties)
+/// - `PUT` (existing) → `Edit`
+/// - `PUT` (new) → `Edit` on parent collection
+/// - `DELETE` → `Delete`
+/// - `MOVE` → `Delete` on source + `Edit` on destination
+/// - `COPY` → `Read` + `Edit` on destination
+/// - `MKCOL`, `MKCALENDAR` → `Edit` on parent
+/// - `ACL` → `Admin`
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum HttpMethod {
     Options,
@@ -125,22 +118,21 @@ impl HttpMethod {
     ///
     /// ## Notes
     ///
-    /// - For `PUT`, `DELETE`, `MOVE`, and `COPY`, additional context is needed
-    ///   to determine if the operation is on an existing or new resource.
-    /// - For `MOVE` and `COPY`, both source and destination must be authorized.
-    /// - `PROPPATCH` requires `Write` because it modifies properties.
+    /// - For `PUT`, `DELETE`, `MOVE`, and `COPY`, additional context may be needed
+    /// - For `MOVE` and `COPY`, both source and destination must be authorized
+    /// - `ACL` requires `Admin` permission
     #[must_use]
     pub const fn primary_action(self) -> Action {
         match self {
             Self::Options | Self::Get | Self::Head | Self::Propfind | Self::Report => Action::Read,
             Self::Put
-            | Self::Delete
             | Self::Proppatch
             | Self::Mkcol
             | Self::Mkcalendar
             | Self::Copy
-            | Self::Move
-            | Self::Acl => Action::Write,
+            | Self::Move => Action::Edit,
+            Self::Delete => Action::Delete,
+            Self::Acl => Action::Admin,
         }
     }
 }
@@ -203,19 +195,17 @@ pub fn action_for_method(method: HttpMethod, context: MethodContext) -> Action {
     match method {
         HttpMethod::Report if context.is_freebusy_query => Action::ReadFreebusy,
         HttpMethod::Report => Action::Read,
-
         HttpMethod::Options | HttpMethod::Get | HttpMethod::Head | HttpMethod::Propfind => {
             Action::Read
         }
-
         HttpMethod::Put
-        | HttpMethod::Delete
         | HttpMethod::Proppatch
         | HttpMethod::Mkcol
         | HttpMethod::Mkcalendar
         | HttpMethod::Copy
-        | HttpMethod::Move
-        | HttpMethod::Acl => Action::Write,
+        | HttpMethod::Move => Action::Edit,
+        HttpMethod::Delete => Action::Delete,
+        HttpMethod::Acl => Action::Admin,
     }
 }
 
@@ -228,14 +218,16 @@ mod tests {
         let actions = [
             Action::ReadFreebusy,
             Action::Read,
-            Action::Write,
-            Action::ShareGrant(PermissionLevel::Read),
-            Action::ShareGrant(PermissionLevel::EditShare),
+            Action::Edit,
+            Action::Delete,
+            Action::ShareRead,
+            Action::ShareEdit,
+            Action::Admin,
         ];
 
         for action in actions {
             let casbin_str = action.as_casbin_action();
-            let parsed = Action::from_casbin_action(&casbin_str);
+            let parsed = Action::from_casbin_action(casbin_str);
             assert_eq!(Some(action), parsed, "Roundtrip failed for {action:?}");
         }
     }
@@ -255,5 +247,13 @@ mod tests {
 
         let action = action_for_method(HttpMethod::Report, MethodContext::existing());
         assert_eq!(action, Action::Read);
+    }
+
+    #[test]
+    fn method_actions() {
+        assert_eq!(HttpMethod::Get.primary_action(), Action::Read);
+        assert_eq!(HttpMethod::Put.primary_action(), Action::Edit);
+        assert_eq!(HttpMethod::Delete.primary_action(), Action::Delete);
+        assert_eq!(HttpMethod::Acl.primary_action(), Action::Admin);
     }
 }

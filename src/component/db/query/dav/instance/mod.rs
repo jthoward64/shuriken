@@ -35,14 +35,39 @@ pub fn by_collection(
 }
 
 /// ## Summary
-/// Returns a query to find a non-deleted instance by collection and URI.
+/// Returns a query to find a non-deleted instance by collection and slug.
+#[must_use]
+pub fn by_slug_and_collection(
+    collection_id: uuid::Uuid,
+    slug: &str,
+) -> dav_instance::BoxedQuery<'_, diesel::pg::Pg> {
+    by_collection(collection_id)
+        .filter(dav_instance::slug.eq(slug))
+        .filter(dav_instance::deleted_at.is_null())
+}
+
+/// ## Summary
+/// Legacy: Returns a query to find an instance by collection and URI (now uses slug extraction).
+///
+/// For compatibility during migration, extracts the slug from the URI path.
+/// If the URI looks like "filename.ics", uses that; otherwise extracts the last path segment.
 #[must_use]
 pub fn by_collection_and_uri(
     collection_id: uuid::Uuid,
     uri: &str,
-) -> dav_instance::BoxedQuery<'_, diesel::pg::Pg> {
-    by_collection(collection_id)
-        .filter(dav_instance::uri.eq(uri))
+) -> dav_instance::BoxedQuery<'static, diesel::pg::Pg> {
+    // Extract slug from URI: remove file extensions and use the name
+    let slug = uri
+        .trim_end_matches(".ics")
+        .trim_end_matches(".vcf")
+        .split('/')
+        .last()
+        .unwrap_or(uri)
+        .to_string();
+
+    all()
+        .filter(dav_instance::collection_id.eq(collection_id))
+        .filter(dav_instance::slug.eq(slug))
         .filter(dav_instance::deleted_at.is_null())
 }
 
@@ -52,14 +77,9 @@ pub fn by_collection_and_uri(
 pub fn by_collection_not_deleted(
     collection_id: uuid::Uuid,
 ) -> dav_instance::BoxedQuery<'static, diesel::pg::Pg> {
-    by_collection(collection_id).filter(dav_instance::deleted_at.is_null())
-}
-
-/// ## Summary
-/// Returns a query to find instances by entity ID.
-#[must_use]
-pub fn by_entity(entity_id: uuid::Uuid) -> dav_instance::BoxedQuery<'static, diesel::pg::Pg> {
-    all().filter(dav_instance::entity_id.eq(entity_id))
+    all()
+        .filter(dav_instance::collection_id.eq(collection_id))
+        .filter(dav_instance::deleted_at.is_null())
 }
 
 /// ## Summary
@@ -70,7 +90,7 @@ pub fn by_entity(entity_id: uuid::Uuid) -> dav_instance::BoxedQuery<'static, die
 #[tracing::instrument(skip(conn, new_instance), fields(
     collection_id = %new_instance.collection_id,
     entity_id = %new_instance.entity_id,
-    uri = new_instance.uri,
+    slug = new_instance.slug,
     etag = new_instance.etag
 ))]
 pub async fn create_instance(
@@ -192,16 +212,18 @@ pub async fn delete_instance_with_tombstone(
     // Soft-delete the instance
     soft_delete_instance(conn, instance_id).await?;
 
-    // Create tombstone
+    // Create tombstone with URI variants (both slug and UUID paths)
+    let uri_variants = vec![format!("/item-{}", instance.slug), instance.id.to_string()];
+
     let tombstone = NewDavTombstone {
         collection_id: instance.collection_id,
-        uri: &instance.uri,
         entity_id: Some(instance.entity_id),
         synctoken,
         sync_revision: instance.sync_revision,
         deleted_at: chrono::Utc::now(),
         last_etag: Some(&instance.etag),
         logical_uid: None,
+        uri_variants,
     };
 
     create_tombstone(conn, &tombstone).await

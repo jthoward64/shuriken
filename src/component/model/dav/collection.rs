@@ -10,7 +10,6 @@ pub struct DavCollection {
     pub id: uuid::Uuid,
     pub owner_principal_id: uuid::Uuid,
     pub collection_type: String,
-    pub uri: String,
     pub display_name: Option<String>,
     pub description: Option<String>,
     pub timezone_tzid: Option<String>,
@@ -18,6 +17,8 @@ pub struct DavCollection {
     pub updated_at: chrono::DateTime<chrono::Utc>,
     pub deleted_at: Option<chrono::DateTime<chrono::Utc>>,
     pub supported_components: Option<Vec<Option<String>>>,
+    pub slug: String,
+    pub parent_collection_id: Option<uuid::Uuid>,
 }
 
 /// Insert struct for creating new DAV collections
@@ -26,8 +27,8 @@ pub struct DavCollection {
 pub struct NewDavCollection<'a> {
     pub owner_principal_id: uuid::Uuid,
     pub collection_type: &'a str,
-    pub uri: &'a str,
     pub display_name: Option<&'a str>,
     pub description: Option<&'a str>,
     pub timezone_tzid: Option<&'a str>,
+    pub slug: &'a str,
 }

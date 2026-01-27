@@ -637,7 +637,7 @@ impl TestDb {
     pub async fn seed_principal(
         &self,
         principal_type: &str,
-        uri: &str,
+        slug: &str,
         display_name: Option<&str>,
     ) -> anyhow::Result<uuid::Uuid> {
         use shuriken::component::db::schema::principal;
@@ -649,7 +649,7 @@ impl TestDb {
         let new_principal = NewPrincipal {
             id: principal_id,
             principal_type,
-            uri,
+            slug,
             display_name,
         };
 
@@ -699,7 +699,7 @@ impl TestDb {
         &self,
         owner_principal_id: uuid::Uuid,
         collection_type: &str,
-        uri: &str,
+        slug: &str,
         display_name: Option<&str>,
     ) -> anyhow::Result<uuid::Uuid> {
         use shuriken::component::db::schema::dav_collection;
@@ -710,7 +710,7 @@ impl TestDb {
         let new_collection = NewDavCollection {
             owner_principal_id,
             collection_type,
-            uri,
+            slug,
             display_name,
             description: None,
             timezone_tzid: None,
@@ -761,7 +761,7 @@ impl TestDb {
         &self,
         collection_id: uuid::Uuid,
         entity_id: uuid::Uuid,
-        uri: &str,
+        slug: &str,
         content_type: &str,
         etag: &str,
         sync_revision: i64,
@@ -774,7 +774,7 @@ impl TestDb {
         let new_instance = NewDavInstance {
             collection_id,
             entity_id,
-            uri,
+            slug,
             content_type,
             etag,
             sync_revision,
@@ -1024,7 +1024,7 @@ impl TestDb {
 
         let count = dav_tombstone::table
             .filter(dav_tombstone::collection_id.eq(collection_id))
-            .filter(dav_tombstone::uri.eq(uri))
+            .filter(dav_tombstone::uri_variants.contains(vec![Some(uri.to_string())]))
             .count()
             .get_result::<i64>(&mut conn)
             .await?;
@@ -1042,7 +1042,7 @@ impl TestDb {
         let mut conn = self.get_conn().await?;
 
         let count = dav_instance::table
-            .filter(dav_instance::uri.eq(uri))
+            .filter(dav_instance::slug.eq(uri))
             .filter(dav_instance::deleted_at.is_null())
             .count()
             .get_result::<i64>(&mut conn)
@@ -1066,7 +1066,7 @@ impl TestDb {
         let mut conn = self.get_conn().await?;
 
         let instance = dav_instance::table
-            .filter(dav_instance::uri.eq(uri))
+            .filter(dav_instance::slug.eq(uri))
             .filter(dav_instance::deleted_at.is_null())
             .select(DavInstance::as_select())
             .first::<DavInstance>(&mut conn)

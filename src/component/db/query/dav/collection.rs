@@ -39,14 +39,35 @@ pub fn by_principal_not_deleted(
 }
 
 /// ## Summary
-/// Returns a query to find a collection by URI and principal.
+/// Returns a query to find a collection by slug and principal.
+#[must_use]
+pub fn by_slug_and_principal(
+    slug: &str,
+    principal_id: uuid::Uuid,
+) -> dav_collection::BoxedQuery<'_, diesel::pg::Pg> {
+    all()
+        .filter(dav_collection::slug.eq(slug))
+        .filter(dav_collection::owner_principal_id.eq(principal_id))
+}
+
+/// ## Summary
+/// Legacy: Returns a query to find a collection by URI and principal (now uses slug extraction).
+///
+/// For compatibility during migration, extracts the slug from the URI path.
 #[must_use]
 pub fn by_uri_and_principal(
     uri: &str,
     principal_id: uuid::Uuid,
-) -> dav_collection::BoxedQuery<'_, diesel::pg::Pg> {
+) -> dav_collection::BoxedQuery<'static, diesel::pg::Pg> {
+    // Extract slug from URI: remove trailing slashes and use the last path segment
+    let slug = uri
+        .trim_end_matches('/')
+        .split('/')
+        .last()
+        .unwrap_or(uri)
+        .to_string();
     all()
-        .filter(dav_collection::uri.eq(uri))
+        .filter(dav_collection::slug.eq(slug))
         .filter(dav_collection::owner_principal_id.eq(principal_id))
 }
 
@@ -63,7 +84,7 @@ pub fn not_deleted() -> dav_collection::BoxedQuery<'static, diesel::pg::Pg> {
 /// ## Errors
 /// Returns a database error if the insert fails.
 #[tracing::instrument(skip(conn, new_collection), fields(
-    uri = new_collection.uri,
+    slug = new_collection.slug,
     collection_type = new_collection.collection_type
 ))]
 pub async fn create_collection(

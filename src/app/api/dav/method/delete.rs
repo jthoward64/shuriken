@@ -7,9 +7,13 @@ use diesel_async::AsyncConnection;
 use diesel_async::scoped_futures::ScopedFutureExt;
 
 use crate::app::api::dav::extract::auth::{
-    check_authorization, get_auth_context, load_instance_resource,
+    check_authorization, get_auth_context, load_instance_resource, resource_id_for,
 };
-use crate::component::auth::{Action, ResourceId};
+use crate::component::auth::Action;
+use crate::component::auth::depot::{
+    get_parsed_collection_id_from_depot, get_parsed_instance_slug_from_depot,
+};
+use crate::component::auth::get_resource_id_from_depot;
 use crate::component::db::connection;
 use crate::component::db::query::caldav::{event_index, occurrence};
 use crate::component::db::query::carddav::card_index;
@@ -41,14 +45,20 @@ pub async fn delete(req: &mut Request, res: &mut Response, depot: &Depot) {
     // Get path before borrowing req mutably
     let path = req.uri().path().to_string();
 
-    // Parse path to extract collection_id and uri
-    let (collection_id, uri) = match path::parse_collection_and_uri(&path) {
-        Ok(parsed) => parsed,
-        Err(e) => {
-            tracing::debug!(error = %e, path = %path, "Failed to parse path");
-            res.status_code(StatusCode::NOT_FOUND);
-            return;
-        }
+    // Prefer middleware-resolved values from depot; fallback to path parsing
+    let (collection_id, slug) = match (
+        get_parsed_collection_id_from_depot(depot),
+        get_parsed_instance_slug_from_depot(depot),
+    ) {
+        (Ok(cid), Ok(s)) => (cid, s),
+        _ => match path::parse_collection_and_uri(&path) {
+            Ok(parsed) => parsed,
+            Err(e) => {
+                tracing::debug!(error = %e, path = %path, "Failed to parse path");
+                res.status_code(StatusCode::NOT_FOUND);
+                return;
+            }
+        },
     };
 
     if collection_id.is_nil() {
@@ -77,7 +87,7 @@ pub async fn delete(req: &mut Request, res: &mut Response, depot: &Depot) {
 
     tracing::debug!(
         collection_id = %collection_id,
-        uri = %uri,
+        slug = %slug,
         "Parsed request path"
     );
 
@@ -88,13 +98,13 @@ pub async fn delete(req: &mut Request, res: &mut Response, depot: &Depot) {
         .map(String::from);
 
     // Check authorization: need write permission on the resource
-    if let Err(status) = check_delete_authorization(depot, &mut conn, collection_id, &uri).await {
+    if let Err(status) = check_delete_authorization(depot, &mut conn, collection_id, &slug).await {
         res.status_code(status);
         return;
     }
 
     // Perform the deletion
-    match perform_delete(&mut conn, collection_id, &uri, if_match.as_deref()).await {
+    match perform_delete(&mut conn, collection_id, &slug, if_match.as_deref()).await {
         Ok(DeleteOutcome::Deleted) => {
             // Successfully deleted
             tracing::info!("Resource deleted successfully");
@@ -138,16 +148,16 @@ enum DeleteOutcome {
 async fn perform_delete(
     conn: &mut connection::DbConnection<'_>,
     collection_id: uuid::Uuid,
-    uri: &str,
+    slug: &str,
     if_match: Option<&str>,
 ) -> anyhow::Result<DeleteOutcome> {
     tracing::debug!("Performing resource deletion");
 
-    let uri = uri.to_string();
+    let slug = slug.to_string();
     let if_match = if_match.map(str::to_string);
 
     conn.transaction::<_, anyhow::Error, _>(move |tx| {
-        let uri = uri.clone();
+        let slug = slug.clone();
         let if_match = if_match.clone();
 
         async move {
@@ -155,7 +165,7 @@ async fn perform_delete(
             use diesel_async::RunQueryDsl;
 
             let instance_row: Option<DavInstance> =
-                instance::by_collection_and_uri(collection_id, &uri)
+                instance::by_slug_and_collection(collection_id, &slug)
                     .select(DavInstance::as_select())
                     .first::<DavInstance>(tx)
                     .await
@@ -208,16 +218,20 @@ async fn check_delete_authorization(
     depot: &Depot,
     conn: &mut connection::DbConnection<'_>,
     collection_id: uuid::Uuid,
-    uri: &str,
+    slug: &str,
 ) -> Result<(), StatusCode> {
     let (subjects, authorizer) = get_auth_context(depot, conn).await?;
 
-    let Some((inst, resource_type)) = load_instance_resource(conn, collection_id, uri).await?
-    else {
+    // Prefer ResourceId from depot if available
+    let resource = if let Ok(rid) = get_resource_id_from_depot(depot) {
+        rid.clone()
+    } else if let Some((inst, resource_type)) =
+        load_instance_resource(conn, collection_id, slug).await?
+    {
+        resource_id_for(resource_type, collection_id, Some(&inst.slug))
+    } else {
         // Let the main handler return NOT_FOUND for consistency
         return Ok(());
     };
-
-    let resource = ResourceId::new(resource_type, inst.entity_id);
-    check_authorization(&authorizer, &subjects, &resource, Action::Write, "DELETE")
+    check_authorization(&authorizer, &subjects, &resource, Action::Delete, "DELETE")
 }

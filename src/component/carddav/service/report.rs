@@ -35,7 +35,7 @@ pub async fn execute_addressbook_query(
     // Build multistatus response
     let mut multistatus = Multistatus::new();
     for instance in instances {
-        let href = Href::new(format!("/{}", instance.uri));
+        let href = Href::new(format!("/item-{}", instance.slug));
         let props = build_instance_properties(conn, &instance, properties).await?;
         let response = PropstatResponse::ok(href, props);
         multistatus.add_response(response);

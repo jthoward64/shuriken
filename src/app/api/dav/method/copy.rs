@@ -6,9 +6,12 @@ use salvo::http::StatusCode;
 use salvo::{Depot, Request, Response, handler};
 
 use crate::app::api::dav::extract::auth::{
-    check_authorization, get_auth_context, load_instance_resource,
+    check_authorization, get_auth_context, load_instance_resource, resource_id_for,
 };
-use crate::component::auth::{Action, ResourceId, ResourceType};
+use crate::component::auth::depot::{
+    get_parsed_collection_id_from_depot, get_parsed_instance_slug_from_depot,
+};
+use crate::component::auth::{Action, ResourceType, get_resource_id_from_depot};
 use crate::component::db::connection;
 use crate::util::path;
 
@@ -53,14 +56,20 @@ pub async fn copy(req: &mut Request, res: &mut Response, depot: &Depot) {
         None => true,
     };
 
-    // Parse source path to extract collection ID and URI
-    let (source_collection_id, source_uri) = match path::parse_collection_and_uri(&source_path) {
-        Ok(parsed) => parsed,
-        Err(e) => {
-            tracing::error!(error = %e, path = %source_path, "Failed to parse source path");
-            res.status_code(StatusCode::BAD_REQUEST);
-            return;
-        }
+    // Parse source path to extract collection ID and URI (prefer middleware)
+    let (source_collection_id, source_uri) = match (
+        get_parsed_collection_id_from_depot(depot),
+        get_parsed_instance_slug_from_depot(depot),
+    ) {
+        (Ok(cid), Ok(slug)) => (cid, slug),
+        _ => match path::parse_collection_and_uri(&source_path) {
+            Ok(parsed) => parsed,
+            Err(e) => {
+                tracing::error!(error = %e, path = %source_path, "Failed to parse source path");
+                res.status_code(StatusCode::BAD_REQUEST);
+                return;
+            }
+        },
     };
 
     // Parse destination to extract target collection ID and URI
@@ -165,11 +174,14 @@ async fn check_copy_authorization(
 ) -> Result<(), StatusCode> {
     let (subjects, authorizer) = get_auth_context(depot, conn).await?;
 
-    // Check Read on source (if it exists)
-    if let Some((inst, resource_type)) =
+    // Check Read on source (if it exists), prefer ResourceId from depot
+    if let Ok(rid) = get_resource_id_from_depot(depot) {
+        check_authorization(&authorizer, &subjects, rid, Action::Read, "COPY source")?;
+    } else if let Some((_inst, resource_type)) =
         load_instance_resource(conn, source_collection_id, source_uri).await?
     {
-        let source_resource = ResourceId::new(resource_type, inst.entity_id);
+        let source_resource =
+            resource_id_for(resource_type, source_collection_id, Some(source_uri));
         check_authorization(
             &authorizer,
             &subjects,
@@ -182,12 +194,12 @@ async fn check_copy_authorization(
 
     // Check Write on destination collection
     // TODO: Determine collection type (calendar vs addressbook) from DB
-    let dest_resource = ResourceId::new(ResourceType::Calendar, dest_collection_id);
+    let dest_resource = resource_id_for(ResourceType::Calendar, dest_collection_id, None);
     check_authorization(
         &authorizer,
         &subjects,
         &dest_resource,
-        Action::Write,
+        Action::Edit,
         "COPY destination",
     )
 }

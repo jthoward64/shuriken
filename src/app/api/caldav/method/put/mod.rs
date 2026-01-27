@@ -5,8 +5,9 @@ mod types;
 use salvo::http::{HeaderValue, StatusCode};
 use salvo::{Depot, Request, Response, handler};
 
+use crate::app::api::dav::extract::auth::resource_id_for;
 use crate::component::auth::{
-    Action, ResourceId, ResourceType, authorizer_from_depot, get_subjects_from_depot,
+    Action, ResourceType, authorizer_from_depot, get_subjects_from_depot,
 };
 use crate::component::caldav::service::object::{PutObjectContext, put_calendar_object};
 use crate::component::db::connection;
@@ -170,7 +171,7 @@ async fn perform_put(
     // Create PUT context
     let ctx = PutObjectContext {
         collection_id,
-        uri,
+        slug: uri.trim_end_matches(".ics").to_string(),
         entity_type: "calendar".to_string(),
         logical_uid,
         if_none_match,
@@ -245,12 +246,12 @@ async fn check_put_authorization(
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-    let resource = if let Some(inst) = existing {
-        // Update: check permission on the entity
-        ResourceId::new(ResourceType::CalendarEvent, inst.entity_id)
+    let resource = if let Some(_inst) = existing {
+        // Update: check permission on the entity URI within the collection
+        resource_id_for(ResourceType::Calendar, collection_id, Some(&uri))
     } else {
-        // Create: check permission on the collection
-        ResourceId::new(ResourceType::Calendar, collection_id)
+        // Create: check permission on the collection root
+        resource_id_for(ResourceType::Calendar, collection_id, None)
     };
 
     // Get the authorizer
@@ -259,8 +260,8 @@ async fn check_put_authorization(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    // Check write permission
-    match authorizer.require(&subjects, &resource, Action::Write) {
+    // Check edit permission
+    match authorizer.require(&subjects, &resource, Action::Edit) {
         Ok(_level) => Ok(()),
         Err(AppError::AuthorizationError(msg)) => {
             tracing::warn!(

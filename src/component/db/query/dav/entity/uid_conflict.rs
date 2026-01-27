@@ -12,11 +12,11 @@ use super::query_builders::by_logical_uid;
 /// Checks if a UID conflict exists for the given logical UID in a collection.
 ///
 /// A conflict exists if there's another instance in the same collection with the same
-/// logical UID but a different URI (i.e., the UID is already used by a different resource).
+/// logical UID but a different slug (i.e., the UID is already used by a different resource).
 ///
 /// ## Returns
-/// - `Ok(Some(uri))` if a conflict exists, returning the conflicting instance's URI
-/// - `Ok(None)` if no conflict exists (UID is free or being reused for the same URI)
+/// - `Ok(Some(slug))` if a conflict exists, returning the conflicting instance's slug
+/// - `Ok(None)` if no conflict exists (UID is free or being reused for the same slug)
 ///
 /// ## Errors
 /// Returns a database error if the query fails.
@@ -24,7 +24,7 @@ pub async fn check_uid_conflict(
     conn: &mut crate::component::db::connection::DbConnection<'_>,
     collection_id: uuid::Uuid,
     logical_uid: &str,
-    current_uri: &str,
+    current_slug: &str,
 ) -> diesel::QueryResult<Option<String>> {
     // Query for entities with this logical UID
     let instances: Vec<DavInstance> = by_logical_uid(logical_uid)
@@ -35,10 +35,10 @@ pub async fn check_uid_conflict(
         .load(conn)
         .await?;
 
-    // Check if any instance has a different URI
+    // Check if any instance has a different slug (indicating a UID conflict)
     for instance in instances {
-        if instance.uri != current_uri {
-            return Ok(Some(instance.uri));
+        if instance.slug != current_slug {
+            return Ok(Some(instance.slug));
         }
     }
 

@@ -29,10 +29,10 @@ impl PrincipalType {
 pub struct Principal {
     pub id: uuid::Uuid,
     pub principal_type: String,
-    pub uri: String,
     pub display_name: Option<String>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
     pub deleted_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub slug: String,
 }
 
 #[derive(Debug, Clone, Insertable)]
@@ -40,6 +40,6 @@ pub struct Principal {
 pub struct NewPrincipal<'a> {
     pub id: uuid::Uuid,
     pub principal_type: &'a str,
-    pub uri: &'a str,
     pub display_name: Option<&'a str>,
+    pub slug: &'a str,
 }

@@ -13,8 +13,8 @@ use crate::component::model::dav::collection::{DavCollection, NewDavCollection};
 pub struct CreateCollectionContext {
     /// Owner principal ID.
     pub owner_principal_id: uuid::Uuid,
-    /// Collection URI (e.g., "my-calendar").
-    pub uri: String,
+    /// Collection slug (e.g., "my-calendar").
+    pub slug: String,
     /// Collection type ("calendar" or "addressbook").
     pub collection_type: String,
     /// Optional display name.
@@ -28,8 +28,8 @@ pub struct CreateCollectionContext {
 pub struct CreateCollectionResult {
     /// ID of the created collection.
     pub collection_id: uuid::Uuid,
-    /// URI of the created collection.
-    pub uri: String,
+    /// Slug of the created collection.
+    pub slug: String,
 }
 
 /// ## Summary
@@ -56,37 +56,37 @@ pub async fn create_collection(
     }
 
     let owner_principal_id = ctx.owner_principal_id;
-    let uri = ctx.uri.clone();
+    let slug = ctx.slug.clone();
     let collection_type = ctx.collection_type.clone();
     let displayname = ctx.displayname.clone();
     let description = ctx.description.clone();
 
     conn.transaction::<_, anyhow::Error, _>(move |tx| {
-        let uri = uri.clone();
+        let slug = slug.clone();
         let collection_type = collection_type.clone();
         let displayname = displayname.clone();
         let description = description.clone();
 
         async move {
-            // Check if collection already exists with same URI and owner
+            // Check if collection already exists with same slug and owner
             let existing: Option<DavCollection> =
-                collection::by_uri_and_principal(&uri, owner_principal_id)
+                collection::by_slug_and_principal(&slug, owner_principal_id)
                     .first(tx)
                     .await
                     .optional()
                     .context("failed to check for existing collection")?;
 
             if existing.is_some() {
-                anyhow::bail!("collection with URI '{uri}' already exists");
+                anyhow::bail!("collection with slug '{slug}' already exists");
             }
 
             let new_collection = NewDavCollection {
                 owner_principal_id,
-                uri: &uri,
                 collection_type: &collection_type,
                 display_name: displayname.as_deref(),
                 description: description.as_deref(),
                 timezone_tzid: None,
+                slug: &slug,
             };
 
             let created = collection::create_collection(tx, &new_collection)
@@ -95,7 +95,7 @@ pub async fn create_collection(
 
             Ok(CreateCollectionResult {
                 collection_id: created.id,
-                uri: created.uri,
+                slug: created.slug,
             })
         }
         .scope_boxed()

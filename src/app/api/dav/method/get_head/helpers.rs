@@ -3,8 +3,13 @@
 use salvo::http::{HeaderValue, StatusCode};
 use salvo::{Depot, Request, Response};
 
+use crate::app::api::dav::extract::auth::resource_id_for;
+use crate::component::auth::depot::{
+    get_instance_from_depot, get_parsed_collection_id_from_depot,
+    get_parsed_instance_slug_from_depot,
+};
 use crate::component::auth::{
-    Action, ResourceId, ResourceType, authorizer_from_depot, get_subjects_from_depot,
+    Action, ResourceType, authorizer_from_depot, get_subjects_from_depot,
 };
 use crate::component::db::connection;
 use crate::component::db::map::dav::{serialize_ical_tree, serialize_vcard_tree};
@@ -33,14 +38,26 @@ pub(super) async fn handle_get_or_head(
     // Extract the resource path from the request
     let request_path = req.uri().path();
 
-    // Parse path to extract collection_id and URI
-    let (collection_id, uri) = match path::parse_collection_and_uri(request_path) {
-        Ok(parsed) => parsed,
-        Err(e) => {
-            tracing::debug!(error = %e, path = %request_path, "Failed to parse path");
+    // Prefer middleware-resolved values from depot
+    let (collection_id, slug) = match (
+        get_parsed_collection_id_from_depot(depot),
+        get_parsed_instance_slug_from_depot(depot),
+    ) {
+        (Ok(cid), Ok(s)) => (cid, s),
+        (Ok(cid), Err(_)) => {
+            // No instance slug; GET/HEAD requires an instance target
+            tracing::debug!(collection_id = %cid, "Instance slug missing in depot for GET/HEAD");
             res.status_code(StatusCode::NOT_FOUND);
             return;
         }
+        _ => match path::parse_collection_and_uri(request_path) {
+            Ok(parsed) => parsed,
+            Err(e) => {
+                tracing::debug!(error = %e, path = %request_path, "Failed to parse path");
+                res.status_code(StatusCode::NOT_FOUND);
+                return;
+            }
+        },
     };
 
     if collection_id.is_nil() {
@@ -50,14 +67,33 @@ pub(super) async fn handle_get_or_head(
 
     tracing::debug!(
         collection_id = %collection_id,
-        uri = %uri,
+        slug = %slug,
         "Parsed request path"
     );
 
-    let Some((instance, canonical_bytes)) =
-        get_collection_instance(res, depot, collection_id, uri).await
-    else {
-        return;
+    // If middleware already loaded instance, reuse it
+    let maybe_inst = get_instance_from_depot(depot).cloned();
+    let (instance, canonical_bytes) = if let Some(inst) = maybe_inst {
+        match load_entity_bytes_for_instance(depot, &inst).await {
+            Ok(Some(bytes)) => (inst, bytes),
+            Ok(None) => {
+                tracing::debug!("Entity tree missing for instance");
+                res.status_code(StatusCode::NOT_FOUND);
+                return;
+            }
+            Err(e) => {
+                tracing::error!(error = %e, "Database error");
+                res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+                return;
+            }
+        }
+    } else {
+        let Some((instance, canonical_bytes)) =
+            get_collection_instance(res, depot, collection_id, slug).await
+        else {
+            return;
+        };
+        (instance, canonical_bytes)
     };
 
     // Check If-None-Match for conditional GET/HEAD
@@ -70,12 +106,36 @@ pub(super) async fn handle_get_or_head(
     // Set response headers and body
     set_response_headers_and_body(res, &instance, &canonical_bytes, is_head);
 }
+async fn load_entity_bytes_for_instance(
+    depot: &Depot,
+    inst: &DavInstance,
+) -> anyhow::Result<Option<Vec<u8>>> {
+    use crate::component::db::connection;
+    use crate::component::db::query::dav::entity;
+
+    let provider = connection::get_db_from_depot(depot)?;
+    let mut conn = provider.get_connection().await?;
+
+    let Some((_, tree)) = entity::get_entity_with_tree(&mut conn, inst.entity_id).await? else {
+        return Ok(None);
+    };
+
+    let canonical_text = if inst.content_type.starts_with("text/calendar") {
+        serialize_ical_tree(tree)?
+    } else if inst.content_type.starts_with("text/vcard") {
+        serialize_vcard_tree(&tree)?
+    } else {
+        anyhow::bail!("unsupported content type: {}", inst.content_type);
+    };
+
+    Ok(Some(canonical_text.into_bytes()))
+}
 
 async fn get_collection_instance(
     res: &mut Response,
     depot: &Depot,
     collection_id: uuid::Uuid,
-    uri: String,
+    slug: String,
 ) -> Option<(DavInstance, Vec<u8>)> {
     let provider = match connection::get_db_from_depot(depot) {
         Ok(provider) => provider,
@@ -95,12 +155,12 @@ async fn get_collection_instance(
     };
 
     // Load the instance first to determine its type
-    let (instance, canonical_bytes) = match load_instance(&mut conn, collection_id, &uri).await {
+    let (instance, canonical_bytes) = match load_instance(&mut conn, collection_id, &slug).await {
         Ok(Some(data)) => data,
         Ok(None) => {
             tracing::debug!(
                 collection_id = %collection_id,
-                uri = %uri,
+                slug = %slug,
                 "Resource not found"
             );
             res.status_code(StatusCode::NOT_FOUND);
@@ -137,19 +197,19 @@ async fn check_read_authorization(
 
     // Determine resource type from content-type
     let resource_type = if instance.content_type.starts_with("text/calendar") {
-        ResourceType::CalendarEvent
+        ResourceType::Calendar
     } else if instance.content_type.starts_with("text/vcard") {
-        ResourceType::Vcard
+        ResourceType::Addressbook
     } else {
-        // Unknown content type - treat as calendar event (safer default)
+        // Unknown content type - treat as calendar (safer default)
         tracing::warn!(
             content_type = %instance.content_type,
-            "Unknown content type, defaulting to CalendarEvent for authorization"
+            "Unknown content type, defaulting to Calendar for authorization"
         );
-        ResourceType::CalendarEvent
+        ResourceType::Calendar
     };
 
-    let resource = ResourceId::new(resource_type, instance.entity_id);
+    let resource = resource_id_for(resource_type, instance.collection_id, Some(&instance.slug));
 
     // Check authorization
     let authorizer = authorizer_from_depot(depot)?;
@@ -166,13 +226,13 @@ async fn check_read_authorization(
 async fn load_instance(
     conn: &mut connection::DbConnection<'_>,
     collection_id: uuid::Uuid,
-    uri: &str,
+    slug: &str,
 ) -> anyhow::Result<Option<(DavInstance, Vec<u8>)>> {
     use diesel::prelude::*;
     use diesel_async::RunQueryDsl;
 
     // Load the instance
-    let inst = instance::by_collection_and_uri(collection_id, uri)
+    let inst = instance::by_slug_and_collection(collection_id, slug)
         .select(crate::component::model::dav::instance::DavInstance::as_select())
         .first::<DavInstance>(conn)
         .await

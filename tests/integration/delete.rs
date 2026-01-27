@@ -78,7 +78,7 @@ async fn fetch_entity_id(
 
     let entity_id = dav_instance::table
         .filter(dav_instance::collection_id.eq(collection_id))
-        .filter(dav_instance::uri.eq(resource_uri))
+        .filter(dav_instance::slug.eq(resource_uri))
         .select(dav_instance::entity_id)
         .first::<uuid::Uuid>(&mut conn)
         .await?;

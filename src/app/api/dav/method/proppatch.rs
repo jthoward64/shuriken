@@ -7,8 +7,11 @@ use salvo::http::StatusCode;
 use salvo::writing::Text;
 use salvo::{Depot, Request, Response, handler};
 
+use crate::app::api::dav::extract::auth::resource_id_for;
+use crate::component::auth::depot::get_parsed_collection_id_from_depot;
+use crate::component::auth::get_resource_id_from_depot;
 use crate::component::auth::{
-    Action, ResourceId, ResourceType, authorizer_from_depot, get_subjects_from_depot,
+    Action, ResourceType, authorizer_from_depot, get_subjects_from_depot,
 };
 use crate::component::db::connection;
 use crate::component::db::query::dav::collection;
@@ -57,14 +60,17 @@ pub async fn proppatch(req: &mut Request, res: &mut Response, depot: &Depot) {
         }
     };
 
-    // Parse path to extract collection ID
-    let collection_id = match path::extract_collection_id(&path) {
+    // Prefer middleware-resolved collection ID from depot
+    let collection_id = match get_parsed_collection_id_from_depot(depot) {
         Ok(id) => id,
-        Err(e) => {
-            tracing::error!(error = %e, path = %path, "Failed to parse collection ID from path");
-            res.status_code(StatusCode::BAD_REQUEST);
-            return;
-        }
+        Err(_) => match path::extract_collection_id(&path) {
+            Ok(id) => id,
+            Err(e) => {
+                tracing::error!(error = %e, path = %path, "Failed to parse collection ID from path");
+                res.status_code(StatusCode::BAD_REQUEST);
+                return;
+            }
+        },
     };
 
     if collection_id.is_nil() {
@@ -94,9 +100,7 @@ pub async fn proppatch(req: &mut Request, res: &mut Response, depot: &Depot) {
     tracing::debug!(collection_id = %collection_id, "Parsed collection ID from path");
 
     // Check authorization: need write permission on the collection
-    if let Err(status) =
-        check_proppatch_authorization(depot, &mut conn, collection_id).await
-    {
+    if let Err(status) = check_proppatch_authorization(depot, &mut conn, collection_id).await {
         res.status_code(status);
         return;
     }
@@ -221,26 +225,25 @@ async fn check_proppatch_authorization(
     conn: &mut connection::DbConnection<'_>,
     collection_id: uuid::Uuid,
 ) -> Result<(), StatusCode> {
-    // Get expanded subjects for the current user
-    let subjects = get_subjects_from_depot(depot, conn)
-        .await
-        .map_err(|e| {
-            tracing::error!(error = %e, "Failed to get subjects from depot");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+    let subjects = get_subjects_from_depot(depot, conn).await.map_err(|e| {
+        tracing::error!(error = %e, "Failed to get subjects from depot");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
-    // PROPPATCH on a collection requires write permission
-    // TODO: Determine collection type (calendar vs addressbook) from DB
-    let resource = ResourceId::new(ResourceType::Calendar, collection_id);
+    // Prefer ResourceId from depot if available
+    let resource = if let Ok(rid) = get_resource_id_from_depot(depot) {
+        rid.clone()
+    } else {
+        // TODO: Determine collection type (calendar vs addressbook) from DB
+        resource_id_for(ResourceType::Calendar, collection_id, None)
+    };
 
-    // Get the authorizer
     let authorizer = authorizer_from_depot(depot).map_err(|e| {
         tracing::error!(error = %e, "Failed to get authorizer");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    // Check write permission
-    match authorizer.require(&subjects, &resource, Action::Write) {
+    match authorizer.require(&subjects, &resource, Action::Edit) {
         Ok(_level) => Ok(()),
         Err(AppError::AuthorizationError(msg)) => {
             tracing::warn!(

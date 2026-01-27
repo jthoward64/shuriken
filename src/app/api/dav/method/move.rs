@@ -9,9 +9,12 @@ use salvo::http::StatusCode;
 use salvo::{Request, Response, handler};
 
 use crate::app::api::dav::extract::auth::{
-    check_authorization, get_auth_context, load_instance_resource,
+    check_authorization, get_auth_context, load_instance_resource, resource_id_for,
 };
-use crate::component::auth::{Action, ResourceId, ResourceType};
+use crate::component::auth::depot::{
+    get_parsed_collection_id_from_depot, get_parsed_instance_slug_from_depot,
+};
+use crate::component::auth::{Action, ResourceType, get_resource_id_from_depot};
 use crate::component::db::connection::{self, DbConnection};
 use crate::component::db::query::dav::{collection, instance};
 use crate::component::model::dav::instance::NewDavInstance;
@@ -60,21 +63,27 @@ pub async fn r#move(req: &mut Request, res: &mut Response, depot: &Depot) {
         None => true,
     };
 
-    // Parse source path to extract collection ID and URI
-    let (source_collection_id, source_uri) = match path::parse_collection_and_uri(&source_path) {
-        Ok(parsed) => parsed,
-        Err(e) => {
-            tracing::error!(error = %e, path = %source_path, "Failed to parse source path");
-            res.status_code(StatusCode::BAD_REQUEST);
-            return;
-        }
+    // Parse source path to extract collection ID and slug (prefer middleware)
+    let (source_collection_id, source_slug) = match (
+        get_parsed_collection_id_from_depot(depot),
+        get_parsed_instance_slug_from_depot(depot),
+    ) {
+        (Ok(cid), Ok(slug)) => (cid, slug),
+        _ => match path::parse_collection_and_uri(&source_path) {
+            Ok(parsed) => parsed,
+            Err(e) => {
+                tracing::error!(error = %e, path = %source_path, "Failed to parse source path");
+                res.status_code(StatusCode::BAD_REQUEST);
+                return;
+            }
+        },
     };
 
-    // Parse destination to extract target collection ID and URI
+    // Parse destination to extract target collection ID and slug
     // Note: Destination header contains full URL, extract path first
     let dest_path = path::extract_path_from_url(&destination);
 
-    let (dest_collection_id, dest_uri) = match path::parse_collection_and_uri(&dest_path) {
+    let (dest_collection_id, dest_slug) = match path::parse_collection_and_uri(&dest_path) {
         Ok(parsed) => parsed,
         Err(e) => {
             tracing::error!(error = %e, path = %dest_path, "Failed to parse destination path");
@@ -109,9 +118,9 @@ pub async fn r#move(req: &mut Request, res: &mut Response, depot: &Depot) {
 
     tracing::debug!(
         source_collection_id = %source_collection_id,
-        source_uri = %source_uri,
+        source_slug = %source_slug,
         dest_collection_id = %dest_collection_id,
-        dest_uri = %dest_uri,
+        dest_slug = %dest_slug,
         "Parsed MOVE paths"
     );
 
@@ -120,7 +129,7 @@ pub async fn r#move(req: &mut Request, res: &mut Response, depot: &Depot) {
         depot,
         &mut conn,
         source_collection_id,
-        &source_uri,
+        &source_slug,
         dest_collection_id,
     )
     .await
@@ -133,9 +142,9 @@ pub async fn r#move(req: &mut Request, res: &mut Response, depot: &Depot) {
     match perform_move(
         &mut conn,
         source_collection_id,
-        &source_uri,
+        &source_slug,
         dest_collection_id,
-        &dest_uri,
+        &dest_slug,
         overwrite,
     )
     .await
@@ -210,9 +219,9 @@ impl From<diesel::result::Error> for MoveError {
 async fn perform_move(
     conn: &mut DbConnection<'_>,
     source_collection_id: uuid::Uuid,
-    source_uri: &str,
+    source_slug: &str,
     dest_collection_id: uuid::Uuid,
-    dest_uri: &str,
+    dest_slug: &str,
     overwrite: bool,
 ) -> Result<MoveResult, MoveError> {
     use diesel::prelude::*;
@@ -220,17 +229,17 @@ async fn perform_move(
 
     tracing::debug!("Performing MOVE operation");
 
-    let source_uri = source_uri.to_string();
-    let dest_uri = dest_uri.to_string();
+    let source_slug = source_slug.to_string();
+    let dest_slug = dest_slug.to_string();
 
     conn.transaction::<_, MoveError, _>(move |tx| {
-        let source_uri = source_uri.clone();
-        let dest_uri = dest_uri.clone();
+        let source_slug = source_slug.clone();
+        let dest_slug = dest_slug.clone();
 
         async move {
             // Load source instance
             let source_instance =
-                instance::by_collection_and_uri(source_collection_id, &source_uri)
+                instance::by_slug_and_collection(source_collection_id, &source_slug)
                     .select(crate::component::model::dav::instance::DavInstance::as_select())
                     .first(tx)
                     .await?;
@@ -242,7 +251,7 @@ async fn perform_move(
             );
 
             // Check if destination exists
-            let dest_exists = instance::by_collection_and_uri(dest_collection_id, &dest_uri)
+            let dest_exists = instance::by_slug_and_collection(dest_collection_id, &dest_slug)
                 .select(diesel::dsl::count(
                     crate::component::db::schema::dav_instance::id,
                 ))
@@ -264,11 +273,12 @@ async fn perform_move(
 
             // If destination exists and overwrite is true, soft-delete it first
             if dest_exists {
-                let dest_instance = instance::by_collection_and_uri(dest_collection_id, &dest_uri)
-                    .select(crate::component::model::dav::instance::DavInstance::as_select())
-                    .first(tx)
-                    .await
-                    .map_err(|e| MoveError::DatabaseError(anyhow::Error::from(e)))?;
+                let dest_instance =
+                    instance::by_slug_and_collection(dest_collection_id, &dest_slug)
+                        .select(crate::component::model::dav::instance::DavInstance::as_select())
+                        .first(tx)
+                        .await
+                        .map_err(|e| MoveError::DatabaseError(anyhow::Error::from(e)))?;
 
                 instance::soft_delete_instance(tx, dest_instance.id)
                     .await
@@ -299,7 +309,7 @@ async fn perform_move(
             let new_instance = NewDavInstance {
                 collection_id: dest_collection_id,
                 entity_id: source_instance.entity_id,
-                uri: &dest_uri,
+                slug: &dest_slug,
                 content_type: &source_instance.content_type,
                 etag: new_etag,
                 sync_revision: new_sync_revision,
@@ -320,15 +330,20 @@ async fn perform_move(
             tracing::debug!("Soft-deleted source instance");
 
             // Create tombstone for source with updated synctoken
+            let uri_variants = vec![
+                format!("/item-{}", source_instance.slug),
+                source_instance.id.to_string(),
+            ];
+
             let tombstone = NewDavTombstone {
                 collection_id: source_collection_id,
-                uri: &source_uri,
                 entity_id: Some(source_instance.entity_id),
                 synctoken: new_source_synctoken,
                 sync_revision: source_instance.sync_revision,
                 deleted_at: now,
                 last_etag: Some(&source_instance.etag),
                 logical_uid: None,
+                uri_variants,
             };
 
             instance::create_tombstone(tx, &tombstone)
@@ -362,15 +377,18 @@ async fn check_move_authorization(
     let (subjects, authorizer) = get_auth_context(depot, conn).await?;
 
     // Check Write on source (unbind requires write)
-    if let Some((inst, resource_type)) =
+    if let Ok(rid) = get_resource_id_from_depot(depot) {
+        check_authorization(&authorizer, &subjects, rid, Action::Edit, "MOVE source")?;
+    } else if let Some((inst, resource_type)) =
         load_instance_resource(conn, source_collection_id, source_uri).await?
     {
-        let source_resource = ResourceId::new(resource_type, inst.entity_id);
+        let source_resource =
+            resource_id_for(resource_type, source_collection_id, Some(&inst.slug));
         check_authorization(
             &authorizer,
             &subjects,
             &source_resource,
-            Action::Write,
+            Action::Edit,
             "MOVE source",
         )?;
     }
@@ -378,12 +396,12 @@ async fn check_move_authorization(
 
     // Check Write on destination collection
     // TODO: Determine collection type (calendar vs addressbook) from DB
-    let dest_resource = ResourceId::new(ResourceType::Calendar, dest_collection_id);
+    let dest_resource = resource_id_for(ResourceType::Calendar, dest_collection_id, None);
     check_authorization(
         &authorizer,
         &subjects,
         &dest_resource,
-        Action::Write,
+        Action::Edit,
         "MOVE destination",
     )
 }

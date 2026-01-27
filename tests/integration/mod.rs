@@ -30,3 +30,4 @@ mod propfind;
 mod proppatch;
 mod put;
 mod report;
+mod slug_resolver;

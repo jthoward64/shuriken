@@ -94,7 +94,7 @@ pub async fn mkcol_extended(req: &mut Request, res: &mut Response, depot: &Depot
     // Create collection context
     let ctx = CreateCollectionContext {
         owner_principal_id,
-        uri,
+        slug: uri,
         collection_type: "addressbook".to_string(),
         displayname: parsed_request.displayname,
         description: parsed_request.description,
@@ -105,7 +105,7 @@ pub async fn mkcol_extended(req: &mut Request, res: &mut Response, depot: &Depot
         Ok(result) => {
             tracing::info!(
                 "Created addressbook collection: {} (ID: {})",
-                result.uri,
+                result.slug,
                 result.collection_id
             );
             res.status_code(StatusCode::CREATED);

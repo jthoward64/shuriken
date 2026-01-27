@@ -54,7 +54,7 @@ pub async fn execute_calendar_query(
         // No expansion - return instances as-is
         let mut multistatus = Multistatus::new();
         for instance in instances {
-            let href = Href::new(format!("/{}", instance.uri));
+            let href = Href::new(format!("/item-{}", instance.slug));
             let props = build_instance_properties(conn, &instance, properties).await?;
             let response = PropstatResponse::ok(href, props);
             multistatus.add_response(response);
@@ -147,7 +147,7 @@ async fn execute_calendar_query_with_expansion(
 
         if !has_recurrence {
             // Non-recurring event - return as-is
-            let href = Href::new(format!("/{}", instance.uri));
+            let href = Href::new(format!("/item-{}", instance.slug));
             let props = build_instance_properties(conn, &instance, properties).await?;
             let response = PropstatResponse::ok(href, props);
             multistatus.add_response(response);
@@ -176,15 +176,15 @@ async fn execute_calendar_query_with_expansion(
                     let occurrence_href = if let Some(recurrence_id) = occ.recurrence_id_utc {
                         // Exception instance - use RECURRENCE-ID in href
                         Href::new(format!(
-                            "/{}/{}",
-                            instance.uri.trim_end_matches(".ics"),
+                            "/item-{}/{}",
+                            instance.slug,
                             recurrence_id.format("%Y%m%dT%H%M%SZ")
                         ))
                     } else {
-                        // Regular occurrence - use instance URI + occurrence time
+                        // Regular occurrence - use instance slug + occurrence time
                         Href::new(format!(
-                            "/{}/{}",
-                            instance.uri.trim_end_matches(".ics"),
+                            "/item-{}/{}",
+                            instance.slug,
                             occ.start_utc.format("%Y%m%dT%H%M%SZ")
                         ))
                     };
@@ -202,7 +202,7 @@ async fn execute_calendar_query_with_expansion(
             }
             RecurrenceExpansion::LimitRecurrenceSet => {
                 // Return master event as-is (filtering already done in query)
-                let href = Href::new(format!("/{}", instance.uri));
+                let href = Href::new(format!("/item-{}", instance.slug));
                 let props = build_instance_properties(conn, &instance, properties).await?;
                 let response = PropstatResponse::ok(href, props);
                 multistatus.add_response(response);

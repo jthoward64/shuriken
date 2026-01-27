@@ -118,7 +118,7 @@ async fn put_populates_cal_index_and_occurrences() {
 
     let entity_id = dav_instance::table
         .filter(dav_instance::collection_id.eq(collection_id))
-        .filter(dav_instance::uri.eq(&uri))
+        .filter(dav_instance::slug.eq(&uri))
         .select(dav_instance::entity_id)
         .first::<uuid::Uuid>(&mut conn)
         .await
@@ -212,7 +212,7 @@ async fn put_populates_card_index() {
 
     let entity_id = dav_instance::table
         .filter(dav_instance::collection_id.eq(collection_id))
-        .filter(dav_instance::uri.eq(&uri))
+        .filter(dav_instance::slug.eq(&uri))
         .select(dav_instance::entity_id)
         .first::<uuid::Uuid>(&mut conn)
         .await

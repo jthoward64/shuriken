@@ -6,10 +6,11 @@ use salvo::http::StatusCode;
 use salvo::{Depot, Request, Response, handler};
 
 use crate::app::api::dav::extract::auth::{
-    check_authorization, get_auth_context, load_instance_resource,
+    check_authorization, get_auth_context, load_instance_resource, resource_id_for,
 };
 use crate::app::api::dav::extract::headers::{Depth, parse_depth};
-use crate::component::auth::{Action, ResourceId, ResourceType};
+use crate::component::auth::get_resource_id_from_depot;
+use crate::component::auth::{Action, ResourceType};
 use crate::component::db::connection;
 use crate::component::rfc::dav::build::multistatus::serialize_multistatus;
 use crate::component::rfc::dav::parse::propfind::parse_propfind;
@@ -155,25 +156,20 @@ async fn check_propfind_authorization(
 ) -> Result<(), StatusCode> {
     let (subjects, authorizer) = get_auth_context(depot, conn).await?;
 
-    // Try to parse as collection+uri first
-    let resource = if let Ok((collection_id, uri)) = path::parse_collection_and_uri(path) {
-        // Check if there's a specific instance
+    // Prefer ResourceId from depot populated by middleware
+    let resource = if let Ok(rid) = get_resource_id_from_depot(depot) {
+        rid.clone()
+    } else if let Ok((collection_id, uri)) = path::parse_collection_and_uri(path) {
         if let Some((inst, resource_type)) =
             load_instance_resource(conn, collection_id, &uri).await?
         {
-            ResourceId::new(resource_type, inst.entity_id)
+            resource_id_for(resource_type, collection_id, Some(&inst.slug))
         } else {
-            // PROPFIND on collection (uri may be empty or instance not found)
-            // TODO: Determine collection type (calendar vs addressbook) from DB
-            ResourceId::new(ResourceType::Calendar, collection_id)
+            resource_id_for(ResourceType::Calendar, collection_id, None)
         }
     } else if let Ok(collection_id) = path::extract_collection_id(path) {
-        // PROPFIND directly on a collection
-        // TODO: Determine collection type (calendar vs addressbook) from DB
-        ResourceId::new(ResourceType::Calendar, collection_id)
+        resource_id_for(ResourceType::Calendar, collection_id, None)
     } else {
-        // Could be a principal URL or root - allow for now
-        // Full implementation needs to handle these cases
         return Ok(());
     };
 

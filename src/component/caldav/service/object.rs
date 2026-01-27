@@ -38,8 +38,8 @@ pub struct PutObjectResult {
 pub struct PutObjectContext {
     /// Collection ID where the object will be stored.
     pub collection_id: uuid::Uuid,
-    /// URI of the object within the collection (e.g., "event.ics").
-    pub uri: String,
+    /// Slug of the object within the collection (e.g., "event").
+    pub slug: String,
     /// Entity type for the object.
     pub entity_type: String,
     /// Logical UID extracted from iCalendar.
@@ -69,7 +69,7 @@ pub struct PutObjectContext {
 /// - Database operations fail
 #[tracing::instrument(skip(conn, ical_bytes), fields(
     collection_id = %ctx.collection_id,
-    uri = %ctx.uri,
+    slug = %ctx.slug,
     entity_type = %ctx.entity_type,
     logical_uid = ?ctx.logical_uid,
     has_if_none_match = ctx.if_none_match.is_some(),
@@ -104,7 +104,7 @@ pub async fn put_calendar_object(
     let _uid = ical.root.uid().map(String::from);
 
     // Check if instance already exists
-    let existing_instance = instance::by_collection_and_uri(ctx.collection_id, &ctx.uri)
+    let existing_instance = instance::by_slug_and_collection(ctx.collection_id, &ctx.slug)
         .select(crate::component::model::dav::instance::DavInstance::as_select())
         .first(conn)
         .await
@@ -133,13 +133,13 @@ pub async fn put_calendar_object(
         }
     }
 
-    // Check for UID conflicts in this collection (same UID, different URI)
+    // Check for UID conflicts in this collection (same UID, different slug)
     if let Some(ref uid) = ctx.logical_uid {
-        match entity::check_uid_conflict(conn, ctx.collection_id, uid, &ctx.uri).await {
-            Ok(Some(conflicting_uri)) => {
-                tracing::warn!(uid = %uid, conflicting_uri = %conflicting_uri, "UID conflict detected");
+        match entity::check_uid_conflict(conn, ctx.collection_id, uid, &ctx.slug).await {
+            Ok(Some(conflicting_slug)) => {
+                tracing::warn!(uid = %uid, conflicting_slug = %conflicting_slug, "UID conflict detected");
                 anyhow::bail!(
-                    "UID conflict: UID '{uid}' is already used by resource '{conflicting_uri}' in this collection"
+                    "UID conflict: UID '{uid}' is already used by resource '{conflicting_slug}' in this collection"
                 );
             }
             Ok(None) => {
@@ -160,7 +160,7 @@ pub async fn put_calendar_object(
     tracing::debug!(etag = %etag, "Generated ETag");
 
     let collection_id = ctx.collection_id;
-    let uri = ctx.uri.clone();
+    let slug = ctx.slug.clone();
     let entity_type = ctx.entity_type.clone();
     let logical_uid = ctx.logical_uid.clone();
     let etag_for_tx = etag.clone();
@@ -244,7 +244,7 @@ pub async fn put_calendar_object(
                 let new_instance = NewDavInstance {
                     collection_id,
                     entity_id: created_entity.id,
-                    uri: &uri,
+                    slug: &slug,
                     content_type: "text/calendar",
                     etag: &etag_for_tx,
                     sync_revision: collection_synctoken + 1,

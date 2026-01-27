@@ -30,11 +30,12 @@ mod casbin_test;
 // Re-export commonly used types at module level
 pub use action::{Action, HttpMethod, MethodContext, action_for_method};
 pub use authorize::{
-    Authorizer, AuthzResult, authorizer_from_depot, check_read, check_write, require_read,
-    require_read_freebusy, require_write,
+    Authorizer, AuthzResult, authorizer_from_depot, handler_check, handler_require,
 };
-pub use depot::{get_expanded_subjects, get_subjects_from_depot, get_user_from_depot};
+pub use depot::{
+    get_expanded_subjects, get_resource_id_from_depot, get_subjects_from_depot, get_user_from_depot,
+};
 pub use permission::{PermissionLevel, WebDavPrivilege};
 pub use privilege::{PrivilegeSetBuilder, privileges_for_level, supported_privilege_set_xml};
-pub use resource::{ResourceId, ResourceType};
+pub use resource::{PathSegment, ResourceId, ResourceType};
 pub use subject::{ExpandedSubjects, Subject};

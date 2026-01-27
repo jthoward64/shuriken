@@ -17,11 +17,11 @@ use crate::component::model::user::NewUser;
 
 /// Creates a test principal for use in tests.
 #[must_use]
-pub fn test_principal<'a>(uri: &'a str, name: &'a str) -> NewPrincipal<'a> {
+pub fn test_principal<'a>(slug: &'a str, name: &'a str) -> NewPrincipal<'a> {
     NewPrincipal {
         id: Uuid::new_v4(),
         principal_type: "user",
-        uri,
+        slug,
         display_name: Some(name),
     }
 }
@@ -38,9 +38,9 @@ pub fn test_user<'a>(name: &'a str, email: &'a str, principal_id: Uuid) -> NewUs
 
 /// Creates a test calendar collection.
 #[must_use]
-pub fn test_calendar_collection(uri: &str, owner_principal_id: Uuid) -> NewDavCollection<'_> {
+pub fn test_calendar_collection(slug: &str, owner_principal_id: Uuid) -> NewDavCollection<'_> {
     NewDavCollection {
-        uri,
+        slug,
         owner_principal_id,
         collection_type: "calendar",
         display_name: Some("Test Calendar"),
@@ -51,9 +51,9 @@ pub fn test_calendar_collection(uri: &str, owner_principal_id: Uuid) -> NewDavCo
 
 /// Creates a test addressbook collection.
 #[must_use]
-pub fn test_addressbook_collection(uri: &str, owner_principal_id: Uuid) -> NewDavCollection<'_> {
+pub fn test_addressbook_collection(slug: &str, owner_principal_id: Uuid) -> NewDavCollection<'_> {
     NewDavCollection {
-        uri,
+        slug,
         owner_principal_id,
         collection_type: "addressbook",
         display_name: Some("Test Addressbook"),
@@ -167,13 +167,13 @@ pub fn test_parameter<'a>(
 pub fn test_instance<'a>(
     collection_id: Uuid,
     entity_id: Uuid,
-    uri: &'a str,
+    slug: &'a str,
     etag: &'a str,
 ) -> NewDavInstance<'a> {
     NewDavInstance {
         collection_id,
         entity_id,
-        uri,
+        slug,
         content_type: "text/calendar",
         etag,
         sync_revision: 1,

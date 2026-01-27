@@ -12,13 +12,14 @@ pub struct DavInstance {
     pub id: uuid::Uuid,
     pub collection_id: uuid::Uuid,
     pub entity_id: uuid::Uuid,
-    pub uri: String,
     pub content_type: String,
     pub etag: String,
     pub sync_revision: i64,
     pub last_modified: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
     pub deleted_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub schedule_tag: Option<String>,
+    pub slug: String,
 }
 
 /// Insert struct for creating new DAV instances
@@ -27,9 +28,9 @@ pub struct DavInstance {
 pub struct NewDavInstance<'a> {
     pub collection_id: uuid::Uuid,
     pub entity_id: uuid::Uuid,
-    pub uri: &'a str,
     pub content_type: &'a str,
     pub etag: &'a str,
     pub sync_revision: i64,
     pub last_modified: chrono::DateTime<chrono::Utc>,
+    pub slug: &'a str,
 }
