@@ -28,6 +28,30 @@ pub enum AppError {
 
     #[error("Parse error: {0}")]
     ParseError(String),
+
+    #[error("Path resolution error: {0}")]
+    PathResolutionError(#[from] PathResolutionError),
+}
+
+#[derive(Error, Debug)]
+pub enum PathResolutionError {
+    #[error("Invalid path format: {0}")]
+    InvalidPathFormat(String),
+
+    #[error("Principal not found: {0}")]
+    PrincipalNotFound(String),
+
+    #[error("Collection not found: owner={owner}, slug={slug}")]
+    CollectionNotFound { owner: String, slug: String },
+
+    #[error("Instance not found: collection_id={collection_id}, slug={slug}")]
+    InstanceNotFound {
+        collection_id: uuid::Uuid,
+        slug: String,
+    },
+
+    #[error("Database error during path resolution: {0}")]
+    DatabaseError(#[from] diesel::result::Error),
 }
 
 pub type AppResult<T> = std::result::Result<T, AppError>;

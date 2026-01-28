@@ -48,6 +48,8 @@ impl ResourceType {
     }
 }
 
+// TODO: Structurally separate Glob from the normal segments so that it is impossible to accidentally have in non-auth uses
+
 /// A segment in a resource path.
 ///
 /// Paths are composed of segments that identify the resource type, owner,

@@ -9,7 +9,10 @@ use diesel_async::RunQueryDsl;
 use crate::component::{
     db::{connection::DbConnection, schema},
     error::{AppError, AppResult},
-    middleware::auth::DepotUser,
+    middleware::{
+        auth::DepotUser,
+        path_parser::{CollectionChain, DavIdentifier},
+    },
     model::group::Group,
 };
 
@@ -18,14 +21,13 @@ use super::subject::ExpandedSubjects;
 pub mod depot_keys {
     pub const AUTHENTICATED_PRINCIPAL: &str = "__authenticated_principal";
 
+    pub const PATH_LOCATION: &str = "__path_location";
     pub const RESOLVED_LOCATION: &str = "__resolved_location";
 
     pub const OWNER_PRINCIPAL: &str = "__owner_principal";
     pub const COLLECTION_CHAIN: &str = "__collection_chain";
     pub const TERMINAL_COLLECTION: &str = "__terminal_collection";
     pub const INSTANCE: &str = "__instance";
-
-    pub const TARGET_FILEBASENAME: &str = "__target_filename";
 }
 
 /// Get the authenticated user from the depot.
@@ -50,7 +52,7 @@ pub fn get_user_from_depot(
 #[must_use]
 pub fn is_authenticated(depot: &salvo::Depot) -> bool {
     depot
-        .get::<DepotUser>("user")
+        .get::<DepotUser>(depot_keys::AUTHENTICATED_PRINCIPAL)
         .is_ok_and(|u| matches!(u, DepotUser::User(_)))
 }
 
@@ -113,7 +115,7 @@ pub async fn get_subjects_from_depot(
     depot: &salvo::Depot,
     conn: &mut DbConnection<'_>,
 ) -> AppResult<ExpandedSubjects> {
-    let depot_user = depot.get::<DepotUser>("user");
+    let depot_user = depot.get::<DepotUser>(depot_keys::AUTHENTICATED_PRINCIPAL);
 
     match depot_user {
         Ok(DepotUser::User(user)) => get_expanded_subjects(conn, user).await,
@@ -137,6 +139,18 @@ pub fn get_owner_principal_from_depot(
         .map_err(|_| AppError::NotFound("Owner principal not found in depot".to_string()))
 }
 
+/// Get the original path location from the depot.
+///
+/// ## Errors
+/// Returns `NotFound` if the path location is not present.
+pub fn get_path_location_from_depot(
+    depot: &salvo::Depot,
+) -> AppResult<&crate::component::auth::ResourceLocation> {
+    depot
+        .get::<crate::component::auth::ResourceLocation>(depot_keys::PATH_LOCATION)
+        .map_err(|_| AppError::NotFound("Path location not found in depot".to_string()))
+}
+
 /// Get the resolved resource location from the depot.
 ///
 /// ## Errors
@@ -153,28 +167,38 @@ pub fn get_resolved_location_from_depot(
 ///
 /// ## Errors
 /// Returns `NotFound` if the collection chain is not present.
-pub fn get_collection_chain_from_depot(
-    depot: &salvo::Depot,
-) -> AppResult<&Vec<crate::component::model::dav::collection::DavCollection>> {
+pub fn get_collection_chain_from_depot(depot: &salvo::Depot) -> AppResult<&CollectionChain> {
     depot
-        .get::<Vec<crate::component::model::dav::collection::DavCollection>>(
-            depot_keys::COLLECTION_CHAIN,
-        )
+        .get::<CollectionChain>(depot_keys::COLLECTION_CHAIN)
         .map_err(|_| AppError::NotFound("Collection chain not found in depot".to_string()))
+}
+
+/// Get the resolved terminal collection identifier from the depot.
+///
+/// ## Errors
+/// Returns `NotFound` if the terminal collection identifier is not present.
+pub fn get_terminal_collection_identifier_from_depot(
+    depot: &salvo::Depot,
+) -> AppResult<&DavIdentifier> {
+    depot
+        .get::<DavIdentifier>(depot_keys::TERMINAL_COLLECTION)
+        .map_err(|_| AppError::NotFound("Terminal collection not found in depot".to_string()))
 }
 
 /// Get the resolved terminal collection from the depot.
 ///
 /// ## Errors
-/// Returns `NotFound` if the terminal collection is not present.
+/// Returns `NotFound` if the terminal collection or collection chain is not present.
 pub fn get_terminal_collection_from_depot(
     depot: &salvo::Depot,
 ) -> AppResult<&crate::component::model::dav::collection::DavCollection> {
-    depot
-        .get::<crate::component::model::dav::collection::DavCollection>(
-            depot_keys::TERMINAL_COLLECTION,
-        )
-        .map_err(|_| AppError::NotFound("Terminal collection not found in depot".to_string()))
+    let terminal_identifier = get_terminal_collection_identifier_from_depot(depot)?;
+    let collection_chain = get_collection_chain_from_depot(depot)?;
+    collection_chain
+        .get_by_identifier(terminal_identifier)
+        .ok_or_else(|| {
+            AppError::NotFound("Terminal collection not found in collection chain".to_string())
+        })
 }
 
 /// Get the resolved instance from the depot.
@@ -187,30 +211,4 @@ pub fn get_instance_from_depot(
     depot
         .get::<crate::component::model::dav::instance::DavInstance>(depot_keys::INSTANCE)
         .map_err(|_| AppError::NotFound("Instance not found in depot".to_string()))
-}
-
-/// Get the target filename base (without extension) from the depot.
-///
-/// ## Errors
-/// Returns `NotFound` if the target filename is not present.
-pub fn get_target_filename_from_depot(depot: &salvo::Depot) -> AppResult<&String> {
-    depot
-        .get::<String>(depot_keys::TARGET_FILEBASENAME)
-        .map_err(|_| AppError::NotFound("Target filename not found in depot".to_string()))
-}
-
-/// Get the target filename with extension from the depot.
-///
-/// ## Errors
-/// Returns `NotFound` if the target filename is not present.
-pub fn get_target_file_with_extension_from_depot(depot: &salvo::Depot) -> AppResult<String> {
-    // Combine with the resource type to form the full filename
-    let filename = depot
-        .get::<String>(depot_keys::TARGET_FILEBASENAME)
-        .map_err(|_| AppError::NotFound("Target filename not found in depot".to_string()))?;
-    let resource_type = depot
-        .get::<crate::component::auth::ResourceType>(depot_keys::RESOLVED_LOCATION)
-        .map_err(|_| AppError::NotFound("Resource type not found in depot".to_string()))?;
-    let full_filename = format!("{}.{}", filename, resource_type.item_extension());
-    Ok(full_filename)
 }
