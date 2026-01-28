@@ -98,7 +98,7 @@ pub async fn propfind(req: &mut Request, res: &mut Response, depot: &Depot) {
     }
 
     // Build multistatus response
-    let multistatus = match build_propfind_response(&mut conn, req, depth, &propfind_req).await {
+    let multistatus = match build_propfind_response(&mut conn, req, depot, depth, &propfind_req).await {
         Ok(ms) => ms,
         Err(e) => {
             tracing::error!(error = %e, "Failed to build PROPFIND response");

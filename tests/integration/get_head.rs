@@ -23,9 +23,9 @@ async fn get_calendar_object_content_type() {
 
     // Seed test data
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", Some("Personal"))
@@ -56,7 +56,7 @@ async fn get_calendar_object_content_type() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let uri = caldav_item_path("alice", "testcal", "event-123.ics");
+    let uri = caldav_item_path("testuser", "testcal", "event-123.ics");
     let response = TestRequest::get(&uri).send(&service).await;
 
     // Expect 200 OK with correct content type
@@ -76,9 +76,9 @@ async fn get_vcard_content_type() {
         .expect("Failed to seed role permissions");
 
     let principal_id = test_db
-        .seed_principal("user", "bob", Some("Bob"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "addressbook", "contacts", Some("Contacts"))
@@ -109,7 +109,7 @@ async fn get_vcard_content_type() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let uri = carddav_item_path("bob", "contacts", "contact-456.vcf");
+    let uri = carddav_item_path("testuser", "contacts", "contact-456.vcf");
     let response = TestRequest::get(&uri).send(&service).await;
 
     response
@@ -136,9 +136,9 @@ async fn get_calendar_object_uses_component_tree() {
         .expect("Failed to seed role permissions");
 
     let principal_id = test_db
-        .seed_principal("user", "tree-user", Some("Tree User"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "treecal", Some("Tree Calendar"))
@@ -214,7 +214,7 @@ async fn get_calendar_object_uses_component_tree() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let uri = caldav_item_path("tree-user", "treecal", "tree-event.ics");
+    let uri = caldav_item_path("testuser", "treecal", "tree-event.ics");
     let response = TestRequest::get(&uri).send(&service).await;
 
     let response = response.assert_status(StatusCode::OK);
@@ -251,9 +251,9 @@ async fn get_vcard_uses_component_tree() {
         .expect("Failed to seed role permissions");
 
     let principal_id = test_db
-        .seed_principal("user", "tree-vcard", Some("Tree VCard"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "addressbook", "treebook", Some("Tree Book"))
@@ -310,7 +310,7 @@ async fn get_vcard_uses_component_tree() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let uri = carddav_item_path("tree-vcard", "treebook", "tree-contact.vcf");
+    let uri = carddav_item_path("testuser", "treebook", "tree-contact.vcf");
     let response = TestRequest::get(&uri).send(&service).await;
 
     let response = response.assert_status(StatusCode::OK);
@@ -365,9 +365,9 @@ async fn head_matches_get_headers() {
         .expect("Failed to seed role permissions");
 
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", Some("Personal"))
@@ -398,7 +398,7 @@ async fn head_matches_get_headers() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let uri = caldav_item_path("alice", "testcal", "event-789.ics");
+    let uri = caldav_item_path("testuser", "testcal", "event-789.ics");
 
     // Send GET request
     let get_response = TestRequest::get(&uri).send(&service).await;
@@ -467,9 +467,9 @@ async fn get_etag_present_and_strong() {
         .expect("Failed to seed role permissions");
 
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -500,7 +500,7 @@ async fn get_etag_present_and_strong() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let uri = caldav_item_path("alice", "testcal", "etag-test.ics");
+    let uri = caldav_item_path("testuser", "testcal", "etag-test.ics");
     let response = TestRequest::get(&uri).send(&service).await;
 
     let response = response
@@ -534,9 +534,9 @@ async fn get_if_none_match_304() {
         .expect("Failed to seed role permissions");
 
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -568,7 +568,7 @@ async fn get_if_none_match_304() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let uri = caldav_item_path("alice", "testcal", "cond-test.ics");
+    let uri = caldav_item_path("testuser", "testcal", "cond-test.ics");
 
     // First GET to verify resource exists
     let response = TestRequest::get(&uri).send(&service).await;
@@ -594,9 +594,9 @@ async fn get_if_none_match_different_etag_returns_200() {
         .expect("Failed to seed role permissions");
 
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -627,7 +627,7 @@ async fn get_if_none_match_different_etag_returns_200() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let uri = caldav_item_path("alice", "testcal", "cond-test-2.ics");
+    let uri = caldav_item_path("testuser", "testcal", "cond-test-2.ics");
 
     // GET with different ETag should return 200
     let response = TestRequest::get(&uri)
@@ -649,9 +649,9 @@ async fn get_if_match_412() {
         .expect("Failed to seed role permissions");
 
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -682,7 +682,7 @@ async fn get_if_match_412() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let uri = caldav_item_path("alice", "testcal", "match-test.ics");
+    let uri = caldav_item_path("testuser", "testcal", "match-test.ics");
 
     // GET with wrong If-Match should return 412
     let response = TestRequest::get(&uri)
@@ -704,9 +704,9 @@ async fn get_if_match_success() {
         .expect("Failed to seed role permissions");
 
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -738,7 +738,7 @@ async fn get_if_match_success() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let uri = caldav_item_path("alice", "testcal", "match-test-2.ics");
+    let uri = caldav_item_path("testuser", "testcal", "match-test-2.ics");
 
     // GET with correct If-Match should return 200
     let response = TestRequest::get(&uri).if_match(etag).send(&service).await;
@@ -792,9 +792,9 @@ async fn get_last_modified_header() {
         .expect("Failed to seed role permissions");
 
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -825,7 +825,7 @@ async fn get_last_modified_header() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let uri = caldav_item_path("alice", "testcal", "lm-test.ics");
+    let uri = caldav_item_path("testuser", "testcal", "lm-test.ics");
     let response = TestRequest::get(&uri).send(&service).await;
 
     response
@@ -844,9 +844,9 @@ async fn get_content_length_accurate() {
         .expect("Failed to seed role permissions");
 
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -877,7 +877,7 @@ async fn get_content_length_accurate() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let uri = caldav_item_path("alice", "testcal", "cl-test.ics");
+    let uri = caldav_item_path("testuser", "testcal", "cl-test.ics");
     let response = TestRequest::get(&uri).send(&service).await;
 
     let response = response.assert_status(StatusCode::OK);

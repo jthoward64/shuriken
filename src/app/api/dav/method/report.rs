@@ -4,7 +4,9 @@ use salvo::http::StatusCode;
 use salvo::{Depot, Request, Response, handler};
 
 use crate::app::api::dav::extract::auth::get_auth_context;
-use crate::component::auth::{Action, get_resolved_location_from_depot};
+use crate::component::auth::{
+    Action, get_resolved_location_from_depot, get_terminal_collection_from_depot,
+};
 use crate::component::db::connection;
 use crate::component::rfc::dav::build::multistatus::serialize_multistatus;
 use crate::component::rfc::dav::core::{ExpandProperty, Multistatus, ReportType, SyncCollection};
@@ -23,6 +25,16 @@ use crate::component::rfc::dav::core::{ExpandProperty, Multistatus, ReportType, 
 /// Returns 400 for invalid requests, 501 for unsupported reports.
 #[handler]
 pub async fn report(req: &mut Request, res: &mut Response, depot: &Depot) {
+    let path = req.uri().path().to_string();
+
+    // Check if the collection was resolved by slug_resolver middleware
+    // If not, return 404 (resource not found)
+    if get_terminal_collection_from_depot(depot).is_err() {
+        tracing::debug!("Collection not found in depot for REPORT request");
+        res.status_code(StatusCode::NOT_FOUND);
+        return;
+    }
+
     // Read request body
     let body = match req.payload().await {
         Ok(body) => body,

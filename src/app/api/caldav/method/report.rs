@@ -18,6 +18,14 @@ use crate::component::rfc::dav::core::ReportType;
 /// Returns 400 for invalid requests, 501 for unsupported reports.
 #[handler]
 pub async fn report(req: &mut Request, res: &mut Response, depot: &Depot) {
+    // Check if the collection was resolved by slug_resolver middleware
+    // If not, return 404 (resource not found)
+    if crate::component::auth::get_terminal_collection_from_depot(depot).is_err() {
+        tracing::debug!("Collection not found in depot for CalDAV REPORT request");
+        res.status_code(StatusCode::NOT_FOUND);
+        return;
+    }
+
     // Read request body
     let body = match req.payload().await {
         Ok(body) => body,

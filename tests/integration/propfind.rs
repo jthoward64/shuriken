@@ -21,9 +21,9 @@ async fn propfind_returns_multistatus() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", Some("Personal"))
@@ -37,7 +37,7 @@ async fn propfind_returns_multistatus() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::propfind(&caldav_collection_path("alice", "testcal"))
+    let response = TestRequest::propfind(&caldav_collection_path("testuser", "testcal"))
         .depth("0")
         .xml_body(propfind_allprop())
         .send(&service)
@@ -56,9 +56,9 @@ async fn propfind_returns_valid_xml() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -72,7 +72,7 @@ async fn propfind_returns_valid_xml() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::propfind(&caldav_collection_path("alice", "testcal"))
+    let response = TestRequest::propfind(&caldav_collection_path("testuser", "testcal"))
         .depth("0")
         .xml_body(propfind_allprop())
         .send(&service)
@@ -160,9 +160,9 @@ async fn propfind_depth1_collection() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -196,7 +196,7 @@ async fn propfind_depth1_collection() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::propfind(&caldav_collection_path("alice", "testcal"))
+    let response = TestRequest::propfind(&caldav_collection_path("testuser", "testcal"))
         .depth("1")
         .xml_body(propfind_allprop())
         .send(&service)
@@ -222,9 +222,9 @@ async fn propfind_depth_infinity() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -238,7 +238,7 @@ async fn propfind_depth_infinity() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::propfind(&caldav_collection_path("alice", "testcal"))
+    let response = TestRequest::propfind(&caldav_collection_path("testuser", "testcal"))
         .depth("infinity")
         .xml_body(propfind_allprop())
         .send(&service)
@@ -262,9 +262,9 @@ async fn propfind_default_depth() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -279,7 +279,7 @@ async fn propfind_default_depth() {
     let service = create_db_test_service(&test_db.url()).await;
 
     // Send without Depth header
-    let response = TestRequest::propfind(&caldav_collection_path("alice", "testcal"))
+    let response = TestRequest::propfind(&caldav_collection_path("testuser", "testcal"))
         .xml_body(propfind_allprop())
         .send(&service)
         .await;
@@ -302,9 +302,9 @@ async fn propfind_known_props_200() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(
@@ -324,7 +324,7 @@ async fn propfind_known_props_200() {
     let service = create_db_test_service(&test_db.url()).await;
 
     let props = propfind_props(&[("DAV:", "displayname"), ("DAV:", "resourcetype")]);
-    let response = TestRequest::propfind(&caldav_collection_path("alice", "testcal"))
+    let response = TestRequest::propfind(&caldav_collection_path("testuser", "testcal"))
         .depth("0")
         .xml_body(&props)
         .send(&service)
@@ -346,9 +346,9 @@ async fn propfind_unknown_props_404() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -363,7 +363,7 @@ async fn propfind_unknown_props_404() {
     let service = create_db_test_service(&test_db.url()).await;
 
     let props = propfind_props(&[("http://custom.example.com/", "nonexistent-property")]);
-    let response = TestRequest::propfind(&caldav_collection_path("alice", "testcal"))
+    let response = TestRequest::propfind(&caldav_collection_path("testuser", "testcal"))
         .depth("0")
         .xml_body(&props)
         .send(&service)
@@ -384,9 +384,9 @@ async fn propfind_mixed_props() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -409,7 +409,7 @@ async fn propfind_mixed_props() {
   </D:prop>
 </D:propfind>"#;
 
-    let response = TestRequest::propfind(&caldav_collection_path("alice", "testcal"))
+    let response = TestRequest::propfind(&caldav_collection_path("testuser", "testcal"))
         .depth("0")
         .xml_body(body)
         .send(&service)
@@ -439,9 +439,9 @@ async fn propfind_allprop_request() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(
@@ -460,7 +460,7 @@ async fn propfind_allprop_request() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::propfind(&caldav_collection_path("alice", "testcal"))
+    let response = TestRequest::propfind(&caldav_collection_path("testuser", "testcal"))
         .depth("0")
         .xml_body(propfind_allprop())
         .send(&service)
@@ -482,9 +482,9 @@ async fn propfind_propname() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -503,7 +503,7 @@ async fn propfind_propname() {
   <D:propname/>
 </D:propfind>"#;
 
-    let response = TestRequest::propfind(&caldav_collection_path("alice", "testcal"))
+    let response = TestRequest::propfind(&caldav_collection_path("testuser", "testcal"))
         .depth("0")
         .xml_body(body)
         .send(&service)
@@ -528,9 +528,9 @@ async fn propfind_calendar_resourcetype() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -545,7 +545,7 @@ async fn propfind_calendar_resourcetype() {
     let service = create_db_test_service(&test_db.url()).await;
 
     let props = propfind_props(&[("DAV:", "resourcetype")]);
-    let response = TestRequest::propfind(&caldav_collection_path("alice", "testcal"))
+    let response = TestRequest::propfind(&caldav_collection_path("testuser", "testcal"))
         .depth("0")
         .xml_body(&props)
         .send(&service)
@@ -567,9 +567,9 @@ async fn propfind_addressbook_resourcetype() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "bob", Some("Bob"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "addressbook", "addr", None)
@@ -584,7 +584,7 @@ async fn propfind_addressbook_resourcetype() {
     let service = create_db_test_service(&test_db.url()).await;
 
     let props = propfind_props(&[("DAV:", "resourcetype")]);
-    let response = TestRequest::propfind(&carddav_collection_path("bob", "addr"))
+    let response = TestRequest::propfind(&carddav_collection_path("testuser", "addr"))
         .depth("0")
         .xml_body(&props)
         .send(&service)
@@ -611,9 +611,9 @@ async fn propfind_getetag() {
         .expect("Failed to seed role permissions");
 
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -645,7 +645,7 @@ async fn propfind_getetag() {
     let service = create_db_test_service(&test_db.url()).await;
 
     let props = propfind_props(&[("DAV:", "getetag")]);
-    let response = TestRequest::propfind(&caldav_collection_path("alice", "testcal"))
+    let response = TestRequest::propfind(&caldav_collection_path("testuser", "testcal"))
         .depth("1")
         .xml_body(&props)
         .send(&service)
@@ -667,9 +667,9 @@ async fn propfind_sync_token() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -684,7 +684,7 @@ async fn propfind_sync_token() {
     let service = create_db_test_service(&test_db.url()).await;
 
     let props = propfind_props(&[("DAV:", "sync-token")]);
-    let response = TestRequest::propfind(&caldav_collection_path("alice", "testcal"))
+    let response = TestRequest::propfind(&caldav_collection_path("testuser", "testcal"))
         .depth("0")
         .xml_body(&props)
         .send(&service)
@@ -733,9 +733,9 @@ async fn propfind_invalid_xml_400() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -749,7 +749,7 @@ async fn propfind_invalid_xml_400() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::propfind(&caldav_collection_path("alice", "testcal"))
+    let response = TestRequest::propfind(&caldav_collection_path("testuser", "testcal"))
         .depth("0")
         .xml_body("this is not valid xml <><><")
         .send(&service)

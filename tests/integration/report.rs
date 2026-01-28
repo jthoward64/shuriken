@@ -22,9 +22,9 @@ async fn calendar_query_returns_multistatus() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -50,7 +50,7 @@ async fn calendar_query_returns_multistatus() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::report(&caldav_collection_path("alice", "testcal"))
+    let response = TestRequest::report(&caldav_collection_path("testuser", "testcal"))
         .xml_body(calendar_query_report())
         .send(&service)
         .await;
@@ -68,9 +68,9 @@ async fn calendar_query_time_range_filter() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -112,7 +112,7 @@ async fn calendar_query_time_range_filter() {
   </C:filter>
 </C:calendar-query>"#;
 
-    let response = TestRequest::report(&caldav_collection_path("alice", "testcal"))
+    let response = TestRequest::report(&caldav_collection_path("testuser", "testcal"))
         .xml_body(body)
         .send(&service)
         .await;
@@ -130,9 +130,9 @@ async fn calendar_query_returns_calendar_data() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -158,7 +158,7 @@ async fn calendar_query_returns_calendar_data() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::report(&caldav_collection_path("alice", "testcal"))
+    let response = TestRequest::report(&caldav_collection_path("testuser", "testcal"))
         .xml_body(calendar_query_report())
         .send(&service)
         .await;
@@ -182,9 +182,9 @@ async fn calendar_multiget_returns_resources() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -200,7 +200,7 @@ async fn calendar_multiget_returns_resources() {
             .expect("Failed to seed entity");
 
         let slug = format!("event-{i}");
-        let href = caldav_item_path("alice", "testcal", &format!("{slug}.ics"));
+        let href = caldav_item_path("testuser", "testcal", &format!("{slug}.ics"));
         hrefs.push(href);
 
         let _instance_id = test_db
@@ -219,7 +219,7 @@ async fn calendar_multiget_returns_resources() {
     let service = create_db_test_service(&test_db.url()).await;
 
     let body = calendar_multiget_report(&hrefs);
-    let response = TestRequest::report(&caldav_collection_path("alice", "testcal"))
+    let response = TestRequest::report(&caldav_collection_path("testuser", "testcal"))
         .xml_body(&body)
         .send(&service)
         .await;
@@ -244,9 +244,9 @@ async fn calendar_multiget_missing_resource_404() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let _collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -255,10 +255,10 @@ async fn calendar_multiget_missing_resource_404() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let hrefs = vec![caldav_item_path("alice", "testcal", "nonexistent.ics")];
+    let hrefs = vec![caldav_item_path("testuser", "testcal", "nonexistent.ics")];
     let body = calendar_multiget_report(&hrefs);
 
-    let response = TestRequest::report(&caldav_collection_path("alice", "testcal"))
+    let response = TestRequest::report(&caldav_collection_path("testuser", "testcal"))
         .xml_body(&body)
         .send(&service)
         .await;
@@ -282,9 +282,9 @@ async fn addressbook_query_returns_multistatus() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "bob", Some("Bob"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "addressbook", "contacts", None)
@@ -310,7 +310,7 @@ async fn addressbook_query_returns_multistatus() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::report(&carddav_collection_path("bob", "contacts"))
+    let response = TestRequest::report(&carddav_collection_path("testuser", "contacts"))
         .xml_body(addressbook_query_report())
         .send(&service)
         .await;
@@ -328,9 +328,9 @@ async fn addressbook_query_returns_address_data() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "bob", Some("Bob"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "addressbook", "addrdata", None)
@@ -356,7 +356,7 @@ async fn addressbook_query_returns_address_data() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::report(&carddav_collection_path("bob", "addrdata"))
+    let response = TestRequest::report(&carddav_collection_path("testuser", "addrdata"))
         .xml_body(addressbook_query_report())
         .send(&service)
         .await;
@@ -380,9 +380,9 @@ async fn addressbook_multiget_returns_vcards() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "bob", Some("Bob"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "addressbook", "abmg", None)
@@ -398,7 +398,7 @@ async fn addressbook_multiget_returns_vcards() {
             .expect("Failed to seed entity");
 
         let slug = format!("contact-{i}");
-        let href = carddav_item_path("bob", "abmg", &format!("{slug}.vcf"));
+        let href = carddav_item_path("testuser", "abmg", &format!("{slug}.vcf"));
         hrefs.push(href);
 
         let _instance_id = test_db
@@ -417,7 +417,7 @@ async fn addressbook_multiget_returns_vcards() {
     let service = create_db_test_service(&test_db.url()).await;
 
     let body = addressbook_multiget_report(&hrefs);
-    let response = TestRequest::report(&carddav_collection_path("bob", "abmg"))
+    let response = TestRequest::report(&carddav_collection_path("testuser", "abmg"))
         .xml_body(&body)
         .send(&service)
         .await;
@@ -445,9 +445,9 @@ async fn sync_collection_returns_multistatus() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let _collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -456,7 +456,7 @@ async fn sync_collection_returns_multistatus() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::report(&caldav_collection_path("alice", "testcal"))
+    let response = TestRequest::report(&caldav_collection_path("testuser", "testcal"))
         .xml_body(sync_collection_report_initial())
         .send(&service)
         .await;
@@ -474,9 +474,9 @@ async fn sync_collection_returns_sync_token() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let _collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -485,7 +485,7 @@ async fn sync_collection_returns_sync_token() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::report(&caldav_collection_path("alice", "testcal"))
+    let response = TestRequest::report(&caldav_collection_path("testuser", "testcal"))
         .xml_body(sync_collection_report_initial())
         .send(&service)
         .await;
@@ -505,9 +505,9 @@ async fn sync_collection_initial_sync() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -537,7 +537,7 @@ async fn sync_collection_initial_sync() {
     let service = create_db_test_service(&test_db.url()).await;
 
     // Empty sync-token means initial sync
-    let response = TestRequest::report(&caldav_collection_path("alice", "testcal"))
+    let response = TestRequest::report(&caldav_collection_path("testuser", "testcal"))
         .xml_body(sync_collection_report_initial())
         .send(&service)
         .await;
@@ -561,9 +561,9 @@ async fn sync_collection_delta_sync() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -591,7 +591,7 @@ async fn sync_collection_delta_sync() {
     let service = create_db_test_service(&test_db.url()).await;
 
     // Get initial sync-token
-    let initial_response = TestRequest::report(&caldav_collection_path("alice", "testcal"))
+    let initial_response = TestRequest::report(&caldav_collection_path("testuser", "testcal"))
         .xml_body(sync_collection_report_initial())
         .send(&service)
         .await;
@@ -636,9 +636,9 @@ async fn report_invalid_xml_400() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let _collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -647,7 +647,7 @@ async fn report_invalid_xml_400() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::report(&caldav_collection_path("alice", "testcal"))
+    let response = TestRequest::report(&caldav_collection_path("testuser", "testcal"))
         .xml_body("this is not valid xml <><><")
         .send(&service)
         .await;
@@ -665,9 +665,9 @@ async fn report_unsupported_type() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let _collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -681,7 +681,7 @@ async fn report_unsupported_type() {
 <X:unknown-report xmlns:X="http://custom.example.com/">
 </X:unknown-report>"#;
 
-    let response = TestRequest::report(&caldav_collection_path("alice", "testcal"))
+    let response = TestRequest::report(&caldav_collection_path("testuser", "testcal"))
         .xml_body(body)
         .send(&service)
         .await;

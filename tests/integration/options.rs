@@ -18,14 +18,19 @@ async fn options_returns_allow_header() {
         .await
         .expect("Failed to seed role permissions");
 
-    test_db
+    let principal_id = test_db
         .seed_authenticated_user()
         .await
         .expect("Failed to seed authenticated user");
 
+    let _collection_id = test_db
+        .seed_collection(principal_id, "calendar", "some-collection", None)
+        .await
+        .expect("Failed to seed collection");
+
     let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::options("/api/caldav/some-collection/")
+    let response = TestRequest::options(&caldav_collection_path("testuser", "some-collection"))
         .send(&service)
         .await;
 

@@ -68,9 +68,32 @@ pub(super) async fn handle_get_or_head(
         "Parsed request path"
     );
 
-    // If middleware already loaded instance, reuse it
+    // If middleware already loaded instance, reuse it but STILL check authorization
     let maybe_inst = get_instance_from_depot(depot).ok().cloned();
     let (instance, canonical_bytes) = if let Some(inst) = maybe_inst {
+        // Authorization check: require read access even when using depot-cached instance
+        let provider = match connection::get_db_from_depot(depot) {
+            Ok(p) => p,
+            Err(e) => {
+                tracing::error!(error = %e, "Failed to get database provider");
+                res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+                return;
+            }
+        };
+        let mut conn = match provider.get_connection().await {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::error!(error = %e, "Failed to get database connection");
+                res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+                return;
+            }
+        };
+        if let Err(e) = check_read_authorization(depot, &mut conn, &inst).await {
+            tracing::debug!(error = %e, instance_id = %inst.id, "Authorization denied");
+            res.status_code(StatusCode::FORBIDDEN);
+            return;
+        }
+
         match load_entity_bytes_for_instance(depot, &inst).await {
             Ok(Some(bytes)) => (inst, bytes),
             Ok(None) => {

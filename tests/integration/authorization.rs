@@ -21,7 +21,6 @@
 //! - `owner`: all permissions including admin
 
 use salvo::http::StatusCode;
-use tracing_test::traced_test;
 
 use super::helpers::*;
 
@@ -31,7 +30,6 @@ use super::helpers::*;
 
 /// ## Summary
 /// Test that GET returns 403 Forbidden when no permission is granted.
-#[traced_test]
 #[test_log::test(tokio::test)]
 async fn get_returns_403_without_permission() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
@@ -96,7 +94,6 @@ async fn get_returns_403_without_permission() {
 
 /// ## Summary
 /// Test that GET returns 200 OK when read permission is granted.
-#[traced_test]
 #[test_log::test(tokio::test)]
 async fn get_returns_200_with_read_permission() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
@@ -171,7 +168,6 @@ async fn get_returns_200_with_read_permission() {
 
 /// ## Summary
 /// Test that DELETE returns 403 Forbidden when only read permission is granted.
-#[traced_test]
 #[test_log::test(tokio::test)]
 async fn delete_returns_403_without_write_permission() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
@@ -245,7 +241,6 @@ async fn delete_returns_403_without_write_permission() {
 
 /// ## Summary
 /// Test that DELETE returns 204 No Content when editor permission is granted.
-#[traced_test]
 #[test_log::test(tokio::test)]
 async fn delete_returns_204_with_write_permission() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
@@ -314,7 +309,6 @@ async fn delete_returns_204_with_write_permission() {
 
 /// ## Summary
 /// Test that PUT (create new resource) returns 403 when no write permission on collection.
-#[traced_test]
 #[test_log::test(tokio::test)]
 async fn put_new_returns_403_without_collection_write_permission() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
@@ -362,7 +356,6 @@ END:VCALENDAR";
 
 /// ## Summary
 /// Test that PUT (update existing resource) returns 403 when only read permission.
-#[traced_test]
 #[test_log::test(tokio::test)]
 async fn put_update_returns_403_without_write_permission() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
@@ -446,7 +439,6 @@ END:VCALENDAR";
 
 /// ## Summary
 /// Test that PROPFIND on a resource returns 403 when no permission.
-#[traced_test]
 #[test_log::test(tokio::test)]
 async fn propfind_returns_403_without_permission() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
@@ -518,7 +510,6 @@ async fn propfind_returns_403_without_permission() {
 
 /// ## Summary
 /// Test that PROPPATCH returns 403 when only read permission.
-#[traced_test]
 #[test_log::test(tokio::test)]
 async fn proppatch_returns_403_without_write_permission() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
@@ -601,7 +592,6 @@ async fn proppatch_returns_403_without_write_permission() {
 /// ## Summary
 /// Test that owner role includes read permission.
 /// Owner role should allow read access via role→permission mapping.
-#[traced_test]
 #[test_log::test(tokio::test)]
 async fn get_returns_200_with_owner_role_for_read_action() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
@@ -671,7 +661,6 @@ async fn get_returns_200_with_owner_role_for_read_action() {
 /// ## Summary
 /// Test that editor-basic role includes read permission.
 /// Editor-basic role should allow read access via role→permission mapping.
-#[traced_test]
 #[test_log::test(tokio::test)]
 async fn get_returns_200_with_edit_role_for_read_action() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
@@ -739,7 +728,6 @@ async fn get_returns_200_with_edit_role_for_read_action() {
 
 /// ## Summary
 /// Test that editor role can perform delete actions.
-#[traced_test]
 #[test_log::test(tokio::test)]
 async fn delete_returns_204_with_edit_role() {
     let test_db = TestDb::new().await.expect("Failed to create test database");

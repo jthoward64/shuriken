@@ -4,7 +4,6 @@
 //! Verifies property modification, protected properties, and partial success handling.
 
 use salvo::http::StatusCode;
-use tracing_test::traced_test;
 
 use super::helpers::*;
 
@@ -14,7 +13,6 @@ use super::helpers::*;
 
 /// ## Summary
 /// Test that PROPPATCH returns 207 Multi-Status.
-#[traced_test]
 #[test_log::test(tokio::test)]
 async fn proppatch_returns_multistatus() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
@@ -23,9 +21,9 @@ async fn proppatch_returns_multistatus() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -40,7 +38,7 @@ async fn proppatch_returns_multistatus() {
     let service = create_db_test_service(&test_db.url()).await;
 
     let body = proppatch_set(&[("DAV:", "displayname", "New Name")]);
-    let response = TestRequest::proppatch(&format!("/api/caldav/{collection_id}/"))
+    let response = TestRequest::proppatch(&caldav_collection_path("testuser", "testcal"))
         .xml_body(&body)
         .send(&service)
         .await;
@@ -62,9 +60,9 @@ async fn proppatch_set_protected_prop_403() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -88,7 +86,7 @@ async fn proppatch_set_protected_prop_403() {
   </D:set>
 </D:propertyupdate>"#;
 
-    let response = TestRequest::proppatch(&format!("/api/caldav/{collection_id}/"))
+    let response = TestRequest::proppatch(&caldav_collection_path("testuser", "testcal"))
         .xml_body(body)
         .send(&service)
         .await;
@@ -108,9 +106,9 @@ async fn proppatch_remove_protected_prop_403() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -134,7 +132,7 @@ async fn proppatch_remove_protected_prop_403() {
   </D:remove>
 </D:propertyupdate>"#;
 
-    let response = TestRequest::proppatch(&format!("/api/caldav/{collection_id}/"))
+    let response = TestRequest::proppatch(&caldav_collection_path("testuser", "testcal"))
         .xml_body(body)
         .send(&service)
         .await;
@@ -158,9 +156,9 @@ async fn proppatch_set_displayname_200() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -175,7 +173,7 @@ async fn proppatch_set_displayname_200() {
     let service = create_db_test_service(&test_db.url()).await;
 
     let body = proppatch_set(&[("DAV:", "displayname", "My Work Calendar")]);
-    let response = TestRequest::proppatch(&format!("/api/caldav/{collection_id}/"))
+    let response = TestRequest::proppatch(&caldav_collection_path("testuser", "testcal"))
         .xml_body(&body)
         .send(&service)
         .await;
@@ -186,7 +184,7 @@ async fn proppatch_set_displayname_200() {
 
     // Verify persistence with PROPFIND
     let props = propfind_props(&[("DAV:", "displayname")]);
-    let verify_response = TestRequest::propfind(&format!("/api/caldav/{collection_id}/"))
+    let verify_response = TestRequest::propfind(&caldav_collection_path("testuser", "testcal"))
         .depth("0")
         .xml_body(&props)
         .send(&service)
@@ -207,9 +205,9 @@ async fn proppatch_set_calendar_description() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -232,7 +230,7 @@ async fn proppatch_set_calendar_description() {
   </D:set>
 </D:propertyupdate>"#;
 
-    let response = TestRequest::proppatch(&format!("/api/caldav/{collection_id}/"))
+    let response = TestRequest::proppatch(&caldav_collection_path("testuser", "testcal"))
         .xml_body(body)
         .send(&service)
         .await;
@@ -252,9 +250,9 @@ async fn proppatch_remove_displayname() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", Some("Original Name"))
@@ -277,7 +275,7 @@ async fn proppatch_remove_displayname() {
   </D:remove>
 </D:propertyupdate>"#;
 
-    let response = TestRequest::proppatch(&format!("/api/caldav/{collection_id}/"))
+    let response = TestRequest::proppatch(&caldav_collection_path("testuser", "testcal"))
         .xml_body(body)
         .send(&service)
         .await;
@@ -297,9 +295,9 @@ async fn proppatch_set_multiple_props() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -323,7 +321,7 @@ async fn proppatch_set_multiple_props() {
   </D:set>
 </D:propertyupdate>"#;
 
-    let response = TestRequest::proppatch(&format!("/api/caldav/{collection_id}/"))
+    let response = TestRequest::proppatch(&caldav_collection_path("testuser", "testcal"))
         .xml_body(body)
         .send(&service)
         .await;
@@ -347,9 +345,9 @@ async fn proppatch_partial_success_207() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -374,7 +372,7 @@ async fn proppatch_partial_success_207() {
   </D:set>
 </D:propertyupdate>"#;
 
-    let response = TestRequest::proppatch(&format!("/api/caldav/{collection_id}/"))
+    let response = TestRequest::proppatch(&caldav_collection_path("testuser", "testcal"))
         .xml_body(body)
         .send(&service)
         .await;
@@ -424,9 +422,9 @@ async fn proppatch_invalid_xml_400() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -440,7 +438,7 @@ async fn proppatch_invalid_xml_400() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::proppatch(&format!("/api/caldav/{collection_id}/"))
+    let response = TestRequest::proppatch(&caldav_collection_path("testuser", "testcal"))
         .xml_body("this is not valid xml <><><")
         .send(&service)
         .await;
@@ -458,9 +456,9 @@ async fn proppatch_empty_body_error() {
         .await
         .expect("Failed to seed role permissions");
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_authenticated_user()
         .await
-        .expect("Failed to seed principal");
+        .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
         .seed_collection(principal_id, "calendar", "testcal", None)
@@ -474,7 +472,7 @@ async fn proppatch_empty_body_error() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::proppatch(&format!("/api/caldav/{collection_id}/"))
+    let response = TestRequest::proppatch(&caldav_collection_path("testuser", "testcal"))
         .send(&service)
         .await;
 

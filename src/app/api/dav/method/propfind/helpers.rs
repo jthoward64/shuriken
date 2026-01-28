@@ -1,8 +1,9 @@
 //! Helper functions for PROPFIND request processing.
 
-use salvo::Request;
+use salvo::{Depot, Request};
 
 use crate::app::api::dav::extract::headers::Depth;
+use crate::component::auth::get_terminal_collection_from_depot;
 use crate::component::db::connection;
 use crate::component::rfc::dav::core::{
     DavProperty, Href, Multistatus, PropstatResponse, QName, property::PropertyValue,
@@ -19,13 +20,14 @@ use crate::component::rfc::dav::core::{
 pub(super) async fn build_propfind_response(
     conn: &mut connection::DbConnection<'_>,
     req: &Request,
+    depot: &Depot,
     depth: Depth,
     propfind_req: &crate::component::rfc::dav::core::PropfindRequest,
 ) -> anyhow::Result<Multistatus> {
     let path = req.uri().path();
 
-    // TODO: Parse path to determine if this is a collection or item
-    // TODO: Load resource from database
+    // Try to get collection from depot (populated by slug_resolver middleware)
+    let collection = get_terminal_collection_from_depot(depot).ok();
 
     let mut multistatus = Multistatus::new();
 
@@ -39,7 +41,7 @@ pub(super) async fn build_propfind_response(
 
     // Stub: Return a minimal response for the requested resource
     let href = Href::new(path);
-    let properties = get_properties_for_resource(conn, path, propfind_req).await?;
+    let properties = get_properties_for_resource(conn, path, collection, propfind_req).await?;
 
     let response = PropstatResponse::ok(href, properties);
     multistatus.add_response(response);
@@ -57,18 +59,24 @@ pub(super) async fn build_propfind_response(
 ///
 /// ## Errors
 /// Returns errors if property resolution fails.
-#[expect(clippy::unused_async, clippy::too_many_lines)]
+#[expect(clippy::too_many_lines)]
 async fn get_properties_for_resource(
     _conn: &mut connection::DbConnection<'_>,
     _path: &str,
+    collection: Option<&crate::component::model::dav::collection::DavCollection>,
     propfind_req: &crate::component::rfc::dav::core::PropfindRequest,
 ) -> anyhow::Result<Vec<DavProperty>> {
     let mut properties = Vec::new();
 
+    // Get the displayname from the collection, or use a sensible default
+    let display_name = collection
+        .and_then(|c| c.display_name.as_deref())
+        .unwrap_or("Calendar");
+
     // Handle different PROPFIND types
     if propfind_req.is_allprop() {
         // Return all defined properties
-        properties.push(DavProperty::text(QName::dav("displayname"), "Calendar"));
+        properties.push(DavProperty::text(QName::dav("displayname"), display_name));
         properties.push(DavProperty {
             name: QName::dav("resourcetype"),
             value: Some(PropertyValue::ResourceType(vec![
@@ -97,7 +105,7 @@ async fn get_properties_for_resource(
             // For now, stub with placeholder values
             match (qname.namespace_uri(), qname.local_name()) {
                 ("DAV:", "displayname") => {
-                    properties.push(DavProperty::text(qname, "Calendar"));
+                    properties.push(DavProperty::text(qname, display_name));
                 }
                 ("DAV:", "resourcetype") => {
                     properties.push(DavProperty {
