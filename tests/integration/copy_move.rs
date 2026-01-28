@@ -42,6 +42,11 @@ async fn move_rename_item_updates_href() {
         .await
         .expect("Failed to seed entity");
 
+    test_db
+        .seed_minimal_icalendar_event(entity_id, "move-test@example.com", "Move Test Event")
+        .await
+        .expect("Failed to seed iCalendar event");
+
     let _instance_id = test_db
         .seed_instance(
             collection_id,
@@ -114,6 +119,11 @@ async fn move_within_collection() {
         .await
         .expect("Failed to seed entity");
 
+    test_db
+        .seed_minimal_icalendar_event(entity_id, "within-test@example.com", "Within Test Event")
+        .await
+        .expect("Failed to seed iCalendar event");
+
     let _instance_id = test_db
         .seed_instance(
             collection_id,
@@ -182,6 +192,11 @@ async fn move_across_collections() {
         .await
         .expect("Failed to seed entity");
 
+    test_db
+        .seed_minimal_icalendar_event(entity_id, "cross-move@example.com", "Cross Collection Move")
+        .await
+        .expect("Failed to seed iCalendar event");
+
     let _instance_id = test_db
         .seed_instance(
             collection_a,
@@ -248,6 +263,11 @@ async fn copy_duplicates_resource() {
         .await
         .expect("Failed to seed entity");
 
+    test_db
+        .seed_minimal_icalendar_event(entity_id, "copy-test@example.com", "Copy Test Event")
+        .await
+        .expect("Failed to seed iCalendar event");
+
     let _instance_id = test_db
         .seed_instance(
             collection_id,
@@ -308,6 +328,11 @@ async fn copy_does_not_create_tombstone() {
         .seed_entity("icalendar", Some("no-tomb@example.com"))
         .await
         .expect("Failed to seed entity");
+
+    test_db
+        .seed_minimal_icalendar_event(entity_id, "no-tomb@example.com", "No Tombstone Test")
+        .await
+        .expect("Failed to seed iCalendar event");
 
     let _instance_id = test_db
         .seed_instance(
@@ -373,6 +398,11 @@ async fn move_destination_exists_overwrite_false_412() {
         .await
         .expect("Failed to seed source entity");
 
+    test_db
+        .seed_minimal_icalendar_event(source_entity_id, "source-conflict@example.com", "Source Conflict")
+        .await
+        .expect("Failed to seed iCalendar event");
+
     let _source_instance = test_db
         .seed_instance(
             collection_id,
@@ -390,6 +420,11 @@ async fn move_destination_exists_overwrite_false_412() {
         .seed_entity("icalendar", Some("dest-conflict@example.com"))
         .await
         .expect("Failed to seed dest entity");
+
+    test_db
+        .seed_minimal_icalendar_event(dest_entity_id, "dest-conflict@example.com", "Dest Conflict")
+        .await
+        .expect("Failed to seed iCalendar event");
 
     let _dest_instance = test_db
         .seed_instance(
@@ -447,7 +482,10 @@ async fn move_destination_exists_overwrite_true_succeeds() {
         .seed_entity("icalendar", Some("src-overwrite@example.com"))
         .await
         .expect("Failed to seed source entity");
-
+    test_db
+        .seed_minimal_icalendar_event(source_entity, "src-overwrite@example.com", "Source Overwrite")
+        .await
+        .expect("Failed to seed iCalendar event");
     let _source_instance = test_db
         .seed_instance(
             collection_id,
@@ -465,7 +503,10 @@ async fn move_destination_exists_overwrite_true_succeeds() {
         .seed_entity("icalendar", Some("dst-overwrite@example.com"))
         .await
         .expect("Failed to seed dest entity");
-
+    test_db
+        .seed_minimal_icalendar_event(dest_entity, "dst-overwrite@example.com", "Dest Overwrite")
+        .await
+        .expect("Failed to seed iCalendar event");
     let _dest_instance = test_db
         .seed_instance(
             collection_id,
@@ -530,6 +571,11 @@ async fn move_generates_tombstone() {
         .seed_entity("icalendar", Some("tomb-test@example.com"))
         .await
         .expect("Failed to seed entity");
+
+    test_db
+        .seed_minimal_icalendar_event(entity_id, "tomb-test@example.com", "Tombstone Test")
+        .await
+        .expect("Failed to seed iCalendar event");
 
     let _instance_id = test_db
         .seed_instance(
@@ -610,6 +656,11 @@ async fn move_without_destination_400() {
         .seed_entity("icalendar", Some("no-dest@example.com"))
         .await
         .expect("Failed to seed entity");
+
+    test_db
+        .seed_minimal_icalendar_event(entity_id, "no-dest@example.com", "No Destination Test")
+        .await
+        .expect("Failed to seed iCalendar event");
 
     let _instance_id = test_db
         .seed_instance(

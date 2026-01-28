@@ -17,7 +17,6 @@ use crate::component::db::query::carddav::card_index;
 use crate::component::db::query::dav::{collection, instance};
 use crate::component::model::dav::instance::DavInstance;
 
-
 /// ## Summary
 /// Handles DELETE requests for `WebDAV` resources.
 ///
@@ -217,7 +216,7 @@ async fn check_delete_authorization(
 ) -> Result<(), StatusCode> {
     let (subjects, authorizer) = get_auth_context(depot, conn).await?;
 
-    // Get ResourceLocation from depot (populated by slug_resolver middleware)
+    // Get ResourceLocation from depot (use resolved UUID-based location for authorization)
     let resource = get_resolved_location_from_depot(depot).map_err(|e| {
         tracing::error!(error = %e, "ResourceLocation not found in depot; slug_resolver middleware may not have run");
         StatusCode::INTERNAL_SERVER_ERROR

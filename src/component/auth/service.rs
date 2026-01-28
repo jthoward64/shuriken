@@ -88,20 +88,53 @@ impl Authorizer {
         let path = resource.to_resource_path(false)?;
         let act = action.as_casbin_action();
 
+        tracing::debug!(
+            path = %path,
+            action = %act,
+            subject_count = subjects.len(),
+            "Authorization check started"
+        );
+
         // Check each subject until we find one that's allowed
         for subject in subjects {
             let sub = subject.casbin_subject();
+
+            tracing::trace!(
+                subject = %sub,
+                path = %path,
+                action = %act,
+                "Checking subject"
+            );
 
             let allowed = self
                 .enforcer
                 .enforce((&sub, &path, act))
                 .map_err(AppError::CasbinError)?;
 
+            tracing::trace!(
+                subject = %sub,
+                path = %path,
+                action = %act,
+                allowed = %allowed,
+                "Subject check result"
+            );
+
             if allowed {
+                tracing::debug!(
+                    subject = %sub,
+                    path = %path,
+                    action = %act,
+                    "Authorization granted"
+                );
                 return Ok(AuthzResult::Allowed);
             }
         }
 
+        tracing::debug!(
+            path = %path,
+            action = %act,
+            "Authorization denied for all subjects"
+        );
         Ok(AuthzResult::Denied)
     }
 

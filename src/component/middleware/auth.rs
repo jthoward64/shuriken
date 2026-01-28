@@ -1,7 +1,10 @@
 use salvo::Depot;
 use tracing::error;
 
-use crate::component::{auth::authenticate::authenticate, model};
+use crate::component::{
+    auth::{authenticate::authenticate, depot::depot_keys},
+    model,
+};
 
 pub enum DepotUser {
     User(model::user::User),
@@ -33,23 +36,23 @@ impl salvo::Handler for AuthMiddleware {
         tracing::trace!("Authenticating request");
 
         if req.method() == salvo::http::Method::OPTIONS {
-            depot.insert("user", DepotUser::Public);
+            depot.insert(depot_keys::AUTHENTICATED_PRINCIPAL, DepotUser::Public);
             return;
         }
 
         match authenticate(req, depot).await {
             Ok(user) => {
                 tracing::debug!(user_email = %user.email, "User authenticated successfully");
-                depot.insert("user", DepotUser::User(user));
+                depot.insert(depot_keys::AUTHENTICATED_PRINCIPAL, DepotUser::User(user));
             }
             Err(e) => match e {
                 crate::component::error::AppError::NotAuthenticated => {
                     tracing::debug!("Request not authenticated, treating as public");
-                    depot.insert("user", DepotUser::Public);
+                    depot.insert(depot_keys::AUTHENTICATED_PRINCIPAL, DepotUser::Public);
                 }
                 crate::component::error::AppError::PoolError(_) => {
                     tracing::warn!(error = ?e, "Database pool unavailable, treating as public");
-                    depot.insert("user", DepotUser::Public);
+                    depot.insert(depot_keys::AUTHENTICATED_PRINCIPAL, DepotUser::Public);
                 }
                 crate::component::error::AppError::AuthenticationError(_) => {
                     tracing::warn!(error = ?e, "Authentication error");

@@ -93,7 +93,9 @@ pub async fn get_expanded_subjects(
 
     tracing::trace!(
         user_id = %user.id,
+        user_principal_id = %user.principal_id,
         group_count = group_principal_ids.len(),
+        group_principals = ?group_principal_ids,
         "Expanded user subjects"
     );
 

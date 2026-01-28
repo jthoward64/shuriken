@@ -140,10 +140,9 @@ async fn get_returns_200_with_read_permission() {
         .await
         .expect("Failed to seed instance");
 
-    // // Grant reader access to the authenticated user on their collection
-    // // Use UUID-based path pattern to match what slug_resolver produces
-    // let path_pattern = format!("/cal/{principal_id}/{collection_id}/**");
-    let path_pattern = cal_collection_glob("testuser", "bobcal", true);
+    // Grant reader access to the authenticated user on their collection
+    // Use UUID-based path pattern for authorization
+    let path_pattern = format!("/cal/{principal_id}/{collection_id}/**");
     test_db
         .seed_access_policy(
             &format!("principal:{principal_id}"),
@@ -212,10 +211,11 @@ async fn delete_returns_403_without_write_permission() {
         .expect("Failed to seed instance");
 
     // Grant only READ permission (reader role) - delete should be denied
+    let path_pattern = format!("/cal/{principal_id}/{collection_id}/**");
     test_db
         .seed_access_policy(
             &format!("principal:{principal_id}"),
-            &cal_collection_glob("testuser", "charliecal", true),
+            &path_pattern,
             "reader",
         )
         .await
@@ -285,10 +285,12 @@ async fn delete_returns_204_with_write_permission() {
         .expect("Failed to seed instance");
 
     // Grant editor permission (includes delete) - delete should succeed
+    // Use UUID-based path pattern for authorization
+    let path_pattern = format!("/cal/{principal_id}/{collection_id}/**");
     test_db
         .seed_access_policy(
             &format!("principal:{principal_id}"),
-            &cal_collection_glob("testuser", "danacal", true),
+            &path_pattern,
             "editor",
         )
         .await
@@ -400,10 +402,11 @@ async fn put_update_returns_403_without_write_permission() {
         .expect("Failed to seed instance");
 
     // Grant only reader permission - PUT should be denied
+    let path_pattern = format!("/cal/{principal_id}/{collection_id}/**");
     test_db
         .seed_access_policy(
             &format!("principal:{principal_id}"),
-            &cal_collection_glob("testuser", "frankcal", true),
+            &path_pattern,
             "reader",
         )
         .await
@@ -554,10 +557,11 @@ async fn proppatch_returns_403_without_write_permission() {
         .expect("Failed to seed instance");
 
     // Grant only reader permission
+    let path_pattern = format!("/cal/{principal_id}/{collection_id}/**");
     test_db
         .seed_access_policy(
             &format!("principal:{principal_id}"),
-            &cal_collection_glob("testuser", "henrycal", true),
+            &path_pattern,
             "reader",
         )
         .await
@@ -708,10 +712,11 @@ async fn get_returns_200_with_edit_role_for_read_action() {
         .expect("Failed to seed instance");
 
     // Grant editor-basic role (includes read, edit but not delete)
+    let path_pattern = format!("/cal/{principal_id}/{collection_id}/**");
     test_db
         .seed_access_policy(
             &format!("principal:{principal_id}"),
-            &cal_collection_glob("testuser", "carolcal", true),
+            &path_pattern,
             "editor-basic",
         )
         .await
@@ -771,10 +776,11 @@ async fn delete_returns_204_with_edit_role() {
         .expect("Failed to seed instance");
 
     // Grant editor role (includes delete)
+    let path_pattern = format!("/cal/{principal_id}/{collection_id}/**");
     test_db
         .seed_access_policy(
             &format!("principal:{principal_id}"),
-            &cal_collection_glob("testuser", "davecal", true),
+            &path_pattern,
             "editor",
         )
         .await

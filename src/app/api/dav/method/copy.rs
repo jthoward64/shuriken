@@ -5,7 +5,10 @@
 use salvo::http::StatusCode;
 use salvo::{Depot, Request, Response, handler};
 
-use crate::app::api::dav::extract::auth::{check_authorization, get_auth_context};
+use crate::app::api::{
+    DAV_ROUTE_PREFIX,
+    dav::extract::auth::{check_authorization, get_auth_context},
+};
 use crate::component::auth::{Action, get_instance_from_depot, get_resolved_location_from_depot};
 use crate::component::db::connection;
 use crate::component::middleware::path_parser::parse_and_resolve_path;
@@ -62,10 +65,17 @@ pub async fn copy(req: &mut Request, res: &mut Response, depot: &Depot) {
     };
 
     // Extract destination path from URL (Destination header contains full URL)
-    let dest_path = if let Some(path_start) = destination.find("/dav/") {
+    let dest_path = if let Some(path_start) = destination.find("/api/dav/") {
+        let full_path = &destination[path_start..];
+        // Strip /api/dav prefix for parsing
+        full_path
+            .strip_prefix(DAV_ROUTE_PREFIX)
+            .unwrap_or(full_path)
+    } else if let Some(path_start) = destination.find("/dav/") {
+        // Handle legacy paths without /api prefix
         &destination[path_start..]
     } else {
-        tracing::error!(destination = %destination, "Destination header does not contain /dav/ path");
+        tracing::error!(destination = %destination, "Destination header does not contain /api/dav/ or /dav/ path");
         res.status_code(StatusCode::BAD_REQUEST);
         return;
     };

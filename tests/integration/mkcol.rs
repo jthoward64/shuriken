@@ -25,9 +25,10 @@ async fn mkcalendar_creates_calendar_collection() {
         .await
         .expect("Failed to seed authenticated user");
 
-    // Grant owner access to the testuser's calendar namespace
+    // Grant owner access to the authenticated user on their namespace
+    // Use UUID-based path for authorization
     test_db
-        .seed_access_policy(&format!("principal:{principal_id}"), "/cal/testuser/**", "owner")
+        .seed_access_policy(&format!("principal:{principal_id}"), &format!("/cal/{principal_id}/**"), "owner")
         .await
         .expect("Failed to seed access policy");
 
@@ -68,9 +69,10 @@ async fn mkcalendar_initial_props_applied() {
         .await
         .expect("Failed to seed authenticated user");
 
-    // Grant owner access to the testuser's calendar namespace
+    // Grant owner access to the authenticated user on their namespace
+    // Use UUID-based path for authorization
     test_db
-        .seed_access_policy(&format!("principal:{principal_id}"), "/cal/testuser/**", "owner")
+        .seed_access_policy(&format!("principal:{principal_id}"), &format!("/cal/{principal_id}/**"), "owner")
         .await
         .expect("Failed to seed access policy");
 
@@ -295,9 +297,10 @@ async fn mkcol_creates_plain_collection() {
         .await
         .expect("Failed to seed authenticated user");
 
-    // Grant owner access to the testuser's calendar namespace (use cal for generic DAV collections)
+    // Grant owner access to the authenticated user on their namespace
+    // Use UUID-based path for authorization
     test_db
-        .seed_access_policy(&format!("principal:{principal_id}"), "/cal/testuser/**", "owner")
+        .seed_access_policy(&format!("principal:{principal_id}"), &format!("/cal/{principal_id}/**"), "owner")
         .await
         .expect("Failed to seed access policy");
 
@@ -383,9 +386,10 @@ async fn mkcalendar_protected_props_rejected() {
         .await
         .expect("Failed to seed authenticated user");
 
-    // Grant owner access to the testuser's calendar namespace
+    // Grant owner access to the authenticated user on their namespace
+    // Use UUID-based path for authorization
     test_db
-        .seed_access_policy(&format!("principal:{principal_id}"), "/cal/testuser/**", "owner")
+        .seed_access_policy(&format!("principal:{principal_id}"), &format!("/cal/{principal_id}/**"), "owner")
         .await
         .expect("Failed to seed access policy");
 
