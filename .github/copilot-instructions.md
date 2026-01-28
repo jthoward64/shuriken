@@ -434,6 +434,7 @@ pub struct AuthUser {
 - Supports direct sharing to users, groups, and "public"
 - Type-based permissions per resource type (calendar, calendar_event, addressbook, vcard)
 - Roles: freebusy, reader, writer, owner
+- **Authorization path format**: Casbin policies use **UUID-based paths** (e.g., `/cal/<principal-uuid>/<collection-uuid>/**`), NOT slug-based paths. This ensures policies remain stable even if collection slugs are renamed. Use `RESOLVED_LOCATION` from the depot for authorization checks, not `PATH_LOCATION`. Exception: For handlers that specifically need the original slug (e.g., PUT where the filename matters), use `PATH_LOCATION` only for that purpose, not for authorization.
 
 ### Implementation Guidelines
 
