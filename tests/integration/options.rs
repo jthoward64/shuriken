@@ -50,14 +50,19 @@ async fn options_returns_dav_header() {
         .await
         .expect("Failed to seed role permissions");
 
-    test_db
+    let principal_id = test_db
         .seed_authenticated_user()
         .await
         .expect("Failed to seed authenticated user");
 
+    let _collection_id = test_db
+        .seed_collection(principal_id, "calendar", "some-collection", None)
+        .await
+        .expect("Failed to seed collection");
+
     let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::options("/api/caldav/some-collection/")
+    let response = TestRequest::options(&caldav_collection_path("testuser", "some-collection"))
         .send(&service)
         .await;
 
@@ -77,14 +82,19 @@ async fn options_dav_header_contains_class_1() {
         .await
         .expect("Failed to seed role permissions");
 
-    test_db
+    let principal_id = test_db
         .seed_authenticated_user()
         .await
         .expect("Failed to seed authenticated user");
 
+    let _collection_id = test_db
+        .seed_collection(principal_id, "calendar", "some-path", None)
+        .await
+        .expect("Failed to seed collection");
+
     let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::options("/api/caldav/some-path/")
+    let response = TestRequest::options(&caldav_collection_path("testuser", "some-path"))
         .send(&service)
         .await;
 
@@ -104,14 +114,19 @@ async fn options_dav_header_contains_calendar_access() {
         .await
         .expect("Failed to seed role permissions");
 
-    test_db
+    let principal_id = test_db
         .seed_authenticated_user()
         .await
         .expect("Failed to seed authenticated user");
 
+    let _collection_id = test_db
+        .seed_collection(principal_id, "calendar", "calendar", None)
+        .await
+        .expect("Failed to seed collection");
+
     let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::options("/api/caldav/calendar/")
+    let response = TestRequest::options(&caldav_collection_path("testuser", "calendar"))
         .send(&service)
         .await;
 
@@ -131,14 +146,19 @@ async fn options_dav_header_contains_addressbook() {
         .await
         .expect("Failed to seed role permissions");
 
-    test_db
+    let principal_id = test_db
         .seed_authenticated_user()
         .await
         .expect("Failed to seed authenticated user");
 
+    let _collection_id = test_db
+        .seed_collection(principal_id, "addressbook", "addressbook", None)
+        .await
+        .expect("Failed to seed collection");
+
     let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::options("/api/carddav/addressbook/")
+    let response = TestRequest::options(&carddav_collection_path("testuser", "addressbook"))
         .send(&service)
         .await;
 
@@ -158,14 +178,19 @@ async fn options_allow_contains_dav_methods() {
         .await
         .expect("Failed to seed role permissions");
 
-    test_db
+    let principal_id = test_db
         .seed_authenticated_user()
         .await
         .expect("Failed to seed authenticated user");
 
+    let _collection_id = test_db
+        .seed_collection(principal_id, "calendar", "collection", None)
+        .await
+        .expect("Failed to seed collection");
+
     let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::options("/api/caldav/collection/")
+    let response = TestRequest::options(&caldav_collection_path("testuser", "collection"))
         .send(&service)
         .await;
 
@@ -194,14 +219,19 @@ async fn options_status_code() {
         .await
         .expect("Failed to seed role permissions");
 
-    test_db
+    let principal_id = test_db
         .seed_authenticated_user()
         .await
         .expect("Failed to seed authenticated user");
 
+    let _collection_id = test_db
+        .seed_collection(principal_id, "calendar", "resource", None)
+        .await
+        .expect("Failed to seed collection");
+
     let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::options("/api/caldav/resource/")
+    let response = TestRequest::options(&caldav_collection_path("testuser", "resource"))
         .send(&service)
         .await;
 
@@ -224,14 +254,19 @@ async fn options_no_locking_advertised_without_lock() {
         .await
         .expect("Failed to seed role permissions");
 
-    test_db
+    let principal_id = test_db
         .seed_authenticated_user()
         .await
         .expect("Failed to seed authenticated user");
 
+    let _collection_id = test_db
+        .seed_collection(principal_id, "calendar", "resource", None)
+        .await
+        .expect("Failed to seed collection");
+
     let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::options("/api/caldav/resource/")
+    let response = TestRequest::options(&caldav_collection_path("testuser", "resource"))
         .send(&service)
         .await;
 
@@ -269,9 +304,14 @@ async fn options_on_nonexistent_resource_succeeds() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::options("/api/caldav/nonexistent-uuid/nonexistent.ics")
-        .send(&service)
-        .await;
+    // Test with a non-existent collection slug that won't resolve through middleware
+    let response = TestRequest::options(&caldav_item_path(
+        "testuser",
+        "nonexistent",
+        "nonexistent.ics",
+    ))
+    .send(&service)
+    .await;
 
     // OPTIONS should succeed even for non-existent resources
     // This is required by WebDAV spec - server capabilities are path-independent
@@ -321,14 +361,19 @@ async fn options_no_auto_schedule_without_rfc6638() {
         .await
         .expect("Failed to seed role permissions");
 
-    test_db
+    let principal_id = test_db
         .seed_authenticated_user()
         .await
         .expect("Failed to seed authenticated user");
 
+    let _collection_id = test_db
+        .seed_collection(principal_id, "calendar", "calendar", None)
+        .await
+        .expect("Failed to seed collection");
+
     let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::options("/api/caldav/calendar/")
+    let response = TestRequest::options(&caldav_collection_path("testuser", "calendar"))
         .send(&service)
         .await;
 
@@ -355,14 +400,19 @@ async fn options_ignores_accept_header() {
         .await
         .expect("Failed to seed role permissions");
 
-    test_db
+    let principal_id = test_db
         .seed_authenticated_user()
         .await
         .expect("Failed to seed authenticated user");
 
+    let _collection_id = test_db
+        .seed_collection(principal_id, "calendar", "collection", None)
+        .await
+        .expect("Failed to seed collection");
+
     let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::options("/api/caldav/collection/")
+    let response = TestRequest::options(&caldav_collection_path("testuser", "collection"))
         .header("Accept", "application/xml")
         .send(&service)
         .await;

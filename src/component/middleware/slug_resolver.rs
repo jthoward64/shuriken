@@ -72,6 +72,7 @@ pub async fn resolve_path_and_load_entities(
                     .trim_end_matches(".vcf")
                     .to_string();
                 item_opt = Some(cleaned);
+                depot.insert(depot_keys::TARGET_FILEBASENAME, s.clone());
             }
             PathSegment::Glob { .. } => {
                 tracing::error!("Glob segments are not supported in slug resolution");

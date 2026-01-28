@@ -42,6 +42,11 @@ async fn get_calendar_object_content_type() {
         .await
         .expect("Failed to seed entity");
 
+    test_db
+        .seed_minimal_icalendar_event(entity_id, "event-123@example.com", "Test Event")
+        .await
+        .expect("Failed to seed event components");
+
     let _instance_id = test_db
         .seed_instance(
             collection_id,
@@ -94,6 +99,11 @@ async fn get_vcard_content_type() {
         .seed_entity("vcard", Some("contact-456@example.com"))
         .await
         .expect("Failed to seed entity");
+
+    test_db
+        .seed_minimal_vcard(entity_id, "contact-456@example.com", "Test Person")
+        .await
+        .expect("Failed to seed vcard components");
 
     let _instance_id = test_db
         .seed_instance(
@@ -151,7 +161,7 @@ async fn get_calendar_object_uses_component_tree() {
         .expect("Failed to seed collection owner");
 
     let entity_id = test_db
-        .seed_entity("calendar", Some("tree-event-001@example.com"))
+        .seed_entity("icalendar", Some("tree-event-001@example.com"))
         .await
         .expect("Failed to seed entity");
 
@@ -384,6 +394,11 @@ async fn head_matches_get_headers() {
         .await
         .expect("Failed to seed entity");
 
+    test_db
+        .seed_minimal_icalendar_event(entity_id, "event-789@example.com", "Test Event")
+        .await
+        .expect("Failed to seed event components");
+
     let _instance_id = test_db
         .seed_instance(
             collection_id,
@@ -485,6 +500,11 @@ async fn get_etag_present_and_strong() {
         .seed_entity("icalendar", Some("etag-test@example.com"))
         .await
         .expect("Failed to seed entity");
+
+    test_db
+        .seed_minimal_icalendar_event(entity_id, "etag-test@example.com", "Test Event")
+        .await
+        .expect("Failed to seed event components");
 
     let _instance_id = test_db
         .seed_instance(
@@ -612,6 +632,14 @@ async fn get_if_none_match_different_etag_returns_200() {
         .seed_entity("icalendar", Some("cond-test-2@example.com"))
         .await
         .expect("Failed to seed entity");
+    test_db
+        .seed_minimal_icalendar_event(entity_id, "cond-test@example.com", "Test Event")
+        .await
+        .expect("Failed to seed event components");
+    test_db
+        .seed_minimal_icalendar_event(entity_id, "cond-test-2@example.com", "Test Event")
+        .await
+        .expect("Failed to seed event components");
 
     let _instance_id = test_db
         .seed_instance(
@@ -667,6 +695,14 @@ async fn get_if_match_412() {
         .seed_entity("icalendar", Some("match-test@example.com"))
         .await
         .expect("Failed to seed entity");
+    test_db
+        .seed_minimal_icalendar_event(entity_id, "match-test-2@example.com", "Test Event")
+        .await
+        .expect("Failed to seed event components");
+    test_db
+        .seed_minimal_icalendar_event(entity_id, "match-test@example.com", "Test Event")
+        .await
+        .expect("Failed to seed event components");
 
     let _instance_id = test_db
         .seed_instance(
@@ -811,6 +847,11 @@ async fn get_last_modified_header() {
         .await
         .expect("Failed to seed entity");
 
+    test_db
+        .seed_minimal_icalendar_event(entity_id, "lm-test@example.com", "Test Event")
+        .await
+        .expect("Failed to seed event components");
+
     let _instance_id = test_db
         .seed_instance(
             collection_id,
@@ -862,6 +903,11 @@ async fn get_content_length_accurate() {
         .seed_entity("icalendar", Some("cl-test@example.com"))
         .await
         .expect("Failed to seed entity");
+
+    test_db
+        .seed_minimal_icalendar_event(entity_id, "cl-test@example.com", "Test Event")
+        .await
+        .expect("Failed to seed event components");
 
     let _instance_id = test_db
         .seed_instance(

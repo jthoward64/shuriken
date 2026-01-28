@@ -25,8 +25,6 @@ use crate::component::rfc::dav::core::{ExpandProperty, Multistatus, ReportType, 
 /// Returns 400 for invalid requests, 501 for unsupported reports.
 #[handler]
 pub async fn report(req: &mut Request, res: &mut Response, depot: &Depot) {
-    let path = req.uri().path().to_string();
-
     // Check if the collection was resolved by slug_resolver middleware
     // If not, return 404 (resource not found)
     if get_terminal_collection_from_depot(depot).is_err() {
@@ -117,28 +115,23 @@ pub async fn handle_sync_collection(
         }
     };
 
-    // Extract collection ID from request path to build resource ID
-    let collection_id = match crate::util::path::extract_collection_id(_req.uri().path()) {
-        Ok(id) if !id.is_nil() => id,
-        _ => {
-            tracing::warn!("Failed to extract collection ID from path");
-            res.status_code(StatusCode::BAD_REQUEST);
+    // Get collection from depot (resolved by slug_resolver middleware)
+    let _collection = match get_terminal_collection_from_depot(depot) {
+        Ok(coll) => coll,
+        Err(_) => {
+            tracing::debug!("Collection not found in depot for sync-collection REPORT");
+            res.status_code(StatusCode::NOT_FOUND);
             return;
         }
     };
 
-    // Prefer ResourceLocation from depot if available (resolved by slug_resolver middleware)
+    // Get the resource location for authorization (resolved by slug_resolver middleware)
     let resource = match get_resolved_location_from_depot(depot) {
         Ok(loc) => loc.clone(),
         Err(_) => {
-            // Fallback: Build a minimal resource location from collection ID for auth checks
-            // Using PathSegments to construct a valid ResourceLocation
-            use crate::component::auth::{PathSegment, ResourceLocation, ResourceType};
-            let segments = vec![
-                PathSegment::ResourceType(ResourceType::Calendar),
-                PathSegment::Collection(collection_id.to_string()),
-            ];
-            ResourceLocation::from_segments(segments)
+            tracing::error!("Failed to get resource location from depot");
+            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+            return;
         }
     };
 
@@ -234,28 +227,23 @@ pub async fn handle_expand_property(
         }
     };
 
-    // Extract collection ID from request path to build resource ID
-    let collection_id = match crate::util::path::extract_collection_id(req.uri().path()) {
-        Ok(id) if !id.is_nil() => id,
-        _ => {
-            tracing::warn!("Failed to extract collection ID from path");
-            res.status_code(StatusCode::BAD_REQUEST);
+    // Get collection from depot (resolved by slug_resolver middleware)
+    let _collection = match get_terminal_collection_from_depot(depot) {
+        Ok(coll) => coll,
+        Err(_) => {
+            tracing::debug!("Collection not found in depot for expand-property REPORT");
+            res.status_code(StatusCode::NOT_FOUND);
             return;
         }
     };
 
-    // Prefer ResourceLocation from depot if available (resolved by slug_resolver middleware)
+    // Get the resource location for authorization (resolved by slug_resolver middleware)
     let resource = match get_resolved_location_from_depot(depot) {
         Ok(loc) => loc.clone(),
         Err(_) => {
-            // Fallback: Build a minimal resource location from collection ID for auth checks
-            // Using PathSegments to construct a valid ResourceLocation
-            use crate::component::auth::{PathSegment, ResourceLocation, ResourceType};
-            let segments = vec![
-                PathSegment::ResourceType(ResourceType::Calendar),
-                PathSegment::Collection(collection_id.to_string()),
-            ];
-            ResourceLocation::from_segments(segments)
+            tracing::error!("Failed to get resource location from depot");
+            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+            return;
         }
     };
 

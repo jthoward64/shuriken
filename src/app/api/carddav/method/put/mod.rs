@@ -6,12 +6,13 @@ use salvo::http::{HeaderValue, StatusCode};
 use salvo::{Depot, Request, Response, handler};
 
 use crate::component::auth::{
-    Action, authorizer_from_depot, get_resolved_location_from_depot, get_subjects_from_depot,
+    Action, authorizer_from_depot, depot::get_target_filename_from_depot,
+    depot::get_terminal_collection_from_depot, get_resolved_location_from_depot,
+    get_subjects_from_depot,
 };
 use crate::component::carddav::service::object::{PutObjectContext, put_address_object};
 use crate::component::db::connection;
 use crate::component::error::AppError;
-use crate::util::path;
 
 use types::{PutError, PutResult};
 
@@ -35,8 +36,25 @@ use types::{PutError, PutResult};
 pub async fn put(req: &mut Request, res: &mut Response, depot: &Depot) {
     tracing::info!("Handling PUT request for vCard object");
 
-    // Get path before borrowing req mutably
-    let path = req.uri().path().to_string();
+    // Get the collection from the depot (set by SlugResolverHandler)
+    let collection = match get_terminal_collection_from_depot(depot) {
+        Ok(c) => c.clone(),
+        Err(e) => {
+            tracing::error!(error = %e, "Terminal collection not found in depot");
+            res.status_code(StatusCode::NOT_FOUND);
+            return;
+        }
+    };
+
+    // Get the resource slug from the depot (populated by SlugResolverHandler)
+    let slug = match get_target_filename_from_depot(depot) {
+        Ok(s) => s.clone(),
+        Err(e) => {
+            tracing::error!(error = %e, "Target filename not found in depot");
+            res.status_code(StatusCode::BAD_REQUEST);
+            return;
+        }
+    };
 
     // Read request body
     let body = match req.payload().await {
@@ -49,13 +67,6 @@ pub async fn put(req: &mut Request, res: &mut Response, depot: &Depot) {
     };
 
     tracing::debug!(bytes = body.len(), "Request body read successfully");
-
-    if let Ok(collection_id) = path::extract_collection_id(&path)
-        && collection_id.is_nil()
-    {
-        res.status_code(StatusCode::NOT_FOUND);
-        return;
-    }
 
     // Get database connection
     let provider = match connection::get_db_from_depot(depot) {
@@ -96,13 +107,22 @@ pub async fn put(req: &mut Request, res: &mut Response, depot: &Depot) {
     }
 
     // Check authorization: need write permission
-    if let Err(status) = check_put_authorization(depot, &mut conn, &path).await {
+    if let Err(status) = check_put_authorization(depot, &mut conn).await {
         res.status_code(status);
         return;
     }
 
     // Perform the PUT operation
-    match perform_put(&mut conn, &path, &body, if_none_match, if_match).await {
+    match perform_put(
+        &mut conn,
+        collection.id,
+        &slug,
+        &body,
+        if_none_match,
+        if_match,
+    )
+    .await
+    {
         Ok(PutResult::Created(etag)) => {
             tracing::info!(etag = %etag, "vCard object created");
             res.status_code(StatusCode::CREATED);
@@ -148,15 +168,12 @@ pub async fn put(req: &mut Request, res: &mut Response, depot: &Depot) {
 /// Returns `PutError` for validation failures, conflicts, or database errors.
 async fn perform_put(
     conn: &mut connection::DbConnection<'_>,
-    path: &str,
+    collection_id: uuid::Uuid,
+    slug: &str,
     body: &[u8],
     if_none_match: Option<String>,
     if_match: Option<String>,
 ) -> Result<PutResult, PutError> {
-    // Parse path to extract collection_id and uri
-    let (collection_id, uri) = path::parse_collection_and_uri(path)
-        .map_err(|e| PutError::InvalidVcardData(format!("Invalid path: {e}")))?;
-
     // Parse vCard to extract UID early for context
     let vcard_str = std::str::from_utf8(body)
         .map_err(|e| PutError::InvalidVcardData(format!("not valid UTF-8: {e}")))?;
@@ -167,7 +184,7 @@ async fn perform_put(
     // Create PUT context
     let ctx = PutObjectContext {
         collection_id,
-        slug: uri.trim_end_matches(".vcf").to_string(),
+        slug: slug.to_string(),
         entity_type: "addressbook".to_string(),
         logical_uid,
         if_none_match,
@@ -210,7 +227,6 @@ async fn perform_put(
 async fn check_put_authorization(
     depot: &Depot,
     conn: &mut connection::DbConnection<'_>,
-    _path: &str,
 ) -> Result<(), StatusCode> {
     // Get expanded subjects for the current user
     let subjects = get_subjects_from_depot(depot, conn).await.map_err(|e| {

@@ -1,34 +1,30 @@
-//! MKCOL method handler for Extended MKCOL (RFC 5689) for `CardDAV`.
-
-#![allow(clippy::manual_let_else)]
-#![allow(clippy::single_match_else)]
+//! MKCOL method handler for WebDAV collection creation.
 
 use salvo::http::StatusCode;
 use salvo::{Depot, Request, Response, handler};
 
 use crate::app::api::dav::extract::auth::get_auth_context;
-use crate::component::auth::{Action, get_resolved_location_from_depot};
+use crate::component::auth::{Action, ResourceType, get_resolved_location_from_depot};
 use crate::component::dav::service::collection::{CreateCollectionContext, create_collection};
 use crate::component::db::connection;
 use crate::component::rfc::dav::parse::{MkcolRequest, parse_mkcol};
 
 /// ## Summary
-/// Handles Extended MKCOL requests to create addressbook collections.
+/// Handles MKCOL requests to create WebDAV collections.
 ///
-/// Parses the Extended MKCOL XML request body (RFC 5689) with resourcetype and properties,
-/// creates an addressbook collection in the database, and sets the resourcetype.
+/// Supports both plain MKCOL (empty body) and Extended MKCOL (RFC 5689) with
+/// resourcetype and initial properties.
 ///
 /// ## Side Effects
-/// - Creates addressbook collection in database
-/// - Sets DAV:resourcetype to include DAV:collection and CARDDAV:addressbook
-/// - Applies initial properties (displayname, addressbook-description, etc.)
+/// - Creates collection in database
+/// - Sets DAV:resourcetype based on request body or parent path type
+/// - Applies initial properties (displayname, description, etc.)
 /// - Returns 201 Created
 ///
 /// ## Errors
 /// Returns 400 for invalid XML, 403 for authorization failures, 409 if exists, 500 for errors.
 #[handler]
-pub async fn mkcol_extended(req: &mut Request, res: &mut Response, depot: &Depot) {
-    // Get path to determine where to create the addressbook
+pub async fn mkcol(req: &mut Request, res: &mut Response, depot: &Depot) {
     let path = req.uri().path().to_string();
 
     // Get database connection
@@ -50,7 +46,7 @@ pub async fn mkcol_extended(req: &mut Request, res: &mut Response, depot: &Depot
         }
     };
 
-    // Check authorization: user must have Edit (write) permission on parent collection
+    // Check authorization: user must have Edit permission on parent
     let (subjects, authorizer) = match get_auth_context(depot, &mut conn).await {
         Ok(ctx) => ctx,
         Err(status) => {
@@ -59,11 +55,9 @@ pub async fn mkcol_extended(req: &mut Request, res: &mut Response, depot: &Depot
         }
     };
 
-    // Get the resolved resource location from depot (populated by slug_resolver)
     let parent_resource = match get_resolved_location_from_depot(depot) {
         Ok(loc) => loc,
         Err(_) => {
-            // If slug_resolver didn't resolve, we can't authorize
             tracing::warn!(path = %path, "Resource location not found in depot");
             res.status_code(StatusCode::BAD_REQUEST);
             return;
@@ -76,19 +70,19 @@ pub async fn mkcol_extended(req: &mut Request, res: &mut Response, depot: &Depot
         return;
     }
 
-    // Parse Extended MKCOL XML body (RFC 5689)
+    // Parse MKCOL XML body (RFC 5689) or empty for plain MKCOL
     let body = req.payload().await;
     let parsed_request = match body {
         Ok(bytes) if !bytes.is_empty() => match parse_mkcol(bytes) {
             Ok(request) => request,
             Err(e) => {
-                tracing::error!("Failed to parse Extended MKCOL body: {}", e);
+                tracing::error!("Failed to parse MKCOL body: {}", e);
                 res.status_code(StatusCode::BAD_REQUEST);
                 return;
             }
         },
         Ok(_) => {
-            // Empty body - no initial properties
+            // Empty body - plain MKCOL (creates generic collection)
             MkcolRequest::default()
         }
         Err(e) => {
@@ -98,15 +92,26 @@ pub async fn mkcol_extended(req: &mut Request, res: &mut Response, depot: &Depot
         }
     };
 
-    // Extract URI from path (last segment)
-    let uri = path
+    // Determine collection type from path context
+    let collection_type = match determine_collection_type(&path, &parsed_request) {
+        Ok(ctype) => ctype,
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to determine collection type");
+            res.status_code(StatusCode::BAD_REQUEST);
+            return;
+        }
+    };
+
+    // Extract slug from path (last segment)
+    let slug = path
+        .trim_end_matches('/')
         .split('/')
-        .next_back()
-        .unwrap_or("addressbook")
+        .last()
+        .unwrap_or("collection")
         .to_string();
 
-    // Get owner principal ID from authenticated subjects
-    let owner_principal_id = match extract_owner_principal_id(&subjects) {
+    // Get owner principal ID from auth context
+    let owner_principal_id = match extract_owner_principal_id(depot, &subjects) {
         Ok(id) => id,
         Err(e) => {
             tracing::error!(error = %e, "Failed to extract owner principal ID");
@@ -118,26 +123,24 @@ pub async fn mkcol_extended(req: &mut Request, res: &mut Response, depot: &Depot
     // Create collection context
     let ctx = CreateCollectionContext {
         owner_principal_id,
-        slug: uri,
-        collection_type: "addressbook".to_string(),
+        slug: slug.clone(),
+        collection_type,
         displayname: parsed_request.displayname,
         description: parsed_request.description,
     };
 
-    // Create the addressbook collection
+    // Create the collection
     match create_collection(&mut conn, &ctx).await {
         Ok(result) => {
             tracing::info!(
-                "Created addressbook collection: {} (ID: {})",
+                "Created collection: {} (ID: {})",
                 result.slug,
                 result.collection_id
             );
             res.status_code(StatusCode::CREATED);
-            // TODO: Set Location header
         }
         Err(e) => {
-            tracing::error!("Failed to create addressbook collection: {}", e);
-            // Check if it's a conflict (already exists)
+            tracing::error!(error = %e, "Failed to create collection");
             if e.to_string().contains("duplicate") || e.to_string().contains("exists") {
                 res.status_code(StatusCode::CONFLICT);
             } else {
@@ -147,21 +150,30 @@ pub async fn mkcol_extended(req: &mut Request, res: &mut Response, depot: &Depot
     }
 }
 
-/// Extract resource type from path.
-#[expect(dead_code, reason = "May be used for future path-based routing")]
-fn extract_resource_type_from_path(path: &str) -> Option<crate::component::auth::ResourceType> {
-    use crate::component::auth::ResourceType;
-    if path.contains("/calendars/") {
-        Some(ResourceType::Calendar)
-    } else if path.contains("/addressbooks/") {
-        Some(ResourceType::Addressbook)
+/// Determines collection type from path context and request body.
+fn determine_collection_type(path: &str, request: &MkcolRequest) -> anyhow::Result<String> {
+    // Check if request specifies resourcetype
+    if let Some(rt) = &request.resource_type {
+        if rt.contains("calendar") {
+            return Ok("calendar".to_string());
+        } else if rt.contains("addressbook") {
+            return Ok("addressbook".to_string());
+        }
+    }
+
+    // Infer from path context
+    if path.contains("/cal/") {
+        Ok("collection".to_string()) // Plain collection in calendar context
+    } else if path.contains("/card/") {
+        Ok("collection".to_string()) // Plain collection in addressbook context
     } else {
-        None
+        Ok("collection".to_string()) // Generic collection
     }
 }
 
 /// Extracts owner principal ID from auth context.
 fn extract_owner_principal_id(
+    _depot: &Depot,
     subjects: &crate::component::auth::ExpandedSubjects,
 ) -> anyhow::Result<uuid::Uuid> {
     use crate::component::auth::Subject;

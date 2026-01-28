@@ -82,12 +82,12 @@ fn try_lock_connection(
 /// Global database pool for test isolation.
 static DB_POOL: OnceCell<Arc<Mutex<DbPool>>> = OnceCell::const_new();
 
-/// Initializes the database pool with 20 pre-created test databases.
+/// Initializes the database pool with multiple distinct databases for testing.
 async fn init_db_pool() -> anyhow::Result<Arc<Mutex<DbPool>>> {
     let base_url = get_base_database_url();
     let admin_url = format!("{base_url}/postgres");
 
-    const DB_POOL_SIZE: usize = 5;
+    const DB_POOL_SIZE: usize = 75;
 
     eprintln!("[TestDb] Initializing pool of {DB_POOL_SIZE} test databases...");
 
@@ -1288,6 +1288,35 @@ impl TestDb {
         // Add SUMMARY property
         self.seed_property(vevent_id, "SUMMARY", Some(summary), 3)
             .await?;
+
+        Ok(())
+    }
+
+    /// Seeds a minimal valid vCard for an entity.
+    ///
+    /// Creates a VCARD component with VERSION, FN (full name), and UID properties.
+    ///
+    /// ## Errors
+    /// Returns an error if any component or property cannot be inserted.
+    pub async fn seed_minimal_vcard(
+        &self,
+        entity_id: uuid::Uuid,
+        uid: &str,
+        full_name: &str,
+    ) -> anyhow::Result<()> {
+        // Create VCARD component (root)
+        let vcard_id = self.seed_component(entity_id, None, "VCARD", 0).await?;
+
+        // Add VERSION property
+        self.seed_property(vcard_id, "VERSION", Some("4.0"), 0)
+            .await?;
+
+        // Add FN (full name) property
+        self.seed_property(vcard_id, "FN", Some(full_name), 1)
+            .await?;
+
+        // Add UID property
+        self.seed_property(vcard_id, "UID", Some(uid), 2).await?;
 
         Ok(())
     }

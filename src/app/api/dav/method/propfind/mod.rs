@@ -7,11 +7,10 @@ use salvo::{Depot, Request, Response, handler};
 
 use crate::app::api::dav::extract::auth::{check_authorization, get_auth_context};
 use crate::app::api::dav::extract::headers::{Depth, parse_depth};
-use crate::component::auth::{Action, get_resolved_location_from_depot};
+use crate::component::auth::{Action, get_resolved_location_from_depot, get_terminal_collection_from_depot};
 use crate::component::db::connection;
 use crate::component::rfc::dav::build::multistatus::serialize_multistatus;
 use crate::component::rfc::dav::parse::propfind::parse_propfind;
-use crate::util::path;
 
 use helpers::build_propfind_response;
 
@@ -41,9 +40,8 @@ pub async fn propfind(req: &mut Request, res: &mut Response, depot: &Depot) {
     let depth = parse_depth(req).unwrap_or_else(Depth::default_for_propfind);
     tracing::debug!(depth = ?depth, "Depth header parsed");
 
-    if let Ok(collection_id) = path::extract_collection_id(req.uri().path())
-        && collection_id.is_nil()
-    {
+    // Validate that the collection was resolved by slug_resolver middleware
+    if get_terminal_collection_from_depot(depot).is_err() {
         res.status_code(StatusCode::NOT_FOUND);
         return;
     }
@@ -92,7 +90,7 @@ pub async fn propfind(req: &mut Request, res: &mut Response, depot: &Depot) {
     };
 
     // Check authorization: need read permission on the target resource
-    if let Err(status) = check_propfind_authorization(depot, &mut conn, req.uri().path()).await {
+    if let Err(status) = check_propfind_authorization(depot, &mut conn).await {
         res.status_code(status);
         return;
     }
@@ -149,7 +147,6 @@ pub async fn propfind(req: &mut Request, res: &mut Response, depot: &Depot) {
 async fn check_propfind_authorization(
     depot: &Depot,
     conn: &mut connection::DbConnection<'_>,
-    _path: &str,
 ) -> Result<(), StatusCode> {
     let (subjects, authorizer) = get_auth_context(depot, conn).await?;
 

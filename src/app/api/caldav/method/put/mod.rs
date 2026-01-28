@@ -6,15 +6,14 @@ use salvo::http::{HeaderValue, StatusCode};
 use salvo::{Depot, Request, Response, handler};
 
 use crate::component::auth::{
-    Action, ResourceType, authorizer_from_depot, depot::get_terminal_collection_from_depot,
-    get_subjects_from_depot,
+    Action, ResourceType, authorizer_from_depot, depot::get_target_filename_from_depot,
+    depot::get_terminal_collection_from_depot, get_subjects_from_depot,
 };
 use crate::component::caldav::service::object::{PutObjectContext, put_calendar_object};
 use crate::component::db::connection;
 use crate::component::db::query::dav::instance;
 use crate::component::error::AppError;
 use crate::component::model::dav::instance::DavInstance;
-use crate::util::path;
 
 use types::{PutError, PutResult};
 
@@ -38,9 +37,6 @@ use types::{PutError, PutResult};
 pub async fn put(req: &mut Request, res: &mut Response, depot: &Depot) {
     tracing::info!("Handling PUT request for calendar object");
 
-    // Get path before borrowing req mutably
-    let path = req.uri().path().to_string();
-
     // Get the collection from the depot (set by SlugResolverHandler)
     let collection = match get_terminal_collection_from_depot(depot) {
         Ok(c) => c.clone(),
@@ -51,11 +47,11 @@ pub async fn put(req: &mut Request, res: &mut Response, depot: &Depot) {
         }
     };
 
-    // Extract the resource slug from the path (last segment without extension)
-    let slug = match path::extract_resource_uri(&path) {
-        Ok(uri) => uri.trim_end_matches(".ics").to_string(),
+    // Get the resource slug from the depot (populated by SlugResolverHandler)
+    let slug = match get_target_filename_from_depot(depot) {
+        Ok(s) => s.clone(),
         Err(e) => {
-            tracing::error!(error = %e, "Failed to extract resource URI from path");
+            tracing::error!(error = %e, "Target filename not found in depot");
             res.status_code(StatusCode::BAD_REQUEST);
             return;
         }

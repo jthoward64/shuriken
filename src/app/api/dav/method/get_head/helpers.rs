@@ -94,7 +94,7 @@ pub(super) async fn handle_get_or_head(
             return;
         }
 
-        match load_entity_bytes_for_instance(depot, &inst).await {
+        match load_entity_bytes_for_instance(&mut conn, &inst).await {
             Ok(Some(bytes)) => (inst, bytes),
             Ok(None) => {
                 tracing::debug!("Entity tree missing for instance");
@@ -127,16 +127,12 @@ pub(super) async fn handle_get_or_head(
     set_response_headers_and_body(res, &instance, &canonical_bytes, is_head);
 }
 async fn load_entity_bytes_for_instance(
-    depot: &Depot,
+    conn: &mut connection::DbConnection<'_>,
     inst: &DavInstance,
 ) -> anyhow::Result<Option<Vec<u8>>> {
-    use crate::component::db::connection;
     use crate::component::db::query::dav::entity;
 
-    let provider = connection::get_db_from_depot(depot)?;
-    let mut conn = provider.get_connection().await?;
-
-    let Some((_, tree)) = entity::get_entity_with_tree(&mut conn, inst.entity_id).await? else {
+    let Some((_, tree)) = entity::get_entity_with_tree(conn, inst.entity_id).await? else {
         return Ok(None);
     };
 

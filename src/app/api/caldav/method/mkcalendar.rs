@@ -105,12 +105,11 @@ pub async fn mkcalendar(req: &mut Request, res: &mut Response, depot: &Depot) {
         .unwrap_or("calendar")
         .to_string();
 
-    // TODO: Get authenticated user's principal ID
-    // For now, use a placeholder
-    let owner_principal_id = match extract_owner_from_path(&path) {
+    // Get owner principal ID from authenticated subjects
+    let owner_principal_id = match extract_owner_principal_id(&subjects) {
         Ok(id) => id,
-        Err(_) => {
-            tracing::error!("Failed to extract owner from path: {}", path);
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to extract owner principal ID");
             res.status_code(StatusCode::BAD_REQUEST);
             return;
         }
@@ -149,6 +148,7 @@ pub async fn mkcalendar(req: &mut Request, res: &mut Response, depot: &Depot) {
 }
 
 /// Extract resource type from path.
+#[expect(dead_code, reason = "May be used for future path-based routing")]
 fn extract_resource_type_from_path(path: &str) -> Option<crate::component::auth::ResourceType> {
     use crate::component::auth::ResourceType;
     if path.contains("/calendars/") {
@@ -160,10 +160,18 @@ fn extract_resource_type_from_path(path: &str) -> Option<crate::component::auth:
     }
 }
 
-/// Placeholder function to extract owner principal ID from path.
-#[expect(clippy::unnecessary_wraps)]
-fn extract_owner_from_path(_path: &str) -> Result<uuid::Uuid, String> {
-    // TODO: Implement proper path parsing and authentication
-    // For now, return a dummy UUID
-    Ok(uuid::Uuid::nil())
+/// Extracts owner principal ID from auth context.
+fn extract_owner_principal_id(
+    subjects: &crate::component::auth::ExpandedSubjects,
+) -> anyhow::Result<uuid::Uuid> {
+    use crate::component::auth::Subject;
+
+    // The first subject should be the user's principal
+    for subject in subjects.iter() {
+        if let Subject::Principal(id) = subject {
+            return Ok(*id);
+        }
+    }
+
+    anyhow::bail!("No authenticated principal found in subjects")
 }

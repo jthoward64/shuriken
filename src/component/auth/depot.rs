@@ -24,6 +24,8 @@ pub mod depot_keys {
     pub const COLLECTION_CHAIN: &str = "__collection_chain";
     pub const TERMINAL_COLLECTION: &str = "__terminal_collection";
     pub const INSTANCE: &str = "__instance";
+
+    pub const TARGET_FILEBASENAME: &str = "__target_filename";
 }
 
 /// Get the authenticated user from the depot.
@@ -185,4 +187,30 @@ pub fn get_instance_from_depot(
     depot
         .get::<crate::component::model::dav::instance::DavInstance>(depot_keys::INSTANCE)
         .map_err(|_| AppError::NotFound("Instance not found in depot".to_string()))
+}
+
+/// Get the target filename base (without extension) from the depot.
+///
+/// ## Errors
+/// Returns `NotFound` if the target filename is not present.
+pub fn get_target_filename_from_depot(depot: &salvo::Depot) -> AppResult<&String> {
+    depot
+        .get::<String>(depot_keys::TARGET_FILEBASENAME)
+        .map_err(|_| AppError::NotFound("Target filename not found in depot".to_string()))
+}
+
+/// Get the target filename with extension from the depot.
+///
+/// ## Errors
+/// Returns `NotFound` if the target filename is not present.
+pub fn get_target_file_with_extension_from_depot(depot: &salvo::Depot) -> AppResult<String> {
+    // Combine with the resource type to form the full filename
+    let filename = depot
+        .get::<String>(depot_keys::TARGET_FILEBASENAME)
+        .map_err(|_| AppError::NotFound("Target filename not found in depot".to_string()))?;
+    let resource_type = depot
+        .get::<crate::component::auth::ResourceType>(depot_keys::RESOLVED_LOCATION)
+        .map_err(|_| AppError::NotFound("Resource type not found in depot".to_string()))?;
+    let full_filename = format!("{}.{}", filename, resource_type.item_extension());
+    Ok(full_filename)
 }

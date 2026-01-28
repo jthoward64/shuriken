@@ -19,26 +19,23 @@ use crate::component::rfc::dav::core::{AddressbookQuery, PropertyName};
 /// ## Errors
 /// Returns 400 for invalid paths, 500 for server errors.
 pub async fn handle(
-    req: &mut Request,
+    _req: &mut Request,
     res: &mut Response,
     query: AddressbookQuery,
     properties: Vec<PropertyName>,
     depot: &Depot,
 ) {
     // Extract collection_id from request path
-    let collection_id = match crate::util::path::extract_collection_id(req.uri().path()) {
-        Ok(id) => id,
-        Err(e) => {
-            tracing::error!("Failed to extract collection_id from path: {}", e);
-            res.status_code(StatusCode::BAD_REQUEST);
+    // Get collection from depot (resolved by slug_resolver middleware)
+    let collection = match crate::component::auth::get_terminal_collection_from_depot(depot) {
+        Ok(coll) => coll,
+        Err(_) => {
+            tracing::debug!("Collection not found in depot for addressbook-query REPORT");
+            res.status_code(StatusCode::NOT_FOUND);
             return;
         }
     };
-
-    if collection_id.is_nil() {
-        res.status_code(StatusCode::NOT_FOUND);
-        return;
-    }
+    let collection_id = collection.id;
 
     // Get database connection
     let provider = match connection::get_db_from_depot(depot) {

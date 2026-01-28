@@ -37,6 +37,15 @@ impl ResourceType {
             _ => None,
         }
     }
+
+    // Get the extension for items of this resource type.
+    #[must_use]
+    pub const fn item_extension(&self) -> &'static str {
+        match self {
+            Self::Calendar => "ics",
+            Self::Addressbook => "vcf",
+        }
+    }
 }
 
 /// A segment in a resource path.

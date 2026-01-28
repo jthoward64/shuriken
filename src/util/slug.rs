@@ -1,8 +1,8 @@
-/// Slug generation utilities for human-readable resource identifiers.
-///
-/// ## Summary
-/// Generates stable, URL-safe slugs from resource names. Slugs are lowercase,
-/// alphanumeric with hyphens, and don't change even if the resource name changes.
+//! Slug generation utilities for human-readable resource identifiers.
+//!
+//! ## Summary
+//! Generates stable, URL-safe slugs from resource names. Slugs are lowercase,
+//! alphanumeric with hyphens, and don't change even if the resource name changes.
 
 /// Generate a URL-safe slug from a name.
 ///

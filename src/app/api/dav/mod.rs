@@ -40,4 +40,10 @@ pub fn routes() -> Router {
                 .filter_fn(|req, _| req.method().as_str() == "MOVE")
                 .goal(method::r#move::r#move),
         )
+        .push(
+            // MKCOL method
+            Router::new()
+                .filter_fn(|req, _| req.method().as_str() == "MKCOL")
+                .goal(method::mkcol::mkcol),
+        )
 }
