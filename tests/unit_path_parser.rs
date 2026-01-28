@@ -3,8 +3,8 @@
 //! These tests verify the pure functions in path_parser without requiring
 //! database connections.
 
-use shuriken::component::auth::{PathSegment, ResourceLocation, ResourceType};
-use shuriken::component::middleware::path_parser::build_canonical_location;
+use shuriken::component::auth::{PathSegment, ResourceType};
+use shuriken::component::middleware::path_parser::{CollectionChain, build_canonical_location};
 use shuriken::component::model::dav::collection::DavCollection;
 use shuriken::component::model::dav::instance::DavInstance;
 use shuriken::component::model::principal::Principal;
@@ -58,11 +58,12 @@ fn test_build_canonical_location_full_path_with_ics() {
     let principal = create_test_principal("alice");
     let collection = create_test_collection(principal.id, "work");
     let instance = create_test_instance(collection.id, "event-1");
+    let chain = CollectionChain::new(vec![collection.clone()]);
 
     let canonical = build_canonical_location(
         Some(ResourceType::Calendar),
         &Some(principal.clone()),
-        &Some(collection.clone()),
+        Some(&chain),
         &Some(instance.clone()),
         Some("event-1.ics"),
     );
@@ -121,11 +122,12 @@ fn test_build_canonical_location_with_vcf_extension() {
     let principal = create_test_principal("bob");
     let collection = create_test_collection(principal.id, "contacts");
     let instance = create_test_instance(collection.id, "john-doe");
+    let chain = CollectionChain::new(vec![collection.clone()]);
 
     let canonical = build_canonical_location(
         Some(ResourceType::Addressbook),
         &Some(principal.clone()),
-        &Some(collection.clone()),
+        Some(&chain),
         &Some(instance.clone()),
         Some("john-doe.vcf"),
     );
@@ -152,11 +154,12 @@ fn test_build_canonical_location_without_extension() {
     let principal = create_test_principal("alice");
     let collection = create_test_collection(principal.id, "work");
     let instance = create_test_instance(collection.id, "event-1");
+    let chain = CollectionChain::new(vec![collection.clone()]);
 
     let canonical = build_canonical_location(
         Some(ResourceType::Calendar),
         &Some(principal),
-        &Some(collection),
+        Some(&chain),
         &Some(instance.clone()),
         Some("event-1"),
     );
@@ -178,17 +181,19 @@ fn test_build_canonical_location_without_extension() {
 fn test_build_canonical_location_collection_only() {
     let principal = create_test_principal("alice");
     let collection = create_test_collection(principal.id, "work");
+    let chain = CollectionChain::new(vec![collection.clone()]);
 
     let canonical = build_canonical_location(
         Some(ResourceType::Calendar),
         &Some(principal.clone()),
-        &Some(collection.clone()),
+        Some(&chain),
         &None,
         None,
     );
 
     assert!(canonical.is_some());
-    let segments = canonical.unwrap().segments();
+    let loc = canonical.unwrap();
+    let segments = loc.segments();
     assert_eq!(segments.len(), 3, "Collection-only should have 3 segments");
     assert!(matches!(segments[2], PathSegment::Collection(_)));
 }
@@ -200,20 +205,21 @@ fn test_build_canonical_location_principal_only() {
     let canonical = build_canonical_location(
         Some(ResourceType::Calendar),
         &Some(principal.clone()),
-        &None,
+        None,
         &None,
         None,
     );
 
     assert!(canonical.is_some());
-    let segments = canonical.unwrap().segments();
+    let loc = canonical.unwrap();
+    let segments = loc.segments();
     assert_eq!(segments.len(), 2, "Principal-only should have 2 segments");
 }
 
 #[test]
 fn test_build_canonical_location_missing_principal() {
     let canonical =
-        build_canonical_location(Some(ResourceType::Calendar), &None, &None, &None, None);
+        build_canonical_location(Some(ResourceType::Calendar), &None, None, &None, None);
 
     assert!(canonical.is_none(), "Without principal, should return None");
 }
@@ -222,9 +228,9 @@ fn test_build_canonical_location_missing_principal() {
 fn test_build_canonical_location_missing_resource_type() {
     let principal = create_test_principal("alice");
     let collection = create_test_collection(principal.id, "work");
+    let chain = CollectionChain::new(vec![collection.clone()]);
 
-    let canonical =
-        build_canonical_location(None, &Some(principal), &Some(collection), &None, None);
+    let canonical = build_canonical_location(None, &Some(principal), Some(&chain), &None, None);
 
     assert!(
         canonical.is_none(),
@@ -240,14 +246,15 @@ fn test_build_canonical_location_instance_without_collection() {
     let canonical = build_canonical_location(
         Some(ResourceType::Calendar),
         &Some(principal),
-        &None,
+        None,
         &Some(instance),
         None,
     );
 
     // Should succeed but only have principal, no instance
     assert!(canonical.is_some());
-    let segments = canonical.unwrap().segments();
+    let loc = canonical.unwrap();
+    let segments = loc.segments();
     assert_eq!(
         segments.len(),
         2,

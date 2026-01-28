@@ -6,7 +6,7 @@ use salvo::Depot;
 use salvo::http::StatusCode;
 
 use crate::component::auth::{
-    Action, Authorizer, ExpandedSubjects, PathSegment, ResourceLocation, ResourceType,
+    Action, Authorizer, ExpandedSubjects, ResourceLocation, ResourceType,
     authorizer_from_depot, get_subjects_from_depot,
 };
 use crate::component::db::connection::DbConnection;

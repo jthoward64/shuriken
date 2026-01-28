@@ -4,7 +4,7 @@ use salvo::http::StatusCode;
 use salvo::{Depot, Request, Response, handler};
 
 use crate::app::api::dav::extract::auth::get_auth_context;
-use crate::component::auth::{Action, ResourceType, get_resolved_location_from_depot};
+use crate::component::auth::{Action, get_resolved_location_from_depot};
 use crate::component::dav::service::collection::{CreateCollectionContext, create_collection};
 use crate::component::db::connection;
 use crate::component::rfc::dav::parse::{MkcolRequest, parse_mkcol};

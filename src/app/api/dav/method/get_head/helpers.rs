@@ -12,7 +12,7 @@ use crate::component::db::connection;
 use crate::component::db::map::dav::{serialize_ical_tree, serialize_vcard_tree};
 use crate::component::db::query::dav::{entity, instance};
 use crate::component::model::dav::instance::DavInstance;
-use crate::util::path;
+
 
 /// ## Summary
 /// Shared implementation for GET and HEAD handlers.
@@ -47,14 +47,11 @@ pub(super) async fn handle_get_or_head(
             res.status_code(StatusCode::NOT_FOUND);
             return;
         }
-        _ => match path::parse_collection_and_uri(request_path) {
-            Ok(parsed) => parsed,
-            Err(e) => {
-                tracing::debug!(error = %e, path = %request_path, "Failed to parse path");
-                res.status_code(StatusCode::NOT_FOUND);
-                return;
-            }
-        },
+        _ => {
+            tracing::debug!(path = %request_path, "Failed to parse path");
+            res.status_code(StatusCode::NOT_FOUND);
+            return;
+        }
     };
 
     if collection_id.is_nil() {

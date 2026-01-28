@@ -16,7 +16,7 @@ use crate::component::db::query::caldav::{event_index, occurrence};
 use crate::component::db::query::carddav::card_index;
 use crate::component::db::query::dav::{collection, instance};
 use crate::component::model::dav::instance::DavInstance;
-use crate::util::path;
+
 
 /// ## Summary
 /// Handles DELETE requests for `WebDAV` resources.
@@ -42,20 +42,17 @@ pub async fn delete(req: &mut Request, res: &mut Response, depot: &Depot) {
     // Get path before borrowing req mutably
     let path = req.uri().path().to_string();
 
-    // Prefer middleware-resolved values from depot; fallback to path parsing
+    // Prefer middleware-resolved values from depot; fallback to error
     let (collection_id, slug) = match (
         get_terminal_collection_from_depot(depot),
         get_instance_from_depot(depot),
     ) {
         (Ok(coll), Ok(inst)) => (coll.id, inst.slug.clone()),
-        _ => match path::parse_collection_and_uri(&path) {
-            Ok(parsed) => parsed,
-            Err(e) => {
-                tracing::debug!(error = %e, path = %path, "Failed to parse path");
-                res.status_code(StatusCode::NOT_FOUND);
-                return;
-            }
-        },
+        _ => {
+            tracing::debug!(path = %path, "Collection or instance not found in depot");
+            res.status_code(StatusCode::NOT_FOUND);
+            return;
+        }
     };
 
     // Check early if collection_id is nil before attempting database connection

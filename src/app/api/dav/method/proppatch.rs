@@ -19,7 +19,7 @@ use crate::component::rfc::dav::core::{
     DavProperty, Multistatus, Propstat, PropstatResponse, Status,
 };
 use crate::component::rfc::dav::parse;
-use crate::util::path;
+
 
 /// ## Summary
 /// Handles PROPPATCH requests to update `WebDAV` properties.
@@ -61,14 +61,11 @@ pub async fn proppatch(req: &mut Request, res: &mut Response, depot: &Depot) {
     // Prefer middleware-resolved collection ID from depot
     let collection_id = match get_terminal_collection_from_depot(depot) {
         Ok(coll) => coll.id,
-        Err(_) => match path::extract_collection_id(&path) {
-            Ok(id) => id,
-            Err(e) => {
-                tracing::error!(error = %e, path = %path, "Failed to parse collection ID from path");
-                res.status_code(StatusCode::BAD_REQUEST);
-                return;
-            }
-        },
+        Err(_) => {
+            tracing::error!(path = %path, "Failed to get collection from depot");
+            res.status_code(StatusCode::BAD_REQUEST);
+            return;
+        }
     };
 
     if collection_id.is_nil() {

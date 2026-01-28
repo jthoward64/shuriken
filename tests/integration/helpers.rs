@@ -87,7 +87,7 @@ async fn init_db_pool() -> anyhow::Result<Arc<Mutex<DbPool>>> {
     let base_url = get_base_database_url();
     let admin_url = format!("{base_url}/postgres");
 
-    const DB_POOL_SIZE: usize = 75;
+    const DB_POOL_SIZE: usize = 25;
 
     eprintln!("[TestDb] Initializing pool of {DB_POOL_SIZE} test databases...");
 
@@ -96,45 +96,60 @@ async fn init_db_pool() -> anyhow::Result<Arc<Mutex<DbPool>>> {
         AsyncPgConnection,
     >::new(&admin_url);
     let admin_pool = diesel_async::pooled_connection::bb8::Pool::builder()
-        .max_size(1)
+        .max_size(DB_POOL_SIZE as u32)
         .build(admin_config)
         .await?;
 
-    let mut connections = Vec::with_capacity(DB_POOL_SIZE);
+    let admin_pool = Arc::new(admin_pool);
 
-    for i in 1..=DB_POOL_SIZE {
-        let db_name = format!("shuriken_test_{i}");
-        let database_url = format!("{base_url}/{db_name}");
+    // Create all databases in parallel
+    let db_creation_tasks: Vec<_> = (1..=DB_POOL_SIZE)
+        .map(|i| {
+            let admin_pool = admin_pool.clone();
+            let base_url = base_url.clone();
+            async move {
+                let db_name = format!("shuriken_test_{i}");
+                let database_url = format!("{base_url}/{db_name}");
 
-        // Create or recreate the database
-        {
-            let mut admin_conn = admin_pool.get().await?;
+                // Create or recreate the database
+                {
+                    let mut admin_conn = admin_pool.get().await?;
 
-            // Drop if exists and recreate
-            let drop_sql = format!("DROP DATABASE IF EXISTS \"{db_name}\" WITH (FORCE)");
-            let _ = diesel::sql_query(&drop_sql).execute(&mut admin_conn).await;
+                    // Drop if exists and recreate
+                    let drop_sql = format!("DROP DATABASE IF EXISTS \"{db_name}\" WITH (FORCE)");
+                    let _ = diesel::sql_query(&drop_sql).execute(&mut admin_conn).await;
 
-            let create_sql = format!("CREATE DATABASE \"{db_name}\"");
-            diesel::sql_query(&create_sql)
-                .execute(&mut admin_conn)
-                .await?;
-        }
+                    let create_sql = format!("CREATE DATABASE \"{db_name}\"");
+                    diesel::sql_query(&create_sql)
+                        .execute(&mut admin_conn)
+                        .await?;
+                }
 
-        // Run migrations
-        run_migrations(&database_url).await?;
+                // Run migrations
+                run_migrations(&database_url).await?;
 
-        // Create connection pool
-        let config = diesel_async::pooled_connection::AsyncDieselConnectionManager::<
-            AsyncPgConnection,
-        >::new(&database_url);
-        let pool = diesel_async::pooled_connection::bb8::Pool::builder()
-            .max_size(5)
-            .build(config)
-            .await?;
+                // Create connection pool
+                let config = diesel_async::pooled_connection::AsyncDieselConnectionManager::<
+                    AsyncPgConnection,
+                >::new(&database_url);
+                let pool = diesel_async::pooled_connection::bb8::Pool::builder()
+                    .max_size(5)
+                    .build(config)
+                    .await?;
 
-        connections.push(Mutex::new(Some(PooledConnection { db_name, pool })));
-        eprintln!("[TestDb] Created shuriken_test_{i}");
-    }
+                eprintln!("[TestDb] Created {db_name}");
+                anyhow::Ok((db_name, pool))
+            }
+        })
+        .collect();
+
+    // Wait for all databases to be created and initialized
+    let results = futures::future::try_join_all(db_creation_tasks).await?;
+
+    let connections: Vec<_> = results
+        .into_iter()
+        .map(|(db_name, pool)| Mutex::new(Some(PooledConnection { db_name, pool })))
+        .collect();
 
     let (notify, _) = broadcast::channel(100);
 

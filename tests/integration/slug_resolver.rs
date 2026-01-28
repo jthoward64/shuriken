@@ -1,11 +1,10 @@
 #![allow(clippy::unused_async)]
-//! Integration tests for slug resolver middleware.
+//! Integration tests for path parser.
 //!
 //! Uses `tests/integration/helpers.rs` for database setup and request utilities.
 
 use super::helpers::{TestDb, cal_collection_glob, cal_owner_glob, cal_path};
-use shuriken::component::auth::ResourceLocation;
-use shuriken::component::middleware::slug_resolver::resolve_path_for_testing;
+use shuriken::component::middleware::path_parser::parse_and_resolve_path;
 
 /// Resolves a calendar owner-only path and verifies principal resolution.
 #[test_log::test(tokio::test)]
@@ -20,19 +19,18 @@ async fn resolve_owner_only_calendar_path() {
         .expect("Failed to seed principal");
 
     let mut conn = test_db.get_conn().await.expect("conn");
-    let (owner, _collection, _instance, resource_id) =
-        resolve_path_for_testing(&cal_owner_glob("alice", true), &mut conn)
-            .await
-            .expect("resolve ok");
+    let result = parse_and_resolve_path(&cal_owner_glob("alice", true), &mut conn)
+        .await
+        .expect("resolve ok");
 
     // Verify owner principal
-    let principal = owner.expect("owner principal present");
+    let principal = result.principal.expect("owner principal present");
     assert_eq!(principal.id, principal_id);
     assert_eq!(principal.slug, "alice");
 
-    // Verify ResourceId shape
-    let resource_id: ResourceLocation = resource_id.expect("resource id present");
-    assert!(resource_id.segments().len() >= 3);
+    // Verify original location shape
+    let segments = result.original_location.segments();
+    assert!(segments.len() >= 2);
 }
 
 /// Resolves a calendar collection path and verifies collection resolution.
@@ -52,15 +50,15 @@ async fn resolve_calendar_collection_path() {
         .expect("Failed to seed collection");
 
     let mut conn = test_db.get_conn().await.expect("conn");
-    let (_owner, collection_opt, _instance, _rid) =
-        resolve_path_for_testing(&cal_collection_glob("alice", "work", true), &mut conn)
-            .await
-            .expect("resolve ok");
+    let result = parse_and_resolve_path(&cal_collection_glob("alice", "work", true), &mut conn)
+        .await
+        .expect("resolve ok");
 
-    // Verify collection
-    let collection = collection_opt.expect("collection present");
-    assert_eq!(collection.id, collection_id);
-    assert_eq!(collection.slug, "work");
+    // Verify collection chain
+    let chain = result.collection_chain.expect("collection chain present");
+    let terminal = chain.terminal().expect("terminal collection present");
+    assert_eq!(terminal.id, collection_id);
+    assert_eq!(terminal.slug, "work");
 }
 
 /// Resolves a nested calendar collection path and verifies child resolution.
@@ -83,14 +81,18 @@ async fn resolve_nested_calendar_collection_path() {
         .expect("Failed to seed child collection");
 
     let mut conn = test_db.get_conn().await.expect("conn");
-    let (_owner, collection_opt, _instance, _rid) =
-        resolve_path_for_testing(&cal_collection_glob("alice", "work/team", true), &mut conn)
+    let result =
+        parse_and_resolve_path(&cal_collection_glob("alice", "work/team", true), &mut conn)
             .await
             .expect("resolve ok");
 
-    let collection = collection_opt.expect("collection present");
-    assert_eq!(collection.id, child_id);
-    assert_eq!(collection.slug, "team");
+    let chain = result.collection_chain.expect("collection chain present");
+    let terminal = chain.terminal().expect("terminal collection present");
+    assert_eq!(terminal.id, child_id);
+    assert_eq!(terminal.slug, "team");
+    
+    // Verify chain contains both parent and child
+    assert_eq!(chain.len(), 2);
 }
 
 /// Resolves a calendar instance path and verifies instance resolution.
@@ -125,13 +127,12 @@ async fn resolve_calendar_instance_path() {
         .expect("Failed to seed instance");
 
     let mut conn = test_db.get_conn().await.expect("conn");
-    let (_owner, _collection, instance_opt, _rid) =
-        resolve_path_for_testing(&cal_path("alice", "work", Some("event-1.ics")), &mut conn)
-            .await
-            .expect("resolve ok");
+    let result = parse_and_resolve_path(&cal_path("alice", "work", Some("event-1.ics")), &mut conn)
+        .await
+        .expect("resolve ok");
 
     // Verify instance
-    let instance = instance_opt.expect("instance present");
+    let instance = result.instance.expect("instance present");
     assert_eq!(instance.id, instance_id);
     assert_eq!(instance.slug, "event-1");
 }
@@ -164,14 +165,14 @@ async fn resolve_nested_calendar_instance_path() {
         .expect("Failed to seed instance");
 
     let mut conn = test_db.get_conn().await.expect("conn");
-    let (_owner, _collection, instance_opt, _rid) = resolve_path_for_testing(
+    let result = parse_and_resolve_path(
         &cal_path("alice", "work/team", Some("standup.ics")),
         &mut conn,
     )
     .await
     .expect("resolve ok");
 
-    let instance = instance_opt.expect("instance present");
+    let instance = result.instance.expect("instance present");
     assert_eq!(instance.id, instance_id);
     assert_eq!(instance.slug, "standup");
 }

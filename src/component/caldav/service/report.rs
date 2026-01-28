@@ -5,7 +5,7 @@
 use crate::component::db::connection::DbConnection;
 use crate::component::db::query::caldav::filter::find_matching_instances;
 use crate::component::db::query::caldav::occurrence;
-use crate::component::db::query::dav::{entity, instance};
+use crate::component::db::query::dav::entity;
 use crate::component::db::query::report_property::build_instance_properties;
 use crate::component::model::dav::instance::DavInstance;
 use crate::component::model::dav::occurrence::CalOccurrence;
@@ -66,49 +66,55 @@ pub async fn execute_calendar_query(
 /// ## Summary
 /// Executes a calendar-multiget report.
 ///
-/// Retrieves specified calendar objects by href and builds a multistatus response.
+/// RFC 4791 Section 7.9: Retrieves calendar resources by full DAV:href path.
+/// Each href is a complete resource path (e.g., `/calendars/alice/work/event-1.ics`)
+/// that is resolved to a specific instance and returned with requested properties.
 ///
 /// ## Side Effects
-/// Queries the database for each requested resource.
+/// Queries the database for each requested resource path resolution and data retrieval.
 ///
 /// ## Errors
-/// Returns database errors if queries fail.
+/// Returns database errors if queries fail. Missing resources return 404 in response.
 pub async fn execute_calendar_multiget(
     conn: &mut DbConnection<'_>,
-    collection_id: uuid::Uuid,
+    _collection_id: uuid::Uuid,
     multiget: &CalendarMultiget,
     properties: &[PropertyName],
 ) -> anyhow::Result<Multistatus> {
+    use crate::component::error::PathResolutionError;
+    use crate::component::middleware::path_parser::parse_and_resolve_path;
+
     let mut multistatus = Multistatus::new();
 
-    // Process each href
+    // Process each DAV:href in the multiget request
     for href in &multiget.hrefs {
         let href_str = href.as_str();
 
-        // Extract the resource URI from the href
-        let Ok(uri) = crate::util::path::extract_resource_uri(href_str) else {
-            // Invalid href format, return 404
-            let response = PropstatResponse::not_found(href.clone());
-            multistatus.add_response(response);
-            continue;
-        };
-
-        // Query for instance by collection and URI
-        let instance_opt = instance::by_collection_and_uri(collection_id, &uri)
-            .select(DavInstance::as_select())
-            .first::<DavInstance>(conn)
-            .await
-            .optional()?;
-
-        if let Some(inst) = instance_opt {
-            // Build requested properties for this instance
-            let props = build_instance_properties(conn, &inst, properties).await?;
-            let response = PropstatResponse::ok(href.clone(), props);
-            multistatus.add_response(response);
-        } else {
-            // Resource not found
-            let response = PropstatResponse::not_found(href.clone());
-            multistatus.add_response(response);
+        // Parse and resolve the full DAV:href path to get the calendar instance
+        match parse_and_resolve_path(href_str, conn).await {
+            Ok(resolution) => {
+                if let Some(inst) = resolution.instance {
+                    // Successfully resolved to an instance - build response
+                    let props = build_instance_properties(conn, &inst, properties).await?;
+                    let response = PropstatResponse::ok(href.clone(), props);
+                    multistatus.add_response(response);
+                } else {
+                    // Path was valid but resolved to no instance (404)
+                    let response = PropstatResponse::not_found(href.clone());
+                    multistatus.add_response(response);
+                }
+            }
+            Err(PathResolutionError::PrincipalNotFound(_))
+            | Err(PathResolutionError::CollectionNotFound { .. })
+            | Err(PathResolutionError::InvalidPathFormat(_)) => {
+                // Resource not found (404)
+                let response = PropstatResponse::not_found(href.clone());
+                multistatus.add_response(response);
+            }
+            Err(e) => {
+                // Propagate unexpected errors (DB errors, etc.)
+                return Err(anyhow::anyhow!("Path resolution error: {}", e));
+            }
         }
     }
 

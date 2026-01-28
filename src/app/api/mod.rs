@@ -5,7 +5,7 @@ mod dav;
 
 use salvo::Router;
 
-use crate::component::middleware::{auth::AuthMiddleware, slug_resolver::SlugResolverHandler};
+use crate::component::middleware::{auth::AuthMiddleware, dav_path_middleware::DavPathMiddleware};
 
 // The route component for the api
 pub const API_ROUTE_COMPONENT: &str = "api";
@@ -27,7 +27,7 @@ pub fn routes() -> anyhow::Result<Router> {
         .push(app_specific::routes())
         .push(
             Router::with_path(DAV_ROUTE_COMPONENT)
-                .hoop(SlugResolverHandler)
+                .hoop(DavPathMiddleware)
                 .push(caldav::routes()?)
                 .push(carddav::routes()?),
         ))

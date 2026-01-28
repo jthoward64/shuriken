@@ -6,8 +6,9 @@ use salvo::http::{HeaderValue, StatusCode};
 use salvo::{Depot, Request, Response, handler};
 
 use crate::component::auth::{
-    Action, ResourceType, authorizer_from_depot, depot::get_target_filename_from_depot,
-    depot::get_terminal_collection_from_depot, get_subjects_from_depot,
+    Action, ResourceType, authorizer_from_depot,
+    depot::{get_path_location_from_depot, get_terminal_collection_from_depot},
+    get_resolved_location_from_depot, get_subjects_from_depot,
 };
 use crate::component::caldav::service::object::{PutObjectContext, put_calendar_object};
 use crate::component::db::connection;
@@ -47,14 +48,37 @@ pub async fn put(req: &mut Request, res: &mut Response, depot: &Depot) {
         }
     };
 
-    // Get the resource slug from the depot (populated by SlugResolverHandler)
-    let slug = match get_target_filename_from_depot(depot) {
-        Ok(s) => s.clone(),
-        Err(e) => {
-            tracing::error!(error = %e, "Target filename not found in depot");
-            res.status_code(StatusCode::BAD_REQUEST);
-            return;
-        }
+    // Get the resource slug from the depot (populated by DavPathMiddleware)
+    // Try to get from resolved location first, fallback to original location
+    let slug = if let Ok(resolved) = get_resolved_location_from_depot(depot) {
+        // Extract Item segment from resolved location
+        resolved
+            .segments()
+            .iter()
+            .find_map(|seg| {
+                if let crate::component::auth::PathSegment::Item(s) = seg {
+                    Some(s.clone())
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_else(|| "unknown".to_string())
+    } else if let Ok(original) = get_path_location_from_depot(depot) {
+        original
+            .segments()
+            .iter()
+            .find_map(|seg| {
+                if let crate::component::auth::PathSegment::Item(s) = seg {
+                    Some(s.clone())
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_else(|| "unknown".to_string())
+    } else {
+        tracing::error!("Item slug not found in either resolved or original location");
+        res.status_code(StatusCode::BAD_REQUEST);
+        return;
     };
 
     // Read request body
