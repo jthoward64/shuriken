@@ -182,23 +182,28 @@ pub async fn mkcol(req: &mut Request, res: &mut Response, depot: &Depot) {
 }
 
 /// Determines collection type from path context and request body.
-fn determine_collection_type(path: &str, request: &MkcolRequest) -> anyhow::Result<String> {
+fn determine_collection_type(
+    path: &str,
+    request: &MkcolRequest,
+) -> anyhow::Result<crate::component::db::enums::CollectionType> {
+    use crate::component::db::enums::CollectionType;
+
     // Check if request specifies resourcetype
     if let Some(rt) = &request.resource_type {
         if rt.contains("calendar") {
-            return Ok("calendar".to_string());
+            return Ok(CollectionType::Calendar);
         } else if rt.contains("addressbook") {
-            return Ok("addressbook".to_string());
+            return Ok(CollectionType::Addressbook);
         }
     }
 
     // Infer from path context
     if path.contains("/cal/") {
-        Ok("collection".to_string()) // Plain collection in calendar context
+        Ok(CollectionType::Collection) // Plain collection in calendar context
     } else if path.contains("/card/") {
-        Ok("collection".to_string()) // Plain collection in addressbook context
+        Ok(CollectionType::Collection) // Plain collection in addressbook context
     } else {
-        Ok("collection".to_string()) // Generic collection
+        Ok(CollectionType::Collection) // Generic collection
     }
 }
 

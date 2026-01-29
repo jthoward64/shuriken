@@ -11,7 +11,7 @@ use super::extract::{extract_ical_uid, extract_ical_value};
 
 /// Type alias for the complex return type of database model mappings.
 type DbModels<'a> = (
-    NewDavEntity<'static>,
+    NewDavEntity,
     Vec<NewDavComponent<'a>>,
     Vec<NewDavProperty<'a>>,
     Vec<NewDavParameter<'static>>,
@@ -27,18 +27,14 @@ type DbModels<'a> = (
 /// Returns an error if the mapping fails (e.g., unsupported value types).
 pub fn icalendar_to_db_models<'a>(
     ical: &'a ICalendar,
-    entity_type: &str,
+    entity_type: crate::component::db::enums::EntityType,
 ) -> anyhow::Result<DbModels<'a>> {
-    // Extract logical UID from top-level component - leak to get 'static lifetime
-    let logical_uid_opt =
-        extract_ical_uid(&ical.root).map(|s| Box::leak(s.into_boxed_str()) as &'static str);
-
-    // Leak entity_type to get 'static lifetime
-    let entity_type_static = Box::leak(entity_type.to_string().into_boxed_str()) as &'static str;
+    // Extract logical UID from top-level component
+    let logical_uid = extract_ical_uid(&ical.root);
 
     let entity = NewDavEntity {
-        entity_type: entity_type_static,
-        logical_uid: logical_uid_opt,
+        entity_type,
+        logical_uid,
     };
 
     let mut components = Vec::new();

@@ -1,6 +1,6 @@
 use diesel::{pg::Pg, prelude::*};
 
-use crate::component::db::schema;
+use crate::component::db::{enums::CollectionType, schema};
 
 /// DAV collection (`CalDAV` calendar or `CardDAV` addressbook)
 #[derive(Debug, Clone, PartialEq, Eq, Queryable, Selectable, Identifiable)]
@@ -9,7 +9,7 @@ use crate::component::db::schema;
 pub struct DavCollection {
     pub id: uuid::Uuid,
     pub owner_principal_id: uuid::Uuid,
-    pub collection_type: String,
+    pub collection_type: CollectionType,
     pub display_name: Option<String>,
     pub description: Option<String>,
     pub timezone_tzid: Option<String>,
@@ -32,7 +32,7 @@ pub struct DavCollectionWithParent {
 #[diesel(table_name = schema::dav_collection)]
 pub struct NewDavCollection<'a> {
     pub owner_principal_id: uuid::Uuid,
-    pub collection_type: &'a str,
+    pub collection_type: CollectionType,
     pub display_name: Option<&'a str>,
     pub description: Option<&'a str>,
     pub timezone_tzid: Option<&'a str>,

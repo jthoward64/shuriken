@@ -4,6 +4,7 @@ use chrono::{DateTime, Utc};
 use diesel::prelude::*;
 use uuid::Uuid;
 
+use crate::component::db::enums::ComponentType;
 use crate::component::db::schema::cal_index;
 
 /// Calendar index entry.
@@ -19,7 +20,7 @@ pub struct CalIndex {
     /// Reference to the indexed component (VEVENT, VTODO, etc.).
     pub component_id: Uuid,
     /// Component type (e.g., "VEVENT", "VTODO").
-    pub component_type: String,
+    pub component_type: ComponentType,
     /// UID of the component.
     pub uid: Option<String>,
     /// RECURRENCE-ID in UTC (for exception instances).
@@ -55,7 +56,7 @@ pub struct NewCalIndex {
     /// Reference to the indexed component (VEVENT, VTODO, etc.).
     pub component_id: Uuid,
     /// Component type (e.g., "VEVENT", "VTODO").
-    pub component_type: String,
+    pub component_type: ComponentType,
     /// UID of the component.
     pub uid: Option<String>,
     /// RECURRENCE-ID in UTC (for exception instances).

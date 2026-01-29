@@ -3,23 +3,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::component::db::schema;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum PrincipalType {
-    User,
-    Group,
-    Public,
-}
-
-impl PrincipalType {
-    #[must_use]
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::User => "user",
-            Self::Group => "group",
-            Self::Public => "public",
-        }
-    }
-}
+// Re-export PrincipalType for public API
+pub use crate::component::db::enums::PrincipalType;
 
 #[derive(
     Debug, Clone, PartialEq, Eq, Hash, Identifiable, Queryable, Selectable, Serialize, Deserialize,
@@ -28,7 +13,7 @@ impl PrincipalType {
 #[diesel(check_for_backend(Pg))]
 pub struct Principal {
     pub id: uuid::Uuid,
-    pub principal_type: String,
+    pub principal_type: PrincipalType,
     pub display_name: Option<String>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
     pub deleted_at: Option<chrono::DateTime<chrono::Utc>>,
@@ -39,7 +24,7 @@ pub struct Principal {
 #[diesel(table_name = schema::principal)]
 pub struct NewPrincipal<'a> {
     pub id: uuid::Uuid,
-    pub principal_type: &'a str,
+    pub principal_type: PrincipalType,
     pub display_name: Option<&'a str>,
     pub slug: &'a str,
 }

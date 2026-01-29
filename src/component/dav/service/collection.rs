@@ -6,6 +6,7 @@ use diesel_async::scoped_futures::ScopedFutureExt;
 use diesel_async::{AsyncConnection, RunQueryDsl};
 
 use crate::component::db::connection::DbConnection;
+use crate::component::db::enums::CollectionType;
 use crate::component::db::query::dav::collection;
 use crate::component::model::dav::collection::{DavCollection, NewDavCollection};
 
@@ -16,7 +17,7 @@ pub struct CreateCollectionContext {
     /// Collection slug (e.g., "my-calendar").
     pub slug: String,
     /// Collection type ("collection", "calendar", or "addressbook").
-    pub collection_type: String,
+    pub collection_type: CollectionType,
     /// Optional display name.
     pub displayname: Option<String>,
     /// Optional description.
@@ -47,26 +48,14 @@ pub async fn create_collection(
     conn: &mut DbConnection<'_>,
     ctx: &CreateCollectionContext,
 ) -> Result<CreateCollectionResult> {
-    // Validate collection type
-    if !matches!(
-        ctx.collection_type.as_str(),
-        "collection" | "calendar" | "addressbook"
-    ) {
-        anyhow::bail!(
-            "invalid collection type '{}': must be 'collection', 'calendar', or 'addressbook'",
-            ctx.collection_type
-        );
-    }
-
     let owner_principal_id = ctx.owner_principal_id;
     let slug = ctx.slug.clone();
-    let collection_type = ctx.collection_type.clone();
+    let collection_type = ctx.collection_type;
     let displayname = ctx.displayname.clone();
     let description = ctx.description.clone();
 
     conn.transaction::<_, anyhow::Error, _>(move |tx| {
         let slug = slug.clone();
-        let collection_type = collection_type.clone();
         let displayname = displayname.clone();
         let description = description.clone();
 
@@ -85,7 +74,7 @@ pub async fn create_collection(
 
             let new_collection = NewDavCollection {
                 owner_principal_id,
-                collection_type: &collection_type,
+                collection_type,
                 display_name: displayname.as_deref(),
                 description: description.as_deref(),
                 timezone_tzid: None,

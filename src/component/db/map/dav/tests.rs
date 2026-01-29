@@ -61,14 +61,14 @@ fn test_icalendar_to_db_models_simple_event() {
         },
     };
 
-    let result = icalendar_to_db_models(&ical, "calendar_event");
+    let result = icalendar_to_db_models(&ical, crate::component::db::enums::EntityType::ICalendar);
     assert!(result.is_ok());
 
     let (entity, components, properties, parameters) = result.unwrap();
 
     // Check entity
-    assert_eq!(entity.entity_type, "calendar_event");
-    assert_eq!(entity.logical_uid, Some("event-123"));
+    assert_eq!(entity.entity_type, crate::component::db::enums::EntityType::ICalendar);
+    assert_eq!(entity.logical_uid, Some("event-123".to_string()));
 
     // Check components
     assert_eq!(components.len(), 2); // VCALENDAR + VEVENT
@@ -104,7 +104,7 @@ fn test_icalendar_to_db_models_without_uid() {
         },
     };
 
-    let result = icalendar_to_db_models(&ical, "calendar_event");
+    let result = icalendar_to_db_models(&ical, crate::component::db::enums::EntityType::ICalendar);
     assert!(result.is_ok());
 
     let (entity, _, _, _) = result.unwrap();
@@ -142,7 +142,7 @@ fn test_icalendar_to_db_models_nested_components() {
         },
     };
 
-    let result = icalendar_to_db_models(&ical, "calendar_event");
+    let result = icalendar_to_db_models(&ical, crate::component::db::enums::EntityType::ICalendar);
     assert!(result.is_ok());
 
     let (_, components, properties, _) = result.unwrap();
@@ -197,14 +197,14 @@ fn test_vcard_to_db_models_simple() {
         ],
     };
 
-    let result = vcard_to_db_models(&vcard, "vcard");
+    let result = vcard_to_db_models(&vcard, crate::component::db::enums::EntityType::VCard);
     assert!(result.is_ok());
 
     let (entity, components, properties, parameters) = result.unwrap();
 
     // Check entity
-    assert_eq!(entity.entity_type, "vcard");
-    assert_eq!(entity.logical_uid, Some("vcard-123"));
+    assert_eq!(entity.entity_type, crate::component::db::enums::EntityType::VCard);
+    assert_eq!(entity.logical_uid, Some("vcard-123".to_string()));
 
     // Check components (should be 1 root vCard component)
     assert_eq!(components.len(), 1);
@@ -231,7 +231,7 @@ fn test_vcard_to_db_models_without_uid() {
         }],
     };
 
-    let result = vcard_to_db_models(&vcard, "vcard");
+    let result = vcard_to_db_models(&vcard, crate::component::db::enums::EntityType::VCard);
     assert!(result.is_ok());
 
     let (entity, _, _, _) = result.unwrap();
@@ -260,7 +260,7 @@ fn test_vcard_to_db_models_with_multiple_parameters() {
         }],
     };
 
-    let result = vcard_to_db_models(&vcard, "vcard");
+    let result = vcard_to_db_models(&vcard, crate::component::db::enums::EntityType::VCard);
     assert!(result.is_ok());
 
     let (_, _, _, parameters) = result.unwrap();

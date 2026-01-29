@@ -214,7 +214,7 @@ pub async fn r#move(req: &mut Request, res: &mut Response, depot: &Depot) {
         let new_inst = NewDavInstance {
             collection_id: dest_collection.id,
             entity_id: source_instance.entity_id,
-            content_type: &source_instance.content_type,
+            content_type: source_instance.content_type,
             etag: &source_instance.etag,
             sync_revision: dest_collection.synctoken + 1,
             last_modified: chrono::Utc::now(),

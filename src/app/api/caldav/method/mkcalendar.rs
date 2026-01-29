@@ -149,7 +149,7 @@ pub async fn mkcalendar(req: &mut Request, res: &mut Response, depot: &Depot) {
     let ctx = CreateCollectionContext {
         owner_principal_id,
         slug,
-        collection_type: "calendar".to_string(),
+        collection_type: crate::component::db::enums::CollectionType::Calendar,
         displayname: parsed_request.displayname,
         description: parsed_request.description,
     };

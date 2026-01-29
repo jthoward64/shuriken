@@ -4,6 +4,7 @@ use chrono::{DateTime, Utc};
 use diesel::prelude::*;
 use uuid::Uuid;
 
+use crate::component::db::enums::{ItipMethod, ItipStatus};
 use crate::component::db::schema::dav_schedule_message;
 
 /// Scheduling message for iTIP (RFC 6638).
@@ -22,9 +23,9 @@ pub struct ScheduleMessage {
     /// Calendar user address of recipient (mailto: URI).
     pub recipient: String,
     /// iTIP method (REQUEST, REPLY, CANCEL, etc.).
-    pub method: String,
+    pub method: ItipMethod,
     /// Delivery status (pending, delivered, failed).
-    pub status: String,
+    pub status: ItipStatus,
     /// iCalendar data with METHOD property.
     pub ical_data: String,
     /// Delivery diagnostics or error information.
@@ -50,7 +51,7 @@ pub struct NewScheduleMessage<'a> {
     /// Calendar user address of recipient (mailto: URI).
     pub recipient: &'a str,
     /// iTIP method (REQUEST, REPLY, CANCEL, etc.).
-    pub method: &'a str,
+    pub method: ItipMethod,
     /// iCalendar data with METHOD property.
     pub ical_data: &'a str,
 }
@@ -62,7 +63,7 @@ impl<'a> NewScheduleMessage<'a> {
         collection_id: Uuid,
         sender: &'a str,
         recipient: &'a str,
-        method: &'a str,
+        method: ItipMethod,
         ical_data: &'a str,
     ) -> Self {
         Self {

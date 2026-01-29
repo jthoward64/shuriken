@@ -1,5 +1,6 @@
 //! Value extraction utilities for iCalendar and vCard.
 
+use crate::component::db::enums::ValueType;
 use crate::component::rfc::ical::core::{Component, Value};
 use crate::component::rfc::ical::expand::TimeZoneResolver;
 use crate::component::rfc::vcard::core::{VCard, VCardValue};
@@ -17,7 +18,7 @@ pub(super) fn extract_ical_value<'a>(
     raw: &'a str,
     resolver: &mut TimeZoneResolver,
 ) -> anyhow::Result<(
-    &'static str,
+    ValueType,
     Option<&'a str>,
     Option<i64>,
     Option<f64>,
@@ -27,11 +28,19 @@ pub(super) fn extract_ical_value<'a>(
 )> {
     match value {
         Value::Text(_) | Value::TextList(_) | Value::CalAddress(_) | Value::Uri(_) => {
-            Ok(("text", Some(raw), None, None, None, None, None))
+            Ok((ValueType::Text, Some(raw), None, None, None, None, None))
         }
-        Value::Integer(i) => Ok(("integer", None, Some(i64::from(*i)), None, None, None, None)),
-        Value::Float(f) => Ok(("float", None, None, Some(*f), None, None, None)),
-        Value::Boolean(b) => Ok(("boolean", None, None, None, Some(*b), None, None)),
+        Value::Integer(i) => Ok((
+            ValueType::Integer,
+            None,
+            Some(i64::from(*i)),
+            None,
+            None,
+            None,
+            None,
+        )),
+        Value::Float(f) => Ok((ValueType::Float, None, None, Some(*f), None, None, None)),
+        Value::Boolean(b) => Ok((ValueType::Boolean, None, None, None, Some(*b), None, None)),
         Value::Date(d) => {
             let naive = chrono::NaiveDate::from_ymd_opt(
                 i32::from(d.year),
@@ -39,12 +48,20 @@ pub(super) fn extract_ical_value<'a>(
                 u32::from(d.day),
             )
             .ok_or_else(|| anyhow::anyhow!("Invalid date"))?;
-            Ok(("date", None, None, None, None, Some(naive), None))
+            Ok((ValueType::Date, None, None, None, None, Some(naive), None))
         }
         Value::DateTime(dt) => {
             // Convert to UTC if possible
             let tstz = datetime_to_utc(dt, resolver)?;
-            Ok(("datetime", None, None, None, None, None, Some(tstz)))
+            Ok((
+                ValueType::DateTime,
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some(tstz),
+            ))
         }
         Value::Duration(_)
         | Value::Period(_)
@@ -55,12 +72,12 @@ pub(super) fn extract_ical_value<'a>(
         | Value::Binary(_)
         | Value::Unknown(_) => {
             // Store complex types as text (raw value)
-            Ok(("text", Some(raw), None, None, None, None, None))
+            Ok((ValueType::Text, Some(raw), None, None, None, None, None))
         }
         Value::DateList(_) | Value::DateTimeList(_) => {
             // Store list types as text (raw value) for now
             // TODO: Consider storing first element or handling lists specially
-            Ok(("text", Some(raw), None, None, None, None, None))
+            Ok((ValueType::Text, Some(raw), None, None, None, None, None))
         }
     }
 }
@@ -77,7 +94,7 @@ pub(super) fn extract_vcard_value<'a>(
     value: &VCardValue,
     raw: &'a str,
 ) -> (
-    &'static str,
+    ValueType,
     Option<&'a str>,
     Option<i64>,
     Option<f64>,
@@ -101,15 +118,23 @@ pub(super) fn extract_vcard_value<'a>(
         | VCardValue::Binary(_)
         | VCardValue::Unknown(_) => {
             // Store text and structured types as text (raw)
-            ("text", Some(raw), None, None, None, None, None)
+            (ValueType::Text, Some(raw), None, None, None, None, None)
         }
         VCardValue::Timestamp(ts) => {
             // Store timestamp in value_tstz column
-            ("timestamp", None, None, None, None, None, Some(ts.datetime))
+            (
+                ValueType::DateTime,
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some(ts.datetime),
+            )
         }
-        VCardValue::Integer(i) => ("integer", None, Some(*i), None, None, None, None),
-        VCardValue::Float(f) => ("float", None, None, Some(*f), None, None, None),
-        VCardValue::Boolean(b) => ("boolean", None, None, None, Some(*b), None, None),
+        VCardValue::Integer(i) => (ValueType::Integer, None, Some(*i), None, None, None, None),
+        VCardValue::Float(f) => (ValueType::Float, None, None, Some(*f), None, None, None),
+        VCardValue::Boolean(b) => (ValueType::Boolean, None, None, None, Some(*b), None, None),
     }
 }
 
@@ -337,7 +362,7 @@ mod tests {
         let (vtype, _, _, _, _, _, vtstz) =
             extract_ical_value(&value, "20260115T100000", &mut resolver).unwrap();
 
-        assert_eq!(vtype, "datetime");
+        assert_eq!(vtype, crate::component::db::enums::ValueType::DateTime);
         let expected = chrono::Utc.with_ymd_and_hms(2026, 1, 15, 8, 0, 0).unwrap();
         assert_eq!(vtstz, Some(expected));
     }
@@ -348,7 +373,7 @@ mod tests {
         let (vtype, vtext, vint, vfloat, vbool, vdate, vtstz) =
             extract_vcard_value(&value, "John Doe");
 
-        assert_eq!(vtype, "text");
+        assert_eq!(vtype, crate::component::db::enums::ValueType::Text);
         assert_eq!(vtext, Some("John Doe"));
         assert_eq!(vint, None);
         assert_eq!(vfloat, None);
@@ -362,7 +387,7 @@ mod tests {
         let value = VCardValue::Integer(100);
         let (vtype, vtext, vint, _, _, _, _) = extract_vcard_value(&value, "100");
 
-        assert_eq!(vtype, "integer");
+        assert_eq!(vtype, crate::component::db::enums::ValueType::Integer);
         assert_eq!(vtext, None);
         assert_eq!(vint, Some(100));
     }
@@ -372,7 +397,7 @@ mod tests {
         let value = VCardValue::Float(12.34);
         let (vtype, vtext, vint, vfloat, _, _, _) = extract_vcard_value(&value, "12.34");
 
-        assert_eq!(vtype, "float");
+        assert_eq!(vtype, crate::component::db::enums::ValueType::Float);
         assert_eq!(vtext, None);
         assert_eq!(vint, None);
         assert_eq!(vfloat, Some(12.34));
@@ -383,7 +408,7 @@ mod tests {
         let value = VCardValue::Boolean(true);
         let (vtype, _, _, _, vbool, _, _) = extract_vcard_value(&value, "true");
 
-        assert_eq!(vtype, "boolean");
+        assert_eq!(vtype, crate::component::db::enums::ValueType::Boolean);
         assert_eq!(vbool, Some(true));
     }
 
@@ -397,7 +422,7 @@ mod tests {
         let (vtype, vtext, vint, vfloat, vbool, vdate, vtstz) =
             extract_vcard_value(&value, "20240115T123000Z");
 
-        assert_eq!(vtype, "timestamp");
+        assert_eq!(vtype, crate::component::db::enums::ValueType::DateTime);
         assert_eq!(vtext, None);
         assert_eq!(vint, None);
         assert_eq!(vfloat, None);

@@ -219,7 +219,7 @@ async fn build_sync_collection_response(
             // Return all default properties
             vec![
                 DavProperty::text(QName::dav("getetag"), &inst.etag),
-                DavProperty::text(QName::dav("getcontenttype"), &inst.content_type),
+                DavProperty::text(QName::dav("getcontenttype"), inst.content_type.as_str()),
             ]
         } else {
             // Return requested properties
@@ -231,7 +231,7 @@ async fn build_sync_collection_response(
                         props.push(DavProperty::text(qname.clone(), &inst.etag));
                     }
                     ("DAV:", "getcontenttype") => {
-                        props.push(DavProperty::text(qname.clone(), &inst.content_type));
+                        props.push(DavProperty::text(qname.clone(), inst.content_type.as_str()));
                     }
                     _ => {
                         // Unknown property - skip or add as not found

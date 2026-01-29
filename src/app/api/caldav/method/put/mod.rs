@@ -220,7 +220,7 @@ async fn perform_put(
     let ctx = PutObjectContext {
         collection_id,
         slug: slug.to_string(),
-        entity_type: "icalendar".to_string(),
+        entity_type: crate::component::db::enums::EntityType::ICalendar,
         logical_uid,
         if_none_match,
         if_match,

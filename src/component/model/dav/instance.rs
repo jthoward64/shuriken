@@ -1,6 +1,6 @@
 use diesel::{pg::Pg, prelude::*};
 
-use crate::component::db::schema;
+use crate::component::db::{enums::ContentType, schema};
 
 /// Per-collection resource identity that references a canonical `DavEntity`
 #[derive(Debug, Clone, PartialEq, Eq, Queryable, Selectable, Identifiable, Associations)]
@@ -12,7 +12,7 @@ pub struct DavInstance {
     pub id: uuid::Uuid,
     pub collection_id: uuid::Uuid,
     pub entity_id: uuid::Uuid,
-    pub content_type: String,
+    pub content_type: ContentType,
     pub etag: String,
     pub sync_revision: i64,
     pub last_modified: chrono::DateTime<chrono::Utc>,
@@ -28,7 +28,7 @@ pub struct DavInstance {
 pub struct NewDavInstance<'a> {
     pub collection_id: uuid::Uuid,
     pub entity_id: uuid::Uuid,
-    pub content_type: &'a str,
+    pub content_type: ContentType,
     pub etag: &'a str,
     pub sync_revision: i64,
     pub last_modified: chrono::DateTime<chrono::Utc>,

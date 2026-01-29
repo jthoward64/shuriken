@@ -4,6 +4,7 @@ use chrono::{DateTime, Utc};
 use diesel::prelude::*;
 use uuid::Uuid;
 
+use crate::component::db::enums::{AttendeeRole, ParticipationStatus};
 use crate::component::db::schema::cal_attendee;
 
 /// Calendar event attendee.
@@ -22,9 +23,9 @@ pub struct CalAttendee {
     /// Attendee calendar user address (mailto: URI).
     pub calendar_user_address: String,
     /// Participation status (NEEDS-ACTION, ACCEPTED, DECLINED, etc.).
-    pub partstat: String,
+    pub partstat: ParticipationStatus,
     /// Attendee role (CHAIR, REQ-PARTICIPANT, etc.).
-    pub role: Option<String>,
+    pub role: Option<AttendeeRole>,
     /// RSVP requested flag.
     pub rsvp: Option<bool>,
     /// Common name of attendee.
@@ -52,9 +53,9 @@ pub struct NewCalAttendee<'a> {
     /// Attendee calendar user address (mailto: URI).
     pub calendar_user_address: &'a str,
     /// Participation status (NEEDS-ACTION, ACCEPTED, DECLINED, etc.).
-    pub partstat: &'a str,
+    pub partstat: ParticipationStatus,
     /// Attendee role (CHAIR, REQ-PARTICIPANT, etc.).
-    pub role: Option<&'a str>,
+    pub role: Option<AttendeeRole>,
     /// RSVP requested flag.
     pub rsvp: Option<bool>,
     /// Common name of attendee.
@@ -76,7 +77,7 @@ impl<'a> NewCalAttendee<'a> {
             entity_id,
             component_id,
             calendar_user_address,
-            partstat: "NEEDS-ACTION",
+            partstat: ParticipationStatus::NeedsAction,
             role: None,
             rsvp: None,
             cn: None,
@@ -86,14 +87,14 @@ impl<'a> NewCalAttendee<'a> {
 
     /// Sets the participation status.
     #[must_use]
-    pub fn with_partstat(mut self, partstat: &'a str) -> Self {
+    pub fn with_partstat(mut self, partstat: ParticipationStatus) -> Self {
         self.partstat = partstat;
         self
     }
 
     /// Sets the role.
     #[must_use]
-    pub fn with_role(mut self, role: &'a str) -> Self {
+    pub fn with_role(mut self, role: AttendeeRole) -> Self {
         self.role = Some(role);
         self
     }

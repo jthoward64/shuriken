@@ -198,7 +198,7 @@ async fn perform_put(
     let ctx = PutObjectContext {
         collection_id,
         slug: slug.to_string(),
-        entity_type: "vcard".to_string(),
+        entity_type: crate::component::db::enums::EntityType::VCard,
         logical_uid,
         if_none_match,
         if_match,

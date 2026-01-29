@@ -68,25 +68,19 @@ pub async fn load_instance_resource(
         })?;
 
     Ok(instance_row.map(|inst| {
-        let resource_type = resource_type_from_content_type(&inst.content_type);
+        let resource_type = resource_type_from_content_type(inst.content_type);
         (inst, resource_type)
     }))
 }
 
 /// ## Summary
-/// Determines resource type from content-type header.
-///
-/// ## Deprecated
-/// This function is no longer used directly. Kept for reference only.
+/// Determines resource type from content-type.
 #[must_use]
-pub fn resource_type_from_content_type(content_type: &str) -> ResourceType {
-    if content_type.starts_with("text/calendar") {
-        ResourceType::Calendar
-    } else if content_type.starts_with("text/vcard") {
-        ResourceType::Addressbook
-    } else {
-        // Default to Calendar for unknown types
-        ResourceType::Calendar
+pub fn resource_type_from_content_type(content_type: crate::component::db::enums::ContentType) -> ResourceType {
+    use crate::component::db::enums::ContentType;
+    match content_type {
+        ContentType::TextCalendar => ResourceType::Calendar,
+        ContentType::TextVCard => ResourceType::Addressbook,
     }
 }
 

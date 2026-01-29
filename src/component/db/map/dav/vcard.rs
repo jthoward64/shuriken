@@ -10,7 +10,7 @@ use super::extract::{extract_vcard_uid, extract_vcard_value};
 
 /// Type alias for the complex return type of database model mappings.
 type DbModels<'a> = (
-    NewDavEntity<'static>,
+    NewDavEntity,
     Vec<NewDavComponent<'a>>,
     Vec<NewDavProperty<'a>>,
     Vec<NewDavParameter<'static>>,
@@ -23,16 +23,15 @@ type DbModels<'a> = (
 ///
 /// ## Errors
 /// Returns an error if the mapping fails.
-pub fn vcard_to_db_models<'a>(vcard: &'a VCard, entity_type: &str) -> anyhow::Result<DbModels<'a>> {
-    let logical_uid_opt =
-        extract_vcard_uid(vcard).map(|s| Box::leak(s.into_boxed_str()) as &'static str);
-
-    // Leak entity_type to get 'static lifetime
-    let entity_type_static = Box::leak(entity_type.to_string().into_boxed_str()) as &'static str;
+pub fn vcard_to_db_models<'a>(
+    vcard: &'a VCard,
+    entity_type: crate::component::db::enums::EntityType,
+) -> anyhow::Result<DbModels<'a>> {
+    let logical_uid = extract_vcard_uid(vcard);
 
     let entity = NewDavEntity {
-        entity_type: entity_type_static,
-        logical_uid: logical_uid_opt,
+        entity_type,
+        logical_uid,
     };
 
     let mut components = Vec::new();
@@ -56,7 +55,7 @@ pub fn vcard_to_db_models<'a>(vcard: &'a VCard, entity_type: &str) -> anyhow::Re
         component_id,
         name: "VERSION",
         group: None,
-        value_type: "text",
+        value_type: crate::component::db::enums::ValueType::Text,
         value_text: Some(vcard.version.as_str()),
         value_int: None,
         value_float: None,

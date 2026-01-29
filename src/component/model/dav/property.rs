@@ -1,6 +1,6 @@
 use diesel::{pg::Pg, prelude::*};
 
-use crate::component::db::schema;
+use crate::component::db::{enums::ValueType, schema};
 
 /// Property for a component with typed value storage
 #[derive(Debug, Clone, PartialEq, Queryable, Selectable, Identifiable, Associations)]
@@ -11,7 +11,7 @@ pub struct DavProperty {
     pub id: uuid::Uuid,
     pub component_id: uuid::Uuid,
     pub name: String,
-    pub value_type: String,
+    pub value_type: ValueType,
     pub value_text: Option<String>,
     pub value_int: Option<i64>,
     pub value_float: Option<f64>,
@@ -35,7 +35,7 @@ pub struct NewDavProperty<'a> {
     pub name: &'a str,
     #[diesel(column_name = group_name)]
     pub group: Option<&'a str>,
-    pub value_type: &'a str,
+    pub value_type: ValueType,
     pub value_text: Option<&'a str>,
     pub value_int: Option<i64>,
     pub value_float: Option<f64>,

@@ -15,12 +15,12 @@ use crate::component::model::dav::property::NewDavProperty;
 /// ## Errors
 /// Returns a database error if the insert fails.
 #[tracing::instrument(skip(conn, entity), fields(
-    entity_type = entity.entity_type,
+    entity_type = %entity.entity_type,
     logical_uid = ?entity.logical_uid
 ))]
 pub async fn create_entity(
     conn: &mut crate::component::db::connection::DbConnection<'_>,
-    entity: &NewDavEntity<'_>,
+    entity: &NewDavEntity,
 ) -> Result<DavEntity, diesel::result::Error> {
     tracing::debug!("Creating DAV entity");
 

@@ -431,7 +431,7 @@ mod tests {
     fn create_test_principal(slug: &str) -> Principal {
         Principal {
             id: uuid::Uuid::new_v4(),
-            principal_type: "user".to_string(),
+            principal_type: crate::component::db::enums::PrincipalType::User,
             display_name: Some("Test User".to_string()),
             updated_at: chrono::Utc::now(),
             deleted_at: None,
@@ -447,7 +447,7 @@ mod tests {
         DavCollection {
             id: uuid::Uuid::new_v4(),
             owner_principal_id: owner_id,
-            collection_type: "calendar".to_string(),
+            collection_type: crate::component::db::enums::CollectionType::Calendar,
             display_name: Some("Test Collection".to_string()),
             description: None,
             timezone_tzid: None,
@@ -465,7 +465,7 @@ mod tests {
             id: uuid::Uuid::new_v4(),
             collection_id,
             entity_id: uuid::Uuid::new_v4(),
-            content_type: "text/calendar".to_string(),
+            content_type: crate::component::db::enums::ContentType::TextCalendar,
             slug: slug.to_string(),
             etag: "test-etag".to_string(),
             sync_revision: 1,

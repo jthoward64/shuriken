@@ -85,7 +85,7 @@ pub fn not_deleted() -> dav_collection::BoxedQuery<'static, diesel::pg::Pg> {
 /// Returns a database error if the insert fails.
 #[tracing::instrument(skip(conn, new_collection), fields(
     slug = new_collection.slug,
-    collection_type = new_collection.collection_type
+    collection_type = %new_collection.collection_type
 ))]
 pub async fn create_collection(
     conn: &mut crate::component::db::connection::DbConnection<'_>,

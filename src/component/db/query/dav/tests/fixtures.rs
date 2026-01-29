@@ -17,12 +17,12 @@ use crate::component::model::user::NewUser;
 
 /// Creates a test principal for use in tests.
 #[must_use]
-pub fn test_principal<'a>(slug: &'a str, name: &'a str) -> NewPrincipal<'a> {
+pub fn test_principal<'a>(slug: &'a str, name: Option<&'a str>) -> NewPrincipal<'a> {
     NewPrincipal {
         id: Uuid::new_v4(),
-        principal_type: "user",
+        principal_type: crate::component::db::enums::PrincipalType::User,
         slug,
-        display_name: Some(name),
+        display_name: name,
     }
 }
 
@@ -42,7 +42,7 @@ pub fn test_calendar_collection(slug: &str, owner_principal_id: Uuid) -> NewDavC
     NewDavCollection {
         slug,
         owner_principal_id,
-        collection_type: "calendar",
+        collection_type: crate::component::db::enums::CollectionType::Calendar,
         display_name: Some("Test Calendar"),
         description: None,
         timezone_tzid: None,
@@ -55,7 +55,7 @@ pub fn test_addressbook_collection(slug: &str, owner_principal_id: Uuid) -> NewD
     NewDavCollection {
         slug,
         owner_principal_id,
-        collection_type: "addressbook",
+        collection_type: crate::component::db::enums::CollectionType::Addressbook,
         display_name: Some("Test Addressbook"),
         description: None,
         timezone_tzid: None,
@@ -64,19 +64,19 @@ pub fn test_addressbook_collection(slug: &str, owner_principal_id: Uuid) -> NewD
 
 /// Creates a minimal iCalendar entity (VEVENT).
 #[must_use]
-pub fn test_ical_entity(logical_uid: &str) -> NewDavEntity<'_> {
+pub fn test_ical_entity(logical_uid: Option<String>) -> NewDavEntity {
     NewDavEntity {
-        entity_type: "calendar",
-        logical_uid: Some(logical_uid),
+        entity_type: crate::component::db::enums::EntityType::ICalendar,
+        logical_uid,
     }
 }
 
 /// Creates a minimal vCard entity.
 #[must_use]
-pub fn test_vcard_entity(logical_uid: &str) -> NewDavEntity<'_> {
+pub fn test_vcard_entity(logical_uid: Option<String>) -> NewDavEntity {
     NewDavEntity {
-        entity_type: "vcard",
-        logical_uid: Some(logical_uid),
+        entity_type: crate::component::db::enums::EntityType::VCard,
+        logical_uid,
     }
 }
 
@@ -133,7 +133,7 @@ pub fn test_property<'a>(
         component_id,
         name,
         group: None,
-        value_type: "TEXT",
+        value_type: crate::component::db::enums::ValueType::Text,
         ordinal,
         value_text: text_value,
         value_int: None,
@@ -174,7 +174,7 @@ pub fn test_instance<'a>(
         collection_id,
         entity_id,
         slug,
-        content_type: "text/calendar",
+        content_type: crate::component::db::enums::ContentType::TextCalendar,
         etag,
         sync_revision: 1,
         last_modified: chrono::Utc::now(),

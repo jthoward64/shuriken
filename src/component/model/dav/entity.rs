@@ -1,6 +1,6 @@
 use diesel::{pg::Pg, prelude::*};
 
-use crate::component::db::schema;
+use crate::component::db::{enums::EntityType, schema};
 
 /// Canonical content entity (shared across one or more DAV instances)
 #[derive(Debug, Clone, PartialEq, Eq, Queryable, Selectable, Identifiable)]
@@ -8,7 +8,7 @@ use crate::component::db::schema;
 #[diesel(check_for_backend(Pg))]
 pub struct DavEntity {
     pub id: uuid::Uuid,
-    pub entity_type: String,
+    pub entity_type: EntityType,
     pub logical_uid: Option<String>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
     pub deleted_at: Option<chrono::DateTime<chrono::Utc>>,
@@ -17,7 +17,7 @@ pub struct DavEntity {
 /// Insert struct for creating new DAV entities
 #[derive(Debug, Clone, Insertable)]
 #[diesel(table_name = schema::dav_entity)]
-pub struct NewDavEntity<'a> {
-    pub entity_type: &'a str,
-    pub logical_uid: Option<&'a str>,
+pub struct NewDavEntity {
+    pub entity_type: EntityType,
+    pub logical_uid: Option<String>,
 }

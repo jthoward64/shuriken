@@ -119,7 +119,7 @@ pub async fn mkcol_extended(req: &mut Request, res: &mut Response, depot: &Depot
     let ctx = CreateCollectionContext {
         owner_principal_id,
         slug: uri,
-        collection_type: "addressbook".to_string(),
+        collection_type: crate::component::db::enums::CollectionType::Addressbook,
         displayname: parsed_request.displayname,
         description: parsed_request.description,
     };

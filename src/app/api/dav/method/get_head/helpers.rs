@@ -325,7 +325,7 @@ fn set_response_headers_and_body(
     }
 
     // Set Content-Type header
-    if let Ok(ct_value) = HeaderValue::from_str(&instance.content_type) {
+    if let Ok(ct_value) = HeaderValue::from_str(instance.content_type.as_str()) {
         #[expect(
             clippy::let_underscore_must_use,
             reason = "Header addition failure is non-fatal"

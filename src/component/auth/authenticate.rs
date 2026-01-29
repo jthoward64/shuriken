@@ -90,7 +90,7 @@ async fn create_single_user(
 
     let new_principal = NewPrincipal {
         id: principal_id,
-        principal_type: PrincipalType::User.as_str(),
+        principal_type: PrincipalType::User,
         slug: principal_slug.as_str(),
         display_name: Some(name),
     };

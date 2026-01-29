@@ -3,6 +3,7 @@ use std::future::Future;
 use std::pin::Pin;
 
 pub mod connection;
+pub mod enums;
 pub mod map;
 pub mod query;
 pub mod schema;

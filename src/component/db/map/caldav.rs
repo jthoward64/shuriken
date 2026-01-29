@@ -89,7 +89,7 @@ fn build_cal_index(
         return None;
     }
 
-    let component_type = component_kind.as_str().to_string();
+    let component_type = crate::component::db::enums::ComponentType::from(component_kind);
     let uid = component.uid().map(String::from);
 
     // Extract DTSTART

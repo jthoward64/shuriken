@@ -8,6 +8,7 @@ use diesel_async::scoped_futures::ScopedFutureExt;
 use diesel_async::{AsyncConnection, RunQueryDsl};
 
 use crate::component::db::connection::DbConnection;
+use crate::component::db::enums::EntityType;
 use crate::component::db::map::carddav::build_card_index;
 use crate::component::db::query::carddav::card_index;
 use crate::component::db::query::dav::{collection, entity, instance};
@@ -30,7 +31,7 @@ pub struct PutObjectContext {
     /// Slug of the object within the collection (e.g., "contact").
     pub slug: String,
     /// Entity type for the object.
-    pub entity_type: String,
+    pub entity_type: EntityType,
     /// Logical UID extracted from vCard.
     pub logical_uid: Option<String>,
     /// Precondition: If-None-Match header value.
@@ -200,8 +201,8 @@ pub async fn put_address_object(
                 // Full tree insertion will be implemented once proper ID mapping is in place
 
                 let entity_model = crate::component::model::dav::entity::NewDavEntity {
-                    entity_type: entity_type.as_str(),
-                    logical_uid: logical_uid.as_deref(),
+                    entity_type,
+                    logical_uid,
                 };
 
                 let created_entity = entity::create_entity(tx, &entity_model)
@@ -213,7 +214,7 @@ pub async fn put_address_object(
                     collection_id,
                     entity_id: created_entity.id,
                     slug: &slug,
-                    content_type: "text/vcard",
+                    content_type: crate::component::db::enums::ContentType::TextVCard,
                     etag: &etag_for_tx,
                     sync_revision: collection_synctoken + 1,
                     last_modified: chrono::Utc::now(),

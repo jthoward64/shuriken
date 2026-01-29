@@ -228,7 +228,7 @@ async fn get_properties_for_instance(
         found.push(DavProperty::text(QName::dav("getetag"), &instance.etag));
         found.push(DavProperty::text(
             QName::dav("getcontenttype"),
-            &instance.content_type,
+            instance.content_type.as_str(),
         ));
         // resourcetype is empty for non-collection resources
         found.push(DavProperty {
@@ -250,7 +250,7 @@ async fn get_properties_for_instance(
                     found.push(DavProperty::text(qname, &instance.etag));
                 }
                 ("DAV:", "getcontenttype") => {
-                    found.push(DavProperty::text(qname, &instance.content_type));
+                    found.push(DavProperty::text(qname, instance.content_type.as_str()));
                 }
                 ("DAV:", "resourcetype") => {
                     found.push(DavProperty {
