@@ -208,7 +208,6 @@ pub fn parse_content_line(line: &str, line_num: usize) -> ParseResult<ContentLin
 /// Parses a single parameter from the character stream.
 ///
 /// Returns the parameter and whether the next character is ':'.
-#[expect(clippy::too_many_lines)]
 fn parse_parameter(
     chars: &mut std::iter::Peekable<std::str::CharIndices<'_>>,
     line: &str,
@@ -281,7 +280,6 @@ fn parse_parameter(
 }
 
 /// Parses a parameter value (possibly quoted).
-#[expect(clippy::too_many_lines)]
 fn parse_param_value(
     chars: &mut std::iter::Peekable<std::str::CharIndices<'_>>,
     line: &str,

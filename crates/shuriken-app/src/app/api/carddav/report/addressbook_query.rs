@@ -26,13 +26,12 @@ pub async fn handle(
 ) {
     // Extract collection_id from request path
     // Get collection from depot (resolved by slug_resolver middleware)
-    let collection = match shuriken_service::auth::get_terminal_collection_from_depot(depot) {
-        Ok(coll) => coll,
-        Err(_) => {
-            tracing::debug!("Collection not found in depot for addressbook-query REPORT");
-            res.status_code(StatusCode::NOT_FOUND);
-            return;
-        }
+    let Ok(collection) =
+        shuriken_service::auth::get_terminal_collection_from_depot(depot)
+    else {
+        tracing::debug!("Collection not found in depot for addressbook-query REPORT");
+        res.status_code(StatusCode::NOT_FOUND);
+        return;
     };
     let collection_id = collection.id;
 

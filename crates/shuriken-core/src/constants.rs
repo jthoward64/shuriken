@@ -1,5 +1,4 @@
 /// Route component constants shared across crates
-
 pub const API_ROUTE_COMPONENT: &str = "api";
 pub const API_ROUTE_PREFIX: &str = const_str::concat!("/", API_ROUTE_COMPONENT);
 

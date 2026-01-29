@@ -1189,6 +1189,7 @@ g2, owner, admin
     }
 
     #[tokio::test]
+    #[expect(clippy::too_many_lines)]
     async fn test_all_permission_types_for_each_role() {
         let e = create_test_enforcer().await;
 
@@ -1232,9 +1233,9 @@ g2, owner, admin
                 .enforce(("principal:eve", "/calendars/eve/personal/event.ics", *perm))
                 .unwrap();
             if *perm == "read_freebusy" || *perm == "read" || *perm == "edit" {
-                assert!(result, "editor-basic should have {}", perm);
+                assert!(result, "editor-basic should have {perm}");
             } else {
-                assert!(!result, "editor-basic should not have {}", perm);
+                assert!(!result, "editor-basic should not have {perm}");
             }
         }
 
@@ -1248,9 +1249,9 @@ g2, owner, admin
                 ))
                 .unwrap();
             if ["read_freebusy", "read", "edit", "delete"].contains(perm) {
-                assert!(result, "editor should have {}", perm);
+                assert!(result, "editor should have {perm}");
             } else {
-                assert!(!result, "editor should not have {}", perm);
+                assert!(!result, "editor should not have {perm}");
             }
         }
 
@@ -1263,10 +1264,10 @@ g2, owner, admin
                     *perm,
                 ))
                 .unwrap();
-            if *perm != "admin" {
-                assert!(result, "share-manager should have {}", perm);
+            if *perm == "admin" {
+                assert!(!result, "share-manager should not have {perm}");
             } else {
-                assert!(!result, "share-manager should not have {}", perm);
+                assert!(result, "share-manager should have {perm}");
             }
         }
 
@@ -1279,7 +1280,7 @@ g2, owner, admin
                     *perm,
                 ))
                 .unwrap();
-            assert!(result, "owner should have {}", perm);
+            assert!(result, "owner should have {perm}");
         }
     }
 
@@ -1656,7 +1657,7 @@ g2, owner, admin
             for other_user in &users {
                 if user != other_user {
                     let other_name = other_user.strip_prefix("principal:").unwrap();
-                    let path = format!("/calendars/{}/private/secret.ics", other_name);
+                    let path = format!("/calendars/{other_name}/private/secret.ics");
 
                     // Users should not have access to other users' private resources
                     // (except CIO who has universal read)
@@ -1665,12 +1666,10 @@ g2, owner, admin
                         if result.is_ok() && result.unwrap() {
                             // Only ok if there's an explicit policy granting it
                             // Bob has access to Alice's pets, so that's ok
-                            if !(user.contains("bob") && other_name == "alice") {
-                                panic!(
-                                    "{} should not have access to {}'s private resources",
-                                    user, other_name
-                                );
-                            }
+                            assert!(
+                                user.contains("bob") && other_name == "alice",
+                                "{user} should not have access to {other_name}'s private resources"
+                            );
                         }
                     }
                 }
@@ -1700,14 +1699,13 @@ g2, owner, admin
         for path in &public_allowed {
             assert!(
                 e.enforce(("public", path, "read_freebusy")).is_ok(),
-                "Public should have access to {}",
-                path
+                "Public should have access to {path}"
             );
         }
 
         for path in &public_denied {
             let result = e.enforce(("public", path, "read_freebusy")).unwrap();
-            assert!(!result, "Public should not have access to {}", path);
+            assert!(!result, "Public should not have access to {path}");
         }
     }
 
@@ -1766,9 +1764,7 @@ g2, owner, admin
                 assert_eq!(
                     expected_perms.contains(perm),
                     should_have,
-                    "Role {} permission {} expectation",
-                    role,
-                    perm
+                    "Role {role} permission {perm} expectation"
                 );
             }
         }

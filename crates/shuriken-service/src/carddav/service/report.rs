@@ -52,6 +52,7 @@ pub async fn execute_addressbook_query(
 ///
 /// ## Errors
 /// Returns database errors if queries fail. Missing resources return 404 in response.
+#[expect(clippy::unused_async, reason = "Stub function - will be async when implemented")]
 pub async fn execute_addressbook_multiget(
     conn: &mut DbConnection<'_>,
     _collection_id: uuid::Uuid,

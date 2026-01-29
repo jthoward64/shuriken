@@ -57,7 +57,6 @@ pub fn parse(input: &str) -> ParseResult<ICalendar> {
 }
 
 /// Parses a single component from the content line iterator.
-#[expect(clippy::too_many_lines)]
 fn parse_component(
     iter: &mut std::iter::Peekable<impl Iterator<Item = (usize, ContentLine)>>,
     expected_name: Option<&str>,
@@ -302,7 +301,6 @@ impl ValueType {
 }
 
 /// Parses a raw value string into a typed Value.
-#[expect(clippy::too_many_lines)]
 fn parse_value(
     raw: &str,
     value_type: ValueType,

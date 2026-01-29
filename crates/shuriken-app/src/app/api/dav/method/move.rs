@@ -49,7 +49,7 @@ pub async fn r#move(req: &mut Request, res: &mut Response, depot: &Depot) {
     };
 
     // Get Overwrite header (default: T)
-    let _overwrite = match req.headers().get("Overwrite") {
+    let overwrite = match req.headers().get("Overwrite") {
         Some(header) => header.to_str().unwrap_or("T") == "T",
         None => true,
     };
@@ -179,7 +179,7 @@ pub async fn r#move(req: &mut Request, res: &mut Response, depot: &Depot) {
     let is_overwrite = existing_dest.is_some();
 
     // If destination exists and Overwrite is false, return 412
-    if is_overwrite && !_overwrite {
+    if is_overwrite && !overwrite {
         tracing::debug!(
             dest_slug = %dest_resource_name,
             "Destination exists and Overwrite is false"
@@ -284,12 +284,12 @@ pub async fn r#move(req: &mut Request, res: &mut Response, depot: &Depot) {
         }
 
         // Update destination collection synctoken (only if different from source)
-        if dest_collection.id != source_instance.collection_id {
-            if let Err(e) = collection::update_synctoken(&mut conn, dest_collection.id).await {
-                tracing::error!(error = %e, "Failed to update destination collection synctoken");
-                res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
-                return;
-            }
+        if dest_collection.id != source_instance.collection_id
+            && let Err(e) = collection::update_synctoken(&mut conn, dest_collection.id).await
+        {
+            tracing::error!(error = %e, "Failed to update destination collection synctoken");
+            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+            return;
         }
     }
 

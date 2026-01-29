@@ -33,10 +33,10 @@ use shuriken_service::auth::{PathSegment, ResourceLocation};
 /// (if all entities were successfully resolved), and the loaded entities.
 #[derive(Debug, Clone)]
 pub struct PathResolutionResult {
-    /// Original path parsed into ResourceLocation (may contain slugs)
+    /// Original path parsed into `ResourceLocation` (may contain slugs)
     pub original_location: ResourceLocation,
 
-    /// Canonical ResourceLocation with UUIDs (only present if all entities resolved)
+    /// Canonical `ResourceLocation` with UUIDs (only present if all entities resolved)
     pub canonical_location: Option<ResourceLocation>,
 
     /// Resolved principal (owner)
@@ -56,7 +56,7 @@ pub struct PathResolutionResult {
 ///
 /// ## Summary
 /// Takes a path string, parses it into segments, loads entities from the database,
-/// and returns both the original and canonical ResourceLocation along with entities.
+/// and returns both the original and canonical `ResourceLocation` along with entities.
 ///
 /// This function returns partial results when entities are not found, allowing
 /// handlers to process PUT requests for non-existent resources.
@@ -155,13 +155,17 @@ pub async fn parse_and_resolve_path(
     })
 }
 
-/// Build canonical ResourceLocation from resolved entities using UUIDs.
+/// Build canonical `ResourceLocation` from resolved entities using UUIDs.
 ///
 /// ## Summary
-/// Constructs a UUID-based ResourceLocation that matches the structure of the
+/// Constructs a UUID-based `ResourceLocation` that matches the structure of the
 /// original location. Only returns `Some` if all required entities are present.
 ///
 /// This function is public to enable unit testing without database dependencies.
+///
+/// ## Panics
+/// Panics if the filename contains `.ics` or `.vcf` extension but `rfind('.')` returns `None`,
+/// which should never happen due to the preceding `ends_with` check.
 #[must_use]
 pub fn build_canonical_location(
     resource_type: Option<shuriken_service::auth::ResourceType>,
@@ -178,25 +182,40 @@ pub fn build_canonical_location(
         PathSegment::Owner(princ.id.to_string()),
     ];
 
-    if let Some(chain) = collection_chain {
-        if let Some(coll) = chain.terminal() {
-            segments.push(PathSegment::Collection(coll.id.to_string()));
+    if let Some(chain) = collection_chain
+        && let Some(coll) = chain.terminal()
+    {
+        segments.push(PathSegment::Collection(coll.id.to_string()));
 
-            // Add Item segment if instance exists
-            if let Some(inst) = instance {
-                // Preserve original filename if provided, otherwise use UUID
-                let item_segment = if let Some(filename) = item_filename {
-                    // Extract extension from filename
-                    if filename.ends_with(".ics") || filename.ends_with(".vcf") {
-                        format!("{}{}", inst.id, &filename[filename.rfind('.').unwrap()..])
-                    } else {
-                        inst.id.to_string()
-                    }
+        // Add Item segment if instance exists
+        if let Some(inst) = instance {
+            // Preserve original filename if provided, otherwise use UUID
+            let item_segment = if let Some(filename) = item_filename {
+                // Extract extension from filename
+                let path = std::path::Path::new(filename);
+                let has_ics = path
+                    .extension()
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("ics"));
+                let has_vcf = path
+                    .extension()
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("vcf"));
+                
+                if has_ics || has_vcf {
+                    // SAFETY: rfind returns Some because has_ics/has_vcf checks confirmed extension exists
+                    format!(
+                        "{}{}",
+                        inst.id,
+                        &filename[filename
+                            .rfind('.')
+                            .expect("extension present after is_some_and check")..]
+                    )
                 } else {
                     inst.id.to_string()
-                };
-                segments.push(PathSegment::Item(item_segment));
-            }
+                }
+            } else {
+                inst.id.to_string()
+            };
+            segments.push(PathSegment::Item(item_segment));
         }
     }
 
@@ -405,7 +424,9 @@ mod tests {
         );
         // Item segment should have UUID with .ics extension
         if let PathSegment::Item(s) = &segments[3] {
-            assert!(s.ends_with(".ics"));
+            assert!(std::path::Path::new(s)
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("ics")));
             assert!(s.starts_with(&instance.id.to_string()));
         } else {
             panic!("Expected Item segment");
@@ -440,7 +461,9 @@ mod tests {
 
         // Item segment should have UUID with .vcf extension
         if let PathSegment::Item(s) = &segments[3] {
-            assert!(s.ends_with(".vcf"));
+            assert!(std::path::Path::new(s)
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("vcf")));
             assert!(s.starts_with(&instance.id.to_string()));
         } else {
             panic!("Expected Item segment");

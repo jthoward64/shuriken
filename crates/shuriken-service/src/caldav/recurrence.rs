@@ -35,7 +35,6 @@ pub struct RecurrenceData {
 /// - Component has no RRULE property
 /// - DTSTART is missing or invalid
 /// - DTEND/DURATION is missing or invalid
-#[must_use]
 pub fn extract_recurrence_data(component: &Component) -> ServiceResult<Option<RecurrenceData>> {
     let mut resolver = TimeZoneResolver::new();
     extract_recurrence_data_with_resolver(component, &mut resolver)
@@ -53,7 +52,10 @@ pub fn extract_recurrence_data(component: &Component) -> ServiceResult<Option<Re
 /// - Component has no RRULE property
 /// - DTSTART is missing or invalid
 /// - DTEND/DURATION is missing or invalid
-#[must_use]
+#[expect(
+    clippy::too_many_lines,
+    reason = "TODO: Refactor to extract helper functions like in shuriken-rfc recurrence.rs"
+)]
 pub fn extract_recurrence_data_with_resolver(
     component: &Component,
     resolver: &mut TimeZoneResolver,
@@ -65,9 +67,7 @@ pub fn extract_recurrence_data_with_resolver(
     );
 
     // Check for RRULE property
-    let rrule_prop = if let Some(prop) = component.get_property("RRULE") {
-        prop
-    } else {
+    let Some(rrule_prop) = component.get_property("RRULE") else {
         tracing::trace!("RRULE property not found");
         return Ok(None);
     };
@@ -84,32 +84,29 @@ pub fn extract_recurrence_data_with_resolver(
     tracing::trace!(rrule = %rrule_text, "Found RRULE");
 
     // Extract DTSTART
-    let dtstart_prop = match component.get_property("DTSTART") {
-        Some(prop) => prop,
-        None => return Ok(None),
+    let Some(dtstart_prop) = component.get_property("DTSTART") else {
+        return Ok(None);
     };
     let tzid = dtstart_prop.get_param_value("TZID").map(String::from);
-    let dtstart_ical = match dtstart_prop.as_datetime() {
-        Some(dt) => dt,
-        None => return Ok(None),
+    let Some(dtstart_ical) = dtstart_prop.as_datetime() else {
+        return Ok(None);
     };
-    let dtstart_utc =
-        match ical_datetime_to_utc_with_resolver(dtstart_ical, tzid.as_deref(), resolver) {
-            Some(dt) => dt,
-            None => return Ok(None),
-        };
+    let Some(dtstart_utc) =
+        ical_datetime_to_utc_with_resolver(dtstart_ical, tzid.as_deref(), resolver)
+    else {
+        return Ok(None);
+    };
     tracing::trace!(dtstart = %dtstart_utc, "Extracted DTSTART");
 
     // Calculate duration from DTEND or DURATION
     let duration = if let Some(dtend_prop) = component.get_property("DTEND") {
-        let dtend_ical = match dtend_prop.as_datetime() {
-            Some(dt) => dt,
-            None => return Ok(None),
+        let Some(dtend_ical) = dtend_prop.as_datetime() else {
+            return Ok(None);
         };
         let dtend_tzid = dtend_prop.get_param_value("TZID");
-        let dtend_utc = match ical_datetime_to_utc_with_resolver(dtend_ical, dtend_tzid, resolver) {
-            Some(dt) => dt,
-            None => return Ok(None),
+        let Some(dtend_utc) = ical_datetime_to_utc_with_resolver(dtend_ical, dtend_tzid, resolver)
+        else {
+            return Ok(None);
         };
         let dur = dtend_utc.signed_duration_since(dtstart_utc);
         tracing::trace!(
@@ -118,9 +115,8 @@ pub fn extract_recurrence_data_with_resolver(
         );
         dur
     } else if let Some(duration_prop) = component.get_property("DURATION") {
-        let duration_ical = match duration_prop.as_duration() {
-            Some(dur) => dur,
-            None => return Ok(None),
+        let Some(duration_ical) = duration_prop.as_duration() else {
+            return Ok(None);
         };
         let dur = ical_duration_to_chrono(duration_ical);
         tracing::trace!(duration_seconds = dur.num_seconds(), "Extracted DURATION");

@@ -1,6 +1,5 @@
 //! PROPPATCH method handler for `WebDAV` property updates.
 
-#![expect(clippy::manual_let_else)]
 #![expect(clippy::single_match_else)]
 
 use salvo::http::StatusCode;

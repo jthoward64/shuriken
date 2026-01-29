@@ -134,7 +134,7 @@ pub fn get_owner_principal_from_depot(
 ) -> ServiceResult<&shuriken_db::model::principal::Principal> {
     depot
         .get::<shuriken_db::model::principal::Principal>(depot_keys::OWNER_PRINCIPAL)
-        .map_err(|_| ServiceError::NotFound("Owner principal not found in depot".to_string()))
+        .map_err(|_e| ServiceError::NotFound("Owner principal not found in depot".to_string()))
 }
 
 /// Get the original path location from the depot.
@@ -146,7 +146,7 @@ pub fn get_path_location_from_depot(
 ) -> ServiceResult<&crate::auth::ResourceLocation> {
     depot
         .get::<crate::auth::ResourceLocation>(depot_keys::PATH_LOCATION)
-        .map_err(|_| ServiceError::NotFound("Path location not found in depot".to_string()))
+        .map_err(|_e| ServiceError::NotFound("Path location not found in depot".to_string()))
 }
 
 /// Get the resolved resource location from the depot.
@@ -158,7 +158,7 @@ pub fn get_resolved_location_from_depot(
 ) -> ServiceResult<&crate::auth::ResourceLocation> {
     depot
         .get::<crate::auth::ResourceLocation>(depot_keys::RESOLVED_LOCATION)
-        .map_err(|_| ServiceError::NotFound("Resolved location not found in depot".to_string()))
+        .map_err(|_e| ServiceError::NotFound("Resolved location not found in depot".to_string()))
 }
 
 /// Get the resolved collection chain from the depot.
@@ -168,7 +168,7 @@ pub fn get_resolved_location_from_depot(
 pub fn get_collection_chain_from_depot(depot: &salvo::Depot) -> ServiceResult<&CollectionChain> {
     depot
         .get::<CollectionChain>(depot_keys::COLLECTION_CHAIN)
-        .map_err(|_| ServiceError::NotFound("Collection chain not found in depot".to_string()))
+        .map_err(|_e| ServiceError::NotFound("Collection chain not found in depot".to_string()))
 }
 
 /// Get the resolved terminal collection identifier from the depot.
@@ -180,7 +180,7 @@ pub fn get_terminal_collection_identifier_from_depot(
 ) -> ServiceResult<&DavIdentifier> {
     depot
         .get::<DavIdentifier>(depot_keys::TERMINAL_COLLECTION)
-        .map_err(|_| ServiceError::NotFound("Terminal collection not found in depot".to_string()))
+        .map_err(|_e| ServiceError::NotFound("Terminal collection not found in depot".to_string()))
 }
 
 /// Get the resolved terminal collection from the depot.
@@ -208,5 +208,5 @@ pub fn get_instance_from_depot(
 ) -> ServiceResult<&shuriken_db::model::dav::instance::DavInstance> {
     depot
         .get::<shuriken_db::model::dav::instance::DavInstance>(depot_keys::INSTANCE)
-        .map_err(|_| ServiceError::NotFound("Instance not found in depot".to_string()))
+        .map_err(|_e| ServiceError::NotFound("Instance not found in depot".to_string()))
 }

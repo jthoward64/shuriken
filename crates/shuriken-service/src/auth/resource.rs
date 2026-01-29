@@ -268,13 +268,15 @@ impl ResourceLocation {
 
     /// Convert the resource identifier to a path string for Casbin enforcement.
     ///
+    /// ## Errors
+    /// Returns error if glob patterns are not allowed but glob wildcards are present.
+    ///
     /// ## Examples
     ///
     /// ```ignore
     /// let resource = ResourceId::parse("/calendars/alice/personal/work.ics").unwrap();
     /// assert_eq!(resource.to_path(), "/calendars/alice/personal/work.ics");
     /// ```
-    #[must_use]
     pub fn to_resource_path(&self, allow_glob: bool) -> ServiceResult<String> {
         let mut path = String::from("/");
         for (i, segment) in self.segments.iter().enumerate() {
@@ -313,13 +315,15 @@ impl ResourceLocation {
         Ok(path)
     }
 
-    #[must_use]
+    /// ## Errors
+    /// Returns error if path cannot be constructed.
     pub fn to_full_path(&self) -> ServiceResult<String> {
         let path = self.to_resource_path(false)?;
         Ok(format!("{DAV_ROUTE_PREFIX}{path}"))
     }
 
-    #[must_use]
+    /// ## Errors
+    /// Returns error if full path cannot be constructed.
     pub fn to_url(&self, serve_origin: &str) -> ServiceResult<String> {
         let path = self.to_full_path()?;
         Ok(format!("{}{}", serve_origin.trim_end_matches('/'), path))

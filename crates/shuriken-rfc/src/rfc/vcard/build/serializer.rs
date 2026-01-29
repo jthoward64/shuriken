@@ -172,7 +172,6 @@ fn serialize_parameter(param: &VCardParameter, output: &mut String) {
     }
 }
 
-#[expect(clippy::too_many_lines)]
 fn serialize_value(value: &VCardValue, raw_value: &str, output: &mut String) {
     match value {
         VCardValue::Text(s) => {

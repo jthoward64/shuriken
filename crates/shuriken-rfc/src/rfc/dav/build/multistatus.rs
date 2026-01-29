@@ -100,7 +100,6 @@ fn write_response<W: std::io::Write>(
 }
 
 /// Writes a property element.
-#[expect(clippy::too_many_lines)]
 fn write_property<W: std::io::Write>(
     writer: &mut Writer<W>,
     prop: &crate::rfc::dav::core::DavProperty,

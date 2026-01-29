@@ -329,7 +329,6 @@ impl RRule {
 }
 
 impl fmt::Display for RRule {
-    #[expect(clippy::too_many_lines)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut parts = Vec::new();
 

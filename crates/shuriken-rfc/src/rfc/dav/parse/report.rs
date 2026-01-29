@@ -220,7 +220,6 @@ fn parse_calendar_query(xml: &[u8]) -> ParseResult<ReportRequest> {
 }
 
 /// Parses a calendar-multiget report.
-#[expect(clippy::too_many_lines)]
 fn parse_calendar_multiget(xml: &[u8]) -> ParseResult<ReportRequest> {
     let mut reader = Reader::from_reader(xml);
     reader.config_mut().trim_text(true);
@@ -289,7 +288,10 @@ fn parse_calendar_multiget(xml: &[u8]) -> ParseResult<ReportRequest> {
 
 /// Parses an addressbook-query report.
 /// Parses an addressbook-query report.
-#[expect(clippy::too_many_lines)]
+#[expect(
+    clippy::too_many_lines,
+    reason = "XML parsing with many nested elements"
+)]
 fn parse_addressbook_query(xml: &[u8]) -> ParseResult<ReportRequest> {
     let mut reader = Reader::from_reader(xml);
     reader.config_mut().trim_text(true);
@@ -417,7 +419,6 @@ fn parse_addressbook_query(xml: &[u8]) -> ParseResult<ReportRequest> {
 }
 
 /// Parses an addressbook-multiget report.
-#[expect(clippy::too_many_lines)]
 fn parse_addressbook_multiget(xml: &[u8]) -> ParseResult<ReportRequest> {
     let mut reader = Reader::from_reader(xml);
     reader.config_mut().trim_text(true);
@@ -485,7 +486,10 @@ fn parse_addressbook_multiget(xml: &[u8]) -> ParseResult<ReportRequest> {
 }
 
 /// Parses a sync-collection report.
-#[expect(clippy::too_many_lines)]
+#[expect(
+    clippy::too_many_lines,
+    reason = "XML parsing with many property types"
+)]
 fn parse_sync_collection(xml: &[u8]) -> ParseResult<ReportRequest> {
     let mut reader = Reader::from_reader(xml);
     reader.config_mut().trim_text(true);
@@ -702,7 +706,6 @@ fn parse_calendar_filter_content(
 }
 
 /// Parses a comp-filter element when name is already extracted.
-#[expect(clippy::too_many_lines)]
 fn parse_comp_filter_with_name(
     reader: &mut Reader<&[u8]>,
     buf: &mut Vec<u8>,
@@ -767,7 +770,6 @@ fn parse_comp_filter_with_name(
 }
 
 /// Parses a prop-filter element when name is already extracted.
-#[expect(clippy::too_many_lines)]
 fn parse_prop_filter_with_name(
     reader: &mut Reader<&[u8]>,
     buf: &mut Vec<u8>,
@@ -854,7 +856,6 @@ fn parse_prop_filter_with_name(
 }
 
 /// Parses a param-filter element when name is already extracted.
-#[expect(clippy::too_many_lines)]
 fn parse_param_filter_with_name(
     reader: &mut Reader<&[u8]>,
     buf: &mut Vec<u8>,

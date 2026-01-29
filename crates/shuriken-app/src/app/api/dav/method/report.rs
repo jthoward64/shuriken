@@ -114,23 +114,19 @@ pub async fn handle_sync_collection(
     };
 
     // Get collection from depot (resolved by slug_resolver middleware)
-    let collection = match get_terminal_collection_from_depot(depot) {
-        Ok(coll) => coll,
-        Err(_) => {
-            tracing::debug!("Collection not found in depot for sync-collection REPORT");
-            res.status_code(StatusCode::NOT_FOUND);
-            return;
-        }
+    let Ok(collection) = get_terminal_collection_from_depot(depot) else {
+        tracing::debug!("Collection not found in depot for sync-collection REPORT");
+        res.status_code(StatusCode::NOT_FOUND);
+        return;
     };
 
     // Get the resource location for authorization (resolved by slug_resolver middleware)
-    let resource = match get_resolved_location_from_depot(depot) {
-        Ok(loc) => loc.clone(),
-        Err(_) => {
-            tracing::error!("Failed to get resource location from depot");
-            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
-            return;
-        }
+    let resource = if let Ok(loc) = get_resolved_location_from_depot(depot) {
+        loc.clone()
+    } else {
+        tracing::error!("Failed to get resource location from depot");
+        res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+        return;
     };
 
     if let Err(e) = authorizer.require(&subjects, &resource, Action::Read) {
@@ -207,7 +203,7 @@ async fn build_sync_collection_response(
 
     // Add changed/added instances to response
     for inst in instances {
-        let href = Href::new(&format!(
+        let href = Href::new(format!(
             "{}{}.ics",
             base_path.trim_end_matches('/'),
             inst.slug
@@ -246,14 +242,14 @@ async fn build_sync_collection_response(
     // Add deleted resources to response (404 status)
     for tomb in tombstones {
         // Use first URI variant if available
-        if let Some(Some(uri)) = tomb.uri_variants.get(0) {
-            let href = Href::new(&format!("{}{}", base_path.trim_end_matches('/'), uri));
+        if let Some(uri) = tomb.uri_variants.iter().find_map(|opt| opt.as_ref()) {
+            let href = Href::new(format!("{}{}", base_path.trim_end_matches('/'), uri));
             multistatus.add_response(PropstatResponse::not_found(href));
         }
     }
 
     // Add sync-token to multistatus
-    multistatus.set_sync_token(&collection.synctoken.to_string());
+    multistatus.set_sync_token(collection.synctoken.to_string());
 
     Ok(multistatus)
 }
@@ -305,23 +301,19 @@ pub async fn handle_expand_property(
     };
 
     // Get collection from depot (resolved by slug_resolver middleware)
-    let _collection = match get_terminal_collection_from_depot(depot) {
-        Ok(coll) => coll,
-        Err(_) => {
-            tracing::debug!("Collection not found in depot for expand-property REPORT");
-            res.status_code(StatusCode::NOT_FOUND);
-            return;
-        }
+    let Ok(_collection) = get_terminal_collection_from_depot(depot) else {
+        tracing::debug!("Collection not found in depot for expand-property REPORT");
+        res.status_code(StatusCode::NOT_FOUND);
+        return;
     };
 
     // Get the resource location for authorization (resolved by slug_resolver middleware)
-    let resource = match get_resolved_location_from_depot(depot) {
-        Ok(loc) => loc.clone(),
-        Err(_) => {
-            tracing::error!("Failed to get resource location from depot");
-            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
-            return;
-        }
+    let resource = if let Ok(loc) = get_resolved_location_from_depot(depot) {
+        loc.clone()
+    } else {
+        tracing::error!("Failed to get resource location from depot");
+        res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+        return;
     };
 
     if let Err(e) = authorizer.require(&subjects, &resource, Action::Read) {
@@ -485,7 +477,6 @@ async fn build_expand_property_response(
 /// ## Errors
 /// Returns database errors if queries fail.
 #[expect(clippy::unused_async)]
-#[expect(clippy::too_many_lines)]
 async fn fetch_property(
     _conn: &mut shuriken_db::db::connection::DbConnection<'_>,
     path: &str,

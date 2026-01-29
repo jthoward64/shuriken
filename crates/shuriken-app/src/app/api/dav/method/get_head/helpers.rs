@@ -24,6 +24,7 @@ use shuriken_service::auth::{
 /// ## Side Effects
 /// - Sets HTTP status code and headers on response
 /// - For GET requests, writes response body
+#[expect(clippy::too_many_lines, reason = "GET/HEAD requires many cases for headers and content")]
 pub(super) async fn handle_get_or_head(
     req: &mut Request,
     res: &mut Response,
@@ -228,18 +229,17 @@ async fn check_read_authorization(
     };
 
     // Use resolved ResourceLocation from depot if available, otherwise build from instance
-    let resource = match get_resolved_location_from_depot(depot) {
-        Ok(loc) => loc.clone(),
-        Err(_) => {
-            // Fallback: Build resource location from instance data
-            use shuriken_service::auth::{PathSegment, ResourceLocation};
-            let segments = vec![
-                PathSegment::ResourceType(resource_type),
-                PathSegment::Collection(instance.collection_id.to_string()),
-                PathSegment::Item(instance.slug.clone()),
-            ];
-            ResourceLocation::from_segments(segments)
-        }
+    let resource = if let Ok(loc) = get_resolved_location_from_depot(depot) {
+        loc.clone()
+    } else {
+        // Fallback: Build resource location from instance data
+        use shuriken_service::auth::{PathSegment, ResourceLocation};
+        let segments = vec![
+            PathSegment::ResourceType(resource_type),
+            PathSegment::Collection(instance.collection_id.to_string()),
+            PathSegment::Item(instance.slug.clone()),
+        ];
+        ResourceLocation::from_segments(segments)
     };
 
     // Check authorization

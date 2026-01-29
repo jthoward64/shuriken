@@ -29,13 +29,10 @@ pub async fn handle(
     depot: &Depot,
 ) {
     // Get collection from depot (resolved by slug_resolver middleware)
-    let collection = match get_terminal_collection_from_depot(depot) {
-        Ok(coll) => coll,
-        Err(_) => {
-            tracing::debug!("Collection not found in depot for calendar-multiget REPORT");
-            res.status_code(StatusCode::NOT_FOUND);
-            return;
-        }
+    let Ok(collection) = get_terminal_collection_from_depot(depot) else {
+        tracing::debug!("Collection not found in depot for calendar-multiget REPORT");
+        res.status_code(StatusCode::NOT_FOUND);
+        return;
     };
     let collection_id = collection.id;
 
@@ -68,18 +65,17 @@ pub async fn handle(
     };
 
     // Prefer ResourceLocation from depot if available (resolved by slug_resolver middleware)
-    let resource = match get_resolved_location_from_depot(depot) {
-        Ok(loc) => loc.clone(),
-        Err(_) => {
-            // Fallback: Build a minimal resource location from collection ID for auth checks
-            // Using PathSegments to construct a valid ResourceLocation
-            use shuriken_service::auth::{PathSegment, ResourceLocation, ResourceType};
-            let segments = vec![
-                PathSegment::ResourceType(ResourceType::Calendar),
-                PathSegment::Collection(collection_id.to_string()),
-            ];
-            ResourceLocation::from_segments(segments)
-        }
+    let resource = if let Ok(loc) = get_resolved_location_from_depot(depot) {
+        loc.clone()
+    } else {
+        // Fallback: Build a minimal resource location from collection ID for auth checks
+        // Using PathSegments to construct a valid ResourceLocation
+        use shuriken_service::auth::{PathSegment, ResourceLocation, ResourceType};
+        let segments = vec![
+            PathSegment::ResourceType(ResourceType::Calendar),
+            PathSegment::Collection(collection_id.to_string()),
+        ];
+        ResourceLocation::from_segments(segments)
     };
 
     if let Err(e) = authorizer.require(&subjects, &resource, Action::Read) {

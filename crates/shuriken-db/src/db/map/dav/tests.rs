@@ -9,7 +9,6 @@ use shuriken_rfc::rfc::vcard::core::{
     VCard, VCardParameter, VCardProperty, VCardValue, VCardVersion,
 };
 
-#[expect(clippy::too_many_lines)]
 #[test]
 fn test_icalendar_to_db_models_simple_event() {
     let ical = ICalendar {

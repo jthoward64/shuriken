@@ -65,13 +65,12 @@ pub async fn mkcol(req: &mut Request, res: &mut Response, depot: &Depot) {
         // Otherwise, construct parent path from original location
         use shuriken_service::auth::{ResourceLocation, depot::get_path_location_from_depot};
 
-        let path_loc = match get_path_location_from_depot(depot) {
-            Ok(loc) => loc.clone(),
-            Err(_) => {
-                tracing::warn!(path = %path, "Neither resolved nor path location found in depot");
-                res.status_code(StatusCode::NOT_FOUND);
-                return;
-            }
+        let path_loc = if let Ok(loc) = get_path_location_from_depot(depot) {
+            loc.clone()
+        } else {
+            tracing::warn!(path = %path, "Neither resolved nor path location found in depot");
+            res.status_code(StatusCode::NOT_FOUND);
+            return;
         };
 
         // Build parent location by removing the last collection segment
@@ -121,20 +120,13 @@ pub async fn mkcol(req: &mut Request, res: &mut Response, depot: &Depot) {
     };
 
     // Determine collection type from path context
-    let collection_type = match determine_collection_type(&path, &parsed_request) {
-        Ok(ctype) => ctype,
-        Err(e) => {
-            tracing::error!(error = %e, "Failed to determine collection type");
-            res.status_code(StatusCode::BAD_REQUEST);
-            return;
-        }
-    };
+    let collection_type = determine_collection_type(&path, &parsed_request);
 
     // Extract slug from path (last segment)
     let slug = path
         .trim_end_matches('/')
         .split('/')
-        .last()
+        .next_back()
         .unwrap_or("collection")
         .to_string();
 
@@ -182,28 +174,23 @@ pub async fn mkcol(req: &mut Request, res: &mut Response, depot: &Depot) {
 
 /// Determines collection type from path context and request body.
 fn determine_collection_type(
-    path: &str,
+    _path: &str,
     request: &MkcolRequest,
-) -> anyhow::Result<shuriken_db::db::enums::CollectionType> {
+) -> shuriken_db::db::enums::CollectionType {
     use shuriken_db::db::enums::CollectionType;
 
     // Check if request specifies resourcetype
     if let Some(rt) = &request.resource_type {
         if rt.contains("calendar") {
-            return Ok(CollectionType::Calendar);
-        } else if rt.contains("addressbook") {
-            return Ok(CollectionType::Addressbook);
+            return CollectionType::Calendar;
+        }
+        if rt.contains("addressbook") {
+            return CollectionType::Addressbook;
         }
     }
 
-    // Infer from path context
-    if path.contains("/cal/") {
-        Ok(CollectionType::Collection) // Plain collection in calendar context
-    } else if path.contains("/card/") {
-        Ok(CollectionType::Collection) // Plain collection in addressbook context
-    } else {
-        Ok(CollectionType::Collection) // Generic collection
-    }
+    // Infer from path context - all paths default to generic Collection
+    CollectionType::Collection
 }
 
 /// Extracts owner principal ID from auth context.

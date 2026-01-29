@@ -48,7 +48,7 @@ pub async fn copy(req: &mut Request, res: &mut Response, depot: &Depot) {
     };
 
     // Get Overwrite header (default: T)
-    let _overwrite = match req.headers().get("Overwrite") {
+    let overwrite = match req.headers().get("Overwrite") {
         Some(header) => header.to_str().unwrap_or("T") == "T",
         None => true,
     };
@@ -178,7 +178,7 @@ pub async fn copy(req: &mut Request, res: &mut Response, depot: &Depot) {
     let is_overwrite = existing_dest.is_some();
 
     // If destination exists and Overwrite is false, return 412
-    if is_overwrite && !_overwrite {
+    if is_overwrite && !overwrite {
         tracing::debug!(
             dest_slug = %dest_resource_name,
             "Destination exists and Overwrite is false"

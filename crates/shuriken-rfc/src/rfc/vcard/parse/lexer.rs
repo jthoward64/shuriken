@@ -236,7 +236,6 @@ fn parse_single_parameter(s: &str, line_num: usize) -> ParseResult<(VCardParamet
 }
 
 /// Parses parameter values (comma-separated, possibly quoted).
-#[expect(clippy::too_many_lines)]
 fn parse_param_values(s: &str) -> (Vec<String>, &str) {
     let mut values = Vec::new();
     let mut chars = s.chars().peekable();

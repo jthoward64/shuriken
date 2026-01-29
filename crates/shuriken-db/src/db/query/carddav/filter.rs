@@ -156,10 +156,6 @@ async fn evaluate_prop_filter(
 ///
 /// ## Errors
 /// Returns database errors if queries fail.
-#[expect(
-    clippy::too_many_lines,
-    reason = "Arbitrary property filter logic handles multiple filter modes cohesively"
-)]
 async fn evaluate_arbitrary_property_filter(
     conn: &mut DbConnection<'_>,
     prop_filter: &PropFilter,
@@ -297,14 +293,14 @@ async fn evaluate_email_filter(
 ) -> anyhow::Result<Vec<uuid::Uuid>> {
     use diesel::sql_types::{Text, Uuid as SqlUuid};
 
+    #[derive(QueryableByName)]
+    struct EntityId {
+        #[diesel(sql_type = SqlUuid)]
+        entity_id: uuid::Uuid,
+    }
+
     if prop_filter.is_not_defined {
         // EMAIL must NOT exist - find cards where emails array is empty or null
-        #[derive(QueryableByName)]
-        struct EntityId {
-            #[diesel(sql_type = SqlUuid)]
-            entity_id: uuid::Uuid,
-        }
-
         let query = diesel::sql_query(
             "SELECT entity_id FROM card_index \
              WHERE deleted_at IS NULL \
@@ -319,25 +315,11 @@ async fn evaluate_email_filter(
         let value = normalize_for_ilike(&text_match.value, text_match.collation.as_ref())?;
         let pattern = build_like_pattern(&value, &text_match.match_type);
 
-        #[derive(QueryableByName)]
-        struct EntityId {
-            #[diesel(sql_type = SqlUuid)]
-            entity_id: uuid::Uuid,
-        }
-
         // Query entities where any email in the array matches
-        let query_str = match text_match.match_type {
-            MatchType::Equals => {
-                "SELECT DISTINCT entity_id FROM card_index, \
-                 jsonb_array_elements_text(data->'emails') AS email \
-                 WHERE deleted_at IS NULL AND email ILIKE $1"
-            }
-            MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
-                "SELECT DISTINCT entity_id FROM card_index, \
-                 jsonb_array_elements_text(data->'emails') AS email \
-                 WHERE deleted_at IS NULL AND email ILIKE $1"
-            }
-        };
+        let query_str =
+            "SELECT DISTINCT entity_id FROM card_index, \
+             jsonb_array_elements_text(data->'emails') AS email \
+             WHERE deleted_at IS NULL AND email ILIKE $1";
 
         let query = diesel::sql_query(query_str).bind::<Text, _>(
             if text_match.match_type == MatchType::Equals {
@@ -369,12 +351,6 @@ async fn evaluate_email_filter(
     }
 
     // No text-match, just return all entities that have at least one email
-    #[derive(QueryableByName)]
-    struct EntityId {
-        #[diesel(sql_type = SqlUuid)]
-        entity_id: uuid::Uuid,
-    }
-
     let query = diesel::sql_query(
         "SELECT entity_id FROM card_index \
          WHERE deleted_at IS NULL \
@@ -399,14 +375,14 @@ async fn evaluate_phone_filter(
 ) -> anyhow::Result<Vec<uuid::Uuid>> {
     use diesel::sql_types::{Text, Uuid as SqlUuid};
 
+    #[derive(QueryableByName)]
+    struct EntityId {
+        #[diesel(sql_type = SqlUuid)]
+        entity_id: uuid::Uuid,
+    }
+
     if prop_filter.is_not_defined {
         // TEL must NOT exist - find cards where phones array is empty or null
-        #[derive(QueryableByName)]
-        struct EntityId {
-            #[diesel(sql_type = SqlUuid)]
-            entity_id: uuid::Uuid,
-        }
-
         let query = diesel::sql_query(
             "SELECT entity_id FROM card_index \
              WHERE deleted_at IS NULL \
@@ -421,25 +397,11 @@ async fn evaluate_phone_filter(
         let value = normalize_for_ilike(&text_match.value, text_match.collation.as_ref())?;
         let pattern = build_like_pattern(&value, &text_match.match_type);
 
-        #[derive(QueryableByName)]
-        struct EntityId {
-            #[diesel(sql_type = SqlUuid)]
-            entity_id: uuid::Uuid,
-        }
-
         // Query entities where any phone in the array matches
-        let query_str = match text_match.match_type {
-            MatchType::Equals => {
-                "SELECT DISTINCT entity_id FROM card_index, \
-                 jsonb_array_elements_text(data->'phones') AS phone \
-                 WHERE deleted_at IS NULL AND phone ILIKE $1"
-            }
-            MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
-                "SELECT DISTINCT entity_id FROM card_index, \
-                 jsonb_array_elements_text(data->'phones') AS phone \
-                 WHERE deleted_at IS NULL AND phone ILIKE $1"
-            }
-        };
+        let query_str =
+            "SELECT DISTINCT entity_id FROM card_index, \
+             jsonb_array_elements_text(data->'phones') AS phone \
+             WHERE deleted_at IS NULL AND phone ILIKE $1";
 
         let query = diesel::sql_query(query_str).bind::<Text, _>(
             if text_match.match_type == MatchType::Equals {
@@ -471,12 +433,6 @@ async fn evaluate_phone_filter(
     }
 
     // No text-match, just return all entities that have at least one phone
-    #[derive(QueryableByName)]
-    struct EntityId {
-        #[diesel(sql_type = SqlUuid)]
-        entity_id: uuid::Uuid,
-    }
-
     let query = diesel::sql_query(
         "SELECT entity_id FROM card_index \
          WHERE deleted_at IS NULL \
@@ -607,10 +563,6 @@ async fn evaluate_uid_filter(
 ///
 /// ## Errors
 /// Returns database errors if queries fail.
-#[expect(
-    clippy::too_many_lines,
-    reason = "Parameter filter logic requires cohesive handling of multiple filter modes"
-)]
 async fn apply_param_filters(
     conn: &mut DbConnection<'_>,
     entity_ids: &[uuid::Uuid],
@@ -696,10 +648,6 @@ async fn apply_param_filters(
 ///
 /// ## Errors
 /// Returns database errors if queries fail.
-#[expect(
-    clippy::too_many_lines,
-    reason = "Single param-filter evaluation has multiple code paths for match types"
-)]
 async fn evaluate_single_param_filter(
     conn: &mut DbConnection<'_>,
     prop_ids: &[uuid::Uuid],

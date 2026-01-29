@@ -72,6 +72,7 @@ pub async fn execute_calendar_query(
 ///
 /// ## Errors
 /// Returns database errors if queries fail. Missing resources return 404 in response.
+#[expect(clippy::unused_async, reason = "Stub function - will be async when implemented")]
 pub async fn execute_calendar_multiget(
     conn: &mut DbConnection<'_>,
     _collection_id: uuid::Uuid,
@@ -143,9 +144,10 @@ async fn execute_calendar_query_with_expansion(
     expansion_mode: RecurrenceExpansion,
     properties: &[PropertyName],
 ) -> anyhow::Result<Multistatus> {
+    type CalIndexRow = (Option<String>, Option<chrono::DateTime<chrono::Utc>>);
     let mut multistatus = Multistatus::new();
     for instance in instances {
-        let cal_index_row: Option<(Option<String>, Option<chrono::DateTime<chrono::Utc>>)> =
+        let cal_index_row: Option<CalIndexRow> =
             match cal_index::table
                 .filter(cal_index::entity_id.eq(instance.entity_id))
                 .filter(cal_index::recurrence_id_utc.is_null())

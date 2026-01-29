@@ -128,7 +128,7 @@ pub async fn mkcalendar(req: &mut Request, res: &mut Response, depot: &Depot) {
     let slug = path
         .trim_end_matches('/')
         .split('/')
-        .last()
+        .next_back()
         .unwrap_or("calendar")
         .to_string();
 

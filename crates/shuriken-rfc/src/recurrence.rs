@@ -35,127 +35,121 @@ pub struct RecurrenceData {
 /// - Component has no RRULE property
 /// - DTSTART is missing or invalid
 /// - DTEND/DURATION is missing or invalid
-#[must_use]
 pub fn extract_recurrence_data(component: &Component) -> RfcResult<Option<RecurrenceData>> {
     let mut resolver = TimeZoneResolver::new();
     extract_recurrence_data_with_resolver(component, &mut resolver)
 }
 
 /// ## Summary
-/// Extracts recurrence data from a VEVENT component with a timezone resolver.
+/// Extracts RRULE property text from a component.
 ///
-/// Parses RRULE, DTSTART, DTEND/DURATION, EXDATE, and RDATE properties.
-/// Converts all date-times to UTC if TZID is present.
-///
-/// ## Errors
-///
-/// Returns `Ok(None)` if:
-/// - Component has no RRULE property
-/// - DTSTART is missing or invalid
-/// - DTEND/DURATION is missing or invalid
-#[must_use]
-pub fn extract_recurrence_data_with_resolver(
-    component: &Component,
-    resolver: &mut TimeZoneResolver,
-) -> RfcResult<Option<RecurrenceData>> {
-    tracing::trace!(
-        component_name = %component.name,
-        property_count = component.properties.len(),
-        "Extracting recurrence data from component"
-    );
-
-    // Check for RRULE property
-    let rrule_prop = if let Some(prop) = component.get_property("RRULE") {
-        prop
-    } else {
+/// Returns `None` if RRULE property is not found or has unexpected value type.
+fn extract_rrule_text(component: &Component) -> Option<String> {
+    let Some(rrule_prop) = component.get_property("RRULE") else {
         tracing::trace!("RRULE property not found");
-        return Ok(None);
+        return None;
     };
 
-    // RRULE can be either Value::Recur or Value::Text
     let rrule_text = match &rrule_prop.value {
         crate::rfc::ical::core::Value::Recur(rrule) => rrule.to_string(),
         crate::rfc::ical::core::Value::Text(text) => text.clone(),
         _ => {
             tracing::trace!("RRULE property has unexpected value type");
-            return Ok(None);
+            return None;
         }
     };
     tracing::trace!(rrule = %rrule_text, "Found RRULE");
+    Some(rrule_text)
+}
 
-    // Extract DTSTART
-    let dtstart_prop = match component.get_property("DTSTART") {
-        Some(prop) => prop,
-        None => return Ok(None),
-    };
+/// ## Summary
+/// Extracts DTSTART property and converts to UTC with timezone info.
+///
+/// Returns `None` if DTSTART is missing or cannot be converted to UTC.
+fn extract_dtstart(
+    component: &Component,
+    resolver: &mut TimeZoneResolver,
+) -> Option<(DateTime<Utc>, Option<String>)> {
+    let dtstart_prop = component.get_property("DTSTART")?;
+
     let tzid = dtstart_prop.get_param_value("TZID").map(String::from);
-    let dtstart_ical = match dtstart_prop.as_datetime() {
-        Some(dt) => dt,
-        None => return Ok(None),
-    };
-    let dtstart_utc =
-        match ical_datetime_to_utc_with_resolver(dtstart_ical, tzid.as_deref(), resolver) {
-            Some(dt) => dt,
-            None => return Ok(None),
-        };
-    tracing::trace!(dtstart = %dtstart_utc, "Extracted DTSTART");
+    let dtstart_ical = dtstart_prop.as_datetime()?;
 
-    // Calculate duration from DTEND or DURATION
-    let duration = if let Some(dtend_prop) = component.get_property("DTEND") {
-        let dtend_ical = match dtend_prop.as_datetime() {
-            Some(dt) => dt,
-            None => return Ok(None),
-        };
+    let dtstart_utc = ical_datetime_to_utc_with_resolver(dtstart_ical, tzid.as_deref(), resolver)?;
+
+    tracing::trace!(dtstart = %dtstart_utc, "Extracted DTSTART");
+    Some((dtstart_utc, tzid))
+}
+
+/// ## Summary
+/// Extracts duration from DTEND or DURATION property.
+///
+/// Returns `None` if DTEND/DURATION properties are invalid.
+/// Returns `Some(zero)` if neither property is present (RFC 5545).
+fn extract_duration(
+    component: &Component,
+    dtstart_utc: DateTime<Utc>,
+    resolver: &mut TimeZoneResolver,
+) -> Option<chrono::TimeDelta> {
+    if let Some(dtend_prop) = component.get_property("DTEND") {
+        let dtend_ical = dtend_prop.as_datetime()?;
+
         let dtend_tzid = dtend_prop.get_param_value("TZID");
-        let dtend_utc = match ical_datetime_to_utc_with_resolver(dtend_ical, dtend_tzid, resolver) {
-            Some(dt) => dt,
-            None => return Ok(None),
-        };
+        let dtend_utc = ical_datetime_to_utc_with_resolver(dtend_ical, dtend_tzid, resolver)?;
+
         let dur = dtend_utc.signed_duration_since(dtstart_utc);
         tracing::trace!(
             duration_seconds = dur.num_seconds(),
             "Calculated duration from DTEND"
         );
-        dur
+        Some(dur)
     } else if let Some(duration_prop) = component.get_property("DURATION") {
-        let duration_ical = match duration_prop.as_duration() {
-            Some(dur) => dur,
-            None => return Ok(None),
-        };
+        let duration_ical = duration_prop.as_duration()?;
+
         let dur = ical_duration_to_chrono(duration_ical);
         tracing::trace!(duration_seconds = dur.num_seconds(), "Extracted DURATION");
-        dur
+        Some(dur)
     } else {
         // RFC 5545: If neither DTEND nor DURATION is present, the event has zero duration
         tracing::trace!("No DTEND or DURATION found, using zero duration");
-        chrono::TimeDelta::zero()
-    };
+        Some(chrono::TimeDelta::zero())
+    }
+}
 
-    // Extract EXDATE values
-    let exdates: Vec<DateTime<Utc>> = component
-        .get_properties("EXDATE")
+/// ## Summary
+/// Extracts date values from EXDATE or RDATE properties.
+fn extract_dates(
+    component: &Component,
+    property_name: &str,
+    resolver: &mut TimeZoneResolver,
+) -> Vec<DateTime<Utc>> {
+    component
+        .get_properties(property_name)
         .iter()
         .filter_map(|prop| {
             let tzid = prop.get_param_value("TZID");
             let dt = prop.as_datetime()?;
             ical_datetime_to_utc_with_resolver(dt, tzid, resolver)
         })
-        .collect();
+        .collect()
+}
 
-    // Extract RDATE values
-    let rdates: Vec<DateTime<Utc>> = component
-        .get_properties("RDATE")
-        .iter()
-        .filter_map(|prop| {
-            let tzid = prop.get_param_value("TZID");
-            let dt = prop.as_datetime()?;
-            ical_datetime_to_utc_with_resolver(dt, tzid, resolver)
-        })
-        .collect();
-
+/// ## Summary
+/// Builds an `RRuleSet` from RRULE text and date collections.
+///
+/// ## Errors
+///
+/// Returns error if RRULE parsing or validation fails.
+fn build_rrule_set(
+    rrule_text: &str,
+    dtstart_utc: DateTime<Utc>,
+    rdates: &[DateTime<Utc>],
+    exdates: &[DateTime<Utc>],
+) -> RfcResult<RRuleSet> {
     let rrule = rrule_text
         .parse::<RRule<Unvalidated>>()
         .map_err(|err| RfcError::ValidationError(err.to_string()))?;
+
     let dt_start = dtstart_utc.with_timezone(&Tz::UTC);
     let mut rrule_set = rrule.build(dt_start).map_err(|err| match err {
         rrule::RRuleError::ValidationError(validation) => {
@@ -177,6 +171,53 @@ pub fn extract_recurrence_data_with_resolver(
             .collect();
         rrule_set = rrule_set.set_exdates(exdates_tz);
     }
+
+    Ok(rrule_set)
+}
+
+/// ## Summary
+/// Extracts recurrence data from a VEVENT component with a timezone resolver.
+///
+/// Parses RRULE, DTSTART, DTEND/DURATION, EXDATE, and RDATE properties.
+/// Converts all date-times to UTC if TZID is present.
+///
+/// ## Errors
+///
+/// Returns `Ok(None)` if:
+/// - Component has no RRULE property
+/// - DTSTART is missing or invalid
+/// - DTEND/DURATION is missing or invalid
+pub fn extract_recurrence_data_with_resolver(
+    component: &Component,
+    resolver: &mut TimeZoneResolver,
+) -> RfcResult<Option<RecurrenceData>> {
+    tracing::trace!(
+        component_name = %component.name,
+        property_count = component.properties.len(),
+        "Extracting recurrence data from component"
+    );
+
+    // Extract and validate RRULE
+    let Some(rrule_text) = extract_rrule_text(component) else {
+        return Ok(None);
+    };
+
+    // Extract DTSTART with timezone
+    let Some((dtstart_utc, tzid)) = extract_dtstart(component, resolver) else {
+        return Ok(None);
+    };
+
+    // Calculate event duration
+    let Some(duration) = extract_duration(component, dtstart_utc, resolver) else {
+        return Ok(None);
+    };
+
+    // Extract exception and additional dates
+    let exdates = extract_dates(component, "EXDATE", resolver);
+    let rdates = extract_dates(component, "RDATE", resolver);
+
+    // Build RRULE set
+    let rrule_set = build_rrule_set(&rrule_text, dtstart_utc, &rdates, &exdates)?;
 
     Ok(Some(RecurrenceData {
         rrule_set,

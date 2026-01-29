@@ -44,55 +44,50 @@ pub(super) async fn build_propfind_response(
     let (found_properties, not_found_properties) =
         get_properties_for_resource(conn, path, collection, propfind_req).await?;
 
-    let response = if !not_found_properties.is_empty() {
-        PropstatResponse::with_found_and_not_found(href, found_properties, not_found_properties)
-    } else {
+    let response = if not_found_properties.is_empty() {
         PropstatResponse::ok(href, found_properties)
+    } else {
+        PropstatResponse::with_found_and_not_found(href, found_properties, not_found_properties)
     };
     multistatus.add_response(response);
 
     // If depth is 1, add child resources
-    if matches!(depth, Depth::One) {
-        if let Some(coll) = collection {
-            // Query for child instances in the collection
-            let instances = {
-                use diesel_async::RunQueryDsl;
-                use shuriken_db::db::query::dav::instance;
+    if matches!(depth, Depth::One)
+        && let Some(coll) = collection
+    {
+        // Query for child instances in the collection
+        let instances = {
+            use diesel_async::RunQueryDsl;
+            use shuriken_db::db::query::dav::instance;
 
-                instance::by_collection_not_deleted(coll.id)
-                    .load::<shuriken_db::model::dav::instance::DavInstance>(conn)
-                    .await?
+            instance::by_collection_not_deleted(coll.id)
+                .load::<shuriken_db::model::dav::instance::DavInstance>(conn)
+                .await?
+        };
+
+        // Build a response for each child instance
+        for inst in instances {
+            // Determine file extension from collection type
+            let extension = match coll.collection_type.as_str() {
+                "calendar" => ".ics",
+                "addressbook" => ".vcf",
+                _ => "", // Plain collections have no extension
+            };
+            // Build child path by appending slug with extension to collection path
+            let child_path = format!("{}/{}{}", path.trim_end_matches('/'), inst.slug, extension);
+            let child_href = Href::new(&child_path);
+
+            // For child resources, build properties from the instance
+            let (child_found, child_not_found) =
+                get_properties_for_instance(conn, &inst, collection, propfind_req).await?;
+
+            let child_response = if child_not_found.is_empty() {
+                PropstatResponse::ok(child_href, child_found)
+            } else {
+                PropstatResponse::with_found_and_not_found(child_href, child_found, child_not_found)
             };
 
-            // Build a response for each child instance
-            for inst in instances {
-                // Determine file extension from collection type
-                let extension = match coll.collection_type.as_str() {
-                    "calendar" => ".ics",
-                    "addressbook" => ".vcf",
-                    _ => "", // Plain collections have no extension
-                };
-                // Build child path by appending slug with extension to collection path
-                let child_path =
-                    format!("{}/{}{}", path.trim_end_matches('/'), inst.slug, extension);
-                let child_href = Href::new(&child_path);
-
-                // For child resources, build properties from the instance
-                let (child_found, child_not_found) =
-                    get_properties_for_instance(conn, &inst, collection, propfind_req).await?;
-
-                let child_response = if !child_not_found.is_empty() {
-                    PropstatResponse::with_found_and_not_found(
-                        child_href,
-                        child_found,
-                        child_not_found,
-                    )
-                } else {
-                    PropstatResponse::ok(child_href, child_found)
-                };
-
-                multistatus.add_response(child_response);
-            }
+            multistatus.add_response(child_response);
         }
     }
 
@@ -102,11 +97,18 @@ pub(super) async fn build_propfind_response(
 /// ## Summary
 /// Retrieves properties for a resource based on the PROPFIND request.
 ///
-/// Returns a tuple of (found_properties, not_found_properties).
+/// Returns a tuple of (`found_properties`, `not_found_properties`).
 ///
 /// ## Errors
 /// Returns errors if property resolution fails.
-#[expect(clippy::too_many_lines)]
+#[expect(
+    clippy::too_many_lines,
+    reason = "property resolution requires many cases"
+)]
+#[expect(
+    clippy::unused_async,
+    reason = "async signature needed for future DB queries"
+)]
 async fn get_properties_for_resource(
     _conn: &mut shuriken_db::db::connection::DbConnection<'_>,
     _path: &str,
@@ -124,9 +126,8 @@ async fn get_properties_for_resource(
     // Determine the collection type for resourcetype property
     let collection_type = collection.map(|c| c.collection_type.as_str());
     let collection_qname = match collection_type {
-        Some("calendar") => QName::caldav("calendar"),
         Some("addressbook") => QName::carddav("addressbook"),
-        _ => QName::caldav("calendar"), // Default fallback
+        _ => QName::caldav("calendar"), // Default for calendar or unknown
     };
 
     // Handle different PROPFIND types
@@ -176,7 +177,7 @@ async fn get_properties_for_resource(
             // Add getetag
             found.push(DavProperty::text(
                 QName::dav("getetag"),
-                &format!("\"{}\"", coll.synctoken),
+                format!("\"{}\"", coll.synctoken),
             ));
         }
     } else if propfind_req.is_propname() {
@@ -258,7 +259,7 @@ async fn get_properties_for_resource(
                 }
                 ("DAV:", "getetag") => {
                     if let Some(coll) = collection {
-                        found.push(DavProperty::text(qname, &format!("\"{}\"", coll.synctoken)));
+                        found.push(DavProperty::text(qname, format!("\"{}\"", coll.synctoken)));
                     } else {
                         not_found.push(DavProperty::empty(qname));
                     }
@@ -269,6 +270,8 @@ async fn get_properties_for_resource(
                 }
             }
         }
+    } else {
+        // Invalid request type - neither allprop, propname, nor prop
     }
 
     Ok((found, not_found))
@@ -277,10 +280,14 @@ async fn get_properties_for_resource(
 /// ## Summary
 /// Retrieves properties for a child instance resource.
 ///
-/// Returns a tuple of (found_properties, not_found_properties).
+/// Returns a tuple of (`found_properties`, `not_found_properties`).
 ///
 /// ## Errors
 /// Returns errors if property resolution fails.
+#[expect(
+    clippy::unused_async,
+    reason = "async signature needed for future DB queries"
+)]
 async fn get_properties_for_instance(
     _conn: &mut shuriken_db::db::connection::DbConnection<'_>,
     instance: &shuriken_db::model::dav::instance::DavInstance,
@@ -332,6 +339,12 @@ async fn get_properties_for_instance(
                 }
             }
         }
+    } else {
+        // Invalid request type
+        tracing::warn!(
+            req = ?propfind_req,
+            "Invalid PROPFIND request type for instance"
+        );
     }
 
     Ok((found, not_found))

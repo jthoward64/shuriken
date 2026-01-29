@@ -79,21 +79,17 @@ impl salvo::Handler for DavPathMiddleware {
                     "Path resolved successfully"
                 );
 
-                match result
+                if let Some(PathSegment::Collection(value)) = result
                     .original_location
                     .segments()
                     .iter()
-                    .filter(|s| matches!(s, PathSegment::Collection(_)))
-                    .last()
+                    .rfind(|s| matches!(s, PathSegment::Collection(_)))
                 {
-                    Some(PathSegment::Collection(value)) => {
-                        depot.insert(
-                            depot_keys::TERMINAL_COLLECTION,
-                            DavIdentifier::from(value.clone()),
-                        );
-                    }
-                    _ => {}
-                };
+                    depot.insert(
+                        depot_keys::TERMINAL_COLLECTION,
+                        DavIdentifier::from(value.clone()),
+                    );
+                }
 
                 // Store original location
                 depot.insert(depot_keys::PATH_LOCATION, result.original_location);
@@ -136,6 +132,8 @@ mod tests {
     #[test]
     fn test_middleware_struct_exists() {
         // Verify the middleware struct can be instantiated
-        let _middleware = DavPathMiddleware;
+        let middleware = DavPathMiddleware;
+        // Use the middleware variable to satisfy clippy
+        let _ = middleware;
     }
 }

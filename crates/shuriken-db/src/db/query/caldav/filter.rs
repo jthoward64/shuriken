@@ -454,10 +454,6 @@ fn build_property_time_range_sql(time_range: &TimeRange) -> Option<String> {
 ///
 /// ## Errors
 /// Returns database errors if queries fail.
-#[expect(
-    clippy::too_many_lines,
-    reason = "Parameter filter logic requires cohesive handling of multiple filter modes"
-)]
 async fn apply_param_filters(
     conn: &mut DbConnection<'_>,
     entity_ids: &[uuid::Uuid],

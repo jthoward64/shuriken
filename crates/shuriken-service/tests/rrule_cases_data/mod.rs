@@ -11,6 +11,7 @@ pub struct RRuleCase {
     pub before: Option<&'static str>,
 }
 
+#[expect(clippy::too_many_lines)]
 pub fn rrule_cases() -> Vec<RRuleCase> {
     vec![
         RRuleCase {
@@ -180,7 +181,7 @@ pub fn assert_case(case: &RRuleCase) {
     }
 
     let result = rrule_set.all(case.limit);
-    let actual_timestamps: Vec<i64> = result.dates.iter().map(|dt| dt.timestamp()).collect();
+    let actual_timestamps: Vec<i64> = result.dates.iter().map(chrono::DateTime::timestamp).collect();
 
     if let Some(expected) = case.expected {
         let expected_timestamps: Vec<i64> = expected
@@ -207,6 +208,6 @@ pub fn assert_case(case: &RRuleCase) {
 
 fn parse_rfc3339(value: &str) -> DateTime<FixedOffset> {
     DateTime::parse_from_rfc3339(value).unwrap_or_else(|err| {
-        panic!("Failed to parse rfc3339 value {}: {}", value, err)
+        panic!("Failed to parse rfc3339 value {value}: {err}")
     })
 }
