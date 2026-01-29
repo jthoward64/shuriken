@@ -1,0 +1,39 @@
+[package]
+name = "shuriken-app"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "shuriken"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+shuriken-core = { workspace = true }
+shuriken-rfc = { workspace = true }
+shuriken-db = { workspace = true }
+shuriken-service = { workspace = true }
+
+anyhow = { workspace = true }
+chrono = { workspace = true }
+diesel = { workspace = true }
+diesel-async = { workspace = true }
+dotenvy = { workspace = true }
+reqwest = { workspace = true }
+salvo = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-futures = { workspace = true }
+tracing-log = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-unwrap = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+string-adapter = { workspace = true }
+test-log = { workspace = true }

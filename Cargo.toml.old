@@ -1,21 +1,17 @@
-[workspace]
-resolver = "2"
-members = [
-    "crates/shuriken-core",
-    "crates/shuriken-rfc",
-    "crates/shuriken-db",
-    "crates/shuriken-service",
-    "crates/shuriken-app",
-]
-
-[workspace.package]
+[package]
+name = "shuriken"
 version = "0.1.0"
 edition = "2024"
 
-[workspace.lints.clippy]
+[lib]
+name = "shuriken"
+path = "src/lib.rs"
+
+[lints.clippy]
 pedantic = { level = "deny", priority = -1 }
 style = { level = "warn", priority = -1 }
 complexity = { level = "warn", priority = -1 }
+# cargo = { level = "warn", priority = -1 }
 perf = { level = "warn", priority = -1 }
 suspicious = { level = "warn", priority = -1 }
 
@@ -32,21 +28,12 @@ return_and_then = "warn"
 self_named_module_files = "warn"
 unwrap_used = "warn"
 
-[workspace.dependencies]
-# Workspace crates
-shuriken-core = { path = "crates/shuriken-core" }
-shuriken-rfc = { path = "crates/shuriken-rfc" }
-shuriken-db = { path = "crates/shuriken-db" }
-shuriken-service = { path = "crates/shuriken-service" }
-
-# External dependencies
+[dependencies]
 anyhow = { version = "1.0.100", features = ["backtrace"] }
 base64 = "0.22"
-casbin = { version = "2.19.1", features = ["glob"] }
 chrono = { version = "0.4.43", features = ["serde"] }
 chrono-tz = "0.10.4"
 config = { version = "0.15.19", features = ["toml", "json", "yaml"] }
-const-str = "1.0.0"
 diesel = { version = "2.3.5", features = [
     "postgres",
     "chrono",
@@ -60,10 +47,6 @@ diesel-async-adapter = { version = "0.1.0", features = [
 ], git = "https://github.com/jthoward64/diesel-async-adapter.git" }
 diesel-async = { version = "0.7.4", features = ["postgres", "tokio", "bb8"] }
 diesel-guard = "0.5.0"
-dotenvy = "0.15.7"
-futures = "0.3.31"
-hex = "0.4.3"
-icu = "2.1.1"
 ipnetwork = "0.21.1"
 quick-xml = { version = "0.39.0", features = ["async-tokio"] }
 reqwest = { version = "0.13.1", default-features = false, features = [
@@ -71,8 +54,6 @@ reqwest = { version = "0.13.1", default-features = false, features = [
     "rustls",
     "gzip",
 ] }
-reqwest-tracing = "0.5"
-rrule = "0.14.0"
 salvo = { version = "0.88.1", features = [
     "http2-cleartext",
     "anyhow",
@@ -80,13 +61,6 @@ salvo = { version = "0.88.1", features = [
     "caching-headers",
     "logging",
 ] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0.149"
-sha2 = "0.10.8"
-string-adapter = { version = "1.1.0", default-features = false, features = [
-    "runtime-tokio",
-] }
-test-log = { version = "0.2", features = ["trace"] }
 thiserror = "2.0.18"
 tokio = { version = "1.49.0", features = [
     "macros",
@@ -99,14 +73,31 @@ tokio = { version = "1.49.0", features = [
     "sync",
 ] }
 tracing = { version = "0.1.44", features = ["valuable"] }
-tracing-futures = "0.2"
-tracing-log = "0.2"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
+tracing-log = "0.2"
+tracing-futures = "0.2"
 tracing-unwrap = "1.0"
+reqwest-tracing = "0.5"
 uuid = { version = "1.19.0", features = [
     "v4",
     "v5",
     "v7",
     "serde",
     "fast-rng",
+] }
+serde = { version = "1.0", features = ["derive"] }
+dotenvy = "0.15.7"
+casbin = { version = "2.19.1", features = ["glob"] }
+serde_json = "1.0.149"
+sha2 = "0.10.8"
+hex = "0.4.3"
+rrule = "0.14.0"
+icu = "2.1.1"
+const-str = "1.0.0"
+futures = "0.3.31"
+
+[dev-dependencies]
+test-log = { version = "0.2", features = ["trace"] }
+string-adapter = { version = "1.1.0", default-features = false, features = [
+    "runtime-tokio",
 ] }

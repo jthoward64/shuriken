@@ -1,0 +1,37 @@
+[package]
+name = "shuriken-service"
+version.workspace = true
+edition.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+shuriken-core = { workspace = true }
+shuriken-rfc = { workspace = true }
+shuriken-db = { workspace = true }
+
+anyhow = { workspace = true }
+casbin = { workspace = true }
+chrono = { workspace = true }
+diesel = { workspace = true }
+diesel-async = { workspace = true }
+diesel-async-adapter = { workspace = true }
+diesel-guard = { workspace = true }
+futures = { workspace = true }
+reqwest = { workspace = true }
+reqwest-tracing = { workspace = true }
+rrule = { workspace = true }
+salvo = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-futures = { workspace = true }
+tracing-unwrap = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+string-adapter = { workspace = true }
+test-log = { workspace = true }

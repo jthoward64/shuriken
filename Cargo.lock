@@ -4185,16 +4185,57 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
-name = "shuriken"
+name = "shuriken-app"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "diesel",
+ "diesel-async",
+ "dotenvy",
+ "reqwest 0.13.1",
+ "salvo",
+ "serde",
+ "serde_json",
+ "shuriken-core",
+ "shuriken-db",
+ "shuriken-rfc",
+ "shuriken-service",
+ "string-adapter",
+ "test-log",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "tracing-futures",
+ "tracing-log",
+ "tracing-subscriber",
+ "tracing-unwrap",
+ "uuid",
+]
+
+[[package]]
+name = "shuriken-core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "config",
+ "const-str",
+ "dotenvy",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "shuriken-db"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "base64",
- "casbin",
  "chrono",
- "chrono-tz",
- "config",
- "const-str",
  "diesel",
  "diesel-async",
  "diesel-async-adapter",
@@ -4205,6 +4246,31 @@ dependencies = [
  "hex",
  "icu",
  "ipnetwork",
+ "rrule",
+ "serde",
+ "serde_json",
+ "sha2",
+ "shuriken-core",
+ "shuriken-rfc",
+ "test-log",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "shuriken-rfc"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64",
+ "chrono",
+ "chrono-tz",
+ "const-str",
+ "futures",
+ "hex",
+ "icu",
  "quick-xml",
  "reqwest 0.13.1",
  "reqwest-tracing",
@@ -4213,14 +4279,41 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "shuriken-core",
+ "test-log",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "shuriken-service"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "casbin",
+ "chrono",
+ "diesel",
+ "diesel-async",
+ "diesel-async-adapter",
+ "diesel-guard",
+ "futures",
+ "reqwest 0.13.1",
+ "reqwest-tracing",
+ "rrule",
+ "salvo",
+ "serde",
+ "serde_json",
+ "shuriken-core",
+ "shuriken-db",
+ "shuriken-rfc",
  "string-adapter",
  "test-log",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
  "tracing-futures",
- "tracing-log",
- "tracing-subscriber",
  "tracing-unwrap",
  "uuid",
 ]

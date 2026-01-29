@@ -1,0 +1,36 @@
+[package]
+name = "shuriken-db"
+version.workspace = true
+edition.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+shuriken-core = { workspace = true }
+shuriken-rfc = { workspace = true }
+
+anyhow = { workspace = true }
+base64 = { workspace = true }
+chrono = { workspace = true }
+diesel = { workspace = true }
+diesel_migrations = { workspace = true }
+diesel-async = { workspace = true }
+diesel-async-adapter = { workspace = true }
+diesel-guard = { workspace = true }
+dotenvy = { workspace = true }
+futures = { workspace = true }
+hex = { workspace = true }
+icu = { workspace = true }
+ipnetwork = { workspace = true }
+rrule = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+test-log = { workspace = true }
