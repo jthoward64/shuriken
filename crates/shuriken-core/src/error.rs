@@ -11,6 +11,9 @@ pub enum CoreError {
 
     #[error("Invalid input: {0}")]
     InvalidInput(String),
+
+    #[error("Invariant violation: {0}")]
+    InvariantViolation(&'static str),
 }
 
 pub type CoreResult<T> = std::result::Result<T, CoreError>;

@@ -257,9 +257,7 @@ pub fn ical_datetime_to_utc_with_resolver(
 /// ## Summary
 /// Converts an iCalendar `Duration` to `chrono::Duration`.
 #[must_use]
-pub fn ical_duration_to_chrono(
-    duration: &crate::rfc::ical::core::Duration,
-) -> chrono::TimeDelta {
+pub fn ical_duration_to_chrono(duration: &crate::rfc::ical::core::Duration) -> chrono::TimeDelta {
     let mut total = chrono::TimeDelta::zero();
 
     if duration.weeks > 0 {
@@ -302,8 +300,8 @@ mod tests {
         standard.add_property(Property::text("TZOFFSETTO", "+0200"));
         timezone.add_child(standard);
 
-        let vtimezone = crate::rfc::ical::expand::VTimezone::parse(&timezone)
-            .expect("valid VTIMEZONE");
+        let vtimezone =
+            crate::rfc::ical::expand::VTimezone::parse(&timezone).expect("valid VTIMEZONE");
         resolver.register_vtimezone(vtimezone);
     }
 
@@ -350,9 +348,10 @@ mod tests {
             .expect("should extract data")
             .expect("should have recurrence data");
 
+        // The rrule crate normalizes RRULE by inferring BYHOUR/BYMINUTE/BYSECOND from DTSTART
         assert_eq!(
             data.rrule_set.to_string(),
-            "DTSTART:20260101T100000Z\nRRULE:FREQ=DAILY;COUNT=5"
+            "DTSTART:20260101T100000Z\nRRULE:FREQ=DAILY;COUNT=5;BYHOUR=10;BYMINUTE=0;BYSECOND=0"
         );
         assert_eq!(data.duration, chrono::TimeDelta::hours(1));
         assert_eq!(data.exdates.len(), 0);

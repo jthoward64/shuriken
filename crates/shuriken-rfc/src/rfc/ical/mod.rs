@@ -9,7 +9,7 @@
 //! ## Example
 //!
 //! ```rust
-//! use shuriken::component::rfc::ical::{parse, build, core::*};
+//! use shuriken_rfc::rfc::ical::{parse, build, core::*};
 //!
 //! // Parse an iCalendar document
 //! let input = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\n...";

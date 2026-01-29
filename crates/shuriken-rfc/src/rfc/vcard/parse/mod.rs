@@ -5,7 +5,7 @@
 //! ## Usage
 //!
 //! ```rust
-//! use shuriken::component::rfc::vcard::parse;
+//! use shuriken_rfc::rfc::vcard::parse;
 //!
 //! let input = "\
 //! BEGIN:VCARD\r\n\

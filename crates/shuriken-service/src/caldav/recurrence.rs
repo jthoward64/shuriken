@@ -1,10 +1,10 @@
 //! Helper functions for extracting and processing recurrence data from iCalendar components.
 
 use crate::error::{ServiceError, ServiceResult};
-use shuriken_rfc::rfc::ical::core::{Component, DateTime as IcalDateTime};
-use shuriken_rfc::rfc::ical::expand::TimeZoneResolver;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use rrule::{RRule, RRuleSet, Tz, Unvalidated};
+use shuriken_rfc::rfc::ical::core::{Component, DateTime as IcalDateTime};
+use shuriken_rfc::rfc::ical::expand::TimeZoneResolver;
 
 /// Extracted recurrence data from a VEVENT component.
 #[derive(Debug, Clone)]
@@ -281,10 +281,10 @@ pub fn ical_duration_to_chrono(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::TimeZone;
     use shuriken_rfc::rfc::ical::core::{
         Component, ComponentKind, DateTime, DateTimeForm, Parameter, Property, Value,
     };
-    use chrono::TimeZone;
 
     fn register_fixed_timezone(resolver: &mut TimeZoneResolver) {
         let mut timezone = Component::new(ComponentKind::Timezone);
@@ -299,8 +299,8 @@ mod tests {
         standard.add_property(Property::text("TZOFFSETTO", "+0200"));
         timezone.add_child(standard);
 
-        let vtimezone = shuriken_rfc::rfc::ical::expand::VTimezone::parse(&timezone)
-            .expect("valid VTIMEZONE");
+        let vtimezone =
+            shuriken_rfc::rfc::ical::expand::VTimezone::parse(&timezone).expect("valid VTIMEZONE");
         resolver.register_vtimezone(vtimezone);
     }
 
@@ -347,9 +347,10 @@ mod tests {
             .expect("should extract data")
             .expect("should have recurrence data");
 
+        // The rrule crate normalizes RRULE by inferring BYHOUR/BYMINUTE/BYSECOND from DTSTART
         assert_eq!(
             data.rrule_set.to_string(),
-            "DTSTART:20260101T100000Z\nRRULE:FREQ=DAILY;COUNT=5"
+            "DTSTART:20260101T100000Z\nRRULE:FREQ=DAILY;COUNT=5;BYHOUR=10;BYMINUTE=0;BYSECOND=0"
         );
         assert_eq!(data.duration, chrono::TimeDelta::hours(1));
         assert_eq!(data.exdates.len(), 0);

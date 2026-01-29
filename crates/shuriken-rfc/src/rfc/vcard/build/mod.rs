@@ -5,7 +5,7 @@
 //! ## Usage
 //!
 //! ```rust
-//! use shuriken::component::rfc::vcard::{VCard, VCardProperty, serialize};
+//! use shuriken_rfc::rfc::vcard::{VCard, VCardProperty, serialize};
 //!
 //! let mut card = VCard::new();
 //! card.add_property(VCardProperty::text("FN", "John Doe"));

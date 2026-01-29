@@ -25,7 +25,7 @@
 //! ## Example
 //!
 //! ```rust
-//! use shuriken::component::rfc::vcard::core::{VCard, VCardProperty, StructuredName};
+//! use shuriken_rfc::rfc::vcard::core::{VCard, VCardProperty, StructuredName};
 //!
 //! let mut card = VCard::new();
 //! card.add_property(VCardProperty::text("FN", "John Doe"));

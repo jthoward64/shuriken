@@ -13,7 +13,7 @@
 //! ### Parsing
 //!
 //! ```rust
-//! use shuriken::component::rfc::vcard::{parse, VCard};
+//! use shuriken_rfc::rfc::vcard::{parse, VCard};
 //!
 //! let input = "\
 //! BEGIN:VCARD\r\n\
@@ -29,7 +29,7 @@
 //! ### Serializing
 //!
 //! ```rust
-//! use shuriken::component::rfc::vcard::{VCard, VCardProperty, serialize};
+//! use shuriken_rfc::rfc::vcard::{VCard, VCardProperty, serialize};
 //!
 //! let mut card = VCard::new();
 //! card.add_property(VCardProperty::text("FN", "Jane Doe"));
