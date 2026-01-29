@@ -157,30 +157,18 @@ async fn calendar_query_returns_calendar_data() {
         .await
         .expect("Failed to seed collection owner");
 
-    let entity_id = test_db
-        .seed_entity("icalendar", Some("caldata@example.com"))
-        .await
-        .expect("Failed to seed entity");
-
-    test_db
-        .seed_minimal_icalendar_event(entity_id, "caldata@example.com", "CalData Event")
-        .await
-        .expect("Failed to seed iCalendar event");
-
-    let _instance_id = test_db
-        .seed_instance(
-            collection_id,
-            entity_id,
-            "caldata",
-            "text/calendar",
-            "\"caldata-etag\"",
-            1,
-        )
-        .await
-        .expect("Failed to seed instance");
-
     let service = create_db_test_service(&test_db.url()).await;
 
+    // Use PUT to create the event (which will populate cal_index)
+    let uid = "caldata@example.com";
+    let summary = "CalData Event";
+    let ical = sample_icalendar_event(uid, summary);
+    TestRequest::put(&caldav_item_path("testuser", "testcal", "caldata.ics"))
+        .if_none_match("*")
+        .icalendar_body(&ical)
+        .send(&service)
+        .await
+        .assert_status(StatusCode::CREATED);
     let response = TestRequest::report(&caldav_collection_path("testuser", "testcal"))
         .xml_body(calendar_query_report())
         .send(&service)
