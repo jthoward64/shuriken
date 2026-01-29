@@ -87,7 +87,7 @@ async fn resolve_nested_calendar_collection_path() {
     let terminal = chain.terminal().expect("terminal collection present");
     assert_eq!(terminal.id, child_id);
     assert_eq!(terminal.slug, "team");
-    
+
     // Verify chain contains both parent and child
     assert_eq!(chain.len(), 2);
 }

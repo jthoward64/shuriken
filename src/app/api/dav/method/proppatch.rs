@@ -20,7 +20,6 @@ use crate::component::rfc::dav::core::{
 };
 use crate::component::rfc::dav::parse;
 
-
 /// ## Summary
 /// Handles PROPPATCH requests to update `WebDAV` properties.
 ///

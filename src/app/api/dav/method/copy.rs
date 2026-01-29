@@ -294,7 +294,11 @@ async fn check_copy_authorization(
         use crate::component::auth::{PathSegment, ResourceLocation, ResourceType};
 
         let segments = vec![
-            PathSegment::ResourceType(source_resource.resource_type().unwrap_or(ResourceType::Calendar)),
+            PathSegment::ResourceType(
+                source_resource
+                    .resource_type()
+                    .unwrap_or(ResourceType::Calendar),
+            ),
             PathSegment::Owner(dest_collection.owner_principal_id.to_string()),
             PathSegment::Collection(dest_collection.id.to_string()),
         ];

@@ -551,13 +551,23 @@ async fn delete_if_match_success() {
     let uri = caldav_item_path("testuser", "ifm", "ifm-test.ics");
     let etag = "\"ifm-etag-123\"";
     let _instance_id = test_db
-        .seed_instance(collection_id, entity_id, "ifm-test", "text/calendar", etag, 1)
+        .seed_instance(
+            collection_id,
+            entity_id,
+            "ifm-test",
+            "text/calendar",
+            etag,
+            1,
+        )
         .await
         .expect("Failed to seed instance");
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let response = TestRequest::delete(&uri).if_match(etag).send(&service).await;
+    let response = TestRequest::delete(&uri)
+        .if_match(etag)
+        .send(&service)
+        .await;
 
     response.assert_status(StatusCode::NO_CONTENT);
 }

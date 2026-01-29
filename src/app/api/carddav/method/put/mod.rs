@@ -6,9 +6,9 @@ use salvo::http::{HeaderValue, StatusCode};
 use salvo::{Depot, Request, Response, handler};
 
 use crate::component::auth::{
-    Action, authorizer_from_depot, get_resolved_location_from_depot,
+    Action, authorizer_from_depot,
     depot::{get_path_location_from_depot, get_terminal_collection_from_depot},
-    get_subjects_from_depot,
+    get_resolved_location_from_depot, get_subjects_from_depot,
 };
 use crate::component::carddav::service::object::{PutObjectContext, put_address_object};
 use crate::component::db::connection;

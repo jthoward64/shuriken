@@ -28,7 +28,11 @@ async fn mkcalendar_creates_calendar_collection() {
     // Grant owner access to the authenticated user on their namespace
     // Use UUID-based path for authorization
     test_db
-        .seed_access_policy(&format!("principal:{principal_id}"), &format!("/cal/{principal_id}/**"), "owner")
+        .seed_access_policy(
+            &format!("principal:{principal_id}"),
+            &format!("/cal/{principal_id}/**"),
+            "owner",
+        )
         .await
         .expect("Failed to seed access policy");
 
@@ -36,9 +40,7 @@ async fn mkcalendar_creates_calendar_collection() {
 
     let new_collection_slug = "new-calendar";
     let path = caldav_collection_path("testuser", new_collection_slug);
-    let response = TestRequest::mkcalendar(&path)
-        .send(&service)
-        .await;
+    let response = TestRequest::mkcalendar(&path).send(&service).await;
 
     response.assert_status(StatusCode::CREATED);
 
@@ -72,7 +74,11 @@ async fn mkcalendar_initial_props_applied() {
     // Grant owner access to the authenticated user on their namespace
     // Use UUID-based path for authorization
     test_db
-        .seed_access_policy(&format!("principal:{principal_id}"), &format!("/cal/{principal_id}/**"), "owner")
+        .seed_access_policy(
+            &format!("principal:{principal_id}"),
+            &format!("/cal/{principal_id}/**"),
+            "owner",
+        )
         .await
         .expect("Failed to seed access policy");
 
@@ -138,9 +144,7 @@ async fn mkcalendar_on_existing_uri_conflict() {
 
     // Try to create a collection with the same slug
     let path = caldav_collection_path("testuser", "testcal");
-    let response = TestRequest::mkcalendar(&path)
-        .send(&service)
-        .await;
+    let response = TestRequest::mkcalendar(&path).send(&service).await;
 
     // Either 405 Method Not Allowed or 409 Conflict
     assert!(
@@ -172,7 +176,11 @@ async fn mkcol_extended_creates_addressbook() {
     // Grant owner access to the testuser's addressbook namespace
     // Use UUID-based path for authorization
     test_db
-        .seed_access_policy(&format!("principal:{principal_id}"), &format!("/card/{principal_id}/**"), "owner")
+        .seed_access_policy(
+            &format!("principal:{principal_id}"),
+            &format!("/card/{principal_id}/**"),
+            "owner",
+        )
         .await
         .expect("Failed to seed access policy");
 
@@ -219,7 +227,11 @@ async fn mkcol_extended_applies_initial_props() {
     // Grant owner access to the testuser's addressbook namespace
     // Use UUID-based path for authorization
     test_db
-        .seed_access_policy(&format!("principal:{principal_id}"), &format!("/card/{principal_id}/**"), "owner")
+        .seed_access_policy(
+            &format!("principal:{principal_id}"),
+            &format!("/card/{principal_id}/**"),
+            "owner",
+        )
         .await
         .expect("Failed to seed access policy");
 
@@ -266,7 +278,11 @@ async fn mkcol_extended_rejects_bad_body() {
     // Grant owner access to the testuser's addressbook namespace
     // Use UUID-based path for authorization
     test_db
-        .seed_access_policy(&format!("principal:{principal_id}"), &format!("/card/{principal_id}/**"), "owner")
+        .seed_access_policy(
+            &format!("principal:{principal_id}"),
+            &format!("/card/{principal_id}/**"),
+            "owner",
+        )
         .await
         .expect("Failed to seed access policy");
 
@@ -303,7 +319,11 @@ async fn mkcol_creates_plain_collection() {
     // Grant owner access to the authenticated user on their namespace
     // Use UUID-based path for authorization
     test_db
-        .seed_access_policy(&format!("principal:{principal_id}"), &format!("/cal/{principal_id}/**"), "owner")
+        .seed_access_policy(
+            &format!("principal:{principal_id}"),
+            &format!("/cal/{principal_id}/**"),
+            "owner",
+        )
         .await
         .expect("Failed to seed access policy");
 
@@ -311,9 +331,7 @@ async fn mkcol_creates_plain_collection() {
 
     let new_collection_slug = "plain-collection";
     let path = caldav_collection_path("testuser", new_collection_slug);
-    let response = TestRequest::mkcol(&path)
-        .send(&service)
-        .await;
+    let response = TestRequest::mkcol(&path).send(&service).await;
 
     response.assert_status(StatusCode::CREATED);
 
@@ -358,9 +376,7 @@ async fn mkcol_on_existing_uri_conflict() {
 
     // Try to create a collection with the same slug
     let path = caldav_collection_path("testuser", "testcal");
-    let response = TestRequest::mkcol(&path)
-        .send(&service)
-        .await;
+    let response = TestRequest::mkcol(&path).send(&service).await;
 
     // Either 405 or 409
     assert!(
@@ -392,7 +408,11 @@ async fn mkcalendar_protected_props_rejected() {
     // Grant owner access to the authenticated user on their namespace
     // Use UUID-based path for authorization
     test_db
-        .seed_access_policy(&format!("principal:{principal_id}"), &format!("/cal/{principal_id}/**"), "owner")
+        .seed_access_policy(
+            &format!("principal:{principal_id}"),
+            &format!("/cal/{principal_id}/**"),
+            "owner",
+        )
         .await
         .expect("Failed to seed access policy");
 

@@ -277,7 +277,8 @@ pub async fn r#move(req: &mut Request, res: &mut Response, depot: &Depot) {
         use crate::component::db::query::dav::collection;
 
         // Update source collection synctoken
-        if let Err(e) = collection::update_synctoken(&mut conn, source_instance.collection_id).await {
+        if let Err(e) = collection::update_synctoken(&mut conn, source_instance.collection_id).await
+        {
             tracing::error!(error = %e, "Failed to update source collection synctoken");
             res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
             return;
@@ -344,7 +345,11 @@ async fn check_move_authorization(
         use crate::component::auth::{PathSegment, ResourceLocation, ResourceType};
 
         let segments = vec![
-            PathSegment::ResourceType(source_resource.resource_type().unwrap_or(ResourceType::Calendar)),
+            PathSegment::ResourceType(
+                source_resource
+                    .resource_type()
+                    .unwrap_or(ResourceType::Calendar),
+            ),
             PathSegment::Owner(dest_collection.owner_principal_id.to_string()),
             PathSegment::Collection(dest_collection.id.to_string()),
         ];

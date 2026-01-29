@@ -65,7 +65,7 @@ pub async fn mkcol(req: &mut Request, res: &mut Response, depot: &Depot) {
     } else {
         // Otherwise, construct parent path from original location
         use crate::component::auth::{ResourceLocation, depot::get_path_location_from_depot};
-        
+
         let path_loc = match get_path_location_from_depot(depot) {
             Ok(loc) => loc.clone(),
             Err(_) => {
@@ -74,20 +74,21 @@ pub async fn mkcol(req: &mut Request, res: &mut Response, depot: &Depot) {
                 return;
             }
         };
-        
+
         // Build parent location by removing the last collection segment
         let segments = path_loc.segments();
-        let parent_segments: Vec<_> = segments.iter()
+        let parent_segments: Vec<_> = segments
+            .iter()
             .take(segments.len().saturating_sub(1))
             .cloned()
             .collect();
-        
+
         if parent_segments.is_empty() {
             tracing::warn!(path = %path, "Cannot determine parent resource for MKCOL");
             res.status_code(StatusCode::BAD_REQUEST);
             return;
         }
-        
+
         tracing::debug!(path = %path, parent_segment_count = parent_segments.len(), "Constructed parent path for MKCOL authorization");
         ResourceLocation::from_segments(parent_segments)
     };
@@ -137,7 +138,7 @@ pub async fn mkcol(req: &mut Request, res: &mut Response, depot: &Depot) {
         .last()
         .unwrap_or("collection")
         .to_string();
-    
+
     tracing::debug!(path = %path, slug = %slug, "Extracted slug from MKCOL path");
 
     // Get owner principal ID from auth context

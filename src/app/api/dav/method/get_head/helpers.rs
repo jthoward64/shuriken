@@ -13,7 +13,6 @@ use crate::component::db::map::dav::{serialize_ical_tree, serialize_vcard_tree};
 use crate::component::db::query::dav::{entity, instance};
 use crate::component::model::dav::instance::DavInstance;
 
-
 /// ## Summary
 /// Shared implementation for GET and HEAD handlers.
 ///
