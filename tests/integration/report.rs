@@ -31,6 +31,12 @@ async fn calendar_query_returns_multistatus() {
         .await
         .expect("Failed to seed collection");
 
+    // Grant owner access to the user on their collection
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
     let entity_id = test_db
         .seed_entity("icalendar", Some("query-test@example.com"))
         .await
@@ -76,6 +82,12 @@ async fn calendar_query_time_range_filter() {
         .seed_collection(principal_id, "calendar", "testcal", None)
         .await
         .expect("Failed to seed collection");
+
+    // Grant owner access to the user on their collection
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
 
     // Seed an event
     let entity_id = test_db
@@ -139,10 +151,21 @@ async fn calendar_query_returns_calendar_data() {
         .await
         .expect("Failed to seed collection");
 
+    // Grant owner access to the user on their collection
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
     let entity_id = test_db
         .seed_entity("icalendar", Some("caldata@example.com"))
         .await
         .expect("Failed to seed entity");
+
+    test_db
+        .seed_minimal_icalendar_event(entity_id, "caldata@example.com", "CalData Event")
+        .await
+        .expect("Failed to seed iCalendar event");
 
     let _instance_id = test_db
         .seed_instance(
@@ -190,6 +213,12 @@ async fn calendar_multiget_returns_resources() {
         .seed_collection(principal_id, "calendar", "testcal", None)
         .await
         .expect("Failed to seed collection");
+
+    // Grant owner access to the user on their collection
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
 
     // Create 3 events
     let mut hrefs = Vec::new();
@@ -253,6 +282,12 @@ async fn calendar_multiget_missing_resource_404() {
         .await
         .expect("Failed to seed collection");
 
+    // Grant owner access to the user on their collection
+    test_db
+        .seed_collection_owner(principal_id, _collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
     let service = create_db_test_service(&test_db.url()).await;
 
     let hrefs = vec![caldav_item_path("testuser", "testcal", "nonexistent.ics")];
@@ -295,6 +330,11 @@ async fn addressbook_query_returns_multistatus() {
         .seed_entity("vcard", Some("card-query@example.com"))
         .await
         .expect("Failed to seed entity");
+
+    test_db
+        .seed_minimal_vcard(entity_id, "card-query@example.com", "Query Contact")
+        .await
+        .expect("Failed to seed vCard");
 
     let _instance_id = test_db
         .seed_instance(
@@ -341,6 +381,11 @@ async fn addressbook_query_returns_address_data() {
         .seed_entity("vcard", Some("addr-data@example.com"))
         .await
         .expect("Failed to seed entity");
+
+    test_db
+        .seed_minimal_vcard(entity_id, "addr-data@example.com", "Address Data Contact")
+        .await
+        .expect("Failed to seed vCard");
 
     let _instance_id = test_db
         .seed_instance(
@@ -454,6 +499,12 @@ async fn sync_collection_returns_multistatus() {
         .await
         .expect("Failed to seed collection");
 
+    // Grant owner access to the user on their collection
+    test_db
+        .seed_collection_owner(principal_id, _collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
     let service = create_db_test_service(&test_db.url()).await;
 
     let response = TestRequest::report(&caldav_collection_path("testuser", "testcal"))
@@ -482,6 +533,12 @@ async fn sync_collection_returns_sync_token() {
         .seed_collection(principal_id, "calendar", "testcal", None)
         .await
         .expect("Failed to seed collection");
+
+    // Grant owner access to the user on their collection
+    test_db
+        .seed_collection_owner(principal_id, _collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
 
     let service = create_db_test_service(&test_db.url()).await;
 
@@ -514,12 +571,27 @@ async fn sync_collection_initial_sync() {
         .await
         .expect("Failed to seed collection");
 
+    // Grant owner access to the user on their collection
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
     // Create 3 events
     for i in 0..3 {
         let entity_id = test_db
             .seed_entity("icalendar", Some(&format!("init-sync-{i}@example.com")))
             .await
             .expect("Failed to seed entity");
+
+        test_db
+            .seed_minimal_icalendar_event(
+                entity_id,
+                &format!("init-sync-{i}@example.com"),
+                &format!("Init Sync Event {i}"),
+            )
+            .await
+            .expect("Failed to seed iCalendar event");
 
         let _instance_id = test_db
             .seed_instance(
@@ -570,11 +642,22 @@ async fn sync_collection_delta_sync() {
         .await
         .expect("Failed to seed collection");
 
+    // Grant owner access to the user on their collection
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
     // Create initial event
     let entity_id = test_db
         .seed_entity("icalendar", Some("delta-1@example.com"))
         .await
         .expect("Failed to seed entity");
+
+    test_db
+        .seed_minimal_icalendar_event(entity_id, "delta-1@example.com", "Delta Event 1")
+        .await
+        .expect("Failed to seed iCalendar event");
 
     let _instance_id = test_db
         .seed_instance(

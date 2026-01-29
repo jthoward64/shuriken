@@ -56,27 +56,55 @@ pub fn extract_recurrence_data_with_resolver(
     component: &Component,
     resolver: &mut TimeZoneResolver,
 ) -> Option<RecurrenceData> {
+    tracing::trace!(
+        component_name = %component.name,
+        property_count = component.properties.len(),
+        "Extracting recurrence data from component"
+    );
+    
     // Check for RRULE property
-    let rrule_prop = component.get_property("RRULE")?;
-    let rrule_text = rrule_prop.as_text()?.to_string();
+    let rrule_prop = match component.get_property("RRULE") {
+        Some(prop) => prop,
+        None => {
+            tracing::trace!("RRULE property not found");
+            return None;
+        }
+    };
+    
+    // RRULE can be either Value::Recur or Value::Text
+    let rrule_text = match &rrule_prop.value {
+        crate::component::rfc::ical::core::Value::Recur(rrule) => rrule.to_string(),
+        crate::component::rfc::ical::core::Value::Text(text) => text.clone(),
+        _ => {
+            tracing::trace!("RRULE property has unexpected value type");
+            return None;
+        }
+    };
+    tracing::trace!(rrule = %rrule_text, "Found RRULE");
 
     // Extract DTSTART
     let dtstart_prop = component.get_property("DTSTART")?;
     let tzid = dtstart_prop.get_param_value("TZID").map(String::from);
     let dtstart_ical = dtstart_prop.as_datetime()?;
     let dtstart_utc = ical_datetime_to_utc_with_resolver(dtstart_ical, tzid.as_deref(), resolver)?;
+    tracing::trace!(dtstart = %dtstart_utc, "Extracted DTSTART");
 
     // Calculate duration from DTEND or DURATION
     let duration = if let Some(dtend_prop) = component.get_property("DTEND") {
         let dtend_ical = dtend_prop.as_datetime()?;
         let dtend_tzid = dtend_prop.get_param_value("TZID");
         let dtend_utc = ical_datetime_to_utc_with_resolver(dtend_ical, dtend_tzid, resolver)?;
-        dtend_utc.signed_duration_since(dtstart_utc)
+        let dur = dtend_utc.signed_duration_since(dtstart_utc);
+        tracing::trace!(duration_seconds = dur.num_seconds(), "Calculated duration from DTEND");
+        dur
     } else if let Some(duration_prop) = component.get_property("DURATION") {
         let duration_ical = duration_prop.as_duration()?;
-        ical_duration_to_chrono(duration_ical)
+        let dur = ical_duration_to_chrono(duration_ical);
+        tracing::trace!(duration_seconds = dur.num_seconds(), "Extracted DURATION");
+        dur
     } else {
         // RFC 5545: If neither DTEND nor DURATION is present, the event has zero duration
+        tracing::trace!("No DTEND or DURATION found, using zero duration");
         chrono::TimeDelta::zero()
     };
 

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use casbin::CoreApi;
+use casbin::{CoreApi, MgmtApi};
 use salvo::async_trait;
 
 use crate::component::{
@@ -23,9 +23,16 @@ pub async fn init_casbin(pool: DbPool) -> AppResult<casbin::Enforcer> {
     let adapter = diesel_async_adapter::DieselAdapter::with_pool(pool).await?;
     tracing::debug!("Casbin adapter created");
 
-    // casbin::Enforcer::new(model, adapter).await
     let enforcer = casbin::Enforcer::new(model, adapter).await?;
-    tracing::info!("Casbin enforcer initialized successfully");
+
+    // Log policy counts for production observability
+    let policy_count = enforcer.get_policy().len();
+    let grouping_count = enforcer.get_grouping_policy().len();
+    tracing::info!(
+        policy_count = policy_count,
+        grouping_count = grouping_count,
+        "Casbin enforcer initialized successfully"
+    );
     Ok(enforcer)
 }
 

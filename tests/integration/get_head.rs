@@ -573,6 +573,11 @@ async fn get_if_none_match_304() {
         .await
         .expect("Failed to seed entity");
 
+    test_db
+        .seed_minimal_icalendar_event(entity_id, "cond-test@example.com", "Conditional Test Event")
+        .await
+        .expect("Failed to seed event components");
+
     let etag = "\"cond-etag-456\"";
     let _instance_id = test_db
         .seed_instance(
@@ -758,6 +763,11 @@ async fn get_if_match_success() {
         .seed_entity("icalendar", Some("match-test-2@example.com"))
         .await
         .expect("Failed to seed entity");
+
+    test_db
+        .seed_minimal_icalendar_event(entity_id, "match-test-2@example.com", "Match Test Event")
+        .await
+        .expect("Failed to seed event components");
 
     let etag = "\"correct-etag\"";
     let _instance_id = test_db

@@ -113,6 +113,13 @@ pub(super) async fn handle_get_or_head(
         (instance, canonical_bytes)
     };
 
+    // Check If-Match for conditional GET/HEAD
+    // If-Match must be checked before If-None-Match (RFC 7232)
+    if !check_if_match(req, &instance.etag) {
+        res.status_code(StatusCode::PRECONDITION_FAILED);
+        return;
+    }
+
     // Check If-None-Match for conditional GET/HEAD
     // Both GET and HEAD should support conditional requests and return 304 Not Modified
     if check_if_none_match(req, &instance.etag) {
@@ -333,6 +340,26 @@ fn set_response_headers_and_body(
     if !is_head && let Err(e) = res.write_body(canonical_bytes.to_vec()) {
         tracing::error!("Failed to write response body: {}", e);
     }
+}
+
+/// ## Summary
+/// Checks `If-Match` header for conditional GET.
+///
+/// Returns true if the request should proceed (ETag matches or no If-Match header).
+/// Returns false if the request should fail with 412 Precondition Failed.
+#[must_use]
+fn check_if_match(req: &Request, instance_etag: &str) -> bool {
+    if let Some(if_match) = req.headers().get("If-Match")
+        && let Ok(value) = if_match.to_str()
+    {
+        // Check if any of the ETags match (or "*" which matches any)
+        return value
+            .split(',')
+            .map(str::trim)
+            .any(|etag| etag == instance_etag || etag == "*");
+    }
+    // No If-Match header means proceed
+    true
 }
 
 /// ## Summary

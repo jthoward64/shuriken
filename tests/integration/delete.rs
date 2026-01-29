@@ -11,19 +11,9 @@ use super::helpers::*;
 async fn setup_calendar_index_cleanup(
     test_db: &TestDb,
     service: &salvo::Service,
-) -> anyhow::Result<(uuid::Uuid, String)> {
-    // Seed authenticated user (matches config email)
-    let principal_id = test_db.seed_authenticated_user().await?;
-
-    let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "clean-cal", None)
-        .await?;
-
-    // Grant owner access to the authenticated user on their collection
-    test_db
-        .seed_collection_owner(principal_id, collection_id, "calendar")
-        .await?;
-
+    principal_id: uuid::Uuid,
+    collection_id: uuid::Uuid,
+) -> anyhow::Result<String> {
     let uri = caldav_item_path("testuser", "clean-cal", "clean-event.ics");
     let ical = sample_recurring_event(
         "clean-event@example.com",
@@ -39,25 +29,15 @@ async fn setup_calendar_index_cleanup(
 
     response.assert_status(StatusCode::CREATED);
 
-    Ok((collection_id, uri))
+    Ok(uri)
 }
 
 async fn setup_card_index_cleanup(
     test_db: &TestDb,
     service: &salvo::Service,
-) -> anyhow::Result<(uuid::Uuid, String)> {
-    // Seed authenticated user (matches config email)
-    let principal_id = test_db.seed_authenticated_user().await?;
-
-    let collection_id = test_db
-        .seed_collection(principal_id, "addressbook", "clean-book", None)
-        .await?;
-
-    // Grant owner access to the authenticated user on their collection
-    test_db
-        .seed_collection_owner(principal_id, collection_id, "addressbook")
-        .await?;
-
+    principal_id: uuid::Uuid,
+    collection_id: uuid::Uuid,
+) -> anyhow::Result<String> {
     let uri = carddav_item_path("testuser", "clean-book", "clean-contact.vcf");
     let vcard = sample_vcard(
         "clean-contact@example.com",
@@ -73,7 +53,7 @@ async fn setup_card_index_cleanup(
 
     response.assert_status(StatusCode::CREATED);
 
-    Ok((collection_id, uri))
+    Ok(uri)
 }
 
 async fn fetch_entity_id(
@@ -200,7 +180,6 @@ async fn delete_calendar_object() {
 /// ## Summary
 /// Test that DELETE creates a tombstone and bumps sync token.
 #[test_log::test(tokio::test)]
-#[ignore = "DELETE handler doesn't create tombstones yet - needs implementation"]
 async fn delete_creates_tombstone() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
@@ -283,7 +262,6 @@ async fn delete_creates_tombstone() {
 /// ## Summary
 /// Test that DELETE removes calendar index rows and occurrences.
 #[test_log::test(tokio::test)]
-#[ignore = "Index cleanup tests need PUT handler to populate indexes"]
 async fn delete_cleans_calendar_indexes() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
@@ -293,13 +271,31 @@ async fn delete_cleans_calendar_indexes() {
         .await
         .expect("Failed to seed role permissions");
 
+    // Seed authenticated user (matches config email)
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
+
+    let collection_id = test_db
+        .seed_collection(principal_id, "calendar", "clean-cal", None)
+        .await
+        .expect("Failed to seed collection");
+
+    // Grant owner access to the authenticated user on their collection
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    // Create service AFTER seeding policies
     let service = create_db_test_service(&test_db.url()).await;
 
-    let (collection_id, uri) = setup_calendar_index_cleanup(&test_db, &service)
+    let uri = setup_calendar_index_cleanup(&test_db, &service, principal_id, collection_id)
         .await
         .expect("Failed to seed calendar cleanup fixture");
 
-    let entity_id = fetch_entity_id(&test_db, collection_id, "clean-event.ics")
+    let entity_id = fetch_entity_id(&test_db, collection_id, "clean-event")
         .await
         .expect("Failed to fetch entity_id for instance");
 
@@ -330,7 +326,7 @@ async fn delete_cleans_calendar_indexes() {
     );
 
     let tombstone_exists = test_db
-        .tombstone_exists(collection_id, "clean-event.ics")
+        .tombstone_exists(collection_id, "clean-event")
         .await
         .expect("Failed to check tombstone");
     assert!(tombstone_exists, "Tombstone should exist after DELETE");
@@ -339,7 +335,6 @@ async fn delete_cleans_calendar_indexes() {
 /// ## Summary
 /// Test that DELETE removes card index rows.
 #[test_log::test(tokio::test)]
-#[ignore = "Index cleanup tests need PUT handler to populate indexes"]
 async fn delete_cleans_card_index() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
@@ -349,13 +344,31 @@ async fn delete_cleans_card_index() {
         .await
         .expect("Failed to seed role permissions");
 
+    // Seed authenticated user (matches config email)
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
+
+    let collection_id = test_db
+        .seed_collection(principal_id, "addressbook", "clean-book", None)
+        .await
+        .expect("Failed to seed collection");
+
+    // Grant owner access to the authenticated user on their collection
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "addressbook")
+        .await
+        .expect("Failed to seed collection owner");
+
+    // Create service AFTER seeding policies
     let service = create_db_test_service(&test_db.url()).await;
 
-    let (collection_id, uri) = setup_card_index_cleanup(&test_db, &service)
+    let uri = setup_card_index_cleanup(&test_db, &service, principal_id, collection_id)
         .await
         .expect("Failed to seed card cleanup fixture");
 
-    let entity_id = fetch_entity_id(&test_db, collection_id, "clean-contact.vcf")
+    let entity_id = fetch_entity_id(&test_db, collection_id, "clean-contact")
         .await
         .expect("Failed to fetch entity_id for instance");
 
@@ -381,7 +394,7 @@ async fn delete_cleans_card_index() {
     );
 
     let tombstone_exists = test_db
-        .tombstone_exists(collection_id, "clean-contact.vcf")
+        .tombstone_exists(collection_id, "clean-contact")
         .await
         .expect("Failed to check tombstone");
     assert!(tombstone_exists, "Tombstone should exist after DELETE");
@@ -621,7 +634,6 @@ async fn delete_if_match_mismatch_412() {
 /// ## Summary
 /// Test that DELETE on collection is handled appropriately.
 #[test_log::test(tokio::test)]
-#[ignore = "Collection DELETE returns 404 - slug resolver might not support collection-level DELETE"]
 async fn delete_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 

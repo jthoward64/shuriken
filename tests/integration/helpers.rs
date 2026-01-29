@@ -1025,6 +1025,29 @@ impl TestDb {
         Ok(user_id)
     }
 
+    /// Gets the user ID for a given principal ID.
+    ///
+    /// ## Errors
+    /// Returns an error if the user cannot be found or the query fails.
+    pub async fn get_user_id_by_principal(
+        &self,
+        principal_id: uuid::Uuid,
+    ) -> anyhow::Result<uuid::Uuid> {
+        use diesel::prelude::*;
+        use diesel_async::RunQueryDsl;
+        use shuriken::component::db::schema::user;
+
+        let mut conn = self.get_conn().await?;
+
+        let user_id = user::table
+            .filter(user::principal_id.eq(principal_id))
+            .select(user::id)
+            .first::<uuid::Uuid>(&mut conn)
+            .await?;
+
+        Ok(user_id)
+    }
+
     /// Seeds a single-user that matches the authenticated user in single-user mode.
     ///
     /// This creates a principal and user with the email from config (`your.email@example.com`),

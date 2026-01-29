@@ -59,18 +59,44 @@ pub async fn mkcalendar(req: &mut Request, res: &mut Response, depot: &Depot) {
         }
     };
 
-    // Get the resolved resource location from depot (populated by slug_resolver)
-    let parent_resource = match get_resolved_location_from_depot(depot) {
-        Ok(loc) => loc,
-        Err(_) => {
-            // If slug_resolver didn't resolve, we can't authorize
-            tracing::warn!(path = %path, "Resource location not found in depot");
+    // For MKCALENDAR, authorize against the parent, not the resource itself
+    // (which doesn't exist yet). Try to get the resolved location (parent),
+    // or fall back to constructing it from the path location.
+    let parent_resource = if let Ok(loc) = get_resolved_location_from_depot(depot) {
+        // If resolved location exists, it's the parent
+        tracing::debug!(path = %path, "Using resolved parent location for MKCALENDAR authorization");
+        loc.clone()
+    } else {
+        // Otherwise, construct parent path from original location
+        use crate::component::auth::{ResourceLocation, depot::get_path_location_from_depot};
+        
+        let path_loc = match get_path_location_from_depot(depot) {
+            Ok(loc) => loc.clone(),
+            Err(_) => {
+                tracing::warn!(path = %path, "Neither resolved nor path location found in depot");
+                res.status_code(StatusCode::NOT_FOUND);
+                return;
+            }
+        };
+        
+        // Build parent location by removing the last collection segment
+        let segments = path_loc.segments();
+        let parent_segments: Vec<_> = segments.iter()
+            .take(segments.len().saturating_sub(1))
+            .cloned()
+            .collect();
+        
+        if parent_segments.is_empty() {
+            tracing::warn!(path = %path, "Cannot determine parent resource for MKCALENDAR");
             res.status_code(StatusCode::BAD_REQUEST);
             return;
         }
+        
+        tracing::debug!(path = %path, parent_segment_count = parent_segments.len(), "Constructed parent path for MKCALENDAR authorization");
+        ResourceLocation::from_segments(parent_segments)
     };
 
-    if let Err(e) = authorizer.require(&subjects, parent_resource, Action::Edit) {
+    if let Err(e) = authorizer.require(&subjects, &parent_resource, Action::Edit) {
         tracing::debug!(error = %e, "Authorization denied for MKCALENDAR");
         res.status_code(StatusCode::FORBIDDEN);
         return;
@@ -98,12 +124,15 @@ pub async fn mkcalendar(req: &mut Request, res: &mut Response, depot: &Depot) {
         }
     };
 
-    // Extract URI from path (last segment)
-    let uri = path
+    // Extract slug from path (last segment), trimming trailing slashes
+    let slug = path
+        .trim_end_matches('/')
         .split('/')
-        .next_back()
+        .last()
         .unwrap_or("calendar")
         .to_string();
+    
+    tracing::debug!(path = %path, slug = %slug, "Extracted slug from MKCALENDAR path");
 
     // Get owner principal ID from authenticated subjects
     let owner_principal_id = match extract_owner_principal_id(&subjects) {
@@ -118,7 +147,7 @@ pub async fn mkcalendar(req: &mut Request, res: &mut Response, depot: &Depot) {
     // Create collection context
     let ctx = CreateCollectionContext {
         owner_principal_id,
-        slug: uri,
+        slug,
         collection_type: "calendar".to_string(),
         displayname: parsed_request.displayname,
         description: parsed_request.description,

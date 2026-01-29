@@ -8,7 +8,6 @@ use shuriken::component::middleware::path_parser::parse_and_resolve_path;
 
 /// Resolves a calendar owner-only path and verifies principal resolution.
 #[test_log::test(tokio::test)]
-#[ignore = "requires running database"]
 async fn resolve_owner_only_calendar_path() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
@@ -35,7 +34,6 @@ async fn resolve_owner_only_calendar_path() {
 
 /// Resolves a calendar collection path and verifies collection resolution.
 #[test_log::test(tokio::test)]
-#[ignore = "requires running database"]
 async fn resolve_calendar_collection_path() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
@@ -63,7 +61,6 @@ async fn resolve_calendar_collection_path() {
 
 /// Resolves a nested calendar collection path and verifies child resolution.
 #[test_log::test(tokio::test)]
-#[ignore = "requires running database"]
 async fn resolve_nested_calendar_collection_path() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
@@ -97,7 +94,6 @@ async fn resolve_nested_calendar_collection_path() {
 
 /// Resolves a calendar instance path and verifies instance resolution.
 #[test_log::test(tokio::test)]
-#[ignore = "requires running database"]
 async fn resolve_calendar_instance_path() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
@@ -139,7 +135,6 @@ async fn resolve_calendar_instance_path() {
 
 /// Resolves a nested calendar instance path and verifies instance resolution under child collection.
 #[test_log::test(tokio::test)]
-#[ignore = "requires running database"]
 async fn resolve_nested_calendar_instance_path() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 

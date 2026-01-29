@@ -457,7 +457,7 @@ diesel::table! {
         id -> Uuid,
         /// Owner principal of this collection
         owner_principal_id -> Uuid,
-        /// calendar or addressbook
+        /// collection (plain WebDAV), calendar, or addressbook
         collection_type -> Text,
         /// The `display_name` column of the `dav_collection` table.
         ///

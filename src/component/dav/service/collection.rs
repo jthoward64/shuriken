@@ -15,7 +15,7 @@ pub struct CreateCollectionContext {
     pub owner_principal_id: uuid::Uuid,
     /// Collection slug (e.g., "my-calendar").
     pub slug: String,
-    /// Collection type ("calendar" or "addressbook").
+    /// Collection type ("collection", "calendar", or "addressbook").
     pub collection_type: String,
     /// Optional display name.
     pub displayname: Option<String>,
@@ -48,9 +48,12 @@ pub async fn create_collection(
     ctx: &CreateCollectionContext,
 ) -> Result<CreateCollectionResult> {
     // Validate collection type
-    if ctx.collection_type != "calendar" && ctx.collection_type != "addressbook" {
+    if !matches!(
+        ctx.collection_type.as_str(),
+        "collection" | "calendar" | "addressbook"
+    ) {
         anyhow::bail!(
-            "invalid collection type '{}': must be 'calendar' or 'addressbook'",
+            "invalid collection type '{}': must be 'collection', 'calendar', or 'addressbook'",
             ctx.collection_type
         );
     }

@@ -170,8 +170,9 @@ async fn mkcol_extended_creates_addressbook() {
         .expect("Failed to seed authenticated user");
 
     // Grant owner access to the testuser's addressbook namespace
+    // Use UUID-based path for authorization
     test_db
-        .seed_access_policy(&format!("principal:{principal_id}"), "/card/testuser/**", "owner")
+        .seed_access_policy(&format!("principal:{principal_id}"), &format!("/card/{principal_id}/**"), "owner")
         .await
         .expect("Failed to seed access policy");
 
@@ -216,8 +217,9 @@ async fn mkcol_extended_applies_initial_props() {
         .expect("Failed to seed authenticated user");
 
     // Grant owner access to the testuser's addressbook namespace
+    // Use UUID-based path for authorization
     test_db
-        .seed_access_policy(&format!("principal:{principal_id}"), "/card/testuser/**", "owner")
+        .seed_access_policy(&format!("principal:{principal_id}"), &format!("/card/{principal_id}/**"), "owner")
         .await
         .expect("Failed to seed access policy");
 
@@ -262,8 +264,9 @@ async fn mkcol_extended_rejects_bad_body() {
         .expect("Failed to seed authenticated user");
 
     // Grant owner access to the testuser's addressbook namespace
+    // Use UUID-based path for authorization
     test_db
-        .seed_access_policy(&format!("principal:{principal_id}"), "/card/testuser/**", "owner")
+        .seed_access_policy(&format!("principal:{principal_id}"), &format!("/card/{principal_id}/**"), "owner")
         .await
         .expect("Failed to seed access policy");
 

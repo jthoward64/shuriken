@@ -399,7 +399,11 @@ async fn move_destination_exists_overwrite_false_412() {
         .expect("Failed to seed source entity");
 
     test_db
-        .seed_minimal_icalendar_event(source_entity_id, "source-conflict@example.com", "Source Conflict")
+        .seed_minimal_icalendar_event(
+            source_entity_id,
+            "source-conflict@example.com",
+            "Source Conflict",
+        )
         .await
         .expect("Failed to seed iCalendar event");
 
@@ -483,7 +487,11 @@ async fn move_destination_exists_overwrite_true_succeeds() {
         .await
         .expect("Failed to seed source entity");
     test_db
-        .seed_minimal_icalendar_event(source_entity, "src-overwrite@example.com", "Source Overwrite")
+        .seed_minimal_icalendar_event(
+            source_entity_id,
+            "src-overwrite@example.com",
+            "Source Overwrite",
+        )
         .await
         .expect("Failed to seed iCalendar event");
     let _source_instance = test_db
@@ -504,7 +512,11 @@ async fn move_destination_exists_overwrite_true_succeeds() {
         .await
         .expect("Failed to seed dest entity");
     test_db
-        .seed_minimal_icalendar_event(dest_entity, "dst-overwrite@example.com", "Dest Overwrite")
+        .seed_minimal_icalendar_event(
+            dest_entity_id,
+            "dst-overwrite@example.com",
+            "Dest Overwrite",
+        )
         .await
         .expect("Failed to seed iCalendar event");
     let _dest_instance = test_db

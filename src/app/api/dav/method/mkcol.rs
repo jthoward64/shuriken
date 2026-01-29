@@ -55,16 +55,44 @@ pub async fn mkcol(req: &mut Request, res: &mut Response, depot: &Depot) {
         }
     };
 
-    let parent_resource = match get_resolved_location_from_depot(depot) {
-        Ok(loc) => loc,
-        Err(_) => {
-            tracing::warn!(path = %path, "Resource location not found in depot");
+    // For MKCOL, we need to authorize against the parent, not the resource itself
+    // (which doesn't exist yet). Try to get the resolved location (parent),
+    // or fall back to constructing it from the path location.
+    let parent_resource = if let Ok(loc) = get_resolved_location_from_depot(depot) {
+        // If resolved location exists, it's the parent
+        tracing::debug!(path = %path, "Using resolved parent location for MKCOL authorization");
+        loc.clone()
+    } else {
+        // Otherwise, construct parent path from original location
+        use crate::component::auth::{ResourceLocation, depot::get_path_location_from_depot};
+        
+        let path_loc = match get_path_location_from_depot(depot) {
+            Ok(loc) => loc.clone(),
+            Err(_) => {
+                tracing::warn!(path = %path, "Neither resolved nor path location found in depot");
+                res.status_code(StatusCode::NOT_FOUND);
+                return;
+            }
+        };
+        
+        // Build parent location by removing the last collection segment
+        let segments = path_loc.segments();
+        let parent_segments: Vec<_> = segments.iter()
+            .take(segments.len().saturating_sub(1))
+            .cloned()
+            .collect();
+        
+        if parent_segments.is_empty() {
+            tracing::warn!(path = %path, "Cannot determine parent resource for MKCOL");
             res.status_code(StatusCode::BAD_REQUEST);
             return;
         }
+        
+        tracing::debug!(path = %path, parent_segment_count = parent_segments.len(), "Constructed parent path for MKCOL authorization");
+        ResourceLocation::from_segments(parent_segments)
     };
 
-    if let Err(e) = authorizer.require(&subjects, parent_resource, Action::Edit) {
+    if let Err(e) = authorizer.require(&subjects, &parent_resource, Action::Edit) {
         tracing::debug!(error = %e, "Authorization denied for MKCOL");
         res.status_code(StatusCode::FORBIDDEN);
         return;
@@ -109,6 +137,8 @@ pub async fn mkcol(req: &mut Request, res: &mut Response, depot: &Depot) {
         .last()
         .unwrap_or("collection")
         .to_string();
+    
+    tracing::debug!(path = %path, slug = %slug, "Extracted slug from MKCOL path");
 
     // Get owner principal ID from auth context
     let owner_principal_id = match extract_owner_principal_id(depot, &subjects) {

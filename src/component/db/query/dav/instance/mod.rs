@@ -212,8 +212,8 @@ pub async fn delete_instance_with_tombstone(
     // Soft-delete the instance
     soft_delete_instance(conn, instance_id).await?;
 
-    // Create tombstone with URI variants (both slug and UUID paths)
-    let uri_variants = vec![format!("/item-{}", instance.slug), instance.id.to_string()];
+    // Create tombstone with URI variants (slug for sync clients, UUID for internal reference)
+    let uri_variants = vec![instance.slug.clone(), instance.id.to_string()];
 
     let tombstone = NewDavTombstone {
         collection_id: instance.collection_id,

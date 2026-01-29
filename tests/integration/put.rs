@@ -58,7 +58,6 @@ async fn put_creates_calendar_object() {
 /// ## Summary
 /// Test that PUT creates a new vCard.
 #[test_log::test(tokio::test)]
-#[ignore = "CardDAV PUT handler has a bug: ResourceLocation not found in depot"]
 async fn put_creates_vcard() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
@@ -106,7 +105,6 @@ async fn put_creates_vcard() {
 /// ## Summary
 /// Test that PUT populates `cal_index` and `cal_occurrence` for recurring events.
 #[test_log::test(tokio::test)]
-#[ignore = "Server does not yet populate cal_occurrence for recurring events"]
 #[expect(
     clippy::too_many_lines,
     reason = "Integration test exercises multiple assertions in one flow"
@@ -217,7 +215,6 @@ async fn put_populates_cal_index_and_occurrences() {
 /// ## Summary
 /// Test that PUT populates `card_index` for vCards.
 #[test_log::test(tokio::test)]
-#[ignore = "CardDAV PUT handler has a bug: ResourceLocation not found in depot"]
 #[expect(
     clippy::too_many_lines,
     reason = "Integration test exercises multiple assertions in one flow"
@@ -610,7 +607,6 @@ async fn put_invalid_ical_rejected() {
 /// ## Summary
 /// Test that PUT with invalid vCard returns validation error.
 #[test_log::test(tokio::test)]
-#[ignore = "CardDAV PUT handler has a bug: ResourceLocation not found in depot"]
 async fn put_invalid_vcard_rejected() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
@@ -664,7 +660,6 @@ async fn put_invalid_vcard_rejected() {
 /// ## Summary
 /// Test that PUT with duplicate UID returns no-uid-conflict error.
 #[test_log::test(tokio::test)]
-#[ignore = "Server does not yet check for UID conflicts in collection"]
 async fn put_uid_conflict_rejected() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
@@ -723,8 +718,8 @@ async fn put_uid_conflict_rejected() {
         .send(&service)
         .await;
 
-    // Should return 403 Forbidden with no-uid-conflict precondition
-    response.assert_status(StatusCode::FORBIDDEN);
+    // Should return 409 Conflict per RFC 4791 (UID conflicts are resource conflicts)
+    response.assert_status(StatusCode::CONFLICT);
 }
 
 // ============================================================================

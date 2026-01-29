@@ -31,3 +31,4 @@ mod proppatch;
 mod put;
 mod report;
 mod slug_resolver;
+mod uid_validation;

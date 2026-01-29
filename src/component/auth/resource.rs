@@ -413,7 +413,12 @@ mod tests {
             resource.segments()[2],
             PathSegment::Glob { recursive: true }
         );
-        assert_eq!(resource.to_full_path().unwrap(), full_path(&path));
+        // Use to_resource_path with allow_glob=true for glob segments
+        let resource_path = resource.to_resource_path(true).unwrap();
+        assert_eq!(
+            format!("{DAV_ROUTE_PREFIX}{resource_path}"),
+            full_path(&path)
+        );
     }
 
     #[test]
@@ -425,7 +430,12 @@ mod tests {
             resource.segments()[3],
             PathSegment::Glob { recursive: false }
         );
-        assert_eq!(resource.to_full_path().unwrap(), full_path(&path));
+        // Use to_resource_path with allow_glob=true for glob segments
+        let resource_path = resource.to_resource_path(true).unwrap();
+        assert_eq!(
+            format!("{DAV_ROUTE_PREFIX}{resource_path}"),
+            full_path(&path)
+        );
     }
 
     #[test]

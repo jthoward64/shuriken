@@ -8,7 +8,7 @@ use salvo::{Depot, Request, Response, handler};
 use crate::component::auth::{
     Action, ResourceType, authorizer_from_depot,
     depot::{get_path_location_from_depot, get_terminal_collection_from_depot},
-    get_resolved_location_from_depot, get_subjects_from_depot,
+    get_subjects_from_depot,
 };
 use crate::component::caldav::service::object::{PutObjectContext, put_calendar_object};
 use crate::component::db::connection;
@@ -49,34 +49,24 @@ pub async fn put(req: &mut Request, res: &mut Response, depot: &Depot) {
     };
 
     // Get the resource slug from the depot (populated by DavPathMiddleware)
-    // Try to get from resolved location first, fallback to original location
-    let slug = if let Ok(resolved) = get_resolved_location_from_depot(depot) {
-        // Extract Item segment from resolved location
-        resolved
-            .segments()
-            .iter()
-            .find_map(|seg| {
-                if let crate::component::auth::PathSegment::Item(s) = seg {
-                    Some(s.clone())
-                } else {
-                    None
-                }
-            })
-            .unwrap_or_else(|| "unknown".to_string())
-    } else if let Ok(original) = get_path_location_from_depot(depot) {
+    // Use the original location (PATH_LOCATION) which contains the slug from the URL,
+    // not the resolved UUID. The slug is what we need for database lookups.
+    let slug = if let Ok(original) = get_path_location_from_depot(depot) {
         original
             .segments()
             .iter()
             .find_map(|seg| {
                 if let crate::component::auth::PathSegment::Item(s) = seg {
-                    Some(s.clone())
+                    // Strip file extensions (.ics, .vcf) to get base slug
+                    let cleaned = s.trim_end_matches(".ics").trim_end_matches(".vcf");
+                    Some(cleaned.to_string())
                 } else {
                     None
                 }
             })
             .unwrap_or_else(|| "unknown".to_string())
     } else {
-        tracing::error!("Item slug not found in either resolved or original location");
+        tracing::error!("Item slug not found in original location");
         res.status_code(StatusCode::BAD_REQUEST);
         return;
     };
@@ -176,7 +166,7 @@ pub async fn put(req: &mut Request, res: &mut Response, depot: &Depot) {
             // TODO: Return proper CalDAV error XML with valid-calendar-data precondition
         }
         Err(PutError::UidConflict(uid)) => {
-            tracing::error!(uid = %uid, "UID conflict");
+            tracing::error!(uid = %uid, "UID conflict detected");
             res.status_code(StatusCode::CONFLICT);
             // TODO: Return proper CalDAV error XML with no-uid-conflict precondition
         }
@@ -205,8 +195,27 @@ async fn perform_put(
         .map_err(|e| PutError::InvalidCalendarData(format!("not valid UTF-8: {e}")))?;
     let ical = crate::component::rfc::ical::parse::parse(ical_str)
         .map_err(|e| PutError::InvalidCalendarData(format!("invalid iCalendar: {e}")))?;
-    let logical_uid = ical.root.uid().map(String::from);
 
+    // Extract UID from first VEVENT child (for UID conflict checking)
+    let logical_uid = ical
+        .root
+        .children
+        .iter()
+        .find(|c| {
+            matches!(
+                c.kind,
+                Some(crate::component::rfc::ical::core::ComponentKind::Event)
+            )
+        })
+        .and_then(|vevent| vevent.uid())
+        .map(String::from);
+    // Validate that we have a UID for calendar objects
+    if logical_uid.is_none() {
+        tracing::warn!("Calendar object missing UID in VEVENT component");
+        return Err(PutError::InvalidCalendarData(
+            "VEVENT component must have a UID property".to_string(),
+        ));
+    }
     // Create PUT context
     let ctx = PutObjectContext {
         collection_id,
@@ -295,7 +304,7 @@ async fn check_put_authorization(
             PathSegment::Item(slug.to_string()),
         ])
     } else {
-        // Create: check permission on the collection (concrete path, no glob)
+        // Create: check permission on the collection (glob patterns in policies will match)
         ResourceLocation::from_segments(vec![
             PathSegment::ResourceType(ResourceType::Calendar),
             PathSegment::Owner(owner_principal.id.to_string()),

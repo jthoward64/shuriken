@@ -59,7 +59,7 @@ pub async fn copy(req: &mut Request, res: &mut Response, depot: &Depot) {
         Ok(inst) => inst.clone(),
         Err(_) => {
             tracing::error!(path = %source_path, "Failed to get source instance from depot");
-            res.status_code(StatusCode::BAD_REQUEST);
+            res.status_code(StatusCode::NOT_FOUND);
             return;
         }
     };
@@ -150,22 +150,112 @@ pub async fn copy(req: &mut Request, res: &mut Response, depot: &Depot) {
     );
 
     // Check authorization: need Read on source and Write on destination
-    if let Err(status) = check_copy_authorization(depot, &mut conn).await {
+    if let Err(status) = check_copy_authorization(depot, &mut conn, &dest_collection).await {
         res.status_code(status);
         return;
     }
 
-    // TODO: Duplicate entity or reference same entity (shallow copy)
-    // TODO: Create new instance at destination
-    // TODO: Update sync token for destination collection
-    // TODO: Return 201 Created or 204 No Content
+    // Check if destination already exists
+    let existing_dest = {
+        use crate::component::db::query::dav::instance;
+        use diesel::OptionalExtension;
+        use diesel_async::RunQueryDsl;
 
-    tracing::warn!(
-        "COPY partially implemented for: {} -> {}",
-        source_path,
-        destination
+        instance::by_slug_and_collection(dest_collection.id, &dest_resource_name)
+            .first::<crate::component::model::dav::instance::DavInstance>(&mut conn)
+            .await
+            .optional()
+    };
+
+    let existing_dest = match existing_dest {
+        Ok(opt) => opt,
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to check destination existence");
+            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+            return;
+        }
+    };
+
+    let is_overwrite = existing_dest.is_some();
+
+    // If destination exists and Overwrite is false, return 412
+    if is_overwrite && !_overwrite {
+        tracing::debug!(
+            dest_slug = %dest_resource_name,
+            "Destination exists and Overwrite is false"
+        );
+        res.status_code(StatusCode::PRECONDITION_FAILED);
+        return;
+    }
+
+    // If overwriting, delete the existing destination first
+    if let Some(existing) = existing_dest {
+        use crate::component::db::query::dav::instance;
+
+        if let Err(e) = instance::delete_instance_with_tombstone(
+            &mut conn,
+            existing.id,
+            dest_collection.synctoken + 1,
+        )
+        .await
+        {
+            tracing::error!(error = %e, "Failed to delete existing destination");
+            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+            return;
+        }
+    }
+
+    // Create new instance at destination (shallow copy - reuse same entity)
+    let new_instance = {
+        use crate::component::db::query::dav::instance;
+        use crate::component::model::dav::instance::NewDavInstance;
+
+        let new_inst = NewDavInstance {
+            collection_id: dest_collection.id,
+            entity_id: source_instance.entity_id,
+            content_type: &source_instance.content_type,
+            etag: &source_instance.etag,
+            sync_revision: dest_collection.synctoken + 1,
+            last_modified: chrono::Utc::now(),
+            slug: &dest_resource_name,
+        };
+
+        instance::create_instance(&mut conn, &new_inst).await
+    };
+
+    let _new_instance = match new_instance {
+        Ok(inst) => inst,
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to create destination instance");
+            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+            return;
+        }
+    };
+
+    // Update destination collection sync token
+    {
+        use crate::component::db::query::dav::collection;
+
+        if let Err(e) = collection::update_synctoken(&mut conn, dest_collection.id).await {
+            tracing::error!(error = %e, "Failed to update destination collection synctoken");
+            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+            return;
+        }
+    }
+
+    tracing::info!(
+        source = %source_path,
+        destination = %destination,
+        overwrite = is_overwrite,
+        "COPY completed successfully"
     );
-    res.status_code(StatusCode::CREATED);
+
+    // Return 201 if created new resource, 204 if overwrote existing
+    res.status_code(if is_overwrite {
+        StatusCode::NO_CONTENT
+    } else {
+        StatusCode::CREATED
+    });
 }
 
 /// ## Summary
@@ -180,6 +270,7 @@ pub async fn copy(req: &mut Request, res: &mut Response, depot: &Depot) {
 async fn check_copy_authorization(
     depot: &Depot,
     conn: &mut connection::DbConnection<'_>,
+    dest_collection: &crate::component::model::dav::collection::DavCollection,
 ) -> Result<(), StatusCode> {
     let (subjects, authorizer) = get_auth_context(depot, conn).await?;
 
@@ -198,8 +289,25 @@ async fn check_copy_authorization(
         "COPY source",
     )?;
 
-    // TODO: Build proper ResourceLocation for destination and check Write permission
-    // For now, assuming authorization passed if we got here
+    // Check Write permission on destination collection
+    let dest_resource = {
+        use crate::component::auth::{PathSegment, ResourceLocation, ResourceType};
+
+        let segments = vec![
+            PathSegment::ResourceType(source_resource.resource_type().unwrap_or(ResourceType::Calendar)),
+            PathSegment::Owner(dest_collection.owner_principal_id.to_string()),
+            PathSegment::Collection(dest_collection.id.to_string()),
+        ];
+        ResourceLocation::from_segments(segments)
+    };
+
+    check_authorization(
+        &authorizer,
+        &subjects,
+        &dest_resource,
+        Action::Edit,
+        "COPY destination",
+    )?;
 
     Ok(())
 }

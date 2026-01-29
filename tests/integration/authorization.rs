@@ -794,3 +794,343 @@ async fn delete_returns_204_with_edit_role() {
 
     response.assert_status(StatusCode::NO_CONTENT);
 }
+
+// ============================================================================
+// Group Authorization Tests
+// ============================================================================
+
+/// ## Summary
+/// Test that group members inherit permissions granted to the group.
+#[test_log::test(tokio::test)]
+async fn group_member_inherits_group_permissions() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+
+    // Create owner of the calendar
+    let owner_principal_id = test_db
+        .seed_principal("user", "owner", Some("Owner"))
+        .await
+        .expect("Failed to seed owner principal");
+
+    let _owner_user_id = test_db
+        .seed_user("Owner", "owner@example.com", owner_principal_id)
+        .await
+        .expect("Failed to seed owner user");
+
+    // Create authenticated user (member of a group)
+    let member_principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
+
+    // Get the user_id for membership (need to query by principal_id)
+    let member_user_id = test_db
+        .get_user_id_by_principal(member_principal_id)
+        .await
+        .expect("Failed to get user ID from principal");
+
+    // Create a group and add the authenticated user to it
+    let group_principal_id = test_db
+        .seed_principal("group", "team", Some("Team Group"))
+        .await
+        .expect("Failed to seed group principal");
+
+    let group_id = test_db
+        .seed_group(group_principal_id)
+        .await
+        .expect("Failed to seed group");
+
+    // Add authenticated user to the group
+    test_db
+        .seed_membership(member_user_id, group_id)
+        .await
+        .expect("Failed to seed membership");
+
+    // Create owner's calendar
+    let collection_id = test_db
+        .seed_collection(
+            owner_principal_id,
+            "calendar",
+            "teamcal",
+            Some("Team Calendar"),
+        )
+        .await
+        .expect("Failed to seed collection");
+
+    let entity_id = test_db
+        .seed_entity("icalendar", Some("group-event@example.com"))
+        .await
+        .expect("Failed to seed entity");
+
+    test_db
+        .seed_minimal_icalendar_event(entity_id, "group-event@example.com", "Group Event")
+        .await
+        .expect("Failed to seed iCalendar event");
+
+    let _instance_id = test_db
+        .seed_instance(
+            collection_id,
+            entity_id,
+            "group-event",
+            "text/calendar",
+            "\"group-etag\"",
+            1,
+        )
+        .await
+        .expect("Failed to seed instance");
+
+    // Grant reader role to the GROUP (not the user directly)
+    let path_pattern = format!("/cal/{owner_principal_id}/{collection_id}/**");
+    test_db
+        .seed_access_policy(
+            &format!("principal:{group_principal_id}"),
+            &path_pattern,
+            "reader",
+        )
+        .await
+        .expect("Failed to seed access policy");
+
+    let service = create_db_test_service(&test_db.url()).await;
+
+    // Authenticated user (group member) should be able to read via group permission
+    let request_path = caldav_item_path("owner", "teamcal", "group-event.ics");
+    let response = TestRequest::get(&request_path).send(&service).await;
+
+    let _ = response.assert_status(StatusCode::OK);
+}
+
+/// ## Summary
+/// Test that non-group members cannot access resources granted to a group.
+#[test_log::test(tokio::test)]
+async fn non_group_member_denied_group_resource() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+
+    // Create owner of the calendar
+    let owner_principal_id = test_db
+        .seed_principal("user", "owner", Some("Owner"))
+        .await
+        .expect("Failed to seed owner principal");
+
+    let _owner_user_id = test_db
+        .seed_user("Owner", "owner@example.com", owner_principal_id)
+        .await
+        .expect("Failed to seed owner user");
+
+    // Create authenticated user (NOT a member of the group)
+    let _member_principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
+
+    // Create a group (without adding authenticated user to it)
+    let group_principal_id = test_db
+        .seed_principal("group", "team", Some("Team Group"))
+        .await
+        .expect("Failed to seed group principal");
+
+    let _group_id = test_db
+        .seed_group(group_principal_id)
+        .await
+        .expect("Failed to seed group");
+
+    // Create owner's calendar
+    let collection_id = test_db
+        .seed_collection(
+            owner_principal_id,
+            "calendar",
+            "teamcal",
+            Some("Team Calendar"),
+        )
+        .await
+        .expect("Failed to seed collection");
+
+    let entity_id = test_db
+        .seed_entity("icalendar", Some("group-event@example.com"))
+        .await
+        .expect("Failed to seed entity");
+
+    test_db
+        .seed_minimal_icalendar_event(entity_id, "group-event@example.com", "Group Event")
+        .await
+        .expect("Failed to seed iCalendar event");
+
+    let _instance_id = test_db
+        .seed_instance(
+            collection_id,
+            entity_id,
+            "group-event",
+            "text/calendar",
+            "\"group-etag\"",
+            1,
+        )
+        .await
+        .expect("Failed to seed instance");
+
+    // Grant reader role to the GROUP only
+    let path_pattern = format!("/cal/{owner_principal_id}/{collection_id}/**");
+    test_db
+        .seed_access_policy(
+            &format!("principal:{group_principal_id}"),
+            &path_pattern,
+            "reader",
+        )
+        .await
+        .expect("Failed to seed access policy");
+
+    let service = create_db_test_service(&test_db.url()).await;
+
+    // Authenticated user (NOT a group member) should be denied
+    let request_path = caldav_item_path("owner", "teamcal", "group-event.ics");
+    let response = TestRequest::get(&request_path).send(&service).await;
+
+    let _ = response.assert_status(StatusCode::FORBIDDEN);
+}
+
+// ============================================================================
+// Public Access Tests
+// ============================================================================
+
+/// ## Summary
+/// Test that public principal can access publicly shared resources.
+#[test_log::test(tokio::test)]
+async fn public_principal_can_access_public_resources() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+
+    // Create owner of the calendar
+    let owner_principal_id = test_db
+        .seed_principal("user", "owner", Some("Owner"))
+        .await
+        .expect("Failed to seed owner principal");
+
+    let _owner_user_id = test_db
+        .seed_user("Owner", "owner@example.com", owner_principal_id)
+        .await
+        .expect("Failed to seed owner user");
+
+    // Create authenticated user (represents public access in this test)
+    let _public_principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
+
+    // Create owner's calendar
+    let collection_id = test_db
+        .seed_collection(
+            owner_principal_id,
+            "calendar",
+            "publiccal",
+            Some("Public Calendar"),
+        )
+        .await
+        .expect("Failed to seed collection");
+
+    let entity_id = test_db
+        .seed_entity("icalendar", Some("public-event@example.com"))
+        .await
+        .expect("Failed to seed entity");
+
+    test_db
+        .seed_minimal_icalendar_event(entity_id, "public-event@example.com", "Public Event")
+        .await
+        .expect("Failed to seed iCalendar event");
+
+    let _instance_id = test_db
+        .seed_instance(
+            collection_id,
+            entity_id,
+            "public-event",
+            "text/calendar",
+            "\"public-etag\"",
+            1,
+        )
+        .await
+        .expect("Failed to seed instance");
+
+    // Grant reader role to "public" principal (special system principal)
+    let path_pattern = format!("/cal/{owner_principal_id}/{collection_id}/**");
+    test_db
+        .seed_access_policy("public", &path_pattern, "reader")
+        .await
+        .expect("Failed to seed access policy");
+
+    let service = create_db_test_service(&test_db.url()).await;
+
+    // Any authenticated user should be able to read (public principal is always expanded)
+    let request_path = caldav_item_path("owner", "publiccal", "public-event.ics");
+    let response = TestRequest::get(&request_path).send(&service).await;
+
+    let _ = response.assert_status(StatusCode::OK);
+}
+
+/// ## Summary
+/// Test that public principal cannot write to read-only public resources.
+#[test_log::test(tokio::test)]
+async fn public_principal_denied_write_on_readonly_public() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+
+    // Create owner of the calendar
+    let owner_principal_id = test_db
+        .seed_principal("user", "owner", Some("Owner"))
+        .await
+        .expect("Failed to seed owner principal");
+
+    let _owner_user_id = test_db
+        .seed_user("Owner", "owner@example.com", owner_principal_id)
+        .await
+        .expect("Failed to seed owner user");
+
+    // Create authenticated user (represents public access)
+    let _public_principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
+
+    // Create owner's calendar
+    let collection_id = test_db
+        .seed_collection(
+            owner_principal_id,
+            "calendar",
+            "publiccal",
+            Some("Public Calendar"),
+        )
+        .await
+        .expect("Failed to seed collection");
+
+    // Grant ONLY reader role to public (no write permission)
+    let path_pattern = format!("/cal/{owner_principal_id}/{collection_id}/**");
+    test_db
+        .seed_access_policy("public", &path_pattern, "reader")
+        .await
+        .expect("Failed to seed access policy");
+
+    let service = create_db_test_service(&test_db.url()).await;
+
+    // Try to PUT a new event (should be denied - public only has read permission)
+    let ical = sample_icalendar_event("public-write@example.com", "Public Write Attempt");
+    let request_path = caldav_item_path("owner", "publiccal", "new-event.ics");
+    let response = TestRequest::put(&request_path)
+        .icalendar_body(&ical)
+        .send(&service)
+        .await;
+
+    let _ = response.assert_status(StatusCode::FORBIDDEN);
+}

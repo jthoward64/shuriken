@@ -41,26 +41,7 @@ pub async fn delete(req: &mut Request, res: &mut Response, depot: &Depot) {
     // Get path before borrowing req mutably
     let path = req.uri().path().to_string();
 
-    // Prefer middleware-resolved values from depot; fallback to error
-    let (collection_id, slug) = match (
-        get_terminal_collection_from_depot(depot),
-        get_instance_from_depot(depot),
-    ) {
-        (Ok(coll), Ok(inst)) => (coll.id, inst.slug.clone()),
-        _ => {
-            tracing::debug!(path = %path, "Collection or instance not found in depot");
-            res.status_code(StatusCode::NOT_FOUND);
-            return;
-        }
-    };
-
-    // Check early if collection_id is nil before attempting database connection
-    if collection_id.is_nil() {
-        res.status_code(StatusCode::NOT_FOUND);
-        return;
-    }
-
-    // Get database connection
+    // Get database connection early
     let provider = match connection::get_db_from_depot(depot) {
         Ok(provider) => provider,
         Err(e) => {
@@ -78,6 +59,46 @@ pub async fn delete(req: &mut Request, res: &mut Response, depot: &Depot) {
             return;
         }
     };
+
+    // Prefer middleware-resolved values from depot
+    let terminal_collection = get_terminal_collection_from_depot(depot);
+    let instance_opt = get_instance_from_depot(depot);
+    
+    let (collection_id, slug) = match (terminal_collection, instance_opt) {
+        (Ok(coll), Ok(inst)) => {
+            // Instance exists - perform instance deletion
+            (coll.id, inst.slug.clone())
+        }
+        (Ok(coll), Err(_)) => {
+            // Collection exists but no instance
+            // Check if the path ends with a slash (collection) or a filename (missing instance)
+            if path.ends_with('/') {
+                // This is a collection DELETE request
+                tracing::warn!(
+                    collection_id = %coll.id,
+                    path = %path,
+                    "DELETE on collections not yet supported"
+                );
+                res.status_code(StatusCode::FORBIDDEN);
+            } else {
+                // This is a request for a non-existent instance
+                tracing::debug!(path = %path, "Instance not found");
+                res.status_code(StatusCode::NOT_FOUND);
+            }
+            return;
+        }
+        _ => {
+            tracing::debug!(path = %path, "Collection or instance not found in depot");
+            res.status_code(StatusCode::NOT_FOUND);
+            return;
+        }
+    };
+
+    // Check early if collection_id is nil before attempting database operations
+    if collection_id.is_nil() {
+        res.status_code(StatusCode::NOT_FOUND);
+        return;
+    }
 
     tracing::debug!(
         collection_id = %collection_id,

@@ -48,6 +48,13 @@ pub async fn proppatch(req: &mut Request, res: &mut Response, depot: &Depot) {
         }
     };
 
+    // Reject empty bodies
+    if body.is_empty() {
+        tracing::error!("PROPPATCH request body is empty");
+        res.status_code(StatusCode::BAD_REQUEST);
+        return;
+    }
+
     // Parse PROPPATCH XML
     let proppatch_request = match parse::parse_proppatch(&body) {
         Ok(req) => req,

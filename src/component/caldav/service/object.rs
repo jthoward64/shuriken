@@ -218,9 +218,15 @@ pub async fn put_calendar_object(
                     &component_map,
                     &mut tz_resolver,
                 );
+                tracing::trace!(
+                    index_count = cal_indexes.len(),
+                    component_map_size = component_map.len(),
+                    "Built calendar indexes for update"
+                );
                 event_index::insert_batch(tx, &cal_indexes)
                     .await
                     .context("failed to insert calendar index entries")?;
+                tracing::trace!("Inserted {} calendar index entries", cal_indexes.len());
 
                 // Expand and store recurrences for the updated entity
                 expand_and_store_occurrences(tx, existing_inst.entity_id, &ical, &mut tz_resolver)
@@ -272,9 +278,15 @@ pub async fn put_calendar_object(
                 // Build and insert calendar index entries using real component IDs
                 let cal_indexes =
                     build_cal_indexes(created_entity.id, &ical, &component_map, &mut tz_resolver);
+                tracing::trace!(
+                    index_count = cal_indexes.len(),
+                    component_map_size = component_map.len(),
+                    "Built calendar indexes for create"
+                );
                 event_index::insert_batch(tx, &cal_indexes)
                     .await
                     .context("failed to insert calendar index entries")?;
+                tracing::trace!("Inserted {} calendar index entries", cal_indexes.len());
 
                 // Expand and store recurrences for the new entity
                 expand_and_store_occurrences(tx, created_entity.id, &ical, &mut tz_resolver)
@@ -338,6 +350,13 @@ async fn expand_and_store_occurrences(
         .iter()
         .filter(|c| c.kind == Some(ComponentKind::Event))
         .collect();
+
+    tracing::trace!(
+        root_name = %ical.root.name,
+        root_children_count = ical.root.children.len(),
+        vevent_count = vevent_components.len(),
+        "Searching for VEVENT components"
+    );
 
     if vevent_components.is_empty() {
         return Ok(());

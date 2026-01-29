@@ -68,6 +68,18 @@ pub async fn report(req: &mut Request, res: &mut Response, depot: &Depot) {
             )
             .await;
         }
+        ReportType::SyncCollection(sync) => {
+            // sync-collection is a generic WebDAV REPORT, not CalDAV-specific
+            // Forward to the generic DAV handler
+            crate::app::api::dav::method::report::handle_sync_collection(
+                req,
+                res,
+                sync,
+                req_data.properties,
+                depot,
+            )
+            .await;
+        }
         _ => {
             tracing::warn!("Unsupported REPORT type for CalDAV endpoint");
             res.status_code(StatusCode::NOT_IMPLEMENTED);

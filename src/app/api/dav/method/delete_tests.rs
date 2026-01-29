@@ -6,16 +6,16 @@ use salvo::test::TestClient;
 use super::delete::delete;
 
 #[tokio::test]
-async fn test_delete_returns_not_found_for_stub() {
-    // Create a test request for any path
+async fn test_delete_returns_error_without_database() {
+    // Create a test request without database provider in depot
     let service = salvo::Router::new().push(salvo::Router::with_path("/{**rest}").delete(delete));
 
     let content = TestClient::delete("http://127.0.0.1:5800/test.ics")
         .send(service)
         .await;
 
-    // Stub implementation returns 404 Not Found
-    assert_eq!(content.status_code, Some(StatusCode::NOT_FOUND));
+    // Handler returns 500 when database provider not available in depot
+    assert_eq!(content.status_code, Some(StatusCode::INTERNAL_SERVER_ERROR));
 }
 
 #[tokio::test]

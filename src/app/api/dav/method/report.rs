@@ -80,9 +80,8 @@ pub async fn report(req: &mut Request, res: &mut Response, depot: &Depot) {
 ///
 /// ## Errors
 /// Returns 400 for invalid sync tokens, 404 for missing collections, 500 for server errors.
-#[expect(dead_code, reason = "Scaffolded REPORT handler not wired yet")]
 pub async fn handle_sync_collection(
-    _req: &mut Request,
+    req: &mut Request,
     res: &mut Response,
     sync: SyncCollection,
     properties: Vec<crate::component::rfc::dav::core::PropertyName>,
@@ -116,7 +115,7 @@ pub async fn handle_sync_collection(
     };
 
     // Get collection from depot (resolved by slug_resolver middleware)
-    let _collection = match get_terminal_collection_from_depot(depot) {
+    let collection = match get_terminal_collection_from_depot(depot) {
         Ok(coll) => coll,
         Err(_) => {
             tracing::debug!("Collection not found in depot for sync-collection REPORT");
@@ -141,15 +140,21 @@ pub async fn handle_sync_collection(
         return;
     }
 
+    // Get base path from request
+    let base_path = req.uri().path();
+
     // Build response
-    let multistatus = match build_sync_collection_response(&mut conn, &sync, &properties).await {
-        Ok(ms) => ms,
-        Err(e) => {
-            tracing::error!("Failed to build sync-collection response: {}", e);
-            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
-            return;
-        }
-    };
+    let multistatus =
+        match build_sync_collection_response(&mut conn, &sync, &properties, collection, base_path)
+            .await
+        {
+            Ok(ms) => ms,
+            Err(e) => {
+                tracing::error!("Failed to build sync-collection response: {}", e);
+                res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+                return;
+            }
+        };
 
     write_multistatus_response(res, &multistatus);
 }
@@ -161,24 +166,97 @@ pub async fn handle_sync_collection(
 ///
 /// ## Errors
 /// Returns database errors or invalid sync token errors.
-#[expect(clippy::unused_async)]
 async fn build_sync_collection_response(
-    _conn: &mut connection::DbConnection<'_>,
-    _sync: &SyncCollection,
-    _properties: &[crate::component::rfc::dav::core::PropertyName],
+    conn: &mut connection::DbConnection<'_>,
+    sync: &SyncCollection,
+    properties: &[crate::component::rfc::dav::core::PropertyName],
+    collection: &crate::component::model::dav::collection::DavCollection,
+    base_path: &str,
 ) -> anyhow::Result<Multistatus> {
-    // TODO: Implement sync logic
-    // 1. Parse collection path from request
-    // 2. Parse sync token (or use 0 for initial sync)
-    // 3. Query instances with sync_revision > token
-    // 4. Query tombstones with sync_revision > token
-    // 5. Build response with:
-    //    - Changed resources (with requested properties)
-    //    - Deleted resources (404 status)
-    // 6. Set new sync token in response (collection.synctoken)
-    // 7. Apply limit if specified (return 507 if truncated)
+    use crate::component::db::query::dav::{instance, tombstone};
+    use crate::component::rfc::dav::core::{DavProperty, Href, PropstatResponse, QName};
+    use diesel::{ExpressionMethods, QueryDsl};
+    use diesel_async::RunQueryDsl;
 
-    Ok(Multistatus::new())
+    // Parse sync token (0 for initial sync, otherwise parse as i64)
+    let baseline_token: i64 = if sync.sync_token.is_empty() {
+        0
+    } else {
+        sync.sync_token.parse().map_err(|e| {
+            tracing::warn!(token = %sync.sync_token, error = %e, "Invalid sync token format");
+            anyhow::anyhow!("Invalid sync-token: must be a valid integer")
+        })?
+    };
+
+    // Query instances changed since baseline
+    let instances = instance::by_collection_not_deleted(collection.id)
+        .filter(crate::component::db::schema::dav_instance::sync_revision.gt(baseline_token))
+        .load::<crate::component::model::dav::instance::DavInstance>(conn)
+        .await?;
+
+    // Query tombstones for deleted resources (only in delta sync, not initial)
+    let tombstones = if baseline_token > 0 {
+        tombstone::by_collection(collection.id)
+            .filter(crate::component::db::schema::dav_tombstone::sync_revision.gt(baseline_token))
+            .load::<crate::component::model::dav::tombstone::DavTombstone>(conn)
+            .await?
+    } else {
+        vec![]
+    };
+
+    let mut multistatus = Multistatus::new();
+
+    // Add changed/added instances to response
+    for inst in instances {
+        let href = Href::new(&format!(
+            "{}{}.ics",
+            base_path.trim_end_matches('/'),
+            inst.slug
+        ));
+
+        // Build properties based on what was requested
+        let props = if properties.is_empty() {
+            // Return all default properties
+            vec![
+                DavProperty::text(QName::dav("getetag"), &inst.etag),
+                DavProperty::text(QName::dav("getcontenttype"), &inst.content_type),
+            ]
+        } else {
+            // Return requested properties
+            let mut props = Vec::new();
+            for prop_name in properties {
+                let qname = prop_name.qname();
+                match (qname.namespace_uri(), qname.local_name()) {
+                    ("DAV:", "getetag") => {
+                        props.push(DavProperty::text(qname.clone(), &inst.etag));
+                    }
+                    ("DAV:", "getcontenttype") => {
+                        props.push(DavProperty::text(qname.clone(), &inst.content_type));
+                    }
+                    _ => {
+                        // Unknown property - skip or add as not found
+                    }
+                }
+            }
+            props
+        };
+
+        multistatus.add_response(PropstatResponse::ok(href, props));
+    }
+
+    // Add deleted resources to response (404 status)
+    for tomb in tombstones {
+        // Use first URI variant if available
+        if let Some(Some(uri)) = tomb.uri_variants.get(0) {
+            let href = Href::new(&format!("{}{}", base_path.trim_end_matches('/'), uri));
+            multistatus.add_response(PropstatResponse::not_found(href));
+        }
+    }
+
+    // Add sync-token to multistatus
+    multistatus.set_sync_token(&collection.synctoken.to_string());
+
+    Ok(multistatus)
 }
 
 /// ## Summary
