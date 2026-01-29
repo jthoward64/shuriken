@@ -10,6 +10,135 @@ use shuriken_rfc::rfc::dav::core::{
 use shuriken_service::auth::get_terminal_collection_from_depot;
 
 /// ## Summary
+/// Resolves CalDAV-specific properties.
+fn resolve_caldav_property(
+    qname: QName,
+    collection: Option<&shuriken_db::model::dav::collection::DavCollection>,
+    found: &mut Vec<DavProperty>,
+    not_found: &mut Vec<DavProperty>,
+) {
+    match qname.local_name() {
+        "supported-calendar-component-set" => {
+            // RFC 4791 §5.2.3: Supported component types for calendar collections
+            if let Some(coll) = collection {
+                if matches!(coll.collection_type.as_str(), "calendar") {
+                    found.push(DavProperty::xml(
+                        qname,
+                        discovery::supported_calendar_component_set(),
+                    ));
+                } else {
+                    not_found.push(DavProperty::empty(qname));
+                }
+            } else {
+                not_found.push(DavProperty::empty(qname));
+            }
+        }
+        "supported-collation-set" => {
+            // RFC 4791 §7.5.1: Supported text matching collations
+            if let Some(coll) = collection {
+                if matches!(coll.collection_type.as_str(), "calendar") {
+                    found.push(DavProperty::xml(
+                        qname,
+                        discovery::supported_collation_set(),
+                    ));
+                } else {
+                    not_found.push(DavProperty::empty(qname));
+                }
+            } else {
+                not_found.push(DavProperty::empty(qname));
+            }
+        }
+        _ => {
+            not_found.push(DavProperty::empty(qname));
+        }
+    }
+}
+
+/// ## Summary
+/// Resolves CardDAV-specific properties.
+fn resolve_carddav_property(
+    qname: QName,
+    collection: Option<&shuriken_db::model::dav::collection::DavCollection>,
+    found: &mut Vec<DavProperty>,
+    not_found: &mut Vec<DavProperty>,
+) {
+    match qname.local_name() {
+        "supported-address-data" => {
+            // RFC 6352 §6.2.2: Supported vCard versions for addressbook collections
+            if let Some(coll) = collection {
+                if matches!(coll.collection_type.as_str(), "addressbook") {
+                    found.push(DavProperty::xml(qname, discovery::supported_address_data()));
+                } else {
+                    not_found.push(DavProperty::empty(qname));
+                }
+            } else {
+                not_found.push(DavProperty::empty(qname));
+            }
+        }
+        _ => {
+            not_found.push(DavProperty::empty(qname));
+        }
+    }
+}
+
+/// Context for property resolution.
+struct PropertyResolutionContext<'a> {
+    display_name: &'a str,
+    collection_qname: &'a QName,
+    collection: Option<&'a shuriken_db::model::dav::collection::DavCollection>,
+    found: &'a mut Vec<DavProperty>,
+    not_found: &'a mut Vec<DavProperty>,
+}
+
+/// ## Summary
+/// Resolves a single property based on its namespace and name.
+fn resolve_single_property(qname: QName, ctx: &mut PropertyResolutionContext<'_>) {
+    match (qname.namespace_uri(), qname.local_name()) {
+        ("DAV:", "displayname") => {
+            ctx.found.push(DavProperty::text(qname, ctx.display_name));
+        }
+        ("DAV:", "resourcetype") => {
+            ctx.found.push(DavProperty {
+                name: qname,
+                value: Some(PropertyValue::ResourceType(vec![
+                    QName::dav("collection"),
+                    ctx.collection_qname.clone(),
+                ])),
+            });
+        }
+        ("DAV:", "supported-report-set") => {
+            // RFC 3253 via RFC 4791/RFC 6352: Return supported REPORT methods
+            if let Some(coll) = ctx.collection {
+                ctx.found.push(DavProperty::xml(
+                    qname,
+                    discovery::supported_report_set(coll.collection_type.into()),
+                ));
+            } else {
+                ctx.not_found.push(DavProperty::empty(qname));
+            }
+        }
+        ("DAV:", "getetag") => {
+            if let Some(coll) = ctx.collection {
+                ctx.found
+                    .push(DavProperty::text(qname, format!("\"{}\"", coll.synctoken)));
+            } else {
+                ctx.not_found.push(DavProperty::empty(qname));
+            }
+        }
+        ("urn:ietf:params:xml:ns:caldav", _) => {
+            resolve_caldav_property(qname, ctx.collection, ctx.found, ctx.not_found);
+        }
+        ("urn:ietf:params:xml:ns:carddav", _) => {
+            resolve_carddav_property(qname, ctx.collection, ctx.found, ctx.not_found);
+        }
+        _ => {
+            // Unknown property - return as not found
+            ctx.not_found.push(DavProperty::empty(qname));
+        }
+    }
+}
+
+/// ## Summary
 /// Builds a multistatus response for a PROPFIND request.
 ///
 /// Queries the database for the target resource and its children (based on depth),
@@ -102,10 +231,6 @@ pub(super) async fn build_propfind_response(
 /// ## Errors
 /// Returns errors if property resolution fails.
 #[expect(
-    clippy::too_many_lines,
-    reason = "property resolution requires many cases"
-)]
-#[expect(
     clippy::unused_async,
     reason = "async signature needed for future DB queries"
 )]
@@ -186,89 +311,16 @@ async fn get_properties_for_resource(
         found.push(DavProperty::empty(QName::dav("resourcetype")));
     } else if let Some(requested_props) = propfind_req.requested_properties() {
         // Return only requested properties
+        let mut ctx = PropertyResolutionContext {
+            display_name,
+            collection_qname: &collection_qname,
+            collection,
+            found: &mut found,
+            not_found: &mut not_found,
+        };
         for prop_name in requested_props {
             let qname = prop_name.qname().clone();
-
-            // Resolve each property
-            match (qname.namespace_uri(), qname.local_name()) {
-                ("DAV:", "displayname") => {
-                    found.push(DavProperty::text(qname, display_name));
-                }
-                ("DAV:", "resourcetype") => {
-                    found.push(DavProperty {
-                        name: qname,
-                        value: Some(PropertyValue::ResourceType(vec![
-                            QName::dav("collection"),
-                            collection_qname.clone(),
-                        ])),
-                    });
-                }
-                ("DAV:", "supported-report-set") => {
-                    // RFC 3253 via RFC 4791/RFC 6352: Return supported REPORT methods
-                    if let Some(coll) = collection {
-                        found.push(DavProperty::xml(
-                            qname,
-                            discovery::supported_report_set(coll.collection_type.into()),
-                        ));
-                    } else {
-                        not_found.push(DavProperty::empty(qname));
-                    }
-                }
-                ("urn:ietf:params:xml:ns:caldav", "supported-calendar-component-set") => {
-                    // RFC 4791 §5.2.3: Supported component types for calendar collections
-                    if let Some(coll) = collection {
-                        if matches!(coll.collection_type.as_str(), "calendar") {
-                            found.push(DavProperty::xml(
-                                qname,
-                                discovery::supported_calendar_component_set(),
-                            ));
-                        } else {
-                            not_found.push(DavProperty::empty(qname));
-                        }
-                    } else {
-                        not_found.push(DavProperty::empty(qname));
-                    }
-                }
-                ("urn:ietf:params:xml:ns:caldav", "supported-collation-set") => {
-                    // RFC 4791 §7.5.1: Supported text matching collations
-                    if let Some(coll) = collection {
-                        if matches!(coll.collection_type.as_str(), "calendar") {
-                            found.push(DavProperty::xml(
-                                qname,
-                                discovery::supported_collation_set(),
-                            ));
-                        } else {
-                            not_found.push(DavProperty::empty(qname));
-                        }
-                    } else {
-                        not_found.push(DavProperty::empty(qname));
-                    }
-                }
-                ("urn:ietf:params:xml:ns:carddav", "supported-address-data") => {
-                    // RFC 6352 §6.2.2: Supported vCard versions for addressbook collections
-                    if let Some(coll) = collection {
-                        if matches!(coll.collection_type.as_str(), "addressbook") {
-                            found
-                                .push(DavProperty::xml(qname, discovery::supported_address_data()));
-                        } else {
-                            not_found.push(DavProperty::empty(qname));
-                        }
-                    } else {
-                        not_found.push(DavProperty::empty(qname));
-                    }
-                }
-                ("DAV:", "getetag") => {
-                    if let Some(coll) = collection {
-                        found.push(DavProperty::text(qname, format!("\"{}\"", coll.synctoken)));
-                    } else {
-                        not_found.push(DavProperty::empty(qname));
-                    }
-                }
-                _ => {
-                    // Unknown property - return as not found
-                    not_found.push(DavProperty::empty(qname));
-                }
-            }
+            resolve_single_property(qname, &mut ctx);
         }
     } else {
         // Invalid request type - neither allprop, propname, nor prop

@@ -199,12 +199,12 @@ pub fn build_canonical_location(
                 let has_vcf = path
                     .extension()
                     .is_some_and(|ext| ext.eq_ignore_ascii_case("vcf"));
-                
+
                 if has_ics || has_vcf {
-                    // SAFETY: rfind returns Some because has_ics/has_vcf checks confirmed extension exists
                     format!(
                         "{}{}",
                         inst.id,
+                        #[expect(clippy::expect_used)]
                         &filename[filename
                             .rfind('.')
                             .expect("extension present after is_some_and check")..]
@@ -424,9 +424,11 @@ mod tests {
         );
         // Item segment should have UUID with .ics extension
         if let PathSegment::Item(s) = &segments[3] {
-            assert!(std::path::Path::new(s)
-                .extension()
-                .is_some_and(|ext| ext.eq_ignore_ascii_case("ics")));
+            assert!(
+                std::path::Path::new(s)
+                    .extension()
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("ics"))
+            );
             assert!(s.starts_with(&instance.id.to_string()));
         } else {
             panic!("Expected Item segment");
@@ -461,9 +463,11 @@ mod tests {
 
         // Item segment should have UUID with .vcf extension
         if let PathSegment::Item(s) = &segments[3] {
-            assert!(std::path::Path::new(s)
-                .extension()
-                .is_some_and(|ext| ext.eq_ignore_ascii_case("vcf")));
+            assert!(
+                std::path::Path::new(s)
+                    .extension()
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("vcf"))
+            );
             assert!(s.starts_with(&instance.id.to_string()));
         } else {
             panic!("Expected Item segment");

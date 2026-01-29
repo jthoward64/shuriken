@@ -1,3 +1,5 @@
+#![feature(stmt_expr_attributes)]
+
 use salvo::conn::TcpListener;
 use salvo::{Listener, Router};
 use shuriken_app::app::api::routes;

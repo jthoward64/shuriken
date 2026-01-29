@@ -128,11 +128,13 @@ pub async fn put(req: &mut Request, res: &mut Response, depot: &Depot) {
     // Perform the PUT operation
     match perform_put(
         &mut conn,
-        collection.id,
-        &slug,
-        &body,
-        if_none_match,
-        if_match,
+        PutRequest {
+            collection_id: collection.id,
+            slug: &slug,
+            body: &body,
+            if_none_match,
+            if_match,
+        },
     )
     .await
     {
@@ -176,20 +178,25 @@ pub async fn put(req: &mut Request, res: &mut Response, depot: &Depot) {
 }
 
 /// ## Summary
+/// Parameters for a PUT operation.
+struct PutRequest<'a> {
+    collection_id: uuid::Uuid,
+    slug: &'a str,
+    body: &'a [u8],
+    if_none_match: Option<String>,
+    if_match: Option<String>,
+}
+
 /// Performs the PUT operation for a calendar object.
 ///
 /// ## Errors
 /// Returns `PutError` for validation failures, conflicts, or database errors.
 async fn perform_put(
     conn: &mut shuriken_db::db::connection::DbConnection<'_>,
-    collection_id: uuid::Uuid,
-    slug: &str,
-    body: &[u8],
-    if_none_match: Option<String>,
-    if_match: Option<String>,
+    req: PutRequest<'_>,
 ) -> Result<PutResult, PutError> {
     // Parse iCalendar to extract UID early for context
-    let ical_str = std::str::from_utf8(body)
+    let ical_str = std::str::from_utf8(req.body)
         .map_err(|e| PutError::InvalidCalendarData(format!("not valid UTF-8: {e}")))?;
     let ical = shuriken_rfc::rfc::ical::parse::parse(ical_str)
         .map_err(|e| PutError::InvalidCalendarData(format!("invalid iCalendar: {e}")))?;
@@ -216,16 +223,16 @@ async fn perform_put(
     }
     // Create PUT context
     let ctx = PutObjectContext {
-        collection_id,
-        slug: slug.to_string(),
+        collection_id: req.collection_id,
+        slug: req.slug.to_string(),
         entity_type: shuriken_db::db::enums::EntityType::ICalendar,
         logical_uid,
-        if_none_match,
-        if_match,
+        if_none_match: req.if_none_match,
+        if_match: req.if_match,
     };
 
     // Call the service layer
-    match put_calendar_object(conn, &ctx, body).await {
+    match put_calendar_object(conn, &ctx, req.body).await {
         Ok(result) => {
             if result.created {
                 Ok(PutResult::Created(result.etag))
