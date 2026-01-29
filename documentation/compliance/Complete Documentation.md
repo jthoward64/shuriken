@@ -1,30 +1,164 @@
-# Shuriken RFC Compliance Review (Second Pass)
+# Shuriken RFC Compliance Review: Comprehensive Assessment {#executive-summary}
 
 **Date**: January 29, 2026  
 **Project**: Shuriken CalDAV/CardDAV Server  
-**Scope**: Comprehensive RFC compliance assessment with deep RFC analysis and architectural alignment
-
-**Status**: ✅ Second pass complete with RFC depth review and architectural assessment
+**Scope**: Comprehensive RFC compliance assessment with deep architectural analysis  
+**Status**: ✅ Complete with architectural verdict
 
 ---
 
-## Executive Summary
+## Executive Summary {#executive-summary-details}
 
-Shuriken demonstrates **70-75% RFC compliance** with **sound architectural foundations** that inherently support RFC requirements. The compliance gap is primarily **protocol-layer** (missing properties, error responses, discovery mechanisms) rather than storage or design issues.
+Shuriken demonstrates **70-75% RFC compliance** with **sound architectural foundations** that inherently support RFC requirements. **The architecture is fundamentally correct - NO REDESIGN NEEDED.**
+
+### Key Architectural Strength {#architecture-strength}
+
+The compliance gap is **purely protocol-layer** (missing properties, error responses, discovery mechanisms) rather than storage or architectural design issues. The UUID-based internal architecture with glob-path ACLs creates a robust foundation for compliance.
+
+**Critical Finding**: Shuriken's architectural decisions are fundamentally sound for RFC compliance. The UUID-based storage, entity/instance separation, and component tree structure create a robust foundation. With focused implementation of ~40 hours of protocol-layer code, Shuriken can achieve 85%+ RFC compliance across CalDAV, CardDAV, WebDAV, and ACL.
+
+### Compliance Summary {#compliance-summary}
 
 **Key Findings:**
-- ✅ Architecture: UUID-based storage, glob paths, component trees, entity/instance separation are all RFC-compliant
-- ✅ Storage: ~95% compliant - database design properly supports RFC requirements
-- ⚠️ Protocol layer: ~65% - missing discovery properties, error response bodies, precondition signaling
-- 🔴 Critical: DAV header Class 2 violation (LOCK/UNLOCK), missing `supported-report-set` property, precondition error XML elements
+- ✅ **Architecture**: UUID-based storage, glob paths, component trees, entity/instance separation are all RFC-compliant
+- ✅ **Storage Layer**: ~95% compliant - database design properly supports RFC requirements
+- ✅ **Architectural Decisions Are Sound**: Design enables RFC compliance without sacrificing flexibility
+- ⚠️ **Protocol Layer**: ~65% - missing discovery properties, error response bodies, precondition signaling
+- 🔴 **Critical Issues**: DAV header Class 2 violation (LOCK/UNLOCK), missing `supported-report-set` property, precondition error XML elements
 
-**Path Forward**: 40 hours of additive changes (no redesign needed) to reach 85% compliance
+**Path Forward**: 40 hours of additive protocol-layer changes (no redesign needed) to reach 85% compliance.
+
+### Compliance by Component {#compliance-by-component}
+
+| Component | RFC(s) | Compliance | Status |
+|-----------|--------|-----------|--------|
+| **CalDAV** | 4791, 5545, 6578 | ~75% | Good foundation, needs query/property gaps |
+| **CardDAV** | 6352, 6350, 6578, 4790 | ~65% | Solid architecture, needs property discovery |
+| **WebDAV Core** | 4918, 5689 | ~70% | Strong, but Class 2 violation on LOCK/UNLOCK |
+| **Authorization** | 3744 (minimal) | ~40% (minimal) | Minimal profile recommended, no ACL method |
+| **Sync Protocol** | 6578 | ~85% | Strong foundation, needs token validation |
+| **Database Schema** | 4791, 6352, 5545, 6350, 6578 | ~95% | Excellent design, minor constraints needed |
+| **RFC Parsing** | 5545, 6350, 4918 | ~65-70% | Functional, validation incomplete |
+| **Testing** | All | ~75% | Good coverage, needs advanced scenarios |
+| **Overall** | Multiple | **~70-75%** | Solid foundation, protocol gaps remain |
 
 ---
 
-## 1. CalDAV (RFC 4791) - ~75% Compliant
+## Table of Contents {#table-of-contents}
 
-### RFC 4791 Core MUST Requirements
+1. [CalDAV (RFC 4791) Compliance](#caldav-compliance)
+   - [Core MUST Requirements](#caldav-must-requirements)
+   - [Correctly Implemented Features](#caldav-correct)
+   - [Partially Implemented Features](#caldav-partial)
+   - [Not Implemented Features](#caldav-not-implemented)
+   - [Query & Filter Validation](#caldav-query-filter)
+   - [Partial Retrieval Implementation](#caldav-partial-retrieval)
+   - [Precondition/Postcondition Errors](#caldav-preconditions)
+   - [Recommendations](#caldav-recommendations)
+
+2. [CardDAV (RFC 6352) Compliance](#carddav-compliance)
+   - [Core MUST Requirements](#carddav-must-requirements)
+   - [Correctly Implemented Features](#carddav-correct)
+   - [Partially Implemented Features](#carddav-partial)
+   - [Not Implemented Features](#carddav-not-implemented)
+   - [Precondition/Postcondition Errors](#carddav-preconditions)
+   - [Recommendations](#carddav-recommendations)
+
+3. [Core WebDAV (RFC 4918) Compliance](#webdav-compliance)
+   - [WebDAV Compliance Classes](#webdav-classes)
+   - [Core MUST Requirements](#webdav-must-requirements)
+   - [Correctly Implemented Features](#webdav-correct)
+   - [Partially Implemented Features](#webdav-partial)
+   - [Not Implemented Features](#webdav-not-implemented)
+   - [Critical Issue: Class 2 Compliance Violation](#webdav-class2-violation)
+   - [Recommendations](#webdav-recommendations)
+
+4. [Authentication & Authorization (RFC 3744) Compliance](#auth-compliance)
+   - [Core MUST Requirements](#auth-must-requirements)
+   - [Minimal RFC 3744 Profile Definition](#auth-minimal-profile)
+   - [Current Implementation Status](#auth-current)
+   - [Gaps in Minimal Profile](#auth-gaps)
+   - [ACL Evaluation](#auth-evaluation)
+   - [Why Minimal Profile for Shuriken](#auth-why-minimal)
+   - [Recommendations](#auth-recommendations)
+
+5. [Sync Collection (RFC 6578) Compliance](#sync-compliance)
+   - [Core MUST Requirements](#sync-must-requirements)
+   - [Correctly Implemented Features](#sync-correct)
+   - [Partially Implemented Features](#sync-partial)
+   - [Recommendations](#sync-recommendations)
+
+6. [Database Schema & Storage Compliance](#database-compliance)
+   - [Correctly Implemented Features](#database-correct)
+   - [Minor Issues](#database-issues)
+   - [Recommendations](#database-recommendations)
+
+7. [RFC Parsing & Validation](#parsing-compliance)
+   - [Correctly Implemented Features](#parsing-correct)
+   - [Partially Implemented Features](#parsing-partial)
+   - [Not Implemented Features](#parsing-not-implemented)
+   - [Recommendations](#parsing-recommendations)
+
+8. [Testing Infrastructure](#testing-infrastructure)
+   - [Well-Covered Areas](#testing-covered)
+   - [Gaps in Test Coverage](#testing-gaps)
+   - [Recommendations](#testing-recommendations)
+
+9. [Architectural Impact Analysis](#architectural-analysis)
+   - [Overview: Strengths of Current Architecture](#architectural-strengths)
+   - [UUID-Based Internal Storage vs RFC Path Requirements](#uuid-architecture)
+   - [Glob-Path ACL Model vs Individual Resource ACLs](#glob-acl-architecture)
+   - [Component Tree Structure](#component-tree-architecture)
+   - [Entity/Instance Separation](#entity-instance-architecture)
+   - [Application Structure](#application-structure)
+   - [Protocol-Layer Gaps (Not Architectural)](#protocol-gaps)
+
+10. [Risk Assessment](#risk-assessment)
+    - [Architectural Gaps: NONE](#risk-architectural)
+    - [Protocol Gaps: MODERATE](#risk-protocol)
+    - [Path Forward](#risk-path-forward)
+
+11. [Missing RFC Requirements - Deep Dive](#missing-requirements)
+    - [RFC 4791 (CalDAV) Missed Requirements](#missing-caldav)
+    - [RFC 6352 (CardDAV) Missed Requirements](#missing-carddav)
+    - [RFC 3744 (ACL) Missed Requirements](#missing-acl)
+    - [RFC 4918 (WebDAV) Class Violation](#missing-webdav)
+    - [RFC 5545 (iCalendar) Parsing Gaps](#missing-icalendar)
+    - [RFC 6350 (vCard) Parsing Gaps](#missing-vcard)
+
+12. [Protocol Layer vs Storage Layer Analysis](#protocol-vs-storage)
+    - [What's Strong (Storage Layer)](#storage-strong)
+    - [What's Broken (Protocol Layer)](#storage-broken)
+    - [No Design Issues](#storage-no-issues)
+
+13. [Critical Action Items](#critical-action-items)
+    - [Must Fix (Blocking)](#action-must-fix)
+    - [Should Fix (Important)](#action-should-fix)
+    - [Nice to Have (Future)](#action-nice-to-have)
+
+14. [Implementation Priority Matrix](#priority-matrix)
+
+15. [Implementation Roadmap](#implementation-roadmap)
+    - [Phase 0: Critical Fixes (1 Day)](#roadmap-phase0)
+    - [Phase 1: Discovery & Errors (1 Week)](#roadmap-phase1)
+    - [Phase 2: Query Improvements (2 Weeks)](#roadmap-phase2)
+    - [Phase 3: Advanced Features (Future)](#roadmap-phase3)
+
+16. [Detailed Implementation Guide](#implementation-guide)
+    - [P0 Actions (This Sprint)](#implementation-p0)
+    - [P1 Actions (Next Sprint)](#implementation-p1)
+
+17. [Specific RFC Requirements Matrix](#requirements-matrix)
+    - [RFC 4791 Requirements](#requirements-caldav)
+    - [RFC 3744 Minimal Profile Requirements](#requirements-acl)
+
+18. [References](#references)
+
+---
+
+## 1. CalDAV (RFC 4791) - ~75% Compliant {#caldav-compliance}
+
+### RFC 4791 Core MUST Requirements {#caldav-must-requirements}
 
 **To advertise CalDAV support, a server MUST:**
 1. ✅ Support iCalendar (RFC 2445/5545) as media type
@@ -33,12 +167,12 @@ Shuriken demonstrates **70-75% RFC compliance** with **sound architectural found
 4. ⚠️ Support TLS transport (RFC 2818) - configuration/deployment concern
 5. ✅ Support ETags (RFC 2616) with specific requirements (§5.3.4)
 6. ✅ Support all calendaring reports (§7) - most implemented
-7. ✅ Advertise `DAV:supported-report-set` property - **MISSING**
+7. ⚠️ Advertise `DAV:supported-report-set` property - **MISSING**
 
 **SHOULD support:**
 - ✅ MKCALENDAR method
 
-### ✅ Correctly Implemented
+### ✅ Correctly Implemented {#caldav-correct}
 
 | Feature | Status | Notes | RFC Ref |
 |---------|--------|-------|---------|
@@ -63,7 +197,7 @@ Shuriken demonstrates **70-75% RFC compliance** with **sound architectural found
 | calendar-data filtering | ⚠️ | Parser exists, reconstruction missing | 7.6 |
 | iCalendar parser compliance | ✅ | Line folding, escaping, component structure | RFC 5545 |
 
-### ⚠️ Partially Implemented
+### ⚠️ Partially Implemented {#caldav-partial}
 
 | Feature | Gap | RFC Ref | Impact |
 |---------|-----|---------|--------|
@@ -82,7 +216,7 @@ Shuriken demonstrates **70-75% RFC compliance** with **sound architectural found
 | Text-match collation | Works but not integrated into filters | 7.5, 9.7.5 | Only exact matches work |
 | Precondition errors | Missing specific XML elements | §1.3, 9 | No `<C:supported-calendar-component>`, `<C:supported-calendar-data>`, `<C:valid-calendar-data>` |
 
-### 🔴 Not Implemented
+### 🔴 Not Implemented {#caldav-not-implemented}
 
 | Feature | RFC | Issue | Phase |
 |---------|-----|-------|-------|
@@ -94,7 +228,170 @@ Shuriken demonstrates **70-75% RFC compliance** with **sound architectural found
 | Non-standard component support | 5.3.3 | Rejected per RFC; may need extension | Future |
 | Partial RRULE expansion limits | 9.6.7 (`limit-freebusy-set`) | No client-side RRULE expansion control | Future |
 
-### Precondition/Postcondition Errors - MISSING IMPLEMENTATION
+### Query & Filter Validation: The Silent Compliance Killer {#caldav-query-filter}
+
+**RFC 4791 §7 & §9.7 Missing Requirements:**
+
+#### ❌ CRITICAL: Unsupported Filter Signaling
+
+RFC 4791 §7.7 states: "Servers MUST fail with the CALDAV:supported-filter precondition if a calendaring REPORT request uses a CALDAV:comp-filter, CALDAV:prop-filter, or CALDAV:param-filter XML element that makes reference to a non-standard component, property, or parameter name on which the server does not support queries."
+
+**Current State in Shuriken**: 
+- ✅ Can parse filter requests
+- ✅ Can execute basic filters (time-range, comp-filter, UID)
+- ❌ No validation that filter is supported
+- ❌ No `<C:supported-filter>` error response
+- ❌ Will silently return empty results instead of 403 Forbidden
+
+**Example - Missed Scenario**:
+```xml
+<C:calendar-query>
+  <C:filter>
+    <C:comp-filter name="VCALENDAR">
+      <C:comp-filter name="VEVENT">
+        <C:prop-filter name="X-CUSTOM-PROP">
+          <!-- Server doesn't support X-CUSTOM-PROP filtering -->
+          <C:text-match>value</C:text-match>
+        </C:prop-filter>
+      </C:comp-filter>
+    </C:comp-filter>
+  </C:filter>
+</C:calendar-query>
+
+<!-- Current: Returns 207 with empty results -->
+<!-- RFC Compliant: Returns 403 with: -->
+<D:error>
+  <C:supported-filter>
+    <C:prop-filter name="X-CUSTOM-PROP"/>
+  </C:supported-filter>
+</D:error>
+```
+
+**RFC Impact**: HIGH - Affects all REPORT methods  
+**Architectural Solution**: Add filter capability registry, validate before execution
+
+#### ❌ Text-Match Collation Enforcement
+
+RFC 4791 §7.5.1 states: "Any XML attribute specifying a collation MUST specify a collation supported by the server as described in Section 7.5"
+
+**Current State**:
+- ✅ Parses `collation` attribute
+- ⚠️ Accepts but doesn't validate against `supported-collation-set`
+- ❌ No precondition error for unsupported collation
+- ⚠️ Implements collation semantics locally (case-folding works, but not standardized)
+
+**Missing**:
+```xml
+<!-- This should fail with CALDAV:supported-collation precondition -->
+<C:text-match collation="i;unsupported-collation">search-text</C:text-match>
+```
+
+**RFC Impact**: MEDIUM - CardDAV §8.3 has same requirement for `i;unicode-casemap`
+
+#### ❌ Supported-Filter Property Discovery
+
+RFC 4791 §7.7 states: "Servers SHOULD report the CALDAV:comp-filter, CALDAV:prop-filter, or CALDAV:param-filter for which it does not provide support [in error response]"
+
+**Example XML Response**:
+```xml
+<!-- Client should be able to discover this -->
+<C:supported-filter xmlns:C="urn:ietf:params:xml:ns:caldav">
+  <C:comp-filter name="VCALENDAR">
+    <C:comp-filter name="VEVENT">
+      <C:prop-filter name="SUMMARY"/>
+      <C:prop-filter name="DTSTART"/>
+      <C:prop-filter name="DTEND"/>
+      <!-- No prop-filter for X-CUSTOM-PROP -->
+    </C:comp-filter>
+  </C:comp-filter>
+</C:supported-filter>
+```
+
+**Not Implemented**: Would be in error response or PROPFIND property
+
+### Partial Retrieval Implementation {#caldav-partial-retrieval}
+
+**RFC 4791 §7.6 & §9.6 - Partial Retrieval Semantics:**
+
+RFC 4791 states: "A CalDAV client can request particular WebDAV property values, all WebDAV property values, or a list of the names of the resource's WebDAV properties. A CalDAV client can also request calendar data to be returned and specify whether all calendar components and properties should be returned, or only particular ones."
+
+**Current State in Shuriken**: 
+- ✅ Parses `<C:calendar-data>` with `<C:comp>` and `<C:prop>` selectors
+- ✅ Stores component tree in database
+- ⚠️ **RECONSTRUCTION FROM TREE IS INCOMPLETE**
+- ❌ Cannot reconstruct filtered iCalendar with only selected properties
+- ❌ Cannot exclude nested components from output
+
+**Current Implementation Gap**:
+```rust
+// From src/component/db/query/report_property.rs
+async fn load_calendar_data(
+    conn: &mut DbConnection<'_>,
+    instance: &DavInstance,
+    prop_name: &PropertyName,
+) -> anyhow::Result<Option<String>> {
+    let tree = entity::get_entity_with_tree(conn, instance.entity_id).await?;
+    let data = serialize_ical_tree(tree)?;  // ← Full serialization
+    
+    if let Some(request) = prop_name.calendar_data_request() {
+        let filtered = filter_calendar_data(&data, request)?;  // ← Post-hoc filtering
+        Ok(Some(filtered))
+    } else {
+        Ok(Some(data))
+    }
+}
+```
+
+**The Problem**:
+- Currently: Serialize FULL iCalendar → Parse again → Filter
+- Should be: Traverse component tree → Selectively serialize only requested components/properties
+
+**Example Missed Scenario**:
+```xml
+<!-- Client requests only VEVENT with SUMMARY and DTSTART -->
+<C:calendar-data>
+  <C:comp name="VCALENDAR">
+    <C:prop name="VERSION"/>
+    <C:comp name="VEVENT">
+      <C:prop name="SUMMARY"/>
+      <C:prop name="DTSTART"/>
+      <!-- Note: not requesting DTEND, DESCRIPTION, ALARM, etc. -->
+    </C:comp>
+  </C:comp>
+</C:calendar-data>
+
+<!-- Current: Returns ALL properties of VEVENT
+     RFC Compliant: Returns ONLY VERSION, SUMMARY, DTSTART -->
+```
+
+**Architectural Impact**: Component tree is perfect for this - just need selective serialization  
+**Effort**: Medium - requires component-aware filter + selective serialization
+
+#### Expansion vs Limit-Recurrence-Set Semantics
+
+RFC 4791 §7.6 & §9.6.5/9.6.6 defines two modes:
+
+**expand mode**: "A CalDAV client with no support for recurrence properties can request to receive only the recurrence instances that overlap a specified time range as separate calendar components that each define exactly one recurrence instance"
+
+**limit-recurrence-set mode**: "A CalDAV client that is only interested in the recurrence instances that overlap a specified time range can request to receive only the 'master component', along with the 'overridden components' that impact the specified time range"
+
+**Current State**: 
+- ✅ Supports expansion mode (returns expanded occurrences)
+- ✅ Supports limit mode (returns master + overrides)
+- ❌ **Semantic Differences Not Enforced**
+
+**The RFC Semantics**:
+
+| Mode | Returns | RRULE Present? | USE CASE |
+|------|---------|---|----------|
+| `expand` | Each occurrence as separate VEVENT | **NO** | Clients that don't understand recurrence |
+| `limit-recurrence-set` | Master event + exception instances | **YES** | Smart clients that expand locally |
+
+**Current Issue**: Both modes implemented, but not validating that expanded mode removes RRULE
+
+**RFC Impact**: MEDIUM - Edge case for old/limited clients
+
+### Precondition/Postcondition Errors - MISSING IMPLEMENTATION {#caldav-preconditions}
 
 Per RFC 4791 §1.3, when preconditions fail, server MUST return specific XML elements as children of `DAV:error`:
 
@@ -105,24 +402,26 @@ Per RFC 4791 §1.3, when preconditions fail, server MUST return specific XML ele
 - `<CALDAV:valid-calendar-object-resource>` (409) - §5.3.2.1 when UID conflict
 - `<CALDAV:no-uid-conflict>` (409) - When creating/updating events with duplicate UID
 
-### Recommendations (Priority Order)
+### Recommendations (Priority Order) {#caldav-recommendations}
 
 1. **P1 (Critical)**: Implement `DAV:supported-report-set` on all calendar collections and resources
 2. **P1 (Critical)**: Add precondition error XML responses (5 missing elements)
 3. **P1 (High)**: Implement `CALDAV:supported-calendar-component-set` property
 4. **P1 (High)**: Implement `CALDAV:supported-calendar-data` property
-5. **P2 (Medium)**: Add `CALDAV:max-resource-size`, `min-date-time`, `max-date-time` properties
-6. **P2 (Medium)**: Implement text-match collation integration
-7. **P2 (Medium)**: Add sync-token retention window validation (RFC 6578 minimum 1 week)
-8. **P3 (Lower)**: Implement partial calendar-data retrieval (property filtering)
-9. **P3 (Future)**: Implement free-busy-query REPORT (Phase 7)
-10. **P3 (Future)**: Implement CalDAV Scheduling (Phase 7+)
+5. **P1 (High)**: Validate CALDAV:supported-filter on REPORT requests
+6. **P2 (Medium)**: Add `CALDAV:max-resource-size`, `min-date-time`, `max-date-time` properties
+7. **P2 (Medium)**: Implement text-match collation integration
+8. **P2 (Medium)**: Add sync-token retention window validation (RFC 6578 minimum 1 week)
+9. **P2 (Medium)**: Implement selective iCalendar serialization from component tree
+10. **P3 (Lower)**: Implement partial calendar-data retrieval (property filtering)
+11. **P3 (Future)**: Implement free-busy-query REPORT (Phase 7)
+12. **P3 (Future)**: Implement CalDAV Scheduling (Phase 7+)
 
 ---
 
-## 2. CardDAV (RFC 6352) - ~65% Compliant
+## 2. CardDAV (RFC 6352) - ~65% Compliant {#carddav-compliance}
 
-### RFC 6352 Core MUST Requirements
+### RFC 6352 Core MUST Requirements {#carddav-must-requirements}
 
 **To advertise CardDAV support, a server MUST:**
 1. ✅ Support vCard v3 (RFC 2426) as media type
@@ -131,14 +430,14 @@ Per RFC 4791 §1.3, when preconditions fail, server MUST return specific XML ele
 4. ⚠️ Support TLS with proper certificate validation
 5. ✅ Support ETags (RFC 2616) with specific requirements (§6.3.2.3)
 6. ✅ Support all address book reports (§8) - most implemented
-7. ✅ Advertise `DAV:supported-report-set` property - **MISSING**
+7. ⚠️ Advertise `DAV:supported-report-set` property - **MISSING**
 
 **SHOULD support:**
 - ⚠️ vCard v4 (RFC 6350)
 - ✅ Extended MKCOL (RFC 5689)
 - ⚠️ DAV:current-user-principal-URL (RFC 5397)
 
-### ✅ Correctly Implemented
+### ✅ Correctly Implemented {#carddav-correct}
 
 | Feature | Status | Notes | RFC Ref |
 |---------|--------|-------|---------|
@@ -157,7 +456,7 @@ Per RFC 4791 §1.3, when preconditions fail, server MUST return specific XML ele
 | sync-collection REPORT | ✅ | Basic sync functionality | RFC 6578 |
 | OPTIONS discovery | ✅ | DAV header, addressbook-access capability | 6.1 |
 
-### ⚠️ Partially Implemented
+### ⚠️ Partially Implemented {#carddav-partial}
 
 | Feature | Gap | RFC Ref | Impact |
 |---------|-----|---------|--------|
@@ -178,7 +477,7 @@ Per RFC 4791 §1.3, when preconditions fail, server MUST return specific XML ele
 | Query result limits | Framework exists but enforcement unclear | 8.6.1 | CARDDAV:nresults handling incomplete |
 | Query truncation signaling | Not implemented | 8.6.2 | Clients don't know results are truncated |
 
-### 🔴 Not Implemented
+### 🔴 Not Implemented {#carddav-not-implemented}
 
 | Feature | RFC | Issue | Phase |
 |---------|-----|-------|-------|
@@ -188,7 +487,7 @@ Per RFC 4791 §1.3, when preconditions fail, server MUST return specific XML ele
 | Service discovery via SRV | 11 | Not implemented | Future |
 | Advanced query features | 8.6 | GROUP-BY, GROUP-CONCAT not in use cases | Future |
 
-### Precondition/Postcondition Errors - MISSING IMPLEMENTATION
+### Precondition/Postcondition Errors - MISSING IMPLEMENTATION {#carddav-preconditions}
 
 Per RFC 6352 §6.3.2.1, when preconditions fail, server MUST return specific XML elements as children of `DAV:error`:
 
@@ -199,7 +498,7 @@ Per RFC 6352 §6.3.2.1, when preconditions fail, server MUST return specific XML
 - `<CARDDAV:no-uid-conflict>` (409) - §6.3.2.1 when UID conflict
 - `<CARDDAV:addressbook-multiget-parse-error>` (403) - Malformed REPORT request
 
-### Recommendations (Priority Order)
+### Recommendations (Priority Order) {#carddav-recommendations}
 
 1. **P1 (Critical)**: Implement `DAV:supported-report-set` on all collections and resources
 2. **P1 (Critical)**: Add precondition error XML responses (5 missing elements)
@@ -216,9 +515,9 @@ Per RFC 6352 §6.3.2.1, when preconditions fail, server MUST return specific XML
 
 ---
 
-## 3. Core WebDAV (RFC 4918) - ~70-75% Compliant
+## 3. Core WebDAV (RFC 4918) - ~70-75% Compliant {#webdav-compliance}
 
-### WebDAV Compliance Classes (RFC 4918 §18)
+### WebDAV Compliance Classes (RFC 4918 §18) {#webdav-classes}
 
 | Class | Status | Requirement | Implementation |
 |-------|--------|-----------|-----------------|
@@ -229,7 +528,7 @@ Per RFC 6352 §6.3.2.1, when preconditions fail, server MUST return specific XML
 **Current DAV header claim**: `1, 2, 3, calendar-access, addressbook`  
 **Should be**: `1, 3, calendar-access, addressbook` (remove `2` since LOCK/UNLOCK not implemented)
 
-### RFC 4918 Core MUST Requirements
+### RFC 4918 Core MUST Requirements {#webdav-must-requirements}
 
 **WebDAV servers MUST support:**
 1. ✅ GET, HEAD methods
@@ -243,7 +542,7 @@ Per RFC 6352 §6.3.2.1, when preconditions fail, server MUST return specific XML
 9. ✅ Multistatus (207) responses for batch operations
 10. ⚠️ LOCK/UNLOCK (if advertising Class 2) - NOT IMPLEMENTED
 
-### ✅ Correctly Implemented
+### ✅ Correctly Implemented {#webdav-correct}
 
 | Feature | Status | Notes | RFC Ref |
 |---------|--------|-------|---------|
@@ -271,7 +570,7 @@ Per RFC 6352 §6.3.2.1, when preconditions fail, server MUST return specific XML
 | propname behavior | ✅ | Returns property names only | 9.1.4 |
 | Protected property handling | ✅ | Prevents modification of live properties | 9.2 |
 
-### ⚠️ Partially Implemented / Edge Cases
+### ⚠️ Partially Implemented / Edge Cases {#webdav-partial}
 
 | Feature | Gap | RFC Ref | Impact |
 |---------|-----|---------|--------|
@@ -289,7 +588,7 @@ Per RFC 6352 §6.3.2.1, when preconditions fail, server MUST return specific XML
 | POST for collections | Defined but may not fully support | 9.5 | CalDAV/CardDAV specific |
 | Location header on 201 | May not be returned | 8.7 | Minor convenience feature |
 
-### 🔴 Not Implemented
+### 🔴 Not Implemented {#webdav-not-implemented}
 
 | Feature | RFC | Issue | Impact |
 |---------|-----|-------|--------|
@@ -304,7 +603,7 @@ Per RFC 6352 §6.3.2.1, when preconditions fail, server MUST return specific XML
 | 424 Failed Dependency | 11.4 | Not tested | Multi-request atomicity unclear |
 | 507 Insufficient Storage | 11.5 | May not be returned | Quota failures unclear |
 
-### Critical Issue: Class 2 Compliance Violation
+### Critical Issue: Class 2 Compliance Violation {#webdav-class2-violation}
 
 **RFC 4918 §18.2: DAV Compliance Class 2**
 
@@ -323,7 +622,7 @@ Per RFC 6352 §6.3.2.1, when preconditions fail, server MUST return specific XML
 2. Update to: `DAV: 1, 3, calendar-access, addressbook`
 3. Rationale: CalDAV (RFC 4791) and CardDAV (RFC 6352) do NOT require Class 2 - they only require Class 1 and basic ACL support
 
-### Recommendations (Priority Order)
+### Recommendations (Priority Order) {#webdav-recommendations}
 
 1. **P0 (Critical - Immediate)**: Remove `2` from DAV header or implement full LOCK/UNLOCK support
 2. **P1 (High)**: Verify 409 Conflict for non-existent parent collections in PUT/COPY/MOVE
@@ -336,9 +635,9 @@ Per RFC 6352 §6.3.2.1, when preconditions fail, server MUST return specific XML
 
 ---
 
-## 4. Authentication & Authorization (RFC 3744) - Minimal Profile Recommended
+## 4. Authentication & Authorization (RFC 3744) - Minimal Profile Recommended {#auth-compliance}
 
-### RFC 3744 Core MUST Requirements (Full Profile)
+### RFC 3744 Core MUST Requirements (Full Profile) {#auth-must-requirements}
 
 **For servers advertising "access-control" capability (§7.2), MUST support:**
 1. ACL method (§8) - Modify ACLs
@@ -356,11 +655,11 @@ Per RFC 6352 §6.3.2.1, when preconditions fail, server MUST return specific XML
 3. DAV:principal-URL property (§4.2)
 4. Optional: DAV:group-member-set, DAV:group-membership (§4.3, §4.4)
 
-### Current State: ~30-40% RFC 3744 Compliant (Full Profile)
+### Current State: ~30-40% RFC 3744 Compliant (Full Profile) {#auth-current}
 
 **Status**: Shuriken should NOT advertise "access-control" in DAV header until minimal profile is implemented.
 
-### 📋 Minimal RFC 3744 Profile Definition (Recommended for Shuriken)
+### 📋 Minimal RFC 3744 Profile Definition (Recommended for Shuriken) {#auth-minimal-profile}
 
 A **minimal profile** provides ACL *discovery* without ACL *modification*:
 
@@ -391,7 +690,7 @@ A **minimal profile** provides ACL *discovery* without ACL *modification*:
 - ❌ principal-collection-set property
 - ❌ Lock privilege enforcement (LOCK/UNLOCK)
 
-### ✅ Currently Implemented (Beyond Minimal)
+### ✅ Currently Implemented (Beyond Minimal) {#auth-current-impl}
 
 | Feature | Status | Notes |
 |---------|--------|-------|
@@ -405,7 +704,7 @@ A **minimal profile** provides ACL *discovery* without ACL *modification*:
 | DAV:supported-privilege-set property | ✅ | Static XML tree |
 | DAV:owner property | ✅ | Reflects creator/owner |
 
-### ⚠️ Gaps in Minimal Profile Implementation
+### ⚠️ Gaps in Minimal Profile Implementation {#auth-gaps}
 
 | Feature | Current | Required | Priority |
 |---------|---------|----------|----------|
@@ -418,7 +717,7 @@ A **minimal profile** provides ACL *discovery* without ACL *modification*:
 | **ACL-restrictions property** | Missing | Not required for minimal | **P3** |
 | **Advanced ACE types** | Not supported | Not required for minimal | **P3** |
 
-### RFC 3744 §6 - ACL Evaluation
+### RFC 3744 §6 - ACL Evaluation {#auth-evaluation}
 
 **Current implementation:**
 - ✅ Casbin evaluates ACLs based on static policies
@@ -461,7 +760,27 @@ A **minimal profile** provides ACL *discovery* without ACL *modification*:
 7. ❌ DAV:inherited-acl-set (§5.7) - Not required (no inheritance)
 8. ❌ DAV:principal-collection-set (§5.8) - Optional for discovery
 
-### Recommendations for Minimal RFC 3744 Profile (Priority Order)
+### Why Minimal Profile for Shuriken? {#auth-why-minimal}
+
+1. **CalDAV/CardDAV don't strictly require full RFC 3744**
+   - RFC 4791 (CalDAV) and RFC 6352 (CardDAV) only require RFC 3744 "support"
+   - Most clients work with simpler permission models
+   - Full ACL support is significant complexity
+
+2. **Shuriken already enforces access control via Casbin**
+   - Authorization is working well for server-side enforcement
+   - Adding ACL modification would require managing Casbin policies via HTTP API
+
+3. **Clients can still work effectively**
+   - They can read permissions for UI feedback (DAV:acl, current-user-privilege-set)
+   - Server enforces actual access control (Casbin backend)
+   - No one can modify ACLs through CalDAV/CardDAV (acceptable limitation)
+
+4. **Can be extended later**
+   - Minimal profile is good foundation
+   - ACL method can be added in future phases when needed
+
+### Recommendations for Minimal RFC 3744 Profile (Priority Order) {#auth-recommendations}
 
 1. **P1 (Critical - Must Do)**: 
    - Implement `DAV:acl` property readable in PROPFIND (return current ACLs as XML)
@@ -486,26 +805,6 @@ A **minimal profile** provides ACL *discovery* without ACL *modification*:
    - ACL REPORT methods
    - Principal property modification
 
-### Why Minimal Profile for Shuriken?
-
-1. **CalDAV/CardDAV don't strictly require full RFC 3744**
-   - RFC 4791 (CalDAV) and RFC 6352 (CardDAV) only require RFC 3744 "support"
-   - Most clients work with simpler permission models
-   - Full ACL support is significant complexity
-
-2. **Shuriken already enforces access control via Casbin**
-   - Authorization is working well for server-side enforcement
-   - Adding ACL modification would require managing Casbin policies via HTTP API
-
-3. **Clients can still work effectively**
-   - They can read permissions for UI feedback (DAV:acl, current-user-privilege-set)
-   - Server enforces actual access control (Casbin backend)
-   - No one can modify ACLs through CalDAV/CardDAV (acceptable limitation)
-
-4. **Can be extended later**
-   - Minimal profile is good foundation
-   - ACL method can be added in future phases when needed
-
 ### Minimal Profile Completion Estimate
 
 - **Effort**: ~16-24 hours
@@ -514,9 +813,9 @@ A **minimal profile** provides ACL *discovery* without ACL *modification*:
 
 ---
 
-## 5.5 RFC 6578 (Sync Collection) - ~85% Compliant
+## 5. Sync Collection (RFC 6578) - ~85% Compliant {#sync-compliance}
 
-### RFC 6578 Core MUST Requirements
+### RFC 6578 Core MUST Requirements {#sync-must-requirements}
 
 **Servers supporting sync-collection REPORT MUST:**
 1. ✅ Support sync-collection REPORT method
@@ -525,9 +824,9 @@ A **minimal profile** provides ACL *discovery* without ACL *modification*:
 4. ✅ Support delta sync requests with existing token
 5. ✅ Return deleted resources via tombstones (DAV:response with status 404)
 6. ⚠️ Implement sync-token validation and retention policy
-7. ⚠️ Return `DAV:sync-token` in response
+7. ✅ Return `DAV:sync-token` in response
 
-### ✅ Correctly Implemented
+### ✅ Correctly Implemented {#sync-correct}
 
 | Feature | Status | Notes | RFC Ref |
 |---------|--------|-------|---------|
@@ -539,7 +838,7 @@ A **minimal profile** provides ACL *discovery* without ACL *modification*:
 | sync-token in response | ✅ | Returned in REPORT response | §3.7 |
 | nresults limit | ✅ | Can limit result count | §4.6 |
 
-### ⚠️ Partially Implemented
+### ⚠️ Partially Implemented {#sync-partial}
 
 | Feature | Gap | RFC Ref | Impact |
 |---------|-----|---------|--------|
@@ -549,7 +848,7 @@ A **minimal profile** provides ACL *discovery* without ACL *modification*:
 | Conflict detection | No `DAV:valid-sync-token` precondition | §4.1 | Clients can't detect invalid tokens |
 | Multi-status per resource | Implemented but not optimized | §4.3 | May be slow on large result sets |
 
-### Recommendations
+### Recommendations {#sync-recommendations}
 
 1. **P1**: Implement sync-token retention policy (minimum 1 week)
 2. **P1**: Add `DAV:valid-sync-token` precondition error handling
@@ -559,9 +858,9 @@ A **minimal profile** provides ACL *discovery* without ACL *modification*:
 
 ---
 
-## 5. Database Schema & Storage (RFC 4791/6352/5545/6350) - ~95% Compliant
+## 6. Database Schema & Storage (RFC 4791/6352/5545/6350) - ~95% Compliant {#database-compliance}
 
-### ✅ Correctly Implemented
+### ✅ Correctly Implemented {#database-correct}
 
 | Requirement | Status | Notes |
 |-------------|--------|-------|
@@ -581,7 +880,7 @@ A **minimal profile** provides ACL *discovery* without ACL *modification*:
 | Sync token in dav_collection | ✅ | Incremented on all changes |
 | Deletion tracking | ✅ | Tombstones preserve paths and UIDs |
 
-### ⚠️ Minor Issues
+### ⚠️ Minor Issues {#database-issues}
 
 | Issue | Recommendation |
 |-------|-----------------|
@@ -589,7 +888,9 @@ A **minimal profile** provides ACL *discovery* without ACL *modification*:
 | Sync token retention policy undocumented | Document ≥1 week minimum (RFC 6578) |
 | Purge strategy not visible | Ensure soft-deleted records cleaned after retention window |
 
-### ✅ Recommended Database Constraint
+### Recommendations {#database-recommendations}
+
+**✅ Recommended Database Constraint**
 
 ```sql
 CREATE UNIQUE INDEX uq_dav_instance_collection_uid
@@ -601,9 +902,9 @@ WHERE deleted_at IS NULL AND logical_uid IS NOT NULL;
 
 ---
 
-## 6. RFC Parsing & Validation - ~65-70% Compliant
+## 7. RFC Parsing & Validation - ~65-70% Compliant {#parsing-compliance}
 
-### ✅ Correctly Implemented
+### ✅ Correctly Implemented {#parsing-correct}
 
 | Feature | Status | Notes |
 |---------|--------|-------|
@@ -616,7 +917,7 @@ WHERE deleted_at IS NULL AND logical_uid IS NOT NULL;
 | Property parameter parsing | ✅ | Standard parameters, case-insensitive names |
 | Namespace handling | ✅ | Quick-xml parsing, DAV/CalDAV/CardDAV namespaces |
 
-### ⚠️ Partially Implemented
+### ⚠️ Partially Implemented {#parsing-partial}
 
 | Feature | Gap | Impact |
 |---------|-----|--------|
@@ -627,7 +928,7 @@ WHERE deleted_at IS NULL AND logical_uid IS NOT NULL;
 | RRULE validation | UNTIL/COUNT mutual exclusivity not checked | Invalid recurrence rules accepted |
 | Timezone references | TZID accepted without VTIMEZONE validation | Silent data corruption possible |
 
-### 🔴 Not Implemented
+### 🔴 Not Implemented {#parsing-not-implemented}
 
 | Feature | Impact |
 |---------|--------|
@@ -637,7 +938,7 @@ WHERE deleted_at IS NULL AND logical_uid IS NOT NULL;
 | Timezone database validation | No IANA zone validation |
 | LINE-LENGTH validation before folding | May fail on edge cases |
 
-### Recommendations
+### Recommendations {#parsing-recommendations}
 
 1. **Immediate**: Add post-parse schema validator for required properties
 2. **Immediate**: Enforce component cardinality constraints
@@ -648,9 +949,9 @@ WHERE deleted_at IS NULL AND logical_uid IS NOT NULL;
 
 ---
 
-## 7. Testing Infrastructure - ~75% Coverage
+## 8. Testing Infrastructure - ~75% Coverage {#testing-infrastructure}
 
-### ✅ Well-Covered
+### ✅ Well-Covered {#testing-covered}
 
 | Area | Coverage | Tests |
 |------|----------|-------|
@@ -661,7 +962,7 @@ WHERE deleted_at IS NULL AND logical_uid IS NOT NULL;
 | UID uniqueness | ✅ | Conflict detection tested |
 | ETags | ✅ | Conditional requests, validation |
 
-### ⚠️ Gaps in Test Coverage
+### ⚠️ Gaps in Test Coverage {#testing-gaps}
 
 | Area | Gap | Priority |
 |------|-----|----------|
@@ -675,7 +976,7 @@ WHERE deleted_at IS NULL AND logical_uid IS NOT NULL;
 | Character encoding edge cases | Not tested | Medium |
 | LOCK/UNLOCK | Not tested | ✅ **OK - not implementing** |
 
-### Recommendations
+### Recommendations {#testing-recommendations}
 
 1. Add text-match query tests (filter evaluation, property matching)
 2. Add concurrent modification tests (race conditions, sync-token correctness)
@@ -685,228 +986,140 @@ WHERE deleted_at IS NULL AND logical_uid IS NOT NULL;
 
 ---
 
-## Summary Table: RFC Compliance by Component
+## 9. Architectural Impact Analysis {#architectural-analysis}
 
-| Component | RFC(s) | Compliance | Status |
-|-----------|--------|-----------|--------|
-| **CalDAV** | 4791, 5545, 6578 | ~75% | Good foundation, needs query/property gaps |
-| **CardDAV** | 6352, 6350, 6578, 4790 | ~65% | Solid architecture, needs property discovery |
-| **WebDAV Core** | 4918, 5689 | ~70% | Strong, but Class 2 violation on LOCK/UNLOCK |
-| **Authorization** | 3744 (minimal) | ~40% (minimal) | Minimal profile recommended, no ACL method |
-| **Database** | 4791, 6352, 5545, 6350, 6578 | ~95% | Excellent schema design |
-| **Parsing** | 5545, 6350, 4918 | ~65-70% | Functional, validation incomplete |
-| **Testing** | All | ~75% | Good coverage, needs advanced scenarios |
-| **Overall** | Multiple | **~70%** | Solid foundation, protocol gaps remain |
+### Overview: Strengths of Current Architecture {#architectural-strengths}
 
----
+**Shuriken's architectural decisions are fundamentally sound for RFC compliance.** The design creates robust foundations that enable RFC requirements without compromising flexibility.
 
-## Critical Action Items
+**Key Architectural Strengths:**
 
-### 🔴 Must Fix (Blocking)
+1. **UUID-Based Internal Storage**: Stable, immutable resource identifiers independent of client-visible paths
+2. **Entity/Instance Separation**: Enables content sharing across collections with per-collection metadata
+3. **Component Tree Structure**: Perfect for RFC-compliant partial retrieval and filtering
+4. **Glob-Path ACL Model**: Efficient collection-level permissions with inheritance
+5. **Clean Layer Separation**: HTTP handlers → Services → DB/Casbin enables testability
 
-1. **Remove LOCK/UNLOCK from DAV header** or implement full support
-   - RFC 4918 §18.1: Cannot advertise Class 2 without LOCK/UNLOCK
-   - **Decision**: Remove from DAV header (CalDAV/CardDAV don't require it)
+**Critical Insight**: All compliance gaps are **protocol-layer** issues (missing XML properties, error responses) rather than architectural problems. No redesign needed.
 
-2. **Implement `supported-report-set` property** (CalDAV + CardDAV)
-   - Required for clients to discover supported REPORT methods
-   - Should return XML listing `calendar-query`, `calendar-multiget`, `addressbook-query`, etc.
+### UUID-Based Internal Storage vs RFC Path Requirements {#uuid-architecture}
 
-3. **Return XML error bodies for PUT failures** (CardDAV)
-   - Currently: HTTP status codes only
-   - Must return: `<C:valid-address-data>`, `<C:no-uid-conflict>`, etc.
+**Shuriken Design Decision**: All authorization paths use UUIDs internally (e.g., `/cal/<principal-uuid>/<collection-uuid>/**`)
 
-4. **Implement `DAV:acl` property retrieval** (RFC 3744 minimal)
-   - Make readable via PROPFIND
-   - Return current ACL as XML with ACE elements
-   - Mark inherited/protected ACEs as read-only
+**RFC Compliance Impact**:
 
-5. **Add `DAV:need-privileges` error element** (RFC 3744 minimal)
-   - Include in 403 Forbidden responses
-   - Specify which privilege was denied on which resource
+#### ✅ ADVANTAGES:
 
-### ⚠️ Should Fix (Important)
+1. **Slug Independence**: Authorization policies don't break when collections are renamed
+2. **Query Stability**: Can recompute slugs without rebuilding ACLs
+3. **Sharing Semantics**: Entity/instance separation means same content in multiple collections has same authorization context
+4. **Performance**: Direct UUID lookups faster than slug traversal
 
-1. Add `supported-calendar-component-set` property
-2. Integrate `i;unicode-casemap` collation into filter evaluation
-3. Implement RFC 4791 §9 precondition error XML responses
-4. Add database-level UID uniqueness constraint
-5. Implement text-match filtering on all properties
-6. Add sync-token validation and retention window checking
+#### ⚠️ CHALLENGES:
 
-### 🔧 Nice to Have (Future)
+1. **Client-Visible Paths Are Slugs**: RFC clients see `/calendars/alice/work/event-123.ics` (slugs)
+2. **Error Responses Must Translate**: When authorization fails, error must reference client-visible path, not UUID path
+3. **Casbin Paths Must Stay Hidden**: Clients cannot see internal UUID-based Casbin paths
 
-1. Implement free-busy-query REPORT (RFC 4791)
-2. Add content negotiation (Accept header) for GET
-3. Implement CalDAV Scheduling (RFC 6638) - Phase 7+
-4. Add expand-property REPORT for principal discovery
-5. Implement ACL method for ACL modification (beyond minimal profile)
-
----
-
-## Implementation Priority Matrix
-
-| Priority | Item | Effort | Impact | Phase |
-|----------|------|--------|--------|-------|
-| **P1** | Remove/implement LOCK/UNLOCK | 1h | Critical | Now |
-| **P1** | `supported-report-set` property | 4h | High | 1 |
-| **P1** | CardDAV error response bodies | 6h | High | 1 |
-| **P1** | `DAV:acl` property PROPFIND | 8h | High | 1 |
-| **P1** | `DAV:need-privileges` errors | 4h | High | 1 |
-| **P2** | `supported-calendar-component-set` | 3h | Medium | 1 |
-| **P2** | Collation integration | 8h | Medium | 1 |
-| **P2** | RFC 4791 precondition errors | 8h | Medium | 1 |
-| **P2** | Database UID constraint | 2h | Medium | 1 |
-| **P2** | Text-match query filtering | 12h | High | 1 |
-| **P3** | free-busy-query REPORT | 16h | High | 7 |
-| **P3** | ACL method implementation | 20h | High | 7+ |
-| **P3** | CalDAV Scheduling | 40h+ | Critical | 7+ |
-
----
-
-## Notes on Minimal RFC 3744 Profile
-
-### What This Means
-
-A **minimal RFC 3744 profile** means Shuriken will:
-
-✅ **Support:**
-- Reading ACL information (DAV:acl property via PROPFIND)
-- Computing and returning privilege sets (current-user-privilege-set)
-- Reporting missing privileges on 403 errors (need-privileges)
-- Simple principal types (href, all, authenticated, unauthenticated)
-- Grant-only ACEs (no deny logic)
-- Marked (but read-only) inherited and protected ACEs
-
-❌ **NOT Support:**
-- Modifying ACLs via ACL method
-- Deny ACEs or complex grant/deny logic
-- Complex principal types (property principals, self, invert)
-- ACL precondition error checking (conflict detection)
-- ACL REPORT methods
-- Full principal property discovery
-- Delegation and advanced ACL patterns
-
-### Why This Makes Sense
-
-1. **CalDAV/CardDAV don't strictly require full RFC 3744**
-   - Most clients work with simpler permission models
-   - Full ACL support adds significant complexity
-
-2. **Shuriken already enforces access control via Casbin**
-   - Authorization is working well
-   - Adding ACL modification would require managing Casbin policies via HTTP
-
-3. **Clients can still work effectively**
-   - They can read permissions (for UI feedback)
-   - Server enforces actual access control (Casbin)
-   - No one can modify ACLs through CalDAV/CardDAV (acceptable limitation)
-
-4. **Can be extended later**
-   - Minimal profile is a good foundation
-   - ACL method can be added in future phases
-
----
-
-## 8. Architectural Alignment Analysis
-
-### Design Decision: UUID-Based Internal Storage with Slug Path Resolution
-
-**Current Implementation:**
-- Internal: All resources identified by UUID (stable, immutable)
-- External: URIs use slug-based paths (human-readable, mutable)
-- Authorization: Glob patterns match UUID-based paths (`/cal/{user-uuid}/{collection-uuid}/**`)
-- Mapping: `RESOLVED_LOCATION` converts slug to UUID for auth, `PATH_LOCATION` preserves original slug
-
-**RFC Compliance Impact:**
-
-✅ **Strengths:**
-- URIs are immutable at database level (RFC 4918 §5.2 - resources have stable identity)
-- Collection member tracking works correctly (RFC 4918 §8.3.1 - collection member URLs)
-- Sync token paths can be opaque (RFC 6578 §3.4 - sync tokens don't require stable URIs)
-- ACL enforcement stable across slug renames (RFC 3744 principal references)
-- UUID paths enable efficient database queries
-
-⚠️ **RFC Gaps:**
-- RFC 4791 §5.2: Calendar collection's `DAV:supported-report-set` should enumerate available REPORT methods - requires mapping from slug to capability discovery
-- RFC 4791 §5.3: Calendar resource UID MUST match iCalendar UID - UUID is separate concern, doesn't affect this
-- RFC 3744 §2: Principals MUST be identified by HTTP(S) URL - Shuriken uses UUIDs for internal principals, which is acceptable per spec ("URI of any scheme MAY be used")
-
-✅ **Recommended**: Current design is compliant. Add principal URL mapping layer that exposes principals at HTTP URLs:
+**Example Mapping Required**:
 ```
-/principals/users/{user-uuid}/                    (or discoverable via /principals)
-/principals/groups/{group-uuid}/
+Client Request: GET /calendars/alice/work/event-123.ics
+Internal Resolution: 
+  - alice → <uuid-alice>
+  - work → <uuid-work>
+  - event-123 → <uuid-event>
+Casbin Check: can_read(<user>, /cal/<uuid-alice>/cal/<uuid-work>/)
+Response (if denied):
+  403 with <D:href>/calendars/alice/work/event-123.ics</D:href>  
+  NOT: <D:href>/cal/<uuid-alice>/cal/<uuid-work>/<uuid-event></D:href>
 ```
-This enables RFC 3744 principal discovery without changing internal storage.
 
----
+**Compliance Note**: Shuriken's architecture supports this correctly - just need to ensure error responses use original path_location, not canonical_location
 
-### Design Decision: Glob-Path-Based ACL Enforcement via Casbin
+**RFC Alignment**: RFC 4918 §5.2 states resources have stable identity - UUID-based storage satisfies this. RFC 6578 sync tokens don't require stable URIs - opaque paths acceptable.
 
-**Current Implementation:**
-- Casbin policies use glob patterns matching UUID-based resource paths
-- Subjects: user principals, groups, pseudo-principals (public)
-- Objects: paths like `/cal/{owner-uuid}/{collection-uuid}/**`, `/card/{owner-uuid}/{collection-uuid}/**`
-- Actions: read, write, admin mapped to HTTP methods and privileges
+### Glob-Path ACL Model vs Individual Resource ACLs {#glob-acl-architecture}
 
-**RFC Compliance Impact:**
+**Shuriken Design**: ACLs are at collection level (glob patterns), items inherit by containment
 
-✅ **Strengths:**
-- Matches RFC 3744 access control philosophy (§6: ACL evaluation for resource access)
-- Glob patterns naturally express collection-level permissions (all members inherit)
-- Casbin supports group membership expansion (RFC 3744 group semantics)
-- Path structure mirrors resource hierarchy (RFC 3744 inheritance-compatible)
-- Separation of ACL definition (database policies) from enforcement (Casbin) is clean
+**RFC Requirement** (RFC 3744 §5): Each resource can have its own DAV:acl property
 
-⚠️ **RFC Gaps:**
-- RFC 3744 §5.5: Requires returning `DAV:acl` property listing ACEs (Access Control Elements) - Shuriken enforces but doesn't expose
-- RFC 3744 §5: Missing `DAV:inherited-acl-set` property (inherited resources)
-- RFC 3744 §5: Missing `DAV:acl-restrictions` property (server ACL constraints)
-- RFC 3744 §8.1: No ACL method to modify policies via HTTP
-- RFC 3744 §9: No ACL REPORT methods for principal discovery
+**Compliance Gap**:
+- ✅ Can return DAV:acl property on collections
+- ❌ Cannot return DAV:acl property on individual items (they don't have own ACEs)
+- ❌ DAV:inherited-acl-set property not applicable (not using inherited ACEs)
 
-✅ **Recommended Changes** (no redesign needed):
-1. **Add ACL property layer**: Casbin policies → `DAV:acl` XML generator
-   - Query Casbin for all policies matching resource path
-   - Convert to `<D:ace>` XML elements
-   - Mark shared ACEs from parent as `<D:inherited>`
-   - Return in PROPFIND responses for ACL property
-
-2. **Add principal discovery**: 
-   - Create `/principals/` endpoint for principal listing
-   - Map Casbin users/groups to principal resources
-   - Enable RFC 3744 principal discovery
-
-3. **Do NOT implement**:
-   - ACL method (beyond minimal profile scope)
-   - Deny ACEs (grant-only model is sufficient)
-   - Complex principal types (keep it simple)
-
----
-
-### Design Decision: Component Tree Storage (Nested Components in DB)
-
-**Current Implementation:**
-- `dav_component` table with hierarchical parent-child relationships
-- Preserves VCALENDAR → VEVENT → VALARM → ICALARM nesting
-- Supports vCard property groups via `property_group` table
-- Serializes by walking tree with ordinal columns
-
-**RFC Compliance Impact:**
-
-✅ **Perfect RFC Alignment:**
-- RFC 5545 §3.6: Component structure preserved exactly as in iCalendar spec
-- RFC 6350 §6: vCard structure matches RFC exactly
-- RFC 4791 §7.6: Partial retrieval can be implemented efficiently (select components to include)
-- RFC 4791 §9.9: calendar-data filtering can work on component tree
-
-⚠️ **Implementation Gaps** (not design issues):
-- Partial retrieval not implemented (but design supports it)
-- Component filtering in REPORT methods not fully utilized
-- Could benefit from component path indexing for queries
-
-✅ **Recommended**: No changes needed. Design is excellent. Implement partial retrieval as next phase:
+**RFC Semantics**:
+```xml
+<!-- What RFC 3744 expects for an item: -->
+<D:acl xmlns:D="DAV:">
+  <D:ace>
+    <D:principal><D:href>...</D:href></D:principal>
+    <D:grant><D:privilege><D:read/></D:privilege></D:grant>
+    <D:inherited>  <!-- Indicates inherited from collection -->
+  </D:ace>
+</D:acl>
 ```
+
+**Shuriken Implementation**:
+```xml
+<!-- Should return empty or collection's ACL -->
+<!-- But no <D:inherited> marker to indicate this is inherited -->
+<D:acl xmlns:D="DAV:">
+  <!-- Items have no direct ACEs -->
+  <!-- Access determined by collection's glob patterns via Casbin -->
+</D:acl>
+```
+
+**Architectural Workaround**: 
+- ✅ Return collection's ACL on item GET (marking as inherited)
+- ✅ Prevents client confusion about why item access works
+
+**RFC Compliance**: Glob-pattern model is philosophically compatible with RFC 3744 §6 ACL evaluation - just needs proper XML serialization layer.
+
+### Component Tree Structure: Query Performance vs Retrieval Completeness {#component-tree-architecture}
+
+**Shuriken Storage Model**:
+```
+dav_entity (canonical content)
+  ↓
+dav_component (tree structure)
+  ├ VCALENDAR
+  ├ VEVENT (1)
+  ├ VALARM (1a)
+  ├ VEVENT (2, RECURRENCE-ID)
+  └ VTIMEZONE
+```
+
+**Advantages for RFC Compliance**:
+- ✅ Perfect for partial retrieval (can traverse and selectively serialize)
+- ✅ Enables time-range queries on components (not just properties)
+- ✅ Stores all nesting context for proper RFC reconstruction
+
+**Challenges**:
+- ⚠️ Serialization from tree must preserve RFC syntax exactly
+- ⚠️ Parameter ordering must match original (not guaranteed)
+- ⚠️ Text escaping must follow RFC 5545 line folding
+
+**Specific Issue**: RFC 4791 §7.8.1 Example shows:
+
+```icalendar
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Example Corp.//CalDAV Client//EN
+BEGIN:VTIMEZONE
+LAST-MODIFIED:20040110T032845Z
+...
+```
+
+**Requirement**: When clients request specific properties, the serialized output **must** include PRODID, VERSION at top level even if not explicitly requested (RFC 5545 §3.6 "iCalendar object" requires these)
+
+**Current Gap**: May strip these if not explicitly requested in partial retrieval
+
+**RFC Impact**: RFC 4791 §9.9 - calendar-data filtering can work on component tree. RFC 4791 §7.6 & §9.6 - partial retrieval semantics require selective serialization.
+
+**Recommended Implementation**:
+```rust
 // Serialize only specified components
 fn serialize_with_filter(
     root: &Component, 
@@ -914,32 +1127,48 @@ fn serialize_with_filter(
 ) -> String { ... }
 ```
 
----
+### Entity/Instance Separation: Sharing Implications {#entity-instance-architecture}
 
-### Design Decision: Entity/Instance Separation (Shared Content Across Collections)
+**Shuriken Model**: One entity can exist in multiple collections as different instances
 
-**Current Implementation:**
-- `dav_entity`: Canonical immutable content (UID, component tree)
-- `dav_instance`: Per-collection reference to entity + collection metadata
-- Enables content sharing across collections with per-collection ETag/sync tracking
+```
+dav_entity (ID: uuid-event-1)
+  ├ dav_instance in /alice/calendar/ (slug: event-1, etag: abc123)
+  ├ dav_instance in /bob/calendar/ (slug: imported-event, etag: xyz789)
+  └ dav_instance in /shared-cal/ (slug: team-event, etag: def456)
+```
 
-**RFC Compliance Impact:**
+**RFC Compliance Implications**:
 
-✅ **Strong RFC Alignment:**
-- RFC 4791 §5.3.2: Resources are immutable once created (entity level)
-- RFC 4791 §5.3.2: Each collection has independent ETag/sync tracking (instance level)
-- RFC 6578 §3.7: Sync tokens are per-collection (instance-level)
-- RFC 4918 §5.2: Collections have independent member lists (instances)
+#### ✅ CORRECT BEHAVIOR:
 
-⚠️ **Potential Issues:**
-- RFC 4791 §5.3.2: UID MUST be unique per collection - need to verify UID uniqueness constraint per collection (not global)
-- RFC 4791 §5.3.2: When copying resource, destination gets new UID by default - entity/instance model handles this correctly
+1. **UID Uniqueness**: Each collection enforces UID uniqueness for its instances ✅
+2. **ETag Independence**: Each instance has own ETag (correct for If-Match) ✅
+3. **Sync Tokens**: Each collection has own sync-token ✅
 
-✅ **Status**: Design is excellent, no changes needed.
+#### ⚠️ POTENTIAL ISSUES:
 
----
+1. **PRODID Preservation**: If shared entity is stored once, PRODID might not reflect original client
+   - RFC 5545 §3.6: PRODID "specifies the product identifier for the product that created the iCalendar object"
+   - Shared entity created by alice, imported by bob - which PRODID should be in GET response?
+   - **Current Implementation**: Probably returns original PRODID (from alice), which is correct
 
-### Design Decision: Application Structure (HTTP Handlers → Services → DB/Casbin)
+2. **DTSTAMP Handling**: RFC 4791 §5.3.2.1 states "iCalendar VALUE MUST NOT have DTSTAMP" in stored form
+   - **Current**: Stores DTSTAMP but strips on retrieval? (Need to verify)
+
+3. **Modified Content**: If shared, what if alice modifies the event?
+   - All instances in other collections see the change (by design)
+   - **RFC Compliance**: This is correct - same event, just in different collections
+
+**RFC Alignment**: 
+- RFC 4791 §5.3.2: Resources are immutable once created (entity level) ✅
+- RFC 4791 §5.3.2: Each collection has independent ETag/sync tracking (instance level) ✅
+- RFC 6578 §3.7: Sync tokens are per-collection (instance-level) ✅
+- RFC 4918 §5.2: Collections have independent member lists (instances) ✅
+
+**Status**: Design is excellent, no changes needed. Just verify UID uniqueness per collection (not global).
+
+### Application Structure (HTTP Handlers → Services → DB/Casbin) {#application-structure}
 
 **Current Implementation:**
 - `src/app/api/`: HTTP request/response handling
@@ -947,7 +1176,7 @@ fn serialize_with_filter(
 - `src/component/db/`: Database queries (query composition pattern)
 - `src/component/auth/`: Casbin authorization enforcement
 
-**RFC Compliance Impact:**
+**RFC Compliance Impact**:
 
 ✅ **Strengths:**
 - Clean separation enables RFC compliance checking per module
@@ -977,11 +1206,179 @@ src/component/rfc/
 
 These are **generators**, not validation logic. They convert Shuriken's internal state (Casbin policies, supported features) into RFC-compliant XML.
 
+### Protocol-Layer Gaps (Not Architectural) {#protocol-gaps}
+
+#### Missing from ALL Collections/Resources:
+
+| Property | RFC | Gap | Impact |
+|----------|-----|-----|--------|
+| `DAV:supported-report-set` | 4791 §2, 6352 §3 | Not on collections or items | **CRITICAL** - Clients can't discover which REPORT methods work |
+| `CALDAV:supported-calendar-component-set` | 4791 §5.2.3 | Not on calendar collections | **HIGH** - Clients don't know if VEVENT/VTODO supported |
+| `CALDAV:supported-calendar-data` | 4791 §5.2.4 | Not on calendar collections | **HIGH** - Clients can't know media-type version support |
+| `CALDAV:max-resource-size` | 4791 §5.2.5 | Not on calendar collections | **MEDIUM** - Clients might send oversized resources |
+| `CALDAV:min-date-time` | 4791 §5.2.6 | Not on calendar collections | **MEDIUM** - Clients don't know query bounds |
+| `CALDAV:max-date-time` | 4791 §5.2.7 | Not on calendar collections | **MEDIUM** - Clients don't know query bounds |
+| `CALDAV:max-instances` | 4791 §5.2.8 | Not on calendar collections | **MEDIUM** - Unlimited expansion could DOS |
+| `CALDAV:supported-collation-set` | 4791 §7.5.1 | Not on calendar collections | **MEDIUM** - Clients don't know collations |
+| `CARDDAV:supported-address-data` | 6352 §6.2.2 | Not on addressbook collections | **HIGH** - vCard v3 vs v4 support unknown |
+| `CARDDAV:supported-collation-set` | 6352 §8.3.1 | Not on addressbook collections | **MEDIUM** - Case-folding support unknown |
+
+**Impact Example**:
+```xml
+<!-- Client with no discovery support: -->
+PROPFIND /calendars/alice/work/ HTTP/1.1
+
+<!-- Expected response includes: -->
+<C:supported-calendar-component-set>
+  <C:comp name="VEVENT"/>
+  <C:comp name="VTODO"/>
+  <C:comp name="VJOURNAL"/>
+</C:supported-calendar-component-set>
+
+<!-- Current: Returns empty or omitted -->
+```
+
+#### Options Method Capability Advertising
+
+**RFC 4791 §5.1 Example**:
+```http
+OPTIONS /calendars/alice/work/ HTTP/1.1
+
+HTTP/1.1 200 OK
+DAV: 1, 3, calendar-access, addressbook  ← Should list capabilities
+Allow: OPTIONS,GET,HEAD,POST,PUT,DELETE,PROPFIND,PROPPATCH,MKCOL,COPY,MOVE,REPORT
+```
+
+**Current Issue**: DAV header claims `2` (LOCK/UNLOCK) but not implemented
+
+#### Error Response Completeness
+
+**Missing XML Elements in Error Responses:**
+
+**For PUT/COPY/MOVE (RFC 4791 §5.3.2.1)**:
+
+```xml
+<!-- Missing from 409/403 responses: -->
+<D:error>
+  <C:valid-calendar-data/>  <!-- Invalid iCalendar syntax -->
+  <C:no-uid-conflict/>      <!-- UID already exists -->
+  <C:supported-calendar-component/>  <!-- Wrong component type -->
+  <C:supported-calendar-data/>  <!-- Unsupported media type -->
+</D:error>
+```
+
+**For PROPFIND DAV:acl (RFC 3744 §8.1.1)**:
+
+```xml
+<!-- Missing from 403 responses: -->
+<D:error>
+  <D:need-privileges>
+    <D:resource>
+      <D:href>/calendars/alice/work/</D:href>
+      <D:privilege><D:read-acl/></D:privilege>
+    </D:resource>
+  </D:need-privileges>
+</D:error>
+```
+
+#### ACL Evaluation: Missing Precondition Error Semantics
+
+**RFC 3744 §7.1.1 - Error Handling:**
+
+RFC 3744 states: "When principal does not have the required privilege, the server MUST return a 403 (Forbidden) response. The response MUST include a DAV:error element that contains a DAV:need-privileges element, which in turn contains one or more DAV:resource and DAV:privilege elements."
+
+**Current Implementation in Shuriken**:
+```rust
+// From src/app/api/dav/method/get_head/helpers.rs
+async fn check_read_authorization(...) -> Result<(), AppError> {
+    // Returns 403 if unauthorized
+    // But does NOT include need-privileges XML in response body
+}
+```
+
+**Example - What's Missing**:
+```http
+HTTP/1.1 403 Forbidden
+Content-Type: application/xml; charset="utf-8"
+
+<?xml version="1.0" encoding="utf-8"?>
+<D:error xmlns:D="DAV:">
+  <D:need-privileges>
+    <D:resource>
+      <D:href>/calendars/alice/calendar/event-1.ics</D:href>
+      <D:privilege>
+        <D:read/>
+      </D:privilege>
+    </D:resource>
+  </D:need-privileges>
+</D:error>
+```
+
+**Current State**: Returns `403 Forbidden` with empty or generic body
+
+**RFC Impact**: HIGH - Clients cannot understand why they're denied access  
+**Architectural Note**: Authorization is UUID-based internally, but clients see slug paths - responses must map back correctly
+
 ---
 
-## 9. Missing RFC Requirements - Deep Dive
+## 10. Risk Assessment {#risk-assessment}
 
-### RFC 4791 (CalDAV) - Missed MUST/SHOULD Requirements
+### Architectural Gaps: NONE {#risk-architectural}
+
+Shuriken's architecture (UUID storage, entity/instance separation, component tree) is **sound for RFC compliance**.
+
+**All design decisions are RFC-compatible:**
+- ✅ UUID-based internal storage with slug-path resolution
+- ✅ Glob-path ACL enforcement via Casbin
+- ✅ Component tree structure for nested components
+- ✅ Entity/instance separation for sharing
+- ✅ Application structure (handlers → services → DB)
+
+**No redesign or refactoring needed.**
+
+### Protocol Gaps: MODERATE {#risk-protocol}
+
+**List of actual gaps**:
+1. ✅ Property discovery (fixable, ~15 hours total)
+2. ✅ Error XML elements (fixable, ~6 hours)
+3. ✅ Filter validation (fixable, ~8 hours)
+4. ✅ Partial retrieval (fixable, ~12 hours)
+
+**Total effort to 85% compliance**: ~40 hours
+
+**These gaps do NOT require architectural changes**, just protocol-layer implementations.
+
+### Path Forward {#risk-path-forward}
+
+**Immediate (This Week)**
+- [ ] Fix DAV header (10 min)
+- [ ] Add supported-report-set (4h)
+- [ ] Add need-privileges error (6h)
+- [ ] Add supported-calendar-component-set (2h)
+
+**Result**: 70% → 75% compliance (spec violations fixed)
+
+**Short Term (Next 2 Weeks)**
+- [ ] Filter validation (8h)
+- [ ] Selective serialization (12h)
+- [ ] Collation validation (3h)
+- [ ] supported-address-data property (1h)
+- [ ] DAV:acl property retrieval (8h)
+
+**Result**: 75% → 85% compliance (discovery and query robustness)
+
+**Medium Term (Phase 7)**
+- [ ] ACL method (20h)
+- [ ] Free-busy-query (16h)
+- [ ] Scheduling (40h+)
+
+**Result**: 85% → 95%+ compliance (full feature parity)
+
+---
+
+## 11. Missing RFC Requirements - Deep Dive {#missing-requirements}
+
+### RFC 4791 (CalDAV) - Missed MUST/SHOULD Requirements {#missing-caldav}
 
 | Requirement | RFC Section | Severity | Impact | Solution |
 |-------------|-------------|----------|--------|----------|
@@ -994,7 +1391,7 @@ These are **generators**, not validation logic. They convert Shuriken's internal
 | SHOULD support iCalendar recurrence expansion limits | 9.6.7 | **SHOULD** | Large recurring events could cause DOS | Implement `limit-freebusy-set` precondition, enforce max-instances |
 | SHOULD support calendar-data property filtering | 9.6 | **SHOULD** | Bandwidth waste with full calendar-data | Implement selective serialization from component tree |
 
-### RFC 6352 (CardDAV) - Missed Requirements
+### RFC 6352 (CardDAV) - Missed Requirements {#missing-carddav}
 
 | Requirement | RFC Section | Severity | Impact | Solution |
 |-------------|-------------|----------|--------|----------|
@@ -1005,7 +1402,7 @@ These are **generators**, not validation logic. They convert Shuriken's internal
 | MUST support FN/EMAIL text-match queries | 10.3 | **SHOULD** | Contact search limited | Integrate collation into filter evaluation |
 | SHOULD support Content-Type negotiation | 5.1.1 | **SHOULD** | Can't select vCard version | Implement Accept header parsing, return v3/v4 |
 
-### RFC 3744 (ACL) - Minimal Profile MUST Requirements
+### RFC 3744 (ACL) - Minimal Profile MUST Requirements {#missing-acl}
 
 | Requirement | RFC Section | Severity | Impact | Solution |
 |-------------|-------------|----------|--------|----------|
@@ -1018,7 +1415,7 @@ These are **generators**, not validation logic. They convert Shuriken's internal
 | MUST support `DAV:unauthenticated` principal | 5.5.1 | **MUST** | Can't share with anonymous users | Add as principal type |
 | MUST return owner property | 5.1 | **MUST** | ACL ownership unclear | Ensure returned in PROPFIND |
 
-### RFC 4918 (WebDAV) - Compliance Class Violation
+### RFC 4918 (WebDAV) - Compliance Class Violation {#missing-webdav}
 
 **Problem**: Current DAV header advertises Compliance Class 2:
 ```
@@ -1039,9 +1436,7 @@ DAV: 1, 2, 3, calendar-access, addressbook-access
 
 **Solution**: Remove `2` from DAV header. CalDAV/CardDAV do not require Class 2.
 
----
-
-### RFC 5545 (iCalendar) - Parsing Validation Gaps
+### RFC 5545 (iCalendar) - Parsing Validation Gaps {#missing-icalendar}
 
 | Missing Validation | RFC Section | Impact | Priority |
 |-------------------|-------------|--------|----------|
@@ -1052,7 +1447,7 @@ DAV: 1, 2, 3, calendar-access, addressbook-access
 | Timezone TZID reference validation | 3.8.4.1 | TZID must reference VTIMEZONE | Low |
 | BASE64/QUOTED-PRINTABLE encoding | 3.1.3 | Attachment encoding | Low |
 
-### RFC 6350 (vCard) - Parsing Validation Gaps
+### RFC 6350 (vCard) - Parsing Validation Gaps {#missing-vcard}
 
 | Missing Validation | RFC Section | Impact | Priority |
 |-------------------|-------------|--------|----------|
@@ -1064,9 +1459,9 @@ DAV: 1, 2, 3, calendar-access, addressbook-access
 
 ---
 
-## 10. Protocol Layer vs Storage Layer - Analysis
+## 12. Protocol Layer vs Storage Layer - Analysis {#protocol-vs-storage}
 
-### What's **Strong** (Storage Layer - No Changes Needed)
+### What's **Strong** (Storage Layer - No Changes Needed) {#storage-strong}
 
 | Layer | Implementation | Status | RFC Impact |
 |-------|----------------|--------|-----------|
@@ -1078,7 +1473,7 @@ DAV: 1, 2, 3, calendar-access, addressbook-access
 | Storage | Timezone caching & IANA mapping | ✅ Excellent | Timezone handling correct |
 | Storage | Casbin policy storage | ✅ Good | ACL enforcement foundation sound |
 
-### What's **Broken** (Protocol Layer - Needs Implementation)
+### What's **Broken** (Protocol Layer - Needs Implementation) {#storage-broken}
 
 | Layer | Missing | Status | RFC Impact |
 |-------|---------|--------|-----------|
@@ -1089,15 +1484,79 @@ DAV: 1, 2, 3, calendar-access, addressbook-access
 | Protocol | Selective serialization | ⚠️ Partial | calendar-data filtering not used |
 | Protocol | LOCK/UNLOCK methods | ❌ Missing | (Remove from DAV header instead) |
 
-### No **Design Issues** (Architecture Is Sound)
+### No **Design Issues** (Architecture Is Sound) {#storage-no-issues}
 
 ✅ All design decisions (UUID storage, glob paths, component trees, entity/instance) are RFC-compliant and well-suited for the task.
 
 ---
 
-## 11. Implementation Roadmap - Revised
+## 13. Critical Action Items {#critical-action-items}
 
-### Phase 0: Critical Fixes (1 Day) - Reach 72% Compliance
+### 🔴 Must Fix (Blocking) {#action-must-fix}
+
+1. **Remove LOCK/UNLOCK from DAV header** or implement full support
+   - RFC 4918 §18.1: Cannot advertise Class 2 without LOCK/UNLOCK
+   - **Decision**: Remove from DAV header (CalDAV/CardDAV don't require it)
+
+2. **Implement `supported-report-set` property** (CalDAV + CardDAV)
+   - Required for clients to discover supported REPORT methods
+   - Should return XML listing `calendar-query`, `calendar-multiget`, `addressbook-query`, etc.
+
+3. **Return XML error bodies for PUT failures** (CardDAV)
+   - Currently: HTTP status codes only
+   - Must return: `<C:valid-address-data>`, `<C:no-uid-conflict>`, etc.
+
+4. **Implement `DAV:acl` property retrieval** (RFC 3744 minimal)
+   - Make readable via PROPFIND
+   - Return current ACL as XML with ACE elements
+   - Mark inherited/protected ACEs as read-only
+
+5. **Add `DAV:need-privileges` error element** (RFC 3744 minimal)
+   - Include in 403 Forbidden responses
+   - Specify which privilege was denied on which resource
+
+### ⚠️ Should Fix (Important) {#action-should-fix}
+
+1. Add `supported-calendar-component-set` property
+2. Integrate `i;unicode-casemap` collation into filter evaluation
+3. Implement RFC 4791 §9 precondition error XML responses
+4. Add database-level UID uniqueness constraint
+5. Implement text-match filtering on all properties
+6. Add sync-token validation and retention window checking
+
+### 🔧 Nice to Have (Future) {#action-nice-to-have}
+
+1. Implement free-busy-query REPORT (RFC 4791)
+2. Add content negotiation (Accept header) for GET
+3. Implement CalDAV Scheduling (RFC 6638) - Phase 7+
+4. Add expand-property REPORT for principal discovery
+5. Implement ACL method for ACL modification (beyond minimal profile)
+
+---
+
+## 14. Implementation Priority Matrix {#priority-matrix}
+
+| Priority | Item | Effort | Impact | Phase |
+|----------|------|--------|--------|-------|
+| **P1** | Remove/implement LOCK/UNLOCK | 1h | Critical | Now |
+| **P1** | `supported-report-set` property | 4h | High | 1 |
+| **P1** | CardDAV error response bodies | 6h | High | 1 |
+| **P1** | `DAV:acl` property PROPFIND | 8h | High | 1 |
+| **P1** | `DAV:need-privileges` errors | 4h | High | 1 |
+| **P2** | `supported-calendar-component-set` | 3h | Medium | 1 |
+| **P2** | Collation integration | 8h | Medium | 1 |
+| **P2** | RFC 4791 precondition errors | 8h | Medium | 1 |
+| **P2** | Database UID constraint | 2h | Medium | 1 |
+| **P2** | Text-match query filtering | 12h | High | 1 |
+| **P3** | free-busy-query REPORT | 16h | High | 7 |
+| **P3** | ACL method implementation | 20h | High | 7+ |
+| **P3** | CalDAV Scheduling | 40h+ | Critical | 7+ |
+
+---
+
+## 15. Implementation Roadmap {#implementation-roadmap}
+
+### Phase 0: Critical Fixes (1 Day) - Reach 72% Compliance {#roadmap-phase0}
 
 | Item | Effort | Impact | Risk | Status |
 |------|--------|--------|------|--------|
@@ -1107,7 +1566,7 @@ DAV: 1, 2, 3, calendar-access, addressbook-access
 
 **Total**: 3 hours → **72% compliance** (partial: property discovery done)
 
-### Phase 1: Discovery & Errors (1 Week) - Reach 80% Compliance
+### Phase 1: Discovery & Errors (1 Week) - Reach 80% Compliance {#roadmap-phase1}
 
 | Item | Effort | Impact | Dependencies | Status |
 |------|--------|--------|---------------|--------|
@@ -1122,7 +1581,7 @@ DAV: 1, 2, 3, calendar-access, addressbook-access
 
 **Total**: 25 hours → **80% compliance** (partial: discovery properties complete)
 
-### Phase 2: Query Improvements (2 Weeks) - Reach 85% Compliance
+### Phase 2: Query Improvements (2 Weeks) - Reach 85% Compliance {#roadmap-phase2}
 
 | Item | Effort | Impact | Dependencies |
 |------|--------|--------|---------------|
@@ -1133,7 +1592,7 @@ DAV: 1, 2, 3, calendar-access, addressbook-access
 
 **Total**: 23 hours → **85% compliance**
 
-### Phase 3: Advanced Features (Future) - Reach 90%+
+### Phase 3: Advanced Features (Future) - Reach 90%+ {#roadmap-phase3}
 
 | Item | Effort | Impact | Phase |
 |------|--------|--------|-------|
@@ -1143,9 +1602,176 @@ DAV: 1, 2, 3, calendar-access, addressbook-access
 
 ---
 
-## 12. Specific RFC Requirements - MUST vs SHOULD
+## 16. Detailed Implementation Guide {#implementation-guide}
 
-### RFC 4791 Requirements Matrix
+### P0 Actions (This Sprint) {#implementation-p0}
+
+#### Fix DAV Header
+
+**File**: [src/app/api/dav/method/options.rs](src/app/api/dav/method/options.rs)
+
+```rust
+// Current
+"DAV" => "1, 2, 3, calendar-access, addressbook"
+
+// Change to
+"DAV" => "1, 3, calendar-access, addressbook"
+```
+
+**Rationale**: LOCK/UNLOCK not implemented, remove from advertised compliance
+
+---
+
+#### Implement supported-report-set Property
+
+**Location**: [src/component/rfc/dav/core/property.rs](src/component/rfc/dav/core/property.rs)
+
+**Implementation Approach**:
+1. Add `supported-report-set` as computed live property
+2. Return based on collection type:
+   - **Calendar collections**: `calendar-query`, `calendar-multiget`, `sync-collection`
+   - **Addressbook collections**: `addressbook-query`, `addressbook-multiget`, `sync-collection`
+3. Return in PROPFIND responses
+
+```xml
+<D:supported-report-set xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:CR="urn:ietf:params:xml:ns:carddav">
+  <!-- For calendar collections -->
+  <D:supported-report>
+    <D:report><C:calendar-query/></D:report>
+  </D:supported-report>
+  <D:supported-report>
+    <D:report><C:calendar-multiget/></D:report>
+  </D:supported-report>
+  <!-- Similar for CardDAV -->
+</D:supported-report-set>
+```
+
+**Effort**: 4 hours
+**Testing**: Unit test for property generation, integration test for PROPFIND response
+
+---
+
+#### Add need-privileges Error Element
+
+**Location**: [src/app/api/dav/method/](src/app/api/dav/method/)
+
+**Current Pattern**:
+```rust
+return Err(AppError::Forbidden);
+```
+
+**Enhance to**:
+```rust
+return Err(AppError::ForbiddenWithPrivileges {
+    resources: vec![
+        (href: resource_href, privilege: "read".into()),
+    ],
+});
+```
+
+**Response Generation**:
+```rust
+<D:error>
+  <D:need-privileges>
+    <D:resource>
+      <D:href>/calendars/alice/work/</D:href>
+      <D:privilege><D:read/></D:privilege>
+    </D:resource>
+  </D:need-privileges>
+</D:error>
+```
+
+**Effort**: 6 hours
+**Scope**: All methods that check authorization (PUT, DELETE, PROPFIND, REPORT, etc.)
+
+---
+
+#### Add supported-calendar-component-set Property
+
+**Location**: [src/component/rfc/dav/core/property.rs](src/component/rfc/dav/core/property.rs)
+
+**Implementation**:
+```xml
+<C:supported-calendar-component-set xmlns:C="urn:ietf:params:xml:ns:caldav">
+  <C:comp name="VEVENT"/>
+  <C:comp name="VTODO"/>
+  <C:comp name="VJOURNAL"/>
+</C:supported-calendar-component-set>
+```
+
+**Effort**: 2 hours
+
+---
+
+### P1 Actions (Next Sprint) {#implementation-p1}
+
+#### Filter Capability Validation
+
+**Architecture**:
+1. Build filter capability registry at startup
+   ```rust
+   pub struct FilterCapabilities {
+       comp_filters: HashMap<&'static str, Vec<&'static str>>,  // VCALENDAR → [VEVENT, VTODO]
+       prop_filters: HashMap<&'static str, bool>,               // SUMMARY → true
+       param_filters: HashMap<&'static str, bool>,              // TZID → true
+   }
+   ```
+
+2. Add validation before query execution
+   ```rust
+   pub fn validate_filter(
+       filter: &CalendarFilter,
+       capabilities: &FilterCapabilities,
+   ) -> Result<(), FilterValidationError>;
+   ```
+
+3. Return `supported-filter` error response:
+   ```xml
+   <D:error>
+     <C:supported-filter>
+       <C:prop-filter name="X-CUSTOM-PROP"/>
+     </C:supported-filter>
+   </D:error>
+   ```
+
+**Effort**: 8 hours
+
+---
+
+#### Selective iCalendar Serialization
+
+**Current Pattern**:
+```rust
+serialize_ical_tree(tree) → full iCalendar → post-hoc filter
+```
+
+**New Pattern**:
+```rust
+fn serialize_with_selector(
+    tree: &ComponentTree,
+    selector: &CalendarDataRequest,
+) -> Result<String> {
+    // Traverse tree, only serialize requested components/properties
+    // Respects RFC 5545 line folding, escaping
+}
+```
+
+**Algorithm**:
+1. Start at VCALENDAR
+2. Include VERSION, PRODID (required by RFC 5545)
+3. For each requested component type:
+   - Traverse and serialize matching components
+   - For each component, only include requested properties
+4. Always include VTIMEZONE if referenced by TZID
+5. Output with RFC 5545 compliance (line folding, escaping)
+
+**Effort**: 12 hours (complex tree traversal + RFC output generation)
+
+---
+
+## 17. Specific RFC Requirements Matrix {#requirements-matrix}
+
+### RFC 4791 Requirements Matrix {#requirements-caldav}
 
 | Req Type | Feature | Status | Phase |
 |----------|---------|--------|-------|
@@ -1162,7 +1788,7 @@ DAV: 1, 2, 3, calendar-access, addressbook-access
 | SHOULD | Support calendar-data filtering | ⚠️ Phase 2 | 2 |
 | SHOULD | Support text-match | ⚠️ Phase 1 | 1 |
 
-### RFC 3744 Minimal Profile MUST Requirements
+### RFC 3744 Minimal Profile Requirements {#requirements-acl}
 
 | Req Type | Feature | Status | Phase |
 |----------|---------|--------|-------|
@@ -1175,7 +1801,7 @@ DAV: 1, 2, 3, calendar-access, addressbook-access
 
 ---
 
-## References
+## 18. References {#references}
 
 - RFC 4791 - CalDAV (Calendar Access Protocol) - §1-9, 14 detailed review
 - RFC 6352 - CardDAV (vCard Extensions) - §3, 5-10 detailed review
@@ -1184,7 +1810,7 @@ DAV: 1, 2, 3, calendar-access, addressbook-access
 - RFC 5545 - iCalendar Format - §3.6, 3.8 detailed review
 - RFC 6350 - vCard Format 4.0 - §6 detailed review
 - RFC 5689 - Extended MKCOL for WebDAV
-- RFC 6578 - Sync Collection (Incremental Sync)  - §3, 4 detailed review
+- RFC 6578 - Sync Collection (Incremental Sync) - §3, 4 detailed review
 - RFC 4790 - LDAP Collation (i;unicode-casemap)
 - RFC 7232 - HTTP Conditional Requests
 - RFC 7231 - HTTP Semantics
@@ -1192,8 +1818,20 @@ DAV: 1, 2, 3, calendar-access, addressbook-access
 
 ---
 
-**Document Version**: 2.0 (Second Pass - Deep RFC Analysis)
-**Last Updated**: 2026-01-29
-**Status**: ✅ Complete with architectural assessment
-**Architectural Verdict**: ✅ No redesign needed - Protocol layer fixes only
-**Path to 85%**: ~46 hours of additive implementation
+**Document Version**: 3.0 (Comprehensive Merged Review)  
+**Last Updated**: 2026-01-29  
+**Status**: ✅ Complete with architectural assessment and deep analysis  
+**Architectural Verdict**: ✅ No redesign needed - Protocol layer fixes only  
+**Path to 85%**: ~40 hours of additive implementation
+
+---
+
+## Conclusion
+
+**Shuriken's architectural decisions are fundamentally sound for RFC compliance.** The UUID-based storage, entity/instance separation, and component tree structure create a robust foundation.
+
+The gaps are **purely at the protocol layer**: clients cannot discover capabilities because properties aren't returned, clients cannot understand why operations fail because error responses lack required XML elements, clients cannot optimize queries because filter capabilities aren't advertised.
+
+**None of these require architectural redesign.** With focused implementation of ~40 hours of protocol-layer code, Shuriken can achieve 85%+ RFC compliance across CalDAV, CardDAV, WebDAV, and ACL.
+
+The path forward is clear and manageable.

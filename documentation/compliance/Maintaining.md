@@ -8,9 +8,8 @@ These instructions guide LLM assistants in maintaining the Shuriken RFC complian
 
 ## Document Ecosystem
 
-### Primary Document: RFC_COMPLIANCE_REVIEW.md
+### Primary Document: Complete Documentation.md
 **Purpose**: Deep technical reference for RFC compliance analysis  
-**Length**: ~60 KB  
 **Audience**: Architects, developers, RFC reviewers  
 **Update Frequency**: When compliance analysis changes or phases complete  
 **Immutable Sections**: 1-7 (archived analysis from initial/second pass)  
@@ -26,9 +25,8 @@ These instructions guide LLM assistants in maintaining the Shuriken RFC complian
 
 ---
 
-### Executive Document: COMPLIANCE_SUMMARY.md
+### Executive Document: Summary.md
 **Purpose**: 10-minute overview for stakeholders and decision makers  
-**Length**: ~9 KB  
 **Audience**: Project managers, leads, stakeholders  
 **Update Frequency**: When overall compliance % changes by >5%  
 **Stability**: Relatively stable; reflects high-level status
@@ -44,24 +42,8 @@ These instructions guide LLM assistants in maintaining the Shuriken RFC complian
 
 ---
 
-### Developer Document: IMPLEMENTATION_PATTERNS.md
-**Purpose**: Concrete code examples and deployment guidance  
-**Length**: ~23 KB  
-**Audience**: Developers implementing fixes  
-**Update Frequency**: When patterns are implemented or new patterns discovered  
-**Stability**: Relatively stable; patterns remain valid after implementation
-
-**Structure**:
-- Pattern 1-8: Code examples (mark "IMPLEMENTED" in title when done)
-- Integration Examples (update with real file paths as code is written)
-- Deployment Checklist (update as phases complete)
-- Rollout Plan (update with actual dates/phases completed)
-
----
-
-### Navigation Document: COMPLIANCE_INDEX.md
+### Navigation Document: Readme.md
 **Purpose**: Quick reference and topic navigation  
-**Length**: ~8.5 KB  
 **Audience**: Anyone looking for specific information  
 **Update Frequency**: When major sections are added or compliance changes significantly  
 **Stability**: Generally stable
@@ -74,9 +56,8 @@ These instructions guide LLM assistants in maintaining the Shuriken RFC complian
 
 ---
 
-### Master Index: README_RFC_COMPLIANCE.md
+### Master Index: Implementation Guide.md
 **Purpose**: Entry point and master index for all compliance docs  
-**Length**: ~9 KB  
 **Audience**: All roles  
 **Update Frequency**: When documents are added/removed or major milestones hit  
 **Stability**: Stable; primary index
@@ -98,18 +79,18 @@ These instructions guide LLM assistants in maintaining the Shuriken RFC complian
 
 **Files to Update**:
 
-1. **RFC_COMPLIANCE_REVIEW.md**
+1. **Complete Documentation.md**
    - Section 11, Roadmap table: Mark "✅ COMPLETE" for Phase 0
    - Update overall compliance % (e.g., 70% → 72%)
    - If new issues discovered during implementation, add to Section 9
 
-2. **COMPLIANCE_SUMMARY.md**
+2. **Summary.md**
    - Update "Implementation Path" section: Move Phase 0 to completed
    - Update compliance % at top
    - Update "Critical Action Items": Remove completed Phase 0 items, promote Phase 1
    - Update compliance by layer %
 
-3. **README_RFC_COMPLIANCE.md**
+3. **Implementation Guide.md**
    - Roadmap table: Update Phase 0 to show completion
    - Update overall % in intro and roadmap
    - Update "Next Actions" timeline if ahead/behind schedule
@@ -127,7 +108,7 @@ These instructions guide LLM assistants in maintaining the Shuriken RFC complian
 
 **Files to Update**:
 
-1. **RFC_COMPLIANCE_REVIEW.md**
+1. **Complete Documentation.md**
    - Section 9 "Missing RFC Requirements": Add new requirement with RFC section
    - Update compliance % if this is a MUST requirement
    - Section 11 "Implementation Roadmap": Add to appropriate phase
@@ -137,7 +118,7 @@ These instructions guide LLM assistants in maintaining the Shuriken RFC complian
    - If this can be a new pattern: Add Pattern 9 with code example
    - Add to relevant phase's implementation details
 
-3. **COMPLIANCE_SUMMARY.md**
+3. **Summary.md**
    - If compliance % changes: Update top-level %
    - Update "What Still Needs Work" if this is critical
 
@@ -155,11 +136,11 @@ These instructions guide LLM assistants in maintaining the Shuriken RFC complian
    - Update integration example with actual code location
    - Mark deployment checklist item as complete
 
-2. **RFC_COMPLIANCE_REVIEW.md**
+2. **Complete Documentation.md**
    - Section 8 "Architectural Alignment": Note implementation status
    - Section 11 "Roadmap": Mark related items in current phase as complete
 
-3. **README_RFC_COMPLIANCE.md**
+3. **Implementation Guide.md**
    - If this moves compliance %, update roadmap table
 
 ---
@@ -170,11 +151,11 @@ These instructions guide LLM assistants in maintaining the Shuriken RFC complian
 
 **Files to Update**:
 
-1. **RFC_COMPLIANCE_REVIEW.md**
+1. **Complete Documentation.md**
    - Section 8 "Architectural Alignment": Update verdict on that decision
    - Add reference to validation (RFC section, PR number, analysis date)
 
-2. **COMPLIANCE_SUMMARY.md**
+2. **Summary.md**
    - Update "Why Design Choices Work" if any validation affects other docs
 
 ---
@@ -185,12 +166,12 @@ These instructions guide LLM assistants in maintaining the Shuriken RFC complian
 
 **Files to Update**:
 
-1. **RFC_COMPLIANCE_REVIEW.md**
+1. **Complete Documentation.md**
    - Add new section (e.g., "Service Discovery Compliance" for RFC 6764)
    - Section 12 "Matrices": Add RFC 6764 requirements table
    - Update overall compliance % if applicable
 
-2. **README_RFC_COMPLIANCE.md**
+2. **Implementation Guide.md**
    - Update roadmap if new phase needed
    - Update quick decision matrix if verdict changes
 
@@ -204,9 +185,9 @@ These instructions guide LLM assistants in maintaining the Shuriken RFC complian
 ### Compliance Percentages
 
 **Rule 1**: Update all 3 locations simultaneously
-- RFC_COMPLIANCE_REVIEW.md (section intro + roadmap table)
-- COMPLIANCE_SUMMARY.md (executive summary + "Compliance by Layer")
-- README_RFC_COMPLIANCE.md (intro + roadmap table)
+- Complete Documentation.md (section intro + roadmap table)
+- Summary.md (executive summary + "Compliance by Layer")
+- Implementation Guide.md (intro + roadmap table)
 
 **Rule 2**: Show progression in tables
 - Before: 70% → After: 72% (show exact delta)
@@ -221,8 +202,8 @@ These instructions guide LLM assistants in maintaining the Shuriken RFC complian
 ### Cross-References
 
 **Rule 1**: Link between documents
-- When RFC_COMPLIANCE_REVIEW Section 11 updates, reference it in README_RFC_COMPLIANCE roadmap
-- When COMPLIANCE_SUMMARY mentions "See implementation details", link to RFC_COMPLIANCE_REVIEW section
+- When Complete Documentation Section 11 updates, reference it in Implementation Guide roadmap
+- When Summary mentions "See implementation details", link to Complete Documentation section
 
 **Rule 2**: Maintain consistency
 - All references to "Phase 0" use same name everywhere
@@ -230,10 +211,10 @@ These instructions guide LLM assistants in maintaining the Shuriken RFC complian
 - All phase completion dates match across documents
 
 **Rule 3**: Don't duplicate detail
-- RFC_COMPLIANCE_REVIEW = source of truth for technical details
-- COMPLIANCE_SUMMARY = high-level summary of RFC_COMPLIANCE_REVIEW
-- IMPLEMENTATION_PATTERNS = code examples referenced from RFC_COMPLIANCE_REVIEW
-- README_RFC_COMPLIANCE = index only, not original content
+- Complete Documentation = source of truth for technical details
+- Summary = high-level summary of Complete Documentation
+- IMPLEMENTATION_PATTERNS = code examples referenced from Complete Documentation
+- Implementation Guide = index only, not original content
 
 ---
 
@@ -258,12 +239,12 @@ These instructions guide LLM assistants in maintaining the Shuriken RFC complian
 
 ### Tone and Voice
 
-**RFC_COMPLIANCE_REVIEW.md**: Technical, precise, reference-oriented
+**Complete Documentation.md**: Technical, precise, reference-oriented
 - "RFC 4791 requires supporting DAV:supported-report-set property"
 - Use tables for comparison
 - Include section numbers and quotes
 
-**COMPLIANCE_SUMMARY.md**: Executive, accessible, action-oriented
+**Summary.md**: Executive, accessible, action-oriented
 - "Architecture is sound; 46 hours of work reaches 85% compliance"
 - Use bullets for actions
 - Focus on what matters to decision makers
@@ -294,7 +275,7 @@ These instructions guide LLM assistants in maintaining the Shuriken RFC complian
 - Don't exceed Level 4
 
 **Links**:
-- Internal: `[RFC_COMPLIANCE_REVIEW.md](RFC_COMPLIANCE_REVIEW.md)` (relative paths)
+- Internal: `[Complete Documentation.md](Complete Documentation.md)` (relative paths)
 - GitHub: `[src/component/auth/mod.rs](src/component/auth/mod.rs)`
 - External RFCs: `[RFC 4791](https://tools.ietf.org/html/rfc4791)`
 
@@ -326,10 +307,10 @@ These instructions guide LLM assistants in maintaining the Shuriken RFC complian
 ```
 docs(rfc): [Component] Update compliance status - Phase X completion
 
-- Update RFC_COMPLIANCE_REVIEW compliance % (70% → 72%)
+- Update Complete Documentation compliance % (70% → 72%)
 - Mark Phase 0 complete in roadmap
-- Update COMPLIANCE_SUMMARY critical action items
-- Update README_RFC_COMPLIANCE progress table
+- Update Summary critical action items
+- Update Implementation Guide progress table
 
 RFC: RFC 4791 §5.2 (property generators)
 Phase: 0/4
@@ -361,7 +342,7 @@ Compliance: 70% → 72%
 
 **Scenario**: Phase 1 (property generators + precondition errors) is merged
 
-**Step 1: RFC_COMPLIANCE_REVIEW.md**
+**Step 1: Complete Documentation.md**
 ```
 Old (Section 11 Roadmap Table):
 | Phase 1 | 8h | 80% | Property generators, precondition error XML |
@@ -370,7 +351,7 @@ New:
 | Phase 1 | 8h | ✅ Complete | Property generators (RFC 4791 §5.2), precondition errors (RFC 4791 §1.3.2) |
 ```
 
-**Step 2: COMPLIANCE_SUMMARY.md**
+**Step 2: Summary.md**
 ```
 Old (Implementation Path):
 - Phase 1 (IN PROGRESS): Property generators, precondition error XML - Estimated 1 week
@@ -389,12 +370,12 @@ Old: 72% (Phase 0 complete)
 New: 80% (Phase 0 + 1 complete)
 
 Update in:
-- RFC_COMPLIANCE_REVIEW.md (intro)
-- COMPLIANCE_SUMMARY.md (executive summary)
-- README_RFC_COMPLIANCE.md (intro + roadmap)
+- Complete Documentation.md (intro)
+- Summary.md (executive summary)
+- Implementation Guide.md (intro + roadmap)
 ```
 
-**Step 4: README_RFC_COMPLIANCE.md**
+**Step 4: Implementation Guide.md**
 ```
 Old Roadmap Table:
 | Phase 1 | 8h | 80% | Property generators, precondition error XML |
@@ -457,7 +438,7 @@ When updating RFC compliance docs:
    - If no: Update only affected sections
 
 3. **Is this a new RFC requirement or existing?**
-   - If new: Add to Section 9 (RFC_COMPLIANCE_REVIEW) first
+   - If new: Add to Section 9 (Complete Documentation) first
    - If existing: Update status of existing requirement
 
 4. **Does this affect the implementation roadmap?**
@@ -470,7 +451,7 @@ When updating RFC compliance docs:
 
 ---
 
-## Maintaining the Master Index (README_RFC_COMPLIANCE.md)
+## Maintaining the Master Index (Implementation Guide.md)
 
 **Update for**:
 - New documents added to ecosystem
@@ -480,7 +461,7 @@ When updating RFC compliance docs:
 
 **Don't update for**:
 - Individual pattern implementations (those go in IMPLEMENTATION_PATTERNS.md)
-- Minor RFC requirement discoveries (those go in RFC_COMPLIANCE_REVIEW.md)
+- Minor RFC requirement discoveries (those go in Complete Documentation.md)
 - Small compliance % changes (<5%)
 
 ---
@@ -490,8 +471,8 @@ When updating RFC compliance docs:
 When a future LLM is asked to update these documents:
 
 1. **First**: Understand which document is the authority for each topic
-   - RFC_COMPLIANCE_REVIEW = technical authority
-   - COMPLIANCE_SUMMARY = executive summary of above
+   - Complete Documentation = technical authority
+   - Summary = executive summary of above
    - Others = derived/supporting
 
 2. **Second**: Verify consistency across all related documents
