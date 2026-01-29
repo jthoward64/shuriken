@@ -30,7 +30,12 @@ async fn put_creates_calendar_object() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Calendar, "testcal", Some("Personal"))
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "testcal",
+            Some("Personal"),
+        )
         .await
         .expect("Failed to seed collection");
 
@@ -74,7 +79,12 @@ async fn put_creates_vcard() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Addressbook, "contacts", Some("Contacts"))
+        .seed_collection(
+            principal_id,
+            CollectionType::Addressbook,
+            "contacts",
+            Some("Contacts"),
+        )
         .await
         .expect("Failed to seed collection");
 
@@ -130,7 +140,12 @@ async fn put_populates_cal_index_and_occurrences() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Calendar, "indexcal", Some("Index Calendar"))
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "indexcal",
+            Some("Index Calendar"),
+        )
         .await
         .expect("Failed to seed collection");
 
@@ -188,7 +203,7 @@ async fn put_populates_cal_index_and_occurrences() {
 
     assert_eq!(component_type, "VEVENT");
     assert_eq!(idx_uid.as_deref(), Some(uid));
-    
+
     // Check summary is in metadata JSONB
     if let Some(meta) = metadata {
         let idx_summary = meta.get("summary").and_then(|v| v.as_str());
@@ -234,7 +249,12 @@ async fn put_populates_card_index() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Addressbook, "indexbook", Some("Index Book"))
+        .seed_collection(
+            principal_id,
+            CollectionType::Addressbook,
+            "indexbook",
+            Some("Index Book"),
+        )
         .await
         .expect("Failed to seed collection");
 
@@ -281,7 +301,7 @@ async fn put_populates_card_index() {
 
     assert_eq!(idx_uid.as_deref(), Some(uid));
     assert_eq!(idx_fn.as_deref(), Some(fn_name));
-    
+
     // Verify data JSONB is present (fields may not be present if vcard is minimal)
     assert!(idx_data.is_some(), "card_index.data should be populated");
     if let Some(data) = idx_data {

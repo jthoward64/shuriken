@@ -135,7 +135,12 @@ async fn delete_calendar_object() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Calendar, "personal", Some("Personal"))
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "personal",
+            Some("Personal"),
+        )
         .await
         .expect("Failed to seed collection");
 
@@ -339,7 +344,12 @@ async fn delete_cleans_card_index() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Addressbook, "clean-book", None)
+        .seed_collection(
+            principal_id,
+            CollectionType::Addressbook,
+            "clean-book",
+            None,
+        )
         .await
         .expect("Failed to seed collection");
 
@@ -648,7 +658,12 @@ async fn delete_collection() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Calendar, "to-delete", Some("To Delete"))
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "to-delete",
+            Some("To Delete"),
+        )
         .await
         .expect("Failed to seed collection");
 
