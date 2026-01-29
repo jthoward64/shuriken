@@ -5,11 +5,16 @@
 use crate::component::db::connection::DbConnection;
 use crate::component::db::query::caldav::filter::find_matching_instances;
 use crate::component::db::query::report_property::build_instance_properties;
+use crate::component::db::schema::cal_index;
 use crate::component::model::dav::instance::DavInstance;
 use crate::component::rfc::dav::core::{
     CalendarMultiget, CalendarQuery, Href, Multistatus, PropertyName, PropstatResponse,
     RecurrenceExpansion,
 };
+use chrono::TimeDelta;
+use diesel::prelude::*;
+use diesel_async::RunQueryDsl;
+use rrule::{RRule, Tz, Unvalidated};
 
 /// ## Summary
 /// Executes a calendar-query report.
@@ -125,44 +130,89 @@ pub async fn execute_calendar_multiget(
 async fn execute_calendar_query_with_expansion(
     conn: &mut DbConnection<'_>,
     instances: Vec<DavInstance>,
-    _time_range: &crate::component::rfc::dav::core::TimeRange,
-    _expansion_mode: RecurrenceExpansion,
+    time_range: &crate::component::rfc::dav::core::TimeRange,
+    expansion_mode: RecurrenceExpansion,
     properties: &[PropertyName],
 ) -> anyhow::Result<Multistatus> {
-    // TODO: Implement on-the-fly RRULE expansion for recurring events.
-    // This was previously handled by pre-expanded cal_occurrence table,
-    // which has been removed. Need to implement RFC 5545 RRULE expansion
-    // during query execution instead.
-    //
-    // Implementation approach:
-    // 1. For each instance, check if cal_index.rrule_text IS NOT NULL
-    // 2. If recurring:
-    //    a. Parse rrule_text using rrule crate
-    //    b. Parse EXDATE/EXRULE/RDATE from metadata JSONB if present
-    //    c. Build RRuleSet with dtstart from cal_index.dtstart_utc
-    //    d. Expand occurrences within time_range using .into_iter()
-    //    e. For each occurrence:
-    //       - Generate synthetic instance with recurrence_id set
-    //       - Check for RECURRENCE-ID exception instances (override)
-    //       - Build response with occurrence-specific properties
-    // 3. Handle expansion_mode:
-    //    - Expand: Return one response per occurrence
-    //    - LimitRecurrenceSet: Return master event + exceptions in range
-    //
-    // Considerations:
-    // - RECURRENCE-ID exceptions: Check cal_index for instances with
-    //   matching entity_id and non-null recurrence_id_utc
-    // - Timezone handling: Parse VTIMEZONE from dav_component tree
-    // - Performance: Limit expansion for infinite recurrences
-    // - Response format: Each occurrence needs unique href with RECURRENCE-ID
-    //
-    // For now, this returns events without expansion.
     let mut multistatus = Multistatus::new();
     for instance in instances {
-        let href = Href::new(format!("/item-{}", instance.slug));
-        let props = build_instance_properties(conn, &instance, properties).await?;
-        let response = PropstatResponse::ok(href, props);
-        multistatus.add_response(response);
+        let cal_index_row: Option<(Option<String>, Option<chrono::DateTime<chrono::Utc>>)> =
+            match cal_index::table
+                .filter(cal_index::entity_id.eq(instance.entity_id))
+                .filter(cal_index::recurrence_id_utc.is_null())
+                .select((cal_index::rrule_text, cal_index::dtstart_utc))
+                .first::<(Option<String>, Option<chrono::DateTime<chrono::Utc>>)>(conn)
+                .await
+            {
+                Ok(row) => Some(row),
+                Err(diesel::result::Error::NotFound) => None,
+                Err(err) => return Err(anyhow::anyhow!(err)),
+            };
+
+        if let Some((Some(rrule_text), Some(dtstart_utc))) = cal_index_row {
+            let rrule: rrule::RRule<Unvalidated> = match rrule_text.parse::<RRule<Unvalidated>>() {
+                Ok(rule) => rule,
+                Err(_) => {
+                    let href = Href::new(format!("/item-{}", instance.slug));
+                    let props = build_instance_properties(conn, &instance, properties).await?;
+                    let response = PropstatResponse::ok(href, props);
+                    multistatus.add_response(response);
+                    continue;
+                }
+            };
+
+            let dt_start = dtstart_utc.with_timezone(&Tz::UTC);
+            let mut rrule_set: rrule::RRuleSet = match rrule.build(dt_start) {
+                Ok(set) => set,
+                Err(_) => {
+                    let href = Href::new(format!("/item-{}", instance.slug));
+                    let props = build_instance_properties(conn, &instance, properties).await?;
+                    let response = PropstatResponse::ok(href, props);
+                    multistatus.add_response(response);
+                    continue;
+                }
+            };
+
+            if let Some(start) = time_range.start {
+                let inclusive_start = start - TimeDelta::seconds(1);
+                rrule_set = rrule_set.after(inclusive_start.with_timezone(&Tz::UTC));
+            }
+
+            if let Some(end) = time_range.end {
+                rrule_set = rrule_set.before(end.with_timezone(&Tz::UTC));
+            }
+
+            let occurrences: Vec<chrono::DateTime<rrule::Tz>> = rrule_set.all(u16::MAX).dates;
+            if occurrences.is_empty() {
+                continue;
+            }
+
+            match expansion_mode {
+                RecurrenceExpansion::Expand => {
+                    for occurrence in occurrences {
+                        let recurrence_id = occurrence.with_timezone(&chrono::Utc).to_rfc3339();
+                        let href = Href::new(format!(
+                            "/item-{}?recurrence-id={}",
+                            instance.slug, recurrence_id
+                        ));
+                        let props = build_instance_properties(conn, &instance, properties).await?;
+                        let response = PropstatResponse::ok(href, props);
+                        multistatus.add_response(response);
+                    }
+                }
+                RecurrenceExpansion::LimitRecurrenceSet => {
+                    let href = Href::new(format!("/item-{}", instance.slug));
+                    let props = build_instance_properties(conn, &instance, properties).await?;
+                    let response = PropstatResponse::ok(href, props);
+                    multistatus.add_response(response);
+                }
+            }
+        } else {
+            let href = Href::new(format!("/item-{}", instance.slug));
+            let props = build_instance_properties(conn, &instance, properties).await?;
+            let response = PropstatResponse::ok(href, props);
+            multistatus.add_response(response);
+        }
     }
     Ok(multistatus)
 }

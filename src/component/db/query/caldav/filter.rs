@@ -10,8 +10,10 @@ use crate::component::model::dav::instance::DavInstance;
 use crate::component::rfc::dav::core::{
     CalendarFilter, CalendarQuery, CompFilter, MatchType, ParamFilter, TimeRange,
 };
+use chrono::TimeDelta;
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
+use rrule::{RRule, Tz, Unvalidated};
 
 /// ## Summary
 /// Finds instances in a collection that match the calendar-query filter.
@@ -156,27 +158,51 @@ async fn apply_comp_filter(
                 .await?;
         }
 
-        // TODO: Query recurring events with on-the-fly RRULE expansion
-        // Previously queried cal_occurrence table, which has been removed.
-        //
-        // Implementation approach:
-        // 1. Query cal_index for records with rrule_text IS NOT NULL in time range
-        // 2. For each recurring event:
-        //    a. Parse rrule_text using rrule crate
-        //    b. Build RRuleSet with dtstart from cal_index.dtstart_utc
-        //    c. Call .into_iter().take(N) where N is reasonable limit (e.g., 1000)
-        //    d. Filter occurrences that fall within time_range
-        //    e. Handle RECURRENCE-ID exceptions (check for instances with matching recurrence_id_utc)
-        // 3. Collect entity_ids of events with at least one occurrence in range
-        //
-        // Considerations:
-        // - EXDATE/EXRULE: Not stored separately, need to parse from metadata JSONB
-        // - RDATE: Not stored separately, need to parse from metadata JSONB
-        // - Timezone handling: Convert all times to UTC for comparison
-        // - Performance: May need to limit expansion for infinite recurrences
-        //
-        // For now, skip recurring event filtering entirely.
-        let recurring_ids: Vec<uuid::Uuid> = Vec::new();
+        let recurring_rows = query
+            .filter(cal_index::rrule_text.is_not_null())
+            .filter(cal_index::dtstart_utc.is_not_null())
+            .select((
+                cal_index::entity_id,
+                cal_index::rrule_text,
+                cal_index::dtstart_utc,
+            ))
+            .load::<(
+                uuid::Uuid,
+                Option<String>,
+                Option<chrono::DateTime<chrono::Utc>>,
+            )>(conn)
+            .await?;
+
+        let recurring_ids: Vec<uuid::Uuid> = recurring_rows
+            .into_iter()
+            .filter_map(|(entity_id, rrule_text, dtstart_utc)| {
+                let rrule_text = rrule_text?;
+                let dtstart_utc = dtstart_utc?;
+
+                let rrule = rrule_text.parse::<RRule<Unvalidated>>().ok()?;
+                let dt_start = dtstart_utc.with_timezone(&Tz::UTC);
+                let mut rrule_set: rrule::RRuleSet = match rrule.build(dt_start) {
+                    Ok(set) => set,
+                    Err(_) => return None,
+                };
+
+                if let Some(range_start) = start {
+                    let inclusive_start = range_start - TimeDelta::seconds(1);
+                    rrule_set = rrule_set.after(inclusive_start.with_timezone(&Tz::UTC));
+                }
+
+                if let Some(range_end) = end {
+                    rrule_set = rrule_set.before(range_end.with_timezone(&Tz::UTC));
+                }
+
+                let occurrences: Vec<chrono::DateTime<rrule::Tz>> = rrule_set.all(u16::MAX).dates;
+                if occurrences.is_empty() {
+                    None
+                } else {
+                    Some(entity_id)
+                }
+            })
+            .collect();
 
         // Union non-recurring and recurring event IDs
         let mut combined_ids = non_recurring_ids;

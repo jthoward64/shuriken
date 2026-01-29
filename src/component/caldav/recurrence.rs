@@ -1,14 +1,16 @@
 //! Helper functions for extracting and processing recurrence data from iCalendar components.
 
+use crate::component::error::{AppError, AppResult};
 use crate::component::rfc::ical::core::{Component, DateTime as IcalDateTime};
 use crate::component::rfc::ical::expand::TimeZoneResolver;
 use chrono::{DateTime, NaiveDateTime, Utc};
+use rrule::{RRule, RRuleSet, Tz, Unvalidated};
 
 /// Extracted recurrence data from a VEVENT component.
 #[derive(Debug, Clone)]
 pub struct RecurrenceData {
-    /// RRULE text (without "RRULE:" prefix).
-    pub rrule: String,
+    /// Validated recurrence rule set.
+    pub rrule_set: RRuleSet,
     /// DTSTART in UTC.
     pub dtstart_utc: DateTime<Utc>,
     /// Event duration (DTEND - DTSTART or DURATION).
@@ -29,12 +31,12 @@ pub struct RecurrenceData {
 ///
 /// ## Errors
 ///
-/// Returns `None` if:
+/// Returns `Ok(None)` if:
 /// - Component has no RRULE property
 /// - DTSTART is missing or invalid
 /// - DTEND/DURATION is missing or invalid
 #[must_use]
-pub fn extract_recurrence_data(component: &Component) -> Option<RecurrenceData> {
+pub fn extract_recurrence_data(component: &Component) -> AppResult<Option<RecurrenceData>> {
     let mut resolver = TimeZoneResolver::new();
     extract_recurrence_data_with_resolver(component, &mut resolver)
 }
@@ -47,7 +49,7 @@ pub fn extract_recurrence_data(component: &Component) -> Option<RecurrenceData> 
 ///
 /// ## Errors
 ///
-/// Returns `None` if:
+/// Returns `Ok(None)` if:
 /// - Component has no RRULE property
 /// - DTSTART is missing or invalid
 /// - DTEND/DURATION is missing or invalid
@@ -55,50 +57,72 @@ pub fn extract_recurrence_data(component: &Component) -> Option<RecurrenceData> 
 pub fn extract_recurrence_data_with_resolver(
     component: &Component,
     resolver: &mut TimeZoneResolver,
-) -> Option<RecurrenceData> {
+) -> AppResult<Option<RecurrenceData>> {
     tracing::trace!(
         component_name = %component.name,
         property_count = component.properties.len(),
         "Extracting recurrence data from component"
     );
-    
+
     // Check for RRULE property
     let rrule_prop = match component.get_property("RRULE") {
         Some(prop) => prop,
         None => {
             tracing::trace!("RRULE property not found");
-            return None;
+            return Ok(None);
         }
     };
-    
+
     // RRULE can be either Value::Recur or Value::Text
     let rrule_text = match &rrule_prop.value {
         crate::component::rfc::ical::core::Value::Recur(rrule) => rrule.to_string(),
         crate::component::rfc::ical::core::Value::Text(text) => text.clone(),
         _ => {
             tracing::trace!("RRULE property has unexpected value type");
-            return None;
+            return Ok(None);
         }
     };
     tracing::trace!(rrule = %rrule_text, "Found RRULE");
 
     // Extract DTSTART
-    let dtstart_prop = component.get_property("DTSTART")?;
+    let dtstart_prop = match component.get_property("DTSTART") {
+        Some(prop) => prop,
+        None => return Ok(None),
+    };
     let tzid = dtstart_prop.get_param_value("TZID").map(String::from);
-    let dtstart_ical = dtstart_prop.as_datetime()?;
-    let dtstart_utc = ical_datetime_to_utc_with_resolver(dtstart_ical, tzid.as_deref(), resolver)?;
+    let dtstart_ical = match dtstart_prop.as_datetime() {
+        Some(dt) => dt,
+        None => return Ok(None),
+    };
+    let dtstart_utc =
+        match ical_datetime_to_utc_with_resolver(dtstart_ical, tzid.as_deref(), resolver) {
+            Some(dt) => dt,
+            None => return Ok(None),
+        };
     tracing::trace!(dtstart = %dtstart_utc, "Extracted DTSTART");
 
     // Calculate duration from DTEND or DURATION
     let duration = if let Some(dtend_prop) = component.get_property("DTEND") {
-        let dtend_ical = dtend_prop.as_datetime()?;
+        let dtend_ical = match dtend_prop.as_datetime() {
+            Some(dt) => dt,
+            None => return Ok(None),
+        };
         let dtend_tzid = dtend_prop.get_param_value("TZID");
-        let dtend_utc = ical_datetime_to_utc_with_resolver(dtend_ical, dtend_tzid, resolver)?;
+        let dtend_utc = match ical_datetime_to_utc_with_resolver(dtend_ical, dtend_tzid, resolver) {
+            Some(dt) => dt,
+            None => return Ok(None),
+        };
         let dur = dtend_utc.signed_duration_since(dtstart_utc);
-        tracing::trace!(duration_seconds = dur.num_seconds(), "Calculated duration from DTEND");
+        tracing::trace!(
+            duration_seconds = dur.num_seconds(),
+            "Calculated duration from DTEND"
+        );
         dur
     } else if let Some(duration_prop) = component.get_property("DURATION") {
-        let duration_ical = duration_prop.as_duration()?;
+        let duration_ical = match duration_prop.as_duration() {
+            Some(dur) => dur,
+            None => return Ok(None),
+        };
         let dur = ical_duration_to_chrono(duration_ical);
         tracing::trace!(duration_seconds = dur.num_seconds(), "Extracted DURATION");
         dur
@@ -109,7 +133,7 @@ pub fn extract_recurrence_data_with_resolver(
     };
 
     // Extract EXDATE values
-    let exdates = component
+    let exdates: Vec<DateTime<Utc>> = component
         .get_properties("EXDATE")
         .iter()
         .filter_map(|prop| {
@@ -120,7 +144,7 @@ pub fn extract_recurrence_data_with_resolver(
         .collect();
 
     // Extract RDATE values
-    let rdates = component
+    let rdates: Vec<DateTime<Utc>> = component
         .get_properties("RDATE")
         .iter()
         .filter_map(|prop| {
@@ -130,14 +154,39 @@ pub fn extract_recurrence_data_with_resolver(
         })
         .collect();
 
-    Some(RecurrenceData {
-        rrule: rrule_text,
+    let rrule = rrule_text
+        .parse::<RRule<Unvalidated>>()
+        .map_err(|err| AppError::ValidationError(err.to_string()))?;
+    let dt_start = dtstart_utc.with_timezone(&Tz::UTC);
+    let mut rrule_set = rrule.build(dt_start).map_err(|err| match err {
+        rrule::RRuleError::ValidationError(validation) => {
+            AppError::RRuleValidationError(validation)
+        }
+        _ => AppError::ValidationError(err.to_string()),
+    })?;
+
+    if !rdates.is_empty() {
+        let rdates_tz: Vec<chrono::DateTime<Tz>> =
+            rdates.iter().map(|dt| dt.with_timezone(&Tz::UTC)).collect();
+        rrule_set = rrule_set.set_rdates(rdates_tz);
+    }
+
+    if !exdates.is_empty() {
+        let exdates_tz: Vec<chrono::DateTime<Tz>> = exdates
+            .iter()
+            .map(|dt| dt.with_timezone(&Tz::UTC))
+            .collect();
+        rrule_set = rrule_set.set_exdates(exdates_tz);
+    }
+
+    Ok(Some(RecurrenceData {
+        rrule_set,
         dtstart_utc,
         duration,
         exdates,
         rdates,
         tzid,
-    })
+    }))
 }
 
 /// ## Summary
@@ -297,9 +346,14 @@ mod tests {
             raw_value: "20260101T110000Z".to_string(),
         });
 
-        let data = extract_recurrence_data(&component).expect("should extract data");
+        let data = extract_recurrence_data(&component)
+            .expect("should extract data")
+            .expect("should have recurrence data");
 
-        assert_eq!(data.rrule, "FREQ=DAILY;COUNT=5");
+        assert_eq!(
+            data.rrule_set.to_string(),
+            "DTSTART:20260101T100000Z\nRRULE:FREQ=DAILY;COUNT=5"
+        );
         assert_eq!(data.duration, chrono::TimeDelta::hours(1));
         assert_eq!(data.exdates.len(), 0);
         assert_eq!(data.rdates.len(), 0);
@@ -308,7 +362,8 @@ mod tests {
     #[test]
     fn test_extract_recurrence_data_no_rrule() {
         let component = Component::new(ComponentKind::Event);
-        assert!(extract_recurrence_data(&component).is_none());
+        let result = extract_recurrence_data(&component).expect("no error");
+        assert!(result.is_none());
     }
 
     #[test]
@@ -351,10 +406,26 @@ mod tests {
         register_fixed_timezone(&mut resolver);
 
         let data = extract_recurrence_data_with_resolver(&component, &mut resolver)
-            .expect("should extract data");
+            .expect("should extract data")
+            .expect("should have recurrence data");
 
         let expected = Utc.with_ymd_and_hms(2026, 1, 15, 8, 0, 0).unwrap();
         assert_eq!(data.dtstart_utc, expected);
         assert_eq!(data.duration, chrono::TimeDelta::hours(1));
+    }
+}
+
+#[cfg(test)]
+mod rrule_cases {
+    include!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/rrule_cases_data/mod.rs"
+    ));
+
+    #[test]
+    fn rrule_cases_unit() {
+        for case in rrule_cases() {
+            assert_case(&case);
+        }
     }
 }

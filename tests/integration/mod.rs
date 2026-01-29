@@ -29,6 +29,7 @@ mod options;
 mod propfind;
 mod proppatch;
 mod put;
+mod rrule_integration;
 mod report;
 mod slug_resolver;
 mod uid_validation;

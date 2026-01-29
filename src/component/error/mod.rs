@@ -29,6 +29,9 @@ pub enum AppError {
     #[error("Parse error: {0}")]
     ParseError(String),
 
+    #[error("RRule validation error: {0}")]
+    RRuleValidationError(#[from] rrule::ValidationError),
+
     #[error("Path resolution error: {0}")]
     PathResolutionError(#[from] PathResolutionError),
 }
