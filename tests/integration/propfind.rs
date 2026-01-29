@@ -26,7 +26,7 @@ async fn propfind_returns_multistatus() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", Some("Personal"))
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", Some("Personal"))
         .await
         .expect("Failed to seed collection");
 
@@ -61,7 +61,7 @@ async fn propfind_returns_valid_xml() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -103,7 +103,7 @@ async fn propfind_depth0_collection() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -165,7 +165,7 @@ async fn propfind_depth1_collection() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -227,7 +227,7 @@ async fn propfind_depth_infinity() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -267,7 +267,7 @@ async fn propfind_default_depth() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -309,7 +309,7 @@ async fn propfind_known_props_200() {
     let collection_id = test_db
         .seed_collection(
             principal_id,
-            "calendar",
+            CollectionType::Calendar,
             "testcal",
             Some("Known Props Calendar"),
         )
@@ -351,7 +351,7 @@ async fn propfind_unknown_props_404() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -389,7 +389,7 @@ async fn propfind_mixed_props() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -446,7 +446,7 @@ async fn propfind_allprop_request() {
     let collection_id = test_db
         .seed_collection(
             principal_id,
-            "calendar",
+            CollectionType::Calendar,
             "testcal",
             Some("All Props Calendar"),
         )
@@ -487,7 +487,7 @@ async fn propfind_propname() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -533,7 +533,7 @@ async fn propfind_calendar_resourcetype() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -572,7 +572,7 @@ async fn propfind_addressbook_resourcetype() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "addressbook", "addr", None)
+        .seed_collection(principal_id, CollectionType::Addressbook, "addr", None)
         .await
         .expect("Failed to seed collection");
 
@@ -616,7 +616,7 @@ async fn propfind_getetag() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -672,7 +672,7 @@ async fn propfind_sync_token() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -738,7 +738,7 @@ async fn propfind_invalid_xml_400() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -779,7 +779,7 @@ async fn propfind_calendar_returns_supported_report_set() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", Some("Test Calendar"))
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", Some("Test Calendar"))
         .await
         .expect("Failed to seed collection");
 
@@ -839,7 +839,7 @@ async fn propfind_addressbook_returns_supported_report_set() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "addressbook", "contacts", Some("My Contacts"))
+        .seed_collection(principal_id, CollectionType::Addressbook, "contacts", Some("My Contacts"))
         .await
         .expect("Failed to seed collection");
 
@@ -899,7 +899,7 @@ async fn propfind_returns_supported_calendar_component_set() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", Some("Test Calendar"))
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", Some("Test Calendar"))
         .await
         .expect("Failed to seed collection");
 
@@ -959,7 +959,7 @@ async fn propfind_returns_supported_address_data() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "addressbook", "contacts", Some("My Contacts"))
+        .seed_collection(principal_id, CollectionType::Addressbook, "contacts", Some("My Contacts"))
         .await
         .expect("Failed to seed collection");
 
@@ -1019,7 +1019,7 @@ async fn propfind_returns_supported_collation_set() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", Some("Test Calendar"))
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", Some("Test Calendar"))
         .await
         .expect("Failed to seed collection");
 

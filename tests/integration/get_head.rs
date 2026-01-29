@@ -28,7 +28,7 @@ async fn get_calendar_object_content_type() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", Some("Personal"))
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", Some("Personal"))
         .await
         .expect("Failed to seed collection");
 
@@ -86,7 +86,7 @@ async fn get_vcard_content_type() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "addressbook", "contacts", Some("Contacts"))
+        .seed_collection(principal_id, CollectionType::Addressbook, "contacts", Some("Contacts"))
         .await
         .expect("Failed to seed collection");
 
@@ -151,7 +151,7 @@ async fn get_calendar_object_uses_component_tree() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "treecal", Some("Tree Calendar"))
+        .seed_collection(principal_id, CollectionType::Calendar, "treecal", Some("Tree Calendar"))
         .await
         .expect("Failed to seed collection");
 
@@ -266,7 +266,7 @@ async fn get_vcard_uses_component_tree() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "addressbook", "treebook", Some("Tree Book"))
+        .seed_collection(principal_id, CollectionType::Addressbook, "treebook", Some("Tree Book"))
         .await
         .expect("Failed to seed collection");
 
@@ -380,7 +380,7 @@ async fn head_matches_get_headers() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", Some("Personal"))
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", Some("Personal"))
         .await
         .expect("Failed to seed collection");
 
@@ -487,7 +487,7 @@ async fn get_etag_present_and_strong() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -559,7 +559,7 @@ async fn get_if_none_match_304() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -624,7 +624,7 @@ async fn get_if_none_match_different_etag_returns_200() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -687,7 +687,7 @@ async fn get_if_match_412() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -750,7 +750,7 @@ async fn get_if_match_success() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -843,7 +843,7 @@ async fn get_last_modified_header() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -900,7 +900,7 @@ async fn get_content_length_accurate() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 

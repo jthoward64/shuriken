@@ -3,7 +3,7 @@
 //!
 //! Uses `tests/integration/helpers.rs` for database setup and request utilities.
 
-use super::helpers::{TestDb, cal_collection_glob, cal_owner_glob, cal_path};
+use super::helpers::{TestDb, cal_collection_glob, cal_owner_glob, cal_path, CollectionType, PrincipalType};
 use shuriken::component::middleware::path_parser::parse_and_resolve_path;
 
 /// Resolves a calendar owner-only path and verifies principal resolution.
@@ -13,7 +13,7 @@ async fn resolve_owner_only_calendar_path() {
 
     // Seed principal
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_principal(PrincipalType::User, "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -39,11 +39,11 @@ async fn resolve_calendar_collection_path() {
 
     // Seed principal and collection
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_principal(PrincipalType::User, "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "work", Some("Work"))
+        .seed_collection(principal_id, CollectionType::Calendar, "work", Some("Work"))
         .await
         .expect("Failed to seed collection");
 
@@ -65,15 +65,15 @@ async fn resolve_nested_calendar_collection_path() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_principal(PrincipalType::User, "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
     let parent_id = test_db
-        .seed_collection(principal_id, "calendar", "work", Some("Work"))
+        .seed_collection(principal_id, CollectionType::Calendar, "work", Some("Work"))
         .await
         .expect("Failed to seed parent collection");
     let child_id = test_db
-        .seed_child_collection(principal_id, "calendar", "team", Some("Team"), parent_id)
+        .seed_child_collection(principal_id, CollectionType::Calendar, "team", Some("Team"), parent_id)
         .await
         .expect("Failed to seed child collection");
 
@@ -99,11 +99,11 @@ async fn resolve_calendar_instance_path() {
 
     // Seed principal, collection, entity, and instance
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_principal(PrincipalType::User, "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "work", Some("Work"))
+        .seed_collection(principal_id, CollectionType::Calendar, "work", Some("Work"))
         .await
         .expect("Failed to seed collection");
     let entity_id = test_db
@@ -139,15 +139,15 @@ async fn resolve_nested_calendar_instance_path() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_principal(PrincipalType::User, "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
     let parent_id = test_db
-        .seed_collection(principal_id, "calendar", "work", Some("Work"))
+        .seed_collection(principal_id, CollectionType::Calendar, "work", Some("Work"))
         .await
         .expect("Failed to seed parent collection");
     let child_id = test_db
-        .seed_child_collection(principal_id, "calendar", "team", Some("Team"), parent_id)
+        .seed_child_collection(principal_id, CollectionType::Calendar, "team", Some("Team"), parent_id)
         .await
         .expect("Failed to seed child collection");
     let entity_id = test_db

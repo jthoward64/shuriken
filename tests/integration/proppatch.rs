@@ -26,7 +26,7 @@ async fn proppatch_returns_multistatus() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -65,7 +65,7 @@ async fn proppatch_set_protected_prop_403() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -111,7 +111,7 @@ async fn proppatch_remove_protected_prop_403() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -161,7 +161,7 @@ async fn proppatch_set_displayname_200() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -210,7 +210,7 @@ async fn proppatch_set_calendar_description() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -255,7 +255,7 @@ async fn proppatch_remove_displayname() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", Some("Original Name"))
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", Some("Original Name"))
         .await
         .expect("Failed to seed collection");
 
@@ -300,7 +300,7 @@ async fn proppatch_set_multiple_props() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -350,7 +350,7 @@ async fn proppatch_partial_success_207() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -427,7 +427,7 @@ async fn proppatch_invalid_xml_400() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -461,7 +461,7 @@ async fn proppatch_empty_body_error() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 

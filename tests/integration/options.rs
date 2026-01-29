@@ -24,7 +24,7 @@ async fn options_returns_allow_header() {
         .expect("Failed to seed authenticated user");
 
     let _collection_id = test_db
-        .seed_collection(principal_id, "calendar", "some-collection", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "some-collection", None)
         .await
         .expect("Failed to seed collection");
 
@@ -56,7 +56,7 @@ async fn options_returns_dav_header() {
         .expect("Failed to seed authenticated user");
 
     let _collection_id = test_db
-        .seed_collection(principal_id, "calendar", "some-collection", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "some-collection", None)
         .await
         .expect("Failed to seed collection");
 
@@ -88,7 +88,7 @@ async fn options_dav_header_contains_class_1() {
         .expect("Failed to seed authenticated user");
 
     let _collection_id = test_db
-        .seed_collection(principal_id, "calendar", "some-path", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "some-path", None)
         .await
         .expect("Failed to seed collection");
 
@@ -120,7 +120,7 @@ async fn options_dav_header_contains_calendar_access() {
         .expect("Failed to seed authenticated user");
 
     let _collection_id = test_db
-        .seed_collection(principal_id, "calendar", "calendar", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "calendar", None)
         .await
         .expect("Failed to seed collection");
 
@@ -152,7 +152,7 @@ async fn options_dav_header_contains_addressbook() {
         .expect("Failed to seed authenticated user");
 
     let _collection_id = test_db
-        .seed_collection(principal_id, "addressbook", "addressbook", None)
+        .seed_collection(principal_id, CollectionType::Addressbook, "addressbook", None)
         .await
         .expect("Failed to seed collection");
 
@@ -184,7 +184,7 @@ async fn options_allow_contains_dav_methods() {
         .expect("Failed to seed authenticated user");
 
     let _collection_id = test_db
-        .seed_collection(principal_id, "calendar", "collection", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "collection", None)
         .await
         .expect("Failed to seed collection");
 
@@ -225,7 +225,7 @@ async fn options_status_code() {
         .expect("Failed to seed authenticated user");
 
     let _collection_id = test_db
-        .seed_collection(principal_id, "calendar", "resource", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "resource", None)
         .await
         .expect("Failed to seed collection");
 
@@ -260,7 +260,7 @@ async fn options_no_locking_advertised_without_lock() {
         .expect("Failed to seed authenticated user");
 
     let _collection_id = test_db
-        .seed_collection(principal_id, "calendar", "resource", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "resource", None)
         .await
         .expect("Failed to seed collection");
 
@@ -367,7 +367,7 @@ async fn options_no_auto_schedule_without_rfc6638() {
         .expect("Failed to seed authenticated user");
 
     let _collection_id = test_db
-        .seed_collection(principal_id, "calendar", "calendar", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "calendar", None)
         .await
         .expect("Failed to seed collection");
 
@@ -406,7 +406,7 @@ async fn options_ignores_accept_header() {
         .expect("Failed to seed authenticated user");
 
     let _collection_id = test_db
-        .seed_collection(principal_id, "calendar", "collection", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "collection", None)
         .await
         .expect("Failed to seed collection");
 

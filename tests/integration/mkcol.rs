@@ -131,7 +131,7 @@ async fn mkcalendar_on_existing_uri_conflict() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -363,7 +363,7 @@ async fn mkcol_on_existing_uri_conflict() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 

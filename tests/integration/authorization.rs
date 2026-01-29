@@ -47,7 +47,7 @@ async fn get_returns_403_without_permission() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", Some("Personal"))
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", Some("Personal"))
         .await
         .expect("Failed to seed collection");
 
@@ -111,7 +111,7 @@ async fn get_returns_200_with_read_permission() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "bobcal", Some("Bob Calendar"))
+        .seed_collection(principal_id, CollectionType::Calendar, "bobcal", Some("Bob Calendar"))
         .await
         .expect("Failed to seed collection");
 
@@ -182,7 +182,7 @@ async fn delete_returns_403_without_write_permission() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "charliecal", Some("Charlie Cal"))
+        .seed_collection(principal_id, CollectionType::Calendar, "charliecal", Some("Charlie Cal"))
         .await
         .expect("Failed to seed collection");
 
@@ -256,7 +256,7 @@ async fn delete_returns_204_with_write_permission() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "danacal", Some("Dana Cal"))
+        .seed_collection(principal_id, CollectionType::Calendar, "danacal", Some("Dana Cal"))
         .await
         .expect("Failed to seed collection");
 
@@ -326,7 +326,7 @@ async fn put_new_returns_403_without_collection_write_permission() {
         .expect("Failed to seed authenticated user");
 
     let _collection_id = test_db
-        .seed_collection(principal_id, "calendar", "evecal", Some("Eve Cal"))
+        .seed_collection(principal_id, CollectionType::Calendar, "evecal", Some("Eve Cal"))
         .await
         .expect("Failed to seed collection");
 
@@ -373,7 +373,7 @@ async fn put_update_returns_403_without_write_permission() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "frankcal", Some("Frank Cal"))
+        .seed_collection(principal_id, CollectionType::Calendar, "frankcal", Some("Frank Cal"))
         .await
         .expect("Failed to seed collection");
 
@@ -457,7 +457,7 @@ async fn propfind_returns_403_without_permission() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "gracecal", Some("Grace Cal"))
+        .seed_collection(principal_id, CollectionType::Calendar, "gracecal", Some("Grace Cal"))
         .await
         .expect("Failed to seed collection");
 
@@ -528,7 +528,7 @@ async fn proppatch_returns_403_without_write_permission() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "henrycal", Some("Henry Cal"))
+        .seed_collection(principal_id, CollectionType::Calendar, "henrycal", Some("Henry Cal"))
         .await
         .expect("Failed to seed collection");
 
@@ -613,7 +613,7 @@ async fn get_returns_200_with_owner_role_for_read_action() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "bobcal", Some("Bob Cal"))
+        .seed_collection(principal_id, CollectionType::Calendar, "bobcal", Some("Bob Cal"))
         .await
         .expect("Failed to seed collection");
 
@@ -680,7 +680,7 @@ async fn get_returns_200_with_edit_role_for_read_action() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "carolcal", Some("Carol Cal"))
+        .seed_collection(principal_id, CollectionType::Calendar, "carolcal", Some("Carol Cal"))
         .await
         .expect("Failed to seed collection");
 
@@ -748,7 +748,7 @@ async fn delete_returns_204_with_edit_role() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "davecal", Some("Dave Cal"))
+        .seed_collection(principal_id, CollectionType::Calendar, "davecal", Some("Dave Cal"))
         .await
         .expect("Failed to seed collection");
 
@@ -812,7 +812,7 @@ async fn group_member_inherits_group_permissions() {
 
     // Create owner of the calendar
     let owner_principal_id = test_db
-        .seed_principal("user", "owner", Some("Owner"))
+        .seed_principal(PrincipalType::User, "owner", Some("Owner"))
         .await
         .expect("Failed to seed owner principal");
 
@@ -835,7 +835,7 @@ async fn group_member_inherits_group_permissions() {
 
     // Create a group and add the authenticated user to it
     let group_principal_id = test_db
-        .seed_principal("group", "team", Some("Team Group"))
+        .seed_principal(PrincipalType::Group, "team", Some("Team Group"))
         .await
         .expect("Failed to seed group principal");
 
@@ -854,7 +854,7 @@ async fn group_member_inherits_group_permissions() {
     let collection_id = test_db
         .seed_collection(
             owner_principal_id,
-            "calendar",
+            CollectionType::Calendar,
             "teamcal",
             Some("Team Calendar"),
         )
@@ -916,7 +916,7 @@ async fn non_group_member_denied_group_resource() {
 
     // Create owner of the calendar
     let owner_principal_id = test_db
-        .seed_principal("user", "owner", Some("Owner"))
+        .seed_principal(PrincipalType::User, "owner", Some("Owner"))
         .await
         .expect("Failed to seed owner principal");
 
@@ -933,7 +933,7 @@ async fn non_group_member_denied_group_resource() {
 
     // Create a group (without adding authenticated user to it)
     let group_principal_id = test_db
-        .seed_principal("group", "team", Some("Team Group"))
+        .seed_principal(PrincipalType::Group, "team", Some("Team Group"))
         .await
         .expect("Failed to seed group principal");
 
@@ -946,7 +946,7 @@ async fn non_group_member_denied_group_resource() {
     let collection_id = test_db
         .seed_collection(
             owner_principal_id,
-            "calendar",
+            CollectionType::Calendar,
             "teamcal",
             Some("Team Calendar"),
         )
@@ -1012,7 +1012,7 @@ async fn public_principal_can_access_public_resources() {
 
     // Create owner of the calendar
     let owner_principal_id = test_db
-        .seed_principal("user", "owner", Some("Owner"))
+        .seed_principal(PrincipalType::User, "owner", Some("Owner"))
         .await
         .expect("Failed to seed owner principal");
 
@@ -1031,7 +1031,7 @@ async fn public_principal_can_access_public_resources() {
     let collection_id = test_db
         .seed_collection(
             owner_principal_id,
-            "calendar",
+            CollectionType::Calendar,
             "publiccal",
             Some("Public Calendar"),
         )
@@ -1089,7 +1089,7 @@ async fn public_principal_denied_write_on_readonly_public() {
 
     // Create owner of the calendar
     let owner_principal_id = test_db
-        .seed_principal("user", "owner", Some("Owner"))
+        .seed_principal(PrincipalType::User, "owner", Some("Owner"))
         .await
         .expect("Failed to seed owner principal");
 
@@ -1108,7 +1108,7 @@ async fn public_principal_denied_write_on_readonly_public() {
     let collection_id = test_db
         .seed_collection(
             owner_principal_id,
-            "calendar",
+            CollectionType::Calendar,
             "publiccal",
             Some("Public Calendar"),
         )

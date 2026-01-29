@@ -16,7 +16,7 @@ async fn example_seed_principal() {
     // Clean slate for test
     // Seed a test principal
     let principal_id = test_db
-        .seed_principal("user", "testuser", Some("Test User"))
+        .seed_principal(PrincipalType::User, "testuser", Some("Test User"))
         .await
         .expect("Failed to seed principal");
 
@@ -31,7 +31,7 @@ async fn example_seed_calendar_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     // 1. Create principal
     let principal_id = test_db
-        .seed_principal("user", "alice", Some("Alice"))
+        .seed_principal(PrincipalType::User, "alice", Some("Alice"))
         .await
         .expect("Failed to seed principal");
 
@@ -45,7 +45,7 @@ async fn example_seed_calendar_collection() {
     let collection_id = test_db
         .seed_collection(
             principal_id,
-            "calendar",
+            CollectionType::Calendar,
             "testcal",
             Some("Personal Calendar"),
         )
@@ -97,13 +97,13 @@ async fn example_seed_addressbook_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     // 1. Create principal
     let principal_id = test_db
-        .seed_principal("user", "bob", Some("Bob"))
+        .seed_principal(PrincipalType::User, "bob", Some("Bob"))
         .await
         .expect("Failed to seed principal");
 
     // 2. Create addressbook collection
     let collection_id = test_db
-        .seed_collection(principal_id, "addressbook", "contacts", Some("Contacts"))
+        .seed_collection(principal_id, CollectionType::Addressbook, "contacts", Some("Contacts"))
         .await
         .expect("Failed to seed collection");
 

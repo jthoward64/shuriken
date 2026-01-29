@@ -27,7 +27,7 @@ async fn calendar_query_returns_multistatus() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -79,7 +79,7 @@ async fn calendar_query_time_range_filter() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -147,7 +147,7 @@ async fn calendar_query_returns_calendar_data() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -210,7 +210,7 @@ async fn calendar_multiget_returns_resources() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -278,7 +278,7 @@ async fn calendar_multiget_missing_resource_404() {
         .expect("Failed to seed authenticated user");
 
     let _collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -322,7 +322,7 @@ async fn addressbook_query_returns_multistatus() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "addressbook", "contacts", None)
+        .seed_collection(principal_id, CollectionType::Addressbook, "contacts", None)
         .await
         .expect("Failed to seed collection");
 
@@ -373,7 +373,7 @@ async fn addressbook_query_returns_address_data() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "addressbook", "addrdata", None)
+        .seed_collection(principal_id, CollectionType::Addressbook, "addrdata", None)
         .await
         .expect("Failed to seed collection");
 
@@ -430,7 +430,7 @@ async fn addressbook_multiget_returns_vcards() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "addressbook", "abmg", None)
+        .seed_collection(principal_id, CollectionType::Addressbook, "abmg", None)
         .await
         .expect("Failed to seed collection");
 
@@ -495,7 +495,7 @@ async fn sync_collection_returns_multistatus() {
         .expect("Failed to seed authenticated user");
 
     let _collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -530,7 +530,7 @@ async fn sync_collection_returns_sync_token() {
         .expect("Failed to seed authenticated user");
 
     let _collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -567,7 +567,7 @@ async fn sync_collection_initial_sync() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -638,7 +638,7 @@ async fn sync_collection_delta_sync() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -724,7 +724,7 @@ async fn report_invalid_xml_400() {
         .expect("Failed to seed authenticated user");
 
     let _collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -753,7 +753,7 @@ async fn report_unsupported_type() {
         .expect("Failed to seed authenticated user");
 
     let _collection_id = test_db
-        .seed_collection(principal_id, "calendar", "testcal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 

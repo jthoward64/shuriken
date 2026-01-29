@@ -24,7 +24,7 @@ async fn put_missing_uid_rejected() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "test-cal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "test-cal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -71,7 +71,7 @@ async fn put_uid_conflict_returns_409() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "test-cal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "test-cal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -139,7 +139,7 @@ async fn put_update_same_uid_succeeds() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "test-cal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "test-cal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -206,7 +206,7 @@ async fn put_vcalendar_without_vevent_rejected() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "test-cal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "test-cal", None)
         .await
         .expect("Failed to seed collection");
 

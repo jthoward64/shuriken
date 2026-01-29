@@ -30,7 +30,7 @@ use tokio::sync::{OnceCell, broadcast};
 use shuriken::component::db::connection::DbConnection;
 
 // Re-export commonly used enums for test code
-pub use shuriken::component::db::enums::{CollectionType, ContentType, PrincipalType};
+pub use shuriken::component::db::enums::{CollectionType, PrincipalType};
 
 /// Pooled database connection for reuse across tests.
 struct PooledConnection {
@@ -976,7 +976,7 @@ impl TestDb {
         principal_type: shuriken::component::db::enums::PrincipalType,
         slug: &str,
         display_name: Option<&str>,
-    ) -> antml:Result<uuid::Uuid> {
+    ) -> anyhow::Result<uuid::Uuid> {
         use shuriken::component::db::schema::principal;
         use shuriken::component::model::principal::NewPrincipal;
 
@@ -1068,7 +1068,11 @@ impl TestDb {
         const SINGLE_USER_SLUG: &str = "testuser";
 
         let principal_id = self
-            .seed_principal("user", SINGLE_USER_SLUG, Some(SINGLE_USER_NAME))
+            .seed_principal(
+                PrincipalType::User,
+                SINGLE_USER_SLUG,
+                Some(SINGLE_USER_NAME),
+            )
             .await?;
 
         self.seed_user(SINGLE_USER_NAME, SINGLE_USER_EMAIL, principal_id)
@@ -1162,9 +1166,15 @@ impl TestDb {
 
         let mut conn = self.get_conn().await?;
 
+        use shuriken::component::db::enums::EntityType;
+        let entity_type_enum = match entity_type {
+            "calendar" => EntityType::ICalendar,
+            "addressbook" => EntityType::VCard,
+            _ => EntityType::ICalendar,
+        };
         let new_entity = NewDavEntity {
-            entity_type,
-            logical_uid,
+            entity_type: entity_type_enum,
+            logical_uid: logical_uid.map(|s| s.to_string()),
         };
 
         let entity_id = diesel::insert_into(dav_entity::table)
@@ -1194,11 +1204,18 @@ impl TestDb {
 
         let mut conn = self.get_conn().await?;
 
+        use shuriken::component::db::enums::ContentType;
+        let content_type_enum = match content_type {
+            "text/calendar" => ContentType::TextCalendar,
+            "text/vcard" => ContentType::TextVCard,
+            _ => ContentType::TextCalendar,
+        };
+
         let new_instance = NewDavInstance {
             collection_id,
             entity_id,
             slug,
-            content_type,
+            content_type: content_type_enum,
             etag,
             sync_revision,
             last_modified: chrono::Utc::now(),
@@ -1261,11 +1278,12 @@ impl TestDb {
 
         let mut conn = self.get_conn().await?;
 
+        use shuriken::component::db::enums::ValueType;
         let new_property = NewDavProperty {
             component_id,
             name,
             group: None,
-            value_type: "TEXT",
+            value_type: ValueType::Text,
             value_text,
             value_int: None,
             value_float: None,

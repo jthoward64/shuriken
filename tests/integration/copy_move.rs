@@ -28,7 +28,7 @@ async fn move_rename_item_updates_href() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "move-test", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "move-test", None)
         .await
         .expect("Failed to seed collection");
 
@@ -105,7 +105,7 @@ async fn move_within_collection() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "within-test", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "within-test", None)
         .await
         .expect("Failed to seed collection");
 
@@ -168,12 +168,12 @@ async fn move_across_collections() {
         .expect("Failed to seed authenticated user");
 
     let collection_a = test_db
-        .seed_collection(principal_id, "calendar", "coll-a", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "coll-a", None)
         .await
         .expect("Failed to seed collection A");
 
     let collection_b = test_db
-        .seed_collection(principal_id, "calendar", "coll-b", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "coll-b", None)
         .await
         .expect("Failed to seed collection B");
 
@@ -249,7 +249,7 @@ async fn copy_duplicates_resource() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "copy-test", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "copy-test", None)
         .await
         .expect("Failed to seed collection");
 
@@ -315,7 +315,7 @@ async fn copy_does_not_create_tombstone() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "notomb", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "notomb", None)
         .await
         .expect("Failed to seed collection");
 
@@ -383,7 +383,7 @@ async fn move_destination_exists_overwrite_false_412() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "conflict-test", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "conflict-test", None)
         .await
         .expect("Failed to seed collection");
 
@@ -472,7 +472,7 @@ async fn move_destination_exists_overwrite_true_succeeds() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "overwrite-test", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "overwrite-test", None)
         .await
         .expect("Failed to seed collection");
 
@@ -570,7 +570,7 @@ async fn move_generates_tombstone() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "tomb-test", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "tomb-test", None)
         .await
         .expect("Failed to seed collection");
 
@@ -655,7 +655,7 @@ async fn move_without_destination_400() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "nodest", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "nodest", None)
         .await
         .expect("Failed to seed collection");
 
@@ -711,7 +711,7 @@ async fn move_nonexistent_404() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "nonexistent-coll", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "nonexistent-coll", None)
         .await
         .expect("Failed to seed collection");
 
@@ -748,7 +748,7 @@ async fn copy_nonexistent_404() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "copy-nonexistent-coll", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "copy-nonexistent-coll", None)
         .await
         .expect("Failed to seed collection");
 

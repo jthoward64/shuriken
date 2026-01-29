@@ -9,10 +9,10 @@ use super::helpers::*;
 
 // Helper functions for setup patterns that need a service
 async fn setup_calendar_index_cleanup(
-    test_db: &TestDb,
+    _test_db: &TestDb,
     service: &salvo::Service,
-    principal_id: uuid::Uuid,
-    collection_id: uuid::Uuid,
+    _principal_id: uuid::Uuid,
+    _collection_id: uuid::Uuid,
 ) -> anyhow::Result<String> {
     let uri = caldav_item_path("testuser", "clean-cal", "clean-event.ics");
     let ical = sample_recurring_event(
@@ -33,10 +33,10 @@ async fn setup_calendar_index_cleanup(
 }
 
 async fn setup_card_index_cleanup(
-    test_db: &TestDb,
+    _test_db: &TestDb,
     service: &salvo::Service,
-    principal_id: uuid::Uuid,
-    collection_id: uuid::Uuid,
+    _principal_id: uuid::Uuid,
+    _collection_id: uuid::Uuid,
 ) -> anyhow::Result<String> {
     let uri = carddav_item_path("testuser", "clean-book", "clean-contact.vcf");
     let vcard = sample_vcard(
@@ -135,7 +135,7 @@ async fn delete_calendar_object() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "personal", Some("Personal"))
+        .seed_collection(principal_id, CollectionType::Calendar, "personal", Some("Personal"))
         .await
         .expect("Failed to seed collection");
 
@@ -189,7 +189,7 @@ async fn delete_creates_tombstone() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "tomb", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "tomb", None)
         .await
         .expect("Failed to seed collection");
 
@@ -271,7 +271,7 @@ async fn delete_cleans_calendar_indexes() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "clean-cal", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "clean-cal", None)
         .await
         .expect("Failed to seed collection");
 
@@ -339,7 +339,7 @@ async fn delete_cleans_card_index() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "addressbook", "clean-book", None)
+        .seed_collection(principal_id, CollectionType::Addressbook, "clean-book", None)
         .await
         .expect("Failed to seed collection");
 
@@ -412,7 +412,7 @@ async fn delete_nonexistent_404() {
 
     // Create a collection so the path prefix is valid
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "notfound", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "notfound", None)
         .await
         .expect("Failed to seed collection");
 
@@ -453,7 +453,7 @@ async fn delete_idempotent() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "idemp", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "idemp", None)
         .await
         .expect("Failed to seed collection");
 
@@ -521,7 +521,7 @@ async fn delete_if_match_success() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "ifm", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "ifm", None)
         .await
         .expect("Failed to seed collection");
 
@@ -579,7 +579,7 @@ async fn delete_if_match_mismatch_412() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "ifmm", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "ifmm", None)
         .await
         .expect("Failed to seed collection");
 
@@ -648,7 +648,7 @@ async fn delete_collection() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "to-delete", Some("To Delete"))
+        .seed_collection(principal_id, CollectionType::Calendar, "to-delete", Some("To Delete"))
         .await
         .expect("Failed to seed collection");
 
@@ -711,7 +711,7 @@ async fn delete_collection_no_orphans() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "orphan", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "orphan", None)
         .await
         .expect("Failed to seed collection");
 
@@ -789,7 +789,7 @@ async fn delete_bumps_synctoken() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, "calendar", "sync", None)
+        .seed_collection(principal_id, CollectionType::Calendar, "sync", None)
         .await
         .expect("Failed to seed collection");
 
