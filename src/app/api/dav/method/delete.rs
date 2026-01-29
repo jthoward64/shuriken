@@ -12,7 +12,7 @@ use crate::component::auth::{
     get_terminal_collection_from_depot,
 };
 use crate::component::db::connection;
-use crate::component::db::query::caldav::{event_index, occurrence};
+use crate::component::db::query::caldav::event_index;
 use crate::component::db::query::carddav::card_index;
 use crate::component::db::query::dav::{collection, instance};
 use crate::component::model::dav::instance::DavInstance;
@@ -63,7 +63,7 @@ pub async fn delete(req: &mut Request, res: &mut Response, depot: &Depot) {
     // Prefer middleware-resolved values from depot
     let terminal_collection = get_terminal_collection_from_depot(depot);
     let instance_opt = get_instance_from_depot(depot);
-    
+
     let (collection_id, slug) = match (terminal_collection, instance_opt) {
         (Ok(coll), Ok(inst)) => {
             // Instance exists - perform instance deletion
@@ -199,7 +199,6 @@ async fn perform_delete(
             let new_synctoken = collection::update_synctoken(tx, collection_id).await?;
 
             if inst.content_type.starts_with("text/calendar") {
-                occurrence::delete_by_entity_id(tx, inst.entity_id).await?;
                 event_index::delete_by_entity_id(tx, inst.entity_id).await?;
             } else if inst.content_type.starts_with("text/vcard") {
                 card_index::delete_by_entity_id(tx, inst.entity_id).await?;

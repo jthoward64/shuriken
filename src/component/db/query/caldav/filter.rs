@@ -124,8 +124,8 @@ async fn apply_comp_filter(
         // 1. Non-recurring events in cal_index
         // 2. Recurring event occurrences in cal_occurrence
 
-        let mut non_recurring_ids = Vec::new();
-        let mut recurring_ids = Vec::new();
+        let mut non_recurring_ids: Vec<uuid::Uuid> = Vec::new();
+        let _recurring_ids: Vec<uuid::Uuid> = Vec::new();
 
         // Query non-recurring events from cal_index (rrule_text IS NULL)
         if start.is_some() || end.is_some() {
@@ -156,42 +156,27 @@ async fn apply_comp_filter(
                 .await?;
         }
 
-        // Query recurring events from cal_occurrence table
-        if start.is_some() || end.is_some() {
-            use crate::component::db::schema::cal_occurrence;
-
-            // First, get all recurring event entity IDs
-            let recurring_event_ids: Vec<uuid::Uuid> = query
-                .filter(cal_index::rrule_text.is_not_null())
-                .select(cal_index::entity_id)
-                .distinct()
-                .load::<uuid::Uuid>(conn)
-                .await?;
-
-            if !recurring_event_ids.is_empty() {
-                // Query occurrences within time range
-                let mut occ_query = cal_occurrence::table
-                    .filter(cal_occurrence::entity_id.eq_any(&recurring_event_ids))
-                    .filter(cal_occurrence::deleted_at.is_null())
-                    .into_boxed();
-
-                // Apply start constraint: occurrence_end > range_start
-                if let Some(range_start) = start {
-                    occ_query = occ_query.filter(cal_occurrence::end_utc.gt(range_start));
-                }
-
-                // Apply end constraint: occurrence_start < range_end
-                if let Some(range_end) = end {
-                    occ_query = occ_query.filter(cal_occurrence::start_utc.lt(range_end));
-                }
-
-                recurring_ids = occ_query
-                    .select(cal_occurrence::entity_id)
-                    .distinct()
-                    .load::<uuid::Uuid>(conn)
-                    .await?;
-            }
-        }
+        // TODO: Query recurring events with on-the-fly RRULE expansion
+        // Previously queried cal_occurrence table, which has been removed.
+        //
+        // Implementation approach:
+        // 1. Query cal_index for records with rrule_text IS NOT NULL in time range
+        // 2. For each recurring event:
+        //    a. Parse rrule_text using rrule crate
+        //    b. Build RRuleSet with dtstart from cal_index.dtstart_utc
+        //    c. Call .into_iter().take(N) where N is reasonable limit (e.g., 1000)
+        //    d. Filter occurrences that fall within time_range
+        //    e. Handle RECURRENCE-ID exceptions (check for instances with matching recurrence_id_utc)
+        // 3. Collect entity_ids of events with at least one occurrence in range
+        //
+        // Considerations:
+        // - EXDATE/EXRULE: Not stored separately, need to parse from metadata JSONB
+        // - RDATE: Not stored separately, need to parse from metadata JSONB
+        // - Timezone handling: Convert all times to UTC for comparison
+        // - Performance: May need to limit expansion for infinite recurrences
+        //
+        // For now, skip recurring event filtering entirely.
+        let recurring_ids: Vec<uuid::Uuid> = Vec::new();
 
         // Union non-recurring and recurring event IDs
         let mut combined_ids = non_recurring_ids;

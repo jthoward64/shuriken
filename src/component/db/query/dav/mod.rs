@@ -1,5 +1,4 @@
 // Pure Diesel query composition for shared DAV storage tables.
-pub mod attendee;
 pub mod collection;
 pub mod component;
 pub mod entity;

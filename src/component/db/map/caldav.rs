@@ -69,7 +69,7 @@ fn build_indexes_recursive(
 /// ## Summary
 /// Builds a `NewCalIndex` from a parsed iCalendar component.
 ///
-/// Extracts indexable properties (UID, DTSTART, DTEND, SUMMARY, LOCATION, ORGANIZER, etc.)
+/// Extracts indexable properties (UID, DTSTART, DTEND) and metadata (SUMMARY, LOCATION, ORGANIZER, etc.)
 /// from the component for efficient calendar-query operations.
 ///
 /// ## Errors
@@ -125,26 +125,85 @@ fn build_cal_index(
         ical_datetime_to_utc_with_resolver(dt, tzid, resolver)
     });
 
-    // Extract ORGANIZER
-    let organizer = component
-        .get_property("ORGANIZER")
-        .and_then(|prop| prop.as_text())
-        .map(String::from);
+    // Build metadata JSONB object with all non-indexed fields
+    let mut metadata = serde_json::json!({});
 
     // Extract SUMMARY
-    let summary = component.summary().map(String::from);
+    if let Some(summary) = component.summary() {
+        metadata["summary"] = serde_json::Value::String(summary.to_string());
+    }
 
     // Extract LOCATION
-    let location = component
-        .get_property("LOCATION")
-        .and_then(|prop| prop.as_text())
-        .map(String::from);
+    if let Some(location) = component.get_property("LOCATION").and_then(|p| p.as_text()) {
+        metadata["location"] = serde_json::Value::String(location.to_string());
+    }
+
+    // Extract DESCRIPTION
+    if let Some(description) = component
+        .get_property("DESCRIPTION")
+        .and_then(|p| p.as_text())
+    {
+        metadata["description"] = serde_json::Value::String(description.to_string());
+    }
+
+    // Extract ORGANIZER
+    if let Some(organizer) = component
+        .get_property("ORGANIZER")
+        .and_then(|p| p.as_text())
+    {
+        metadata["organizer"] = serde_json::Value::String(organizer.to_string());
+        // Extract CN parameter if present
+        if let Some(cn) = component
+            .get_property("ORGANIZER")
+            .and_then(|p| p.get_param_value("CN"))
+        {
+            metadata["organizer_cn"] = serde_json::Value::String(cn.to_string());
+        }
+    }
 
     // Extract SEQUENCE
-    let sequence = component
+    if let Some(sequence) = component
         .get_property("SEQUENCE")
-        .and_then(|prop| prop.as_text())
-        .and_then(|text| text.parse::<i32>().ok());
+        .and_then(|p| p.as_text())
+        .and_then(|s| s.parse::<i32>().ok())
+    {
+        metadata["sequence"] = serde_json::Value::Number(sequence.into());
+    }
+
+    // Extract TRANSP
+    if let Some(transp) = component.get_property("TRANSP").and_then(|p| p.as_text()) {
+        metadata["transp"] = serde_json::Value::String(transp.to_string());
+    }
+
+    // Extract STATUS
+    if let Some(status) = component.get_property("STATUS").and_then(|p| p.as_text()) {
+        metadata["status"] = serde_json::Value::String(status.to_string());
+    }
+
+    // Extract ATTENDEEs as array
+    let attendees: Vec<serde_json::Value> = component
+        .get_properties("ATTENDEE")
+        .iter()
+        .filter_map(|att| {
+            att.as_text().map(|email| {
+                let mut attendee = serde_json::json!({"email": email});
+                if let Some(cn) = att.get_param_value("CN") {
+                    attendee["cn"] = serde_json::Value::String(cn.to_string());
+                }
+                if let Some(partstat) = att.get_param_value("PARTSTAT") {
+                    attendee["partstat"] = serde_json::Value::String(partstat.to_string());
+                }
+                if let Some(role) = att.get_param_value("ROLE") {
+                    attendee["role"] = serde_json::Value::String(role.to_string());
+                }
+                attendee
+            })
+        })
+        .collect();
+
+    if !attendees.is_empty() {
+        metadata["attendees"] = serde_json::Value::Array(attendees);
+    }
 
     Some(NewCalIndex {
         entity_id,
@@ -156,9 +215,6 @@ fn build_cal_index(
         dtend_utc,
         all_day,
         rrule_text,
-        organizer,
-        summary,
-        location,
-        sequence,
+        metadata: Some(metadata),
     })
 }

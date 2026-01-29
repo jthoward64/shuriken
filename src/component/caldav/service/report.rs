@@ -4,20 +4,12 @@
 
 use crate::component::db::connection::DbConnection;
 use crate::component::db::query::caldav::filter::find_matching_instances;
-use crate::component::db::query::caldav::occurrence;
-use crate::component::db::query::dav::entity;
 use crate::component::db::query::report_property::build_instance_properties;
 use crate::component::model::dav::instance::DavInstance;
-use crate::component::model::dav::occurrence::CalOccurrence;
 use crate::component::rfc::dav::core::{
     CalendarMultiget, CalendarQuery, Href, Multistatus, PropertyName, PropstatResponse,
     RecurrenceExpansion,
 };
-use crate::component::rfc::ical::build;
-use crate::component::rfc::ical::core::{ComponentKind, ICalendar, Property};
-use chrono::Utc;
-use diesel::prelude::*;
-use diesel_async::RunQueryDsl;
 
 /// ## Summary
 /// Executes a calendar-query report.
@@ -133,172 +125,44 @@ pub async fn execute_calendar_multiget(
 async fn execute_calendar_query_with_expansion(
     conn: &mut DbConnection<'_>,
     instances: Vec<DavInstance>,
-    time_range: &crate::component::rfc::dav::core::TimeRange,
-    expansion_mode: RecurrenceExpansion,
+    _time_range: &crate::component::rfc::dav::core::TimeRange,
+    _expansion_mode: RecurrenceExpansion,
     properties: &[PropertyName],
 ) -> anyhow::Result<Multistatus> {
+    // TODO: Implement on-the-fly RRULE expansion for recurring events.
+    // This was previously handled by pre-expanded cal_occurrence table,
+    // which has been removed. Need to implement RFC 5545 RRULE expansion
+    // during query execution instead.
+    //
+    // Implementation approach:
+    // 1. For each instance, check if cal_index.rrule_text IS NOT NULL
+    // 2. If recurring:
+    //    a. Parse rrule_text using rrule crate
+    //    b. Parse EXDATE/EXRULE/RDATE from metadata JSONB if present
+    //    c. Build RRuleSet with dtstart from cal_index.dtstart_utc
+    //    d. Expand occurrences within time_range using .into_iter()
+    //    e. For each occurrence:
+    //       - Generate synthetic instance with recurrence_id set
+    //       - Check for RECURRENCE-ID exception instances (override)
+    //       - Build response with occurrence-specific properties
+    // 3. Handle expansion_mode:
+    //    - Expand: Return one response per occurrence
+    //    - LimitRecurrenceSet: Return master event + exceptions in range
+    //
+    // Considerations:
+    // - RECURRENCE-ID exceptions: Check cal_index for instances with
+    //   matching entity_id and non-null recurrence_id_utc
+    // - Timezone handling: Parse VTIMEZONE from dav_component tree
+    // - Performance: Limit expansion for infinite recurrences
+    // - Response format: Each occurrence needs unique href with RECURRENCE-ID
+    //
+    // For now, this returns events without expansion.
     let mut multistatus = Multistatus::new();
-
     for instance in instances {
-        let Some((_, tree)) = entity::get_entity_with_tree(conn, instance.entity_id).await? else {
-            continue;
-        };
-
-        let ical = crate::component::db::map::dav::ical_from_tree(tree)?;
-
-        // Check if any VEVENT has RRULE
-        let has_recurrence = ical.root.children.iter().any(|comp| {
-            comp.kind == Some(ComponentKind::Event) && comp.get_property("RRULE").is_some()
-        });
-
-        if !has_recurrence {
-            // Non-recurring event - return as-is
-            let href = Href::new(format!("/item-{}", instance.slug));
-            let props = build_instance_properties(conn, &instance, properties).await?;
-            let response = PropstatResponse::ok(href, props);
-            multistatus.add_response(response);
-            continue;
-        }
-
-        // Query occurrences for this instance in the time range
-        let range_start = time_range
-            .start
-            .unwrap_or_else(|| Utc::now() - chrono::Duration::days(365));
-        let range_end = time_range
-            .end
-            .unwrap_or_else(|| Utc::now() + chrono::Duration::days(365));
-
-        let occurrences = occurrence::by_time_range(range_start, range_end)
-            .filter(crate::component::db::schema::cal_occurrence::entity_id.eq(instance.entity_id))
-            .filter(crate::component::db::schema::cal_occurrence::deleted_at.is_null())
-            .select(CalOccurrence::as_select())
-            .load::<CalOccurrence>(conn)
-            .await?;
-
-        match expansion_mode {
-            RecurrenceExpansion::Expand => {
-                // Generate separate response for each occurrence
-                for occ in occurrences {
-                    let occurrence_href = if let Some(recurrence_id) = occ.recurrence_id_utc {
-                        // Exception instance - use RECURRENCE-ID in href
-                        Href::new(format!(
-                            "/item-{}/{}",
-                            instance.slug,
-                            recurrence_id.format("%Y%m%dT%H%M%SZ")
-                        ))
-                    } else {
-                        // Regular occurrence - use instance slug + occurrence time
-                        Href::new(format!(
-                            "/item-{}/{}",
-                            instance.slug,
-                            occ.start_utc.format("%Y%m%dT%H%M%SZ")
-                        ))
-                    };
-
-                    // Create expanded calendar data for this occurrence
-                    let expanded_ical = expand_occurrence_ical(&ical, &occ);
-                    let expanded_content = build::serialize(&expanded_ical);
-
-                    // Build properties with modified content
-                    let props = build_expanded_occurrence_properties(&expanded_content, properties);
-
-                    let response = PropstatResponse::ok(occurrence_href, props);
-                    multistatus.add_response(response);
-                }
-            }
-            RecurrenceExpansion::LimitRecurrenceSet => {
-                // Return master event as-is (filtering already done in query)
-                let href = Href::new(format!("/item-{}", instance.slug));
-                let props = build_instance_properties(conn, &instance, properties).await?;
-                let response = PropstatResponse::ok(href, props);
-                multistatus.add_response(response);
-            }
-        }
+        let href = Href::new(format!("/item-{}", instance.slug));
+        let props = build_instance_properties(conn, &instance, properties).await?;
+        let response = PropstatResponse::ok(href, props);
+        multistatus.add_response(response);
     }
-
     Ok(multistatus)
-}
-
-/// ## Summary
-/// Expands an iCalendar for a specific occurrence.
-///
-/// Creates a new iCalendar with DTSTART/DTEND adjusted to the occurrence time
-/// and RRULE/EXDATE/RDATE properties removed.
-fn expand_occurrence_ical(ical: &ICalendar, occurrence: &CalOccurrence) -> ICalendar {
-    let mut expanded_ical = ical.clone();
-
-    // Find and modify VEVENT components
-    for component in &mut expanded_ical.root.children {
-        if component.kind != Some(ComponentKind::Event) {
-            continue;
-        }
-
-        // Remove recurrence properties
-        component
-            .properties
-            .retain(|prop| !matches!(prop.name.as_str(), "RRULE" | "EXDATE" | "RDATE" | "EXRULE"));
-
-        // Update DTSTART
-        if let Some(dtstart_prop_idx) = component
-            .properties
-            .iter()
-            .position(|p| p.name == "DTSTART")
-        {
-            // Create new DTSTART property with occurrence time
-            let dtstart_value = occurrence.start_utc.format("%Y%m%dT%H%M%SZ").to_string();
-            component.properties[dtstart_prop_idx] = Property::text("DTSTART", &dtstart_value);
-        }
-
-        // Update DTEND
-        if let Some(dtend_prop_idx) = component.properties.iter().position(|p| p.name == "DTEND") {
-            let dtend_value = occurrence.end_utc.format("%Y%m%dT%H%M%SZ").to_string();
-            component.properties[dtend_prop_idx] = Property::text("DTEND", &dtend_value);
-        } else if component.get_property("DURATION").is_some() {
-            // If DURATION is present, replace with DTEND
-            component.properties.retain(|p| p.name != "DURATION");
-            let dtend_value = occurrence.end_utc.format("%Y%m%dT%H%M%SZ").to_string();
-            component
-                .properties
-                .push(Property::text("DTEND", &dtend_value));
-        } else {
-            // Neither DTEND nor DURATION - add DTEND for the occurrence
-        }
-
-        // Add RECURRENCE-ID if this is an exception
-        if let Some(recurrence_id) = occurrence.recurrence_id_utc {
-            let recurrence_id_value = recurrence_id.format("%Y%m%dT%H%M%SZ").to_string();
-            component
-                .properties
-                .push(Property::text("RECURRENCE-ID", &recurrence_id_value));
-        }
-    }
-
-    expanded_ical
-}
-
-/// ## Summary
-/// Builds properties for an expanded occurrence.
-///
-/// Similar to `build_instance_properties` but uses the expanded calendar data.
-fn build_expanded_occurrence_properties(
-    calendar_data: &str,
-    properties: &[PropertyName],
-) -> Vec<crate::component::rfc::dav::core::DavProperty> {
-    use crate::component::rfc::dav::core::DavProperty;
-
-    let mut props = Vec::new();
-
-    for prop_name in properties {
-        // Handle calendar-data property
-        let qname = prop_name.qname();
-        if qname.namespace_uri() == "urn:ietf:params:xml:ns:caldav"
-            && qname.local_name() == "calendar-data"
-        {
-            props.push(DavProperty::xml(qname, calendar_data.to_string()));
-        }
-        // Other properties would need to be computed from the expanded data
-        // For now, just include calendar-data which is the most common request
-    }
-
-    props
 }

@@ -80,10 +80,10 @@ async fn fetch_entity_id(
 async fn fetch_calendar_index_stats(
     test_db: &TestDb,
     entity_id: uuid::Uuid,
-) -> anyhow::Result<(i64, i64)> {
+) -> anyhow::Result<i64> {
     use diesel::prelude::*;
     use diesel_async::RunQueryDsl;
-    use shuriken::component::db::schema::{cal_index, cal_occurrence};
+    use shuriken::component::db::schema::cal_index;
 
     let mut conn = test_db.get_conn().await?;
 
@@ -93,14 +93,7 @@ async fn fetch_calendar_index_stats(
         .get_result::<i64>(&mut conn)
         .await?;
 
-    let occurrence_count = cal_occurrence::table
-        .filter(cal_occurrence::entity_id.eq(entity_id))
-        .filter(cal_occurrence::deleted_at.is_null())
-        .count()
-        .get_result::<i64>(&mut conn)
-        .await?;
-
-    Ok((cal_index_count, occurrence_count))
+    Ok(cal_index_count)
 }
 
 async fn fetch_card_index_count(test_db: &TestDb, entity_id: uuid::Uuid) -> anyhow::Result<i64> {
@@ -299,7 +292,7 @@ async fn delete_cleans_calendar_indexes() {
         .await
         .expect("Failed to fetch entity_id for instance");
 
-    let (cal_index_count, occurrence_count) = fetch_calendar_index_stats(&test_db, entity_id)
+    let cal_index_count = fetch_calendar_index_stats(&test_db, entity_id)
         .await
         .expect("Failed to count calendar index rows");
 
@@ -307,22 +300,17 @@ async fn delete_cleans_calendar_indexes() {
         cal_index_count > 0,
         "cal_index should be populated before DELETE"
     );
-    assert_eq!(occurrence_count, 3, "Expected 3 occurrences before DELETE");
 
     let response = TestRequest::delete(&uri).send(&service).await;
     response.assert_status(StatusCode::NO_CONTENT);
 
-    let (cal_index_count, occurrence_count) = fetch_calendar_index_stats(&test_db, entity_id)
+    let cal_index_count = fetch_calendar_index_stats(&test_db, entity_id)
         .await
         .expect("Failed to count calendar index rows after DELETE");
 
     assert_eq!(
         cal_index_count, 0,
         "cal_index rows should be removed after DELETE"
-    );
-    assert_eq!(
-        occurrence_count, 0,
-        "Occurrences should be removed after DELETE"
     );
 
     let tombstone_exists = test_db

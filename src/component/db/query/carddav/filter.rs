@@ -8,7 +8,7 @@ use crate::component::db::query::text_match::{
     CollationError, build_like_pattern, normalize_for_ilike, normalize_for_sql_upper,
 };
 use crate::component::db::schema::{
-    card_email, card_index, card_phone, dav_component, dav_instance, dav_parameter, dav_property,
+    card_index, dav_component, dav_instance, dav_parameter, dav_property,
 };
 use crate::component::model::dav::instance::DavInstance;
 use crate::component::rfc::dav::core::{
@@ -287,7 +287,9 @@ async fn apply_text_match_to_property(
 }
 
 /// ## Summary
-/// Evaluates email property filter against `card_email` table.
+/// Evaluates email property filter against card_index.data JSONB field.
+///
+/// Queries the emails array in the JSONB data field.
 ///
 /// ## Errors
 /// Returns database errors if queries fail.
@@ -295,40 +297,60 @@ async fn evaluate_email_filter(
     conn: &mut DbConnection<'_>,
     prop_filter: &PropFilter,
 ) -> anyhow::Result<Vec<uuid::Uuid>> {
+    use diesel::sql_types::{Text, Uuid as SqlUuid};
+
     if prop_filter.is_not_defined {
-        // EMAIL must NOT exist - get all entities and exclude those with emails
-        let entities_with_email: Vec<uuid::Uuid> = card_email::table
-            .filter(card_email::deleted_at.is_null())
-            .select(card_email::entity_id)
-            .distinct()
-            .load::<uuid::Uuid>(conn)
-            .await?;
+        // EMAIL must NOT exist - find cards where emails array is empty or null
+        #[derive(QueryableByName)]
+        struct EntityId {
+            #[diesel(sql_type = SqlUuid)]
+            entity_id: uuid::Uuid,
+        }
 
-        let all_card_ids: Vec<uuid::Uuid> = card_index::table
-            .filter(card_index::deleted_at.is_null())
-            .select(card_index::entity_id)
-            .distinct()
-            .load::<uuid::Uuid>(conn)
-            .await?;
+        let query = diesel::sql_query(
+            "SELECT entity_id FROM card_index \
+             WHERE deleted_at IS NULL \
+             AND (data->'emails' IS NULL OR jsonb_array_length(data->'emails') = 0)",
+        );
 
-        return Ok(all_card_ids
-            .into_iter()
-            .filter(|id| !entities_with_email.contains(id))
-            .collect());
+        let results: Vec<EntityId> = query.load(conn).await?;
+        return Ok(results.into_iter().map(|r| r.entity_id).collect());
     }
 
-    let mut query = card_email::table
-        .filter(card_email::deleted_at.is_null())
-        .into_boxed();
-
     if let Some(text_match) = &prop_filter.text_match {
-        query = apply_text_match_email(query, text_match)?;
+        let value = normalize_for_ilike(&text_match.value, text_match.collation.as_ref())?;
+        let pattern = build_like_pattern(&value, &text_match.match_type);
 
-        let matched_ids = query
-            .select(card_email::entity_id)
-            .distinct()
-            .load::<uuid::Uuid>(conn)
-            .await?;
+        #[derive(QueryableByName)]
+        struct EntityId {
+            #[diesel(sql_type = SqlUuid)]
+            entity_id: uuid::Uuid,
+        }
+
+        // Query entities where any email in the array matches
+        let query_str = match text_match.match_type {
+            MatchType::Equals => {
+                "SELECT DISTINCT entity_id FROM card_index, \
+                 jsonb_array_elements_text(data->'emails') AS email \
+                 WHERE deleted_at IS NULL AND email ILIKE $1"
+            }
+            MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
+                "SELECT DISTINCT entity_id FROM card_index, \
+                 jsonb_array_elements_text(data->'emails') AS email \
+                 WHERE deleted_at IS NULL AND email ILIKE $1"
+            }
+        };
+
+        let query = diesel::sql_query(query_str).bind::<Text, _>(
+            if text_match.match_type == MatchType::Equals {
+                &value
+            } else {
+                &pattern
+            },
+        );
+
+        let matched_ids: Vec<EntityId> = query.load(conn).await?;
+        let matched: Vec<uuid::Uuid> = matched_ids.into_iter().map(|r| r.entity_id).collect();
 
         // Handle negate attribute
         if text_match.negate {
@@ -341,24 +363,35 @@ async fn evaluate_email_filter(
 
             return Ok(all_card_ids
                 .into_iter()
-                .filter(|id| !matched_ids.contains(id))
+                .filter(|id| !matched.contains(id))
                 .collect());
         }
 
-        return Ok(matched_ids);
+        return Ok(matched);
     }
 
-    let entity_ids = query
-        .select(card_email::entity_id)
-        .distinct()
-        .load::<uuid::Uuid>(conn)
-        .await?;
+    // No text-match, just return all entities that have at least one email
+    #[derive(QueryableByName)]
+    struct EntityId {
+        #[diesel(sql_type = SqlUuid)]
+        entity_id: uuid::Uuid,
+    }
 
-    Ok(entity_ids)
+    let query = diesel::sql_query(
+        "SELECT entity_id FROM card_index \
+         WHERE deleted_at IS NULL \
+         AND data->'emails' IS NOT NULL \
+         AND jsonb_array_length(data->'emails') > 0",
+    );
+
+    let results: Vec<EntityId> = query.load(conn).await?;
+    Ok(results.into_iter().map(|r| r.entity_id).collect())
 }
 
 /// ## Summary
-/// Evaluates phone property filter against `card_phone` table.
+/// Evaluates phone property filter against card_index.data JSONB field.
+///
+/// Queries the phones array in the JSONB data field.
 ///
 /// ## Errors
 /// Returns database errors if queries fail.
@@ -366,40 +399,60 @@ async fn evaluate_phone_filter(
     conn: &mut DbConnection<'_>,
     prop_filter: &PropFilter,
 ) -> anyhow::Result<Vec<uuid::Uuid>> {
+    use diesel::sql_types::{Text, Uuid as SqlUuid};
+
     if prop_filter.is_not_defined {
-        // TEL must NOT exist - get all entities and exclude those with phones
-        let entities_with_phone: Vec<uuid::Uuid> = card_phone::table
-            .filter(card_phone::deleted_at.is_null())
-            .select(card_phone::entity_id)
-            .distinct()
-            .load::<uuid::Uuid>(conn)
-            .await?;
+        // TEL must NOT exist - find cards where phones array is empty or null
+        #[derive(QueryableByName)]
+        struct EntityId {
+            #[diesel(sql_type = SqlUuid)]
+            entity_id: uuid::Uuid,
+        }
 
-        let all_card_ids: Vec<uuid::Uuid> = card_index::table
-            .filter(card_index::deleted_at.is_null())
-            .select(card_index::entity_id)
-            .distinct()
-            .load::<uuid::Uuid>(conn)
-            .await?;
+        let query = diesel::sql_query(
+            "SELECT entity_id FROM card_index \
+             WHERE deleted_at IS NULL \
+             AND (data->'phones' IS NULL OR jsonb_array_length(data->'phones') = 0)",
+        );
 
-        return Ok(all_card_ids
-            .into_iter()
-            .filter(|id| !entities_with_phone.contains(id))
-            .collect());
+        let results: Vec<EntityId> = query.load(conn).await?;
+        return Ok(results.into_iter().map(|r| r.entity_id).collect());
     }
 
-    let mut query = card_phone::table
-        .filter(card_phone::deleted_at.is_null())
-        .into_boxed();
-
     if let Some(text_match) = &prop_filter.text_match {
-        query = apply_text_match_phone(query, text_match)?;
+        let value = normalize_for_ilike(&text_match.value, text_match.collation.as_ref())?;
+        let pattern = build_like_pattern(&value, &text_match.match_type);
 
-        let matched_ids = query
-            .select(card_phone::entity_id)
-            .distinct()
-            .load::<uuid::Uuid>(conn)
-            .await?;
+        #[derive(QueryableByName)]
+        struct EntityId {
+            #[diesel(sql_type = SqlUuid)]
+            entity_id: uuid::Uuid,
+        }
+
+        // Query entities where any phone in the array matches
+        let query_str = match text_match.match_type {
+            MatchType::Equals => {
+                "SELECT DISTINCT entity_id FROM card_index, \
+                 jsonb_array_elements_text(data->'phones') AS phone \
+                 WHERE deleted_at IS NULL AND phone ILIKE $1"
+            }
+            MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
+                "SELECT DISTINCT entity_id FROM card_index, \
+                 jsonb_array_elements_text(data->'phones') AS phone \
+                 WHERE deleted_at IS NULL AND phone ILIKE $1"
+            }
+        };
+
+        let query = diesel::sql_query(query_str).bind::<Text, _>(
+            if text_match.match_type == MatchType::Equals {
+                &value
+            } else {
+                &pattern
+            },
+        );
+
+        let matched_ids: Vec<EntityId> = query.load(conn).await?;
+        let matched: Vec<uuid::Uuid> = matched_ids.into_iter().map(|r| r.entity_id).collect();
 
         // Handle negate attribute
         if text_match.negate {
@@ -412,20 +465,29 @@ async fn evaluate_phone_filter(
 
             return Ok(all_card_ids
                 .into_iter()
-                .filter(|id| !matched_ids.contains(id))
+                .filter(|id| !matched.contains(id))
                 .collect());
         }
 
-        return Ok(matched_ids);
+        return Ok(matched);
     }
 
-    let entity_ids = query
-        .select(card_phone::entity_id)
-        .distinct()
-        .load::<uuid::Uuid>(conn)
-        .await?;
+    // No text-match, just return all entities that have at least one phone
+    #[derive(QueryableByName)]
+    struct EntityId {
+        #[diesel(sql_type = SqlUuid)]
+        entity_id: uuid::Uuid,
+    }
 
-    Ok(entity_ids)
+    let query = diesel::sql_query(
+        "SELECT entity_id FROM card_index \
+         WHERE deleted_at IS NULL \
+         AND data->'phones' IS NOT NULL \
+         AND jsonb_array_length(data->'phones') > 0",
+    );
+
+    let results: Vec<EntityId> = query.load(conn).await?;
+    Ok(results.into_iter().map(|r| r.entity_id).collect())
 }
 
 /// ## Summary
@@ -735,50 +797,19 @@ async fn evaluate_single_param_filter(
 }
 
 /// ## Summary
-/// Applies text-match to email query using ILIKE.
-fn apply_text_match_email(
-    query: card_email::BoxedQuery<'static, diesel::pg::Pg>,
-    text_match: &TextMatch,
-) -> Result<card_email::BoxedQuery<'static, diesel::pg::Pg>, CollationError> {
-    let value = normalize_for_ilike(&text_match.value, text_match.collation.as_ref())?;
-    let pattern = build_like_pattern(&value, &text_match.match_type);
-
-    Ok(match text_match.match_type {
-        MatchType::Equals => query.filter(card_email::email.ilike(value)),
-        MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
-            query.filter(card_email::email.ilike(pattern))
-        }
-    })
-}
-
-/// ## Summary
-/// Applies text-match to phone query using ILIKE.
-fn apply_text_match_phone(
-    query: card_phone::BoxedQuery<'static, diesel::pg::Pg>,
-    text_match: &TextMatch,
-) -> Result<card_phone::BoxedQuery<'static, diesel::pg::Pg>, CollationError> {
-    let value = normalize_for_ilike(&text_match.value, text_match.collation.as_ref())?;
-    let pattern = build_like_pattern(&value, &text_match.match_type);
-
-    Ok(match text_match.match_type {
-        MatchType::Equals => query.filter(card_phone::phone_raw.ilike(value)),
-        MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
-            query.filter(card_phone::phone_raw.ilike(pattern))
-        }
-    })
-}
-
-/// ## Summary
 /// Applies text-match to `card_index` query for specific property using ILIKE.
 fn apply_text_match_card_index(
     query: card_index::BoxedQuery<'static, diesel::pg::Pg>,
     text_match: &TextMatch,
     prop_name: &str,
 ) -> Result<card_index::BoxedQuery<'static, diesel::pg::Pg>, CollationError> {
+    use diesel::dsl::sql;
+    use diesel::sql_types::{Bool, Text};
+
     let value = normalize_for_ilike(&text_match.value, text_match.collation.as_ref())?;
     let pattern = build_like_pattern(&value, &text_match.match_type);
 
-    // Select the appropriate column based on property name
+    // Select the appropriate column or JSONB field based on property name
     Ok(match prop_name {
         "FN" => match text_match.match_type {
             MatchType::Equals => query.filter(card_index::fn_.ilike(value)),
@@ -787,15 +818,19 @@ fn apply_text_match_card_index(
             }
         },
         "ORG" => match text_match.match_type {
-            MatchType::Equals => query.filter(card_index::org.ilike(value)),
+            MatchType::Equals => {
+                query.filter(sql::<Bool>("(data->>'org') ILIKE ").bind::<Text, _>(value))
+            }
             MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
-                query.filter(card_index::org.ilike(pattern))
+                query.filter(sql::<Bool>("(data->>'org') ILIKE ").bind::<Text, _>(pattern))
             }
         },
         "TITLE" => match text_match.match_type {
-            MatchType::Equals => query.filter(card_index::title.ilike(value)),
+            MatchType::Equals => {
+                query.filter(sql::<Bool>("(data->>'title') ILIKE ").bind::<Text, _>(value))
+            }
             MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
-                query.filter(card_index::title.ilike(pattern))
+                query.filter(sql::<Bool>("(data->>'title') ILIKE ").bind::<Text, _>(pattern))
             }
         },
         _ => query, // N is handled via card_index but doesn't have a dedicated column

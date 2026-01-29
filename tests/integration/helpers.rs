@@ -29,6 +29,9 @@ use tokio::sync::{OnceCell, broadcast};
 
 use shuriken::component::db::connection::DbConnection;
 
+// Re-export commonly used enums for test code
+pub use shuriken::component::db::enums::{CollectionType, ContentType, PrincipalType};
+
 /// Pooled database connection for reuse across tests.
 struct PooledConnection {
     db_name: String,
@@ -970,10 +973,10 @@ impl TestDb {
     /// and retrieving IDs from the database after insertion.
     pub async fn seed_principal(
         &self,
-        principal_type: &str,
+        principal_type: shuriken::component::db::enums::PrincipalType,
         slug: &str,
         display_name: Option<&str>,
-    ) -> anyhow::Result<uuid::Uuid> {
+    ) -> antml:Result<uuid::Uuid> {
         use shuriken::component::db::schema::principal;
         use shuriken::component::model::principal::NewPrincipal;
 
@@ -1081,7 +1084,7 @@ impl TestDb {
     pub async fn seed_collection(
         &self,
         owner_principal_id: uuid::Uuid,
-        collection_type: &str,
+        collection_type: shuriken::component::db::enums::CollectionType,
         slug: &str,
         display_name: Option<&str>,
     ) -> anyhow::Result<uuid::Uuid> {
@@ -1112,7 +1115,7 @@ impl TestDb {
     pub async fn seed_child_collection(
         &self,
         owner_principal_id: uuid::Uuid,
-        collection_type: &str,
+        collection_type: shuriken::component::db::enums::CollectionType,
         slug: &str,
         display_name: Option<&str>,
         parent_collection_id: uuid::Uuid,

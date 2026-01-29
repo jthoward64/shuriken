@@ -2,6 +2,7 @@
 
 use chrono::{DateTime, Utc};
 use diesel::prelude::*;
+use serde_json::Value as JsonValue;
 use uuid::Uuid;
 
 use crate::component::db::enums::ComponentType;
@@ -33,14 +34,8 @@ pub struct CalIndex {
     pub all_day: Option<bool>,
     /// RRULE text for recurring events.
     pub rrule_text: Option<String>,
-    /// Organizer email/principal.
-    pub organizer: Option<String>,
-    /// Event summary/title.
-    pub summary: Option<String>,
-    /// Event location.
-    pub location: Option<String>,
-    /// Sequence number (for iTIP).
-    pub sequence: Option<i32>,
+    /// Flexible metadata (summary, location, organizer, attendees, etc.).
+    pub metadata: Option<JsonValue>,
     /// Last update timestamp.
     pub updated_at: DateTime<Utc>,
     /// Soft delete timestamp.
@@ -69,12 +64,6 @@ pub struct NewCalIndex {
     pub all_day: Option<bool>,
     /// RRULE text for recurring events.
     pub rrule_text: Option<String>,
-    /// Organizer email/principal.
-    pub organizer: Option<String>,
-    /// Event summary/title.
-    pub summary: Option<String>,
-    /// Event location.
-    pub location: Option<String>,
-    /// Sequence number (for iTIP).
-    pub sequence: Option<i32>,
+    /// Flexible metadata (summary, location, organizer, attendees, etc.).
+    pub metadata: Option<JsonValue>,
 }
