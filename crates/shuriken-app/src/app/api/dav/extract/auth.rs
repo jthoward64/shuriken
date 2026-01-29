@@ -5,13 +5,13 @@
 use salvo::Depot;
 use salvo::http::StatusCode;
 
-use shuriken_service::auth::{
-    Action, Authorizer, ExpandedSubjects, ResourceLocation, ResourceType,
-    authorizer_from_depot, get_subjects_from_depot,
-};
 use shuriken_db::db::connection::DbConnection;
 use shuriken_db::db::query::dav::instance;
 use shuriken_db::model::dav::instance::DavInstance;
+use shuriken_service::auth::{
+    Action, Authorizer, ExpandedSubjects, ResourceLocation, ResourceType, authorizer_from_depot,
+    get_subjects_from_depot,
+};
 
 /// ## Summary
 /// Gets authorization context (subjects and authorizer) from the depot.
@@ -75,7 +75,9 @@ pub async fn load_instance_resource(
 /// ## Summary
 /// Determines resource type from content-type.
 #[must_use]
-pub fn resource_type_from_content_type(content_type: shuriken_db::db::enums::ContentType) -> ResourceType {
+pub fn resource_type_from_content_type(
+    content_type: shuriken_db::db::enums::ContentType,
+) -> ResourceType {
     use shuriken_db::db::enums::ContentType;
     match content_type {
         ContentType::TextCalendar => ResourceType::Calendar,

@@ -9,8 +9,8 @@ use crate::app::api::{
     DAV_ROUTE_PREFIX,
     dav::extract::auth::{check_authorization, get_auth_context},
 };
-use shuriken_service::auth::{Action, get_instance_from_depot, get_resolved_location_from_depot};
 use crate::middleware::path_parser::parse_and_resolve_path;
+use shuriken_service::auth::{Action, get_instance_from_depot, get_resolved_location_from_depot};
 
 /// ## Summary
 /// Handles COPY requests to duplicate `WebDAV` resources.
@@ -156,9 +156,9 @@ pub async fn copy(req: &mut Request, res: &mut Response, depot: &Depot) {
 
     // Check if destination already exists
     let existing_dest = {
-        use shuriken_db::db::query::dav::instance;
         use diesel::OptionalExtension;
         use diesel_async::RunQueryDsl;
+        use shuriken_db::db::query::dav::instance;
 
         instance::by_slug_and_collection(dest_collection.id, &dest_resource_name)
             .first::<shuriken_db::model::dav::instance::DavInstance>(&mut conn)

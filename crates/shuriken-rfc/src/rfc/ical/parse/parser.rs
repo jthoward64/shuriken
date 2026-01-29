@@ -460,10 +460,7 @@ END:VCALENDAR\r\n";
         let rrule_prop = event.get_property("RRULE").unwrap();
         let rrule = rrule_prop.value.as_recur().unwrap();
 
-        assert_eq!(
-            rrule.freq,
-            Some(crate::rfc::ical::core::Frequency::Weekly)
-        );
+        assert_eq!(rrule.freq, Some(crate::rfc::ical::core::Frequency::Weekly));
         assert_eq!(rrule.count, Some(10));
         assert_eq!(rrule.by_day.len(), 3);
     }

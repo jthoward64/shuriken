@@ -4,9 +4,9 @@ use salvo::http::StatusCode;
 use salvo::{Depot, Request, Response};
 
 use crate::app::api::dav::extract::auth::get_auth_context;
-use shuriken_service::auth::{Action, get_resolved_location_from_depot};
 use shuriken_rfc::rfc::dav::build::multistatus::serialize_multistatus;
 use shuriken_rfc::rfc::dav::core::{CalendarQuery, PropertyName};
+use shuriken_service::auth::{Action, get_resolved_location_from_depot};
 
 /// ## Summary
 /// Handles `calendar-query` REPORT requests.

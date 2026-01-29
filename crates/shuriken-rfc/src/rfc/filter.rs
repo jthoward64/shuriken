@@ -2,9 +2,7 @@
 //!
 //! RFC 4791 §9.6 (calendar-data) and RFC 6352 §10.4 (address-data).
 
-use crate::rfc::dav::core::{
-    AddressDataRequest, CalendarDataRequest, ComponentSelection,
-};
+use crate::rfc::dav::core::{AddressDataRequest, CalendarDataRequest, ComponentSelection};
 
 /// ## Summary
 /// Filters iCalendar data based on component/property selection.

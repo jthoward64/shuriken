@@ -7,14 +7,14 @@ use diesel_async::AsyncConnection;
 use diesel_async::scoped_futures::ScopedFutureExt;
 
 use crate::app::api::dav::extract::auth::{check_authorization, get_auth_context};
-use shuriken_service::auth::{
-    Action, get_instance_from_depot, get_resolved_location_from_depot,
-    get_terminal_collection_from_depot,
-};
 use shuriken_db::db::query::caldav::event_index;
 use shuriken_db::db::query::carddav::card_index;
 use shuriken_db::db::query::dav::{collection, instance};
 use shuriken_db::model::dav::instance::DavInstance;
+use shuriken_service::auth::{
+    Action, get_instance_from_depot, get_resolved_location_from_depot,
+    get_terminal_collection_from_depot,
+};
 
 /// ## Summary
 /// Handles DELETE requests for `WebDAV` resources.

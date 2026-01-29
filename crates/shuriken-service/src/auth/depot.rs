@@ -3,8 +3,8 @@
 //! This module provides functions to extract the authenticated user and build
 //! `ExpandedSubjects` for authorization checks.
 
-use diesel::prelude::*;
 use diesel::SelectableHelper;
+use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 
 use crate::error::{ServiceError, ServiceResult};
@@ -33,9 +33,7 @@ pub mod depot_keys {
 /// ## Errors
 ///
 /// Returns `NotAuthenticated` if no user is found in the depot or if the user is public.
-pub fn get_user_from_depot(
-    depot: &salvo::Depot,
-) -> ServiceResult<&shuriken_db::model::user::User> {
+pub fn get_user_from_depot(depot: &salvo::Depot) -> ServiceResult<&shuriken_db::model::user::User> {
     let depot_user = depot
         .get::<DepotUser>(depot_keys::AUTHENTICATED_PRINCIPAL)
         .map_err(|_e| ServiceError::NotAuthenticated)?;

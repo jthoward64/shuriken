@@ -2,6 +2,10 @@
 
 //! Business logic for calendar-query and calendar-multiget reports.
 
+use chrono::TimeDelta;
+use diesel::prelude::*;
+use diesel_async::RunQueryDsl;
+use rrule::{RRule, Tz, Unvalidated};
 use shuriken_db::db::connection::DbConnection;
 use shuriken_db::db::query::caldav::filter::find_matching_instances;
 use shuriken_db::db::query::report_property::build_instance_properties;
@@ -11,10 +15,6 @@ use shuriken_rfc::rfc::dav::core::{
     CalendarMultiget, CalendarQuery, Href, Multistatus, PropertyName, PropstatResponse,
     RecurrenceExpansion,
 };
-use chrono::TimeDelta;
-use diesel::prelude::*;
-use diesel_async::RunQueryDsl;
-use rrule::{RRule, Tz, Unvalidated};
 
 /// ## Summary
 /// Executes a calendar-query report.
@@ -159,16 +159,21 @@ async fn execute_calendar_query_with_expansion(
             };
 
         if let Some((Some(rrule_text), Some(dtstart_utc))) = cal_index_row {
-            let rrule: rrule::RRule<Unvalidated> = if let Ok(rule) = rrule_text.parse::<RRule<Unvalidated>>() { rule } else {
-                let href = Href::new(format!("/item-{}", instance.slug));
-                let props = build_instance_properties(conn, &instance, properties).await?;
-                let response = PropstatResponse::ok(href, props);
-                multistatus.add_response(response);
-                continue;
-            };
+            let rrule: rrule::RRule<Unvalidated> =
+                if let Ok(rule) = rrule_text.parse::<RRule<Unvalidated>>() {
+                    rule
+                } else {
+                    let href = Href::new(format!("/item-{}", instance.slug));
+                    let props = build_instance_properties(conn, &instance, properties).await?;
+                    let response = PropstatResponse::ok(href, props);
+                    multistatus.add_response(response);
+                    continue;
+                };
 
             let dt_start = dtstart_utc.with_timezone(&Tz::UTC);
-            let mut rrule_set: rrule::RRuleSet = if let Ok(set) = rrule.build(dt_start) { set } else {
+            let mut rrule_set: rrule::RRuleSet = if let Ok(set) = rrule.build(dt_start) {
+                set
+            } else {
                 let href = Href::new(format!("/item-{}", instance.slug));
                 let props = build_instance_properties(conn, &instance, properties).await?;
                 let response = PropstatResponse::ok(href, props);

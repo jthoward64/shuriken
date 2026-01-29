@@ -196,10 +196,10 @@ pub(super) fn extract_vcard_uid(vcard: &VCard) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::{Datelike, TimeZone, Timelike};
     use shuriken_rfc::rfc::ical::core::{
         Component, ComponentKind, Date, DateTime, DateTimeForm, Property,
     };
-    use chrono::{Datelike, TimeZone, Timelike};
 
     type IcalValueTuple<'a> = (
         ValueType,
@@ -341,8 +341,8 @@ mod tests {
         standard.add_property(Property::text("TZOFFSETTO", "+0200"));
         timezone.add_child(standard);
 
-        let vtimezone = shuriken_rfc::rfc::ical::expand::VTimezone::parse(&timezone)
-            .expect("valid VTIMEZONE");
+        let vtimezone =
+            shuriken_rfc::rfc::ical::expand::VTimezone::parse(&timezone).expect("valid VTIMEZONE");
 
         let mut resolver = TimeZoneResolver::new();
         resolver.register_vtimezone(vtimezone);
@@ -414,8 +414,8 @@ mod tests {
 
     #[test]
     fn extract_vcard_timestamp_value() {
-        use shuriken_rfc::rfc::vcard::core::Timestamp;
         use chrono::{TimeZone, Utc};
+        use shuriken_rfc::rfc::vcard::core::Timestamp;
 
         let dt = Utc.with_ymd_and_hms(2024, 1, 15, 12, 30, 0).unwrap();
         let value = VCardValue::Timestamp(Timestamp { datetime: dt });

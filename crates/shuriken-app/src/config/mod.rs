@@ -30,10 +30,11 @@ impl salvo::Handler for ConfigHandler {
 /// ## Errors
 /// Returns an error if the configuration is not found in the depot.
 pub fn get_config_from_depot(depot: &salvo::Depot) -> AppResult<Arc<Settings>> {
-    depot
-        .obtain::<Arc<Settings>>()
-        .cloned()
-        .map_err(|_err| AppError::CoreError(shuriken_core::error::CoreError::InvariantViolation("Configuration not found in depot")))
+    depot.obtain::<Arc<Settings>>().cloned().map_err(|_err| {
+        AppError::CoreError(shuriken_core::error::CoreError::InvariantViolation(
+            "Configuration not found in depot",
+        ))
+    })
 }
 
 #[cfg(test)]

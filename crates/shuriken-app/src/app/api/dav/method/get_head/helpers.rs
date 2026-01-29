@@ -3,14 +3,14 @@
 use salvo::http::{HeaderValue, StatusCode};
 use salvo::{Depot, Request, Response};
 
+use shuriken_db::db::map::dav::{serialize_ical_tree, serialize_vcard_tree};
+use shuriken_db::db::query::dav::{entity, instance};
+use shuriken_db::model::dav::instance::DavInstance;
 use shuriken_service::auth::get_resolved_location_from_depot;
 use shuriken_service::auth::{
     Action, ResourceType, authorizer_from_depot, get_instance_from_depot, get_subjects_from_depot,
     get_terminal_collection_from_depot,
 };
-use shuriken_db::db::map::dav::{serialize_ical_tree, serialize_vcard_tree};
-use shuriken_db::db::query::dav::{entity, instance};
-use shuriken_db::model::dav::instance::DavInstance;
 
 /// ## Summary
 /// Shared implementation for GET and HEAD handlers.

@@ -4,8 +4,8 @@ use std::collections::HashMap;
 
 use uuid::Uuid;
 
-use shuriken_rfc::recurrence::ical_datetime_to_utc_with_resolver;
 use crate::model::caldav::cal_index::NewCalIndex;
+use shuriken_rfc::recurrence::ical_datetime_to_utc_with_resolver;
 use shuriken_rfc::rfc::ical::core::{Component, ICalendar};
 use shuriken_rfc::rfc::ical::expand::TimeZoneResolver;
 

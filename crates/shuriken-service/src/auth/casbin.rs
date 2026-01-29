@@ -3,10 +3,8 @@ use std::sync::Arc;
 use casbin::{CoreApi, MgmtApi};
 use salvo::async_trait;
 
+use crate::error::{ServiceError, ServiceResult};
 use shuriken_db::db::connection::DbPool;
-use crate::{
-    error::{ServiceError, ServiceResult},
-};
 
 /// ## Summary
 /// Initialize a Casbin enforcer with a Diesel adapter using the provided connection pool.

@@ -1,9 +1,9 @@
 use salvo::async_trait;
 use std::sync::Arc;
 
-use shuriken_db::db::DbProvider;
 use crate::error::AppResult;
 use shuriken_core::error::CoreError;
+use shuriken_db::db::DbProvider;
 
 pub struct DbProviderHandler<T: DbProvider + Send + Sync + Clone> {
     pub provider: T,
@@ -36,5 +36,7 @@ pub fn get_db_from_depot(
     depot
         .obtain::<Arc<dyn DbProvider + Send + Sync>>()
         .cloned()
-        .map_err(|_err| CoreError::InvariantViolation("Database provider not found in depot").into())
+        .map_err(|_err| {
+            CoreError::InvariantViolation("Database provider not found in depot").into()
+        })
 }

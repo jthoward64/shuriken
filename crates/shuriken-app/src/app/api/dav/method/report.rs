@@ -4,11 +4,11 @@ use salvo::http::StatusCode;
 use salvo::{Depot, Request, Response, handler};
 
 use crate::app::api::dav::extract::auth::get_auth_context;
+use shuriken_rfc::rfc::dav::build::multistatus::serialize_multistatus;
+use shuriken_rfc::rfc::dav::core::{ExpandProperty, Multistatus, ReportType, SyncCollection};
 use shuriken_service::auth::{
     Action, get_resolved_location_from_depot, get_terminal_collection_from_depot,
 };
-use shuriken_rfc::rfc::dav::build::multistatus::serialize_multistatus;
-use shuriken_rfc::rfc::dav::core::{ExpandProperty, Multistatus, ReportType, SyncCollection};
 
 /// ## Summary
 /// Main REPORT method dispatcher for `WebDAV`.
@@ -172,10 +172,10 @@ async fn build_sync_collection_response(
     collection: &shuriken_db::model::dav::collection::DavCollection,
     base_path: &str,
 ) -> anyhow::Result<Multistatus> {
-    use shuriken_db::db::query::dav::{instance, tombstone};
-    use shuriken_rfc::rfc::dav::core::{DavProperty, Href, PropstatResponse, QName};
     use diesel::{ExpressionMethods, QueryDsl};
     use diesel_async::RunQueryDsl;
+    use shuriken_db::db::query::dav::{instance, tombstone};
+    use shuriken_rfc::rfc::dav::core::{DavProperty, Href, PropstatResponse, QName};
 
     // Parse sync token (0 for initial sync, otherwise parse as i64)
     let baseline_token: i64 = if sync.sync_token.is_empty() {

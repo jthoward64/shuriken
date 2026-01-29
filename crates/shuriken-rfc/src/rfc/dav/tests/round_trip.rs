@@ -4,9 +4,7 @@
 //! structural integrity.
 
 use crate::rfc::dav::build::serialize_multistatus;
-use crate::rfc::dav::core::{
-    DavProperty, Multistatus, Propstat, PropstatResponse, QName, Status,
-};
+use crate::rfc::dav::core::{DavProperty, Multistatus, Propstat, PropstatResponse, QName, Status};
 
 /// Create a simple multistatus response for testing
 fn create_test_multistatus() -> Multistatus {

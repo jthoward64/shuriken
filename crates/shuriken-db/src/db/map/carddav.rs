@@ -39,7 +39,11 @@ pub fn build_card_index(entity_id: Uuid, vcard: &VCard) -> NewCardIndex {
     }
 
     // Extract all EMAIL properties as array
-    let emails: Vec<String> = vcard.emails().into_iter().map(std::string::ToString::to_string).collect();
+    let emails: Vec<String> = vcard
+        .emails()
+        .into_iter()
+        .map(std::string::ToString::to_string)
+        .collect();
     if !emails.is_empty() {
         data["emails"] =
             serde_json::Value::Array(emails.into_iter().map(serde_json::Value::String).collect());

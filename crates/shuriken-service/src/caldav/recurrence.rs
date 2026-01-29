@@ -65,7 +65,9 @@ pub fn extract_recurrence_data_with_resolver(
     );
 
     // Check for RRULE property
-    let rrule_prop = if let Some(prop) = component.get_property("RRULE") { prop } else {
+    let rrule_prop = if let Some(prop) = component.get_property("RRULE") {
+        prop
+    } else {
         tracing::trace!("RRULE property not found");
         return Ok(None);
     };

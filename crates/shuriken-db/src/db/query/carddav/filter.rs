@@ -7,15 +7,13 @@ use crate::db::connection::DbConnection;
 use crate::db::query::text_match::{
     CollationError, build_like_pattern, normalize_for_ilike, normalize_for_sql_upper,
 };
-use crate::db::schema::{
-    card_index, dav_component, dav_instance, dav_parameter, dav_property,
-};
+use crate::db::schema::{card_index, dav_component, dav_instance, dav_parameter, dav_property};
 use crate::model::dav::instance::DavInstance;
+use diesel::prelude::*;
+use diesel_async::RunQueryDsl;
 use shuriken_rfc::rfc::dav::core::{
     AddressbookFilter, AddressbookQuery, FilterTest, MatchType, ParamFilter, PropFilter, TextMatch,
 };
-use diesel::prelude::*;
-use diesel_async::RunQueryDsl;
 
 /// ## Summary
 /// Finds instances in a collection that match the addressbook-query filter.

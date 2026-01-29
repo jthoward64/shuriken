@@ -7,16 +7,14 @@ use salvo::http::StatusCode;
 use salvo::writing::Text;
 use salvo::{Depot, Request, Response, handler};
 
+use shuriken_db::db::query::dav::collection;
+use shuriken_rfc::rfc::dav::build::multistatus::serialize_multistatus;
+use shuriken_rfc::rfc::dav::core::{DavProperty, Multistatus, Propstat, PropstatResponse, Status};
+use shuriken_rfc::rfc::dav::parse;
 use shuriken_service::auth::{
     Action, authorizer_from_depot, get_resolved_location_from_depot, get_subjects_from_depot,
     get_terminal_collection_from_depot,
 };
-use shuriken_db::db::query::dav::collection;
-use shuriken_rfc::rfc::dav::build::multistatus::serialize_multistatus;
-use shuriken_rfc::rfc::dav::core::{
-    DavProperty, Multistatus, Propstat, PropstatResponse, Status,
-};
-use shuriken_rfc::rfc::dav::parse;
 
 /// ## Summary
 /// Handles PROPPATCH requests to update `WebDAV` properties.

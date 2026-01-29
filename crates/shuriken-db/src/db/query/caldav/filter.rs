@@ -7,13 +7,13 @@ use crate::db::connection::DbConnection;
 use crate::db::query::text_match::{build_like_pattern, normalize_for_sql_upper};
 use crate::db::schema::{cal_index, dav_instance, dav_parameter};
 use crate::model::dav::instance::DavInstance;
-use shuriken_rfc::rfc::dav::core::{
-    CalendarFilter, CalendarQuery, CompFilter, MatchType, ParamFilter, TimeRange,
-};
 use chrono::TimeDelta;
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use rrule::{RRule, Tz, Unvalidated};
+use shuriken_rfc::rfc::dav::core::{
+    CalendarFilter, CalendarQuery, CompFilter, MatchType, ParamFilter, TimeRange,
+};
 
 /// ## Summary
 /// Finds instances in a collection that match the calendar-query filter.

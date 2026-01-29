@@ -7,9 +7,11 @@ use salvo::{Depot, Request, Response, handler};
 
 use crate::app::api::dav::extract::auth::{check_authorization, get_auth_context};
 use crate::app::api::dav::extract::headers::{Depth, parse_depth};
-use shuriken_service::auth::{Action, get_resolved_location_from_depot, get_terminal_collection_from_depot};
 use shuriken_rfc::rfc::dav::build::multistatus::serialize_multistatus;
 use shuriken_rfc::rfc::dav::parse::propfind::parse_propfind;
+use shuriken_service::auth::{
+    Action, get_resolved_location_from_depot, get_terminal_collection_from_depot,
+};
 
 use helpers::build_propfind_response;
 
@@ -95,14 +97,15 @@ pub async fn propfind(req: &mut Request, res: &mut Response, depot: &Depot) {
     }
 
     // Build multistatus response
-    let multistatus = match build_propfind_response(&mut conn, req, depot, depth, &propfind_req).await {
-        Ok(ms) => ms,
-        Err(e) => {
-            tracing::error!(error = %e, "Failed to build PROPFIND response");
-            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
-            return;
-        }
-    };
+    let multistatus =
+        match build_propfind_response(&mut conn, req, depot, depth, &propfind_req).await {
+            Ok(ms) => ms,
+            Err(e) => {
+                tracing::error!(error = %e, "Failed to build PROPFIND response");
+                res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+                return;
+            }
+        };
 
     tracing::debug!("Multistatus response built successfully");
 

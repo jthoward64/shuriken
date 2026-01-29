@@ -4,9 +4,7 @@ use quick_xml::Reader;
 use quick_xml::events::Event;
 
 use super::error::{ParseError, ParseResult};
-use crate::rfc::dav::core::{
-    Namespace, PropertyName, PropfindRequest, PropfindType, QName,
-};
+use crate::rfc::dav::core::{Namespace, PropertyName, PropfindRequest, PropfindType, QName};
 
 /// Parses a PROPFIND request body.
 ///

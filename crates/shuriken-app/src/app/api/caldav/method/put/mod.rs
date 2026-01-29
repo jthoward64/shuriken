@@ -5,14 +5,14 @@ mod types;
 use salvo::http::{HeaderValue, StatusCode};
 use salvo::{Depot, Request, Response, handler};
 
+use shuriken_db::db::query::dav::instance;
+use shuriken_db::model::dav::instance::DavInstance;
 use shuriken_service::auth::{
     Action, ResourceType, authorizer_from_depot,
     depot::{get_path_location_from_depot, get_terminal_collection_from_depot},
     get_subjects_from_depot,
 };
 use shuriken_service::caldav::service::object::{PutObjectContext, put_calendar_object};
-use shuriken_db::db::query::dav::instance;
-use shuriken_db::model::dav::instance::DavInstance;
 
 use types::{PutError, PutResult};
 
@@ -263,11 +263,11 @@ async fn check_put_authorization(
     collection_id: uuid::Uuid,
     slug: &str,
 ) -> Result<(), StatusCode> {
+    use diesel::prelude::*;
+    use diesel_async::RunQueryDsl;
     use shuriken_service::auth::{
         PathSegment, ResourceLocation, depot::get_owner_principal_from_depot,
     };
-    use diesel::prelude::*;
-    use diesel_async::RunQueryDsl;
 
     // Get the owner principal from depot (set by slug resolver)
     let owner_principal = get_owner_principal_from_depot(depot).map_err(|e| {

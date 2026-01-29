@@ -4,9 +4,7 @@
 
 use super::escape::{escape_param_value, escape_text};
 use super::fold::fold_line;
-use crate::rfc::ical::core::{
-    Component, ComponentKind, ICalendar, Parameter, Property, Value,
-};
+use crate::rfc::ical::core::{Component, ComponentKind, ICalendar, Parameter, Property, Value};
 
 /// Serializes an iCalendar document to a string.
 #[must_use]

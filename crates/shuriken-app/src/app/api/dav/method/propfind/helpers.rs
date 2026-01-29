@@ -3,11 +3,11 @@
 use salvo::{Depot, Request};
 
 use crate::app::api::dav::extract::headers::Depth;
-use shuriken_service::auth::get_terminal_collection_from_depot;
 use shuriken_rfc::rfc::dav::core::{
     DavProperty, Href, Multistatus, PropstatResponse, QName, property::PropertyValue,
     property::discovery,
 };
+use shuriken_service::auth::get_terminal_collection_from_depot;
 
 /// ## Summary
 /// Builds a multistatus response for a PROPFIND request.
@@ -56,8 +56,8 @@ pub(super) async fn build_propfind_response(
         if let Some(coll) = collection {
             // Query for child instances in the collection
             let instances = {
-                use shuriken_db::db::query::dav::instance;
                 use diesel_async::RunQueryDsl;
+                use shuriken_db::db::query::dav::instance;
 
                 instance::by_collection_not_deleted(coll.id)
                     .load::<shuriken_db::model::dav::instance::DavInstance>(conn)

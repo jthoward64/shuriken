@@ -1,5 +1,4 @@
 ///! DAV-specific domain types used across crates.
-
 use crate::model::{dav::collection::DavCollection, dav::instance::DavInstance, user::User};
 
 /// Represents an authenticated user or public access in the depot.
