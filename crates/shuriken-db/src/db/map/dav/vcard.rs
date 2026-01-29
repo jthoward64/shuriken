@@ -23,10 +23,10 @@ type DbModels<'a> = (
 ///
 /// ## Errors
 /// Returns an error if the mapping fails.
-pub fn vcard_to_db_models<'a>(
-    vcard: &'a VCard,
+pub fn vcard_to_db_models(
+    vcard: &VCard,
     entity_type: crate::db::enums::EntityType,
-) -> anyhow::Result<DbModels<'a>> {
+) -> anyhow::Result<DbModels<'_>> {
     let logical_uid = extract_vcard_uid(vcard);
 
     let entity = NewDavEntity {

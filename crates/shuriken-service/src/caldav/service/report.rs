@@ -87,7 +87,7 @@ pub async fn execute_calendar_multiget(
     // For now, return empty multistatus to allow compilation
     let _ = (conn, multiget, properties);
     tracing::warn!("execute_calendar_multiget not yet implemented after workspace refactor");
-    return Ok(multistatus);
+    Ok(multistatus)
 
     // DISABLED CODE - needs refactoring:
     /*
@@ -159,27 +159,21 @@ async fn execute_calendar_query_with_expansion(
             };
 
         if let Some((Some(rrule_text), Some(dtstart_utc))) = cal_index_row {
-            let rrule: rrule::RRule<Unvalidated> = match rrule_text.parse::<RRule<Unvalidated>>() {
-                Ok(rule) => rule,
-                Err(_) => {
-                    let href = Href::new(format!("/item-{}", instance.slug));
-                    let props = build_instance_properties(conn, &instance, properties).await?;
-                    let response = PropstatResponse::ok(href, props);
-                    multistatus.add_response(response);
-                    continue;
-                }
+            let rrule: rrule::RRule<Unvalidated> = if let Ok(rule) = rrule_text.parse::<RRule<Unvalidated>>() { rule } else {
+                let href = Href::new(format!("/item-{}", instance.slug));
+                let props = build_instance_properties(conn, &instance, properties).await?;
+                let response = PropstatResponse::ok(href, props);
+                multistatus.add_response(response);
+                continue;
             };
 
             let dt_start = dtstart_utc.with_timezone(&Tz::UTC);
-            let mut rrule_set: rrule::RRuleSet = match rrule.build(dt_start) {
-                Ok(set) => set,
-                Err(_) => {
-                    let href = Href::new(format!("/item-{}", instance.slug));
-                    let props = build_instance_properties(conn, &instance, properties).await?;
-                    let response = PropstatResponse::ok(href, props);
-                    multistatus.add_response(response);
-                    continue;
-                }
+            let mut rrule_set: rrule::RRuleSet = if let Ok(set) = rrule.build(dt_start) { set } else {
+                let href = Href::new(format!("/item-{}", instance.slug));
+                let props = build_instance_properties(conn, &instance, properties).await?;
+                let response = PropstatResponse::ok(href, props);
+                multistatus.add_response(response);
+                continue;
             };
 
             if let Some(start) = time_range.start {

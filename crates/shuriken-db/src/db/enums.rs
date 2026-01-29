@@ -1,7 +1,7 @@
 //! Database enum types with Diesel serialization.
 //!
 //! This module provides type-safe enum wrappers for database CHECK constraints.
-//! Each enum implements `ToSql` and `FromSql` for automatic conversion between Rust and PostgreSQL.
+//! Each enum implements `ToSql` and `FromSql` for automatic conversion between Rust and `PostgreSQL`.
 
 use diesel::deserialize::{self, FromSql, FromSqlRow};
 use diesel::expression::AsExpression;

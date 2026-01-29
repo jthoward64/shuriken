@@ -287,7 +287,7 @@ async fn apply_text_match_to_property(
 }
 
 /// ## Summary
-/// Evaluates email property filter against card_index.data JSONB field.
+/// Evaluates email property filter against `card_index.data` JSONB field.
 ///
 /// Queries the emails array in the JSONB data field.
 ///
@@ -389,7 +389,7 @@ async fn evaluate_email_filter(
 }
 
 /// ## Summary
-/// Evaluates phone property filter against card_index.data JSONB field.
+/// Evaluates phone property filter against `card_index.data` JSONB field.
 ///
 /// Queries the phones array in the JSONB data field.
 ///

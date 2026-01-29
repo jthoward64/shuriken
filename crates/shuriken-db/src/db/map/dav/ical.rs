@@ -25,10 +25,10 @@ type DbModels<'a> = (
 ///
 /// ## Errors
 /// Returns an error if the mapping fails (e.g., unsupported value types).
-pub fn icalendar_to_db_models<'a>(
-    ical: &'a ICalendar,
+pub fn icalendar_to_db_models(
+    ical: &ICalendar,
     entity_type: crate::db::enums::EntityType,
-) -> anyhow::Result<DbModels<'a>> {
+) -> anyhow::Result<DbModels<'_>> {
     // Extract logical UID from top-level component
     let logical_uid = extract_ical_uid(&ical.root);
 

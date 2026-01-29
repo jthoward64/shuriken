@@ -67,7 +67,7 @@ pub async fn execute_addressbook_multiget(
     // For now, return empty multistatus to allow compilation
     let _ = (conn, multiget, properties);
     tracing::warn!("execute_addressbook_multiget not yet implemented after workspace refactor");
-    return Ok(multistatus);
+    Ok(multistatus)
 
     // DISABLED CODE - needs refactoring:
     /*

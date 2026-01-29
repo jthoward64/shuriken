@@ -19,7 +19,7 @@ use shuriken_rfc::rfc::ical::expand::TimeZoneResolver;
 /// ## Parameters
 /// - `component_map`: `HashMap` from tree insertion mapping `(component_name, uid)` to `component_id`
 #[must_use]
-#[allow(clippy::implicit_hasher)]
+#[expect(clippy::implicit_hasher)]
 pub fn build_cal_indexes(
     entity_id: Uuid,
     ical: &ICalendar,

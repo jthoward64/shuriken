@@ -153,7 +153,7 @@ pub async fn put_calendar_object(
 
     let collection_id = ctx.collection_id;
     let slug = ctx.slug.clone();
-    let entity_type = ctx.entity_type.clone();
+    let entity_type = ctx.entity_type;
     let logical_uid = ctx.logical_uid.clone();
     let etag_for_tx = etag.clone();
     let collection_synctoken = collection_data.synctoken;

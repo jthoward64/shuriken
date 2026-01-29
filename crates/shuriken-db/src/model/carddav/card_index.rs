@@ -21,7 +21,7 @@ pub struct CardIndex {
     /// Formatted name (FN property).
     #[diesel(column_name = fn_)]
     pub fn_: Option<String>,
-    /// Flexible vCard data (n_family, n_given, org, title, emails, phones, etc.).
+    /// Flexible vCard data (`n_family`, `n_given`, org, title, emails, phones, etc.).
     pub data: Option<JsonValue>,
     /// Last update timestamp.
     pub updated_at: chrono::DateTime<chrono::Utc>,
@@ -40,6 +40,6 @@ pub struct NewCardIndex {
     /// Formatted name (FN property).
     #[diesel(column_name = fn_)]
     pub fn_: Option<String>,
-    /// Flexible vCard data (n_family, n_given, org, title, emails, phones, etc.).
+    /// Flexible vCard data (`n_family`, `n_given`, org, title, emails, phones, etc.).
     pub data: Option<JsonValue>,
 }
