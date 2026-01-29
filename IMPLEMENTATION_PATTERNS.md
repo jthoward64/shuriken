@@ -5,7 +5,13 @@
 
 ---
 
-## Pattern 1: Live Property Generators
+## Pattern 1: Live Property Generators ✅ IMPLEMENTED
+
+**Status**: Implemented and merged (2026-01-29)  
+**Location**: `src/component/rfc/dav/core/property/discovery.rs`  
+**Integration**: `src/app/api/dav/method/propfind/helpers.rs`  
+**RFC**: RFC 4791 §5.2.3, §7.5.1; RFC 6352 §6.2.2; RFC 3253 §3.1.5  
+**Tests**: 7 unit tests + 5 integration tests (unit tests passing, integration tests written)
 
 ### Discovery Properties (supported-report-set, supported-components)
 

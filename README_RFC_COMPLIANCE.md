@@ -210,25 +210,30 @@
 
 ## 📊 Compliance Roadmap
 
-| Phase | Effort | Compliance | Deliverables |
-|-------|--------|-----------|-----------------|
-| **Phase 0** | 1h | 72% | Remove LOCK/UNLOCK from DAV header, add `supported-report-set` |
-| **Phase 1** | 8h | 80% | Property generators, precondition error XML |
-| **Phase 2** | 8h | 82% | ACL minimal profile (DAV:acl, need-privileges) |
-| **Phase 3** | 15h | 85% | Query improvements, validation |
-| **Total** | **32h** | **85%** | **Ready for client release** |
+| Phase | Effort | Compliance | Deliverables | Status |
+|-------|--------|-----------|------------------|--------|
+| **Phase 0** | 1h | 72% | Remove LOCK/UNLOCK from DAV header, add `supported-report-set` | 🔄 **In Progress** (50% done) |
+| **Phase 1** | 8h | 80% | Property generators, precondition error XML | 🔄 **In Progress** (40% done) |
+| **Phase 2** | 8h | 82% | ACL minimal profile (DAV:acl, need-privileges) | ⏳ Pending |
+| **Phase 3** | 15h | 85% | Query improvements, validation | ⏳ Pending |
+| **Total** | **32h** | **85%** | **Ready for client release** | **~20% Complete** |
+
+### Latest Update (2026-01-29)
+✅ Property Discovery Implementation: All 4 discovery properties implemented and integrated into PROPFIND handler
 
 ---
 
 ## 📋 RFC Compliance Status Summary
 
-### CalDAV (RFC 4791): 75% → 80% target
+### CalDAV (RFC 4791): 75% → 78% (in progress) → 80% target
 - ✅ Component handling, RRULE, ETags, sync tokens
-- ⚠️ Missing: `supported-report-set`, `supported-calendar-component-set`, precondition errors
+- ✅ **NEW**: `supported-report-set`, `supported-calendar-component-set`, `supported-collation-set` (2026-01-29)
+- ⚠️ Missing: precondition error XML
 
-### CardDAV (RFC 6352): 65% → 75% target
+### CardDAV (RFC 6352): 65% → 70% (in progress) → 75% target
 - ✅ vCard parsing, filtering, sync
-- ⚠️ Missing: `supported-report-set`, `supported-address-data`, error XML
+- ✅ **NEW**: `supported-report-set`, `supported-address-data` (2026-01-29)
+- ⚠️ Missing: precondition error XML
 
 ### WebDAV (RFC 4918): 70% → 75% target
 - ✅ All core methods (GET, PUT, DELETE, PROPFIND, etc.)

@@ -1099,27 +1099,28 @@ DAV: 1, 2, 3, calendar-access, addressbook-access
 
 ### Phase 0: Critical Fixes (1 Day) - Reach 72% Compliance
 
-| Item | Effort | Impact | Risk |
-|------|--------|--------|------|
-| Remove Class 2 from DAV header | 30m | Eliminates spec violation | None |
-| Add `supported-report-set` property | 2h | Enables report discovery | Low |
-| Fix Compliance Class advertising | 30m | Honest about capabilities | None |
+| Item | Effort | Impact | Risk | Status |
+|------|--------|--------|------|--------|
+| Remove Class 2 from DAV header | 30m | Eliminates spec violation | None | ⏳ Pending |
+| Add `supported-report-set` property | 2h | Enables report discovery | Low | ✅ **Complete** (2026-01-29) |
+| Fix Compliance Class advertising | 30m | Honest about capabilities | None | ⏳ Pending |
 
-**Total**: 3 hours → **72% compliance**
+**Total**: 3 hours → **72% compliance** (partial: property discovery done)
 
 ### Phase 1: Discovery & Errors (1 Week) - Reach 80% Compliance
 
-| Item | Effort | Impact | Dependencies |
-|------|--------|--------|---------------|
-| Add `supported-calendar-component-set` property | 3h | Clients know component support | Phase 0 |
-| Add `supported-calendar-data` property | 2h | Clients know media types | Phase 0 |
-| Add `CALDAV:` precondition error XML | 4h | Clients understand errors | Phase 0 |
-| Add `CARDDAV:` precondition error XML | 3h | CardDAV error handling | Phase 0 |
-| Add `DAV:acl` property serializer | 6h | ACLs readable | Phase 0 |
-| Add `DAV:need-privileges` error element | 3h | 403 errors detailed | Phase 0 |
-| Return `DAV:supported-privilege-set` | 2h | Privilege discovery | Phase 0 |
+| Item | Effort | Impact | Dependencies | Status |
+|------|--------|--------|---------------|--------|
+| Add `supported-calendar-component-set` property | 3h | Clients know component support | Phase 0 | ✅ **Complete** (2026-01-29) |
+| Add `supported-calendar-data` property | 2h | Clients know media types | Phase 0 | ✅ **Complete** (2026-01-29) |
+| Add `supported-collation-set` property | 2h | Text-match collations | Phase 0 | ✅ **Complete** (2026-01-29) |
+| Add `CALDAV:` precondition error XML | 4h | Clients understand errors | Phase 0 | ⏳ Pending |
+| Add `CARDDAV:` precondition error XML | 3h | CardDAV error handling | Phase 0 | ⏳ Pending |
+| Add `DAV:acl` property serializer | 6h | ACLs readable | Phase 0 | ⏳ Pending |
+| Add `DAV:need-privileges` error element | 3h | 403 errors detailed | Phase 0 | ⏳ Pending |
+| Return `DAV:supported-privilege-set` | 2h | Privilege discovery | Phase 0 | ⏳ Pending |
 
-**Total**: 23 hours → **80% compliance**
+**Total**: 25 hours → **80% compliance** (partial: discovery properties complete)
 
 ### Phase 2: Query Improvements (2 Weeks) - Reach 85% Compliance
 

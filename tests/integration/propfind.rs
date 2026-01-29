@@ -757,3 +757,307 @@ async fn propfind_invalid_xml_400() {
 
     response.assert_status(StatusCode::BAD_REQUEST);
 }
+
+// ============================================================================
+// RFC Compliance: Discovery Property Tests
+// ============================================================================
+
+/// ## Summary
+/// Test that PROPFIND returns DAV:supported-report-set for calendar collections.
+///
+/// RFC 4791 §7: CalDAV servers MUST advertise supported REPORT methods.
+#[test_log::test(tokio::test)]
+async fn propfind_calendar_returns_supported_report_set() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
+
+    let collection_id = test_db
+        .seed_collection(principal_id, "calendar", "testcal", Some("Test Calendar"))
+        .await
+        .expect("Failed to seed collection");
+
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let prop_request = r#"<?xml version="1.0" encoding="utf-8"?>
+<D:propfind xmlns:D="DAV:">
+  <D:prop>
+    <D:supported-report-set/>
+  </D:prop>
+</D:propfind>"#;
+
+    let response = TestRequest::propfind(&caldav_collection_path("testuser", "testcal"))
+        .depth("0")
+        .xml_body(prop_request)
+        .send(&service)
+        .await;
+
+    let response = response.assert_status(StatusCode::MULTI_STATUS);
+
+    let body = response.body_string();
+
+    // RFC 4791 §7: MUST support calendar-query and calendar-multiget
+    assert!(
+        body.contains("calendar-query"),
+        "Response should contain calendar-query report"
+    );
+    assert!(
+        body.contains("calendar-multiget"),
+        "Response should contain calendar-multiget report"
+    );
+    assert!(
+        body.contains("sync-collection"),
+        "Response should contain sync-collection report"
+    );
+}
+
+/// ## Summary
+/// Test that PROPFIND returns DAV:supported-report-set for addressbook collections.
+///
+/// RFC 6352 §3: CardDAV servers MUST advertise supported REPORT methods.
+#[test_log::test(tokio::test)]
+async fn propfind_addressbook_returns_supported_report_set() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
+
+    let collection_id = test_db
+        .seed_collection(principal_id, "addressbook", "contacts", Some("My Contacts"))
+        .await
+        .expect("Failed to seed collection");
+
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "addressbook")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let prop_request = r#"<?xml version="1.0" encoding="utf-8"?>
+<D:propfind xmlns:D="DAV:">
+  <D:prop>
+    <D:supported-report-set/>
+  </D:prop>
+</D:propfind>"#;
+
+    let response = TestRequest::propfind(&carddav_collection_path("testuser", "contacts"))
+        .depth("0")
+        .xml_body(prop_request)
+        .send(&service)
+        .await;
+
+    let response = response.assert_status(StatusCode::MULTI_STATUS);
+
+    let body = response.body_string();
+
+    // RFC 6352 §3: MUST support addressbook-query and addressbook-multiget
+    assert!(
+        body.contains("addressbook-query"),
+        "Response should contain addressbook-query report"
+    );
+    assert!(
+        body.contains("addressbook-multiget"),
+        "Response should contain addressbook-multiget report"
+    );
+    assert!(
+        body.contains("sync-collection"),
+        "Response should contain sync-collection report"
+    );
+}
+
+/// ## Summary
+/// Test that PROPFIND returns CALDAV:supported-calendar-component-set.
+///
+/// RFC 4791 §5.2.3: Calendar collections MUST advertise supported component types.
+#[test_log::test(tokio::test)]
+async fn propfind_returns_supported_calendar_component_set() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
+
+    let collection_id = test_db
+        .seed_collection(principal_id, "calendar", "testcal", Some("Test Calendar"))
+        .await
+        .expect("Failed to seed collection");
+
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let prop_request = r#"<?xml version="1.0" encoding="utf-8"?>
+<D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+  <D:prop>
+    <C:supported-calendar-component-set/>
+  </D:prop>
+</D:propfind>"#;
+
+    let response = TestRequest::propfind(&caldav_collection_path("testuser", "testcal"))
+        .depth("0")
+        .xml_body(prop_request)
+        .send(&service)
+        .await;
+
+    let response = response.assert_status(StatusCode::MULTI_STATUS);
+
+    let body = response.body_string();
+
+    // RFC 4791 §5.2.3: Must list supported component types
+    assert!(
+        body.contains("VEVENT"),
+        "Response should contain VEVENT component"
+    );
+    assert!(
+        body.contains("VTODO"),
+        "Response should contain VTODO component"
+    );
+    assert!(
+        body.contains("VJOURNAL"),
+        "Response should contain VJOURNAL component"
+    );
+}
+
+/// ## Summary
+/// Test that PROPFIND returns CARDDAV:supported-address-data.
+///
+/// RFC 6352 §6.2.2: Addressbook collections MUST advertise supported vCard versions.
+#[test_log::test(tokio::test)]
+async fn propfind_returns_supported_address_data() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
+
+    let collection_id = test_db
+        .seed_collection(principal_id, "addressbook", "contacts", Some("My Contacts"))
+        .await
+        .expect("Failed to seed collection");
+
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "addressbook")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let prop_request = r#"<?xml version="1.0" encoding="utf-8"?>
+<D:propfind xmlns:D="DAV:" xmlns:CR="urn:ietf:params:xml:ns:carddav">
+  <D:prop>
+    <CR:supported-address-data/>
+  </D:prop>
+</D:propfind>"#;
+
+    let response = TestRequest::propfind(&carddav_collection_path("testuser", "contacts"))
+        .depth("0")
+        .xml_body(prop_request)
+        .send(&service)
+        .await;
+
+    let response = response.assert_status(StatusCode::MULTI_STATUS);
+
+    let body = response.body_string();
+
+    // RFC 6352 §6.2.2: Must list supported vCard versions
+    assert!(
+        body.contains("version=\"3.0\""),
+        "Response should contain vCard 3.0 support"
+    );
+    assert!(
+        body.contains("version=\"4.0\""),
+        "Response should contain vCard 4.0 support"
+    );
+    assert!(
+        body.contains("text/vcard"),
+        "Response should contain text/vcard content type"
+    );
+}
+
+/// ## Summary
+/// Test that PROPFIND returns CALDAV:supported-collation-set.
+///
+/// RFC 4791 §7.5.1: Calendar collections SHOULD advertise supported text collations.
+#[test_log::test(tokio::test)]
+async fn propfind_returns_supported_collation_set() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
+
+    let collection_id = test_db
+        .seed_collection(principal_id, "calendar", "testcal", Some("Test Calendar"))
+        .await
+        .expect("Failed to seed collection");
+
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let prop_request = r#"<?xml version="1.0" encoding="utf-8"?>
+<D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+  <D:prop>
+    <C:supported-collation-set/>
+  </D:prop>
+</D:propfind>"#;
+
+    let response = TestRequest::propfind(&caldav_collection_path("testuser", "testcal"))
+        .depth("0")
+        .xml_body(prop_request)
+        .send(&service)
+        .await;
+
+    let response = response.assert_status(StatusCode::MULTI_STATUS);
+
+    let body = response.body_string();
+
+    // RFC 4791 §7.5.1: Must list supported collations
+    assert!(
+        body.contains("i;octet"),
+        "Response should contain i;octet collation"
+    );
+    assert!(
+        body.contains("i;ascii-casemap"),
+        "Response should contain i;ascii-casemap collation"
+    );
+    assert!(
+        body.contains("i;unicode-casemap"),
+        "Response should contain i;unicode-casemap collation"
+    );
+}

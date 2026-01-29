@@ -202,7 +202,7 @@ mod tests {
     use chrono::{Datelike, TimeZone, Timelike};
 
     type IcalValueTuple<'a> = (
-        &'static str,
+        ValueType,
         Option<&'a str>,
         Option<i64>,
         Option<f64>,
@@ -222,7 +222,7 @@ mod tests {
         let (vtype, vtext, vint, vfloat, vbool, vdate, vtstz) =
             extract_ical_value_for_test(&value, "Hello World");
 
-        assert_eq!(vtype, "text");
+        assert_eq!(vtype, ValueType::Text);
         assert_eq!(vtext, Some("Hello World"));
         assert_eq!(vint, None);
         assert_eq!(vfloat, None);
@@ -236,7 +236,7 @@ mod tests {
         let value = Value::Integer(42);
         let (vtype, vtext, vint, _, _, _, _) = extract_ical_value_for_test(&value, "42");
 
-        assert_eq!(vtype, "integer");
+        assert_eq!(vtype, ValueType::Integer);
         assert_eq!(vtext, None);
         assert_eq!(vint, Some(42));
     }
@@ -246,7 +246,7 @@ mod tests {
         let value = Value::Float(42.5);
         let (vtype, vtext, vint, vfloat, _, _, _) = extract_ical_value_for_test(&value, "42.5");
 
-        assert_eq!(vtype, "float");
+        assert_eq!(vtype, ValueType::Float);
         assert_eq!(vtext, None);
         assert_eq!(vint, None);
         assert_eq!(vfloat, Some(42.5));
@@ -257,7 +257,7 @@ mod tests {
         let value = Value::Boolean(true);
         let (vtype, _, _, _, vbool, _, _) = extract_ical_value_for_test(&value, "TRUE");
 
-        assert_eq!(vtype, "boolean");
+        assert_eq!(vtype, ValueType::Boolean);
         assert_eq!(vbool, Some(true));
     }
 
@@ -266,7 +266,7 @@ mod tests {
         let value = Value::Boolean(false);
         let (vtype, _, _, _, vbool, _, _) = extract_ical_value_for_test(&value, "FALSE");
 
-        assert_eq!(vtype, "boolean");
+        assert_eq!(vtype, ValueType::Boolean);
         assert_eq!(vbool, Some(false));
     }
 
@@ -279,7 +279,7 @@ mod tests {
         });
         let (vtype, _, _, _, _, vdate, _) = extract_ical_value_for_test(&value, "20260124");
 
-        assert_eq!(vtype, "date");
+        assert_eq!(vtype, ValueType::Date);
         assert_eq!(vdate, chrono::NaiveDate::from_ymd_opt(2026, 1, 24));
     }
 
@@ -296,7 +296,7 @@ mod tests {
         });
         let (vtype, _, _, _, _, _, vtstz) = extract_ical_value_for_test(&value, "20260124T123045Z");
 
-        assert_eq!(vtype, "datetime");
+        assert_eq!(vtype, ValueType::DateTime);
         assert!(vtstz.is_some());
         let dt = vtstz.unwrap();
         // Check date components using the date() method
@@ -323,7 +323,7 @@ mod tests {
         });
         let (vtype, vtext, _, _, _, _, _) = extract_ical_value_for_test(&value, "P1DT2H30M");
 
-        assert_eq!(vtype, "text");
+        assert_eq!(vtype, ValueType::Text);
         assert_eq!(vtext, Some("P1DT2H30M"));
     }
 

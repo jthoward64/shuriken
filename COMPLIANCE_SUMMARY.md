@@ -114,14 +114,25 @@
 
 ## Implementation Path: 46 Hours to 85%
 
-| Phase | Hours | Impact | Compliance |
-|-------|-------|--------|-----------|
-| **Phase 0** (Day 1) | 1h | Fix spec violations, remove LOCK/UNLOCK | 72% |
-| **Phase 1** (Week 1) | 8h | Add discovery properties + error XML | 80% |
-| **Phase 2** (Week 2) | 8h | Add ACL minimal profile support | 82% |
-| **Phase 3** (Week 3-4) | 15h | Query improvements + validation | 85% |
-| **Subtotal** | **32h** | | **85%** |
-| Future (Phases 4+) | 40h+ | Scheduling, free-busy, full RFC 3744 | 90%+ |
+| Phase | Hours | Impact | Compliance | Status |
+|-------|-------|--------|-----------|--------|
+| **Phase 0** (Day 1) | 1h | Fix spec violations, remove LOCK/UNLOCK | 72% | 🔄 **In Progress** (property discovery ✅) |
+| **Phase 1** (Week 1) | 8h | Add discovery properties + error XML | 80% | 🔄 **In Progress** (3/8 items ✅) |
+| **Phase 2** (Week 2) | 8h | Add ACL minimal profile support | 82% | ⏳ Pending |
+| **Phase 3** (Week 3-4) | 15h | Query improvements + validation | 85% | ⏳ Pending |
+| **Subtotal** | **32h** | | **85%** | **~20% Complete** |
+| Future (Phases 4+) | 40h+ | Scheduling, free-busy, full RFC 3744 | 90%+ | ⏳ Pending |
+
+### Recent Progress (2026-01-29)
+
+✅ **Property Discovery Implementation Complete**:
+- Implemented `DAV:supported-report-set` for calendar/addressbook/plain collections
+- Implemented `CALDAV:supported-calendar-component-set` for calendar collections
+- Implemented `CARDDAV:supported-address-data` for addressbook collections
+- Implemented `CALDAV:supported-collation-set` for calendar collections
+- Created 7 unit tests (all passing)
+- Created 5 integration tests
+- Integrated into PROPFIND handler for both allprop and specific property requests
 
 ---
 

@@ -1,5 +1,7 @@
 //! DAV property types.
 
+pub mod discovery;
+
 use super::namespace::QName;
 use super::partial_retrieval::{AddressDataRequest, CalendarDataRequest};
 

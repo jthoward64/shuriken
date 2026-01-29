@@ -630,6 +630,7 @@ pub enum ComponentType {
     VTodo,
     VJournal,
     VFreeBusy,
+    Invalid,
 }
 
 impl ToSql<Text, Pg> for ComponentType {
@@ -639,6 +640,7 @@ impl ToSql<Text, Pg> for ComponentType {
             Self::VTodo => "VTODO",
             Self::VJournal => "VJOURNAL",
             Self::VFreeBusy => "VFREEBUSY",
+            Self::Invalid => "INVALID",
         };
         out.write_all(s.as_bytes())?;
         Ok(IsNull::No)
@@ -652,6 +654,7 @@ impl FromSql<Text, Pg> for ComponentType {
             b"VTODO" => Ok(Self::VTodo),
             b"VJOURNAL" => Ok(Self::VJournal),
             b"VFREEBUSY" => Ok(Self::VFreeBusy),
+            b"INVALID" => Ok(Self::Invalid),
             _ => Err("Unrecognized enum variant".into()),
         }
     }
@@ -666,6 +669,7 @@ impl ComponentType {
             Self::VTodo => "VTODO",
             Self::VJournal => "VJOURNAL",
             Self::VFreeBusy => "VFREEBUSY",
+            Self::Invalid => "INVALID",
         }
     }
 }
@@ -684,7 +688,7 @@ impl From<crate::component::rfc::ical::core::ComponentKind> for ComponentType {
             ComponentKind::Todo => Self::VTodo,
             ComponentKind::Journal => Self::VJournal,
             ComponentKind::FreeBusy => Self::VFreeBusy,
-            _ => Self::VEvent, // Default for non-indexable components
+            _ => Self::Invalid,
         }
     }
 }

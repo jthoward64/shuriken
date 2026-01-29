@@ -67,7 +67,10 @@ fn test_icalendar_to_db_models_simple_event() {
     let (entity, components, properties, parameters) = result.unwrap();
 
     // Check entity
-    assert_eq!(entity.entity_type, crate::component::db::enums::EntityType::ICalendar);
+    assert_eq!(
+        entity.entity_type,
+        crate::component::db::enums::EntityType::ICalendar
+    );
     assert_eq!(entity.logical_uid, Some("event-123".to_string()));
 
     // Check components
@@ -203,7 +206,10 @@ fn test_vcard_to_db_models_simple() {
     let (entity, components, properties, parameters) = result.unwrap();
 
     // Check entity
-    assert_eq!(entity.entity_type, crate::component::db::enums::EntityType::VCard);
+    assert_eq!(
+        entity.entity_type,
+        crate::component::db::enums::EntityType::VCard
+    );
     assert_eq!(entity.logical_uid, Some("vcard-123".to_string()));
 
     // Check components (should be 1 root vCard component)

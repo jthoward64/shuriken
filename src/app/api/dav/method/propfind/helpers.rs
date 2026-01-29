@@ -7,6 +7,7 @@ use crate::component::auth::get_terminal_collection_from_depot;
 use crate::component::db::connection;
 use crate::component::rfc::dav::core::{
     DavProperty, Href, Multistatus, PropstatResponse, QName, property::PropertyValue,
+    property::discovery,
 };
 
 /// ## Summary
@@ -137,19 +138,43 @@ async fn get_properties_for_resource(
             name: QName::dav("resourcetype"),
             value: Some(PropertyValue::ResourceType(vec![
                 QName::dav("collection"),
-                collection_qname,
+                collection_qname.clone(),
             ])),
         });
-        found.push(DavProperty {
-            name: QName::dav("supported-report-set"),
-            value: Some(PropertyValue::SupportedReports(vec![
-                QName::caldav("calendar-query"),
-                QName::caldav("calendar-multiget"),
-                QName::dav("sync-collection"),
-            ])),
-        });
-        // Add getetag if we have a collection with synctoken
+
+        // RFC 4791/RFC 6352: Add discovery properties based on collection type
         if let Some(coll) = collection {
+            // DAV:supported-report-set - RFC 3253 via CalDAV/CardDAV
+            found.push(DavProperty::xml(
+                QName::dav("supported-report-set"),
+                discovery::supported_report_set(coll.collection_type),
+            ));
+
+            // CalDAV-specific properties
+            if matches!(coll.collection_type.as_str(), "calendar") {
+                // CALDAV:supported-calendar-component-set - RFC 4791 §5.2.3
+                found.push(DavProperty::xml(
+                    QName::caldav("supported-calendar-component-set"),
+                    discovery::supported_calendar_component_set(),
+                ));
+
+                // CALDAV:supported-collation-set - RFC 4791 §7.5.1
+                found.push(DavProperty::xml(
+                    QName::caldav("supported-collation-set"),
+                    discovery::supported_collation_set(),
+                ));
+            }
+
+            // CardDAV-specific properties
+            if matches!(coll.collection_type.as_str(), "addressbook") {
+                // CARDDAV:supported-address-data - RFC 6352 §6.2.2
+                found.push(DavProperty::xml(
+                    QName::carddav("supported-address-data"),
+                    discovery::supported_address_data(),
+                ));
+            }
+
+            // Add getetag
             found.push(DavProperty::text(
                 QName::dav("getetag"),
                 &format!("\"{}\"", coll.synctoken),
@@ -179,14 +204,58 @@ async fn get_properties_for_resource(
                     });
                 }
                 ("DAV:", "supported-report-set") => {
-                    found.push(DavProperty {
-                        name: qname,
-                        value: Some(PropertyValue::SupportedReports(vec![
-                            QName::caldav("calendar-query"),
-                            QName::caldav("calendar-multiget"),
-                            QName::dav("sync-collection"),
-                        ])),
-                    });
+                    // RFC 3253 via RFC 4791/RFC 6352: Return supported REPORT methods
+                    if let Some(coll) = collection {
+                        found.push(DavProperty::xml(
+                            qname,
+                            discovery::supported_report_set(coll.collection_type),
+                        ));
+                    } else {
+                        not_found.push(DavProperty::empty(qname));
+                    }
+                }
+                ("urn:ietf:params:xml:ns:caldav", "supported-calendar-component-set") => {
+                    // RFC 4791 §5.2.3: Supported component types for calendar collections
+                    if let Some(coll) = collection {
+                        if matches!(coll.collection_type.as_str(), "calendar") {
+                            found.push(DavProperty::xml(
+                                qname,
+                                discovery::supported_calendar_component_set(),
+                            ));
+                        } else {
+                            not_found.push(DavProperty::empty(qname));
+                        }
+                    } else {
+                        not_found.push(DavProperty::empty(qname));
+                    }
+                }
+                ("urn:ietf:params:xml:ns:caldav", "supported-collation-set") => {
+                    // RFC 4791 §7.5.1: Supported text matching collations
+                    if let Some(coll) = collection {
+                        if matches!(coll.collection_type.as_str(), "calendar") {
+                            found.push(DavProperty::xml(
+                                qname,
+                                discovery::supported_collation_set(),
+                            ));
+                        } else {
+                            not_found.push(DavProperty::empty(qname));
+                        }
+                    } else {
+                        not_found.push(DavProperty::empty(qname));
+                    }
+                }
+                ("urn:ietf:params:xml:ns:carddav", "supported-address-data") => {
+                    // RFC 6352 §6.2.2: Supported vCard versions for addressbook collections
+                    if let Some(coll) = collection {
+                        if matches!(coll.collection_type.as_str(), "addressbook") {
+                            found
+                                .push(DavProperty::xml(qname, discovery::supported_address_data()));
+                        } else {
+                            not_found.push(DavProperty::empty(qname));
+                        }
+                    } else {
+                        not_found.push(DavProperty::empty(qname));
+                    }
                 }
                 ("DAV:", "getetag") => {
                     if let Some(coll) = collection {
