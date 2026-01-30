@@ -1,26 +1,34 @@
 //! OPTIONS method handler for `WebDAV` resources.
 
 use salvo::http::HeaderValue;
-use salvo::{Request, Response, handler};
+use salvo::{Depot, Request, Response, handler};
+use shuriken_service::auth::depot::depot_keys;
 
 /// ## Summary
 /// Handles OPTIONS requests for `WebDAV` resources.
 ///
 /// Returns appropriate `Allow` and `DAV` headers based on the resource type.
-/// For collections, allows collection-level methods; for items, allows item-level methods.
+/// Determines if the resource is a collection or item by checking the depot
+/// for an INSTANCE entry (items have instances, collections don't).
 ///
 /// ## Side Effects
 /// Sets the `Allow` and `DAV` headers on the response.
 #[handler]
 #[tracing::instrument(skip_all, fields(path = %req.uri().path()))]
-pub async fn options(req: &mut Request, res: &mut Response) {
+pub async fn options(req: &mut Request, res: &mut Response, depot: &Depot) {
     tracing::info!("Handling OPTIONS request");
 
-    // TODO: Determine if this is a collection or item based on path/database lookup
-    // For now, return a generic set of methods
+    // Determine if this is an item (has instance) or collection (no instance)
+    let is_item = depot.get::<shuriken_db::model::dav::instance::DavInstance>(depot_keys::INSTANCE).is_ok();
 
-    // Standard DAV methods (Phase 3)
-    let allow_methods = "OPTIONS, GET, HEAD, PUT, DELETE, PROPFIND";
+    // Set Allow header based on resource type
+    let allow_methods = if is_item {
+        // Items support basic CRUD operations but not collection creation
+        "OPTIONS, GET, HEAD, PUT, DELETE, PROPFIND, REPORT"
+    } else {
+        // Collections support additional methods like MKCALENDAR, MKCOL
+        "OPTIONS, GET, HEAD, PUT, DELETE, PROPFIND, REPORT, MKCALENDAR, MKCOL"
+    };
 
     // DAV compliance classes
     // Class 1: Basic WebDAV (PROPFIND, PROPPATCH, COPY, MOVE, etc.)
@@ -41,7 +49,7 @@ pub async fn options(req: &mut Request, res: &mut Response) {
     let _ = res.add_header("DAV", HeaderValue::from_static(dav_header), true);
     res.status_code(salvo::http::StatusCode::OK);
 
-    tracing::debug!("OPTIONS response sent");
+    tracing::debug!(is_item, "OPTIONS response sent");
 }
 
 /// ## Summary
