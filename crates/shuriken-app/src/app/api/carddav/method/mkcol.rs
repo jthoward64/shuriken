@@ -132,7 +132,21 @@ pub async fn mkcol_extended(req: &mut Request, res: &mut Response, depot: &Depot
                 result.collection_id
             );
             res.status_code(StatusCode::CREATED);
-            // TODO: Set Location header
+            
+            // Set Location header with full URL (RFC 4918 §8.10.4)
+            // Construct full URL: scheme://host/path
+            let scheme = if req.uri().scheme_str() == Some("https") { "https" } else { "http" };
+            let host = req.headers()
+                .get("Host")
+                .and_then(|h| h.to_str().ok())
+                .unwrap_or("localhost");
+            let location = format!("{}://{}{}", scheme, host, path);
+            
+            #[expect(
+                clippy::let_underscore_must_use,
+                reason = "Location header addition failure is non-fatal"
+            )]
+            let _ = res.add_header("Location", location, true);
         }
         Err(e) => {
             tracing::error!("Failed to create addressbook collection: {}", e);
