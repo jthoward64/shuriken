@@ -244,7 +244,11 @@ async fn check_proppatch_authorization(
 
     let authorizer = authorizer_from_depot(depot).map_err(|e| {
         tracing::error!(error = %e, "Failed to get authorizer");
-        (StatusCode::INTERNAL_SERVER_ERROR, resource.clone(), Action::Edit)
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            resource.clone(),
+            Action::Edit,
+        )
     })?;
 
     match authorizer.require(&subjects, resource, Action::Edit) {
@@ -259,7 +263,11 @@ async fn check_proppatch_authorization(
         }
         Err(e) => {
             tracing::error!(error = %e, "Authorization check failed");
-            Err((StatusCode::INTERNAL_SERVER_ERROR, resource.clone(), Action::Edit))
+            Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                resource.clone(),
+                Action::Edit,
+            ))
         }
     }
 }

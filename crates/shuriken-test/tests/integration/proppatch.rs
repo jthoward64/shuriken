@@ -255,7 +255,12 @@ async fn proppatch_remove_displayname() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Calendar, "testcal", Some("Original Name"))
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "testcal",
+            Some("Original Name"),
+        )
         .await
         .expect("Failed to seed collection");
 

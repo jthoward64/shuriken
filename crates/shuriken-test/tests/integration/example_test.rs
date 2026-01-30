@@ -103,7 +103,12 @@ async fn example_seed_addressbook_collection() {
 
     // 2. Create addressbook collection
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Addressbook, "contacts", Some("Contacts"))
+        .seed_collection(
+            principal_id,
+            CollectionType::Addressbook,
+            "contacts",
+            Some("Contacts"),
+        )
         .await
         .expect("Failed to seed collection");
 

@@ -247,7 +247,10 @@ pub fn parse_client_pid_map(value: &str, line_num: usize) -> ParseResult<ClientP
 ///
 /// ## Errors
 /// Returns an error if the date format is invalid or unrecognized.
-#[expect(clippy::too_many_lines, reason = "RFC 6350 date formats include many variants")]
+#[expect(
+    clippy::too_many_lines,
+    reason = "RFC 6350 date formats include many variants"
+)]
 pub fn parse_date(value: &str, line_num: usize) -> ParseResult<VCardDate> {
     let s = value.trim();
 
@@ -410,7 +413,10 @@ pub fn parse_time(
     Ok((time, offset))
 }
 
-#[expect(clippy::too_many_lines, reason = "RFC 6350 time formats include many truncated variants")]
+#[expect(
+    clippy::too_many_lines,
+    reason = "RFC 6350 time formats include many truncated variants"
+)]
 fn parse_time_value(s: &str, line_num: usize) -> ParseResult<VCardTime> {
     use chrono::NaiveTime;
 

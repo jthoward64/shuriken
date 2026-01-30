@@ -16,9 +16,7 @@ pub fn hash_password(password: &str) -> ServiceResult<String> {
 
     let password_hash = argon2
         .hash_password(password.as_bytes(), &salt)
-        .map_err(|e| {
-            ServiceError::InvalidConfiguration(format!("Failed to hash password: {e}"))
-        })?;
+        .map_err(|e| ServiceError::InvalidConfiguration(format!("Failed to hash password: {e}")))?;
 
     Ok(password_hash.to_string())
 }

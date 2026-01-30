@@ -73,7 +73,9 @@ async fn create_user_handler(req: &mut Request, depot: &mut Depot, res: &mut Res
     tracing::debug!("Processing create user request");
 
     // Get authenticated user from depot
-    let Ok(DepotUser::User(authenticated_user)) = depot.get::<DepotUser>(depot_keys::AUTHENTICATED_PRINCIPAL) else {
+    let Ok(DepotUser::User(authenticated_user)) =
+        depot.get::<DepotUser>(depot_keys::AUTHENTICATED_PRINCIPAL)
+    else {
         res.status_code(StatusCode::UNAUTHORIZED);
         res.render(Json(ErrorResponse {
             error: "Authentication required".to_string(),
@@ -307,7 +309,9 @@ async fn update_password_handler(req: &mut Request, depot: &mut Depot, res: &mut
     tracing::debug!("Processing update password request");
 
     // Get authenticated user from depot
-    let Ok(DepotUser::User(authenticated_user)) = depot.get::<DepotUser>(depot_keys::AUTHENTICATED_PRINCIPAL) else {
+    let Ok(DepotUser::User(authenticated_user)) =
+        depot.get::<DepotUser>(depot_keys::AUTHENTICATED_PRINCIPAL)
+    else {
         res.status_code(StatusCode::UNAUTHORIZED);
         res.render(Json(ErrorResponse {
             error: "Authentication required".to_string(),

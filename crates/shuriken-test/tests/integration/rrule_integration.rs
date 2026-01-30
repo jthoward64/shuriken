@@ -1,6 +1,9 @@
 use super::helpers::TestDb;
 
-include!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/rrule_cases_data/mod.rs"));
+include!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/tests/rrule_cases_data/mod.rs"
+));
 
 /// ## Summary
 /// Integration-level validation for rrule behavior using shared cases.

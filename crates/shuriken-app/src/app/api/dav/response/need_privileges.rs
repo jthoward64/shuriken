@@ -3,8 +3,8 @@
 //! This module provides helper functions to generate RFC-compliant 403 Forbidden
 //! responses that include detailed information about missing privileges.
 
-use salvo::http::StatusCode;
 use salvo::Response;
+use salvo::http::StatusCode;
 use shuriken_rfc::rfc::dav::core::{DavError, Href, PrivilegeRequired};
 use shuriken_service::auth::{Action, ResourceLocation};
 

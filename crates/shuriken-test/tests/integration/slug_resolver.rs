@@ -3,7 +3,9 @@
 //!
 //! Uses `tests/integration/helpers.rs` for database setup and request utilities.
 
-use super::helpers::{TestDb, cal_collection_glob, cal_owner_glob, cal_path, CollectionType, PrincipalType};
+use super::helpers::{
+    CollectionType, PrincipalType, TestDb, cal_collection_glob, cal_owner_glob, cal_path,
+};
 use shuriken_test::component::middleware::path_parser::parse_and_resolve_path;
 
 /// Resolves a calendar owner-only path and verifies principal resolution.
@@ -73,7 +75,13 @@ async fn resolve_nested_calendar_collection_path() {
         .await
         .expect("Failed to seed parent collection");
     let child_id = test_db
-        .seed_child_collection(principal_id, CollectionType::Calendar, "team", Some("Team"), parent_id)
+        .seed_child_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "team",
+            Some("Team"),
+            parent_id,
+        )
         .await
         .expect("Failed to seed child collection");
 
@@ -147,7 +155,13 @@ async fn resolve_nested_calendar_instance_path() {
         .await
         .expect("Failed to seed parent collection");
     let child_id = test_db
-        .seed_child_collection(principal_id, CollectionType::Calendar, "team", Some("Team"), parent_id)
+        .seed_child_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "team",
+            Some("Team"),
+            parent_id,
+        )
         .await
         .expect("Failed to seed child collection");
     let entity_id = test_db

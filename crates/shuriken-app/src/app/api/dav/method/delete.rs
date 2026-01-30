@@ -113,7 +113,9 @@ pub async fn delete(req: &mut Request, res: &mut Response, depot: &Depot) {
         .map(String::from);
 
     // Check authorization: need write permission on the resource
-    if let Err((status, resource, action)) = check_delete_authorization(depot, &mut conn, collection_id, &slug).await {
+    if let Err((status, resource, action)) =
+        check_delete_authorization(depot, &mut conn, collection_id, &slug).await
+    {
         if status == StatusCode::FORBIDDEN {
             let path_href = req.uri().path();
             send_need_privileges_error(res, &resource, action, path_href);
@@ -237,9 +239,20 @@ async fn check_delete_authorization(
     conn: &mut shuriken_db::db::connection::DbConnection<'_>,
     _collection_id: uuid::Uuid,
     _slug: &str,
-) -> Result<(), (StatusCode, shuriken_service::auth::ResourceLocation, shuriken_service::auth::Action)> {
+) -> Result<
+    (),
+    (
+        StatusCode,
+        shuriken_service::auth::ResourceLocation,
+        shuriken_service::auth::Action,
+    ),
+> {
     let (subjects, authorizer) = get_auth_context(depot, conn).await.map_err(|e| {
-        (e, shuriken_service::auth::ResourceLocation::from_segments(vec![]), shuriken_service::auth::Action::Delete)
+        (
+            e,
+            shuriken_service::auth::ResourceLocation::from_segments(vec![]),
+            shuriken_service::auth::Action::Delete,
+        )
     })?;
 
     // Get ResourceLocation from depot (use resolved UUID-based location for authorization)
