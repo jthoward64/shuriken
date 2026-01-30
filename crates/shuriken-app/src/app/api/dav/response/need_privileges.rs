@@ -23,7 +23,8 @@ pub fn send_need_privileges_error(
     href: &str,
 ) {
     res.status_code(StatusCode::FORBIDDEN);
-    let _ = res.add_header("Content-Type", "application/xml; charset=utf-8", true);
+    #[expect(unused)]
+    res.add_header("Content-Type", "application/xml; charset=utf-8", true);
 
     let privilege = action_to_privilege_name(action);
 

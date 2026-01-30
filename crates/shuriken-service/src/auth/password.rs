@@ -36,7 +36,10 @@ pub fn verify_password(password: &str, password_hash: &str) -> ServiceResult<()>
 
     argon2
         .verify_password(password.as_bytes(), &parsed_hash)
-        .map_err(|_| ServiceError::NotAuthenticated)
+        .map_err(|err| {
+            tracing::trace!("Password verification failed: {}", err);
+            ServiceError::NotAuthenticated
+        })
 }
 
 #[cfg(test)]

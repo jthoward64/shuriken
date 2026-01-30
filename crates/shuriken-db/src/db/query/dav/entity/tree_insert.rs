@@ -168,7 +168,6 @@ pub async fn insert_vcard_tree(
 #[expect(
     clippy::cast_possible_truncation,
     clippy::cast_possible_wrap,
-    clippy::too_many_arguments,
     reason = "Component tree depth and property counts are bounded by RFC limits, truncation safe; component_map accumulator required for mapping"
 )]
 fn insert_component_recursive<'a>(

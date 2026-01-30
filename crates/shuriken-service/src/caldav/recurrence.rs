@@ -53,18 +53,10 @@ fn extract_dtstart(
     component: &Component,
     resolver: &mut TimeZoneResolver,
 ) -> Option<(DateTime<Utc>, Option<String>)> {
-    let Some(dtstart_prop) = component.get_property("DTSTART") else {
-        return None;
-    };
+    let dtstart_prop = component.get_property("DTSTART")?;
     let tzid = dtstart_prop.get_param_value("TZID").map(String::from);
-    let Some(dtstart_ical) = dtstart_prop.as_datetime() else {
-        return None;
-    };
-    let Some(dtstart_utc) =
-        ical_datetime_to_utc_with_resolver(dtstart_ical, tzid.as_deref(), resolver)
-    else {
-        return None;
-    };
+    let dtstart_ical = dtstart_prop.as_datetime()?;
+    let dtstart_utc = ical_datetime_to_utc_with_resolver(dtstart_ical, tzid.as_deref(), resolver)?;
     tracing::trace!(dtstart = %dtstart_utc, "Extracted DTSTART");
     Some((dtstart_utc, tzid))
 }
@@ -79,14 +71,9 @@ fn extract_duration(
     resolver: &mut TimeZoneResolver,
 ) -> Option<chrono::TimeDelta> {
     if let Some(dtend_prop) = component.get_property("DTEND") {
-        let Some(dtend_ical) = dtend_prop.as_datetime() else {
-            return None;
-        };
+        let dtend_ical = dtend_prop.as_datetime()?;
         let dtend_tzid = dtend_prop.get_param_value("TZID");
-        let Some(dtend_utc) = ical_datetime_to_utc_with_resolver(dtend_ical, dtend_tzid, resolver)
-        else {
-            return None;
-        };
+        let dtend_utc = ical_datetime_to_utc_with_resolver(dtend_ical, dtend_tzid, resolver)?;
         let dur = dtend_utc.signed_duration_since(dtstart_utc);
         tracing::trace!(
             duration_seconds = dur.num_seconds(),
@@ -94,9 +81,7 @@ fn extract_duration(
         );
         Some(dur)
     } else if let Some(duration_prop) = component.get_property("DURATION") {
-        let Some(duration_ical) = duration_prop.as_duration() else {
-            return None;
-        };
+        let duration_ical = duration_prop.as_duration()?;
         let dur = ical_duration_to_chrono(duration_ical);
         tracing::trace!(duration_seconds = dur.num_seconds(), "Extracted DURATION");
         Some(dur)

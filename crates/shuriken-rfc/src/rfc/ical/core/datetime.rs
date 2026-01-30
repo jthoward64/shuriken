@@ -171,10 +171,6 @@ pub struct DateTime {
 impl DateTime {
     /// Creates a floating DATE-TIME.
     #[must_use]
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "Constructor mirrors RFC 5545 DATE-TIME components"
-    )]
     pub fn floating(year: u16, month: u8, day: u8, hour: u8, minute: u8, second: u8) -> Self {
         Self {
             year,
@@ -189,10 +185,6 @@ impl DateTime {
 
     /// Creates a UTC DATE-TIME.
     #[must_use]
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "Constructor mirrors RFC 5545 DATE-TIME components"
-    )]
     pub fn utc(year: u16, month: u8, day: u8, hour: u8, minute: u8, second: u8) -> Self {
         Self {
             year,

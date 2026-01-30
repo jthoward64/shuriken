@@ -154,9 +154,15 @@ async fn authenticate_basic_auth(
 
     let decoded = base64::prelude::BASE64_STANDARD
         .decode(credentials)
-        .map_err(|_| ServiceError::NotAuthenticated)?;
+        .map_err(|err| {
+            tracing::trace!("Failed to decode Basic Auth credentials: {}", err);
+            ServiceError::NotAuthenticated
+        })?;
 
-    let credentials_str = String::from_utf8(decoded).map_err(|_| ServiceError::NotAuthenticated)?;
+    let credentials_str = String::from_utf8(decoded).map_err(|err| {
+        tracing::trace!("Failed to decode Basic Auth credentials: {}", err);
+        ServiceError::NotAuthenticated
+    })?;
 
     let (email, password) = credentials_str
         .split_once(':')

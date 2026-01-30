@@ -131,10 +131,6 @@ fn map_ical_component_recursive<'a>(
 
 /// ## Summary
 /// Maps an iCalendar property to a database property model.
-#[expect(
-    clippy::too_many_arguments,
-    reason = "Accumulator pattern plus timezone resolver requires these parameters"
-)]
 fn map_ical_property<'a>(
     prop: &'a Property,
     component_id: uuid::Uuid,

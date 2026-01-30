@@ -69,7 +69,9 @@ pub async fn serialize_acl_for_resource(
     enforcer: Arc<dyn std::any::Any + Send + Sync>,
 ) -> ServiceResult<String> {
     // Downcast the Any to Arc<casbin::Enforcer>
-    let enforcer = enforcer.downcast::<casbin::Enforcer>().map_err(|_| {
+    let enforcer = enforcer.downcast::<casbin::Enforcer>().map_err(|err| {
+        let type_name = std::any::type_name_of_val(err.as_ref());
+        tracing::error!("Failed to downcast enforcer: type={type_name}");
         ServiceError::InvariantViolation("Enforcer is not of type casbin::Enforcer")
     })?;
     // Get all policies from Casbin

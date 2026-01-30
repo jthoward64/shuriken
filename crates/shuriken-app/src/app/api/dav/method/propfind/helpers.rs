@@ -379,6 +379,12 @@ async fn get_properties_for_resource(
             let qname = prop_name.qname().clone();
             resolve_single_property(qname, &mut ctx).await;
         }
+    } else {
+        // Invalid request type
+        tracing::warn!(
+            req = ?propfind_req,
+            "Invalid PROPFIND request type for resource"
+        );
     }
 
     Ok((found, not_found))

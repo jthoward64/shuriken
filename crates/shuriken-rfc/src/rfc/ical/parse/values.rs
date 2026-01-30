@@ -269,10 +269,6 @@ fn extract_duration_number(
 }
 
 /// Applies a parsed component value to the duration.
-#[expect(
-    clippy::too_many_arguments,
-    reason = "Duration parser helper requires these parameters for state tracking"
-)]
 fn apply_duration_component(
     dur: &mut Duration,
     c: char,
