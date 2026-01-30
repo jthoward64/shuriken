@@ -118,7 +118,7 @@ async fn authenticate_proxy(
 /// Authenticate a user via HTTP Basic Authentication.
 ///
 /// Extracts credentials from the Authorization header, looks up the user by email,
-/// and verifies the password against the stored Argon2 hash in the auth_user table.
+/// and verifies the password against the stored Argon2 hash in the `auth_user` table.
 ///
 /// ## Errors
 /// Returns an error if:

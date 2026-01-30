@@ -295,7 +295,7 @@ async fn check_copy_authorization(
         Action::Read,
         "COPY source",
     ) {
-        let href = depot.get::<String>("PATH_LOCATION").map(|s| s.to_string()).unwrap_or_default();
+        let href = depot.get::<String>("PATH_LOCATION").cloned().unwrap_or_default();
         return Err((status, resource, action, href));
     }
 
@@ -323,7 +323,7 @@ async fn check_copy_authorization(
         Action::Edit,
         "COPY destination",
     ) {
-        let dest_path = format!("{}{}", destination, resource_name);
+        let dest_path = format!("{destination}{resource_name}");
         return Err((status, resource, action, dest_path));
     }
 

@@ -16,7 +16,7 @@ fn main() {
         href: Href::new("/calendars/alice/work/"),
         privilege: "read".to_string(),
     }]);
-    println!("{}\n", xml);
+    println!("{xml}\n");
 
     // Example 2: Multiple resources
     println!("Example 2: MOVE operation requires privileges on both source and destination\n");
@@ -30,7 +30,7 @@ fn main() {
             privilege: "bind".to_string(),
         },
     ]);
-    println!("{}\n", xml);
+    println!("{xml}\n");
 
     // Example 3: Write-content privilege
     println!("Example 3: User lacks 'write-content' privilege to modify event\n");
@@ -38,7 +38,7 @@ fn main() {
         href: Href::new("/calendars/bob/personal/meeting.ics"),
         privilege: "write-content".to_string(),
     }]);
-    println!("{}\n", xml);
+    println!("{xml}\n");
 
     // Example 4: Read-ACL privilege
     println!("Example 4: User lacks 'read-acl' privilege to view permissions\n");
@@ -46,7 +46,7 @@ fn main() {
         href: Href::new("/principals/users/alice/"),
         privilege: "read-acl".to_string(),
     }]);
-    println!("{}\n", xml);
+    println!("{xml}\n");
 
     // Example 5: Write-properties privilege
     println!("Example 5: User lacks 'write-properties' for PROPPATCH\n");
@@ -54,7 +54,7 @@ fn main() {
         href: Href::new("/calendars/carol/shared/"),
         privilege: "write-properties".to_string(),
     }]);
-    println!("{}\n", xml);
+    println!("{xml}\n");
 
     // Example 6: CardDAV addressbook
     println!("Example 6: User lacks 'write' privilege on addressbook\n");
@@ -62,7 +62,7 @@ fn main() {
         href: Href::new("/addressbooks/dave/contacts/"),
         privilege: "write".to_string(),
     }]);
-    println!("{}\n", xml);
+    println!("{xml}\n");
 
     println!("=== Integration Pattern ===\n");
     println!(

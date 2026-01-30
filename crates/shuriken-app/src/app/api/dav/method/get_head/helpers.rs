@@ -34,6 +34,10 @@ pub(super) async fn handle_get_or_head(
     is_head: bool,
     depot: &Depot,
 ) {
+    // RFC 3744 need-privileges error handling
+    use crate::app::api::dav::response::need_privileges::send_need_privileges_error;
+    use shuriken_service::auth::Action;
+
     // Extract the resource path from the request
     let request_path = req.uri().path();
 
@@ -87,16 +91,14 @@ pub(super) async fn handle_get_or_head(
                 return;
             }
         };
+
         if let Err(e) = check_read_authorization(depot, &mut conn, &inst).await {
             tracing::debug!(error = %e, instance_id = %inst.id, "Authorization denied");
             // Send RFC 3744 need-privileges error
-            use crate::app::api::dav::response::need_privileges::send_need_privileges_error;
-            use shuriken_service::auth::Action;
             if let Ok(resource) = shuriken_service::auth::get_resolved_location_from_depot(depot) {
                 let path_href = depot
                     .get::<String>("PATH_LOCATION")
-                    .map(|s| s.as_str())
-                    .unwrap_or("/");
+                    .map_or("/", std::string::String::as_str);
                 send_need_privileges_error(res, resource, Action::Read, path_href);
             } else {
                 res.status_code(StatusCode::FORBIDDEN);
@@ -317,11 +319,8 @@ fn set_response_headers_and_body(
 ) {
     // Set ETag header
     if let Ok(etag_value) = HeaderValue::from_str(&instance.etag) {
-        #[expect(
-            clippy::let_underscore_must_use,
-            reason = "Header addition failure is non-fatal"
-        )]
-        let _ = res.add_header("ETag", etag_value, true);
+        #[expect(unused)]
+        res.add_header("ETag", etag_value, true);
     }
 
     // Set Last-Modified header
@@ -330,20 +329,14 @@ fn set_response_headers_and_body(
         .format("%a, %d %b %Y %H:%M:%S GMT")
         .to_string();
     if let Ok(lm_value) = HeaderValue::from_str(&last_modified) {
-        #[expect(
-            clippy::let_underscore_must_use,
-            reason = "Header addition failure is non-fatal"
-        )]
-        let _ = res.add_header("Last-Modified", lm_value, true);
+        #[expect(unused)]
+        res.add_header("Last-Modified", lm_value, true);
     }
 
     // Set Content-Type header
     if let Ok(ct_value) = HeaderValue::from_str(instance.content_type.as_str()) {
-        #[expect(
-            clippy::let_underscore_must_use,
-            reason = "Header addition failure is non-fatal"
-        )]
-        let _ = res.add_header("Content-Type", ct_value, true);
+        #[expect(unused)]
+        res.add_header("Content-Type", ct_value, true);
     }
 
     res.status_code(StatusCode::OK);

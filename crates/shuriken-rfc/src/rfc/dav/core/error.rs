@@ -197,7 +197,7 @@ impl DavError {
     /// assert!(xml.contains("<D:read/>"));
     /// ```
     #[must_use]
-    #[allow(clippy::format_push_string)] // write! is preferred but requires std::fmt::Write
+    #[expect(clippy::format_push_string)] // write! is preferred but requires std::fmt::Write
     pub fn need_privileges(privileges_required: &[PrivilegeRequired]) -> String {
         let mut xml = String::from(
             r#"<?xml version="1.0" encoding="utf-8"?>
@@ -282,13 +282,13 @@ mod tests {
 
         assert!(xml.contains(r#"<?xml version="1.0" encoding="utf-8"?>"#));
         assert!(xml.contains(r#"<D:error xmlns:D="DAV:">"#));
-        assert!(xml.contains(r#"<D:need-privileges>"#));
-        assert!(xml.contains(r#"<D:resource>"#));
-        assert!(xml.contains(r#"<D:href>/calendars/alice/work/</D:href>"#));
-        assert!(xml.contains(r#"<D:privilege>"#));
-        assert!(xml.contains(r#"<D:read/>"#));
-        assert!(xml.contains(r#"</D:need-privileges>"#));
-        assert!(xml.contains(r#"</D:error>"#));
+        assert!(xml.contains("<D:need-privileges>"));
+        assert!(xml.contains("<D:resource>"));
+        assert!(xml.contains("<D:href>/calendars/alice/work/</D:href>"));
+        assert!(xml.contains("<D:privilege>"));
+        assert!(xml.contains("<D:read/>"));
+        assert!(xml.contains("</D:need-privileges>"));
+        assert!(xml.contains("</D:error>"));
     }
 
     #[test]
@@ -304,20 +304,20 @@ mod tests {
             },
         ]);
 
-        assert!(xml.contains(r#"<D:href>/calendars/alice/work/</D:href>"#));
-        assert!(xml.contains(r#"<D:read/>"#));
-        assert!(xml.contains(r#"<D:href>/calendars/alice/work/event.ics</D:href>"#));
-        assert!(xml.contains(r#"<D:write-content/>"#));
+        assert!(xml.contains("<D:href>/calendars/alice/work/</D:href>"));
+        assert!(xml.contains("<D:read/>"));
+        assert!(xml.contains("<D:href>/calendars/alice/work/event.ics</D:href>"));
+        assert!(xml.contains("<D:write-content/>"));
     }
 
     #[test]
     fn need_privileges_empty() {
         let xml = DavError::need_privileges(&[]);
 
-        assert!(xml.contains(r#"<D:need-privileges>"#));
-        assert!(xml.contains(r#"</D:need-privileges>"#));
+        assert!(xml.contains("<D:need-privileges>"));
+        assert!(xml.contains("</D:need-privileges>"));
         // Should have no resource elements
-        assert!(!xml.contains(r#"<D:resource>"#));
+        assert!(!xml.contains("<D:resource>"));
     }
 
     #[test]
@@ -328,10 +328,8 @@ mod tests {
         }]);
 
         // Verify XML escaping
-        assert!(
-            xml.contains(r#"<D:href>/path/with&lt;special&gt;&amp;chars&quot;&apos;</D:href>"#)
-        );
-        assert!(xml.contains(r#"<D:read&lt;test&gt;/>"#));
+        assert!(xml.contains(r"<D:href>/path/with&lt;special&gt;&amp;chars&quot;&apos;</D:href>"));
+        assert!(xml.contains(r"<D:read&lt;test&gt;/>"));
         // Should not contain unescaped special chars in content
         assert!(!xml.contains(r#"<D:href>/path/with<special>&chars"'</D:href>"#));
     }

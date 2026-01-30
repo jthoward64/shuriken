@@ -25,11 +25,11 @@ pub struct RecurrenceData {
 
 /// Extract RRULE property text from a component.
 ///
-/// Returns `Ok(None)` if RRULE property is not found.
-fn extract_rrule_text(component: &Component) -> ServiceResult<Option<String>> {
+/// Returns `None` if RRULE property is not found.
+fn extract_rrule_text(component: &Component) -> Option<String> {
     let Some(rrule_prop) = component.get_property("RRULE") else {
         tracing::trace!("RRULE property not found");
-        return Ok(None);
+        return None;
     };
 
     // RRULE can be either Value::Recur or Value::Text
@@ -38,72 +38,72 @@ fn extract_rrule_text(component: &Component) -> ServiceResult<Option<String>> {
         shuriken_rfc::rfc::ical::core::Value::Text(text) => text.clone(),
         _ => {
             tracing::trace!("RRULE property has unexpected value type");
-            return Ok(None);
+            return None;
         }
     };
     tracing::trace!(rrule = %rrule_text, "Found RRULE");
-    Ok(Some(rrule_text))
+    Some(rrule_text)
 }
 
 /// Extract DTSTART property from a component.
 ///
-/// Returns tuple of (DateTime<Utc>, Option<TZID>).
-/// Returns `Ok(None)` if DTSTART is missing or invalid.
+/// Returns tuple of (`DateTime`<Utc>, Option<TZID>).
+/// Returns `None` if DTSTART is missing or invalid.
 fn extract_dtstart(
     component: &Component,
     resolver: &mut TimeZoneResolver,
-) -> ServiceResult<Option<(DateTime<Utc>, Option<String>)>> {
+) -> Option<(DateTime<Utc>, Option<String>)> {
     let Some(dtstart_prop) = component.get_property("DTSTART") else {
-        return Ok(None);
+        return None;
     };
     let tzid = dtstart_prop.get_param_value("TZID").map(String::from);
     let Some(dtstart_ical) = dtstart_prop.as_datetime() else {
-        return Ok(None);
+        return None;
     };
     let Some(dtstart_utc) =
         ical_datetime_to_utc_with_resolver(dtstart_ical, tzid.as_deref(), resolver)
     else {
-        return Ok(None);
+        return None;
     };
     tracing::trace!(dtstart = %dtstart_utc, "Extracted DTSTART");
-    Ok(Some((dtstart_utc, tzid)))
+    Some((dtstart_utc, tzid))
 }
 
 /// Extract duration from DTEND or DURATION property.
 ///
 /// Returns zero duration if neither property is present (RFC 5545).
-/// Returns `Ok(None)` if properties exist but are invalid.
+/// Returns `None` if properties exist but are invalid.
 fn extract_duration(
     component: &Component,
     dtstart_utc: DateTime<Utc>,
     resolver: &mut TimeZoneResolver,
-) -> ServiceResult<Option<chrono::TimeDelta>> {
+) -> Option<chrono::TimeDelta> {
     if let Some(dtend_prop) = component.get_property("DTEND") {
         let Some(dtend_ical) = dtend_prop.as_datetime() else {
-            return Ok(None);
+            return None;
         };
         let dtend_tzid = dtend_prop.get_param_value("TZID");
         let Some(dtend_utc) = ical_datetime_to_utc_with_resolver(dtend_ical, dtend_tzid, resolver)
         else {
-            return Ok(None);
+            return None;
         };
         let dur = dtend_utc.signed_duration_since(dtstart_utc);
         tracing::trace!(
             duration_seconds = dur.num_seconds(),
             "Calculated duration from DTEND"
         );
-        Ok(Some(dur))
+        Some(dur)
     } else if let Some(duration_prop) = component.get_property("DURATION") {
         let Some(duration_ical) = duration_prop.as_duration() else {
-            return Ok(None);
+            return None;
         };
         let dur = ical_duration_to_chrono(duration_ical);
         tracing::trace!(duration_seconds = dur.num_seconds(), "Extracted DURATION");
-        Ok(Some(dur))
+        Some(dur)
     } else {
         // RFC 5545: If neither DTEND nor DURATION is present, the event has zero duration
         tracing::trace!("No DTEND or DURATION found, using zero duration");
-        Ok(Some(chrono::TimeDelta::zero()))
+        Some(chrono::TimeDelta::zero())
     }
 }
 
@@ -166,17 +166,17 @@ pub fn extract_recurrence_data_with_resolver(
     );
 
     // Check for RRULE property and extract text
-    let Some(rrule_text) = extract_rrule_text(component)? else {
+    let Some(rrule_text) = extract_rrule_text(component) else {
         return Ok(None);
     };
 
     // Extract DTSTART
-    let Some((dtstart_utc, tzid)) = extract_dtstart(component, resolver)? else {
+    let Some((dtstart_utc, tzid)) = extract_dtstart(component, resolver) else {
         return Ok(None);
     };
 
     // Calculate duration from DTEND or DURATION
-    let Some(duration) = extract_duration(component, dtstart_utc, resolver)? else {
+    let Some(duration) = extract_duration(component, dtstart_utc, resolver) else {
         return Ok(None);
     };
 

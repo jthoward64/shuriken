@@ -51,7 +51,7 @@ pub struct UserResponse {
 /// ## Side Effects
 /// - Creates a principal row
 /// - Creates a user row
-/// - Creates an auth_user row with hashed password
+/// - Creates an `auth_user` row with hashed password
 ///
 /// ## Errors
 /// Returns HTTP 401 if not authenticated
@@ -73,15 +73,12 @@ async fn create_user_handler(req: &mut Request, depot: &mut Depot, res: &mut Res
     tracing::debug!("Processing create user request");
 
     // Get authenticated user from depot
-    let authenticated_user = match depot.get::<DepotUser>(depot_keys::AUTHENTICATED_PRINCIPAL) {
-        Ok(DepotUser::User(user)) => user,
-        _ => {
-            res.status_code(StatusCode::UNAUTHORIZED);
-            res.render(Json(ErrorResponse {
-                error: "Authentication required".to_string(),
-            }));
-            return;
-        }
+    let Ok(DepotUser::User(authenticated_user)) = depot.get::<DepotUser>(depot_keys::AUTHENTICATED_PRINCIPAL) else {
+        res.status_code(StatusCode::UNAUTHORIZED);
+        res.render(Json(ErrorResponse {
+            error: "Authentication required".to_string(),
+        }));
+        return;
     };
 
     // Check if user has write access to /principals/
@@ -93,15 +90,12 @@ async fn create_user_handler(req: &mut Request, depot: &mut Depot, res: &mut Res
         shuriken_service::auth::ResourceType::Principal,
     )]);
 
-    let principals_resource = match Ok::<_, StatusCode>(principals_resource) {
-        Ok(r) => r,
-        Err(_) => {
-            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
-            res.render(Json(ErrorResponse {
-                error: "Internal server error".to_string(),
-            }));
-            return;
-        }
+    let Ok(principals_resource) = Ok::<_, StatusCode>(principals_resource) else {
+        res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+        res.render(Json(ErrorResponse {
+            error: "Internal server error".to_string(),
+        }));
+        return;
     };
 
     if let Err(_e) = handler_require(depot, &subjects, &principals_resource, Action::Admin) {
@@ -289,7 +283,7 @@ async fn create_user_handler(req: &mut Request, depot: &mut Depot, res: &mut Res
 }
 
 /// ## Summary
-/// PUT /app/users/:user_id/password - Update a user's password
+/// PUT /`app/users/:user_id/password` - Update a user's password
 ///
 /// This endpoint is only accessible to authenticated users with write permissions
 /// to `/principals/{user_id}`. This allows:
@@ -298,7 +292,7 @@ async fn create_user_handler(req: &mut Request, depot: &mut Depot, res: &mut Res
 ///
 /// ## Errors
 /// Returns HTTP 401 if not authenticated
-/// Returns HTTP 403 if user lacks write access to /principals/{user_id}
+/// Returns HTTP 403 if user lacks write access to /`principals/{user_id`}
 /// Returns HTTP 404 if user not found
 /// Returns HTTP 500 if database operations fail
 #[handler]
@@ -313,38 +307,29 @@ async fn update_password_handler(req: &mut Request, depot: &mut Depot, res: &mut
     tracing::debug!("Processing update password request");
 
     // Get authenticated user from depot
-    let authenticated_user = match depot.get::<DepotUser>(depot_keys::AUTHENTICATED_PRINCIPAL) {
-        Ok(DepotUser::User(user)) => user,
-        _ => {
-            res.status_code(StatusCode::UNAUTHORIZED);
-            res.render(Json(ErrorResponse {
-                error: "Authentication required".to_string(),
-            }));
-            return;
-        }
+    let Ok(DepotUser::User(authenticated_user)) = depot.get::<DepotUser>(depot_keys::AUTHENTICATED_PRINCIPAL) else {
+        res.status_code(StatusCode::UNAUTHORIZED);
+        res.render(Json(ErrorResponse {
+            error: "Authentication required".to_string(),
+        }));
+        return;
     };
 
     // Get target user_id from path parameter
-    let user_id_str = match req.param::<String>("user_id") {
-        Some(id) => id,
-        None => {
-            res.status_code(StatusCode::BAD_REQUEST);
-            res.render(Json(ErrorResponse {
-                error: "User ID required".to_string(),
-            }));
-            return;
-        }
+    let Some(user_id_str) = req.param::<String>("user_id") else {
+        res.status_code(StatusCode::BAD_REQUEST);
+        res.render(Json(ErrorResponse {
+            error: "User ID required".to_string(),
+        }));
+        return;
     };
 
-    let target_user_id = match uuid::Uuid::parse_str(&user_id_str) {
-        Ok(id) => id,
-        Err(_) => {
-            res.status_code(StatusCode::BAD_REQUEST);
-            res.render(Json(ErrorResponse {
-                error: "Invalid user ID format".to_string(),
-            }));
-            return;
-        }
+    let Ok(target_user_id) = uuid::Uuid::parse_str(&user_id_str) else {
+        res.status_code(StatusCode::BAD_REQUEST);
+        res.render(Json(ErrorResponse {
+            error: "Invalid user ID format".to_string(),
+        }));
+        return;
     };
 
     // Get database provider
@@ -401,18 +386,15 @@ async fn update_password_handler(req: &mut Request, depot: &mut Depot, res: &mut
     // Check if authenticated user has write access to /principals/{target_principal_id}
     let subjects = ExpandedSubjects::from_user(authenticated_user);
 
-    let principal_resource = match Ok::<_, StatusCode>(ResourceLocation::from_segments(vec![
+    let Ok(principal_resource) = Ok::<_, StatusCode>(ResourceLocation::from_segments(vec![
         PathSegment::ResourceType(shuriken_service::auth::ResourceType::Principal),
         PathSegment::Owner(target_user.principal_id.to_string()),
-    ])) {
-        Ok(r) => r,
-        Err(_) => {
-            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
-            res.render(Json(ErrorResponse {
-                error: "Internal server error".to_string(),
-            }));
-            return;
-        }
+    ])) else {
+        res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+        res.render(Json(ErrorResponse {
+            error: "Internal server error".to_string(),
+        }));
+        return;
     };
 
     if let Err(_e) = handler_require(depot, &subjects, &principal_resource, Action::Edit) {

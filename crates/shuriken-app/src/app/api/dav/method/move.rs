@@ -345,7 +345,7 @@ async fn check_move_authorization(
         Action::Delete,
         "MOVE source",
     ) {
-        let href = depot.get::<String>("PATH_LOCATION").map(|s| s.to_string()).unwrap_or_default();
+        let href = depot.get::<String>("PATH_LOCATION").cloned().unwrap_or_default();
         return Err((status, resource, action, href));
     }
 

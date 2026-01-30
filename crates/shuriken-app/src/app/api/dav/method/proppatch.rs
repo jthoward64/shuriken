@@ -98,7 +98,7 @@ pub async fn proppatch(req: &mut Request, res: &mut Response, depot: &Depot) {
     tracing::debug!(collection_id = %collection_id, "Parsed collection ID from path");
 
     // Check authorization: need write permission on the collection
-    if let Err((status, resource, action)) =
+    if let Err((_status, resource, action)) =
         check_proppatch_authorization(depot, &mut conn, collection_id).await
     {
         send_need_privileges_error(res, &resource, action, &path);

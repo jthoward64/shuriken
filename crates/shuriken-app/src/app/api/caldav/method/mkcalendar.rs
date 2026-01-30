@@ -175,7 +175,7 @@ pub async fn mkcalendar(req: &mut Request, res: &mut Response, depot: &Depot) {
                 .get("Host")
                 .and_then(|h| h.to_str().ok())
                 .unwrap_or("localhost");
-            let location = format!("{}://{}{}", scheme, host, path);
+            let location = format!("{scheme}://{host}{path}");
 
             #[expect(
                 clippy::let_underscore_must_use,

@@ -17,7 +17,7 @@ pub fn hash_password(password: &str) -> ServiceResult<String> {
     let password_hash = argon2
         .hash_password(password.as_bytes(), &salt)
         .map_err(|e| {
-            ServiceError::InvalidConfiguration(format!("Failed to hash password: {}", e))
+            ServiceError::InvalidConfiguration(format!("Failed to hash password: {e}"))
         })?;
 
     Ok(password_hash.to_string())
@@ -32,7 +32,7 @@ pub fn hash_password(password: &str) -> ServiceResult<String> {
 /// Returns an error if password verification fails or the hash format is invalid.
 pub fn verify_password(password: &str, password_hash: &str) -> ServiceResult<()> {
     let parsed_hash = PasswordHash::new(password_hash)
-        .map_err(|e| ServiceError::InvalidConfiguration(format!("Invalid password hash: {}", e)))?;
+        .map_err(|e| ServiceError::InvalidConfiguration(format!("Invalid password hash: {e}")))?;
 
     let argon2 = Argon2::default();
 

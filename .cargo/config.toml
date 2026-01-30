@@ -1,6 +1,6 @@
 [alias]
-full-clippy = "clippy --all-targets --all-features -- -D warnings"
-full-check = "check --all-targets --all-features"
+run-tests = "test --all-targets --quiet --workspace"
+list-tests = "test --all-targets --workspace -- --list"
 
 [target.'cfg(not(windows))']
 rustflags = ["-C", "debuginfo=1"]

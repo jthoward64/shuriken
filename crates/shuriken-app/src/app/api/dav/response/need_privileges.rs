@@ -18,7 +18,7 @@ use shuriken_service::auth::{Action, ResourceLocation};
 /// Sets the response status to 403 Forbidden and writes XML body.
 pub fn send_need_privileges_error(
     res: &mut Response,
-    resource: &ResourceLocation,
+    _resource: &ResourceLocation,
     action: Action,
     href: &str,
 ) {
@@ -42,8 +42,8 @@ pub fn send_need_privileges_error(
 /// in RFC 3744 §3.1.
 fn action_to_privilege_name(action: Action) -> &'static str {
     match action {
-        Action::ReadFreebusy => "read",  // Free-busy is subset of read
-        Action::Read => "read",
+        // Free-busy is subset of read
+        Action::ReadFreebusy | Action::Read => "read",
         Action::Edit => "write-content",
         Action::Delete => "unbind",
         Action::ShareRead => "read-acl",

@@ -1,6 +1,6 @@
-//! Custom PostgreSQL type mappings for Diesel
+//! Custom `PostgreSQL` type mappings for Diesel
 //!
-//! This module provides type-safe wrappers for PostgreSQL types that don't have
+//! This module provides type-safe wrappers for `PostgreSQL` types that don't have
 //! direct Rust equivalents in the standard library.
 
 use diesel::deserialize::{self, FromSql};
@@ -10,10 +10,10 @@ use diesel::sql_types::{Interval, Range, Timestamptz};
 use diesel::{AsExpression, FromSqlRow};
 use std::io::Write;
 
-/// Wrapper for PostgreSQL INTERVAL type
+/// Wrapper for `PostgreSQL` INTERVAL type
 ///
-/// Represents a PostgreSQL INTERVAL as microseconds. This aligns with how
-/// PostgreSQL stores intervals internally and allows for precise duration arithmetic.
+/// Represents a `PostgreSQL` INTERVAL as microseconds. This aligns with how
+/// `PostgreSQL` stores intervals internally and allows for precise duration arithmetic.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, AsExpression, FromSqlRow)]
 #[diesel(sql_type = Interval)]
 pub struct PgInterval {
@@ -91,9 +91,9 @@ impl ToSql<Interval, Pg> for PgInterval {
     }
 }
 
-/// Wrapper for PostgreSQL TSTZRANGE (timestamp with timezone range) type
+/// Wrapper for `PostgreSQL` TSTZRANGE (timestamp with timezone range) type
 ///
-/// Represents a range of timestamps with timezone. PostgreSQL ranges can be inclusive
+/// Represents a range of timestamps with timezone. `PostgreSQL` ranges can be inclusive
 /// or exclusive on either bound.
 #[derive(Debug, Clone, PartialEq, Eq, AsExpression, FromSqlRow)]
 #[diesel(sql_type = Range<Timestamptz>)]
@@ -155,6 +155,9 @@ impl PgTstzRange {
 }
 
 impl FromSql<Range<Timestamptz>, Pg> for PgTstzRange {
+    #[expect(clippy::too_many_lines)] // Complex binary parsing logic, difficult to split meaningfully
+    #[expect(clippy::cast_sign_loss)] // PostgreSQL length prefixes are i32 but always non-negative
+    #[expect(clippy::similar_names)] // lower_inc/lower_inf and upper_inc/upper_inf are standard range terminology
     fn from_sql(bytes: PgValue<'_>) -> deserialize::Result<Self> {
         // PostgreSQL range format:
         // 1 byte: flags (bit 0 = empty, bit 3 = lower inclusive, bit 4 = upper inclusive,
@@ -211,8 +214,8 @@ impl FromSql<Range<Timestamptz>, Pg> for PgTstzRange {
             // PostgreSQL epoch is 2000-01-01, convert to Unix epoch
             let pg_epoch_offset = 946_684_800_000_000i64; // microseconds
             let unix_micros = micros + pg_epoch_offset;
-            let timestamp = chrono::DateTime::from_timestamp_micros(unix_micros)
-                .ok_or("Invalid timestamp")?;
+            let timestamp =
+                chrono::DateTime::from_timestamp_micros(unix_micros).ok_or("Invalid timestamp")?;
             Some(timestamp)
         };
 
@@ -247,8 +250,8 @@ impl FromSql<Range<Timestamptz>, Pg> for PgTstzRange {
 
             let pg_epoch_offset = 946_684_800_000_000i64;
             let unix_micros = micros + pg_epoch_offset;
-            let timestamp = chrono::DateTime::from_timestamp_micros(unix_micros)
-                .ok_or("Invalid timestamp")?;
+            let timestamp =
+                chrono::DateTime::from_timestamp_micros(unix_micros).ok_or("Invalid timestamp")?;
             Some(timestamp)
         };
 

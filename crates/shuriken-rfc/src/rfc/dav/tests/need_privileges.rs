@@ -15,19 +15,19 @@ fn need_privileges_single_read() {
     // Verify XML structure
     assert!(xml.contains(r#"<?xml version="1.0" encoding="utf-8"?>"#));
     assert!(xml.contains(r#"<D:error xmlns:D="DAV:">"#));
-    assert!(xml.contains(r#"<D:need-privileges>"#));
+    assert!(xml.contains(r"<D:need-privileges>"));
 
     // Verify resource element
-    assert!(xml.contains(r#"<D:resource>"#));
-    assert!(xml.contains(r#"<D:href>/calendars/alice/work/</D:href>"#));
+    assert!(xml.contains(r"<D:resource>"));
+    assert!(xml.contains(r"<D:href>/calendars/alice/work/</D:href>"));
 
     // Verify privilege element
-    assert!(xml.contains(r#"<D:privilege>"#));
-    assert!(xml.contains(r#"<D:read/>"#));
+    assert!(xml.contains(r"<D:privilege>"));
+    assert!(xml.contains(r"<D:read/>"));
 
     // Verify closing tags
-    assert!(xml.contains(r#"</D:need-privileges>"#));
-    assert!(xml.contains(r#"</D:error>"#));
+    assert!(xml.contains(r"</D:need-privileges>"));
+    assert!(xml.contains(r"</D:error>"));
 }
 
 #[test]
@@ -45,12 +45,12 @@ fn need_privileges_multiple_resources() {
     ]);
 
     // Both resources should be present
-    assert!(xml.contains(r#"<D:href>/calendars/alice/work/</D:href>"#));
-    assert!(xml.contains(r#"<D:href>/calendars/alice/work/event.ics</D:href>"#));
+    assert!(xml.contains(r"<D:href>/calendars/alice/work/</D:href>"));
+    assert!(xml.contains(r"<D:href>/calendars/alice/work/event.ics</D:href>"));
 
     // Both privileges should be present
-    assert!(xml.contains(r#"<D:read/>"#));
-    assert!(xml.contains(r#"<D:write-content/>"#));
+    assert!(xml.contains(r"<D:read/>"));
+    assert!(xml.contains(r"<D:write-content/>"));
 
     // Should have 2 resource elements
     let resource_count = xml.matches("<D:resource>").count();
@@ -64,8 +64,8 @@ fn need_privileges_write_privilege() {
         privilege: "write".to_string(),
     }]);
 
-    assert!(xml.contains(r#"<D:href>/calendars/bob/personal/event.ics</D:href>"#));
-    assert!(xml.contains(r#"<D:write/>"#));
+    assert!(xml.contains(r"<D:href>/calendars/bob/personal/event.ics</D:href>"));
+    assert!(xml.contains(r"<D:write/>"));
 }
 
 #[test]
@@ -75,7 +75,7 @@ fn need_privileges_write_properties() {
         privilege: "write-properties".to_string(),
     }]);
 
-    assert!(xml.contains(r#"<D:write-properties/>"#));
+    assert!(xml.contains(r"<D:write-properties/>"));
 }
 
 #[test]
@@ -85,7 +85,7 @@ fn need_privileges_read_acl() {
         privilege: "read-acl".to_string(),
     }]);
 
-    assert!(xml.contains(r#"<D:read-acl/>"#));
+    assert!(xml.contains(r"<D:read-acl/>"));
 }
 
 #[test]
@@ -95,7 +95,7 @@ fn need_privileges_all_privilege() {
         privilege: "all".to_string(),
     }]);
 
-    assert!(xml.contains(r#"<D:all/>"#));
+    assert!(xml.contains(r"<D:all/>"));
 }
 
 #[test]
@@ -120,8 +120,8 @@ fn need_privileges_empty_list() {
     // Edge case: empty privilege list (shouldn't happen in practice, but should be valid XML)
     let xml = DavError::need_privileges(&[]);
 
-    assert!(xml.contains(r#"<D:need-privileges>"#));
-    assert!(xml.contains(r#"</D:need-privileges>"#));
+    assert!(xml.contains(r"<D:need-privileges>"));
+    assert!(xml.contains(r"</D:need-privileges>"));
 
     // Should not have any resource elements
     assert!(!xml.contains("<D:resource>"));
@@ -135,8 +135,8 @@ fn need_privileges_addressbook() {
         privilege: "read".to_string(),
     }]);
 
-    assert!(xml.contains(r#"<D:href>/addressbooks/alice/contacts/</D:href>"#));
-    assert!(xml.contains(r#"<D:read/>"#));
+    assert!(xml.contains(r"<D:href>/addressbooks/alice/contacts/</D:href>"));
+    assert!(xml.contains(r"<D:read/>"));
 }
 
 #[test]
@@ -154,12 +154,12 @@ fn need_privileges_complex_scenario() {
     ]);
 
     // Should include both operations
-    assert!(xml.contains(r#"<D:unbind/>"#));
-    assert!(xml.contains(r#"<D:bind/>"#));
+    assert!(xml.contains(r"<D:unbind/>"));
+    assert!(xml.contains(r"<D:bind/>"));
 
     // Should have source and destination
-    assert!(xml.contains(r#"<D:href>/calendars/alice/work/event.ics</D:href>"#));
-    assert!(xml.contains(r#"<D:href>/calendars/alice/personal/</D:href>"#));
+    assert!(xml.contains(r"<D:href>/calendars/alice/work/event.ics</D:href>"));
+    assert!(xml.contains(r"<D:href>/calendars/alice/personal/</D:href>"));
 }
 
 #[test]
@@ -209,7 +209,7 @@ fn privilege_required_debug() {
         privilege: "write".to_string(),
     };
 
-    let debug_str = format!("{:?}", priv_req);
+    let debug_str = format!("{priv_req:?}");
 
     assert!(debug_str.contains("PrivilegeRequired"));
     assert!(debug_str.contains("/test/path"));
