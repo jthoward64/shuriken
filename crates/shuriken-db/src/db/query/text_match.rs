@@ -67,7 +67,8 @@ pub struct CollationResult {
 ///
 /// For `i;unicode-casemap` collation, uses ICU's `fold_string()` for proper
 /// Unicode case folding per RFC 4790. For SQL compatibility with `UPPER()`, we
-/// fold then uppercase. For `i;ascii-casemap`, uses simple uppercasing.
+/// fold then uppercase. For `i;ascii-casemap`, uses ASCII-only uppercasing per
+/// RFC 4790 §9.2.1 (only converts ASCII letters a-z to A-Z, leaves non-ASCII unchanged).
 /// For `i;octet`, returns text as-is (case-sensitive).
 ///
 /// Unicode case folding differs from simple lowercasing in important ways:
@@ -99,9 +100,10 @@ pub fn normalize_for_sql_upper(
                 case_sensitive: false,
             })
         }
-        // ASCII casemap uses simple uppercasing
+        // RFC 4790 §9.2.1: ASCII casemap converts ONLY ASCII letters (a-z) to uppercase
+        // Non-ASCII characters MUST be left unchanged (e.g., ß stays as ß, not SS)
         Some("i;ascii-casemap") => Ok(CollationResult {
-            value: text.to_uppercase(),
+            value: text.to_ascii_uppercase(),
             case_sensitive: false,
         }),
         // Unsupported collation - return error per RFC 4791 §7.5.1
@@ -114,7 +116,8 @@ pub fn normalize_for_sql_upper(
 ///
 /// For `i;unicode-casemap` collation, uses ICU's `fold_string()` for proper
 /// Unicode case folding per RFC 4790. This is suitable for ILIKE comparisons.
-/// For `i;ascii-casemap`, uses simple lowercasing.
+/// For `i;ascii-casemap`, uses ASCII-only lowercasing per RFC 4790 §9.2.1
+/// (only converts ASCII letters A-Z to a-z, leaves non-ASCII unchanged).
 /// For `i;octet`, returns text as-is (case-sensitive).
 ///
 /// ## Errors
@@ -129,8 +132,9 @@ pub fn normalize_for_ilike(
     match collation.map(std::string::String::as_str) {
         // Use ICU case folding for proper Unicode collation
         Some("i;unicode-casemap") | None => Ok(CaseMapper::new().fold_string(text).into_owned()),
-        // Simple ASCII lowercasing for ASCII-only comparison
-        Some("i;ascii-casemap") => Ok(text.to_lowercase()),
+        // RFC 4790 §9.2.1: ASCII casemap converts ONLY ASCII letters (A-Z) to lowercase
+        // Non-ASCII characters MUST be left unchanged (e.g., ß stays as ß, not ss)
+        Some("i;ascii-casemap") => Ok(text.to_ascii_lowercase()),
         // Case-sensitive: return as-is
         Some("i;octet") => Ok(text.to_owned()),
         // Unsupported collation - return error per RFC 4791 §7.5.1

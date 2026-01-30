@@ -857,9 +857,14 @@ mod tests {
         let result = normalize_for_ilike("Hello World", collation.as_ref()).unwrap();
         assert_eq!(result, "hello world");
 
-        // Note: ASCII casemap uses simple to_lowercase, which doesn't fold ß
+        // RFC 4790 §9.2.1: ASCII casemap only converts ASCII letters (a-z),
+        // non-ASCII characters like ß are left unchanged
         let result = normalize_for_ilike("Straße", collation.as_ref()).unwrap();
-        assert_eq!(result, "straße"); // NOT "strasse"
+        assert_eq!(result, "straße"); // ß is unchanged, not folded to ss
+        
+        // Verify uppercase: ASCII letters converted, non-ASCII unchanged
+        let result = normalize_for_sql_upper("Straße", collation.as_ref()).unwrap();
+        assert_eq!(result.value, "STRAßE"); // ß stays as ß, not STRASSE
     }
 
     #[test]
