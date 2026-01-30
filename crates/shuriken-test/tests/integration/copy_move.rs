@@ -14,7 +14,6 @@ use super::helpers::*;
 /// ## Summary
 /// Test that MOVE renames a resource and updates href.
 #[test_log::test(tokio::test)]
-#[expect(clippy::too_many_lines)]
 async fn move_rename_item_updates_href() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -369,7 +368,6 @@ async fn copy_does_not_create_tombstone() {
 /// ## Summary
 /// Test that MOVE with existing destination and Overwrite:F returns 412.
 #[test_log::test(tokio::test)]
-#[expect(clippy::too_many_lines)]
 async fn move_destination_exists_overwrite_false_412() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -383,7 +381,12 @@ async fn move_destination_exists_overwrite_false_412() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Calendar, "conflict-test", None)
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "conflict-test",
+            None,
+        )
         .await
         .expect("Failed to seed collection");
 
@@ -458,7 +461,6 @@ async fn move_destination_exists_overwrite_false_412() {
 /// ## Summary
 /// Test that MOVE with existing destination and Overwrite:T succeeds.
 #[test_log::test(tokio::test)]
-#[expect(clippy::too_many_lines)]
 async fn move_destination_exists_overwrite_true_succeeds() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -472,7 +474,12 @@ async fn move_destination_exists_overwrite_true_succeeds() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Calendar, "overwrite-test", None)
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "overwrite-test",
+            None,
+        )
         .await
         .expect("Failed to seed collection");
 
@@ -556,7 +563,6 @@ async fn move_destination_exists_overwrite_true_succeeds() {
 /// ## Summary
 /// Test that MOVE generates tombstone for source resource.
 #[test_log::test(tokio::test)]
-#[expect(clippy::too_many_lines)]
 async fn move_generates_tombstone() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -711,7 +717,12 @@ async fn move_nonexistent_404() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Calendar, "nonexistent-coll", None)
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "nonexistent-coll",
+            None,
+        )
         .await
         .expect("Failed to seed collection");
 
@@ -748,7 +759,12 @@ async fn copy_nonexistent_404() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Calendar, "copy-nonexistent-coll", None)
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "copy-nonexistent-coll",
+            None,
+        )
         .await
         .expect("Failed to seed collection");
 

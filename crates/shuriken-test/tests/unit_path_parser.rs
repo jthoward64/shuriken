@@ -109,7 +109,12 @@ fn test_build_canonical_location_full_path_with_ics() {
 
     // Verify item with extension
     if let PathSegment::Item(s) = &segments[3] {
-        assert!(s.ends_with(".ics"), "Item should end with .ics");
+        assert!(
+            std::path::Path::new(s)
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("ics")),
+            "Item should end with .ics"
+        );
         assert!(
             s.starts_with(&instance.id.to_string()),
             "Item should start with instance UUID"
@@ -145,7 +150,12 @@ fn test_build_canonical_location_with_vcf_extension() {
     ));
 
     if let PathSegment::Item(s) = &segments[3] {
-        assert!(s.ends_with(".vcf"), "Addressbook item should end with .vcf");
+        assert!(
+            std::path::Path::new(s)
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("vcf")),
+            "Addressbook item should end with .vcf"
+        );
     } else {
         panic!("Expected Item segment");
     }

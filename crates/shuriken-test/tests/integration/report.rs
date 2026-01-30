@@ -216,6 +216,15 @@ async fn calendar_multiget_returns_resources() {
             .await
             .expect("Failed to seed entity");
 
+        test_db
+            .seed_minimal_icalendar_event(
+                entity_id,
+                &format!("multiget-{i}@example.com"),
+                &format!("Multiget Event {i}"),
+            )
+            .await
+            .expect("Failed to seed iCalendar event");
+
         let slug = format!("event-{i}");
         let href = caldav_item_path("testuser", "testcal", &format!("{slug}.ics"));
         hrefs.push(href);
@@ -265,14 +274,14 @@ async fn calendar_multiget_missing_resource_404() {
         .await
         .expect("Failed to seed authenticated user");
 
-    let _collection_id = test_db
+    let collection_id = test_db
         .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
     // Grant owner access to the user on their collection
     test_db
-        .seed_collection_owner(principal_id, _collection_id, "calendar")
+        .seed_collection_owner(principal_id, collection_id, "calendar")
         .await
         .expect("Failed to seed collection owner");
 
@@ -429,7 +438,14 @@ async fn addressbook_multiget_returns_vcards() {
             .seed_entity("vcard", Some(&format!("abmg-{i}@example.com")))
             .await
             .expect("Failed to seed entity");
-
+        test_db
+            .seed_minimal_vcard(
+                entity_id,
+                &format!("abmg-{i}@example.com"),
+                &format!("Contact {i}"),
+            )
+            .await
+            .expect("Failed to seed vCard");
         let slug = format!("contact-{i}");
         let href = carddav_item_path("testuser", "abmg", &format!("{slug}.vcf"));
         hrefs.push(href);
@@ -482,14 +498,14 @@ async fn sync_collection_returns_multistatus() {
         .await
         .expect("Failed to seed authenticated user");
 
-    let _collection_id = test_db
+    let collection_id = test_db
         .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
     // Grant owner access to the user on their collection
     test_db
-        .seed_collection_owner(principal_id, _collection_id, "calendar")
+        .seed_collection_owner(principal_id, collection_id, "calendar")
         .await
         .expect("Failed to seed collection owner");
 
@@ -517,14 +533,14 @@ async fn sync_collection_returns_sync_token() {
         .await
         .expect("Failed to seed authenticated user");
 
-    let _collection_id = test_db
+    let collection_id = test_db
         .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
 
     // Grant owner access to the user on their collection
     test_db
-        .seed_collection_owner(principal_id, _collection_id, "calendar")
+        .seed_collection_owner(principal_id, collection_id, "calendar")
         .await
         .expect("Failed to seed collection owner");
 
@@ -711,7 +727,7 @@ async fn report_invalid_xml_400() {
         .await
         .expect("Failed to seed authenticated user");
 
-    let _collection_id = test_db
+    test_db
         .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
@@ -740,7 +756,7 @@ async fn report_unsupported_type() {
         .await
         .expect("Failed to seed authenticated user");
 
-    let _collection_id = test_db
+    test_db
         .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");

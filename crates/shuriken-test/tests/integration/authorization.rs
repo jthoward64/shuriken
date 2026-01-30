@@ -15,9 +15,9 @@
 //! - `/card/{owner_slug}/{collection_slug}/**` - matches all items in an addressbook collection
 //!
 //! ## Roles and Permissions
-//! - `reader`: read, read_freebusy
-//! - `editor-basic`: read, read_freebusy, edit
-//! - `editor`: read, read_freebusy, edit, delete
+//! - `reader`: read, `read_freebusy`
+//! - `editor-basic`: read, `read_freebusy`, edit
+//! - `editor`: read, `read_freebusy`, edit, delete
 //! - `owner`: all permissions including admin
 
 use salvo::http::StatusCode;
@@ -47,7 +47,12 @@ async fn get_returns_403_without_permission() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Calendar, "testcal", Some("Personal"))
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "testcal",
+            Some("Personal"),
+        )
         .await
         .expect("Failed to seed collection");
 
@@ -111,7 +116,12 @@ async fn get_returns_200_with_read_permission() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Calendar, "bobcal", Some("Bob Calendar"))
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "bobcal",
+            Some("Bob Calendar"),
+        )
         .await
         .expect("Failed to seed collection");
 
@@ -182,7 +192,12 @@ async fn delete_returns_403_without_write_permission() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Calendar, "charliecal", Some("Charlie Cal"))
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "charliecal",
+            Some("Charlie Cal"),
+        )
         .await
         .expect("Failed to seed collection");
 
@@ -256,7 +271,12 @@ async fn delete_returns_204_with_write_permission() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Calendar, "danacal", Some("Dana Cal"))
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "danacal",
+            Some("Dana Cal"),
+        )
         .await
         .expect("Failed to seed collection");
 
@@ -326,7 +346,12 @@ async fn put_new_returns_403_without_collection_write_permission() {
         .expect("Failed to seed authenticated user");
 
     let _collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Calendar, "evecal", Some("Eve Cal"))
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "evecal",
+            Some("Eve Cal"),
+        )
         .await
         .expect("Failed to seed collection");
 
@@ -373,7 +398,12 @@ async fn put_update_returns_403_without_write_permission() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Calendar, "frankcal", Some("Frank Cal"))
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "frankcal",
+            Some("Frank Cal"),
+        )
         .await
         .expect("Failed to seed collection");
 
@@ -457,7 +487,12 @@ async fn propfind_returns_403_without_permission() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Calendar, "gracecal", Some("Grace Cal"))
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "gracecal",
+            Some("Grace Cal"),
+        )
         .await
         .expect("Failed to seed collection");
 
@@ -528,7 +563,12 @@ async fn proppatch_returns_403_without_write_permission() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Calendar, "henrycal", Some("Henry Cal"))
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "henrycal",
+            Some("Henry Cal"),
+        )
         .await
         .expect("Failed to seed collection");
 
@@ -613,7 +653,12 @@ async fn get_returns_200_with_owner_role_for_read_action() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Calendar, "bobcal", Some("Bob Cal"))
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "bobcal",
+            Some("Bob Cal"),
+        )
         .await
         .expect("Failed to seed collection");
 
@@ -680,7 +725,12 @@ async fn get_returns_200_with_edit_role_for_read_action() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Calendar, "carolcal", Some("Carol Cal"))
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "carolcal",
+            Some("Carol Cal"),
+        )
         .await
         .expect("Failed to seed collection");
 
@@ -748,7 +798,12 @@ async fn delete_returns_204_with_edit_role() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Calendar, "davecal", Some("Dave Cal"))
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "davecal",
+            Some("Dave Cal"),
+        )
         .await
         .expect("Failed to seed collection");
 
@@ -900,7 +955,8 @@ async fn group_member_inherits_group_permissions() {
     let request_path = caldav_item_path("owner", "teamcal", "group-event.ics");
     let response = TestRequest::get(&request_path).send(&service).await;
 
-    let _ = response.assert_status(StatusCode::OK);
+    #[expect(unused_must_use)]
+    response.assert_status(StatusCode::OK);
 }
 
 /// ## Summary
@@ -992,7 +1048,8 @@ async fn non_group_member_denied_group_resource() {
     let request_path = caldav_item_path("owner", "teamcal", "group-event.ics");
     let response = TestRequest::get(&request_path).send(&service).await;
 
-    let _ = response.assert_status(StatusCode::FORBIDDEN);
+    #[expect(unused_must_use)]
+    response.assert_status(StatusCode::FORBIDDEN);
 }
 
 // ============================================================================
@@ -1073,7 +1130,8 @@ async fn public_principal_can_access_public_resources() {
     let request_path = caldav_item_path("owner", "publiccal", "public-event.ics");
     let response = TestRequest::get(&request_path).send(&service).await;
 
-    let _ = response.assert_status(StatusCode::OK);
+    #[expect(unused_must_use)]
+    response.assert_status(StatusCode::OK);
 }
 
 /// ## Summary
@@ -1132,5 +1190,6 @@ async fn public_principal_denied_write_on_readonly_public() {
         .send(&service)
         .await;
 
-    let _ = response.assert_status(StatusCode::FORBIDDEN);
+    #[expect(unused_must_use)]
+    response.assert_status(StatusCode::FORBIDDEN);
 }

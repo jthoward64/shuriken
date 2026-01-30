@@ -52,58 +52,60 @@ pub async fn execute_addressbook_query(
 ///
 /// ## Errors
 /// Returns database errors if queries fail. Missing resources return 404 in response.
-#[expect(clippy::unused_async, reason = "Stub function - will be async when implemented")]
 pub async fn execute_addressbook_multiget(
     conn: &mut DbConnection<'_>,
-    _collection_id: uuid::Uuid,
+    collection_id: uuid::Uuid,
     multiget: &AddressbookMultiget,
     properties: &[PropertyName],
 ) -> anyhow::Result<Multistatus> {
-    // TODO: parse_and_resolve_path is in app layer - needs refactoring
-    // use crate::middleware::path_parser::parse_and_resolve_path;
+    use diesel_async::RunQueryDsl;
+    use shuriken_db::db::query::dav::instance;
 
-    let multistatus = Multistatus::new();
+    let mut multistatus = Multistatus::new();
 
-    // TODO: This function needs refactoring to accept parsed paths as parameters
-    // For now, return empty multistatus to allow compilation
-    let _ = (conn, multiget, properties);
-    tracing::warn!("execute_addressbook_multiget not yet implemented after workspace refactor");
-    Ok(multistatus)
-
-    // DISABLED CODE - needs refactoring:
-    /*
     // Process each DAV:href in the multiget request
     for href in &multiget.hrefs {
         let href_str = href.as_str();
 
-        // Parse and resolve the full DAV:href path to get the vCard instance
-        match parse_and_resolve_path(href_str, conn).await {
-            Ok(resolution) => {
-                if let Some(inst) = resolution.instance {
-                    // Successfully resolved to an instance - build response
-                    let props = build_instance_properties(conn, &inst, properties).await?;
-                    let response = PropstatResponse::ok(href.clone(), props);
-                    multistatus.add_response(response);
-                } else {
-                    // Path was valid but resolved to no instance (404)
-                    let response = PropstatResponse::not_found(href.clone());
-                    multistatus.add_response(response);
-                }
+        // Extract slug from href by taking the last path segment and stripping extensions
+        let slug = href_str
+            .trim_end_matches(".ics")
+            .trim_end_matches(".vcf")
+            .split('/')
+            .last()
+            .unwrap_or("")
+            .to_string();
+
+        if slug.is_empty() {
+            // Invalid href format - return 404
+            let response = PropstatResponse::not_found(href.clone());
+            multistatus.add_response(response);
+            continue;
+        }
+
+        // Query for the instance by slug and collection
+        let result = instance::by_slug_and_collection(collection_id, &slug)
+            .first::<shuriken_db::model::dav::instance::DavInstance>(conn)
+            .await;
+
+        match result {
+            Ok(inst) => {
+                // Successfully resolved to an instance - build response
+                let props = build_instance_properties(conn, &inst, properties).await?;
+                let response = PropstatResponse::ok(href.clone(), props);
+                multistatus.add_response(response);
             }
-            Err(PathResolutionError::PrincipalNotFound(_))
-            | Err(PathResolutionError::CollectionNotFound { .. })
-            | Err(PathResolutionError::InvalidPathFormat(_)) => {
-                // Resource not found (404)
+            Err(diesel::result::Error::NotFound) => {
+                // Instance not found (404)
                 let response = PropstatResponse::not_found(href.clone());
                 multistatus.add_response(response);
             }
             Err(e) => {
                 // Propagate unexpected errors (DB errors, etc.)
-                return Err(anyhow::anyhow!("Path resolution error: {}", e));
+                return Err(anyhow::anyhow!("Database error: {}", e));
             }
         }
     }
 
     Ok(multistatus)
-    */
 }

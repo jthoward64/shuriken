@@ -74,6 +74,7 @@ async fn synctoken_unchanged_on_reads() {
         .xml_body(propfind_allprop())
         .send(&service)
         .await;
+    #[expect(unused_must_use)]
     response.assert_status(StatusCode::MULTI_STATUS);
 
     // 2. PROPFIND Depth:1 on collection
@@ -82,6 +83,7 @@ async fn synctoken_unchanged_on_reads() {
         .xml_body(propfind_allprop())
         .send(&service)
         .await;
+    #[expect(unused_must_use)]
     response.assert_status(StatusCode::MULTI_STATUS);
 
     // 3. Another PROPFIND on an item (using specific properties)
@@ -90,6 +92,7 @@ async fn synctoken_unchanged_on_reads() {
         .xml_body(propfind_allprop())
         .send(&service)
         .await;
+    #[expect(unused_must_use)]
     response.assert_status(StatusCode::MULTI_STATUS);
 
     // Verify sync token has NOT changed
@@ -112,6 +115,10 @@ async fn synctoken_unchanged_on_reads() {
 /// with the same slug independently.
 #[test_log::test(tokio::test)]
 async fn multi_principal_same_collection_uri() {
+    use diesel::prelude::*;
+    use diesel_async::RunQueryDsl;
+    use shuriken_test::component::db::schema::dav_collection;
+
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
         .seed_default_role_permissions()
@@ -214,23 +221,18 @@ async fn multi_principal_same_collection_uri() {
     // Query database directly to verify both collections exist
     let mut conn = test_db.get_conn().await.expect("Failed to get connection");
 
-    use diesel::prelude::*;
-    use diesel_async::RunQueryDsl;
-    use shuriken_test::component::db::schema::dav_collection;
-
-    let collections: Vec<(uuid::Uuid, uuid::Uuid, String, Option<String>)> =
-        dav_collection::table
-            .filter(dav_collection::slug.eq("work"))
-            .filter(dav_collection::deleted_at.is_null())
-            .select((
-                dav_collection::id,
-                dav_collection::owner_principal_id,
-                dav_collection::slug,
-                dav_collection::display_name,
-            ))
-            .load(&mut conn)
-            .await
-            .expect("Failed to load collections");
+    let collections: Vec<(uuid::Uuid, uuid::Uuid, String, Option<String>)> = dav_collection::table
+        .filter(dav_collection::slug.eq("work"))
+        .filter(dav_collection::deleted_at.is_null())
+        .select((
+            dav_collection::id,
+            dav_collection::owner_principal_id,
+            dav_collection::slug,
+            dav_collection::display_name,
+        ))
+        .load(&mut conn)
+        .await
+        .expect("Failed to load collections");
 
     // Should have exactly 2 collections with slug "work"
     assert_eq!(
@@ -273,6 +275,10 @@ async fn multi_principal_same_collection_uri() {
 /// querying by principal returns only that principal's collections.
 #[test_log::test(tokio::test)]
 async fn list_collections_by_principal() {
+    use diesel::prelude::*;
+    use diesel_async::RunQueryDsl;
+    use shuriken_test::component::db::schema::dav_collection;
+
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
         .seed_default_role_permissions()
@@ -348,10 +354,6 @@ async fn list_collections_by_principal() {
 
     // Query database for principal 1's collections
     let mut conn = test_db.get_conn().await.expect("Failed to get connection");
-
-    use diesel::prelude::*;
-    use diesel_async::RunQueryDsl;
-    use shuriken_test::component::db::schema::dav_collection;
 
     let principal1_collections: Vec<uuid::Uuid> = dav_collection::table
         .filter(dav_collection::owner_principal_id.eq(principal1_id))

@@ -115,10 +115,6 @@ async fn put_creates_vcard() {
 /// ## Summary
 /// Test that PUT populates `cal_index` for recurring events.
 #[test_log::test(tokio::test)]
-#[expect(
-    clippy::too_many_lines,
-    reason = "Integration test exercises multiple assertions in one flow"
-)]
 async fn put_populates_cal_index_and_occurrences() {
     use chrono::{NaiveDateTime, Utc};
     use diesel::prelude::*;
@@ -225,10 +221,6 @@ async fn put_populates_cal_index_and_occurrences() {
 /// ## Summary
 /// Test that PUT populates `card_index` for vCards.
 #[test_log::test(tokio::test)]
-#[expect(
-    clippy::too_many_lines,
-    reason = "Integration test exercises multiple assertions in one flow"
-)]
 async fn put_populates_card_index() {
     use diesel::prelude::*;
     use diesel_async::RunQueryDsl;
@@ -975,7 +967,7 @@ async fn put_status_codes() {
     // Update existing resource - should return 200 or 204
     let updated_ical = sample_icalendar_event("status-test@example.com", "Updated Status Test");
     let response = TestRequest::put(&uri)
-        .if_match(&etag)
+        .if_match(etag)
         .icalendar_body(&updated_ical)
         .send(&service)
         .await;

@@ -14,7 +14,7 @@
 //!
 //! ## Database Isolation
 //! Each test gets its own unique database, created on demand and dropped automatically
-//! when the TestDb goes out of scope using async drop. This allows tests to run in
+//! when the `TestDb` goes out of scope using async drop. This allows tests to run in
 //! parallel without contention.
 
 use std::sync::{Arc, Mutex, OnceLock, TryLockError};
@@ -87,10 +87,10 @@ static DB_POOL: OnceCell<Arc<Mutex<DbPool>>> = OnceCell::const_new();
 
 /// Initializes the database pool with multiple distinct databases for testing.
 async fn init_db_pool() -> anyhow::Result<Arc<Mutex<DbPool>>> {
+    const DB_POOL_SIZE: usize = 25;
+
     let base_url = get_base_database_url();
     let admin_url = format!("{base_url}/postgres");
-
-    const DB_POOL_SIZE: usize = 25;
 
     eprintln!("[TestDb] Initializing pool of {DB_POOL_SIZE} test databases...");
 
@@ -99,7 +99,7 @@ async fn init_db_pool() -> anyhow::Result<Arc<Mutex<DbPool>>> {
         AsyncPgConnection,
     >::new(&admin_url);
     let admin_pool = diesel_async::pooled_connection::bb8::Pool::builder()
-        .max_size(DB_POOL_SIZE as u32)
+        .max_size(u32::try_from(DB_POOL_SIZE).expect("DB_POOL_SIZE fits in u32"))
         .build(admin_config)
         .await?;
 
@@ -120,7 +120,8 @@ async fn init_db_pool() -> anyhow::Result<Arc<Mutex<DbPool>>> {
 
                     // Drop if exists and recreate
                     let drop_sql = format!("DROP DATABASE IF EXISTS \"{db_name}\" WITH (FORCE)");
-                    let _ = diesel::sql_query(&drop_sql).execute(&mut admin_conn).await;
+                    #[expect(unused_must_use)]
+                    diesel::sql_query(&drop_sql).execute(&mut admin_conn).await;
 
                     let create_sql = format!("CREATE DATABASE \"{db_name}\"");
                     diesel::sql_query(&create_sql)
@@ -397,7 +398,7 @@ static TEST_SERVICE: OnceLock<Service> = OnceLock::new();
 static CONFIG_INIT: OnceLock<Settings> = OnceLock::new();
 
 /// Base database URL for tests.
-/// - CI (GitHub Actions): postgres on localhost:5432
+/// - CI (`GitHub` Actions): postgres on localhost:5432
 /// - Local development: postgres on localhost:4524 (docker-compose test container)
 fn get_base_database_url() -> String {
     // Check for explicit override first
@@ -875,7 +876,7 @@ impl TestResponse {
     }
 }
 
-/// Helper struct for querying database names from pg_database.
+/// Helper struct for querying database names from `pg_database`.
 #[derive(QueryableByName)]
 struct StaleDbRow {
     #[diesel(sql_type = diesel::sql_types::Text)]
@@ -895,7 +896,6 @@ struct TruncateRow {
 /// Each `TestDb` instance acquires one of 20 pooled databases.
 /// The database is truncated on drop and returned to the pool for reuse.
 /// This allows tests to run in parallel without contention.
-#[expect(clippy::doc_markdown)]
 pub struct TestDb {
     pool: diesel_async::pooled_connection::bb8::Pool<AsyncPgConnection>,
     db_name: String,
@@ -923,27 +923,41 @@ impl TestDb {
                 pool.notify.subscribe()
             };
 
-            {
+            // Check if any connection is available
+            let conn_to_use = {
                 let pool = lock_pool(&pool_arc);
 
+                let mut found = None;
                 for (index, conn_mutex) in pool.connections.iter().enumerate() {
-                    if let Some(mut conn_guard) = try_lock_connection(conn_mutex) {
-                        if let Some(pooled) = conn_guard.take() {
-                            // Truncate all tables before returning
-                            Self::truncate_database(&pooled.pool).await?;
+                    // Try to take a connection, storing result before dropping guard
+                    let pooled_opt = if let Some(mut conn_guard) = try_lock_connection(conn_mutex) {
+                        conn_guard.take()
+                    } else {
+                        None
+                    };
 
-                            return Ok(Self {
-                                pool: pooled.pool.clone(),
-                                db_name: pooled.db_name.clone(),
-                                pool_index: index,
-                            });
-                        }
+                    if let Some(pooled) = pooled_opt {
+                        found = Some((index, pooled));
+                        break;
                     }
                 }
+                found
+            };
+
+            if let Some((index, pooled)) = conn_to_use {
+                // Truncate all tables before returning
+                Self::truncate_database(&pooled.pool).await?;
+
+                return Ok(Self {
+                    pool: pooled.pool.clone(),
+                    db_name: pooled.db_name.clone(),
+                    pool_index: index,
+                });
             }
 
             // No connection available, wait for notification
-            let _ = receiver.recv().await;
+            #[expect(unused_must_use)]
+            receiver.recv().await;
         }
     }
 
@@ -1138,7 +1152,7 @@ impl TestDb {
         Ok(collection_id)
     }
 
-    /// Seeds a child collection with a parent_collection_id and returns its ID.
+    /// Seeds a child collection with a `parent_collection_id` and returns its ID.
     pub async fn seed_child_collection(
         &self,
         owner_principal_id: uuid::Uuid,
@@ -1184,20 +1198,19 @@ impl TestDb {
         entity_type: &str,
         logical_uid: Option<&str>,
     ) -> anyhow::Result<uuid::Uuid> {
+        use shuriken_test::component::db::enums::EntityType;
         use shuriken_test::component::db::schema::dav_entity;
         use shuriken_test::component::model::dav::entity::NewDavEntity;
 
         let mut conn = self.get_conn().await?;
 
-        use shuriken_test::component::db::enums::EntityType;
         let entity_type_enum = match entity_type {
-            "calendar" => EntityType::ICalendar,
             "addressbook" => EntityType::VCard,
             _ => EntityType::ICalendar,
         };
         let new_entity = NewDavEntity {
             entity_type: entity_type_enum,
-            logical_uid: logical_uid.map(|s| s.to_string()),
+            logical_uid: logical_uid.map(std::string::ToString::to_string),
         };
 
         let entity_id = diesel::insert_into(dav_entity::table)
@@ -1222,14 +1235,13 @@ impl TestDb {
         etag: &str,
         sync_revision: i64,
     ) -> anyhow::Result<uuid::Uuid> {
+        use shuriken_test::component::db::enums::ContentType;
         use shuriken_test::component::db::schema::dav_instance;
         use shuriken_test::component::model::dav::instance::NewDavInstance;
 
         let mut conn = self.get_conn().await?;
 
-        use shuriken_test::component::db::enums::ContentType;
         let content_type_enum = match content_type {
-            "text/calendar" => ContentType::TextCalendar,
             "text/vcard" => ContentType::TextVCard,
             _ => ContentType::TextCalendar,
         };
@@ -1296,12 +1308,12 @@ impl TestDb {
         value_text: Option<&str>,
         ordinal: i32,
     ) -> anyhow::Result<uuid::Uuid> {
+        use shuriken_test::component::db::enums::ValueType;
         use shuriken_test::component::db::schema::dav_property;
         use shuriken_test::component::model::dav::property::NewDavProperty;
 
         let mut conn = self.get_conn().await?;
 
-        use shuriken_test::component::db::enums::ValueType;
         let new_property = NewDavProperty {
             component_id,
             name,
@@ -2033,6 +2045,10 @@ impl TestDb {
     ///
     /// ## Errors
     /// Returns an error if seeding fails.
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "Test helper that seeds many permissions"
+    )]
     pub async fn seed_default_role_permissions(&self) -> anyhow::Result<()> {
         // reader-freebusy
         self.seed_role_permission("reader-freebusy", "read_freebusy")
@@ -2315,6 +2331,7 @@ impl Drop for TestDb {
         });
 
         // Notify waiting tests
-        let _ = pool.notify.send(());
+        #[expect(unused_must_use)]
+        pool.notify.send(());
     }
 }

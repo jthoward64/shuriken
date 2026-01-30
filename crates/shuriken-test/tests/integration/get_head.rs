@@ -28,7 +28,12 @@ async fn get_calendar_object_content_type() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Calendar, "testcal", Some("Personal"))
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "testcal",
+            Some("Personal"),
+        )
         .await
         .expect("Failed to seed collection");
 
@@ -86,7 +91,12 @@ async fn get_vcard_content_type() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Addressbook, "contacts", Some("Contacts"))
+        .seed_collection(
+            principal_id,
+            CollectionType::Addressbook,
+            "contacts",
+            Some("Contacts"),
+        )
         .await
         .expect("Failed to seed collection");
 
@@ -134,10 +144,6 @@ async fn get_vcard_content_type() {
 /// ## Summary
 /// Test that GET serializes calendar content from the component tree.
 #[test_log::test(tokio::test)]
-#[expect(
-    clippy::too_many_lines,
-    reason = "Integration test exercises multiple assertions in one flow"
-)]
 async fn get_calendar_object_uses_component_tree() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -151,7 +157,12 @@ async fn get_calendar_object_uses_component_tree() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Calendar, "treecal", Some("Tree Calendar"))
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "treecal",
+            Some("Tree Calendar"),
+        )
         .await
         .expect("Failed to seed collection");
 
@@ -249,10 +260,6 @@ async fn get_calendar_object_uses_component_tree() {
 /// ## Summary
 /// Test that GET serializes vCard content from the component tree.
 #[test_log::test(tokio::test)]
-#[expect(
-    clippy::too_many_lines,
-    reason = "Integration test exercises multiple assertions in one flow"
-)]
 async fn get_vcard_uses_component_tree() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
     test_db
@@ -266,7 +273,12 @@ async fn get_vcard_uses_component_tree() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Addressbook, "treebook", Some("Tree Book"))
+        .seed_collection(
+            principal_id,
+            CollectionType::Addressbook,
+            "treebook",
+            Some("Tree Book"),
+        )
         .await
         .expect("Failed to seed collection");
 
@@ -380,7 +392,12 @@ async fn head_matches_get_headers() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Calendar, "testcal", Some("Personal"))
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "testcal",
+            Some("Personal"),
+        )
         .await
         .expect("Failed to seed collection");
 
