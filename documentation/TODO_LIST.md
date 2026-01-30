@@ -29,7 +29,7 @@ None currently identified.
 
 ## 🟠 Priority 1: High Priority
 
-### 1. Middleware Migration
+### ✅ 1. Middleware Migration (DEFERRED)
 
 **Location**: [`crates/shuriken-app/src/middleware/mod.rs:5`](../crates/shuriken-app/src/middleware/mod.rs#L5)
 
@@ -39,39 +39,30 @@ None currently identified.
 
 **Impact**: Technical debt - slug_resolver should be deprecated in favor of dav_path_middleware  
 **Effort**: Medium (requires migration of all consumers)  
-**Status**: Not started
+**Status**: Deferred (requires broader refactoring across handlers)
 
 ---
 
-### 2. Location Header Missing in Collection Creation
+### ✅ 2. Location Header in Collection Creation (COMPLETE)
 
 **Locations**:
 - [`crates/shuriken-app/src/app/api/caldav/method/mkcalendar.rs:165`](../crates/shuriken-app/src/app/api/caldav/method/mkcalendar.rs#L165)
 - [`crates/shuriken-app/src/app/api/carddav/method/mkcol.rs:135`](../crates/shuriken-app/src/app/api/carddav/method/mkcol.rs#L135)
 
-```rust
-// TODO: Set Location header
-```
-
-**Impact**: RFC compliance - Location header should be returned on successful collection creation  
+**Impact**: RFC compliance - Location header returned on successful collection creation  
 **Effort**: Low (add header to response)  
-**Status**: Not started  
-**RFC Reference**: RFC 4918 §9.3.1 (MKCOL response)
+**Status**: ✅ Complete (2026-01-30) - Commit 80c447b  
+**RFC Reference**: RFC 4918 §8.10.4 (Location header for created resources)
 
 ---
 
-### 3. OPTIONS Method Collection Detection
+### ✅ 3. OPTIONS Method Collection Detection (COMPLETE)
 
 **Location**: [`crates/shuriken-app/src/app/api/dav/method/options.rs:19-20`](../crates/shuriken-app/src/app/api/dav/method/options.rs#L19)
 
-```rust
-// TODO: Determine if this is a collection or item based on path/database lookup
-// For now, return a generic set of methods
-```
-
-**Impact**: RFC compliance - Allow header should reflect resource type capabilities  
-**Effort**: Medium (requires path resolution and DB lookup)  
-**Status**: Not started  
+**Impact**: RFC compliance - Allow header reflects resource type capabilities  
+**Effort**: Medium (requires depot inspection)  
+**Status**: ✅ Complete (2026-01-30) - Commit 9c597c1  
 **RFC Reference**: RFC 4918 §9.1 (OPTIONS method)
 
 ---
@@ -451,11 +442,11 @@ The following were identified in the search but are **NOT** TODO items:
 | Priority | Total | Complete | In Progress | Not Started |
 |----------|-------|----------|-------------|-------------|
 | P0       | 0     | 0        | 0           | 0           |
-| P1       | 3     | 0        | 0           | 3           |
+| P1       | 3     | 2        | 0           | 1           |
 | P2       | 3     | 0        | 0           | 3           |
 | P3       | 6     | 0        | 0           | 6           |
 | Tests    | 24    | 0        | 0           | 24          |
-| **Total**| **36**| **0**    | **0**       | **36**      |
+| **Total**| **36**| **2**    | **0**       | **34**      |
 
 ### By Component
 
