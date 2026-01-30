@@ -8,7 +8,7 @@ use salvo::http::StatusCode;
 use super::helpers::*;
 
 /// ## Summary
-/// Test that PUT with missing UID in VEVENT returns 400 Bad Request.
+/// Test that PUT with missing UID in VEVENT returns 403 Forbidden with valid-calendar-data precondition.
 #[test_log::test(tokio::test)]
 async fn put_missing_uid_rejected() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
@@ -51,12 +51,13 @@ END:VCALENDAR";
         .send(&service)
         .await;
 
+    // RFC 4791 §5.3.2: Invalid calendar data returns 403 with valid-calendar-data precondition
     #[expect(unused_must_use)]
-    response.assert_status(StatusCode::BAD_REQUEST);
+    response.assert_status(StatusCode::FORBIDDEN);
 }
 
 /// ## Summary
-/// Test that PUT with duplicate UID returns 409 Conflict (not 403).
+/// Test that PUT with duplicate UID returns 403 Forbidden with no-uid-conflict precondition.
 #[test_log::test(tokio::test)]
 async fn put_uid_conflict_returns_409() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
@@ -120,10 +121,15 @@ END:VCALENDAR";
         .send(&service)
         .await;
 
-    // Should return 409 Conflict per RFC 4791 §5.3.2.1
+    // RFC 4791 §5.3.2.1: UID conflicts return 403 Forbidden with no-uid-conflict precondition
+    let response = response.assert_status(StatusCode::FORBIDDEN);
 
-    #[expect(unused_must_use)]
-    response.assert_status(StatusCode::CONFLICT);
+    // Verify XML error body contains no-uid-conflict element
+    let body = response.body_string();
+    assert!(
+        body.contains("no-uid-conflict"),
+        "Response should contain no-uid-conflict precondition element"
+    );
 }
 
 /// ## Summary
@@ -196,7 +202,7 @@ END:VCALENDAR";
 }
 
 /// ## Summary
-/// Test that PUT with VCALENDAR but no VEVENT returns 400.
+/// Test that PUT with VCALENDAR but no VEVENT returns 403 Forbidden with valid-calendar-object-resource precondition.
 #[test_log::test(tokio::test)]
 async fn put_vcalendar_without_vevent_rejected() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
@@ -234,6 +240,7 @@ END:VCALENDAR";
         .send(&service)
         .await;
 
+    // RFC 4791 §5.3.2: Invalid calendar object returns 403 with valid-calendar-object-resource precondition
     #[expect(unused_must_use)]
-    response.assert_status(StatusCode::BAD_REQUEST);
+    response.assert_status(StatusCode::FORBIDDEN);
 }

@@ -715,8 +715,15 @@ async fn put_uid_conflict_rejected() {
         .send(&service)
         .await;
 
-    // Should return 409 Conflict per RFC 4791 (UID conflicts are resource conflicts)
-    response.assert_status(StatusCode::CONFLICT);
+    // RFC 4791 §5.3.2.1: UID conflicts return 403 with no-uid-conflict precondition
+    let response = response.assert_status(StatusCode::FORBIDDEN);
+
+    // Verify XML error body contains no-uid-conflict element
+    let body = response.body_string();
+    assert!(
+        body.contains("no-uid-conflict"),
+        "Response should contain no-uid-conflict precondition element"
+    );
 }
 
 // ============================================================================

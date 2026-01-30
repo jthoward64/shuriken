@@ -7,6 +7,7 @@ use salvo::{Depot, Request, Response, handler};
 
 use shuriken_db::db::query::dav::instance;
 use shuriken_db::model::dav::instance::DavInstance;
+use shuriken_rfc::rfc::dav::core::PreconditionError;
 use shuriken_service::auth::{
     Action, ResourceType, authorizer_from_depot,
     depot::{get_path_location_from_depot, get_terminal_collection_from_depot},
@@ -14,6 +15,7 @@ use shuriken_service::auth::{
 };
 use shuriken_service::caldav::service::object::{PutObjectContext, put_calendar_object};
 
+use crate::app::api::dav::response::error::write_precondition_error;
 use types::{PutError, PutResult};
 
 /// ## Summary
@@ -162,13 +164,14 @@ pub async fn put(req: &mut Request, res: &mut Response, depot: &Depot) {
         }
         Err(PutError::InvalidCalendarData(msg)) => {
             tracing::error!(message = %msg, "Invalid calendar data");
-            res.status_code(StatusCode::BAD_REQUEST);
-            // TODO: Return proper CalDAV error XML with valid-calendar-data precondition
+            let error = PreconditionError::ValidCalendarData(msg);
+            write_precondition_error(res, &error);
         }
         Err(PutError::UidConflict(uid)) => {
             tracing::error!(uid = %uid, "UID conflict detected");
-            res.status_code(StatusCode::CONFLICT);
-            // TODO: Return proper CalDAV error XML with no-uid-conflict precondition
+            // RFC 4791 §5.3.2.1: Return 403 with no-uid-conflict precondition
+            let error = PreconditionError::CalendarNoUidConflict(Some(uid));
+            write_precondition_error(res, &error);
         }
         Err(PutError::DatabaseError(e)) => {
             tracing::error!(error = %e, "Database error");

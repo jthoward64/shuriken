@@ -5,6 +5,7 @@ mod types;
 use salvo::http::{HeaderValue, StatusCode};
 use salvo::{Depot, Request, Response, handler};
 
+use shuriken_rfc::rfc::dav::core::PreconditionError;
 use shuriken_service::auth::{
     Action, authorizer_from_depot,
     depot::{get_path_location_from_depot, get_terminal_collection_from_depot},
@@ -12,6 +13,7 @@ use shuriken_service::auth::{
 };
 use shuriken_service::carddav::service::object::{PutObjectContext, put_address_object};
 
+use crate::app::api::dav::response::error::write_precondition_error;
 use types::{PutError, PutResult};
 
 /// ## Summary
@@ -159,13 +161,14 @@ pub async fn put(req: &mut Request, res: &mut Response, depot: &Depot) {
         }
         Err(PutError::InvalidVcardData(msg)) => {
             tracing::error!(message = %msg, "Invalid vCard data");
-            res.status_code(StatusCode::BAD_REQUEST);
-            // TODO: Return proper CardDAV error XML with valid-address-data precondition
+            let error = PreconditionError::ValidAddressData(msg);
+            write_precondition_error(res, &error);
         }
         Err(PutError::UidConflict(uid)) => {
             tracing::error!(uid = %uid, "UID conflict");
-            res.status_code(StatusCode::CONFLICT);
-            // TODO: Return proper CardDAV error XML with no-uid-conflict precondition
+            // RFC 6352 §5.3.4: Return 403 with no-uid-conflict precondition
+            let error = PreconditionError::CardNoUidConflict(Some(uid));
+            write_precondition_error(res, &error);
         }
         Err(PutError::DatabaseError(e)) => {
             tracing::error!(error = %e, "Database error");

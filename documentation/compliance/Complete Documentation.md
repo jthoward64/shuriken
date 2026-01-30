@@ -24,7 +24,7 @@ The compliance gap is **purely protocol-layer** (missing properties, error respo
 - ✅ **Storage Layer**: ~95% compliant - database design properly supports RFC requirements
 - ✅ **Architectural Decisions Are Sound**: Design enables RFC compliance without sacrificing flexibility
 - ⚠️ **Protocol Layer**: ~65% - missing discovery properties, error response bodies, precondition signaling
-- 🔴 **Critical Issues**: ~~DAV header Class 2 violation (LOCK/UNLOCK)~~ ✅ Fixed, ~~missing `supported-report-set` property~~ ✅ Implemented, precondition error XML elements still needed
+- 🔴 **Critical Issues**: ~~DAV header Class 2 violation (LOCK/UNLOCK)~~ ✅ Fixed, ~~missing `supported-report-set` property~~ ✅ Implemented, ~~precondition error XML elements~~ ✅ Implemented for PUT operations
 
 **Path Forward**: 40 hours of additive protocol-layer changes (no redesign needed) to reach 85% compliance.
 
@@ -1507,9 +1507,12 @@ DAV: 1, 2, 3, calendar-access, addressbook-access
    - Integration: [propfind helpers.rs](../crates/shuriken-app/src/app/api/dav/method/propfind/helpers.rs#L108-L113)
    - Tests: [propfind.rs](../crates/shuriken-test/tests/integration/propfind.rs#L768-L882)
 
-3. **Return XML error bodies for PUT failures** (CardDAV)
-   - Currently: HTTP status codes only
-   - Must return: `<C:valid-address-data>`, `<C:no-uid-conflict>`, etc.
+3. ✅ **Return XML error bodies for PUT failures** (CalDAV + CardDAV) - **COMPLETE** (2026-01-29)
+   - Status: PUT requests now return RFC-compliant XML error bodies
+   - CalDAV: Returns `valid-calendar-data` and `no-uid-conflict` preconditions (RFC 4791 §5.3.2)
+   - CardDAV: Returns `valid-address-data` and `no-uid-conflict` preconditions (RFC 6352 §5.3.3)
+   - Location: [caldav/put/mod.rs](../crates/shuriken-app/src/app/api/caldav/method/put/mod.rs), [carddav/put/mod.rs](../crates/shuriken-app/src/app/api/carddav/method/put/mod.rs)
+   - Tests: [uid_validation.rs](../crates/shuriken-test/tests/integration/uid_validation.rs), [put.rs](../crates/shuriken-test/tests/integration/put.rs)
 
 4. **Implement `DAV:acl` property retrieval** (RFC 3744 minimal)
    - Make readable via PROPFIND
