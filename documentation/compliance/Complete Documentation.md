@@ -24,7 +24,7 @@ The compliance gap is **purely protocol-layer** (missing properties, error respo
 - ✅ **Storage Layer**: ~95% compliant - database design properly supports RFC requirements
 - ✅ **Architectural Decisions Are Sound**: Design enables RFC compliance without sacrificing flexibility
 - ⚠️ **Protocol Layer**: ~65% - missing discovery properties, error response bodies, precondition signaling
-- 🔴 **Critical Issues**: DAV header Class 2 violation (LOCK/UNLOCK), missing `supported-report-set` property, precondition error XML elements
+- 🔴 **Critical Issues**: ~~DAV header Class 2 violation (LOCK/UNLOCK)~~ ✅ Fixed, ~~missing `supported-report-set` property~~ ✅ Implemented, precondition error XML elements still needed
 
 **Path Forward**: 40 hours of additive protocol-layer changes (no redesign needed) to reach 85% compliance.
 
@@ -167,7 +167,7 @@ The compliance gap is **purely protocol-layer** (missing properties, error respo
 4. ⚠️ Support TLS transport (RFC 2818) - configuration/deployment concern
 5. ✅ Support ETags (RFC 2616) with specific requirements (§5.3.4)
 6. ✅ Support all calendaring reports (§7) - most implemented
-7. ⚠️ Advertise `DAV:supported-report-set` property - **MISSING**
+7. ✅ Advertise `DAV:supported-report-set` property - **COMPLETE** (2026-01-29)
 
 **SHOULD support:**
 - ✅ MKCALENDAR method
@@ -201,7 +201,7 @@ The compliance gap is **purely protocol-layer** (missing properties, error respo
 
 | Feature | Gap | RFC Ref | Impact |
 |---------|-----|---------|--------|
-| `DAV:supported-report-set` | Missing on all collections/resources | RFC 3253 via 4791 | **MUST implement** - Clients can't discover available reports |
+| `DAV:supported-report-set` | ✅ Implemented on all collections | RFC 3253 via 4791 | Clients can discover calendar-query, calendar-multiget, sync-collection |
 | `CALDAV:supported-calendar-component-set` | Missing | 5.2.3 | Clients can't know if server supports VEVENT/VTODO |
 | `CALDAV:supported-calendar-data` | Missing | 5.2.4 | Clients can't know media type support |
 | `CALDAV:max-resource-size` | Missing | 5.2.5 | Clients can't know size limits |
@@ -404,7 +404,7 @@ Per RFC 4791 §1.3, when preconditions fail, server MUST return specific XML ele
 
 ### Recommendations (Priority Order) {#caldav-recommendations}
 
-1. **P1 (Critical)**: Implement `DAV:supported-report-set` on all calendar collections and resources
+1. ✅ **Implemented**: `DAV:supported-report-set` on all calendar collections and resources (2026-01-29)
 2. **P1 (Critical)**: Add precondition error XML responses (5 missing elements)
 3. **P1 (High)**: Implement `CALDAV:supported-calendar-component-set` property
 4. **P1 (High)**: Implement `CALDAV:supported-calendar-data` property
@@ -460,7 +460,7 @@ Per RFC 4791 §1.3, when preconditions fail, server MUST return specific XML ele
 
 | Feature | Gap | RFC Ref | Impact |
 |---------|-----|---------|--------|
-| `DAV:supported-report-set` | Missing on all collections/resources | RFC 3253 via 6352 | **MUST implement** - Clients can't discover available reports |
+| `DAV:supported-report-set` | ✅ Implemented on all collections | RFC 3253 via 6352 | Clients can discover addressbook-query, addressbook-multiget, sync-collection |
 | `CARDDAV:supported-address-data` | Missing | 6.2.2 | Clients can't know vCard version support (v3 vs v4) |
 | `CARDDAV:addressbook-description` | Defined, property support unclear | 6.2.1 | Clients can't discover collection purpose |
 | `CARDDAV:max-resource-size` | Missing | 6.2.3 | Clients can't know size limits |
@@ -500,7 +500,7 @@ Per RFC 6352 §6.3.2.1, when preconditions fail, server MUST return specific XML
 
 ### Recommendations (Priority Order) {#carddav-recommendations}
 
-1. **P1 (Critical)**: Implement `DAV:supported-report-set` on all collections and resources
+1. ✅ **Implemented**: `DAV:supported-report-set` on all collections and resources (2026-01-29)
 2. **P1 (Critical)**: Add precondition error XML responses (5 missing elements)
 3. **P1 (High)**: Implement `CARDDAV:supported-address-data` property
 4. **P1 (High)**: Implement `CARDDAV:supported-collation-set` property
@@ -1353,7 +1353,7 @@ Shuriken's architecture (UUID storage, entity/instance separation, component tre
 
 **Immediate (This Week)**
 - [ ] Fix DAV header (10 min)
-- [ ] Add supported-report-set (4h)
+- [x] Add supported-report-set (4h) - **COMPLETE** (2026-01-29)
 - [ ] Add need-privileges error (6h)
 - [ ] Add supported-calendar-component-set (2h)
 
@@ -1383,7 +1383,7 @@ Shuriken's architecture (UUID storage, entity/instance separation, component tre
 
 | Requirement | RFC Section | Severity | Impact | Solution |
 |-------------|-------------|----------|--------|----------|
-| MUST advertise `DAV:supported-report-set` | 4791 / RFC 3253 | **MUST** | Clients can't discover available REPORT methods | Add property generator, include in PROPFIND |
+| MUST advertise `DAV:supported-report-set` | 4791 / RFC 3253 | **IMPLEMENTED** | ✅ Clients can discover available REPORT methods | ✅ Property generator implemented in discovery.rs |
 | MUST advertise `CALDAV:supported-calendar-component-set` | 5.2.3 | **MUST** | Clients can't know which component types supported | Return XML listing VEVENT, VTODO, VJOURNAL |
 | MUST advertise `CALDAV:supported-calendar-data` | 5.2.4 | **MUST** | Clients can't know media type support | Return `<D:calendar-data><D:comp name="VCALENDAR"/></D:calendar-data>` |
 | MUST advertise `CALDAV:max-resource-size` | 5.2.5 | **SHOULD** | Clients don't know size limits | Return max entity size in bytes |
@@ -1396,7 +1396,7 @@ Shuriken's architecture (UUID storage, entity/instance separation, component tre
 
 | Requirement | RFC Section | Severity | Impact | Solution |
 |-------------|-------------|----------|--------|----------|
-| MUST advertise `DAV:supported-report-set` | 3 / RFC 3253 | **MUST** | Clients can't discover available REPORT methods | Add property, include `<D:report><D:addressbook-query/></D:report>`, etc. |
+| MUST advertise `DAV:supported-report-set` | 3 / RFC 3253 | **IMPLEMENTED** | ✅ Clients can discover available REPORT methods | ✅ Property includes addressbook-query, addressbook-multiget, sync-collection |
 | MUST advertise `CARDDAV:supported-address-data` | 6.3.1 | **MUST** | Clients can't know vCard version support | Return `<D:address-data><D:version>4.0</D:version></D:address-data>` |
 | MUST return address-data error XML | 10.3.1 | **MUST** | Clients can't distinguish error types | Return `<C:supported-address-data>`, `<C:no-uid-conflict>`, etc. in 403/409 |
 | MUST validate single VCARD per resource | 5.1 | **SHOULD** | Multi-VCARD accepted, breaks RFC | Add parser validation, reject on PUT |
@@ -1501,9 +1501,11 @@ DAV: 1, 2, 3, calendar-access, addressbook-access
    - **Location**: [options.rs](../crates/shuriken-app/src/app/api/dav/method/options.rs)
    - **Test**: [options.rs:247-283](../crates/shuriken-test/tests/integration/options.rs#L247-L283)
 
-2. **Implement `supported-report-set` property** (CalDAV + CardDAV)
-   - Required for clients to discover supported REPORT methods
-   - Should return XML listing `calendar-query`, `calendar-multiget`, `addressbook-query`, etc.
+2. ✅ **Implement `supported-report-set` property** (CalDAV + CardDAV) - **COMPLETE** (2026-01-29)
+   - Status: Implemented for calendar and addressbook collections
+   - Location: [discovery.rs](../crates/shuriken-rfc/src/rfc/dav/core/property/discovery.rs#L16-L76)
+   - Integration: [propfind helpers.rs](../crates/shuriken-app/src/app/api/dav/method/propfind/helpers.rs#L108-L113)
+   - Tests: [propfind.rs](../crates/shuriken-test/tests/integration/propfind.rs#L768-L882)
 
 3. **Return XML error bodies for PUT failures** (CardDAV)
    - Currently: HTTP status codes only
@@ -1542,7 +1544,7 @@ DAV: 1, 2, 3, calendar-access, addressbook-access
 | Priority | Item | Effort | Impact | Phase |
 |----------|------|--------|--------|-------|
 | **P1** | Remove/implement LOCK/UNLOCK | 1h | Critical | Now |
-| **P1** | `supported-report-set` property | 4h | High | 1 |
+| ✅ | `supported-report-set` property | 4h | High | ✅ Complete |
 | **P1** | CardDAV error response bodies | 6h | High | 1 |
 | **P1** | `DAV:acl` property PROPFIND | 8h | High | 1 |
 | **P1** | `DAV:need-privileges` errors | 4h | High | 1 |
@@ -1565,6 +1567,8 @@ DAV: 1, 2, 3, calendar-access, addressbook-access
 |------|--------|--------|------|--------|
 | Remove Class 2 from DAV header | 30m | Eliminates spec violation | None | ✅ **Complete** (2026-01-29) |
 | Add `supported-report-set` property | 2h | Enables report discovery | Low | ✅ **Complete** (2026-01-29) |
+| - Calendar collections (CALDAV) | | calendar-query, calendar-multiget, sync-collection | | ✅ **Complete** |
+| - Addressbook collections (CARDDAV) | | addressbook-query, addressbook-multiget, sync-collection | | ✅ **Complete** |
 | Fix Compliance Class advertising | 30m | Honest about capabilities | None | ✅ **Complete** (2026-01-29) |
 
 **Total**: 3 hours → **72% compliance** (partial: property discovery done)
@@ -1784,7 +1788,7 @@ fn serialize_with_selector(
 | MUST | Support ACL | ✅ Done | 0 |
 | MUST | Support MKCALENDAR | ✅ Done | 0 |
 | MUST | Support ETags | ✅ Done | 0 |
-| MUST | Advertise `supported-report-set` | ⚠️ Phase 0 | 0 |
+| MUST | Advertise `supported-report-set` | ✅ Phase 0 | ✅ Complete |
 | MUST | Advertise `supported-calendar-component-set` | ⚠️ Phase 1 | 1 |
 | MUST | Advertise `supported-calendar-data` | ⚠️ Phase 1 | 1 |
 | MUST | Return precondition errors | ⚠️ Phase 1 | 1 |

@@ -140,9 +140,10 @@ The compliance gap is entirely at the protocol layer—HTTP response headers, XM
    - RFC 4918 §18.1: Correctly does not claim Class 2 without LOCK support
    - Implemented in [options.rs](../crates/shuriken-app/src/app/api/dav/method/options.rs)
 
-2. ❌ **Missing `DAV:supported-report-set`** (RFC 3253 via CalDAV/CardDAV)
-   - Impact: Clients cannot discover available REPORT methods
-   - Fix: 4 hours - property generator for all collection types
+2. ✅ **`DAV:supported-report-set` implemented** (RFC 3253 via CalDAV/CardDAV) - COMPLETE (2026-01-29)
+   - Status: Clients can now discover available REPORT methods
+   - Implemented in [discovery.rs](../crates/shuriken-rfc/src/rfc/dav/core/property/discovery.rs#L16-L76)
+   - Tests pass: [propfind.rs](../crates/shuriken-test/tests/integration/propfind.rs#L768-L882)
 
 3. ❌ **Missing error XML elements in 403/409** (RFC 4791/6352 preconditions)
    - Impact: Clients have no feedback on why operations failed
@@ -281,13 +282,14 @@ Current: DAV: 1, 3, calendar-access, addressbook ✅
 - **Files**: [options.rs](../crates/shuriken-app/src/app/api/dav/method/options.rs)
 - **Test**: [options.rs:247-283](../crates/shuriken-test/tests/integration/options.rs#L247-L283)
 
-#### 2. Add `DAV:supported-report-set` Property (4h)
+#### 2. Add `DAV:supported-report-set` Property - ✅ COMPLETE (2026-01-29)
 - **RFC**: RFC 3253 §3.1.5 (referenced by CalDAV/CardDAV)
-- **Impact**: Clients cannot discover available REPORT methods
-- **Implementation**: Property generator returning all supported reports
+- **Status**: Implemented - Clients can discover calendar-query, calendar-multiget, addressbook-query, addressbook-multiget, sync-collection
+- **Implementation**: Property generator in discovery.rs
 - **Files**: 
-  - `src/component/dav/property_generator.rs` (new)
-  - `src/app/api/dav/propfind.rs` (integrate)
+  - [discovery.rs](../crates/shuriken-rfc/src/rfc/dav/core/property/discovery.rs#L16-L76) (property generator)
+  - [propfind helpers.rs](../crates/shuriken-app/src/app/api/dav/method/propfind/helpers.rs#L108-L113) (integration)
+- **Tests**: [propfind.rs:768-882](../crates/shuriken-test/tests/integration/propfind.rs#L768-L882)
 
 **Result**: 70% → 72% compliance
 
@@ -402,7 +404,7 @@ CardDAV errors (RFC 6352 §6.3.2.1):
 
 | Phase | Duration | Effort | Compliance | Deliverables | Status |
 |-------|----------|--------|-----------|--------------|--------|
-| **Phase 0: Critical Fixes** | 1 day | 1h | 72% | Fix DAV header, add `supported-report-set` | 🔄 **In Progress** (50% done) |
+| **Phase 0: Critical Fixes** | 1 day | 1h | 72% | Fix DAV header, add `supported-report-set` | ✅ **Complete** (2026-01-29) |
 | **Phase 1: Discovery & Errors** | 1 week | 8h | 80% | Property generators, precondition XML | 🔄 **In Progress** (40% done) |
 | **Phase 2: ACL Minimal Profile** | 1 week | 8h | 82% | `DAV:acl` serializer, `need-privileges` | ⏳ Pending |
 | **Phase 3: Query Improvements** | 2 weeks | 15h | 85% | Collation, validation, selective data | ⏳ Pending |
@@ -433,13 +435,13 @@ CardDAV errors (RFC 6352 §6.3.2.1):
    - Change: `DAV: 1, 2, 3` → `DAV: 1, 3`
    - Test: Verify OPTIONS response
 
-2. Add `DAV:supported-report-set` (4h)
+2. Add `DAV:supported-report-set` (4h) - ✅ **COMPLETE** (2026-01-29)
    - Create: `src/component/dav/property_generator.rs`
    - Implement: Report set for calendar/addressbook/plain collections
    - Integrate: PROPFIND handler
    - Test: 7 unit tests + 5 integration tests
 
-**Validation**: OPTIONS header correct, PROPFIND returns supported-report-set
+**Validation**: ✅ OPTIONS header correct, ✅ PROPFIND returns supported-report-set
 
 ---
 
@@ -807,11 +809,11 @@ VCALENDAR
 
 ### Phase Completion Criteria {#phase-criteria}
 
-#### Phase 0 Success: 72% Compliance {#phase-0-success}
-- ✅ OPTIONS response excludes Class 2
-- ✅ PROPFIND returns `DAV:supported-report-set` on all collections
-- ✅ All unit tests pass
-- ✅ Integration tests verify OPTIONS header
+#### Phase 0 Success: 72% Compliance - ✅ COMPLETE (2026-01-29) {#phase-0-success}
+- ✅ OPTIONS response excludes Class 2 - **DONE**
+- ✅ PROPFIND returns `DAV:supported-report-set` on all collections - **DONE**
+- ✅ All unit tests pass - **DONE**
+- ✅ Integration tests verify OPTIONS header - **DONE**
 
 #### Phase 1 Success: 80% Compliance {#phase-1-success}
 - ✅ All CalDAV discovery properties return correct values

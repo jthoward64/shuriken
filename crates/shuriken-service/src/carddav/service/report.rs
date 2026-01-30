@@ -72,7 +72,7 @@ pub async fn execute_addressbook_multiget(
             .trim_end_matches(".ics")
             .trim_end_matches(".vcf")
             .split('/')
-            .last()
+            .next_back()
             .unwrap_or("")
             .to_string();
 
@@ -102,7 +102,7 @@ pub async fn execute_addressbook_multiget(
             }
             Err(e) => {
                 // Propagate unexpected errors (DB errors, etc.)
-                return Err(anyhow::anyhow!("Database error: {}", e));
+                return Err(anyhow::anyhow!("Database error: {e}"));
             }
         }
     }
