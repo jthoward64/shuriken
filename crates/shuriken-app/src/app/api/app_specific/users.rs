@@ -91,13 +91,9 @@ async fn create_user_handler(req: &mut Request, depot: &mut Depot, res: &mut Res
     // We use a calendars path with glob to check general admin permissions
     let principals_resource = ResourceLocation::from_segments(vec![PathSegment::ResourceType(
         shuriken_service::auth::ResourceType::Principal,
-    )])
-    .ok_or_else(|| {
-        error!("Failed to parse principals resource path");
-        StatusCode::INTERNAL_SERVER_ERROR
-    });
+    )]);
 
-    let principals_resource = match principals_resource {
+    let principals_resource = match Ok::<_, StatusCode>(principals_resource) {
         Ok(r) => r,
         Err(_) => {
             res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
@@ -405,14 +401,10 @@ async fn update_password_handler(req: &mut Request, depot: &mut Depot, res: &mut
     // Check if authenticated user has write access to /principals/{target_principal_id}
     let subjects = ExpandedSubjects::from_user(authenticated_user);
 
-    let principal_resource = match ResourceLocation::from_segments(vec![
+    let principal_resource = match Ok::<_, StatusCode>(ResourceLocation::from_segments(vec![
         PathSegment::ResourceType(shuriken_service::auth::ResourceType::Principal),
         PathSegment::Owner(target_user.principal_id.to_string()),
-    ])
-    .ok_or_else(|| {
-        error!("Failed to parse principal resource path");
-        StatusCode::INTERNAL_SERVER_ERROR
-    }) {
+    ])) {
         Ok(r) => r,
         Err(_) => {
             res.status_code(StatusCode::INTERNAL_SERVER_ERROR);

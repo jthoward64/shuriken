@@ -59,7 +59,7 @@ mod tests {
     #[test]
     fn action_mapping() {
         assert_eq!(action_to_privilege_name(Action::Read), "read");
-        assert_eq!(action_to_privilege_name(Action::Write), "write");
+        assert_eq!(action_to_privilege_name(Action::Edit), "write-content");
         assert_eq!(action_to_privilege_name(Action::Delete), "unbind");
         assert_eq!(action_to_privilege_name(Action::Admin), "all");
     }

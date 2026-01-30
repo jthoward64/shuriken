@@ -167,7 +167,7 @@ async fn init_db_pool() -> anyhow::Result<Arc<Mutex<DbPool>>> {
 async fn run_migrations(database_url: &str) -> anyhow::Result<()> {
     use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 
-    const MIGRATIONS: EmbeddedMigrations = embed_migrations!("../../migrations");
+    const MIGRATIONS: EmbeddedMigrations = embed_migrations!("../shuriken-db/migrations");
 
     let url = database_url.to_string();
     tokio::task::spawn_blocking(move || {
@@ -1328,6 +1328,12 @@ impl TestDb {
             value_bytes: None,
             value_json: None,
             ordinal,
+            value_text_array: None,
+            value_date_array: None,
+            value_tstz_array: None,
+            value_time: None,
+            value_interval: None,
+            value_tstzrange: None,
         };
 
         let property_id = diesel::insert_into(dav_property::table)
