@@ -23,6 +23,109 @@ pub struct RecurrenceData {
     pub tzid: Option<String>,
 }
 
+/// Extract RRULE property text from a component.
+///
+/// Returns `Ok(None)` if RRULE property is not found.
+fn extract_rrule_text(component: &Component) -> ServiceResult<Option<String>> {
+    let Some(rrule_prop) = component.get_property("RRULE") else {
+        tracing::trace!("RRULE property not found");
+        return Ok(None);
+    };
+
+    // RRULE can be either Value::Recur or Value::Text
+    let rrule_text = match &rrule_prop.value {
+        shuriken_rfc::rfc::ical::core::Value::Recur(rrule) => rrule.to_string(),
+        shuriken_rfc::rfc::ical::core::Value::Text(text) => text.clone(),
+        _ => {
+            tracing::trace!("RRULE property has unexpected value type");
+            return Ok(None);
+        }
+    };
+    tracing::trace!(rrule = %rrule_text, "Found RRULE");
+    Ok(Some(rrule_text))
+}
+
+/// Extract DTSTART property from a component.
+///
+/// Returns tuple of (DateTime<Utc>, Option<TZID>).
+/// Returns `Ok(None)` if DTSTART is missing or invalid.
+fn extract_dtstart(
+    component: &Component,
+    resolver: &mut TimeZoneResolver,
+) -> ServiceResult<Option<(DateTime<Utc>, Option<String>)>> {
+    let Some(dtstart_prop) = component.get_property("DTSTART") else {
+        return Ok(None);
+    };
+    let tzid = dtstart_prop.get_param_value("TZID").map(String::from);
+    let Some(dtstart_ical) = dtstart_prop.as_datetime() else {
+        return Ok(None);
+    };
+    let Some(dtstart_utc) =
+        ical_datetime_to_utc_with_resolver(dtstart_ical, tzid.as_deref(), resolver)
+    else {
+        return Ok(None);
+    };
+    tracing::trace!(dtstart = %dtstart_utc, "Extracted DTSTART");
+    Ok(Some((dtstart_utc, tzid)))
+}
+
+/// Extract duration from DTEND or DURATION property.
+///
+/// Returns zero duration if neither property is present (RFC 5545).
+/// Returns `Ok(None)` if properties exist but are invalid.
+fn extract_duration(
+    component: &Component,
+    dtstart_utc: DateTime<Utc>,
+    resolver: &mut TimeZoneResolver,
+) -> ServiceResult<Option<chrono::TimeDelta>> {
+    if let Some(dtend_prop) = component.get_property("DTEND") {
+        let Some(dtend_ical) = dtend_prop.as_datetime() else {
+            return Ok(None);
+        };
+        let dtend_tzid = dtend_prop.get_param_value("TZID");
+        let Some(dtend_utc) = ical_datetime_to_utc_with_resolver(dtend_ical, dtend_tzid, resolver)
+        else {
+            return Ok(None);
+        };
+        let dur = dtend_utc.signed_duration_since(dtstart_utc);
+        tracing::trace!(
+            duration_seconds = dur.num_seconds(),
+            "Calculated duration from DTEND"
+        );
+        Ok(Some(dur))
+    } else if let Some(duration_prop) = component.get_property("DURATION") {
+        let Some(duration_ical) = duration_prop.as_duration() else {
+            return Ok(None);
+        };
+        let dur = ical_duration_to_chrono(duration_ical);
+        tracing::trace!(duration_seconds = dur.num_seconds(), "Extracted DURATION");
+        Ok(Some(dur))
+    } else {
+        // RFC 5545: If neither DTEND nor DURATION is present, the event has zero duration
+        tracing::trace!("No DTEND or DURATION found, using zero duration");
+        Ok(Some(chrono::TimeDelta::zero()))
+    }
+}
+
+/// Extract EXDATE or RDATE properties from a component.
+///
+/// Returns a vector of UTC datetime values.
+fn extract_date_list(
+    component: &Component,
+    property_name: &str,
+    resolver: &mut TimeZoneResolver,
+) -> Vec<DateTime<Utc>> {
+    component
+        .get_properties(property_name)
+        .iter()
+        .filter_map(|prop| {
+            let tzid = prop.get_param_value("TZID");
+            let dt = prop.as_datetime()?;
+            ical_datetime_to_utc_with_resolver(dt, tzid, resolver)
+        })
+        .collect()
+}
+
 /// ## Summary
 /// Extracts recurrence data from a VEVENT component.
 ///
@@ -52,10 +155,6 @@ pub fn extract_recurrence_data(component: &Component) -> ServiceResult<Option<Re
 /// - Component has no RRULE property
 /// - DTSTART is missing or invalid
 /// - DTEND/DURATION is missing or invalid
-#[expect(
-    clippy::too_many_lines,
-    reason = "TODO: Refactor to extract helper functions like in shuriken-rfc recurrence.rs"
-)]
 pub fn extract_recurrence_data_with_resolver(
     component: &Component,
     resolver: &mut TimeZoneResolver,
@@ -66,88 +165,24 @@ pub fn extract_recurrence_data_with_resolver(
         "Extracting recurrence data from component"
     );
 
-    // Check for RRULE property
-    let Some(rrule_prop) = component.get_property("RRULE") else {
-        tracing::trace!("RRULE property not found");
+    // Check for RRULE property and extract text
+    let Some(rrule_text) = extract_rrule_text(component)? else {
         return Ok(None);
     };
-
-    // RRULE can be either Value::Recur or Value::Text
-    let rrule_text = match &rrule_prop.value {
-        shuriken_rfc::rfc::ical::core::Value::Recur(rrule) => rrule.to_string(),
-        shuriken_rfc::rfc::ical::core::Value::Text(text) => text.clone(),
-        _ => {
-            tracing::trace!("RRULE property has unexpected value type");
-            return Ok(None);
-        }
-    };
-    tracing::trace!(rrule = %rrule_text, "Found RRULE");
 
     // Extract DTSTART
-    let Some(dtstart_prop) = component.get_property("DTSTART") else {
+    let Some((dtstart_utc, tzid)) = extract_dtstart(component, resolver)? else {
         return Ok(None);
     };
-    let tzid = dtstart_prop.get_param_value("TZID").map(String::from);
-    let Some(dtstart_ical) = dtstart_prop.as_datetime() else {
-        return Ok(None);
-    };
-    let Some(dtstart_utc) =
-        ical_datetime_to_utc_with_resolver(dtstart_ical, tzid.as_deref(), resolver)
-    else {
-        return Ok(None);
-    };
-    tracing::trace!(dtstart = %dtstart_utc, "Extracted DTSTART");
 
     // Calculate duration from DTEND or DURATION
-    let duration = if let Some(dtend_prop) = component.get_property("DTEND") {
-        let Some(dtend_ical) = dtend_prop.as_datetime() else {
-            return Ok(None);
-        };
-        let dtend_tzid = dtend_prop.get_param_value("TZID");
-        let Some(dtend_utc) = ical_datetime_to_utc_with_resolver(dtend_ical, dtend_tzid, resolver)
-        else {
-            return Ok(None);
-        };
-        let dur = dtend_utc.signed_duration_since(dtstart_utc);
-        tracing::trace!(
-            duration_seconds = dur.num_seconds(),
-            "Calculated duration from DTEND"
-        );
-        dur
-    } else if let Some(duration_prop) = component.get_property("DURATION") {
-        let Some(duration_ical) = duration_prop.as_duration() else {
-            return Ok(None);
-        };
-        let dur = ical_duration_to_chrono(duration_ical);
-        tracing::trace!(duration_seconds = dur.num_seconds(), "Extracted DURATION");
-        dur
-    } else {
-        // RFC 5545: If neither DTEND nor DURATION is present, the event has zero duration
-        tracing::trace!("No DTEND or DURATION found, using zero duration");
-        chrono::TimeDelta::zero()
+    let Some(duration) = extract_duration(component, dtstart_utc, resolver)? else {
+        return Ok(None);
     };
 
-    // Extract EXDATE values
-    let exdates: Vec<DateTime<Utc>> = component
-        .get_properties("EXDATE")
-        .iter()
-        .filter_map(|prop| {
-            let tzid = prop.get_param_value("TZID");
-            let dt = prop.as_datetime()?;
-            ical_datetime_to_utc_with_resolver(dt, tzid, resolver)
-        })
-        .collect();
-
-    // Extract RDATE values
-    let rdates: Vec<DateTime<Utc>> = component
-        .get_properties("RDATE")
-        .iter()
-        .filter_map(|prop| {
-            let tzid = prop.get_param_value("TZID");
-            let dt = prop.as_datetime()?;
-            ical_datetime_to_utc_with_resolver(dt, tzid, resolver)
-        })
-        .collect();
+    // Extract EXDATE and RDATE values
+    let exdates = extract_date_list(component, "EXDATE", resolver);
+    let rdates = extract_date_list(component, "RDATE", resolver);
 
     let rrule = rrule_text
         .parse::<RRule<Unvalidated>>()

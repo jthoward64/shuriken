@@ -19,7 +19,9 @@ pub async fn options(req: &mut Request, res: &mut Response, depot: &Depot) {
     tracing::info!("Handling OPTIONS request");
 
     // Determine if this is an item (has instance) or collection (no instance)
-    let is_item = depot.get::<shuriken_db::model::dav::instance::DavInstance>(depot_keys::INSTANCE).is_ok();
+    let is_item = depot
+        .get::<shuriken_db::model::dav::instance::DavInstance>(depot_keys::INSTANCE)
+        .is_ok();
 
     // Set Allow header based on resource type
     let allow_methods = if is_item {

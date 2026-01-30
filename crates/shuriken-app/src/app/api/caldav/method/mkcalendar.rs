@@ -162,16 +162,21 @@ pub async fn mkcalendar(req: &mut Request, res: &mut Response, depot: &Depot) {
                 result.collection_id
             );
             res.status_code(StatusCode::CREATED);
-            
+
             // Set Location header with full URL (RFC 4918 §8.10.4)
             // Construct full URL: scheme://host/path
-            let scheme = if req.uri().scheme_str() == Some("https") { "https" } else { "http" };
-            let host = req.headers()
+            let scheme = if req.uri().scheme_str() == Some("https") {
+                "https"
+            } else {
+                "http"
+            };
+            let host = req
+                .headers()
                 .get("Host")
                 .and_then(|h| h.to_str().ok())
                 .unwrap_or("localhost");
             let location = format!("{}://{}{}", scheme, host, path);
-            
+
             #[expect(
                 clippy::let_underscore_must_use,
                 reason = "Location header addition failure is non-fatal"
