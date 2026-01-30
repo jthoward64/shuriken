@@ -123,7 +123,7 @@ async fn put_populates_cal_index_and_occurrences() {
     use chrono::{NaiveDateTime, Utc};
     use diesel::prelude::*;
     use diesel_async::RunQueryDsl;
-    use shuriken::component::db::schema::{cal_index, dav_instance};
+    use shuriken_test::component::db::schema::{cal_index, dav_instance};
 
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
@@ -232,7 +232,7 @@ async fn put_populates_cal_index_and_occurrences() {
 async fn put_populates_card_index() {
     use diesel::prelude::*;
     use diesel_async::RunQueryDsl;
-    use shuriken::component::db::schema::{card_index, dav_instance};
+    use shuriken_test::component::db::schema::{card_index, dav_instance};
 
     let test_db = TestDb::new().await.expect("Failed to create test database");
 

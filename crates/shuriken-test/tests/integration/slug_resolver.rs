@@ -4,7 +4,7 @@
 //! Uses `tests/integration/helpers.rs` for database setup and request utilities.
 
 use super::helpers::{TestDb, cal_collection_glob, cal_owner_glob, cal_path, CollectionType, PrincipalType};
-use shuriken::component::middleware::path_parser::parse_and_resolve_path;
+use shuriken_test::component::middleware::path_parser::parse_and_resolve_path;
 
 /// Resolves a calendar owner-only path and verifies principal resolution.
 #[test_log::test(tokio::test)]

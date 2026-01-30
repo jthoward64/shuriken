@@ -63,7 +63,7 @@ async fn fetch_entity_id(
 ) -> anyhow::Result<uuid::Uuid> {
     use diesel::prelude::*;
     use diesel_async::RunQueryDsl;
-    use shuriken::component::db::schema::dav_instance;
+    use shuriken_test::component::db::schema::dav_instance;
 
     let mut conn = test_db.get_conn().await?;
 
@@ -83,7 +83,7 @@ async fn fetch_calendar_index_stats(
 ) -> anyhow::Result<i64> {
     use diesel::prelude::*;
     use diesel_async::RunQueryDsl;
-    use shuriken::component::db::schema::cal_index;
+    use shuriken_test::component::db::schema::cal_index;
 
     let mut conn = test_db.get_conn().await?;
 
@@ -99,7 +99,7 @@ async fn fetch_calendar_index_stats(
 async fn fetch_card_index_count(test_db: &TestDb, entity_id: uuid::Uuid) -> anyhow::Result<i64> {
     use diesel::prelude::*;
     use diesel_async::RunQueryDsl;
-    use shuriken::component::db::schema::card_index;
+    use shuriken_test::component::db::schema::card_index;
 
     let mut conn = test_db.get_conn().await?;
 

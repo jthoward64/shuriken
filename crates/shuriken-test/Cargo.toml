@@ -1,0 +1,30 @@
+[package]
+name = "shuriken-test"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+shuriken-core = { workspace = true }
+shuriken-rfc = { workspace = true }
+shuriken-db = { workspace = true }
+shuriken-service = { workspace = true }
+shuriken-app = { path = "../shuriken-app" }
+
+anyhow = { workspace = true }
+chrono = { workspace = true }
+diesel = { workspace = true }
+diesel-async = { workspace = true }
+diesel_migrations = { workspace = true }
+futures = { workspace = true }
+rrule = { workspace = true }
+salvo = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+string-adapter = { workspace = true }
+test-log = { workspace = true }
+tokio = { workspace = true }
+uuid = { workspace = true }

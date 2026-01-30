@@ -27,10 +27,10 @@ use salvo::prelude::*;
 use salvo::test::{RequestBuilder, ResponseExt, TestClient};
 use tokio::sync::{OnceCell, broadcast};
 
-use shuriken::component::db::connection::DbConnection;
+use shuriken_test::component::db::connection::DbConnection;
 
 // Re-export commonly used enums for test code
-pub use shuriken::component::db::enums::{CollectionType, PrincipalType};
+pub use shuriken_test::component::db::enums::{CollectionType, PrincipalType};
 
 /// Pooled database connection for reuse across tests.
 struct PooledConnection {
@@ -166,7 +166,7 @@ async fn init_db_pool() -> anyhow::Result<Arc<Mutex<DbPool>>> {
 async fn run_migrations(database_url: &str) -> anyhow::Result<()> {
     use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 
-    const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
+    const MIGRATIONS: EmbeddedMigrations = embed_migrations!("../../migrations");
 
     let url = database_url.to_string();
     tokio::task::spawn_blocking(move || {
@@ -180,10 +180,36 @@ async fn run_migrations(database_url: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-use shuriken::component::auth::casbin::CasbinEnforcerHandler;
-use shuriken::component::auth::{ResourceLocation, ResourceType};
-use shuriken::component::config::{Settings, load_config};
-use shuriken::component::db::connection::DbProviderHandler;
+use shuriken_test::component::auth::casbin::CasbinEnforcerHandler;
+use shuriken_test::component::auth::{ResourceLocation, ResourceType};
+use shuriken_test::component::config::*;
+use shuriken_test::component::db::connection::DbProviderHandler;
+
+/// Test configuration - static struct instead of loading from file.
+fn test_config() -> Settings {
+    Settings {
+        database: DatabaseConfig {
+            url: "postgres://unused:unused@localhost/unused".to_string(),
+            max_connections: 4,
+        },
+        auth: AuthConfig {
+            method: AuthMethod::SingleUser,
+            proxy: None,
+            single_user: Some(SingleUserAuthConfig {
+                name: "Test User".to_string(),
+                email: "your.email@example.com".to_string(),
+            }),
+        },
+        server: ServerConfig {
+            host: "127.0.0.1".to_string(),
+            port: 5800,
+            serve_origin: None,
+        },
+        logging: LoggingConfig {
+            level: "debug".to_string(),
+        },
+    }
+}
 
 // ============================================================================
 // Path Construction Helpers
@@ -366,8 +392,6 @@ pub fn card_collection_glob(owner: &str, collection: &str, recursive: bool) -> S
     .expect("Failed to build card collection glob")
 }
 
-// ============================================================================
-
 /// Static reference to shared test service (initialized once per test run)
 static TEST_SERVICE: OnceLock<Service> = OnceLock::new();
 static CONFIG_INIT: OnceLock<Settings> = OnceLock::new();
@@ -405,10 +429,10 @@ fn get_base_database_url() -> String {
 #[must_use]
 pub fn create_test_service() -> &'static Service {
     TEST_SERVICE.get_or_init(|| {
-        CONFIG_INIT.get_or_init(|| load_config().expect("Failed to load config for tests"));
+        CONFIG_INIT.get_or_init(test_config);
         // Create the full router with all API routes
-        let router =
-            Router::new().push(shuriken::app::api::routes().expect("API routes should be valid"));
+        let router = Router::new()
+            .push(shuriken_test::app::api::routes().expect("API routes should be valid"));
         Service::new(router)
     })
 }
@@ -426,16 +450,15 @@ pub fn create_test_service() -> &'static Service {
 /// Panics if the service or enforcer cannot be created.
 #[expect(clippy::expect_used, reason = "Service creation failure is fatal")]
 pub async fn create_db_test_service(database_url: &str) -> Service {
-    let config =
-        CONFIG_INIT.get_or_init(|| load_config().expect("Failed to load config for tests"));
+    let config = CONFIG_INIT.get_or_init(test_config);
 
     // Create the database pool
-    let pool = shuriken::component::db::connection::create_pool(database_url, 1u32)
+    let pool = shuriken_test::component::db::connection::create_pool(database_url, 1u32)
         .await
         .expect("Failed to create database pool for test service");
 
     // Initialize Casbin enforcer - loads policies from current DB state
-    let enforcer = shuriken::component::auth::casbin::init_casbin(pool.clone())
+    let enforcer = shuriken_test::component::auth::casbin::init_casbin(pool.clone())
         .await
         .expect("Failed to initialize Casbin enforcer for tests");
 
@@ -443,13 +466,13 @@ pub async fn create_db_test_service(database_url: &str) -> Service {
     // Note: AuthMiddleware is already included in routes() at the /api level
     let router = Router::new()
         .hoop(DbProviderHandler { provider: pool })
-        .hoop(shuriken::component::config::ConfigHandler {
+        .hoop(shuriken_test::component::config::ConfigHandler {
             settings: config.clone(),
         })
         .hoop(CasbinEnforcerHandler {
             enforcer: Arc::new(enforcer),
         })
-        .push(shuriken::app::api::routes().expect("API routes should be valid"));
+        .push(shuriken_test::app::api::routes().expect("API routes should be valid"));
 
     Service::new(router)
 }
@@ -973,12 +996,12 @@ impl TestDb {
     /// and retrieving IDs from the database after insertion.
     pub async fn seed_principal(
         &self,
-        principal_type: shuriken::component::db::enums::PrincipalType,
+        principal_type: shuriken_test::component::db::enums::PrincipalType,
         slug: &str,
         display_name: Option<&str>,
     ) -> anyhow::Result<uuid::Uuid> {
-        use shuriken::component::db::schema::principal;
-        use shuriken::component::model::principal::NewPrincipal;
+        use shuriken_test::component::db::schema::principal;
+        use shuriken_test::component::model::principal::NewPrincipal;
 
         let mut conn = self.get_conn().await?;
         let principal_id = uuid::Uuid::now_v7();
@@ -1008,8 +1031,8 @@ impl TestDb {
         email: &str,
         principal_id: uuid::Uuid,
     ) -> anyhow::Result<uuid::Uuid> {
-        use shuriken::component::db::schema::user;
-        use shuriken::component::model::user::NewUser;
+        use shuriken_test::component::db::schema::user;
+        use shuriken_test::component::model::user::NewUser;
 
         let mut conn = self.get_conn().await?;
 
@@ -1038,7 +1061,7 @@ impl TestDb {
     ) -> anyhow::Result<uuid::Uuid> {
         use diesel::prelude::*;
         use diesel_async::RunQueryDsl;
-        use shuriken::component::db::schema::user;
+        use shuriken_test::component::db::schema::user;
 
         let mut conn = self.get_conn().await?;
 
@@ -1088,12 +1111,12 @@ impl TestDb {
     pub async fn seed_collection(
         &self,
         owner_principal_id: uuid::Uuid,
-        collection_type: shuriken::component::db::enums::CollectionType,
+        collection_type: shuriken_test::component::db::enums::CollectionType,
         slug: &str,
         display_name: Option<&str>,
     ) -> anyhow::Result<uuid::Uuid> {
-        use shuriken::component::db::schema::dav_collection;
-        use shuriken::component::model::dav::collection::NewDavCollection;
+        use shuriken_test::component::db::schema::dav_collection;
+        use shuriken_test::component::model::dav::collection::NewDavCollection;
 
         let mut conn = self.get_conn().await?;
 
@@ -1119,13 +1142,13 @@ impl TestDb {
     pub async fn seed_child_collection(
         &self,
         owner_principal_id: uuid::Uuid,
-        collection_type: shuriken::component::db::enums::CollectionType,
+        collection_type: shuriken_test::component::db::enums::CollectionType,
         slug: &str,
         display_name: Option<&str>,
         parent_collection_id: uuid::Uuid,
     ) -> anyhow::Result<uuid::Uuid> {
-        use shuriken::component::db::schema::dav_collection;
-        use shuriken::component::model::dav::collection::NewDavCollection;
+        use shuriken_test::component::db::schema::dav_collection;
+        use shuriken_test::component::model::dav::collection::NewDavCollection;
 
         let mut conn = self.get_conn().await?;
 
@@ -1161,12 +1184,12 @@ impl TestDb {
         entity_type: &str,
         logical_uid: Option<&str>,
     ) -> anyhow::Result<uuid::Uuid> {
-        use shuriken::component::db::schema::dav_entity;
-        use shuriken::component::model::dav::entity::NewDavEntity;
+        use shuriken_test::component::db::schema::dav_entity;
+        use shuriken_test::component::model::dav::entity::NewDavEntity;
 
         let mut conn = self.get_conn().await?;
 
-        use shuriken::component::db::enums::EntityType;
+        use shuriken_test::component::db::enums::EntityType;
         let entity_type_enum = match entity_type {
             "calendar" => EntityType::ICalendar,
             "addressbook" => EntityType::VCard,
@@ -1199,12 +1222,12 @@ impl TestDb {
         etag: &str,
         sync_revision: i64,
     ) -> anyhow::Result<uuid::Uuid> {
-        use shuriken::component::db::schema::dav_instance;
-        use shuriken::component::model::dav::instance::NewDavInstance;
+        use shuriken_test::component::db::schema::dav_instance;
+        use shuriken_test::component::model::dav::instance::NewDavInstance;
 
         let mut conn = self.get_conn().await?;
 
-        use shuriken::component::db::enums::ContentType;
+        use shuriken_test::component::db::enums::ContentType;
         let content_type_enum = match content_type {
             "text/calendar" => ContentType::TextCalendar,
             "text/vcard" => ContentType::TextVCard,
@@ -1241,8 +1264,8 @@ impl TestDb {
         name: &str,
         ordinal: i32,
     ) -> anyhow::Result<uuid::Uuid> {
-        use shuriken::component::db::schema::dav_component;
-        use shuriken::component::model::dav::component::NewDavComponent;
+        use shuriken_test::component::db::schema::dav_component;
+        use shuriken_test::component::model::dav::component::NewDavComponent;
 
         let mut conn = self.get_conn().await?;
 
@@ -1273,12 +1296,12 @@ impl TestDb {
         value_text: Option<&str>,
         ordinal: i32,
     ) -> anyhow::Result<uuid::Uuid> {
-        use shuriken::component::db::schema::dav_property;
-        use shuriken::component::model::dav::property::NewDavProperty;
+        use shuriken_test::component::db::schema::dav_property;
+        use shuriken_test::component::model::dav::property::NewDavProperty;
 
         let mut conn = self.get_conn().await?;
 
-        use shuriken::component::db::enums::ValueType;
+        use shuriken_test::component::db::enums::ValueType;
         let new_property = NewDavProperty {
             component_id,
             name,
@@ -1385,8 +1408,8 @@ impl TestDb {
     /// ## Errors
     /// Returns an error if the group cannot be inserted.
     pub async fn seed_group(&self, principal_id: uuid::Uuid) -> anyhow::Result<uuid::Uuid> {
-        use shuriken::component::db::schema::group;
-        use shuriken::component::model::group::NewGroup;
+        use shuriken_test::component::db::schema::group;
+        use shuriken_test::component::model::group::NewGroup;
 
         let mut conn = self.get_conn().await?;
 
@@ -1413,8 +1436,8 @@ impl TestDb {
         group_id: uuid::Uuid,
         name: &str,
     ) -> anyhow::Result<uuid::Uuid> {
-        use shuriken::component::db::schema::group_name;
-        use shuriken::component::model::group::group_name::NewGroupName;
+        use shuriken_test::component::db::schema::group_name;
+        use shuriken_test::component::model::group::group_name::NewGroupName;
 
         let mut conn = self.get_conn().await?;
 
@@ -1444,8 +1467,8 @@ impl TestDb {
         user_id: uuid::Uuid,
         group_id: uuid::Uuid,
     ) -> anyhow::Result<uuid::Uuid> {
-        use shuriken::component::db::schema::membership;
-        use shuriken::component::model::user::membership::NewMembership;
+        use shuriken_test::component::db::schema::membership;
+        use shuriken_test::component::model::user::membership::NewMembership;
 
         let mut conn = self.get_conn().await?;
 
@@ -1466,7 +1489,7 @@ impl TestDb {
     /// ## Errors
     /// Returns an error if the collection cannot be found.
     pub async fn get_collection_synctoken(&self, collection_id: uuid::Uuid) -> anyhow::Result<i64> {
-        use shuriken::component::db::schema::dav_collection;
+        use shuriken_test::component::db::schema::dav_collection;
 
         let mut conn = self.get_conn().await?;
 
@@ -1488,7 +1511,7 @@ impl TestDb {
         collection_id: uuid::Uuid,
         uri: &str,
     ) -> anyhow::Result<bool> {
-        use shuriken::component::db::schema::dav_tombstone;
+        use shuriken_test::component::db::schema::dav_tombstone;
 
         let mut conn = self.get_conn().await?;
 
@@ -1507,7 +1530,7 @@ impl TestDb {
     /// ## Errors
     /// Returns an error if the database query fails.
     pub async fn instance_exists(&self, uri: &str) -> anyhow::Result<bool> {
-        use shuriken::component::db::schema::dav_instance;
+        use shuriken_test::component::db::schema::dav_instance;
 
         let mut conn = self.get_conn().await?;
 
@@ -1528,10 +1551,10 @@ impl TestDb {
     pub async fn get_instance_by_uri(
         &self,
         uri: &str,
-    ) -> anyhow::Result<Option<shuriken::component::model::dav::instance::DavInstance>> {
+    ) -> anyhow::Result<Option<shuriken_test::component::model::dav::instance::DavInstance>> {
         use diesel::OptionalExtension;
-        use shuriken::component::db::schema::dav_instance;
-        use shuriken::component::model::dav::instance::DavInstance;
+        use shuriken_test::component::db::schema::dav_instance;
+        use shuriken_test::component::model::dav::instance::DavInstance;
 
         let mut conn = self.get_conn().await?;
 
@@ -1553,10 +1576,11 @@ impl TestDb {
     pub async fn get_collection(
         &self,
         collection_id: uuid::Uuid,
-    ) -> anyhow::Result<Option<shuriken::component::model::dav::collection::DavCollection>> {
+    ) -> anyhow::Result<Option<shuriken_test::component::model::dav::collection::DavCollection>>
+    {
         use diesel::OptionalExtension;
-        use shuriken::component::db::schema::dav_collection;
-        use shuriken::component::model::dav::collection::DavCollection;
+        use shuriken_test::component::db::schema::dav_collection;
+        use shuriken_test::component::model::dav::collection::DavCollection;
 
         let mut conn = self.get_conn().await?;
 
@@ -1578,7 +1602,7 @@ impl TestDb {
         &self,
         collection_id: uuid::Uuid,
     ) -> anyhow::Result<i64> {
-        use shuriken::component::db::schema::dav_instance;
+        use shuriken_test::component::db::schema::dav_instance;
 
         let mut conn = self.get_conn().await?;
 
@@ -1944,7 +1968,7 @@ impl TestDb {
         path: &str,
         role: &str,
     ) -> anyhow::Result<()> {
-        use shuriken::component::db::schema::casbin_rule;
+        use shuriken_test::component::db::schema::casbin_rule;
 
         let mut conn = self.get_conn().await?;
 
@@ -1974,7 +1998,7 @@ impl TestDb {
     /// ## Errors
     /// Returns an error if the rule cannot be inserted.
     pub async fn seed_role_permission(&self, role: &str, permission: &str) -> anyhow::Result<()> {
-        use shuriken::component::db::schema::casbin_rule;
+        use shuriken_test::component::db::schema::casbin_rule;
 
         let mut conn = self.get_conn().await?;
 
@@ -2087,7 +2111,7 @@ impl TestDb {
     /// Use `seed_access_policy` instead. This helper has incorrect semantics.
     #[deprecated(note = "Use seed_access_policy instead")]
     pub async fn seed_policy(&self, role: &str, obj_type: &str, act: &str) -> anyhow::Result<()> {
-        use shuriken::component::db::schema::casbin_rule;
+        use shuriken_test::component::db::schema::casbin_rule;
 
         let mut conn = self.get_conn().await?;
 
@@ -2119,7 +2143,7 @@ impl TestDb {
         resource: &str,
         role: &str,
     ) -> anyhow::Result<()> {
-        use shuriken::component::db::schema::casbin_rule;
+        use shuriken_test::component::db::schema::casbin_rule;
 
         let mut conn = self.get_conn().await?;
 
@@ -2155,7 +2179,7 @@ impl TestDb {
         resource: &str,
         resource_type: &str,
     ) -> anyhow::Result<()> {
-        use shuriken::component::db::schema::casbin_rule;
+        use shuriken_test::component::db::schema::casbin_rule;
 
         let mut conn = self.get_conn().await?;
 
@@ -2183,7 +2207,7 @@ impl TestDb {
     /// ## Errors
     /// Returns an error if the rule cannot be inserted.
     pub async fn seed_containment(&self, child: &str, parent: &str) -> anyhow::Result<()> {
-        use shuriken::component::db::schema::casbin_rule;
+        use shuriken_test::component::db::schema::casbin_rule;
 
         let mut conn = self.get_conn().await?;
 
@@ -2211,7 +2235,7 @@ impl TestDb {
     /// ## Errors
     /// Returns an error if the rule cannot be inserted.
     pub async fn seed_role_hierarchy(&self, higher: &str, lower: &str) -> anyhow::Result<()> {
-        use shuriken::component::db::schema::casbin_rule;
+        use shuriken_test::component::db::schema::casbin_rule;
 
         let mut conn = self.get_conn().await?;
 

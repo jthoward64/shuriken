@@ -6,6 +6,7 @@ members = [
     "crates/shuriken-db",
     "crates/shuriken-service",
     "crates/shuriken-app",
+    "crates/shuriken-test",
 ]
 
 [workspace.package]
