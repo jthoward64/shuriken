@@ -284,6 +284,15 @@ pub enum ValueType {
     Uri,
     Binary,
     Json,
+    TextList,
+    DateList,
+    DateTimeList,
+    Time,
+    DurationInterval,
+    UtcOffset,
+    UtcOffsetInterval,
+    Period,
+    PeriodList,
 }
 
 impl ToSql<Text, Pg> for ValueType {
@@ -299,6 +308,15 @@ impl ToSql<Text, Pg> for ValueType {
             Self::Uri => "URI",
             Self::Binary => "BINARY",
             Self::Json => "JSON",
+            Self::TextList => "TEXT_LIST",
+            Self::DateList => "DATE_LIST",
+            Self::DateTimeList => "DATE_TIME_LIST",
+            Self::Time => "TIME",
+            Self::DurationInterval => "DURATION_INTERVAL",
+            Self::UtcOffset => "UTC_OFFSET",
+            Self::UtcOffsetInterval => "UTC_OFFSET_INTERVAL",
+            Self::Period => "PERIOD",
+            Self::PeriodList => "PERIOD_LIST",
         };
         out.write_all(s.as_bytes())?;
         Ok(IsNull::No)
@@ -318,6 +336,15 @@ impl FromSql<Text, Pg> for ValueType {
             b"URI" => Ok(Self::Uri),
             b"BINARY" => Ok(Self::Binary),
             b"JSON" => Ok(Self::Json),
+            b"TEXT_LIST" => Ok(Self::TextList),
+            b"DATE_LIST" => Ok(Self::DateList),
+            b"DATE_TIME_LIST" => Ok(Self::DateTimeList),
+            b"TIME" => Ok(Self::Time),
+            b"DURATION_INTERVAL" => Ok(Self::DurationInterval),
+            b"UTC_OFFSET" => Ok(Self::UtcOffset),
+            b"UTC_OFFSET_INTERVAL" => Ok(Self::UtcOffsetInterval),
+            b"PERIOD" => Ok(Self::Period),
+            b"PERIOD_LIST" => Ok(Self::PeriodList),
             _ => Err("Unrecognized enum variant".into()),
         }
     }
@@ -338,6 +365,15 @@ impl ValueType {
             Self::Uri => "URI",
             Self::Binary => "BINARY",
             Self::Json => "JSON",
+            Self::TextList => "TEXT_LIST",
+            Self::DateList => "DATE_LIST",
+            Self::DateTimeList => "DATE_TIME_LIST",
+            Self::Time => "TIME",
+            Self::DurationInterval => "DURATION_INTERVAL",
+            Self::UtcOffset => "UTC_OFFSET",
+            Self::UtcOffsetInterval => "UTC_OFFSET_INTERVAL",
+            Self::Period => "PERIOD",
+            Self::PeriodList => "PERIOD_LIST",
         }
     }
 }

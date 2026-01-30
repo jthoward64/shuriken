@@ -5,7 +5,7 @@
 file = "src/component/db/schema.rs"
 custom_type_derives = ["diesel::query_builder::QueryId", "Clone"]
 with_docs = true
-patch_file = "src/component/db/schema.patch"
+patch_file = "src/db/schema.patch"
 
 [migrations_directory]
 dir = "migrations"
