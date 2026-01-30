@@ -70,7 +70,7 @@ impl Authorizer {
     /// Check if any subject in the expanded set has the required permission.
     ///
     /// This implements the enforcement flow using the new model:
-    /// 1. For each subject in the expanded set (user + groups + public)
+    /// 1. For each subject in the expanded set (user + groups + authenticated + all)
     /// 2. Check Casbin policy: `enforce((subject, path, action))`
     /// 3. Casbin uses `globMatch(r.path, p.path)` for path matching
     /// 4. Casbin uses `g2(p.role, r.action)` for role-to-permission mapping

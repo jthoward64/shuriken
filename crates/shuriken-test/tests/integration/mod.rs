@@ -18,6 +18,7 @@
 //! Most tests are currently marked `#[ignore]` as they require the HTTP
 //! routing to be fully wired up.
 
+mod acl_pseudo_principals;
 mod authorization;
 mod collection;
 mod copy_move;
@@ -30,7 +31,7 @@ mod options;
 mod propfind;
 mod proppatch;
 mod put;
-mod rrule_integration;
 mod report;
+mod rrule_integration;
 mod slug_resolver;
 mod uid_validation;

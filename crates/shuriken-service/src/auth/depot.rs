@@ -52,13 +52,13 @@ pub fn is_authenticated(depot: &salvo::Depot) -> bool {
         .is_ok_and(|u| matches!(u, DepotUser::User(_)))
 }
 
-/// Get expanded subjects for public access only.
+/// Get expanded subjects for unauthenticated/anonymous access only.
 ///
 /// Use this when the user is not authenticated but you still want to check
-/// if public access is allowed.
+/// if unauthenticated or all-access permissions are allowed.
 #[must_use]
-pub fn public_subjects() -> ExpandedSubjects {
-    ExpandedSubjects::public_only()
+pub fn unauthenticated_subjects() -> ExpandedSubjects {
+    ExpandedSubjects::unauthenticated_only()
 }
 
 /// Get expanded subjects for the authenticated user including group memberships.
@@ -67,7 +67,8 @@ pub fn public_subjects() -> ExpandedSubjects {
 /// an `ExpandedSubjects` set containing:
 /// - The user's principal
 /// - All group principals the user belongs to
-/// - The public pseudo-principal
+/// - The `authenticated` pseudo-principal
+/// - The `all` pseudo-principal
 ///
 /// ## Errors
 ///
@@ -117,10 +118,10 @@ pub async fn get_subjects_from_depot(
 
     match depot_user {
         Ok(DepotUser::User(user)) => get_expanded_subjects(conn, user).await,
-        Ok(DepotUser::Public) => Ok(public_subjects()),
+        Ok(DepotUser::Public) => Ok(unauthenticated_subjects()),
         Err(_missing) => {
-            tracing::warn!("Depot missing user context; defaulting to public subjects");
-            Ok(public_subjects())
+            tracing::warn!("Depot missing user context; defaulting to unauthenticated subjects");
+            Ok(unauthenticated_subjects())
         }
     }
 }

@@ -46,9 +46,9 @@ p, principal:dave, /calendars/dave/private/**, owner
 p, principal:dave, /calendars/shared/events/dave-event.ics, owner
 p, principal:eve, /calendars/eve/**, editor-basic
 p, principal:eve, /addressbooks/team/directory/*, reader
-p, public, /calendars/bob/shared/*, reader
-p, public, /calendars/dave/public/*, reader-freebusy
-p, public, /calendars/shared/public/*, reader-freebusy
+p, all, /calendars/bob/shared/*, reader
+p, unauthenticated, /calendars/dave/public/*, reader-freebusy
+p, unauthenticated, /calendars/shared/public/*, reader-freebusy
 
 # Role-to-permission mappings (g2 = role, permission)
 g2, reader-freebusy, read_freebusy
@@ -136,27 +136,23 @@ g2, owner, admin
     async fn test_reader_permissions() {
         let e = create_test_enforcer().await;
 
-        // Public has read access to Bob's shared calendar
+        // All has read access to Bob's shared calendar
         assert!(
-            e.enforce(("public", "/calendars/bob/shared/event6.ics", "read"))
+            e.enforce(("all", "/calendars/bob/shared/event6.ics", "read"))
                 .unwrap()
         );
         assert!(
-            e.enforce((
-                "public",
-                "/calendars/bob/shared/event6.ics",
-                "read_freebusy"
-            ))
-            .unwrap()
+            e.enforce(("all", "/calendars/bob/shared/event6.ics", "read_freebusy"))
+                .unwrap()
         );
 
-        // Public should not have write permissions
+        // All should not have write permissions
         assert!(
-            !e.enforce(("public", "/calendars/bob/shared/event6.ics", "edit"))
+            !e.enforce(("all", "/calendars/bob/shared/event6.ics", "edit"))
                 .unwrap()
         );
         assert!(
-            !e.enforce(("public", "/calendars/bob/shared/event6.ics", "delete"))
+            !e.enforce(("all", "/calendars/bob/shared/event6.ics", "delete"))
                 .unwrap()
         );
     }
@@ -259,7 +255,7 @@ g2, owner, admin
 
         // Public has access to /calendars/bob/shared/* (one level only)
         assert!(
-            e.enforce(("public", "/calendars/bob/shared/event6.ics", "read"))
+            e.enforce(("all", "/calendars/bob/shared/event6.ics", "read"))
                 .unwrap()
         );
 
@@ -275,7 +271,7 @@ g2, owner, admin
 
         // Public should NOT have access to Bob's other calendars
         assert!(
-            !e.enforce(("public", "/calendars/bob/personal/event5.ics", "read"))
+            !e.enforce(("all", "/calendars/bob/personal/event5.ics", "read"))
                 .unwrap()
         );
     }
@@ -481,7 +477,7 @@ g2, owner, admin
 
         // Public should not have access to Alice's calendar
         assert!(
-            !e.enforce(("public", "/calendars/alice/personal/event.ics", "read"))
+            !e.enforce(("all", "/calendars/alice/personal/event.ics", "read"))
                 .unwrap()
         );
     }
@@ -539,13 +535,13 @@ g2, owner, admin
                 .unwrap()
         );
         assert!(
-            e.enforce(("public", "/calendars/bob/shared/", "read"))
+            e.enforce(("all", "/calendars/bob/shared/", "read"))
                 .unwrap()
         );
 
         // Public should not have access to bob's personal collection
         assert!(
-            !e.enforce(("public", "/calendars/bob/personal/", "read"))
+            !e.enforce(("all", "/calendars/bob/personal/", "read"))
                 .unwrap()
         );
     }
@@ -574,11 +570,11 @@ g2, owner, admin
 
         // Verify reader has read but not edit
         assert!(
-            e.enforce(("public", "/calendars/bob/shared/event.ics", "read"))
+            e.enforce(("all", "/calendars/bob/shared/event.ics", "read"))
                 .unwrap()
         );
         assert!(
-            !e.enforce(("public", "/calendars/bob/shared/event.ics", "edit"))
+            !e.enforce(("all", "/calendars/bob/shared/event.ics", "edit"))
                 .unwrap()
         );
 
@@ -617,7 +613,7 @@ g2, owner, admin
 
         // Test that /calendars/bob/shared/* doesn't match /calendars/bob/shared-evil/event.ics
         assert!(
-            !e.enforce(("public", "/calendars/bob/shared-evil/event.ics", "read"))
+            !e.enforce(("all", "/calendars/bob/shared-evil/event.ics", "read"))
                 .unwrap()
         );
     }
@@ -683,18 +679,22 @@ g2, owner, admin
             .unwrap()
         );
 
-        // Public has reader-freebusy for Dave's public calendar
+        // Unauthenticated has reader-freebusy for Dave's public calendar
         assert!(
             e.enforce((
-                "public",
+                "unauthenticated",
                 "/calendars/dave/public/event.ics",
                 "read_freebusy"
             ))
             .unwrap()
         );
         assert!(
-            !e.enforce(("public", "/calendars/dave/public/event.ics", "read"))
-                .unwrap()
+            !e.enforce((
+                "unauthenticated",
+                "/calendars/dave/public/event.ics",
+                "read"
+            ))
+            .unwrap()
         );
     }
 
@@ -897,23 +897,27 @@ g2, owner, admin
     async fn test_public_access_various_resources() {
         let e = create_test_enforcer().await;
 
-        // Public has freebusy access to shared public calendar
+        // Unauthenticated has freebusy access to shared public calendar
         assert!(
             e.enforce((
-                "public",
+                "unauthenticated",
                 "/calendars/shared/public/holiday.ics",
                 "read_freebusy"
             ))
             .unwrap()
         );
         assert!(
-            !e.enforce(("public", "/calendars/shared/public/holiday.ics", "read"))
-                .unwrap()
+            !e.enforce((
+                "unauthenticated",
+                "/calendars/shared/public/holiday.ics",
+                "read"
+            ))
+            .unwrap()
         );
 
-        // Public has read access to Bob's shared items
+        // All has read access to Bob's shared items
         assert!(
-            e.enforce(("public", "/calendars/bob/shared/event.ics", "read"))
+            e.enforce(("all", "/calendars/bob/shared/event.ics", "read"))
                 .unwrap()
         );
 
@@ -1218,7 +1222,7 @@ g2, owner, admin
         // reader: read_freebusy + read
         for perm in &permissions {
             let result = e
-                .enforce(("public", "/calendars/bob/shared/event.ics", *perm))
+                .enforce(("all", "/calendars/bob/shared/event.ics", *perm))
                 .unwrap();
             if *perm == "read_freebusy" || *perm == "read" {
                 assert!(result, "reader should have {perm}");
@@ -1328,7 +1332,7 @@ g2, owner, admin
 
         // Public should not have access to collection roots they don't own
         assert!(
-            !e.enforce(("public", "/calendars/alice/", "read_freebusy"))
+            !e.enforce(("all", "/calendars/alice/", "read_freebusy"))
                 .unwrap()
         );
     }
@@ -1398,7 +1402,7 @@ g2, owner, admin
 
         // Public has reader access to Bob's shared calendar
         assert!(
-            e.enforce(("public", "/calendars/bob/shared/event.ics", "read"))
+            e.enforce(("all", "/calendars/bob/shared/event.ics", "read"))
                 .unwrap()
         );
 
@@ -1408,7 +1412,7 @@ g2, owner, admin
                 .unwrap()
         );
         assert!(
-            !e.enforce(("public", "/calendars/bob/shared/event.ics", "admin"))
+            !e.enforce(("all", "/calendars/bob/shared/event.ics", "admin"))
                 .unwrap()
         );
     }
@@ -1698,13 +1702,13 @@ g2, owner, admin
 
         for path in &public_allowed {
             assert!(
-                e.enforce(("public", path, "read_freebusy")).is_ok(),
+                e.enforce(("all", path, "read_freebusy")).is_ok(),
                 "Public should have access to {path}"
             );
         }
 
         for path in &public_denied {
-            let result = e.enforce(("public", path, "read_freebusy")).unwrap();
+            let result = e.enforce(("all", path, "read_freebusy")).unwrap();
             assert!(!result, "Public should not have access to {path}");
         }
     }

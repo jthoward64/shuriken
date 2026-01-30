@@ -1,8 +1,8 @@
 //! Subject types for authorization.
 //!
-//! A subject represents a principal (user, group) or the public pseudo-principal.
+//! A subject represents a principal (user, group) or special pseudo-principals.
 //! The authorization system expands a user subject to include all their group
-//! memberships plus the public pseudo-principal.
+//! memberships plus special pseudo-principals (authenticated, unauthenticated, all).
 
 use shuriken_db::model::user;
 
@@ -13,8 +13,12 @@ use shuriken_db::model::user;
 pub enum Subject {
     /// A principal identified by its UUID (user or group).
     Principal(uuid::Uuid),
-    /// The public pseudo-principal for anonymous/public access.
-    Public,
+    /// The unauthenticated pseudo-principal (RFC 3744 §5.5.1) - for anonymous access only.
+    Unauthenticated,
+    /// The authenticated pseudo-principal (RFC 3744 §5.5.1) - for any authenticated user.
+    Authenticated,
+    /// The all pseudo-principal (RFC 3744 §5.5.1) - for everyone (authenticated + unauthenticated).
+    All,
 }
 
 impl Subject {
@@ -35,20 +39,25 @@ impl Subject {
     pub fn casbin_subject(self) -> String {
         match self {
             Self::Principal(id) => format!("principal:{id}"),
-            Self::Public => "public".to_string(),
+            Self::Unauthenticated => "unauthenticated".to_string(),
+            Self::Authenticated => "authenticated".to_string(),
+            Self::All => "all".to_string(),
         }
     }
 
     /// Parse a Casbin subject string.
     #[must_use]
     pub fn from_casbin_subject(s: &str) -> Option<Self> {
-        if s == "public" {
-            return Some(Self::Public);
+        match s {
+            "unauthenticated" => Some(Self::Unauthenticated),
+            "authenticated" => Some(Self::Authenticated),
+            "all" => Some(Self::All),
+            _ => {
+                let id_str = s.strip_prefix("principal:")?;
+                let id = uuid::Uuid::parse_str(id_str).ok()?;
+                Some(Self::Principal(id))
+            }
         }
-
-        let id_str = s.strip_prefix("principal:")?;
-        let id = uuid::Uuid::parse_str(id_str).ok()?;
-        Some(Self::Principal(id))
     }
 }
 
@@ -60,10 +69,15 @@ impl std::fmt::Display for Subject {
 
 /// An expanded set of subjects for authorization.
 ///
-/// When authorizing a user, we check permissions for:
+/// When authorizing an authenticated user, we check permissions for:
 /// - The user's principal
 /// - All groups the user belongs to
-/// - The public pseudo-principal
+/// - The `authenticated` pseudo-principal (any logged-in user)
+/// - The `all` pseudo-principal (everyone)
+///
+/// When authorizing an unauthenticated user, we check permissions for:
+/// - The `unauthenticated` pseudo-principal (anonymous only)
+/// - The `all` pseudo-principal (everyone)
 ///
 /// Access is granted if ANY of these subjects has the required permission.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -93,24 +107,27 @@ impl ExpandedSubjects {
             subjects.push(Subject::Principal(group_id));
         }
 
-        // Always include public
-        subjects.push(Subject::Public);
+        // Include authenticated and all pseudo-principals for authenticated users
+        subjects.push(Subject::Authenticated);
+        subjects.push(Subject::All);
 
         Self { subjects }
     }
 
-    /// Create an expanded subject set for public/anonymous access only.
+    /// Create an expanded subject set for unauthenticated/anonymous access only.
+    ///
+    /// Includes both `unauthenticated` (anonymous only) and `all` (everyone) pseudo-principals.
     #[must_use]
-    pub fn public_only() -> Self {
+    pub fn unauthenticated_only() -> Self {
         Self {
-            subjects: vec![Subject::Public],
+            subjects: vec![Subject::Unauthenticated, Subject::All],
         }
     }
 
     /// Create an expanded subject set from a user model.
     ///
-    /// This is a convenience method that creates a set with just the user
-    /// and public. Use `new()` if you need to include group memberships.
+    /// This is a convenience method that creates a set with just the user,
+    /// `authenticated`, and `all`. Use `new()` if you need to include group memberships.
     #[must_use]
     pub fn from_user(user: &user::User) -> Self {
         Self::new(user.principal_id, std::iter::empty())
@@ -171,7 +188,7 @@ mod tests {
     #[test]
     fn subject_casbin_roundtrip() {
         let id = uuid::Uuid::now_v7();
-        let subjects = [Subject::Principal(id), Subject::Public];
+        let subjects = [Subject::Principal(id), Subject::Unauthenticated];
 
         for subject in subjects {
             let casbin_str = subject.casbin_subject();
@@ -181,13 +198,14 @@ mod tests {
     }
 
     #[test]
-    fn expanded_subjects_contains_user_and_public() {
+    fn expanded_subjects_contains_user_authenticated_and_all() {
         let user_id = uuid::Uuid::now_v7();
         let expanded = ExpandedSubjects::new(user_id, std::iter::empty());
 
         assert!(expanded.contains(&Subject::Principal(user_id)));
-        assert!(expanded.contains(&Subject::Public));
-        assert_eq!(expanded.len(), 2);
+        assert!(expanded.contains(&Subject::Authenticated));
+        assert!(expanded.contains(&Subject::All));
+        assert_eq!(expanded.len(), 3);
     }
 
     #[test]
@@ -201,7 +219,8 @@ mod tests {
         assert!(expanded.contains(&Subject::Principal(user_id)));
         assert!(expanded.contains(&Subject::Principal(group1_id)));
         assert!(expanded.contains(&Subject::Principal(group2_id)));
-        assert!(expanded.contains(&Subject::Public));
-        assert_eq!(expanded.len(), 4);
+        assert!(expanded.contains(&Subject::Authenticated));
+        assert!(expanded.contains(&Subject::All));
+        assert_eq!(expanded.len(), 5);
     }
 }

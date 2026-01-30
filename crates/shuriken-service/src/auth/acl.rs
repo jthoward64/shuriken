@@ -22,7 +22,7 @@ use crate::error::{ServiceError, ServiceResult};
 /// ## RFC 3744 Compliance
 ///
 /// Per RFC 3744 §5.5, the DAV:acl property contains a list of ACE elements where each ACE has:
-/// - `<principal>`: Who the grant applies to (`<href>` for specific principal, `<all>` for public)
+/// - `<principal>`: Who the grant applies to (`<href>` for specific principal, `<all>` for everyone, `<authenticated>` for logged-in users, `<unauthenticated>` for anonymous)
 /// - `<grant>` or `<deny>`: Whether this is a permission grant or denial
 /// - `<privilege>`: What privileges are granted/denied
 ///
@@ -32,7 +32,10 @@ use crate::error::{ServiceError, ServiceResult};
 /// - We filter policies to those that glob-match the given path
 /// - Policies are grouped by subject (principal) to create one ACE per principal
 /// - Only the highest permission level for each principal is returned (owner > admin > edit > read)
-/// - The `public` subject is serialized as `<D:all/>` per RFC 3744 §5.5.1
+/// - Special subjects are serialized per RFC 3744 §5.5.1:
+///   - `all` → `<D:all/>`
+///   - `authenticated` → `<D:authenticated/>`
+///   - `unauthenticated` → `<D:unauthenticated/>`
 ///
 /// ## Errors
 ///
@@ -113,22 +116,25 @@ pub async fn serialize_acl_for_resource(
 
         // Principal
         xml.push_str("\n    <D:principal>");
-        if subject == "public" {
-            xml.push_str("\n      <D:all/>");
-        } else {
-            // Convert Casbin subject format (e.g., "principal:uuid") to href
-            let principal_href = if subject.starts_with("principal:") {
-                let uuid = subject.strip_prefix("principal:").unwrap_or(&subject);
-                format!("/principals/{uuid}")
-            } else {
-                format!("/principals/{subject}")
-            };
-            write!(
-                xml,
-                "\n      <D:href>{}</D:href>",
-                xml_escape(&principal_href)
-            )
-            .unwrap_or_log();
+        match subject.as_str() {
+            "all" => xml.push_str("\n      <D:all/>"),
+            "authenticated" => xml.push_str("\n      <D:authenticated/>"),
+            "unauthenticated" => xml.push_str("\n      <D:unauthenticated/>"),
+            _ => {
+                // Convert Casbin subject format (e.g., "principal:uuid") to href
+                let principal_href = if subject.starts_with("principal:") {
+                    let uuid = subject.strip_prefix("principal:").unwrap_or(&subject);
+                    format!("/principals/{uuid}")
+                } else {
+                    format!("/principals/{subject}")
+                };
+                write!(
+                    xml,
+                    "\n      <D:href>{}</D:href>",
+                    xml_escape(&principal_href)
+                )
+                .unwrap_or_log();
+            }
         }
         xml.push_str("\n    </D:principal>");
 

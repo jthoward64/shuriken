@@ -1,5 +1,9 @@
 # Shuriken: Copilot Instructions
 
+## Tool Usage
+
+- When in complex shells like fish, complex cli commands may not work as expected due to escaping issues. In such cases, switch to a simpler shell like bash or sh (with `exec bash` or `exec sh`) first. For one offs you can also use `bash -c 'your command here'` to run a command in bash without switching shells.
+
 ## Project Overview
 
 **Shuriken** is a CalDAV/CardDAV server implementation in Rust. It provides calendar and contact synchronization with the following core features:

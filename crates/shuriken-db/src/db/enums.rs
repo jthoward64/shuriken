@@ -31,7 +31,7 @@ pub enum PrincipalType {
     User,
     Group,
     System,
-    Public,
+    Unauthenticated,
     Resource,
 }
 
@@ -41,7 +41,7 @@ impl ToSql<Text, Pg> for PrincipalType {
             Self::User => "user",
             Self::Group => "group",
             Self::System => "system",
-            Self::Public => "public",
+            Self::Unauthenticated => "unauthenticated",
             Self::Resource => "resource",
         };
         out.write_all(s.as_bytes())?;
@@ -55,7 +55,7 @@ impl FromSql<Text, Pg> for PrincipalType {
             b"user" => Ok(Self::User),
             b"group" => Ok(Self::Group),
             b"system" => Ok(Self::System),
-            b"public" => Ok(Self::Public),
+            b"unauthenticated" => Ok(Self::Unauthenticated),
             b"resource" => Ok(Self::Resource),
             _ => Err("Unrecognized enum variant".into()),
         }
@@ -70,7 +70,7 @@ impl PrincipalType {
             Self::User => "user",
             Self::Group => "group",
             Self::System => "system",
-            Self::Public => "public",
+            Self::Unauthenticated => "unauthenticated",
             Self::Resource => "resource",
         }
     }

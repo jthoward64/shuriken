@@ -26,7 +26,12 @@ async fn propfind_returns_multistatus() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Calendar, "testcal", Some("Personal"))
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "testcal",
+            Some("Personal"),
+        )
         .await
         .expect("Failed to seed collection");
 
@@ -779,7 +784,12 @@ async fn propfind_calendar_returns_supported_report_set() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Calendar, "testcal", Some("Test Calendar"))
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "testcal",
+            Some("Test Calendar"),
+        )
         .await
         .expect("Failed to seed collection");
 
@@ -839,7 +849,12 @@ async fn propfind_addressbook_returns_supported_report_set() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Addressbook, "contacts", Some("My Contacts"))
+        .seed_collection(
+            principal_id,
+            CollectionType::Addressbook,
+            "contacts",
+            Some("My Contacts"),
+        )
         .await
         .expect("Failed to seed collection");
 
@@ -899,7 +914,12 @@ async fn propfind_returns_supported_calendar_component_set() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Calendar, "testcal", Some("Test Calendar"))
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "testcal",
+            Some("Test Calendar"),
+        )
         .await
         .expect("Failed to seed collection");
 
@@ -959,7 +979,12 @@ async fn propfind_returns_supported_address_data() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Addressbook, "contacts", Some("My Contacts"))
+        .seed_collection(
+            principal_id,
+            CollectionType::Addressbook,
+            "contacts",
+            Some("My Contacts"),
+        )
         .await
         .expect("Failed to seed collection");
 
@@ -1019,7 +1044,12 @@ async fn propfind_returns_supported_collation_set() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Calendar, "testcal", Some("Test Calendar"))
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "testcal",
+            Some("Test Calendar"),
+        )
         .await
         .expect("Failed to seed collection");
 
@@ -1084,7 +1114,12 @@ async fn propfind_returns_acl_property() {
         .expect("Failed to seed authenticated user");
 
     let collection_id = test_db
-        .seed_collection(principal_id, CollectionType::Calendar, "testcal", Some("Test Calendar"))
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "testcal",
+            Some("Test Calendar"),
+        )
         .await
         .expect("Failed to seed collection");
 
@@ -1094,7 +1129,7 @@ async fn propfind_returns_acl_property() {
         .await
         .expect("Failed to seed collection owner");
 
-    // Seed additional ACL: Reader permission for "public"
+    // Seed additional ACL: Reader permission for "all" (anyone can read)
     // Use ResourceLocation to build the policy path
     let collection_path = shuriken_service::auth::ResourceLocation::from_segments_collection(
         shuriken_service::auth::ResourceType::Calendar,
@@ -1104,9 +1139,9 @@ async fn propfind_returns_acl_property() {
     .to_resource_path(false)
     .expect("Failed to build resource path");
     test_db
-        .seed_access_policy("public", &collection_path, "read")
+        .seed_access_policy("all", &collection_path, "read")
         .await
-        .expect("Failed to seed public read access");
+        .expect("Failed to seed all read access");
 
     let service = create_db_test_service(&test_db.url()).await;
 
@@ -1183,11 +1218,21 @@ async fn propfind_acl_filters_by_resource_path() {
 
     // Create two collections
     let collection1_id = test_db
-        .seed_collection(principal_id, CollectionType::Calendar, "col1", Some("Collection 1"))
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "col1",
+            Some("Collection 1"),
+        )
         .await
         .expect("Failed to seed collection 1");
     let collection2_id = test_db
-        .seed_collection(principal_id, CollectionType::Calendar, "col2", Some("Collection 2"))
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "col2",
+            Some("Collection 2"),
+        )
         .await
         .expect("Failed to seed collection 2");
 
@@ -1201,7 +1246,7 @@ async fn propfind_acl_filters_by_resource_path() {
         .await
         .expect("Failed to seed collection 2 owner");
 
-    // Seed ACL: Public read only on collection 1
+    // Seed ACL: All-access read only on collection 1
     // Use ResourceLocation to build the policy path
     let collection1_path = shuriken_service::auth::ResourceLocation::from_segments_collection(
         shuriken_service::auth::ResourceType::Calendar,
@@ -1211,9 +1256,9 @@ async fn propfind_acl_filters_by_resource_path() {
     .to_resource_path(false)
     .expect("Failed to build resource path");
     test_db
-        .seed_access_policy("public", &collection1_path, "read")
+        .seed_access_policy("all", &collection1_path, "read")
         .await
-        .expect("Failed to seed public read access for col1");
+        .expect("Failed to seed all read access for col1");
 
     let service = create_db_test_service(&test_db.url()).await;
 

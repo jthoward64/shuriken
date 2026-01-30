@@ -1117,16 +1117,16 @@ async fn public_principal_can_access_public_resources() {
         .await
         .expect("Failed to seed instance");
 
-    // Grant reader role to "public" principal (special system principal)
+    // Grant reader role to "all" principal (special system principal for everyone)
     let path_pattern = format!("/cal/{owner_principal_id}/{collection_id}/**");
     test_db
-        .seed_access_policy("public", &path_pattern, "reader")
+        .seed_access_policy("all", &path_pattern, "reader")
         .await
         .expect("Failed to seed access policy");
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    // Any authenticated user should be able to read (public principal is always expanded)
+    // Any authenticated user should be able to read (all principal matches everyone)
     let request_path = caldav_item_path("owner", "publiccal", "public-event.ics");
     let response = TestRequest::get(&request_path).send(&service).await;
 
