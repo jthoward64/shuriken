@@ -183,7 +183,7 @@ None currently identified.
 
 ---
 
-### 12. ASCII Casemap ß Folding
+### ✅ 12. ASCII Casemap ß Folding (NOT A BUG)
 
 **Location**: [`crates/shuriken-db/src/db/query/carddav/filter.rs:860`](../crates/shuriken-db/src/db/query/carddav/filter.rs#L860)
 
@@ -191,9 +191,9 @@ None currently identified.
 // Note: ASCII casemap uses simple to_lowercase, which doesn't fold ß
 ```
 
-**Impact**: Edge case - German ß (sharp s) not handled correctly in ASCII casemap  
-**Effort**: Low (use ICU4X CaseMapper)  
-**Status**: Deferred
+**Impact**: Edge case - German ß (sharp s) not handled in ASCII casemap  
+**Effort**: N/A  
+**Status**: ✅ Not a bug - RFC 4790 §9.2.1 specifies that i;ascii-casemap only treats ASCII letters (a-z) case-insensitively. Non-ASCII characters like ß are intentionally not folded. Current implementation is correct per spec.
 
 ---
 
