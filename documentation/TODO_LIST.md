@@ -93,18 +93,29 @@ None currently identified.
 
 ---
 
-### 6. List Type Property Storage
+### ✅ 6. List Type Property Storage (COMPLETE)
 
 **Location**: [`crates/shuriken-db/src/db/map/dav/extract.rs:78-79`](../crates/shuriken-db/src/db/map/dav/extract.rs#L78)
 
-```rust
-// Store list types as text (raw value) for now
-// TODO: Consider storing first element or handling lists specially
-```
+**Impact**: Proper type-safe storage for list and complex iCalendar/vCard values  
+**Effort**: ✅ Complete  
+**Status**: ✅ Complete (2026-01-30) - Commit 323bac1
 
-**Impact**: Data model - list properties currently stored as text; may need special handling  
-**Effort**: Medium (requires schema and mapping changes)  
-**Status**: Deferred (current approach works)
+**Implementation**:
+- Added PostgreSQL array columns: `TEXT[]`, `DATE[]`, `TIMESTAMPTZ[]` for list types
+- Added specialized type columns:
+  - `TIME` for iCal TIME values
+  - `INTERVAL` for DURATION and UTC-OFFSET  
+  - `TSTZRANGE` for PERIOD values (start/end range)
+- Updated `ValueType` enum with 9 new variants
+- Database constraints ensure type-value column matching
+
+**Benefits**:
+- Native PostgreSQL array operations for TEXT-LIST, DATE-LIST, DATE-TIME-LIST
+- Type-safe storage instead of TEXT serialization
+- Range queries on PERIOD values
+- Interval arithmetic for DURATION calculations
+- Binary storage already available via `value_bytes` column
 
 ---
 
@@ -434,10 +445,10 @@ The following were identified in the search but are **NOT** TODO items:
 |----------|-------|----------|-------------|-------------|
 | P0       | 0     | 0        | 0           | 0           |
 | P1       | 3     | 2        | 0           | 1           |
-| P2       | 3     | 1        | 0           | 2           |
-| P3       | 6     | 0        | 0           | 6           |
+| P2       | 3     | 2        | 0           | 1           |
+| P3       | 6     | 1        | 0           | 5           |
 | Tests    | 24    | 0        | 0           | 24          |
-| **Total**| **36**| **3**    | **0**       | **33**      |
+| **Total**| **36**| **5**    | **0**       | **31**      |
 
 ### By Component
 
