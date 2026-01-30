@@ -2,6 +2,7 @@
 //!
 //! ## Module Organization
 //!
+//! - `acl`: DAV:acl property serialization from Casbin policies
 //! - `action`: Authorization actions for Casbin enforcement (read, write, `share_grant`)
 //! - `authenticate`: User authentication (single user, proxy)
 //! - `authorize`: Authorization wrappers and convenience functions
@@ -13,6 +14,7 @@
 //! - `service`: Centralized authorization service (`Authorizer`)
 //! - `subject`: Subject types and principal expansion
 
+pub mod acl;
 pub mod action;
 pub mod authenticate;
 pub mod authorize;
@@ -28,6 +30,9 @@ pub mod subject;
 mod casbin_test;
 
 // Re-export commonly used types at module level
+pub use acl::{
+    serialize_acl_for_resource, supported_privilege_set_xml as acl_supported_privilege_set_xml,
+};
 pub use action::{Action, HttpMethod, MethodContext, action_for_method};
 pub use authorize::{
     Authorizer, AuthzResult, authorizer_from_depot, handler_check, handler_require,

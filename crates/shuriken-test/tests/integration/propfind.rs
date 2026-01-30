@@ -1061,3 +1061,199 @@ async fn propfind_returns_supported_collation_set() {
         "Response should contain i;unicode-casemap collation"
     );
 }
+
+// ============================================================================
+// ACL Property Tests
+// ============================================================================
+
+/// ## Summary
+/// Test that PROPFIND returns DAV:acl property with principals and privileges.
+///
+/// RFC 3744 §5.5: The DAV:acl property is readable and contains ACE elements
+/// with principal, grant, and privilege sub-elements.
+#[test_log::test(tokio::test)]
+async fn propfind_returns_acl_property() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
+
+    let collection_id = test_db
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", Some("Test Calendar"))
+        .await
+        .expect("Failed to seed collection");
+
+    // Seed ACL: Owner permission for principal on this collection
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    // Seed additional ACL: Reader permission for "public"
+    // Use ResourceLocation to build the policy path
+    let collection_path = shuriken_service::auth::ResourceLocation::from_segments_collection(
+        shuriken_service::auth::ResourceType::Calendar,
+        principal_id.to_string(),
+        &collection_id.to_string(),
+    )
+    .to_resource_path(false)
+    .expect("Failed to build resource path");
+    test_db
+        .seed_access_policy("public", &collection_path, "read")
+        .await
+        .expect("Failed to seed public read access");
+
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let prop_request = r#"<?xml version="1.0" encoding="utf-8"?>
+<D:propfind xmlns:D="DAV:">
+  <D:prop>
+    <D:acl/>
+  </D:prop>
+</D:propfind>"#;
+
+    let response = TestRequest::propfind(&caldav_collection_path("testuser", "testcal"))
+        .depth("0")
+        .xml_body(prop_request)
+        .send(&service)
+        .await;
+
+    let response = response.assert_status(StatusCode::MULTI_STATUS);
+
+    let body = response.body_string();
+
+    // RFC 3744 §5.5: Response must contain DAV:acl property
+    assert!(
+        body.contains("<D:acl"),
+        "Response should contain DAV:acl property"
+    );
+
+    // RFC 3744 §5.5.1: Should contain ACE elements with principal and grant
+    assert!(
+        body.contains("<D:ace>"),
+        "Response should contain ACE elements"
+    );
+    assert!(
+        body.contains("<D:principal>"),
+        "Response should contain principal elements"
+    );
+    assert!(
+        body.contains("<D:grant>"),
+        "Response should contain grant elements"
+    );
+    assert!(
+        body.contains("<D:privilege>"),
+        "Response should contain privilege elements"
+    );
+
+    // RFC 3744 §5.5.1: Public access should be represented as <D:all/>
+    assert!(
+        body.contains("<D:all/>"),
+        "Response should contain <D:all/> for public principal"
+    );
+
+    // Check for specific privileges (owner should have read/write)
+    // The exact privileges depend on permission level mapping
+    assert!(
+        body.contains("<D:read/>") || body.contains("<read/>"),
+        "Response should contain read privilege"
+    );
+}
+
+/// ## Summary
+/// Test that PROPFIND DAV:acl property shows only ACLs matching the resource path.
+///
+/// RFC 3744 §5.5: The ACL should only include entries that apply to this specific resource.
+#[test_log::test(tokio::test)]
+async fn propfind_acl_filters_by_resource_path() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
+
+    // Create two collections
+    let collection1_id = test_db
+        .seed_collection(principal_id, CollectionType::Calendar, "col1", Some("Collection 1"))
+        .await
+        .expect("Failed to seed collection 1");
+    let collection2_id = test_db
+        .seed_collection(principal_id, CollectionType::Calendar, "col2", Some("Collection 2"))
+        .await
+        .expect("Failed to seed collection 2");
+
+    // Seed ACL: Owner permission for both collections
+    test_db
+        .seed_collection_owner(principal_id, collection1_id, "calendar")
+        .await
+        .expect("Failed to seed collection 1 owner");
+    test_db
+        .seed_collection_owner(principal_id, collection2_id, "calendar")
+        .await
+        .expect("Failed to seed collection 2 owner");
+
+    // Seed ACL: Public read only on collection 1
+    // Use ResourceLocation to build the policy path
+    let collection1_path = shuriken_service::auth::ResourceLocation::from_segments_collection(
+        shuriken_service::auth::ResourceType::Calendar,
+        principal_id.to_string(),
+        &collection1_id.to_string(),
+    )
+    .to_resource_path(false)
+    .expect("Failed to build resource path");
+    test_db
+        .seed_access_policy("public", &collection1_path, "read")
+        .await
+        .expect("Failed to seed public read access for col1");
+
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let prop_request = r#"<?xml version="1.0" encoding="utf-8"?>
+<D:propfind xmlns:D="DAV:">
+  <D:prop>
+    <D:acl/>
+  </D:prop>
+</D:propfind>"#;
+
+    // Query collection 1 - should have public ACE
+    let response1 = TestRequest::propfind(&caldav_collection_path("testuser", "col1"))
+        .depth("0")
+        .xml_body(prop_request)
+        .send(&service)
+        .await;
+
+    let response1 = response1.assert_status(StatusCode::MULTI_STATUS);
+    let body1 = response1.body_string();
+
+    assert!(
+        body1.contains("<D:all/>"),
+        "Collection 1 should contain public ACE with <D:all/>"
+    );
+
+    // Query collection 2 - should NOT have public ACE
+    let response2 = TestRequest::propfind(&caldav_collection_path("testuser", "col2"))
+        .depth("0")
+        .xml_body(prop_request)
+        .send(&service)
+        .await;
+
+    let response2 = response2.assert_status(StatusCode::MULTI_STATUS);
+    let body2 = response2.body_string();
+
+    // Collection 2 has no public policy, so should not have <D:all/>
+    // (unless it matches via a parent path like /calendars/**)
+    // For this test, we're using specific collection paths, so no match expected
+    assert!(
+        !body2.contains("<D:all/>") || !body2.contains("read"),
+        "Collection 2 should not contain public read ACE (or at least not with read privilege)"
+    );
+}

@@ -1,5 +1,7 @@
 //! Helper functions for PROPFIND request processing.
 
+use std::sync::Arc;
+
 use salvo::{Depot, Request};
 
 use crate::app::api::dav::extract::headers::Depth;
@@ -7,7 +9,11 @@ use shuriken_rfc::rfc::dav::core::{
     DavProperty, Href, Multistatus, PropstatResponse, QName, property::PropertyValue,
     property::discovery,
 };
-use shuriken_service::auth::get_terminal_collection_from_depot;
+use shuriken_service::auth::casbin::get_enforcer_from_depot;
+use shuriken_service::auth::{
+    get_resolved_location_from_depot, get_terminal_collection_from_depot,
+    serialize_acl_for_resource,
+};
 
 /// ## Summary
 /// Resolves CalDAV-specific properties.
@@ -86,13 +92,15 @@ struct PropertyResolutionContext<'a> {
     display_name: &'a str,
     collection_qname: &'a QName,
     collection: Option<&'a shuriken_db::model::dav::collection::DavCollection>,
+    resource_path: &'a str,
+    enforcer: Option<Arc<dyn std::any::Any + Send + Sync>>, // Opaque enforcer type
     found: &'a mut Vec<DavProperty>,
     not_found: &'a mut Vec<DavProperty>,
 }
 
 /// ## Summary
 /// Resolves a single property based on its namespace and name.
-fn resolve_single_property(qname: QName, ctx: &mut PropertyResolutionContext<'_>) {
+async fn resolve_single_property(qname: QName, ctx: &mut PropertyResolutionContext<'_>) {
     match (qname.namespace_uri(), qname.local_name()) {
         ("DAV:", "displayname") => {
             ctx.found.push(DavProperty::text(qname, ctx.display_name));
@@ -105,6 +113,30 @@ fn resolve_single_property(qname: QName, ctx: &mut PropertyResolutionContext<'_>
                     ctx.collection_qname.clone(),
                 ])),
             });
+        }
+        ("DAV:", "acl") => {
+            // RFC 3744 §5.5: DAV:acl property - current access control entries
+            if let Some(enforcer) = &ctx.enforcer {
+                // Downcast the Any to the concrete Enforcer type
+                // This is safe because we know get_enforcer_from_depot returns Arc<casbin::Enforcer>
+                let enforcer_any = enforcer.clone();
+                match serialize_acl_for_resource(ctx.resource_path, enforcer_any).await {
+                    Ok(acl_xml) => {
+                        ctx.found.push(DavProperty::xml(qname, acl_xml));
+                    }
+                    Err(err) => {
+                        tracing::warn!(
+                            resource_path = ctx.resource_path,
+                            error = %err,
+                            "Failed to serialize ACL for resource"
+                        );
+                        ctx.not_found.push(DavProperty::empty(qname));
+                    }
+                }
+            } else {
+                // Enforcer not available - cannot determine ACL
+                ctx.not_found.push(DavProperty::empty(qname));
+            }
         }
         ("DAV:", "supported-report-set") => {
             // RFC 3253 via RFC 4791/RFC 6352: Return supported REPORT methods
@@ -170,8 +202,27 @@ pub(super) async fn build_propfind_response(
 
     // Stub: Return a minimal response for the requested resource
     let href = Href::new(path);
-    let (found_properties, not_found_properties) =
-        get_properties_for_resource(conn, path, collection, propfind_req).await?;
+
+    // Get enforcer from depot (may be None if middleware didn't inject it)
+    // Wrap in Arc<dyn Any> to avoid direct casbin dependency
+    let enforcer = get_enforcer_from_depot(depot)
+        .ok()
+        .map(|e| e as Arc<dyn std::any::Any + Send + Sync>);
+
+    // Get the resolved resource location for ACL lookups (uses internal path format)
+    let resource_path = get_resolved_location_from_depot(depot)
+        .ok()
+        .and_then(|loc| loc.to_resource_path(false).ok());
+
+    let (found_properties, not_found_properties) = get_properties_for_resource(
+        conn,
+        path,
+        collection,
+        enforcer.clone(),
+        resource_path.as_deref(),
+        propfind_req,
+    )
+    .await?;
 
     let response = if not_found_properties.is_empty() {
         PropstatResponse::ok(href, found_properties)
@@ -207,8 +258,14 @@ pub(super) async fn build_propfind_response(
             let child_href = Href::new(&child_path);
 
             // For child resources, build properties from the instance
-            let (child_found, child_not_found) =
-                get_properties_for_instance(conn, &inst, collection, propfind_req).await?;
+            let (child_found, child_not_found) = get_properties_for_instance(
+                conn,
+                &inst,
+                collection,
+                enforcer.clone(),
+                propfind_req,
+            )
+            .await?;
 
             let child_response = if child_not_found.is_empty() {
                 PropstatResponse::ok(child_href, child_found)
@@ -230,14 +287,12 @@ pub(super) async fn build_propfind_response(
 ///
 /// ## Errors
 /// Returns errors if property resolution fails.
-#[expect(
-    clippy::unused_async,
-    reason = "async signature needed for future DB queries"
-)]
 async fn get_properties_for_resource(
     _conn: &mut shuriken_db::db::connection::DbConnection<'_>,
-    _path: &str,
+    path: &str,
     collection: Option<&shuriken_db::model::dav::collection::DavCollection>,
+    enforcer: Option<Arc<dyn std::any::Any + Send + Sync>>,
+    resource_path: Option<&str>,
     propfind_req: &shuriken_rfc::rfc::dav::core::PropfindRequest,
 ) -> anyhow::Result<(Vec<DavProperty>, Vec<DavProperty>)> {
     let mut found = Vec::new();
@@ -315,15 +370,15 @@ async fn get_properties_for_resource(
             display_name,
             collection_qname: &collection_qname,
             collection,
+            resource_path: resource_path.unwrap_or(path), // Use resolved path if available, fallback to HTTP path
+            enforcer,
             found: &mut found,
             not_found: &mut not_found,
         };
         for prop_name in requested_props {
             let qname = prop_name.qname().clone();
-            resolve_single_property(qname, &mut ctx);
+            resolve_single_property(qname, &mut ctx).await;
         }
-    } else {
-        // Invalid request type - neither allprop, propname, nor prop
     }
 
     Ok((found, not_found))
@@ -344,6 +399,7 @@ async fn get_properties_for_instance(
     _conn: &mut shuriken_db::db::connection::DbConnection<'_>,
     instance: &shuriken_db::model::dav::instance::DavInstance,
     _collection: Option<&shuriken_db::model::dav::collection::DavCollection>,
+    _enforcer: Option<Arc<dyn std::any::Any + Send + Sync>>,
     propfind_req: &shuriken_rfc::rfc::dav::core::PropfindRequest,
 ) -> anyhow::Result<(Vec<DavProperty>, Vec<DavProperty>)> {
     let mut found = Vec::new();
