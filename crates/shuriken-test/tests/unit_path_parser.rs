@@ -1,11 +1,12 @@
-//! Unit tests for path_parser module
+//! Unit tests for `path_parser` module
 //!
-//! These tests verify the pure functions in path_parser without requiring
+//! These tests verify the pure functions in `path_parser` without requiring
 //! database connections.
 
+use shuriken_db::dav_types::CollectionChain;
 use shuriken_test::component::auth::{PathSegment, ResourceType};
 use shuriken_test::component::db::enums::{CollectionType, ContentType, PrincipalType};
-use shuriken_test::component::middleware::path_parser::{CollectionChain, build_canonical_location};
+use shuriken_test::component::middleware::path_parser::build_canonical_location;
 use shuriken_test::component::model::dav::collection::DavCollection;
 use shuriken_test::component::model::dav::instance::DavInstance;
 use shuriken_test::component::model::principal::Principal;
