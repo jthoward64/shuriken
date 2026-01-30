@@ -15,6 +15,5 @@
 //! cargo test --lib db::query::dav::tests
 //! ```
 
-mod entity;
 mod fixtures;
 mod instance;
