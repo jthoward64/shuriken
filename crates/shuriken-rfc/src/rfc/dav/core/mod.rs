@@ -16,7 +16,7 @@ mod proppatch;
 mod report;
 
 pub use depth::Depth;
-pub use error::DavError;
+pub use error::{DavError, PrivilegeRequired};
 pub use href::Href;
 pub use multistatus::{Multistatus, Propstat, PropstatResponse, ResponseDescription, Status};
 pub use namespace::{CALDAV_NS, CARDDAV_NS, CS_NS, DAV_NS, Namespace, QName};

@@ -145,7 +145,13 @@ The compliance gap is entirely at the protocol layer—HTTP response headers, XM
    - Implemented in [discovery.rs](../crates/shuriken-rfc/src/rfc/dav/core/property/discovery.rs#L16-L76)
    - Tests pass: [propfind.rs](../crates/shuriken-test/tests/integration/propfind.rs#L768-L882)
 
-3. ❌ **Missing error XML elements in 403/409** (RFC 4791/6352 preconditions)
+3. ✅ **DAV:acl property retrieval implemented** (RFC 3744 §5.5) - COMPLETE (2026-01-30)
+   - Status: Clients can now read ACL policies via PROPFIND
+   - RFC 3744 §5.5.1: Full pseudo-principal support (all, authenticated, unauthenticated)
+   - Implemented in [acl.rs](../crates/shuriken-service/src/auth/acl.rs)
+   - Tests pass: [acl_pseudo_principals.rs](../crates/shuriken-test/tests/integration/acl_pseudo_principals.rs)
+
+4. ❌ **Missing error XML elements in 403/409** (RFC 4791/6352 preconditions)
    - Impact: Clients have no feedback on why operations failed
    - Fix: 6 hours - error builders for CalDAV/CardDAV preconditions
 

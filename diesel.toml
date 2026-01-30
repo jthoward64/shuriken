@@ -8,4 +8,4 @@ with_docs = true
 patch_file = "crates/shuriken-db/src/db/schema.patch"
 
 [migrations_directory]
-dir = "migrations"
+dir = "crates/shuriken-db/migrations"

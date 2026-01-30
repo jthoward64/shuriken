@@ -1514,10 +1514,12 @@ DAV: 1, 2, 3, calendar-access, addressbook-access
    - Location: [caldav/put/mod.rs](../crates/shuriken-app/src/app/api/caldav/method/put/mod.rs), [carddav/put/mod.rs](../crates/shuriken-app/src/app/api/carddav/method/put/mod.rs)
    - Tests: [uid_validation.rs](../crates/shuriken-test/tests/integration/uid_validation.rs), [put.rs](../crates/shuriken-test/tests/integration/put.rs)
 
-4. **Implement `DAV:acl` property retrieval** (RFC 3744 minimal)
-   - Make readable via PROPFIND
-   - Return current ACL as XML with ACE elements
-   - Mark inherited/protected ACEs as read-only
+4. ✅ **Implement `DAV:acl` property retrieval** (RFC 3744 minimal) - **COMPLETE** (2026-01-30)
+   - Status: DAV:acl property returns Casbin policies serialized to RFC 3744 XML format
+   - RFC 3744 §5.5.1: Full pseudo-principal support (DAV:all, DAV:authenticated, DAV:unauthenticated)
+   - Location: [acl.rs](../crates/shuriken-service/src/auth/acl.rs), [propfind helpers.rs](../crates/shuriken-app/src/app/api/dav/method/propfind/helpers.rs#L139-L149)
+   - Tests: [acl_pseudo_principals.rs](../crates/shuriken-test/tests/integration/acl_pseudo_principals.rs) (4 comprehensive tests)
+   - Implementation: `serialize_acl_for_resource()` queries Casbin, groups by principal, serializes to XML ACE elements
 
 5. **Add `DAV:need-privileges` error element** (RFC 3744 minimal)
    - Include in 403 Forbidden responses
@@ -1549,7 +1551,7 @@ DAV: 1, 2, 3, calendar-access, addressbook-access
 | **P1** | Remove/implement LOCK/UNLOCK | 1h | Critical | Now |
 | ✅ | `supported-report-set` property | 4h | High | ✅ Complete |
 | **P1** | CardDAV error response bodies | 6h | High | 1 |
-| **P1** | `DAV:acl` property PROPFIND | 8h | High | 1 |
+| ✅ | `DAV:acl` property PROPFIND | 6h | High | ✅ Complete |
 | **P1** | `DAV:need-privileges` errors | 4h | High | 1 |
 | **P2** | `supported-calendar-component-set` | 3h | Medium | 1 |
 | **P2** | Collation integration | 8h | Medium | 1 |
@@ -1585,11 +1587,11 @@ DAV: 1, 2, 3, calendar-access, addressbook-access
 | Add `supported-collation-set` property | 2h | Text-match collations | Phase 0 | ✅ **Complete** (2026-01-29) |
 | Add `CALDAV:` precondition error XML | 4h | Clients understand errors | Phase 0 | ⏳ Pending |
 | Add `CARDDAV:` precondition error XML | 3h | CardDAV error handling | Phase 0 | ⏳ Pending |
-| Add `DAV:acl` property serializer | 6h | ACLs readable | Phase 0 | ⏳ Pending |
+| Add `DAV:acl` property serializer | 6h | ACLs readable | Phase 0 | ✅ **Complete** (2026-01-30) |
 | Add `DAV:need-privileges` error element | 3h | 403 errors detailed | Phase 0 | ⏳ Pending |
 | Return `DAV:supported-privilege-set` | 2h | Privilege discovery | Phase 0 | ⏳ Pending |
 
-**Total**: 25 hours → **80% compliance** (partial: discovery properties complete)
+**Total**: 25 hours → **80% compliance** (partial: discovery properties + ACL serialization complete)
 
 ### Phase 2: Query Improvements (2 Weeks) - Reach 85% Compliance {#roadmap-phase2}
 

@@ -126,11 +126,11 @@ These instructions guide LLM assistants in maintaining the Shuriken RFC complian
 
 ### Scenario 3: A Code Pattern is Successfully Implemented
 
-**Example**: Developers implement the property generator pattern from IMPLEMENTATION_PATTERNS.md
+**Example**: Developers implement the property generator pattern from Implementation Guide.md
 
 **Files to Update**:
 
-1. **IMPLEMENTATION_PATTERNS.md**
+1. **Implementation Guide.md**
    - Update section title: "Pattern 1: Live Property Generators ✅ IMPLEMENTED"
    - Add implementation note: "Merged in commit XXX (date), path: src/component/dav/properties/mod.rs"
    - Update integration example with actual code location
@@ -139,9 +139,6 @@ These instructions guide LLM assistants in maintaining the Shuriken RFC complian
 2. **Complete Documentation.md**
    - Section 8 "Architectural Alignment": Note implementation status
    - Section 11 "Roadmap": Mark related items in current phase as complete
-
-3. **Implementation Guide.md**
-   - If this moves compliance %, update roadmap table
 
 ---
 

@@ -14,6 +14,7 @@ pub struct Settings {
 #[serde(rename_all = "snake_case")]
 pub enum AuthMethod {
     SingleUser,
+    BasicAuth,
     Proxy,
 }
 

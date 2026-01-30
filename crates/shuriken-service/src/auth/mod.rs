@@ -8,6 +8,7 @@
 //! - `authorize`: Authorization wrappers and convenience functions
 //! - `casbin`: Casbin enforcer initialization and depot integration
 //! - `depot`: Helpers for extracting authorization context from Salvo requests
+//! - `password`: Password hashing and verification with Argon2
 //! - `permission`: Permission levels and WebDAV privilege mappings
 //! - `privilege`: WebDAV privilege set generation for `DAV:current-user-privilege-set`
 //! - `resource`: Resource types and identifiers for authorization
@@ -20,6 +21,7 @@ pub mod authenticate;
 pub mod authorize;
 pub mod casbin;
 pub mod depot;
+pub mod password;
 pub mod permission;
 pub mod privilege;
 pub mod resource;

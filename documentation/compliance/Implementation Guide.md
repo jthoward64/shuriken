@@ -74,7 +74,7 @@ This guide provides concrete implementation patterns for all RFC compliance fixe
 |------|---------|-------|---------------|
 | Add live property to PROPFIND | [Pattern 1](#pattern-1) | P0/P1 | `src/component/rfc/dav/core/property/discovery.rs` |
 | Return precondition error on PUT | [Pattern 2](#pattern-2) | P0 | `src/component/caldav/error.rs` |
-| Serialize ACL from Casbin | [Pattern 4](#pattern-4) | P1 | `src/component/auth/acl_properties.rs` |
+| Serialize ACL from Casbin | [Pattern 4](#pattern-4) ✅ | P1 | `crates/shuriken-service/src/auth/acl.rs` |
 | Validate calendar-query filter | Pattern 3.1 | P2 | `src/component/caldav/service/filter_capabilities.rs` |
 | Apply text-match collation | [Pattern 6](#pattern-6) | P2 | `src/component/rfc/filters/collation.rs` |
 | Selective component serialization | [Pattern 8](#pattern-8) | P2 | `src/component/db/map/serialize_with_selector.rs` |
@@ -87,11 +87,11 @@ This guide provides concrete implementation patterns for all RFC compliance fixe
 |---------|-------------|----------------------|
 | supported-report-set | RFC 3253 §3.1.5 | ✅ Implemented |
 | supported-calendar-component-set | RFC 4791 §5.2.3 | ✅ Implemented |
+| DAV:acl property | RFC 3744 §5.5 | ✅ Implemented (2026-01-30) |
 | no-uid-conflict | RFC 4791 §5.3.2.1 | 📋 Pattern available |
 | need-privileges | RFC 3744 §7.1.1 | 📋 Pattern available |
 | valid-sync-token | RFC 6578 §4.1 | 📋 Pattern available |
 | i;unicode-casemap | RFC 4790 §9.3 | 📋 Pattern available |
-| DAV:acl property | RFC 3744 §5.5 | 📋 Pattern available |
 | calendar-data filtering | RFC 4791 §9.6 | 📋 Pattern available |
 
 ---
@@ -797,11 +797,13 @@ async fn put_vcard_resource(
 
 ---
 
-### Pattern 4: ACL Property Serialization {#pattern-4}
+### Pattern 4: ACL Property Serialization ✅ IMPLEMENTED {#pattern-4}
 
-**Status**: 📋 PLANNED  
-**Location**: [`src/component/auth/acl_properties.rs`](../../src/component/auth/acl_properties.rs)  
-**RFC References**: RFC 3744 §5.5, §5.8  
+**Status**: ✅ IMPLEMENTED (2026-01-30)  
+**Location**: [`crates/shuriken-service/src/auth/acl.rs`](../../crates/shuriken-service/src/auth/acl.rs)  
+**Integration**: [`crates/shuriken-app/src/app/api/dav/method/propfind/helpers.rs`](../../crates/shuriken-app/src/app/api/dav/method/propfind/helpers.rs#L139-L149)  
+**Tests**: [`crates/shuriken-test/tests/integration/acl_pseudo_principals.rs`](../../crates/shuriken-test/tests/integration/acl_pseudo_principals.rs)  
+**RFC References**: RFC 3744 §5.5 (DAV:acl property), §5.5.1 (pseudo-principals), §5.8 (supported-privilege-set)  
 **Phase**: P1
 
 #### Problem

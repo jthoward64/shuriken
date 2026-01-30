@@ -9,7 +9,7 @@ use shuriken_db::{
     db::{connection::DbConnection, schema},
     model::{
         principal::{NewPrincipal, PrincipalType},
-        user::{NewUser, User},
+        user::{NewUser, User, authuser::AuthUser},
     },
 };
 
@@ -115,6 +115,83 @@ async fn authenticate_proxy(
 }
 
 /// ## Summary
+/// Authenticate a user via HTTP Basic Authentication.
+///
+/// Extracts credentials from the Authorization header, looks up the user by email,
+/// and verifies the password against the stored Argon2 hash in the auth_user table.
+///
+/// ## Errors
+/// Returns an error if:
+/// - Authorization header is missing or malformed
+/// - User is not found
+/// - Password verification fails
+/// - Database query fails
+#[tracing::instrument(skip(req, conn))]
+async fn authenticate_basic_auth(
+    req: &salvo::Request,
+    conn: &mut DbConnection<'_>,
+) -> ServiceResult<User> {
+    use base64::Engine;
+    use diesel_async::RunQueryDsl;
+    use salvo::http::header::AUTHORIZATION;
+
+    tracing::trace!("Attempting basic authentication");
+
+    // Extract Basic Auth credentials from Authorization header
+    let auth_header = req
+        .headers()
+        .get(AUTHORIZATION)
+        .and_then(|h| h.to_str().ok())
+        .ok_or(ServiceError::NotAuthenticated)?;
+
+    if !auth_header.starts_with("Basic ") {
+        return Err(ServiceError::NotAuthenticated);
+    }
+
+    let credentials = auth_header
+        .strip_prefix("Basic ")
+        .ok_or(ServiceError::NotAuthenticated)?;
+
+    let decoded = base64::prelude::BASE64_STANDARD
+        .decode(credentials)
+        .map_err(|_| ServiceError::NotAuthenticated)?;
+
+    let credentials_str = String::from_utf8(decoded).map_err(|_| ServiceError::NotAuthenticated)?;
+
+    let (email, password) = credentials_str
+        .split_once(':')
+        .ok_or(ServiceError::NotAuthenticated)?;
+
+    tracing::debug!(email = %email, "Extracted credentials from Basic Auth header");
+
+    // Look up user by email
+    let user = schema::user::table
+        .filter(schema::user::email.eq(email))
+        .select(User::as_select())
+        .first::<User>(conn)
+        .await
+        .optional()?
+        .ok_or(ServiceError::NotAuthenticated)?;
+
+    // Look up auth_user entry with source "password"
+    let auth_user = schema::auth_user::table
+        .filter(schema::auth_user::user_id.eq(user.id))
+        .filter(schema::auth_user::auth_source.eq("password"))
+        .select(AuthUser::as_select())
+        .first::<AuthUser>(conn)
+        .await
+        .optional()?
+        .ok_or(ServiceError::NotAuthenticated)?;
+
+    // Verify password (auth_id contains the Argon2 hash)
+    crate::auth::password::verify_password(password, &auth_user.auth_id)?;
+
+    tracing::info!(user_id = %user.id, user_email = %user.email, "User authenticated via basic auth");
+
+    Ok(user)
+}
+
+/// ## Summary
 /// Authenticate a user based on the configured authentication method.
 ///
 /// ## Errors
@@ -129,6 +206,7 @@ pub async fn authenticate(
 
     match config.auth.method {
         AuthMethod::SingleUser => authenticate_single_user(conn, config).await,
+        AuthMethod::BasicAuth => authenticate_basic_auth(req, conn).await,
         AuthMethod::Proxy => authenticate_proxy(req, config).await,
     }
 }
