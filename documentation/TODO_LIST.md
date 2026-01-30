@@ -69,7 +69,7 @@ None currently identified.
 
 ## 🟡 Priority 2: Medium Priority
 
-### 4. Authorization - Glob Segment Structural Separation
+### 4. Authorization - Glob Segment Structural Separation (DEFERRED)
 
 **Location**: [`crates/shuriken-service/src/auth/resource.rs:56`](../crates/shuriken-service/src/auth/resource.rs#L56)
 
@@ -79,24 +79,17 @@ None currently identified.
 
 **Impact**: Code safety - prevent accidental use of Glob in non-authorization contexts  
 **Effort**: Medium (refactor ResourcePath type structure)  
-**Status**: Not started
+**Status**: Deferred (user will handle separately)
 
 ---
 
-### 5. Recurrence Processing Refactoring
+### ✅ 5. Recurrence Processing Refactoring (COMPLETE)
 
 **Location**: [`crates/shuriken-service/src/caldav/recurrence.rs:57`](../crates/shuriken-service/src/caldav/recurrence.rs#L57)
 
-```rust
-#[expect(
-    clippy::too_many_lines,
-    reason = "TODO: Refactor to extract helper functions like in shuriken-rfc recurrence.rs"
-)]
-```
-
-**Impact**: Code maintainability - long function should be split into helpers  
+**Impact**: Code maintainability - long function split into helpers  
 **Effort**: Medium (extract helper functions)  
-**Status**: Not started
+**Status**: ✅ Complete (2026-01-30) - Commit 1d8cd73
 
 ---
 
@@ -443,10 +436,10 @@ The following were identified in the search but are **NOT** TODO items:
 |----------|-------|----------|-------------|-------------|
 | P0       | 0     | 0        | 0           | 0           |
 | P1       | 3     | 2        | 0           | 1           |
-| P2       | 3     | 0        | 0           | 3           |
+| P2       | 3     | 1        | 0           | 2           |
 | P3       | 6     | 0        | 0           | 6           |
 | Tests    | 24    | 0        | 0           | 24          |
-| **Total**| **36**| **2**    | **0**       | **34**      |
+| **Total**| **36**| **3**    | **0**       | **33**      |
 
 ### By Component
 
