@@ -15,6 +15,8 @@ use shuriken_service::auth::{
     get_terminal_collection_from_depot,
 };
 
+use crate::app::api::dav::response::need_privileges::send_need_privileges_error;
+
 /// ## Summary
 /// Handles PROPPATCH requests to update `WebDAV` properties.
 ///
@@ -96,8 +98,10 @@ pub async fn proppatch(req: &mut Request, res: &mut Response, depot: &Depot) {
     tracing::debug!(collection_id = %collection_id, "Parsed collection ID from path");
 
     // Check authorization: need write permission on the collection
-    if let Err(status) = check_proppatch_authorization(depot, &mut conn, collection_id).await {
-        res.status_code(status);
+    if let Err((status, resource, action)) =
+        check_proppatch_authorization(depot, &mut conn, collection_id).await
+    {
+        send_need_privileges_error(res, &resource, action, &path);
         return;
     }
 
@@ -214,27 +218,33 @@ pub async fn proppatch(req: &mut Request, res: &mut Response, depot: &Depot) {
 /// Checks if the current user has write permission for the PROPPATCH operation.
 ///
 /// ## Errors
-/// Returns `StatusCode::FORBIDDEN` if authorization is denied.
-/// Returns `StatusCode::INTERNAL_SERVER_ERROR` for database or auth errors.
+/// Returns `(StatusCode::FORBIDDEN, ResourceLocation, Action)` if authorization is denied.
+/// Returns `(StatusCode::INTERNAL_SERVER_ERROR, ResourceLocation, Action)` for database or auth errors.
 async fn check_proppatch_authorization(
     depot: &Depot,
     conn: &mut shuriken_db::db::connection::DbConnection<'_>,
     _collection_id: uuid::Uuid,
-) -> Result<(), StatusCode> {
+) -> Result<(), (StatusCode, shuriken_service::auth::ResourceLocation, Action)> {
     let subjects = get_subjects_from_depot(depot, conn).await.map_err(|e| {
         tracing::error!(error = %e, "Failed to get subjects from depot");
-        StatusCode::INTERNAL_SERVER_ERROR
+        // Create empty resource for error reporting
+        let resource = shuriken_service::auth::ResourceLocation::from_segments(vec![]);
+        (StatusCode::INTERNAL_SERVER_ERROR, resource, Action::Edit)
     })?;
 
     // Get ResourceLocation from depot (populated by slug_resolver middleware)
     let resource = get_resolved_location_from_depot(depot).map_err(|e| {
         tracing::error!(error = %e, "ResourceLocation not found in depot; slug_resolver middleware may not have run");
-        StatusCode::INTERNAL_SERVER_ERROR
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            shuriken_service::auth::ResourceLocation::from_segments(vec![]),
+            Action::Edit,
+        )
     })?;
 
     let authorizer = authorizer_from_depot(depot).map_err(|e| {
         tracing::error!(error = %e, "Failed to get authorizer");
-        StatusCode::INTERNAL_SERVER_ERROR
+        (StatusCode::INTERNAL_SERVER_ERROR, resource.clone(), Action::Edit)
     })?;
 
     match authorizer.require(&subjects, resource, Action::Edit) {
@@ -245,11 +255,11 @@ async fn check_proppatch_authorization(
                 reason = %msg,
                 "Authorization denied for PROPPATCH"
             );
-            Err(StatusCode::FORBIDDEN)
+            Err((StatusCode::FORBIDDEN, resource.clone(), Action::Edit))
         }
         Err(e) => {
             tracing::error!(error = %e, "Authorization check failed");
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
+            Err((StatusCode::INTERNAL_SERVER_ERROR, resource.clone(), Action::Edit))
         }
     }
 }

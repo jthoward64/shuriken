@@ -9,6 +9,7 @@ use crate::app::api::{
     DAV_ROUTE_PREFIX,
     dav::extract::auth::{check_authorization, get_auth_context},
 };
+use crate::app::api::dav::response::need_privileges::send_need_privileges_error;
 use crate::middleware::path_parser::parse_and_resolve_path;
 use shuriken_service::auth::{Action, get_instance_from_depot, get_resolved_location_from_depot};
 
@@ -150,8 +151,12 @@ pub async fn r#move(req: &mut Request, res: &mut Response, depot: &Depot) {
     );
 
     // Check authorization: need Write on source (unbind) and Write on destination (bind)
-    if let Err(status) = check_move_authorization(depot, &mut conn, &dest_collection).await {
-        res.status_code(status);
+    if let Err((status, resource, action, href)) = check_move_authorization(depot, &mut conn, &dest_collection, &destination).await {
+        if status == StatusCode::FORBIDDEN {
+            send_need_privileges_error(res, &resource, action, &href);
+        } else {
+            res.status_code(status);
+        }
         return;
     }
 
@@ -315,29 +320,34 @@ pub async fn r#move(req: &mut Request, res: &mut Response, depot: &Depot) {
 /// and the destination collection (to bind a new resource).
 ///
 /// ## Errors
-/// Returns `StatusCode::FORBIDDEN` if authorization is denied.
-/// Returns `StatusCode::INTERNAL_SERVER_ERROR` for database or auth errors.
+/// Returns error tuple (status, resource, action, href) if authorization is denied.
 async fn check_move_authorization(
     depot: &Depot,
     conn: &mut shuriken_db::db::connection::DbConnection<'_>,
     dest_collection: &shuriken_db::model::dav::collection::DavCollection,
-) -> Result<(), StatusCode> {
-    let (subjects, authorizer) = get_auth_context(depot, conn).await?;
+    destination: &str,
+) -> Result<(), (StatusCode, shuriken_service::auth::ResourceLocation, shuriken_service::auth::Action, String)> {
+    let (subjects, authorizer) = get_auth_context(depot, conn).await.map_err(|e| {
+        (e, shuriken_service::auth::ResourceLocation::from_segments(vec![]), shuriken_service::auth::Action::Delete, String::new())
+    })?;
 
     // Get ResourceLocation from depot (populated by DavPathMiddleware)
     let source_resource = get_resolved_location_from_depot(depot).map_err(|e| {
         tracing::error!(error = %e, "ResourceLocation not found in depot");
-        StatusCode::INTERNAL_SERVER_ERROR
+        (StatusCode::INTERNAL_SERVER_ERROR, shuriken_service::auth::ResourceLocation::from_segments(vec![]), shuriken_service::auth::Action::Delete, String::new())
     })?;
 
     // Check Delete action on source (to delete/unbind)
-    check_authorization(
+    if let Err((status, resource, action)) = check_authorization(
         &authorizer,
         &subjects,
         source_resource,
         Action::Delete,
         "MOVE source",
-    )?;
+    ) {
+        let href = depot.get::<String>("PATH_LOCATION").map(|s| s.to_string()).unwrap_or_default();
+        return Err((status, resource, action, href));
+    }
 
     // Check Write permission on destination collection
     let dest_resource = {
@@ -355,13 +365,16 @@ async fn check_move_authorization(
         ResourceLocation::from_segments(segments)
     };
 
-    check_authorization(
+    // Check Write permission on destination
+    if let Err((status, resource, action)) = check_authorization(
         &authorizer,
         &subjects,
         &dest_resource,
         Action::Edit,
         "MOVE destination",
-    )?;
+    ) {
+        return Err((status, resource, action, destination.to_string()));
+    }
 
     Ok(())
 }

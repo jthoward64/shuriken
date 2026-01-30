@@ -9,6 +9,7 @@ use crate::app::api::{
     DAV_ROUTE_PREFIX,
     dav::extract::auth::{check_authorization, get_auth_context},
 };
+use crate::app::api::dav::response::need_privileges::send_need_privileges_error;
 use crate::middleware::path_parser::parse_and_resolve_path;
 use shuriken_service::auth::{Action, get_instance_from_depot, get_resolved_location_from_depot};
 
@@ -149,8 +150,12 @@ pub async fn copy(req: &mut Request, res: &mut Response, depot: &Depot) {
     );
 
     // Check authorization: need Read on source and Write on destination
-    if let Err(status) = check_copy_authorization(depot, &mut conn, &dest_collection).await {
-        res.status_code(status);
+    if let Err((status, resource, action, href)) = check_copy_authorization(depot, &mut conn, &dest_collection, &destination, &dest_resource_name).await {
+        if status == StatusCode::FORBIDDEN {
+            send_need_privileges_error(res, &resource, action, &href);
+        } else {
+            res.status_code(status);
+        }
         return;
     }
 
@@ -264,29 +269,35 @@ pub async fn copy(req: &mut Request, res: &mut Response, depot: &Depot) {
 /// on the destination collection (to bind a new resource).
 ///
 /// ## Errors
-/// Returns `StatusCode::FORBIDDEN` if authorization is denied.
-/// Returns `StatusCode::INTERNAL_SERVER_ERROR` for database or auth errors.
+/// Returns error tuple (status, resource, action) if authorization is denied.
 async fn check_copy_authorization(
     depot: &Depot,
     conn: &mut shuriken_db::db::connection::DbConnection<'_>,
     dest_collection: &shuriken_db::model::dav::collection::DavCollection,
-) -> Result<(), StatusCode> {
-    let (subjects, authorizer) = get_auth_context(depot, conn).await?;
+    destination: &str,
+    resource_name: &str,
+) -> Result<(), (StatusCode, shuriken_service::auth::ResourceLocation, shuriken_service::auth::Action, String)> {
+    let (subjects, authorizer) = get_auth_context(depot, conn).await.map_err(|e| {
+        (e, shuriken_service::auth::ResourceLocation::from_segments(vec![]), shuriken_service::auth::Action::Read, String::new())
+    })?;
 
     // Get ResourceLocation from depot (populated by DavPathMiddleware)
     let source_resource = get_resolved_location_from_depot(depot).map_err(|e| {
         tracing::error!(error = %e, "ResourceLocation not found in depot");
-        StatusCode::INTERNAL_SERVER_ERROR
+        (StatusCode::INTERNAL_SERVER_ERROR, shuriken_service::auth::ResourceLocation::from_segments(vec![]), shuriken_service::auth::Action::Read, String::new())
     })?;
 
     // Check Read on source
-    check_authorization(
+    if let Err((status, resource, action)) = check_authorization(
         &authorizer,
         &subjects,
         source_resource,
         Action::Read,
         "COPY source",
-    )?;
+    ) {
+        let href = depot.get::<String>("PATH_LOCATION").map(|s| s.to_string()).unwrap_or_default();
+        return Err((status, resource, action, href));
+    }
 
     // Check Write permission on destination collection
     let dest_resource = {
@@ -304,13 +315,17 @@ async fn check_copy_authorization(
         ResourceLocation::from_segments(segments)
     };
 
-    check_authorization(
+    // Check Write permission on destination
+    if let Err((status, resource, action)) = check_authorization(
         &authorizer,
         &subjects,
         &dest_resource,
         Action::Edit,
         "COPY destination",
-    )?;
+    ) {
+        let dest_path = format!("{}{}", destination, resource_name);
+        return Err((status, resource, action, dest_path));
+    }
 
     Ok(())
 }

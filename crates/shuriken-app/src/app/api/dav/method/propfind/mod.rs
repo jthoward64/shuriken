@@ -7,6 +7,7 @@ use salvo::{Depot, Request, Response, handler};
 
 use crate::app::api::dav::extract::auth::{check_authorization, get_auth_context};
 use crate::app::api::dav::extract::headers::{Depth, parse_depth};
+use crate::app::api::dav::response::need_privileges::send_need_privileges_error;
 use shuriken_rfc::rfc::dav::build::multistatus::serialize_multistatus;
 use shuriken_rfc::rfc::dav::parse::propfind::parse_propfind;
 use shuriken_service::auth::{
@@ -91,8 +92,13 @@ pub async fn propfind(req: &mut Request, res: &mut Response, depot: &Depot) {
     };
 
     // Check authorization: need read permission on the target resource
-    if let Err(status) = check_propfind_authorization(depot, &mut conn).await {
-        res.status_code(status);
+    if let Err((status, resource, action)) = check_propfind_authorization(depot, &mut conn).await {
+        if status == StatusCode::FORBIDDEN {
+            let path_href = req.uri().path();
+            send_need_privileges_error(res, &resource, action, path_href);
+        } else {
+            res.status_code(status);
+        }
         return;
     }
 
@@ -144,18 +150,31 @@ pub async fn propfind(req: &mut Request, res: &mut Response, depot: &Depot) {
 /// For instances: checks Read permission on the entity.
 ///
 /// ## Errors
-/// Returns `StatusCode::FORBIDDEN` if authorization is denied.
-/// Returns `StatusCode::INTERNAL_SERVER_ERROR` for database or auth errors.
+/// Returns error tuple (status, resource, action) if authorization is denied.
+/// Returns `StatusCode::INTERNAL_SERVER_ERROR` if authorization check fails.
 async fn check_propfind_authorization(
     depot: &Depot,
     conn: &mut shuriken_db::db::connection::DbConnection<'_>,
-) -> Result<(), StatusCode> {
-    let (subjects, authorizer) = get_auth_context(depot, conn).await?;
+) -> Result<
+    (),
+    (
+        StatusCode,
+        shuriken_service::auth::ResourceLocation,
+        shuriken_service::auth::Action,
+    ),
+> {
+    let (subjects, authorizer) = get_auth_context(depot, conn).await.map_err(|e| {
+        (
+            e,
+            shuriken_service::auth::ResourceLocation::from_segments(vec![]),
+            shuriken_service::auth::Action::Read,
+        )
+    })?;
 
     // Get ResourceLocation from depot (populated by slug_resolver middleware)
     let resource = get_resolved_location_from_depot(depot).map_err(|e| {
         tracing::error!(error = %e, "ResourceLocation not found in depot; slug_resolver middleware may not have run");
-        StatusCode::INTERNAL_SERVER_ERROR
+        (StatusCode::INTERNAL_SERVER_ERROR, shuriken_service::auth::ResourceLocation::from_segments(vec![]), shuriken_service::auth::Action::Read)
     })?;
 
     check_authorization(&authorizer, &subjects, resource, Action::Read, "PROPFIND")

@@ -116,7 +116,7 @@ pub fn resource_type_from_content_type(
 /// Checks authorization and returns an appropriate HTTP status on denial.
 ///
 /// ## Errors
-/// Returns `StatusCode::FORBIDDEN` if denied.
+/// Returns `StatusCode::FORBIDDEN` with resource context if denied.
 /// Returns `StatusCode::INTERNAL_SERVER_ERROR` for evaluation errors.
 pub fn check_authorization(
     authorizer: &Authorizer,
@@ -124,7 +124,7 @@ pub fn check_authorization(
     resource: &ResourceLocation,
     action: Action,
     operation_name: &str,
-) -> Result<(), StatusCode> {
+) -> Result<(), (StatusCode, ResourceLocation, Action)> {
     match authorizer.require(subjects, resource, action) {
         Ok(_level) => Ok(()),
         Err(shuriken_service::error::ServiceError::AuthorizationError(msg)) => {
@@ -133,11 +133,11 @@ pub fn check_authorization(
                 reason = %msg,
                 "Authorization denied for {}", operation_name
             );
-            Err(StatusCode::FORBIDDEN)
+            Err((StatusCode::FORBIDDEN, resource.clone(), action))
         }
         Err(e) => {
             tracing::error!(error = %e, "Authorization check failed");
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
+            Err((StatusCode::INTERNAL_SERVER_ERROR, resource.clone(), action))
         }
     }
 }

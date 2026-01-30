@@ -5,7 +5,9 @@
 //! path strings for Casbin enforcement.
 
 use crate::error::{ServiceError, ServiceResult};
-use shuriken_core::constants::{CALDAV_ROUTE_COMPONENT, CARDDAV_ROUTE_COMPONENT, DAV_ROUTE_PREFIX};
+use shuriken_core::constants::{
+    CALDAV_ROUTE_COMPONENT, CARDDAV_ROUTE_COMPONENT, DAV_ROUTE_PREFIX, PRINCIPAL_ROUTE_COMPONENT,
+};
 
 /// Resource type for DAV collections.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -14,6 +16,8 @@ pub enum ResourceType {
     Calendar,
     /// Addressbook collection (`/addressbooks/...`).
     Addressbook,
+    /// Principal (user, group, etc.) resource.
+    Principal,
 }
 
 impl ResourceType {
@@ -23,6 +27,7 @@ impl ResourceType {
         match self {
             Self::Calendar => CALDAV_ROUTE_COMPONENT,
             Self::Addressbook => CARDDAV_ROUTE_COMPONENT,
+            Self::Principal => PRINCIPAL_ROUTE_COMPONENT,
         }
     }
 
@@ -32,6 +37,7 @@ impl ResourceType {
         match s {
             CALDAV_ROUTE_COMPONENT => Some(Self::Calendar),
             CARDDAV_ROUTE_COMPONENT => Some(Self::Addressbook),
+            PRINCIPAL_ROUTE_COMPONENT => Some(Self::Principal),
             _ => None,
         }
     }
@@ -42,6 +48,7 @@ impl ResourceType {
         match self {
             Self::Calendar => "ics",
             Self::Addressbook => "vcf",
+            Self::Principal => "",
         }
     }
 }

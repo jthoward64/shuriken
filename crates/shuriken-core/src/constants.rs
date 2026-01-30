@@ -12,3 +12,7 @@ pub const CALDAV_ROUTE_PREFIX: &str =
 pub const CARDDAV_ROUTE_COMPONENT: &str = "card";
 pub const CARDDAV_ROUTE_PREFIX: &str =
     const_str::concat!(DAV_ROUTE_PREFIX, "/", CARDDAV_ROUTE_COMPONENT);
+
+pub const PRINCIPAL_ROUTE_COMPONENT: &str = "principal";
+pub const PRINCIPAL_ROUTE_PREFIX: &str =
+    const_str::concat!(DAV_ROUTE_PREFIX, "/", PRINCIPAL_ROUTE_COMPONENT);

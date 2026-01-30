@@ -24,7 +24,10 @@ use shuriken_service::auth::{
 /// ## Side Effects
 /// - Sets HTTP status code and headers on response
 /// - For GET requests, writes response body
-#[expect(clippy::too_many_lines, reason = "GET/HEAD requires many cases for headers and content")]
+#[expect(
+    clippy::too_many_lines,
+    reason = "GET/HEAD requires many cases for headers and content"
+)]
 pub(super) async fn handle_get_or_head(
     req: &mut Request,
     res: &mut Response,
@@ -86,7 +89,18 @@ pub(super) async fn handle_get_or_head(
         };
         if let Err(e) = check_read_authorization(depot, &mut conn, &inst).await {
             tracing::debug!(error = %e, instance_id = %inst.id, "Authorization denied");
-            res.status_code(StatusCode::FORBIDDEN);
+            // Send RFC 3744 need-privileges error
+            use crate::app::api::dav::response::need_privileges::send_need_privileges_error;
+            use shuriken_service::auth::Action;
+            if let Ok(resource) = shuriken_service::auth::get_resolved_location_from_depot(depot) {
+                let path_href = depot
+                    .get::<String>("PATH_LOCATION")
+                    .map(|s| s.as_str())
+                    .unwrap_or("/");
+                send_need_privileges_error(res, resource, Action::Read, path_href);
+            } else {
+                res.status_code(StatusCode::FORBIDDEN);
+            }
             return;
         }
 
