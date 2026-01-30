@@ -183,17 +183,15 @@ None currently identified.
 
 ---
 
-### ✅ 12. ASCII Casemap ß Folding (NOT A BUG)
+### ✅ 12. ASCII Casemap Implementation (FIXED)
 
-**Location**: [`crates/shuriken-db/src/db/query/carddav/filter.rs:860`](../crates/shuriken-db/src/db/query/carddav/filter.rs#L860)
+**Location**: [`crates/shuriken-db/src/db/query/text_match.rs`](../crates/shuriken-db/src/db/query/text_match.rs)
 
-```rust
-// Note: ASCII casemap uses simple to_lowercase, which doesn't fold ß
-```
+**Fixed**: Changed from `to_lowercase()`/`to_uppercase()` (which perform Unicode case folding) to `to_ascii_lowercase()`/`to_ascii_uppercase()` (which only convert ASCII letters).
 
-**Impact**: Edge case - German ß (sharp s) not handled in ASCII casemap  
-**Effort**: N/A  
-**Status**: ✅ Not a bug - RFC 4790 §9.2.1 specifies that i;ascii-casemap only treats ASCII letters (a-z) case-insensitively. Non-ASCII characters like ß are intentionally not folded. Current implementation is correct per spec.
+**Impact**: RFC 4790 §9.2.1 compliance - `i;ascii-casemap` now correctly treats only ASCII letters (a-z) case-insensitively and leaves non-ASCII characters like ß unchanged.  
+**Effort**: ✅ Complete  
+**Status**: ✅ Fixed in commit fbc0623. Previously used Rust's Unicode-aware methods which violated RFC; now uses ASCII-only methods per spec.
 
 ---
 
