@@ -474,14 +474,14 @@ This index provides quick navigation across **three comprehensive RFC compliance
 
 ### Q: What are the compliance blockers? {#q-blockers}
 
-**Answer**: 🚨 **3 critical blockers, all protocol-layer fixes**
+**Answer**: 🚨 **2 critical blockers remaining, all protocol-layer fixes**
 
 **Critical Action Items**: [Critical Actions](Complete Documentation.md#critical-action-items)
 
 **Blockers**:
-1. **DAV header Class 2 violation** - Advertises LOCK/UNLOCK but doesn't support it
-   - Fix: Remove "2" from DAV header (10 min)
-   - [Class 2 Violation](Complete Documentation.md#webdav-class2-violation)
+1. ✅ **DAV header Class 2 compliance** - COMPLETE (2026-01-29)
+   - Status: DAV header correctly advertises "1, 3, calendar-access, addressbook" without Class 2
+   - [Implementation](../crates/shuriken-app/src/app/api/dav/method/options.rs)
 
 2. **Missing supported-report-set** - Clients can't discover REPORT methods
    - Fix: Add live property generator (4h)
@@ -491,7 +491,7 @@ This index provides quick navigation across **three comprehensive RFC compliance
    - Fix: Implement error XML builders (6h)
    - [Pattern 2: Precondition Errors](RFC_COMPLIANCE_IMPLEMENTATION_GUIDE.md#pattern-2)
 
-**Timeline**: All blockers fixed in Phase 0 (1 hour) + Phase 1 (8 hours)
+**Timeline**: 1 blocker fixed; remaining blockers in Phase 0 (4h) + Phase 1 (6h)
 
 ---
 

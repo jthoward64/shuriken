@@ -11,6 +11,13 @@
 - **Casbin-based authorization** for fine-grained access control
 - **Principal-based ACL system** for unified identity management
 
+## Compliance Documentation
+
+When making any feature changes or implementing new functionality:
+- **Follow the guidelines in** [`documentation/compliance/Maintaining.md`](../documentation/compliance/Maintaining.md) for keeping compliance documentation in sync
+- **Refer to** [`documentation/compliance/README.md`](../documentation/compliance/README.md) as the compliance index to quickly locate RFC requirements, implementation patterns, and architectural decisions
+- Update the relevant compliance documents when adding features that affect RFC compliance
+
 ## Architecture Principles
 
 ### Module Organization

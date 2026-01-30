@@ -135,9 +135,10 @@ The compliance gap is entirely at the protocol layer—HTTP response headers, XM
 
 #### Critical Gaps (Spec Violations) 🔴
 
-1. ❌ **Advertises `DAV: 2` without LOCK/UNLOCK** (RFC 4918 §18.1 violation)
-   - Impact: Clients expect locking support that doesn't exist
-   - Fix: 10 minutes - remove Class 2 from DAV header
+1. ✅ **DAV Class 2 compliance** - COMPLETE (2026-01-29)
+   - DAV header correctly advertises "1, 3, calendar-access, addressbook" without Class 2
+   - RFC 4918 §18.1: Correctly does not claim Class 2 without LOCK support
+   - Implemented in [options.rs](../crates/shuriken-app/src/app/api/dav/method/options.rs)
 
 2. ❌ **Missing `DAV:supported-report-set`** (RFC 3253 via CalDAV/CardDAV)
    - Impact: Clients cannot discover available REPORT methods
@@ -220,7 +221,7 @@ The compliance gap is entirely at the protocol layer—HTTP response headers, XM
 | Component | Status | Notes |
 |-----------|--------|-------|
 | Core HTTP methods | ✅ 100% | GET, PUT, DELETE, PROPFIND, etc. working |
-| DAV header compliance | ⚠️ 50% | Advertises Class 2, needs removal |
+| DAV header compliance | ✅ 100% | Correctly advertises "1, 3, calendar-access, addressbook" |
 | Discovery properties | ❌ 30% | Missing critical properties |
 | Precondition error XML | ❌ 20% | Missing all error elements |
 | ACL property serialization | ❌ 40% | Missing `DAV:acl` generator |
@@ -243,7 +244,7 @@ The compliance gap is entirely at the protocol layer—HTTP response headers, XM
 
 | RFC | Standard | Current | Target | Gap | Effort |
 |-----|----------|---------|--------|-----|--------|
-| **RFC 4918** | WebDAV Core | 70% | 85% | Class 2 violation, properties | 10h |
+| **RFC 4918** | WebDAV Core | 72% | 85% | Missing some properties | 8h |
 | **RFC 4791** | CalDAV | 75% | 90% | Discovery, errors, validation | 20h |
 | **RFC 6352** | CardDAV | 65% | 85% | Discovery, collation, errors | 15h |
 | **RFC 3744** | ACL (minimal) | 40% | 80% | Property serialization, errors | 14h |
@@ -271,14 +272,14 @@ The compliance gap is entirely at the protocol layer—HTTP response headers, XM
 
 **Must fix before claiming RFC compliance**
 
-#### 1. Remove Class 2 from DAV Header (10 min)
+#### 1. Remove Class 2 from DAV Header - ✅ COMPLETE (2026-01-29)
 ```
-Current: DAV: 1, 2, 3, calendar-access, addressbook
-Target:  DAV: 1, 3, calendar-access, addressbook
+Current: DAV: 1, 3, calendar-access, addressbook ✅
 ```
 - **RFC**: 4918 §18.1 - "A server MUST NOT send `DAV: 2` unless it supports LOCK/UNLOCK"
-- **Impact**: Spec violation - clients expect locking support
-- **Files**: `src/app/api/dav/options.rs`
+- **Status**: Correctly implemented - no Class 2 in DAV header
+- **Files**: [options.rs](../crates/shuriken-app/src/app/api/dav/method/options.rs)
+- **Test**: [options.rs:247-283](../crates/shuriken-test/tests/integration/options.rs#L247-L283)
 
 #### 2. Add `DAV:supported-report-set` Property (4h)
 - **RFC**: RFC 3253 §3.1.5 (referenced by CalDAV/CardDAV)

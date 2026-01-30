@@ -103,7 +103,7 @@ This guide provides concrete implementation patterns for all RFC compliance fixe
 **Goal**: Fix immediate RFC violations that break standard clients
 
 **Changes**:
-1. Remove LOCK/UNLOCK from DAV header (RFC 4918)
+1. ✅ Remove LOCK/UNLOCK from DAV header (RFC 4918) - COMPLETE (2026-01-29)
 2. Add `supported-report-set` property (RFC 3253 §3.1.5)
 3. Fix PROPFIND to return minimal live properties
 
