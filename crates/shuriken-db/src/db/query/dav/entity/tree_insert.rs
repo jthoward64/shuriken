@@ -96,6 +96,12 @@ pub async fn insert_vcard_tree(
         value_bytes: None,
         value_json: None,
         ordinal: 0,
+        value_text_array: None,
+        value_date_array: None,
+        value_tstz_array: None,
+        value_time: None,
+        value_interval: None,
+        value_tstzrange: None,
     };
 
     let _version_property: DavProperty = diesel::insert_into(dav_property::table)
@@ -120,6 +126,12 @@ pub async fn insert_vcard_tree(
             value_bytes: None,
             value_json: None,
             ordinal: (prop_ord + 1) as i32,
+            value_text_array: None,
+            value_date_array: None,
+            value_tstz_array: None,
+            value_time: None,
+            value_interval: None,
+            value_tstzrange: None,
         };
 
         let inserted_property: DavProperty = diesel::insert_into(dav_property::table)
@@ -210,6 +222,12 @@ fn insert_component_recursive<'a>(
                 value_bytes: None,
                 value_json: None,
                 ordinal: prop_ord as i32,
+                value_text_array: None,
+                value_date_array: None,
+                value_tstz_array: None,
+                value_time: None,
+                value_interval: None,
+                value_tstzrange: None,
             };
 
             let inserted_property: DavProperty = diesel::insert_into(dav_property::table)

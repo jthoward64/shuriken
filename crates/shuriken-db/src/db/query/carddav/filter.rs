@@ -316,8 +316,7 @@ async fn evaluate_email_filter(
         let pattern = build_like_pattern(&value, &text_match.match_type);
 
         // Query entities where any email in the array matches
-        let query_str =
-            "SELECT DISTINCT entity_id FROM card_index, \
+        let query_str = "SELECT DISTINCT entity_id FROM card_index, \
              jsonb_array_elements_text(data->'emails') AS email \
              WHERE deleted_at IS NULL AND email ILIKE $1";
 
@@ -398,8 +397,7 @@ async fn evaluate_phone_filter(
         let pattern = build_like_pattern(&value, &text_match.match_type);
 
         // Query entities where any phone in the array matches
-        let query_str =
-            "SELECT DISTINCT entity_id FROM card_index, \
+        let query_str = "SELECT DISTINCT entity_id FROM card_index, \
              jsonb_array_elements_text(data->'phones') AS phone \
              WHERE deleted_at IS NULL AND phone ILIKE $1";
 
@@ -861,7 +859,7 @@ mod tests {
         // non-ASCII characters like ß are left unchanged
         let result = normalize_for_ilike("Straße", collation.as_ref()).unwrap();
         assert_eq!(result, "straße"); // ß is unchanged, not folded to ss
-        
+
         // Verify uppercase: ASCII letters converted, non-ASCII unchanged
         let result = normalize_for_sql_upper("Straße", collation.as_ref()).unwrap();
         assert_eq!(result.value, "STRAßE"); // ß stays as ß, not STRASSE

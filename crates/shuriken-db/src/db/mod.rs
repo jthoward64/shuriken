@@ -5,6 +5,7 @@ use std::pin::Pin;
 pub mod connection;
 pub mod enums;
 pub mod map;
+pub mod pg_types;
 pub mod query;
 pub mod schema;
 pub mod transaction;

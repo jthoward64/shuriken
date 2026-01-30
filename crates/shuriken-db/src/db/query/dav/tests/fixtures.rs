@@ -143,6 +143,12 @@ pub fn test_property<'a>(
         value_tstz: None,
         value_bytes: None,
         value_json: None,
+        value_text_array: None,
+        value_date_array: None,
+        value_tstz_array: None,
+        value_time: None,
+        value_interval: None,
+        value_tstzrange: None,
     }
 }
 

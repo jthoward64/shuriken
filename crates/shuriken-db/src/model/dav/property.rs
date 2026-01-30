@@ -1,6 +1,10 @@
 use diesel::{pg::Pg, prelude::*};
 
-use crate::db::{enums::ValueType, schema};
+use crate::db::{
+    enums::ValueType,
+    pg_types::{PgInterval, PgTstzRange},
+    schema,
+};
 
 /// Property for a component with typed value storage
 #[derive(Debug, Clone, PartialEq, Queryable, Selectable, Identifiable, Associations)]
@@ -25,6 +29,12 @@ pub struct DavProperty {
     pub deleted_at: Option<chrono::DateTime<chrono::Utc>>,
     #[diesel(column_name = group_name)]
     pub group: Option<String>,
+    pub value_text_array: Option<Vec<Option<String>>>,
+    pub value_date_array: Option<Vec<Option<chrono::NaiveDate>>>,
+    pub value_tstz_array: Option<Vec<Option<chrono::DateTime<chrono::Utc>>>>,
+    pub value_time: Option<chrono::NaiveTime>,
+    pub value_interval: Option<PgInterval>,
+    pub value_tstzrange: Option<PgTstzRange>,
 }
 
 /// Insert struct for creating new DAV properties
@@ -45,4 +55,10 @@ pub struct NewDavProperty<'a> {
     pub value_bytes: Option<&'a [u8]>,
     pub value_json: Option<&'a serde_json::Value>,
     pub ordinal: i32,
+    pub value_text_array: Option<Vec<Option<String>>>,
+    pub value_date_array: Option<Vec<Option<chrono::NaiveDate>>>,
+    pub value_tstz_array: Option<Vec<Option<chrono::DateTime<chrono::Utc>>>>,
+    pub value_time: Option<chrono::NaiveTime>,
+    pub value_interval: Option<PgInterval>,
+    pub value_tstzrange: Option<PgTstzRange>,
 }

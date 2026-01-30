@@ -65,6 +65,12 @@ pub fn vcard_to_db_models(
         value_bytes: None,
         value_json: None,
         ordinal: 0,
+        value_text_array: None,
+        value_date_array: None,
+        value_tstz_array: None,
+        value_time: None,
+        value_interval: None,
+        value_tstzrange: None,
     });
 
     // Map all properties
@@ -116,6 +122,12 @@ fn map_vcard_property<'a>(
         value_bytes: None,
         value_json: None,
         ordinal,
+        value_text_array: None,
+        value_date_array: None,
+        value_tstz_array: None,
+        value_time: None,
+        value_interval: None,
+        value_tstzrange: None,
     });
 
     // Map parameters
