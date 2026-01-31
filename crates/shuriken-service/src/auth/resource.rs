@@ -53,7 +53,20 @@ impl ResourceType {
     }
 }
 
-// TODO: Structurally separate Glob from the normal segments so that it is impossible to accidentally have in non-auth uses
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ResourceIdentifier {
+    Slug(String),
+    Id(uuid::Uuid),
+}
+
+impl std::fmt::Display for ResourceIdentifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ResourceIdentifier::Slug(s) => write!(f, "{}", s),
+            ResourceIdentifier::Id(id) => write!(f, "{}", id),
+        }
+    }
+}
 
 /// A segment in a resource path.
 ///
@@ -64,11 +77,11 @@ pub enum PathSegment {
     /// Resource type (calendars or addressbooks).
     ResourceType(ResourceType),
     /// Owner/principal name (e.g., "alice", "principal:abc-123").
-    Owner(String),
+    Owner(ResourceIdentifier),
     /// Collection name (e.g., "personal", "work").
-    Collection(String),
+    Collection(ResourceIdentifier),
     /// Item filename (e.g., "event.ics", "contact.vcf").
-    Item(String),
+    Item(ResourceIdentifier),
     /// Glob pattern - `*` (single level) or `**` (recursive).
     Glob { recursive: bool },
 }
@@ -78,6 +91,36 @@ impl PathSegment {
     #[must_use]
     pub const fn is_terminal(&self) -> bool {
         matches!(self, Self::Item(_) | Self::Glob { .. })
+    }
+
+    #[must_use]
+    pub const fn owner_from_slug(s: String) -> Self {
+        Self::Owner(ResourceIdentifier::Slug(s))
+    }
+
+    #[must_use]
+    pub const fn collection_from_slug(s: String) -> Self {
+        Self::Collection(ResourceIdentifier::Slug(s))
+    }
+
+    #[must_use]
+    pub const fn item_from_slug(s: String) -> Self {
+        Self::Item(ResourceIdentifier::Slug(s))
+    }
+
+    #[must_use]
+    pub const fn item_from_id(id: uuid::Uuid) -> Self {
+        Self::Item(ResourceIdentifier::Id(id))
+    }
+
+    #[must_use]
+    pub const fn collection_from_id(id: uuid::Uuid) -> Self {
+        Self::Collection(ResourceIdentifier::Id(id))
+    }
+
+    #[must_use]
+    pub const fn owner_from_id(id: uuid::Uuid) -> Self {
+        Self::Owner(ResourceIdentifier::Id(id))
     }
 }
 
@@ -96,91 +139,75 @@ pub struct ResourceLocation {
     segments: Vec<PathSegment>,
 }
 
+pub enum ResourceLocationStringBuilderOutputType {
+    Unset,
+    Path,
+    FullPath,
+    Url(String),
+}
+
+pub struct ResourceLocationStringBuilder {
+    resource_location: ResourceLocation,
+    include_extension: bool,
+    output_type: ResourceLocationStringBuilderOutputType,
+    allow_glob: bool,
+}
+
 impl ResourceLocation {
     /// Create a new resource identifier from path segments.
     #[must_use]
-    pub fn from_segments(segments: Vec<PathSegment>) -> Self {
-        Self { segments }
-    }
-
-    /// Create a resource location for a principal (owner only).
-    #[must_use]
-    pub fn from_segments_principal(resource_type: ResourceType, owner: String) -> Self {
-        let segments = vec![
-            PathSegment::ResourceType(resource_type),
-            PathSegment::Owner(owner),
-        ];
-        Self { segments }
-    }
-
-    /// Create a resource location for a collection.
-    #[must_use]
-    pub fn from_segments_collection(
-        resource_type: ResourceType,
-        owner: String,
-        collection: &str,
-    ) -> Self {
-        let mut segments = Vec::with_capacity(3);
-        segments.push(PathSegment::ResourceType(resource_type));
-        segments.push(PathSegment::Owner(owner));
-        // Split collection path into multiple segments if needed
-        for col in collection.split('/').filter(|s| !s.is_empty()) {
-            segments.push(PathSegment::Collection(col.to_string()));
+    pub fn from_segments(segments: Vec<PathSegment>) -> ServiceResult<Self> {
+        if segments.len() < 2 {
+            return Err(ServiceError::ParseError(
+                "Resource path must have at least resource type and owner".to_string(),
+            ));
         }
-        Self { segments }
-    }
-
-    /// Create a resource location for an item.
-    #[must_use]
-    pub fn from_segments_item(
-        resource_type: ResourceType,
-        owner: String,
-        collection: &str,
-        item: String,
-    ) -> Self {
-        let mut segments = Vec::with_capacity(4);
-        segments.push(PathSegment::ResourceType(resource_type));
-        segments.push(PathSegment::Owner(owner));
-        // Split collection path into multiple segments if needed
-        for col in collection.split('/').filter(|s| !s.is_empty()) {
-            segments.push(PathSegment::Collection(col.to_string()));
+        let resource_type = match &segments[0] {
+            PathSegment::ResourceType(rt) => rt,
+            _ => {
+                return Err(ServiceError::ParseError(
+                    "First segment of resource path must be resource type".to_string(),
+                ));
+            }
+        };
+        let principal_segment = match &segments[1] {
+            PathSegment::Owner(owner) => owner,
+            _ => {
+                return Err(ServiceError::ParseError(format!(
+                    "Second segment of resource path must be owner/principal for resource type {:?}",
+                    resource_type
+                )));
+            }
+        };
+        // Make sure all remaining segments are either collections, or are the last segment and are an item or glob
+        for (i, segment) in segments.iter().enumerate().skip(2) {
+            if i == segments.len() - 1 {
+                // Last segment can be item or glob
+                match segment {
+                    PathSegment::Collection(_)
+                    | PathSegment::Item(_)
+                    | PathSegment::Glob { .. } => {}
+                    _ => {
+                        return Err(ServiceError::ParseError(
+                            "Last segment of resource path must be collection, item, or glob"
+                                .to_string(),
+                        ));
+                    }
+                }
+            } else {
+                // Intermediate segments must be collections
+                match segment {
+                    PathSegment::Collection(_) => {}
+                    _ => {
+                        return Err(ServiceError::ParseError(
+                            "Intermediate segments of resource path must be collections"
+                                .to_string(),
+                        ));
+                    }
+                }
+            }
         }
-        segments.push(PathSegment::Item(item));
-        Self { segments }
-    }
-
-    /// Create a resource location for a glob pattern on an owner (e.g., `/cal/alice/**`).
-    #[must_use]
-    pub fn from_segments_owner_glob(
-        resource_type: ResourceType,
-        owner: String,
-        recursive: bool,
-    ) -> Self {
-        let segments = vec![
-            PathSegment::ResourceType(resource_type),
-            PathSegment::Owner(owner),
-            PathSegment::Glob { recursive },
-        ];
-        Self { segments }
-    }
-
-    /// Create a resource location for a glob pattern on a collection (e.g., `/cal/alice/work/**`).
-    #[must_use]
-    pub fn from_segments_collection_glob(
-        resource_type: ResourceType,
-        owner: String,
-        collection: &str,
-        recursive: bool,
-    ) -> Self {
-        let mut segments = Vec::with_capacity(4);
-        segments.push(PathSegment::ResourceType(resource_type));
-        segments.push(PathSegment::Owner(owner));
-        // Split collection path into multiple segments if needed
-        for col in collection.split('/').filter(|s| !s.is_empty()) {
-            segments.push(PathSegment::Collection(col.to_string()));
-        }
-        segments.push(PathSegment::Glob { recursive });
-        Self { segments }
+        Ok(Self { segments })
     }
 
     /// Parse a path string into a resource identifier.
@@ -188,10 +215,10 @@ impl ResourceLocation {
     /// ## Examples
     ///
     /// ```ignore
-    /// let resource = ResourceId::parse("/calendars/alice/personal/work.ics");
-    /// let resource = ResourceId::parse("/calendars/alice/**");
-    /// let resource = ResourceId::parse("/addressbooks/bob/contacts/*");
-    /// let resource = ResourceId::parse("/calendars/team/shared/");
+    /// let resource = ResourceLocation::parse("/calendars/alice/personal/work.ics");
+    /// let resource = ResourceLocation::parse("/calendars/alice/**");
+    /// let resource = ResourceLocation::parse("/addressbooks/bob/contacts/*");
+    /// let resource = ResourceLocation::parse("/calendars/team/shared/");
     /// ```
     ///
     /// ## Returns
@@ -227,7 +254,10 @@ impl ResourceLocation {
             // - Item or glob can be last segment
             if i == 1 {
                 // Owner segment
-                segments.push(PathSegment::Owner(part.to_string()));
+                segments.push(match part.parse::<uuid::Uuid>() {
+                    Ok(id) => PathSegment::owner_from_id(id),
+                    Err(_) => PathSegment::owner_from_slug(part.to_string()),
+                });
                 continue;
             }
 
@@ -249,15 +279,23 @@ impl ResourceLocation {
                 break;
             }
 
+            // TODO: Add validation in the route handlers that parse slugs to make sure they are not valid uuids
+
             if i == parts.len() - 1 {
                 // Last segment - could be item or collection
                 if part.ends_with('/') {
                     // Collection (trailing slash)
                     let col_name = part.trim_end_matches('/').to_string();
-                    segments.push(PathSegment::Collection(col_name));
+                    segments.push(match col_name.parse::<uuid::Uuid>() {
+                        Ok(id) => PathSegment::collection_from_id(id),
+                        Err(_) => PathSegment::collection_from_slug(col_name),
+                    });
                 } else {
                     // Item
-                    segments.push(PathSegment::Item(part.to_string()));
+                    segments.push(match part.parse::<uuid::Uuid>() {
+                        Ok(id) => PathSegment::item_from_id(id),
+                        Err(_) => PathSegment::item_from_slug(part.to_string()),
+                    });
                 }
                 continue;
             }
@@ -267,74 +305,87 @@ impl ResourceLocation {
                 return None;
             }
 
-            segments.push(PathSegment::Collection(part.to_string()));
+            segments.push(match part.parse::<uuid::Uuid>() {
+                Ok(id) => PathSegment::collection_from_id(id),
+                Err(_) => PathSegment::collection_from_slug(part.to_string()),
+            });
         }
 
         Some(Self { segments })
     }
 
-    /// Convert the resource identifier to a path string for Casbin enforcement.
-    ///
-    /// ## Errors
-    /// Returns error if glob patterns are not allowed but glob wildcards are present.
-    ///
-    /// ## Examples
-    ///
-    /// ```ignore
-    /// let resource = ResourceId::parse("/calendars/alice/personal/work.ics").unwrap();
-    /// assert_eq!(resource.to_path(), "/calendars/alice/personal/work.ics");
-    /// ```
-    pub fn to_resource_path(&self, allow_glob: bool) -> ServiceResult<String> {
-        let mut path = String::from("/");
-        for (i, segment) in self.segments.iter().enumerate() {
-            match segment {
-                PathSegment::ResourceType(rt) => path.push_str(rt.as_path_segment()),
-                PathSegment::Owner(owner) => path.push_str(owner),
-                PathSegment::Collection(col) => path.push_str(col),
-                PathSegment::Item(item) => path.push_str(item),
-                PathSegment::Glob { recursive } => {
-                    if !allow_glob {
-                        // Should not serialize glob segments if not allowed
-                        return Err(ServiceError::ParseError(
-                            "Cannot serialize glob segment in resource path".to_string(),
-                        ));
-                    }
-                    if *recursive {
-                        path.push_str("**");
-                    } else {
-                        path.push('*');
-                    }
-                }
-            }
-            if segment.is_terminal() {
-                if i + 1 < self.segments.len() {
-                    // Terminal segment must be last
-                    tracing::warn!(
-                        "Warning: Terminal segment {:?} is not last in resource {:?}",
-                        segment,
-                        self
-                    );
-                }
-                break;
-            }
-            path.push('/');
+    #[must_use]
+    pub fn serialize(&self) -> ResourceLocationStringBuilder {
+        ResourceLocationStringBuilder {
+            resource_location: self.clone(),
+            include_extension: false,
+            output_type: ResourceLocationStringBuilderOutputType::Unset,
+            allow_glob: false,
         }
-        Ok(path)
     }
 
-    /// ## Errors
-    /// Returns error if path cannot be constructed.
-    pub fn to_full_path(&self) -> ServiceResult<String> {
-        let path = self.to_resource_path(false)?;
-        Ok(format!("{DAV_ROUTE_PREFIX}{path}"))
-    }
+    // /// Convert the resource identifier to a path string for Casbin enforcement.
+    // ///
+    // /// ## Errors
+    // /// Returns error if glob patterns are not allowed but glob wildcards are present.
+    // ///
+    // /// ## Examples
+    // ///
+    // /// ```ignore
+    // /// let resource = ResourceId::parse("/calendars/alice/personal/work.ics").unwrap();
+    // /// assert_eq!(resource.to_path(), "/calendars/alice/personal/work.ics");
+    // /// ```
+    // pub fn to_resource_path(&self, allow_glob: bool) -> ServiceResult<String> {
+    //     let mut path = String::from("/");
+    //     for (i, segment) in self.segments.iter().enumerate() {
+    //         match segment {
+    //             PathSegment::ResourceType(rt) => path.push_str(rt.as_path_segment()),
+    //             PathSegment::Owner(owner) => path.push_str(owner),
+    //             PathSegment::Collection(col) => path.push_str(col),
+    //             PathSegment::Item(item) => path.push_str(item),
+    //             PathSegment::Glob { recursive } => {
+    //                 if !allow_glob {
+    //                     // Should not serialize glob segments if not allowed
+    //                     return Err(ServiceError::ParseError(
+    //                         "Cannot serialize glob segment in resource path".to_string(),
+    //                     ));
+    //                 }
+    //                 if *recursive {
+    //                     path.push_str("**");
+    //                 } else {
+    //                     path.push('*');
+    //                 }
+    //             }
+    //         }
+    //         if segment.is_terminal() {
+    //             if i + 1 < self.segments.len() {
+    //                 // Terminal segment must be last
+    //                 tracing::warn!(
+    //                     "Warning: Terminal segment {:?} is not last in resource {:?}",
+    //                     segment,
+    //                     self
+    //                 );
+    //             }
+    //             break;
+    //         }
+    //         path.push('/');
+    //     }
+    //     Ok(path)
+    // }
 
-    /// ## Errors
-    /// Returns error if full path cannot be constructed.
-    pub fn to_url(&self, serve_origin: &str) -> ServiceResult<String> {
-        let path = self.to_full_path()?;
-        Ok(format!("{}{}", serve_origin.trim_end_matches('/'), path))
-    }
+    // /// ## Errors
+    // /// Returns error if path cannot be constructed.
+    // pub fn to_full_path(&self) -> ServiceResult<String> {
+    //     let path = self.to_resource_path(false)?;
+    //     Ok(format!("{DAV_ROUTE_PREFIX}{path}"))
+    // }
+
+    // /// ## Errors
+    // /// Returns error if full path cannot be constructed.
+    // pub fn to_url(&self, serve_origin: &str) -> ServiceResult<String> {
+    //     let path = self.to_full_path()?;
+    //     Ok(format!("{}{}", serve_origin.trim_end_matches('/'), path))
+    // }
 
     /// Returns the segments of this resource path.
     #[must_use]
@@ -355,10 +406,10 @@ impl ResourceLocation {
 
     /// Returns the owner if present in the path.
     #[must_use]
-    pub fn owner(&self) -> Option<&str> {
+    pub fn owner(&self) -> Option<ResourceIdentifier> {
         self.segments.iter().find_map(|seg| {
             if let PathSegment::Owner(owner) = seg {
-                Some(owner.as_str())
+                Some(owner.clone())
             } else {
                 None
             }
@@ -366,20 +417,101 @@ impl ResourceLocation {
     }
 }
 
-impl std::fmt::Display for ResourceLocation {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            self.to_resource_path(false)
-                .unwrap_or_else(|_| "<invalid path>".to_string())
-        )
-    }
-}
-
 impl From<Vec<PathSegment>> for ResourceLocation {
     fn from(segments: Vec<PathSegment>) -> Self {
         Self::from_segments(segments)
+    }
+}
+
+impl ResourceLocationStringBuilder {
+    /// Include path in the output.
+    pub fn include_extension(mut self, include: bool) -> Self {
+        self.include_extension = include;
+        self
+    }
+
+    /// Set output type.
+    pub fn output_type(mut self, output_type: ResourceLocationStringBuilderOutputType) -> Self {
+        self.output_type = output_type;
+        self
+    }
+
+    /// Set whether glob segments are allowed.
+    pub fn allow_glob(mut self, allow: bool) -> Self {
+        self.allow_glob = allow;
+        self
+    }
+
+    /// Build the string representation.
+    pub fn build(&self) -> ServiceResult<String> {
+        let mut path = String::new();
+        for (i, segment) in self.resource_location.segments.iter().enumerate() {
+            match segment {
+                PathSegment::ResourceType(rt) => path.push_str(rt.as_path_segment()),
+                PathSegment::Owner(owner) => match owner {
+                    ResourceIdentifier::Slug(s) => path.push_str(s),
+                    ResourceIdentifier::Id(id) => path.push_str(&id.to_string()),
+                },
+                PathSegment::Collection(col) => match col {
+                    ResourceIdentifier::Slug(s) => path.push_str(s),
+                    ResourceIdentifier::Id(id) => path.push_str(&id.to_string()),
+                },
+                PathSegment::Item(item) => match item {
+                    ResourceIdentifier::Slug(s) => path.push_str(s),
+                    ResourceIdentifier::Id(id) => path.push_str(&id.to_string()),
+                },
+                PathSegment::Glob { recursive } => {
+                    if !self.allow_glob {
+                        // Should not serialize glob segments if not allowed
+                        return Err(ServiceError::ParseError(
+                            "Cannot serialize glob segment in resource path".to_string(),
+                        ));
+                    }
+                    if *recursive {
+                        path.push_str("**");
+                    } else {
+                        path.push('*');
+                    }
+                }
+            }
+            if segment.is_terminal() {
+                if i + 1 < self.resource_location.segments.len() {
+                    // Terminal segment must be last
+                    tracing::warn!(
+                        "Warning: Terminal segment {:?} is not last in resource {:?}",
+                        segment,
+                        self.resource_location
+                    );
+                }
+                break;
+            }
+            path.push('/');
+        }
+        if self.include_extension {
+            if let Some(PathSegment::Item(_)) = self.resource_location.segments.last() {
+                if let Some(rt) = self.resource_location.resource_type() {
+                    let ext = rt.item_extension();
+                    if !ext.is_empty() && !path.ends_with(ext) {
+                        path.push('.');
+                        path.push_str(ext);
+                    }
+                }
+            }
+        }
+
+        match self.output_type {
+            ResourceLocationStringBuilderOutputType::Path => Ok(format!("/{path}")),
+            ResourceLocationStringBuilderOutputType::FullPath => {
+                Ok(format!("{DAV_ROUTE_PREFIX}/{path}"))
+            }
+            ResourceLocationStringBuilderOutputType::Url(ref serve_origin) => Ok(format!(
+                "{}{DAV_ROUTE_PREFIX}/{path}",
+                serve_origin.trim_end_matches('/')
+            )),
+            ResourceLocationStringBuilderOutputType::Unset => Err(ServiceError::ParseError(
+                "Output type not set for ResourceLocationStringBuilder".to_string(),
+            )),
+        }
     }
 }
 

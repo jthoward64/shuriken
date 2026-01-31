@@ -11,8 +11,8 @@ use shuriken_rfc::rfc::dav::core::{
 };
 use shuriken_service::auth::casbin::get_enforcer_from_depot;
 use shuriken_service::auth::{
-    get_resolved_location_from_depot, get_terminal_collection_from_depot,
-    serialize_acl_for_resource,
+    PathSegment, ResourceLocation, get_resolved_location_from_depot,
+    get_terminal_collection_from_depot, serialize_acl_for_resource,
 };
 
 /// ## Summary
@@ -245,6 +245,9 @@ pub(super) async fn build_propfind_response(
                 .await?
         };
 
+        // Get the resolved location (UUID-based) from depot for building child paths
+        let resolved_location = get_resolved_location_from_depot(depot);
+
         // Build a response for each child instance
         for inst in instances {
             // Determine file extension from collection type
@@ -253,8 +256,22 @@ pub(super) async fn build_propfind_response(
                 "addressbook" => ".vcf",
                 _ => "", // Plain collections have no extension
             };
-            // Build child path by appending slug with extension to collection path
-            let child_path = format!("{}/{}{}", path.trim_end_matches('/'), inst.slug, extension);
+
+            // Build child path using ResourceLocation with instance UUID
+            let child_path = if let Ok(resolved) = resolved_location {
+                // Append PathSegment::Item with instance UUID and extension
+                let mut child_segments = resolved.segments().to_vec();
+                let item_name = format!("{}{}", inst.id, extension);
+                child_segments.push(PathSegment::Item(item_name));
+                let child_location = ResourceLocation::from_segments(child_segments);
+                child_location.to_full_path().unwrap_or_else(|_| {
+                    format!("{}/{}{}", path.trim_end_matches('/'), inst.id, extension)
+                })
+            } else {
+                // Fallback: use request path with instance UUID if resolved location not available
+                format!("{}/{}{}", path.trim_end_matches('/'), inst.id, extension)
+            };
+
             let child_href = Href::new(&child_path);
 
             // For child resources, build properties from the instance
