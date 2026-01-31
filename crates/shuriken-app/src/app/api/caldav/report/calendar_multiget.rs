@@ -77,7 +77,14 @@ pub async fn handle(
             PathSegment::ResourceType(ResourceType::Calendar),
             PathSegment::Collection(ResourceIdentifier::Id(collection_id)),
         ];
-        ResourceLocation::from_segments(segments).expect("Failed to create resource location")
+        match ResourceLocation::from_segments(segments) {
+            Ok(resource) => resource,
+            Err(e) => {
+                tracing::error!(error = %e, "Failed to build resource location for multiget auth");
+                res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+                return;
+            }
+        }
     };
 
     if let Err(e) = authorizer.require(&subjects, &resource, Action::Read) {

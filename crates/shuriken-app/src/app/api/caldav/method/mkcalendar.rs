@@ -93,7 +93,14 @@ pub async fn mkcalendar(req: &mut Request, res: &mut Response, depot: &Depot) {
         }
 
         tracing::debug!(path = %path, parent_segment_count = parent_segments.len(), "Constructed parent path for MKCALENDAR authorization");
-        ResourceLocation::from_segments(parent_segments).expect("Valid parent resource")
+        match ResourceLocation::from_segments(parent_segments) {
+            Ok(resource) => resource,
+            Err(e) => {
+                tracing::error!(error = %e, "Failed to build parent resource for MKCALENDAR authorization");
+                res.status_code(StatusCode::BAD_REQUEST);
+                return;
+            }
+        }
     };
 
     if let Err(e) = authorizer.require(&subjects, &parent_resource, Action::Edit) {

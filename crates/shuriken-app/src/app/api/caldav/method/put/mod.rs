@@ -315,14 +315,22 @@ async fn check_put_authorization(
             PathSegment::Owner(shuriken_service::auth::ResourceIdentifier::Id(owner_principal.id)),
             PathSegment::Collection(shuriken_service::auth::ResourceIdentifier::Id(collection_id)),
             PathSegment::Item(shuriken_service::auth::ResourceIdentifier::Slug(slug.to_string())),
-        ]).expect("Valid resource location")
+        ])
+        .map_err(|e| {
+            tracing::error!(error = %e, "Failed to build resource location for PUT authorization");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
     } else {
         // Create: check permission on the collection (glob patterns in policies will match)
         ResourceLocation::from_segments(vec![
             PathSegment::ResourceType(ResourceType::Calendar),
             PathSegment::Owner(shuriken_service::auth::ResourceIdentifier::Id(owner_principal.id)),
             PathSegment::Collection(shuriken_service::auth::ResourceIdentifier::Id(collection_id)),
-        ]).expect("Valid resource location")
+        ])
+        .map_err(|e| {
+            tracing::error!(error = %e, "Failed to build resource location for PUT authorization");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
     };
 
     // Get the authorizer

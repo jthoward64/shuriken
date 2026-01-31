@@ -3,7 +3,6 @@
 mod helpers;
 
 use salvo::http::StatusCode;
-use shuriken_service::auth::ResourceLocation;
 use salvo::{Depot, Request, Response, handler};
 
 use crate::app::api::dav::extract::auth::{check_authorization, get_auth_context};
@@ -93,10 +92,10 @@ pub async fn propfind(req: &mut Request, res: &mut Response, depot: &Depot) {
     };
 
     // Check authorization: need read permission on the target resource
-    if let Err((status, resource, action)) = check_propfind_authorization(depot, &mut conn).await {
+    if let Err((status, action)) = check_propfind_authorization(depot, &mut conn).await {
         if status == StatusCode::FORBIDDEN {
             let path_href = req.uri().path();
-            send_need_privileges_error(res, &resource, action, path_href);
+            send_need_privileges_error(res, action, path_href);
         } else {
             res.status_code(status);
         }
@@ -151,42 +150,22 @@ pub async fn propfind(req: &mut Request, res: &mut Response, depot: &Depot) {
 /// For instances: checks Read permission on the entity.
 ///
 /// ## Errors
-/// Returns error tuple (status, resource, action) if authorization is denied.
+/// Returns error tuple (status, action) if authorization is denied.
 /// Returns `StatusCode::INTERNAL_SERVER_ERROR` if authorization check fails.
 async fn check_propfind_authorization(
     depot: &Depot,
     conn: &mut shuriken_db::db::connection::DbConnection<'_>,
-) -> Result<
-    (),
-    (
-        StatusCode,
-        shuriken_service::auth::ResourceLocation,
-        shuriken_service::auth::Action,
-    ),
-> {
-    let (subjects, authorizer) = get_auth_context(depot, conn).await.map_err(|e| {
-        use shuriken_service::auth::{PathSegment, ResourceType, ResourceIdentifier};
-        let dummy_resource = ResourceLocation::from_segments(vec![
-            PathSegment::ResourceType(ResourceType::Calendar),
-            PathSegment::Owner(ResourceIdentifier::Slug("unknown".to_string())),
-        ]).expect("Minimal resource location");
-        (
-            e,
-            dummy_resource,
-            shuriken_service::auth::Action::Read,
-        )
-    })?;
+) -> Result<(), (StatusCode, shuriken_service::auth::Action)> {
+    let (subjects, authorizer) = get_auth_context(depot, conn)
+        .await
+        .map_err(|e| (e, shuriken_service::auth::Action::Read))?;
 
     // Get ResourceLocation from depot (populated by slug_resolver middleware)
     let resource = get_resolved_location_from_depot(depot).map_err(|e| {
-        use shuriken_service::auth::{PathSegment, ResourceType, ResourceIdentifier};
-        let dummy_resource = ResourceLocation::from_segments(vec![
-            PathSegment::ResourceType(ResourceType::Calendar),
-            PathSegment::Owner(ResourceIdentifier::Slug("unknown".to_string())),
-        ]).expect("Minimal resource location");
         tracing::error!(error = %e, "ResourceLocation not found in depot; slug_resolver middleware may not have run");
-        (StatusCode::INTERNAL_SERVER_ERROR, dummy_resource, shuriken_service::auth::Action::Read)
+        (StatusCode::INTERNAL_SERVER_ERROR, shuriken_service::auth::Action::Read)
     })?;
 
     check_authorization(&authorizer, &subjects, resource, Action::Read, "PROPFIND")
+        .map_err(|(status, _resource, action)| (status, action))
 }

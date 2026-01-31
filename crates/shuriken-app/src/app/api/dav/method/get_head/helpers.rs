@@ -6,10 +6,9 @@ use salvo::{Depot, Request, Response};
 use shuriken_db::db::map::dav::{serialize_ical_tree, serialize_vcard_tree};
 use shuriken_db::db::query::dav::{entity, instance};
 use shuriken_db::model::dav::instance::DavInstance;
-use shuriken_service::auth::get_resolved_location_from_depot;
 use shuriken_service::auth::{
-    Action, ResourceType, authorizer_from_depot, get_instance_from_depot, get_subjects_from_depot,
-    get_terminal_collection_from_depot,
+    Action, ResourceType, authorizer_from_depot, get_instance_from_depot,
+    get_resolved_location_from_depot, get_subjects_from_depot, get_terminal_collection_from_depot,
 };
 
 /// ## Summary
@@ -95,14 +94,10 @@ pub(super) async fn handle_get_or_head(
         if let Err(e) = check_read_authorization(depot, &mut conn, &inst).await {
             tracing::debug!(error = %e, instance_id = %inst.id, "Authorization denied");
             // Send RFC 3744 need-privileges error
-            if let Ok(resource) = shuriken_service::auth::get_resolved_location_from_depot(depot) {
-                let path_href = depot
-                    .get::<String>("PATH_LOCATION")
-                    .map_or("/", std::string::String::as_str);
-                send_need_privileges_error(res, resource, Action::Read, path_href);
-            } else {
-                res.status_code(StatusCode::FORBIDDEN);
-            }
+            let path_href = depot
+                .get::<String>("PATH_LOCATION")
+                .map_or("/", std::string::String::as_str);
+            send_need_privileges_error(res, Action::Read, path_href);
             return;
         }
 
@@ -255,7 +250,7 @@ async fn check_read_authorization(
             PathSegment::Collection(ResourceIdentifier::Id(instance.collection_id)),
             PathSegment::Item(ResourceIdentifier::Slug(instance.slug.clone())),
         ];
-        ResourceLocation::from_segments(segments).expect("Valid resource location")
+        ResourceLocation::from_segments(segments)?
     };
 
     // Check authorization

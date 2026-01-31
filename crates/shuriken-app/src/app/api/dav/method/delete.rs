@@ -1,7 +1,6 @@
 //! DELETE method handler for `WebDAV` resources.
 
 use salvo::http::StatusCode;
-use shuriken_service::auth::ResourceLocation;
 use salvo::{Depot, Request, Response, handler};
 
 use diesel_async::AsyncConnection;
@@ -114,12 +113,12 @@ pub async fn delete(req: &mut Request, res: &mut Response, depot: &Depot) {
         .map(String::from);
 
     // Check authorization: need write permission on the resource
-    if let Err((status, resource, action)) =
+    if let Err((status, action)) =
         check_delete_authorization(depot, &mut conn, collection_id, &slug).await
     {
         if status == StatusCode::FORBIDDEN {
             let path_href = req.uri().path();
-            send_need_privileges_error(res, &resource, action, path_href);
+            send_need_privileges_error(res, action, path_href);
         } else {
             res.status_code(status);
         }
@@ -233,44 +232,24 @@ async fn perform_delete(
 /// authorization for the Write action.
 ///
 /// ## Errors
-/// Returns error tuple (status, resource, action) if authorization is denied.
+/// Returns error tuple (status, action) if authorization is denied.
 /// Returns `StatusCode::INTERNAL_SERVER_ERROR` for database or auth errors.
 async fn check_delete_authorization(
     depot: &Depot,
     conn: &mut shuriken_db::db::connection::DbConnection<'_>,
     _collection_id: uuid::Uuid,
     _slug: &str,
-) -> Result<
-    (),
-    (
-        StatusCode,
-        shuriken_service::auth::ResourceLocation,
-        shuriken_service::auth::Action,
-    ),
-> {
-    let (subjects, authorizer) = get_auth_context(depot, conn).await.map_err(|e| {
-        use shuriken_service::auth::{PathSegment, ResourceType, ResourceIdentifier};
-        let dummy_resource = ResourceLocation::from_segments(vec![
-            PathSegment::ResourceType(ResourceType::Calendar),
-            PathSegment::Owner(ResourceIdentifier::Slug("unknown".to_string())),
-        ]).expect("Minimal resource location");
-        (
-            e,
-            dummy_resource,
-            shuriken_service::auth::Action::Delete,
-        )
-    })?;
+) -> Result<(), (StatusCode, shuriken_service::auth::Action)> {
+    let (subjects, authorizer) = get_auth_context(depot, conn)
+        .await
+        .map_err(|e| (e, shuriken_service::auth::Action::Delete))?;
 
     // Get ResourceLocation from depot (use resolved UUID-based location for authorization)
     let resource = get_resolved_location_from_depot(depot).map_err(|e| {
-        use shuriken_service::auth::{PathSegment, ResourceType, ResourceIdentifier};
-        let dummy_resource = ResourceLocation::from_segments(vec![
-            PathSegment::ResourceType(ResourceType::Calendar),
-            PathSegment::Owner(ResourceIdentifier::Slug("unknown".to_string())),
-        ]).expect("Minimal resource location");
         tracing::error!(error = %e, "ResourceLocation not found in depot; slug_resolver middleware may not have run");
-        (StatusCode::INTERNAL_SERVER_ERROR, dummy_resource, shuriken_service::auth::Action::Delete)
+        (StatusCode::INTERNAL_SERVER_ERROR, shuriken_service::auth::Action::Delete)
     })?;
 
     check_authorization(&authorizer, &subjects, resource, Action::Delete, "DELETE")
+        .map_err(|(status, _resource, action)| (status, action))
 }

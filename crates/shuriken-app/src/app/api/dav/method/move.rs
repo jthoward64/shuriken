@@ -3,7 +3,6 @@
 #![expect(clippy::single_match_else)]
 
 use salvo::http::StatusCode;
-use shuriken_service::auth::ResourceLocation;
 use salvo::{Depot, Request, Response, handler};
 
 use crate::app::api::dav::response::need_privileges::send_need_privileges_error;
@@ -152,11 +151,11 @@ pub async fn r#move(req: &mut Request, res: &mut Response, depot: &Depot) {
     );
 
     // Check authorization: need Write on source (unbind) and Write on destination (bind)
-    if let Err((status, resource, action, href)) =
+    if let Err((status, action, href)) =
         check_move_authorization(depot, &mut conn, &dest_collection, &destination).await
     {
         if status == StatusCode::FORBIDDEN {
-            send_need_privileges_error(res, &resource, action, &href);
+            send_need_privileges_error(res, action, &href);
         } else {
             res.status_code(status);
         }
@@ -323,53 +322,25 @@ pub async fn r#move(req: &mut Request, res: &mut Response, depot: &Depot) {
 /// and the destination collection (to bind a new resource).
 ///
 /// ## Errors
-/// Returns error tuple (status, resource, action, href) if authorization is denied.
+/// Returns error tuple (status, action, href) if authorization is denied.
 async fn check_move_authorization(
     depot: &Depot,
     conn: &mut shuriken_db::db::connection::DbConnection<'_>,
     dest_collection: &shuriken_db::model::dav::collection::DavCollection,
     destination: &str,
-) -> Result<
-    (),
-    (
-        StatusCode,
-        shuriken_service::auth::ResourceLocation,
-        shuriken_service::auth::Action,
-        String,
-    ),
-> {
-    let (subjects, authorizer) = get_auth_context(depot, conn).await.map_err(|e| {
-        use shuriken_service::auth::{PathSegment, ResourceType, ResourceIdentifier};
-        let dummy_resource = ResourceLocation::from_segments(vec![
-            PathSegment::ResourceType(ResourceType::Calendar),
-            PathSegment::Owner(ResourceIdentifier::Slug("unknown".to_string())),
-        ]).expect("Minimal resource location");
-        (
-            e,
-            dummy_resource,
-            shuriken_service::auth::Action::Delete,
-            String::new(),
-        )
-    })?;
+) -> Result<(), (StatusCode, shuriken_service::auth::Action, String)> {
+    let (subjects, authorizer) = get_auth_context(depot, conn)
+        .await
+        .map_err(|e| (e, shuriken_service::auth::Action::Delete, String::new()))?;
 
     // Get ResourceLocation from depot (populated by DavPathMiddleware)
     let source_resource = get_resolved_location_from_depot(depot).map_err(|e| {
-        use shuriken_service::auth::{PathSegment, ResourceType, ResourceIdentifier};
-        let dummy_resource = ResourceLocation::from_segments(vec![
-            PathSegment::ResourceType(ResourceType::Calendar),
-            PathSegment::Owner(ResourceIdentifier::Slug("unknown".to_string())),
-        ]).expect("Minimal resource location");
         tracing::error!(error = %e, "ResourceLocation not found in depot");
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            dummy_resource,
-            shuriken_service::auth::Action::Delete,
-            String::new(),
-        )
+        (StatusCode::INTERNAL_SERVER_ERROR, shuriken_service::auth::Action::Delete, String::new())
     })?;
 
     // Check Delete action on source (to delete/unbind)
-    if let Err((status, resource, action)) = check_authorization(
+    if let Err((status, _resource, action)) = check_authorization(
         &authorizer,
         &subjects,
         source_resource,
@@ -380,12 +351,13 @@ async fn check_move_authorization(
             .get::<String>("PATH_LOCATION")
             .cloned()
             .unwrap_or_default();
-        return Err((status, resource, action, href));
+        return Err((status, action, href));
     }
 
     // Check Write permission on destination collection
+    let dest_path = destination.to_string();
     let dest_resource = {
-        use shuriken_service::auth::{PathSegment, ResourceLocation, ResourceType, ResourceIdentifier};
+        use shuriken_service::auth::{PathSegment, ResourceIdentifier, ResourceLocation, ResourceType};
 
         let segments = vec![
             PathSegment::ResourceType(
@@ -396,18 +368,21 @@ async fn check_move_authorization(
             PathSegment::Owner(ResourceIdentifier::Id(dest_collection.owner_principal_id)),
             PathSegment::Collection(ResourceIdentifier::Id(dest_collection.id)),
         ];
-        ResourceLocation::from_segments(segments).expect("Valid destination resource")
+        ResourceLocation::from_segments(segments).map_err(|e| {
+            tracing::error!(error = %e, "Failed to build destination resource");
+            (StatusCode::INTERNAL_SERVER_ERROR, Action::Edit, dest_path.clone())
+        })?
     };
 
     // Check Write permission on destination
-    if let Err((status, resource, action)) = check_authorization(
+    if let Err((status, _resource, action)) = check_authorization(
         &authorizer,
         &subjects,
         &dest_resource,
         Action::Edit,
         "MOVE destination",
     ) {
-        return Err((status, resource, action, destination.to_string()));
+        return Err((status, action, dest_path));
     }
 
     Ok(())

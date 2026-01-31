@@ -3,7 +3,6 @@
 #![expect(clippy::single_match_else)]
 
 use salvo::http::StatusCode;
-use shuriken_service::auth::ResourceLocation;
 use salvo::writing::Text;
 use salvo::{Depot, Request, Response, handler};
 
@@ -99,10 +98,10 @@ pub async fn proppatch(req: &mut Request, res: &mut Response, depot: &Depot) {
     tracing::debug!(collection_id = %collection_id, "Parsed collection ID from path");
 
     // Check authorization: need write permission on the collection
-    if let Err((_status, resource, action)) =
+    if let Err((_status, action)) =
         check_proppatch_authorization(depot, &mut conn, collection_id).await
     {
-        send_need_privileges_error(res, &resource, action, &path);
+        send_need_privileges_error(res, action, &path);
         return;
     }
 
@@ -219,46 +218,27 @@ pub async fn proppatch(req: &mut Request, res: &mut Response, depot: &Depot) {
 /// Checks if the current user has write permission for the PROPPATCH operation.
 ///
 /// ## Errors
-/// Returns `(StatusCode::FORBIDDEN, ResourceLocation, Action)` if authorization is denied.
-/// Returns `(StatusCode::INTERNAL_SERVER_ERROR, ResourceLocation, Action)` for database or auth errors.
+/// Returns `(StatusCode::FORBIDDEN, Action)` if authorization is denied.
+/// Returns `(StatusCode::INTERNAL_SERVER_ERROR, Action)` for database or auth errors.
 async fn check_proppatch_authorization(
     depot: &Depot,
     conn: &mut shuriken_db::db::connection::DbConnection<'_>,
     _collection_id: uuid::Uuid,
-) -> Result<(), (StatusCode, shuriken_service::auth::ResourceLocation, Action)> {
+) -> Result<(), (StatusCode, Action)> {
     let subjects = get_subjects_from_depot(depot, conn).await.map_err(|e| {
-        use shuriken_service::auth::{PathSegment, ResourceType, ResourceIdentifier};
-        let dummy_resource = ResourceLocation::from_segments(vec![
-            PathSegment::ResourceType(ResourceType::Calendar),
-            PathSegment::Owner(ResourceIdentifier::Slug("unknown".to_string())),
-        ]).expect("Minimal resource location");
         tracing::error!(error = %e, "Failed to get subjects from depot");
-        // Create empty resource for error reporting
-        (StatusCode::INTERNAL_SERVER_ERROR, dummy_resource, Action::Edit)
+        (StatusCode::INTERNAL_SERVER_ERROR, Action::Edit)
     })?;
 
     // Get ResourceLocation from depot (populated by slug_resolver middleware)
     let resource = get_resolved_location_from_depot(depot).map_err(|e| {
-        use shuriken_service::auth::{PathSegment, ResourceType, ResourceIdentifier};
-        let dummy_resource = ResourceLocation::from_segments(vec![
-            PathSegment::ResourceType(ResourceType::Calendar),
-            PathSegment::Owner(ResourceIdentifier::Slug("unknown".to_string())),
-        ]).expect("Minimal resource location");
         tracing::error!(error = %e, "ResourceLocation not found in depot; slug_resolver middleware may not have run");
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            dummy_resource,
-            Action::Edit,
-        )
+        (StatusCode::INTERNAL_SERVER_ERROR, Action::Edit)
     })?;
 
     let authorizer = authorizer_from_depot(depot).map_err(|e| {
         tracing::error!(error = %e, "Failed to get authorizer");
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            resource.clone(),
-            Action::Edit,
-        )
+        (StatusCode::INTERNAL_SERVER_ERROR, Action::Edit)
     })?;
 
     match authorizer.require(&subjects, resource, Action::Edit) {
@@ -269,15 +249,11 @@ async fn check_proppatch_authorization(
                 reason = %msg,
                 "Authorization denied for PROPPATCH"
             );
-            Err((StatusCode::FORBIDDEN, resource.clone(), Action::Edit))
+            Err((StatusCode::FORBIDDEN, Action::Edit))
         }
         Err(e) => {
             tracing::error!(error = %e, "Authorization check failed");
-            Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                resource.clone(),
-                Action::Edit,
-            ))
+            Err((StatusCode::INTERNAL_SERVER_ERROR, Action::Edit))
         }
     }
 }

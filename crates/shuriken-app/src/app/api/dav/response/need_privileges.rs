@@ -6,7 +6,7 @@
 use salvo::Response;
 use salvo::http::StatusCode;
 use shuriken_rfc::rfc::dav::core::{DavError, Href, PrivilegeRequired};
-use shuriken_service::auth::{Action, ResourceLocation};
+use shuriken_service::auth::Action;
 
 /// ## Summary
 /// Sends a 403 Forbidden response with `DAV:need-privileges` error XML.
@@ -18,7 +18,6 @@ use shuriken_service::auth::{Action, ResourceLocation};
 /// Sets the response status to 403 Forbidden and writes XML body.
 pub fn send_need_privileges_error(
     res: &mut Response,
-    _resource: &ResourceLocation,
     action: Action,
     href: &str,
 ) {
