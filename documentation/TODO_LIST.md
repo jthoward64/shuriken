@@ -18,9 +18,9 @@ This document tracks all TODO comments, "for now" implementations, stub code, pl
 ### Statistics
 
 - **Total Items**: 40 tracked items
-- **Complete**: 15 (38%)
+- **Complete**: 16 (40%)
 - **In Progress**: 0
-- **Not Started**: 25 (62%)
+- **Not Started**: 24 (60%)
 - **Deferred**: 5 (higher-level refactoring)
 
 ---
@@ -80,7 +80,7 @@ None currently identified.
 
 ## 🟡 Priority 2: Medium Priority
 
-### 4. Authorization - Glob Segment Structural Separation (DEFERRED)
+### ✅ 4. Authorization - Glob Segment Structural Separation (DONE)
 
 **Location**: [`crates/shuriken-service/src/auth/resource.rs:56`](../crates/shuriken-service/src/auth/resource.rs#L56)
 
@@ -266,26 +266,29 @@ None currently identified.
 
 **Status**: ✅ Complete - Mirrors CalDAV implementation pattern
 
-### Integration Tests\n\n5. **DELETE Handler Test - Stub Verification**  
+### Integration Tests
+
+5. **DELETE Handler Test - Stub Verification**  
    **Location**: [`crates/shuriken-app/src/app/api/dav/method/delete_tests.rs:64`](../crates/shuriken-app/src/app/api/dav/method/delete_tests.rs#L64)  
    ```rust
    // For now, verify the handler is callable
    ```
    **Status**: Test needs expansion
 
-6. **REPORT Test - Structure Verification Only**  
-   **Location**: [`crates/shuriken-test/tests/integration/report.rs:689`](../crates/shuriken-test/tests/integration/report.rs#L689)  
-   ```rust
-   // For now, test that response structure is correct
-   ```
-   **Status**: Test needs expansion
+6. ✅ **REPORT Test - Sync-Token Parsing (COMPLETE)**  
+   **Location**: [`crates/shuriken-test/tests/integration/report.rs`](../crates/shuriken-test/tests/integration/report.rs)  
+   **Status**: ✅ Complete (2026-01-31)
 
-7. **Casbin Test - Expected Behavior Documentation**  
+   **Implementation**:
+   - Added sync-token extraction helper
+   - Asserts token is present and numeric
+
+<!-- 7. **Casbin Test - Expected Behavior Documentation**  
    **Location**: [`crates/shuriken-service/src/auth/casbin_test.rs:1767`](../crates/shuriken-service/src/auth/casbin_test.rs#L1767)  
    ```rust
    // For now, this test documents the expected behavior
    ```
-   **Status**: Test documents expected behavior, not a bug
+   **Status**: Test documents expected behavior, not a bug -->
 
 ### RFC Parser - Test Leniency
 
@@ -410,32 +413,6 @@ These are intentional placeholders that get replaced after insert operations:
    #[expect(clippy::too_many_lines)]
    ```
    **Status**: Test data file; acceptable
-
----
-
-## 🚫 Not TODO Items (False Positives)
-
-The following were identified in the search but are **NOT** TODO items:
-
-### Component Names (VTODO)
-- All references to "VTODO" are iCalendar component types, not TODO comments
-- Files: `cal_index.rs`, `enums.rs`, `schema.rs`, various test files
-- Status: ✅ Valid code, not action items
-
-### Test Panic Messages
-- `panic!` calls in tests with descriptive messages
-- Purpose: Test assertions
-- Status: ✅ Valid test code
-
-### Documentation Comments
-- "Note:" comments explaining implementation decisions
-- Purpose: Code documentation
-- Status: ✅ Valid documentation
-
-### Derive Attributes
-- `PartialEq`, `PartialOrd` derives
-- Purpose: Trait implementations
-- Status: ✅ Valid code
 
 ---
 

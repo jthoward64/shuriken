@@ -8,6 +8,24 @@ use salvo::http::StatusCode;
 
 use super::helpers::*;
 
+fn extract_sync_token(body: &str) -> Option<String> {
+    for tag in ["D:sync-token", "sync-token"] {
+        let open = format!("<{tag}>");
+        let close = format!("</{tag}>");
+        if let Some(start) = body.find(&open) {
+            let content_start = start + open.len();
+            if let Some(end) = body[content_start..].find(&close) {
+                let content = body[content_start..content_start + end].trim();
+                if !content.is_empty() {
+                    return Some(content.to_string());
+                }
+            }
+        }
+    }
+
+    None
+}
+
 // ============================================================================
 // Calendar Query REPORT Tests
 // ============================================================================
@@ -685,9 +703,10 @@ async fn sync_collection_delta_sync() {
 
     let initial_response = initial_response.assert_status(StatusCode::MULTI_STATUS);
 
-    // Extract sync-token from response (would need parsing)
-    // For now, test that response structure is correct
-    initial_response.assert_body_contains("sync-token");
+    let body = initial_response.body_string();
+    let token = extract_sync_token(&body).expect("sync-token present in response");
+    let parsed: i64 = token.parse().expect("sync-token should be numeric");
+    assert!(parsed >= 0, "sync-token should be non-negative");
 }
 
 // ============================================================================
