@@ -3,6 +3,7 @@
 #![expect(clippy::single_match_else)]
 
 use salvo::http::StatusCode;
+use shuriken_service::auth::ResourceLocation;
 use salvo::writing::Text;
 use salvo::{Depot, Request, Response, handler};
 
@@ -226,18 +227,27 @@ async fn check_proppatch_authorization(
     _collection_id: uuid::Uuid,
 ) -> Result<(), (StatusCode, shuriken_service::auth::ResourceLocation, Action)> {
     let subjects = get_subjects_from_depot(depot, conn).await.map_err(|e| {
+        use shuriken_service::auth::{PathSegment, ResourceType, ResourceIdentifier};
+        let dummy_resource = ResourceLocation::from_segments(vec![
+            PathSegment::ResourceType(ResourceType::Calendar),
+            PathSegment::Owner(ResourceIdentifier::Slug("unknown".to_string())),
+        ]).expect("Minimal resource location");
         tracing::error!(error = %e, "Failed to get subjects from depot");
         // Create empty resource for error reporting
-        let resource = shuriken_service::auth::ResourceLocation::from_segments(vec![]);
-        (StatusCode::INTERNAL_SERVER_ERROR, resource, Action::Edit)
+        (StatusCode::INTERNAL_SERVER_ERROR, dummy_resource, Action::Edit)
     })?;
 
     // Get ResourceLocation from depot (populated by slug_resolver middleware)
     let resource = get_resolved_location_from_depot(depot).map_err(|e| {
+        use shuriken_service::auth::{PathSegment, ResourceType, ResourceIdentifier};
+        let dummy_resource = ResourceLocation::from_segments(vec![
+            PathSegment::ResourceType(ResourceType::Calendar),
+            PathSegment::Owner(ResourceIdentifier::Slug("unknown".to_string())),
+        ]).expect("Minimal resource location");
         tracing::error!(error = %e, "ResourceLocation not found in depot; slug_resolver middleware may not have run");
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            shuriken_service::auth::ResourceLocation::from_segments(vec![]),
+            dummy_resource,
             Action::Edit,
         )
     })?;
@@ -255,7 +265,7 @@ async fn check_proppatch_authorization(
         Ok(_level) => Ok(()),
         Err(shuriken_service::error::ServiceError::AuthorizationError(msg)) => {
             tracing::warn!(
-                resource = %resource,
+                resource = ?resource,
                 reason = %msg,
                 "Authorization denied for PROPPATCH"
             );

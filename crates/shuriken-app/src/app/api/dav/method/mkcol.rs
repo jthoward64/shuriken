@@ -88,7 +88,7 @@ pub async fn mkcol(req: &mut Request, res: &mut Response, depot: &Depot) {
         }
 
         tracing::debug!(path = %path, parent_segment_count = parent_segments.len(), "Constructed parent path for MKCOL authorization");
-        ResourceLocation::from_segments(parent_segments)
+        ResourceLocation::from_segments(parent_segments).expect("Valid parent resource")
     };
 
     if let Err(e) = authorizer.require(&subjects, &parent_resource, Action::Edit) {

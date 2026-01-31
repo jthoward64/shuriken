@@ -58,8 +58,13 @@ pub async fn put(req: &mut Request, res: &mut Response, depot: &Depot) {
             .find_map(|seg| {
                 if let shuriken_service::auth::PathSegment::Item(s) = seg {
                     // Strip file extensions (.ics, .vcf) to get base slug
-                    let cleaned = s.trim_end_matches(".ics").trim_end_matches(".vcf");
-                    Some(cleaned.to_string())
+                    let cleaned = match s {
+                        shuriken_service::auth::ResourceIdentifier::Slug(slug) => {
+                            slug.trim_end_matches(".ics").trim_end_matches(".vcf").to_string()
+                        }
+                        shuriken_service::auth::ResourceIdentifier::Id(id) => id.to_string(),
+                    };
+                    Some(cleaned)
                 } else {
                     None
                 }
@@ -307,17 +312,17 @@ async fn check_put_authorization(
         // Update: check permission on the specific item
         ResourceLocation::from_segments(vec![
             PathSegment::ResourceType(ResourceType::Calendar),
-            PathSegment::Owner(owner_principal.id.to_string()),
-            PathSegment::Collection(collection_id.to_string()),
-            PathSegment::Item(slug.to_string()),
-        ])
+            PathSegment::Owner(shuriken_service::auth::ResourceIdentifier::Id(owner_principal.id)),
+            PathSegment::Collection(shuriken_service::auth::ResourceIdentifier::Id(collection_id)),
+            PathSegment::Item(shuriken_service::auth::ResourceIdentifier::Slug(slug.to_string())),
+        ]).expect("Valid resource location")
     } else {
         // Create: check permission on the collection (glob patterns in policies will match)
         ResourceLocation::from_segments(vec![
             PathSegment::ResourceType(ResourceType::Calendar),
-            PathSegment::Owner(owner_principal.id.to_string()),
-            PathSegment::Collection(collection_id.to_string()),
-        ])
+            PathSegment::Owner(shuriken_service::auth::ResourceIdentifier::Id(owner_principal.id)),
+            PathSegment::Collection(shuriken_service::auth::ResourceIdentifier::Id(collection_id)),
+        ]).expect("Valid resource location")
     };
 
     // Get the authorizer
@@ -331,7 +336,7 @@ async fn check_put_authorization(
         Ok(_level) => Ok(()),
         Err(shuriken_service::error::ServiceError::AuthorizationError(msg)) => {
             tracing::warn!(
-                resource = %resource,
+                resource = ?resource,
                 reason = %msg,
                 "Authorization denied for PUT"
             );

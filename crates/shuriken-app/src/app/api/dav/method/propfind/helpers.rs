@@ -11,7 +11,7 @@ use shuriken_rfc::rfc::dav::core::{
 };
 use shuriken_service::auth::casbin::get_enforcer_from_depot;
 use shuriken_service::auth::{
-    PathSegment, ResourceLocation, get_resolved_location_from_depot,
+    PathSegment, ResourceLocation, ResourceIdentifier, get_resolved_location_from_depot,
     get_terminal_collection_from_depot, serialize_acl_for_resource,
 };
 
@@ -212,7 +212,7 @@ pub(super) async fn build_propfind_response(
     // Get the resolved resource location for ACL lookups (uses internal path format)
     let resource_path = get_resolved_location_from_depot(depot)
         .ok()
-        .and_then(|loc| loc.to_resource_path(false).ok());
+        .and_then(|loc| loc.serialize_to_path(false, false).ok());
 
     let (found_properties, not_found_properties) = get_properties_for_resource(
         conn,
@@ -262,11 +262,14 @@ pub(super) async fn build_propfind_response(
                 // Append PathSegment::Item with instance UUID and extension
                 let mut child_segments = resolved.segments().to_vec();
                 let item_name = format!("{}{}", inst.id, extension);
-                child_segments.push(PathSegment::Item(item_name));
+                child_segments.push(PathSegment::Item(ResourceIdentifier::Slug(item_name)));
                 let child_location = ResourceLocation::from_segments(child_segments);
-                child_location.to_full_path().unwrap_or_else(|_| {
-                    format!("{}/{}{}", path.trim_end_matches('/'), inst.id, extension)
-                })
+                child_location
+                    .ok()
+                    .and_then(|loc| loc.serialize_to_full_path(false, false).ok())
+                    .unwrap_or_else(|| {
+                        format!("{}/{}{}", path.trim_end_matches('/'), inst.id, extension)
+                    })
             } else {
                 // Fallback: use request path with instance UUID if resolved location not available
                 format!("{}/{}{}", path.trim_end_matches('/'), inst.id, extension)

@@ -129,7 +129,7 @@ pub fn check_authorization(
         Ok(_level) => Ok(()),
         Err(shuriken_service::error::ServiceError::AuthorizationError(msg)) => {
             tracing::warn!(
-                resource = %resource,
+                resource = ?resource,
                 reason = %msg,
                 "Authorization denied for {}", operation_name
             );

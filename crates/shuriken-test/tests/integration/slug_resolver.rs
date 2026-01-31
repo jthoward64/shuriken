@@ -4,7 +4,7 @@
 //! Uses `tests/integration/helpers.rs` for database setup and request utilities.
 
 use super::helpers::{
-    CollectionType, PrincipalType, TestDb, cal_collection_glob, cal_owner_glob, cal_path,
+    CollectionType, PrincipalType, TestDb, cal_path,
 };
 use shuriken_test::component::middleware::path_parser::parse_and_resolve_path;
 
@@ -20,7 +20,8 @@ async fn resolve_owner_only_calendar_path() {
         .expect("Failed to seed principal");
 
     let mut conn = test_db.get_conn().await.expect("conn");
-    let result = parse_and_resolve_path(&cal_owner_glob("alice", true), &mut conn)
+    // Owner-only path: /cal/alice/ (no collection)
+    let result = parse_and_resolve_path("/cal/alice/", &mut conn)
         .await
         .expect("resolve ok");
 
@@ -50,7 +51,7 @@ async fn resolve_calendar_collection_path() {
         .expect("Failed to seed collection");
 
     let mut conn = test_db.get_conn().await.expect("conn");
-    let result = parse_and_resolve_path(&cal_collection_glob("alice", "work", true), &mut conn)
+    let result = parse_and_resolve_path(&cal_path("alice", "work", None), &mut conn)
         .await
         .expect("resolve ok");
 
@@ -86,8 +87,9 @@ async fn resolve_nested_calendar_collection_path() {
         .expect("Failed to seed child collection");
 
     let mut conn = test_db.get_conn().await.expect("conn");
+    // Nested collection path: /cal/alice/work/team/
     let result =
-        parse_and_resolve_path(&cal_collection_glob("alice", "work/team", true), &mut conn)
+        parse_and_resolve_path("/cal/alice/work/team/", &mut conn)
             .await
             .expect("resolve ok");
 

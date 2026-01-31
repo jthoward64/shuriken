@@ -89,7 +89,7 @@ fn test_build_canonical_location_full_path_with_ics() {
     if let PathSegment::Owner(s) = &segments[1] {
         assert_eq!(
             s,
-            &principal.id.to_string(),
+            &shuriken_test::component::auth::ResourceIdentifier::Id(principal.id),
             "Owner should be principal UUID"
         );
     } else {
@@ -100,24 +100,19 @@ fn test_build_canonical_location_full_path_with_ics() {
     if let PathSegment::Collection(s) = &segments[2] {
         assert_eq!(
             s,
-            &collection.id.to_string(),
+            &shuriken_test::component::auth::ResourceIdentifier::Id(collection.id),
             "Collection should be collection UUID"
         );
     } else {
         panic!("Third segment should be Collection");
     }
 
-    // Verify item with extension
-    if let PathSegment::Item(s) = &segments[3] {
-        assert!(
-            std::path::Path::new(s)
-                .extension()
-                .is_some_and(|ext| ext.eq_ignore_ascii_case("ics")),
-            "Item should end with .ics"
-        );
-        assert!(
-            s.starts_with(&instance.id.to_string()),
-            "Item should start with instance UUID"
+    // Verify item (canonical uses Id, not Slug with extension)
+    if let PathSegment::Item(shuriken_test::component::auth::ResourceIdentifier::Id(id)) = &segments[3] {
+        assert_eq!(
+            id,
+            &instance.id,
+            "Item should be instance UUID"
         );
     } else {
         panic!("Fourth segment should be Item");
@@ -149,12 +144,11 @@ fn test_build_canonical_location_with_vcf_extension() {
         PathSegment::ResourceType(ResourceType::Addressbook)
     ));
 
-    if let PathSegment::Item(s) = &segments[3] {
-        assert!(
-            std::path::Path::new(s)
-                .extension()
-                .is_some_and(|ext| ext.eq_ignore_ascii_case("vcf")),
-            "Addressbook item should end with .vcf"
+    if let PathSegment::Item(shuriken_test::component::auth::ResourceIdentifier::Id(id)) = &segments[3] {
+        assert_eq!(
+            id,
+            &instance.id,
+            "Canonical location should use Id, not Slug with extension"
         );
     } else {
         panic!("Expected Item segment");
@@ -181,7 +175,7 @@ fn test_build_canonical_location_without_extension() {
     if let PathSegment::Item(s) = &canonical.unwrap().segments()[3] {
         assert_eq!(
             s,
-            &instance.id.to_string(),
+            &shuriken_test::component::auth::ResourceIdentifier::Id(instance.id),
             "Without extension, should be just UUID"
         );
     } else {

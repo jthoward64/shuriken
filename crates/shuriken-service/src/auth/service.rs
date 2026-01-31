@@ -35,9 +35,13 @@ impl AuthzResult {
     pub fn require(self, resource: &ResourceLocation, action: &Action) -> ServiceResult<()> {
         match self {
             Self::Allowed => Ok(()),
-            Self::Denied => Err(ServiceError::AuthorizationError(format!(
-                "Access denied: {action} on {resource}"
-            ))),
+            Self::Denied => {
+                let path = resource.serialize_to_path(false, false)
+                    .unwrap_or_else(|_| "<invalid path>".to_string());
+                Err(ServiceError::AuthorizationError(format!(
+                    "Access denied: {action} on {path}"
+                )))
+            }
         }
     }
 }
@@ -85,7 +89,7 @@ impl Authorizer {
         resource: &ResourceLocation,
         action: Action,
     ) -> ServiceResult<AuthzResult> {
-        let path = resource.to_resource_path(false)?;
+        let path = resource.serialize_to_path(false, false)?;
         let act = action.as_casbin_action();
 
         tracing::debug!(
@@ -170,16 +174,16 @@ pub fn authorizer_from_depot(depot: &salvo::Depot) -> ServiceResult<Authorizer> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::auth::ResourceType;
+    use crate::auth::{PathSegment, ResourceType};
 
     #[test]
     fn authz_result_require() {
-        let resource = ResourceLocation::from_segments_item(
-            ResourceType::Calendar,
-            "alice".to_string(),
-            "personal",
-            "work.ics".to_string(),
-        );
+        let resource = ResourceLocation::from_segments(vec![
+            PathSegment::ResourceType(ResourceType::Calendar),
+            PathSegment::owner_from_slug("alice".to_string()),
+            PathSegment::collection_from_slug("personal".to_string()),
+            PathSegment::item_from_slug("work.ics".to_string()),
+        ]).unwrap();
         let action = Action::Read;
 
         let allowed = AuthzResult::Allowed;

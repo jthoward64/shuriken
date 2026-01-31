@@ -90,15 +90,7 @@ async fn create_user_handler(req: &mut Request, depot: &mut Depot, res: &mut Res
     // We use a calendars path with glob to check general admin permissions
     let principals_resource = ResourceLocation::from_segments(vec![PathSegment::ResourceType(
         shuriken_service::auth::ResourceType::Principal,
-    )]);
-
-    let Ok(principals_resource) = Ok::<_, StatusCode>(principals_resource) else {
-        res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
-        res.render(Json(ErrorResponse {
-            error: "Internal server error".to_string(),
-        }));
-        return;
-    };
+    )]).expect("Valid resource location");
 
     if let Err(_e) = handler_require(depot, &subjects, &principals_resource, Action::Admin) {
         tracing::warn!(
@@ -390,16 +382,10 @@ async fn update_password_handler(req: &mut Request, depot: &mut Depot, res: &mut
     // Check if authenticated user has write access to /principals/{target_principal_id}
     let subjects = ExpandedSubjects::from_user(authenticated_user);
 
-    let Ok(principal_resource) = Ok::<_, StatusCode>(ResourceLocation::from_segments(vec![
+    let principal_resource = ResourceLocation::from_segments(vec![
         PathSegment::ResourceType(shuriken_service::auth::ResourceType::Principal),
-        PathSegment::Owner(target_user.principal_id.to_string()),
-    ])) else {
-        res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
-        res.render(Json(ErrorResponse {
-            error: "Internal server error".to_string(),
-        }));
-        return;
-    };
+        PathSegment::Owner(shuriken_service::auth::ResourceIdentifier::Id(target_user.principal_id)),
+    ]).expect("Valid resource location");
 
     if let Err(_e) = handler_require(depot, &subjects, &principal_resource, Action::Edit) {
         tracing::warn!(

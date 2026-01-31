@@ -24,7 +24,7 @@ use shuriken_db::{
     model::dav::instance::DavInstance,
     model::principal::Principal,
 };
-use shuriken_service::auth::{PathSegment, ResourceLocation};
+use shuriken_service::auth::{PathSegment, ResourceLocation, ResourceIdentifier};
 
 /// Result of parsing and resolving a DAV path.
 ///
@@ -70,9 +70,9 @@ pub async fn parse_and_resolve_path(
     path: &str,
     conn: &mut DbConnection<'_>,
 ) -> Result<PathResolutionResult, PathResolutionError> {
-    // Parse path to ResourceLocation
-    let original_location = ResourceLocation::parse(path)
-        .ok_or_else(|| PathResolutionError::InvalidPathFormat(path.to_string()))?;
+    // Parse path to ResourceLocation (globs are internal only, not external)
+    let original_location = ResourceLocation::parse(path, false)
+        .map_err(|_| PathResolutionError::InvalidPathFormat(path.to_string()))?;
 
     // Extract segments for entity lookup
     let mut resource_type_opt = None;
@@ -84,12 +84,13 @@ pub async fn parse_and_resolve_path(
     for seg in original_location.segments() {
         match seg {
             PathSegment::ResourceType(rt) => resource_type_opt = Some(*rt),
-            PathSegment::Owner(s) => owner_identifier = Some(s.clone()),
-            PathSegment::Collection(s) => collection_segments.push(s.clone()),
+            PathSegment::Owner(s) => owner_identifier = Some(s.to_string()),
+            PathSegment::Collection(s) => collection_segments.push(s.to_string()),
             PathSegment::Item(s) => {
-                item_filename = Some(s.clone());
+                item_filename = Some(s.to_string());
                 // Strip file extensions for slug lookup
-                let cleaned = s
+                let s_str = s.to_string();
+                let cleaned = s_str
                     .trim_end_matches(".ics")
                     .trim_end_matches(".vcf")
                     .to_string();
@@ -172,54 +173,29 @@ pub fn build_canonical_location(
     principal: &Option<Principal>,
     collection_chain: Option<&CollectionChain>,
     instance: &Option<DavInstance>,
-    item_filename: Option<&str>,
+    _item_filename: Option<&str>,
 ) -> Option<ResourceLocation> {
     let rt = resource_type?;
     let princ = principal.as_ref()?;
 
     let mut segments = vec![
         PathSegment::ResourceType(rt),
-        PathSegment::Owner(princ.id.to_string()),
+        PathSegment::Owner(ResourceIdentifier::Id(princ.id)),
     ];
 
     if let Some(chain) = collection_chain
         && let Some(coll) = chain.terminal()
     {
-        segments.push(PathSegment::Collection(coll.id.to_string()));
+        segments.push(PathSegment::Collection(ResourceIdentifier::Id(coll.id)));
 
         // Add Item segment if instance exists
         if let Some(inst) = instance {
-            // Preserve original filename if provided, otherwise use UUID
-            let item_segment = if let Some(filename) = item_filename {
-                // Extract extension from filename
-                let path = std::path::Path::new(filename);
-                let has_ics = path
-                    .extension()
-                    .is_some_and(|ext| ext.eq_ignore_ascii_case("ics"));
-                let has_vcf = path
-                    .extension()
-                    .is_some_and(|ext| ext.eq_ignore_ascii_case("vcf"));
-
-                if has_ics || has_vcf {
-                    format!(
-                        "{}{}",
-                        inst.id,
-                        #[expect(clippy::expect_used)]
-                        &filename[filename
-                            .rfind('.')
-                            .expect("extension present after is_some_and check")..]
-                    )
-                } else {
-                    inst.id.to_string()
-                }
-            } else {
-                inst.id.to_string()
-            };
-            segments.push(PathSegment::Item(item_segment));
+            // Canonical location always uses UUID - serialization methods add extensions
+            segments.push(PathSegment::Item(ResourceIdentifier::Id(inst.id)));
         }
     }
 
-    Some(ResourceLocation::from_segments(segments))
+    ResourceLocation::from_segments(segments).ok()
 }
 
 /// Resolve a principal by slug or UUID.
@@ -418,20 +394,15 @@ mod tests {
             segments[0],
             PathSegment::ResourceType(ResourceType::Calendar)
         ));
-        assert!(matches!(&segments[1], PathSegment::Owner(s) if s == &principal.id.to_string()));
+        assert!(matches!(&segments[1], PathSegment::Owner(ResourceIdentifier::Id(id)) if *id == principal.id));
         assert!(
-            matches!(&segments[2], PathSegment::Collection(s) if s == &collection.id.to_string())
+            matches!(&segments[2], PathSegment::Collection(ResourceIdentifier::Id(id)) if *id == collection.id)
         );
-        // Item segment should have UUID with .ics extension
-        if let PathSegment::Item(s) = &segments[3] {
-            assert!(
-                std::path::Path::new(s)
-                    .extension()
-                    .is_some_and(|ext| ext.eq_ignore_ascii_case("ics"))
-            );
-            assert!(s.starts_with(&instance.id.to_string()));
+        // Item segment should have UUID Id (serialization adds extension)
+        if let PathSegment::Item(ResourceIdentifier::Id(id)) = &segments[3] {
+            assert_eq!(*id, instance.id);
         } else {
-            panic!("Expected Item segment");
+            panic!("Expected Item segment with Id");
         }
     }
 
@@ -461,16 +432,11 @@ mod tests {
             PathSegment::ResourceType(ResourceType::Addressbook)
         ));
 
-        // Item segment should have UUID with .vcf extension
-        if let PathSegment::Item(s) = &segments[3] {
-            assert!(
-                std::path::Path::new(s)
-                    .extension()
-                    .is_some_and(|ext| ext.eq_ignore_ascii_case("vcf"))
-            );
-            assert!(s.starts_with(&instance.id.to_string()));
+        // Item segment should have UUID Id (serialization adds extension)
+        if let PathSegment::Item(ResourceIdentifier::Id(id)) = &segments[3] {
+            assert_eq!(*id, instance.id);
         } else {
-            panic!("Expected Item segment");
+            panic!("Expected Item segment with Id");
         }
     }
 
@@ -498,7 +464,7 @@ mod tests {
 
         // Item segment should be just the UUID without extension
         if let PathSegment::Item(s) = &segments[3] {
-            assert_eq!(s, &instance.id.to_string());
+            assert_eq!(s, &ResourceIdentifier::Id(instance.id));
         } else {
             panic!("Expected Item segment");
         }
@@ -528,7 +494,7 @@ mod tests {
 
         // Item segment should be just the UUID
         if let PathSegment::Item(s) = &segments[3] {
-            assert_eq!(s, &instance.id.to_string());
+            assert_eq!(s, &ResourceIdentifier::Id(instance.id));
         } else {
             panic!("Expected Item segment");
         }
@@ -558,9 +524,9 @@ mod tests {
             segments[0],
             PathSegment::ResourceType(ResourceType::Calendar)
         ));
-        assert!(matches!(&segments[1], PathSegment::Owner(s) if s == &principal.id.to_string()));
+        assert!(matches!(&segments[1], PathSegment::Owner(ResourceIdentifier::Id(id)) if *id == principal.id));
         assert!(
-            matches!(&segments[2], PathSegment::Collection(s) if s == &collection.id.to_string())
+            matches!(&segments[2], PathSegment::Collection(ResourceIdentifier::Id(id)) if *id == collection.id)
         );
     }
 
@@ -586,7 +552,7 @@ mod tests {
             segments[0],
             PathSegment::ResourceType(ResourceType::Calendar)
         ));
-        assert!(matches!(&segments[1], PathSegment::Owner(s) if s == &principal.id.to_string()));
+        assert!(matches!(&segments[1], PathSegment::Owner(ResourceIdentifier::Id(id)) if *id == principal.id));
     }
     #[test]
     fn test_build_canonical_location_empty_chain() {
@@ -634,7 +600,7 @@ mod tests {
         let segments = loc.segments();
         assert_eq!(segments.len(), 4);
         // The collection segment should be the leaf
-        assert!(matches!(&segments[2], PathSegment::Collection(s) if s == &leaf.id.to_string()));
+        assert!(matches!(&segments[2], PathSegment::Collection(ResourceIdentifier::Id(id)) if *id == leaf.id));
     }
 
     #[test]

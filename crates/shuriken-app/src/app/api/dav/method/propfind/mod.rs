@@ -3,6 +3,7 @@
 mod helpers;
 
 use salvo::http::StatusCode;
+use shuriken_service::auth::ResourceLocation;
 use salvo::{Depot, Request, Response, handler};
 
 use crate::app::api::dav::extract::auth::{check_authorization, get_auth_context};
@@ -164,17 +165,27 @@ async fn check_propfind_authorization(
     ),
 > {
     let (subjects, authorizer) = get_auth_context(depot, conn).await.map_err(|e| {
+        use shuriken_service::auth::{PathSegment, ResourceType, ResourceIdentifier};
+        let dummy_resource = ResourceLocation::from_segments(vec![
+            PathSegment::ResourceType(ResourceType::Calendar),
+            PathSegment::Owner(ResourceIdentifier::Slug("unknown".to_string())),
+        ]).expect("Minimal resource location");
         (
             e,
-            shuriken_service::auth::ResourceLocation::from_segments(vec![]),
+            dummy_resource,
             shuriken_service::auth::Action::Read,
         )
     })?;
 
     // Get ResourceLocation from depot (populated by slug_resolver middleware)
     let resource = get_resolved_location_from_depot(depot).map_err(|e| {
+        use shuriken_service::auth::{PathSegment, ResourceType, ResourceIdentifier};
+        let dummy_resource = ResourceLocation::from_segments(vec![
+            PathSegment::ResourceType(ResourceType::Calendar),
+            PathSegment::Owner(ResourceIdentifier::Slug("unknown".to_string())),
+        ]).expect("Minimal resource location");
         tracing::error!(error = %e, "ResourceLocation not found in depot; slug_resolver middleware may not have run");
-        (StatusCode::INTERNAL_SERVER_ERROR, shuriken_service::auth::ResourceLocation::from_segments(vec![]), shuriken_service::auth::Action::Read)
+        (StatusCode::INTERNAL_SERVER_ERROR, dummy_resource, shuriken_service::auth::Action::Read)
     })?;
 
     check_authorization(&authorizer, &subjects, resource, Action::Read, "PROPFIND")

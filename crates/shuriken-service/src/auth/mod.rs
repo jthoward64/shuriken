@@ -46,5 +46,5 @@ pub use depot::{
 };
 pub use permission::{PermissionLevel, WebDavPrivilege};
 pub use privilege::{PrivilegeSetBuilder, privileges_for_level, supported_privilege_set_xml};
-pub use resource::{PathSegment, ResourceLocation, ResourceType};
+pub use resource::{PathSegment, ResourceIdentifier, ResourceLocation, ResourceType};
 pub use subject::{ExpandedSubjects, Subject};

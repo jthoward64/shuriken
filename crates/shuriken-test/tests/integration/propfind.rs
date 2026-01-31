@@ -1131,12 +1131,13 @@ async fn propfind_returns_acl_property() {
 
     // Seed additional ACL: Reader permission for "all" (anyone can read)
     // Use ResourceLocation to build the policy path
-    let collection_path = shuriken_service::auth::ResourceLocation::from_segments_collection(
-        shuriken_service::auth::ResourceType::Calendar,
-        principal_id.to_string(),
-        &collection_id.to_string(),
-    )
-    .to_resource_path(false)
+    let collection_path = shuriken_service::auth::ResourceLocation::from_segments(vec![
+        shuriken_service::auth::PathSegment::ResourceType(shuriken_service::auth::ResourceType::Calendar),
+        shuriken_service::auth::PathSegment::Owner(shuriken_service::auth::ResourceIdentifier::Id(principal_id)),
+        shuriken_service::auth::PathSegment::Collection(shuriken_service::auth::ResourceIdentifier::Id(collection_id)),
+    ])
+    .expect("Valid resource location")
+    .serialize_to_path(false, false)
     .expect("Failed to build resource path");
     test_db
         .seed_access_policy("all", &collection_path, "read")
@@ -1248,12 +1249,13 @@ async fn propfind_acl_filters_by_resource_path() {
 
     // Seed ACL: All-access read only on collection 1
     // Use ResourceLocation to build the policy path
-    let collection1_path = shuriken_service::auth::ResourceLocation::from_segments_collection(
-        shuriken_service::auth::ResourceType::Calendar,
-        principal_id.to_string(),
-        &collection1_id.to_string(),
-    )
-    .to_resource_path(false)
+    let collection1_path = shuriken_service::auth::ResourceLocation::from_segments(vec![
+        shuriken_service::auth::PathSegment::ResourceType(shuriken_service::auth::ResourceType::Calendar),
+        shuriken_service::auth::PathSegment::Owner(shuriken_service::auth::ResourceIdentifier::Id(principal_id)),
+        shuriken_service::auth::PathSegment::Collection(shuriken_service::auth::ResourceIdentifier::Id(collection1_id)),
+    ])
+    .expect("Valid resource location")
+    .serialize_to_path(false, false)
     .expect("Failed to build resource path");
     test_db
         .seed_access_policy("all", &collection1_path, "read")

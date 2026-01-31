@@ -56,7 +56,8 @@ pub async fn put(req: &mut Request, res: &mut Response, depot: &Depot) {
             .find_map(|seg| {
                 if let shuriken_service::auth::PathSegment::Item(s) = seg {
                     // Strip file extensions (.ics, .vcf) to get base slug
-                    let cleaned = s.trim_end_matches(".ics").trim_end_matches(".vcf");
+                    let s_str = s.to_string();
+                    let cleaned = s_str.trim_end_matches(".ics").trim_end_matches(".vcf");
                     Some(cleaned.to_string())
                 } else {
                     None
@@ -272,7 +273,7 @@ async fn check_put_authorization(
         Ok(_level) => Ok(()),
         Err(shuriken_service::error::ServiceError::AuthorizationError(msg)) => {
             tracing::warn!(
-                resource = %resource,
+                resource = ?resource,
                 reason = %msg,
                 "Authorization denied for PUT"
             );

@@ -62,8 +62,8 @@ pub enum ResourceIdentifier {
 impl std::fmt::Display for ResourceIdentifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ResourceIdentifier::Slug(s) => write!(f, "{}", s),
-            ResourceIdentifier::Id(id) => write!(f, "{}", id),
+            ResourceIdentifier::Slug(s) => write!(f, "{s}"),
+            ResourceIdentifier::Id(id) => write!(f, "{id}"),
         }
     }
 }
@@ -141,8 +141,8 @@ pub struct ResourceLocation {
 
 pub enum ResourceLocationStringBuilderOutputType {
     Unset,
-    Path,
-    FullPath,
+    ResPath,
+    HrefPath,
     Url(String),
 }
 
@@ -155,27 +155,25 @@ pub struct ResourceLocationStringBuilder {
 
 impl ResourceLocation {
     /// Create a new resource identifier from path segments.
-    #[must_use]
+    ///
+    /// ## Errors
+    /// Returns an error if the segments are invalid (e.g., missing resource type or owner).
     pub fn from_segments(segments: Vec<PathSegment>) -> ServiceResult<Self> {
         if segments.len() < 2 {
             return Err(ServiceError::ParseError(
                 "Resource path must have at least resource type and owner".to_string(),
             ));
         }
-        let resource_type = match &segments[0] {
-            PathSegment::ResourceType(rt) => rt,
-            _ => {
-                return Err(ServiceError::ParseError(
-                    "First segment of resource path must be resource type".to_string(),
-                ));
-            }
+        let PathSegment::ResourceType(resource_type) = &segments[0] else {
+            return Err(ServiceError::ParseError(
+                "First segment of resource path must be resource type".to_string(),
+            ));
         };
         match &segments[1] {
             PathSegment::Owner(owner) => owner,
             _ => {
                 return Err(ServiceError::ParseError(format!(
-                    "Second segment of resource path must be owner/principal for resource type {:?}",
-                    resource_type
+                    "Second segment of resource path must be owner/principal for resource type {resource_type:?}"
                 )));
             }
         };
@@ -227,7 +225,9 @@ impl ResourceLocation {
     /// ## Returns
     ///
     /// `None` if the path is invalid or doesn't start with a recognized resource type.
-    #[must_use]
+    ///
+    /// ## Errors
+    /// Returns an error if the path cannot be parsed into valid segments.
     pub fn parse(path: &str, allow_glob: bool) -> ServiceResult<Self> {
         let path = path.strip_prefix('/').unwrap_or(path);
         if path.is_empty() {
@@ -336,7 +336,9 @@ impl ResourceLocation {
     }
 
     /// Serialize to a path (e.g., "/calendars/alice/personal").
-    #[must_use]
+    ///
+    /// ## Errors
+    /// Returns an error if serialization fails (e.g., glob not allowed but present).
     pub fn serialize_to_path(
         &self,
         include_extension: bool,
@@ -345,12 +347,14 @@ impl ResourceLocation {
         self.serialize()
             .include_extension(include_extension)
             .allow_glob(allow_glob)
-            .output_type(ResourceLocationStringBuilderOutputType::Path)
+            .output_type(ResourceLocationStringBuilderOutputType::ResPath)
             .build()
     }
 
     /// Serialize to a full path with DAV prefix (e.g., "/dav/calendars/alice/personal").
-    #[must_use]
+    ///
+    /// ## Errors
+    /// Returns an error if serialization fails (e.g., glob not allowed but present).
     pub fn serialize_to_full_path(
         &self,
         include_extension: bool,
@@ -359,12 +363,14 @@ impl ResourceLocation {
         self.serialize()
             .include_extension(include_extension)
             .allow_glob(allow_glob)
-            .output_type(ResourceLocationStringBuilderOutputType::FullPath)
+            .output_type(ResourceLocationStringBuilderOutputType::HrefPath)
             .build()
     }
 
-    /// Serialize to a URL (e.g., "https://example.com/dav/calendars/alice/personal").
-    #[must_use]
+    /// Serialize to a URL (e.g., <https://example.com/dav/calendars/alice/personal>).
+    ///
+    /// ## Errors
+    /// Returns an error if serialization fails (e.g., glob not allowed but present).
     pub fn serialize_to_url(
         &self,
         serve_origin: &str,
@@ -441,6 +447,9 @@ impl ResourceLocationStringBuilder {
     }
 
     /// Build the string representation.
+    ///
+    /// ## Errors
+    /// Returns an error if output type is unset or if glob is not allowed.
     pub fn build(&self) -> ServiceResult<String> {
         let mut path = String::new();
         for (i, segment) in self.resource_location.segments.iter().enumerate() {
@@ -485,21 +494,20 @@ impl ResourceLocationStringBuilder {
             }
             path.push('/');
         }
-        if self.include_extension {
-            if let Some(PathSegment::Item(_)) = self.resource_location.segments.last() {
-                if let Some(rt) = self.resource_location.resource_type() {
-                    let ext = rt.item_extension();
-                    if !ext.is_empty() && !path.ends_with(ext) {
-                        path.push('.');
-                        path.push_str(ext);
-                    }
-                }
+        if self.include_extension
+            && let Some(PathSegment::Item(_)) = self.resource_location.segments.last()
+            && let Some(rt) = self.resource_location.resource_type()
+        {
+            let ext = rt.item_extension();
+            if !ext.is_empty() && !path.ends_with(ext) {
+                path.push('.');
+                path.push_str(ext);
             }
         }
 
         match self.output_type {
-            ResourceLocationStringBuilderOutputType::Path => Ok(format!("/{path}")),
-            ResourceLocationStringBuilderOutputType::FullPath => {
+            ResourceLocationStringBuilderOutputType::ResPath => Ok(format!("/{path}")),
+            ResourceLocationStringBuilderOutputType::HrefPath => {
                 Ok(format!("{DAV_ROUTE_PREFIX}/{path}"))
             }
             ResourceLocationStringBuilderOutputType::Url(ref serve_origin) => Ok(format!(
@@ -984,7 +992,7 @@ mod tests {
 
         let path = resource
             .serialize()
-            .output_type(ResourceLocationStringBuilderOutputType::Path)
+            .output_type(ResourceLocationStringBuilderOutputType::ResPath)
             .build()
             .unwrap();
 
@@ -1002,11 +1010,11 @@ mod tests {
 
         let path = resource
             .serialize()
-            .output_type(ResourceLocationStringBuilderOutputType::Path)
+            .output_type(ResourceLocationStringBuilderOutputType::ResPath)
             .build()
             .unwrap();
 
-        assert_eq!(path, card("bob/contacts"));
+        assert_eq!(path, card("bob/contacts/"));
     }
 
     #[test]
@@ -1022,7 +1030,7 @@ mod tests {
         let path = resource
             .serialize()
             .include_extension(true)
-            .output_type(ResourceLocationStringBuilderOutputType::Path)
+            .output_type(ResourceLocationStringBuilderOutputType::ResPath)
             .build()
             .unwrap();
 
@@ -1042,7 +1050,7 @@ mod tests {
         let path = resource
             .serialize()
             .include_extension(true)
-            .output_type(ResourceLocationStringBuilderOutputType::Path)
+            .output_type(ResourceLocationStringBuilderOutputType::ResPath)
             .build()
             .unwrap();
 
@@ -1062,12 +1070,12 @@ mod tests {
         let path = resource
             .serialize()
             .include_extension(true)
-            .output_type(ResourceLocationStringBuilderOutputType::Path)
+            .output_type(ResourceLocationStringBuilderOutputType::ResPath)
             .build()
             .unwrap();
 
         // Extension should only be added to items, not collections
-        assert_eq!(path, cal("alice/personal"));
+        assert_eq!(path, cal("alice/personal/"));
     }
 
     #[test]
@@ -1086,7 +1094,7 @@ mod tests {
 
         let path = resource
             .serialize()
-            .output_type(ResourceLocationStringBuilderOutputType::Path)
+            .output_type(ResourceLocationStringBuilderOutputType::ResPath)
             .build()
             .unwrap();
 
@@ -1106,7 +1114,7 @@ mod tests {
         let path = resource
             .serialize()
             .allow_glob(true)
-            .output_type(ResourceLocationStringBuilderOutputType::Path)
+            .output_type(ResourceLocationStringBuilderOutputType::ResPath)
             .build()
             .unwrap();
 
@@ -1126,7 +1134,7 @@ mod tests {
         let path = resource
             .serialize()
             .allow_glob(true)
-            .output_type(ResourceLocationStringBuilderOutputType::Path)
+            .output_type(ResourceLocationStringBuilderOutputType::ResPath)
             .build()
             .unwrap();
 
@@ -1145,7 +1153,7 @@ mod tests {
         let result = resource
             .serialize()
             .allow_glob(false)
-            .output_type(ResourceLocationStringBuilderOutputType::Path)
+            .output_type(ResourceLocationStringBuilderOutputType::ResPath)
             .build();
 
         assert!(result.is_err());
@@ -1165,7 +1173,7 @@ mod tests {
 
         let path = resource
             .serialize()
-            .output_type(ResourceLocationStringBuilderOutputType::Path)
+            .output_type(ResourceLocationStringBuilderOutputType::ResPath)
             .build()
             .unwrap();
 
@@ -1188,7 +1196,7 @@ mod tests {
 
         let path = resource
             .serialize()
-            .output_type(ResourceLocationStringBuilderOutputType::FullPath)
+            .output_type(ResourceLocationStringBuilderOutputType::HrefPath)
             .build()
             .unwrap();
 
@@ -1207,7 +1215,7 @@ mod tests {
         let path = resource
             .serialize()
             .allow_glob(true)
-            .output_type(ResourceLocationStringBuilderOutputType::FullPath)
+            .output_type(ResourceLocationStringBuilderOutputType::HrefPath)
             .build()
             .unwrap();
 
@@ -1262,10 +1270,9 @@ mod tests {
             .build()
             .unwrap();
 
-        // Should not have double slash
         assert_eq!(
             url,
-            format!("https://example.com{}", full_path(&cal("alice/personal")))
+            format!("https://example.com{}", full_path(&cal("alice/personal/")))
         );
     }
 
@@ -1304,7 +1311,7 @@ mod tests {
         let path = resource
             .serialize()
             .include_extension(true)
-            .output_type(ResourceLocationStringBuilderOutputType::Path)
+            .output_type(ResourceLocationStringBuilderOutputType::ResPath)
             .build()
             .unwrap();
         assert_eq!(path, cal("alice/personal/work.ics"));
@@ -1321,10 +1328,10 @@ mod tests {
 
         let path = resource
             .serialize()
-            .output_type(ResourceLocationStringBuilderOutputType::Path)
+            .output_type(ResourceLocationStringBuilderOutputType::ResPath)
             .build()
             .unwrap();
-        assert_eq!(path, card("bob/contacts"));
+        assert_eq!(path, card("bob/contacts/"));
     }
 
     // ========================================================================
@@ -1337,7 +1344,7 @@ mod tests {
         let resource = ResourceLocation::parse(&path, false).unwrap();
         let serialized = resource
             .serialize()
-            .output_type(ResourceLocationStringBuilderOutputType::Path)
+            .output_type(ResourceLocationStringBuilderOutputType::ResPath)
             .build()
             .unwrap();
 
@@ -1350,7 +1357,7 @@ mod tests {
         let resource = ResourceLocation::parse(&path, false).unwrap();
         let serialized = resource
             .serialize()
-            .output_type(ResourceLocationStringBuilderOutputType::Path)
+            .output_type(ResourceLocationStringBuilderOutputType::ResPath)
             .build()
             .unwrap();
 
@@ -1364,7 +1371,7 @@ mod tests {
         let serialized = resource
             .serialize()
             .allow_glob(true)
-            .output_type(ResourceLocationStringBuilderOutputType::Path)
+            .output_type(ResourceLocationStringBuilderOutputType::ResPath)
             .build()
             .unwrap();
 
@@ -1378,7 +1385,7 @@ mod tests {
         let serialized = resource
             .serialize()
             .allow_glob(true)
-            .output_type(ResourceLocationStringBuilderOutputType::Path)
+            .output_type(ResourceLocationStringBuilderOutputType::ResPath)
             .build()
             .unwrap();
 
@@ -1391,7 +1398,7 @@ mod tests {
         let resource = ResourceLocation::parse(&path, false).unwrap();
         let serialized = resource
             .serialize()
-            .output_type(ResourceLocationStringBuilderOutputType::Path)
+            .output_type(ResourceLocationStringBuilderOutputType::ResPath)
             .build()
             .unwrap();
 
@@ -1405,7 +1412,7 @@ mod tests {
         let resource = ResourceLocation::parse(&path, false).unwrap();
         let serialized = resource
             .serialize()
-            .output_type(ResourceLocationStringBuilderOutputType::Path)
+            .output_type(ResourceLocationStringBuilderOutputType::ResPath)
             .build()
             .unwrap();
 
@@ -1418,7 +1425,7 @@ mod tests {
         let resource = ResourceLocation::parse(&path, false).unwrap();
         let full = resource
             .serialize()
-            .output_type(ResourceLocationStringBuilderOutputType::FullPath)
+            .output_type(ResourceLocationStringBuilderOutputType::HrefPath)
             .build()
             .unwrap();
 

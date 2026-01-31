@@ -12,6 +12,7 @@
 //! - Consistent authorization via canonical UUIDs
 
 use salvo::Depot;
+use shuriken_service::auth::ResourceIdentifier;
 use tracing::debug;
 
 use crate::app::api::DAV_ROUTE_PREFIX;
@@ -85,9 +86,13 @@ impl salvo::Handler for DavPathMiddleware {
                     .iter()
                     .rfind(|s| matches!(s, PathSegment::Collection(_)))
                 {
+                    let dav_id = match value {
+                        ResourceIdentifier::Slug(s) => DavIdentifier::from(s.clone()),
+                        ResourceIdentifier::Id(uuid) => DavIdentifier::from(*uuid),
+                    };
                     depot.insert(
                         depot_keys::TERMINAL_COLLECTION,
-                        DavIdentifier::from(value.clone()),
+                        dav_id,
                     );
                 }
 

@@ -68,12 +68,12 @@ pub async fn handle(
     } else {
         // Fallback: Build a minimal resource location from collection ID for auth checks
         // Using PathSegments to construct a valid ResourceLocation
-        use shuriken_service::auth::{PathSegment, ResourceLocation, ResourceType};
+        use shuriken_service::auth::{PathSegment, ResourceLocation, ResourceType, ResourceIdentifier};
         let segments = vec![
             PathSegment::ResourceType(ResourceType::Calendar),
-            PathSegment::Collection(collection_id.to_string()),
+            PathSegment::Collection(ResourceIdentifier::Id(collection_id)),
         ];
-        ResourceLocation::from_segments(segments)
+        ResourceLocation::from_segments(segments).expect("Failed to create resource location")
     };
 
     if let Err(e) = authorizer.require(&subjects, &resource, Action::Read) {

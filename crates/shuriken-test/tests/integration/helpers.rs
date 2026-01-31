@@ -182,7 +182,7 @@ async fn run_migrations(database_url: &str) -> anyhow::Result<()> {
 }
 
 use shuriken_test::component::auth::casbin::CasbinEnforcerHandler;
-use shuriken_test::component::auth::{ResourceLocation, ResourceType};
+use shuriken_test::component::auth::{PathSegment, ResourceIdentifier, ResourceLocation, ResourceType};
 use shuriken_test::component::config::*;
 use shuriken_test::component::db::connection::DbProviderHandler;
 
@@ -227,12 +227,13 @@ fn test_config() -> Settings {
 /// ```
 #[must_use]
 pub fn caldav_collection_path(owner: &str, collection: &str) -> String {
-    ResourceLocation::from_segments_collection(
-        ResourceType::Calendar,
-        owner.to_string(),
-        collection,
-    )
-    .to_full_path()
+    ResourceLocation::from_segments(vec![
+        PathSegment::ResourceType(ResourceType::Calendar),
+        PathSegment::Owner(ResourceIdentifier::Slug(owner.to_string())),
+        PathSegment::Collection(ResourceIdentifier::Slug(collection.to_string())),
+    ])
+    .expect("Valid resource location")
+    .serialize_to_full_path(false, false)
     .expect("Failed to build caldav collection path")
 }
 
@@ -244,13 +245,14 @@ pub fn caldav_collection_path(owner: &str, collection: &str) -> String {
 /// ```
 #[must_use]
 pub fn caldav_item_path(owner: &str, collection: &str, item: &str) -> String {
-    ResourceLocation::from_segments_item(
-        ResourceType::Calendar,
-        owner.to_string(),
-        collection,
-        item.to_string(),
-    )
-    .to_full_path()
+    ResourceLocation::from_segments(vec![
+        PathSegment::ResourceType(ResourceType::Calendar),
+        PathSegment::Owner(ResourceIdentifier::Slug(owner.to_string())),
+        PathSegment::Collection(ResourceIdentifier::Slug(collection.to_string())),
+        PathSegment::Item(ResourceIdentifier::Slug(item.to_string())),
+    ])
+    .expect("Valid resource location")
+    .serialize_to_full_path(true, false)
     .expect("Failed to build caldav item path")
 }
 
@@ -262,12 +264,13 @@ pub fn caldav_item_path(owner: &str, collection: &str, item: &str) -> String {
 /// ```
 #[must_use]
 pub fn carddav_collection_path(owner: &str, collection: &str) -> String {
-    ResourceLocation::from_segments_collection(
-        ResourceType::Addressbook,
-        owner.to_string(),
-        collection,
-    )
-    .to_full_path()
+    ResourceLocation::from_segments(vec![
+        PathSegment::ResourceType(ResourceType::Addressbook),
+        PathSegment::Owner(ResourceIdentifier::Slug(owner.to_string())),
+        PathSegment::Collection(ResourceIdentifier::Slug(collection.to_string())),
+    ])
+    .expect("Valid resource location")
+    .serialize_to_full_path(false, false)
     .expect("Failed to build carddav collection path")
 }
 
@@ -279,13 +282,14 @@ pub fn carddav_collection_path(owner: &str, collection: &str) -> String {
 /// ```
 #[must_use]
 pub fn carddav_item_path(owner: &str, collection: &str, item: &str) -> String {
-    ResourceLocation::from_segments_item(
-        ResourceType::Addressbook,
-        owner.to_string(),
-        collection,
-        item.to_string(),
-    )
-    .to_full_path()
+    ResourceLocation::from_segments(vec![
+        PathSegment::ResourceType(ResourceType::Addressbook),
+        PathSegment::Owner(ResourceIdentifier::Slug(owner.to_string())),
+        PathSegment::Collection(ResourceIdentifier::Slug(collection.to_string())),
+        PathSegment::Item(ResourceIdentifier::Slug(item.to_string())),
+    ])
+    .expect("Valid resource location")
+    .serialize_to_full_path(true, false)
     .expect("Failed to build carddav item path")
 }
 
@@ -299,21 +303,23 @@ pub fn carddav_item_path(owner: &str, collection: &str, item: &str) -> String {
 #[must_use]
 pub fn cal_path(owner: &str, collection: &str, item: Option<&str>) -> String {
     if let Some(item) = item {
-        ResourceLocation::from_segments_item(
-            ResourceType::Calendar,
-            owner.to_string(),
-            collection,
-            item.to_string(),
-        )
-        .to_resource_path(false)
+        ResourceLocation::from_segments(vec![
+            PathSegment::ResourceType(ResourceType::Calendar),
+            PathSegment::Owner(ResourceIdentifier::Slug(owner.to_string())),
+            PathSegment::Collection(ResourceIdentifier::Slug(collection.to_string())),
+            PathSegment::Item(ResourceIdentifier::Slug(item.to_string())),
+        ])
+        .expect("Valid resource location")
+        .serialize_to_path(true, false)
         .expect("Failed to build cal path")
     } else {
-        ResourceLocation::from_segments_collection(
-            ResourceType::Calendar,
-            owner.to_string(),
-            collection,
-        )
-        .to_resource_path(false)
+        ResourceLocation::from_segments(vec![
+            PathSegment::ResourceType(ResourceType::Calendar),
+            PathSegment::Owner(ResourceIdentifier::Slug(owner.to_string())),
+            PathSegment::Collection(ResourceIdentifier::Slug(collection.to_string())),
+        ])
+        .expect("Valid resource location")
+        .serialize_to_path(false, false)
         .expect("Failed to build cal path")
     }
 }
@@ -328,21 +334,23 @@ pub fn cal_path(owner: &str, collection: &str, item: Option<&str>) -> String {
 #[must_use]
 pub fn card_path(owner: &str, collection: &str, item: Option<&str>) -> String {
     if let Some(item) = item {
-        ResourceLocation::from_segments_item(
-            ResourceType::Addressbook,
-            owner.to_string(),
-            collection,
-            item.to_string(),
-        )
-        .to_resource_path(false)
+        ResourceLocation::from_segments(vec![
+            PathSegment::ResourceType(ResourceType::Addressbook),
+            PathSegment::Owner(ResourceIdentifier::Slug(owner.to_string())),
+            PathSegment::Collection(ResourceIdentifier::Slug(collection.to_string())),
+            PathSegment::Item(ResourceIdentifier::Slug(item.to_string())),
+        ])
+        .expect("Valid resource location")
+        .serialize_to_path(true, false)
         .expect("Failed to build card path")
     } else {
-        ResourceLocation::from_segments_collection(
-            ResourceType::Addressbook,
-            owner.to_string(),
-            collection,
-        )
-        .to_resource_path(false)
+        ResourceLocation::from_segments(vec![
+            PathSegment::ResourceType(ResourceType::Addressbook),
+            PathSegment::Owner(ResourceIdentifier::Slug(owner.to_string())),
+            PathSegment::Collection(ResourceIdentifier::Slug(collection.to_string())),
+        ])
+        .expect("Valid resource location")
+        .serialize_to_path(false, false)
         .expect("Failed to build card path")
     }
 }
@@ -350,46 +358,54 @@ pub fn card_path(owner: &str, collection: &str, item: Option<&str>) -> String {
 /// Constructs a resource path for a calendar owner with glob (e.g., `/cal/alice/**`).
 #[must_use]
 pub fn cal_owner_glob(owner: &str, recursive: bool) -> String {
-    ResourceLocation::from_segments_owner_glob(ResourceType::Calendar, owner.to_string(), recursive)
-        .to_resource_path(true)
-        .expect("Failed to build cal owner glob")
+    ResourceLocation::from_segments(vec![
+        PathSegment::ResourceType(ResourceType::Calendar),
+        PathSegment::Owner(ResourceIdentifier::Slug(owner.to_string())),
+        PathSegment::Glob { recursive },
+    ])
+    .expect("Valid resource location")
+    .serialize_to_path(false, true)
+    .expect("Failed to build cal owner glob")
 }
 
 /// Constructs a resource path for a calendar collection with glob (e.g., `/cal/alice/work/**`).
 #[must_use]
 pub fn cal_collection_glob(owner: &str, collection: &str, recursive: bool) -> String {
-    ResourceLocation::from_segments_collection_glob(
-        ResourceType::Calendar,
-        owner.to_string(),
-        collection,
-        recursive,
-    )
-    .to_resource_path(true)
+    ResourceLocation::from_segments(vec![
+        PathSegment::ResourceType(ResourceType::Calendar),
+        PathSegment::Owner(ResourceIdentifier::Slug(owner.to_string())),
+        PathSegment::Collection(ResourceIdentifier::Slug(collection.to_string())),
+        PathSegment::Glob { recursive },
+    ])
+    .expect("Valid resource location")
+    .serialize_to_path(false, true)
     .expect("Failed to build cal collection glob")
 }
 
 /// Constructs a resource path for an addressbook owner with glob (e.g., `/card/bob/**`).
 #[must_use]
 pub fn card_owner_glob(owner: &str, recursive: bool) -> String {
-    ResourceLocation::from_segments_owner_glob(
-        ResourceType::Addressbook,
-        owner.to_string(),
-        recursive,
-    )
-    .to_resource_path(true)
+    ResourceLocation::from_segments(vec![
+        PathSegment::ResourceType(ResourceType::Addressbook),
+        PathSegment::Owner(ResourceIdentifier::Slug(owner.to_string())),
+        PathSegment::Glob { recursive },
+    ])
+    .expect("Valid resource location")
+    .serialize_to_path(false, true)
     .expect("Failed to build card owner glob")
 }
 
 /// Constructs a resource path for an addressbook collection with glob (e.g., `/card/bob/contacts/**`).
 #[must_use]
 pub fn card_collection_glob(owner: &str, collection: &str, recursive: bool) -> String {
-    ResourceLocation::from_segments_collection_glob(
-        ResourceType::Addressbook,
-        owner.to_string(),
-        collection,
-        recursive,
-    )
-    .to_resource_path(true)
+    ResourceLocation::from_segments(vec![
+        PathSegment::ResourceType(ResourceType::Addressbook),
+        PathSegment::Owner(ResourceIdentifier::Slug(owner.to_string())),
+        PathSegment::Collection(ResourceIdentifier::Slug(collection.to_string())),
+        PathSegment::Glob { recursive },
+    ])
+    .expect("Valid resource location")
+    .serialize_to_path(false, true)
     .expect("Failed to build card collection glob")
 }
 
