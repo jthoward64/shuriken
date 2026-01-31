@@ -26,7 +26,7 @@ pub async fn handle(
     properties: Vec<PropertyName>,
     depot: &Depot,
 ) {
-    // Get collection from depot (resolved by slug_resolver middleware)
+    // Get collection from depot (resolved by DavPathMiddleware)
     let Ok(collection) = shuriken_service::auth::get_terminal_collection_from_depot(depot) else {
         tracing::debug!("Collection not found in depot for calendar-query REPORT");
         res.status_code(StatusCode::NOT_FOUND);
@@ -62,7 +62,7 @@ pub async fn handle(
         }
     };
 
-    // Prefer ResourceLocation from depot if available (resolved by slug_resolver middleware)
+    // Prefer ResourceLocation from depot if available (resolved by DavPathMiddleware)
     let resource = if let Ok(loc) = get_resolved_location_from_depot(depot) {
         loc.clone()
     } else {

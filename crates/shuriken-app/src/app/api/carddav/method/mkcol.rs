@@ -58,11 +58,11 @@ pub async fn mkcol_extended(req: &mut Request, res: &mut Response, depot: &Depot
         }
     };
 
-    // Get the resolved resource location from depot (populated by slug_resolver)
+    // Get the resolved resource location from depot (populated by DavPathMiddleware)
     let parent_resource = match get_resolved_location_from_depot(depot) {
         Ok(loc) => loc,
         Err(_) => {
-            // If slug_resolver didn't resolve, we can't authorize
+            // If DavPathMiddleware didn't resolve, we can't authorize
             tracing::warn!(path = %path, "Resource location not found in depot");
             res.status_code(StatusCode::BAD_REQUEST);
             return;
@@ -139,8 +139,10 @@ pub async fn mkcol_extended(req: &mut Request, res: &mut Response, depot: &Depot
             segments.push(shuriken_service::auth::PathSegment::Collection(
                 shuriken_service::auth::ResourceIdentifier::Id(result.collection_id),
             ));
-            
-            let location_url = if let Ok(resource) = shuriken_service::auth::ResourceLocation::from_segments(segments) {
+
+            let location_url = if let Ok(resource) =
+                shuriken_service::auth::ResourceLocation::from_segments(segments)
+            {
                 // Try to build a full URL using the resource location
                 let scheme = if req.uri().scheme_str() == Some("https") {
                     "https"
@@ -152,7 +154,7 @@ pub async fn mkcol_extended(req: &mut Request, res: &mut Response, depot: &Depot
                     .get("Host")
                     .and_then(|h| h.to_str().ok())
                     .unwrap_or("localhost");
-                
+
                 match resource.serialize_to_full_path(false, false) {
                     Ok(path) => format!("{scheme}://{host}{path}"),
                     Err(e) => {

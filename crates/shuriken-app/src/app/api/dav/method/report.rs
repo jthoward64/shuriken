@@ -7,8 +7,8 @@ use crate::app::api::dav::extract::auth::get_auth_context;
 use shuriken_rfc::rfc::dav::build::multistatus::serialize_multistatus;
 use shuriken_rfc::rfc::dav::core::{ExpandProperty, Multistatus, ReportType, SyncCollection};
 use shuriken_service::auth::{
-    Action, get_resolved_location_from_depot, get_terminal_collection_from_depot,
-    PathSegment, ResourceIdentifier, ResourceLocation,
+    Action, PathSegment, ResourceIdentifier, ResourceLocation, ResourceType,
+    get_resolved_location_from_depot, get_terminal_collection_from_depot,
 };
 
 /// ## Summary
@@ -25,7 +25,7 @@ use shuriken_service::auth::{
 /// Returns 400 for invalid requests, 501 for unsupported reports.
 #[handler]
 pub async fn report(req: &mut Request, res: &mut Response, depot: &Depot) {
-    // Check if the collection was resolved by slug_resolver middleware
+    // Check if the collection was resolved by DavPathMiddleware
     // If not, return 404 (resource not found)
     if get_terminal_collection_from_depot(depot).is_err() {
         tracing::debug!("Collection not found in depot for REPORT request");
@@ -114,14 +114,14 @@ pub async fn handle_sync_collection(
         }
     };
 
-    // Get collection from depot (resolved by slug_resolver middleware)
+    // Get collection from depot (resolved by DavPathMiddleware)
     let Ok(collection) = get_terminal_collection_from_depot(depot) else {
         tracing::debug!("Collection not found in depot for sync-collection REPORT");
         res.status_code(StatusCode::NOT_FOUND);
         return;
     };
 
-    // Get the resource location for authorization (resolved by slug_resolver middleware)
+    // Get the resource location for authorization (resolved by DavPathMiddleware)
     let resource = if let Ok(loc) = get_resolved_location_from_depot(depot) {
         loc.clone()
     } else {
@@ -140,17 +140,23 @@ pub async fn handle_sync_collection(
     let base_path = req.uri().path();
 
     // Build response
-    let multistatus =
-        match build_sync_collection_response(&mut conn, &sync, &properties, collection, &resource, base_path)
-            .await
-        {
-            Ok(ms) => ms,
-            Err(e) => {
-                tracing::error!("Failed to build sync-collection response: {}", e);
-                res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
-                return;
-            }
-        };
+    let multistatus = match build_sync_collection_response(
+        &mut conn,
+        &sync,
+        &properties,
+        collection,
+        &resource,
+        base_path,
+    )
+    .await
+    {
+        Ok(ms) => ms,
+        Err(e) => {
+            tracing::error!("Failed to build sync-collection response: {}", e);
+            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+            return;
+        }
+    };
 
     write_multistatus_response(res, &multistatus);
 }
@@ -314,14 +320,14 @@ pub async fn handle_expand_property(
         }
     };
 
-    // Get collection from depot (resolved by slug_resolver middleware)
+    // Get collection from depot (resolved by DavPathMiddleware)
     let Ok(_collection) = get_terminal_collection_from_depot(depot) else {
         tracing::debug!("Collection not found in depot for expand-property REPORT");
         res.status_code(StatusCode::NOT_FOUND);
         return;
     };
 
-    // Get the resource location for authorization (resolved by slug_resolver middleware)
+    // Get the resource location for authorization (resolved by DavPathMiddleware)
     let resource = if let Ok(loc) = get_resolved_location_from_depot(depot) {
         loc.clone()
     } else {
@@ -338,7 +344,7 @@ pub async fn handle_expand_property(
 
     // Build response
     let multistatus =
-        match build_expand_property_response(&mut conn, req, &expand, &properties).await {
+        match build_expand_property_response(&mut conn, req, depot, &expand, &properties).await {
             Ok(ms) => ms,
             Err(e) => {
                 tracing::error!("Failed to build expand-property response: {}", e);
@@ -362,7 +368,8 @@ pub async fn handle_expand_property(
 #[expect(clippy::too_many_lines)]
 async fn build_expand_property_response(
     conn: &mut shuriken_db::db::connection::DbConnection<'_>,
-    req: &Request,
+    _req: &Request,
+    depot: &Depot,
     expand: &ExpandProperty,
     _properties: &[shuriken_rfc::rfc::dav::core::PropertyName],
 ) -> anyhow::Result<Multistatus> {
@@ -374,9 +381,12 @@ async fn build_expand_property_response(
     // Track visited resources for cycle detection
     let mut visited = HashSet::new();
 
-    // Get the target resource path from the request
-    let target_path = req.uri().path();
-    let target_href = Href::new(target_path);
+    // Get the target resource path from the resolved UUID-based location
+    let resolved_location = get_resolved_location_from_depot(depot).map_err(|e| {
+        anyhow::anyhow!("Missing resolved location for expand-property REPORT: {e}")
+    })?;
+    let target_path = resolved_location.serialize_to_full_path(true, false)?;
+    let target_href = Href::new(&target_path);
 
     // Mark the target as visited
     visited.insert(target_path.to_string());
@@ -391,7 +401,7 @@ async fn build_expand_property_response(
         let prop_name = &prop_item.name;
 
         // Fetch the property value for the target resource
-        if let Some(property) = fetch_property(conn, target_path, prop_name).await? {
+        if let Some(property) = fetch_property(conn, &target_path, prop_name).await? {
             // Check if this property contains an href that should be expanded
             if let Some(value) = &property.value {
                 match value {
@@ -492,66 +502,174 @@ async fn build_expand_property_response(
 /// Returns database errors if queries fail.
 #[expect(clippy::unused_async)]
 async fn fetch_property(
-    _conn: &mut shuriken_db::db::connection::DbConnection<'_>,
+    conn: &mut shuriken_db::db::connection::DbConnection<'_>,
     path: &str,
     prop_name: &shuriken_rfc::rfc::dav::core::PropertyName,
 ) -> anyhow::Result<Option<shuriken_rfc::rfc::dav::core::DavProperty>> {
+    use diesel::prelude::*;
+    use diesel_async::RunQueryDsl;
+    use shuriken_core::constants::DAV_ROUTE_PREFIX;
+    use shuriken_db::db::query::dav::{collection, instance};
+    use shuriken_db::db::schema::principal as principal_schema;
+    use shuriken_db::model::principal::Principal;
     use shuriken_rfc::rfc::dav::core::{DavProperty, PropertyValue, QName};
 
     let qname = prop_name.qname();
+    let normalized_path = path.strip_prefix(DAV_ROUTE_PREFIX).unwrap_or(path);
+    let location = match ResourceLocation::parse(normalized_path, false) {
+        Ok(loc) => loc,
+        Err(err) => {
+            tracing::debug!(error = %err, path = %path, "Failed to parse ResourceLocation");
+            return Ok(None);
+        }
+    };
 
-    // Stub implementation: Return common properties based on path patterns
-    // In a full implementation, this would query the database
+    let resource_type = match location.resource_type() {
+        Some(rt) => rt,
+        None => return Ok(None),
+    };
+
+    let owner_id = match location.owner() {
+        Some(ResourceIdentifier::Id(id)) => Some(id),
+        Some(ResourceIdentifier::Slug(slug)) => slug.parse::<uuid::Uuid>().ok(),
+        None => None,
+    };
+
+    let collection_id = location
+        .segments()
+        .iter()
+        .filter_map(|seg| match seg {
+            PathSegment::Collection(ResourceIdentifier::Id(id)) => Some(*id),
+            PathSegment::Collection(ResourceIdentifier::Slug(slug)) => {
+                slug.parse::<uuid::Uuid>().ok()
+            }
+            _ => None,
+        })
+        .last();
+
+    let item_id = location.segments().iter().find_map(|seg| match seg {
+        PathSegment::Item(ResourceIdentifier::Id(id)) => Some(*id),
+        PathSegment::Item(ResourceIdentifier::Slug(slug)) => {
+            let ext = resource_type.item_extension();
+            let base = if ext.is_empty() {
+                slug.as_str()
+            } else {
+                slug.strip_suffix(&format!(".{ext}")).unwrap_or(slug)
+            };
+            base.parse::<uuid::Uuid>().ok()
+        }
+        _ => None,
+    });
+
     let property = match (qname.namespace_uri(), qname.local_name()) {
         ("DAV:", "current-user-principal" | "principal-URL") => {
-            Some(DavProperty::href(qname, "/principals/user/"))
+            let Some(owner_id) = owner_id else {
+                return Ok(None);
+            };
+            let principal_location = ResourceLocation::from_segments(vec![
+                PathSegment::ResourceType(ResourceType::Principal),
+                PathSegment::owner_from_id(owner_id),
+            ])?;
+            let href = principal_location.serialize_to_full_path(false, false)?;
+            Some(DavProperty::href(qname, href))
         }
-        ("DAV:", "displayname") => {
-            // Extract display name based on path
-            let name = path.split('/').next_back().unwrap_or("Resource");
-            Some(DavProperty::text(qname, name))
-        }
-        ("DAV:", "resourcetype") => {
-            // Determine resource type based on path
-            if path.contains("/principals/") {
-                Some(DavProperty {
-                    name: qname,
-                    value: Some(PropertyValue::ResourceType(vec![
-                        QName::dav("collection"),
-                        QName::dav("principal"),
-                    ])),
-                })
-            } else if path.contains("/calendars/") {
-                Some(DavProperty {
-                    name: qname,
-                    value: Some(PropertyValue::ResourceType(vec![
-                        QName::dav("collection"),
-                        QName::caldav("calendar"),
-                    ])),
-                })
-            } else if path.contains("/addressbooks/") {
-                Some(DavProperty {
-                    name: qname,
-                    value: Some(PropertyValue::ResourceType(vec![
-                        QName::dav("collection"),
-                        QName::carddav("addressbook"),
-                    ])),
-                })
-            } else {
-                Some(DavProperty {
-                    name: qname,
-                    value: Some(PropertyValue::ResourceType(Vec::new())),
+        ("DAV:", "displayname") => match resource_type {
+            ResourceType::Principal => {
+                let Some(owner_id) = owner_id else {
+                    return Ok(None);
+                };
+                let principal = principal_schema::table
+                    .filter(principal_schema::id.eq(owner_id))
+                    .select(Principal::as_select())
+                    .first(conn)
+                    .await
+                    .optional()?;
+                principal.map(|p| {
+                    let name = p.display_name.as_deref().unwrap_or(p.slug.as_str());
+                    DavProperty::text(qname, name)
                 })
             }
+            ResourceType::Calendar | ResourceType::Addressbook => {
+                let Some(collection_id) = collection_id else {
+                    return Ok(None);
+                };
+                let coll = collection::get_collection(conn, collection_id).await?;
+                coll.map(|c| {
+                    let name = c.display_name.as_deref().unwrap_or(c.slug.as_str());
+                    DavProperty::text(qname, name)
+                })
+            }
+        },
+        ("DAV:", "resourcetype") => {
+            let resource_types = if item_id.is_some() {
+                Vec::new()
+            } else {
+                match resource_type {
+                    ResourceType::Principal => {
+                        vec![QName::dav("collection"), QName::dav("principal")]
+                    }
+                    ResourceType::Calendar => {
+                        vec![QName::dav("collection"), QName::caldav("calendar")]
+                    }
+                    ResourceType::Addressbook => {
+                        vec![QName::dav("collection"), QName::carddav("addressbook")]
+                    }
+                }
+            };
+            Some(DavProperty {
+                name: qname,
+                value: Some(PropertyValue::ResourceType(resource_types)),
+            })
+        }
+        ("DAV:", "getetag") => {
+            if let Some(instance_id) = item_id {
+                let inst = instance::by_id(instance_id)
+                    .select(shuriken_db::model::dav::instance::DavInstance::as_select())
+                    .first(conn)
+                    .await
+                    .optional()?;
+                inst.map(|i| DavProperty::text(qname, i.etag))
+            } else if let Some(collection_id) = collection_id {
+                let coll = collection::get_collection(conn, collection_id).await?;
+                coll.map(|c| DavProperty::text(qname, format!("\"{}\"", c.synctoken)))
+            } else {
+                None
+            }
+        }
+        ("DAV:", "getcontenttype") => {
+            let Some(instance_id) = item_id else {
+                return Ok(None);
+            };
+            let inst = instance::by_id(instance_id)
+                .select(shuriken_db::model::dav::instance::DavInstance::as_select())
+                .first(conn)
+                .await
+                .optional()?;
+            inst.map(|i| DavProperty::text(qname, i.content_type.as_str()))
         }
         ("urn:ietf:params:xml:ns:caldav", "calendar-home-set") => {
-            Some(DavProperty::href(qname, "/calendars/user/"))
+            let Some(owner_id) = owner_id else {
+                return Ok(None);
+            };
+            let home_location = ResourceLocation::from_segments(vec![
+                PathSegment::ResourceType(ResourceType::Calendar),
+                PathSegment::owner_from_id(owner_id),
+            ])?;
+            let href = home_location.serialize_to_full_path(false, false)?;
+            Some(DavProperty::href(qname, href))
         }
         ("urn:ietf:params:xml:ns:carddav", "addressbook-home-set") => {
-            Some(DavProperty::href(qname, "/addressbooks/user/"))
+            let Some(owner_id) = owner_id else {
+                return Ok(None);
+            };
+            let home_location = ResourceLocation::from_segments(vec![
+                PathSegment::ResourceType(ResourceType::Addressbook),
+                PathSegment::owner_from_id(owner_id),
+            ])?;
+            let href = home_location.serialize_to_full_path(false, false)?;
+            Some(DavProperty::href(qname, href))
         }
         _ => {
-            // Unknown property
             tracing::debug!(
                 "Unknown property requested: {}:{}",
                 qname.namespace_uri(),
@@ -676,8 +794,18 @@ fn format_nested_response(
 
         if let Some(value) = &prop.value {
             match value {
-                PropertyValue::Text(text) => {
+                PropertyValue::Text(text) | PropertyValue::ContentData(text) => {
                     let _ = write!(xml, "<{prefix}:{name}>{text}</{prefix}:{name}>");
+                }
+                PropertyValue::Integer(value) => {
+                    let _ = write!(xml, "<{prefix}:{name}>{value}</{prefix}:{name}>");
+                }
+                PropertyValue::DateTime(value) => {
+                    let _ = write!(
+                        xml,
+                        "<{prefix}:{name}>{}</{prefix}:{name}>",
+                        value.to_rfc3339()
+                    );
                 }
                 PropertyValue::Href(href) => {
                     let _ = write!(
@@ -685,14 +813,63 @@ fn format_nested_response(
                         "<{prefix}:{name}><D:href>{href}</D:href></{prefix}:{name}>"
                     );
                 }
-                PropertyValue::Empty => {
-                    let _ = write!(xml, "<{prefix}:{name}/>");
+                PropertyValue::HrefSet(hrefs) => {
+                    let _ = write!(xml, "<{prefix}:{name}>");
+                    for href in hrefs {
+                        let _ = write!(xml, "<D:href>{href}</D:href>");
+                    }
+                    let _ = write!(xml, "</{prefix}:{name}>");
+                }
+                PropertyValue::ResourceType(resource_types) => {
+                    let _ = write!(xml, "<{prefix}:{name}>");
+                    for resource_type in resource_types {
+                        let rt_ns = resource_type.namespace_uri();
+                        let rt_name = resource_type.local_name();
+                        let rt_prefix = if rt_ns == "DAV:" {
+                            "D"
+                        } else if rt_ns == "urn:ietf:params:xml:ns:caldav" {
+                            "C"
+                        } else if rt_ns == "urn:ietf:params:xml:ns:carddav" {
+                            "CARD"
+                        } else {
+                            "D"
+                        };
+                        let _ = write!(xml, "<{rt_prefix}:{rt_name}/>");
+                    }
+                    let _ = write!(xml, "</{prefix}:{name}>");
+                }
+                PropertyValue::SupportedComponents(components) => {
+                    let _ = write!(xml, "<{prefix}:{name}>");
+                    for component in components {
+                        let _ = write!(xml, "<C:comp name=\"{component}\"/>");
+                    }
+                    let _ = write!(xml, "</{prefix}:{name}>");
+                }
+                PropertyValue::SupportedReports(reports) => {
+                    let _ = write!(xml, "<{prefix}:{name}>");
+                    for report_qname in reports {
+                        let report_ns = report_qname.namespace_uri();
+                        let report_name = report_qname.local_name();
+                        let report_prefix = if report_ns == "DAV:" {
+                            "D"
+                        } else if report_ns == "urn:ietf:params:xml:ns:caldav" {
+                            "C"
+                        } else if report_ns == "urn:ietf:params:xml:ns:carddav" {
+                            "CARD"
+                        } else {
+                            "D"
+                        };
+                        let _ = write!(
+                            xml,
+                            "<D:supported-report><D:report><{report_prefix}:{report_name}/></D:report></D:supported-report>"
+                        );
+                    }
+                    let _ = write!(xml, "</{prefix}:{name}>");
                 }
                 PropertyValue::Xml(content) => {
                     let _ = write!(xml, "<{prefix}:{name}>{content}</{prefix}:{name}>");
                 }
-                _ => {
-                    // For complex types, just use empty element for now
+                PropertyValue::Empty => {
                     let _ = write!(xml, "<{prefix}:{name}/>");
                 }
             }

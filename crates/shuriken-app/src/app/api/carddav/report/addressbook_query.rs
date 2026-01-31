@@ -26,7 +26,7 @@ pub async fn handle(
     depot: &Depot,
 ) {
     // Extract collection_id from request path
-    // Get collection from depot (resolved by slug_resolver middleware)
+    // Get collection from depot (resolved by DavPathMiddleware)
     let Ok(collection) = shuriken_service::auth::get_terminal_collection_from_depot(depot) else {
         tracing::debug!("Collection not found in depot for addressbook-query REPORT");
         res.status_code(StatusCode::NOT_FOUND);
@@ -34,7 +34,7 @@ pub async fn handle(
     };
     let collection_id = collection.id;
 
-    // Get base ResourceLocation from depot (resolved by slug_resolver middleware)
+    // Get base ResourceLocation from depot (resolved by DavPathMiddleware)
     let Ok(resource) = get_resolved_location_from_depot(depot) else {
         tracing::error!("Failed to get resolved resource location from depot");
         res.status_code(StatusCode::INTERNAL_SERVER_ERROR);

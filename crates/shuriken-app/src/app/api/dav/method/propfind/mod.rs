@@ -42,7 +42,7 @@ pub async fn propfind(req: &mut Request, res: &mut Response, depot: &Depot) {
     let depth = parse_depth(req).unwrap_or_else(Depth::default_for_propfind);
     tracing::debug!(depth = ?depth, "Depth header parsed");
 
-    // Validate that the collection was resolved by slug_resolver middleware
+    // Validate that the collection was resolved by DavPathMiddleware
     if get_terminal_collection_from_depot(depot).is_err() {
         res.status_code(StatusCode::NOT_FOUND);
         return;
@@ -160,9 +160,9 @@ async fn check_propfind_authorization(
         .await
         .map_err(|e| (e, shuriken_service::auth::Action::Read))?;
 
-    // Get ResourceLocation from depot (populated by slug_resolver middleware)
+    // Get ResourceLocation from depot (populated by DavPathMiddleware)
     let resource = get_resolved_location_from_depot(depot).map_err(|e| {
-        tracing::error!(error = %e, "ResourceLocation not found in depot; slug_resolver middleware may not have run");
+        tracing::error!(error = %e, "ResourceLocation not found in depot; DavPathMiddleware may not have run");
         (StatusCode::INTERNAL_SERVER_ERROR, shuriken_service::auth::Action::Read)
     })?;
 

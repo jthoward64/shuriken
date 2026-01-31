@@ -1147,11 +1147,12 @@ fn parse_expand_property(xml: &[u8]) -> ParseResult<ReportRequest> {
     let mut namespaces: Vec<(String, String)> = Vec::new();
     let mut properties: Vec<PropertyName> = Vec::new();
     let mut expand_items: Vec<ExpandPropertyItem> = Vec::new();
+    let mut stack: Vec<ExpandPropertyItem> = Vec::new();
 
     loop {
         buf.clear();
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(ref e) | Event::Empty(ref e)) => {
+            Ok(Event::Start(ref e)) => {
                 collect_namespaces(e, &mut namespaces)?;
                 let local_name_bytes = e.local_name();
                 let local_name = std::str::from_utf8(local_name_bytes.as_ref())?.to_owned();
@@ -1161,14 +1162,51 @@ fn parse_expand_property(xml: &[u8]) -> ParseResult<ReportRequest> {
                     let name_value = get_attribute(e, "name")?;
                     let qname = QName::dav(name_value);
                     let prop_name = PropertyName::new(qname);
-
-                    // For now, we don't support nested expansion
-                    // A full implementation would recursively parse nested <property> elements
-                    expand_items.push(ExpandPropertyItem {
+                    let item = ExpandPropertyItem {
                         name: prop_name.clone(),
                         properties: Vec::new(),
-                    });
-                    properties.push(prop_name);
+                    };
+
+                    if stack.is_empty() {
+                        properties.push(prop_name);
+                    }
+                    stack.push(item);
+                }
+            }
+            Ok(Event::Empty(ref e)) => {
+                collect_namespaces(e, &mut namespaces)?;
+                let local_name_bytes = e.local_name();
+                let local_name = std::str::from_utf8(local_name_bytes.as_ref())?.to_owned();
+
+                if local_name == "property" {
+                    // Parse property element with name attribute
+                    let name_value = get_attribute(e, "name")?;
+                    let qname = QName::dav(name_value);
+                    let prop_name = PropertyName::new(qname);
+                    let item = ExpandPropertyItem {
+                        name: prop_name.clone(),
+                        properties: Vec::new(),
+                    };
+
+                    if let Some(parent) = stack.last_mut() {
+                        parent.properties.push(item);
+                    } else {
+                        expand_items.push(item);
+                        properties.push(prop_name);
+                    }
+                }
+            }
+            Ok(Event::End(ref e)) => {
+                let local_name_bytes = e.local_name();
+                let local_name = std::str::from_utf8(local_name_bytes.as_ref())?.to_owned();
+                if local_name == "property" {
+                    if let Some(item) = stack.pop() {
+                        if let Some(parent) = stack.last_mut() {
+                            parent.properties.push(item);
+                        } else {
+                            expand_items.push(item);
+                        }
+                    }
                 }
             }
             Ok(Event::Eof) => break,

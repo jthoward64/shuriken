@@ -256,9 +256,9 @@ async fn check_put_authorization(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    // Get ResourceLocation from depot (populated by slug_resolver middleware)
+    // Get ResourceLocation from depot (populated by DavPathMiddleware)
     let resource = get_resolved_location_from_depot(depot).map_err(|e| {
-        tracing::error!(error = %e, "ResourceLocation not found in depot; slug_resolver middleware may not have run");
+        tracing::error!(error = %e, "ResourceLocation not found in depot; DavPathMiddleware may not have run");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 

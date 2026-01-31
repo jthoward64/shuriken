@@ -25,7 +25,7 @@ pub async fn handle(
     depot: &Depot,
 ) {
     // Extract collection_id from request path
-    // Get collection from depot (resolved by slug_resolver middleware)
+    // Get collection from depot (resolved by DavPathMiddleware)
     let Ok(collection) = shuriken_service::auth::get_terminal_collection_from_depot(depot) else {
         tracing::debug!("Collection not found in depot for addressbook-multiget REPORT");
         res.status_code(StatusCode::NOT_FOUND);

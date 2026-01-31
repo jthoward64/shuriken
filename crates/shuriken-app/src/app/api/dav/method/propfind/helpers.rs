@@ -201,7 +201,7 @@ pub(super) async fn build_propfind_response(
 ) -> anyhow::Result<Multistatus> {
     let path = req.uri().path();
 
-    // Try to get collection from depot (populated by slug_resolver middleware)
+    // Try to get collection from depot (populated by DavPathMiddleware)
     let collection = get_terminal_collection_from_depot(depot).ok();
 
     let mut multistatus = Multistatus::new();
