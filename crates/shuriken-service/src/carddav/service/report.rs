@@ -8,6 +8,29 @@ use shuriken_db::db::query::report_property::build_instance_properties;
 use shuriken_rfc::rfc::dav::core::{
     AddressbookMultiget, AddressbookQuery, Href, Multistatus, PropertyName, PropstatResponse,
 };
+use shuriken_db::model::dav::instance::DavInstance;
+
+use crate::auth::{PathSegment, ResourceIdentifier, ResourceLocation};
+use crate::error::ServiceResult;
+
+/// ## Summary
+/// Builds a proper Href for a vCard item using ResourceLocation.
+///
+/// ## Errors
+/// Returns error if ResourceLocation serialization fails.
+fn build_item_href(
+    base_location: &ResourceLocation,
+    instance: &DavInstance,
+) -> ServiceResult<Href> {
+    let mut segments = base_location.segments().to_vec();
+    segments.push(PathSegment::Item(ResourceIdentifier::Id(instance.id)));
+    
+    let location = ResourceLocation::from_segments(segments)
+        .map_err(|e| crate::error::ServiceError::ParseError(format!("Failed to build item location: {e}")))?;
+    
+    let path = location.serialize_to_full_path(true, false)?;
+    Ok(Href::new(path))
+}
 
 /// ## Summary
 /// Executes an addressbook-query report.
@@ -21,6 +44,7 @@ use shuriken_rfc::rfc::dav::core::{
 /// Returns database errors or filter evaluation errors.
 pub async fn execute_addressbook_query(
     conn: &mut DbConnection<'_>,
+    base_location: &ResourceLocation,
     collection_id: uuid::Uuid,
     query: &AddressbookQuery,
     properties: &[PropertyName],
@@ -31,7 +55,7 @@ pub async fn execute_addressbook_query(
     // Build multistatus response
     let mut multistatus = Multistatus::new();
     for instance in instances {
-        let href = Href::new(format!("/item-{}", instance.slug));
+        let href = build_item_href(base_location, &instance)?;
         let props = build_instance_properties(conn, &instance, properties).await?;
         let response = PropstatResponse::ok(href, props);
         multistatus.add_response(response);

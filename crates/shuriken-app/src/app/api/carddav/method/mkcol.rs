@@ -134,24 +134,53 @@ pub async fn mkcol_extended(req: &mut Request, res: &mut Response, depot: &Depot
             res.status_code(StatusCode::CREATED);
 
             // Set Location header with full URL (RFC 4918 §8.10.4)
-            // Construct full URL: scheme://host/path
-            let scheme = if req.uri().scheme_str() == Some("https") {
-                "https"
+            // Build Location header using ResourceLocation for type safety
+            let mut segments = parent_resource.segments().to_vec();
+            segments.push(shuriken_service::auth::PathSegment::Collection(
+                shuriken_service::auth::ResourceIdentifier::Id(result.collection_id),
+            ));
+            
+            let location_url = if let Ok(resource) = shuriken_service::auth::ResourceLocation::from_segments(segments) {
+                // Try to build a full URL using the resource location
+                let scheme = if req.uri().scheme_str() == Some("https") {
+                    "https"
+                } else {
+                    "http"
+                };
+                let host = req
+                    .headers()
+                    .get("Host")
+                    .and_then(|h| h.to_str().ok())
+                    .unwrap_or("localhost");
+                
+                match resource.serialize_to_full_path(false, false) {
+                    Ok(path) => format!("{scheme}://{host}{path}"),
+                    Err(e) => {
+                        tracing::warn!("Failed to serialize collection resource location: {}", e);
+                        // Fallback to request path
+                        format!("{scheme}://{host}{path}")
+                    }
+                }
             } else {
-                "http"
+                // Fallback to scheme + host + request path
+                let scheme = if req.uri().scheme_str() == Some("https") {
+                    "https"
+                } else {
+                    "http"
+                };
+                let host = req
+                    .headers()
+                    .get("Host")
+                    .and_then(|h| h.to_str().ok())
+                    .unwrap_or("localhost");
+                format!("{scheme}://{host}{path}")
             };
-            let host = req
-                .headers()
-                .get("Host")
-                .and_then(|h| h.to_str().ok())
-                .unwrap_or("localhost");
-            let location = format!("{scheme}://{host}{path}");
 
             #[expect(
                 clippy::let_underscore_must_use,
                 reason = "Location header addition failure is non-fatal"
             )]
-            let _ = res.add_header("Location", location, true);
+            let _ = res.add_header("Location", location_url, true);
         }
         Err(e) => {
             tracing::error!("Failed to create addressbook collection: {}", e);

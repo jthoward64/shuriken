@@ -8,6 +8,7 @@ use shuriken_rfc::rfc::dav::build::multistatus::serialize_multistatus;
 use shuriken_rfc::rfc::dav::core::{ExpandProperty, Multistatus, ReportType, SyncCollection};
 use shuriken_service::auth::{
     Action, get_resolved_location_from_depot, get_terminal_collection_from_depot,
+    PathSegment, ResourceIdentifier, ResourceLocation,
 };
 
 /// ## Summary
@@ -140,7 +141,7 @@ pub async fn handle_sync_collection(
 
     // Build response
     let multistatus =
-        match build_sync_collection_response(&mut conn, &sync, &properties, collection, base_path)
+        match build_sync_collection_response(&mut conn, &sync, &properties, collection, &resource, base_path)
             .await
         {
             Ok(ms) => ms,
@@ -166,6 +167,7 @@ async fn build_sync_collection_response(
     sync: &SyncCollection,
     properties: &[shuriken_rfc::rfc::dav::core::PropertyName],
     collection: &shuriken_db::model::dav::collection::DavCollection,
+    resource_location: &shuriken_service::auth::ResourceLocation,
     base_path: &str,
 ) -> anyhow::Result<Multistatus> {
     use diesel::{ExpressionMethods, QueryDsl};
@@ -203,11 +205,23 @@ async fn build_sync_collection_response(
 
     // Add changed/added instances to response
     for inst in instances {
-        let href = Href::new(format!(
-            "{}{}.ics",
-            base_path.trim_end_matches('/'),
-            inst.slug
-        ));
+        // Build href using ResourceLocation for type-safe path construction
+        let mut segments = resource_location.segments().to_vec();
+        segments.push(PathSegment::Item(ResourceIdentifier::Id(inst.id)));
+        let href = match ResourceLocation::from_segments(segments)
+            .and_then(|loc| loc.serialize_to_full_path(true, false))
+        {
+            Ok(path) => shuriken_rfc::rfc::dav::core::Href::new(path),
+            Err(e) => {
+                tracing::warn!("Failed to build href for sync-collection instance: {}", e);
+                // Fallback to manual construction
+                shuriken_rfc::rfc::dav::core::Href::new(format!(
+                    "{}{}.ics",
+                    base_path.trim_end_matches('/'),
+                    inst.slug
+                ))
+            }
+        };
 
         // Build properties based on what was requested
         let props = if properties.is_empty() {

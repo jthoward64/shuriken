@@ -315,13 +315,13 @@ async fn check_copy_authorization(
     }
 
     // Check Write permission on destination collection
-    let dest_path = format!("{destination}{resource_name}");
-    let dest_resource = {
+    // Build destination resource location for authorization
+    let (dest_resource, dest_path) = {
         use shuriken_service::auth::{
             PathSegment, ResourceIdentifier, ResourceLocation, ResourceType,
         };
 
-        let segments = vec![
+        let mut segments = vec![
             PathSegment::ResourceType(
                 source_resource
                     .resource_type()
@@ -330,14 +330,25 @@ async fn check_copy_authorization(
             PathSegment::Owner(ResourceIdentifier::Id(dest_collection.owner_principal_id)),
             PathSegment::Collection(ResourceIdentifier::Id(dest_collection.id)),
         ];
-        ResourceLocation::from_segments(segments).map_err(|e| {
+        
+        // Add the item segment with the destination resource name as a slug
+        segments.push(PathSegment::Item(ResourceIdentifier::Slug(resource_name.to_string())));
+        
+        let resource = ResourceLocation::from_segments(segments).map_err(|e| {
             tracing::error!(error = %e, "Failed to build destination resource");
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Action::Edit,
-                dest_path.clone(),
+                destination.to_string(),
             )
-        })?
+        })?;
+        
+        // For error reporting, serialize the resource path
+        let path = resource
+            .serialize_to_full_path(false, false)
+            .unwrap_or_else(|_| destination.to_string());
+        
+        (resource, path)
     };
 
     // Check Write permission on destination

@@ -5,6 +5,7 @@ use salvo::{Depot, Request, Response};
 
 use shuriken_rfc::rfc::dav::build::multistatus::serialize_multistatus;
 use shuriken_rfc::rfc::dav::core::{AddressbookQuery, PropertyName};
+use shuriken_service::auth::get_resolved_location_from_depot;
 
 /// ## Summary
 /// Handles `addressbook-query` REPORT requests.
@@ -33,6 +34,13 @@ pub async fn handle(
     };
     let collection_id = collection.id;
 
+    // Get base ResourceLocation from depot (resolved by slug_resolver middleware)
+    let Ok(resource) = get_resolved_location_from_depot(depot) else {
+        tracing::error!("Failed to get resolved resource location from depot");
+        res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+        return;
+    };
+
     // Get database connection
     let provider = match crate::db_handler::get_db_from_depot(depot) {
         Ok(provider) => provider,
@@ -55,6 +63,7 @@ pub async fn handle(
     // Call service to execute query
     let multistatus = match shuriken_service::carddav::service::report::execute_addressbook_query(
         &mut conn,
+        &resource,
         collection_id,
         &query,
         &properties,

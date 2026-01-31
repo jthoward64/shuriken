@@ -16,6 +16,36 @@ use shuriken_rfc::rfc::dav::core::{
     RecurrenceExpansion,
 };
 
+use crate::auth::{PathSegment, ResourceIdentifier, ResourceLocation};
+use crate::error::ServiceResult;
+
+/// ## Summary
+/// Builds a proper Href for a calendar item using ResourceLocation.
+///
+/// ## Errors
+/// Returns error if ResourceLocation serialization fails.
+fn build_item_href(
+    base_location: &ResourceLocation,
+    instance: &DavInstance,
+    recurrence_id: Option<&str>,
+) -> ServiceResult<Href> {
+    let mut segments = base_location.segments().to_vec();
+    segments.push(PathSegment::Item(ResourceIdentifier::Id(instance.id)));
+
+    let location = ResourceLocation::from_segments(segments).map_err(|e| {
+        crate::error::ServiceError::ParseError(format!("Failed to build item location: {e}"))
+    })?;
+
+    let mut path = location.serialize_to_full_path(true, false)?;
+
+    if let Some(recurrence_id) = recurrence_id {
+        path.push_str("?recurrence-id=");
+        path.push_str(recurrence_id);
+    }
+
+    Ok(Href::new(path))
+}
+
 /// ## Summary
 /// Executes a calendar-query report.
 ///
@@ -30,6 +60,7 @@ use shuriken_rfc::rfc::dav::core::{
 /// Returns database errors or filter evaluation errors.
 pub async fn execute_calendar_query(
     conn: &mut DbConnection<'_>,
+    base_location: &ResourceLocation,
     collection_id: uuid::Uuid,
     query: &CalendarQuery,
     properties: &[PropertyName],
@@ -41,6 +72,7 @@ pub async fn execute_calendar_query(
     if let Some((time_range, expansion_mode)) = &query.expand {
         execute_calendar_query_with_expansion(
             conn,
+            base_location,
             instances,
             time_range,
             *expansion_mode,
@@ -51,7 +83,7 @@ pub async fn execute_calendar_query(
         // No expansion - return instances as-is
         let mut multistatus = Multistatus::new();
         for instance in instances {
-            let href = Href::new(format!("/item-{}", instance.slug));
+            let href = build_item_href(base_location, &instance, None)?;
             let props = build_instance_properties(conn, &instance, properties).await?;
             let response = PropstatResponse::ok(href, props);
             multistatus.add_response(response);
@@ -141,6 +173,7 @@ pub async fn execute_calendar_multiget(
 #[expect(clippy::too_many_lines)]
 async fn execute_calendar_query_with_expansion(
     conn: &mut DbConnection<'_>,
+    base_location: &ResourceLocation,
     instances: Vec<DavInstance>,
     time_range: &shuriken_rfc::rfc::dav::core::TimeRange,
     expansion_mode: RecurrenceExpansion,
@@ -166,7 +199,7 @@ async fn execute_calendar_query_with_expansion(
                 if let Ok(rule) = rrule_text.parse::<RRule<Unvalidated>>() {
                     rule
                 } else {
-                    let href = Href::new(format!("/item-{}", instance.slug));
+                    let href = build_item_href(base_location, &instance, None)?;
                     let props = build_instance_properties(conn, &instance, properties).await?;
                     let response = PropstatResponse::ok(href, props);
                     multistatus.add_response(response);
@@ -177,7 +210,7 @@ async fn execute_calendar_query_with_expansion(
             let mut rrule_set: rrule::RRuleSet = if let Ok(set) = rrule.build(dt_start) {
                 set
             } else {
-                let href = Href::new(format!("/item-{}", instance.slug));
+                let href = build_item_href(base_location, &instance, None)?;
                 let props = build_instance_properties(conn, &instance, properties).await?;
                 let response = PropstatResponse::ok(href, props);
                 multistatus.add_response(response);
@@ -202,24 +235,21 @@ async fn execute_calendar_query_with_expansion(
                 RecurrenceExpansion::Expand => {
                     for occurrence in occurrences {
                         let recurrence_id = occurrence.with_timezone(&chrono::Utc).to_rfc3339();
-                        let href = Href::new(format!(
-                            "/item-{}?recurrence-id={}",
-                            instance.slug, recurrence_id
-                        ));
+                        let href = build_item_href(base_location, &instance, Some(&recurrence_id))?;
                         let props = build_instance_properties(conn, &instance, properties).await?;
                         let response = PropstatResponse::ok(href, props);
                         multistatus.add_response(response);
                     }
                 }
                 RecurrenceExpansion::LimitRecurrenceSet => {
-                    let href = Href::new(format!("/item-{}", instance.slug));
+                    let href = build_item_href(base_location, &instance, None)?;
                     let props = build_instance_properties(conn, &instance, properties).await?;
                     let response = PropstatResponse::ok(href, props);
                     multistatus.add_response(response);
                 }
             }
         } else {
-            let href = Href::new(format!("/item-{}", instance.slug));
+            let href = build_item_href(base_location, &instance, None)?;
             let props = build_instance_properties(conn, &instance, properties).await?;
             let response = PropstatResponse::ok(href, props);
             multistatus.add_response(response);

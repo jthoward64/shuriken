@@ -94,6 +94,7 @@ pub async fn handle(
     // Call service to execute query
     let multistatus = match shuriken_service::caldav::service::report::execute_calendar_query(
         &mut conn,
+        &resource,
         collection_id,
         &query,
         &properties,

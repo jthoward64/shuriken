@@ -266,18 +266,21 @@ pub(super) async fn build_propfind_response(
 
             // Build child path using ResourceLocation with instance UUID
             let child_path = if let Ok(resolved) = resolved_location {
-                // Append PathSegment::Item with instance UUID and extension
+                // Append PathSegment::Item with instance UUID (ResourceLocation will add extension in serialization)
                 let mut child_segments = resolved.segments().to_vec();
-                let item_name = format!("{}{}", inst.id, extension);
-                child_segments.push(PathSegment::Item(ResourceIdentifier::Slug(item_name)));
-                let child_location = ResourceLocation::from_segments(child_segments);
-                child_location
-                    .ok()
-                    .and_then(|loc| loc.serialize_to_full_path(false, false).ok())
-                    .unwrap_or_else(|| {
+                child_segments.push(PathSegment::Item(ResourceIdentifier::Id(inst.id)));
+                match ResourceLocation::from_segments(child_segments)
+                    .and_then(|loc| loc.serialize_to_full_path(true, false))
+                {
+                    Ok(path) => path,
+                    Err(e) => {
+                        tracing::warn!("Failed to serialize child location for PROPFIND: {}", e);
+                        // Fallback: construct path manually only if ResourceLocation fails
                         format!("{}/{}{}", path.trim_end_matches('/'), inst.id, extension)
-                    })
+                    }
+                }
             } else {
+                tracing::warn!("resolved_location not available in depot for PROPFIND child");
                 // Fallback: use request path with instance UUID if resolved location not available
                 format!("{}/{}{}", path.trim_end_matches('/'), inst.id, extension)
             };
