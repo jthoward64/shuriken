@@ -36,7 +36,8 @@ impl AuthzResult {
         match self {
             Self::Allowed => Ok(()),
             Self::Denied => {
-                let path = resource.serialize_to_path(false, false)
+                let path = resource
+                    .serialize_to_path(false, false)
                     .unwrap_or_else(|_| "<invalid path>".to_string());
                 Err(ServiceError::AuthorizationError(format!(
                     "Access denied: {action} on {path}"
@@ -183,7 +184,8 @@ mod tests {
             PathSegment::owner_from_slug("alice".to_string()),
             PathSegment::collection_from_slug("personal".to_string()),
             PathSegment::item_from_slug("work.ics".to_string()),
-        ]).unwrap();
+        ])
+        .unwrap();
         let action = Action::Read;
 
         let allowed = AuthzResult::Allowed;

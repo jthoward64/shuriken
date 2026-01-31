@@ -11,9 +11,23 @@ use shuriken_rfc::rfc::dav::core::{
 };
 use shuriken_service::auth::casbin::get_enforcer_from_depot;
 use shuriken_service::auth::{
-    PathSegment, ResourceLocation, ResourceIdentifier, get_resolved_location_from_depot,
+    PathSegment, ResourceIdentifier, ResourceLocation, get_resolved_location_from_depot,
     get_terminal_collection_from_depot, serialize_acl_for_resource,
 };
+
+/// Load child instances for a collection (for depth=1 queries).
+async fn load_child_instances(
+    conn: &mut shuriken_db::db::connection::DbConnection<'_>,
+    collection_id: uuid::Uuid,
+) -> anyhow::Result<Vec<shuriken_db::model::dav::instance::DavInstance>> {
+    use diesel_async::RunQueryDsl;
+    use shuriken_db::db::query::dav::instance;
+
+    instance::by_collection_not_deleted(collection_id)
+        .load::<shuriken_db::model::dav::instance::DavInstance>(conn)
+        .await
+        .map_err(Into::into)
+}
 
 /// ## Summary
 /// Resolves CalDAV-specific properties.
@@ -236,14 +250,7 @@ pub(super) async fn build_propfind_response(
         && let Some(coll) = collection
     {
         // Query for child instances in the collection
-        let instances = {
-            use diesel_async::RunQueryDsl;
-            use shuriken_db::db::query::dav::instance;
-
-            instance::by_collection_not_deleted(coll.id)
-                .load::<shuriken_db::model::dav::instance::DavInstance>(conn)
-                .await?
-        };
+        let instances = load_child_instances(conn, coll.id).await?;
 
         // Get the resolved location (UUID-based) from depot for building child paths
         let resolved_location = get_resolved_location_from_depot(depot);

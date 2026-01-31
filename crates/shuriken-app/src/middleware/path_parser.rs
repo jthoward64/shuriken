@@ -24,7 +24,7 @@ use shuriken_db::{
     model::dav::instance::DavInstance,
     model::principal::Principal,
 };
-use shuriken_service::auth::{PathSegment, ResourceLocation, ResourceIdentifier};
+use shuriken_service::auth::{PathSegment, ResourceIdentifier, ResourceLocation};
 
 /// Result of parsing and resolving a DAV path.
 ///
@@ -72,7 +72,7 @@ pub async fn parse_and_resolve_path(
 ) -> Result<PathResolutionResult, PathResolutionError> {
     // Parse path to ResourceLocation (globs are internal only, not external)
     let original_location = ResourceLocation::parse(path, false)
-        .map_err(|_| PathResolutionError::InvalidPathFormat(path.to_string()))?;
+        .map_err(|_err| PathResolutionError::InvalidPathFormat(path.to_string()))?;
 
     // Extract segments for entity lookup
     let mut resource_type_opt = None;
@@ -394,7 +394,9 @@ mod tests {
             segments[0],
             PathSegment::ResourceType(ResourceType::Calendar)
         ));
-        assert!(matches!(&segments[1], PathSegment::Owner(ResourceIdentifier::Id(id)) if *id == principal.id));
+        assert!(
+            matches!(&segments[1], PathSegment::Owner(ResourceIdentifier::Id(id)) if *id == principal.id)
+        );
         assert!(
             matches!(&segments[2], PathSegment::Collection(ResourceIdentifier::Id(id)) if *id == collection.id)
         );
@@ -524,7 +526,9 @@ mod tests {
             segments[0],
             PathSegment::ResourceType(ResourceType::Calendar)
         ));
-        assert!(matches!(&segments[1], PathSegment::Owner(ResourceIdentifier::Id(id)) if *id == principal.id));
+        assert!(
+            matches!(&segments[1], PathSegment::Owner(ResourceIdentifier::Id(id)) if *id == principal.id)
+        );
         assert!(
             matches!(&segments[2], PathSegment::Collection(ResourceIdentifier::Id(id)) if *id == collection.id)
         );
@@ -552,7 +556,9 @@ mod tests {
             segments[0],
             PathSegment::ResourceType(ResourceType::Calendar)
         ));
-        assert!(matches!(&segments[1], PathSegment::Owner(ResourceIdentifier::Id(id)) if *id == principal.id));
+        assert!(
+            matches!(&segments[1], PathSegment::Owner(ResourceIdentifier::Id(id)) if *id == principal.id)
+        );
     }
     #[test]
     fn test_build_canonical_location_empty_chain() {
@@ -600,7 +606,9 @@ mod tests {
         let segments = loc.segments();
         assert_eq!(segments.len(), 4);
         // The collection segment should be the leaf
-        assert!(matches!(&segments[2], PathSegment::Collection(ResourceIdentifier::Id(id)) if *id == leaf.id));
+        assert!(
+            matches!(&segments[2], PathSegment::Collection(ResourceIdentifier::Id(id)) if *id == leaf.id)
+        );
     }
 
     #[test]
