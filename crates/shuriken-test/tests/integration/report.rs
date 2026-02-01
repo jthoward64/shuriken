@@ -2095,12 +2095,12 @@ async fn addressbook_query_collation_ascii_non_ascii_no_match() {
     let service = create_db_test_service(&test_db.url()).await;
 
     // Create vCard with non-ASCII email local-part
-    let vcard = r#"BEGIN:VCARD
+    let vcard = r"BEGIN:VCARD
 VERSION:4.0
 UID:ascii-no-fold@example.com
 FN:Café User
 EMAIL:café@example.com
-END:VCARD"#;
+END:VCARD";
 
     TestRequest::put(&carddav_item_path(
         "testuser",
@@ -2169,12 +2169,12 @@ async fn addressbook_query_collation_octet_email_case_sensitive() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let vcard = r#"BEGIN:VCARD
+    let vcard = r"BEGIN:VCARD
 VERSION:4.0
 UID:octet-email@example.com
 FN:Octet Email
 EMAIL:John.Doe@EXAMPLE.COM
-END:VCARD"#;
+END:VCARD";
 
     TestRequest::put(&carddav_item_path(
         "testuser",
@@ -2358,12 +2358,12 @@ async fn addressbook_query_collation_ascii_email() {
     let service = create_db_test_service(&test_db.url()).await;
 
     // Create vCard with email address
-    let vcard = r#"BEGIN:VCARD
+    let vcard = r"BEGIN:VCARD
 VERSION:4.0
 UID:ascii-email@example.com
 FN:John Doe
 EMAIL:John.Doe@EXAMPLE.COM
-END:VCARD"#;
+END:VCARD";
 
     TestRequest::put(&carddav_item_path("testuser", "contacts", "ascii.vcf"))
         .if_none_match("*")
@@ -2569,12 +2569,12 @@ async fn addressbook_query_collation_ascii_email_contains() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let vcard = r#"BEGIN:VCARD
+    let vcard = r"BEGIN:VCARD
 VERSION:4.0
 UID:ascii-contains@example.com
 FN:John Doe
 EMAIL:John.Doe@EXAMPLE.COM
-END:VCARD"#;
+END:VCARD";
 
     TestRequest::put(&carddav_item_path(
         "testuser",
@@ -2642,12 +2642,12 @@ async fn addressbook_query_collation_octet_email_starts_with_case_sensitive() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let vcard = r#"BEGIN:VCARD
+    let vcard = r"BEGIN:VCARD
 VERSION:4.0
 UID:octet-start@example.com
 FN:Octet Start
 EMAIL:John.Doe@EXAMPLE.COM
-END:VCARD"#;
+END:VCARD";
 
     TestRequest::put(&carddav_item_path(
         "testuser",
@@ -2715,12 +2715,12 @@ async fn addressbook_query_collation_ascii_email_negate_contains() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let vcard = r#"BEGIN:VCARD
+    let vcard = r"BEGIN:VCARD
 VERSION:4.0
 UID:ascii-negate@example.com
 FN:Alpha User
 EMAIL:alpha@example.com
-END:VCARD"#;
+END:VCARD";
 
     TestRequest::put(&carddav_item_path(
         "testuser",
@@ -2788,12 +2788,12 @@ async fn addressbook_query_collation_unicode_n_matches_family() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let vcard = r#"BEGIN:VCARD
+    let vcard = r"BEGIN:VCARD
 VERSION:4.0
 UID:n-family@example.com
 FN:Jane Doe
 N:Doe;Jane;;;
-END:VCARD"#;
+END:VCARD";
 
     TestRequest::put(&carddav_item_path("testuser", "contacts", "n-family.vcf"))
         .if_none_match("*")
@@ -2857,12 +2857,12 @@ async fn addressbook_query_collation_octet_n_case_sensitive() {
 
     let service = create_db_test_service(&test_db.url()).await;
 
-    let vcard = r#"BEGIN:VCARD
+    let vcard = r"BEGIN:VCARD
 VERSION:4.0
 UID:n-octet@example.com
 FN:Jane Doe
 N:Doe;Jane;;;
-END:VCARD"#;
+END:VCARD";
 
     TestRequest::put(&carddav_item_path("testuser", "contacts", "n-octet.vcf"))
         .if_none_match("*")
@@ -2966,8 +2966,7 @@ async fn calendar_query_unsupported_component_403() {
     response.assert_status(StatusCode::FORBIDDEN);
     assert!(
         body_text.contains("supported-filter"),
-        "Response should contain supported-filter precondition error: {}",
-        body_text
+        "Response should contain supported-filter precondition error: {body_text}"
     );
 }
 
@@ -3034,8 +3033,7 @@ async fn calendar_query_unsupported_property_403() {
     response.assert_status(StatusCode::FORBIDDEN);
     assert!(
         body_text.contains("supported-filter"),
-        "Response should contain supported-filter precondition error: {}",
-        body_text
+        "Response should contain supported-filter precondition error: {body_text}"
     );
 }
 

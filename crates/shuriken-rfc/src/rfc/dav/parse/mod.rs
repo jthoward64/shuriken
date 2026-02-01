@@ -52,7 +52,10 @@ pub(crate) fn validate_numeric_char_refs(xml: &[u8]) -> ParseResult<()> {
             } else {
                 digits.parse::<u32>()
             }
-            .map_err(|_| ParseError::invalid_value("invalid numeric character reference"))?;
+            .map_err(|err| {
+                tracing::warn!(error = ?err, value = %digits, "Invalid numeric character reference");
+                ParseError::invalid_value("invalid numeric character reference")
+            })?;
 
             if !is_valid_xml_char(value) {
                 return Err(ParseError::invalid_value(

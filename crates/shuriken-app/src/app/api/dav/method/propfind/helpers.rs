@@ -340,7 +340,7 @@ pub(super) async fn build_propfind_response(
         resource_path.as_deref(),
         authorizer.as_ref(),
         subjects.as_ref(),
-        resource_location.as_deref(),
+        resource_location,
         propfind_req,
     )
     .await?;
@@ -425,6 +425,7 @@ pub(super) async fn build_propfind_response(
 /// ## Errors
 /// Returns errors if property resolution fails.
 #[expect(clippy::too_many_lines)]
+#[expect(clippy::too_many_arguments)]
 async fn get_properties_for_resource(
     _conn: &mut shuriken_db::db::connection::DbConnection<'_>,
     path: &str,

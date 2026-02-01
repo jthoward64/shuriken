@@ -265,6 +265,7 @@ fn is_supported_parameter(name: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::rfc::dav::core::ParamFilter;
 
     #[test]
     fn validate_empty_vcalendar_filter() {

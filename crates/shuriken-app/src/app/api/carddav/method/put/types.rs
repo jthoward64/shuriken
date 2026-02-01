@@ -15,6 +15,7 @@ pub(super) enum PutResult {
 ///
 /// Each error maps to an RFC 6352 precondition that gets serialized
 /// as an XML error element in the 403 response body.
+#[expect(dead_code)]
 pub(super) enum PutError {
     /// ## Summary
     /// Invalid vCard data format (RFC 6352 §5.3.4 `valid-address-data`).

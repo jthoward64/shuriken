@@ -1073,8 +1073,7 @@ async fn put_unsupported_vcard_content_type_rejected() {
     response.assert_status(StatusCode::FORBIDDEN);
     assert!(
         body.contains("supported-address-data"),
-        "Response should contain supported-address-data precondition error: {}",
-        body
+        "Response should contain supported-address-data precondition error: {body}"
     );
 }
 
@@ -1166,7 +1165,6 @@ async fn put_invalid_vcard_syntax_rejected() {
     response.assert_status(StatusCode::FORBIDDEN);
     assert!(
         body.contains("valid-address-data"),
-        "Response should contain valid-address-data precondition error: {}",
-        body
+        "Response should contain valid-address-data precondition error: {body}"
     );
 }
