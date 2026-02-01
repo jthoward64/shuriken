@@ -12,8 +12,8 @@ use shuriken_rfc::rfc::dav::parse::{MkcolRequest, parse_mkcol};
 use shuriken_service::auth::{
     Action, PathSegment, ResourceIdentifier, ResourceLocation, get_resolved_location_from_depot,
 };
-use shuriken_service::error::ServiceError;
 use shuriken_service::dav::service::collection::{CreateCollectionContext, create_collection};
+use shuriken_service::error::ServiceError;
 
 /// ## Summary
 /// Handles MKCALENDAR requests to create calendar collections.
@@ -198,4 +198,3 @@ pub async fn mkcalendar(req: &mut Request, res: &mut Response, depot: &Depot) {
         }
     }
 }
-
