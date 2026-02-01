@@ -14,6 +14,8 @@ pub(super) enum PutResult {
 pub(super) enum PutError {
     /// Invalid iCalendar data.
     InvalidCalendarData(String),
+    /// Invalid calendar object resource.
+    InvalidCalendarObjectResource(String),
     /// UID conflict with another resource.
     UidConflict(String),
     /// Database error.

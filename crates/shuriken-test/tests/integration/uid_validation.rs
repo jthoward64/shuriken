@@ -241,6 +241,11 @@ END:VCALENDAR";
         .await;
 
     // RFC 4791 §5.3.2: Invalid calendar object returns 403 with valid-calendar-object-resource precondition
-    #[expect(unused_must_use)]
-    response.assert_status(StatusCode::FORBIDDEN);
+    let response = response.assert_status(StatusCode::FORBIDDEN);
+
+    let body = response.body_string();
+    assert!(
+        body.contains("valid-calendar-object-resource"),
+        "Response should contain valid-calendar-object-resource precondition element"
+    );
 }

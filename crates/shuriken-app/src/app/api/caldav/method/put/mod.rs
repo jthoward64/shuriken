@@ -173,6 +173,11 @@ pub async fn put(req: &mut Request, res: &mut Response, depot: &Depot) {
             let error = PreconditionError::ValidCalendarData(msg);
             write_precondition_error(res, &error);
         }
+        Err(PutError::InvalidCalendarObjectResource(msg)) => {
+            tracing::error!(message = %msg, "Invalid calendar object resource");
+            let error = PreconditionError::ValidCalendarObjectResource(msg);
+            write_precondition_error(res, &error);
+        }
         Err(PutError::UidConflict(uid)) => {
             tracing::error!(uid = %uid, "UID conflict detected");
             // RFC 4791 §5.3.2.1: Return 403 with no-uid-conflict precondition
@@ -210,24 +215,29 @@ async fn perform_put(
     let ical = shuriken_rfc::rfc::ical::parse::parse(ical_str)
         .map_err(|e| PutError::InvalidCalendarData(format!("invalid iCalendar: {e}")))?;
 
-    // Extract UID from first VEVENT child (for UID conflict checking)
-    let logical_uid = ical
-        .root
-        .children
+    let mut supported_components = Vec::new();
+    supported_components.extend(ical.root.events());
+    supported_components.extend(ical.root.todos());
+    supported_components.extend(ical.root.journals());
+
+    if supported_components.is_empty() {
+        tracing::warn!("Calendar object missing supported components");
+        return Err(PutError::InvalidCalendarObjectResource(
+            "VCALENDAR must contain VEVENT, VTODO, or VJOURNAL".to_string(),
+        ));
+    }
+
+    // Extract UID from the first supported component (for UID conflict checking)
+    let logical_uid = supported_components
         .iter()
-        .find(|c| {
-            matches!(
-                c.kind,
-                Some(shuriken_rfc::rfc::ical::core::ComponentKind::Event)
-            )
-        })
-        .and_then(|vevent| vevent.uid())
+        .find_map(|component| component.uid())
         .map(String::from);
+
     // Validate that we have a UID for calendar objects
     if logical_uid.is_none() {
-        tracing::warn!("Calendar object missing UID in VEVENT component");
+        tracing::warn!("Calendar object missing UID in supported component");
         return Err(PutError::InvalidCalendarData(
-            "VEVENT component must have a UID property".to_string(),
+            "Calendar component must have a UID property".to_string(),
         ));
     }
     // Create PUT context

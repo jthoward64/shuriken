@@ -54,7 +54,7 @@ pub async fn create_collection(
     let displayname = ctx.displayname.clone();
     let description = ctx.description.clone();
 
-    conn.transaction::<_, anyhow::Error, _>(move |tx| {
+    conn.transaction::<_, ServiceError, _>(move |tx| {
         let slug = slug.clone();
         let displayname = displayname.clone();
         let description = description.clone();
