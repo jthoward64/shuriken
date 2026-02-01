@@ -1,9 +1,9 @@
 # Shuriken RFC Compliance: Comprehensive Executive Summary {#top}
 
 **Project**: Shuriken CalDAV/CardDAV Server  
-**Date**: January 29, 2026  
-**Status**: ✅ Complete second-pass deep RFC review with architectural assessment  
-**Version**: 2.0 (Merged Executive Summary)
+**Date**: February 1, 2026  
+**Status**: ✅ Phase 0, 2, 3 complete - 85% RFC compliant  
+**Version**: 2.1 (Phase 3 Complete)
 
 ---
 
@@ -13,7 +13,7 @@
 
 ✅ **NO REDESIGN NEEDED** - Shuriken's architecture is fundamentally sound and RFC-compliant
 
-🎯 **Current Status**: 70-75% RFC compliant with excellent storage layer (95%) and solid business logic (85%)
+🎯 **Current Status**: 85% RFC compliant with excellent storage layer (95%) and solid business logic (90%)
 
 ⚠️ **Gap Location**: 100% protocol-layer (missing discovery properties, error XML, ACL serialization)
 
@@ -301,40 +301,44 @@ Current: DAV: 1, 3, calendar-access, addressbook ✅
 
 ---
 
-### 🟠 P1: High Priority - Essential for Interoperability (8 hours) {#p1-high}
+### ✅ P1: High Priority - Essential for Interoperability - COMPLETE (8 hours) {#p1-high}
 
-**Required for clients to work effectively**
+**Status**: ✅ All items implemented (2026-01-29)
 
-#### 1. Add CalDAV Discovery Properties (2h)
-- `CALDAV:supported-calendar-component-set` (RFC 4791 §5.2.3)
-- `CALDAV:supported-collation-set` (RFC 4791 §7.5.1)
-- `CALDAV:max-resource-size` (RFC 4791 §5.2.5)
-- `CALDAV:min-date-time`, `max-date-time` (RFC 4791 §5.2.6-7)
+#### 1. Add CalDAV Discovery Properties (2h) - ✅ COMPLETE
+- ✅ `CALDAV:supported-calendar-component-set` (RFC 4791 §5.2.3)
+- ✅ `CALDAV:supported-collation-set` (RFC 4791 §7.5.1)
+- ✅ `CALDAV:max-resource-size` (RFC 4791 §5.2.5)
+- ✅ `CALDAV:min-date-time`, `max-date-time` (RFC 4791 §5.2.6-7)
+- **Location**: `crates/shuriken-rfc/src/rfc/dav/core/property/discovery.rs`
 
-#### 2. Add CardDAV Discovery Properties (1h)
-- `CARDDAV:supported-address-data` (RFC 6352 §6.2.2)
-- `CARDDAV:supported-collation-set` (RFC 6352 §7.2.1)
-- `CARDDAV:max-resource-size` (RFC 6352 §6.2.3)
+#### 2. Add CardDAV Discovery Properties (1h) - ✅ COMPLETE
+- ✅ `CARDDAV:supported-address-data` (RFC 6352 §6.2.2)
+- ✅ `CARDDAV:supported-collation-set` (RFC 6352 §7.2.1) - uses same as CalDAV
+- ✅ `CARDDAV:max-resource-size` (RFC 6352 §6.2.3)
+- **Location**: `crates/shuriken-rfc/src/rfc/dav/core/property/discovery.rs`
 
-#### 3. Add Precondition Error XML (4h)
-CalDAV errors (RFC 4791 §1.3):
-- `<CALDAV:valid-calendar-data>` on 409
-- `<CALDAV:valid-calendar-object-resource>` on 409
-- `<CALDAV:supported-calendar-component>` on 403
-- `<CALDAV:supported-calendar-data>` on 415
-- `<CALDAV:max-resource-size>` on 413
+#### 3. Add Precondition Error XML (4h) - ✅ COMPLETE
+**CalDAV errors** (RFC 4791 §1.3) - All implemented:
+- ✅ `<CALDAV:valid-calendar-data>` on 409
+- ✅ `<CALDAV:valid-calendar-object-resource>` on 409
+- ✅ `<CALDAV:supported-calendar-component>` on 403
+- ✅ `<CALDAV:supported-calendar-data>` on 415
+- ✅ `<CALDAV:max-resource-size>` on 413
 
-CardDAV errors (RFC 6352 §6.3.2.1):
-- `<CARDDAV:valid-address-data>` on 409
-- `<CARDDAV:supported-address-data>` on 415
-- `<CARDDAV:max-resource-size>` on 413
+**CardDAV errors** (RFC 6352 §6.3.2.1) - All implemented:
+- ✅ `<CARDDAV:valid-address-data>` on 409
+- ✅ `<CARDDAV:supported-address-data>` on 415
+- ✅ `<CARDDAV:max-resource-size>` on 413
 
-#### 4. Validate REPORT Filters (8h)
-- Build capability registry (supported filters, collations, components)
-- Validate filters against capabilities before executing
-- Return 403 with precondition error if unsupported
+**Location**: `crates/shuriken-rfc/src/rfc/dav/core/precondition.rs`
 
-**Result**: 72% → 80% compliance
+#### 4. Validate REPORT Filters (included in P3) - ✅ COMPLETE
+- ✅ Filter validation with `supported-filter` precondition
+- ✅ Returns 403 with precondition error if unsupported
+- **Location**: `crates/shuriken-app/src/app/api/caldav/report/calendar_query.rs`
+
+**Result**: 72% → **80% compliance achieved**
 
 ---
 
@@ -361,31 +365,31 @@ CardDAV errors (RFC 6352 §6.3.2.1):
 
 ---
 
-### 🔵 P3: Lower Priority - Query Improvements (15 hours) {#p3-lower}
+### ✅ P3: Query Improvements - COMPLETE (15 hours) {#p3-lower}
 
-**Polish and RFC compliance improvements**
+**Status**: ✅ All items completed (2026-02-01)
 
-#### 1. Text-Match Collation (8h)
-- Integrate ICU4X `i;unicode-casemap` (RFC 4790)
-- Apply to all text-match filter operations
-- Test with internationalized characters
+#### 1. Text-Match Collation (8h) - ✅ COMPLETE
+- ✅ Integrated ICU4X `i;unicode-casemap` (RFC 4790)
+- ✅ Applied to all text-match filter operations
+- ✅ Comprehensive tests with internationalized characters (Turkish İ, German ß, NFD/NFC)
+- **Location**: `crates/shuriken-db/src/db/query/text_match.rs`
 
-#### 2. Sync-Token Validation (3h)
-- Add retention window configuration
-- Return 410 Gone for expired tokens
-- Document retention policy in discovery
+#### 2. Sync-Token Validation (3h) - ✅ COMPLETE (2026-02-01)
+- ✅ Added retention window configuration (`DavConfig.sync_token_retention_revisions`)
+- ✅ Returns 410 Gone for expired tokens (RFC 6578)
+- ✅ Integration test: `sync_collection_expired_token_returns_gone`
+- **Location**: `crates/shuriken-app/src/app/api/dav/method/report.rs`
 
-#### 3. Selective Calendar-Data Serialization (6h)
-- Parse `<calendar-data>` REPORT request elements
-- Filter components based on request
-- Serialize only requested subset from component tree
+#### 3. Selective Calendar-Data Serialization (6h) - ✅ COMPLETE
+- ✅ `filter_calendar_data()` handles RFC 4791 §9.6 partial retrieval
+- ✅ Component/property filtering integrated in report responses
+- ✅ Unit and integration tests passing
+- **Location**: `crates/shuriken-rfc/src/rfc/filter.rs`
 
-#### 4. Component Validation (included in other work)
-- Enforce cardinality constraints (RFC 5545 §3.6)
-- Validate required properties per component type
-- Return detailed error messages
+#### 4. Component Validation - ✅ Included in other work
 
-**Result**: 82% → 85% compliance
+**Result**: 82% → **85% compliance achieved**
 
 ---
 
@@ -411,23 +415,24 @@ CardDAV errors (RFC 6352 §6.3.2.1):
 | Phase | Duration | Effort | Compliance | Deliverables | Status |
 |-------|----------|--------|-----------|--------------|--------|
 | **Phase 0: Critical Fixes** | 1 day | 1h | 72% | Fix DAV header, add `supported-report-set` | ✅ **Complete** (2026-01-29) |
-| **Phase 1: Discovery & Errors** | 1 week | 8h | 80% | Property generators, precondition XML | 🔄 **In Progress** (40% done) |
-| **Phase 2: ACL Minimal Profile** | 1 week | 8h | 82% | `DAV:acl` serializer, `need-privileges` | ⏳ Pending |
-| **Phase 3: Query Improvements** | 2 weeks | 15h | 85% | Collation, validation, selective data | ⏳ Pending |
-| **Subtotal (Production)** | **4 weeks** | **32h** | **85%** | **Client-ready release** | **~20% Complete** |
+| **Phase 1: Discovery & Errors** | 1 week | 8h | 80% | Property generators, precondition XML | ✅ **Complete** (2026-01-29) |
+| **Phase 2: ACL Minimal Profile** | 1 week | 8h | 82% | `DAV:acl` serializer, `need-privileges` | ✅ **Complete** (2026-01-30) |
+| **Phase 3: Query Improvements** | 2 weeks | 15h | 85% | Collation, validation, selective data | ✅ **Complete** (2026-02-01) |
+| **Subtotal (Production)** | **4 weeks** | **32h** | **85%** | **Client-ready release** | ✅ **100% Complete** |
 | **Phase 4+: Advanced** | Future | 40h+ | 90%+ | Scheduling, free-busy, full ACL | ⏳ Pending |
 
-### Progress Update (2026-01-29) {#progress-update}
+### Progress Update (2026-02-01) {#progress-update}
 
-✅ **Recently Completed**:
-- Property Discovery Implementation:
-  - `DAV:supported-report-set` for all collection types
-  - `CALDAV:supported-calendar-component-set` for calendars
-  - `CARDDAV:supported-address-data` for addressbooks
-  - `CALDAV:supported-collation-set` for calendars
-- 7 unit tests (all passing)
-- 5 integration tests
-- Integrated into PROPFIND handler
+✅ **Recently Completed** (Phase 3):
+- **P3.1**: Text-Match Collation (ICU4X integration, i;unicode-casemap)
+- **P3.2**: Sync-Token Validation (retention window, 410 Gone for expired tokens)
+- **P3.3**: Selective Calendar-Data Serialization (RFC 4791 §9.6 partial retrieval)
+- **P2.1-P2.3**: ACL Minimal Profile (DAV:acl, need-privileges, current-user-privilege-set)
+
+✅ **Previously Completed** (Phase 0):
+- Property Discovery: supported-report-set, supported-calendar-component-set, supported-address-data
+- 7 unit tests + 5 integration tests
+- DAV header Class 2 fix
 
 ### Detailed Phase Plans {#detailed-plans}
 
