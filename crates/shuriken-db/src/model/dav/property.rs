@@ -35,6 +35,8 @@ pub struct DavProperty {
     pub value_time: Option<chrono::NaiveTime>,
     pub value_interval: Option<PgInterval>,
     pub value_tstzrange: Option<PgTstzRange>,
+    pub value_text_ascii_fold: Option<String>,
+    pub value_text_unicode_fold: Option<String>,
 }
 
 /// Insert struct for creating new DAV properties

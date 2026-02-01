@@ -5,7 +5,7 @@
 
 use crate::db::connection::DbConnection;
 use crate::db::query::text_match::{
-    CollationError, build_like_pattern, normalize_for_ilike, normalize_for_sql_upper,
+    Casemap, CollationError, build_like_pattern, normalize_for_folded_compare,
 };
 use crate::db::schema::{card_index, dav_component, dav_instance, dav_parameter, dav_property};
 use crate::model::dav::instance::DavInstance;
@@ -235,8 +235,16 @@ async fn apply_text_match_to_property(
     prop_name: &str,
     text_match: &TextMatch,
 ) -> anyhow::Result<Vec<uuid::Uuid>> {
-    let collation = normalize_for_sql_upper(&text_match.value, text_match.collation.as_ref())?;
-    let pattern = build_like_pattern(&collation.value, &text_match.match_type);
+    let collation = normalize_for_folded_compare(&text_match.value, text_match.collation.as_ref())?;
+    let raw_value = collation.value;
+    let raw_pattern = build_like_pattern(&raw_value, &text_match.match_type);
+    let value = raw_value.replace('\'', "''");
+    let pattern = raw_pattern.replace('\'', "''");
+    let fold_column = match collation.casemap {
+        Casemap::Octet => None,
+        Casemap::Ascii => Some("value_text_ascii_fold"),
+        Casemap::Unicode => Some("value_text_unicode_fold"),
+    };
 
     let mut query = dav_component::table
         .inner_join(dav_property::table.on(dav_property::component_id.eq(dav_component::id)))
@@ -250,23 +258,20 @@ async fn apply_text_match_to_property(
     if collation.case_sensitive {
         // i;octet - case-sensitive comparison
         query = match text_match.match_type {
-            MatchType::Equals => query.filter(dav_property::value_text.eq(&collation.value)),
-            MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => query.filter(
-                dav_property::value_text
-                    .like(build_like_pattern(&collation.value, &text_match.match_type)),
-            ),
+            MatchType::Equals => query.filter(dav_property::value_text.eq(&raw_value)),
+            MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
+                query.filter(dav_property::value_text.like(raw_pattern))
+            }
         };
-    } else {
-        // Case-insensitive: use SQL UPPER() with the pre-uppercased pattern
+    } else if let Some(column) = fold_column {
+        // Case-insensitive: use folded generated columns
         query = match text_match.match_type {
             MatchType::Equals => query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(
-                &format!("UPPER(value_text) = '{}'", collation.value),
+                &format!("{column} = '{value}'"),
             )),
-            MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
-                query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
-                    "UPPER(value_text) LIKE '{pattern}'"
-                )))
-            }
+            MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => query.filter(
+                diesel::dsl::sql::<diesel::sql_types::Bool>(&format!("{column} LIKE '{pattern}'")),
+            ),
         };
     }
 
@@ -312,13 +317,29 @@ async fn evaluate_email_filter(
     }
 
     if let Some(text_match) = &prop_filter.text_match {
-        let value = normalize_for_ilike(&text_match.value, text_match.collation.as_ref())?;
+        let collation =
+            normalize_for_folded_compare(&text_match.value, text_match.collation.as_ref())?;
+        let value = collation.value;
         let pattern = build_like_pattern(&value, &text_match.match_type);
+        let (column_prefix, use_fold) = match collation.casemap {
+            Casemap::Octet => ("data", false),
+            Casemap::Ascii => ("data_ascii_fold", true),
+            Casemap::Unicode => ("data_unicode_fold", true),
+        };
 
         // Query entities where any email in the array matches
-        let query_str = "SELECT DISTINCT entity_id FROM card_index, \
+        let query_str = if use_fold {
+            format!(
+                "SELECT DISTINCT entity_id FROM card_index, \
+                 jsonb_array_elements_text({column_prefix}->'emails') AS email \
+                 WHERE deleted_at IS NULL AND email LIKE $1"
+            )
+        } else {
+            "SELECT DISTINCT entity_id FROM card_index, \
              jsonb_array_elements_text(data->'emails') AS email \
-             WHERE deleted_at IS NULL AND email ILIKE $1";
+             WHERE deleted_at IS NULL AND email LIKE $1"
+                .to_string()
+        };
 
         let query = diesel::sql_query(query_str).bind::<Text, _>(
             if text_match.match_type == MatchType::Equals {
@@ -393,13 +414,29 @@ async fn evaluate_phone_filter(
     }
 
     if let Some(text_match) = &prop_filter.text_match {
-        let value = normalize_for_ilike(&text_match.value, text_match.collation.as_ref())?;
+        let collation =
+            normalize_for_folded_compare(&text_match.value, text_match.collation.as_ref())?;
+        let value = collation.value;
         let pattern = build_like_pattern(&value, &text_match.match_type);
+        let (column_prefix, use_fold) = match collation.casemap {
+            Casemap::Octet => ("data", false),
+            Casemap::Ascii => ("data_ascii_fold", true),
+            Casemap::Unicode => ("data_unicode_fold", true),
+        };
 
         // Query entities where any phone in the array matches
-        let query_str = "SELECT DISTINCT entity_id FROM card_index, \
+        let query_str = if use_fold {
+            format!(
+                "SELECT DISTINCT entity_id FROM card_index, \
+                 jsonb_array_elements_text({column_prefix}->'phones') AS phone \
+                 WHERE deleted_at IS NULL AND phone LIKE $1"
+            )
+        } else {
+            "SELECT DISTINCT entity_id FROM card_index, \
              jsonb_array_elements_text(data->'phones') AS phone \
-             WHERE deleted_at IS NULL AND phone ILIKE $1";
+             WHERE deleted_at IS NULL AND phone LIKE $1"
+                .to_string()
+        };
 
         let query = diesel::sql_query(query_str).bind::<Text, _>(
             if text_match.match_type == MatchType::Equals {
@@ -678,8 +715,12 @@ async fn evaluate_single_param_filter(
             .collect())
     } else if let Some(text_match) = &param_filter.text_match {
         // Parameter must exist and match text
-        let collation = normalize_for_sql_upper(&text_match.value, text_match.collation.as_ref())?;
-        let pattern = build_like_pattern(&collation.value, &text_match.match_type);
+        let collation =
+            normalize_for_folded_compare(&text_match.value, text_match.collation.as_ref())?;
+        let raw_value = collation.value;
+        let raw_pattern = build_like_pattern(&raw_value, &text_match.match_type);
+        let value = raw_value.replace('\'', "''");
+        let pattern = raw_pattern.replace('\'', "''");
 
         let mut query = dav_parameter::table
             .filter(dav_parameter::property_id.eq_any(prop_ids))
@@ -690,19 +731,24 @@ async fn evaluate_single_param_filter(
         // Apply text matching
         if collation.case_sensitive {
             query = match text_match.match_type {
-                MatchType::Equals => query.filter(dav_parameter::value.eq(&collation.value)),
+                MatchType::Equals => query.filter(dav_parameter::value.eq(&raw_value)),
                 MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
-                    query.filter(dav_parameter::value.like(&pattern))
+                    query.filter(dav_parameter::value.like(&raw_pattern))
                 }
             };
         } else {
+            let func = match collation.casemap {
+                Casemap::Ascii => "ascii_casemap",
+                Casemap::Unicode => "unicode_casemap_nfc",
+                Casemap::Octet => "ascii_casemap",
+            };
             query = match text_match.match_type {
                 MatchType::Equals => query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(
-                    &format!("UPPER(value) = '{}'", collation.value),
+                    &format!("{func}(value) = '{value}'"),
                 )),
                 MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
                     query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
-                        "UPPER(value) LIKE '{pattern}'"
+                        "{func}(value) LIKE '{pattern}'"
                     )))
                 }
             };
@@ -741,59 +787,66 @@ async fn evaluate_single_param_filter(
 }
 
 /// ## Summary
-/// Applies text-match to `card_index` query for specific property using ILIKE.
+/// Applies text-match to `card_index` query for specific property using
+/// casemap-folded columns.
 fn apply_text_match_card_index(
     query: card_index::BoxedQuery<'static, diesel::pg::Pg>,
     text_match: &TextMatch,
     prop_name: &str,
 ) -> Result<card_index::BoxedQuery<'static, diesel::pg::Pg>, CollationError> {
     use diesel::dsl::sql;
-    use diesel::sql_types::{Bool, Text};
+    use diesel::sql_types::Bool;
 
-    let value = normalize_for_ilike(&text_match.value, text_match.collation.as_ref())?;
-    let pattern = build_like_pattern(&value, &text_match.match_type);
+    let collation = normalize_for_folded_compare(&text_match.value, text_match.collation.as_ref())?;
+    let value = collation.value.replace('\'', "''");
+    let pattern = build_like_pattern(&collation.value, &text_match.match_type).replace('\'', "''");
+    let (fn_column, data_column) = match collation.casemap {
+        Casemap::Octet => ("fn", "data"),
+        Casemap::Ascii => ("fn_ascii_fold", "data_ascii_fold"),
+        Casemap::Unicode => ("fn_unicode_fold", "data_unicode_fold"),
+    };
 
     // Select the appropriate column or JSONB field based on property name
     Ok(match prop_name {
         "FN" => match text_match.match_type {
-            MatchType::Equals => query.filter(card_index::fn_.ilike(value)),
+            MatchType::Equals => query.filter(sql::<Bool>(&format!("{fn_column} = '{value}'"))),
             MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
-                query.filter(card_index::fn_.ilike(pattern))
+                query.filter(sql::<Bool>(&format!("{fn_column} LIKE '{pattern}'")))
             }
         },
         "ORG" => match text_match.match_type {
             MatchType::Equals => {
-                query.filter(sql::<Bool>("(data->>'org') ILIKE ").bind::<Text, _>(value))
+                query.filter(sql::<Bool>(&format!("({data_column}->>'org') = '{value}'")))
             }
-            MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
-                query.filter(sql::<Bool>("(data->>'org') ILIKE ").bind::<Text, _>(pattern))
-            }
+            MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => query.filter(
+                sql::<Bool>(&format!("({data_column}->>'org') LIKE '{pattern}'")),
+            ),
         },
         "TITLE" => match text_match.match_type {
-            MatchType::Equals => {
-                query.filter(sql::<Bool>("(data->>'title') ILIKE ").bind::<Text, _>(value))
-            }
-            MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
-                query.filter(sql::<Bool>("(data->>'title') ILIKE ").bind::<Text, _>(pattern))
-            }
+            MatchType::Equals => query.filter(sql::<Bool>(&format!(
+                "({data_column}->>'title') = '{value}'"
+            ))),
+            MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => query.filter(
+                sql::<Bool>(&format!("({data_column}->>'title') LIKE '{pattern}'")),
+            ),
         },
         _ => query, // N is handled via card_index but doesn't have a dedicated column
     })
 }
 
 /// ## Summary
-/// Applies text-match to UID column using ILIKE.
+/// Applies text-match to UID column using case-sensitive comparisons.
 fn apply_text_match_uid(
     query: card_index::BoxedQuery<'static, diesel::pg::Pg>,
     text_match: &TextMatch,
 ) -> Result<card_index::BoxedQuery<'static, diesel::pg::Pg>, CollationError> {
-    let value = normalize_for_ilike(&text_match.value, text_match.collation.as_ref())?;
+    let value = text_match.value.clone();
     let pattern = build_like_pattern(&value, &text_match.match_type);
 
     Ok(match text_match.match_type {
-        MatchType::Equals => query.filter(card_index::uid.ilike(value)),
+        MatchType::Equals => query.filter(card_index::uid.eq(value)),
         MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
-            query.filter(card_index::uid.ilike(pattern))
+            query.filter(card_index::uid.like(pattern))
         }
     })
 }

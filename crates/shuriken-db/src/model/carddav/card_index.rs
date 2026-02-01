@@ -27,6 +27,14 @@ pub struct CardIndex {
     pub updated_at: chrono::DateTime<chrono::Utc>,
     /// Soft delete timestamp.
     pub deleted_at: Option<chrono::DateTime<chrono::Utc>>,
+    /// ASCII case-folded FN for i;ascii-casemap collation.
+    pub fn_ascii_fold: Option<String>,
+    /// Unicode case-folded FN for i;unicode-casemap collation.
+    pub fn_unicode_fold: Option<String>,
+    /// ASCII case-folded data for i;ascii-casemap collation.
+    pub data_ascii_fold: Option<JsonValue>,
+    /// Unicode case-folded data for i;unicode-casemap collation.
+    pub data_unicode_fold: Option<JsonValue>,
 }
 
 /// New card index entry for insertion.

@@ -40,6 +40,10 @@ pub struct CalIndex {
     pub updated_at: DateTime<Utc>,
     /// Soft delete timestamp.
     pub deleted_at: Option<DateTime<Utc>>,
+    /// ASCII case-folded metadata for i;ascii-casemap collation.
+    pub metadata_ascii_fold: Option<JsonValue>,
+    /// Unicode case-folded metadata for i;unicode-casemap collation.
+    pub metadata_unicode_fold: Option<JsonValue>,
 }
 
 /// New calendar index entry for insertion.

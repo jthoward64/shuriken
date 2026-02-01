@@ -4,7 +4,7 @@
 //! and property-filter matching against calendar data.
 
 use crate::db::connection::DbConnection;
-use crate::db::query::text_match::{build_like_pattern, normalize_for_sql_upper};
+use crate::db::query::text_match::{Casemap, build_like_pattern, normalize_for_folded_compare};
 use crate::db::schema::{cal_index, dav_instance, dav_parameter};
 use crate::model::dav::instance::DavInstance;
 use chrono::TimeDelta;
@@ -284,8 +284,16 @@ async fn apply_property_filters(
                 .collation
                 .clone()
                 .unwrap_or_else(|| "i;ascii-casemap".to_string());
-            let collation = normalize_for_sql_upper(&text_match.value, Some(&effective_collation))?;
+            let collation =
+                normalize_for_folded_compare(&text_match.value, Some(&effective_collation))?;
             let pattern = build_like_pattern(&collation.value, &text_match.match_type);
+            let value = collation.value.replace('"', "\"").replace('\'', "''");
+            let pattern = pattern.replace('\'', "''");
+            let fold_column = match collation.casemap {
+                Casemap::Octet => None,
+                Casemap::Ascii => Some("value_text_ascii_fold"),
+                Casemap::Unicode => Some("value_text_unicode_fold"),
+            };
 
             let mut query = dav_component::table
                 .inner_join(
@@ -306,24 +314,19 @@ async fn apply_property_filters(
             if collation.case_sensitive {
                 // i;octet - case-sensitive comparison
                 query = match text_match.match_type {
-                    MatchType::Equals => {
-                        query.filter(dav_property::value_text.eq(&collation.value))
-                    }
+                    MatchType::Equals => query.filter(dav_property::value_text.eq(&value)),
                     MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => query
-                        .filter(
-                            dav_property::value_text
-                                .like(build_like_pattern(&collation.value, &text_match.match_type)),
-                        ),
+                        .filter(dav_property::value_text.like(build_like_pattern(&value, &text_match.match_type))),
                 };
-            } else {
-                // Case-insensitive: use SQL UPPER() with pre-uppercased pattern
+            } else if let Some(column) = fold_column {
+                // Case-insensitive: use folded generated columns
                 query = match text_match.match_type {
                     MatchType::Equals => query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(
-                        &format!("UPPER(value_text) = '{}'", collation.value),
+                        &format!("{column} = '{value}'"),
                     )),
                     MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => query
                         .filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
-                            "UPPER(value_text) LIKE '{pattern}'"
+                            "{column} LIKE '{pattern}'"
                         ))),
                 };
             }
@@ -586,8 +589,11 @@ async fn evaluate_single_param_filter(
     } else if let Some(text_match) = &param_filter.text_match {
         // Parameter must exist and match text
         let effective_collation = get_effective_collation(text_match);
-        let collation = normalize_for_sql_upper(&text_match.value, Some(&effective_collation))?;
-        let pattern = build_like_pattern(&collation.value, &text_match.match_type);
+        let collation = normalize_for_folded_compare(&text_match.value, Some(&effective_collation))?;
+        let raw_value = collation.value;
+        let raw_pattern = build_like_pattern(&raw_value, &text_match.match_type);
+        let value = raw_value.replace('\'', "''");
+        let pattern = raw_pattern.replace('\'', "''");
 
         let mut query = dav_parameter::table
             .filter(dav_parameter::property_id.eq_any(prop_ids))
@@ -598,19 +604,24 @@ async fn evaluate_single_param_filter(
         // Apply text matching
         if collation.case_sensitive {
             query = match text_match.match_type {
-                MatchType::Equals => query.filter(dav_parameter::value.eq(&collation.value)),
+                MatchType::Equals => query.filter(dav_parameter::value.eq(&raw_value)),
                 MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
-                    query.filter(dav_parameter::value.like(&pattern))
+                    query.filter(dav_parameter::value.like(&raw_pattern))
                 }
             };
         } else {
+            let func = match collation.casemap {
+                Casemap::Ascii => "ascii_casemap",
+                Casemap::Unicode => "unicode_casemap_nfc",
+                Casemap::Octet => "ascii_casemap",
+            };
             query = match text_match.match_type {
                 MatchType::Equals => query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(
-                    &format!("UPPER(value) = '{}'", collation.value),
+                    &format!("{func}(value) = '{value}'"),
                 )),
                 MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
                     query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
-                        "UPPER(value) LIKE '{pattern}'"
+                        "{func}(value) LIKE '{pattern}'"
                     )))
                 }
             };

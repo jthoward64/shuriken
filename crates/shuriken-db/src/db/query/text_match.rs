@@ -60,6 +60,53 @@ pub struct CollationResult {
     pub value: String,
     /// Whether the comparison should be case-sensitive.
     pub case_sensitive: bool,
+    /// The casemap mode implied by the collation.
+    pub casemap: Casemap,
+}
+
+/// Supported casemap modes for text matching.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Casemap {
+    /// Case-sensitive (i;octet).
+    Octet,
+    /// ASCII-only casemap (i;ascii-casemap).
+    Ascii,
+    /// Unicode casemap (i;unicode-casemap).
+    Unicode,
+}
+
+/// ## Summary
+/// Normalizes text for comparison against casemap-specific stored columns.
+///
+/// For `i;unicode-casemap`, uses ICU case folding (lowercase) to align with
+/// `unicode_casemap_nfc()` generated columns. For `i;ascii-casemap`, uses
+/// ASCII-only lowercasing to align with `ascii_casemap()` generated columns.
+/// For `i;octet`, returns text as-is and marks comparison as case-sensitive.
+///
+/// ## Errors
+/// Returns [`CollationError::UnsupportedCollation`] if the collation is unknown.
+pub fn normalize_for_folded_compare(
+    text: &str,
+    collation: Option<&String>,
+) -> Result<CollationResult, CollationError> {
+    match collation.map(std::string::String::as_str) {
+        Some("i;octet") => Ok(CollationResult {
+            value: text.to_owned(),
+            case_sensitive: true,
+            casemap: Casemap::Octet,
+        }),
+        Some("i;unicode-casemap") | None => Ok(CollationResult {
+            value: CaseMapper::new().fold_string(text).into_owned(),
+            case_sensitive: false,
+            casemap: Casemap::Unicode,
+        }),
+        Some("i;ascii-casemap") => Ok(CollationResult {
+            value: text.to_ascii_lowercase(),
+            case_sensitive: false,
+            casemap: Casemap::Ascii,
+        }),
+        Some(unsupported) => Err(CollationError::UnsupportedCollation(unsupported.to_owned())),
+    }
 }
 
 /// ## Summary
@@ -90,6 +137,7 @@ pub fn normalize_for_sql_upper(
         Some("i;octet") => Ok(CollationResult {
             value: text.to_owned(),
             case_sensitive: true,
+            casemap: Casemap::Octet,
         }),
         // Use ICU case folding then uppercase for SQL UPPER() compatibility
         // Note: Full RFC 4790 compliance would require a pre-folded column in the DB
@@ -98,6 +146,7 @@ pub fn normalize_for_sql_upper(
             Ok(CollationResult {
                 value: folded.to_uppercase(),
                 case_sensitive: false,
+                casemap: Casemap::Unicode,
             })
         }
         // RFC 4790 §9.2.1: ASCII casemap converts ONLY ASCII letters (a-z) to uppercase
@@ -105,6 +154,7 @@ pub fn normalize_for_sql_upper(
         Some("i;ascii-casemap") => Ok(CollationResult {
             value: text.to_ascii_uppercase(),
             case_sensitive: false,
+            casemap: Casemap::Ascii,
         }),
         // Unsupported collation - return error per RFC 4791 §7.5.1
         Some(unsupported) => Err(CollationError::UnsupportedCollation(unsupported.to_owned())),
