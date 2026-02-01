@@ -59,9 +59,10 @@ pub async fn put(req: &mut Request, res: &mut Response, depot: &Depot) {
                 if let shuriken_service::auth::PathSegment::Item(s) = seg {
                     // Strip file extensions (.ics, .vcf) to get base slug
                     let cleaned = match s {
-                        shuriken_service::auth::ResourceIdentifier::Slug(slug) => {
-                            slug.trim_end_matches(".ics").trim_end_matches(".vcf").to_string()
-                        }
+                        shuriken_service::auth::ResourceIdentifier::Slug(slug) => slug
+                            .trim_end_matches(".ics")
+                            .trim_end_matches(".vcf")
+                            .to_string(),
                         shuriken_service::auth::ResourceIdentifier::Id(id) => id.to_string(),
                     };
                     Some(cleaned)
@@ -308,9 +309,10 @@ async fn check_put_authorization(
         })?;
 
     // Build resource path: /{type}/{owner_id}/{collection_id}/{item_or_glob}
-    let resource = if let Some(_inst) = existing {
-        // Update: check permission on the specific item
-        ResourceLocation::from_segments(vec![
+    let resource =
+        if let Some(_inst) = existing {
+            // Update: check permission on the specific item
+            ResourceLocation::from_segments(vec![
             PathSegment::ResourceType(ResourceType::Calendar),
             PathSegment::Owner(shuriken_service::auth::ResourceIdentifier::Id(owner_principal.id)),
             PathSegment::Collection(shuriken_service::auth::ResourceIdentifier::Id(collection_id)),
@@ -320,9 +322,9 @@ async fn check_put_authorization(
             tracing::error!(error = %e, "Failed to build resource location for PUT authorization");
             StatusCode::INTERNAL_SERVER_ERROR
         })?
-    } else {
-        // Create: check permission on the collection (glob patterns in policies will match)
-        ResourceLocation::from_segments(vec![
+        } else {
+            // Create: check permission on the collection (glob patterns in policies will match)
+            ResourceLocation::from_segments(vec![
             PathSegment::ResourceType(ResourceType::Calendar),
             PathSegment::Owner(shuriken_service::auth::ResourceIdentifier::Id(owner_principal.id)),
             PathSegment::Collection(shuriken_service::auth::ResourceIdentifier::Id(collection_id)),
@@ -331,7 +333,7 @@ async fn check_put_authorization(
             tracing::error!(error = %e, "Failed to build resource location for PUT authorization");
             StatusCode::INTERNAL_SERVER_ERROR
         })?
-    };
+        };
 
     // Get the authorizer
     let authorizer = authorizer_from_depot(depot).map_err(|e| {

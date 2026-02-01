@@ -244,7 +244,7 @@ async fn check_read_authorization(
         loc.clone()
     } else {
         // Fallback: Build resource location from instance data
-        use shuriken_service::auth::{PathSegment, ResourceLocation, ResourceIdentifier};
+        use shuriken_service::auth::{PathSegment, ResourceIdentifier, ResourceLocation};
         let segments = vec![
             PathSegment::ResourceType(resource_type),
             PathSegment::Collection(ResourceIdentifier::Id(instance.collection_id)),

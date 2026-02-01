@@ -88,19 +88,20 @@ async fn create_user_handler(req: &mut Request, depot: &mut Depot, res: &mut Res
 
     // For creating users, check if the authenticated user has admin/write access
     // We use a calendars path with glob to check general admin permissions
-    let principals_resource = match ResourceLocation::from_segments(vec![
-        PathSegment::ResourceType(shuriken_service::auth::ResourceType::Principal),
-    ]) {
-        Ok(resource) => resource,
-        Err(e) => {
-            tracing::error!(error = %e, "Failed to build principals resource location");
-            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
-            res.render(Json(ErrorResponse {
-                error: "Internal server error".to_string(),
-            }));
-            return;
-        }
-    };
+    let principals_resource =
+        match ResourceLocation::from_segments(vec![PathSegment::ResourceType(
+            shuriken_service::auth::ResourceType::Principal,
+        )]) {
+            Ok(resource) => resource,
+            Err(e) => {
+                tracing::error!(error = %e, "Failed to build principals resource location");
+                res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+                res.render(Json(ErrorResponse {
+                    error: "Internal server error".to_string(),
+                }));
+                return;
+            }
+        };
 
     if let Err(_e) = handler_require(depot, &subjects, &principals_resource, Action::Admin) {
         tracing::warn!(
@@ -394,7 +395,9 @@ async fn update_password_handler(req: &mut Request, depot: &mut Depot, res: &mut
 
     let principal_resource = match ResourceLocation::from_segments(vec![
         PathSegment::ResourceType(shuriken_service::auth::ResourceType::Principal),
-        PathSegment::Owner(shuriken_service::auth::ResourceIdentifier::Id(target_user.principal_id)),
+        PathSegment::Owner(shuriken_service::auth::ResourceIdentifier::Id(
+            target_user.principal_id,
+        )),
     ]) {
         Ok(resource) => resource,
         Err(e) => {

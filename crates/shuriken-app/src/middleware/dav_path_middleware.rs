@@ -90,10 +90,7 @@ impl salvo::Handler for DavPathMiddleware {
                         ResourceIdentifier::Slug(s) => DavIdentifier::from(s.clone()),
                         ResourceIdentifier::Id(uuid) => DavIdentifier::from(*uuid),
                     };
-                    depot.insert(
-                        depot_keys::TERMINAL_COLLECTION,
-                        dav_id,
-                    );
+                    depot.insert(depot_keys::TERMINAL_COLLECTION, dav_id);
                 }
 
                 // Store original location

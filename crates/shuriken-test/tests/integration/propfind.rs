@@ -1132,9 +1132,15 @@ async fn propfind_returns_acl_property() {
     // Seed additional ACL: Reader permission for "all" (anyone can read)
     // Use ResourceLocation to build the policy path
     let collection_path = shuriken_service::auth::ResourceLocation::from_segments(vec![
-        shuriken_service::auth::PathSegment::ResourceType(shuriken_service::auth::ResourceType::Calendar),
-        shuriken_service::auth::PathSegment::Owner(shuriken_service::auth::ResourceIdentifier::Id(principal_id)),
-        shuriken_service::auth::PathSegment::Collection(shuriken_service::auth::ResourceIdentifier::Id(collection_id)),
+        shuriken_service::auth::PathSegment::ResourceType(
+            shuriken_service::auth::ResourceType::Calendar,
+        ),
+        shuriken_service::auth::PathSegment::Owner(shuriken_service::auth::ResourceIdentifier::Id(
+            principal_id,
+        )),
+        shuriken_service::auth::PathSegment::Collection(
+            shuriken_service::auth::ResourceIdentifier::Id(collection_id),
+        ),
     ])
     .expect("Valid resource location")
     .serialize_to_path(false, false)
@@ -1250,9 +1256,15 @@ async fn propfind_acl_filters_by_resource_path() {
     // Seed ACL: All-access read only on collection 1
     // Use ResourceLocation to build the policy path
     let collection1_path = shuriken_service::auth::ResourceLocation::from_segments(vec![
-        shuriken_service::auth::PathSegment::ResourceType(shuriken_service::auth::ResourceType::Calendar),
-        shuriken_service::auth::PathSegment::Owner(shuriken_service::auth::ResourceIdentifier::Id(principal_id)),
-        shuriken_service::auth::PathSegment::Collection(shuriken_service::auth::ResourceIdentifier::Id(collection1_id)),
+        shuriken_service::auth::PathSegment::ResourceType(
+            shuriken_service::auth::ResourceType::Calendar,
+        ),
+        shuriken_service::auth::PathSegment::Owner(shuriken_service::auth::ResourceIdentifier::Id(
+            principal_id,
+        )),
+        shuriken_service::auth::PathSegment::Collection(
+            shuriken_service::auth::ResourceIdentifier::Id(collection1_id),
+        ),
     ])
     .expect("Valid resource location")
     .serialize_to_path(false, false)

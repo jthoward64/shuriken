@@ -4,8 +4,8 @@
 //! and property-filter matching against calendar data.
 
 use crate::db::connection::DbConnection;
-use crate::db::query::text_match::{Casemap, build_like_pattern, normalize_for_folded_compare};
-use crate::db::schema::{cal_index, dav_instance, dav_parameter};
+use crate::db::query::text_match::build_like_pattern;
+use crate::db::schema::{cal_index, dav_component, dav_instance, dav_parameter, dav_property};
 use crate::model::dav::instance::DavInstance;
 use chrono::TimeDelta;
 use diesel::prelude::*;
@@ -25,6 +25,8 @@ pub async fn find_matching_instances(
     collection_id: uuid::Uuid,
     query: &CalendarQuery,
 ) -> anyhow::Result<Vec<DavInstance>> {
+    tracing::debug!(collection_id = %collection_id, has_filter = query.filter.is_some(), "Finding matching instances");
+
     // Apply filter to get matching entity IDs
     let matching_entity_ids = if let Some(filter) = &query.filter {
         apply_calendar_filter(conn, filter).await?
@@ -38,6 +40,11 @@ pub async fn find_matching_instances(
             .load::<uuid::Uuid>(conn)
             .await?
     };
+
+    tracing::debug!(
+        entity_count = matching_entity_ids.len(),
+        "Found matching entity IDs"
+    );
 
     // Query instances by entity IDs and collection
     let mut query_builder = dav_instance::table
@@ -278,75 +285,7 @@ async fn apply_property_filters(
                 .copied()
                 .collect()
         } else if let Some(text_match) = &prop_filter.text_match {
-            // Property must exist and match text
-            // CalDAV defaults to i;ascii-casemap per RFC 4791 Section 7.5
-            let effective_collation = text_match
-                .collation
-                .clone()
-                .unwrap_or_else(|| "i;ascii-casemap".to_string());
-            let collation =
-                normalize_for_folded_compare(&text_match.value, Some(&effective_collation))?;
-            let pattern = build_like_pattern(&collation.value, &text_match.match_type);
-            let value = collation.value.replace('"', "\"").replace('\'', "''");
-            let pattern = pattern.replace('\'', "''");
-            let fold_column = match collation.casemap {
-                Casemap::Octet => None,
-                Casemap::Ascii => Some("value_text_ascii_fold"),
-                Casemap::Unicode => Some("value_text_unicode_fold"),
-            };
-
-            let mut query = dav_component::table
-                .inner_join(
-                    dav_property::table.on(dav_property::component_id.eq(dav_component::id)),
-                )
-                .filter(dav_component::entity_id.eq_any(entity_ids))
-                .filter(dav_property::name.eq(&prop_name))
-                .filter(dav_property::deleted_at.is_null())
-                .into_boxed();
-
-            if let Some(time_range) = &prop_filter.time_range
-                && let Some(filter_sql) = build_property_time_range_sql(time_range)
-            {
-                query = query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&filter_sql));
-            }
-
-            // Apply text matching based on collation and match type
-            if collation.case_sensitive {
-                // i;octet - case-sensitive comparison
-                query = match text_match.match_type {
-                    MatchType::Equals => query.filter(dav_property::value_text.eq(&value)),
-                    MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => query
-                        .filter(dav_property::value_text.like(build_like_pattern(&value, &text_match.match_type))),
-                };
-            } else if let Some(column) = fold_column {
-                // Case-insensitive: use folded generated columns
-                query = match text_match.match_type {
-                    MatchType::Equals => query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(
-                        &format!("{column} = '{value}'"),
-                    )),
-                    MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => query
-                        .filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
-                            "{column} LIKE '{pattern}'"
-                        ))),
-                };
-            }
-
-            let matched_ids = query
-                .select(dav_component::entity_id)
-                .distinct()
-                .load::<uuid::Uuid>(conn)
-                .await?;
-
-            // Handle negate: return entities that DON'T match
-            if text_match.negate {
-                entity_ids
-                    .iter()
-                    .filter(|id| !matched_ids.contains(id))
-                    .copied()
-                    .collect()
-            } else {
-                matched_ids
-            }
+            apply_text_match_filter(conn, entity_ids, prop_filter, &prop_name, text_match).await?
         } else if let Some(time_range) = &prop_filter.time_range {
             let mut query = dav_component::table
                 .inner_join(
@@ -409,6 +348,110 @@ async fn apply_property_filters(
     }
 
     Ok(final_ids)
+}
+
+#[expect(
+    clippy::too_many_lines,
+    reason = "Text-match filtering involves multiple considerations for collation and matching"
+)]
+async fn apply_text_match_filter(
+    conn: &mut DbConnection<'_>,
+    entity_ids: &[uuid::Uuid],
+    prop_filter: &shuriken_rfc::rfc::dav::core::PropFilter,
+    prop_name: &String,
+    text_match: &shuriken_rfc::rfc::dav::core::TextMatch,
+) -> Result<Vec<uuid::Uuid>, anyhow::Error> {
+    let effective_collation = text_match
+        .collation
+        .clone()
+        .unwrap_or_else(|| "i;ascii-casemap".to_string());
+    tracing::trace!(
+        prop_name = %prop_name,
+        search_value = %text_match.value,
+        collation = %effective_collation,
+        match_type = ?text_match.match_type,
+        negate = text_match.negate,
+        "Applying text-match property filter"
+    );
+    let casemap =
+        crate::db::query::text_match::Casemap::from_collation(Some(&effective_collation))?;
+    let value = text_match.value.replace('\'', "''");
+    let raw_pattern = build_like_pattern(&value, &text_match.match_type);
+    let pattern = raw_pattern.replace('\'', "''");
+    let fold_column = crate::db::query::text_match::get_fold_column(casemap);
+    let case_sensitive = casemap.is_case_sensitive();
+    let mut query = dav_component::table
+        .inner_join(dav_property::table.on(dav_property::component_id.eq(dav_component::id)))
+        .filter(dav_component::entity_id.eq_any(entity_ids))
+        .filter(dav_property::name.eq(prop_name))
+        .filter(dav_property::deleted_at.is_null())
+        .into_boxed();
+    if let Some(time_range) = &prop_filter.time_range
+        && let Some(filter_sql) = build_property_time_range_sql(time_range)
+    {
+        query = query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&filter_sql));
+    }
+    if case_sensitive {
+        // i;octet - case-sensitive comparison (no normalization)
+        query = match text_match.match_type {
+            MatchType::Equals => query.filter(dav_property::value_text.eq(&value)),
+            MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
+                query.filter(dav_property::value_text.like(&raw_pattern))
+            }
+        };
+    } else if let Some(column) = fold_column {
+        // Case-insensitive: compare fold column against normalized pattern
+        // Use PostgreSQL normalization function to ensure consistency
+        let normalized_value = crate::db::query::text_match::wrap_with_normalization_function(
+            &format!("'{value}'"),
+            casemap,
+        );
+        let normalized_pattern = crate::db::query::text_match::wrap_with_normalization_function(
+            &format!("'{pattern}'"),
+            casemap,
+        );
+
+        tracing::debug!(
+            fold_column = %column,
+            casemap = ?casemap,
+            normalized_value = %normalized_value,
+            normalized_pattern = %normalized_pattern,
+            "Building case-insensitive SQL query"
+        );
+
+        query = match text_match.match_type {
+            MatchType::Equals => query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(
+                &format!("{column} = {normalized_value}"),
+            )),
+            MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
+                query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
+                    "{column} LIKE {normalized_pattern}"
+                )))
+            }
+        };
+    } else {
+        // No folding needed
+    }
+    let matched_ids = query
+        .select(dav_component::entity_id)
+        .distinct()
+        .load::<uuid::Uuid>(conn)
+        .await?;
+    tracing::debug!(
+        prop_name = %prop_name,
+        matched_count = matched_ids.len(),
+        negate = text_match.negate,
+        "Text-match query completed"
+    );
+    Ok(if text_match.negate {
+        entity_ids
+            .iter()
+            .filter(|id| !matched_ids.contains(id))
+            .copied()
+            .collect()
+    } else {
+        matched_ids
+    })
 }
 
 /// ## Summary
@@ -589,10 +632,19 @@ async fn evaluate_single_param_filter(
     } else if let Some(text_match) = &param_filter.text_match {
         // Parameter must exist and match text
         let effective_collation = get_effective_collation(text_match);
-        let collation = normalize_for_folded_compare(&text_match.value, Some(&effective_collation))?;
-        let raw_value = collation.value;
-        let raw_pattern = build_like_pattern(&raw_value, &text_match.match_type);
-        let value = raw_value.replace('\'', "''");
+        let casemap =
+            crate::db::query::text_match::Casemap::from_collation(Some(&effective_collation))?;
+
+        tracing::trace!(
+            param_name = %param_name,
+            search_value = %text_match.value,
+            collation = %effective_collation,
+            casemap = ?casemap,
+            "Applying text-match param filter"
+        );
+
+        let raw_value = text_match.value.replace('\'', "''");
+        let raw_pattern = build_like_pattern(&text_match.value, &text_match.match_type);
         let pattern = raw_pattern.replace('\'', "''");
 
         let mut query = dav_parameter::table
@@ -602,7 +654,7 @@ async fn evaluate_single_param_filter(
             .into_boxed();
 
         // Apply text matching
-        if collation.case_sensitive {
+        if casemap.is_case_sensitive() {
             query = match text_match.match_type {
                 MatchType::Equals => query.filter(dav_parameter::value.eq(&raw_value)),
                 MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
@@ -610,18 +662,35 @@ async fn evaluate_single_param_filter(
                 }
             };
         } else {
-            let func = match collation.casemap {
-                Casemap::Ascii => "ascii_casemap",
-                Casemap::Unicode => "unicode_casemap_nfc",
-                Casemap::Octet => "ascii_casemap",
-            };
+            // Use PostgreSQL normalization function
+            let normalized_value = crate::db::query::text_match::wrap_with_normalization_function(
+                &format!("'{raw_value}'"),
+                casemap,
+            );
+            let normalized_pattern = crate::db::query::text_match::wrap_with_normalization_function(
+                &format!("'{pattern}'"),
+                casemap,
+            );
+
             query = match text_match.match_type {
-                MatchType::Equals => query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(
-                    &format!("{func}(value) = '{value}'"),
-                )),
+                MatchType::Equals => {
+                    query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
+                        "{}(value) = {normalized_value}",
+                        if matches!(casemap, crate::db::query::text_match::Casemap::Ascii) {
+                            "ascii_casemap"
+                        } else {
+                            "unicode_casemap_nfc"
+                        }
+                    )))
+                }
                 MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
                     query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
-                        "{func}(value) LIKE '{pattern}'"
+                        "{}(value) LIKE {normalized_pattern}",
+                        if matches!(casemap, crate::db::query::text_match::Casemap::Ascii) {
+                            "ascii_casemap"
+                        } else {
+                            "unicode_casemap_nfc"
+                        }
                     )))
                 }
             };

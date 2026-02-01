@@ -18,8 +18,9 @@ use shuriken_service::auth::get_resolved_location_from_depot;
 ///
 /// ## Errors
 /// Returns 400 for invalid paths, 500 for server errors.
+#[tracing::instrument(skip_all, fields(path = %req.uri().path()))]
 pub async fn handle(
-    _req: &mut Request,
+    req: &mut Request,
     res: &mut Response,
     query: AddressbookQuery,
     properties: Vec<PropertyName>,
@@ -72,7 +73,7 @@ pub async fn handle(
     {
         Ok(ms) => ms,
         Err(e) => {
-            tracing::error!("Failed to execute addressbook-query: {}", e);
+            tracing::error!(error = %e, "Failed to execute addressbook-query");
             res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
             return;
         }

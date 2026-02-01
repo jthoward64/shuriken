@@ -330,10 +330,12 @@ async fn check_copy_authorization(
             PathSegment::Owner(ResourceIdentifier::Id(dest_collection.owner_principal_id)),
             PathSegment::Collection(ResourceIdentifier::Id(dest_collection.id)),
         ];
-        
+
         // Add the item segment with the destination resource name as a slug
-        segments.push(PathSegment::Item(ResourceIdentifier::Slug(resource_name.to_string())));
-        
+        segments.push(PathSegment::Item(ResourceIdentifier::Slug(
+            resource_name.to_string(),
+        )));
+
         let resource = ResourceLocation::from_segments(segments).map_err(|e| {
             tracing::error!(error = %e, "Failed to build destination resource");
             (
@@ -342,12 +344,12 @@ async fn check_copy_authorization(
                 destination.to_string(),
             )
         })?;
-        
+
         // For error reporting, serialize the resource path
         let path = resource
             .serialize_to_full_path(false, false)
             .unwrap_or_else(|_| destination.to_string());
-        
+
         (resource, path)
     };
 

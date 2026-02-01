@@ -25,6 +25,7 @@ use shuriken_service::dav::service::collection::{CreateCollectionContext, create
 ///
 /// ## Errors
 /// Returns 400 for invalid XML, 403 for authorization failures, 409 if exists, 500 for errors.
+#[tracing::instrument(skip_all, fields(path = %req.uri().path()))]
 #[handler]
 pub async fn mkcol_extended(req: &mut Request, res: &mut Response, depot: &Depot) {
     // Get path to determine where to create the addressbook

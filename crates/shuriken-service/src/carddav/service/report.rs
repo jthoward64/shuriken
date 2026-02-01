@@ -5,10 +5,10 @@
 use shuriken_db::db::connection::DbConnection;
 use shuriken_db::db::query::carddav::filter::find_matching_instances;
 use shuriken_db::db::query::report_property::build_instance_properties;
+use shuriken_db::model::dav::instance::DavInstance;
 use shuriken_rfc::rfc::dav::core::{
     AddressbookMultiget, AddressbookQuery, Href, Multistatus, PropertyName, PropstatResponse,
 };
-use shuriken_db::model::dav::instance::DavInstance;
 
 use crate::auth::{PathSegment, ResourceIdentifier, ResourceLocation};
 use crate::error::ServiceResult;
@@ -24,10 +24,11 @@ fn build_item_href(
 ) -> ServiceResult<Href> {
     let mut segments = base_location.segments().to_vec();
     segments.push(PathSegment::Item(ResourceIdentifier::Id(instance.id)));
-    
-    let location = ResourceLocation::from_segments(segments)
-        .map_err(|e| crate::error::ServiceError::ParseError(format!("Failed to build item location: {e}")))?;
-    
+
+    let location = ResourceLocation::from_segments(segments).map_err(|e| {
+        crate::error::ServiceError::ParseError(format!("Failed to build item location: {e}"))
+    })?;
+
     let path = location.serialize_to_full_path(true, false)?;
     Ok(Href::new(path))
 }

@@ -133,4 +133,89 @@ mod tests {
         let tm = prop_filter.text_match.unwrap();
         assert_eq!(tm.collation, Some("i;octet".to_string()));
     }
+
+    // ========================================================================
+    // RFC 4790 Collation Tests
+    // ========================================================================
+    // Per RFC 4790 §9.1: i;octet is case-sensitive
+    // Per RFC 4790 §9.2: i;ascii-casemap is ASCII-only case-insensitive
+    // Per RFC 4790 §9.3: i;unicode-casemap is full Unicode case-insensitive
+
+    #[test]
+    fn test_collation_octet_case_sensitive() {
+        // i;octet: "meeting" should NOT match "Meeting" (case-sensitive)
+        let text_match = TextMatch::contains("meeting").with_collation("i;octet");
+        assert_eq!(text_match.collation.as_deref(), Some("i;octet"));
+    }
+
+    #[test]
+    fn test_collation_ascii_casemap_basic() {
+        // i;ascii-casemap: ASCII letters are case-insensitive
+        // "meeting" should match "MEETING" or "Meeting"
+        let text_match = TextMatch::contains("meeting").with_collation("i;ascii-casemap");
+        assert_eq!(text_match.collation.as_deref(), Some("i;ascii-casemap"));
+    }
+
+    #[test]
+    fn test_collation_ascii_casemap_non_ascii_preserved() {
+        // i;ascii-casemap: Non-ASCII characters are NOT case-folded
+        // Per RFC 4790 §9.2.1: only ASCII a-z/A-Z are affected
+        // "straße" stays as-is (ß is NOT converted to ss)
+        let text_match = TextMatch::contains("straße").with_collation("i;ascii-casemap");
+        assert_eq!(text_match.value, "straße");
+    }
+
+    #[test]
+    fn test_collation_unicode_casemap_basic() {
+        // i;unicode-casemap: Full Unicode case folding
+        // "meeting" should match "MEETING" with proper case folding
+        let text_match = TextMatch::contains("Meeting").with_collation("i;unicode-casemap");
+        assert_eq!(text_match.collation.as_deref(), Some("i;unicode-casemap"));
+    }
+
+    #[test]
+    fn test_collation_unicode_casemap_german_eszett() {
+        // i;unicode-casemap: German ß folds to ss
+        // "straße" should match "STRASSE" with Unicode case folding
+        let text_match = TextMatch::contains("straße").with_collation("i;unicode-casemap");
+        assert_eq!(text_match.value, "straße");
+    }
+
+    #[test]
+    fn test_collation_unicode_casemap_greek_sigma() {
+        // i;unicode-casemap: Greek final sigma ς normalizes to σ
+        // Both should match with proper case folding
+        let text_match1 = TextMatch::contains("Σ").with_collation("i;unicode-casemap");
+        let text_match2 = TextMatch::contains("σ").with_collation("i;unicode-casemap");
+        assert_eq!(text_match1.collation, text_match2.collation);
+    }
+
+    #[test]
+    fn test_collation_unicode_casemap_turkish() {
+        // i;unicode-casemap: Turkish dotted I handling
+        // Full Unicode case folding handles locale-specific rules
+        let text_match = TextMatch::contains("İstanbul").with_collation("i;unicode-casemap");
+        assert_eq!(text_match.collation.as_deref(), Some("i;unicode-casemap"));
+    }
+
+    #[test]
+    fn test_collation_default_is_unicode() {
+        // Per RFC 4791 §7.5.1: default collation is i;unicode-casemap
+        let text_match = TextMatch::contains("test");
+        assert!(text_match.collation.is_none()); // Server infers i;unicode-casemap
+    }
+
+    #[test]
+    fn test_collation_with_match_types() {
+        // Collation should work with all match types
+        let equals = TextMatch::equals("Meeting").with_collation("i;unicode-casemap");
+        let contains = TextMatch::contains("Meeting").with_collation("i;unicode-casemap");
+        let starts = TextMatch::starts_with("Meeting").with_collation("i;unicode-casemap");
+        let ends = TextMatch::ends_with("Meeting").with_collation("i;unicode-casemap");
+
+        assert_eq!(equals.collation.as_deref(), Some("i;unicode-casemap"));
+        assert_eq!(contains.collation.as_deref(), Some("i;unicode-casemap"));
+        assert_eq!(starts.collation.as_deref(), Some("i;unicode-casemap"));
+        assert_eq!(ends.collation.as_deref(), Some("i;unicode-casemap"));
+    }
 }

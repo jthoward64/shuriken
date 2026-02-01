@@ -801,3 +801,566 @@ async fn report_unsupported_type() {
         response.status
     );
 }
+// ============================================================================
+// RFC 4790 Collation Integration Tests
+// ============================================================================
+
+/// ## Summary
+/// Test calendar-query with i;octet (case-sensitive) collation.
+/// Per RFC 4790 §9.1: i;octet performs byte-by-byte comparison.
+#[test_log::test(tokio::test)]
+async fn calendar_query_collation_octet_case_sensitive() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
+
+    let collection_id = test_db
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
+        .await
+        .expect("Failed to seed collection");
+
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
+
+    // Create event with "Meeting" (capital M) in summary
+    let ical = sample_icalendar_event("octet-test@example.com", "Meeting Room Booking");
+    TestRequest::put(&caldav_item_path("testuser", "testcal", "octet.ics"))
+        .if_none_match("*")
+        .icalendar_body(&ical)
+        .send(&service)
+        .await
+        .assert_status(StatusCode::CREATED);
+
+    // Search for "meeting" (lowercase) with i;octet - should NOT match
+    let body = r#"<?xml version="1.0" encoding="utf-8"?>
+<C:calendar-query xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:D="DAV:">
+  <D:prop>
+    <D:getetag/>
+  </D:prop>
+  <C:filter>
+    <C:comp-filter name="VCALENDAR">
+      <C:comp-filter name="VEVENT">
+        <C:prop-filter name="SUMMARY">
+          <C:text-match collation="i;octet">meeting</C:text-match>
+        </C:prop-filter>
+      </C:comp-filter>
+    </C:comp-filter>
+  </C:filter>
+</C:calendar-query>"#;
+
+    let response = TestRequest::report(&caldav_collection_path("testuser", "testcal"))
+        .xml_body(body)
+        .send(&service)
+        .await;
+
+    let response = response.assert_status(StatusCode::MULTI_STATUS);
+    // Should return empty result (no match due to case sensitivity)
+    let body_text = response.body_string();
+    assert!(
+        !body_text.contains("octet.ics"),
+        "i;octet should be case-sensitive: 'meeting' should NOT match 'Meeting'"
+    );
+}
+
+/// ## Summary
+/// Test calendar-query with i;unicode-casemap (default) collation.
+/// Per RFC 4790 §9.3 and RFC 4791 §7.5.1: Full Unicode case folding.
+#[test_log::test(tokio::test)]
+async fn calendar_query_collation_unicode_case_insensitive() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
+
+    let collection_id = test_db
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
+        .await
+        .expect("Failed to seed collection");
+
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
+
+    // Create event with "Meeting" (capital M)
+    let ical = sample_icalendar_event("unicode-test@example.com", "Meeting Room Booking");
+    TestRequest::put(&caldav_item_path("testuser", "testcal", "unicode.ics"))
+        .if_none_match("*")
+        .icalendar_body(&ical)
+        .send(&service)
+        .await
+        .assert_status(StatusCode::CREATED);
+
+    // Search for "meeting" (lowercase) with i;unicode-casemap - SHOULD match
+    let body = r#"<?xml version="1.0" encoding="utf-8"?>
+<C:calendar-query xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:D="DAV:">
+  <D:prop>
+    <D:getetag/>
+  </D:prop>
+  <C:filter>
+    <C:comp-filter name="VCALENDAR">
+      <C:comp-filter name="VEVENT">
+        <C:prop-filter name="SUMMARY">
+          <C:text-match collation="i;unicode-casemap">meeting</C:text-match>
+        </C:prop-filter>
+      </C:comp-filter>
+    </C:comp-filter>
+  </C:filter>
+</C:calendar-query>"#;
+
+    let response = TestRequest::report(&caldav_collection_path("testuser", "testcal"))
+        .xml_body(body)
+        .send(&service)
+        .await;
+
+    let response = response.assert_status(StatusCode::MULTI_STATUS);
+    let body_text = response.body_string();
+    // Should return one matching result with UUID-based href
+    assert!(
+        response.count_multistatus_responses() == 1,
+        "i;unicode-casemap should be case-insensitive: 'meeting' SHOULD match 'Meeting' (found {} responses)",
+        response.count_multistatus_responses()
+    );
+    assert!(
+        body_text.contains(".ics</D:href>"),
+        "Response should contain at least one .ics href"
+    );
+}
+
+/// ## Summary
+/// Test calendar-query with uppercase search term matching lowercase content.
+/// Per RFC 4790 §9.3: i;unicode-casemap is bidirectional case-insensitive.
+#[test_log::test(tokio::test)]
+async fn calendar_query_collation_uppercase_search() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
+
+    let collection_id = test_db
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
+        .await
+        .expect("Failed to seed collection");
+
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
+
+    // Create event with lowercase "meeting"
+    let ical = sample_icalendar_event("uppercase-search@example.com", "meeting room");
+    TestRequest::put(&caldav_item_path("testuser", "testcal", "uppersearch.ics"))
+        .if_none_match("*")
+        .icalendar_body(&ical)
+        .send(&service)
+        .await
+        .assert_status(StatusCode::CREATED);
+
+    // Search for "MEETING" (uppercase) - SHOULD match "meeting" (lowercase)
+    let body = r#"<?xml version="1.0" encoding="utf-8"?>
+<C:calendar-query xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:D="DAV:">
+  <D:prop>
+    <D:getetag/>
+  </D:prop>
+  <C:filter>
+    <C:comp-filter name="VCALENDAR">
+      <C:comp-filter name="VEVENT">
+        <C:prop-filter name="SUMMARY">
+          <C:text-match collation="i;unicode-casemap">MEETING</C:text-match>
+        </C:prop-filter>
+      </C:comp-filter>
+    </C:comp-filter>
+  </C:filter>
+</C:calendar-query>"#;
+
+    let response = TestRequest::report(&caldav_collection_path("testuser", "testcal"))
+        .xml_body(body)
+        .send(&service)
+        .await;
+
+    let response = response.assert_status(StatusCode::MULTI_STATUS);
+    let body_text = response.body_string();
+    assert!(
+        response.count_multistatus_responses() == 1,
+        "i;unicode-casemap should be case-insensitive: 'MEETING' SHOULD match 'meeting' (found {} responses)",
+        response.count_multistatus_responses()
+    );
+    assert!(
+        body_text.contains(".ics</D:href>"),
+        "Response should contain at least one .ics href"
+    );
+}
+
+/// ## Summary
+/// Test calendar-query with mixed case search and content.
+/// Per RFC 4790 §9.3: Full Unicode normalization and case folding.
+#[test_log::test(tokio::test)]
+async fn calendar_query_collation_mixed_case() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
+
+    let collection_id = test_db
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
+        .await
+        .expect("Failed to seed collection");
+
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
+
+    // Create event with mixed case "MiXeD CaSe"
+    let ical = sample_icalendar_event("mixed-case@example.com", "MiXeD CaSe Event");
+    TestRequest::put(&caldav_item_path("testuser", "testcal", "mixedcase.ics"))
+        .if_none_match("*")
+        .icalendar_body(&ical)
+        .send(&service)
+        .await
+        .assert_status(StatusCode::CREATED);
+
+    // Search for "mixed case" (lowercase) - SHOULD match
+    let body = r#"<?xml version="1.0" encoding="utf-8"?>
+<C:calendar-query xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:D="DAV:">
+  <D:prop>
+    <D:getetag/>
+  </D:prop>
+  <C:filter>
+    <C:comp-filter name="VCALENDAR">
+      <C:comp-filter name="VEVENT">
+        <C:prop-filter name="SUMMARY">
+          <C:text-match collation="i;unicode-casemap">mixed case</C:text-match>
+        </C:prop-filter>
+      </C:comp-filter>
+    </C:comp-filter>
+  </C:filter>
+</C:calendar-query>"#;
+
+    let response = TestRequest::report(&caldav_collection_path("testuser", "testcal"))
+        .xml_body(body)
+        .send(&service)
+        .await;
+
+    let response = response.assert_status(StatusCode::MULTI_STATUS);
+    let body_text = response.body_string();
+    assert!(
+        response.count_multistatus_responses() == 1,
+        "i;unicode-casemap should normalize mixed case (found {} responses)",
+        response.count_multistatus_responses()
+    );
+    assert!(
+        body_text.contains(".ics</D:href>"),
+        "Response should contain matching .ics href"
+    );
+}
+
+/// ## Summary
+/// Test calendar-query with Turkish İ (dotted capital I) case folding.
+/// Per RFC 4790 §9.3: Full Unicode case folding, not locale-specific.
+#[test_log::test(tokio::test)]
+async fn calendar_query_collation_turkish_i() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
+
+    let collection_id = test_db
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
+        .await
+        .expect("Failed to seed collection");
+
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
+
+    // Create event with Turkish İ (U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE)
+    let ical = sample_icalendar_event("turkish-i@example.com", "İstanbul Meeting");
+    TestRequest::put(&caldav_item_path("testuser", "testcal", "turkish.ics"))
+        .if_none_match("*")
+        .icalendar_body(&ical)
+        .send(&service)
+        .await
+        .assert_status(StatusCode::CREATED);
+
+    // Search for "istanbul" (lowercase) - SHOULD match "İstanbul"
+    // Per Unicode case folding: İ (U+0130) folds to i (U+0069)
+    let body = r#"<?xml version="1.0" encoding="utf-8"?>
+<C:calendar-query xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:D="DAV:">
+  <D:prop>
+    <D:getetag/>
+  </D:prop>
+  <C:filter>
+    <C:comp-filter name="VCALENDAR">
+      <C:comp-filter name="VEVENT">
+        <C:prop-filter name="SUMMARY">
+          <C:text-match collation="i;unicode-casemap">istanbul</C:text-match>
+        </C:prop-filter>
+      </C:comp-filter>
+    </C:comp-filter>
+  </C:filter>
+</C:calendar-query>"#;
+
+    let response = TestRequest::report(&caldav_collection_path("testuser", "testcal"))
+        .xml_body(body)
+        .send(&service)
+        .await;
+
+    let response = response.assert_status(StatusCode::MULTI_STATUS);
+    let body_text = response.body_string();
+    assert!(
+        response.count_multistatus_responses() == 1,
+        "i;unicode-casemap should fold Turkish İ to i: 'istanbul' SHOULD match 'İstanbul' (found {} responses)",
+        response.count_multistatus_responses()
+    );
+    assert!(
+        body_text.contains(".ics</D:href>"),
+        "Response should contain matching .ics href"
+    );
+}
+
+/// ## Summary
+/// Test calendar-query with Greek sigma (Σ/σ/ς) case folding.
+/// Per RFC 4790 §9.3: Unicode handles Greek final sigma correctly.
+#[test_log::test(tokio::test)]
+async fn calendar_query_collation_greek_sigma() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
+
+    let collection_id = test_db
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
+        .await
+        .expect("Failed to seed collection");
+
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
+
+    // Create event with Greek word ending in final sigma (ς)
+    // "σύνδεσης" (syndesis - "connection" with final sigma ς)
+    let ical = sample_icalendar_event("greek-sigma@example.com", "Δοκιμή σύνδεσης");
+    TestRequest::put(&caldav_item_path("testuser", "testcal", "greek.ics"))
+        .if_none_match("*")
+        .icalendar_body(&ical)
+        .send(&service)
+        .await
+        .assert_status(StatusCode::CREATED);
+
+    // Search with regular sigma (σ) instead of final sigma (ς)
+    let body = r#"<?xml version="1.0" encoding="utf-8"?>
+<C:calendar-query xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:D="DAV:">
+  <D:prop>
+    <D:getetag/>
+  </D:prop>
+  <C:filter>
+    <C:comp-filter name="VCALENDAR">
+      <C:comp-filter name="VEVENT">
+        <C:prop-filter name="SUMMARY">
+          <C:text-match collation="i;unicode-casemap">συνδεσησ</C:text-match>
+        </C:prop-filter>
+      </C:comp-filter>
+    </C:comp-filter>
+  </C:filter>
+</C:calendar-query>"#;
+
+    let response = TestRequest::report(&caldav_collection_path("testuser", "testcal"))
+        .xml_body(body)
+        .send(&service)
+        .await;
+
+    let response = response.assert_status(StatusCode::MULTI_STATUS);
+    let body_text = response.body_string();
+    assert!(
+        response.count_multistatus_responses() == 1,
+        "i;unicode-casemap should handle Greek sigma variants (found {} responses)",
+        response.count_multistatus_responses()
+    );
+    assert!(
+        body_text.contains(".ics</D:href>"),
+        "Response should contain matching .ics href"
+    );
+}
+
+/// ## Summary
+/// Test addressbook-query with i;unicode-casemap for international names.
+/// Per RFC 4790 §9.3: Full Unicode case folding including non-ASCII.
+#[test_log::test(tokio::test)]
+async fn addressbook_query_collation_unicode_german() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
+
+    let collection_id = test_db
+        .seed_collection(principal_id, CollectionType::Addressbook, "contacts", None)
+        .await
+        .expect("Failed to seed collection");
+
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "addressbook")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
+
+    // Create vCard with German name containing ß
+    let vcard = sample_vcard("german-test@example.com", "Straße", "test@example.com");
+    TestRequest::put(&carddav_item_path("testuser", "contacts", "german.vcf"))
+        .if_none_match("*")
+        .vcard_body(&vcard)
+        .send(&service)
+        .await
+        .assert_status(StatusCode::CREATED);
+
+    // Search for "strasse" (ss) - should match "Straße" (ß) with Unicode folding
+    let body = r#"<?xml version="1.0" encoding="utf-8"?>
+<C:addressbook-query xmlns:C="urn:ietf:params:xml:ns:carddav" xmlns:D="DAV:">
+  <D:prop>
+    <D:getetag/>
+  </D:prop>
+  <C:filter>
+    <C:prop-filter name="FN">
+      <C:text-match collation="i;unicode-casemap">strasse</C:text-match>
+    </C:prop-filter>
+  </C:filter>
+</C:addressbook-query>"#;
+
+    let response = TestRequest::report(&carddav_collection_path("testuser", "contacts"))
+        .xml_body(body)
+        .send(&service)
+        .await;
+
+    let response = response.assert_status(StatusCode::MULTI_STATUS);
+    assert!(
+        response.count_multistatus_responses() == 1,
+        "i;unicode-casemap should fold German ß to ss: 'strasse' SHOULD match 'Straße'"
+    );
+}
+
+/// ## Summary
+/// Test addressbook-query with i;ascii-casemap for email addresses.
+/// Per RFC 4790 §9.2: ASCII-only case folding, non-ASCII preserved.
+#[test_log::test(tokio::test)]
+async fn addressbook_query_collation_ascii_email() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
+
+    let collection_id = test_db
+        .seed_collection(principal_id, CollectionType::Addressbook, "contacts", None)
+        .await
+        .expect("Failed to seed collection");
+
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "addressbook")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
+
+    // Create vCard with email address
+    let vcard = r#"BEGIN:VCARD
+VERSION:4.0
+UID:ascii-email@example.com
+FN:John Doe
+EMAIL:John.Doe@EXAMPLE.COM
+END:VCARD"#;
+
+    TestRequest::put(&carddav_item_path("testuser", "contacts", "ascii.vcf"))
+        .if_none_match("*")
+        .vcard_body(vcard)
+        .send(&service)
+        .await
+        .assert_status(StatusCode::CREATED);
+
+    // Search for lowercase email - should match with ASCII case folding
+    let body = r#"<?xml version="1.0" encoding="utf-8"?>
+<C:addressbook-query xmlns:C="urn:ietf:params:xml:ns:carddav" xmlns:D="DAV:">
+  <D:prop>
+    <D:getetag/>
+  </D:prop>
+  <C:filter>
+    <C:prop-filter name="EMAIL">
+      <C:text-match collation="i;ascii-casemap">@example.com</C:text-match>
+    </C:prop-filter>
+  </C:filter>
+</C:addressbook-query>"#;
+
+    let response = TestRequest::report(&carddav_collection_path("testuser", "contacts"))
+        .xml_body(body)
+        .send(&service)
+        .await;
+
+    let response = response.assert_status(StatusCode::MULTI_STATUS);
+    let body_text = response.body_string();
+    // Should match with ASCII case folding
+    assert!(
+        response.count_multistatus_responses() == 1,
+        "i;ascii-casemap should match ASCII case-insensitively (found {} responses)",
+        response.count_multistatus_responses()
+    );
+    assert!(
+        body_text.contains(".vcf</D:href>"),
+        "Response should contain at least one .vcf href"
+    );
+}

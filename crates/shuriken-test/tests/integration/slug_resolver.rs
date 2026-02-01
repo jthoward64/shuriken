@@ -3,9 +3,7 @@
 //!
 //! Uses `tests/integration/helpers.rs` for database setup and request utilities.
 
-use super::helpers::{
-    CollectionType, PrincipalType, TestDb, cal_path,
-};
+use super::helpers::{CollectionType, PrincipalType, TestDb, cal_path};
 use shuriken_test::component::middleware::path_parser::parse_and_resolve_path;
 
 /// Resolves a calendar owner-only path and verifies principal resolution.
@@ -88,10 +86,9 @@ async fn resolve_nested_calendar_collection_path() {
 
     let mut conn = test_db.get_conn().await.expect("conn");
     // Nested collection path: /cal/alice/work/team/
-    let result =
-        parse_and_resolve_path("/cal/alice/work/team/", &mut conn)
-            .await
-            .expect("resolve ok");
+    let result = parse_and_resolve_path("/cal/alice/work/team/", &mut conn)
+        .await
+        .expect("resolve ok");
 
     let chain = result.collection_chain.expect("collection chain present");
     let terminal = chain.terminal().expect("terminal collection present");

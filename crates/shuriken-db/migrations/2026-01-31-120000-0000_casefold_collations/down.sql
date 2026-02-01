@@ -12,16 +12,16 @@ ALTER TABLE dav_property
     DROP COLUMN IF EXISTS value_text_unicode_fold,
     DROP COLUMN IF EXISTS value_text_ascii_fold;
 
-ALTER TABLE card_index
-    ALTER COLUMN "fn" TYPE text COLLATE "default",
-    ALTER COLUMN uid TYPE text COLLATE "default";
+-- ALTER TABLE card_index
+--     ALTER COLUMN "fn" TYPE text COLLATE "default",
+--     ALTER COLUMN uid TYPE text COLLATE "default";
 
-ALTER TABLE cal_index
-    ALTER COLUMN rrule_text TYPE text COLLATE "default",
-    ALTER COLUMN uid TYPE text COLLATE "default";
+-- ALTER TABLE cal_index
+--     ALTER COLUMN rrule_text TYPE text COLLATE "default",
+--     ALTER COLUMN uid TYPE text COLLATE "default";
 
-ALTER TABLE dav_property
-    ALTER COLUMN value_text TYPE text COLLATE "default";
+-- ALTER TABLE dav_property
+--     ALTER COLUMN value_text TYPE text COLLATE "default";
 
 DROP FUNCTION IF EXISTS unicode_casemap_nfc(text);
 DROP FUNCTION IF EXISTS ascii_casemap(text);

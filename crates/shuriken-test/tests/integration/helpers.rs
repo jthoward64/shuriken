@@ -182,7 +182,9 @@ async fn run_migrations(database_url: &str) -> anyhow::Result<()> {
 }
 
 use shuriken_test::component::auth::casbin::CasbinEnforcerHandler;
-use shuriken_test::component::auth::{PathSegment, ResourceIdentifier, ResourceLocation, ResourceType};
+use shuriken_test::component::auth::{
+    PathSegment, ResourceIdentifier, ResourceLocation, ResourceType,
+};
 use shuriken_test::component::config::*;
 use shuriken_test::component::db::connection::DbProviderHandler;
 

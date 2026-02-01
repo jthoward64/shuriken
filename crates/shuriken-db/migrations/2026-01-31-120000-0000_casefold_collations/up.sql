@@ -107,16 +107,16 @@ AS $$
     END;
 $$;
 
-ALTER TABLE dav_property
-    ALTER COLUMN value_text TYPE text COLLATE "C";
+-- ALTER TABLE dav_property
+--     ALTER COLUMN value_text TYPE text COLLATE "C";
 
-ALTER TABLE cal_index
-    ALTER COLUMN uid TYPE text COLLATE "C",
-    ALTER COLUMN rrule_text TYPE text COLLATE "C";
+-- ALTER TABLE cal_index
+--     ALTER COLUMN uid TYPE text COLLATE "C",
+--     ALTER COLUMN rrule_text TYPE text COLLATE "C";
 
-ALTER TABLE card_index
-    ALTER COLUMN uid TYPE text COLLATE "C",
-    ALTER COLUMN "fn" TYPE text COLLATE "C";
+-- ALTER TABLE card_index
+--     ALTER COLUMN uid TYPE text COLLATE "C",
+--     ALTER COLUMN "fn" TYPE text COLLATE "C";
 
 ALTER TABLE dav_property
     ADD COLUMN value_text_ascii_fold text

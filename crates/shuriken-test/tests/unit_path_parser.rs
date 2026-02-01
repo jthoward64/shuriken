@@ -108,12 +108,10 @@ fn test_build_canonical_location_full_path_with_ics() {
     }
 
     // Verify item (canonical uses Id, not Slug with extension)
-    if let PathSegment::Item(shuriken_test::component::auth::ResourceIdentifier::Id(id)) = &segments[3] {
-        assert_eq!(
-            id,
-            &instance.id,
-            "Item should be instance UUID"
-        );
+    if let PathSegment::Item(shuriken_test::component::auth::ResourceIdentifier::Id(id)) =
+        &segments[3]
+    {
+        assert_eq!(id, &instance.id, "Item should be instance UUID");
     } else {
         panic!("Fourth segment should be Item");
     }
@@ -144,10 +142,11 @@ fn test_build_canonical_location_with_vcf_extension() {
         PathSegment::ResourceType(ResourceType::Addressbook)
     ));
 
-    if let PathSegment::Item(shuriken_test::component::auth::ResourceIdentifier::Id(id)) = &segments[3] {
+    if let PathSegment::Item(shuriken_test::component::auth::ResourceIdentifier::Id(id)) =
+        &segments[3]
+    {
         assert_eq!(
-            id,
-            &instance.id,
+            id, &instance.id,
             "Canonical location should use Id, not Slug with extension"
         );
     } else {

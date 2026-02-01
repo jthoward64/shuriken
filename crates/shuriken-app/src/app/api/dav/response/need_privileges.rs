@@ -16,11 +16,7 @@ use shuriken_service::auth::Action;
 ///
 /// ## Side Effects
 /// Sets the response status to 403 Forbidden and writes XML body.
-pub fn send_need_privileges_error(
-    res: &mut Response,
-    action: Action,
-    href: &str,
-) {
+pub fn send_need_privileges_error(res: &mut Response, action: Action, href: &str) {
     res.status_code(StatusCode::FORBIDDEN);
     #[expect(unused)]
     res.add_header("Content-Type", "application/xml; charset=utf-8", true);

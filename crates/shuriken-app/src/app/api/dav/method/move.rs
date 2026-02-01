@@ -336,7 +336,11 @@ async fn check_move_authorization(
     // Get ResourceLocation from depot (populated by DavPathMiddleware)
     let source_resource = get_resolved_location_from_depot(depot).map_err(|e| {
         tracing::error!(error = %e, "ResourceLocation not found in depot");
-        (StatusCode::INTERNAL_SERVER_ERROR, shuriken_service::auth::Action::Delete, String::new())
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            shuriken_service::auth::Action::Delete,
+            String::new(),
+        )
     })?;
 
     // Check Delete action on source (to delete/unbind)
@@ -357,7 +361,9 @@ async fn check_move_authorization(
     // Check Write permission on destination collection
     let dest_path = destination.to_string();
     let dest_resource = {
-        use shuriken_service::auth::{PathSegment, ResourceIdentifier, ResourceLocation, ResourceType};
+        use shuriken_service::auth::{
+            PathSegment, ResourceIdentifier, ResourceLocation, ResourceType,
+        };
 
         let segments = vec![
             PathSegment::ResourceType(
@@ -370,7 +376,11 @@ async fn check_move_authorization(
         ];
         ResourceLocation::from_segments(segments).map_err(|e| {
             tracing::error!(error = %e, "Failed to build destination resource");
-            (StatusCode::INTERNAL_SERVER_ERROR, Action::Edit, dest_path.clone())
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Action::Edit,
+                dest_path.clone(),
+            )
         })?
     };
 

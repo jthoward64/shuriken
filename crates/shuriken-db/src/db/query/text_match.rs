@@ -75,6 +75,27 @@ pub enum Casemap {
     Unicode,
 }
 
+impl Casemap {
+    /// Converts a collation string to a Casemap enum.
+    ///
+    /// ## Errors
+    /// Returns [`CollationError::UnsupportedCollation`] if the collation is unknown.
+    pub fn from_collation(collation: Option<&String>) -> Result<Self, CollationError> {
+        match collation.map(std::string::String::as_str) {
+            Some("i;octet") => Ok(Self::Octet),
+            Some("i;unicode-casemap") | None => Ok(Self::Unicode),
+            Some("i;ascii-casemap") => Ok(Self::Ascii),
+            Some(unsupported) => Err(CollationError::UnsupportedCollation(unsupported.to_owned())),
+        }
+    }
+
+    /// Returns whether this casemap mode is case-sensitive.
+    #[must_use]
+    pub const fn is_case_sensitive(self) -> bool {
+        matches!(self, Self::Octet)
+    }
+}
+
 /// ## Summary
 /// Normalizes text for comparison against casemap-specific stored columns.
 ///
@@ -226,6 +247,34 @@ pub fn build_like_pattern(
         MatchType::Equals => escaped,
         MatchType::StartsWith => format!("{escaped}%"),
         MatchType::EndsWith => format!("%{escaped}"),
+    }
+}
+
+/// ## Summary
+/// Wraps a SQL string literal with the appropriate PostgreSQL normalization function.
+///
+/// Returns SQL like `unicode_casemap_nfc('value')` or `ascii_casemap('value')`.
+/// For i;octet, returns the value as-is (no normalization function).
+#[must_use]
+pub fn wrap_with_normalization_function(sql_literal: &str, casemap: Casemap) -> String {
+    match casemap {
+        Casemap::Octet => sql_literal.to_owned(),
+        Casemap::Unicode => format!("unicode_casemap_nfc({sql_literal})"),
+        Casemap::Ascii => format!("ascii_casemap({sql_literal})"),
+    }
+}
+
+/// ## Summary
+/// Determines the fold column name for case-insensitive comparisons.
+///
+/// Returns `None` for i;octet (case-sensitive), or the appropriate fold column
+/// for i;ascii-casemap and i;unicode-casemap.
+#[must_use]
+pub const fn get_fold_column(casemap: Casemap) -> Option<&'static str> {
+    match casemap {
+        Casemap::Octet => None,
+        Casemap::Unicode => Some("value_text_unicode_fold"),
+        Casemap::Ascii => Some("value_text_ascii_fold"),
     }
 }
 

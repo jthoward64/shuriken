@@ -10,7 +10,9 @@ use crate::db::query::text_match::{
 use crate::db::schema::{card_index, dav_component, dav_instance, dav_parameter, dav_property};
 use crate::model::dav::instance::DavInstance;
 use diesel::prelude::*;
+use diesel::sql_types;
 use diesel_async::RunQueryDsl;
+use shuriken_core::error::CoreError;
 use shuriken_rfc::rfc::dav::core::{
     AddressbookFilter, AddressbookQuery, FilterTest, MatchType, ParamFilter, PropFilter, TextMatch,
 };
@@ -25,6 +27,8 @@ pub async fn find_matching_instances(
     collection_id: uuid::Uuid,
     query: &AddressbookQuery,
 ) -> anyhow::Result<Vec<DavInstance>> {
+    tracing::debug!(collection_id = %collection_id, has_filter = query.filter.is_some(), "Finding matching addressbook instances");
+
     // Start with instances in the collection
     let base_query = dav_instance::table
         .filter(dav_instance::collection_id.eq(collection_id))
@@ -64,6 +68,8 @@ async fn apply_addressbook_filter(
     filter: &AddressbookFilter,
     limit: Option<u32>,
 ) -> anyhow::Result<Vec<DavInstance>> {
+    tracing::trace!(prop_filter_count = filter.prop_filters.len(), test = ?filter.test, "Applying addressbook filter");
+
     // Collect matching entity IDs for each prop-filter
     let mut entity_id_sets: Vec<Vec<uuid::Uuid>> = Vec::new();
 
@@ -123,6 +129,7 @@ async fn evaluate_prop_filter(
     prop_filter: &PropFilter,
 ) -> anyhow::Result<Vec<uuid::Uuid>> {
     let prop_name = prop_filter.name.to_uppercase();
+    tracing::trace!(prop_name = %prop_name, is_not_defined = prop_filter.is_not_defined, has_text_match = prop_filter.text_match.is_some(), "Evaluating property filter");
 
     // Handle specific properties with dedicated index tables for performance
     let entity_ids = match prop_name.as_str() {
@@ -235,6 +242,8 @@ async fn apply_text_match_to_property(
     prop_name: &str,
     text_match: &TextMatch,
 ) -> anyhow::Result<Vec<uuid::Uuid>> {
+    tracing::trace!(prop_name = %prop_name, collation = ?text_match.collation, match_type = ?text_match.match_type, negate = text_match.negate, "Applying text-match to property");
+
     let collation = normalize_for_folded_compare(&text_match.value, text_match.collation.as_ref())?;
     let raw_value = collation.value;
     let raw_pattern = build_like_pattern(&raw_value, &text_match.match_type);
@@ -273,6 +282,8 @@ async fn apply_text_match_to_property(
                 diesel::dsl::sql::<diesel::sql_types::Bool>(&format!("{column} LIKE '{pattern}'")),
             ),
         };
+    } else {
+        // No folding needed
     }
 
     // Handle negate attribute
@@ -554,7 +565,7 @@ async fn evaluate_uid_filter(
         .into_boxed();
 
     if let Some(text_match) = &prop_filter.text_match {
-        query = apply_text_match_uid(query, text_match)?;
+        query = apply_text_match_uid(query, text_match);
 
         let matched_ids = query
             .select(card_index::entity_id)
@@ -714,63 +725,7 @@ async fn evaluate_single_param_filter(
             .copied()
             .collect())
     } else if let Some(text_match) = &param_filter.text_match {
-        // Parameter must exist and match text
-        let collation =
-            normalize_for_folded_compare(&text_match.value, text_match.collation.as_ref())?;
-        let raw_value = collation.value;
-        let raw_pattern = build_like_pattern(&raw_value, &text_match.match_type);
-        let value = raw_value.replace('\'', "''");
-        let pattern = raw_pattern.replace('\'', "''");
-
-        let mut query = dav_parameter::table
-            .filter(dav_parameter::property_id.eq_any(prop_ids))
-            .filter(dav_parameter::name.eq(param_name))
-            .filter(dav_parameter::deleted_at.is_null())
-            .into_boxed();
-
-        // Apply text matching
-        if collation.case_sensitive {
-            query = match text_match.match_type {
-                MatchType::Equals => query.filter(dav_parameter::value.eq(&raw_value)),
-                MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
-                    query.filter(dav_parameter::value.like(&raw_pattern))
-                }
-            };
-        } else {
-            let func = match collation.casemap {
-                Casemap::Ascii => "ascii_casemap",
-                Casemap::Unicode => "unicode_casemap_nfc",
-                Casemap::Octet => "ascii_casemap",
-            };
-            query = match text_match.match_type {
-                MatchType::Equals => query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(
-                    &format!("{func}(value) = '{value}'"),
-                )),
-                MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
-                    query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
-                        "{func}(value) LIKE '{pattern}'"
-                    )))
-                }
-            };
-        }
-
-        let matched_prop_ids: Vec<uuid::Uuid> = query
-            .select(dav_parameter::property_id)
-            .distinct()
-            .load::<uuid::Uuid>(conn)
-            .await?;
-
-        // Handle negate: return properties that DON'T match
-        if text_match.negate {
-            let matched_set: std::collections::HashSet<_> = matched_prop_ids.into_iter().collect();
-            Ok(prop_ids
-                .iter()
-                .filter(|id| !matched_set.contains(id))
-                .copied()
-                .collect())
-        } else {
-            Ok(matched_prop_ids.into_iter().collect())
-        }
+        evaluate_single_param_filter_with_text_match(conn, prop_ids, param_name, text_match).await
     } else {
         // Parameter must exist (no text match specified)
         let props_with_param: Vec<uuid::Uuid> = dav_parameter::table
@@ -783,6 +738,75 @@ async fn evaluate_single_param_filter(
             .await?;
 
         Ok(props_with_param.into_iter().collect())
+    }
+}
+
+async fn evaluate_single_param_filter_with_text_match(
+    conn: &mut DbConnection<'_>,
+    prop_ids: &[uuid::Uuid],
+    param_name: &str,
+    text_match: &TextMatch,
+) -> Result<std::collections::HashSet<uuid::Uuid>, anyhow::Error> {
+    // Parameter must exist and match text
+    let collation = normalize_for_folded_compare(&text_match.value, text_match.collation.as_ref())?;
+    let raw_value = collation.value;
+    let raw_pattern = build_like_pattern(&raw_value, &text_match.match_type);
+    let value = raw_value.replace('\'', "''");
+    let pattern = raw_pattern.replace('\'', "''");
+
+    let mut query = dav_parameter::table
+        .filter(dav_parameter::property_id.eq_any(prop_ids))
+        .filter(dav_parameter::name.eq(param_name))
+        .filter(dav_parameter::deleted_at.is_null())
+        .into_boxed();
+
+    // Apply text matching
+    if collation.case_sensitive {
+        query = match text_match.match_type {
+            MatchType::Equals => query.filter(dav_parameter::value.eq(&raw_value)),
+            MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
+                query.filter(dav_parameter::value.like(&raw_pattern))
+            }
+        };
+    } else {
+        let func = match collation.casemap {
+            Casemap::Ascii => "ascii_casemap",
+            Casemap::Unicode => "unicode_casemap_nfc",
+            Casemap::Octet => {
+                return Err(CoreError::InvariantViolation(
+                    "Octet collation should be handled as case-sensitive",
+                )
+                .into());
+            }
+        };
+        query = match text_match.match_type {
+            MatchType::Equals => query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(
+                &format!("{func}(value) = '{value}'"),
+            )),
+            MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
+                query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
+                    "{func}(value) LIKE '{pattern}'"
+                )))
+            }
+        };
+    }
+
+    let matched_prop_ids: Vec<uuid::Uuid> = query
+        .select(dav_parameter::property_id)
+        .distinct()
+        .load::<uuid::Uuid>(conn)
+        .await?;
+
+    // Handle negate: return properties that DON'T match
+    if text_match.negate {
+        let matched_set: std::collections::HashSet<_> = matched_prop_ids.into_iter().collect();
+        Ok(prop_ids
+            .iter()
+            .filter(|id| !matched_set.contains(id))
+            .copied()
+            .collect())
+    } else {
+        Ok(matched_prop_ids.into_iter().collect())
     }
 }
 
@@ -834,21 +858,41 @@ fn apply_text_match_card_index(
     })
 }
 
+/// CardDAV index query result type.
+type CardIndexQueryResult = diesel::query_builder::BoxedSelectStatement<
+    'static,
+    (
+        sql_types::Uuid,
+        sql_types::Nullable<sql_types::Text>,
+        sql_types::Nullable<sql_types::Text>,
+        sql_types::Timestamptz,
+        sql_types::Nullable<sql_types::Timestamptz>,
+        sql_types::Nullable<sql_types::Jsonb>,
+        sql_types::Nullable<crate::db::schema::sql_types::Tsvector>,
+        sql_types::Nullable<sql_types::Text>,
+        sql_types::Nullable<sql_types::Text>,
+        sql_types::Nullable<sql_types::Jsonb>,
+        sql_types::Nullable<sql_types::Jsonb>,
+    ),
+    diesel::query_builder::FromClause<crate::db::schema::card_index::table>,
+    diesel::pg::Pg,
+>;
+
 /// ## Summary
 /// Applies text-match to UID column using case-sensitive comparisons.
 fn apply_text_match_uid(
     query: card_index::BoxedQuery<'static, diesel::pg::Pg>,
     text_match: &TextMatch,
-) -> Result<card_index::BoxedQuery<'static, diesel::pg::Pg>, CollationError> {
+) -> CardIndexQueryResult {
     let value = text_match.value.clone();
     let pattern = build_like_pattern(&value, &text_match.match_type);
 
-    Ok(match text_match.match_type {
+    match text_match.match_type {
         MatchType::Equals => query.filter(card_index::uid.eq(value)),
         MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
             query.filter(card_index::uid.like(pattern))
         }
-    })
+    }
 }
 
 #[cfg(test)]

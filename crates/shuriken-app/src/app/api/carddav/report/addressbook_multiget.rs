@@ -17,8 +17,9 @@ use shuriken_rfc::rfc::dav::core::{AddressbookMultiget, PropertyName};
 ///
 /// ## Errors
 /// Returns 400 for invalid paths, 500 for server errors.
+#[tracing::instrument(skip_all, fields(path = %req.uri().path()))]
 pub async fn handle(
-    _req: &mut Request,
+    req: &mut Request,
     res: &mut Response,
     multiget: AddressbookMultiget,
     properties: Vec<PropertyName>,
@@ -64,7 +65,7 @@ pub async fn handle(
         {
             Ok(ms) => ms,
             Err(e) => {
-                tracing::error!("Failed to execute addressbook-multiget: {}", e);
+                tracing::error!(error = %e, "Failed to execute addressbook-multiget");
                 res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
                 return;
             }
@@ -82,7 +83,7 @@ fn write_multistatus_response(
     let xml = match serialize_multistatus(multistatus) {
         Ok(xml) => xml,
         Err(e) => {
-            tracing::error!("Failed to serialize multistatus: {}", e);
+            tracing::error!(error = %e, "Failed to serialize multistatus");
             res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
             return;
         }

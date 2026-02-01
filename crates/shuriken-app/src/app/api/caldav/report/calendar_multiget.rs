@@ -21,8 +21,9 @@ use shuriken_service::auth::{
 ///
 /// ## Errors
 /// Returns 400 for invalid paths, 500 for server errors.
+#[tracing::instrument(skip_all, fields(path = %req.uri().path()))]
 pub async fn handle(
-    _req: &mut Request,
+    req: &mut Request,
     res: &mut Response,
     multiget: CalendarMultiget,
     properties: Vec<PropertyName>,
