@@ -13,11 +13,6 @@ use super::helpers::*;
 async fn options_returns_allow_header() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
-
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -49,11 +44,6 @@ async fn options_returns_allow_header() {
 #[test_log::test(tokio::test)]
 async fn options_returns_dav_header() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -87,11 +77,6 @@ async fn options_returns_dav_header() {
 async fn options_dav_header_contains_class_1() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
-
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -119,11 +104,6 @@ async fn options_dav_header_contains_class_1() {
 async fn options_dav_header_contains_calendar_access() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
-
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -150,11 +130,6 @@ async fn options_dav_header_contains_calendar_access() {
 #[test_log::test(tokio::test)]
 async fn options_dav_header_contains_addressbook() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -187,11 +162,6 @@ async fn options_dav_header_contains_addressbook() {
 #[test_log::test(tokio::test)]
 async fn options_allow_contains_dav_methods() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -229,11 +199,6 @@ async fn options_allow_contains_dav_methods() {
 async fn options_status_code() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
-
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -263,11 +228,6 @@ async fn options_status_code() {
 #[test_log::test(tokio::test)]
 async fn options_no_locking_advertised_without_lock() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -308,11 +268,6 @@ async fn options_on_nonexistent_resource_succeeds() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
-
-    test_db
         .seed_authenticated_user()
         .await
         .expect("Failed to seed authenticated user");
@@ -344,11 +299,6 @@ async fn options_on_api_root() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
-
-    test_db
         .seed_authenticated_user()
         .await
         .expect("Failed to seed authenticated user");
@@ -370,11 +320,6 @@ async fn options_on_api_root() {
 #[test_log::test(tokio::test)]
 async fn options_no_auto_schedule_without_rfc6638() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -409,11 +354,6 @@ async fn options_no_auto_schedule_without_rfc6638() {
 #[test_log::test(tokio::test)]
 async fn options_ignores_accept_header() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()

@@ -13,10 +13,6 @@ use super::helpers::*;
 async fn put_missing_uid_rejected() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -62,10 +58,6 @@ END:VCALENDAR";
 async fn put_uid_conflict_returns_409() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -138,10 +130,6 @@ END:VCALENDAR";
 async fn put_update_same_uid_succeeds() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -207,10 +195,6 @@ END:VCALENDAR";
 async fn put_vcalendar_without_vevent_rejected() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -256,10 +240,6 @@ END:VCALENDAR";
 async fn put_method_property_rejected() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -313,10 +293,6 @@ END:VCALENDAR";
 async fn put_multiple_component_types_rejected() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -373,10 +349,6 @@ END:VCALENDAR";
 async fn put_unsupported_content_type_rejected() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()

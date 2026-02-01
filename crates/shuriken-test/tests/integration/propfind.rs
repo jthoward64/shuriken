@@ -16,10 +16,6 @@ use super::helpers::*;
 #[test_log::test(tokio::test)]
 async fn propfind_returns_multistatus() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -56,10 +52,6 @@ async fn propfind_returns_multistatus() {
 #[test_log::test(tokio::test)]
 async fn propfind_returns_valid_xml() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -98,10 +90,6 @@ async fn propfind_returns_valid_xml() {
 #[test_log::test(tokio::test)]
 async fn propfind_depth0_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -160,10 +148,6 @@ async fn propfind_depth0_collection() {
 #[test_log::test(tokio::test)]
 async fn propfind_depth1_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -222,10 +206,6 @@ async fn propfind_depth1_collection() {
 #[test_log::test(tokio::test)]
 async fn propfind_depth_infinity() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -262,10 +242,6 @@ async fn propfind_depth_infinity() {
 #[test_log::test(tokio::test)]
 async fn propfind_default_depth() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -302,10 +278,6 @@ async fn propfind_default_depth() {
 #[test_log::test(tokio::test)]
 async fn propfind_known_props_200() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -346,10 +318,6 @@ async fn propfind_known_props_200() {
 #[test_log::test(tokio::test)]
 async fn propfind_unknown_props_404() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -384,10 +352,6 @@ async fn propfind_unknown_props_404() {
 #[test_log::test(tokio::test)]
 async fn propfind_mixed_props() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -439,10 +403,6 @@ async fn propfind_mixed_props() {
 #[test_log::test(tokio::test)]
 async fn propfind_allprop_request() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -482,10 +442,6 @@ async fn propfind_allprop_request() {
 #[test_log::test(tokio::test)]
 async fn propfind_propname() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -528,10 +484,6 @@ async fn propfind_propname() {
 #[test_log::test(tokio::test)]
 async fn propfind_calendar_resourcetype() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -567,10 +519,6 @@ async fn propfind_calendar_resourcetype() {
 #[test_log::test(tokio::test)]
 async fn propfind_addressbook_resourcetype() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -610,10 +558,6 @@ async fn propfind_addressbook_resourcetype() {
 #[test_log::test(tokio::test)]
 async fn propfind_getetag() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -667,10 +611,6 @@ async fn propfind_getetag() {
 #[test_log::test(tokio::test)]
 async fn propfind_sync_token() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -709,10 +649,6 @@ async fn propfind_sync_token() {
 #[test_log::test(tokio::test)]
 async fn propfind_nonexistent_404() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let service = create_db_test_service(&test_db.url()).await;
 
@@ -733,10 +669,6 @@ async fn propfind_nonexistent_404() {
 #[test_log::test(tokio::test)]
 async fn propfind_invalid_xml_400() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -774,10 +706,6 @@ async fn propfind_invalid_xml_400() {
 #[test_log::test(tokio::test)]
 async fn propfind_calendar_returns_supported_report_set() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -839,10 +767,6 @@ async fn propfind_calendar_returns_supported_report_set() {
 #[test_log::test(tokio::test)]
 async fn propfind_addressbook_returns_supported_report_set() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -904,10 +828,6 @@ async fn propfind_addressbook_returns_supported_report_set() {
 #[test_log::test(tokio::test)]
 async fn propfind_returns_supported_calendar_component_set() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -969,10 +889,6 @@ async fn propfind_returns_supported_calendar_component_set() {
 #[test_log::test(tokio::test)]
 async fn propfind_returns_supported_address_data() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -1034,10 +950,6 @@ async fn propfind_returns_supported_address_data() {
 #[test_log::test(tokio::test)]
 async fn propfind_returns_supported_collation_set() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -1104,10 +1016,6 @@ async fn propfind_returns_supported_collation_set() {
 #[test_log::test(tokio::test)]
 async fn propfind_returns_acl_property() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -1214,10 +1122,6 @@ async fn propfind_returns_acl_property() {
 #[test_log::test(tokio::test)]
 async fn propfind_acl_filters_by_resource_path() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -1325,10 +1229,6 @@ async fn propfind_acl_filters_by_resource_path() {
 #[test_log::test(tokio::test)]
 async fn propfind_returns_current_user_privilege_set() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -1415,10 +1315,6 @@ async fn propfind_returns_current_user_privilege_set() {
 #[test_log::test(tokio::test)]
 async fn propfind_addressbook_returns_carddav_discovery() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -1483,10 +1379,6 @@ async fn propfind_addressbook_returns_carddav_discovery() {
 #[test_log::test(tokio::test)]
 async fn propfind_calendar_excludes_carddav_properties() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await

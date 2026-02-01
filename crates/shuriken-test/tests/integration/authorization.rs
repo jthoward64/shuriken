@@ -6,7 +6,6 @@
 //!
 //! ## Authorization Model
 //! The authorization model is path-based using Casbin policies:
-//! - `seed_default_role_permissions()` sets up role→permission mappings (g2 rules)
 //! - `seed_access_policy(subject, path_pattern, role)` grants a subject a role on a path
 //! - `seed_collection_owner(principal_id, collection_id, type)` is a convenience for owner access
 //!
@@ -35,10 +34,6 @@ async fn get_returns_403_without_permission() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     // Seed role→permission mappings (g2 rules)
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Create an authenticated user (slug: "testuser")
     let principal_id = test_db
@@ -104,10 +99,6 @@ async fn get_returns_200_with_read_permission() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     // Seed role→permission mappings
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Create an authenticated user
     let principal_id = test_db
@@ -180,11 +171,6 @@ async fn get_returns_200_with_read_permission() {
 #[test_log::test(tokio::test)]
 async fn delete_returns_403_without_write_permission() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -260,11 +246,6 @@ async fn delete_returns_403_without_write_permission() {
 async fn delete_returns_204_with_write_permission() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
-
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -335,11 +316,6 @@ async fn delete_returns_204_with_write_permission() {
 async fn put_new_returns_403_without_collection_write_permission() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
-
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -386,11 +362,6 @@ END:VCALENDAR";
 #[test_log::test(tokio::test)]
 async fn put_update_returns_403_without_write_permission() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -476,11 +447,6 @@ END:VCALENDAR";
 async fn propfind_returns_403_without_permission() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
-
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -551,11 +517,6 @@ async fn propfind_returns_403_without_permission() {
 #[test_log::test(tokio::test)]
 async fn proppatch_returns_403_without_write_permission() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -641,10 +602,6 @@ async fn get_returns_200_with_owner_role_for_read_action() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     // Seed role→permission mappings
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Create an authenticated user
     let principal_id = test_db
@@ -714,11 +671,6 @@ async fn get_returns_200_with_owner_role_for_read_action() {
 async fn get_returns_200_with_edit_role_for_read_action() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
-
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -787,11 +739,6 @@ async fn get_returns_200_with_edit_role_for_read_action() {
 async fn delete_returns_204_with_edit_role() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
-
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -859,11 +806,6 @@ async fn delete_returns_204_with_edit_role() {
 #[test_log::test(tokio::test)]
 async fn group_member_inherits_group_permissions() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Create owner of the calendar
     let owner_principal_id = test_db
@@ -965,11 +907,6 @@ async fn group_member_inherits_group_permissions() {
 async fn non_group_member_denied_group_resource() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
-
     // Create owner of the calendar
     let owner_principal_id = test_db
         .seed_principal(PrincipalType::User, "owner", Some("Owner"))
@@ -1062,11 +999,6 @@ async fn non_group_member_denied_group_resource() {
 async fn public_principal_can_access_public_resources() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
-
     // Create owner of the calendar
     let owner_principal_id = test_db
         .seed_principal(PrincipalType::User, "owner", Some("Owner"))
@@ -1139,11 +1071,6 @@ async fn public_principal_can_access_public_resources() {
 #[test_log::test(tokio::test)]
 async fn public_principal_denied_write_on_readonly_public() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Create owner of the calendar
     let owner_principal_id = test_db

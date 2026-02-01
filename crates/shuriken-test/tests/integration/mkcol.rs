@@ -16,10 +16,6 @@ use super::helpers::*;
 #[test_log::test(tokio::test)]
 async fn mkcalendar_creates_calendar_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -62,10 +58,6 @@ async fn mkcalendar_creates_calendar_collection() {
 #[test_log::test(tokio::test)]
 async fn mkcalendar_initial_props_applied() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -121,10 +113,6 @@ async fn mkcalendar_initial_props_applied() {
 #[test_log::test(tokio::test)]
 async fn mkcalendar_on_existing_uri_conflict() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -164,10 +152,6 @@ async fn mkcalendar_on_existing_uri_conflict() {
 #[test_log::test(tokio::test)]
 async fn mkcol_extended_creates_addressbook() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -215,10 +199,6 @@ async fn mkcol_extended_creates_addressbook() {
 #[test_log::test(tokio::test)]
 async fn mkcol_extended_applies_initial_props() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -266,10 +246,6 @@ async fn mkcol_extended_applies_initial_props() {
 #[test_log::test(tokio::test)]
 async fn mkcol_extended_rejects_bad_body() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -307,10 +283,6 @@ async fn mkcol_extended_rejects_bad_body() {
 #[test_log::test(tokio::test)]
 async fn mkcol_creates_plain_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -353,10 +325,6 @@ async fn mkcol_creates_plain_collection() {
 #[test_log::test(tokio::test)]
 async fn mkcol_on_existing_uri_conflict() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -396,10 +364,6 @@ async fn mkcol_on_existing_uri_conflict() {
 #[test_log::test(tokio::test)]
 async fn mkcalendar_protected_props_rejected() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await

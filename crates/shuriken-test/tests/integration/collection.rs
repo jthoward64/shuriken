@@ -19,10 +19,6 @@ use super::helpers::*;
 #[test_log::test(tokio::test)]
 async fn synctoken_unchanged_on_reads() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -120,10 +116,6 @@ async fn multi_principal_same_collection_uri() {
     use shuriken_test::component::db::schema::dav_collection;
 
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Create two principals with different users
     let principal1_id = test_db
@@ -280,10 +272,6 @@ async fn list_collections_by_principal() {
     use shuriken_test::component::db::schema::dav_collection;
 
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Create two principals
     let principal1_id = test_db

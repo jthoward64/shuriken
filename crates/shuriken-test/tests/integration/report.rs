@@ -35,10 +35,6 @@ fn extract_sync_token(body: &str) -> Option<String> {
 #[test_log::test(tokio::test)]
 async fn calendar_query_returns_multistatus() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -87,10 +83,6 @@ async fn calendar_query_returns_multistatus() {
 #[test_log::test(tokio::test)]
 async fn calendar_query_time_range_filter() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -155,10 +147,6 @@ async fn calendar_query_time_range_filter() {
 #[test_log::test(tokio::test)]
 async fn calendar_query_returns_calendar_data() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -206,10 +194,6 @@ async fn calendar_query_returns_calendar_data() {
 #[test_log::test(tokio::test)]
 async fn calendar_multiget_returns_resources() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -283,10 +267,6 @@ async fn calendar_multiget_returns_resources() {
 #[test_log::test(tokio::test)]
 async fn calendar_multiget_missing_resource_404() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -327,10 +307,6 @@ async fn calendar_multiget_missing_resource_404() {
 #[test_log::test(tokio::test)]
 async fn addressbook_query_returns_multistatus() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -378,10 +354,6 @@ async fn addressbook_query_returns_multistatus() {
 #[test_log::test(tokio::test)]
 async fn addressbook_query_returns_address_data() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -435,10 +407,6 @@ async fn addressbook_query_returns_address_data() {
 #[test_log::test(tokio::test)]
 async fn addressbook_multiget_returns_vcards() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -507,10 +475,6 @@ async fn addressbook_multiget_returns_vcards() {
 #[test_log::test(tokio::test)]
 async fn sync_collection_returns_multistatus() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -542,10 +506,6 @@ async fn sync_collection_returns_multistatus() {
 #[test_log::test(tokio::test)]
 async fn sync_collection_expired_token_returns_gone() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -583,10 +543,6 @@ async fn sync_collection_expired_token_returns_gone() {
 #[test_log::test(tokio::test)]
 async fn sync_collection_returns_sync_token() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -620,10 +576,6 @@ async fn sync_collection_returns_sync_token() {
 #[test_log::test(tokio::test)]
 async fn sync_collection_initial_sync() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -691,10 +643,6 @@ async fn sync_collection_initial_sync() {
 #[test_log::test(tokio::test)]
 async fn sync_collection_delta_sync() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -759,10 +707,6 @@ async fn sync_collection_delta_sync() {
 #[test_log::test(tokio::test)]
 async fn report_nonexistent_404() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let service = create_db_test_service(&test_db.url()).await;
 
     let response = TestRequest::report(&caldav_collection_path("nonexistent", "unknown"))
@@ -778,10 +722,6 @@ async fn report_nonexistent_404() {
 #[test_log::test(tokio::test)]
 async fn report_invalid_xml_400() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -812,10 +752,6 @@ async fn report_invalid_xml_400() {
 #[test_log::test(tokio::test)]
 async fn report_unsupported_type() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -857,10 +793,6 @@ async fn report_unsupported_type() {
 #[test_log::test(tokio::test)]
 async fn calendar_query_collation_octet_case_sensitive() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -925,10 +857,6 @@ async fn calendar_query_collation_octet_case_sensitive() {
 #[test_log::test(tokio::test)]
 async fn calendar_query_collation_octet_normalization_mismatch() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -996,10 +924,6 @@ async fn calendar_query_collation_octet_normalization_mismatch() {
 #[test_log::test(tokio::test)]
 async fn calendar_query_collation_unicode_case_insensitive() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -1069,10 +993,6 @@ async fn calendar_query_collation_unicode_case_insensitive() {
 #[test_log::test(tokio::test)]
 async fn calendar_query_collation_unicode_normalization_match() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -1140,10 +1060,6 @@ async fn calendar_query_collation_unicode_normalization_match() {
 #[test_log::test(tokio::test)]
 async fn calendar_query_collation_ascii_non_ascii_no_match() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -1213,10 +1129,6 @@ async fn calendar_query_collation_ascii_non_ascii_no_match() {
 #[test_log::test(tokio::test)]
 async fn calendar_query_collation_unicode_german_sharp_s() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -1280,10 +1192,6 @@ async fn calendar_query_collation_unicode_german_sharp_s() {
 #[test_log::test(tokio::test)]
 async fn calendar_query_collation_ascii_case_insensitive() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -1347,10 +1255,6 @@ async fn calendar_query_collation_ascii_case_insensitive() {
 #[test_log::test(tokio::test)]
 async fn calendar_query_collation_unicode_starts_with() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -1418,10 +1322,6 @@ async fn calendar_query_collation_unicode_starts_with() {
 #[test_log::test(tokio::test)]
 async fn calendar_query_collation_unicode_ends_with() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -1485,10 +1385,6 @@ async fn calendar_query_collation_unicode_ends_with() {
 #[test_log::test(tokio::test)]
 async fn calendar_query_collation_unicode_negate_contains() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -1556,10 +1452,6 @@ async fn calendar_query_collation_unicode_negate_contains() {
 #[test_log::test(tokio::test)]
 async fn calendar_query_collation_octet_starts_with_case_sensitive() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -1623,10 +1515,6 @@ async fn calendar_query_collation_octet_starts_with_case_sensitive() {
 #[test_log::test(tokio::test)]
 async fn calendar_query_collation_ascii_contains_case_insensitive() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -1694,10 +1582,6 @@ async fn calendar_query_collation_ascii_contains_case_insensitive() {
 #[test_log::test(tokio::test)]
 async fn calendar_query_collation_ascii_negate_contains() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -1762,10 +1646,6 @@ async fn calendar_query_collation_ascii_negate_contains() {
 #[test_log::test(tokio::test)]
 async fn calendar_query_collation_uppercase_search() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -1834,10 +1714,6 @@ async fn calendar_query_collation_uppercase_search() {
 #[test_log::test(tokio::test)]
 async fn calendar_query_collation_mixed_case() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -1906,10 +1782,6 @@ async fn calendar_query_collation_mixed_case() {
 #[test_log::test(tokio::test)]
 async fn calendar_query_collation_turkish_i() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -1979,10 +1851,6 @@ async fn calendar_query_collation_turkish_i() {
 #[test_log::test(tokio::test)]
 async fn calendar_query_collation_greek_sigma() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -2052,10 +1920,6 @@ async fn calendar_query_collation_greek_sigma() {
 #[test_log::test(tokio::test)]
 async fn addressbook_query_collation_unicode_german() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -2114,10 +1978,6 @@ async fn addressbook_query_collation_unicode_german() {
 #[test_log::test(tokio::test)]
 async fn addressbook_query_collation_ascii_non_ascii_no_match() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -2189,10 +2049,6 @@ END:VCARD";
 #[test_log::test(tokio::test)]
 async fn addressbook_query_collation_octet_email_case_sensitive() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -2263,10 +2119,6 @@ END:VCARD";
 #[test_log::test(tokio::test)]
 async fn addressbook_query_collation_unicode_normalization_match() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -2331,10 +2183,6 @@ async fn addressbook_query_collation_unicode_normalization_match() {
 #[test_log::test(tokio::test)]
 async fn report_malformed_unicode_reference_400() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -2377,10 +2225,6 @@ async fn report_malformed_unicode_reference_400() {
 #[test_log::test(tokio::test)]
 async fn addressbook_query_collation_ascii_email() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -2451,10 +2295,6 @@ END:VCARD";
 #[test_log::test(tokio::test)]
 async fn addressbook_query_collation_unicode_fn_starts_with() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -2518,10 +2358,6 @@ async fn addressbook_query_collation_unicode_fn_starts_with() {
 #[test_log::test(tokio::test)]
 async fn addressbook_query_collation_unicode_fn_ends_with() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -2589,10 +2425,6 @@ async fn addressbook_query_collation_unicode_fn_ends_with() {
 #[test_log::test(tokio::test)]
 async fn addressbook_query_collation_ascii_email_contains() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -2662,10 +2494,6 @@ END:VCARD";
 #[test_log::test(tokio::test)]
 async fn addressbook_query_collation_octet_email_starts_with_case_sensitive() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -2735,10 +2563,6 @@ END:VCARD";
 #[test_log::test(tokio::test)]
 async fn addressbook_query_collation_ascii_email_negate_contains() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -2808,10 +2632,6 @@ END:VCARD";
 #[test_log::test(tokio::test)]
 async fn addressbook_query_collation_unicode_n_matches_family() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -2877,10 +2697,6 @@ END:VCARD";
 #[test_log::test(tokio::test)]
 async fn addressbook_query_collation_octet_n_case_sensitive() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -2954,10 +2770,6 @@ END:VCARD";
 async fn calendar_query_unsupported_component_403() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -3020,10 +2832,6 @@ async fn calendar_query_unsupported_component_403() {
 async fn calendar_query_unsupported_property_403() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -3087,10 +2895,6 @@ async fn calendar_query_unsupported_property_403() {
 async fn calendar_query_supported_components_accepted() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()

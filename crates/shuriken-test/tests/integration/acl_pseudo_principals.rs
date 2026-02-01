@@ -17,10 +17,6 @@ use super::helpers::*;
 #[test_log::test(tokio::test)]
 async fn propfind_acl_shows_all_pseudo_principal() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -99,10 +95,6 @@ async fn propfind_acl_shows_all_pseudo_principal() {
 #[test_log::test(tokio::test)]
 async fn propfind_acl_shows_authenticated_pseudo_principal() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -181,10 +173,6 @@ async fn propfind_acl_shows_authenticated_pseudo_principal() {
 #[test_log::test(tokio::test)]
 async fn propfind_acl_shows_unauthenticated_pseudo_principal() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -264,10 +252,6 @@ async fn propfind_acl_shows_unauthenticated_pseudo_principal() {
 #[test_log::test(tokio::test)]
 async fn propfind_acl_shows_multiple_pseudo_principals() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await

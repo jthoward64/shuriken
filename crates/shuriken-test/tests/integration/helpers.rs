@@ -2081,68 +2081,6 @@ impl TestDb {
         Ok(())
     }
 
-    /// Seeds all standard role-to-permission mappings (g2 rules).
-    ///
-    /// This sets up the complete permission model matching the Casbin model config.
-    ///
-    /// ## Roles and Permissions
-    /// - `reader-freebusy`: `read_freebusy`
-    /// - `reader`: `read_freebusy`, `read`
-    /// - `editor-basic`: `read_freebusy`, `read`, `edit`
-    /// - `editor`: `read_freebusy`, `read`, `edit`, `delete`
-    /// - `share-manager`: `read_freebusy`, `read`, `edit`, `delete`, `share_read`, `share_edit`
-    /// - `owner`: all permissions including `admin`
-    ///
-    /// ## Errors
-    /// Returns an error if seeding fails.
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "Test helper that seeds many permissions"
-    )]
-    pub async fn seed_default_role_permissions(&self) -> anyhow::Result<()> {
-        // reader-freebusy
-        self.seed_role_permission("reader-freebusy", "read_freebusy")
-            .await?;
-
-        // reader
-        self.seed_role_permission("reader", "read_freebusy").await?;
-        self.seed_role_permission("reader", "read").await?;
-
-        // editor-basic
-        self.seed_role_permission("editor-basic", "read_freebusy")
-            .await?;
-        self.seed_role_permission("editor-basic", "read").await?;
-        self.seed_role_permission("editor-basic", "edit").await?;
-
-        // editor
-        self.seed_role_permission("editor", "read_freebusy").await?;
-        self.seed_role_permission("editor", "read").await?;
-        self.seed_role_permission("editor", "edit").await?;
-        self.seed_role_permission("editor", "delete").await?;
-
-        // share-manager
-        self.seed_role_permission("share-manager", "read_freebusy")
-            .await?;
-        self.seed_role_permission("share-manager", "read").await?;
-        self.seed_role_permission("share-manager", "edit").await?;
-        self.seed_role_permission("share-manager", "delete").await?;
-        self.seed_role_permission("share-manager", "share_read")
-            .await?;
-        self.seed_role_permission("share-manager", "share_edit")
-            .await?;
-
-        // owner
-        self.seed_role_permission("owner", "read_freebusy").await?;
-        self.seed_role_permission("owner", "read").await?;
-        self.seed_role_permission("owner", "edit").await?;
-        self.seed_role_permission("owner", "delete").await?;
-        self.seed_role_permission("owner", "share_read").await?;
-        self.seed_role_permission("owner", "share_edit").await?;
-        self.seed_role_permission("owner", "admin").await?;
-
-        Ok(())
-    }
-
     /// Grants a principal owner access to a collection.
     ///
     /// This is a convenience method that seeds an access policy granting
@@ -2318,48 +2256,6 @@ impl TestDb {
             ))
             .execute(&mut conn)
             .await?;
-
-        Ok(())
-    }
-
-    /// Seeds default policies and role hierarchy for testing.
-    ///
-    /// ## Deprecated
-    /// Use `seed_default_role_permissions` instead.
-    ///
-    /// ## Errors
-    /// Returns an error if seeding fails.
-    #[deprecated(note = "Use seed_default_role_permissions instead")]
-    #[expect(deprecated)]
-    pub async fn seed_default_policies(&self) -> anyhow::Result<()> {
-        // Role hierarchy: owner > admin > edit-share > edit > read-share > read > read-freebusy
-        self.seed_role_hierarchy("owner", "admin").await?;
-        self.seed_role_hierarchy("admin", "edit-share").await?;
-        self.seed_role_hierarchy("edit-share", "edit").await?;
-        self.seed_role_hierarchy("edit", "read-share").await?;
-        self.seed_role_hierarchy("read-share", "read").await?;
-        self.seed_role_hierarchy("read", "read-freebusy").await?;
-
-        // Policies: what role is required for each action on each type
-        // Calendar
-        self.seed_policy("read", "calendar", "read").await?;
-        self.seed_policy("edit", "calendar", "write").await?;
-        self.seed_policy("read-freebusy", "calendar", "read_freebusy")
-            .await?;
-
-        // Calendar event
-        self.seed_policy("read", "calendar_event", "read").await?;
-        self.seed_policy("edit", "calendar_event", "write").await?;
-        self.seed_policy("read-freebusy", "calendar_event", "read_freebusy")
-            .await?;
-
-        // Addressbook
-        self.seed_policy("read", "addressbook", "read").await?;
-        self.seed_policy("edit", "addressbook", "write").await?;
-
-        // Vcard
-        self.seed_policy("read", "vcard", "read").await?;
-        self.seed_policy("edit", "vcard", "write").await?;
 
         Ok(())
     }

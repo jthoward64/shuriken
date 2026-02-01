@@ -16,10 +16,6 @@ use super::helpers::*;
 #[test_log::test(tokio::test)]
 async fn proppatch_returns_multistatus() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -55,10 +51,6 @@ async fn proppatch_returns_multistatus() {
 #[test_log::test(tokio::test)]
 async fn proppatch_set_protected_prop_403() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -101,10 +93,6 @@ async fn proppatch_set_protected_prop_403() {
 #[test_log::test(tokio::test)]
 async fn proppatch_remove_protected_prop_403() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -151,10 +139,6 @@ async fn proppatch_remove_protected_prop_403() {
 #[test_log::test(tokio::test)]
 async fn proppatch_set_displayname_200() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -200,10 +184,6 @@ async fn proppatch_set_displayname_200() {
 #[test_log::test(tokio::test)]
 async fn proppatch_set_calendar_description() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -245,10 +225,6 @@ async fn proppatch_set_calendar_description() {
 #[test_log::test(tokio::test)]
 async fn proppatch_remove_displayname() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -295,10 +271,6 @@ async fn proppatch_remove_displayname() {
 #[test_log::test(tokio::test)]
 async fn proppatch_set_multiple_props() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -345,10 +317,6 @@ async fn proppatch_set_multiple_props() {
 #[test_log::test(tokio::test)]
 async fn proppatch_partial_success_207() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -401,10 +369,6 @@ async fn proppatch_partial_success_207() {
 #[test_log::test(tokio::test)]
 async fn proppatch_nonexistent_404() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let service = create_db_test_service(&test_db.url()).await;
 
@@ -422,10 +386,6 @@ async fn proppatch_nonexistent_404() {
 #[test_log::test(tokio::test)]
 async fn proppatch_invalid_xml_400() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await
@@ -456,10 +416,6 @@ async fn proppatch_invalid_xml_400() {
 #[test_log::test(tokio::test)]
 async fn proppatch_empty_body_error() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
     let principal_id = test_db
         .seed_authenticated_user()
         .await

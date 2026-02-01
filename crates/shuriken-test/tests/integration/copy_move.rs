@@ -16,10 +16,6 @@ use super::helpers::*;
 #[test_log::test(tokio::test)]
 async fn move_rename_item_updates_href() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -93,10 +89,6 @@ async fn move_rename_item_updates_href() {
 #[test_log::test(tokio::test)]
 async fn move_within_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -156,10 +148,6 @@ async fn move_within_collection() {
 #[test_log::test(tokio::test)]
 async fn move_across_collections() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -237,10 +225,6 @@ async fn move_across_collections() {
 #[test_log::test(tokio::test)]
 async fn copy_duplicates_resource() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -303,10 +287,6 @@ async fn copy_duplicates_resource() {
 #[test_log::test(tokio::test)]
 async fn copy_does_not_create_tombstone() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -370,10 +350,6 @@ async fn copy_does_not_create_tombstone() {
 #[test_log::test(tokio::test)]
 async fn move_destination_exists_overwrite_false_412() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -463,10 +439,6 @@ async fn move_destination_exists_overwrite_false_412() {
 #[test_log::test(tokio::test)]
 async fn move_destination_exists_overwrite_true_succeeds() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -565,10 +537,6 @@ async fn move_destination_exists_overwrite_true_succeeds() {
 #[test_log::test(tokio::test)]
 async fn move_generates_tombstone() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -650,10 +618,6 @@ async fn move_generates_tombstone() {
 #[test_log::test(tokio::test)]
 async fn move_without_destination_400() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -706,10 +670,6 @@ async fn move_without_destination_400() {
 #[test_log::test(tokio::test)]
 async fn move_nonexistent_404() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -748,10 +708,6 @@ async fn move_nonexistent_404() {
 #[test_log::test(tokio::test)]
 async fn copy_nonexistent_404() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()

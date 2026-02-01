@@ -18,10 +18,6 @@ async fn put_creates_calendar_object() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     // Seed the role→permission mappings (g2 rules)
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Seed the authenticated user (matches config email)
     let principal_id = test_db
@@ -67,10 +63,6 @@ async fn put_creates_vcard() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     // Seed the role→permission mappings (g2 rules)
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Seed the authenticated user (matches config email)
     let principal_id = test_db
@@ -124,10 +116,6 @@ async fn put_populates_cal_index_and_occurrences() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     // Seed the role→permission mappings (g2 rules)
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Seed the authenticated user (matches config email)
     let principal_id = test_db
@@ -229,10 +217,6 @@ async fn put_populates_card_index() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     // Seed the role→permission mappings (g2 rules)
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Seed the authenticated user (matches config email)
     let principal_id = test_db
@@ -314,10 +298,6 @@ async fn put_create_if_none_match_star_ok() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     // Seed the role→permission mappings (g2 rules)
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Seed the authenticated user (matches config email)
     let principal_id = test_db
@@ -359,10 +339,6 @@ async fn put_create_if_none_match_star_fails_when_exists() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     // Seed the role→permission mappings (g2 rules)
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Seed the authenticated user (matches config email)
     let principal_id = test_db
@@ -425,10 +401,6 @@ async fn put_update_if_match_success() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     // Seed the role→permission mappings (g2 rules)
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Seed the authenticated user (matches config email)
     let principal_id = test_db
@@ -493,10 +465,6 @@ async fn put_update_if_match_mismatch_412() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     // Seed the role→permission mappings (g2 rules)
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Seed the authenticated user (matches config email)
     let principal_id = test_db
@@ -559,10 +527,6 @@ async fn put_invalid_ical_rejected() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     // Seed the role→permission mappings (g2 rules)
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Seed the authenticated user (matches config email)
     let principal_id = test_db
@@ -608,10 +572,6 @@ async fn put_invalid_vcard_rejected() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     // Seed the role→permission mappings (g2 rules)
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Seed the authenticated user (matches config email)
     let principal_id = test_db
@@ -661,10 +621,6 @@ async fn put_uid_conflict_rejected() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     // Seed the role→permission mappings (g2 rules)
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Seed the authenticated user (matches config email)
     let principal_id = test_db
@@ -737,10 +693,6 @@ async fn put_bumps_synctoken() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     // Seed the role→permission mappings (g2 rules)
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Seed the authenticated user (matches config email)
     let principal_id = test_db
@@ -801,10 +753,6 @@ async fn put_returns_etag() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     // Seed the role→permission mappings (g2 rules)
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Seed the authenticated user (matches config email)
     let principal_id = test_db
@@ -853,10 +801,6 @@ async fn put_updates_etag() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     // Seed the role→permission mappings (g2 rules)
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Seed the authenticated user (matches config email)
     let principal_id = test_db
@@ -932,10 +876,6 @@ async fn put_status_codes() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     // Seed the role→permission mappings (g2 rules)
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Seed the authenticated user (matches config email)
     let principal_id = test_db
@@ -997,10 +937,6 @@ async fn put_nonexistent_collection_404() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     // Seed the role→permission mappings (g2 rules)
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let service = create_db_test_service(&test_db.url()).await;
 
@@ -1030,10 +966,6 @@ async fn put_nonexistent_collection_404() {
 async fn put_unsupported_vcard_content_type_rejected() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -1121,10 +1053,6 @@ async fn put_vcard_max_resource_size_validation_configured() {
 async fn put_invalid_vcard_syntax_rejected() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()

@@ -123,10 +123,6 @@ async fn delete_calendar_object() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     // Seed the role→permission mappings (g2 rules)
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Seed the authenticated user (matches config email)
     let principal_id = test_db
@@ -182,10 +178,6 @@ async fn delete_creates_tombstone() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     // Seed the role→permission mappings (g2 rules)
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Seed the authenticated user (matches config email)
     let principal_id = test_db
@@ -264,10 +256,6 @@ async fn delete_cleans_calendar_indexes() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     // Seed the role→permission mappings (g2 rules)
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Seed authenticated user (matches config email)
     let principal_id = test_db
@@ -332,10 +320,6 @@ async fn delete_cleans_card_index() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     // Seed the role→permission mappings (g2 rules)
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Seed authenticated user (matches config email)
     let principal_id = test_db
@@ -409,10 +393,6 @@ async fn delete_nonexistent_404() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     // Seed the role→permission mappings (g2 rules)
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Seed authenticated user so we have a valid owner
     let principal_id = test_db
@@ -451,10 +431,6 @@ async fn delete_idempotent() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     // Seed the role→permission mappings (g2 rules)
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Seed the authenticated user (matches config email)
     let principal_id = test_db
@@ -519,10 +495,6 @@ async fn delete_if_match_success() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     // Seed the role→permission mappings (g2 rules)
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Seed the authenticated user (matches config email)
     let principal_id = test_db
@@ -577,10 +549,6 @@ async fn delete_if_match_mismatch_412() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     // Seed the role→permission mappings (g2 rules)
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Seed the authenticated user (matches config email)
     let principal_id = test_db
@@ -646,10 +614,6 @@ async fn delete_collection() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     // Seed the role→permission mappings (g2 rules)
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Seed the authenticated user (matches config email)
     let principal_id = test_db
@@ -714,10 +678,6 @@ async fn delete_collection_no_orphans() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     // Seed the role→permission mappings (g2 rules)
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Seed the authenticated user (matches config email)
     let principal_id = test_db
@@ -792,10 +752,6 @@ async fn delete_bumps_synctoken() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
 
     // Seed the role→permission mappings (g2 rules)
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Seed the authenticated user (matches config email)
     let principal_id = test_db

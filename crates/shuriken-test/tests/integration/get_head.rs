@@ -16,10 +16,6 @@ use super::helpers::*;
 #[test_log::test(tokio::test)]
 async fn get_calendar_object_content_type() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     // Seed test data
     let principal_id = test_db
@@ -80,10 +76,6 @@ async fn get_calendar_object_content_type() {
 #[test_log::test(tokio::test)]
 async fn get_vcard_content_type() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -146,10 +138,6 @@ async fn get_vcard_content_type() {
 #[test_log::test(tokio::test)]
 async fn get_calendar_object_uses_component_tree() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -262,10 +250,6 @@ async fn get_calendar_object_uses_component_tree() {
 #[test_log::test(tokio::test)]
 async fn get_vcard_uses_component_tree() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -355,10 +339,6 @@ async fn get_vcard_uses_component_tree() {
 #[test_log::test(tokio::test)]
 async fn get_nonexistent_404() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let service = create_db_test_service(&test_db.url()).await;
 
@@ -381,10 +361,6 @@ async fn get_nonexistent_404() {
 #[test_log::test(tokio::test)]
 async fn head_matches_get_headers() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -467,10 +443,6 @@ async fn head_matches_get_headers() {
 #[test_log::test(tokio::test)]
 async fn head_nonexistent_404() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let service = create_db_test_service(&test_db.url()).await;
 
@@ -493,10 +465,6 @@ async fn head_nonexistent_404() {
 #[test_log::test(tokio::test)]
 async fn get_etag_present_and_strong() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -565,10 +533,6 @@ async fn get_etag_present_and_strong() {
 #[test_log::test(tokio::test)]
 async fn get_if_none_match_304() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -630,10 +594,6 @@ async fn get_if_none_match_304() {
 #[test_log::test(tokio::test)]
 async fn get_if_none_match_different_etag_returns_200() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -693,10 +653,6 @@ async fn get_if_none_match_different_etag_returns_200() {
 #[test_log::test(tokio::test)]
 async fn get_if_match_412() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -756,10 +712,6 @@ async fn get_if_match_412() {
 #[test_log::test(tokio::test)]
 async fn get_if_match_success() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -818,10 +770,6 @@ async fn get_if_match_success() {
 #[test_log::test(tokio::test)]
 async fn get_on_collection_path() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let service = create_db_test_service(&test_db.url()).await;
 
@@ -849,10 +797,6 @@ async fn get_on_collection_path() {
 #[test_log::test(tokio::test)]
 async fn get_last_modified_header() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()
@@ -906,10 +850,6 @@ async fn get_last_modified_header() {
 #[test_log::test(tokio::test)]
 async fn get_content_length_accurate() {
     let test_db = TestDb::new().await.expect("Failed to create test database");
-    test_db
-        .seed_default_role_permissions()
-        .await
-        .expect("Failed to seed role permissions");
 
     let principal_id = test_db
         .seed_authenticated_user()

@@ -63,7 +63,7 @@ LOG_FILE="$LOG_DIR/$LOG_FILENAME"
 echo -e "${YELLOW}Starting Shuriken server (logs: $LOG_FILE)...${NC}"
 touch "$LOG_FILE"
 ln -sf "$LOG_FILENAME" "$LOG_DIR/shuriken-caldavtester-latest.log"
-NO_COLOR=1 cargo run > "$LOG_FILE" 2>&1 &
+NO_COLOR=1 RUST_LOG=shuriken=trace cargo run > "$LOG_FILE" 2>&1 &
 SHURIKEN_PID=$!
 
 cleanup() {
