@@ -4,6 +4,7 @@ use quick_xml::Reader;
 use quick_xml::events::Event;
 
 use super::error::{ParseError, ParseResult};
+use super::validate_numeric_char_refs;
 use crate::rfc::dav::core::{
     DavProperty, Namespace, PropertyValue, ProppatchRequest, QName, SetOrRemove,
 };
@@ -26,6 +27,7 @@ use crate::rfc::dav::core::{
     clippy::cognitive_complexity
 )]
 pub fn parse_proppatch(xml: &[u8]) -> ParseResult<ProppatchRequest> {
+    validate_numeric_char_refs(xml)?;
     let mut reader = Reader::from_reader(xml);
     reader.config_mut().trim_text(true);
 

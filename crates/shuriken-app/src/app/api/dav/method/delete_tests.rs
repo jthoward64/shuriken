@@ -59,9 +59,8 @@ async fn test_delete_accepts_any_path() {
 }
 
 #[tokio::test]
-async fn test_delete_expected_success_status() {
-    // When implemented, DELETE should return 204 No Content on success
-    // For now, verify the handler is callable
+async fn test_delete_smoke_status_codes_without_middleware() {
+    // Smoke test for handler wiring without middleware or database setup.
     let service = salvo::Router::new().push(salvo::Router::with_path("/{**rest}").delete(delete));
 
     let content = TestClient::delete("http://127.0.0.1:5800/test.ics")

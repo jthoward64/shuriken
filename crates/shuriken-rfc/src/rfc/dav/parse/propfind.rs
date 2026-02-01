@@ -4,6 +4,7 @@ use quick_xml::Reader;
 use quick_xml::events::Event;
 
 use super::error::{ParseError, ParseResult};
+use super::validate_numeric_char_refs;
 use crate::rfc::dav::core::{Namespace, PropertyName, PropfindRequest, PropfindType, QName};
 
 /// Parses a PROPFIND request body.
@@ -23,6 +24,8 @@ pub fn parse_propfind(xml: &[u8]) -> ParseResult<PropfindRequest> {
         // Empty body means allprop
         return Ok(PropfindRequest::allprop());
     }
+
+    validate_numeric_char_refs(xml)?;
 
     tracing::debug!("Parsing PROPFIND XML request");
 

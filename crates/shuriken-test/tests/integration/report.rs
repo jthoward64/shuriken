@@ -746,10 +746,15 @@ async fn report_invalid_xml_400() {
         .await
         .expect("Failed to seed authenticated user");
 
-    test_db
+    let collection_id = test_db
         .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
         .await
         .expect("Failed to seed collection");
+
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
 
     let service = create_db_test_service(&test_db.url()).await;
 

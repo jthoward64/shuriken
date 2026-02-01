@@ -495,35 +495,16 @@ END:VCALENDAR\r\n";
 
         let output = serialize(&parsed);
 
-        // For debugging, let's just check the output contains FREEBUSY
-        assert!(output.contains("FREEBUSY"));
-
-        // Parse again - this is where it might fail
-        // Let's make this test more lenient for now
-        match parse::parse(&output) {
-            Ok(reparsed) => {
-                let freebusy2 = reparsed
-                    .root
-                    .children
-                    .iter()
-                    .find(|c| c.kind == Some(ComponentKind::FreeBusy))
-                    .unwrap();
-                let freebusy_prop2 = freebusy2.get_property("FREEBUSY").unwrap();
-                // It should be parseable as a period list
-                if let Some(pl) = freebusy_prop2.value.as_period_list() {
-                    assert_eq!(pl.len(), 2);
-                } else if freebusy_prop2.value.as_period().is_some() {
-                    // If it's parsed as a single period, that's also acceptable
-                    // (might happen if serializer outputs differently)
-                    // For now, just verify we can parse it
-                } else {
-                    panic!("FREEBUSY value is neither Period nor PeriodList");
-                }
-            }
-            Err(e) => {
-                eprintln!("Serialized output:\n{output}");
-                panic!("Failed to reparse: {e:?}");
-            }
-        }
+        // Reparse and ensure the FREEBUSY list round-trips.
+        let reparsed = parse::parse(&output).unwrap();
+        let freebusy2 = reparsed
+            .root
+            .children
+            .iter()
+            .find(|c| c.kind == Some(ComponentKind::FreeBusy))
+            .unwrap();
+        let freebusy_prop2 = freebusy2.get_property("FREEBUSY").unwrap();
+        let period_list2 = freebusy_prop2.value.as_period_list().unwrap();
+        assert_eq!(period_list2.len(), 2);
     }
 }

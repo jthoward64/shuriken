@@ -4,6 +4,7 @@ use quick_xml::Reader;
 use quick_xml::events::Event;
 
 use super::error::{ParseError, ParseResult};
+use super::validate_numeric_char_refs;
 
 /// Parsed result from MKCALENDAR or Extended MKCOL request body.
 #[derive(Debug, Clone, Default)]
@@ -31,6 +32,8 @@ pub fn parse_mkcol(xml: &[u8]) -> ParseResult<MkcolRequest> {
         // Empty body is valid - no initial properties
         return Ok(MkcolRequest::default());
     }
+
+    validate_numeric_char_refs(xml)?;
 
     let mut reader = Reader::from_reader(xml);
     reader.config_mut().trim_text(true);

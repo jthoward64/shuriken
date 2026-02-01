@@ -7,7 +7,7 @@ use crate::model::dav::property::NewDavProperty;
 use shuriken_rfc::rfc::ical::core::{Component, ICalendar, Parameter, Property};
 use shuriken_rfc::rfc::ical::expand::{TimeZoneResolver, build_timezone_resolver};
 
-use super::extract::{extract_ical_uid, extract_ical_value};
+use super::extract::{ExtractedValue, extract_ical_uid, extract_ical_value};
 
 /// Type alias for the complex return type of database model mappings.
 type DbModels<'a> = (
@@ -141,8 +141,21 @@ fn map_ical_property<'a>(
 ) -> anyhow::Result<()> {
     let property_id = uuid::Uuid::nil(); // Placeholder
 
-    let (value_type, value_text, value_int, value_float, value_bool, value_date, value_tstz) =
-        extract_ical_value(&prop.value, &prop.raw_value, resolver)?;
+    let ExtractedValue {
+        value_type,
+        value_text,
+        value_int,
+        value_float,
+        value_bool,
+        value_date,
+        value_tstz,
+        value_text_array,
+        value_date_array,
+        value_tstz_array,
+        value_time,
+        value_interval,
+        value_tstzrange,
+    } = extract_ical_value(&prop.value, &prop.raw_value, resolver)?;
 
     properties.push(NewDavProperty {
         component_id,
@@ -158,12 +171,12 @@ fn map_ical_property<'a>(
         value_bytes: None,
         value_json: None,
         ordinal,
-        value_text_array: None,
-        value_date_array: None,
-        value_tstz_array: None,
-        value_time: None,
-        value_interval: None,
-        value_tstzrange: None,
+        value_text_array,
+        value_date_array,
+        value_tstz_array,
+        value_time,
+        value_interval,
+        value_tstzrange,
     });
 
     // Map parameters

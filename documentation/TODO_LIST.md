@@ -1,6 +1,6 @@
 # Shuriken TODO List
 
-**Last Updated**: January 31, 2026 (Session 3)  
+**Last Updated**: January 31, 2026 (Session 4)  
 **Purpose**: Comprehensive list of TODOs, incomplete implementations, stubs, and areas needing work across the codebase
 
 ---
@@ -14,6 +14,8 @@ This document tracks all TODO comments, "for now" implementations, stub code, pl
 1. ✅ **REPORT Property Resolution**: Implemented DB-backed property fetch with UUID-based `ResourceLocation` hrefs
 2. ✅ **Nested Expand-Property Parsing**: Added stack-based parsing for nested `<property>` elements
 3. ✅ **Middleware Migration**: All handlers now reference DavPathMiddleware; slug_resolver removed
+4. ✅ **Index Metadata Mapping**: Added CardDAV/CalDAV JSONB key helpers and unit test coverage
+5. ✅ **CalDAV Organizer/Attendee Handling**: Accept CAL-ADDRESS/URI values in metadata extraction
 
 ### Statistics
 
@@ -146,7 +148,7 @@ None currently identified.
 - Leverages `get_resolved_location_from_depot()` for UUID-based paths
 - All 820 tests passing
 
-**Note**: The "stub" comment in the code was outdated - the implementation was already RFC-compliant with proper allprop/propname/specific property support, Depth handling, and CalDAV/CardDAV discovery properties. The fix was changing from string manipulation with slugs to ResourceLocation with UUIDs.
+**Note**: The earlier "stub" comment has been removed; implementation is RFC-compliant with proper allprop/propname/specific property support, Depth handling, and CalDAV/CardDAV discovery properties.
 
 ---
 
@@ -236,7 +238,7 @@ None currently identified.
 - `build_cal_indexes()` and index insertion for event query support
 - Sync token updates
 
-**Note**: Comment is outdated; implementation is complete
+**Note**: Comment removed; implementation is complete
 ### ✅ 2. CalDAV Object Creation - Full Tree Implementation (COMPLETE)
 
 **Location**: [`crates/shuriken-service/src/caldav/service/object.rs:223`](../crates/shuriken-service/src/caldav/service/object.rs#L223)
@@ -251,29 +253,26 @@ None currently identified.
 - Batch index insertion
 - Sync token updates
 
-**Note**: Comment is outdated; implementation is complete
+**Note**: Comment removed; implementation is complete
 
 ### CardDAV Service
 
 ### ✅ 3. CardDAV Object Update - Full Tree Implementation (COMPLETE)
 **Location**: [`crates/shuriken-service/src/carddav/service/object.rs:159`](../crates/shuriken-service/src/carddav/service/object.rs#L159)
 
-**Status**: ✅ Complete - Mirrors CalDAV implementation pattern
+**Status**: ✅ Complete - Mirrors CalDAV implementation pattern (comment removed)
 
 ### ✅ 4. CardDAV Object Creation - Full Tree Implementation (COMPLETE)
 
 **Location**: [`crates/shuriken-service/src/carddav/service/object.rs:200`](../crates/shuriken-service/src/carddav/service/object.rs#L200)
 
-**Status**: ✅ Complete - Mirrors CalDAV implementation pattern
+**Status**: ✅ Complete - Mirrors CalDAV implementation pattern (comment removed)
 
 ### Integration Tests
 
-5. **DELETE Handler Test - Stub Verification**  
+5. ✅ **DELETE Handler Test - Smoke Coverage (COMPLETE)**  
    **Location**: [`crates/shuriken-app/src/app/api/dav/method/delete_tests.rs:64`](../crates/shuriken-app/src/app/api/dav/method/delete_tests.rs#L64)  
-   ```rust
-   // For now, verify the handler is callable
-   ```
-   **Status**: Test needs expansion
+   **Status**: ✅ Complete (2026-01-31) - Clarified smoke test intent; full behavior covered by integration tests
 
 6. ✅ **REPORT Test - Sync-Token Parsing (COMPLETE)**  
    **Location**: [`crates/shuriken-test/tests/integration/report.rs`](../crates/shuriken-test/tests/integration/report.rs)  
@@ -292,19 +291,9 @@ None currently identified.
 
 ### RFC Parser - Test Leniency
 
-8. **iCalendar Serializer Test - Lenient Comparison**  
+8. ✅ **iCalendar Serializer Test - Period List Round-Trip (COMPLETE)**  
    **Location**: [`crates/shuriken-rfc/src/rfc/ical/build/serializer.rs:502`](../crates/shuriken-rfc/src/rfc/ical/build/serializer.rs#L502)  
-   ```rust
-   // Let's make this test more lenient for now
-   ```
-   **Status**: Test relaxed for practical parsing
-
-9. **iCalendar Serializer - Parse Verification Only**  
-   **Location**: [`crates/shuriken-rfc/src/rfc/ical/build/serializer.rs:518`](../crates/shuriken-rfc/src/rfc/ical/build/serializer.rs#L518)  
-   ```rust
-   // For now, just verify we can parse it
-   ```
-   **Status**: Minimal test coverage
+   **Status**: ✅ Complete (2026-01-31) - Strict round-trip assertion for FREEBUSY period list
 
 ---
 

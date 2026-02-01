@@ -1,46 +1,43 @@
 //! Value extraction utilities for iCalendar and vCard.
 
 use crate::db::enums::ValueType;
+use crate::db::pg_types::{PgInterval, PgTstzRange};
 use shuriken_rfc::rfc::ical::core::{Component, Value};
 use shuriken_rfc::rfc::ical::expand::TimeZoneResolver;
 use shuriken_rfc::rfc::vcard::core::{VCard, VCardValue};
 
 /// ## Summary
 /// Extracts typed value fields from an iCalendar Value.
-///
-/// Returns a tuple of (`value_type`, `value_text`, `value_int`, `value_float`, `value_bool`, `value_date`, `value_tstz`).
-#[expect(
-    clippy::type_complexity,
-    reason = "Return tuple mirrors database column types for direct mapping"
-)]
 pub(super) fn extract_ical_value<'a>(
     value: &Value,
     raw: &'a str,
     resolver: &mut TimeZoneResolver,
-) -> anyhow::Result<(
-    ValueType,
-    Option<&'a str>,
-    Option<i64>,
-    Option<f64>,
-    Option<bool>,
-    Option<chrono::NaiveDate>,
-    Option<chrono::DateTime<chrono::Utc>>,
-)> {
+) -> anyhow::Result<ExtractedValue<'a>> {
     match value {
-        Value::Text(_) | Value::TextList(_) | Value::CalAddress(_) | Value::Uri(_) => {
-            Ok((ValueType::Text, Some(raw), None, None, None, None, None))
+        Value::Text(_) => Ok(ExtractedValue::with_text(ValueType::Text, Some(raw))),
+        Value::TextList(list) => Ok(ExtractedValue {
+            value_type: ValueType::TextList,
+            value_text_array: Some(list.iter().map(|s| Some(s.clone())).collect()),
+            ..ExtractedValue::empty()
+        }),
+        Value::CalAddress(_) | Value::Uri(_) => {
+            Ok(ExtractedValue::with_text(ValueType::Uri, Some(raw)))
         }
-        Value::Integer(i) => Ok((
-            ValueType::Integer,
-            None,
-            Some(i64::from(*i)),
-            None,
-            None,
-            None,
-            None,
-        )),
-        Value::Float(f) => Ok((ValueType::Float, None, None, Some(*f), None, None, None)),
-        Value::Boolean(b) => Ok((ValueType::Boolean, None, None, None, Some(*b), None, None)),
+        Value::Integer(i) => Ok(ExtractedValue {
+            value_type: ValueType::Integer,
+            value_int: Some(i64::from(*i)),
+            ..ExtractedValue::empty()
+        }),
+        Value::Float(f) => Ok(ExtractedValue {
+            value_type: ValueType::Float,
+            value_float: Some(*f),
+            ..ExtractedValue::empty()
+        }),
+        Value::Boolean(b) => Ok(ExtractedValue {
+            value_type: ValueType::Boolean,
+            value_bool: Some(*b),
+            ..ExtractedValue::empty()
+        }),
         Value::Date(d) => {
             let naive = chrono::NaiveDate::from_ymd_opt(
                 i32::from(d.year),
@@ -48,63 +45,94 @@ pub(super) fn extract_ical_value<'a>(
                 u32::from(d.day),
             )
             .ok_or_else(|| anyhow::anyhow!("Invalid date"))?;
-            Ok((ValueType::Date, None, None, None, None, Some(naive), None))
+            Ok(ExtractedValue {
+                value_type: ValueType::Date,
+                value_date: Some(naive),
+                ..ExtractedValue::empty()
+            })
         }
         Value::DateTime(dt) => {
             // Convert to UTC if possible
             let tstz = datetime_to_utc(dt, resolver)?;
-            Ok((
-                ValueType::DateTime,
-                None,
-                None,
-                None,
-                None,
-                None,
-                Some(tstz),
-            ))
+            Ok(ExtractedValue {
+                value_type: ValueType::DateTime,
+                value_tstz: Some(tstz),
+                ..ExtractedValue::empty()
+            })
         }
-        Value::Duration(_)
-        | Value::Period(_)
-        | Value::PeriodList(_)
-        | Value::Recur(_)
-        | Value::Time(_)
-        | Value::UtcOffset(_)
-        | Value::Binary(_)
-        | Value::Unknown(_) => {
-            // Store complex types as text (raw value)
-            Ok((ValueType::Text, Some(raw), None, None, None, None, None))
+        Value::DateList(list) => {
+            let mut dates = Vec::with_capacity(list.len());
+            for d in list {
+                let naive = chrono::NaiveDate::from_ymd_opt(
+                    i32::from(d.year),
+                    u32::from(d.month),
+                    u32::from(d.day),
+                )
+                .ok_or_else(|| anyhow::anyhow!("Invalid date"))?;
+                dates.push(Some(naive));
+            }
+            Ok(ExtractedValue {
+                value_type: ValueType::DateList,
+                value_date_array: Some(dates),
+                ..ExtractedValue::empty()
+            })
         }
-        Value::DateList(_) | Value::DateTimeList(_) => {
-            // Store list types as text (raw value) for now
-            // TODO: Consider storing first element or handling lists specially
-            Ok((ValueType::Text, Some(raw), None, None, None, None, None))
+        Value::DateTimeList(list) => {
+            let mut values = Vec::with_capacity(list.len());
+            for dt in list {
+                let tstz = datetime_to_utc(dt, resolver)?;
+                values.push(Some(tstz));
+            }
+            Ok(ExtractedValue {
+                value_type: ValueType::DateTimeList,
+                value_tstz_array: Some(values),
+                ..ExtractedValue::empty()
+            })
+        }
+        Value::Time(t) => {
+            let time = chrono::NaiveTime::from_hms_opt(
+                u32::from(t.hour),
+                u32::from(t.minute),
+                u32::from(t.second),
+            )
+            .ok_or_else(|| anyhow::anyhow!("Invalid time"))?;
+            Ok(ExtractedValue {
+                value_type: ValueType::Time,
+                value_time: Some(time),
+                ..ExtractedValue::empty()
+            })
+        }
+        Value::Duration(duration) => Ok(ExtractedValue {
+            value_type: ValueType::DurationInterval,
+            value_interval: Some(duration_to_interval(duration)),
+            ..ExtractedValue::empty()
+        }),
+        Value::UtcOffset(offset) => Ok(ExtractedValue {
+            value_type: ValueType::UtcOffsetInterval,
+            value_interval: Some(PgInterval::from_seconds(i64::from(offset.as_seconds()))),
+            ..ExtractedValue::empty()
+        }),
+        Value::Period(period) => Ok(ExtractedValue {
+            value_type: ValueType::Period,
+            value_tstzrange: Some(period_to_range(period, resolver)?),
+            ..ExtractedValue::empty()
+        }),
+        Value::PeriodList(list) => Ok(ExtractedValue {
+            value_type: ValueType::PeriodList,
+            value_tstzrange: period_list_to_range(list, resolver)?,
+            ..ExtractedValue::empty()
+        }),
+        Value::Recur(_) | Value::Binary(_) | Value::Unknown(_) => {
+            Ok(ExtractedValue::with_text(ValueType::Text, Some(raw)))
         }
     }
 }
 
 /// ## Summary
 /// Extracts typed value fields from a vCard Value.
-///
-/// Returns a tuple of (`value_type`, `value_text`, `value_int`, `value_float`, `value_bool`, `value_date`, `value_tstz`).
-#[expect(
-    clippy::type_complexity,
-    reason = "Return tuple mirrors database column types for direct mapping"
-)]
-pub(super) fn extract_vcard_value<'a>(
-    value: &VCardValue,
-    raw: &'a str,
-) -> (
-    ValueType,
-    Option<&'a str>,
-    Option<i64>,
-    Option<f64>,
-    Option<bool>,
-    Option<chrono::NaiveDate>,
-    Option<chrono::DateTime<chrono::Utc>>,
-) {
+pub(super) fn extract_vcard_value<'a>(value: &VCardValue, raw: &'a str) -> ExtractedValue<'a> {
     match value {
         VCardValue::Text(_)
-        | VCardValue::TextList(_)
         | VCardValue::Uri(_)
         | VCardValue::LanguageTag(_)
         | VCardValue::DateAndOrTime(_)
@@ -118,24 +146,160 @@ pub(super) fn extract_vcard_value<'a>(
         | VCardValue::Binary(_)
         | VCardValue::Unknown(_) => {
             // Store text and structured types as text (raw)
-            (ValueType::Text, Some(raw), None, None, None, None, None)
+            ExtractedValue::with_text(ValueType::Text, Some(raw))
         }
+        VCardValue::TextList(list) => ExtractedValue {
+            value_type: ValueType::TextList,
+            value_text_array: Some(list.iter().map(|s| Some(s.clone())).collect()),
+            ..ExtractedValue::empty()
+        },
         VCardValue::Timestamp(ts) => {
             // Store timestamp in value_tstz column
-            (
-                ValueType::DateTime,
-                None,
-                None,
-                None,
-                None,
-                None,
-                Some(ts.datetime),
-            )
+            ExtractedValue {
+                value_type: ValueType::DateTime,
+                value_tstz: Some(ts.datetime),
+                ..ExtractedValue::empty()
+            }
         }
-        VCardValue::Integer(i) => (ValueType::Integer, None, Some(*i), None, None, None, None),
-        VCardValue::Float(f) => (ValueType::Float, None, None, Some(*f), None, None, None),
-        VCardValue::Boolean(b) => (ValueType::Boolean, None, None, None, Some(*b), None, None),
+        VCardValue::Integer(i) => ExtractedValue {
+            value_type: ValueType::Integer,
+            value_int: Some(*i),
+            ..ExtractedValue::empty()
+        },
+        VCardValue::Float(f) => ExtractedValue {
+            value_type: ValueType::Float,
+            value_float: Some(*f),
+            ..ExtractedValue::empty()
+        },
+        VCardValue::Boolean(b) => ExtractedValue {
+            value_type: ValueType::Boolean,
+            value_bool: Some(*b),
+            ..ExtractedValue::empty()
+        },
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(super) struct ExtractedValue<'a> {
+    pub value_type: ValueType,
+    pub value_text: Option<&'a str>,
+    pub value_int: Option<i64>,
+    pub value_float: Option<f64>,
+    pub value_bool: Option<bool>,
+    pub value_date: Option<chrono::NaiveDate>,
+    pub value_tstz: Option<chrono::DateTime<chrono::Utc>>,
+    pub value_text_array: Option<Vec<Option<String>>>,
+    pub value_date_array: Option<Vec<Option<chrono::NaiveDate>>>,
+    pub value_tstz_array: Option<Vec<Option<chrono::DateTime<chrono::Utc>>>>,
+    pub value_time: Option<chrono::NaiveTime>,
+    pub value_interval: Option<PgInterval>,
+    pub value_tstzrange: Option<PgTstzRange>,
+}
+
+impl<'a> ExtractedValue<'a> {
+    #[must_use]
+    pub fn empty() -> Self {
+        Self {
+            value_type: ValueType::Text,
+            value_text: None,
+            value_int: None,
+            value_float: None,
+            value_bool: None,
+            value_date: None,
+            value_tstz: None,
+            value_text_array: None,
+            value_date_array: None,
+            value_tstz_array: None,
+            value_time: None,
+            value_interval: None,
+            value_tstzrange: None,
+        }
+    }
+
+    #[must_use]
+    pub fn with_text(value_type: ValueType, value_text: Option<&'a str>) -> Self {
+        Self {
+            value_type,
+            value_text,
+            ..Self::empty()
+        }
+    }
+}
+
+fn duration_to_interval(duration: &shuriken_rfc::rfc::ical::core::Duration) -> PgInterval {
+    let weeks_days = duration
+        .weeks
+        .saturating_mul(7)
+        .saturating_add(duration.days);
+    let days = i32::try_from(weeks_days).unwrap_or(i32::MAX);
+    let seconds = i64::from(duration.hours) * 3600
+        + i64::from(duration.minutes) * 60
+        + i64::from(duration.seconds);
+
+    let mut interval = PgInterval::new(0, days, seconds * 1_000_000);
+    if duration.negative {
+        interval = PgInterval::new(0, -interval.days, -interval.microseconds);
+    }
+
+    interval
+}
+
+fn duration_to_chrono(duration: &shuriken_rfc::rfc::ical::core::Duration) -> chrono::Duration {
+    let weeks_days = i64::from(duration.weeks) * 7 + i64::from(duration.days);
+    let seconds = i64::from(duration.hours) * 3600
+        + i64::from(duration.minutes) * 60
+        + i64::from(duration.seconds);
+    let mut total = chrono::Duration::days(weeks_days) + chrono::Duration::seconds(seconds);
+    if duration.negative {
+        total = -total;
+    }
+    total
+}
+
+fn period_to_range(
+    period: &shuriken_rfc::rfc::ical::core::Period,
+    resolver: &mut TimeZoneResolver,
+) -> anyhow::Result<PgTstzRange> {
+    let (start, end) = match period {
+        shuriken_rfc::rfc::ical::core::Period::Explicit { start, end } => {
+            let start = datetime_to_utc(start, resolver)?;
+            let end = datetime_to_utc(end, resolver)?;
+            (start, end)
+        }
+        shuriken_rfc::rfc::ical::core::Period::Duration { start, duration } => {
+            let start = datetime_to_utc(start, resolver)?;
+            let end = start + duration_to_chrono(duration);
+            (start, end)
+        }
+    };
+
+    Ok(PgTstzRange::inclusive(start, end))
+}
+
+fn period_list_to_range(
+    list: &[shuriken_rfc::rfc::ical::core::Period],
+    resolver: &mut TimeZoneResolver,
+) -> anyhow::Result<Option<PgTstzRange>> {
+    let mut min_start: Option<chrono::DateTime<chrono::Utc>> = None;
+    let mut max_end: Option<chrono::DateTime<chrono::Utc>> = None;
+
+    for period in list {
+        let range = period_to_range(period, resolver)?;
+        let Some(start) = range.lower else {
+            continue;
+        };
+        let Some(end) = range.upper else {
+            continue;
+        };
+
+        min_start = Some(min_start.map_or(start, |current| current.min(start)));
+        max_end = Some(max_end.map_or(end, |current| current.max(end)));
+    }
+
+    Ok(match (min_start, max_end) {
+        (Some(start), Some(end)) => Some(PgTstzRange::inclusive(start, end)),
+        _ => None,
+    })
 }
 
 /// ## Summary
@@ -201,17 +365,7 @@ mod tests {
         Component, ComponentKind, Date, DateTime, DateTimeForm, Property,
     };
 
-    type IcalValueTuple<'a> = (
-        ValueType,
-        Option<&'a str>,
-        Option<i64>,
-        Option<f64>,
-        Option<bool>,
-        Option<chrono::NaiveDate>,
-        Option<chrono::DateTime<chrono::Utc>>,
-    );
-
-    fn extract_ical_value_for_test<'a>(value: &Value, raw: &'a str) -> IcalValueTuple<'a> {
+    fn extract_ical_value_for_test<'a>(value: &Value, raw: &'a str) -> ExtractedValue<'a> {
         let mut resolver = TimeZoneResolver::new();
         extract_ical_value(value, raw, &mut resolver).unwrap()
     }
@@ -219,55 +373,54 @@ mod tests {
     #[test]
     fn extract_ical_text_value() {
         let value = Value::Text("Hello World".to_string());
-        let (vtype, vtext, vint, vfloat, vbool, vdate, vtstz) =
-            extract_ical_value_for_test(&value, "Hello World");
+        let extracted = extract_ical_value_for_test(&value, "Hello World");
 
-        assert_eq!(vtype, ValueType::Text);
-        assert_eq!(vtext, Some("Hello World"));
-        assert_eq!(vint, None);
-        assert_eq!(vfloat, None);
-        assert_eq!(vbool, None);
-        assert_eq!(vdate, None);
-        assert_eq!(vtstz, None);
+        assert_eq!(extracted.value_type, ValueType::Text);
+        assert_eq!(extracted.value_text, Some("Hello World"));
+        assert_eq!(extracted.value_int, None);
+        assert_eq!(extracted.value_float, None);
+        assert_eq!(extracted.value_bool, None);
+        assert_eq!(extracted.value_date, None);
+        assert_eq!(extracted.value_tstz, None);
     }
 
     #[test]
     fn extract_ical_integer_value() {
         let value = Value::Integer(42);
-        let (vtype, vtext, vint, _, _, _, _) = extract_ical_value_for_test(&value, "42");
+        let extracted = extract_ical_value_for_test(&value, "42");
 
-        assert_eq!(vtype, ValueType::Integer);
-        assert_eq!(vtext, None);
-        assert_eq!(vint, Some(42));
+        assert_eq!(extracted.value_type, ValueType::Integer);
+        assert_eq!(extracted.value_text, None);
+        assert_eq!(extracted.value_int, Some(42));
     }
 
     #[test]
     fn extract_ical_float_value() {
         let value = Value::Float(42.5);
-        let (vtype, vtext, vint, vfloat, _, _, _) = extract_ical_value_for_test(&value, "42.5");
+        let extracted = extract_ical_value_for_test(&value, "42.5");
 
-        assert_eq!(vtype, ValueType::Float);
-        assert_eq!(vtext, None);
-        assert_eq!(vint, None);
-        assert_eq!(vfloat, Some(42.5));
+        assert_eq!(extracted.value_type, ValueType::Float);
+        assert_eq!(extracted.value_text, None);
+        assert_eq!(extracted.value_int, None);
+        assert_eq!(extracted.value_float, Some(42.5));
     }
 
     #[test]
     fn extract_ical_boolean_true() {
         let value = Value::Boolean(true);
-        let (vtype, _, _, _, vbool, _, _) = extract_ical_value_for_test(&value, "TRUE");
+        let extracted = extract_ical_value_for_test(&value, "TRUE");
 
-        assert_eq!(vtype, ValueType::Boolean);
-        assert_eq!(vbool, Some(true));
+        assert_eq!(extracted.value_type, ValueType::Boolean);
+        assert_eq!(extracted.value_bool, Some(true));
     }
 
     #[test]
     fn extract_ical_boolean_false() {
         let value = Value::Boolean(false);
-        let (vtype, _, _, _, vbool, _, _) = extract_ical_value_for_test(&value, "FALSE");
+        let extracted = extract_ical_value_for_test(&value, "FALSE");
 
-        assert_eq!(vtype, ValueType::Boolean);
-        assert_eq!(vbool, Some(false));
+        assert_eq!(extracted.value_type, ValueType::Boolean);
+        assert_eq!(extracted.value_bool, Some(false));
     }
 
     #[test]
@@ -277,10 +430,13 @@ mod tests {
             month: 1,
             day: 24,
         });
-        let (vtype, _, _, _, _, vdate, _) = extract_ical_value_for_test(&value, "20260124");
+        let extracted = extract_ical_value_for_test(&value, "20260124");
 
-        assert_eq!(vtype, ValueType::Date);
-        assert_eq!(vdate, chrono::NaiveDate::from_ymd_opt(2026, 1, 24));
+        assert_eq!(extracted.value_type, ValueType::Date);
+        assert_eq!(
+            extracted.value_date,
+            chrono::NaiveDate::from_ymd_opt(2026, 1, 24)
+        );
     }
 
     #[test]
@@ -294,11 +450,11 @@ mod tests {
             second: 45,
             form: DateTimeForm::Utc,
         });
-        let (vtype, _, _, _, _, _, vtstz) = extract_ical_value_for_test(&value, "20260124T123045Z");
+        let extracted = extract_ical_value_for_test(&value, "20260124T123045Z");
 
-        assert_eq!(vtype, ValueType::DateTime);
-        assert!(vtstz.is_some());
-        let dt = vtstz.unwrap();
+        assert_eq!(extracted.value_type, ValueType::DateTime);
+        assert!(extracted.value_tstz.is_some());
+        let dt = extracted.value_tstz.unwrap();
         // Check date components using the date() method
         let date = dt.date_naive();
         assert_eq!(date.year(), 2026);
@@ -312,7 +468,7 @@ mod tests {
     }
 
     #[test]
-    fn extract_ical_duration_as_text() {
+    fn extract_ical_duration_interval() {
         let value = Value::Duration(shuriken_rfc::rfc::ical::core::Duration {
             negative: false,
             weeks: 0,
@@ -321,10 +477,10 @@ mod tests {
             minutes: 30,
             seconds: 0,
         });
-        let (vtype, vtext, _, _, _, _, _) = extract_ical_value_for_test(&value, "P1DT2H30M");
+        let extracted = extract_ical_value_for_test(&value, "P1DT2H30M");
 
-        assert_eq!(vtype, ValueType::Text);
-        assert_eq!(vtext, Some("P1DT2H30M"));
+        assert_eq!(extracted.value_type, ValueType::DurationInterval);
+        assert!(extracted.value_interval.is_some());
     }
 
     #[test]
@@ -359,57 +515,55 @@ mod tests {
             },
         });
 
-        let (vtype, _, _, _, _, _, vtstz) =
-            extract_ical_value(&value, "20260115T100000", &mut resolver).unwrap();
+        let extracted = extract_ical_value(&value, "20260115T100000", &mut resolver).unwrap();
 
-        assert_eq!(vtype, crate::db::enums::ValueType::DateTime);
+        assert_eq!(extracted.value_type, crate::db::enums::ValueType::DateTime);
         let expected = chrono::Utc.with_ymd_and_hms(2026, 1, 15, 8, 0, 0).unwrap();
-        assert_eq!(vtstz, Some(expected));
+        assert_eq!(extracted.value_tstz, Some(expected));
     }
 
     #[test]
     fn extract_vcard_text_value() {
         let value = VCardValue::Text("John Doe".to_string());
-        let (vtype, vtext, vint, vfloat, vbool, vdate, vtstz) =
-            extract_vcard_value(&value, "John Doe");
+        let extracted = extract_vcard_value(&value, "John Doe");
 
-        assert_eq!(vtype, crate::db::enums::ValueType::Text);
-        assert_eq!(vtext, Some("John Doe"));
-        assert_eq!(vint, None);
-        assert_eq!(vfloat, None);
-        assert_eq!(vbool, None);
-        assert_eq!(vdate, None);
-        assert_eq!(vtstz, None);
+        assert_eq!(extracted.value_type, crate::db::enums::ValueType::Text);
+        assert_eq!(extracted.value_text, Some("John Doe"));
+        assert_eq!(extracted.value_int, None);
+        assert_eq!(extracted.value_float, None);
+        assert_eq!(extracted.value_bool, None);
+        assert_eq!(extracted.value_date, None);
+        assert_eq!(extracted.value_tstz, None);
     }
 
     #[test]
     fn extract_vcard_integer_value() {
         let value = VCardValue::Integer(100);
-        let (vtype, vtext, vint, _, _, _, _) = extract_vcard_value(&value, "100");
+        let extracted = extract_vcard_value(&value, "100");
 
-        assert_eq!(vtype, crate::db::enums::ValueType::Integer);
-        assert_eq!(vtext, None);
-        assert_eq!(vint, Some(100));
+        assert_eq!(extracted.value_type, crate::db::enums::ValueType::Integer);
+        assert_eq!(extracted.value_text, None);
+        assert_eq!(extracted.value_int, Some(100));
     }
 
     #[test]
     fn extract_vcard_float_value() {
         let value = VCardValue::Float(12.34);
-        let (vtype, vtext, vint, vfloat, _, _, _) = extract_vcard_value(&value, "12.34");
+        let extracted = extract_vcard_value(&value, "12.34");
 
-        assert_eq!(vtype, crate::db::enums::ValueType::Float);
-        assert_eq!(vtext, None);
-        assert_eq!(vint, None);
-        assert_eq!(vfloat, Some(12.34));
+        assert_eq!(extracted.value_type, crate::db::enums::ValueType::Float);
+        assert_eq!(extracted.value_text, None);
+        assert_eq!(extracted.value_int, None);
+        assert_eq!(extracted.value_float, Some(12.34));
     }
 
     #[test]
     fn extract_vcard_boolean_value() {
         let value = VCardValue::Boolean(true);
-        let (vtype, _, _, _, vbool, _, _) = extract_vcard_value(&value, "true");
+        let extracted = extract_vcard_value(&value, "true");
 
-        assert_eq!(vtype, crate::db::enums::ValueType::Boolean);
-        assert_eq!(vbool, Some(true));
+        assert_eq!(extracted.value_type, crate::db::enums::ValueType::Boolean);
+        assert_eq!(extracted.value_bool, Some(true));
     }
 
     #[test]
@@ -419,16 +573,46 @@ mod tests {
 
         let dt = Utc.with_ymd_and_hms(2024, 1, 15, 12, 30, 0).unwrap();
         let value = VCardValue::Timestamp(Timestamp { datetime: dt });
-        let (vtype, vtext, vint, vfloat, vbool, vdate, vtstz) =
-            extract_vcard_value(&value, "20240115T123000Z");
+        let extracted = extract_vcard_value(&value, "20240115T123000Z");
 
-        assert_eq!(vtype, crate::db::enums::ValueType::DateTime);
-        assert_eq!(vtext, None);
-        assert_eq!(vint, None);
-        assert_eq!(vfloat, None);
-        assert_eq!(vbool, None);
-        assert_eq!(vdate, None);
-        assert_eq!(vtstz, Some(dt));
+        assert_eq!(extracted.value_type, crate::db::enums::ValueType::DateTime);
+        assert_eq!(extracted.value_text, None);
+        assert_eq!(extracted.value_int, None);
+        assert_eq!(extracted.value_float, None);
+        assert_eq!(extracted.value_bool, None);
+        assert_eq!(extracted.value_date, None);
+        assert_eq!(extracted.value_tstz, Some(dt));
+    }
+
+    #[test]
+    fn extract_ical_text_list_value() {
+        let value = Value::TextList(vec!["One".to_string(), "Two".to_string()]);
+        let extracted = extract_ical_value_for_test(&value, "One,Two");
+
+        assert_eq!(extracted.value_type, ValueType::TextList);
+        let list = extracted.value_text_array.expect("text array");
+        assert_eq!(list.len(), 2);
+    }
+
+    #[test]
+    fn extract_ical_date_list_value() {
+        let value = Value::DateList(vec![
+            Date {
+                year: 2026,
+                month: 1,
+                day: 24,
+            },
+            Date {
+                year: 2026,
+                month: 1,
+                day: 25,
+            },
+        ]);
+        let extracted = extract_ical_value_for_test(&value, "20260124,20260125");
+
+        assert_eq!(extracted.value_type, ValueType::DateList);
+        let list = extracted.value_date_array.expect("date array");
+        assert_eq!(list.len(), 2);
     }
 
     #[test]

@@ -4,6 +4,7 @@ use quick_xml::Reader;
 use quick_xml::events::Event;
 
 use super::error::{ParseError, ParseResult};
+use super::validate_numeric_char_refs;
 use crate::rfc::dav::core::{
     AddressbookFilter, AddressbookQuery, CalendarFilter, CalendarQuery, CompFilter, FilterTest,
     Href, MatchType, Namespace, ParamFilter, PropFilter, PropertyName, QName, RecurrenceExpansion,
@@ -20,6 +21,7 @@ use crate::rfc::dav::core::{
 /// Returns an error if the XML is malformed or contains
 /// unsupported report types.
 pub fn parse_report(xml: &[u8]) -> ParseResult<ReportRequest> {
+    validate_numeric_char_refs(xml)?;
     let mut reader = Reader::from_reader(xml);
     reader.config_mut().trim_text(true);
 

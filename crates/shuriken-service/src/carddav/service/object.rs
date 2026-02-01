@@ -156,8 +156,6 @@ pub async fn put_address_object(
         async move {
             if let Some(existing_inst) = existing_instance {
                 // Update existing instance
-                // For now, just update the ETag and sync revision
-                // Full entity tree replacement will be implemented once proper ID mapping is in place
 
                 let sync_revision = existing_inst.sync_revision + 1;
                 let _updated_instance = instance::update_instance(
@@ -197,8 +195,6 @@ pub async fn put_address_object(
                     .context("failed to insert card index entry")?;
             } else {
                 // Create new entity and instance
-                // For now, create a minimal entity without the full tree
-                // Full tree insertion will be implemented once proper ID mapping is in place
 
                 let entity_model = shuriken_db::model::dav::entity::NewDavEntity {
                     entity_type,

@@ -206,15 +206,7 @@ pub(super) async fn build_propfind_response(
 
     let mut multistatus = Multistatus::new();
 
-    // For now, create a stub response
-    // In a real implementation, we would:
-    // 1. Parse the path to get collection_id or instance_id
-    // 2. Load the resource from the database
-    // 3. Based on depth, load children if this is a collection
-    // 4. For each resource, get the requested properties
-    // 5. Build PropstatResponse for each resource
-
-    // Stub: Return a minimal response for the requested resource
+    // Build a response for the requested resource
     let href = Href::new(path);
 
     // Get enforcer from depot (may be None if middleware didn't inject it)
