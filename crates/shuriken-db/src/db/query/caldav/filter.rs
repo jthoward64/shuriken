@@ -393,10 +393,11 @@ async fn apply_text_match_filter(
     }
     if case_sensitive {
         // i;octet - case-sensitive comparison (no normalization)
+        let value_text_c = diesel::dsl::sql::<diesel::sql_types::Text>("value_text COLLATE \"C\"");
         query = match text_match.match_type {
-            MatchType::Equals => query.filter(dav_property::value_text.eq(&value)),
+            MatchType::Equals => query.filter(value_text_c.eq(&value)),
             MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
-                query.filter(dav_property::value_text.like(&raw_pattern))
+                query.filter(value_text_c.like(&raw_pattern))
             }
         };
     } else if let Some(column) = fold_column {

@@ -31,6 +31,7 @@ use shuriken_test::component::db::connection::DbConnection;
 
 // Re-export commonly used enums for test code
 pub use shuriken_test::component::db::enums::{CollectionType, PrincipalType};
+pub use tracing;
 
 /// Pooled database connection for reuse across tests.
 struct PooledConnection {

@@ -4380,6 +4380,7 @@ dependencies = [
  "string-adapter",
  "test-log",
  "tokio",
+ "tracing",
  "uuid",
 ]
 

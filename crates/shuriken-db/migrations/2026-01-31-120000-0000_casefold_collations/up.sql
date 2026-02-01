@@ -21,7 +21,7 @@ AS $$
      *
      * This is a conscious, documented divergence from strict RFC 5051.
      */
-    SELECT normalize(casefold(input), NFC);
+    SELECT normalize(casefold(input COLLATE "und-x-icu"), NFC);
 $$;
 
 CREATE OR REPLACE FUNCTION ascii_casemap(input text)
@@ -52,10 +52,11 @@ IMMUTABLE
 PARALLEL SAFE
 AS $$
     /*
-     * Unicode casemap for flat JSONB objects.
+     * Unicode casemap for JSONB objects with string fields or string arrays.
      *
-     * Only top-level string values are case-mapped.
-     * Non-string values are preserved unchanged.
+     * - Top-level string values are case-mapped.
+     * - Array elements that are strings are case-mapped.
+     * - Non-string values are preserved unchanged.
      */
     SELECT CASE
         WHEN input IS NULL THEN NULL
@@ -66,6 +67,20 @@ AS $$
                     CASE
                         WHEN jsonb_typeof(value) = 'string'
                             THEN to_jsonb(unicode_casemap_nfc(value #>> '{}'))
+                        WHEN jsonb_typeof(value) = 'array'
+                            THEN (
+                                SELECT COALESCE(
+                                    jsonb_agg(
+                                        CASE
+                                            WHEN jsonb_typeof(elem) = 'string'
+                                                THEN to_jsonb(unicode_casemap_nfc(elem #>> '{}'))
+                                            ELSE elem
+                                        END
+                                    ),
+                                    '[]'::jsonb
+                                )
+                                FROM jsonb_array_elements(value) AS elem
+                            )
                         ELSE value
                     END
                 ),
@@ -83,10 +98,11 @@ IMMUTABLE
 PARALLEL SAFE
 AS $$
     /*
-     * ASCII-only casemap for flat JSONB objects.
+     * ASCII casemap for JSONB objects with string fields or string arrays.
      *
-     * Only top-level string values are case-mapped.
-     * Non-string values are preserved unchanged.
+     * - Top-level string values are case-mapped.
+     * - Array elements that are strings are case-mapped.
+     * - Non-string values are preserved unchanged.
      */
     SELECT CASE
         WHEN input IS NULL THEN NULL
@@ -97,6 +113,20 @@ AS $$
                     CASE
                         WHEN jsonb_typeof(value) = 'string'
                             THEN to_jsonb(ascii_casemap(value #>> '{}'))
+                        WHEN jsonb_typeof(value) = 'array'
+                            THEN (
+                                SELECT COALESCE(
+                                    jsonb_agg(
+                                        CASE
+                                            WHEN jsonb_typeof(elem) = 'string'
+                                                THEN to_jsonb(ascii_casemap(elem #>> '{}'))
+                                            ELSE elem
+                                        END
+                                    ),
+                                    '[]'::jsonb
+                                )
+                                FROM jsonb_array_elements(value) AS elem
+                            )
                         ELSE value
                     END
                 ),

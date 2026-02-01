@@ -866,6 +866,7 @@ async fn calendar_query_collation_octet_case_sensitive() {
     let response = response.assert_status(StatusCode::MULTI_STATUS);
     // Should return empty result (no match due to case sensitivity)
     let body_text = response.body_string();
+    tracing::info!("Response body: {}", body_text);
     assert!(
         !body_text.contains("octet.ics"),
         "i;octet should be case-sensitive: 'meeting' should NOT match 'Meeting'"
@@ -932,6 +933,7 @@ async fn calendar_query_collation_unicode_case_insensitive() {
 
     let response = response.assert_status(StatusCode::MULTI_STATUS);
     let body_text = response.body_string();
+    tracing::info!("Response body: {}", body_text);
     // Should return one matching result with UUID-based href
     assert!(
         response.count_multistatus_responses() == 1,
@@ -1004,6 +1006,7 @@ async fn calendar_query_collation_uppercase_search() {
 
     let response = response.assert_status(StatusCode::MULTI_STATUS);
     let body_text = response.body_string();
+    tracing::info!("Response body: {}", body_text);
     assert!(
         response.count_multistatus_responses() == 1,
         "i;unicode-casemap should be case-insensitive: 'MEETING' SHOULD match 'meeting' (found {} responses)",
@@ -1075,6 +1078,7 @@ async fn calendar_query_collation_mixed_case() {
 
     let response = response.assert_status(StatusCode::MULTI_STATUS);
     let body_text = response.body_string();
+    tracing::info!("Response body: {}", body_text);
     assert!(
         response.count_multistatus_responses() == 1,
         "i;unicode-casemap should normalize mixed case (found {} responses)",
@@ -1122,8 +1126,8 @@ async fn calendar_query_collation_turkish_i() {
         .await
         .assert_status(StatusCode::CREATED);
 
-    // Search for "istanbul" (lowercase) - SHOULD match "İstanbul"
-    // Per Unicode case folding: İ (U+0130) folds to i (U+0069)
+    // Search for "i̇stanbul" (i + combining dot) - SHOULD match "İstanbul"
+    // Per Unicode case folding: İ (U+0130) folds to i + U+0307 (combining dot)
     let body = r#"<?xml version="1.0" encoding="utf-8"?>
 <C:calendar-query xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:D="DAV:">
   <D:prop>
@@ -1133,7 +1137,7 @@ async fn calendar_query_collation_turkish_i() {
     <C:comp-filter name="VCALENDAR">
       <C:comp-filter name="VEVENT">
         <C:prop-filter name="SUMMARY">
-          <C:text-match collation="i;unicode-casemap">istanbul</C:text-match>
+                    <C:text-match collation="i;unicode-casemap">i̇stanbul</C:text-match>
         </C:prop-filter>
       </C:comp-filter>
     </C:comp-filter>
@@ -1147,6 +1151,7 @@ async fn calendar_query_collation_turkish_i() {
 
     let response = response.assert_status(StatusCode::MULTI_STATUS);
     let body_text = response.body_string();
+    tracing::info!("Response body: {}", body_text);
     assert!(
         response.count_multistatus_responses() == 1,
         "i;unicode-casemap should fold Turkish İ to i: 'istanbul' SHOULD match 'İstanbul' (found {} responses)",
@@ -1195,7 +1200,7 @@ async fn calendar_query_collation_greek_sigma() {
         .await
         .assert_status(StatusCode::CREATED);
 
-    // Search with regular sigma (σ) instead of final sigma (ς)
+    // Search with regular sigma (σ) instead of final sigma (ς), keep tonos
     let body = r#"<?xml version="1.0" encoding="utf-8"?>
 <C:calendar-query xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:D="DAV:">
   <D:prop>
@@ -1205,7 +1210,7 @@ async fn calendar_query_collation_greek_sigma() {
     <C:comp-filter name="VCALENDAR">
       <C:comp-filter name="VEVENT">
         <C:prop-filter name="SUMMARY">
-          <C:text-match collation="i;unicode-casemap">συνδεσησ</C:text-match>
+                    <C:text-match collation="i;unicode-casemap">σύνδεσησ</C:text-match>
         </C:prop-filter>
       </C:comp-filter>
     </C:comp-filter>
@@ -1219,6 +1224,7 @@ async fn calendar_query_collation_greek_sigma() {
 
     let response = response.assert_status(StatusCode::MULTI_STATUS);
     let body_text = response.body_string();
+    tracing::info!("Response body: {}", body_text);
     assert!(
         response.count_multistatus_responses() == 1,
         "i;unicode-casemap should handle Greek sigma variants (found {} responses)",
@@ -1285,6 +1291,8 @@ async fn addressbook_query_collation_unicode_german() {
         .await;
 
     let response = response.assert_status(StatusCode::MULTI_STATUS);
+    let body_text = response.body_string();
+    tracing::info!("Response body: {}", body_text);
     assert!(
         response.count_multistatus_responses() == 1,
         "i;unicode-casemap should fold German ß to ss: 'strasse' SHOULD match 'Straße'"
@@ -1353,6 +1361,7 @@ END:VCARD"#;
 
     let response = response.assert_status(StatusCode::MULTI_STATUS);
     let body_text = response.body_string();
+    tracing::info!("Response body: {}", body_text);
     // Should match with ASCII case folding
     assert!(
         response.count_multistatus_responses() == 1,
