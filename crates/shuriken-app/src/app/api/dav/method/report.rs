@@ -105,6 +105,7 @@ pub async fn report(req: &mut Request, res: &mut Response, depot: &Depot) {
 ///
 /// ## Errors
 /// Returns 400 for invalid sync tokens, 404 for missing collections, 500 for server errors.
+#[expect(clippy::too_many_lines)]
 pub async fn handle_sync_collection(
     req: &mut Request,
     res: &mut Response,
@@ -222,6 +223,8 @@ pub async fn handle_sync_collection(
 ///
 /// ## Errors
 /// Returns database errors or invalid sync token errors.
+#[expect(clippy::too_many_lines)]
+#[expect(clippy::too_many_arguments)]
 async fn build_sync_collection_response(
     conn: &mut shuriken_db::db::connection::DbConnection<'_>,
     sync: &SyncCollection,
