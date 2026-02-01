@@ -170,5 +170,49 @@ FROM principal p
 WHERE p.principal_type = 'user'
 ON CONFLICT DO NOTHING;
 
+-- Casbin role-permission mappings (g2 rules)
+-- Define what permissions each role grants
+INSERT INTO casbin_rule (ptype, v0, v1, v2, v3, v4, v5)
+VALUES
+    -- owner role grants all permissions
+    ('g2', 'owner', 'read_freebusy', '', '', '', ''),
+    ('g2', 'owner', 'read', '', '', '', ''),
+    ('g2', 'owner', 'edit', '', '', '', ''),
+    ('g2', 'owner', 'delete', '', '', '', ''),
+    ('g2', 'owner', 'share_read', '', '', '', ''),
+    ('g2', 'owner', 'share_edit', '', '', '', ''),
+    ('g2', 'owner', 'admin', '', '', '', ''),
+    -- reader role grants read permissions
+    ('g2', 'reader', 'read_freebusy', '', '', '', ''),
+    ('g2', 'reader', 'read', '', '', '', ''),
+    -- editor role grants read/edit/delete permissions
+    ('g2', 'editor', 'read_freebusy', '', '', '', ''),
+    ('g2', 'editor', 'read', '', '', '', ''),
+    ('g2', 'editor', 'edit', '', '', '', ''),
+    ('g2', 'editor', 'delete', '', '', '', '')
+ON CONFLICT DO NOTHING;
+
+-- Casbin policies: Grant users owner access to their own collections
+-- Format: (ptype='p', v0=principal:uuid, v1=path_pattern, v2=role)
+-- Path patterns use UUID-based paths like /api/dav/cal/principal-uuid/**
+INSERT INTO casbin_rule (ptype, v0, v1, v2, v3, v4, v5)
+SELECT 'p', 'principal:' || p.id::text, '/api/dav/cal/' || p.id::text || '/**', 'owner', '', '', ''
+FROM principal p
+WHERE p.principal_type IN ('user', 'resource')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO casbin_rule (ptype, v0, v1, v2, v3, v4, v5)
+SELECT 'p', 'principal:' || p.id::text, '/api/dav/card/' || p.id::text || '/**', 'owner', '', '', ''
+FROM principal p
+WHERE p.principal_type = 'user'
+ON CONFLICT DO NOTHING;
+
+-- Grant users read access to their own principal resource
+INSERT INTO casbin_rule (ptype, v0, v1, v2, v3, v4, v5)
+SELECT 'p', 'principal:' || p.id::text, '/api/dav/principal/' || p.id::text, 'reader', '', '', ''
+FROM principal p
+WHERE p.principal_type IN ('user', 'resource')
+ON CONFLICT DO NOTHING;
+
 COMMIT;
 
