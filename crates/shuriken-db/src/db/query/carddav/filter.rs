@@ -825,34 +825,44 @@ fn apply_text_match_card_index(
     let collation = normalize_for_folded_compare(&text_match.value, text_match.collation.as_ref())?;
     let value = collation.value.replace('\'', "''");
     let pattern = build_like_pattern(&collation.value, &text_match.match_type).replace('\'', "''");
-    let (fn_column, data_column) = match collation.casemap {
-        Casemap::Octet => ("fn", "data"),
-        Casemap::Ascii => ("fn_ascii_fold", "data_ascii_fold"),
-        Casemap::Unicode => ("fn_unicode_fold", "data_unicode_fold"),
+    let (fn_column, data_column, value_expr, pattern_expr) = match collation.casemap {
+        Casemap::Octet => ("fn", "data", format!("'{value}'"), format!("'{pattern}'")),
+        Casemap::Ascii => (
+            "fn_ascii_fold",
+            "data_ascii_fold",
+            format!("'{value}'"),
+            format!("'{pattern}'"),
+        ),
+        Casemap::Unicode => (
+            "fn_unicode_fold",
+            "data_unicode_fold",
+            format!("unicode_casemap_nfc('{value}')"),
+            format!("unicode_casemap_nfc('{pattern}')"),
+        ),
     };
 
     // Select the appropriate column or JSONB field based on property name
     Ok(match prop_name {
         "FN" => match text_match.match_type {
-            MatchType::Equals => query.filter(sql::<Bool>(&format!("{fn_column} = '{value}'"))),
+            MatchType::Equals => query.filter(sql::<Bool>(&format!("{fn_column} = {value_expr}"))),
             MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
-                query.filter(sql::<Bool>(&format!("{fn_column} LIKE '{pattern}'")))
+                query.filter(sql::<Bool>(&format!("{fn_column} LIKE {pattern_expr}")))
             }
         },
         "ORG" => match text_match.match_type {
-            MatchType::Equals => {
-                query.filter(sql::<Bool>(&format!("({data_column}->>'org') = '{value}'")))
-            }
+            MatchType::Equals => query.filter(sql::<Bool>(&format!(
+                "({data_column}->>'org') = {value_expr}"
+            ))),
             MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => query.filter(
-                sql::<Bool>(&format!("({data_column}->>'org') LIKE '{pattern}'")),
+                sql::<Bool>(&format!("({data_column}->>'org') LIKE {pattern_expr}")),
             ),
         },
         "TITLE" => match text_match.match_type {
             MatchType::Equals => query.filter(sql::<Bool>(&format!(
-                "({data_column}->>'title') = '{value}'"
+                "({data_column}->>'title') = {value_expr}"
             ))),
             MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => query.filter(
-                sql::<Bool>(&format!("({data_column}->>'title') LIKE '{pattern}'")),
+                sql::<Bool>(&format!("({data_column}->>'title') LIKE {pattern_expr}")),
             ),
         },
         _ => query, // N is handled via card_index but doesn't have a dedicated column
