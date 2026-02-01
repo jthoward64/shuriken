@@ -64,7 +64,7 @@ pub async fn handle(
     // Call service to execute query
     let multistatus = match shuriken_service::carddav::service::report::execute_addressbook_query(
         &mut conn,
-        &resource,
+        resource,
         collection_id,
         &query,
         &properties,

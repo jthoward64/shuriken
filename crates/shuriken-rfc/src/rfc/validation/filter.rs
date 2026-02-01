@@ -7,7 +7,7 @@
 //! This module provides validation to check if filters only reference
 //! components, properties, and parameters the server supports.
 
-use crate::rfc::dav::core::{CalendarFilter, CompFilter, ParamFilter, PropFilter};
+use crate::rfc::dav::core::{CalendarFilter, CompFilter, PropFilter};
 
 /// ## Summary
 /// Result of filter validation.

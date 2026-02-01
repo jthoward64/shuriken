@@ -84,13 +84,13 @@ pub async fn put(req: &mut Request, res: &mut Response, depot: &Depot) {
         .and_then(|h| h.to_str().ok())
         .map(str::to_lowercase);
 
-    if let Some(ct) = &content_type {
-        if !ct.starts_with("text/calendar") {
-            tracing::error!(content_type = %ct, "Unsupported calendar data format");
-            let error = PreconditionError::SupportedCalendarData;
-            write_precondition_error(res, &error);
-            return;
-        }
+    if let Some(ct) = &content_type
+        && !ct.starts_with("text/calendar")
+    {
+        tracing::error!(content_type = %ct, "Unsupported calendar data format");
+        let error = PreconditionError::SupportedCalendarData;
+        write_precondition_error(res, &error);
+        return;
     }
 
     // Read request body

@@ -2,9 +2,9 @@ use crate::error::DbResult;
 use std::future::Future;
 use std::pin::Pin;
 
-pub mod connection;
-pub mod carddav_keys;
 pub mod caldav_keys;
+pub mod carddav_keys;
+pub mod connection;
 pub mod enums;
 pub mod map;
 pub mod pg_types;

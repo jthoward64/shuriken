@@ -544,7 +544,7 @@ async fn fetch_property(
             }
             _ => None,
         })
-        .last();
+        .next_back();
 
     let item_id = location.segments().iter().find_map(|seg| match seg {
         PathSegment::Item(ResourceIdentifier::Id(id)) => Some(*id),

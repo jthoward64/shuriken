@@ -1201,13 +1201,13 @@ fn parse_expand_property(xml: &[u8]) -> ParseResult<ReportRequest> {
             Ok(Event::End(ref e)) => {
                 let local_name_bytes = e.local_name();
                 let local_name = std::str::from_utf8(local_name_bytes.as_ref())?.to_owned();
-                if local_name == "property" {
-                    if let Some(item) = stack.pop() {
-                        if let Some(parent) = stack.last_mut() {
-                            parent.properties.push(item);
-                        } else {
-                            expand_items.push(item);
-                        }
+                if local_name == "property"
+                    && let Some(item) = stack.pop()
+                {
+                    if let Some(parent) = stack.last_mut() {
+                        parent.properties.push(item);
+                    } else {
+                        expand_items.push(item);
                     }
                 }
             }

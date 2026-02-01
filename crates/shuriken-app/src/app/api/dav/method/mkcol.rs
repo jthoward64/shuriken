@@ -3,12 +3,12 @@
 use salvo::http::StatusCode;
 use salvo::{Depot, Request, Response, handler};
 
-use crate::app::api::dav::util::{owner_principal_id_from_subjects, resource_type_from_location};
 use crate::app::api::dav::extract::auth::get_auth_context;
+use crate::app::api::dav::util::{owner_principal_id_from_subjects, resource_type_from_location};
 use shuriken_rfc::rfc::dav::parse::{MkcolRequest, parse_mkcol};
 use shuriken_service::auth::{Action, get_resolved_location_from_depot};
-use shuriken_service::error::ServiceError;
 use shuriken_service::dav::service::collection::{CreateCollectionContext, create_collection};
+use shuriken_service::error::ServiceError;
 
 /// ## Summary
 /// Handles MKCOL requests to create WebDAV collections.

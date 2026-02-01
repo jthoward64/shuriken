@@ -227,8 +227,10 @@ fn build_cal_index(
 
     // Extract SEQUENCE
     if let Some(sequence) = component.get_property("SEQUENCE").and_then(|p| {
-        p.as_integer()
-            .or_else(|| p.as_text().and_then(|s| s.parse::<i32>().ok()))
+        p.as_integer().or_else(|| {
+            let s = p.as_text()?;
+            s.parse::<i32>().ok()
+        })
     }) {
         insert_number(&mut metadata, KEY_SEQUENCE, sequence);
     }

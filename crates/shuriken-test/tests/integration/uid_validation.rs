@@ -291,14 +291,10 @@ SUMMARY:Event With METHOD
 END:VEVENT
 END:VCALENDAR";
 
-    let response = TestRequest::put(&caldav_item_path(
-        "testuser",
-        "test-cal",
-        "with-method.ics",
-    ))
-    .icalendar_body(ical_with_method)
-    .send(&service)
-    .await;
+    let response = TestRequest::put(&caldav_item_path("testuser", "test-cal", "with-method.ics"))
+        .icalendar_body(ical_with_method)
+        .send(&service)
+        .await;
 
     // RFC 4791 §5.3.2.1: METHOD property not allowed returns 403 with valid-calendar-data
     let response = response.assert_status(StatusCode::FORBIDDEN);
@@ -355,14 +351,10 @@ SUMMARY:A Task
 END:VTODO
 END:VCALENDAR";
 
-    let response = TestRequest::put(&caldav_item_path(
-        "testuser",
-        "test-cal",
-        "mixed.ics",
-    ))
-    .icalendar_body(ical_mixed)
-    .send(&service)
-    .await;
+    let response = TestRequest::put(&caldav_item_path("testuser", "test-cal", "mixed.ics"))
+        .icalendar_body(ical_mixed)
+        .send(&service)
+        .await;
 
     // RFC 4791 §5.3.2.1: Multiple component types return 403 with valid-calendar-object-resource
     let response = response.assert_status(StatusCode::FORBIDDEN);
@@ -415,15 +407,11 @@ SUMMARY:Test Event
 END:VEVENT
 END:VCALENDAR";
 
-    let response = TestRequest::put(&caldav_item_path(
-        "testuser",
-        "test-cal",
-        "wrong-type.ics",
-    ))
-    .body(ical)
-    .header("Content-Type", "application/json")
-    .send(&service)
-    .await;
+    let response = TestRequest::put(&caldav_item_path("testuser", "test-cal", "wrong-type.ics"))
+        .body(ical)
+        .header("Content-Type", "application/json")
+        .send(&service)
+        .await;
 
     // RFC 4791 §5.3.2.1: Wrong Content-Type returns 403 with supported-calendar-data
     let response = response.assert_status(StatusCode::FORBIDDEN);

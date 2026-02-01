@@ -91,16 +91,16 @@ pub async fn put(req: &mut Request, res: &mut Response, depot: &Depot) {
     // If Content-Type is specified, it must be "text/vcard". If not specified, we assume
     // the client is using the default vCard format. Return 403 with supported-address-data
     // precondition if media type is not supported.
-    if let Some(content_type_header) = req.headers().get("Content-Type") {
-        if let Ok(ct_str) = content_type_header.to_str() {
-            let ct_lower = ct_str.to_lowercase();
-            // Check if it's text/vcard (allow optional charset parameter)
-            if !ct_lower.starts_with("text/vcard") {
-                tracing::error!(content_type = %ct_str, "Unsupported Content-Type for vCard");
-                let error = PreconditionError::SupportedAddressData;
-                write_precondition_error(res, &error);
-                return;
-            }
+    if let Some(content_type_header) = req.headers().get("Content-Type")
+        && let Ok(ct_str) = content_type_header.to_str()
+    {
+        let ct_lower = ct_str.to_lowercase();
+        // Check if it's text/vcard (allow optional charset parameter)
+        if !ct_lower.starts_with("text/vcard") {
+            tracing::error!(content_type = %ct_str, "Unsupported Content-Type for vCard");
+            let error = PreconditionError::SupportedAddressData;
+            write_precondition_error(res, &error);
+            return;
         }
     }
 

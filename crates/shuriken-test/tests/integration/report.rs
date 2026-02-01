@@ -3112,4 +3112,3 @@ async fn calendar_query_supported_components_accepted() {
         "Response should not contain supported-filter error for valid filter"
     );
 }
-

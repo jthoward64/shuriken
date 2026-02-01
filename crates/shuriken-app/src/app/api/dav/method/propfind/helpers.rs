@@ -340,7 +340,7 @@ pub(super) async fn build_propfind_response(
         resource_path.as_deref(),
         authorizer.as_ref(),
         subjects.as_ref(),
-        resource_location.as_ref().map(|r| &**r),
+        resource_location.as_deref(),
         propfind_req,
     )
     .await?;
