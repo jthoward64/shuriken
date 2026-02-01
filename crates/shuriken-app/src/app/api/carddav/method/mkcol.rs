@@ -7,11 +7,12 @@ use salvo::http::StatusCode;
 use salvo::{Depot, Request, Response, handler};
 
 use crate::app::api::dav::extract::auth::get_auth_context;
-use crate::app::api::dav::util::build_full_url;
+use crate::app::api::dav::util::{build_full_url, owner_principal_id_from_subjects};
 use shuriken_rfc::rfc::dav::parse::{MkcolRequest, parse_mkcol};
 use shuriken_service::auth::{
     Action, PathSegment, ResourceIdentifier, ResourceLocation, get_resolved_location_from_depot,
 };
+use shuriken_service::error::ServiceError;
 use shuriken_service::dav::service::collection::{CreateCollectionContext, create_collection};
 
 /// ## Summary
@@ -109,7 +110,7 @@ pub async fn mkcol_extended(req: &mut Request, res: &mut Response, depot: &Depot
         .to_string();
 
     // Get owner principal ID from authenticated subjects
-    let owner_principal_id = match extract_owner_principal_id(&subjects) {
+    let owner_principal_id = match owner_principal_id_from_subjects(&subjects) {
         Ok(id) => id,
         Err(e) => {
             tracing::error!(error = %e, "Failed to extract owner principal ID");
@@ -154,28 +155,11 @@ pub async fn mkcol_extended(req: &mut Request, res: &mut Response, depot: &Depot
         }
         Err(e) => {
             tracing::error!("Failed to create addressbook collection: {}", e);
-            // Check if it's a conflict (already exists)
-            if e.to_string().contains("duplicate") || e.to_string().contains("exists") {
-                res.status_code(StatusCode::CONFLICT);
-            } else {
-                res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
-            }
+            res.status_code(match e {
+                ServiceError::Conflict(_) => StatusCode::CONFLICT,
+                _ => StatusCode::INTERNAL_SERVER_ERROR,
+            });
         }
     }
 }
 
-/// Extracts owner principal ID from auth context.
-fn extract_owner_principal_id(
-    subjects: &shuriken_service::auth::ExpandedSubjects,
-) -> anyhow::Result<uuid::Uuid> {
-    use shuriken_service::auth::Subject;
-
-    // The first subject should be the user's principal
-    for subject in subjects.iter() {
-        if let Subject::Principal(id) = subject {
-            return Ok(*id);
-        }
-    }
-
-    anyhow::bail!("No authenticated principal found in subjects")
-}

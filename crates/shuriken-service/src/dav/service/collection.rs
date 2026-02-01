@@ -1,10 +1,10 @@
 //! Collection creation and management service.
 
-use anyhow::{Context, Result};
 use diesel::prelude::*;
 use diesel_async::scoped_futures::ScopedFutureExt;
 use diesel_async::{AsyncConnection, RunQueryDsl};
 
+use crate::error::{ServiceError, ServiceResult};
 use shuriken_db::db::connection::DbConnection;
 use shuriken_db::db::enums::CollectionType;
 use shuriken_db::db::query::dav::collection;
@@ -47,7 +47,7 @@ pub struct CreateCollectionResult {
 pub async fn create_collection(
     conn: &mut DbConnection<'_>,
     ctx: &CreateCollectionContext,
-) -> Result<CreateCollectionResult> {
+) -> ServiceResult<CreateCollectionResult> {
     let owner_principal_id = ctx.owner_principal_id;
     let slug = ctx.slug.clone();
     let collection_type = ctx.collection_type;
@@ -66,10 +66,12 @@ pub async fn create_collection(
                     .first(tx)
                     .await
                     .optional()
-                    .context("failed to check for existing collection")?;
+                    .map_err(ServiceError::from)?;
 
             if existing.is_some() {
-                anyhow::bail!("collection with slug '{slug}' already exists");
+                return Err(ServiceError::Conflict(format!(
+                    "collection with slug '{slug}' already exists"
+                )));
             }
 
             let new_collection = NewDavCollection {
@@ -83,7 +85,7 @@ pub async fn create_collection(
 
             let created = collection::create_collection(tx, &new_collection)
                 .await
-                .context("failed to create collection")?;
+                .map_err(ServiceError::from)?;
 
             Ok(CreateCollectionResult {
                 collection_id: created.id,

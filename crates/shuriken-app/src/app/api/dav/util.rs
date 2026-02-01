@@ -1,7 +1,7 @@
 use salvo::{Depot, Request};
 
 use crate::config::get_config_from_depot;
-use shuriken_service::auth::{PathSegment, ResourceLocation, ResourceType};
+use shuriken_service::auth::{ExpandedSubjects, PathSegment, ResourceLocation, ResourceType, Subject};
 
 /// ## Summary
 /// Returns the request origin, preferring the `Host` header and falling back to server config.
@@ -59,4 +59,21 @@ pub fn resource_type_from_location(resource: &ResourceLocation) -> Option<Resour
             None
         }
     })
+}
+
+/// ## Summary
+/// Extracts the owner principal ID from authenticated subjects.
+///
+/// ## Errors
+/// Returns an error if no principal subject is found.
+pub fn owner_principal_id_from_subjects(
+    subjects: &ExpandedSubjects,
+) -> anyhow::Result<uuid::Uuid> {
+    for subject in subjects.iter() {
+        if let Subject::Principal(id) = subject {
+            return Ok(*id);
+        }
+    }
+
+    anyhow::bail!("No authenticated principal found in subjects")
 }

@@ -36,6 +36,9 @@ pub enum ServiceError {
     #[error("Validation error: {0}")]
     ValidationError(String),
 
+    #[error("Conflict: {0}")]
+    Conflict(String),
+
     #[error("Diesel error: {0}")]
     DieselError(#[from] diesel::result::Error),
 }

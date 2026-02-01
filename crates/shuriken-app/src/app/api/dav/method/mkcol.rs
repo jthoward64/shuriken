@@ -3,9 +3,11 @@
 use salvo::http::StatusCode;
 use salvo::{Depot, Request, Response, handler};
 
+use crate::app::api::dav::util::{owner_principal_id_from_subjects, resource_type_from_location};
 use crate::app::api::dav::extract::auth::get_auth_context;
 use shuriken_rfc::rfc::dav::parse::{MkcolRequest, parse_mkcol};
 use shuriken_service::auth::{Action, get_resolved_location_from_depot};
+use shuriken_service::error::ServiceError;
 use shuriken_service::dav::service::collection::{CreateCollectionContext, create_collection};
 
 /// ## Summary
@@ -127,7 +129,7 @@ pub async fn mkcol(req: &mut Request, res: &mut Response, depot: &Depot) {
     };
 
     // Determine collection type from path context
-    let collection_type = determine_collection_type(&path, &parsed_request);
+    let collection_type = determine_collection_type(&parent_resource, &parsed_request);
 
     // Extract slug from path (last segment)
     let slug = path
@@ -140,7 +142,7 @@ pub async fn mkcol(req: &mut Request, res: &mut Response, depot: &Depot) {
     tracing::debug!(path = %path, slug = %slug, "Extracted slug from MKCOL path");
 
     // Get owner principal ID from auth context
-    let owner_principal_id = match extract_owner_principal_id(depot, &subjects) {
+    let owner_principal_id = match owner_principal_id_from_subjects(&subjects) {
         Ok(id) => id,
         Err(e) => {
             tracing::error!(error = %e, "Failed to extract owner principal ID");
@@ -170,18 +172,17 @@ pub async fn mkcol(req: &mut Request, res: &mut Response, depot: &Depot) {
         }
         Err(e) => {
             tracing::error!(error = %e, "Failed to create collection");
-            if e.to_string().contains("duplicate") || e.to_string().contains("exists") {
-                res.status_code(StatusCode::CONFLICT);
-            } else {
-                res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
-            }
+            res.status_code(match e {
+                ServiceError::Conflict(_) => StatusCode::CONFLICT,
+                _ => StatusCode::INTERNAL_SERVER_ERROR,
+            });
         }
     }
 }
 
 /// Determines collection type from path context and request body.
 fn determine_collection_type(
-    _path: &str,
+    parent_resource: &shuriken_service::auth::ResourceLocation,
     request: &MkcolRequest,
 ) -> shuriken_db::db::enums::CollectionType {
     use shuriken_db::db::enums::CollectionType;
@@ -196,23 +197,10 @@ fn determine_collection_type(
         }
     }
 
-    // Infer from path context - all paths default to generic Collection
-    CollectionType::Collection
-}
-
-/// Extracts owner principal ID from auth context.
-fn extract_owner_principal_id(
-    _depot: &Depot,
-    subjects: &shuriken_service::auth::ExpandedSubjects,
-) -> anyhow::Result<uuid::Uuid> {
-    use shuriken_service::auth::Subject;
-
-    // The first subject should be the user's principal
-    for subject in subjects.iter() {
-        if let Subject::Principal(id) = subject {
-            return Ok(*id);
-        }
+    // Infer from resource type context
+    match resource_type_from_location(parent_resource) {
+        Some(shuriken_service::auth::ResourceType::Calendar) => CollectionType::Calendar,
+        Some(shuriken_service::auth::ResourceType::Addressbook) => CollectionType::Addressbook,
+        _ => CollectionType::Collection,
     }
-
-    anyhow::bail!("No authenticated principal found in subjects")
 }
