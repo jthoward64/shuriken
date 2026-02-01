@@ -212,6 +212,9 @@ fn test_config() -> Settings {
         logging: LoggingConfig {
             level: "debug".to_string(),
         },
+        dav: DavConfig {
+            sync_token_retention_revisions: 10_000,
+        },
     }
 }
 

@@ -104,6 +104,9 @@ fn test_settings_structure() {
         logging: LoggingConfig {
             level: "debug".to_string(),
         },
+        dav: DavConfig {
+            sync_token_retention_revisions: 10_000,
+        },
     };
 
     assert_eq!(settings.database.url, "postgresql://test");
@@ -132,6 +135,9 @@ fn test_settings_debug() {
         },
         logging: LoggingConfig {
             level: "info".to_string(),
+        },
+        dav: DavConfig {
+            sync_token_retention_revisions: 10_000,
         },
     };
 

@@ -8,6 +8,7 @@ pub struct Settings {
     pub auth: AuthConfig,
     pub server: ServerConfig,
     pub logging: LoggingConfig,
+    pub dav: DavConfig,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -72,6 +73,13 @@ pub struct LoggingConfig {
     pub level: String,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct DavConfig {
+    /// Maximum number of sync revisions retained for `sync-collection`.
+    /// If the client presents a token older than this window, the server returns 410 Gone.
+    pub sync_token_retention_revisions: i64,
+}
+
 impl Settings {
     /// ## Summary
     /// Loads configuration from `.env` file and environment variables into a `Settings`.
@@ -85,6 +93,7 @@ impl Settings {
             .set_default("server.port", 8698)?
             .set_default("database.max_connections", 4)?
             .set_default("logging.level", "debug")?
+            .set_default("dav.sync_token_retention_revisions", 10_000)?
             // Env file
             .add_source(
                 config::Environment::default()

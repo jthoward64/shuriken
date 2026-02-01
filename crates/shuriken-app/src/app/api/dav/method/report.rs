@@ -4,12 +4,37 @@ use salvo::http::StatusCode;
 use salvo::{Depot, Request, Response, handler};
 
 use crate::app::api::dav::extract::auth::get_auth_context;
+use crate::config::get_config_from_depot;
 use shuriken_rfc::rfc::dav::build::multistatus::serialize_multistatus;
 use shuriken_rfc::rfc::dav::core::{ExpandProperty, Multistatus, ReportType, SyncCollection};
 use shuriken_service::auth::{
     Action, PathSegment, ResourceIdentifier, ResourceLocation, ResourceType,
     get_resolved_location_from_depot, get_terminal_collection_from_depot,
 };
+
+#[derive(Debug)]
+enum SyncCollectionError {
+    InvalidSyncToken { token: String },
+    ExpiredSyncToken { token: i64, min_allowed: i64 },
+}
+
+impl std::fmt::Display for SyncCollectionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidSyncToken { token } => {
+                write!(f, "invalid sync token: {token}")
+            }
+            Self::ExpiredSyncToken { token, min_allowed } => {
+                write!(
+                    f,
+                    "sync token expired: {token} < min retained {min_allowed}"
+                )
+            }
+        }
+    }
+}
+
+impl std::error::Error for SyncCollectionError {}
 
 /// ## Summary
 /// Main REPORT method dispatcher for `WebDAV`.
@@ -87,6 +112,15 @@ pub async fn handle_sync_collection(
     properties: Vec<shuriken_rfc::rfc::dav::core::PropertyName>,
     depot: &Depot,
 ) {
+    let settings = match get_config_from_depot(depot) {
+        Ok(settings) => settings,
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to get config from depot");
+            res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+            return;
+        }
+    };
+
     let provider = match crate::db_handler::get_db_from_depot(depot) {
         Ok(provider) => provider,
         Err(e) => {
@@ -147,11 +181,31 @@ pub async fn handle_sync_collection(
         collection,
         &resource,
         base_path,
+        settings.dav.sync_token_retention_revisions,
     )
     .await
     {
         Ok(ms) => ms,
         Err(e) => {
+            if let Some(err) = e.downcast_ref::<SyncCollectionError>() {
+                match err {
+                    SyncCollectionError::InvalidSyncToken { token } => {
+                        tracing::warn!(token = %token, "Invalid sync token");
+                        res.status_code(StatusCode::BAD_REQUEST);
+                        return;
+                    }
+                    SyncCollectionError::ExpiredSyncToken { token, min_allowed } => {
+                        tracing::info!(
+                            token = %token,
+                            min_allowed = %min_allowed,
+                            "Sync token expired; client must resync"
+                        );
+                        res.status_code(StatusCode::GONE);
+                        return;
+                    }
+                }
+            }
+
             tracing::error!("Failed to build sync-collection response: {}", e);
             res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
             return;
@@ -175,6 +229,7 @@ async fn build_sync_collection_response(
     collection: &shuriken_db::model::dav::collection::DavCollection,
     resource_location: &shuriken_service::auth::ResourceLocation,
     base_path: &str,
+    retention_revisions: i64,
 ) -> anyhow::Result<Multistatus> {
     use diesel::{ExpressionMethods, QueryDsl};
     use diesel_async::RunQueryDsl;
@@ -187,9 +242,22 @@ async fn build_sync_collection_response(
     } else {
         sync.sync_token.parse().map_err(|e| {
             tracing::warn!(token = %sync.sync_token, error = %e, "Invalid sync token format");
-            anyhow::anyhow!("Invalid sync-token: must be a valid integer")
+            SyncCollectionError::InvalidSyncToken {
+                token: sync.sync_token.clone(),
+            }
         })?
     };
+
+    if baseline_token > 0 && retention_revisions > 0 {
+        let min_allowed = collection.synctoken.saturating_sub(retention_revisions);
+        if baseline_token < min_allowed {
+            return Err(SyncCollectionError::ExpiredSyncToken {
+                token: baseline_token,
+                min_allowed,
+            }
+            .into());
+        }
+    }
 
     // Query instances changed since baseline
     let instances = instance::by_collection_not_deleted(collection.id)
