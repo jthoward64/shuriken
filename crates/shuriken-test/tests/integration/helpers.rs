@@ -1542,6 +1542,28 @@ impl TestDb {
         Ok(synctoken)
     }
 
+    /// Sets the sync token for a collection (test helper only).
+    ///
+    /// ## Errors
+    /// Returns an error if the update fails.
+    pub async fn set_collection_synctoken(
+        &self,
+        collection_id: uuid::Uuid,
+        synctoken: i64,
+    ) -> anyhow::Result<()> {
+        use shuriken_test::component::db::schema::dav_collection;
+
+        let mut conn = self.get_conn().await?;
+
+        diesel::update(dav_collection::table)
+            .filter(dav_collection::id.eq(collection_id))
+            .set(dav_collection::synctoken.eq(synctoken))
+            .execute(&mut conn)
+            .await?;
+
+        Ok(())
+    }
+
     /// Checks if a tombstone exists for a given collection and URI.
     ///
     /// ## Errors

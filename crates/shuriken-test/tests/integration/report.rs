@@ -538,6 +538,47 @@ async fn sync_collection_returns_multistatus() {
 }
 
 /// ## Summary
+/// Test that expired sync-token returns 410 Gone.
+#[test_log::test(tokio::test)]
+async fn sync_collection_expired_token_returns_gone() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
+
+    let collection_id = test_db
+        .seed_collection(principal_id, CollectionType::Calendar, "testcal", None)
+        .await
+        .expect("Failed to seed collection");
+
+    // Grant owner access to the user on their collection
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    // Force a high sync token to exceed retention window
+    test_db
+        .set_collection_synctoken(collection_id, 20_000)
+        .await
+        .expect("Failed to set collection synctoken");
+
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let response = TestRequest::report(&caldav_collection_path("testuser", "testcal"))
+        .xml_body(&sync_collection_report("1"))
+        .send(&service)
+        .await;
+
+    response.assert_status(StatusCode::GONE);
+}
+
+/// ## Summary
 /// Test that sync-collection returns sync-token in response.
 #[test_log::test(tokio::test)]
 async fn sync_collection_returns_sync_token() {
