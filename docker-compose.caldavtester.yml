@@ -1,4 +1,15 @@
 services:
+  postgres_caldavtester:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: shuriken
+      POSTGRES_PASSWORD: shuriken
+      POSTGRES_DB: shuriken_caldavtester
+    ports:
+      - "4525:5432"
+    volumes:
+      - ./caldavtester_seed.sql:/seed/caldavtester_seed.sql:ro
   caldavtester:
     build:
       context: .

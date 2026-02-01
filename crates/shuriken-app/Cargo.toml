@@ -2,6 +2,7 @@
 name = "shuriken-app"
 version.workspace = true
 edition.workspace = true
+default-run = "shuriken"
 
 [[bin]]
 name = "shuriken"

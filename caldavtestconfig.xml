@@ -178,10 +178,10 @@ limitations under the License.
     <value>/api/dav/</value>
     </substitution>
 
-    <!-- relative path to main principal collection-->
+    <!-- relative path to main principal collection - Shuriken uses /api/dav/principal/ -->
     <substitution>
     <key>$principalcollection:</key>
-    <value>$root:principals/</value>
+    <value>$root:principal/</value>
     </substitution>
 
     <!-- the core record type collections - Shuriken uses users/groups -->
@@ -209,23 +209,23 @@ limitations under the License.
     <!-- relative path to record type principal collections-->
     <substitution>
     <key>$principals_uids:</key>
-    <value>$principalcollection:$uidstype:/</value>
+    <value>$principalcollection:</value>
     </substitution>
     <substitution>
     <key>$principals_users:</key>
-    <value>$principalcollection:$userstype:/</value>
+    <value>$principalcollection:</value>
     </substitution>
     <substitution>
     <key>$principals_groups:</key>
-    <value>$principalcollection:$groupstype:/</value>
+    <value>$principalcollection:</value>
     </substitution>
     <substitution>
     <key>$principals_resources:</key>
-    <value>$principalcollection:$resourcestype:/</value>
+    <value>$principalcollection:</value>
     </substitution>
     <substitution>
     <key>$principals_locations:</key>
-    <value>$principalcollection:$locationstype:/</value>
+    <value>$principalcollection:</value>
     </substitution>
 
     <!-- relative path to calendars collection - Shuriken uses /api/dav/cal/ -->
@@ -237,19 +237,19 @@ limitations under the License.
     <!-- relative path to record type calendar collections-->
     <substitution>
     <key>$calendars_uids:</key>
-    <value>$calendars:$uidstype:/</value>
+    <value>$calendars:</value>
     </substitution>
     <substitution>
     <key>$calendars_users:</key>
-    <value>$calendars:$userstype:/</value>
+    <value>$calendars:</value>
     </substitution>
     <substitution>
     <key>$calendars_resources:</key>
-    <value>$calendars:$resourcestype:/</value>
+    <value>$calendars:</value>
     </substitution>
     <substitution>
     <key>$calendars_locations:</key>
-    <value>$calendars:$locationstype:/</value>
+    <value>$calendars:</value>
     </substitution>
 
     <!-- primary calendar name-->
@@ -352,11 +352,11 @@ limitations under the License.
     <!-- relative path to record type addressbook collections-->
     <substitution>
     <key>$addressbooks_uids:</key>
-    <value>$addressbooks:$uidstype:/</value>
+    <value>$addressbooks:</value>
     </substitution>
     <substitution>
     <key>$addressbooks_users:</key>
-    <value>$addressbooks:$userstype:/</value>
+    <value>$addressbooks:</value>
     </substitution>
 
     <!-- primary addressbook name -->
@@ -385,12 +385,12 @@ limitations under the License.
     <!-- guid for admin user - Shuriken uses slug-based identifiers -->
     <substitution>
     <key>$useradminguid:</key>
-    <value>testuser</value>
+    <value>90000000-0000-0000-0000-000000000001</value>
     </substitution>
     <!-- password for admin user -->
     <substitution>
     <key>$pswdadmin:</key>
-    <value>testpass</value>
+    <value>password</value>
     </substitution>
 
     <!-- relative path to admin principal resource-->
@@ -416,7 +416,7 @@ limitations under the License.
     <!-- password for admin user -->
     <substitution>
     <key>$pswdapprentice:</key>
-    <value>apprentice</value>
+    <value>password</value>
     </substitution>
 
     <!-- relative path to apprentice principal resource-->
@@ -437,7 +437,7 @@ limitations under the License.
     <!-- password for proxy user -->
     <substitution>
     <key>$pswdproxy:</key>
-    <value>superuser</value>
+    <value>password</value>
     </substitution>
 
     <!--  Forty user accounts -->
@@ -475,7 +475,7 @@ limitations under the License.
     <!-- password -->
     <substitution>
         <key>$pswd%d:</key>
-        <value>user%02d</value>
+        <value>password</value>
     </substitution>
     <!-- relative path to user principal resource-->
     <substitution>
@@ -600,7 +600,7 @@ limitations under the License.
     <!-- password -->
     <substitution>
         <key>$publicpswd%d:</key>
-        <value>public%02d</value>
+        <value>password</value>
     </substitution>
     <!-- relative path to user principal resource-->
     <substitution>
@@ -808,7 +808,7 @@ limitations under the License.
     <!-- password -->
     <substitution>
     <key>$i18npswd:</key>
-    <value>i18nuser</value>
+    <value>password</value>
     </substitution>
     <!-- relative path to user calendar-->
     <substitution>

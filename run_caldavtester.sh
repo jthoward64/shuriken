@@ -10,12 +10,58 @@ NC='\033[0m' # No Color
 echo -e "${GREEN}=== Shuriken CalDAV Test Suite Runner ===${NC}"
 echo
 
+# Set DATABASE_URL for CalDAVTester
+export DATABASE_URL="postgres://shuriken:shuriken@localhost:4525/shuriken_caldavtester"
+export AUTH_METHOD="basic_auth"
+
+# First, reset that database
+echo -e "${YELLOW}Resetting CalDAVTester database...${NC}"
+docker compose -f docker-compose.caldavtester.yml down
+docker compose -f docker-compose.caldavtester.yml up -d postgres_caldavtester
+
+# Wait for Postgres to be ready
+echo -e "${YELLOW}Waiting for Postgres to be ready...${NC}"
+PG_READY=0
+for i in {1..30}; do
+    if pg_isready -h localhost -p 4525 -U shuriken > /dev/null 2>&1; then
+        PG_READY=1
+        break
+    fi
+    sleep 1
+done
+
+if [ "$PG_READY" -ne 1 ]; then
+    echo -e "${RED}ERROR: Postgres did not become ready on port 4525${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}✓ Postgres is ready${NC}"
+
+# Migrate the database schema
+echo -e "${YELLOW}Migrating CalDAVTester database schema...${NC}"
+pushd crates/shuriken-db > /dev/null
+diesel migration run
+popd > /dev/null
+echo -e "${GREEN}✓ Database schema migrated${NC}"
+
+echo -e "${YELLOW}Generating password hash for test accounts...${NC}"
+PASSWORD_HASH=$(cargo run -q -p shuriken-service --bin hash_password -- "password")
+echo -e "${GREEN}✓ Password hash generated${NC}"
+
+echo -e "${YELLOW}Seeding CalDAVTester database...${NC}"
+docker compose -f docker-compose.caldavtester.yml exec -T postgres_caldavtester \
+    psql -v ON_ERROR_STOP=1 -U shuriken -d shuriken_caldavtester \
+    -v password_hash="$PASSWORD_HASH" -f /seed/caldavtester_seed.sql
+echo -e "${GREEN}✓ Database seeded${NC}"
+
 # Start Shuriken server (log to file)
 LOG_DIR="./logs"
 mkdir -p "$LOG_DIR"
 LOG_FILE="$LOG_DIR/shuriken-caldavtester-$(date +%Y%m%d-%H%M%S).log"
 
 echo -e "${YELLOW}Starting Shuriken server (logs: $LOG_FILE)...${NC}"
+touch "$LOG_FILE"
+ln -sf "$LOG_FILE" "$LOG_DIR/shuriken-caldavtester-latest.log"
 cargo run > "$LOG_FILE" 2>&1 &
 SHURIKEN_PID=$!
 

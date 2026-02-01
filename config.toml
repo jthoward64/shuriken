@@ -1,6 +1,0 @@
-[auth]
-method = "single_user"
-
-[auth.single_user]
-name = "Your Name"
-email = "your.email@example.com"
