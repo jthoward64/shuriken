@@ -3,8 +3,8 @@
 use uuid::Uuid;
 
 use crate::db::carddav_keys::{
-    insert_string, insert_string_array, KEY_EMAILS, KEY_N_FAMILY, KEY_N_GIVEN, KEY_ORG,
-    KEY_PHONES, KEY_TITLE,
+    KEY_EMAILS, KEY_N_FAMILY, KEY_N_GIVEN, KEY_ORG, KEY_PHONES, KEY_TITLE, insert_string,
+    insert_string_array,
 };
 use crate::model::carddav::card_index::NewCardIndex;
 use shuriken_rfc::rfc::vcard::VCard;
@@ -77,7 +77,7 @@ mod tests {
 
     #[test]
     fn build_card_index_maps_json_keys_and_arrays() {
-        let vcard = r#"BEGIN:VCARD
+        let vcard = r"BEGIN:VCARD
 VERSION:4.0
 UID:test@example.com
 FN:John Doe
@@ -87,7 +87,7 @@ TITLE:Engineer
 EMAIL:John.Doe@EXAMPLE.COM
 EMAIL:alt@example.com
 TEL:+1-555-0100
-END:VCARD"#;
+END:VCARD";
 
         let card = parse_single(vcard).expect("vCard parse");
         let index = build_card_index(Uuid::nil(), &card);

@@ -20,6 +20,7 @@ use shuriken_service::auth::{Action, get_resolved_location_from_depot};
 /// ## Errors
 /// Returns 400 for invalid paths, 500 for server errors.
 #[tracing::instrument(skip_all, fields(path = %req.uri().path()))]
+#[expect(clippy::too_many_lines)]
 pub async fn handle(
     req: &mut Request,
     res: &mut Response,

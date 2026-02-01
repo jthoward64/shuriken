@@ -1316,6 +1316,94 @@ async fn propfind_acl_filters_by_resource_path() {
         "Collection 2 should not contain public read ACE (or at least not with read privilege)"
     );
 }
+
+/// ## Summary
+/// Test that PROPFIND returns DAV:current-user-privilege-set property.
+///
+/// RFC 3744 §5.4: The DAV:current-user-privilege-set property contains the
+/// privileges granted to the current user on the resource.
+#[test_log::test(tokio::test)]
+async fn propfind_returns_current_user_privilege_set() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
+
+    let collection_id = test_db
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "testcal",
+            Some("Test Calendar"),
+        )
+        .await
+        .expect("Failed to seed collection");
+
+    // Seed ACL: Owner permission for principal on this collection
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let prop_request = r#"<?xml version="1.0" encoding="utf-8"?>
+<D:propfind xmlns:D="DAV:">
+  <D:prop>
+    <D:current-user-privilege-set/>
+  </D:prop>
+</D:propfind>"#;
+
+    let response = TestRequest::propfind(&caldav_collection_path("testuser", "testcal"))
+        .depth("0")
+        .xml_body(prop_request)
+        .send(&service)
+        .await;
+
+    let response = response.assert_status(StatusCode::MULTI_STATUS);
+
+    let body = response.body_string();
+
+    // RFC 3744 §5.4: Response must contain DAV:current-user-privilege-set property
+    assert!(
+        body.contains("<D:current-user-privilege-set"),
+        "Response should contain DAV:current-user-privilege-set property"
+    );
+
+    // RFC 3744 §5.4: Should contain privilege elements describing grants
+    assert!(
+        body.contains("<D:privilege>"),
+        "Response should contain privilege elements"
+    );
+
+    // Owner should have read, write-content, bind, unbind, and read-acl privileges
+    assert!(
+        body.contains("<D:read/>") || body.contains("<read/>"),
+        "Owner should have read privilege"
+    );
+    assert!(
+        body.contains("<D:write-content/>") || body.contains("<write-content/>"),
+        "Owner should have write-content privilege"
+    );
+    assert!(
+        body.contains("<D:bind/>") || body.contains("<bind/>"),
+        "Owner should have bind privilege"
+    );
+    assert!(
+        body.contains("<D:unbind/>") || body.contains("<unbind/>"),
+        "Owner should have unbind privilege"
+    );
+    assert!(
+        body.contains("<D:read-acl/>") || body.contains("<read-acl/>"),
+        "Owner should have read-acl privilege"
+    );
+}
+
 // ============================================================================
 // CardDAV Discovery Properties Tests (RFC 6352)
 // ============================================================================

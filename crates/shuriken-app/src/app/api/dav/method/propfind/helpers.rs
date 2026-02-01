@@ -11,8 +11,9 @@ use shuriken_rfc::rfc::dav::core::{
 };
 use shuriken_service::auth::casbin::get_enforcer_from_depot;
 use shuriken_service::auth::{
-    PathSegment, ResourceIdentifier, ResourceLocation, get_resolved_location_from_depot,
-    get_terminal_collection_from_depot, serialize_acl_for_resource,
+    Action, Authorizer, ExpandedSubjects, PathSegment, PermissionLevel, PrivilegeSetBuilder,
+    ResourceIdentifier, ResourceLocation, authorizer_from_depot, get_resolved_location_from_depot,
+    get_subjects_from_depot, get_terminal_collection_from_depot, serialize_acl_for_resource,
 };
 
 /// Load child instances for a collection (for depth=1 queries).
@@ -158,13 +159,17 @@ struct PropertyResolutionContext<'a> {
     collection_qname: &'a QName,
     collection: Option<&'a shuriken_db::model::dav::collection::DavCollection>,
     resource_path: &'a str,
+    resource_location: Option<&'a ResourceLocation>,
     enforcer: Option<Arc<dyn std::any::Any + Send + Sync>>, // Opaque enforcer type
+    authorizer: Option<&'a Authorizer>,
+    subjects: Option<&'a ExpandedSubjects>,
     found: &'a mut Vec<DavProperty>,
     not_found: &'a mut Vec<DavProperty>,
 }
 
 /// ## Summary
 /// Resolves a single property based on its namespace and name.
+#[expect(clippy::too_many_lines)]
 async fn resolve_single_property(qname: QName, ctx: &mut PropertyResolutionContext<'_>) {
     match (qname.namespace_uri(), qname.local_name()) {
         ("DAV:", "displayname") => {
@@ -200,6 +205,52 @@ async fn resolve_single_property(qname: QName, ctx: &mut PropertyResolutionConte
                 }
             } else {
                 // Enforcer not available - cannot determine ACL
+                ctx.not_found.push(DavProperty::empty(qname));
+            }
+        }
+        ("DAV:", "current-user-privilege-set") => {
+            // RFC 3744 §5.4: DAV:current-user-privilege-set - effective privileges for current user
+            if let (Some(authorizer), Some(subjects), Some(resource)) =
+                (ctx.authorizer, ctx.subjects, ctx.resource_location)
+            {
+                // Determine the highest permission level the user has by checking actions
+                // Check from highest to lowest: admin, edit, read, read_freebusy
+                let permission_level = if authorizer
+                    .check(subjects, resource, Action::Admin)
+                    .is_ok_and(|r| r.is_allowed())
+                {
+                    Some(PermissionLevel::Admin)
+                } else if authorizer
+                    .check(subjects, resource, Action::Edit)
+                    .is_ok_and(|r| r.is_allowed())
+                {
+                    Some(PermissionLevel::Edit)
+                } else if authorizer
+                    .check(subjects, resource, Action::Read)
+                    .is_ok_and(|r| r.is_allowed())
+                {
+                    Some(PermissionLevel::Read)
+                } else if authorizer
+                    .check(subjects, resource, Action::ReadFreebusy)
+                    .is_ok_and(|r| r.is_allowed())
+                {
+                    Some(PermissionLevel::ReadFreebusy)
+                } else {
+                    None
+                };
+
+                if let Some(level) = permission_level {
+                    let builder = PrivilegeSetBuilder::for_level(level);
+                    ctx.found.push(DavProperty::xml(qname, builder.to_xml()));
+                } else {
+                    // User has no privileges - return empty privilege set
+                    ctx.found.push(DavProperty::xml(
+                        qname,
+                        "<D:current-user-privilege-set xmlns:D=\"DAV:\"/>".to_string(),
+                    ));
+                }
+            } else {
+                // Missing authorization context - cannot determine privileges
                 ctx.not_found.push(DavProperty::empty(qname));
             }
         }
@@ -243,6 +294,7 @@ async fn resolve_single_property(qname: QName, ctx: &mut PropertyResolutionConte
 ///
 /// ## Errors
 /// Returns errors for database failures or property resolution issues.
+#[expect(clippy::too_many_lines)]
 pub(super) async fn build_propfind_response(
     conn: &mut shuriken_db::db::connection::DbConnection<'_>,
     req: &Request,
@@ -267,9 +319,18 @@ pub(super) async fn build_propfind_response(
         .map(|e| e as Arc<dyn std::any::Any + Send + Sync>);
 
     // Get the resolved resource location for ACL lookups (uses internal path format)
-    let resource_path = get_resolved_location_from_depot(depot)
-        .ok()
+    let resource_location = get_resolved_location_from_depot(depot).ok();
+    let resource_path = resource_location
+        .as_ref()
         .and_then(|loc| loc.serialize_to_path(false, false).ok());
+
+    // Get authorizer and subjects for privilege checking (may be None)
+    let authorizer = authorizer_from_depot(depot).ok();
+    let subjects = if authorizer.is_some() {
+        get_subjects_from_depot(depot, conn).await.ok()
+    } else {
+        None
+    };
 
     let (found_properties, not_found_properties) = get_properties_for_resource(
         conn,
@@ -277,6 +338,9 @@ pub(super) async fn build_propfind_response(
         collection,
         enforcer.clone(),
         resource_path.as_deref(),
+        authorizer.as_ref(),
+        subjects.as_ref(),
+        resource_location.as_ref().map(|r| &**r),
         propfind_req,
     )
     .await?;
@@ -360,12 +424,16 @@ pub(super) async fn build_propfind_response(
 ///
 /// ## Errors
 /// Returns errors if property resolution fails.
+#[expect(clippy::too_many_lines)]
 async fn get_properties_for_resource(
     _conn: &mut shuriken_db::db::connection::DbConnection<'_>,
     path: &str,
     collection: Option<&shuriken_db::model::dav::collection::DavCollection>,
     enforcer: Option<Arc<dyn std::any::Any + Send + Sync>>,
     resource_path: Option<&str>,
+    authorizer: Option<&Authorizer>,
+    subjects: Option<&ExpandedSubjects>,
+    resource_location: Option<&ResourceLocation>,
     propfind_req: &shuriken_rfc::rfc::dav::core::PropfindRequest,
 ) -> anyhow::Result<(Vec<DavProperty>, Vec<DavProperty>)> {
     let mut found = Vec::new();
@@ -468,7 +536,10 @@ async fn get_properties_for_resource(
             collection_qname: &collection_qname,
             collection,
             resource_path: resource_path.unwrap_or(path), // Use resolved path if available, fallback to HTTP path
+            resource_location,
             enforcer,
+            authorizer,
+            subjects,
             found: &mut found,
             not_found: &mut not_found,
         };

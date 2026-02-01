@@ -389,7 +389,7 @@ async fn build_expand_property_response(
     let target_href = Href::new(&target_path);
 
     // Mark the target as visited
-    visited.insert(target_path.to_string());
+    visited.insert(target_path.clone());
 
     // Start building the multistatus response
     let mut multistatus = Multistatus::new();
@@ -500,7 +500,7 @@ async fn build_expand_property_response(
 ///
 /// ## Errors
 /// Returns database errors if queries fail.
-#[expect(clippy::unused_async)]
+#[expect(clippy::too_many_lines)]
 async fn fetch_property(
     conn: &mut shuriken_db::db::connection::DbConnection<'_>,
     path: &str,
@@ -524,9 +524,8 @@ async fn fetch_property(
         }
     };
 
-    let resource_type = match location.resource_type() {
-        Some(rt) => rt,
-        None => return Ok(None),
+    let Some(resource_type) = location.resource_type() else {
+        return Ok(None);
     };
 
     let owner_id = match location.owner() {
@@ -768,6 +767,7 @@ fn fetch_nested_properties<'a>(
     clippy::let_underscore_must_use,
     reason = "Write to String is infallible"
 )]
+#[expect(clippy::too_many_lines)]
 fn format_nested_response(
     href: &str,
     properties: &[shuriken_rfc::rfc::dav::core::DavProperty],

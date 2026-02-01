@@ -5,8 +5,8 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::db::caldav_keys::{
-    insert_array, insert_number, insert_string, KEY_ATTENDEES, KEY_DESCRIPTION, KEY_LOCATION,
-    KEY_ORGANIZER, KEY_ORGANIZER_CN, KEY_SEQUENCE, KEY_STATUS, KEY_SUMMARY, KEY_TRANSP,
+    KEY_ATTENDEES, KEY_DESCRIPTION, KEY_LOCATION, KEY_ORGANIZER, KEY_ORGANIZER_CN, KEY_SEQUENCE,
+    KEY_STATUS, KEY_SUMMARY, KEY_TRANSP, insert_array, insert_number, insert_string,
 };
 use crate::model::caldav::cal_index::NewCalIndex;
 use shuriken_rfc::recurrence::ical_datetime_to_utc_with_resolver;
@@ -35,6 +35,7 @@ pub fn build_cal_indexes(
     indexes
 }
 
+#[expect(clippy::items_after_test_module)]
 #[cfg(test)]
 mod tests {
     use super::build_cal_indexes;
@@ -49,7 +50,7 @@ mod tests {
 
     #[test]
     fn build_cal_index_maps_metadata_keys() {
-        let ical = r#"BEGIN:VCALENDAR
+        let ical = r"BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//Test//EN
 BEGIN:VEVENT
@@ -65,13 +66,16 @@ TRANSP:OPAQUE
 STATUS:CONFIRMED
 ATTENDEE;CN=Bob;PARTSTAT=ACCEPTED;ROLE=REQ-PARTICIPANT:mailto:bob@example.com
 END:VEVENT
-END:VCALENDAR"#;
+END:VCALENDAR";
 
         let calendar = parse(ical).expect("ical parse");
         let mut resolver = TimeZoneResolver::new();
         let mut component_map = HashMap::new();
         component_map.insert(
-            ("VEVENT".to_string(), Some("test-uid@example.com".to_string())),
+            (
+                "VEVENT".to_string(),
+                Some("test-uid@example.com".to_string()),
+            ),
             Uuid::nil(),
         );
 
@@ -222,10 +226,10 @@ fn build_cal_index(
     }
 
     // Extract SEQUENCE
-    if let Some(sequence) = component
-        .get_property("SEQUENCE")
-        .and_then(|p| p.as_integer().or_else(|| p.as_text().and_then(|s| s.parse::<i32>().ok())))
-    {
+    if let Some(sequence) = component.get_property("SEQUENCE").and_then(|p| {
+        p.as_integer()
+            .or_else(|| p.as_text().and_then(|s| s.parse::<i32>().ok()))
+    }) {
         insert_number(&mut metadata, KEY_SEQUENCE, sequence);
     }
 

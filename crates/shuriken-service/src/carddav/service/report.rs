@@ -14,10 +14,10 @@ use crate::auth::{PathSegment, ResourceIdentifier, ResourceLocation};
 use crate::error::ServiceResult;
 
 /// ## Summary
-/// Builds a proper Href for a vCard item using ResourceLocation.
+/// Builds a proper Href for a vCard item using `ResourceLocation`.
 ///
 /// ## Errors
-/// Returns error if ResourceLocation serialization fails.
+/// Returns error if `ResourceLocation` serialization fails.
 fn build_item_href(
     base_location: &ResourceLocation,
     instance: &DavInstance,

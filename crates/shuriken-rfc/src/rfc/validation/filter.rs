@@ -7,7 +7,7 @@
 //! This module provides validation to check if filters only reference
 //! components, properties, and parameters the server supports.
 
-use crate::rfc::dav::core::{CalendarFilter, CompFilter, PropFilter};
+use crate::rfc::dav::core::{CalendarFilter, CompFilter, ParamFilter, PropFilter};
 
 /// ## Summary
 /// Result of filter validation.
@@ -38,13 +38,13 @@ impl FilterValidationResult {
         match self {
             Self::Valid => None,
             Self::UnsupportedComponent(name) => {
-                Some(format!("Unsupported component in filter: {}", name))
+                Some(format!("Unsupported component in filter: {name}"))
             }
             Self::UnsupportedProperty(name) => {
-                Some(format!("Unsupported property in filter: {}", name))
+                Some(format!("Unsupported property in filter: {name}"))
             }
             Self::UnsupportedParameter(name) => {
-                Some(format!("Unsupported parameter in filter: {}", name))
+                Some(format!("Unsupported parameter in filter: {name}"))
             }
         }
     }
@@ -328,7 +328,6 @@ mod tests {
         let mut filter = CalendarFilter::vcalendar();
         let mut vevent = CompFilter::new("VEVENT");
         let mut summary_filter = PropFilter::new("SUMMARY");
-        use crate::rfc::dav::core::ParamFilter;
         summary_filter.param_filters.push(ParamFilter {
             name: "X-CUSTOM-PARAM".to_string(),
             is_not_defined: false,

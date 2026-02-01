@@ -16,6 +16,9 @@ use shuriken_service::carddav::service::object::{PutObjectContext, put_address_o
 use crate::app::api::dav::response::error::write_precondition_error;
 use types::{PutError, PutResult};
 
+/// CardDAV maximum resource size per RFC 6352 §6.2.3 (100 KB)
+const MAX_VCARD_SIZE: usize = 102_400;
+
 /// ## Summary
 /// Handles PUT requests for vCard objects (`.vcf` files).
 ///
@@ -106,7 +109,6 @@ pub async fn put(req: &mut Request, res: &mut Response, depot: &Depot) {
     //
     // CardDAV defines a maximum resource size of 100KB (102400 bytes) for vCard objects.
     // Check the size before parsing to fail fast on oversized uploads.
-    const MAX_VCARD_SIZE: usize = 102_400; // 100 KB per RFC 6352 §6.2.3
     if body.len() > MAX_VCARD_SIZE {
         tracing::error!(
             size = body.len(),

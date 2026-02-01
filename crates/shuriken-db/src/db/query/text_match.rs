@@ -251,7 +251,7 @@ pub fn build_like_pattern(
 }
 
 /// ## Summary
-/// Wraps a SQL string literal with the appropriate PostgreSQL normalization function.
+/// Wraps a SQL string literal with the appropriate `PostgreSQL` normalization function.
 ///
 /// Returns SQL like `unicode_casemap_nfc('value')` or `ascii_casemap('value')`.
 /// For i;octet, returns the value as-is (no normalization function).

@@ -8,6 +8,7 @@ use shuriken_rfc::rfc::vcard::core::{VCard, VCardValue};
 
 /// ## Summary
 /// Extracts typed value fields from an iCalendar Value.
+#[expect(clippy::too_many_lines)]
 pub(super) fn extract_ical_value<'a>(
     value: &Value,
     raw: &'a str,
@@ -180,6 +181,7 @@ pub(super) fn extract_vcard_value<'a>(value: &VCardValue, raw: &'a str) -> Extra
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[expect(clippy::struct_field_names)]
 pub(super) struct ExtractedValue<'a> {
     pub value_type: ValueType,
     pub value_text: Option<&'a str>,

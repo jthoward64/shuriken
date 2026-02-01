@@ -20,10 +20,10 @@ use crate::auth::{PathSegment, ResourceIdentifier, ResourceLocation};
 use crate::error::ServiceResult;
 
 /// ## Summary
-/// Builds a proper Href for a calendar item using ResourceLocation.
+/// Builds a proper Href for a calendar item using `ResourceLocation`.
 ///
 /// ## Errors
-/// Returns error if ResourceLocation serialization fails.
+/// Returns error if `ResourceLocation` serialization fails.
 fn build_item_href(
     base_location: &ResourceLocation,
     instance: &DavInstance,
@@ -170,7 +170,6 @@ pub async fn execute_calendar_multiget(
 ///
 /// ## Errors
 /// Returns database or parsing errors.
-#[expect(clippy::too_many_lines)]
 async fn execute_calendar_query_with_expansion(
     conn: &mut DbConnection<'_>,
     base_location: &ResourceLocation,

@@ -50,7 +50,7 @@ pub(crate) fn validate_numeric_char_refs(xml: &[u8]) -> ParseResult<()> {
             let value = if is_hex {
                 u32::from_str_radix(digits, 16)
             } else {
-                u32::from_str_radix(digits, 10)
+                digits.parse::<u32>()
             }
             .map_err(|_| ParseError::invalid_value("invalid numeric character reference"))?;
 
@@ -73,6 +73,6 @@ pub(crate) fn validate_numeric_char_refs(xml: &[u8]) -> ParseResult<()> {
 fn is_valid_xml_char(value: u32) -> bool {
     matches!(
         value,
-        0x9 | 0xA | 0xD | 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x10FFFF
+        0x9 | 0xA | 0xD | 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x0001_0000..=0x0010_FFFF
     )
 }

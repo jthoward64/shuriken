@@ -82,7 +82,7 @@ pub async fn put(req: &mut Request, res: &mut Response, depot: &Depot) {
         .headers()
         .get("Content-Type")
         .and_then(|h| h.to_str().ok())
-        .map(|s| s.to_lowercase());
+        .map(str::to_lowercase);
 
     if let Some(ct) = &content_type {
         if !ct.starts_with("text/calendar") {
