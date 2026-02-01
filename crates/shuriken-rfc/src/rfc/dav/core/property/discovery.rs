@@ -30,8 +30,8 @@ pub fn supported_report_set(collection_type: CollectionType) -> String {
     match collection_type {
         CollectionType::Calendar => {
             // RFC 4791 §7: calendar-access servers MUST support these reports
-            r#"<D:supported-report-set xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
-  <D:supported-report>
+            // Note: Outer <D:supported-report-set> wrapper is added by multistatus serializer
+            r#"<D:supported-report xmlns:C="urn:ietf:params:xml:ns:caldav">
     <D:report><C:calendar-query/></D:report>
   </D:supported-report>
   <D:supported-report>
@@ -39,14 +39,13 @@ pub fn supported_report_set(collection_type: CollectionType) -> String {
   </D:supported-report>
   <D:supported-report>
     <D:report><D:sync-collection/></D:report>
-  </D:supported-report>
-</D:supported-report-set>"#
+  </D:supported-report>"#
                 .to_string()
         }
         CollectionType::Addressbook => {
             // RFC 6352 §3: addressbook servers MUST support these reports
-            r#"<D:supported-report-set xmlns:D="DAV:" xmlns:CR="urn:ietf:params:xml:ns:carddav">
-  <D:supported-report>
+            // Note: Outer <D:supported-report-set> wrapper is added by multistatus serializer
+            r#"<D:supported-report xmlns:CR="urn:ietf:params:xml:ns:carddav">
     <D:report><CR:addressbook-query/></D:report>
   </D:supported-report>
   <D:supported-report>
@@ -54,17 +53,15 @@ pub fn supported_report_set(collection_type: CollectionType) -> String {
   </D:supported-report>
   <D:supported-report>
     <D:report><D:sync-collection/></D:report>
-  </D:supported-report>
-</D:supported-report-set>"#
+  </D:supported-report>"#
                 .to_string()
         }
         CollectionType::Collection => {
             // Plain collections only support sync-collection
-            r#"<D:supported-report-set xmlns:D="DAV:">
-  <D:supported-report>
+            // Note: Outer <D:supported-report-set> wrapper is added by multistatus serializer
+            r#"<D:supported-report>
     <D:report><D:sync-collection/></D:report>
-  </D:supported-report>
-</D:supported-report-set>"#
+  </D:supported-report>"#
                 .to_string()
         }
     }
@@ -238,8 +235,7 @@ mod tests {
         assert!(xml.contains("calendar-multiget"));
         assert!(xml.contains("sync-collection"));
 
-        // Should use correct namespaces
-        assert!(xml.contains("xmlns:D=\"DAV:\""));
+        // Should use correct namespaces (note: D namespace added by serializer)
         assert!(xml.contains("xmlns:C=\"urn:ietf:params:xml:ns:caldav\""));
 
         // Should wrap in supported-report elements
@@ -256,8 +252,7 @@ mod tests {
         assert!(xml.contains("addressbook-multiget"));
         assert!(xml.contains("sync-collection"));
 
-        // Should use correct namespaces
-        assert!(xml.contains("xmlns:D=\"DAV:\""));
+        // Should use correct namespaces (note: D namespace added by serializer)
         assert!(xml.contains("xmlns:CR=\"urn:ietf:params:xml:ns:carddav\""));
     }
 
@@ -271,9 +266,6 @@ mod tests {
         // Should NOT contain calendar or addressbook specific reports
         assert!(!xml.contains("calendar-query"));
         assert!(!xml.contains("addressbook-query"));
-
-        // Should use correct namespace
-        assert!(xml.contains("xmlns:D=\"DAV:\""));
     }
 
     #[test]
