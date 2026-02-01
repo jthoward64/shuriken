@@ -8,6 +8,7 @@ use salvo::Router;
 pub mod extract;
 pub mod method;
 pub mod response;
+pub mod util;
 
 #[must_use]
 pub fn routes() -> Router {

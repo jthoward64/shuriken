@@ -51,8 +51,8 @@ impl ServerConfig {
     /// ## Summary
     /// Returns the server address as a string in the format "host:port".
     #[must_use]
-    pub fn address(&self) -> String {
-        format!("{}:{}", self.host, self.port)
+    pub fn serve_origin(&self) -> String {
+        format!("http://{}:{}", self.host, self.port)
     }
 
     /// ## Summary
@@ -62,7 +62,7 @@ impl ServerConfig {
         if let Some(origin) = &self.serve_origin {
             origin.clone()
         } else {
-            format!("http://{}", self.address())
+            self.serve_origin()
         }
     }
 }

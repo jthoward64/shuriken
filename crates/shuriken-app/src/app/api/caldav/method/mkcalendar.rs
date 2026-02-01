@@ -7,8 +7,11 @@ use salvo::http::StatusCode;
 use salvo::{Depot, Request, Response, handler};
 
 use crate::app::api::dav::extract::auth::get_auth_context;
+use crate::app::api::dav::util::build_full_url;
 use shuriken_rfc::rfc::dav::parse::{MkcolRequest, parse_mkcol};
-use shuriken_service::auth::{Action, get_resolved_location_from_depot};
+use shuriken_service::auth::{
+    Action, PathSegment, ResourceIdentifier, ResourceLocation, get_resolved_location_from_depot,
+};
 use shuriken_service::dav::service::collection::{CreateCollectionContext, create_collection};
 
 /// ## Summary
@@ -68,7 +71,7 @@ pub async fn mkcalendar(req: &mut Request, res: &mut Response, depot: &Depot) {
         loc.clone()
     } else {
         // Otherwise, construct parent path from original location
-        use shuriken_service::auth::{ResourceLocation, depot::get_path_location_from_depot};
+        use shuriken_service::auth::depot::get_path_location_from_depot;
 
         let path_loc = match get_path_location_from_depot(depot) {
             Ok(loc) => loc.clone(),
@@ -172,18 +175,12 @@ pub async fn mkcalendar(req: &mut Request, res: &mut Response, depot: &Depot) {
             res.status_code(StatusCode::CREATED);
 
             // Set Location header with full URL (RFC 4918 §8.10.4)
-            // Construct full URL: scheme://host/path
-            let scheme = if req.uri().scheme_str() == Some("https") {
-                "https"
-            } else {
-                "http"
-            };
-            let host = req
-                .headers()
-                .get("Host")
-                .and_then(|h| h.to_str().ok())
-                .unwrap_or("localhost");
-            let location = format!("{scheme}://{host}{path}");
+            let mut segments = parent_resource.segments().to_vec();
+            segments.push(PathSegment::Collection(ResourceIdentifier::Id(
+                result.collection_id,
+            )));
+            let location_resource = ResourceLocation::from_segments(segments).ok();
+            let location = build_full_url(req, depot, location_resource.as_ref(), &path);
 
             #[expect(
                 clippy::let_underscore_must_use,
@@ -200,19 +197,6 @@ pub async fn mkcalendar(req: &mut Request, res: &mut Response, depot: &Depot) {
                 res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
             }
         }
-    }
-}
-
-/// Extract resource type from path.
-#[expect(dead_code, reason = "May be used for future path-based routing")]
-fn extract_resource_type_from_path(path: &str) -> Option<shuriken_service::auth::ResourceType> {
-    use shuriken_service::auth::ResourceType;
-    if path.contains("/calendars/") {
-        Some(ResourceType::Calendar)
-    } else if path.contains("/addressbooks/") {
-        Some(ResourceType::Addressbook)
-    } else {
-        None
     }
 }
 
