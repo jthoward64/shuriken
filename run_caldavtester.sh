@@ -57,12 +57,13 @@ echo -e "${GREEN}✓ Database seeded${NC}"
 # Start Shuriken server (log to file)
 LOG_DIR="./logs"
 mkdir -p "$LOG_DIR"
-LOG_FILE="$LOG_DIR/shuriken-caldavtester-$(date +%Y%m%d-%H%M%S).log"
+LOG_FILENAME="shuriken-caldavtester-$(date +%Y%m%d-%H%M%S).log"
+LOG_FILE="$LOG_DIR/$LOG_FILENAME"
 
 echo -e "${YELLOW}Starting Shuriken server (logs: $LOG_FILE)...${NC}"
 touch "$LOG_FILE"
-ln -sf "$LOG_FILE" "$LOG_DIR/shuriken-caldavtester-latest.log"
-cargo run > "$LOG_FILE" 2>&1 &
+ln -sf "$LOG_FILENAME" "$LOG_DIR/shuriken-caldavtester-latest.log"
+NO_COLOR=1 cargo run > "$LOG_FILE" 2>&1 &
 SHURIKEN_PID=$!
 
 cleanup() {
@@ -103,9 +104,13 @@ echo "--------------------------------------------------------------"
 echo
 
 # Run with docker-compose
-docker compose -f docker-compose.caldavtester.yml run --rm caldavtester -- $@
+RESULTS_FILENAME="shuriken-caldavtester-results-$(date +%Y%m%d-%H%M%S).log"
+RESULTS_FILE="$LOG_DIR/$RESULTS_FILENAME"
 
-TEST_RESULT=$?
+docker compose -f docker-compose.caldavtester.yml run --rm caldavtester -- $@ | tee "$RESULTS_FILE"
+ln -sf "$RESULTS_FILENAME" "$LOG_DIR/shuriken-caldavtester-results-latest.log"
+
+TEST_RESULT=${PIPESTATUS[0]}
 
 echo
 echo "--------------------------------------------------------------"

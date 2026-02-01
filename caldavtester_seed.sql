@@ -196,20 +196,20 @@ ON CONFLICT DO NOTHING;
 -- Format: (ptype='p', v0=principal:uuid, v1=path_pattern, v2=role)
 -- Path patterns use UUID-based paths like /api/dav/cal/principal-uuid/**
 INSERT INTO casbin_rule (ptype, v0, v1, v2, v3, v4, v5)
-SELECT 'p', 'principal:' || p.id::text, '/api/dav/cal/' || p.id::text || '/**', 'owner', '', '', ''
+SELECT 'p', 'principal:' || p.id::text, '/cal/' || p.id::text || '/**', 'owner', '', '', ''
 FROM principal p
 WHERE p.principal_type IN ('user', 'resource')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO casbin_rule (ptype, v0, v1, v2, v3, v4, v5)
-SELECT 'p', 'principal:' || p.id::text, '/api/dav/card/' || p.id::text || '/**', 'owner', '', '', ''
+SELECT 'p', 'principal:' || p.id::text, '/card/' || p.id::text || '/**', 'owner', '', '', ''
 FROM principal p
 WHERE p.principal_type = 'user'
 ON CONFLICT DO NOTHING;
 
 -- Grant users read access to their own principal resource
 INSERT INTO casbin_rule (ptype, v0, v1, v2, v3, v4, v5)
-SELECT 'p', 'principal:' || p.id::text, '/api/dav/principal/' || p.id::text, 'reader', '', '', ''
+SELECT 'p', 'principal:' || p.id::text, '/principal/' || p.id::text, 'reader', '', '', ''
 FROM principal p
 WHERE p.principal_type IN ('user', 'resource')
 ON CONFLICT DO NOTHING;
