@@ -1316,3 +1316,135 @@ async fn propfind_acl_filters_by_resource_path() {
         "Collection 2 should not contain public read ACE (or at least not with read privilege)"
     );
 }
+// ============================================================================
+// CardDAV Discovery Properties Tests (RFC 6352)
+// ============================================================================
+
+/// ## Summary
+/// Test that PROPFIND on addressbook collection returns CardDAV discovery properties.
+/// RFC 6352 §6.2: addressbook collections MUST advertise supported-address-data
+/// and max-resource-size in allprop queries.
+#[test_log::test(tokio::test)]
+async fn propfind_addressbook_returns_carddav_discovery() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
+
+    let collection_id = test_db
+        .seed_collection(
+            principal_id,
+            CollectionType::Addressbook,
+            "myaddressbook",
+            Some("My Contacts"),
+        )
+        .await
+        .expect("Failed to seed addressbook collection");
+
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "addressbook")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
+
+    // Query with allprop to verify discovery properties are returned
+    let response = TestRequest::propfind(&carddav_collection_path("testuser", "myaddressbook"))
+        .depth("0")
+        .xml_body(propfind_allprop())
+        .send(&service)
+        .await;
+
+    let response = response.assert_status(StatusCode::MULTI_STATUS);
+    let body = response.body_string();
+
+    // RFC 6352 §6.2.2: supported-address-data MUST be present in addressbook allprop
+    assert!(
+        body.contains("supported-address-data"),
+        "PROPFIND allprop on addressbook should contain supported-address-data property"
+    );
+
+    // RFC 6352 §6.2.3: max-resource-size MUST be present (CardDAV version, not CalDAV)
+    // The property appears as max-resource-size with carddav namespace (CR: or CARD:)
+    assert!(
+        body.contains("<CR:max-resource-size") || body.contains("100000"),
+        "PROPFIND allprop on addressbook should contain CardDAV max-resource-size property"
+    );
+
+    // Verify it contains vCard version information
+    assert!(
+        body.contains("text/vcard"),
+        "supported-address-data should contain vCard MIME type"
+    );
+
+    // Verify addressbook resourcetype is present
+    assert!(
+        body.contains("addressbook"),
+        "PROPFIND allprop on addressbook should contain addressbook resourcetype"
+    );
+}
+
+/// ## Summary
+/// Test that PROPFIND on calendar collection does NOT return CardDAV properties.
+/// Only CalDAV discovery properties should be present for calendar collections.
+#[test_log::test(tokio::test)]
+async fn propfind_calendar_excludes_carddav_properties() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
+
+    let collection_id = test_db
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "mycal",
+            Some("My Calendar"),
+        )
+        .await
+        .expect("Failed to seed calendar collection");
+
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
+
+    // Query with allprop
+    let response = TestRequest::propfind(&caldav_collection_path("testuser", "mycal"))
+        .depth("0")
+        .xml_body(propfind_allprop())
+        .send(&service)
+        .await;
+
+    let response = response.assert_status(StatusCode::MULTI_STATUS);
+    let body = response.body_string();
+
+    // Should have CalDAV properties
+    assert!(
+        body.contains("supported-calendar-component-set"),
+        "PROPFIND allprop on calendar should contain supported-calendar-component-set"
+    );
+
+    assert!(
+        body.contains("max-date-time"),
+        "PROPFIND allprop on calendar should contain CalDAV max-date-time"
+    );
+
+    // Should NOT have CardDAV-specific supported-address-data
+    assert!(
+        !body.contains("supported-address-data"),
+        "PROPFIND allprop on calendar should NOT contain CardDAV supported-address-data"
+    );
+}

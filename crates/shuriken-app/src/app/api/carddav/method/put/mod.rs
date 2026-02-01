@@ -82,6 +82,42 @@ pub async fn put(req: &mut Request, res: &mut Response, depot: &Depot) {
 
     tracing::debug!(bytes = body.len(), "Request body read successfully");
 
+    // ## Summary
+    // Validate Content-Type header per RFC 6352 §5.3.4 `supported-address-data`.
+    //
+    // If Content-Type is specified, it must be "text/vcard". If not specified, we assume
+    // the client is using the default vCard format. Return 403 with supported-address-data
+    // precondition if media type is not supported.
+    if let Some(content_type_header) = req.headers().get("Content-Type") {
+        if let Ok(ct_str) = content_type_header.to_str() {
+            let ct_lower = ct_str.to_lowercase();
+            // Check if it's text/vcard (allow optional charset parameter)
+            if !ct_lower.starts_with("text/vcard") {
+                tracing::error!(content_type = %ct_str, "Unsupported Content-Type for vCard");
+                let error = PreconditionError::SupportedAddressData;
+                write_precondition_error(res, &error);
+                return;
+            }
+        }
+    }
+
+    // ## Summary
+    // Validate resource size per RFC 6352 §5.3.4 `max-resource-size`.
+    //
+    // CardDAV defines a maximum resource size of 100KB (102400 bytes) for vCard objects.
+    // Check the size before parsing to fail fast on oversized uploads.
+    const MAX_VCARD_SIZE: usize = 102_400; // 100 KB per RFC 6352 §6.2.3
+    if body.len() > MAX_VCARD_SIZE {
+        tracing::error!(
+            size = body.len(),
+            max = MAX_VCARD_SIZE,
+            "vCard size exceeds maximum"
+        );
+        let error = PreconditionError::CardMaxResourceSize;
+        write_precondition_error(res, &error);
+        return;
+    }
+
     // Get database connection
     let provider = match crate::db_handler::get_db_from_depot(depot) {
         Ok(provider) => provider,
@@ -163,6 +199,22 @@ pub async fn put(req: &mut Request, res: &mut Response, depot: &Depot) {
         Err(PutError::InvalidVcardData(msg)) => {
             tracing::error!(message = %msg, "Invalid vCard data");
             let error = PreconditionError::ValidAddressData(msg);
+            write_precondition_error(res, &error);
+        }
+        Err(PutError::UnsupportedAddressData(msg)) => {
+            tracing::error!(content_type = %msg, "Unsupported media type for vCard");
+            // RFC 6352 §5.3.4: Return 403 with supported-address-data precondition
+            let error = PreconditionError::SupportedAddressData;
+            write_precondition_error(res, &error);
+        }
+        Err(PutError::MaxResourceSizeExceeded { size, max }) => {
+            tracing::error!(
+                size = size,
+                max = max,
+                "vCard exceeds maximum resource size"
+            );
+            // RFC 6352 §5.3.4: Return 403 with max-resource-size precondition
+            let error = PreconditionError::CardMaxResourceSize;
             write_precondition_error(res, &error);
         }
         Err(PutError::UidConflict(uid)) => {

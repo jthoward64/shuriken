@@ -2899,3 +2899,217 @@ END:VCARD"#;
         "Response should not contain matching .vcf href"
     );
 }
+
+// ============================================================================
+// REPORT Filter Validation Tests (RFC 4791 §7.8 supported-filter)
+// ============================================================================
+
+/// ## Summary
+/// Test that calendar-query with unsupported component returns supported-filter error.
+///
+/// RFC 4791 §7.8 requires returning 403 with supported-filter precondition when
+/// a filter uses unsupported components. For MVP, we support VEVENT, VTODO, VJOURNAL, etc.
+#[test_log::test(tokio::test)]
+async fn calendar_query_unsupported_component_403() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
+
+    let collection_id = test_db
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "testcal",
+            Some("Personal"),
+        )
+        .await
+        .expect("Failed to seed collection");
+
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
+
+    // Create a calendar-query with an unsupported component (VUNDEFINED)
+    // RFC 4791 requires the filter root to be VCALENDAR, with nested components like VEVENT, VTODO, etc.
+    // VUNDEFINED is not a valid iCalendar component (RFC 5545).
+    let body = r#"<?xml version="1.0" encoding="utf-8"?>
+<C:calendar-query xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:D="DAV:">
+  <D:prop>
+    <D:getetag/>
+  </D:prop>
+  <C:filter>
+    <C:comp-filter name="VCALENDAR">
+      <C:comp-filter name="VUNDEFINED">
+      </C:comp-filter>
+    </C:comp-filter>
+  </C:filter>
+</C:calendar-query>"#;
+
+    let response = TestRequest::report(&caldav_collection_path("testuser", "testcal"))
+        .xml_body(body)
+        .send(&service)
+        .await;
+
+    // RFC 4791 §7.8: Must return 403 with supported-filter precondition
+    let body_text = response.body_string();
+    response.assert_status(StatusCode::FORBIDDEN);
+    assert!(
+        body_text.contains("supported-filter"),
+        "Response should contain supported-filter precondition error: {}",
+        body_text
+    );
+}
+
+/// ## Summary
+/// Test that calendar-query with unsupported property returns supported-filter error.
+///
+/// RFC 4791 §7.8 requires returning 403 with supported-filter precondition when
+/// a filter uses unsupported properties.
+#[test_log::test(tokio::test)]
+async fn calendar_query_unsupported_property_403() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
+
+    let collection_id = test_db
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "testcal",
+            Some("Personal"),
+        )
+        .await
+        .expect("Failed to seed collection");
+
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
+
+    // Create a calendar-query with an unsupported property (NONEXISTENT)
+    // Filter structure must be: VCALENDAR (root) -> VEVENT (component) -> NONEXISTENT (property)
+    let body = r#"<?xml version="1.0" encoding="utf-8"?>
+<C:calendar-query xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:D="DAV:">
+  <D:prop>
+    <D:getetag/>
+  </D:prop>
+  <C:filter>
+    <C:comp-filter name="VCALENDAR">
+      <C:comp-filter name="VEVENT">
+        <C:prop-filter name="NONEXISTENT">
+        </C:prop-filter>
+      </C:comp-filter>
+    </C:comp-filter>
+  </C:filter>
+</C:calendar-query>"#;
+
+    let response = TestRequest::report(&caldav_collection_path("testuser", "testcal"))
+        .xml_body(body)
+        .send(&service)
+        .await;
+
+    // RFC 4791 §7.8: Must return 403 with supported-filter precondition
+    let body_text = response.body_string();
+    response.assert_status(StatusCode::FORBIDDEN);
+    assert!(
+        body_text.contains("supported-filter"),
+        "Response should contain supported-filter precondition error: {}",
+        body_text
+    );
+}
+
+/// ## Summary
+/// Test that calendar-query with supported components works correctly.
+///
+/// RFC 4791 §7.8 supported-filter should allow VEVENT, VTODO, VJOURNAL, etc.
+/// This test verifies that standard components are accepted.
+#[test_log::test(tokio::test)]
+async fn calendar_query_supported_components_accepted() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
+
+    let collection_id = test_db
+        .seed_collection(
+            principal_id,
+            CollectionType::Calendar,
+            "testcal",
+            Some("Personal"),
+        )
+        .await
+        .expect("Failed to seed collection");
+
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "calendar")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let ical = sample_icalendar_event("test@example.com", "Test Event");
+    TestRequest::put(&caldav_item_path("testuser", "testcal", "test.ics"))
+        .if_none_match("*")
+        .icalendar_body(&ical)
+        .send(&service)
+        .await
+        .assert_status(StatusCode::CREATED);
+
+    // Create a calendar-query with supported components (VEVENT)
+    let body = r#"<?xml version="1.0" encoding="utf-8"?>
+<C:calendar-query xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:D="DAV:">
+  <D:prop>
+    <D:getetag/>
+  </D:prop>
+  <C:filter>
+    <C:comp-filter name="VEVENT">
+      <C:prop-filter name="SUMMARY">
+        <C:text-match collation="i;octet">Test</C:text-match>
+      </C:prop-filter>
+    </C:comp-filter>
+  </C:filter>
+</C:calendar-query>"#;
+
+    let response = TestRequest::report(&caldav_collection_path("testuser", "testcal"))
+        .xml_body(body)
+        .send(&service)
+        .await;
+
+    // Should return 207 Multi-Status (not 403 error)
+    let body_text = response.body_string();
+    response.assert_status(StatusCode::MULTI_STATUS);
+    // Should NOT contain error precondition
+    assert!(
+        !body_text.contains("supported-filter"),
+        "Response should not contain supported-filter error for valid filter"
+    );
+}
+

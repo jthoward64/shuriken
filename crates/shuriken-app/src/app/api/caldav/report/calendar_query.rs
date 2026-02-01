@@ -92,7 +92,25 @@ pub async fn handle(
         return;
     }
 
-    // Call service to execute query
+    // ## Summary
+    // Validate calendar-query filter per RFC 4791 §7.8 `supported-filter` precondition.
+    //
+    // Check that the filter only references components, properties, and parameters
+    // that the server supports. If unsupported elements are found, return 403 with
+    // the supported-filter precondition element.
+    if let Some(ref filter) = query.filter {
+        let validation_result = shuriken_rfc::rfc::validation::validate_calendar_filter(filter);
+        if !validation_result.is_valid() {
+            tracing::warn!(
+                filter_error = ?validation_result,
+                "Unsupported filter in calendar-query REPORT"
+            );
+            let error = shuriken_rfc::rfc::dav::core::PreconditionError::CalendarSupportedFilter;
+            crate::app::api::dav::response::error::write_precondition_error(res, &error);
+            return;
+        }
+    }
+
     let multistatus = match shuriken_service::caldav::service::report::execute_calendar_query(
         &mut conn,
         &resource,
