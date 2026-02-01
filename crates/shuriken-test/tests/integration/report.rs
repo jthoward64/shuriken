@@ -2756,3 +2756,141 @@ END:VCARD"#;
         "Response should not contain matching .vcf href"
     );
 }
+
+/// ## Summary
+/// Test addressbook-query N property matches family/given with unicode casemap.
+#[test_log::test(tokio::test)]
+async fn addressbook_query_collation_unicode_n_matches_family() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
+
+    let collection_id = test_db
+        .seed_collection(principal_id, CollectionType::Addressbook, "contacts", None)
+        .await
+        .expect("Failed to seed collection");
+
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "addressbook")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let vcard = r#"BEGIN:VCARD
+VERSION:4.0
+UID:n-family@example.com
+FN:Jane Doe
+N:Doe;Jane;;;
+END:VCARD"#;
+
+    TestRequest::put(&carddav_item_path("testuser", "contacts", "n-family.vcf"))
+        .if_none_match("*")
+        .vcard_body(vcard)
+        .send(&service)
+        .await
+        .assert_status(StatusCode::CREATED);
+
+    let body = r#"<?xml version="1.0" encoding="utf-8"?>
+<C:addressbook-query xmlns:C="urn:ietf:params:xml:ns:carddav" xmlns:D="DAV:">
+  <D:prop>
+    <D:getetag/>
+  </D:prop>
+  <C:filter>
+    <C:prop-filter name="N">
+      <C:text-match match-type="contains" collation="i;unicode-casemap">doe</C:text-match>
+    </C:prop-filter>
+  </C:filter>
+</C:addressbook-query>"#;
+
+    let response = TestRequest::report(&carddav_collection_path("testuser", "contacts"))
+        .xml_body(body)
+        .send(&service)
+        .await;
+
+    let response = response.assert_status(StatusCode::MULTI_STATUS);
+    let body_text = response.body_string();
+    assert!(
+        response.count_multistatus_responses() == 1,
+        "N property should match family name with unicode casemap"
+    );
+    assert!(
+        body_text.contains(".vcf</D:href>"),
+        "Response should contain matching .vcf href"
+    );
+}
+
+/// ## Summary
+/// Test addressbook-query N property with i;octet remains case-sensitive.
+#[test_log::test(tokio::test)]
+async fn addressbook_query_collation_octet_n_case_sensitive() {
+    let test_db = TestDb::new().await.expect("Failed to create test database");
+    test_db
+        .seed_default_role_permissions()
+        .await
+        .expect("Failed to seed role permissions");
+    let principal_id = test_db
+        .seed_authenticated_user()
+        .await
+        .expect("Failed to seed authenticated user");
+
+    let collection_id = test_db
+        .seed_collection(principal_id, CollectionType::Addressbook, "contacts", None)
+        .await
+        .expect("Failed to seed collection");
+
+    test_db
+        .seed_collection_owner(principal_id, collection_id, "addressbook")
+        .await
+        .expect("Failed to seed collection owner");
+
+    let service = create_db_test_service(&test_db.url()).await;
+
+    let vcard = r#"BEGIN:VCARD
+VERSION:4.0
+UID:n-octet@example.com
+FN:Jane Doe
+N:Doe;Jane;;;
+END:VCARD"#;
+
+    TestRequest::put(&carddav_item_path("testuser", "contacts", "n-octet.vcf"))
+        .if_none_match("*")
+        .vcard_body(vcard)
+        .send(&service)
+        .await
+        .assert_status(StatusCode::CREATED);
+
+    let body = r#"<?xml version="1.0" encoding="utf-8"?>
+<C:addressbook-query xmlns:C="urn:ietf:params:xml:ns:carddav" xmlns:D="DAV:">
+  <D:prop>
+    <D:getetag/>
+  </D:prop>
+  <C:filter>
+    <C:prop-filter name="N">
+      <C:text-match match-type="contains" collation="i;octet">doe</C:text-match>
+    </C:prop-filter>
+  </C:filter>
+</C:addressbook-query>"#;
+
+    let response = TestRequest::report(&carddav_collection_path("testuser", "contacts"))
+        .xml_body(body)
+        .send(&service)
+        .await;
+
+    let response = response.assert_status(StatusCode::MULTI_STATUS);
+    let body_text = response.body_string();
+    assert!(
+        response.count_multistatus_responses() == 0,
+        "N property with i;octet should be case-sensitive"
+    );
+    assert!(
+        !body_text.contains(".vcf</D:href>"),
+        "Response should not contain matching .vcf href"
+    );
+}

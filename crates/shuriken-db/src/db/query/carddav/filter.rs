@@ -3,6 +3,7 @@
 //! Implements filter logic for property-filter and text-match
 //! matching against vCard data.
 
+use crate::db::carddav_keys::{CardDavJsonKey, json_key_for_property};
 use crate::db::connection::DbConnection;
 use crate::db::query::text_match::{
     Casemap, CollationError, build_like_pattern, normalize_for_folded_compare,
@@ -841,6 +842,8 @@ fn apply_text_match_card_index(
         ),
     };
 
+    let data_key = json_key_for_property(prop_name);
+
     // Select the appropriate column or JSONB field based on property name
     Ok(match prop_name {
         "FN" => match text_match.match_type {
@@ -849,23 +852,31 @@ fn apply_text_match_card_index(
                 query.filter(sql::<Bool>(&format!("{fn_column} LIKE {pattern_expr}")))
             }
         },
-        "ORG" => match text_match.match_type {
-            MatchType::Equals => query.filter(sql::<Bool>(&format!(
-                "({data_column}->>'org') = {value_expr}"
-            ))),
-            MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => query.filter(
-                sql::<Bool>(&format!("({data_column}->>'org') LIKE {pattern_expr}")),
-            ),
+        _ => match data_key {
+            Some(CardDavJsonKey::Scalar(key)) => match text_match.match_type {
+                MatchType::Equals => query.filter(sql::<Bool>(&format!(
+                    "({data_column}->>'{key}') = {value_expr}"
+                ))),
+                MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => query.filter(
+                    sql::<Bool>(&format!("({data_column}->>'{key}') LIKE {pattern_expr}")),
+                ),
+            },
+            Some(CardDavJsonKey::Multi(keys)) => {
+                let conditions: Vec<String> = keys
+                    .iter()
+                    .map(|key| match text_match.match_type {
+                        MatchType::Equals => {
+                            format!("({data_column}->>'{key}') = {value_expr}")
+                        }
+                        MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => {
+                            format!("({data_column}->>'{key}') LIKE {pattern_expr}")
+                        }
+                    })
+                    .collect();
+                query.filter(sql::<Bool>(&conditions.join(" OR ")))
+            }
+            _ => query, // N is handled via card_index but doesn't have a dedicated column
         },
-        "TITLE" => match text_match.match_type {
-            MatchType::Equals => query.filter(sql::<Bool>(&format!(
-                "({data_column}->>'title') = {value_expr}"
-            ))),
-            MatchType::Contains | MatchType::StartsWith | MatchType::EndsWith => query.filter(
-                sql::<Bool>(&format!("({data_column}->>'title') LIKE {pattern_expr}")),
-            ),
-        },
-        _ => query, // N is handled via card_index but doesn't have a dedicated column
     })
 }
 

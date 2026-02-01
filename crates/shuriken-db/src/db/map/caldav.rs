@@ -4,9 +4,13 @@ use std::collections::HashMap;
 
 use uuid::Uuid;
 
+use crate::db::caldav_keys::{
+    insert_array, insert_number, insert_string, KEY_ATTENDEES, KEY_DESCRIPTION, KEY_LOCATION,
+    KEY_ORGANIZER, KEY_ORGANIZER_CN, KEY_SEQUENCE, KEY_STATUS, KEY_SUMMARY, KEY_TRANSP,
+};
 use crate::model::caldav::cal_index::NewCalIndex;
 use shuriken_rfc::recurrence::ical_datetime_to_utc_with_resolver;
-use shuriken_rfc::rfc::ical::core::{Component, ICalendar};
+use shuriken_rfc::rfc::ical::core::{Component, ICalendar, Value};
 use shuriken_rfc::rfc::ical::expand::TimeZoneResolver;
 
 /// ## Summary
@@ -29,6 +33,66 @@ pub fn build_cal_indexes(
     let mut indexes = Vec::new();
     build_indexes_recursive(entity_id, &ical.root, component_map, resolver, &mut indexes);
     indexes
+}
+
+#[cfg(test)]
+mod tests {
+    use super::build_cal_indexes;
+    use crate::db::caldav_keys::{
+        KEY_ATTENDEES, KEY_DESCRIPTION, KEY_LOCATION, KEY_ORGANIZER, KEY_ORGANIZER_CN,
+        KEY_SEQUENCE, KEY_STATUS, KEY_SUMMARY, KEY_TRANSP,
+    };
+    use shuriken_rfc::rfc::ical::expand::TimeZoneResolver;
+    use shuriken_rfc::rfc::ical::parse::parse;
+    use std::collections::HashMap;
+    use uuid::Uuid;
+
+    #[test]
+    fn build_cal_index_maps_metadata_keys() {
+        let ical = r#"BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Test//EN
+BEGIN:VEVENT
+UID:test-uid@example.com
+DTSTART:20260101T100000Z
+DTEND:20260101T110000Z
+SUMMARY:Planning Meeting
+LOCATION:Room 1
+DESCRIPTION:Discuss Q1 plans
+ORGANIZER;CN=Alice:mailto:alice@example.com
+SEQUENCE:3
+TRANSP:OPAQUE
+STATUS:CONFIRMED
+ATTENDEE;CN=Bob;PARTSTAT=ACCEPTED;ROLE=REQ-PARTICIPANT:mailto:bob@example.com
+END:VEVENT
+END:VCALENDAR"#;
+
+        let calendar = parse(ical).expect("ical parse");
+        let mut resolver = TimeZoneResolver::new();
+        let mut component_map = HashMap::new();
+        component_map.insert(
+            ("VEVENT".to_string(), Some("test-uid@example.com".to_string())),
+            Uuid::nil(),
+        );
+
+        let indexes = build_cal_indexes(Uuid::nil(), &calendar, &component_map, &mut resolver);
+        let metadata = indexes
+            .first()
+            .and_then(|index| index.metadata.clone())
+            .expect("metadata json");
+
+        assert_eq!(metadata[KEY_SUMMARY], "Planning Meeting");
+        assert_eq!(metadata[KEY_LOCATION], "Room 1");
+        assert_eq!(metadata[KEY_DESCRIPTION], "Discuss Q1 plans");
+        assert_eq!(metadata[KEY_ORGANIZER], "mailto:alice@example.com");
+        assert_eq!(metadata[KEY_ORGANIZER_CN], "Alice");
+        assert_eq!(metadata[KEY_SEQUENCE], 3);
+        assert_eq!(metadata[KEY_TRANSP], "OPAQUE");
+        assert_eq!(metadata[KEY_STATUS], "CONFIRMED");
+
+        let attendees = metadata[KEY_ATTENDEES].as_array().expect("attendees array");
+        assert_eq!(attendees.len(), 1);
+    }
 }
 
 /// Recursively builds index entries for a component and its children.
@@ -130,12 +194,12 @@ fn build_cal_index(
 
     // Extract SUMMARY
     if let Some(summary) = component.summary() {
-        metadata["summary"] = serde_json::Value::String(summary.to_string());
+        insert_string(&mut metadata, KEY_SUMMARY, summary.to_string());
     }
 
     // Extract LOCATION
     if let Some(location) = component.get_property("LOCATION").and_then(|p| p.as_text()) {
-        metadata["location"] = serde_json::Value::String(location.to_string());
+        insert_string(&mut metadata, KEY_LOCATION, location.to_string());
     }
 
     // Extract DESCRIPTION
@@ -143,41 +207,36 @@ fn build_cal_index(
         .get_property("DESCRIPTION")
         .and_then(|p| p.as_text())
     {
-        metadata["description"] = serde_json::Value::String(description.to_string());
+        insert_string(&mut metadata, KEY_DESCRIPTION, description.to_string());
     }
 
     // Extract ORGANIZER
-    if let Some(organizer) = component
-        .get_property("ORGANIZER")
-        .and_then(|p| p.as_text())
-    {
-        metadata["organizer"] = serde_json::Value::String(organizer.to_string());
+    if let Some(organizer_prop) = component.get_property("ORGANIZER") {
+        if let Some(organizer) = value_as_text_or_uri(&organizer_prop.value) {
+            insert_string(&mut metadata, KEY_ORGANIZER, organizer.to_string());
+        }
         // Extract CN parameter if present
-        if let Some(cn) = component
-            .get_property("ORGANIZER")
-            .and_then(|p| p.get_param_value("CN"))
-        {
-            metadata["organizer_cn"] = serde_json::Value::String(cn.to_string());
+        if let Some(cn) = organizer_prop.get_param_value("CN") {
+            insert_string(&mut metadata, KEY_ORGANIZER_CN, cn.to_string());
         }
     }
 
     // Extract SEQUENCE
     if let Some(sequence) = component
         .get_property("SEQUENCE")
-        .and_then(|p| p.as_text())
-        .and_then(|s| s.parse::<i32>().ok())
+        .and_then(|p| p.as_integer().or_else(|| p.as_text().and_then(|s| s.parse::<i32>().ok())))
     {
-        metadata["sequence"] = serde_json::Value::Number(sequence.into());
+        insert_number(&mut metadata, KEY_SEQUENCE, sequence);
     }
 
     // Extract TRANSP
     if let Some(transp) = component.get_property("TRANSP").and_then(|p| p.as_text()) {
-        metadata["transp"] = serde_json::Value::String(transp.to_string());
+        insert_string(&mut metadata, KEY_TRANSP, transp.to_string());
     }
 
     // Extract STATUS
     if let Some(status) = component.get_property("STATUS").and_then(|p| p.as_text()) {
-        metadata["status"] = serde_json::Value::String(status.to_string());
+        insert_string(&mut metadata, KEY_STATUS, status.to_string());
     }
 
     // Extract ATTENDEEs as array
@@ -185,7 +244,7 @@ fn build_cal_index(
         .get_properties("ATTENDEE")
         .iter()
         .filter_map(|att| {
-            att.as_text().map(|email| {
+            value_as_text_or_uri(&att.value).map(|email| {
                 let mut attendee = serde_json::json!({"email": email});
                 if let Some(cn) = att.get_param_value("CN") {
                     attendee["cn"] = serde_json::Value::String(cn.to_string());
@@ -201,9 +260,7 @@ fn build_cal_index(
         })
         .collect();
 
-    if !attendees.is_empty() {
-        metadata["attendees"] = serde_json::Value::Array(attendees);
-    }
+    insert_array(&mut metadata, KEY_ATTENDEES, attendees);
 
     Some(NewCalIndex {
         entity_id,
@@ -217,4 +274,12 @@ fn build_cal_index(
         rrule_text,
         metadata: Some(metadata),
     })
+}
+
+#[must_use]
+fn value_as_text_or_uri(value: &Value) -> Option<&str> {
+    match value {
+        Value::Text(text) | Value::CalAddress(text) | Value::Uri(text) => Some(text),
+        _ => None,
+    }
 }

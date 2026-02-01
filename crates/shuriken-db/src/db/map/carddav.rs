@@ -2,6 +2,10 @@
 
 use uuid::Uuid;
 
+use crate::db::carddav_keys::{
+    insert_string, insert_string_array, KEY_EMAILS, KEY_N_FAMILY, KEY_N_GIVEN, KEY_ORG,
+    KEY_PHONES, KEY_TITLE,
+};
 use crate::model::carddav::card_index::NewCardIndex;
 use shuriken_rfc::rfc::vcard::VCard;
 
@@ -21,21 +25,21 @@ pub fn build_card_index(entity_id: Uuid, vcard: &VCard) -> NewCardIndex {
     // Extract N (structured name) components
     if let Some(name) = vcard.name() {
         if let Some(family) = name.family.first() {
-            data["n_family"] = serde_json::Value::String(family.clone());
+            insert_string(&mut data, KEY_N_FAMILY, family.clone());
         }
         if let Some(given) = name.given.first() {
-            data["n_given"] = serde_json::Value::String(given.clone());
+            insert_string(&mut data, KEY_N_GIVEN, given.clone());
         }
     }
 
     // Extract ORG (organization)
     if let Some(org) = vcard.organization() {
-        data["org"] = serde_json::Value::String(org.name.clone());
+        insert_string(&mut data, KEY_ORG, org.name.clone());
     }
 
     // Extract TITLE
     if let Some(title) = vcard.title() {
-        data["title"] = serde_json::Value::String(title.to_string());
+        insert_string(&mut data, KEY_TITLE, title.to_string());
     }
 
     // Extract all EMAIL properties as array
@@ -44,10 +48,7 @@ pub fn build_card_index(entity_id: Uuid, vcard: &VCard) -> NewCardIndex {
         .into_iter()
         .map(std::string::ToString::to_string)
         .collect();
-    if !emails.is_empty() {
-        data["emails"] =
-            serde_json::Value::Array(emails.into_iter().map(serde_json::Value::String).collect());
-    }
+    insert_string_array(&mut data, KEY_EMAILS, emails);
 
     // Extract all TEL properties as array
     let phones: Vec<String> = vcard
@@ -55,15 +56,52 @@ pub fn build_card_index(entity_id: Uuid, vcard: &VCard) -> NewCardIndex {
         .into_iter()
         .map(std::string::ToString::to_string)
         .collect();
-    if !phones.is_empty() {
-        data["phones"] =
-            serde_json::Value::Array(phones.into_iter().map(serde_json::Value::String).collect());
-    }
+    insert_string_array(&mut data, KEY_PHONES, phones);
 
     NewCardIndex {
         entity_id,
         uid,
         fn_,
         data: Some(data),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::build_card_index;
+    use crate::db::carddav_keys::{
+        KEY_EMAILS, KEY_N_FAMILY, KEY_N_GIVEN, KEY_ORG, KEY_PHONES, KEY_TITLE,
+    };
+    use shuriken_rfc::rfc::vcard::parse::parse_single;
+    use uuid::Uuid;
+
+    #[test]
+    fn build_card_index_maps_json_keys_and_arrays() {
+        let vcard = r#"BEGIN:VCARD
+VERSION:4.0
+UID:test@example.com
+FN:John Doe
+N:Doe;John;;;
+ORG:Example Inc.
+TITLE:Engineer
+EMAIL:John.Doe@EXAMPLE.COM
+EMAIL:alt@example.com
+TEL:+1-555-0100
+END:VCARD"#;
+
+        let card = parse_single(vcard).expect("vCard parse");
+        let index = build_card_index(Uuid::nil(), &card);
+        let data = index.data.expect("data json");
+
+        assert_eq!(data[KEY_N_FAMILY], "Doe");
+        assert_eq!(data[KEY_N_GIVEN], "John");
+        assert_eq!(data[KEY_ORG], "Example Inc.");
+        assert_eq!(data[KEY_TITLE], "Engineer");
+
+        let emails = data[KEY_EMAILS].as_array().expect("emails array");
+        assert_eq!(emails.len(), 2);
+
+        let phones = data[KEY_PHONES].as_array().expect("phones array");
+        assert_eq!(phones.len(), 1);
     }
 }
