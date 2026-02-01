@@ -68,6 +68,42 @@ fn resolve_caldav_property(
                 not_found.push(DavProperty::empty(qname));
             }
         }
+        "max-resource-size" => {
+            // RFC 4791 §5.2.5: Maximum resource size for calendar collections
+            if let Some(coll) = collection {
+                if matches!(coll.collection_type.as_str(), "calendar") {
+                    found.push(DavProperty::xml(qname, discovery::max_resource_size()));
+                } else {
+                    not_found.push(DavProperty::empty(qname));
+                }
+            } else {
+                not_found.push(DavProperty::empty(qname));
+            }
+        }
+        "min-date-time" => {
+            // RFC 4791 §5.2.6: Minimum supported date/time for calendar collections
+            if let Some(coll) = collection {
+                if matches!(coll.collection_type.as_str(), "calendar") {
+                    found.push(DavProperty::xml(qname, discovery::min_date_time()));
+                } else {
+                    not_found.push(DavProperty::empty(qname));
+                }
+            } else {
+                not_found.push(DavProperty::empty(qname));
+            }
+        }
+        "max-date-time" => {
+            // RFC 4791 §5.2.7: Maximum supported date/time for calendar collections
+            if let Some(coll) = collection {
+                if matches!(coll.collection_type.as_str(), "calendar") {
+                    found.push(DavProperty::xml(qname, discovery::max_date_time()));
+                } else {
+                    not_found.push(DavProperty::empty(qname));
+                }
+            } else {
+                not_found.push(DavProperty::empty(qname));
+            }
+        }
         _ => {
             not_found.push(DavProperty::empty(qname));
         }
@@ -88,6 +124,21 @@ fn resolve_carddav_property(
             if let Some(coll) = collection {
                 if matches!(coll.collection_type.as_str(), "addressbook") {
                     found.push(DavProperty::xml(qname, discovery::supported_address_data()));
+                } else {
+                    not_found.push(DavProperty::empty(qname));
+                }
+            } else {
+                not_found.push(DavProperty::empty(qname));
+            }
+        }
+        "max-resource-size" => {
+            // RFC 6352 §6.2.3: Maximum resource size for addressbook collections
+            if let Some(coll) = collection {
+                if matches!(coll.collection_type.as_str(), "addressbook") {
+                    found.push(DavProperty::xml(
+                        qname,
+                        discovery::carddav_max_resource_size(),
+                    ));
                 } else {
                     not_found.push(DavProperty::empty(qname));
                 }
@@ -365,6 +416,24 @@ async fn get_properties_for_resource(
                     QName::caldav("supported-collation-set"),
                     discovery::supported_collation_set(),
                 ));
+
+                // CALDAV:max-resource-size - RFC 4791 §5.2.5
+                found.push(DavProperty::xml(
+                    QName::caldav("max-resource-size"),
+                    discovery::max_resource_size(),
+                ));
+
+                // CALDAV:min-date-time - RFC 4791 §5.2.6
+                found.push(DavProperty::xml(
+                    QName::caldav("min-date-time"),
+                    discovery::min_date_time(),
+                ));
+
+                // CALDAV:max-date-time - RFC 4791 §5.2.7
+                found.push(DavProperty::xml(
+                    QName::caldav("max-date-time"),
+                    discovery::max_date_time(),
+                ));
             }
 
             // CardDAV-specific properties
@@ -373,6 +442,12 @@ async fn get_properties_for_resource(
                 found.push(DavProperty::xml(
                     QName::carddav("supported-address-data"),
                     discovery::supported_address_data(),
+                ));
+
+                // CARDDAV:max-resource-size - RFC 6352 §6.2.3
+                found.push(DavProperty::xml(
+                    QName::carddav("max-resource-size"),
+                    discovery::carddav_max_resource_size(),
                 ));
             }
 

@@ -144,6 +144,87 @@ pub fn supported_collation_set() -> String {
         .to_string()
 }
 
+/// ## Summary
+/// Generates the `CALDAV:max-resource-size` property XML.
+///
+/// Returns an XML fragment with the maximum allowed size in bytes for a single
+/// calendar resource. This property is defined in RFC 4791 §5.2.5 and is
+/// REQUIRED for CalDAV implementations.
+///
+/// ## Side Effects
+/// None - pure function generating XML string.
+///
+/// ## Errors
+/// None - always returns valid XML.
+#[must_use]
+pub fn max_resource_size() -> String {
+    // RFC 4791 §5.2.5: Maximum resource size in bytes
+    // We allow up to 500 KB per resource (500,000 bytes)
+    r#"<C:max-resource-size xmlns:C="urn:ietf:params:xml:ns:caldav">500000</C:max-resource-size>"#
+        .to_string()
+}
+
+/// ## Summary
+/// Generates the `CALDAV:min-date-time` property XML.
+///
+/// Returns an XML fragment with the minimum supported date/time value for
+/// calendar resources. This property is defined in RFC 4791 §5.2.6 and indicates
+/// the earliest date that the server can handle reliably.
+///
+/// ## Side Effects
+/// None - pure function generating XML string.
+///
+/// ## Errors
+/// None - always returns valid XML.
+#[must_use]
+pub fn min_date_time() -> String {
+    // RFC 4791 §5.2.6: Minimum supported date/time
+    // We support dates back to 1970-01-01 (Unix epoch)
+    r#"<C:min-date-time xmlns:C="urn:ietf:params:xml:ns:caldav">19700101T000000Z</C:min-date-time>"#
+        .to_string()
+}
+
+/// ## Summary
+/// Generates the `CALDAV:max-date-time` property XML.
+///
+/// Returns an XML fragment with the maximum supported date/time value for
+/// calendar resources. This property is defined in RFC 4791 §5.2.7 and indicates
+/// the latest date that the server can handle reliably.
+///
+/// ## Side Effects
+/// None - pure function generating XML string.
+///
+/// ## Errors
+/// None - always returns valid XML.
+#[must_use]
+pub fn max_date_time() -> String {
+    // RFC 4791 §5.2.7: Maximum supported date/time
+    // We support dates up to 2147483647 (Max 32-bit signed int timestamp)
+    // Represented as: 2038-01-19 03:14:07 UTC
+    r#"<C:max-date-time xmlns:C="urn:ietf:params:xml:ns:caldav">20380119T031407Z</C:max-date-time>"#
+        .to_string()
+}
+
+/// ## Summary
+/// Generates the `CARDDAV:max-resource-size` property XML.
+///
+/// Returns an XML fragment with the maximum allowed size in bytes for a single
+/// vCard resource. This property is defined in RFC 6352 §6.2.3 and is
+/// REQUIRED for CardDAV implementations.
+///
+/// ## Side Effects
+/// None - pure function generating XML string.
+///
+/// ## Errors
+/// None - always returns valid XML.
+#[must_use]
+pub fn carddav_max_resource_size() -> String {
+    // RFC 6352 §6.2.3: Maximum resource size in bytes for vCard resources
+    // We allow up to 100 KB per vCard (100,000 bytes)
+    r#"<CR:max-resource-size xmlns:CR="urn:ietf:params:xml:ns:carddav">100000</CR:max-resource-size>"#
+        .to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -244,6 +325,46 @@ mod tests {
     }
 
     #[test]
+    fn max_resource_size_returns_valid_caldav_element() {
+        let xml = max_resource_size();
+
+        // RFC 4791 §5.2.5: Must be a number indicating max bytes
+        assert!(xml.contains("max-resource-size"));
+        assert!(xml.contains("500000"));
+        assert!(xml.contains("xmlns:C="));
+    }
+
+    #[test]
+    fn min_date_time_returns_valid_caldav_element() {
+        let xml = min_date_time();
+
+        // RFC 4791 §5.2.6: Must be a date in iCalendar format
+        assert!(xml.contains("min-date-time"));
+        assert!(xml.contains("19700101T000000Z"));
+        assert!(xml.contains("xmlns:C="));
+    }
+
+    #[test]
+    fn max_date_time_returns_valid_caldav_element() {
+        let xml = max_date_time();
+
+        // RFC 4791 §5.2.7: Must be a date in iCalendar format
+        assert!(xml.contains("max-date-time"));
+        assert!(xml.contains("20380119T031407Z"));
+        assert!(xml.contains("xmlns:C="));
+    }
+
+    #[test]
+    fn carddav_max_resource_size_returns_valid_element() {
+        let xml = carddav_max_resource_size();
+
+        // RFC 6352 §6.2.3: Must be a number indicating max bytes
+        assert!(xml.contains("max-resource-size"));
+        assert!(xml.contains("100000"));
+        assert!(xml.contains("xmlns:CR="));
+    }
+
+    #[test]
     fn all_property_generators_return_valid_xml_structure() {
         // Test that all generators return non-empty strings with basic XML structure
         let calendar_reports = supported_report_set(CollectionType::Calendar);
@@ -252,6 +373,10 @@ mod tests {
         let components = supported_calendar_component_set();
         let address_data = supported_address_data();
         let collations = supported_collation_set();
+        let max_res_size = max_resource_size();
+        let min_dt = min_date_time();
+        let max_dt = max_date_time();
+        let card_max_res_size = carddav_max_resource_size();
 
         // All should be non-empty
         assert!(!calendar_reports.is_empty());
@@ -260,6 +385,10 @@ mod tests {
         assert!(!components.is_empty());
         assert!(!address_data.is_empty());
         assert!(!collations.is_empty());
+        assert!(!max_res_size.is_empty());
+        assert!(!min_dt.is_empty());
+        assert!(!max_dt.is_empty());
+        assert!(!card_max_res_size.is_empty());
 
         // All should contain opening and closing tags (basic XML validity check)
         for xml in &[
@@ -269,6 +398,10 @@ mod tests {
             components,
             address_data,
             collations,
+            max_res_size,
+            min_dt,
+            max_dt,
+            card_max_res_size,
         ] {
             assert!(xml.contains('<'));
             assert!(xml.contains('>'));

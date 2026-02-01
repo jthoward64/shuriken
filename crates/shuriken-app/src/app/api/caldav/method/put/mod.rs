@@ -77,6 +77,22 @@ pub async fn put(req: &mut Request, res: &mut Response, depot: &Depot) {
         return;
     };
 
+    // RFC 4791 §5.3.2.1: Check Content-Type is text/calendar (supported-calendar-data)
+    let content_type = req
+        .headers()
+        .get("Content-Type")
+        .and_then(|h| h.to_str().ok())
+        .map(|s| s.to_lowercase());
+
+    if let Some(ct) = &content_type {
+        if !ct.starts_with("text/calendar") {
+            tracing::error!(content_type = %ct, "Unsupported calendar data format");
+            let error = PreconditionError::SupportedCalendarData;
+            write_precondition_error(res, &error);
+            return;
+        }
+    }
+
     // Read request body
     let body = match req.payload().await {
         Ok(bytes) => bytes.to_vec(),
@@ -178,6 +194,16 @@ pub async fn put(req: &mut Request, res: &mut Response, depot: &Depot) {
             let error = PreconditionError::ValidCalendarObjectResource(msg);
             write_precondition_error(res, &error);
         }
+        Err(PutError::UnsupportedCalendarData(msg)) => {
+            tracing::error!(message = %msg, "Unsupported calendar data format");
+            let error = PreconditionError::SupportedCalendarData;
+            write_precondition_error(res, &error);
+        }
+        Err(PutError::UnsupportedCalendarComponent(msg)) => {
+            tracing::error!(message = %msg, "Unsupported calendar component");
+            let error = PreconditionError::SupportedCalendarComponent(msg);
+            write_precondition_error(res, &error);
+        }
         Err(PutError::UidConflict(uid)) => {
             tracing::error!(uid = %uid, "UID conflict detected");
             // RFC 4791 §5.3.2.1: Return 403 with no-uid-conflict precondition
@@ -214,6 +240,32 @@ async fn perform_put(
         .map_err(|e| PutError::InvalidCalendarData(format!("not valid UTF-8: {e}")))?;
     let ical = shuriken_rfc::rfc::ical::parse::parse(ical_str)
         .map_err(|e| PutError::InvalidCalendarData(format!("invalid iCalendar: {e}")))?;
+
+    // RFC 4791 §5.3.2.1: valid-calendar-data - Check for METHOD property (not allowed)
+    if ical.root.get_property("METHOD").is_some() {
+        tracing::error!("VCALENDAR contains METHOD property (not allowed in calendar objects)");
+        return Err(PutError::InvalidCalendarData(
+            "VCALENDAR must not contain METHOD property".to_string(),
+        ));
+    }
+
+    // RFC 4791 §4.1: Check for multiple component types (only one type allowed, plus VTIMEZONE)
+    let has_event = !ical.root.events().is_empty();
+    let has_todo = !ical.root.todos().is_empty();
+    let has_journal = !ical.root.journals().is_empty();
+
+    // Ensure only one component type is present
+    let component_count = [has_event, has_todo, has_journal]
+        .iter()
+        .filter(|&&b| b)
+        .count();
+
+    if component_count > 1 {
+        tracing::error!("Calendar object contains multiple component types");
+        return Err(PutError::InvalidCalendarObjectResource(
+            "VCALENDAR cannot contain multiple component types (only VEVENT, VTODO, or VJOURNAL allowed)".to_string(),
+        ));
+    }
 
     let mut supported_components = Vec::new();
     supported_components.extend(ical.root.events());
