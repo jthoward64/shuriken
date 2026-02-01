@@ -15,14 +15,22 @@
 /// - "Email & Tasks" -> "email-tasks"
 #[must_use]
 pub fn generate_slug(name: &str) -> String {
-    name.to_lowercase()
+    let slug = name
+        .to_lowercase()
         .chars()
         .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
         .collect::<String>()
         .split('-')
         .filter(|s| !s.is_empty())
         .collect::<Vec<_>>()
-        .join("-")
+        .join("-");
+
+    // If slug is a valid uuid, prepend "res-" to avoid conflicts
+    if uuid::Uuid::parse_str(&slug).is_ok() {
+        format!("res-{slug}")
+    } else {
+        slug
+    }
 }
 
 #[cfg(test)]
@@ -60,5 +68,11 @@ mod tests {
             generate_slug("Work & Personal @ Home"),
             "work-personal-home"
         );
+    }
+
+    #[test]
+    fn test_uuid_name() {
+        let uuid_str = "550e8400-e29b-41d4-a716-446655440000";
+        assert_eq!(generate_slug(uuid_str), format!("res-{uuid_str}"));
     }
 }
