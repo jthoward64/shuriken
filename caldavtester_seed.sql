@@ -19,8 +19,8 @@ VALUES
     (uuidv7(), 'まだ', 'i18nuser', '860B3EE9-6D7C-4296-9639-E6B998074A78'::uuid)
 ON CONFLICT DO NOTHING;
 
-INSERT INTO auth_user (id, user_id, auth_source, auth_id)
-SELECT uuidv7(), u.id, 'password', :'password_hash'
+INSERT INTO auth_user (id, user_id, auth_source, auth_id, auth_credential)
+SELECT uuidv7(), u.id, 'password', u.email, :'password_hash'
 FROM "user" u
 WHERE u.principal_id IN (
     '90000000-0000-0000-0000-000000000001'::uuid,
@@ -49,8 +49,8 @@ SELECT
 FROM generate_series(1, 40) AS s(i)
 ON CONFLICT DO NOTHING;
 
-INSERT INTO auth_user (id, user_id, auth_source, auth_id)
-SELECT uuidv7(), u.id, 'password', :'password_hash'
+INSERT INTO auth_user (id, user_id, auth_source, auth_id, auth_credential)
+SELECT uuidv7(), u.id, 'password', u.email, :'password_hash'
 FROM "user" u
 WHERE u.principal_id >= '10000000-0000-0000-0000-000000000001'::uuid
   AND u.principal_id <= '10000000-0000-0000-0000-000000000040'::uuid
@@ -75,8 +75,8 @@ SELECT
 FROM generate_series(1, 10) AS s(i)
 ON CONFLICT DO NOTHING;
 
-INSERT INTO auth_user (id, user_id, auth_source, auth_id)
-SELECT uuidv7(), u.id, 'password', :'password_hash'
+INSERT INTO auth_user (id, user_id, auth_source, auth_id, auth_credential)
+SELECT uuidv7(), u.id, 'password', u.email, :'password_hash'
 FROM "user" u
 WHERE u.principal_id >= '50000000-0000-0000-0000-000000000001'::uuid
   AND u.principal_id <= '50000000-0000-0000-0000-000000000010'::uuid

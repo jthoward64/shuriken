@@ -998,11 +998,19 @@ impl TestDb {
                 .map(|row| row.tablename)
                 .collect();
 
-        // Truncate all tables
+        // Truncate all tables except casbin_rule
         for table in tables {
+            if table == "casbin_rule" {
+                continue;
+            }
             let truncate_sql = format!("TRUNCATE TABLE \"{table}\" CASCADE");
             diesel::sql_query(&truncate_sql).execute(&mut conn).await?;
         }
+
+        // Delete all 'p' rows from casbin_rule (leaving the g2 rows added by the migration files intact)
+        diesel::sql_query("DELETE FROM casbin_rule WHERE ptype = 'p'")
+            .execute(&mut conn)
+            .await?;
 
         Ok(())
     }
@@ -2036,7 +2044,6 @@ impl TestDb {
 
         diesel::insert_into(casbin_rule::table)
             .values((
-                casbin_rule::id.eq(next_casbin_rule_id()),
                 casbin_rule::ptype.eq("p"),
                 casbin_rule::v0.eq(subject),
                 casbin_rule::v1.eq(path),
@@ -2066,7 +2073,6 @@ impl TestDb {
 
         diesel::insert_into(casbin_rule::table)
             .values((
-                casbin_rule::id.eq(next_casbin_rule_id()),
                 casbin_rule::ptype.eq("g2"),
                 casbin_rule::v0.eq(role),
                 casbin_rule::v1.eq(permission),

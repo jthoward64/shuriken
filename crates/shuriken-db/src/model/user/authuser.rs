@@ -11,6 +11,7 @@ pub struct AuthUser {
     pub auth_id: String,
     pub user_id: uuid::Uuid,
     pub updated_at: chrono::DateTime<chrono::Utc>,
+    pub auth_credential: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Insertable)]
@@ -19,4 +20,5 @@ pub struct NewAuthUser {
     pub auth_source: String,
     pub auth_id: String,
     pub user_id: uuid::Uuid,
+    pub auth_credential: Option<String>,
 }

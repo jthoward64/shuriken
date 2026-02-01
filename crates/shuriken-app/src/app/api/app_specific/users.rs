@@ -254,7 +254,8 @@ async fn create_user_handler(req: &mut Request, depot: &mut Depot, res: &mut Res
     // Create auth_user with password hash
     let new_auth_user = NewAuthUser {
         auth_source: "password".to_string(),
-        auth_id: password_hash,
+        auth_id: user.email.clone(),
+        auth_credential: Some(password_hash),
         user_id: user.id,
     };
 
@@ -463,7 +464,7 @@ async fn update_password_handler(req: &mut Request, depot: &mut Depot, res: &mut
     let updated_rows = match diesel::update(schema::auth_user::table)
         .filter(schema::auth_user::user_id.eq(target_user_id))
         .filter(schema::auth_user::auth_source.eq("password"))
-        .set(schema::auth_user::auth_id.eq(&password_hash))
+        .set(schema::auth_user::auth_credential.eq(&password_hash))
         .execute(&mut conn)
         .await
     {
@@ -482,8 +483,9 @@ async fn update_password_handler(req: &mut Request, depot: &mut Depot, res: &mut
         // No auth_user record exists with auth_source="password", create one
         let new_auth_user = NewAuthUser {
             auth_source: "password".to_string(),
-            auth_id: password_hash,
+            auth_id: target_user.email.clone(),
             user_id: target_user_id,
+            auth_credential: Some(password_hash),
         };
 
         if let Err(e) = diesel::insert_into(schema::auth_user::table)

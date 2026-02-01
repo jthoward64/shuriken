@@ -179,6 +179,8 @@ async fn authenticate_basic_auth(
         .optional()?
         .ok_or(ServiceError::NotAuthenticated)?;
 
+    tracing::debug!(user_id = %user.id, user_email = %user.email, "User found for Basic Auth");
+
     // Look up auth_user entry with source "password"
     let auth_user = schema::auth_user::table
         .filter(schema::auth_user::user_id.eq(user.id))
@@ -187,10 +189,20 @@ async fn authenticate_basic_auth(
         .first::<AuthUser>(conn)
         .await
         .optional()?
+        .ok_or_else(|| {
+            tracing::warn!(user_id = %user.id, user_email = %user.email, "No auth_user entry found for Basic Auth");
+            ServiceError::NotAuthenticated
+        })?;
+
+    tracing::debug!(user_id = %user.id, "Found auth_user entry for Basic Auth");
+
+    // Verify password (auth_credential contains the Argon2 hash)
+    let password_hash = auth_user
+        .auth_credential
+        .as_ref()
         .ok_or(ServiceError::NotAuthenticated)?;
 
-    // Verify password (auth_id contains the Argon2 hash)
-    crate::auth::password::verify_password(password, &auth_user.auth_id)?;
+    crate::auth::password::verify_password(password, password_hash)?;
 
     tracing::info!(user_id = %user.id, user_email = %user.email, "User authenticated via basic auth");
 

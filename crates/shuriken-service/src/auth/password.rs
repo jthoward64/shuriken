@@ -34,6 +34,8 @@ pub fn verify_password(password: &str, password_hash: &str) -> ServiceResult<()>
 
     let argon2 = Argon2::default();
 
+    tracing::debug!("Verifying password ({password}) against hash ({password_hash})");
+
     argon2
         .verify_password(password.as_bytes(), &parsed_hash)
         .map_err(|err| {
