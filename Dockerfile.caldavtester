@@ -6,4 +6,5 @@ RUN git clone https://github.com/apple/ccs-caldavtester.git
 WORKDIR /app/ccs-caldavtester
 RUN pip install -r requirements.txt
 
-CMD ["python", "testcaldav.py"]
+ENTRYPOINT ["python", "testcaldav.py"]
+CMD []

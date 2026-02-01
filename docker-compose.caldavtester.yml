@@ -3,5 +3,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.caldavtester
+    network_mode: host
     volumes:
       - ./caldavtestconfig.xml:/app/ccs-caldavtester/scripts/server/serverinfo.xml:ro
