@@ -94,7 +94,10 @@ impl<T: ParseSized + Ord> Ord for NormalizedValue<T> {
             // If both are parsed successfully, compare the parsed values
             (Some(a), Some(b)) => a.cmp(b),
             // If neither is parsed (both unknown), compare original strings case-insensitively
-            (None, None) => self.original.to_ascii_lowercase().cmp(&other.original.to_ascii_lowercase()),
+            (None, None) => self
+                .original
+                .to_ascii_lowercase()
+                .cmp(&other.original.to_ascii_lowercase()),
             // Parsed values come before unparsed ones
             (Some(_), None) => std::cmp::Ordering::Less,
             (None, Some(_)) => std::cmp::Ordering::Greater,

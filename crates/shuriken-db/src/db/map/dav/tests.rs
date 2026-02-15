@@ -173,7 +173,7 @@ fn test_vcard_to_db_models_simple() {
             VCardProperty {
                 group: None,
                 name: VCardPropertyNameValue::new("FN"),
-                params: vec[],
+                params: vec![],
                 value: VCardValue::Text("John Doe".to_string()),
                 raw_value: "John Doe".to_string(),
             },
