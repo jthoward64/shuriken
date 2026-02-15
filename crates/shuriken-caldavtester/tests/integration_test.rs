@@ -6,7 +6,6 @@
 use shuriken_caldavtester::config;
 use shuriken_caldavtester::runner::{ServerConfig, TestRunner};
 use shuriken_caldavtester::xml;
-use std::path::Path;
 
 /// Verify that every listed test file can be parsed successfully.
 ///

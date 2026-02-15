@@ -22,6 +22,7 @@ serde = { workspace = true }
 
 # Logging
 tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
 
 # Other workspace dependencies
 shuriken-core = { path = "../shuriken-core" }
@@ -31,4 +32,3 @@ shuriken-service = { path = "../shuriken-service" }
 
 [dev-dependencies]
 test-log = { workspace = true }
-tracing-subscriber = { workspace = true }

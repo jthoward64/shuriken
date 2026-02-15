@@ -13,7 +13,6 @@
 
 use shuriken_caldavtester::config;
 use shuriken_caldavtester::runner::{ServerConfig, TestRunner};
-use std::path::PathBuf;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -65,10 +64,7 @@ async fn main() -> anyhow::Result<()> {
         match runner.run_test_file(&path).await {
             Ok(results) => {
                 let marker = if results.all_passed() { "OK" } else { "FAIL" };
-                println!(
-                    "  [{marker}] {} — {results}",
-                    entry.path,
-                );
+                println!("  [{marker}] {} — {results}", entry.path,);
                 total.add(&results);
             }
             Err(e) => {

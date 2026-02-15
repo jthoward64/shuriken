@@ -25,7 +25,7 @@
 //!
 //! #[tokio::main]
 //! async fn main() -> anyhow::Result<()> {
-//!     let runner = TestRunner::new().await?;
+//!     let mut runner = TestRunner::new()?;
 //!     runner.run_test_file("test-suite/tests/CalDAV/get.xml").await?;
 //!     Ok(())
 //! }
