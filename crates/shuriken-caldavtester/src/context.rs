@@ -60,6 +60,10 @@ impl TestContext {
             "/{DAV:}multistatus/{DAV:}response",
         );
         self.set(
+            "$verify-bad-response:",
+            "/{DAV:}multistatus/{DAV:}response/{DAV:}propstat/{DAV:}status",
+        );
+        self.set(
             "$multistatus-href-prefix:",
             "/{DAV:}multistatus/{DAV:}response/{DAV:}href",
         );

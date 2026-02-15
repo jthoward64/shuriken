@@ -131,14 +131,9 @@ fn parse_calendar_query(xml: &[u8]) -> ParseResult<ReportRequest> {
                         }
                     }
                     "calendar-data" if in_prop => {
-                        let (property, calendar_data_expand) =
+                        let (property, _calendar_data_expand) =
                             parse_calendar_data_property(&mut reader, &mut buf, &namespaces)?;
                         properties.push(property);
-                        if expand.is_none()
-                            && let Some(expand_from_calendar_data) = calendar_data_expand
-                        {
-                            expand = Some(expand_from_calendar_data);
-                        }
                     }
                     _ if in_prop && !in_filter => {
                         let qname = resolve_qname(e, &namespaces)?;
