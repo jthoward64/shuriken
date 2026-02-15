@@ -164,11 +164,14 @@ fn parse_args() -> (bool, bool, bool, bool, usize, usize, usize, Vec<String>) {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let log_filter = std::env::var("CALDAV_TEST_LOG").unwrap_or_else(|_| "off".to_string());
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("error")),
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new(log_filter)),
         )
+        .with_target(false)
+        .without_time()
         .init();
 
     let (

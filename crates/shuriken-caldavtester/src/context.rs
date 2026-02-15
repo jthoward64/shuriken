@@ -63,7 +63,7 @@ impl TestContext {
 
         // ── User 1 (default auth) ────────────────────────────────────────
         self.set("$userid1:", "user01");
-        self.set("$pswd1:", "user01");
+        self.set("$pswd1:", "password");
         self.set("$email1:", "user01@example.com");
         self.set("$cuaddr1:", "mailto:user01@example.com");
         self.set("$userguid1:", "10000000-0000-0000-0000-000000000001");
@@ -81,7 +81,7 @@ impl TestContext {
 
         // ── User 2 ──────────────────────────────────────────────────────
         self.set("$userid2:", "user02");
-        self.set("$pswd2:", "user02");
+        self.set("$pswd2:", "password");
         self.set("$email2:", "user02@example.com");
         self.set("$cuaddr2:", "mailto:user02@example.com");
         self.set("$userguid2:", "10000000-0000-0000-0000-000000000002");
@@ -98,7 +98,7 @@ impl TestContext {
 
         // ── User 3 ──────────────────────────────────────────────────────
         self.set("$userid3:", "user03");
-        self.set("$pswd3:", "user03");
+        self.set("$pswd3:", "password");
         self.set("$email3:", "user03@example.com");
         self.set("$cuaddr3:", "mailto:user03@example.com");
         self.set("$userguid3:", "10000000-0000-0000-0000-000000000003");
@@ -116,7 +116,7 @@ impl TestContext {
             let uid = format!("user{i:02}");
             let guid = format!("10000000-0000-0000-0000-0000000000{i:02}");
             self.set(&format!("$userid{i}:"), &uid);
-            self.set(&format!("$pswd{i}:"), &uid);
+            self.set(&format!("$pswd{i}:"), "password");
             self.set(&format!("$email{i}:"), &format!("{uid}@example.com"));
             self.set(
                 &format!("$cuaddr{i}:"),

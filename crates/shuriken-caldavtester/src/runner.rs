@@ -407,8 +407,14 @@ impl TestRunner {
     async fn execute_request_network(&self, request: &TestRequest) -> Result<Response> {
         let url = match &request.ruri {
             Some(ruri) => {
-                let path = self.context.substitute(ruri);
-                format!("{}{path}", self.config.base_url)
+                let target = self.context.substitute(ruri);
+                if let Ok(absolute) = reqwest::Url::parse(&target) {
+                    absolute.to_string()
+                } else {
+                    let normalized = normalize_in_process_target(&target);
+                    let rewritten = rewrite_apple_dav_path(&normalized);
+                    format!("{}{rewritten}", self.config.base_url)
+                }
             }
             None => self.config.base_url.clone(),
         };
@@ -436,13 +442,9 @@ impl TestRunner {
                 req_builder = req_builder.basic_auth(user, Some(password));
             }
             None => {
-                // Default: use user01/user01 basic auth
-                let user = self
-                    .context
-                    .get("$userid1:")
-                    .unwrap_or("user01")
-                    .to_string();
-                let password = self.context.get("$pswd1:").unwrap_or("user01").to_string();
+                // Default credentials can be overridden via env vars, and align
+                // with seeded caldavtester fixtures (`password`).
+                let (user, password) = default_basic_credentials(&self.context);
                 req_builder = req_builder.basic_auth(user, Some(password));
             }
         }
@@ -480,11 +482,13 @@ impl TestRunner {
         request: &TestRequest,
         service: &salvo::Service,
     ) -> Result<Response> {
-        let path = request
+        let request_target = request
             .ruri
             .as_deref()
             .map_or_else(|| "/".to_string(), |ruri| self.context.substitute(ruri));
-        let url = format!("http://127.0.0.1:5800{path}");
+        let normalized_path = normalize_in_process_target(&request_target);
+        let rewritten_path = rewrite_apple_dav_path(&normalized_path);
+        let url = format!("http://127.0.0.1:5800{rewritten_path}");
 
         let method =
             SalvoMethod::from_bytes(request.method.as_bytes()).map_err(Error::InvalidMethod)?;
@@ -511,12 +515,7 @@ impl TestRunner {
                 );
             }
             None => {
-                let user = self
-                    .context
-                    .get("$userid1:")
-                    .unwrap_or("user01")
-                    .to_string();
-                let password = self.context.get("$pswd1:").unwrap_or("user01").to_string();
+                let (user, password) = default_basic_credentials(&self.context);
                 req_builder = req_builder.add_header(
                     AUTHORIZATION,
                     basic_auth_header(&user, &password),
@@ -642,6 +641,71 @@ fn basic_auth_header(user: &str, password: &str) -> String {
     let credentials = format!("{user}:{password}");
     let encoded = base64::engine::general_purpose::STANDARD.encode(credentials);
     format!("Basic {encoded}")
+}
+
+fn normalize_in_process_target(target: &str) -> String {
+    if let Ok(url) = reqwest::Url::parse(target) {
+        let mut path = url.path().to_string();
+        if path.is_empty() {
+            path.push('/');
+        }
+        if let Some(query) = url.query() {
+            path.push('?');
+            path.push_str(query);
+        }
+        return path;
+    }
+
+    if target.starts_with('/') {
+        target.to_string()
+    } else {
+        format!("/{target}")
+    }
+}
+
+fn default_basic_credentials(context: &TestContext) -> (String, String) {
+    let user = context
+        .get("$userid1:")
+        .map(str::to_string)
+        .or_else(|| std::env::var("CALDAV_TEST_DEFAULT_USER").ok())
+        .unwrap_or_else(|| "user01".to_string());
+
+    let password = context
+        .get("$pswd1:")
+        .map(str::to_string)
+        .or_else(|| std::env::var("CALDAV_TEST_DEFAULT_PASSWORD").ok())
+        .unwrap_or_else(|| "password".to_string());
+
+    (user, password)
+}
+
+fn rewrite_apple_dav_path(target: &str) -> String {
+    let (path, query) = match target.split_once('?') {
+        Some((path, query)) => (path, Some(query)),
+        None => (target, None),
+    };
+
+    let rewritten_path = if let Some(rest) = path.strip_prefix("/dav/calendars/") {
+        format!("/api/dav/cal/{rest}")
+    } else if let Some(rest) = path.strip_prefix("/dav/addressbooks/") {
+        format!("/api/dav/card/{rest}")
+    } else if let Some(rest) = path.strip_prefix("/dav/principals/") {
+        let rest = rest
+            .strip_prefix("users/")
+            .or_else(|| rest.strip_prefix("groups/"))
+            .unwrap_or(rest);
+        format!("/api/dav/principal/{rest}")
+    } else if path == "/dav" || path == "/dav/" {
+        "/api/dav/".to_string()
+    } else {
+        path.to_string()
+    };
+
+    if let Some(query) = query {
+        format!("{rewritten_path}?{query}")
+    } else {
+        rewritten_path
+    }
 }
 
 #[cfg(test)]
