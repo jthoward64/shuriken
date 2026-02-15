@@ -37,4 +37,5 @@ pub struct NewDavCollection<'a> {
     pub description: Option<&'a str>,
     pub timezone_tzid: Option<&'a str>,
     pub slug: &'a str,
+    pub parent_collection_id: Option<uuid::Uuid>,
 }

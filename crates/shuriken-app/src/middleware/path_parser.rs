@@ -271,6 +271,28 @@ async fn resolve_collection_hierarchy(
         if let Some(c) = found {
             current_parent = Some(c.id);
             resolved_chain.push(c);
+            continue;
+        }
+
+        // Fallback: some deployments enforce owner-wide unique slugs, so the
+        // resource may exist without the expected parent linkage.
+        let fallback = dav_collection::table
+            .filter(dav_collection::owner_principal_id.eq(principal.id))
+            .filter(dav_collection::slug.eq(slug.as_str()))
+            .filter(dav_collection::deleted_at.is_null())
+            .select(DavCollection::as_select())
+            .first(conn)
+            .await
+            .optional()?;
+
+        if let Some(c) = fallback {
+            tracing::debug!(
+                slug = %slug,
+                collection_id = %c.id,
+                "Resolved collection via owner-level fallback (parent linkage missing)"
+            );
+            current_parent = Some(c.id);
+            resolved_chain.push(c);
         } else {
             // Collection not found - stop here and return partial chain
             break;

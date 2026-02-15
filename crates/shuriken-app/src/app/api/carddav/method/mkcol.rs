@@ -11,6 +11,7 @@ use crate::app::api::dav::util::{build_full_url, owner_principal_id_from_subject
 use shuriken_rfc::rfc::dav::parse::{MkcolRequest, parse_mkcol};
 use shuriken_service::auth::{
     Action, PathSegment, ResourceIdentifier, ResourceLocation, get_resolved_location_from_depot,
+    get_terminal_collection_from_depot,
 };
 use shuriken_service::dav::service::collection::{CreateCollectionContext, create_collection};
 use shuriken_service::error::ServiceError;
@@ -119,6 +120,10 @@ pub async fn mkcol_extended(req: &mut Request, res: &mut Response, depot: &Depot
         }
     };
 
+    let parent_collection_id = get_terminal_collection_from_depot(depot)
+        .ok()
+        .map(|collection| collection.id);
+
     // Create collection context
     let ctx = CreateCollectionContext {
         owner_principal_id,
@@ -126,6 +131,7 @@ pub async fn mkcol_extended(req: &mut Request, res: &mut Response, depot: &Depot
         collection_type: shuriken_db::db::enums::CollectionType::Addressbook,
         displayname: parsed_request.displayname,
         description: parsed_request.description,
+        parent_collection_id,
     };
 
     // Create the addressbook collection

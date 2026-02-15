@@ -51,6 +51,22 @@ pub fn by_slug_and_principal(
 }
 
 /// ## Summary
+/// Returns a query to find a collection by slug, principal, and parent collection.
+#[must_use]
+pub fn by_slug_principal_and_parent(
+    slug: &str,
+    principal_id: uuid::Uuid,
+    parent_collection_id: Option<uuid::Uuid>,
+) -> dav_collection::BoxedQuery<'_, diesel::pg::Pg> {
+    let query = by_slug_and_principal(slug, principal_id);
+    if let Some(parent_id) = parent_collection_id {
+        query.filter(dav_collection::parent_collection_id.eq(parent_id))
+    } else {
+        query.filter(dav_collection::parent_collection_id.is_null())
+    }
+}
+
+/// ## Summary
 /// Legacy: Returns a query to find a collection by URI and principal (now uses slug extraction).
 ///
 /// For compatibility during migration, extracts the slug from the URI path.

@@ -162,6 +162,24 @@ fn parse_args() -> (bool, bool, bool, bool, usize, usize, usize, Vec<String>) {
     )
 }
 
+fn ensure_in_process_auth_defaults() {
+    if std::env::var("DATABASE_URL").is_err() {
+        std::env::set_var(
+            "DATABASE_URL",
+            "postgres://shuriken:shuriken@localhost:4525/shuriken_caldavtester",
+        );
+    }
+    if std::env::var("AUTH_METHOD").is_err() {
+        std::env::set_var("AUTH_METHOD", "basic_auth");
+    }
+    if std::env::var("CALDAV_TEST_DEFAULT_USER").is_err() {
+        std::env::set_var("CALDAV_TEST_DEFAULT_USER", "user01");
+    }
+    if std::env::var("CALDAV_TEST_DEFAULT_PASSWORD").is_err() {
+        std::env::set_var("CALDAV_TEST_DEFAULT_PASSWORD", "password");
+    }
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let log_filter = std::env::var("CALDAV_TEST_LOG").unwrap_or_else(|_| "off".to_string());
@@ -196,6 +214,10 @@ async fn main() -> anyhow::Result<()> {
     } else {
         true
     };
+
+    if in_process {
+        ensure_in_process_auth_defaults();
+    }
 
     let base_url = std::env::var("CALDAV_TEST_BASE_URL")
         .unwrap_or_else(|_| "http://localhost:8698".to_string());

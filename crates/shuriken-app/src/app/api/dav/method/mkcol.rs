@@ -9,6 +9,7 @@ use shuriken_rfc::rfc::dav::parse::{MkcolRequest, parse_mkcol};
 use shuriken_service::auth::{Action, get_resolved_location_from_depot};
 use shuriken_service::dav::service::collection::{CreateCollectionContext, create_collection};
 use shuriken_service::error::ServiceError;
+use shuriken_service::auth::get_terminal_collection_from_depot;
 
 /// ## Summary
 /// Handles MKCOL requests to create WebDAV collections.
@@ -151,6 +152,10 @@ pub async fn mkcol(req: &mut Request, res: &mut Response, depot: &Depot) {
         }
     };
 
+    let parent_collection_id = get_terminal_collection_from_depot(depot)
+        .ok()
+        .map(|collection| collection.id);
+
     // Create collection context
     let ctx = CreateCollectionContext {
         owner_principal_id,
@@ -158,6 +163,7 @@ pub async fn mkcol(req: &mut Request, res: &mut Response, depot: &Depot) {
         collection_type,
         displayname: parsed_request.displayname,
         description: parsed_request.description,
+        parent_collection_id,
     };
 
     // Create the collection

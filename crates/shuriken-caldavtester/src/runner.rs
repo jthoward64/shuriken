@@ -689,6 +689,12 @@ fn rewrite_apple_dav_path(target: &str) -> String {
         "/api/dav/cal/".to_string()
     } else if path == "/.well-known/carddav" || path == "/.well-known/carddav/" {
         "/api/dav/card/".to_string()
+    } else if path == "/dav/calendars" || path == "/dav/calendars/" {
+        "/api/dav/cal/".to_string()
+    } else if path == "/dav/addressbooks" || path == "/dav/addressbooks/" {
+        "/api/dav/card/".to_string()
+    } else if path == "/dav/principals" || path == "/dav/principals/" {
+        "/api/dav/principal/".to_string()
     } else if let Some(rest) = path.strip_prefix("/dav/calendars/") {
         format!("/api/dav/cal/{rest}")
     } else if let Some(rest) = path.strip_prefix("/dav/addressbooks/") {
@@ -715,12 +721,37 @@ fn rewrite_apple_dav_path(target: &str) -> String {
 }
 
 fn rewrite_home_aliases(path: &str) -> String {
+    let default_user = std::env::var("CALDAV_TEST_DEFAULT_USER")
+        .ok()
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| "user01".to_string());
+
     if path == "/api/dav/principal/" || path == "/api/dav/principal" {
-        let default_user = std::env::var("CALDAV_TEST_DEFAULT_USER")
-            .ok()
-            .filter(|v| !v.is_empty())
-            .unwrap_or_else(|| "user01".to_string());
         return format!("/api/dav/principal/{default_user}/");
+    }
+
+    if path == "/api/dav/cal/" || path == "/api/dav/cal" {
+        return format!("/api/dav/cal/{default_user}/calendar/");
+    }
+
+    if path == "/api/dav/card/" || path == "/api/dav/card" {
+        return format!("/api/dav/card/{default_user}/addressbook/");
+    }
+
+    if let Some(rest) = path.strip_prefix("/api/dav/cal/users/") {
+        return rewrite_user_hierarchy(rest, "cal");
+    }
+
+    if let Some(rest) = path.strip_prefix("/api/dav/card/users/") {
+        return rewrite_user_hierarchy(rest, "card");
+    }
+
+    if let Some(rest) = path.strip_prefix("/api/dav/cal/__uids__/") {
+        return rewrite_user_hierarchy(rest, "cal");
+    }
+
+    if let Some(rest) = path.strip_prefix("/api/dav/card/__uids__/") {
+        return rewrite_user_hierarchy(rest, "card");
     }
 
     if let Some(rest) = path.strip_prefix("/api/dav/cal/") {
@@ -744,6 +775,28 @@ fn rewrite_home_aliases(path: &str) -> String {
     }
 
     path.to_string()
+}
+
+fn rewrite_user_hierarchy(rest: &str, kind: &str) -> String {
+    let segments: Vec<&str> = rest.trim_matches('/').split('/').collect();
+    if segments.is_empty() || segments[0].is_empty() {
+        return format!("/api/dav/{kind}/");
+    }
+
+    let user = segments[0];
+    let base = if kind == "cal" {
+        "calendar"
+    } else {
+        "addressbook"
+    };
+
+    match segments.len() {
+        1 => format!("/api/dav/{kind}/{user}/{base}/"),
+        _ => {
+            let suffix = segments[1..].join("/");
+            format!("/api/dav/{kind}/{user}/{base}/{suffix}")
+        }
+    }
 }
 
 #[cfg(test)]

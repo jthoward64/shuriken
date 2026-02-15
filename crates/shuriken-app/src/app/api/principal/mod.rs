@@ -18,10 +18,10 @@ pub mod method;
 /// Returns an error if route setup fails.
 pub fn routes() -> anyhow::Result<Router> {
     Ok(Router::with_path("principal/{**rest}")
-        .push(dav::routes())
         .push(
             Router::new()
                 .filter(MethodFilter(Method::from_bytes(b"PROPFIND")?))
                 .goal(method::propfind::principal_propfind),
-        ))
+        )
+        .push(dav::routes()))
 }

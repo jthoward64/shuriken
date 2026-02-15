@@ -3,6 +3,24 @@ use shuriken_caldavtester::runner::{ServerConfig, TestRunner};
 use shuriken_caldavtester::server;
 use std::sync::Arc;
 
+fn ensure_in_process_auth_defaults() {
+    if std::env::var("DATABASE_URL").is_err() {
+        std::env::set_var(
+            "DATABASE_URL",
+            "postgres://shuriken:shuriken@localhost:4525/shuriken_caldavtester",
+        );
+    }
+    if std::env::var("AUTH_METHOD").is_err() {
+        std::env::set_var("AUTH_METHOD", "basic_auth");
+    }
+    if std::env::var("CALDAV_TEST_DEFAULT_USER").is_err() {
+        std::env::set_var("CALDAV_TEST_DEFAULT_USER", "user01");
+    }
+    if std::env::var("CALDAV_TEST_DEFAULT_PASSWORD").is_err() {
+        std::env::set_var("CALDAV_TEST_DEFAULT_PASSWORD", "password");
+    }
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
@@ -45,6 +63,10 @@ async fn main() -> anyhow::Result<()> {
     } else {
         true
     };
+
+    if in_process {
+        ensure_in_process_auth_defaults();
+    }
 
     let suite_dir = config::test_suite_dir();
     let tests_dir = suite_dir.join("tests");

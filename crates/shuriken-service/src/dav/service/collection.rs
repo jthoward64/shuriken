@@ -22,6 +22,8 @@ pub struct CreateCollectionContext {
     pub displayname: Option<String>,
     /// Optional description.
     pub description: Option<String>,
+    /// Optional parent collection ID for nested collections.
+    pub parent_collection_id: Option<uuid::Uuid>,
 }
 
 /// Result of a collection creation operation.
@@ -53,6 +55,7 @@ pub async fn create_collection(
     let collection_type = ctx.collection_type;
     let displayname = ctx.displayname.clone();
     let description = ctx.description.clone();
+    let parent_collection_id = ctx.parent_collection_id;
 
     conn.transaction::<_, ServiceError, _>(move |tx| {
         let slug = slug.clone();
@@ -62,7 +65,11 @@ pub async fn create_collection(
         async move {
             // Check if collection already exists with same slug and owner
             let existing: Option<DavCollection> =
-                collection::by_slug_and_principal(&slug, owner_principal_id)
+                collection::by_slug_principal_and_parent(
+                    &slug,
+                    owner_principal_id,
+                    parent_collection_id,
+                )
                     .first(tx)
                     .await
                     .optional()
@@ -81,6 +88,7 @@ pub async fn create_collection(
                 description: description.as_deref(),
                 timezone_tzid: None,
                 slug: &slug,
+                parent_collection_id,
             };
 
             let created = collection::create_collection(tx, &new_collection)
