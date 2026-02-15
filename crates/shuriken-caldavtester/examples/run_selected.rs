@@ -10,12 +10,25 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
 
-    let selected: Vec<String> = std::env::args().skip(1).collect();
+    let mut strict_callbacks = false;
+    let mut selected = Vec::new();
+    for arg in std::env::args().skip(1) {
+        if arg == "--strict-callbacks" {
+            strict_callbacks = true;
+        } else {
+            selected.push(arg);
+        }
+    }
+
     if selected.is_empty() {
         eprintln!(
-            "usage: cargo run -p shuriken-caldavtester --example run_selected -- <CalDAV/file1.xml> [CalDAV/file2.xml ...]"
+            "usage: cargo run -p shuriken-caldavtester --example run_selected -- [--strict-callbacks] <CalDAV/file1.xml> [CalDAV/file2.xml ...]"
         );
         std::process::exit(2);
+    }
+
+    if strict_callbacks {
+        std::env::set_var("CALDAV_TEST_STRICT_CALLBACKS", "1");
     }
 
     let base_url = std::env::var("CALDAV_TEST_BASE_URL")

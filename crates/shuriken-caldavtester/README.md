@@ -60,6 +60,10 @@ cargo run -p shuriken-caldavtester --example run_tests
 ```bash
 cargo run -p shuriken-caldavtester --example run_selected -- \
     CalDAV/freebusy.xml CalDAV/acl.xml
+
+# Same run, but fail on any unknown callback
+cargo run -p shuriken-caldavtester --example run_selected -- \
+    --strict-callbacks CalDAV/freebusy.xml CalDAV/acl.xml
 ```
 
 ### Variable Substitution

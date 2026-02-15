@@ -518,7 +518,7 @@ fn map_method(method: &str) -> Result<reqwest::Method> {
         "OPTIONS" => Ok(reqwest::Method::OPTIONS),
         "PATCH" => Ok(reqwest::Method::PATCH),
         // WebDAV methods
-        other => reqwest::Method::from_bytes(other.as_bytes()).map_err(|e| Error::InvalidMethod(e)),
+        other => reqwest::Method::from_bytes(other.as_bytes()).map_err(Error::InvalidMethod),
     }
 }
 

@@ -6,6 +6,9 @@ use quick_xml::events::Event;
 use quick_xml::Reader;
 use std::collections::HashMap;
 
+type PropertyMap = HashMap<String, Option<String>>;
+type PropstatMap = HashMap<u16, PropertyMap>;
+
 /// A parsed `<DAV:response>` element from a multistatus body.
 #[derive(Debug, Clone)]
 pub struct MultistatusResponse {
@@ -15,7 +18,7 @@ pub struct MultistatusResponse {
     pub status: Option<String>,
     /// Properties grouped by their propstat HTTP status code.
     /// Key: status code (e.g., 200, 404). Value: map of `{ns}localname` → serialized value.
-    pub propstats: HashMap<u16, HashMap<String, Option<String>>>,
+    pub propstats: PropstatMap,
 }
 
 /// Parse all `<response>` elements from a `DAV:multistatus` XML body.
@@ -54,7 +57,7 @@ fn parse_response_element(
 ) -> Result<MultistatusResponse, String> {
     let mut href = String::new();
     let mut status = None;
-    let mut propstats: HashMap<u16, HashMap<String, Option<String>>> = HashMap::new();
+    let mut propstats: PropstatMap = HashMap::new();
     let mut depth = 1u32;
     let mut text_buf = String::new();
 
@@ -117,10 +120,10 @@ fn parse_response_element(
 fn parse_propstat_element(
     reader: &mut Reader<&[u8]>,
     buf: &mut Vec<u8>,
-) -> Result<(u16, HashMap<String, Option<String>>), String> {
+) -> Result<(u16, PropertyMap), String> {
     let mut status_code = 200u16;
     let mut status_text;
-    let mut props: HashMap<String, Option<String>> = HashMap::new();
+    let mut props: PropertyMap = HashMap::new();
     let mut depth = 1u32;
     let mut text_buf = String::new();
 
@@ -351,10 +354,7 @@ fn well_known_ns(prefix: &str) -> Option<&'static str> {
 #[must_use]
 fn local_name(raw: &[u8]) -> String {
     let full = String::from_utf8_lossy(raw);
-    full.split(':')
-        .next_back()
-        .unwrap_or(&full)
-        .to_string()
+    full.split(':').next_back().unwrap_or(&full).to_string()
 }
 
 /// Percent-decode a URL string.

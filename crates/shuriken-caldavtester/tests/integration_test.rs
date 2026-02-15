@@ -6,6 +6,7 @@
 use shuriken_caldavtester::config;
 use shuriken_caldavtester::runner::{ServerConfig, TestRunner};
 use shuriken_caldavtester::xml;
+use std::collections::BTreeSet;
 
 /// Verify that every listed test file can be parsed successfully.
 ///
@@ -47,6 +48,97 @@ fn runner_construction() {
         features: config::server_features(),
     };
     let _runner = TestRunner::with_config(config).expect("runner should construct");
+}
+
+/// Ensure every callback used by suite XML files is implemented by the verifier.
+#[test]
+fn callbacks_used_by_suite_are_supported() {
+    let suite_dir = config::test_suite_dir();
+    let tests_dir = suite_dir.join("tests");
+    let entries = config::all_tests();
+
+    let supported: BTreeSet<&str> = [
+        "statusCode",
+        "header",
+        "headerContains",
+        "dataString",
+        "notDataString",
+        "propfindItems",
+        "propfindValues",
+        "multistatusItems",
+        "xmlElementMatch",
+        "prepostcondition",
+        "jsonPointerMatch",
+        "calendarDataMatch",
+        "jcalDataMatch",
+        "addressDataMatch",
+        "dataMatch",
+        "xmlDataMatch",
+        "freeBusy",
+        "postFreeBusy",
+        "acl",
+        "aclItems",
+        "exists",
+        "doesNotExist",
+    ]
+    .into_iter()
+    .collect();
+
+    let mut used = BTreeSet::new();
+    let mut parse_failures = Vec::new();
+
+    for entry in &entries {
+        let path = tests_dir.join(entry.path);
+        if !path.exists() {
+            continue;
+        }
+
+        match xml::parse_test_file(&path) {
+            Ok(test_file) => {
+                for request in &test_file.start_requests {
+                    for verification in &request.verifications {
+                        used.insert(verification.callback.clone());
+                    }
+                }
+                for suite in &test_file.test_suites {
+                    for test in &suite.tests {
+                        for request in &test.requests {
+                            for verification in &request.verifications {
+                                used.insert(verification.callback.clone());
+                            }
+                        }
+                    }
+                }
+                for request in &test_file.end_requests {
+                    for verification in &request.verifications {
+                        used.insert(verification.callback.clone());
+                    }
+                }
+            }
+            Err(err) => parse_failures.push(format!("{}: {err}", entry.path)),
+        }
+    }
+
+    if !parse_failures.is_empty() {
+        panic!(
+            "Failed to parse {} test file(s):\n{}",
+            parse_failures.len(),
+            parse_failures.join("\n")
+        );
+    }
+
+    let unsupported: Vec<String> = used
+        .iter()
+        .filter(|callback| !supported.contains(callback.as_str()))
+        .cloned()
+        .collect();
+
+    if !unsupported.is_empty() {
+        panic!(
+            "Unsupported callbacks found in suite: {}",
+            unsupported.join(", ")
+        );
+    }
 }
 
 /// Run enabled tests against a live server.

@@ -9,6 +9,9 @@
 //!
 //! # Run ALL tests, not just the enabled ones
 //! CALDAV_TEST_ALL=1 cargo run --example run_tests
+//!
+//! # Fail on unknown verification callbacks
+//! cargo run -p shuriken-caldavtester --example run_tests -- --strict-callbacks
 //! ```
 
 use shuriken_caldavtester::config;
@@ -26,6 +29,11 @@ async fn main() -> anyhow::Result<()> {
     let base_url = std::env::var("CALDAV_TEST_BASE_URL")
         .unwrap_or_else(|_| "http://localhost:8080".to_string());
     let run_all = std::env::var("CALDAV_TEST_ALL").is_ok();
+    let strict_callbacks = std::env::args().skip(1).any(|arg| arg == "--strict-callbacks");
+
+    if strict_callbacks {
+        std::env::set_var("CALDAV_TEST_STRICT_CALLBACKS", "1");
+    }
 
     let suite_dir = config::test_suite_dir();
     let tests_dir = suite_dir.join("tests");

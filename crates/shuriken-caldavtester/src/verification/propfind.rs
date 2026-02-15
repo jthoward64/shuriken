@@ -23,6 +23,9 @@ use super::{Response, VerifyResult};
 use crate::error::Result;
 use std::collections::HashMap;
 
+type PropertyMap = HashMap<String, Option<String>>;
+type PropertyBuckets = (PropertyMap, PropertyMap);
+
 /// Verify a `PROPFIND` response.
 pub fn verify(
     response: &Response,
@@ -171,12 +174,9 @@ fn filter_responses<'a>(
 /// `{ns}localname` → `Option<serialized_value>`.
 fn collect_properties(
     responses: &[&MultistatusResponse],
-) -> (
-    HashMap<String, Option<String>>,
-    HashMap<String, Option<String>>,
-) {
-    let mut ok_props: HashMap<String, Option<String>> = HashMap::new();
-    let mut bad_props: HashMap<String, Option<String>> = HashMap::new();
+) -> PropertyBuckets {
+    let mut ok_props: PropertyMap = HashMap::new();
+    let mut bad_props: PropertyMap = HashMap::new();
 
     for resp in responses {
         for (&status_code, props) in &resp.propstats {
@@ -197,7 +197,7 @@ fn collect_properties(
 /// Check a list of property specs against actual properties.
 fn check_property_specs(
     specs: &[String],
-    actual: &HashMap<String, Option<String>>,
+    actual: &PropertyMap,
     category: &str,
 ) -> Result<VerifyResult> {
     for spec in specs {
@@ -211,7 +211,7 @@ fn check_property_specs(
 
 fn check_property_regex_specs(
     specs: &[String],
-    actual: &HashMap<String, Option<String>>,
+    actual: &PropertyMap,
 ) -> Result<VerifyResult> {
     for spec in specs {
         let (qname, check) = parse_prop_spec(spec);
@@ -303,7 +303,7 @@ fn status_matches(actual: u16, pattern: &str) -> bool {
 /// Format: `{ns}propname`, `{ns}propname$value`, `{ns}propname$`, `{ns}propname!value`
 fn check_one_property(
     spec: &str,
-    actual: &HashMap<String, Option<String>>,
+    actual: &PropertyMap,
     category: &str,
 ) -> VerifyResult {
     let (qname, check) = parse_prop_spec(spec);

@@ -95,6 +95,11 @@ pub fn verify_response(
             Ok(VerifyResult::Pass)
         }
         _ => {
+            if strict_unknown_callbacks_enabled() {
+                return Ok(VerifyResult::Fail(format!(
+                    "Unknown verification callback '{callback}'"
+                )));
+            }
             tracing::warn!(
                 callback,
                 "Unimplemented verification callback — treating as pass"
@@ -102,6 +107,17 @@ pub fn verify_response(
             Ok(VerifyResult::Pass)
         }
     }
+}
+
+#[must_use]
+fn strict_unknown_callbacks_enabled() -> bool {
+    std::env::var("CALDAV_TEST_STRICT_CALLBACKS")
+        .ok()
+        .map(|value| {
+            let value = value.trim().to_ascii_lowercase();
+            matches!(value.as_str(), "1" | "true" | "yes" | "on")
+        })
+        .unwrap_or(false)
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -1482,6 +1498,7 @@ fn strip_vtimezone_blocks(content: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, OnceLock};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn make_response(status: u16) -> Response {
@@ -1509,6 +1526,11 @@ mod tests {
                 )
             })
             .collect()
+    }
+
+    fn env_guard() -> &'static Mutex<()> {
+        static GUARD: OnceLock<Mutex<()>> = OnceLock::new();
+        GUARD.get_or_init(|| Mutex::new(()))
     }
 
     // ── statusCode ───────────────────────────────────────────────────────
@@ -2032,5 +2054,30 @@ mod tests {
         let result = verify_acl_items(&response, &args(&[("granted", "{DAV:}write")])).unwrap();
 
         assert!(result.is_fail(), "unexpected result: {result:?}");
+    }
+
+    #[test]
+    fn unknown_callback_default_passes() {
+        let guard = env_guard().lock().unwrap();
+        std::env::remove_var("CALDAV_TEST_STRICT_CALLBACKS");
+
+        let response = make_response(200);
+        let result = verify_response(&response, "nonexistentCallback", &HashMap::new()).unwrap();
+        assert!(result.is_pass(), "unexpected result: {result:?}");
+
+        drop(guard);
+    }
+
+    #[test]
+    fn unknown_callback_strict_mode_fails() {
+        let guard = env_guard().lock().unwrap();
+        std::env::set_var("CALDAV_TEST_STRICT_CALLBACKS", "1");
+
+        let response = make_response(200);
+        let result = verify_response(&response, "nonexistentCallback", &HashMap::new()).unwrap();
+        assert!(result.is_fail(), "unexpected result: {result:?}");
+
+        std::env::remove_var("CALDAV_TEST_STRICT_CALLBACKS");
+        drop(guard);
     }
 }
