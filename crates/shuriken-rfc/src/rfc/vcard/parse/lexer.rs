@@ -107,7 +107,7 @@ pub fn split_lines(input: &str) -> Vec<String> {
 pub struct ContentLine {
     /// Property group (e.g., "item1" in "item1.TEL").
     pub group: Option<String>,
-    /// Property name (uppercase).
+    /// Property name (preserves original casing).
     pub name: String,
     /// Parameters.
     pub params: Vec<VCardParameter>,
@@ -162,7 +162,7 @@ pub fn parse_content_line(line: &str, line_num: usize) -> ParseResult<ContentLin
 
     Ok(ContentLine {
         group: group.map(String::from),
-        name: name.to_ascii_uppercase(),
+        name: name.to_string(),
         params,
         value: value.to_string(),
     })

@@ -10,7 +10,7 @@ use std::fmt;
 /// The `TZID` is a parameter with name `TZID` and value `America/New_York`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Parameter {
-    /// Parameter name (normalized to uppercase).
+    /// Parameter name (preserves original casing).
     pub name: String,
     /// Parameter values. Most parameters have one value, but some
     /// (like MEMBER) can have multiple comma-separated values.
@@ -22,7 +22,7 @@ impl Parameter {
     #[must_use]
     pub fn new(name: impl Into<String>, value: impl Into<String>) -> Self {
         Self {
-            name: name.into().to_ascii_uppercase(),
+            name: name.into(),
             values: vec![value.into()],
         }
     }
@@ -31,7 +31,7 @@ impl Parameter {
     #[must_use]
     pub fn with_values(name: impl Into<String>, values: Vec<String>) -> Self {
         Self {
-            name: name.into().to_ascii_uppercase(),
+            name: name.into(),
             values,
         }
     }

@@ -129,7 +129,7 @@ fn serialize_property(prop: &VCardProperty, output: &mut String) {
         line.push('.');
     }
 
-    // Property name
+    // Property name - preserve original casing
     line.push_str(&prop.name);
 
     // Parameters
@@ -148,6 +148,7 @@ fn serialize_property(prop: &VCardProperty, output: &mut String) {
 
 fn serialize_parameter(param: &VCardParameter, output: &mut String) {
     output.push(';');
+    // Preserve original parameter name casing
     output.push_str(&param.name);
     output.push('=');
 

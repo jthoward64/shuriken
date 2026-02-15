@@ -151,7 +151,7 @@ impl Parser {
         let value_type = line
             .params
             .iter()
-            .find(|p| p.name == "VALUE")
+            .find(|p| p.name.eq_ignore_ascii_case("VALUE"))
             .and_then(|p| p.value());
 
         let value = self.parse_property_value(&line.name, &line.value, value_type, line_num)?;

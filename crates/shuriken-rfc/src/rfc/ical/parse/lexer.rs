@@ -174,7 +174,7 @@ pub fn parse_content_line(line: &str, line_num: usize) -> ParseResult<ContentLin
         ));
     }
 
-    let name = line[..name_end].to_ascii_uppercase();
+    let name = line[..name_end].to_string();
 
     // Parse parameters if we stopped at ';'
     let mut params = Vec::new();
@@ -241,7 +241,7 @@ fn parse_parameter(
         ));
     }
 
-    let param_name = line[start..name_end].to_ascii_uppercase();
+    let param_name = line[start..name_end].to_string();
 
     // Parse parameter values (comma-separated, may be quoted)
     let mut values = Vec::new();

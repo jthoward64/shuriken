@@ -2,6 +2,7 @@ mod app_specific;
 mod caldav;
 mod carddav;
 mod dav;
+mod principal;
 
 use salvo::Router;
 
@@ -25,7 +26,7 @@ pub fn routes() -> anyhow::Result<Router> {
         .push(
             Router::with_path(DAV_ROUTE_COMPONENT)
                 .hoop(DavPathMiddleware)
-                // TODO: Add /api/dav/principal/ route for CalDAVTester principal collection.
+                .push(principal::routes()?)
                 .push(caldav::routes()?)
                 .push(carddav::routes()?),
         ))

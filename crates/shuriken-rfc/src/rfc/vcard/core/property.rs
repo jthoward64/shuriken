@@ -11,7 +11,7 @@ use super::value::VCardValue;
 pub struct VCardProperty {
     /// Optional property group (e.g., "item1" in "item1.TEL").
     pub group: Option<String>,
-    /// Property name (normalized to uppercase).
+    /// Property name (preserves original casing).
     pub name: String,
     /// Parameters in order of appearance.
     pub params: Vec<VCardParameter>,
@@ -28,7 +28,7 @@ impl VCardProperty {
         let value_str = value.into();
         Self {
             group: None,
-            name: name.into().to_ascii_uppercase(),
+            name: name.into(),
             params: Vec::new(),
             value: VCardValue::Text(value_str.clone()),
             raw_value: value_str,
@@ -45,7 +45,7 @@ impl VCardProperty {
         let value_str = value.into();
         Self {
             group: Some(group.into()),
-            name: name.into().to_ascii_uppercase(),
+            name: name.into(),
             params: Vec::new(),
             value: VCardValue::Text(value_str.clone()),
             raw_value: value_str,
@@ -58,18 +58,19 @@ impl VCardProperty {
         let value_str = value.into();
         Self {
             group: None,
-            name: name.into().to_ascii_uppercase(),
+            name: name.into(),
             params: Vec::new(),
             value: VCardValue::Uri(value_str.clone()),
             raw_value: value_str,
         }
     }
 
-    /// Returns the parameter with the given name.
+    /// Returns the parameter with the given name (case-insensitive).
     #[must_use]
     pub fn get_param(&self, name: &str) -> Option<&VCardParameter> {
-        let name_upper = name.to_ascii_uppercase();
-        self.params.iter().find(|p| p.name == name_upper)
+        self.params
+            .iter()
+            .find(|p| p.name.eq_ignore_ascii_case(name))
     }
 
     /// Returns the value of a parameter.
@@ -108,7 +109,11 @@ impl VCardProperty {
 
     /// Adds a TYPE parameter value.
     pub fn add_type(&mut self, type_value: impl Into<String>) {
-        if let Some(param) = self.params.iter_mut().find(|p| p.name == "TYPE") {
+        if let Some(param) = self
+            .params
+            .iter_mut()
+            .find(|p| p.name.eq_ignore_ascii_case("TYPE"))
+        {
             param.values.push(type_value.into());
         } else {
             self.params.push(VCardParameter::type_param(type_value));

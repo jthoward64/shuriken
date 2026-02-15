@@ -174,17 +174,15 @@ impl Component {
     /// Returns the first property with the given name.
     #[must_use]
     pub fn get_property(&self, name: &str) -> Option<&Property> {
-        let name_upper = name.to_ascii_uppercase();
-        self.properties.iter().find(|p| p.name == name_upper)
+        self.properties.iter().find(|p| p.name.eq_ignore_ascii_case(name))
     }
 
     /// Returns all properties with the given name.
     #[must_use]
     pub fn get_properties(&self, name: &str) -> Vec<&Property> {
-        let name_upper = name.to_ascii_uppercase();
         self.properties
             .iter()
-            .filter(|p| p.name == name_upper)
+            .filter(|p| p.name.eq_ignore_ascii_case(name))
             .collect()
     }
 

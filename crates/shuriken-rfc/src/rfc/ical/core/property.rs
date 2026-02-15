@@ -21,7 +21,7 @@ impl ContentLine {
     #[must_use]
     pub fn new(name: impl Into<String>, value: impl Into<String>) -> Self {
         Self {
-            name: name.into().to_ascii_uppercase(),
+            name: name.into(),
             params: Vec::new(),
             raw_value: value.into(),
         }
@@ -35,7 +35,7 @@ impl ContentLine {
         value: impl Into<String>,
     ) -> Self {
         Self {
-            name: name.into().to_ascii_uppercase(),
+            name: name.into(),
             params,
             raw_value: value.into(),
         }
@@ -44,8 +44,7 @@ impl ContentLine {
     /// Returns the parameter with the given name.
     #[must_use]
     pub fn get_param(&self, name: &str) -> Option<&Parameter> {
-        let name_upper = name.to_ascii_uppercase();
-        self.params.iter().find(|p| p.name == name_upper)
+        self.params.iter().find(|p| p.name.eq_ignore_ascii_case(name))
     }
 
     /// Returns the value of a parameter.
@@ -96,7 +95,7 @@ impl Property {
     pub fn text(name: impl Into<String>, value: impl Into<String>) -> Self {
         let value_str = value.into();
         Self {
-            name: name.into().to_ascii_uppercase(),
+            name: name.into(),
             params: Vec::new(),
             value: Value::Text(value_str.clone()),
             raw_value: value_str,
@@ -107,7 +106,7 @@ impl Property {
     #[must_use]
     pub fn integer(name: impl Into<String>, value: i32) -> Self {
         Self {
-            name: name.into().to_ascii_uppercase(),
+            name: name.into(),
             params: Vec::new(),
             value: Value::Integer(value),
             raw_value: value.to_string(),
@@ -119,7 +118,7 @@ impl Property {
     pub fn datetime(name: impl Into<String>, dt: super::DateTime) -> Self {
         let raw = dt.to_string();
         Self {
-            name: name.into().to_ascii_uppercase(),
+            name: name.into(),
             params: Vec::new(),
             value: Value::DateTime(dt),
             raw_value: raw,
@@ -131,7 +130,7 @@ impl Property {
     pub fn date(name: impl Into<String>, d: super::Date) -> Self {
         let raw = d.to_string();
         Self {
-            name: name.into().to_ascii_uppercase(),
+            name: name.into(),
             params: vec![Parameter::value_type("DATE")],
             value: Value::Date(d),
             raw_value: raw,
@@ -143,7 +142,7 @@ impl Property {
     pub fn duration(name: impl Into<String>, d: super::Duration) -> Self {
         let raw = d.to_string();
         Self {
-            name: name.into().to_ascii_uppercase(),
+            name: name.into(),
             params: Vec::new(),
             value: Value::Duration(d),
             raw_value: raw,
@@ -164,8 +163,7 @@ impl Property {
     /// Returns the parameter with the given name.
     #[must_use]
     pub fn get_param(&self, name: &str) -> Option<&Parameter> {
-        let name_upper = name.to_ascii_uppercase();
-        self.params.iter().find(|p| p.name == name_upper)
+        self.params.iter().find(|p| p.name.eq_ignore_ascii_case(name))
     }
 
     /// Returns the value of a parameter.

@@ -5,7 +5,7 @@
 /// Parameters can have multiple values (e.g., TYPE=home,work).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VCardParameter {
-    /// Parameter name (normalized to uppercase).
+    /// Parameter name (preserves original casing).
     pub name: String,
     /// Parameter values.
     pub values: Vec<String>,
@@ -16,7 +16,7 @@ impl VCardParameter {
     #[must_use]
     pub fn new(name: impl Into<String>, value: impl Into<String>) -> Self {
         Self {
-            name: name.into().to_ascii_uppercase(),
+            name: name.into(),
             values: vec![value.into()],
         }
     }
@@ -25,7 +25,7 @@ impl VCardParameter {
     #[must_use]
     pub fn multi(name: impl Into<String>, values: Vec<String>) -> Self {
         Self {
-            name: name.into().to_ascii_uppercase(),
+            name: name.into(),
             values,
         }
     }
@@ -39,10 +39,7 @@ impl VCardParameter {
     /// Returns whether the parameter has the specified value (case-insensitive).
     #[must_use]
     pub fn has_value(&self, value: &str) -> bool {
-        let value_upper = value.to_ascii_uppercase();
-        self.values
-            .iter()
-            .any(|v| v.eq_ignore_ascii_case(&value_upper))
+        self.values.iter().any(|v| v.eq_ignore_ascii_case(value))
     }
 
     // --- Convenience constructors ---
@@ -165,7 +162,7 @@ mod tests {
     #[test]
     fn parameter_single_value() {
         let param = VCardParameter::new("type", "home");
-        assert_eq!(param.name, "TYPE");
+        assert_eq!(param.name, "type"); // Preserves original casing
         assert_eq!(param.value(), Some("home"));
     }
 
