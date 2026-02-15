@@ -212,14 +212,23 @@ pub async fn delete_instance_with_tombstone(
     // Soft-delete the instance
     soft_delete_instance(conn, instance_id).await?;
 
-    // Create tombstone with URI variants (slug for sync clients, UUID for internal reference)
-    let uri_variants = vec![instance.slug.clone(), instance.id.to_string()];
+    // Create tombstone with URI variants (filename + slug + UUID)
+    let extension = if instance.content_type.as_str().contains("calendar") {
+        ".ics"
+    } else {
+        ".vcf"
+    };
+    let uri_variants = vec![
+        format!("{}{}", instance.slug, extension),
+        instance.slug.clone(),
+        instance.id.to_string(),
+    ];
 
     let tombstone = NewDavTombstone {
         collection_id: instance.collection_id,
         entity_id: Some(instance.entity_id),
         synctoken,
-        sync_revision: instance.sync_revision,
+        sync_revision: synctoken,
         deleted_at: chrono::Utc::now(),
         last_etag: Some(&instance.etag),
         logical_uid: None,

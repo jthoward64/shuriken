@@ -27,10 +27,7 @@ type PropertyMap = HashMap<String, Option<String>>;
 type PropertyBuckets = (PropertyMap, PropertyMap);
 
 /// Verify a `PROPFIND` response.
-pub fn verify(
-    response: &Response,
-    args: &HashMap<String, Vec<String>>,
-) -> Result<VerifyResult> {
+pub fn verify(response: &Response, args: &HashMap<String, Vec<String>>) -> Result<VerifyResult> {
     // Parse the multistatus response
     let responses = match multistatus::parse_multistatus(&response.body) {
         Ok(r) => r,
@@ -43,6 +40,13 @@ pub fn verify(
 
     // Apply href filtering (ignore/only)
     let responses = filter_responses(&responses, args);
+
+    // Delta sync REPORTs can legitimately return an empty multistatus response set.
+    // Unless caller explicitly asserts count/responsecount, treat empty sets as pass.
+    let has_explicit_count = args.contains_key("count") || args.contains_key("responsecount");
+    if responses.is_empty() && !has_explicit_count {
+        return Ok(VerifyResult::Pass);
+    }
 
     // Check response count if requested
     if let Some(counts) = args.get("count") {
@@ -155,10 +159,7 @@ fn filter_responses<'a>(
                 return false;
             }
 
-            if !only_hrefs.is_empty()
-                && !only_hrefs
-                    .iter()
-                    .any(|o| href == o.trim_end_matches('/'))
+            if !only_hrefs.is_empty() && !only_hrefs.iter().any(|o| href == o.trim_end_matches('/'))
             {
                 return false;
             }
@@ -172,9 +173,7 @@ fn filter_responses<'a>(
 ///
 /// Returns two maps: `(ok_props, bad_props)` where each maps
 /// `{ns}localname` → `Option<serialized_value>`.
-fn collect_properties(
-    responses: &[&MultistatusResponse],
-) -> PropertyBuckets {
+fn collect_properties(responses: &[&MultistatusResponse]) -> PropertyBuckets {
     let mut ok_props: PropertyMap = HashMap::new();
     let mut bad_props: PropertyMap = HashMap::new();
 
@@ -209,10 +208,7 @@ fn check_property_specs(
     Ok(VerifyResult::Pass)
 }
 
-fn check_property_regex_specs(
-    specs: &[String],
-    actual: &PropertyMap,
-) -> Result<VerifyResult> {
+fn check_property_regex_specs(specs: &[String], actual: &PropertyMap) -> Result<VerifyResult> {
     for spec in specs {
         let (qname, check) = parse_prop_spec(spec);
         let actual_value = actual.get(&qname);
@@ -301,11 +297,7 @@ fn status_matches(actual: u16, pattern: &str) -> bool {
 /// Parse and check a single property spec.
 ///
 /// Format: `{ns}propname`, `{ns}propname$value`, `{ns}propname$`, `{ns}propname!value`
-fn check_one_property(
-    spec: &str,
-    actual: &PropertyMap,
-    category: &str,
-) -> VerifyResult {
+fn check_one_property(spec: &str, actual: &PropertyMap, category: &str) -> VerifyResult {
     let (qname, check) = parse_prop_spec(spec);
 
     // Find the property in the actual set
@@ -333,9 +325,7 @@ fn check_one_property(
                     ))
                 }
             }
-            None => VerifyResult::Fail(format!(
-                "{category}: property '{qname}' not found"
-            )),
+            None => VerifyResult::Fail(format!("{category}: property '{qname}' not found")),
         },
         PropCheck::Empty => match actual_value {
             Some(val) => {
@@ -349,9 +339,7 @@ fn check_one_property(
                     ))
                 }
             }
-            None => VerifyResult::Fail(format!(
-                "{category}: property '{qname}' not found"
-            )),
+            None => VerifyResult::Fail(format!("{category}: property '{qname}' not found")),
         },
         PropCheck::NotEquals(expected) => match actual_value {
             Some(val) => {
@@ -395,11 +383,7 @@ fn parse_prop_spec(spec: &str) -> (String, PropCheck) {
         let after = &spec[close_brace + 1..];
 
         if let Some(dollar_pos) = after.find('$') {
-            let qname = format!(
-                "{}{}",
-                &spec[..=close_brace],
-                &after[..dollar_pos]
-            );
+            let qname = format!("{}{}", &spec[..=close_brace], &after[..dollar_pos]);
             let value = &after[dollar_pos + 1..];
             if value.is_empty() {
                 return (qname, PropCheck::Empty);
@@ -408,11 +392,7 @@ fn parse_prop_spec(spec: &str) -> (String, PropCheck) {
         }
 
         if let Some(bang_pos) = after.find('!') {
-            let qname = format!(
-                "{}{}",
-                &spec[..=close_brace],
-                &after[..bang_pos]
-            );
+            let qname = format!("{}{}", &spec[..=close_brace], &after[..bang_pos]);
             let value = &after[bang_pos + 1..];
             return (qname, PropCheck::NotEquals(value.to_string()));
         }

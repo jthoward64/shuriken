@@ -576,8 +576,13 @@ fn parse_sync_collection(xml: &[u8]) -> ParseResult<ReportRequest> {
                     "sync-level" => {
                         in_sync_level = false;
                         sync_level = match text_buf.trim() {
+                            "1" => SyncLevel::One,
                             "infinity" => SyncLevel::Infinity,
-                            _ => SyncLevel::One, // Default for "1" or any other value
+                            invalid => {
+                                return Err(ParseError::invalid_value(format!(
+                                    "invalid sync-level '{invalid}', expected '1' or 'infinity'"
+                                )));
+                            }
                         };
                     }
                     _ => {}

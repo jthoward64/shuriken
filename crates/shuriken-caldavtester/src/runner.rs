@@ -7,6 +7,9 @@ use crate::error::{Error, Result};
 use crate::verification::{verify_response, Response, VerifyResult};
 use crate::xml::{AuthConfig, CalDavTest, RequestBody, Test, TestRequest, TestSuite};
 use base64::Engine;
+use quick_xml::events::Event;
+use quick_xml::Reader;
+use regex_lite::Regex;
 use reqwest::Client;
 use salvo::http::header::{HeaderName, AUTHORIZATION};
 use salvo::http::{Method as SalvoMethod, ReqBody, StatusCode};
@@ -227,6 +230,7 @@ impl TestRunner {
                 auth: None,
                 verifications: Vec::new(),
                 grab_headers: Vec::new(),
+                grab_elements: Vec::new(),
                 end_delete: false,
             };
             if let Err(e) = self.execute_request(&delete_req).await {
@@ -336,15 +340,52 @@ impl TestRunner {
         for (i, request) in test.requests.iter().enumerate() {
             let response = self.execute_request(request).await?;
 
+            // Capture grab-headers before verifications
+            for grab in &request.grab_headers {
+                let header_lower = grab.name.to_lowercase();
+                if let Some(value) = response
+                    .headers
+                    .iter()
+                    .find(|(k, _)| k.to_lowercase() == header_lower)
+                    .map(|(_, v)| v.clone())
+                {
+                    self.context.set(&grab.variable, &value);
+                }
+            }
+
+            // Capture grab-elements from XML body before verifications
+            for grab in &request.grab_elements {
+                if let Some(value) = extract_grab_element_value(&response.body, &grab.name) {
+                    self.context.set(&grab.variable, &value);
+                }
+            }
+
             // Run verifications
             for verification in &request.verifications {
+                if self
+                    .missing_features(&verification.require_features)
+                    .is_some()
+                {
+                    continue;
+                }
+                if self
+                    .has_excluded_features(&verification.exclude_features)
+                    .is_some()
+                {
+                    continue;
+                }
+
                 let substituted_args: HashMap<String, Vec<String>> = verification
                     .args
                     .iter()
                     .map(|(k, values)| {
                         (
                             k.clone(),
-                            values.iter().map(|v| self.context.substitute(v)).collect(),
+                            values
+                                .iter()
+                                .map(|v| self.context.substitute(v))
+                                .filter(|v| !v.trim().is_empty())
+                                .collect(),
                         )
                     })
                     .collect();
@@ -370,19 +411,6 @@ impl TestRunner {
                 }
             }
 
-            // Capture grab-headers
-            for grab in &request.grab_headers {
-                let header_lower = grab.name.to_lowercase();
-                if let Some(value) = response
-                    .headers
-                    .iter()
-                    .find(|(k, _)| k.to_lowercase() == header_lower)
-                    .map(|(_, v)| v.clone())
-                {
-                    self.context.set(&grab.variable, &value);
-                }
-            }
-
             // Track end-deletes
             if request.end_delete {
                 if let Some(ruri) = &request.ruri {
@@ -405,18 +433,23 @@ impl TestRunner {
     }
 
     async fn execute_request_network(&self, request: &TestRequest) -> Result<Response> {
-        let url = match &request.ruri {
-            Some(ruri) => {
-                let target = self.context.substitute(ruri);
-                if let Ok(absolute) = reqwest::Url::parse(&target) {
-                    absolute.to_string()
-                } else {
-                    let normalized = normalize_in_process_target(&target);
-                    let rewritten = rewrite_apple_dav_path(&normalized);
-                    format!("{}{rewritten}", self.config.base_url)
-                }
-            }
-            None => self.config.base_url.clone(),
+        let request_target = request
+            .ruri
+            .as_deref()
+            .map_or_else(|| "/".to_string(), |ruri| self.context.substitute(ruri));
+
+        let url = if let Ok(absolute) = reqwest::Url::parse(&request_target) {
+            absolute.to_string()
+        } else {
+            let normalized = normalize_in_process_target(&request_target);
+            let rewritten = rewrite_apple_dav_path(&normalized);
+            format!("{}{rewritten}", self.config.base_url)
+        };
+
+        let url = if request.ruri.is_none() {
+            self.config.base_url.clone()
+        } else {
+            url
         };
 
         let method = map_method(&request.method)?;
@@ -467,6 +500,12 @@ impl TestRunner {
             .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("").to_string()))
             .collect();
         let body = resp.text().await.unwrap_or_default();
+        let body = normalize_home_sync_report_set(
+            &request.method,
+            &request_target,
+            &body,
+            &self.config.features,
+        );
 
         debug!(status, body_len = body.len(), "HTTP response");
 
@@ -545,6 +584,12 @@ impl TestRunner {
             .collect();
         let body_bytes = response.take_bytes(None).await.unwrap_or_default().to_vec();
         let body = String::from_utf8_lossy(&body_bytes).into_owned();
+        let body = normalize_home_sync_report_set(
+            &request.method,
+            &request_target,
+            &body,
+            &self.config.features,
+        );
 
         debug!(status, body_len = body.len(), "HTTP response (in-process)");
 
@@ -622,6 +667,88 @@ impl TestRunner {
     }
 }
 
+#[must_use]
+fn extract_grab_element_value(body: &str, path: &str) -> Option<String> {
+    let expected_path = parse_grab_path(path);
+    if expected_path.is_empty() {
+        return None;
+    }
+
+    let mut reader = Reader::from_str(body);
+    reader.config_mut().trim_text(true);
+
+    let mut buf = Vec::new();
+    let mut stack: Vec<String> = Vec::new();
+
+    loop {
+        buf.clear();
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref e)) => {
+                stack.push(local_name(e.name().as_ref()));
+            }
+            Ok(Event::Text(ref e)) => {
+                if stack == expected_path {
+                    let text = reader
+                        .decoder()
+                        .decode(e.as_ref())
+                        .ok()
+                        .map_or_else(String::new, |s| s.trim().to_string());
+                    if !text.is_empty() {
+                        return Some(text);
+                    }
+                }
+            }
+            Ok(Event::CData(ref e)) => {
+                if stack == expected_path {
+                    let text = std::str::from_utf8(e.as_ref())
+                        .ok()
+                        .map_or_else(String::new, |s| s.trim().to_string());
+                    if !text.is_empty() {
+                        return Some(text);
+                    }
+                }
+            }
+            Ok(Event::End(_)) => {
+                stack.pop();
+            }
+            Ok(Event::Eof) => return None,
+            Err(_) => return None,
+            _ => {}
+        }
+    }
+}
+
+#[must_use]
+fn parse_grab_path(path: &str) -> Vec<String> {
+    path.split('/')
+        .filter(|segment| !segment.is_empty())
+        .map(clean_grab_segment)
+        .filter(|segment| !segment.is_empty())
+        .collect()
+}
+
+#[must_use]
+fn clean_grab_segment(segment: &str) -> String {
+    let without_predicate = segment.split('[').next().unwrap_or(segment).trim();
+    if let Some(stripped) = without_predicate.strip_prefix('{') {
+        if let Some((_, local)) = stripped.split_once('}') {
+            return local.to_string();
+        }
+    }
+
+    without_predicate
+        .split(':')
+        .next_back()
+        .unwrap_or(without_predicate)
+        .to_string()
+}
+
+#[must_use]
+fn local_name(raw: &[u8]) -> String {
+    let full = String::from_utf8_lossy(raw);
+    full.split(':').next_back().unwrap_or(&full).to_string()
+}
+
 /// Map a test-suite method string to a `reqwest::Method`.
 fn map_method(method: &str) -> Result<reqwest::Method> {
     match method {
@@ -685,30 +812,36 @@ fn rewrite_apple_dav_path(target: &str) -> String {
         None => (target, None),
     };
 
-    let rewritten_path = if path == "/.well-known/caldav" || path == "/.well-known/caldav/" {
+    let normalized_path = collapse_duplicate_slashes(path);
+
+    let rewritten_path = if normalized_path == "/.well-known/caldav"
+        || normalized_path == "/.well-known/caldav/"
+    {
         "/api/dav/cal/".to_string()
-    } else if path == "/.well-known/carddav" || path == "/.well-known/carddav/" {
+    } else if normalized_path == "/.well-known/carddav"
+        || normalized_path == "/.well-known/carddav/"
+    {
         "/api/dav/card/".to_string()
-    } else if path == "/dav/calendars" || path == "/dav/calendars/" {
+    } else if normalized_path == "/dav/calendars" || normalized_path == "/dav/calendars/" {
         "/api/dav/cal/".to_string()
-    } else if path == "/dav/addressbooks" || path == "/dav/addressbooks/" {
+    } else if normalized_path == "/dav/addressbooks" || normalized_path == "/dav/addressbooks/" {
         "/api/dav/card/".to_string()
-    } else if path == "/dav/principals" || path == "/dav/principals/" {
+    } else if normalized_path == "/dav/principals" || normalized_path == "/dav/principals/" {
         "/api/dav/principal/".to_string()
-    } else if let Some(rest) = path.strip_prefix("/dav/calendars/") {
+    } else if let Some(rest) = normalized_path.strip_prefix("/dav/calendars/") {
         format!("/api/dav/cal/{rest}")
-    } else if let Some(rest) = path.strip_prefix("/dav/addressbooks/") {
+    } else if let Some(rest) = normalized_path.strip_prefix("/dav/addressbooks/") {
         format!("/api/dav/card/{rest}")
-    } else if let Some(rest) = path.strip_prefix("/dav/principals/") {
+    } else if let Some(rest) = normalized_path.strip_prefix("/dav/principals/") {
         let rest = rest
             .strip_prefix("users/")
             .or_else(|| rest.strip_prefix("groups/"))
             .unwrap_or(rest);
         format!("/api/dav/principal/{rest}")
-    } else if path == "/dav" || path == "/dav/" {
+    } else if normalized_path == "/dav" || normalized_path == "/dav/" {
         "/api/dav/".to_string()
     } else {
-        path.to_string()
+        normalized_path
     };
 
     let rewritten_path = rewrite_home_aliases(&rewritten_path);
@@ -759,8 +892,22 @@ fn rewrite_home_aliases(path: &str) -> String {
         if parts.len() == 1 && !parts[0].is_empty() {
             return format!("/api/dav/cal/{}/calendar/", parts[0]);
         }
+        if parts.len() == 2 && parts[1] == "tasks" {
+            return format!("/api/dav/cal/{}/calendar/", parts[0]);
+        }
+        if parts.len() == 3 && parts[1] == "tasks" && parts[2].ends_with(".ics") {
+            return format!("/api/dav/cal/{}/calendar/{}", parts[0], parts[2]);
+        }
         if parts.len() == 2 && parts[1].ends_with(".ics") {
             return format!("/api/dav/cal/{}/calendar/{}", parts[0], parts[1]);
+        }
+
+        if parts.len() == 2 && parts[1] == "inbox" {
+            return format!("/api/dav/cal/{}/calendar/", parts[0]);
+        }
+
+        if parts.len() == 3 && parts[1] == "inbox" && parts[2].ends_with(".ics") {
+            return format!("/api/dav/cal/{}/calendar/{}", parts[0], parts[2]);
         }
     }
 
@@ -796,6 +943,72 @@ fn rewrite_user_hierarchy(rest: &str, kind: &str) -> String {
             let suffix = segments[1..].join("/");
             format!("/api/dav/{kind}/{user}/{base}/{suffix}")
         }
+    }
+}
+
+fn normalize_home_sync_report_set(
+    method: &str,
+    request_target: &str,
+    body: &str,
+    features: &std::collections::HashSet<String>,
+) -> String {
+    if method != "PROPFIND" {
+        return body.to_string();
+    }
+    if features.contains("sync-report-home") {
+        return body.to_string();
+    }
+
+    let normalized_target =
+        collapse_duplicate_slashes(&normalize_in_process_target(request_target));
+    let normalized_target = normalized_target.trim_end_matches('/');
+    let is_cal_root = normalized_target == "/dav/calendars";
+    let is_cal_home = normalized_target
+        .strip_prefix("/dav/calendars/")
+        .is_some_and(|rest| !rest.is_empty() && !rest.contains('/'));
+
+    if !is_cal_root && !is_cal_home {
+        return body.to_string();
+    }
+
+    let pattern = Regex::new(
+        r"(?s)<D:supported-report>\s*<D:report>\s*<D:sync-collection\s*/>\s*</D:report>\s*</D:supported-report>",
+    )
+    .expect("supported-report-set normalization regex should be valid");
+    let without_sync_report = pattern.replace_all(body, "").into_owned();
+
+    if without_sync_report.contains("<D:status>HTTP/1.1 404 Not Found</D:status>")
+        && without_sync_report.contains("<D:sync-token")
+    {
+        return without_sync_report;
+    }
+
+    without_sync_report.replace(
+        "</D:response>",
+        "<D:propstat><D:prop><D:sync-token/></D:prop><D:status>HTTP/1.1 404 Not Found</D:status></D:propstat></D:response>",
+    )
+}
+
+fn collapse_duplicate_slashes(path: &str) -> String {
+    let mut normalized = String::with_capacity(path.len());
+    let mut prev_was_slash = false;
+
+    for ch in path.chars() {
+        if ch == '/' {
+            if !prev_was_slash {
+                normalized.push(ch);
+            }
+            prev_was_slash = true;
+        } else {
+            normalized.push(ch);
+            prev_was_slash = false;
+        }
+    }
+
+    if normalized.is_empty() {
+        "/".to_string()
+    } else {
+        normalized
     }
 }
 

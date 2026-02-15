@@ -4,6 +4,9 @@
 
 use std::collections::HashMap;
 
+use chrono::{Datelike, Duration, Utc};
+use regex_lite::Regex;
+
 /// Test execution context holding variables and state
 #[derive(Debug, Clone)]
 pub struct TestContext {
@@ -197,6 +200,7 @@ impl TestContext {
             for (var_name, var_value) in &self.variables {
                 result = result.replace(var_name.as_str(), var_value);
             }
+            result = substitute_now_tokens(&result);
             if result == prev {
                 break;
             }
@@ -210,6 +214,39 @@ impl TestContext {
     pub fn substitute_opt(&self, input: Option<&str>) -> Option<String> {
         input.map(|s| self.substitute(s))
     }
+}
+
+#[must_use]
+fn substitute_now_tokens(input: &str) -> String {
+    let pattern = Regex::new(r"\$now(?:\.year)?\.-?\d+:")
+        .expect("$now substitution regex should always be valid");
+    let today = Utc::now().date_naive();
+
+    pattern
+        .replace_all(input, |caps: &regex_lite::Captures<'_>| {
+            let token = caps.get(0).map_or("", |m| m.as_str());
+            let Some(inner) = token
+                .strip_prefix("$now.")
+                .and_then(|s| s.strip_suffix(':'))
+            else {
+                return token.to_string();
+            };
+
+            if let Some(offset_str) = inner.strip_prefix("year.") {
+                if let Ok(offset) = offset_str.parse::<i32>() {
+                    return format!("{:04}", today.year() + offset);
+                }
+                return token.to_string();
+            }
+
+            if let Ok(offset_days) = inner.parse::<i64>() {
+                let date = today + Duration::days(offset_days);
+                return date.format("%Y%m%d").to_string();
+            }
+
+            token.to_string()
+        })
+        .into_owned()
 }
 
 impl Default for TestContext {
@@ -255,5 +292,18 @@ mod tests {
 
         let result = ctx.substitute("path=$full:");
         assert_eq!(result, "path=/root/child");
+    }
+
+    #[test]
+    fn test_now_offset_substitution() {
+        let ctx = TestContext::new();
+        let result = ctx.substitute("d=$now.0:, y=$now.year.1:");
+        assert!(!result.contains("$now.0:"));
+        assert!(!result.contains("$now.year.1:"));
+
+        let parts: Vec<&str> = result.split(", ").collect();
+        assert_eq!(parts.len(), 2);
+        assert_eq!(parts[0].trim_start_matches("d=").len(), 8);
+        assert_eq!(parts[1].trim_start_matches("y=").len(), 4);
     }
 }

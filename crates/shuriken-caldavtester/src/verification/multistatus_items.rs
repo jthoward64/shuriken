@@ -206,9 +206,23 @@ fn find_response<'a>(
     href: &str,
 ) -> Option<&'a MultistatusResponse> {
     let target = href.trim_end_matches('/').to_lowercase();
-    responses
-        .iter()
-        .find(|r| r.href.trim_end_matches('/').to_lowercase() == target)
+    let target_has_path_separator = target.contains('/');
+
+    responses.iter().find(|r| {
+        let normalized_href = r.href.trim_end_matches('/').to_lowercase();
+        if normalized_href == target {
+            return true;
+        }
+
+        if !target_has_path_separator {
+            return normalized_href
+                .rsplit('/')
+                .next()
+                .is_some_and(|basename| basename == target);
+        }
+
+        false
+    })
 }
 
 /// Check if a response has at least one 2xx status.

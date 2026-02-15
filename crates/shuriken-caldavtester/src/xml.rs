@@ -78,6 +78,8 @@ pub struct TestRequest {
     pub verifications: Vec<Verification>,
     /// Headers to grab from response
     pub grab_headers: Vec<GrabHeader>,
+    /// XML elements to grab from response body
+    pub grab_elements: Vec<GrabElement>,
     /// Whether to delete this resource at end
     pub end_delete: bool,
 }
@@ -114,12 +116,25 @@ pub struct Verification {
     pub callback: String,
     /// Verification arguments (name -> list of values)
     pub args: HashMap<String, Vec<String>>,
+    /// Required features for this verification
+    pub require_features: Vec<String>,
+    /// Excluded features for this verification
+    pub exclude_features: Vec<String>,
 }
 
 /// Header value to capture
 #[derive(Debug, Clone)]
 pub struct GrabHeader {
     /// Header name
+    pub name: String,
+    /// Variable to store value in
+    pub variable: String,
+}
+
+/// XML element value to capture
+#[derive(Debug, Clone)]
+pub struct GrabElement {
+    /// XML path to the element
     pub name: String,
     /// Variable to store value in
     pub variable: String,
@@ -436,6 +451,7 @@ fn parse_request_body(
         auth: None,
         verifications: Vec::new(),
         grab_headers: Vec::new(),
+        grab_elements: Vec::new(),
         end_delete,
     };
 
@@ -460,6 +476,10 @@ fn parse_request_body(
     let mut in_verify = false;
     let mut verify_callback = String::new();
     let mut verify_args: HashMap<String, Vec<String>> = HashMap::new();
+    let mut verify_require_features: Vec<String> = Vec::new();
+    let mut verify_exclude_features: Vec<String> = Vec::new();
+    let mut in_verify_require_feature = false;
+    let mut in_verify_exclude_feature = false;
 
     let mut in_arg = false;
     let mut arg_name = String::new();
@@ -468,6 +488,9 @@ fn parse_request_body(
     let mut in_grabheader = false;
     let mut grab_name = String::new();
     let mut grab_variable = String::new();
+    let mut in_grabelement = false;
+    let mut grab_element_name = String::new();
+    let mut grab_element_variable = String::new();
 
     loop {
         buf.clear();
@@ -500,6 +523,14 @@ fn parse_request_body(
                         in_verify = true;
                         verify_callback.clear();
                         verify_args.clear();
+                        verify_require_features.clear();
+                        verify_exclude_features.clear();
+                    }
+                    "require-feature" if in_verify => {
+                        in_verify_require_feature = true;
+                    }
+                    "exclude-feature" if in_verify => {
+                        in_verify_exclude_feature = true;
                     }
                     "arg" if in_verify => {
                         in_arg = true;
@@ -510,6 +541,11 @@ fn parse_request_body(
                         in_grabheader = true;
                         grab_name.clear();
                         grab_variable.clear();
+                    }
+                    "grabelement" => {
+                        in_grabelement = true;
+                        grab_element_name.clear();
+                        grab_element_variable.clear();
                     }
                     _ => {}
                 }
@@ -576,10 +612,8 @@ fn parse_request_body(
                     }
                     "substitute" if in_data => {
                         if !substitute_name.is_empty() {
-                            data_substitutions.push((
-                                substitute_name.clone(),
-                                substitute_value.clone(),
-                            ));
+                            data_substitutions
+                                .push((substitute_name.clone(), substitute_value.clone()));
                         }
                         in_substitute = false;
                     }
@@ -617,11 +651,27 @@ fn parse_request_body(
                         }
                         in_arg = false;
                     }
+                    "feature" if in_verify_require_feature => {
+                        verify_require_features.push(text_buf.trim().to_string());
+                    }
+                    "feature" if in_verify_exclude_feature => {
+                        verify_exclude_features.push(text_buf.trim().to_string());
+                    }
+                    "require-feature" if in_verify => {
+                        in_verify_require_feature = false;
+                    }
+                    "exclude-feature" if in_verify => {
+                        in_verify_exclude_feature = false;
+                    }
                     "verify" => {
                         req.verifications.push(Verification {
                             callback: verify_callback.clone(),
                             args: verify_args.clone(),
+                            require_features: verify_require_features.clone(),
+                            exclude_features: verify_exclude_features.clone(),
                         });
+                        in_verify_require_feature = false;
+                        in_verify_exclude_feature = false;
                         in_verify = false;
                     }
 
@@ -632,12 +682,25 @@ fn parse_request_body(
                     "variable" if in_grabheader => {
                         grab_variable = text_buf.trim().to_string();
                     }
+                    "name" if in_grabelement => {
+                        grab_element_name = text_buf.trim().to_string();
+                    }
+                    "variable" if in_grabelement => {
+                        grab_element_variable = text_buf.trim().to_string();
+                    }
                     "grabheader" => {
                         req.grab_headers.push(GrabHeader {
                             name: grab_name.clone(),
                             variable: grab_variable.clone(),
                         });
                         in_grabheader = false;
+                    }
+                    "grabelement" => {
+                        req.grab_elements.push(GrabElement {
+                            name: grab_element_name.clone(),
+                            variable: grab_element_variable.clone(),
+                        });
+                        in_grabelement = false;
                     }
 
                     _ => {}
@@ -923,12 +986,42 @@ mod tests {
             } => {
                 assert_eq!(path, &PathBuf::from("Resource/test.xml"));
                 assert_eq!(content_type, "text/xml");
-                assert_eq!(substitutions, &vec![(
-                    "$sharee:".to_string(),
-                    "$cuaddr2:".to_string(),
-                )]);
+                assert_eq!(
+                    substitutions,
+                    &vec![("$sharee:".to_string(), "$cuaddr2:".to_string(),)]
+                );
             }
             other => panic!("Expected file body, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn parse_grabelement() {
+        let xml = r#"<?xml version="1.0"?>
+        <caldavtest>
+            <start/>
+            <test-suite name="GrabElement">
+                <test name="1">
+                    <request>
+                        <method>REPORT</method>
+                        <ruri>/dav/cal/user01/calendar/</ruri>
+                        <grabelement>
+                            <name>/{DAV:}multistatus/{DAV:}sync-token</name>
+                            <variable>$synctoken1:</variable>
+                        </grabelement>
+                    </request>
+                </test>
+            </test-suite>
+            <end/>
+        </caldavtest>"#;
+
+        let result = parse_test_xml(xml, Path::new("grabelement.xml")).unwrap();
+        let req = &result.test_suites[0].tests[0].requests[0];
+        assert_eq!(req.grab_elements.len(), 1);
+        assert_eq!(
+            req.grab_elements[0].name,
+            "/{DAV:}multistatus/{DAV:}sync-token"
+        );
+        assert_eq!(req.grab_elements[0].variable, "$synctoken1:");
     }
 }

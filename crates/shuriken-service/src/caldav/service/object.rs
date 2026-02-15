@@ -165,7 +165,7 @@ pub async fn put_calendar_object(
 
                 // Update existing instance
 
-                let sync_revision = existing_inst.sync_revision + 1;
+                let sync_revision = collection_synctoken + 1;
                 let _updated_instance = instance::update_instance(
                     tx,
                     existing_inst.id,

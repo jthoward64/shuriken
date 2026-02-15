@@ -30,7 +30,7 @@ fn build_item_href(
     recurrence_id: Option<&str>,
 ) -> ServiceResult<Href> {
     let mut segments = base_location.segments().to_vec();
-    segments.push(PathSegment::Item(ResourceIdentifier::Id(instance.id)));
+    segments.push(PathSegment::item_from_slug(format!("{}.ics", instance.slug)));
 
     let location = ResourceLocation::from_segments(segments).map_err(|e| {
         crate::error::ServiceError::ParseError(format!("Failed to build item location: {e}"))

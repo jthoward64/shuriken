@@ -36,6 +36,40 @@ impl std::fmt::Display for SyncCollectionError {
 
 impl std::error::Error for SyncCollectionError {}
 
+#[must_use]
+fn serialize_sync_token(token: i64) -> String {
+    format!("data:,{token}")
+}
+
+#[must_use]
+fn join_href_path(base_path: &str, child: &str) -> String {
+    let base = base_path.trim_end_matches('/');
+    let suffix = child.trim_start_matches('/');
+    format!("{base}/{suffix}")
+}
+
+fn parse_sync_token(raw: &str) -> Result<i64, SyncCollectionError> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Ok(0);
+    }
+
+    let unquoted = trimmed.trim_matches('"');
+    let normalized = if let Some(value) = unquoted.strip_prefix("data:,") {
+        value
+    } else if let Some((_, suffix)) = unquoted.rsplit_once("data:,") {
+        suffix
+    } else {
+        unquoted
+    };
+
+    normalized
+        .parse()
+        .map_err(|_e| SyncCollectionError::InvalidSyncToken {
+            token: raw.to_string(),
+        })
+}
+
 /// ## Summary
 /// Main REPORT method dispatcher for `WebDAV`.
 ///
@@ -240,16 +274,10 @@ async fn build_sync_collection_response(
     use shuriken_rfc::rfc::dav::core::{DavProperty, Href, PropstatResponse, QName};
 
     // Parse sync token (0 for initial sync, otherwise parse as i64)
-    let baseline_token: i64 = if sync.sync_token.is_empty() {
-        0
-    } else {
-        sync.sync_token.parse().map_err(|e| {
-            tracing::warn!(token = %sync.sync_token, error = %e, "Invalid sync token format");
-            SyncCollectionError::InvalidSyncToken {
-                token: sync.sync_token.clone(),
-            }
-        })?
-    };
+    let baseline_token: i64 = parse_sync_token(&sync.sync_token).map_err(|e| {
+        tracing::warn!(token = %sync.sync_token, error = %e, "Invalid sync token format");
+        e
+    })?;
 
     if baseline_token > 0 && retention_revisions > 0 {
         let min_allowed = collection.synctoken.saturating_sub(retention_revisions);
@@ -284,7 +312,7 @@ async fn build_sync_collection_response(
     for inst in instances {
         // Build href using ResourceLocation for type-safe path construction
         let mut segments = resource_location.segments().to_vec();
-        segments.push(PathSegment::Item(ResourceIdentifier::Id(inst.id)));
+        segments.push(PathSegment::item_from_slug(format!("{}.ics", inst.slug)));
         let href = match ResourceLocation::from_segments(segments)
             .and_then(|loc| loc.serialize_to_full_path(true, false))
         {
@@ -292,10 +320,9 @@ async fn build_sync_collection_response(
             Err(e) => {
                 tracing::warn!("Failed to build href for sync-collection instance: {}", e);
                 // Fallback to manual construction
-                shuriken_rfc::rfc::dav::core::Href::new(format!(
-                    "{}{}.ics",
-                    base_path.trim_end_matches('/'),
-                    inst.slug
+                shuriken_rfc::rfc::dav::core::Href::new(join_href_path(
+                    base_path,
+                    &format!("{}.ics", inst.slug),
                 ))
             }
         };
@@ -334,13 +361,13 @@ async fn build_sync_collection_response(
     for tomb in tombstones {
         // Use first URI variant if available
         if let Some(uri) = tomb.uri_variants.iter().find_map(|opt| opt.as_ref()) {
-            let href = Href::new(format!("{}{}", base_path.trim_end_matches('/'), uri));
+            let href = Href::new(join_href_path(base_path, uri));
             multistatus.add_response(PropstatResponse::not_found(href));
         }
     }
 
     // Add sync-token to multistatus
-    multistatus.set_sync_token(collection.synctoken.to_string());
+    multistatus.set_sync_token(serialize_sync_token(collection.synctoken));
 
     Ok(multistatus)
 }

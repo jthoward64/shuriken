@@ -16,6 +16,11 @@ use shuriken_service::auth::{
     get_subjects_from_depot, get_terminal_collection_from_depot, serialize_acl_for_resource,
 };
 
+#[must_use]
+fn serialize_sync_token(token: i64) -> String {
+    format!("data:,{token}")
+}
+
 /// Load child instances for a collection (for depth=1 queries).
 async fn load_child_instances(
     conn: &mut shuriken_db::db::connection::DbConnection<'_>,
@@ -273,6 +278,14 @@ async fn resolve_single_property(qname: QName, ctx: &mut PropertyResolutionConte
                 ctx.not_found.push(DavProperty::empty(qname));
             }
         }
+        ("DAV:", "sync-token") => {
+            if let Some(coll) = ctx.collection {
+                ctx.found
+                    .push(DavProperty::text(qname, serialize_sync_token(coll.synctoken)));
+            } else {
+                ctx.not_found.push(DavProperty::empty(qname));
+            }
+        }
         ("urn:ietf:params:xml:ns:caldav", _) => {
             resolve_caldav_property(qname, ctx.collection, ctx.found, ctx.not_found);
         }
@@ -525,11 +538,18 @@ async fn get_properties_for_resource(
                 QName::dav("getetag"),
                 format!("\"{}\"", coll.synctoken),
             ));
+
+            // RFC 6578: DAV:sync-token
+            found.push(DavProperty::text(
+                QName::dav("sync-token"),
+                serialize_sync_token(coll.synctoken),
+            ));
         }
     } else if propfind_req.is_propname() {
         // Return property names only (empty values)
         found.push(DavProperty::empty(QName::dav("displayname")));
         found.push(DavProperty::empty(QName::dav("resourcetype")));
+        found.push(DavProperty::empty(QName::dav("sync-token")));
     } else if let Some(requested_props) = propfind_req.requested_properties() {
         // Return only requested properties
         let mut ctx = PropertyResolutionContext {
