@@ -257,22 +257,19 @@ impl VTimezone {
         // TZOFFSETTO (required)
         let offset_to_str = component
             .get_property("TZOFFSETTO")
-            .and_then(|p| p.as_text())
+            .map(|p| p.raw_value.as_str())
             .ok_or(VTimezoneError::MissingProperty("TZOFFSETTO", kind_str))?;
         let offset_to = UtcOffset::parse(offset_to_str)?;
 
         // TZOFFSETFROM (required)
         let offset_from_str = component
             .get_property("TZOFFSETFROM")
-            .and_then(|p| p.as_text())
+            .map(|p| p.raw_value.as_str())
             .ok_or(VTimezoneError::MissingProperty("TZOFFSETFROM", kind_str))?;
         let offset_from = UtcOffset::parse(offset_from_str)?;
 
         // RRULE (optional)
-        let rrule = component
-            .get_property("RRULE")
-            .and_then(|p| p.as_text())
-            .map(String::from);
+        let rrule = component.get_property("RRULE").map(|p| p.raw_value.clone());
 
         // RDATE (optional, can be multiple)
         let rdates = component

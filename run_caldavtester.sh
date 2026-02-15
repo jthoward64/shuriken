@@ -107,10 +107,33 @@ echo
 RESULTS_FILENAME="shuriken-caldavtester-results-$(date +%Y%m%d-%H%M%S).log"
 RESULTS_FILE="$LOG_DIR/$RESULTS_FILENAME"
 
-docker compose -f docker-compose.caldavtester.yml run --rm caldavtester -- $@ | tee "$RESULTS_FILE"
+docker compose -f docker-compose.caldavtester.yml run --rm caldavtester -- $@ > "$RESULTS_FILE"
 ln -sf "$RESULTS_FILENAME" "$LOG_DIR/shuriken-caldavtester-results-latest.log"
 
 TEST_RESULT=${PIPESTATUS[0]}
+
+echo
+echo "--------------------------------------------------------------"
+echo "Result summary (from $RESULTS_FILE)"
+grep -E "FAILED \(ok=|OK \(ok=" "$RESULTS_FILE" | tail -1
+
+echo
+echo "Top status code mismatches"
+grep "HTTP Status Code Wrong" "$RESULTS_FILE" \
+    | sed 's/^ *//' \
+    | sort \
+    | uniq -c \
+    | sort -rn \
+    | head -10
+
+echo
+echo "Top verifier failures"
+grep "Failed Verifier:" "$RESULTS_FILE" \
+    | sed 's/^ *//' \
+    | sort \
+    | uniq -c \
+    | sort -rn \
+    | head -10
 
 echo
 echo "--------------------------------------------------------------"

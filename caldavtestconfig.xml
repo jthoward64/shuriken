@@ -48,8 +48,8 @@ limitations under the License.
     <!-- <feature>brief</feature> -->				    <!-- Brief header for PROPFIND, REPORT (not implemented) -->
     <!-- <feature>bulk-post</feature> -->				<!-- Bulk POST requests (not implemented) -->
     <!-- <feature>ctag</feature> -->					<!-- ctag extension (not implemented) -->
-    <feature>current-user-principal</feature>			<!-- current-user-principal extension -->
-    <feature>directory listing</feature> 				<!-- GET on collection -->
+    <!-- <feature>current-user-principal</feature> -->		<!-- current-user-principal extension (not implemented) -->
+    <!-- <feature>directory listing</feature> -->			<!-- GET on collection (not implemented) -->
     <!-- <feature>extended-principal-search</feature> -->	<!-- Extended principal-property-search REPORT extension (not implemented) -->
     <!-- <feature>expand-property</feature> -->			<!-- Expand property REPORT (not implemented) -->
     <!-- <feature>only-proxy-groups</feature> -->		<!-- Group-membership only includes delegated-to groups -->

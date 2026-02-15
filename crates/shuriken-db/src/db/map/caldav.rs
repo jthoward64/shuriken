@@ -21,13 +21,13 @@ use shuriken_rfc::rfc::ical::expand::TimeZoneResolver;
 /// component IDs. Returns a vector of index entries ready for batch insertion.
 ///
 /// ## Parameters
-/// - `component_map`: `HashMap` from tree insertion mapping `(component_name, uid)` to `component_id`
+/// - `component_map`: `HashMap` from tree insertion mapping `(component_name, uid, recurrence_id)` to `component_id`
 #[must_use]
 #[expect(clippy::implicit_hasher)]
 pub fn build_cal_indexes(
     entity_id: Uuid,
     ical: &ICalendar,
-    component_map: &HashMap<(String, Option<String>), Uuid>,
+    component_map: &HashMap<(String, Option<String>, Option<String>), Uuid>,
     resolver: &mut TimeZoneResolver,
 ) -> Vec<NewCalIndex> {
     let mut indexes = Vec::new();
@@ -75,6 +75,7 @@ END:VCALENDAR";
             (
                 "VEVENT".to_string(),
                 Some("test-uid@example.com".to_string()),
+                None,
             ),
             Uuid::nil(),
         );
@@ -103,7 +104,7 @@ END:VCALENDAR";
 fn build_indexes_recursive(
     entity_id: Uuid,
     component: &Component,
-    component_map: &HashMap<(String, Option<String>), Uuid>,
+    component_map: &HashMap<(String, Option<String>, Option<String>), Uuid>,
     resolver: &mut TimeZoneResolver,
     indexes: &mut Vec<NewCalIndex>,
 ) {
@@ -113,7 +114,10 @@ fn build_indexes_recursive(
     {
         // Look up the real component ID from the database mapping
         let uid = component.uid().map(String::from);
-        let key = (component.name.clone(), uid.clone());
+        let recurrence_id = component
+            .get_property("RECURRENCE-ID")
+            .map(|prop| prop.raw_value.clone());
+        let key = (component.name.clone(), uid.clone(), recurrence_id);
 
         if let Some(&component_id) = component_map.get(&key) {
             if let Some(index) = build_cal_index(entity_id, component_id, component, resolver) {

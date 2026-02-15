@@ -25,6 +25,7 @@ pub fn routes() -> anyhow::Result<Router> {
         .push(
             Router::with_path(DAV_ROUTE_COMPONENT)
                 .hoop(DavPathMiddleware)
+                // TODO: Add /api/dav/principal/ route for CalDAVTester principal collection.
                 .push(caldav::routes()?)
                 .push(carddav::routes()?),
         ))

@@ -15,8 +15,8 @@ use shuriken_rfc::rfc::ical::core::ICalendar;
 use shuriken_rfc::rfc::vcard::core::VCard;
 
 /// Type alias for the component ID mapping returned by tree insertion.
-/// Maps `(component_name, uid)` tuples to their database `component_id` values.
-pub type ComponentIdMap = HashMap<(String, Option<String>), uuid::Uuid>;
+/// Maps `(component_name, uid, recurrence_id)` tuples to their database `component_id` values.
+pub type ComponentIdMap = HashMap<(String, Option<String>, Option<String>), uuid::Uuid>;
 
 /// ## Summary
 /// Inserts an iCalendar component tree with proper ID mapping.
@@ -200,7 +200,10 @@ fn insert_component_recursive<'a>(
             && kind.is_schedulable()
         {
             let uid = component.uid().map(String::from);
-            let key = (component.name.clone(), uid);
+            let recurrence_id = component
+                .get_property("RECURRENCE-ID")
+                .map(|prop| prop.raw_value.clone());
+            let key = (component.name.clone(), uid, recurrence_id);
             component_map.insert(key, component_id);
         }
 

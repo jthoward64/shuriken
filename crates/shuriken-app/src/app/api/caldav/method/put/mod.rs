@@ -313,7 +313,10 @@ async fn perform_put(
         }
         Err(e) => {
             let err_msg = e.to_string();
-            if err_msg.contains("invalid iCalendar") || err_msg.contains("not valid UTF-8") {
+            if err_msg.contains("invalid iCalendar")
+                || err_msg.contains("not valid UTF-8")
+                || err_msg.contains("invalid VTIMEZONE component")
+            {
                 Err(PutError::InvalidCalendarData(err_msg))
             } else if err_msg.contains("precondition failed") {
                 Ok(PutResult::PreconditionFailed)
