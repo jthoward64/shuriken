@@ -88,19 +88,23 @@ pub enum RequestBody {
     File {
         path: PathBuf,
         content_type: String,
+        substitutions: Vec<(String, String)>,
     },
     /// Direct body content
     Inline {
         content: String,
         content_type: String,
+        substitutions: Vec<(String, String)>,
     },
 }
 
 /// Authentication configuration
 #[derive(Debug, Clone)]
-pub struct AuthConfig {
-    pub user: String,
-    pub password: String,
+pub enum AuthConfig {
+    /// No authentication (auth="no")
+    None,
+    /// Basic authentication with user/password
+    Basic { user: String, password: String },
 }
 
 /// Response verification specification
@@ -176,16 +180,16 @@ fn parse_test_xml(xml: &str, source_path: &Path) -> Result<CalDavTest> {
                     "end" => in_end = true,
                     "test-suite" => {
                         let name = get_attr(e, "name").unwrap_or_default();
-                        let ignore = get_attr(e, "ignore")
-                            .is_ok_and(|v| v == "yes");
+                        let ignore = get_attr(e, "ignore").is_ok_and(|v| v == "yes");
                         let suite = parse_test_suite_body(&mut reader, &mut buf, name, ignore)?;
                         test.test_suites.push(suite);
                         depth_stack.pop(); // parse_test_suite_body consumed the end tag
                     }
                     "request" if in_start || in_end => {
-                        let end_delete = get_attr(e, "end-delete")
-                            .is_ok_and(|v| v == "yes");
-                        let req = parse_request_body(&mut reader, &mut buf, end_delete)?;
+                        let end_delete = get_attr(e, "end-delete").is_ok_and(|v| v == "yes");
+                        let auth = parse_auth_attrs(e);
+                        let mut req = parse_request_body(&mut reader, &mut buf, end_delete)?;
+                        req.auth = auth;
                         if in_start {
                             test.start_requests.push(req);
                         } else {
@@ -284,8 +288,7 @@ fn parse_test_suite_body(
                     "exclude-feature" => in_exclude_feature = true,
                     "test" => {
                         let test_name = get_attr(e, "name").unwrap_or_default();
-                        let test_ignore = get_attr(e, "ignore")
-                            .is_ok_and(|v| v == "yes");
+                        let test_ignore = get_attr(e, "ignore").is_ok_and(|v| v == "yes");
                         let test = parse_test_body(reader, buf, test_name, test_ignore)?;
                         suite.tests.push(test);
                         depth -= 1; // parse consumed end tag
@@ -366,9 +369,10 @@ fn parse_test_body(
                     "require-feature" => in_require_feature = true,
                     "exclude-feature" => in_exclude_feature = true,
                     "request" => {
-                        let end_delete = get_attr(e, "end-delete")
-                            .is_ok_and(|v| v == "yes");
-                        let req = parse_request_body(reader, buf, end_delete)?;
+                        let end_delete = get_attr(e, "end-delete").is_ok_and(|v| v == "yes");
+                        let auth = parse_auth_attrs(e);
+                        let mut req = parse_request_body(reader, buf, end_delete)?;
+                        req.auth = auth;
                         test.requests.push(req);
                         depth -= 1; // parse consumed end tag
                     }
@@ -446,6 +450,12 @@ fn parse_request_body(
     let mut in_data = false;
     let mut data_content_type = String::new();
     let mut data_filepath: Option<String> = None;
+    let mut data_inline_content = String::new();
+    let mut data_substitutions: Vec<(String, String)> = Vec::new();
+    let mut data_depth = 0u32;
+    let mut in_substitute = false;
+    let mut substitute_name = String::new();
+    let mut substitute_value = String::new();
 
     let mut in_verify = false;
     let mut verify_callback = String::new();
@@ -477,6 +487,14 @@ fn parse_request_body(
                         in_data = true;
                         data_content_type.clear();
                         data_filepath = None;
+                        data_inline_content.clear();
+                        data_substitutions.clear();
+                        data_depth = 0;
+                    }
+                    "substitute" if in_data => {
+                        in_substitute = true;
+                        substitute_name.clear();
+                        substitute_value.clear();
                     }
                     "verify" => {
                         in_verify = true;
@@ -495,6 +513,10 @@ fn parse_request_body(
                     }
                     _ => {}
                 }
+
+                if in_data && tag != "data" {
+                    data_depth += 1;
+                }
             }
             Ok(Event::Empty(ref e)) => {
                 // Some elements may be self-closing, ignore them
@@ -503,11 +525,17 @@ fn parse_request_body(
             Ok(Event::Text(ref e)) => {
                 if let Ok(decoded) = reader.decoder().decode(e.as_ref()) {
                     text_buf.push_str(&decoded);
+                    if in_data && data_depth == 0 {
+                        data_inline_content.push_str(&decoded);
+                    }
                 }
             }
             Ok(Event::CData(ref e)) => {
                 if let Ok(decoded) = std::str::from_utf8(e.as_ref()) {
                     text_buf.push_str(decoded);
+                    if in_data && data_depth == 0 {
+                        data_inline_content.push_str(decoded);
+                    }
                 }
             }
             Ok(Event::End(ref e)) => {
@@ -527,7 +555,8 @@ fn parse_request_body(
                     }
                     "header" if !in_verify => {
                         if !header_name.is_empty() {
-                            req.headers.insert(header_name.clone(), header_value.clone());
+                            req.headers
+                                .insert(header_name.clone(), header_value.clone());
                         }
                         in_header = false;
                     }
@@ -539,14 +568,37 @@ fn parse_request_body(
                     "filepath" if in_data => {
                         data_filepath = Some(text_buf.trim().to_string());
                     }
+                    "name" if in_substitute => {
+                        substitute_name = text_buf.trim().to_string();
+                    }
+                    "value" if in_substitute => {
+                        substitute_value = text_buf.trim().to_string();
+                    }
+                    "substitute" if in_data => {
+                        if !substitute_name.is_empty() {
+                            data_substitutions.push((
+                                substitute_name.clone(),
+                                substitute_value.clone(),
+                            ));
+                        }
+                        in_substitute = false;
+                    }
                     "data" => {
                         if let Some(ref fp) = data_filepath {
                             req.body = Some(RequestBody::File {
                                 path: PathBuf::from(fp),
                                 content_type: data_content_type.clone(),
+                                substitutions: data_substitutions.clone(),
+                            });
+                        } else if !data_inline_content.trim().is_empty() {
+                            req.body = Some(RequestBody::Inline {
+                                content: data_inline_content.trim().to_string(),
+                                content_type: data_content_type.clone(),
+                                substitutions: data_substitutions.clone(),
                             });
                         }
                         in_data = false;
+                        data_depth = 0;
                     }
 
                     // Verify elements
@@ -590,6 +642,10 @@ fn parse_request_body(
 
                     _ => {}
                 }
+
+                if in_data && tag != "data" {
+                    data_depth = data_depth.saturating_sub(1);
+                }
                 text_buf.clear();
 
                 if depth == 0 {
@@ -611,10 +667,7 @@ fn parse_request_body(
 #[must_use]
 fn local_name(raw: &[u8]) -> String {
     let full = String::from_utf8_lossy(raw);
-    full.split(':')
-        .next_back()
-        .unwrap_or(&full)
-        .to_string()
+    full.split(':').next_back().unwrap_or(&full).to_string()
 }
 
 /// Get an attribute value from an element.
@@ -629,6 +682,32 @@ fn get_attr(
         }
     }
     Err(format!("attribute '{name}' not found"))
+}
+
+/// Parse authentication attributes from a `<request>` element.
+///
+/// Returns `Some(AuthConfig)` if auth attributes are present, `None` for default.
+fn parse_auth_attrs(e: &quick_xml::events::BytesStart<'_>) -> Option<AuthConfig> {
+    // auth="no" → explicitly disable authentication
+    if get_attr(e, "auth").is_ok_and(|v| v == "no") {
+        return Some(AuthConfig::None);
+    }
+
+    // user="..." pswd="..." → override credentials
+    let user = get_attr(e, "user").ok();
+    let pswd = get_attr(e, "pswd").ok();
+
+    match (user, pswd) {
+        (Some(u), Some(p)) => Some(AuthConfig::Basic {
+            user: u,
+            password: p,
+        }),
+        (Some(u), Option::None) => Some(AuthConfig::Basic {
+            user: u,
+            password: String::new(),
+        }),
+        _ => Option::None,
+    }
 }
 
 #[cfg(test)]
@@ -772,5 +851,84 @@ mod tests {
         assert_eq!(test.requests.len(), 2);
         assert_eq!(test.requests[0].method, "PUT");
         assert_eq!(test.requests[1].method, "GET");
+    }
+
+    #[test]
+    fn parse_data_inline_cdata_body() {
+        let xml = r#"<?xml version="1.0"?>
+        <caldavtest>
+            <start/>
+            <test-suite name="InlineData">
+                <test name="1">
+                    <request>
+                        <method>POST</method>
+                        <ruri>/path</ruri>
+                        <data>
+                            <content-type>text/plain</content-type>
+                            <![CDATA[hello inline body]]>
+                        </data>
+                    </request>
+                </test>
+            </test-suite>
+            <end/>
+        </caldavtest>"#;
+
+        let result = parse_test_xml(xml, Path::new("inline.xml")).unwrap();
+        let req = &result.test_suites[0].tests[0].requests[0];
+        match req.body.as_ref().expect("body should exist") {
+            RequestBody::Inline {
+                content,
+                content_type,
+                substitutions,
+            } => {
+                assert_eq!(content, "hello inline body");
+                assert_eq!(content_type, "text/plain");
+                assert!(substitutions.is_empty());
+            }
+            other => panic!("Expected inline body, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_data_file_with_substitutions() {
+        let xml = r#"<?xml version="1.0"?>
+        <caldavtest>
+            <start/>
+            <test-suite name="SubstituteData">
+                <test name="1">
+                    <request>
+                        <method>POST</method>
+                        <ruri>/path</ruri>
+                        <data>
+                            <content-type>text/xml</content-type>
+                            <filepath>Resource/test.xml</filepath>
+                            <substitute>
+                                <name>$sharee:</name>
+                                <value>$cuaddr2:</value>
+                            </substitute>
+                        </data>
+                    </request>
+                </test>
+            </test-suite>
+            <end/>
+        </caldavtest>"#;
+
+        let result = parse_test_xml(xml, Path::new("substitute.xml")).unwrap();
+        let req = &result.test_suites[0].tests[0].requests[0];
+        match req.body.as_ref().expect("body should exist") {
+            RequestBody::File {
+                path,
+                content_type,
+                substitutions,
+            } => {
+                assert_eq!(path, &PathBuf::from("Resource/test.xml"));
+                assert_eq!(content_type, "text/xml");
+                assert_eq!(substitutions, &vec![(
+                    "$sharee:".to_string(),
+                    "$cuaddr2:".to_string(),
+                )]);
+            }
+            other => panic!("Expected file body, got {other:?}"),
+        }
     }
 }

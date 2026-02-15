@@ -1,5 +1,8 @@
 # Shuriken CalDAVTester Module - Summary
 
+> Historical note: this document reflects an early implementation snapshot.
+> For current capabilities and remaining work, use `README.md` in this crate.
+
 ## Overview
 
 Successfully created `shuriken-caldavtester`, a new crate for executing Apple's CalDAV/CardDAV test suite against the Shuriken server. This module provides a clean, well-architected alternative to `shuriken-test` with better separation of concerns and testability.

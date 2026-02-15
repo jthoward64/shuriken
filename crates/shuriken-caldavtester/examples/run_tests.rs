@@ -12,7 +12,7 @@
 //! ```
 
 use shuriken_caldavtester::config;
-use shuriken_caldavtester::runner::{ServerConfig, TestRunner};
+use shuriken_caldavtester::runner::{ServerConfig, TestFailure, TestRunner};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -70,6 +70,11 @@ async fn main() -> anyhow::Result<()> {
             Err(e) => {
                 println!("  [ERR] {} — {e}", entry.path);
                 total.failed += 1;
+                total.failures.push(TestFailure {
+                    suite: entry.path.to_string(),
+                    test: "run_test_file".to_string(),
+                    message: e.to_string(),
+                });
             }
         }
     }

@@ -35,7 +35,7 @@ use shuriken_caldavtester::runner::TestRunner;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let mut runner = TestRunner::new().await?;
+    let mut runner = TestRunner::new()?;
     
     // Run a single test file
     let results = runner
@@ -52,7 +52,14 @@ async fn main() -> anyhow::Result<()> {
 ### Running via Example
 
 ```bash
-cargo run --example run_tests
+cargo run -p shuriken-caldavtester --example run_tests
+```
+
+### Running Selected Files
+
+```bash
+cargo run -p shuriken-caldavtester --example run_selected -- \
+    CalDAV/freebusy.xml CalDAV/acl.xml
 ```
 
 ### Variable Substitution
@@ -133,10 +140,23 @@ The following verification callbacks are implemented:
 - **`statusCode`**: Verify HTTP status code
 - **`header`**: Verify header exists
 - **`headerContains`**: Verify header contains value
-- **`propfindItems`**: Verify PROPFIND multistatus response (TODO)
-- **`calendarDataMatch`**: Verify calendar data content (TODO)
+- **`dataString`** / **`notDataString`**: Verify body contains / does not contain strings
+- **`propfindItems`**: Verify PROPFIND multistatus properties and statuses
+- **`propfindValues`**: Verify PROPFIND property values by regex
+- **`multistatusItems`**: Verify href/status sets in multistatus responses
+- **`prepostcondition`**: Verify DAV pre/postcondition error bodies
+- **`xmlElementMatch`**: Verify XPath-like XML element existence/value checks
+- **`xmlDataMatch`**: Compare response XML with filterable canonical matching
+- **`dataMatch`**: Compare raw response body against expected file content
+- **`calendarDataMatch`**: Compare iCalendar data with filters/timezone options
+- **`addressDataMatch`**: Compare vCard data with filters
+- **`jcalDataMatch`**: Compare jCal JSON body to expected file
+- **`jsonPointerMatch`**: Verify JSON pointer existence/value/null with wildcard support
+- **`freeBusy`**: Verify freebusy periods by FBTYPE
+- **`postFreeBusy`**: Verify schedule-response attendee freebusy and VEVENT counts
+- **`acl`** / **`aclItems`**: Verify ACL privilege sets
 
-Additional callbacks will be implemented as needed.
+Unknown callbacks are still tolerated as pass (with warning), but core suite callbacks are now implemented.
 
 ## Test Isolation
 
@@ -153,19 +173,21 @@ Each test execution:
 - ✅ XML parsing infrastructure
 - ✅ Test execution framework
 - ✅ Variable substitution context
-- ✅ Basic HTTP verifications (status, headers)
+- ✅ Full callback coverage for currently used CalDAV/CardDAV suite verifiers
 - ✅ Test result aggregation
-- ✅ Server management infrastructure
+- ✅ Detailed per-test failure recording/reporting
+- ✅ Focused single-file and selected-file runners
 
-### TODO
-- ⏳ Complete XML parser for all test elements
-- ⏳ Implement PROPFIND/multistatus verification
-- ⏳ Implement calendar data comparison
-- ⏳ Add authentication support
-- ⏳ Server lifecycle integration
-- ⏳ Feature capability checking
-- ⏳ Request body loading from files
-- ⏳ Test filtering and selection
+### In Progress / Remaining
+- ⏳ In-process server lifecycle integration in `server.rs` (runner currently assumes external server)
+- ⏳ Optional strict mode for unknown callbacks (currently warns + pass)
+- ⏳ Broader integration run stabilization against partially implemented app features
+
+### Historical TODOs (Completed)
+- ✅ PROPFIND/multistatus verification
+- ✅ Calendar/vCard/jCal/XML data comparison callbacks
+- ✅ Request body loading from files
+- ✅ Test filtering and selection via examples
 
 ## Attribution
 

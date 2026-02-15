@@ -5,7 +5,7 @@
 use crate::context::TestContext;
 use crate::error::{Error, Result};
 use crate::verification::{verify_response, Response, VerifyResult};
-use crate::xml::{CalDavTest, RequestBody, Test, TestRequest, TestSuite};
+use crate::xml::{AuthConfig, CalDavTest, RequestBody, Test, TestRequest, TestSuite};
 use reqwest::Client;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -27,6 +27,13 @@ pub struct TestFailure {
     pub suite: String,
     pub test: String,
     pub message: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum TestOutcome {
+    Passed,
+    Ignored,
+    Failed(String),
 }
 
 impl TestResults {
@@ -239,14 +246,23 @@ impl TestRunner {
         info!(suite = %suite.name, tests = suite.tests.len(), "Running suite");
 
         for test in &suite.tests {
-            match self.run_test(&suite.name, test).await {
-                Ok(true) => {
+            match self.run_test(test).await {
+                Ok(TestOutcome::Passed) => {
                     debug!(suite = %suite.name, test = %test.name, "PASS");
                     results.passed += 1;
                 }
-                Ok(false) => {
-                    // Failure details already logged and recorded inside run_test
+                Ok(TestOutcome::Ignored) => {
+                    debug!(suite = %suite.name, test = %test.name, "IGNORED");
+                    results.ignored += 1;
+                }
+                Ok(TestOutcome::Failed(message)) => {
+                    warn!(suite = %suite.name, test = %test.name, message = %message, "FAIL");
                     results.failed += 1;
+                    results.failures.push(TestFailure {
+                        suite: suite.name.clone(),
+                        test: test.name.clone(),
+                        message,
+                    });
                 }
                 Err(e) => {
                     warn!(suite = %suite.name, test = %test.name, error = %e, "ERROR");
@@ -270,20 +286,23 @@ impl TestRunner {
         results
     }
 
-    /// Execute a single test. Returns `Ok(true)` on pass, `Ok(false)` on
-    /// verification failure.
-    async fn run_test(&mut self, suite_name: &str, test: &Test) -> Result<bool> {
+    /// Execute a single test.
+    ///
+    /// Returns [`TestOutcome::Passed`] on success, [`TestOutcome::Ignored`]
+    /// when skipped by flags/features, and [`TestOutcome::Failed`] for
+    /// verifier-level failures.
+    async fn run_test(&mut self, test: &Test) -> Result<TestOutcome> {
         if test.ignore {
             debug!(test = %test.name, "Test skipped — ignored");
-            return Ok(true);
+            return Ok(TestOutcome::Ignored);
         }
         if let Some(missing) = self.missing_features(&test.require_features) {
             debug!(test = %test.name, missing = %missing, "Test skipped — missing features");
-            return Ok(true);
+            return Ok(TestOutcome::Ignored);
         }
         if let Some(excluded) = self.has_excluded_features(&test.exclude_features) {
             debug!(test = %test.name, excluded = %excluded, "Test skipped — excluded features");
-            return Ok(true);
+            return Ok(TestOutcome::Ignored);
         }
 
         debug!(
@@ -298,19 +317,35 @@ impl TestRunner {
 
             // Run verifications
             for verification in &request.verifications {
+                let substituted_args: HashMap<String, Vec<String>> = verification
+                    .args
+                    .iter()
+                    .map(|(k, values)| {
+                        (
+                            k.clone(),
+                            values.iter().map(|v| self.context.substitute(v)).collect(),
+                        )
+                    })
+                    .collect();
+
                 let result =
-                    verify_response(&response, &verification.callback, &verification.args)?;
+                    match verify_response(&response, &verification.callback, &substituted_args) {
+                        Ok(result) => result,
+                        Err(err) => {
+                            let message = format!(
+                                "request #{i} verifier '{}' errored: {err}",
+                                verification.callback
+                            );
+                            return Ok(TestOutcome::Failed(message));
+                        }
+                    };
 
                 if let VerifyResult::Fail(msg) = &result {
-                    warn!(
-                        suite = suite_name,
-                        test = %test.name,
-                        request_idx = i,
-                        callback = %verification.callback,
-                        message = %msg,
-                        "FAIL"
+                    let message = format!(
+                        "request #{i} verifier '{}' failed: {msg}",
+                        verification.callback
                     );
-                    return Ok(false);
+                    return Ok(TestOutcome::Failed(message));
                 }
             }
 
@@ -330,21 +365,20 @@ impl TestRunner {
             // Track end-deletes
             if request.end_delete {
                 if let Some(ruri) = &request.ruri {
-                    if let Ok(resolved) = self.context.substitute(ruri) {
-                        self.end_deletes.push(resolved);
-                    }
+                    let resolved = self.context.substitute(ruri);
+                    self.end_deletes.push(resolved);
                 }
             }
         }
 
-        Ok(true)
+        Ok(TestOutcome::Passed)
     }
 
     /// Execute an HTTP request and return the response.
     async fn execute_request(&self, request: &TestRequest) -> Result<Response> {
         let url = match &request.ruri {
             Some(ruri) => {
-                let path = self.context.substitute(ruri)?;
+                let path = self.context.substitute(ruri);
                 format!("{}{path}", self.config.base_url)
             }
             None => self.config.base_url.clone(),
@@ -358,23 +392,53 @@ impl TestRunner {
 
         // Add headers
         for (name, value) in &request.headers {
-            let value_subst = self.context.substitute(value)?;
+            let value_subst = self.context.substitute(value);
             req_builder = req_builder.header(name.as_str(), value_subst);
+        }
+
+        // Apply authentication
+        match &request.auth {
+            Some(AuthConfig::None) => {
+                // auth="no" → send without authentication
+            }
+            Some(AuthConfig::Basic { user, password }) => {
+                let user = self.context.substitute(user);
+                let password = self.context.substitute(password);
+                req_builder = req_builder.basic_auth(user, Some(password));
+            }
+            None => {
+                // Default: use user01/user01 basic auth
+                let user = self
+                    .context
+                    .get("$userid1:")
+                    .unwrap_or("user01")
+                    .to_string();
+                let password = self.context.get("$pswd1:").unwrap_or("user01").to_string();
+                req_builder = req_builder.basic_auth(user, Some(password));
+            }
         }
 
         // Add body if present
         if let Some(body) = &request.body {
             match body {
-                RequestBody::File { path, content_type } => {
+                RequestBody::File {
+                    path,
+                    content_type,
+                    substitutions,
+                } => {
                     let full_path = self.config.resource_dir.join(path);
                     if full_path.exists() {
-                        let data = std::fs::read_to_string(&full_path).map_err(|e| {
+                        let mut data = std::fs::read_to_string(&full_path).map_err(|e| {
                             Error::Other(format!(
                                 "Failed to read resource file {}: {e}",
                                 full_path.display()
                             ))
                         })?;
-                        let data = self.context.substitute(&data)?;
+                        for (name, value) in substitutions {
+                            let resolved_value = self.context.substitute(value);
+                            data = data.replace(name, &resolved_value);
+                        }
+                        let data = self.context.substitute(&data);
                         req_builder = req_builder
                             .header("Content-Type", content_type.as_str())
                             .body(data);
@@ -386,8 +450,14 @@ impl TestRunner {
                 RequestBody::Inline {
                     content,
                     content_type,
+                    substitutions,
                 } => {
-                    let data = self.context.substitute(content)?;
+                    let mut data = content.clone();
+                    for (name, value) in substitutions {
+                        let resolved_value = self.context.substitute(value);
+                        data = data.replace(name, &resolved_value);
+                    }
+                    let data = self.context.substitute(&data);
                     req_builder = req_builder
                         .header("Content-Type", content_type.as_str())
                         .body(data);
@@ -448,8 +518,7 @@ fn map_method(method: &str) -> Result<reqwest::Method> {
         "OPTIONS" => Ok(reqwest::Method::OPTIONS),
         "PATCH" => Ok(reqwest::Method::PATCH),
         // WebDAV methods
-        other => reqwest::Method::from_bytes(other.as_bytes())
-            .map_err(|e| Error::InvalidMethod(e)),
+        other => reqwest::Method::from_bytes(other.as_bytes()).map_err(|e| Error::InvalidMethod(e)),
     }
 }
 

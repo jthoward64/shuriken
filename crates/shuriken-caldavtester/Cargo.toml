@@ -19,6 +19,10 @@ salvo = { workspace = true, features = ["test"] }
 # XML parsing
 quick-xml = { workspace = true, features = ["serialize"] }
 serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Regex (lightweight, no std dependency)
+regex-lite = "0.1"
 
 # Logging
 tracing = { workspace = true }
