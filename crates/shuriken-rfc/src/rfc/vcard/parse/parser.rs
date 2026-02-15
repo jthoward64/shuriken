@@ -6,7 +6,7 @@ use super::values::{
     parse_address, parse_client_pid_map, parse_date_and_or_time, parse_gender, parse_organization,
     parse_structured_name, parse_timestamp, unescape_text,
 };
-use crate::rfc::vcard::core::{VCard, VCardProperty, VCardValue, VCardVersion};
+use crate::rfc::vcard::core::{VCard, VCardProperty, VCardPropertyNameValue, VCardValue, VCardVersion};
 
 /// Parses a vCard document into one or more vCards.
 ///
@@ -122,7 +122,7 @@ impl Parser {
             let content_line = parse_content_line(line, line_num)?;
 
             // Handle special properties
-            if content_line.name.as_str() == "VERSION" {
+            if content_line.name == VCardPropertyNameValue::new("VERSION") {
                 version = VCardVersion::from_str(&content_line.value).ok_or_else(|| {
                     ParseError::new(
                         ParseErrorKind::UnsupportedVersion,
@@ -151,10 +151,10 @@ impl Parser {
         let value_type = line
             .params
             .iter()
-            .find(|p| p.name.eq_ignore_ascii_case("VALUE"))
+            .find(|p| p.name == crate::rfc::vcard::core::VCardParameterNameValue::new("VALUE"))
             .and_then(|p| p.value());
 
-        let value = self.parse_property_value(&line.name, &line.value, value_type, line_num)?;
+        let value = self.parse_property_value(line.name.as_str(), &line.value, value_type, line_num)?;
 
         Ok(VCardProperty {
             group: line.group,

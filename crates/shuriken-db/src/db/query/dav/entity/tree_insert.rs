@@ -114,7 +114,7 @@ pub async fn insert_vcard_tree(
     for (prop_ord, vcard_prop) in vcard.properties.iter().enumerate() {
         let new_property = NewDavProperty {
             component_id,
-            name: &vcard_prop.name,
+            name: vcard_prop.name.as_str(),
             group: vcard_prop.group.as_deref(),
             value_type: crate::db::enums::ValueType::Text,
             value_text: Some(&vcard_prop.raw_value),
@@ -147,7 +147,7 @@ pub async fn insert_vcard_tree(
             let param_value = param.values.join(",");
             let new_parameter = NewDavParameter {
                 property_id,
-                name: Box::leak(param.name.clone().into_boxed_str()),
+                name: Box::leak(param.name.as_str().to_string().into_boxed_str()),
                 value: Box::leak(param_value.into_boxed_str()),
                 ordinal: param_ord as i32,
             };
@@ -212,7 +212,7 @@ fn insert_component_recursive<'a>(
             // Use raw_value for text storage
             let new_property = NewDavProperty {
                 component_id,
-                name: &prop.name,
+                name: prop.name.as_str(),
                 group: None,
                 value_type: crate::db::enums::ValueType::Text,
                 value_text: Some(&prop.raw_value),
@@ -245,7 +245,7 @@ fn insert_component_recursive<'a>(
                 let param_value = param.value().unwrap_or("");
                 let new_parameter = NewDavParameter {
                     property_id,
-                    name: Box::leak(param.name.clone().into_boxed_str()),
+                    name: Box::leak(param.name.as_str().to_string().into_boxed_str()),
                     value: Box::leak(param_value.to_string().into_boxed_str()),
                     ordinal: param_ord as i32,
                 };

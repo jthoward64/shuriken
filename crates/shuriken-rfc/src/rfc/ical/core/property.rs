@@ -1,6 +1,6 @@
 //! iCalendar property and content line types (RFC 5545 §3.1, §3.8).
 
-use super::{Parameter, Value};
+use super::{Parameter, PropertyName, Value};
 
 /// A raw content line as parsed from iCalendar text.
 ///
@@ -8,8 +8,8 @@ use super::{Parameter, Value};
 /// Preserves the original raw value for round-trip fidelity.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ContentLine {
-    /// Property name (normalized to uppercase).
-    pub name: String,
+    /// Property name (preserves original casing, compares case-insensitively).
+    pub name: PropertyName,
     /// Parameters in order of appearance.
     pub params: Vec<Parameter>,
     /// Raw value string (after unfolding, before unescaping).
@@ -21,7 +21,7 @@ impl ContentLine {
     #[must_use]
     pub fn new(name: impl Into<String>, value: impl Into<String>) -> Self {
         Self {
-            name: name.into(),
+            name: PropertyName::new(name),
             params: Vec::new(),
             raw_value: value.into(),
         }
@@ -35,7 +35,7 @@ impl ContentLine {
         value: impl Into<String>,
     ) -> Self {
         Self {
-            name: name.into(),
+            name: PropertyName::new(name),
             params,
             raw_value: value.into(),
         }
@@ -44,9 +44,8 @@ impl ContentLine {
     /// Returns the parameter with the given name.
     #[must_use]
     pub fn get_param(&self, name: &str) -> Option<&Parameter> {
-        self.params
-            .iter()
-            .find(|p| p.name.eq_ignore_ascii_case(name))
+        let search_name = super::ParameterName::new(name);
+        self.params.iter().find(|p| p.name == search_name)
     }
 
     /// Returns the value of a parameter.
@@ -81,8 +80,8 @@ impl ContentLine {
 /// for round-trip fidelity.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Property {
-    /// Property name (normalized to uppercase).
-    pub name: String,
+    /// Property name (preserves original casing, compares case-insensitively).
+    pub name: PropertyName,
     /// Parameters in order of appearance.
     pub params: Vec<Parameter>,
     /// Parsed value.
@@ -97,7 +96,7 @@ impl Property {
     pub fn text(name: impl Into<String>, value: impl Into<String>) -> Self {
         let value_str = value.into();
         Self {
-            name: name.into(),
+            name: PropertyName::new(name),
             params: Vec::new(),
             value: Value::Text(value_str.clone()),
             raw_value: value_str,
@@ -108,7 +107,7 @@ impl Property {
     #[must_use]
     pub fn integer(name: impl Into<String>, value: i32) -> Self {
         Self {
-            name: name.into(),
+            name: PropertyName::new(name),
             params: Vec::new(),
             value: Value::Integer(value),
             raw_value: value.to_string(),
@@ -120,7 +119,7 @@ impl Property {
     pub fn datetime(name: impl Into<String>, dt: super::DateTime) -> Self {
         let raw = dt.to_string();
         Self {
-            name: name.into(),
+            name: PropertyName::new(name),
             params: Vec::new(),
             value: Value::DateTime(dt),
             raw_value: raw,
@@ -132,7 +131,7 @@ impl Property {
     pub fn date(name: impl Into<String>, d: super::Date) -> Self {
         let raw = d.to_string();
         Self {
-            name: name.into(),
+            name: PropertyName::new(name),
             params: vec![Parameter::value_type("DATE")],
             value: Value::Date(d),
             raw_value: raw,
@@ -144,7 +143,7 @@ impl Property {
     pub fn duration(name: impl Into<String>, d: super::Duration) -> Self {
         let raw = d.to_string();
         Self {
-            name: name.into(),
+            name: PropertyName::new(name),
             params: Vec::new(),
             value: Value::Duration(d),
             raw_value: raw,
@@ -165,9 +164,8 @@ impl Property {
     /// Returns the parameter with the given name.
     #[must_use]
     pub fn get_param(&self, name: &str) -> Option<&Parameter> {
-        self.params
-            .iter()
-            .find(|p| p.name.eq_ignore_ascii_case(name))
+        let search_name = super::ParameterName::new(name);
+        self.params.iter().find(|p| p.name == search_name)
     }
 
     /// Returns the value of a parameter.
@@ -311,7 +309,7 @@ mod tests {
     #[test]
     fn property_text() {
         let prop = Property::text("SUMMARY", "Meeting");
-        assert_eq!(prop.name, "SUMMARY");
+        assert_eq!(prop.name.as_str(), "SUMMARY");
         assert_eq!(prop.as_text(), Some("Meeting"));
     }
 

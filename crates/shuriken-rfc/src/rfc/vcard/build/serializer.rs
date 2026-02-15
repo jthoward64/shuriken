@@ -70,8 +70,8 @@ fn canonical_property_order(props: &[VCardProperty]) -> Vec<&VCardProperty> {
             }
             (None, None) => {
                 // Sort by property name priority
-                let pri_a = property_priority(&a.name);
-                let pri_b = property_priority(&b.name);
+                let pri_a = property_priority(a.name.as_str());
+                let pri_b = property_priority(b.name.as_str());
                 pri_a.cmp(&pri_b)
             }
         }
@@ -130,7 +130,7 @@ fn serialize_property(prop: &VCardProperty, output: &mut String) {
     }
 
     // Property name - preserve original casing
-    line.push_str(&prop.name);
+    line.push_str(prop.name.as_str());
 
     // Parameters
     for param in &prop.params {
@@ -149,7 +149,7 @@ fn serialize_property(prop: &VCardProperty, output: &mut String) {
 fn serialize_parameter(param: &VCardParameter, output: &mut String) {
     output.push(';');
     // Preserve original parameter name casing
-    output.push_str(&param.name);
+    output.push_str(param.name.as_str());
     output.push('=');
 
     if param.values.is_empty() {
@@ -380,7 +380,7 @@ fn serialize_utc_offset(offset: VCardUtcOffset, output: &mut String) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::rfc::vcard::core::{VCard, VCardProperty, VCardVersion};
+    use crate::rfc::vcard::core::{VCard, VCardProperty, VCardPropertyNameValue, VCardVersion};
 
     #[test]
     fn serialize_simple_vcard() {
@@ -448,7 +448,7 @@ mod tests {
         let name = StructuredName::simple("Doe", "John");
         card.add_property(VCardProperty {
             group: None,
-            name: "N".to_string(),
+            name: VCardPropertyNameValue::new("N"),
             params: Vec::new(),
             value: VCardValue::StructuredName(name),
             raw_value: "Doe;John;;;".to_string(),

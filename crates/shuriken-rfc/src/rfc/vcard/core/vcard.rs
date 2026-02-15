@@ -130,16 +130,18 @@ impl VCard {
     /// Returns all properties with the given name.
     #[must_use]
     pub fn get_properties(&self, name: &str) -> Vec<&VCardProperty> {
+        let search_name = super::VCardPropertyNameValue::new(name);
         self.properties
             .iter()
-            .filter(|p| p.name.eq_ignore_ascii_case(name))
+            .filter(|p| p.name == search_name)
             .collect()
     }
 
     /// Returns the first property with the given name.
     #[must_use]
     pub fn get_property(&self, name: &str) -> Option<&VCardProperty> {
-        self.properties.iter().find(|p| p.name.eq_ignore_ascii_case(name))
+        let search_name = super::VCardPropertyNameValue::new(name);
+        self.properties.iter().find(|p| p.name == search_name)
     }
 
     /// Returns the FN (formatted name) value.

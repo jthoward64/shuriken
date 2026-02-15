@@ -165,6 +165,7 @@ END:VCARD\r\n";
 mod tests {
     use super::*;
     use crate::rfc::vcard::core::VCardVersion;
+    use crate::rfc::vcard::core::{VCardParameterNameValue, VCardPropertyNameValue};
     use crate::rfc::vcard::parse::parse_single;
 
     #[test]
@@ -175,7 +176,7 @@ mod tests {
         let fn_prop = vcard
             .properties
             .iter()
-            .find(|p| p.name == "FN")
+            .find(|p| p.name == VCardPropertyNameValue::new("FN"))
             .expect("should have FN");
         assert_eq!(fn_prop.raw_value, "Simon Perreault");
     }
@@ -188,7 +189,7 @@ mod tests {
         let email = vcard
             .properties
             .iter()
-            .find(|p| p.name == "EMAIL")
+            .find(|p| p.name == VCardPropertyNameValue::new("EMAIL"))
             .expect("should have EMAIL");
         assert_eq!(email.raw_value, "john.doe@example.com");
     }
@@ -200,7 +201,7 @@ mod tests {
         let n = vcard
             .properties
             .iter()
-            .find(|p| p.name == "N")
+            .find(|p| p.name == VCardPropertyNameValue::new("N"))
             .expect("should have N");
         assert!(n.raw_value.contains("Public"));
         assert!(n.raw_value.contains("John"));
@@ -213,7 +214,7 @@ mod tests {
         let org = vcard
             .properties
             .iter()
-            .find(|p| p.name == "ORG")
+            .find(|p| p.name == VCardPropertyNameValue::new("ORG"))
             .expect("should have ORG");
         assert!(org.raw_value.contains("Acme"));
     }
@@ -225,7 +226,7 @@ mod tests {
         let addrs: Vec<_> = vcard
             .properties
             .iter()
-            .filter(|p| p.name == "ADR")
+            .filter(|p| p.name == VCardPropertyNameValue::new("ADR"))
             .collect();
         assert_eq!(addrs.len(), 2);
     }
@@ -237,7 +238,7 @@ mod tests {
         let categories = vcard
             .properties
             .iter()
-            .find(|p| p.name == "CATEGORIES")
+            .find(|p| p.name == VCardPropertyNameValue::new("CATEGORIES"))
             .expect("should have CATEGORIES");
         assert!(categories.raw_value.contains("WORK"));
         assert!(categories.raw_value.contains("FRIEND"));
@@ -250,7 +251,7 @@ mod tests {
         let uid = vcard
             .properties
             .iter()
-            .find(|p| p.name == "UID")
+            .find(|p| p.name == VCardPropertyNameValue::new("UID"))
             .expect("should have UID");
         assert!(uid.raw_value.contains("f81d4fae"));
     }
@@ -268,7 +269,7 @@ mod tests {
         let gender = vcard
             .properties
             .iter()
-            .find(|p| p.name == "GENDER")
+            .find(|p| p.name == VCardPropertyNameValue::new("GENDER"))
             .expect("should have GENDER");
         assert!(gender.raw_value.contains('F'));
     }
@@ -280,7 +281,7 @@ mod tests {
         let emails: Vec<_> = vcard
             .properties
             .iter()
-            .filter(|p| p.name == "EMAIL")
+            .filter(|p| p.name == VCardPropertyNameValue::new("EMAIL"))
             .collect();
         assert_eq!(emails.len(), 2);
 
@@ -289,6 +290,6 @@ mod tests {
             .iter()
             .find(|e| e.raw_value.contains("work"))
             .expect("should have work email");
-        assert!(work_email.params.iter().any(|p| p.name == "PREF"));
+        assert!(work_email.params.iter().any(|p| p.name == VCardParameterNameValue::new("PREF")));
     }
 }

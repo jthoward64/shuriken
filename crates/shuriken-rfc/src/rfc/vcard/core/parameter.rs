@@ -1,12 +1,14 @@
 //! vCard parameter types (RFC 6350).
 
+use super::VCardParameterNameValue;
+
 /// A vCard parameter.
 ///
 /// Parameters can have multiple values (e.g., TYPE=home,work).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VCardParameter {
-    /// Parameter name (preserves original casing).
-    pub name: String,
+    /// Parameter name (preserves original casing, compares case-insensitively).
+    pub name: VCardParameterNameValue,
     /// Parameter values.
     pub values: Vec<String>,
 }
@@ -16,7 +18,7 @@ impl VCardParameter {
     #[must_use]
     pub fn new(name: impl Into<String>, value: impl Into<String>) -> Self {
         Self {
-            name: name.into(),
+            name: VCardParameterNameValue::new(name),
             values: vec![value.into()],
         }
     }
@@ -25,7 +27,7 @@ impl VCardParameter {
     #[must_use]
     pub fn multi(name: impl Into<String>, values: Vec<String>) -> Self {
         Self {
-            name: name.into(),
+            name: VCardParameterNameValue::new(name),
             values,
         }
     }
@@ -162,7 +164,7 @@ mod tests {
     #[test]
     fn parameter_single_value() {
         let param = VCardParameter::new("type", "home");
-        assert_eq!(param.name, "type"); // Preserves original casing
+        assert_eq!(param.name.as_str(), "type"); // Preserves original casing
         assert_eq!(param.value(), Some("home"));
     }
 
@@ -178,7 +180,7 @@ mod tests {
     #[test]
     fn pref_parameter() {
         let param = VCardParameter::pref(1);
-        assert_eq!(param.name, "PREF");
+        assert_eq!(param.name.as_str(), "PREF");
         assert_eq!(param.value(), Some("1"));
     }
 }

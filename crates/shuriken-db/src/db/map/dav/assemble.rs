@@ -8,6 +8,7 @@ use base64::{Engine as _, engine::general_purpose::STANDARD};
 use crate::model::dav::component::DavComponent;
 use crate::model::dav::parameter::DavParameter;
 use crate::model::dav::property::DavProperty;
+use shuriken_rfc::rfc::vcard::core::VCardPropertyNameValue;
 use shuriken_rfc::rfc::ical::build as ical_build;
 use shuriken_rfc::rfc::ical::core::{
     Component, ComponentKind, ContentLine, ICalendar, Parameter, Property,
@@ -213,7 +214,7 @@ fn build_vcard_property(prop: &DavProperty, params: &[DavParameter]) -> VCardPro
 
     VCardProperty {
         group: prop.group.clone(),
-        name: prop.name.clone(),
+        name: VCardPropertyNameValue::new(&prop.name),
         params,
         value: VCardValue::Unknown(raw_value.clone()),
         raw_value,

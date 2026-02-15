@@ -3,7 +3,7 @@
 //! vCard uses the same folding/unfolding rules as iCalendar (RFC 5545 §3.1).
 
 use super::error::{ParseError, ParseErrorKind, ParseResult};
-use crate::rfc::vcard::core::VCardParameter;
+use crate::rfc::vcard::core::{VCardParameter, VCardPropertyNameValue};
 
 /// Unfolds a vCard document by removing line continuations.
 ///
@@ -107,8 +107,8 @@ pub fn split_lines(input: &str) -> Vec<String> {
 pub struct ContentLine {
     /// Property group (e.g., "item1" in "item1.TEL").
     pub group: Option<String>,
-    /// Property name (preserves original casing).
-    pub name: String,
+    /// Property name (preserves original casing, compares case-insensitively).
+    pub name: VCardPropertyNameValue,
     /// Parameters.
     pub params: Vec<VCardParameter>,
     /// Raw value string.
@@ -162,7 +162,7 @@ pub fn parse_content_line(line: &str, line_num: usize) -> ParseResult<ContentLin
 
     Ok(ContentLine {
         group: group.map(String::from),
-        name: name.to_string(),
+        name: VCardPropertyNameValue::new(name),
         params,
         value: value.to_string(),
     })
@@ -337,7 +337,7 @@ mod tests {
     fn parse_simple_line() {
         let line = parse_content_line("FN:John Doe", 1).unwrap();
         assert!(line.group.is_none());
-        assert_eq!(line.name, "FN");
+        assert_eq!(line.name.as_str(), "FN");
         assert!(line.params.is_empty());
         assert_eq!(line.value, "John Doe");
     }
@@ -346,21 +346,21 @@ mod tests {
     fn parse_grouped_line() {
         let line = parse_content_line("item1.TEL:+1-555-555-5555", 1).unwrap();
         assert_eq!(line.group, Some("item1".to_string()));
-        assert_eq!(line.name, "TEL");
+        assert_eq!(line.name.as_str(), "TEL");
     }
 
     #[test]
     fn parse_with_parameters() {
         let line = parse_content_line("TEL;TYPE=home,voice;PREF=1:+1-555-555-5555", 1).unwrap();
-        assert_eq!(line.name, "TEL");
+        assert_eq!(line.name.as_str(), "TEL");
         assert_eq!(line.params.len(), 2);
 
         let type_param = &line.params[0];
-        assert_eq!(type_param.name, "TYPE");
+        assert_eq!(type_param.name.as_str(), "TYPE");
         assert_eq!(type_param.values, vec!["home", "voice"]);
 
         let pref_param = &line.params[1];
-        assert_eq!(pref_param.name, "PREF");
+        assert_eq!(pref_param.name.as_str(), "PREF");
         assert_eq!(pref_param.value(), Some("1"));
     }
 

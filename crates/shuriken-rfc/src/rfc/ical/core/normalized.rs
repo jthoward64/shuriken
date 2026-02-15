@@ -69,11 +69,38 @@ impl<T: ParseSized> NormalizedValue<T> {
 
 impl<T: ParseSized + PartialEq> PartialEq for NormalizedValue<T> {
     fn eq(&self, other: &Self) -> bool {
-        self.parsed == other.parsed
+        match (&self.parsed, &other.parsed) {
+            // If both are parsed successfully, compare the parsed values
+            (Some(a), Some(b)) => a == b,
+            // If neither is parsed (both unknown), compare original strings case-insensitively
+            (None, None) => self.original.eq_ignore_ascii_case(&other.original),
+            // If only one is parsed, they're not equal
+            _ => false,
+        }
     }
 }
 
 impl<T: ParseSized + Eq> Eq for NormalizedValue<T> {}
+
+impl<T: ParseSized + Ord> PartialOrd for NormalizedValue<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<T: ParseSized + Ord> Ord for NormalizedValue<T> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match (&self.parsed, &other.parsed) {
+            // If both are parsed successfully, compare the parsed values
+            (Some(a), Some(b)) => a.cmp(b),
+            // If neither is parsed (both unknown), compare original strings case-insensitively
+            (None, None) => self.original.to_ascii_lowercase().cmp(&other.original.to_ascii_lowercase()),
+            // Parsed values come before unparsed ones
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+        }
+    }
+}
 
 impl<T: ParseSized + fmt::Display> fmt::Display for NormalizedValue<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -107,7 +134,7 @@ macro_rules! define_names {
         $($variant:ident => $string:expr),* $(,)?
     ) => {
         $(#[$meta])*
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
         $vis enum $enum_name {
             $($variant,)*
         }

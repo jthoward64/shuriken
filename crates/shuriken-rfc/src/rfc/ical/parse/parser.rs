@@ -66,7 +66,7 @@ fn parse_component(
         .next()
         .ok_or_else(|| ParseError::new(ParseErrorKind::MissingBegin, 1, 1))?;
 
-    if begin_line.name != "BEGIN" {
+    if begin_line.name != crate::rfc::ical::core::PropertyName::new("BEGIN") {
         return Err(ParseError::new(ParseErrorKind::MissingBegin, line_num, 1));
     }
 

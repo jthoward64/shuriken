@@ -226,6 +226,7 @@ END:VCALENDAR\r\n";
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::rfc::ical::core::{ParameterName, PropertyName};
     use crate::rfc::ical::parse::parse;
 
     #[test]
@@ -242,7 +243,7 @@ mod tests {
         // Check for RRULE property
         let events = ical.events();
         let event = events[0];
-        assert!(event.properties.iter().any(|p| p.name == "RRULE"));
+        assert!(event.properties.iter().any(|p| p.name == PropertyName::new("RRULE")));
     }
 
     #[test]
@@ -280,7 +281,7 @@ mod tests {
         assert!(alarm.get_property("REPEAT").is_some());
         assert!(alarm.get_property("DURATION").is_some());
         let trigger = alarm.get_property("TRIGGER").expect("trigger present");
-        assert!(trigger.params.iter().any(|p| p.name == "RELATED"));
+        assert!(trigger.params.iter().any(|p| p.name == ParameterName::new("RELATED")));
     }
 
     #[test]
@@ -293,7 +294,7 @@ mod tests {
         assert_eq!(action.as_text(), Some("AUDIO"));
         assert!(alarm.get_property("ATTACH").is_some());
         let trigger = alarm.get_property("TRIGGER").expect("trigger present");
-        assert!(trigger.params.iter().any(|p| p.name == "VALUE"));
+        assert!(trigger.params.iter().any(|p| p.name == ParameterName::new("VALUE")));
     }
 
     #[test]
@@ -311,7 +312,7 @@ mod tests {
         let attendees: Vec<_> = event
             .properties
             .iter()
-            .filter(|p| p.name == "ATTENDEE")
+            .filter(|p| p.name == PropertyName::new("ATTENDEE"))
             .collect();
         assert_eq!(attendees.len(), 2);
     }
@@ -325,13 +326,13 @@ mod tests {
         let dtstart = event
             .properties
             .iter()
-            .find(|p| p.name == "DTSTART")
+            .find(|p| p.name == PropertyName::new("DTSTART"))
             .expect("should have DTSTART");
         assert!(
             dtstart
                 .params
                 .iter()
-                .any(|p| p.name == "VALUE" && p.value() == Some("DATE"))
+                .any(|p| p.name == ParameterName::new("VALUE") && p.value() == Some("DATE"))
         );
     }
 
@@ -340,7 +341,7 @@ mod tests {
         let ical = parse(VEVENT_WITH_GEO).expect("should parse");
         let events = ical.events();
         let event = events[0];
-        assert!(event.properties.iter().any(|p| p.name == "GEO"));
+        assert!(event.properties.iter().any(|p| p.name == PropertyName::new("GEO")));
     }
 
     #[test]
@@ -348,6 +349,6 @@ mod tests {
         let ical = parse(VEVENT_WITH_EXDATE).expect("should parse");
         let events = ical.events();
         let event = events[0];
-        assert!(event.properties.iter().any(|p| p.name == "EXDATE"));
+        assert!(event.properties.iter().any(|p| p.name == PropertyName::new("EXDATE")));
     }
 }

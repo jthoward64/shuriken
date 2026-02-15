@@ -123,7 +123,7 @@ fn map_vcard_property<'a>(
 
     properties.push(NewDavProperty {
         component_id,
-        name: &prop.name,
+        name: prop.name.as_str(),
         group: prop.group.as_deref(),
         value_type,
         value_text,
@@ -170,7 +170,7 @@ fn map_vcard_parameter(
     parameters: &mut Vec<NewDavParameter<'static>>,
 ) {
     // Leak all strings for 'static lifetime
-    let name_static = Box::leak(param.name.clone().into_boxed_str()) as &'static str;
+    let name_static = Box::leak(param.name.as_str().to_string().into_boxed_str()) as &'static str;
     let value_static = Box::leak(param.values.join(",").into_boxed_str()) as &'static str;
 
     parameters.push(NewDavParameter {

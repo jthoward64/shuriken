@@ -2,6 +2,8 @@
 
 use std::fmt;
 
+use super::ParameterName;
+
 /// A single iCalendar property parameter.
 ///
 /// Parameters modify or provide metadata for a property value.
@@ -10,8 +12,8 @@ use std::fmt;
 /// The `TZID` is a parameter with name `TZID` and value `America/New_York`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Parameter {
-    /// Parameter name (preserves original casing).
-    pub name: String,
+    /// Parameter name (preserves original casing, compares case-insensitively).
+    pub name: ParameterName,
     /// Parameter values. Most parameters have one value, but some
     /// (like MEMBER) can have multiple comma-separated values.
     pub values: Vec<String>,
@@ -22,7 +24,7 @@ impl Parameter {
     #[must_use]
     pub fn new(name: impl Into<String>, value: impl Into<String>) -> Self {
         Self {
-            name: name.into(),
+            name: ParameterName::new(name),
             values: vec![value.into()],
         }
     }
@@ -31,7 +33,7 @@ impl Parameter {
     #[must_use]
     pub fn with_values(name: impl Into<String>, values: Vec<String>) -> Self {
         Self {
-            name: name.into(),
+            name: ParameterName::new(name),
             values,
         }
     }
@@ -242,7 +244,7 @@ mod tests {
     fn parameter_name_preserves_case() {
         let paramLower = Parameter::new("tzid", "Europe/London");
         let paramUpper = Parameter::new("TZID", "Europe/London");
-        assert_eq!(paramLower.name, "tzid"); // Preserves original casing
-        assert_eq!(paramUpper.name, "TZID"); // Preserves original casing
+        assert_eq!(paramLower.name.as_str(), "tzid"); // Preserves original casing
+        assert_eq!(paramUpper.name.as_str(), "TZID"); // Preserves original casing
     }
 }

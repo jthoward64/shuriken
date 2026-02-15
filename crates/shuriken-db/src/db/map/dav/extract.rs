@@ -2,7 +2,7 @@
 
 use crate::db::enums::ValueType;
 use crate::db::pg_types::{PgInterval, PgTstzRange};
-use shuriken_rfc::rfc::ical::core::{Component, Value};
+use shuriken_rfc::rfc::ical::core::{Component, PropertyName, Value};
 use shuriken_rfc::rfc::ical::expand::TimeZoneResolver;
 use shuriken_rfc::rfc::vcard::core::{VCard, VCardValue};
 
@@ -345,7 +345,7 @@ pub(super) fn extract_ical_uid(component: &Component) -> Option<String> {
     component
         .properties
         .iter()
-        .find(|p| p.name == "UID")
+        .find(|p| p.name == PropertyName::new("UID"))
         .and_then(|p| p.value.as_text())
         .map(String::from)
 }
@@ -626,13 +626,13 @@ mod tests {
             name: "VEVENT".to_string(),
             properties: vec![
                 Property {
-                    name: "SUMMARY".to_string(),
+                    name: PropertyName::new("SUMMARY"),
                     params: vec![],
                     value: Value::Text("Test Event".to_string()),
                     raw_value: "Test Event".to_string(),
                 },
                 Property {
-                    name: "UID".to_string(),
+                    name: PropertyName::new("UID"),
                     params: vec![],
                     value: Value::Text("unique-id-123".to_string()),
                     raw_value: "unique-id-123".to_string(),
@@ -655,7 +655,7 @@ mod tests {
             kind: Some(ComponentKind::Event),
             name: "VEVENT".to_string(),
             properties: vec![Property {
-                name: "SUMMARY".to_string(),
+                name: PropertyName::new("SUMMARY"),
                 params: vec![],
                 value: Value::Text("Test Event".to_string()),
                 raw_value: "Test Event".to_string(),

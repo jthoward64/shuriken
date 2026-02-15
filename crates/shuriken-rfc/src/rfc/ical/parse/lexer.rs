@@ -199,7 +199,7 @@ pub fn parse_content_line(line: &str, line_num: usize) -> ParseResult<ContentLin
     let value = &line[colon_pos + 1..];
 
     Ok(ContentLine {
-        name,
+        name: crate::rfc::ical::core::PropertyName::new(name),
         params,
         raw_value: value.to_string(),
     })
@@ -395,7 +395,7 @@ mod tests {
     fn parse_simple_line() {
         let line = "SUMMARY:Team Meeting";
         let result = parse_content_line(line, 1).unwrap();
-        assert_eq!(result.name, "SUMMARY");
+        assert_eq!(result.name.as_str(), "SUMMARY");
         assert!(result.params.is_empty());
         assert_eq!(result.raw_value, "Team Meeting");
     }
@@ -404,9 +404,9 @@ mod tests {
     fn parse_line_with_params() {
         let line = "DTSTART;TZID=America/New_York:20260123T120000";
         let result = parse_content_line(line, 1).unwrap();
-        assert_eq!(result.name, "DTSTART");
+        assert_eq!(result.name.as_str(), "DTSTART");
         assert_eq!(result.params.len(), 1);
-        assert_eq!(result.params[0].name, "TZID");
+        assert_eq!(result.params[0].name.as_str(), "TZID");
         assert_eq!(result.params[0].value(), Some("America/New_York"));
         assert_eq!(result.raw_value, "20260123T120000");
     }

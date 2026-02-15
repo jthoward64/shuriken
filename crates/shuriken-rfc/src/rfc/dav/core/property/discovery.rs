@@ -59,7 +59,7 @@ pub fn supported_report_set(collection_type: CollectionType) -> String {
         CollectionType::Collection => {
             // Plain collections only support sync-collection
             // Note: Outer <D:supported-report-set> wrapper is added by multistatus serializer
-            r#"<D:supported-report>
+            r#"<D:supported-report xmlns:D="DAV:">
     <D:report><D:sync-collection/></D:report>
   </D:supported-report>"#
                 .to_string()

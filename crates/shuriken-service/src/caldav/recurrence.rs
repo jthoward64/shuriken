@@ -3,7 +3,7 @@
 use crate::error::{ServiceError, ServiceResult};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use rrule::{RRule, RRuleSet, Tz, Unvalidated};
-use shuriken_rfc::rfc::ical::core::{Component, DateTime as IcalDateTime};
+use shuriken_rfc::rfc::ical::core::{Component, DateTime as IcalDateTime, PropertyName};
 use shuriken_rfc::rfc::ical::expand::TimeZoneResolver;
 
 /// Extracted recurrence data from a VEVENT component.
@@ -328,7 +328,7 @@ mod tests {
 
         // Add DTSTART (20260101T100000Z)
         component.add_property(Property {
-            name: "DTSTART".to_string(),
+            name: PropertyName::new("DTSTART"),
             params: vec![],
             value: Value::DateTime(IcalDateTime {
                 year: 2026,
@@ -344,7 +344,7 @@ mod tests {
 
         // Add DTEND (20260101T110000Z)
         component.add_property(Property {
-            name: "DTEND".to_string(),
+            name: PropertyName::new("DTEND"),
             params: vec![],
             value: Value::DateTime(IcalDateTime {
                 year: 2026,
@@ -386,7 +386,7 @@ mod tests {
         component.add_property(Property::text("RRULE", "FREQ=DAILY;COUNT=2"));
 
         component.add_property(Property {
-            name: "DTSTART".to_string(),
+            name: PropertyName::new("DTSTART"),
             params: vec![Parameter::tzid("Test/Fixed")],
             value: Value::DateTime(IcalDateTime {
                 year: 2026,
@@ -401,7 +401,7 @@ mod tests {
         });
 
         component.add_property(Property {
-            name: "DTEND".to_string(),
+            name: PropertyName::new("DTEND"),
             params: vec![Parameter::tzid("Test/Fixed")],
             value: Value::DateTime(IcalDateTime {
                 year: 2026,

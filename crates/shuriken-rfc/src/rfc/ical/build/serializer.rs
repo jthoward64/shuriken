@@ -4,7 +4,9 @@
 
 use super::escape::{escape_param_value, escape_text};
 use super::fold::fold_line;
-use crate::rfc::ical::core::{Component, ComponentKind, ICalendar, Parameter, Property, Value};
+use crate::rfc::ical::core::{
+    Component, ComponentKind, ICalendar, Parameter, ParameterName, Property, PropertyName, Value,
+};
 
 /// Serializes an iCalendar document to a string.
 #[must_use]
@@ -41,7 +43,7 @@ pub fn serialize_component(component: &Component) -> String {
 /// Serializes a property to a string.
 #[must_use]
 pub fn serialize_property(prop: &Property) -> String {
-    let mut line = prop.name.clone();
+    let mut line = prop.name.as_str().to_string();
 
     // Serialize parameters in canonical order
     let ordered_params = canonical_param_order(&prop.params);
@@ -53,7 +55,11 @@ pub fn serialize_property(prop: &Property) -> String {
     line.push(':');
 
     // Use raw_value for round-trip fidelity, or serialize the parsed value
-    line.push_str(&serialize_value(&prop.value, &prop.raw_value, &prop.name));
+    line.push_str(&serialize_value(
+        &prop.value,
+        &prop.raw_value,
+        prop.name.as_str(),
+    ));
 
     fold_line(&line)
 }
@@ -61,7 +67,7 @@ pub fn serialize_property(prop: &Property) -> String {
 /// Serializes a parameter to a string.
 #[must_use]
 pub fn serialize_parameter(param: &Parameter) -> String {
-    let mut result = param.name.clone();
+    let mut result = param.name.as_str().to_string();
     result.push('=');
 
     let values: Vec<String> = param.values.iter().map(|v| escape_param_value(v)).collect();
@@ -187,8 +193,9 @@ fn canonical_property_order(props: &[Property], kind: Option<ComponentKind>) -> 
 
     // First, add properties in defined order
     for &name in order {
+        let search_name = PropertyName::new(name);
         for prop in props {
-            if prop.name.eq_ignore_ascii_case(name) {
+            if prop.name == search_name {
                 ordered.push(prop);
             }
         }
@@ -196,7 +203,7 @@ fn canonical_property_order(props: &[Property], kind: Option<ComponentKind>) -> 
 
     // Then add remaining properties (including X-properties) in original order
     for prop in props {
-        if !order.iter().any(|&n| prop.name.eq_ignore_ascii_case(n)) {
+        if !order.iter().any(|&n| prop.name == PropertyName::new(n)) {
             ordered.push(prop);
         }
     }
@@ -232,8 +239,9 @@ fn canonical_param_order(params: &[Parameter]) -> Vec<&Parameter> {
     let mut ordered: Vec<&Parameter> = Vec::with_capacity(params.len());
 
     for name in &order {
+        let search_name = ParameterName::new(*name);
         for param in params {
-            if param.name.eq_ignore_ascii_case(name) {
+            if param.name == search_name {
                 ordered.push(param);
             }
         }
@@ -241,7 +249,7 @@ fn canonical_param_order(params: &[Parameter]) -> Vec<&Parameter> {
 
     // Add remaining parameters
     for param in params {
-        if !order.iter().any(|n| param.name.eq_ignore_ascii_case(n)) {
+        if !order.iter().any(|n| param.name == ParameterName::new(*n)) {
             ordered.push(param);
         }
     }

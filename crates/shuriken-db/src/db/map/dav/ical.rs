@@ -159,7 +159,7 @@ fn map_ical_property<'a>(
 
     properties.push(NewDavProperty {
         component_id,
-        name: &prop.name,
+        name: prop.name.as_str(),
         group: None,
         value_type,
         value_text,
@@ -208,7 +208,7 @@ fn map_ical_parameter(
     parameters: &mut Vec<NewDavParameter<'static>>,
 ) {
     // Join multiple values with comma if present - leak all strings for 'static
-    let name_static = Box::leak(param.name.clone().into_boxed_str()) as &'static str;
+    let name_static = Box::leak(param.name.as_str().to_string().into_boxed_str()) as &'static str;
     let value_static = Box::leak(param.values.join(",").into_boxed_str()) as &'static str;
 
     parameters.push(NewDavParameter {

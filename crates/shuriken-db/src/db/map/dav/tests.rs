@@ -3,10 +3,11 @@
 use super::ical::icalendar_to_db_models;
 use super::vcard::vcard_to_db_models;
 use shuriken_rfc::rfc::ical::core::{
-    Component, ComponentKind, ICalendar, Parameter, Property, Value,
+    Component, ComponentKind, ICalendar, Parameter, ParameterName, Property, PropertyName, Value,
 };
 use shuriken_rfc::rfc::vcard::core::{
-    VCard, VCardParameter, VCardProperty, VCardValue, VCardVersion,
+    VCard, VCardParameter, VCardParameterNameValue, VCardProperty, VCardPropertyNameValue,
+    VCardValue, VCardVersion,
 };
 
 #[test]
@@ -17,19 +18,19 @@ fn test_icalendar_to_db_models_simple_event() {
             name: "VCALENDAR".to_string(),
             properties: vec![
                 Property {
-                    name: "VERSION".to_string(),
+                    name: PropertyName::new("VERSION"),
                     params: vec![],
                     value: Value::Text("2.0".to_string()),
                     raw_value: "2.0".to_string(),
                 },
                 Property {
-                    name: "PRODID".to_string(),
+                    name: PropertyName::new("PRODID"),
                     params: vec![],
                     value: Value::Text("-//Test//Test//EN".to_string()),
                     raw_value: "-//Test//Test//EN".to_string(),
                 },
                 Property {
-                    name: "UID".to_string(),
+                    name: PropertyName::new("UID"),
                     params: vec![],
                     value: Value::Text("event-123".to_string()),
                     raw_value: "event-123".to_string(),
@@ -40,16 +41,16 @@ fn test_icalendar_to_db_models_simple_event() {
                 name: "VEVENT".to_string(),
                 properties: vec![
                     Property {
-                        name: "SUMMARY".to_string(),
+                        name: PropertyName::new("SUMMARY"),
                         params: vec![Parameter {
-                            name: "LANGUAGE".to_string(),
+                            name: ParameterName::new("LANGUAGE"),
                             values: vec!["en".to_string()],
                         }],
                         value: Value::Text("Test Event".to_string()),
                         raw_value: "Test Event".to_string(),
                     },
                     Property {
-                        name: "DTSTART".to_string(),
+                        name: PropertyName::new("DTSTART"),
                         params: vec![],
                         value: Value::Text("20260124T120000Z".to_string()),
                         raw_value: "20260124T120000Z".to_string(),
@@ -93,7 +94,7 @@ fn test_icalendar_to_db_models_without_uid() {
                 kind: Some(ComponentKind::Event),
                 name: "VEVENT".to_string(),
                 properties: vec![Property {
-                    name: "SUMMARY".to_string(),
+                    name: PropertyName::new("SUMMARY"),
                     params: vec![],
                     value: Value::Text("No UID Event".to_string()),
                     raw_value: "No UID Event".to_string(),
@@ -117,7 +118,7 @@ fn test_icalendar_to_db_models_nested_components() {
             kind: Some(ComponentKind::Calendar),
             name: "VCALENDAR".to_string(),
             properties: vec![Property {
-                name: "UID".to_string(),
+                name: PropertyName::new("UID"),
                 params: vec![],
                 value: Value::Text("event-with-alarm".to_string()),
                 raw_value: "event-with-alarm".to_string(),
@@ -130,7 +131,7 @@ fn test_icalendar_to_db_models_nested_components() {
                     kind: Some(ComponentKind::Alarm),
                     name: "VALARM".to_string(),
                     properties: vec![Property {
-                        name: "ACTION".to_string(),
+                        name: PropertyName::new("ACTION"),
                         params: vec![],
                         value: Value::Text("DISPLAY".to_string()),
                         raw_value: "DISPLAY".to_string(),
@@ -171,16 +172,16 @@ fn test_vcard_to_db_models_simple() {
         properties: vec![
             VCardProperty {
                 group: None,
-                name: "FN".to_string(),
-                params: vec![],
+                name: VCardPropertyNameValue::new("FN"),
+                params: vec[],
                 value: VCardValue::Text("John Doe".to_string()),
                 raw_value: "John Doe".to_string(),
             },
             VCardProperty {
                 group: None,
-                name: "EMAIL".to_string(),
+                name: VCardPropertyNameValue::new("EMAIL"),
                 params: vec![VCardParameter {
-                    name: "TYPE".to_string(),
+                    name: VCardParameterNameValue::new("TYPE"),
                     values: vec!["work".to_string()],
                 }],
                 value: VCardValue::Text("john@example.com".to_string()),
@@ -188,7 +189,7 @@ fn test_vcard_to_db_models_simple() {
             },
             VCardProperty {
                 group: None,
-                name: "UID".to_string(),
+                name: VCardPropertyNameValue::new("UID"),
                 params: vec![],
                 value: VCardValue::Text("vcard-123".to_string()),
                 raw_value: "vcard-123".to_string(),
@@ -223,7 +224,7 @@ fn test_vcard_to_db_models_without_uid() {
         version: VCardVersion::V3,
         properties: vec![VCardProperty {
             group: None,
-            name: "FN".to_string(),
+            name: VCardPropertyNameValue::new("FN"),
             params: vec![],
             value: VCardValue::Text("Jane Smith".to_string()),
             raw_value: "Jane Smith".to_string(),
@@ -243,14 +244,14 @@ fn test_vcard_to_db_models_with_multiple_parameters() {
         version: VCardVersion::V4,
         properties: vec![VCardProperty {
             group: None,
-            name: "TEL".to_string(),
+            name: VCardPropertyNameValue::new("TEL"),
             params: vec![
                 VCardParameter {
-                    name: "TYPE".to_string(),
+                    name: VCardParameterNameValue::new("TYPE"),
                     values: vec!["cell".to_string()],
                 },
                 VCardParameter {
-                    name: "PREF".to_string(),
+                    name: VCardParameterNameValue::new("PREF"),
                     values: vec!["1".to_string()],
                 },
             ],
