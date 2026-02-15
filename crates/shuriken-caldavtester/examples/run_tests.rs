@@ -1,7 +1,7 @@
 //! Example: Run the CalDAV / CardDAV test suite.
 //!
 //! ```sh
-//! # Run with default settings (assumes server at localhost:8080)
+//! # Run with default settings (in-process Salvo service)
 //! cargo run --example run_tests
 //!
 //! # Custom base URL
@@ -9,6 +9,9 @@
 //!
 //! # In-process mode (Salvo test API)
 //! CALDAV_TEST_IN_PROCESS=1 cargo run --example run_tests
+//!
+//! # External server mode (opt-out of in-process default)
+//! CALDAV_TEST_EXTERNAL=1 cargo run --example run_tests -- --external
 //!
 //! # Run ALL tests, not just the enabled ones
 //! CALDAV_TEST_ALL=1 cargo run --example run_tests
@@ -18,8 +21,8 @@
 //! ```
 
 use shuriken_caldavtester::config;
-use shuriken_caldavtester::server;
 use shuriken_caldavtester::runner::{ServerConfig, TestFailure, TestRunner};
+use shuriken_caldavtester::server;
 use std::sync::Arc;
 
 #[tokio::main]
@@ -34,8 +37,23 @@ async fn main() -> anyhow::Result<()> {
     let base_url = std::env::var("CALDAV_TEST_BASE_URL")
         .unwrap_or_else(|_| "http://localhost:8698".to_string());
     let run_all = std::env::var("CALDAV_TEST_ALL").is_ok();
-    let in_process = std::env::var("CALDAV_TEST_IN_PROCESS").is_ok();
-    let strict_callbacks = std::env::args().skip(1).any(|arg| arg == "--strict-callbacks");
+    let mut strict_callbacks = false;
+    let mut force_external = false;
+    for arg in std::env::args().skip(1) {
+        match arg.as_str() {
+            "--strict-callbacks" => strict_callbacks = true,
+            "--external" => force_external = true,
+            _ => {}
+        }
+    }
+
+    let in_process = if std::env::var("CALDAV_TEST_IN_PROCESS").is_ok() {
+        true
+    } else if force_external || std::env::var("CALDAV_TEST_EXTERNAL").is_ok() {
+        false
+    } else {
+        true
+    };
 
     if strict_callbacks {
         std::env::set_var("CALDAV_TEST_STRICT_CALLBACKS", "1");
@@ -60,9 +78,10 @@ async fn main() -> anyhow::Result<()> {
     };
 
     println!(
-        "Running {} test files (suite dir: {})",
+        "Running {} test files (suite dir: {}, mode: {})",
         entries.len(),
-        suite_dir.display()
+        suite_dir.display(),
+        if in_process { "in-process" } else { "external" }
     );
 
     let mut total = shuriken_caldavtester::runner::TestResults::default();

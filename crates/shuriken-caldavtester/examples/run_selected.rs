@@ -13,10 +13,13 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let mut strict_callbacks = false;
+    let mut force_external = false;
     let mut selected = Vec::new();
     for arg in std::env::args().skip(1) {
         if arg == "--strict-callbacks" {
             strict_callbacks = true;
+        } else if arg == "--external" {
+            force_external = true;
         } else {
             selected.push(arg);
         }
@@ -24,7 +27,7 @@ async fn main() -> anyhow::Result<()> {
 
     if selected.is_empty() {
         eprintln!(
-            "usage: cargo run -p shuriken-caldavtester --example run_selected -- [--strict-callbacks] <CalDAV/file1.xml> [CalDAV/file2.xml ...]"
+            "usage: cargo run -p shuriken-caldavtester --example run_selected -- [--strict-callbacks] [--external] <CalDAV/file1.xml> [CalDAV/file2.xml ...]"
         );
         std::process::exit(2);
     }
@@ -35,7 +38,13 @@ async fn main() -> anyhow::Result<()> {
 
     let base_url = std::env::var("CALDAV_TEST_BASE_URL")
         .unwrap_or_else(|_| "http://localhost:8698".to_string());
-    let in_process = std::env::var("CALDAV_TEST_IN_PROCESS").is_ok();
+    let in_process = if std::env::var("CALDAV_TEST_IN_PROCESS").is_ok() {
+        true
+    } else if force_external || std::env::var("CALDAV_TEST_EXTERNAL").is_ok() {
+        false
+    } else {
+        true
+    };
 
     let suite_dir = config::test_suite_dir();
     let tests_dir = suite_dir.join("tests");

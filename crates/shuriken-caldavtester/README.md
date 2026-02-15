@@ -52,10 +52,11 @@ async fn main() -> anyhow::Result<()> {
 ### Running via Example
 
 ```bash
+# Default mode is in-process (Salvo test API)
 cargo run -p shuriken-caldavtester --example run_tests
 
-# Run in-process against a Salvo Service (no external HTTP server)
-CALDAV_TEST_IN_PROCESS=1 cargo run -p shuriken-caldavtester --example run_tests
+# Force external HTTP server mode
+CALDAV_TEST_EXTERNAL=1 cargo run -p shuriken-caldavtester --example run_tests -- --external
 
 # Fail on any unknown verifier callback
 cargo run -p shuriken-caldavtester --example run_tests -- --strict-callbacks
@@ -74,7 +75,40 @@ cargo run -p shuriken-caldavtester --example run_selected -- \
 # Selected files in-process
 CALDAV_TEST_IN_PROCESS=1 cargo run -p shuriken-caldavtester --example run_selected -- \
     CalDAV/get.xml CalDAV/propfind.xml
+
+# Selected files against external server
+CALDAV_TEST_EXTERNAL=1 cargo run -p shuriken-caldavtester --example run_selected -- \
+        --external CalDAV/get.xml
 ```
+
+### LLM-Friendly Output
+
+Use the compact JSON runner to get token-friendly, actionable output:
+
+```bash
+# Enabled tests only, in-process by default
+cargo run -p shuriken-caldavtester --example run_llm
+
+# Include all suite files and cap output size
+cargo run -p shuriken-caldavtester --example run_llm -- \
+    --all --max-failures 20 --max-message-len 180
+
+# Include optional per-file pass/fail matrix (capped)
+cargo run -p shuriken-caldavtester --example run_llm -- \
+    --file-matrix --max-file-matrix 60
+
+# Strict callback mode + external server mode
+CALDAV_TEST_EXTERNAL=1 cargo run -p shuriken-caldavtester --example run_llm -- \
+    --strict-callbacks --external
+```
+
+The JSON report includes:
+
+- execution mode and file stats
+- pass/fail/ignored totals
+- top grouped failure patterns with suggested actions
+- truncated per-failure details (`max-failures` + `max-message-len`)
+- optional per-file matrix (`--file-matrix`, capped by `--max-file-matrix`)
 
 ### Local Postgres Bootstrap
 

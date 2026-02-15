@@ -8,7 +8,7 @@ use crate::verification::{verify_response, Response, VerifyResult};
 use crate::xml::{AuthConfig, CalDavTest, RequestBody, Test, TestRequest, TestSuite};
 use base64::Engine;
 use reqwest::Client;
-use salvo::http::header::{AUTHORIZATION, HeaderName};
+use salvo::http::header::{HeaderName, AUTHORIZATION};
 use salvo::http::{Method as SalvoMethod, ReqBody, StatusCode};
 use salvo::test::{RequestBuilder, ResponseExt};
 use std::collections::HashMap;
@@ -137,7 +137,10 @@ impl TestRunner {
     ///
     /// ## Errors
     /// Returns an error if the HTTP client cannot be built.
-    pub fn with_in_process_service(config: ServerConfig, service: Arc<salvo::Service>) -> Result<Self> {
+    pub fn with_in_process_service(
+        config: ServerConfig,
+        service: Arc<salvo::Service>,
+    ) -> Result<Self> {
         let mut runner = Self::with_config(config)?;
         runner.in_process_service = Some(service);
         Ok(runner)
@@ -483,7 +486,8 @@ impl TestRunner {
             .map_or_else(|| "/".to_string(), |ruri| self.context.substitute(ruri));
         let url = format!("http://127.0.0.1:5800{path}");
 
-        let method = SalvoMethod::from_bytes(request.method.as_bytes()).map_err(Error::InvalidMethod)?;
+        let method =
+            SalvoMethod::from_bytes(request.method.as_bytes()).map_err(Error::InvalidMethod)?;
         debug!(method = %request.method, url = %url, "HTTP request (in-process)");
 
         let mut req_builder = RequestBuilder::new(&url, method);
@@ -530,7 +534,11 @@ impl TestRunner {
         }
 
         let mut response = req_builder.send(service).await;
-        let status = response.status_code.unwrap_or(StatusCode::INTERNAL_SERVER_ERROR) as u16;
+        let status = u16::from(
+            response
+                .status_code
+                .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
+        );
         let headers = response
             .headers()
             .iter()
