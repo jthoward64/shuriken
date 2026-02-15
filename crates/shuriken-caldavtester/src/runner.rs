@@ -685,7 +685,11 @@ fn rewrite_apple_dav_path(target: &str) -> String {
         None => (target, None),
     };
 
-    let rewritten_path = if let Some(rest) = path.strip_prefix("/dav/calendars/") {
+    let rewritten_path = if path == "/.well-known/caldav" || path == "/.well-known/caldav/" {
+        "/api/dav/cal/".to_string()
+    } else if path == "/.well-known/carddav" || path == "/.well-known/carddav/" {
+        "/api/dav/card/".to_string()
+    } else if let Some(rest) = path.strip_prefix("/dav/calendars/") {
         format!("/api/dav/cal/{rest}")
     } else if let Some(rest) = path.strip_prefix("/dav/addressbooks/") {
         format!("/api/dav/card/{rest}")
@@ -701,11 +705,45 @@ fn rewrite_apple_dav_path(target: &str) -> String {
         path.to_string()
     };
 
+    let rewritten_path = rewrite_home_aliases(&rewritten_path);
+
     if let Some(query) = query {
         format!("{rewritten_path}?{query}")
     } else {
         rewritten_path
     }
+}
+
+fn rewrite_home_aliases(path: &str) -> String {
+    if path == "/api/dav/principal/" || path == "/api/dav/principal" {
+        let default_user = std::env::var("CALDAV_TEST_DEFAULT_USER")
+            .ok()
+            .filter(|v| !v.is_empty())
+            .unwrap_or_else(|| "user01".to_string());
+        return format!("/api/dav/principal/{default_user}/");
+    }
+
+    if let Some(rest) = path.strip_prefix("/api/dav/cal/") {
+        let parts: Vec<&str> = rest.trim_matches('/').split('/').collect();
+        if parts.len() == 1 && !parts[0].is_empty() {
+            return format!("/api/dav/cal/{}/calendar/", parts[0]);
+        }
+        if parts.len() == 2 && parts[1].ends_with(".ics") {
+            return format!("/api/dav/cal/{}/calendar/{}", parts[0], parts[1]);
+        }
+    }
+
+    if let Some(rest) = path.strip_prefix("/api/dav/card/") {
+        let parts: Vec<&str> = rest.trim_matches('/').split('/').collect();
+        if parts.len() == 1 && !parts[0].is_empty() {
+            return format!("/api/dav/card/{}/addressbook/", parts[0]);
+        }
+        if parts.len() == 2 && parts[1].ends_with(".vcf") {
+            return format!("/api/dav/card/{}/addressbook/{}", parts[0], parts[1]);
+        }
+    }
+
+    path.to_string()
 }
 
 #[cfg(test)]

@@ -873,7 +873,6 @@ pub fn server_features() -> HashSet<String> {
         "ctag",
         "sync-report",
         "current-user-principal",
-        "well-known",
     ]
     .iter()
     .map(|s| (*s).to_string())

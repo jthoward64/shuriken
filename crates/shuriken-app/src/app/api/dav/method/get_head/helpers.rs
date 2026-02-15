@@ -6,9 +6,11 @@ use salvo::{Depot, Request, Response};
 use shuriken_db::db::map::dav::{serialize_ical_tree, serialize_vcard_tree};
 use shuriken_db::db::query::dav::{entity, instance};
 use shuriken_db::model::dav::instance::DavInstance;
+use shuriken_service::auth::depot::get_path_location_from_depot;
 use shuriken_service::auth::{
-    Action, ResourceType, authorizer_from_depot, get_instance_from_depot,
-    get_resolved_location_from_depot, get_subjects_from_depot, get_terminal_collection_from_depot,
+    Action, PathSegment, ResourceIdentifier, ResourceType, authorizer_from_depot,
+    get_instance_from_depot, get_resolved_location_from_depot, get_subjects_from_depot,
+    get_terminal_collection_from_depot,
 };
 
 /// ## Summary
@@ -41,22 +43,25 @@ pub(super) async fn handle_get_or_head(
     let request_path = req.uri().path();
 
     // Prefer middleware-resolved values from depot
-    let (collection_id, slug) = match (
-        get_terminal_collection_from_depot(depot),
-        get_instance_from_depot(depot),
-    ) {
-        (Ok(coll), Ok(inst)) => (coll.id, inst.slug.clone()),
-        (Ok(coll), Err(_)) => {
-            // No instance slug; GET/HEAD requires an instance target
-            tracing::debug!(collection_id = %coll.id, "Instance slug missing in depot for GET/HEAD");
+    let collection = match get_terminal_collection_from_depot(depot) {
+        Ok(coll) => coll,
+        Err(_e) => {
+            tracing::debug!(path = %request_path, "Failed to resolve terminal collection");
             res.status_code(StatusCode::NOT_FOUND);
             return;
         }
-        _ => {
-            tracing::debug!(path = %request_path, "Failed to parse path");
-            res.status_code(StatusCode::NOT_FOUND);
-            return;
-        }
+    };
+    let collection_id = collection.id;
+
+    let slug = if let Ok(inst) = get_instance_from_depot(depot) {
+        inst.slug.clone()
+    } else if let Some(path_slug) = extract_item_slug_from_path_location(depot) {
+        tracing::debug!(collection_id = %collection_id, slug = %path_slug, "Using path-derived slug fallback for GET/HEAD");
+        path_slug
+    } else {
+        tracing::debug!(collection_id = %collection_id, "Instance slug missing in depot and path for GET/HEAD");
+        res.status_code(StatusCode::NOT_FOUND);
+        return;
     };
 
     if collection_id.is_nil() {
@@ -139,6 +144,20 @@ pub(super) async fn handle_get_or_head(
 
     // Set response headers and body
     set_response_headers_and_body(res, &instance, &canonical_bytes, is_head);
+}
+
+fn extract_item_slug_from_path_location(depot: &Depot) -> Option<String> {
+    let path_location = get_path_location_from_depot(depot).ok()?;
+
+    path_location.segments().iter().find_map(|seg| match seg {
+        PathSegment::Item(ResourceIdentifier::Slug(slug)) => Some(
+            slug.trim_end_matches(".ics")
+                .trim_end_matches(".vcf")
+                .to_string(),
+        ),
+        PathSegment::Item(ResourceIdentifier::Id(id)) => Some(id.to_string()),
+        _ => None,
+    })
 }
 async fn load_entity_bytes_for_instance(
     conn: &mut shuriken_db::db::connection::DbConnection<'_>,
