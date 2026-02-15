@@ -119,21 +119,25 @@ async fn apply_comp_filter(
 ) -> anyhow::Result<Vec<uuid::Uuid>> {
     let component_name = comp_filter.name.as_str();
 
-    // Build base query on cal_index
-    let query = cal_index::table
+    // Build base queries on cal_index (time-range) and dav_component (existence/property scope)
+    let cal_index_query = cal_index::table
         .filter(cal_index::component_type.eq(component_name))
         .filter(cal_index::deleted_at.is_null());
 
+    let component_query = dav_component::table
+        .filter(dav_component::name.eq(component_name))
+        .filter(dav_component::deleted_at.is_null());
+
     if comp_filter.is_not_defined {
-        let with_component_ids = query
-            .select(cal_index::entity_id)
+        let with_component_ids = component_query
+            .select(dav_component::entity_id)
             .distinct()
             .load::<uuid::Uuid>(conn)
             .await?;
 
-        let all_entity_ids = cal_index::table
-            .filter(cal_index::deleted_at.is_null())
-            .select(cal_index::entity_id)
+        let all_entity_ids = dav_instance::table
+            .filter(dav_instance::deleted_at.is_null())
+            .select(dav_instance::entity_id)
             .distinct()
             .load::<uuid::Uuid>(conn)
             .await?;
@@ -161,7 +165,9 @@ async fn apply_comp_filter(
 
         // Query non-recurring events from cal_index (rrule_text IS NULL)
         if start.is_some() || end.is_some() {
-            let mut boxed_query = query.filter(cal_index::rrule_text.is_null()).into_boxed();
+            let mut boxed_query = cal_index_query
+                .filter(cal_index::rrule_text.is_null())
+                .into_boxed();
 
             // Apply start constraint: event_end > range_start
             if let Some(range_start) = start {
@@ -188,7 +194,7 @@ async fn apply_comp_filter(
                 .await?;
         }
 
-        let recurring_rows = query
+        let recurring_rows = cal_index_query
             .filter(cal_index::rrule_text.is_not_null())
             .filter(cal_index::dtstart_utc.is_not_null())
             .select((
@@ -242,8 +248,8 @@ async fn apply_comp_filter(
 
         combined_ids
     } else {
-        query
-            .select(cal_index::entity_id)
+        component_query
+            .select(dav_component::entity_id)
             .distinct()
             .load::<uuid::Uuid>(conn)
             .await?
@@ -252,11 +258,109 @@ async fn apply_comp_filter(
     // Apply property filters (if present)
     if !comp_filter.prop_filters.is_empty() {
         let prop_filtered_ids =
-            apply_property_filters(conn, &entity_ids, &comp_filter.prop_filters).await?;
+            apply_property_filters(conn, &entity_ids, component_name, &comp_filter.prop_filters)
+                .await?;
         entity_ids = prop_filtered_ids;
     }
 
+    // Apply direct nested component existence filters (e.g. VEVENT -> VALARM)
+    if !comp_filter.comp_filters.is_empty() {
+        entity_ids =
+            apply_nested_comp_filters(conn, &entity_ids, component_name, &comp_filter.comp_filters)
+                .await?;
+    }
+
     Ok(entity_ids)
+}
+
+/// ## Summary
+/// Applies direct nested component filters under a parent component type.
+///
+/// This currently supports component existence and `is-not-defined` semantics
+/// for immediate children (e.g., `VEVENT` with child `VALARM`).
+async fn apply_nested_comp_filters(
+    conn: &mut DbConnection<'_>,
+    entity_ids: &[uuid::Uuid],
+    parent_component_name: &str,
+    child_filters: &[CompFilter],
+) -> anyhow::Result<Vec<uuid::Uuid>> {
+    use std::collections::{HashMap, HashSet};
+
+    if entity_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let parent_components: Vec<(uuid::Uuid, uuid::Uuid)> = dav_component::table
+        .filter(dav_component::entity_id.eq_any(entity_ids))
+        .filter(dav_component::name.eq(parent_component_name))
+        .filter(dav_component::deleted_at.is_null())
+        .select((dav_component::entity_id, dav_component::id))
+        .load::<(uuid::Uuid, uuid::Uuid)>(conn)
+        .await?;
+
+    if parent_components.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut entity_to_parents: HashMap<uuid::Uuid, Vec<uuid::Uuid>> = HashMap::new();
+    for (entity_id, component_id) in &parent_components {
+        entity_to_parents
+            .entry(*entity_id)
+            .or_default()
+            .push(*component_id);
+    }
+
+    let parent_ids: Vec<uuid::Uuid> = parent_components
+        .iter()
+        .map(|(_, component_id)| *component_id)
+        .collect();
+
+    let mut combined_entities: Option<HashSet<uuid::Uuid>> = None;
+
+    for child_filter in child_filters {
+        let child_name = child_filter.name.as_str();
+
+        let child_parent_ids: HashSet<uuid::Uuid> = dav_component::table
+            .filter(dav_component::parent_component_id.eq_any(&parent_ids))
+            .filter(dav_component::name.eq(child_name))
+            .filter(dav_component::deleted_at.is_null())
+            .select(dav_component::parent_component_id)
+            .load::<Option<uuid::Uuid>>(conn)
+            .await?
+            .into_iter()
+            .flatten()
+            .collect();
+
+        let mut matching_entities = HashSet::new();
+        for (entity_id, parent_component_ids) in &entity_to_parents {
+            let has_child = parent_component_ids
+                .iter()
+                .any(|parent_id| child_parent_ids.contains(parent_id));
+            let has_parent_without_child = parent_component_ids
+                .iter()
+                .any(|parent_id| !child_parent_ids.contains(parent_id));
+
+            if child_filter.is_not_defined {
+                if has_parent_without_child {
+                    matching_entities.insert(*entity_id);
+                }
+            } else if has_child {
+                matching_entities.insert(*entity_id);
+            }
+        }
+
+        combined_entities = Some(match combined_entities {
+            Some(mut existing) => {
+                existing.retain(|entity_id| matching_entities.contains(entity_id));
+                existing
+            }
+            None => matching_entities,
+        });
+    }
+
+    let mut result: Vec<uuid::Uuid> = combined_entities.unwrap_or_default().into_iter().collect();
+    result.sort_unstable();
+    Ok(result)
 }
 
 /// ## Summary
@@ -274,6 +378,7 @@ async fn apply_comp_filter(
 async fn apply_property_filters(
     conn: &mut DbConnection<'_>,
     entity_ids: &[uuid::Uuid],
+    component_name: &str,
     prop_filters: &[shuriken_rfc::rfc::dav::core::PropFilter],
 ) -> anyhow::Result<Vec<uuid::Uuid>> {
     use crate::db::schema::{dav_component, dav_property};
@@ -288,33 +393,62 @@ async fn apply_property_filters(
         let prop_name = prop_filter.name.to_uppercase();
 
         let matching_entity_ids = if prop_filter.is_not_defined {
-            // Property must NOT exist - find entities without this property
-            let entities_with_prop: Vec<uuid::Uuid> = dav_component::table
-                .inner_join(
-                    dav_property::table.on(dav_property::component_id.eq(dav_component::id)),
-                )
+            // Property must NOT exist on at least one matching component instance
+            let components: Vec<(uuid::Uuid, uuid::Uuid)> = dav_component::table
                 .filter(dav_component::entity_id.eq_any(entity_ids))
-                .filter(dav_property::name.eq(&prop_name))
-                .filter(dav_property::deleted_at.is_null())
-                .select(dav_component::entity_id)
-                .distinct()
-                .load::<uuid::Uuid>(conn)
+                .filter(dav_component::name.eq(component_name))
+                .filter(dav_component::deleted_at.is_null())
+                .select((dav_component::entity_id, dav_component::id))
+                .load::<(uuid::Uuid, uuid::Uuid)>(conn)
                 .await?;
 
-            // Return entities that DON'T have this property
-            entity_ids
-                .iter()
-                .filter(|id| !entities_with_prop.contains(id))
-                .copied()
-                .collect()
+            if components.is_empty() {
+                Vec::new()
+            } else {
+                let component_ids: Vec<uuid::Uuid> = components
+                    .iter()
+                    .map(|(_, component_id)| *component_id)
+                    .collect();
+
+                let components_with_prop: Vec<uuid::Uuid> = dav_property::table
+                    .filter(dav_property::component_id.eq_any(&component_ids))
+                    .filter(dav_property::name.eq(&prop_name))
+                    .filter(dav_property::deleted_at.is_null())
+                    .select(dav_property::component_id)
+                    .distinct()
+                    .load::<uuid::Uuid>(conn)
+                    .await?;
+
+                let with_prop_set: std::collections::HashSet<uuid::Uuid> =
+                    components_with_prop.into_iter().collect();
+
+                let mut entities = components
+                    .into_iter()
+                    .filter(|(_, component_id)| !with_prop_set.contains(component_id))
+                    .map(|(entity_id, _)| entity_id)
+                    .collect::<Vec<_>>();
+
+                entities.sort_unstable();
+                entities.dedup();
+                entities
+            }
         } else if let Some(text_match) = &prop_filter.text_match {
-            apply_text_match_filter(conn, entity_ids, prop_filter, &prop_name, text_match).await?
+            apply_text_match_filter(
+                conn,
+                entity_ids,
+                component_name,
+                prop_filter,
+                &prop_name,
+                text_match,
+            )
+            .await?
         } else if let Some(time_range) = &prop_filter.time_range {
             let mut query = dav_component::table
                 .inner_join(
                     dav_property::table.on(dav_property::component_id.eq(dav_component::id)),
                 )
                 .filter(dav_component::entity_id.eq_any(entity_ids))
+                .filter(dav_component::name.eq(component_name))
                 .filter(dav_property::name.eq(&prop_name))
                 .filter(dav_property::deleted_at.is_null())
                 .into_boxed();
@@ -335,6 +469,7 @@ async fn apply_property_filters(
                     dav_property::table.on(dav_property::component_id.eq(dav_component::id)),
                 )
                 .filter(dav_component::entity_id.eq_any(entity_ids))
+                .filter(dav_component::name.eq(component_name))
                 .filter(dav_property::name.eq(&prop_name))
                 .filter(dav_property::deleted_at.is_null())
                 .select(dav_component::entity_id)
@@ -350,6 +485,7 @@ async fn apply_property_filters(
             apply_param_filters(
                 conn,
                 &matching_entity_ids,
+                component_name,
                 &prop_name,
                 &prop_filter.param_filters,
                 prop_filter.test,
@@ -380,6 +516,7 @@ async fn apply_property_filters(
 async fn apply_text_match_filter(
     conn: &mut DbConnection<'_>,
     entity_ids: &[uuid::Uuid],
+    component_name: &str,
     prop_filter: &shuriken_rfc::rfc::dav::core::PropFilter,
     prop_name: &String,
     text_match: &shuriken_rfc::rfc::dav::core::TextMatch,
@@ -406,6 +543,7 @@ async fn apply_text_match_filter(
     let mut query = dav_component::table
         .inner_join(dav_property::table.on(dav_property::component_id.eq(dav_component::id)))
         .filter(dav_component::entity_id.eq_any(entity_ids))
+        .filter(dav_component::name.eq(component_name))
         .filter(dav_property::name.eq(prop_name))
         .filter(dav_property::deleted_at.is_null())
         .into_boxed();
@@ -527,6 +665,7 @@ fn build_property_time_range_sql(time_range: &TimeRange) -> Option<String> {
 async fn apply_param_filters(
     conn: &mut DbConnection<'_>,
     entity_ids: &[uuid::Uuid],
+    component_name: &str,
     prop_name: &str,
     param_filters: &[ParamFilter],
     test: shuriken_rfc::rfc::dav::core::FilterTest,
@@ -542,6 +681,7 @@ async fn apply_param_filters(
     let prop_ids: Vec<(uuid::Uuid, uuid::Uuid)> = dav_component::table
         .inner_join(dav_property::table.on(dav_property::component_id.eq(dav_component::id)))
         .filter(dav_component::entity_id.eq_any(entity_ids))
+        .filter(dav_component::name.eq(component_name))
         .filter(dav_property::name.eq(prop_name))
         .filter(dav_property::deleted_at.is_null())
         .filter(dav_component::deleted_at.is_null())

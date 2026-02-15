@@ -6,9 +6,10 @@ use quick_xml::events::Event;
 use super::error::{ParseError, ParseResult};
 use super::validate_numeric_char_refs;
 use crate::rfc::dav::core::{
-    AddressbookFilter, AddressbookQuery, CalendarFilter, CalendarQuery, CompFilter, FilterTest,
-    Href, MatchType, Namespace, ParamFilter, PropFilter, PropertyName, QName, RecurrenceExpansion,
-    ReportRequest, ReportType, SyncCollection, SyncLevel, TextMatch, TimeRange,
+    AddressbookFilter, AddressbookQuery, CalendarDataRequest, CalendarFilter, CalendarQuery,
+    CompFilter, ComponentSelection, FilterTest, Href, MatchType, Namespace, ParamFilter,
+    PropFilter, PropertyName, QName, RecurrenceExpansion, ReportRequest, ReportType,
+    SyncCollection, SyncLevel, TextMatch, TimeRange,
 };
 
 /// Parses a REPORT request body.
@@ -130,9 +131,14 @@ fn parse_calendar_query(xml: &[u8]) -> ParseResult<ReportRequest> {
                         }
                     }
                     "calendar-data" if in_prop => {
-                        // Parse calendar-data element for partial retrieval
-                        let qname = resolve_qname(e, &namespaces)?;
-                        properties.push(PropertyName::new(qname));
+                        let (property, calendar_data_expand) =
+                            parse_calendar_data_property(&mut reader, &mut buf, &namespaces)?;
+                        properties.push(property);
+                        if expand.is_none()
+                            && let Some(expand_from_calendar_data) = calendar_data_expand
+                        {
+                            expand = Some(expand_from_calendar_data);
+                        }
                     }
                     _ if in_prop && !in_filter => {
                         let qname = resolve_qname(e, &namespaces)?;
@@ -163,8 +169,7 @@ fn parse_calendar_query(xml: &[u8]) -> ParseResult<ReportRequest> {
                         }
                     }
                     "calendar-data" if in_prop => {
-                        let qname = resolve_qname(e, &namespaces)?;
-                        properties.push(PropertyName::new(qname));
+                        properties.push(PropertyName::calendar_data(CalendarDataRequest::full()));
                     }
                     _ if in_prop && !in_filter => {
                         let qname = resolve_qname(e, &namespaces)?;
@@ -219,6 +224,112 @@ fn parse_calendar_query(xml: &[u8]) -> ParseResult<ReportRequest> {
     };
 
     Ok(ReportRequest::calendar_query(query, properties))
+}
+
+/// Parses a non-empty `calendar-data` element and returns the corresponding property.
+fn parse_calendar_data_property(
+    reader: &mut Reader<&[u8]>,
+    buf: &mut Vec<u8>,
+    namespaces: &[(String, String)],
+) -> ParseResult<(PropertyName, Option<(TimeRange, RecurrenceExpansion)>)> {
+    let mut local_namespaces = namespaces.to_vec();
+    let mut selection_stack: Vec<ComponentSelection> = Vec::new();
+    let mut root_selection: Option<ComponentSelection> = None;
+    let mut expand: Option<(TimeRange, RecurrenceExpansion)> = None;
+
+    loop {
+        buf.clear();
+        match reader.read_event_into(buf) {
+            Ok(Event::Start(ref e)) => {
+                collect_namespaces(e, &mut local_namespaces)?;
+                let local_name_bytes = e.local_name();
+                let local_name = std::str::from_utf8(local_name_bytes.as_ref())?.to_owned();
+
+                match local_name.as_str() {
+                    "comp" => {
+                        let name = get_attribute(e, "name")?;
+                        selection_stack.push(ComponentSelection::new(name));
+                    }
+                    "prop" => {
+                        let name = get_attribute(e, "name")?;
+                        if let Some(current) = selection_stack.last_mut() {
+                            current.props.push(name);
+                        }
+                    }
+                    "expand" => {
+                        let time_range = parse_time_range(e)?;
+                        expand = Some((time_range, RecurrenceExpansion::Expand));
+                    }
+                    "limit-recurrence-set" | "limit-freebusy-set" => {
+                        let time_range = parse_time_range(e)?;
+                        expand = Some((time_range, RecurrenceExpansion::LimitRecurrenceSet));
+                    }
+                    _ => {}
+                }
+            }
+            Ok(Event::Empty(ref e)) => {
+                collect_namespaces(e, &mut local_namespaces)?;
+                let local_name_bytes = e.local_name();
+                let local_name = std::str::from_utf8(local_name_bytes.as_ref())?.to_owned();
+
+                match local_name.as_str() {
+                    "comp" => {
+                        let name = get_attribute(e, "name")?;
+                        let comp = ComponentSelection::new(name);
+                        if let Some(parent) = selection_stack.last_mut() {
+                            parent.comps.push(comp);
+                        } else {
+                            root_selection = Some(comp);
+                        }
+                    }
+                    "prop" => {
+                        let name = get_attribute(e, "name")?;
+                        if let Some(current) = selection_stack.last_mut() {
+                            current.props.push(name);
+                        }
+                    }
+                    "expand" => {
+                        let time_range = parse_time_range(e)?;
+                        expand = Some((time_range, RecurrenceExpansion::Expand));
+                    }
+                    "limit-recurrence-set" | "limit-freebusy-set" => {
+                        let time_range = parse_time_range(e)?;
+                        expand = Some((time_range, RecurrenceExpansion::LimitRecurrenceSet));
+                    }
+                    _ => {}
+                }
+            }
+            Ok(Event::End(ref e)) => {
+                let local_name_bytes = e.local_name();
+                let local_name = std::str::from_utf8(local_name_bytes.as_ref())?;
+
+                match local_name {
+                    "comp" => {
+                        if let Some(comp) = selection_stack.pop() {
+                            if let Some(parent) = selection_stack.last_mut() {
+                                parent.comps.push(comp);
+                            } else {
+                                root_selection = Some(comp);
+                            }
+                        }
+                    }
+                    "calendar-data" => break,
+                    _ => {}
+                }
+            }
+            Ok(Event::Eof) => break,
+            Err(e) => return Err(ParseError::xml(e.to_string())),
+            _ => {}
+        }
+    }
+
+    let request = if let Some(selection) = root_selection {
+        CalendarDataRequest::with_selection(selection)
+    } else {
+        CalendarDataRequest::full()
+    };
+
+    Ok((PropertyName::calendar_data(request), expand))
 }
 
 /// Parses a calendar-multiget report.

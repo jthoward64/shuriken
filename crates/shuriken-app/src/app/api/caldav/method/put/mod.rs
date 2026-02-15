@@ -253,9 +253,10 @@ async fn perform_put(
     let has_event = !ical.root.events().is_empty();
     let has_todo = !ical.root.todos().is_empty();
     let has_journal = !ical.root.journals().is_empty();
+    let has_freebusy = !ical.root.freebusy().is_empty();
 
     // Ensure only one component type is present
-    let component_count = [has_event, has_todo, has_journal]
+    let component_count = [has_event, has_todo, has_journal, has_freebusy]
         .iter()
         .filter(|&&b| b)
         .count();
@@ -263,7 +264,7 @@ async fn perform_put(
     if component_count > 1 {
         tracing::error!("Calendar object contains multiple component types");
         return Err(PutError::InvalidCalendarObjectResource(
-            "VCALENDAR cannot contain multiple component types (only VEVENT, VTODO, or VJOURNAL allowed)".to_string(),
+            "VCALENDAR cannot contain multiple component types (only VEVENT, VTODO, VJOURNAL, or VFREEBUSY allowed)".to_string(),
         ));
     }
 
@@ -271,11 +272,12 @@ async fn perform_put(
     supported_components.extend(ical.root.events());
     supported_components.extend(ical.root.todos());
     supported_components.extend(ical.root.journals());
+    supported_components.extend(ical.root.freebusy());
 
     if supported_components.is_empty() {
         tracing::warn!("Calendar object missing supported components");
         return Err(PutError::InvalidCalendarObjectResource(
-            "VCALENDAR must contain VEVENT, VTODO, or VJOURNAL".to_string(),
+            "VCALENDAR must contain VEVENT, VTODO, VJOURNAL, or VFREEBUSY".to_string(),
         ));
     }
 

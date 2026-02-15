@@ -74,6 +74,11 @@ fn should_include_component(component_stack: &[String], selection: &ComponentSel
 
     // VCALENDAR is always the root
     if component_stack[0] == "VCALENDAR" && selection.name == "VCALENDAR" {
+        // Empty root selection means include full VCALENDAR content.
+        if selection.props.is_empty() && selection.comps.is_empty() {
+            return true;
+        }
+
         if component_stack.len() == 1 {
             return true;
         }
@@ -110,6 +115,10 @@ fn should_include_property(
     // Check if property is in the selection
     if component_stack.len() == 1 && component_stack[0] == "VCALENDAR" {
         // Root VCALENDAR properties
+        if selection.props.is_empty() && selection.comps.is_empty() {
+            return true;
+        }
+
         selection
             .props
             .iter()
@@ -118,6 +127,10 @@ fn should_include_property(
         // Nested component properties (e.g., VEVENT properties)
         let nested_comp = &component_stack[1];
         if let Some(comp_selection) = selection.comps.iter().find(|c| c.name == *nested_comp) {
+            if comp_selection.props.is_empty() {
+                return true;
+            }
+
             return comp_selection
                 .props
                 .iter()
