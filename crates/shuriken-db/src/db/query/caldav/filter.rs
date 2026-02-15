@@ -124,6 +124,29 @@ async fn apply_comp_filter(
         .filter(cal_index::component_type.eq(component_name))
         .filter(cal_index::deleted_at.is_null());
 
+    if comp_filter.is_not_defined {
+        let with_component_ids = query
+            .select(cal_index::entity_id)
+            .distinct()
+            .load::<uuid::Uuid>(conn)
+            .await?;
+
+        let all_entity_ids = cal_index::table
+            .filter(cal_index::deleted_at.is_null())
+            .select(cal_index::entity_id)
+            .distinct()
+            .load::<uuid::Uuid>(conn)
+            .await?;
+
+        let with_component: std::collections::HashSet<uuid::Uuid> =
+            with_component_ids.into_iter().collect();
+
+        return Ok(all_entity_ids
+            .into_iter()
+            .filter(|entity_id| !with_component.contains(entity_id))
+            .collect());
+    }
+
     // Get entity IDs based on time-range filter (if present)
     let mut entity_ids = if let Some(time_range) = &comp_filter.time_range {
         let start = time_range.start;
