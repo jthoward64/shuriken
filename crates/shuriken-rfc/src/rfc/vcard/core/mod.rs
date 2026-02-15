@@ -34,14 +34,18 @@
 
 mod datetime;
 mod parameter;
+mod parameter_name;
 mod property;
+mod property_name;
 mod structured;
 mod value;
 mod vcard;
 
 pub use datetime::{DateAndOrTime, Timestamp, VCardDate, VCardTime, VCardUtcOffset};
 pub use parameter::{VCardParameter, types};
+pub use parameter_name::{VCardParameterName, VCardParameterNameValue};
 pub use property::{VCardProperty, names};
+pub use property_name::{VCardPropertyName, VCardPropertyNameValue};
 pub use structured::{
     Address, Anniversary, ClientPidMap, Gender, Organization, Related, Sex, StructuredName, TelUri,
 };

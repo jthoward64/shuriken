@@ -174,7 +174,9 @@ impl Component {
     /// Returns the first property with the given name.
     #[must_use]
     pub fn get_property(&self, name: &str) -> Option<&Property> {
-        self.properties.iter().find(|p| p.name.eq_ignore_ascii_case(name))
+        self.properties
+            .iter()
+            .find(|p| p.name.eq_ignore_ascii_case(name))
     }
 
     /// Returns all properties with the given name.

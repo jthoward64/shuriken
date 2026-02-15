@@ -9,15 +9,21 @@
 mod component;
 mod datetime;
 mod duration;
+mod normalized;
 mod parameter;
+mod parameter_name;
 mod property;
+mod property_name;
 mod rrule;
 mod value;
 
 pub use component::{Component, ComponentKind, ICalendar};
 pub use datetime::{DateTime, DateTimeForm, Time, UtcOffset};
 pub use duration::Duration;
+pub use normalized::{NormalizedValue, ParseSized};
 pub use parameter::Parameter;
+pub use parameter_name::{ICalParameterName, ParameterName};
 pub use property::{ContentLine, Property};
+pub use property_name::{ICalPropertyName, PropertyName};
 pub use rrule::{Frequency, RRule, RRuleUntil, Weekday, WeekdayNum};
 pub use value::{Date, Period, Value};

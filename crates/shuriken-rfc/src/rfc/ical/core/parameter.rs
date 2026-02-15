@@ -239,8 +239,10 @@ mod tests {
     }
 
     #[test]
-    fn parameter_name_normalized() {
-        let param = Parameter::new("tzid", "Europe/London");
-        assert_eq!(param.name, "TZID");
+    fn parameter_name_preserves_case() {
+        let paramLower = Parameter::new("tzid", "Europe/London");
+        let paramUpper = Parameter::new("TZID", "Europe/London");
+        assert_eq!(paramLower.name, "tzid"); // Preserves original casing
+        assert_eq!(paramUpper.name, "TZID"); // Preserves original casing
     }
 }

@@ -44,7 +44,9 @@ impl ContentLine {
     /// Returns the parameter with the given name.
     #[must_use]
     pub fn get_param(&self, name: &str) -> Option<&Parameter> {
-        self.params.iter().find(|p| p.name.eq_ignore_ascii_case(name))
+        self.params
+            .iter()
+            .find(|p| p.name.eq_ignore_ascii_case(name))
     }
 
     /// Returns the value of a parameter.
@@ -163,7 +165,9 @@ impl Property {
     /// Returns the parameter with the given name.
     #[must_use]
     pub fn get_param(&self, name: &str) -> Option<&Parameter> {
-        self.params.iter().find(|p| p.name.eq_ignore_ascii_case(name))
+        self.params
+            .iter()
+            .find(|p| p.name.eq_ignore_ascii_case(name))
     }
 
     /// Returns the value of a parameter.
