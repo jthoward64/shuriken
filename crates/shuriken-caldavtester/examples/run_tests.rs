@@ -7,6 +7,9 @@
 //! # Custom base URL
 //! CALDAV_TEST_BASE_URL=http://localhost:3000 cargo run --example run_tests
 //!
+//! # In-process mode (Salvo test API)
+//! CALDAV_TEST_IN_PROCESS=1 cargo run --example run_tests
+//!
 //! # Run ALL tests, not just the enabled ones
 //! CALDAV_TEST_ALL=1 cargo run --example run_tests
 //!
@@ -15,7 +18,9 @@
 //! ```
 
 use shuriken_caldavtester::config;
+use shuriken_caldavtester::server;
 use shuriken_caldavtester::runner::{ServerConfig, TestFailure, TestRunner};
+use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -27,8 +32,9 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let base_url = std::env::var("CALDAV_TEST_BASE_URL")
-        .unwrap_or_else(|_| "http://localhost:8080".to_string());
+        .unwrap_or_else(|_| "http://localhost:8698".to_string());
     let run_all = std::env::var("CALDAV_TEST_ALL").is_ok();
+    let in_process = std::env::var("CALDAV_TEST_IN_PROCESS").is_ok();
     let strict_callbacks = std::env::args().skip(1).any(|arg| arg == "--strict-callbacks");
 
     if strict_callbacks {
@@ -60,6 +66,11 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let mut total = shuriken_caldavtester::runner::TestResults::default();
+    let in_process_service = if in_process {
+        Some(Arc::new(server::create_in_process_service().await?))
+    } else {
+        None
+    };
 
     for entry in &entries {
         let path = tests_dir.join(entry.path);
@@ -68,7 +79,11 @@ async fn main() -> anyhow::Result<()> {
             continue;
         }
 
-        let mut runner = TestRunner::with_config(server_config.clone())?;
+        let mut runner = if let Some(service) = &in_process_service {
+            TestRunner::with_in_process_service(server_config.clone(), Arc::clone(service))?
+        } else {
+            TestRunner::with_config(server_config.clone())?
+        };
         match runner.run_test_file(&path).await {
             Ok(results) => {
                 let marker = if results.all_passed() { "OK" } else { "FAIL" };

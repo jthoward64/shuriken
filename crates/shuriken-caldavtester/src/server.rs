@@ -3,7 +3,15 @@
 //! Handles starting and stopping the Shuriken server for testing.
 
 use crate::error::{Error, Result};
+use salvo::{Router, Service};
+use shuriken_app::app::api::routes;
+use shuriken_app::config::ConfigHandler;
+use shuriken_app::db_handler::DbProviderHandler;
+use shuriken_core::config::{Settings, load_config};
+use shuriken_db::db::connection::create_pool;
+use shuriken_service::auth::casbin::{CasbinEnforcerHandler, init_casbin};
 use std::net::SocketAddr;
+use std::sync::Arc;
 use tokio::task::JoinHandle;
 
 /// Test server instance
@@ -21,9 +29,8 @@ impl TestServer {
     /// ## Errors
     /// Returns an error if the server fails to start.
     pub async fn start() -> Result<Self> {
-        // TODO: Implement server startup using shuriken-app
-        // For now, assume server is already running
-        let addr = "127.0.0.1:8080"
+        let settings = load_config().map_err(|e| Error::Server(format!("load config failed: {e}")))?;
+        let addr = format!("{}:{}", settings.server.host, settings.server.port)
             .parse()
             .map_err(|e| Error::Server(format!("Invalid address: {e}")))?;
 
@@ -50,6 +57,47 @@ impl TestServer {
         }
         Ok(())
     }
+}
+
+/// ## Summary
+/// Builds a full in-process Salvo service using current runtime settings.
+///
+/// ## Errors
+/// Returns an error if config loading, pool creation, route creation, or Casbin setup fails.
+pub async fn create_in_process_service() -> Result<Service> {
+    let settings =
+        load_config().map_err(|e| Error::Server(format!("load config failed: {e}")))?;
+    create_in_process_service_with_settings(settings).await
+}
+
+/// ## Summary
+/// Builds a full in-process Salvo service from explicit settings.
+///
+/// ## Errors
+/// Returns an error if pool creation, route creation, or Casbin setup fails.
+pub async fn create_in_process_service_with_settings(settings: Settings) -> Result<Service> {
+    let pool = create_pool(
+        &settings.database.url,
+        u32::from(settings.database.max_connections),
+    )
+    .await
+    .map_err(|e| Error::Server(format!("create pool failed: {e}")))?;
+
+    let enforcer = init_casbin(pool.clone())
+        .await
+        .map_err(|e| Error::Server(format!("init casbin failed: {e}")))?;
+
+    let router = Router::new()
+        .hoop(DbProviderHandler { provider: pool })
+        .hoop(ConfigHandler {
+            settings: settings.clone(),
+        })
+        .hoop(CasbinEnforcerHandler {
+            enforcer: Arc::new(enforcer),
+        })
+        .push(routes().map_err(|e| Error::Server(format!("build routes failed: {e}")))?);
+
+    Ok(Service::new(router))
 }
 
 impl Drop for TestServer {

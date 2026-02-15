@@ -1,5 +1,7 @@
 use shuriken_caldavtester::config;
 use shuriken_caldavtester::runner::{ServerConfig, TestRunner};
+use shuriken_caldavtester::server;
+use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -33,6 +35,7 @@ async fn main() -> anyhow::Result<()> {
 
     let base_url = std::env::var("CALDAV_TEST_BASE_URL")
         .unwrap_or_else(|_| "http://localhost:8698".to_string());
+    let in_process = std::env::var("CALDAV_TEST_IN_PROCESS").is_ok();
 
     let suite_dir = config::test_suite_dir();
     let tests_dir = suite_dir.join("tests");
@@ -44,6 +47,11 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let mut total = shuriken_caldavtester::runner::TestResults::default();
+    let in_process_service = if in_process {
+        Some(Arc::new(server::create_in_process_service().await?))
+    } else {
+        None
+    };
 
     for rel in &selected {
         let path = tests_dir.join(rel);
@@ -52,7 +60,11 @@ async fn main() -> anyhow::Result<()> {
             continue;
         }
 
-        let mut runner = TestRunner::with_config(server_config.clone())?;
+        let mut runner = if let Some(service) = &in_process_service {
+            TestRunner::with_in_process_service(server_config.clone(), Arc::clone(service))?
+        } else {
+            TestRunner::with_config(server_config.clone())?
+        };
         match runner.run_test_file(&path).await {
             Ok(results) => {
                 let marker = if results.all_passed() { "OK" } else { "FAIL" };

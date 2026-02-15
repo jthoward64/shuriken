@@ -53,6 +53,12 @@ async fn main() -> anyhow::Result<()> {
 
 ```bash
 cargo run -p shuriken-caldavtester --example run_tests
+
+# Run in-process against a Salvo Service (no external HTTP server)
+CALDAV_TEST_IN_PROCESS=1 cargo run -p shuriken-caldavtester --example run_tests
+
+# Fail on any unknown verifier callback
+cargo run -p shuriken-caldavtester --example run_tests -- --strict-callbacks
 ```
 
 ### Running Selected Files
@@ -64,7 +70,30 @@ cargo run -p shuriken-caldavtester --example run_selected -- \
 # Same run, but fail on any unknown callback
 cargo run -p shuriken-caldavtester --example run_selected -- \
     --strict-callbacks CalDAV/freebusy.xml CalDAV/acl.xml
+
+# Selected files in-process
+CALDAV_TEST_IN_PROCESS=1 cargo run -p shuriken-caldavtester --example run_selected -- \
+    CalDAV/get.xml CalDAV/propfind.xml
 ```
+
+### Local Postgres Bootstrap
+
+Use the crate-local compose file and setup script:
+
+```bash
+# Reset DB container + migrate + seed (default command)
+crates/shuriken-caldavtester/scripts/setup_local_env.sh bootstrap
+
+# Individual steps
+crates/shuriken-caldavtester/scripts/setup_local_env.sh up
+crates/shuriken-caldavtester/scripts/setup_local_env.sh migrate
+crates/shuriken-caldavtester/scripts/setup_local_env.sh seed
+crates/shuriken-caldavtester/scripts/setup_local_env.sh down
+```
+
+The script uses `crates/shuriken-caldavtester/docker-compose.local.yml` and defaults to:
+
+- `DATABASE_URL=postgres://shuriken:shuriken@localhost:4525/shuriken_caldavtester`
 
 ### Variable Substitution
 
@@ -162,6 +191,8 @@ The following verification callbacks are implemented:
 
 Unknown callbacks are still tolerated as pass (with warning), but core suite callbacks are now implemented.
 
+Set `CALDAV_TEST_STRICT_CALLBACKS=1` (or pass `--strict-callbacks` to examples) to fail-fast on unknown callbacks.
+
 ## Test Isolation
 
 Each test execution:
@@ -183,8 +214,7 @@ Each test execution:
 - ✅ Focused single-file and selected-file runners
 
 ### In Progress / Remaining
-- ⏳ In-process server lifecycle integration in `server.rs` (runner currently assumes external server)
-- ⏳ Optional strict mode for unknown callbacks (currently warns + pass)
+- ⏳ Optional in-process mode uses current process config and DB, so it still requires prepared database state
 - ⏳ Broader integration run stabilization against partially implemented app features
 
 ### Historical TODOs (Completed)

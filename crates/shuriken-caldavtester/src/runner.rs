@@ -6,9 +6,14 @@ use crate::context::TestContext;
 use crate::error::{Error, Result};
 use crate::verification::{verify_response, Response, VerifyResult};
 use crate::xml::{AuthConfig, CalDavTest, RequestBody, Test, TestRequest, TestSuite};
+use base64::Engine;
 use reqwest::Client;
+use salvo::http::header::{AUTHORIZATION, HeaderName};
+use salvo::http::{Method as SalvoMethod, ReqBody, StatusCode};
+use salvo::test::{RequestBuilder, ResponseExt};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
 /// Test execution results
@@ -97,6 +102,7 @@ pub struct TestRunner {
     client: Client,
     context: TestContext,
     config: ServerConfig,
+    in_process_service: Option<Arc<salvo::Service>>,
     /// Resources to DELETE in cleanup (from `end-delete="yes"`)
     end_deletes: Vec<String>,
 }
@@ -121,8 +127,20 @@ impl TestRunner {
             client,
             context,
             config,
+            in_process_service: None,
             end_deletes: Vec::new(),
         })
+    }
+
+    /// ## Summary
+    /// Create a runner that executes requests against an in-process Salvo service.
+    ///
+    /// ## Errors
+    /// Returns an error if the HTTP client cannot be built.
+    pub fn with_in_process_service(config: ServerConfig, service: Arc<salvo::Service>) -> Result<Self> {
+        let mut runner = Self::with_config(config)?;
+        runner.in_process_service = Some(service);
+        Ok(runner)
     }
 
     /// ## Summary
@@ -376,6 +394,14 @@ impl TestRunner {
 
     /// Execute an HTTP request and return the response.
     async fn execute_request(&self, request: &TestRequest) -> Result<Response> {
+        if let Some(service) = &self.in_process_service {
+            return self.execute_request_in_process(request, service).await;
+        }
+
+        self.execute_request_network(request).await
+    }
+
+    async fn execute_request_network(&self, request: &TestRequest) -> Result<Response> {
         let url = match &request.ruri {
             Some(ruri) => {
                 let path = self.context.substitute(ruri);
@@ -420,48 +446,10 @@ impl TestRunner {
 
         // Add body if present
         if let Some(body) = &request.body {
-            match body {
-                RequestBody::File {
-                    path,
-                    content_type,
-                    substitutions,
-                } => {
-                    let full_path = self.config.resource_dir.join(path);
-                    if full_path.exists() {
-                        let mut data = std::fs::read_to_string(&full_path).map_err(|e| {
-                            Error::Other(format!(
-                                "Failed to read resource file {}: {e}",
-                                full_path.display()
-                            ))
-                        })?;
-                        for (name, value) in substitutions {
-                            let resolved_value = self.context.substitute(value);
-                            data = data.replace(name, &resolved_value);
-                        }
-                        let data = self.context.substitute(&data);
-                        req_builder = req_builder
-                            .header("Content-Type", content_type.as_str())
-                            .body(data);
-                    } else {
-                        debug!(path = %full_path.display(), "Resource file not found – sending empty body");
-                        req_builder = req_builder.header("Content-Type", content_type.as_str());
-                    }
-                }
-                RequestBody::Inline {
-                    content,
-                    content_type,
-                    substitutions,
-                } => {
-                    let mut data = content.clone();
-                    for (name, value) in substitutions {
-                        let resolved_value = self.context.substitute(value);
-                        data = data.replace(name, &resolved_value);
-                    }
-                    let data = self.context.substitute(&data);
-                    req_builder = req_builder
-                        .header("Content-Type", content_type.as_str())
-                        .body(data);
-                }
+            let (content_type, resolved_body) = self.resolve_request_body(body)?;
+            req_builder = req_builder.header("Content-Type", content_type);
+            if let Some(data) = resolved_body {
+                req_builder = req_builder.body(data);
             }
         }
 
@@ -482,6 +470,126 @@ impl TestRunner {
             headers,
             body,
         })
+    }
+
+    async fn execute_request_in_process(
+        &self,
+        request: &TestRequest,
+        service: &salvo::Service,
+    ) -> Result<Response> {
+        let path = request
+            .ruri
+            .as_deref()
+            .map_or_else(|| "/".to_string(), |ruri| self.context.substitute(ruri));
+        let url = format!("http://127.0.0.1:5800{path}");
+
+        let method = SalvoMethod::from_bytes(request.method.as_bytes()).map_err(Error::InvalidMethod)?;
+        debug!(method = %request.method, url = %url, "HTTP request (in-process)");
+
+        let mut req_builder = RequestBuilder::new(&url, method);
+
+        for (name, value) in &request.headers {
+            let value_subst = self.context.substitute(value);
+            if let Ok(header_name) = HeaderName::try_from(name.as_str()) {
+                req_builder = req_builder.add_header(header_name, value_subst, true);
+            }
+        }
+
+        match &request.auth {
+            Some(AuthConfig::None) => {}
+            Some(AuthConfig::Basic { user, password }) => {
+                let user = self.context.substitute(user);
+                let password = self.context.substitute(password);
+                req_builder = req_builder.add_header(
+                    AUTHORIZATION,
+                    basic_auth_header(&user, &password),
+                    true,
+                );
+            }
+            None => {
+                let user = self
+                    .context
+                    .get("$userid1:")
+                    .unwrap_or("user01")
+                    .to_string();
+                let password = self.context.get("$pswd1:").unwrap_or("user01").to_string();
+                req_builder = req_builder.add_header(
+                    AUTHORIZATION,
+                    basic_auth_header(&user, &password),
+                    true,
+                );
+            }
+        }
+
+        if let Some(body) = &request.body {
+            let (content_type, resolved_body) = self.resolve_request_body(body)?;
+            req_builder = req_builder.add_header("Content-Type", content_type, true);
+            if let Some(data) = resolved_body {
+                req_builder = req_builder.body(ReqBody::Once(data.into()));
+            }
+        }
+
+        let mut response = req_builder.send(service).await;
+        let status = response.status_code.unwrap_or(StatusCode::INTERNAL_SERVER_ERROR) as u16;
+        let headers = response
+            .headers()
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("").to_string()))
+            .collect();
+        let body_bytes = response.take_bytes(None).await.unwrap_or_default().to_vec();
+        let body = String::from_utf8_lossy(&body_bytes).into_owned();
+
+        debug!(status, body_len = body.len(), "HTTP response (in-process)");
+
+        Ok(Response {
+            status,
+            headers,
+            body,
+        })
+    }
+
+    fn resolve_request_body(&self, body: &RequestBody) -> Result<(String, Option<Vec<u8>>)> {
+        match body {
+            RequestBody::File {
+                path,
+                content_type,
+                substitutions,
+            } => {
+                let full_path = self.config.resource_dir.join(path);
+                if !full_path.exists() {
+                    debug!(path = %full_path.display(), "Resource file not found – sending empty body");
+                    return Ok((content_type.clone(), None));
+                }
+
+                let mut data = std::fs::read_to_string(&full_path).map_err(|e| {
+                    Error::Other(format!(
+                        "Failed to read resource file {}: {e}",
+                        full_path.display()
+                    ))
+                })?;
+
+                for (name, value) in substitutions {
+                    let resolved_value = self.context.substitute(value);
+                    data = data.replace(name, &resolved_value);
+                }
+
+                let data = self.context.substitute(&data);
+                Ok((content_type.clone(), Some(data.into_bytes())))
+            }
+            RequestBody::Inline {
+                content,
+                content_type,
+                substitutions,
+            } => {
+                let mut data = content.clone();
+                for (name, value) in substitutions {
+                    let resolved_value = self.context.substitute(value);
+                    data = data.replace(name, &resolved_value);
+                }
+                let data = self.context.substitute(&data);
+                Ok((content_type.clone(), Some(data.into_bytes())))
+            }
+        }
     }
 
     // ── Feature helpers ──────────────────────────────────────────────────
@@ -520,6 +628,12 @@ fn map_method(method: &str) -> Result<reqwest::Method> {
         // WebDAV methods
         other => reqwest::Method::from_bytes(other.as_bytes()).map_err(Error::InvalidMethod),
     }
+}
+
+fn basic_auth_header(user: &str, password: &str) -> String {
+    let credentials = format!("{user}:{password}");
+    let encoded = base64::engine::general_purpose::STANDARD.encode(credentials);
+    format!("Basic {encoded}")
 }
 
 #[cfg(test)]
