@@ -2,3 +2,4 @@
 
 pub mod calendar_multiget;
 pub mod calendar_query;
+pub mod free_busy_query;

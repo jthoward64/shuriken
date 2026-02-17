@@ -143,6 +143,8 @@ impl CalendarQuery {
 pub struct CalendarFilter {
     /// Component name to filter (VCALENDAR, VEVENT, VTODO, etc.).
     pub component: String,
+    /// Filter test (anyof/allof) for nested component filters.
+    pub test: FilterTest,
     /// Nested filters.
     pub filters: Vec<CompFilter>,
     /// Time range filter.
@@ -155,6 +157,7 @@ impl CalendarFilter {
     pub fn vcalendar() -> Self {
         Self {
             component: "VCALENDAR".to_string(),
+            test: FilterTest::AllOf,
             filters: Vec::new(),
             time_range: None,
         }
@@ -173,6 +176,8 @@ impl CalendarFilter {
 pub struct CompFilter {
     /// Component name.
     pub name: String,
+    /// Filter test (anyof/allof) for nested component/property filters.
+    pub test: FilterTest,
     /// Is-not-defined test.
     pub is_not_defined: bool,
     /// Time range filter.
@@ -189,6 +194,7 @@ impl CompFilter {
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
+            test: FilterTest::AllOf,
             is_not_defined: false,
             time_range: None,
             prop_filters: Vec::new(),

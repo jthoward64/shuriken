@@ -21,10 +21,7 @@ use crate::error::Result;
 use std::collections::HashMap;
 
 /// Verify a multistatus response's hrefs and status codes.
-pub fn verify(
-    response: &Response,
-    args: &HashMap<String, Vec<String>>,
-) -> Result<VerifyResult> {
+pub fn verify(response: &Response, args: &HashMap<String, Vec<String>>) -> Result<VerifyResult> {
     let responses = match multistatus::parse_multistatus(&response.body) {
         Ok(r) => r,
         Err(e) => {
@@ -58,8 +55,22 @@ pub fn verify(
                     }
                 }
                 None => {
+                    let returned_hrefs = responses
+                        .iter()
+                        .map(|response| {
+                            response
+                                .href
+                                .trim_end_matches('/')
+                                .rsplit('/')
+                                .next()
+                                .unwrap_or(response.href.as_str())
+                                .to_string()
+                        })
+                        .collect::<Vec<_>>()
+                        .join(", ");
                     return Ok(VerifyResult::Fail(format!(
-                        "okhrefs: href '{expected_href}' not found in response"
+                        "okhrefs: href '{expected_href}' not found in response (status={}, returned: [{returned_hrefs}])",
+                        response.status
                     )));
                 }
             }
@@ -263,9 +274,7 @@ fn parse_bad_href_spec(spec: &str) -> (Option<u16>, String) {
         if let Some(colon_pos) = spec.find(':') {
             // Check if everything before the colon is digits (status code)
             let potential_code = &spec[..colon_pos];
-            if potential_code.len() == 3
-                && potential_code.chars().all(|c| c.is_ascii_digit())
-            {
+            if potential_code.len() == 3 && potential_code.chars().all(|c| c.is_ascii_digit()) {
                 if let Ok(code) = potential_code.parse::<u16>() {
                     return (Some(code), spec[colon_pos + 1..].to_string());
                 }

@@ -7,10 +7,12 @@ use super::error::{ParseError, ParseResult};
 use super::validate_numeric_char_refs;
 use crate::rfc::dav::core::{
     AddressbookFilter, AddressbookQuery, CalendarDataRequest, CalendarFilter, CalendarQuery,
-    CompFilter, ComponentSelection, FilterTest, Href, MatchType, Namespace, ParamFilter,
-    PropFilter, PropertyName, QName, RecurrenceExpansion, ReportRequest, ReportType,
+    CompFilter, ComponentSelection, FilterTest, FreeBusyQuery, Href, MatchType, Namespace,
+    ParamFilter, PropFilter, PropertyName, QName, RecurrenceExpansion, ReportRequest, ReportType,
     SyncCollection, SyncLevel, TextMatch, TimeRange,
 };
+use crate::rfc::ical::core::ComponentKind;
+use crate::rfc::ical::expand::build_timezone_resolver;
 
 /// Parses a REPORT request body.
 ///
@@ -53,6 +55,7 @@ pub fn parse_report(xml: &[u8]) -> ParseResult<ReportRequest> {
                 return match local_name.as_str() {
                     "calendar-query" => parse_calendar_query(xml),
                     "calendar-multiget" => parse_calendar_multiget(xml),
+                    "free-busy-query" => parse_free_busy_query(xml),
                     "addressbook-query" => parse_addressbook_query(xml),
                     "addressbook-multiget" => parse_addressbook_multiget(xml),
                     "sync-collection" => parse_sync_collection(xml),
@@ -68,6 +71,40 @@ pub fn parse_report(xml: &[u8]) -> ParseResult<ReportRequest> {
         }
         buf.clear();
     }
+}
+
+/// Parses a free-busy-query report.
+fn parse_free_busy_query(xml: &[u8]) -> ParseResult<ReportRequest> {
+    let mut reader = Reader::from_reader(xml);
+    reader.config_mut().trim_text(true);
+
+    let mut buf = Vec::new();
+    let mut time_range: Option<TimeRange> = None;
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref e) | Event::Empty(ref e)) => {
+                let local_name_bytes = e.local_name();
+                let local_name = std::str::from_utf8(local_name_bytes.as_ref())?.to_owned();
+
+                if local_name == "time-range" {
+                    time_range = Some(parse_time_range(e)?);
+                }
+            }
+            Ok(Event::Eof) => break,
+            Err(e) => return Err(ParseError::xml(e.to_string())),
+            _ => {}
+        }
+    }
+
+    let Some(time_range) = time_range else {
+        return Err(ParseError::missing_element("time-range"));
+    };
+
+    Ok(ReportRequest {
+        report_type: ReportType::FreeBusyQuery(FreeBusyQuery { time_range }),
+        properties: Vec::new(),
+    })
 }
 
 /// Parses a calendar-query report.
@@ -131,9 +168,17 @@ fn parse_calendar_query(xml: &[u8]) -> ParseResult<ReportRequest> {
                         }
                     }
                     "calendar-data" if in_prop => {
-                        let (property, _calendar_data_expand) =
+                        let (property, calendar_data_expand) =
                             parse_calendar_data_property(&mut reader, &mut buf, &namespaces)?;
                         properties.push(property);
+                        if expand.is_none()
+                            && let Some(expand_from_calendar_data) = calendar_data_expand
+                        {
+                            expand = Some(expand_from_calendar_data);
+                        }
+                    }
+                    "timezone" if !in_filter => {
+                        parse_calendar_timezone_element(&mut reader, &mut buf)?;
                     }
                     _ if in_prop && !in_filter => {
                         let qname = resolve_qname(e, &namespaces)?;
@@ -758,6 +803,24 @@ fn parse_filter_test_attribute(e: &quick_xml::events::BytesStart<'_>) -> FilterT
     FilterTest::AnyOf // Default per RFC 6352
 }
 
+/// Parses the `test` attribute for `CalDAV` comp-filter elements.
+///
+/// Default is `allof` for `CalDAV` component-filter matching.
+fn parse_calendar_comp_filter_test_attribute(e: &quick_xml::events::BytesStart<'_>) -> FilterTest {
+    for attr in e.attributes().flatten() {
+        if let Ok(key) = std::str::from_utf8(attr.key.as_ref())
+            && key == "test"
+            && let Ok(value) = std::str::from_utf8(&attr.value)
+        {
+            return match value {
+                "anyof" => FilterTest::AnyOf,
+                _ => FilterTest::AllOf,
+            };
+        }
+    }
+    FilterTest::AllOf
+}
+
 /// Parses the `<nresults>` value inside a `limit` element.
 fn parse_nresults_value(value: &str) -> ParseResult<u32> {
     let trimmed = value.trim();
@@ -786,20 +849,35 @@ fn parse_calendar_filter_content(
         match reader.read_event_into(buf) {
             Ok(Event::Start(e)) => {
                 let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
-                depth += 1;
+                if local_name == "comp-filter" && depth == 1 {
+                    let name = get_attribute(&e, "name")?;
+                    let test = parse_calendar_comp_filter_test_attribute(&e);
+                    let nested = parse_comp_filter_with_name(reader, buf, namespaces, name, test)?;
 
-                if local_name == "comp-filter" && depth == 2 {
-                    // Extract name attribute before consuming the element
-                    let name = get_attribute(&e, "name")?.clone();
-                    let comp_filter = parse_comp_filter_with_name(reader, buf, namespaces, name)?;
-                    filter.filters.push(comp_filter);
+                    if nested.name.eq_ignore_ascii_case("VCALENDAR") {
+                        filter.component = nested.name;
+                        filter.test = nested.test;
+                        filter.time_range = nested.time_range;
+                        filter.filters = nested.comp_filters;
+                    } else {
+                        filter.filters.push(nested);
+                    }
+                } else {
+                    depth += 1;
                 }
             }
             Ok(Event::Empty(e)) => {
                 let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
                 if local_name == "comp-filter" && depth == 1 {
                     let name = get_attribute(&e, "name")?;
-                    filter.filters.push(CompFilter::new(name));
+                    if name.eq_ignore_ascii_case("VCALENDAR") {
+                        filter.component = name;
+                        filter.test = parse_calendar_comp_filter_test_attribute(&e);
+                    } else {
+                        let mut comp = CompFilter::new(name);
+                        comp.test = parse_calendar_comp_filter_test_attribute(&e);
+                        filter.filters.push(comp);
+                    }
                 }
             }
             Ok(Event::End(e)) => {
@@ -824,8 +902,10 @@ fn parse_comp_filter_with_name(
     buf: &mut Vec<u8>,
     namespaces: &[(String, String)],
     name: String,
+    test: FilterTest,
 ) -> ParseResult<CompFilter> {
     let mut comp_filter = CompFilter::new(name);
+    comp_filter.test = test;
     let mut depth = 1;
 
     loop {
@@ -833,12 +913,12 @@ fn parse_comp_filter_with_name(
         match reader.read_event_into(buf) {
             Ok(Event::Start(e)) => {
                 let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
-                depth += 1;
-
                 match local_name.as_str() {
                     "comp-filter" => {
                         let name = get_attribute(&e, "name")?.clone();
-                        let nested = parse_comp_filter_with_name(reader, buf, namespaces, name)?;
+                        let test = parse_calendar_comp_filter_test_attribute(&e);
+                        let nested =
+                            parse_comp_filter_with_name(reader, buf, namespaces, name, test)?;
                         comp_filter.comp_filters.push(nested);
                     }
                     "prop-filter" => {
@@ -849,9 +929,12 @@ fn parse_comp_filter_with_name(
                         comp_filter.prop_filters.push(prop_filter);
                     }
                     "time-range" => {
+                        depth += 1;
                         comp_filter.time_range = Some(parse_time_range(&e)?);
                     }
-                    _ => {}
+                    _ => {
+                        depth += 1;
+                    }
                 }
             }
             Ok(Event::Empty(e)) => {
@@ -899,8 +982,6 @@ fn parse_prop_filter_with_name(
         match reader.read_event_into(buf) {
             Ok(Event::Start(e)) => {
                 let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
-                depth += 1;
-
                 match local_name.as_str() {
                     "text-match" => {
                         // Extract attributes before recursing to avoid borrow conflicts
@@ -930,6 +1011,7 @@ fn parse_prop_filter_with_name(
                         )?);
                     }
                     "time-range" => {
+                        depth += 1;
                         prop_filter.time_range = Some(parse_time_range(&e)?);
                     }
                     "param-filter" => {
@@ -937,7 +1019,9 @@ fn parse_prop_filter_with_name(
                         let param_filter = parse_param_filter_with_name(reader, buf, name)?;
                         prop_filter.param_filters.push(param_filter);
                     }
-                    _ => {}
+                    _ => {
+                        depth += 1;
+                    }
                 }
             }
             Ok(Event::Empty(e)) => {
@@ -986,8 +1070,6 @@ fn parse_param_filter_with_name(
         match reader.read_event_into(buf) {
             Ok(Event::Start(e)) => {
                 let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
-                depth += 1;
-
                 if local_name == "text-match" {
                     // Extract attributes before recursing to avoid borrow conflicts
                     let mut collation = None;
@@ -1014,6 +1096,8 @@ fn parse_param_filter_with_name(
                     param_filter.text_match = Some(parse_text_match_content(
                         reader, collation, negate, match_type,
                     )?);
+                } else {
+                    depth += 1;
                 }
             }
             Ok(Event::Empty(e)) => {
@@ -1132,6 +1216,119 @@ fn parse_time_range(elem: &quick_xml::events::BytesStart<'_>) -> ParseResult<Tim
     Ok(TimeRange { start, end })
 }
 
+/// Parses and validates a non-empty `timezone` element in a `calendar-query` REPORT.
+///
+/// The payload must be parseable iCalendar and contain only `VTIMEZONE`
+/// components under the root `VCALENDAR`.
+fn parse_calendar_timezone_element(
+    reader: &mut Reader<&[u8]>,
+    buf: &mut Vec<u8>,
+) -> ParseResult<()> {
+    let mut timezone_payload = String::new();
+
+    loop {
+        buf.clear();
+        match reader.read_event_into(buf) {
+            Ok(Event::Text(e)) => {
+                let decoded = reader.decoder().decode(e.as_ref())?;
+                timezone_payload.push_str(&decoded);
+            }
+            Ok(Event::CData(e)) => {
+                let decoded = reader.decoder().decode(e.as_ref())?;
+                timezone_payload.push_str(&decoded);
+            }
+            Ok(Event::End(e)) => {
+                let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
+                if local_name == "timezone" {
+                    break;
+                }
+            }
+            Ok(Event::Eof) => break,
+            Err(e) => return Err(ParseError::xml(e.to_string())),
+            _ => {}
+        }
+    }
+
+    let timezone_payload = timezone_payload.trim();
+    if timezone_payload.is_empty() {
+        return Err(ParseError::invalid_value(
+            "invalid timezone calendar-data: empty payload",
+        ));
+    }
+
+    let uppercase_payload = timezone_payload.to_ascii_uppercase();
+    if !uppercase_payload.contains("BEGIN:VCALENDAR") {
+        return Err(ParseError::invalid_value(
+            "invalid timezone calendar-data: missing VCALENDAR root",
+        ));
+    }
+
+    if !uppercase_payload.contains("\nVERSION:") {
+        return Err(ParseError::invalid_value(
+            "invalid timezone calendar-data: VCALENDAR missing VERSION",
+        ));
+    }
+
+    if !uppercase_payload.contains("\nPRODID:") {
+        return Err(ParseError::invalid_value(
+            "invalid timezone calendar-data: VCALENDAR missing PRODID",
+        ));
+    }
+
+    let parsed = crate::rfc::ical::parse::parse(timezone_payload).map_err(|err| {
+        ParseError::invalid_value(format!("invalid timezone calendar-data: {err}"))
+    })?;
+
+    if parsed.root.children.is_empty() {
+        return Err(ParseError::invalid_value(
+            "invalid timezone calendar-data: missing VTIMEZONE component",
+        ));
+    }
+
+    if parsed.root.get_property("VERSION").is_none() {
+        return Err(ParseError::invalid_value(
+            "invalid timezone calendar-data: VCALENDAR missing VERSION",
+        ));
+    }
+
+    if parsed.root.get_property("PRODID").is_none() {
+        return Err(ParseError::invalid_value(
+            "invalid timezone calendar-data: VCALENDAR missing PRODID",
+        ));
+    }
+
+    let timezone_count = parsed
+        .root
+        .children
+        .iter()
+        .filter(|child| child.kind == Some(ComponentKind::Timezone))
+        .count();
+
+    if timezone_count != 1 {
+        return Err(ParseError::invalid_value(
+            "invalid timezone calendar-data: expected exactly one VTIMEZONE component",
+        ));
+    }
+
+    let has_only_timezones = parsed
+        .root
+        .children
+        .iter()
+        .all(|child| child.kind == Some(ComponentKind::Timezone));
+
+    if !has_only_timezones {
+        return Err(ParseError::invalid_value(
+            "invalid timezone calendar-data: expected only VTIMEZONE components",
+        ));
+    }
+
+    build_timezone_resolver(&parsed).map_err(|err| {
+        ParseError::invalid_value(format!("invalid timezone calendar-data: {err}"))
+    })?;
+
+    Ok(())
+}
+
 /// Parses an iCalendar UTC DATE-TIME value to chrono.
 ///
 /// Format: `YYYYMMDDTHHMMSSZ` (e.g., `20060104T140000Z`)
@@ -1178,14 +1375,14 @@ fn parse_addressbook_filter_content(
         match reader.read_event_into(buf) {
             Ok(Event::Start(e)) => {
                 let local_name = std::str::from_utf8(e.local_name().as_ref())?.to_owned();
-                depth += 1;
-
-                if local_name == "prop-filter" && depth == 2 {
+                if local_name == "prop-filter" && depth == 1 {
                     let name = get_attribute(&e, "name")?.clone();
                     let test = parse_filter_test_attribute(&e);
                     let prop_filter =
                         parse_prop_filter_with_name(reader, buf, namespaces, name, test)?;
                     prop_filters.push(prop_filter);
+                } else {
+                    depth += 1;
                 }
             }
             Ok(Event::Empty(e)) => {
@@ -1442,6 +1639,67 @@ mod tests {
     }
 
     #[test]
+    fn parse_calendar_query_prop_filters_keep_siblings_separate() {
+        let xml = br#"<?xml version="1.0" encoding="utf-8"?>
+<C:calendar-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+    <D:prop>
+        <D:getetag/>
+        <C:calendar-data/>
+    </D:prop>
+    <C:filter>
+        <C:comp-filter name="VCALENDAR">
+            <C:comp-filter name="VEVENT">
+                <C:prop-filter name="SUMMARY">
+                    <C:text-match>2</C:text-match>
+                </C:prop-filter>
+                <C:prop-filter name="DTSTART">
+                    <C:param-filter name="TZID">
+                        <C:text-match>East</C:text-match>
+                    </C:param-filter>
+                </C:prop-filter>
+            </C:comp-filter>
+        </C:comp-filter>
+    </C:filter>
+</C:calendar-query>"#;
+
+        let req = parse_report(xml).unwrap();
+
+        match req.report_type {
+            ReportType::CalendarQuery(query) => {
+                let filter = query
+                    .filter
+                    .expect("calendar-query should include a filter");
+                let vevent = filter
+                    .filters
+                    .first()
+                    .and_then(|first| {
+                        if first.name == "VEVENT" {
+                            Some(first)
+                        } else {
+                            first.comp_filters.first()
+                        }
+                    })
+                    .expect("expected VEVENT comp-filter");
+
+                assert_eq!(vevent.prop_filters.len(), 2);
+                assert_eq!(vevent.prop_filters[0].name, "SUMMARY");
+                assert!(vevent.prop_filters[0].param_filters.is_empty());
+                assert_eq!(vevent.prop_filters[1].name, "DTSTART");
+                assert_eq!(vevent.prop_filters[1].param_filters.len(), 1);
+                assert_eq!(vevent.prop_filters[1].param_filters[0].name, "TZID");
+                assert_eq!(
+                    vevent.prop_filters[1].param_filters[0]
+                        .text_match
+                        .as_ref()
+                        .map(|tm| tm.value.as_str()),
+                    Some("East")
+                );
+            }
+            _ => panic!("wrong report type"),
+        }
+    }
+
+    #[test]
     fn parse_calendar_query_report_invalid_time_range_format() {
         let xml = br#"<?xml version="1.0" encoding="utf-8"?>
 <C:calendar-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
@@ -1512,6 +1770,40 @@ mod tests {
     }
 
     #[test]
+    fn parse_free_busy_query_report() {
+        let xml = br#"<?xml version="1.0" encoding="utf-8"?>
+<C:free-busy-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+  <C:time-range start="20060101T000000Z" end="20060105T000000Z"/>
+</C:free-busy-query>"#;
+
+        let req = parse_report(xml).unwrap();
+
+        match req.report_type {
+            ReportType::FreeBusyQuery(query) => {
+                assert_eq!(
+                    query.time_range.start,
+                    super::parse_icalendar_utc_datetime("20060101T000000Z")
+                );
+                assert_eq!(
+                    query.time_range.end,
+                    super::parse_icalendar_utc_datetime("20060105T000000Z")
+                );
+            }
+            _ => panic!("wrong report type"),
+        }
+    }
+
+    #[test]
+    fn parse_free_busy_query_report_requires_time_range() {
+        let xml = br#"<?xml version="1.0" encoding="utf-8"?>
+<C:free-busy-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+</C:free-busy-query>"#;
+
+        let result = parse_report(xml);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn parse_addressbook_query_report_with_limit() {
         let xml = br#"<?xml version="1.0" encoding="utf-8"?>
 <C:addressbook-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:carddav">
@@ -1556,6 +1848,66 @@ mod tests {
             }
             _ => panic!("wrong report type"),
         }
+    }
+
+    #[test]
+    fn parse_calendar_query_rejects_timezone_missing_vcalendar_headers() {
+        let xml = br#"<?xml version="1.0"?>
+<C:calendar-query xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:D="DAV:">
+    <D:prop>
+        <C:calendar-data/>
+    </D:prop>
+    <C:filter>
+        <C:comp-filter name="VCALENDAR">
+            <C:comp-filter name="VEVENT">
+                <C:time-range start="20060101T000000Z" end="20060102T000000Z"/>
+            </C:comp-filter>
+        </C:comp-filter>
+    </C:filter>
+    <C:timezone><![CDATA[BEGIN:VCALENDAR
+BEGIN:VTIMEZONE
+TZID:America/Los_Angeles
+END:VTIMEZONE
+END:VCALENDAR
+]]></C:timezone>
+</C:calendar-query>"#;
+
+        let result = parse_report(xml);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_calendar_query_accepts_valid_timezone_payload() {
+        let xml = br#"<?xml version="1.0"?>
+<C:calendar-query xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:D="DAV:">
+    <D:prop>
+        <C:calendar-data/>
+    </D:prop>
+    <C:filter>
+        <C:comp-filter name="VCALENDAR">
+            <C:comp-filter name="VEVENT">
+                <C:time-range start="20060101T000000Z" end="20060102T000000Z"/>
+            </C:comp-filter>
+        </C:comp-filter>
+    </C:filter>
+    <C:timezone><![CDATA[BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Example Corp.//CalDAV Client//EN
+BEGIN:VTIMEZONE
+TZID:America/Los_Angeles
+BEGIN:STANDARD
+DTSTART:19700101T000000
+TZOFFSETFROM:-0700
+TZOFFSETTO:-0800
+TZNAME:PST
+END:STANDARD
+END:VTIMEZONE
+END:VCALENDAR
+]]></C:timezone>
+</C:calendar-query>"#;
+
+        let result = parse_report(xml);
+        assert!(result.is_ok());
     }
 
     #[test]

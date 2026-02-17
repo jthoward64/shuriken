@@ -9,7 +9,7 @@ use crate::db::caldav_keys::{
     KEY_STATUS, KEY_SUMMARY, KEY_TRANSP, insert_array, insert_number, insert_string,
 };
 use crate::model::caldav::cal_index::NewCalIndex;
-use shuriken_rfc::recurrence::ical_datetime_to_utc_with_resolver;
+use shuriken_rfc::recurrence::{ical_datetime_to_utc_with_resolver, ical_duration_to_chrono};
 use shuriken_rfc::rfc::ical::core::{Component, ICalendar, Value};
 use shuriken_rfc::rfc::ical::expand::TimeZoneResolver;
 
@@ -172,11 +172,31 @@ fn build_cal_index(
     });
 
     // Extract DTEND
-    let dtend_utc = component.get_property("DTEND").and_then(|prop| {
+        let mut dtend_utc = component.get_property("DTEND").and_then(|prop| {
         let tzid = prop.get_param_value("TZID");
         let dt = prop.as_datetime()?;
         ical_datetime_to_utc_with_resolver(dt, tzid, resolver)
     });
+
+        // Extract DUE (primarily used by VTODO)
+        let due_utc = component.get_property("DUE").and_then(|prop| {
+            let tzid = prop.get_param_value("TZID");
+            let dt = prop.as_datetime()?;
+            ical_datetime_to_utc_with_resolver(dt, tzid, resolver)
+        });
+
+        // Derive effective end when DTEND is omitted.
+        // RFC 5545 allows DURATION as an alternative to DTEND, and VTODO commonly uses DUE.
+        if dtend_utc.is_none() {
+            dtend_utc = due_utc.or_else(|| {
+                component
+                    .get_property("DURATION")
+                    .and_then(|prop| prop.as_duration())
+                    .and_then(|duration| {
+                        dtstart_utc.map(|start| start + ical_duration_to_chrono(duration))
+                    })
+            });
+        }
 
     // Extract all-day flag (only if VALUE=DATE is explicitly set)
     let all_day = component.get_property("DTSTART").and_then(|prop| {

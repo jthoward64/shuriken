@@ -53,6 +53,8 @@ impl Default for Multistatus {
 pub struct PropstatResponse {
     /// The resource href.
     pub href: Href,
+    /// Optional response-level status.
+    pub status: Option<Status>,
     /// Property statuses grouped by status code.
     pub propstats: Vec<Propstat>,
     /// Optional error element.
@@ -67,6 +69,7 @@ impl PropstatResponse {
     pub fn new(href: impl Into<Href>) -> Self {
         Self {
             href: href.into(),
+            status: None,
             propstats: Vec::new(),
             error: None,
             description: None,
@@ -78,6 +81,7 @@ impl PropstatResponse {
     pub fn ok(href: impl Into<Href>, properties: Vec<DavProperty>) -> Self {
         Self {
             href: href.into(),
+            status: None,
             propstats: vec![Propstat {
                 status: Status::Ok,
                 properties,
@@ -115,6 +119,7 @@ impl PropstatResponse {
 
         Self {
             href: href.into(),
+            status: None,
             propstats,
             error: None,
             description: None,
@@ -126,11 +131,8 @@ impl PropstatResponse {
     pub fn not_found(href: impl Into<Href>) -> Self {
         Self {
             href: href.into(),
-            propstats: vec![Propstat {
-                status: Status::NotFound,
-                properties: Vec::new(),
-                description: None,
-            }],
+            status: Some(Status::NotFound),
+            propstats: Vec::new(),
             error: None,
             description: None,
         }
@@ -141,6 +143,7 @@ impl PropstatResponse {
     pub fn error(href: impl Into<Href>, status: Status, message: impl Into<String>) -> Self {
         Self {
             href: href.into(),
+            status: Some(status.clone()),
             propstats: vec![Propstat {
                 status,
                 properties: Vec::new(),

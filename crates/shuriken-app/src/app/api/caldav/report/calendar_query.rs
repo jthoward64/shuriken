@@ -7,6 +7,7 @@ use crate::app::api::dav::extract::auth::get_auth_context;
 use shuriken_rfc::rfc::dav::build::multistatus::serialize_multistatus;
 use shuriken_rfc::rfc::dav::core::{CalendarQuery, PropertyName};
 use shuriken_service::auth::{Action, get_resolved_location_from_depot};
+use shuriken_service::auth::depot::get_path_location_from_depot;
 
 /// ## Summary
 /// Handles `calendar-query` REPORT requests.
@@ -64,7 +65,7 @@ pub async fn handle(
         }
     };
 
-    // Prefer ResourceLocation from depot if available (resolved by DavPathMiddleware)
+    // Prefer resolved ResourceLocation for authorization checks.
     let resource = if let Ok(loc) = get_resolved_location_from_depot(depot) {
         loc.clone()
     } else {
@@ -93,6 +94,13 @@ pub async fn handle(
         return;
     }
 
+    // Use the original path location for href generation so multistatus responses
+    // preserve client-facing collection slugs (e.g. `/calendar/`) rather than
+    // internal resolved identifiers.
+    let base_location = get_path_location_from_depot(depot)
+        .cloned()
+        .unwrap_or_else(|_| resource.clone());
+
     // ## Summary
     // Validate calendar-query filter per RFC 4791 §7.8 `supported-filter` precondition.
     //
@@ -114,7 +122,7 @@ pub async fn handle(
 
     let multistatus = match shuriken_service::caldav::service::report::execute_calendar_query(
         &mut conn,
-        &resource,
+        &base_location,
         collection_id,
         &query,
         &properties,

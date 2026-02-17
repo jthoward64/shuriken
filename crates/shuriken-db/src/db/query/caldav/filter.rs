@@ -12,7 +12,7 @@ use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use rrule::{RRule, Tz, Unvalidated};
 use shuriken_rfc::rfc::dav::core::{
-    CalendarFilter, CalendarQuery, CompFilter, MatchType, ParamFilter, TimeRange,
+    CalendarFilter, CalendarQuery, CompFilter, FilterTest, MatchType, ParamFilter, TimeRange,
 };
 
 /// ## Summary
@@ -94,12 +94,33 @@ async fn apply_calendar_filter(
         entity_id_sets.push(entity_ids);
     }
 
-    // Union all entity IDs (any component filter matches)
-    let mut matching_entity_ids: Vec<uuid::Uuid> = entity_id_sets.into_iter().flatten().collect();
-    matching_entity_ids.sort_unstable();
-    matching_entity_ids.dedup();
+    if entity_id_sets.is_empty() {
+        return Ok(Vec::new());
+    }
 
-    Ok(matching_entity_ids)
+    let combined = match filter.test {
+        FilterTest::AnyOf => {
+            let mut matching_entity_ids: Vec<uuid::Uuid> =
+                entity_id_sets.into_iter().flatten().collect();
+            matching_entity_ids.sort_unstable();
+            matching_entity_ids.dedup();
+            matching_entity_ids
+        }
+        FilterTest::AllOf => {
+            let mut iter = entity_id_sets.into_iter();
+            let mut intersection: std::collections::HashSet<uuid::Uuid> =
+                iter.next().unwrap_or_default().into_iter().collect();
+            for set in iter {
+                let set_hash: std::collections::HashSet<uuid::Uuid> = set.into_iter().collect();
+                intersection.retain(|id| set_hash.contains(id));
+            }
+            let mut result: Vec<uuid::Uuid> = intersection.into_iter().collect();
+            result.sort_unstable();
+            result
+        }
+    };
+
+    Ok(combined)
 }
 
 /// ## Summary
@@ -135,6 +156,12 @@ async fn apply_comp_filter(
             .load::<uuid::Uuid>(conn)
             .await?;
 
+        let with_index_component_ids = cal_index_query
+            .select(cal_index::entity_id)
+            .distinct()
+            .load::<uuid::Uuid>(conn)
+            .await?;
+
         let all_entity_ids = dav_instance::table
             .filter(dav_instance::deleted_at.is_null())
             .select(dav_instance::entity_id)
@@ -142,8 +169,10 @@ async fn apply_comp_filter(
             .load::<uuid::Uuid>(conn)
             .await?;
 
-        let with_component: std::collections::HashSet<uuid::Uuid> =
-            with_component_ids.into_iter().collect();
+        let with_component: std::collections::HashSet<uuid::Uuid> = with_component_ids
+            .into_iter()
+            .chain(with_index_component_ids)
+            .collect();
 
         return Ok(all_entity_ids
             .into_iter()
@@ -169,22 +198,43 @@ async fn apply_comp_filter(
                 .filter(cal_index::rrule_text.is_null())
                 .into_boxed();
 
-            // Apply start constraint: event_end > range_start
+            if component_name != "VTODO" {
+                boxed_query = boxed_query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(
+                    "COALESCE(dtstart_utc, dtend_utc) IS NOT NULL",
+                ));
+            }
+
+            // Apply start constraint: effective_end > range_start
+            // where effective_end is DTEND when present, otherwise DTSTART.
             if let Some(range_start) = start {
-                boxed_query = boxed_query.filter(
-                    cal_index::dtend_utc
-                        .is_null()
-                        .or(cal_index::dtend_utc.gt(range_start)),
-                );
+                let start_str = range_start.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+                if component_name == "VTODO" {
+                    boxed_query = boxed_query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(
+                        &format!(
+                            "(COALESCE(dtend_utc, dtstart_utc) > '{start_str}' OR (dtstart_utc IS NULL AND dtend_utc IS NULL))"
+                        ),
+                    ));
+                } else {
+                    boxed_query = boxed_query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(
+                        &format!("COALESCE(dtend_utc, dtstart_utc) > '{start_str}'"),
+                    ));
+                }
             }
 
             // Apply end constraint: event_start < range_end
             if let Some(range_end) = end {
-                boxed_query = boxed_query.filter(
-                    cal_index::dtstart_utc
-                        .is_null()
-                        .or(cal_index::dtstart_utc.lt(range_end)),
-                );
+                let end_str = range_end.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+                if component_name == "VTODO" {
+                    boxed_query = boxed_query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(
+                        &format!(
+                            "(COALESCE(dtstart_utc, dtend_utc) < '{end_str}' OR (dtstart_utc IS NULL AND dtend_utc IS NULL))"
+                        ),
+                    ));
+                } else {
+                    boxed_query = boxed_query.filter(diesel::dsl::sql::<diesel::sql_types::Bool>(
+                        &format!("COALESCE(dtstart_utc, dtend_utc) < '{end_str}'"),
+                    ));
+                }
             }
 
             non_recurring_ids = boxed_query
@@ -196,30 +246,42 @@ async fn apply_comp_filter(
 
         let recurring_rows = cal_index_query
             .filter(cal_index::rrule_text.is_not_null())
-            .filter(cal_index::dtstart_utc.is_not_null())
+            .filter(diesel::dsl::sql::<diesel::sql_types::Bool>(
+                "COALESCE(dtstart_utc, dtend_utc) IS NOT NULL",
+            ))
             .select((
                 cal_index::entity_id,
                 cal_index::rrule_text,
                 cal_index::dtstart_utc,
+                cal_index::dtend_utc,
             ))
             .load::<(
                 uuid::Uuid,
                 Option<String>,
+                Option<chrono::DateTime<chrono::Utc>>,
                 Option<chrono::DateTime<chrono::Utc>>,
             )>(conn)
             .await?;
 
         let recurring_ids: Vec<uuid::Uuid> = recurring_rows
             .into_iter()
-            .filter_map(|(entity_id, rrule_text, dtstart_utc)| {
+            .filter_map(|(entity_id, rrule_text, dtstart_utc, dtend_utc)| {
                 let rrule_text = rrule_text?;
-                let dtstart_utc = dtstart_utc?;
+                let dt_anchor = dtstart_utc.or(dtend_utc)?;
 
                 let rrule = rrule_text.parse::<RRule<Unvalidated>>().ok()?;
-                let dt_start = dtstart_utc.with_timezone(&Tz::UTC);
+                let dt_start = dt_anchor.with_timezone(&Tz::UTC);
                 let mut rrule_set: rrule::RRuleSet = match rrule.build(dt_start) {
                     Ok(set) => set,
-                    Err(_) => return None,
+                    Err(_) => {
+                        if component_name == "VTODO" && dtstart_utc.is_none() {
+                            let after_start =
+                                start.is_none_or(|range_start| dt_anchor > range_start);
+                            let before_end = end.is_none_or(|range_end| dt_anchor < range_end);
+                            return (after_start && before_end).then_some(entity_id);
+                        }
+                        return None;
+                    }
                 };
 
                 if let Some(range_start) = start {
@@ -232,10 +294,16 @@ async fn apply_comp_filter(
                 }
 
                 let occurrences: Vec<chrono::DateTime<rrule::Tz>> = rrule_set.all(u16::MAX).dates;
-                if occurrences.is_empty() {
-                    None
+                if !occurrences.is_empty() {
+                    return Some(entity_id);
+                }
+
+                if component_name == "VTODO" && dtstart_utc.is_none() {
+                    let after_start = start.is_none_or(|range_start| dt_anchor > range_start);
+                    let before_end = end.is_none_or(|range_end| dt_anchor < range_end);
+                    (after_start && before_end).then_some(entity_id)
                 } else {
-                    Some(entity_id)
+                    None
                 }
             })
             .collect();
@@ -265,9 +333,14 @@ async fn apply_comp_filter(
 
     // Apply direct nested component existence filters (e.g. VEVENT -> VALARM)
     if !comp_filter.comp_filters.is_empty() {
-        entity_ids =
-            apply_nested_comp_filters(conn, &entity_ids, component_name, &comp_filter.comp_filters)
-                .await?;
+        entity_ids = apply_nested_comp_filters(
+            conn,
+            &entity_ids,
+            component_name,
+            &comp_filter.comp_filters,
+            comp_filter.test,
+        )
+        .await?;
     }
 
     Ok(entity_ids)
@@ -283,6 +356,7 @@ async fn apply_nested_comp_filters(
     entity_ids: &[uuid::Uuid],
     parent_component_name: &str,
     child_filters: &[CompFilter],
+    test: FilterTest,
 ) -> anyhow::Result<Vec<uuid::Uuid>> {
     use std::collections::{HashMap, HashSet};
 
@@ -331,6 +405,19 @@ async fn apply_nested_comp_filters(
             .flatten()
             .collect();
 
+        let child_counts_by_entity: HashMap<uuid::Uuid, usize> = dav_component::table
+            .filter(dav_component::entity_id.eq_any(entity_ids))
+            .filter(dav_component::name.eq(child_name))
+            .filter(dav_component::deleted_at.is_null())
+            .select(dav_component::entity_id)
+            .load::<uuid::Uuid>(conn)
+            .await?
+            .into_iter()
+            .fold(HashMap::new(), |mut acc, entity_id| {
+                *acc.entry(entity_id).or_insert(0) += 1;
+                acc
+            });
+
         let mut matching_entities = HashSet::new();
         for (entity_id, parent_component_ids) in &entity_to_parents {
             let has_child = parent_component_ids
@@ -339,22 +426,28 @@ async fn apply_nested_comp_filters(
             let has_parent_without_child = parent_component_ids
                 .iter()
                 .any(|parent_id| !child_parent_ids.contains(parent_id));
+            let child_count = child_counts_by_entity.get(entity_id).copied().unwrap_or(0);
+            let parent_count = parent_component_ids.len();
 
             if child_filter.is_not_defined {
-                if has_parent_without_child {
+                if has_parent_without_child || child_count < parent_count {
                     matching_entities.insert(*entity_id);
                 }
-            } else if has_child {
+            } else if has_child || child_count > 0 {
                 matching_entities.insert(*entity_id);
             }
         }
 
-        combined_entities = Some(match combined_entities {
-            Some(mut existing) => {
+        combined_entities = Some(match (test, combined_entities) {
+            (FilterTest::AllOf, Some(mut existing)) => {
                 existing.retain(|entity_id| matching_entities.contains(entity_id));
                 existing
             }
-            None => matching_entities,
+            (FilterTest::AnyOf, Some(mut existing)) => {
+                existing.extend(matching_entities);
+                existing
+            }
+            (_, None) => matching_entities,
         });
     }
 
@@ -777,7 +870,10 @@ async fn evaluate_single_param_filter(
         // Parameter must NOT exist - find properties without this parameter
         let props_with_param: Vec<uuid::Uuid> = dav_parameter::table
             .filter(dav_parameter::property_id.eq_any(prop_ids))
-            .filter(dav_parameter::name.eq(param_name))
+            .filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
+                "UPPER(name) = '{}'",
+                param_name.replace('\'', "''")
+            )))
             .filter(dav_parameter::deleted_at.is_null())
             .select(dav_parameter::property_id)
             .distinct()
@@ -788,11 +884,13 @@ async fn evaluate_single_param_filter(
             props_with_param.into_iter().collect();
 
         // Return properties that DON'T have this parameter
-        Ok(prop_ids
+        let result = prop_ids
             .iter()
             .filter(|id| !props_with_param_set.contains(id))
             .copied()
-            .collect())
+            .collect::<std::collections::HashSet<_>>();
+
+        Ok(result)
     } else if let Some(text_match) = &param_filter.text_match {
         // Parameter must exist and match text
         let effective_collation = get_effective_collation(text_match);
@@ -813,7 +911,10 @@ async fn evaluate_single_param_filter(
 
         let mut query = dav_parameter::table
             .filter(dav_parameter::property_id.eq_any(prop_ids))
-            .filter(dav_parameter::name.eq(param_name))
+            .filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
+                "UPPER(name) = '{}'",
+                param_name.replace('\'', "''")
+            )))
             .filter(dav_parameter::deleted_at.is_null())
             .into_boxed();
 
@@ -867,21 +968,28 @@ async fn evaluate_single_param_filter(
             .await?;
 
         // Handle negate: return properties that DON'T match
-        if text_match.negate {
+        let result = if text_match.negate {
             let matched_set: std::collections::HashSet<_> = matched_prop_ids.into_iter().collect();
-            Ok(prop_ids
+            prop_ids
                 .iter()
                 .filter(|id| !matched_set.contains(id))
                 .copied()
-                .collect())
+                .collect::<std::collections::HashSet<_>>()
         } else {
-            Ok(matched_prop_ids.into_iter().collect())
-        }
+            matched_prop_ids
+                .into_iter()
+                .collect::<std::collections::HashSet<_>>()
+        };
+
+        Ok(result)
     } else {
         // Parameter must exist (no text match specified)
         let props_with_param: Vec<uuid::Uuid> = dav_parameter::table
             .filter(dav_parameter::property_id.eq_any(prop_ids))
-            .filter(dav_parameter::name.eq(param_name))
+            .filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
+                "UPPER(name) = '{}'",
+                param_name.replace('\'', "''")
+            )))
             .filter(dav_parameter::deleted_at.is_null())
             .select(dav_parameter::property_id)
             .distinct()

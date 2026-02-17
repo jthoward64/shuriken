@@ -106,7 +106,7 @@ limitations under the License.
     <!-- <feature>shared-calendars</feature> -->			<!-- Shared calendars extension (basic sharing via ACL) -->
     <!-- <feature>share-calendars-to-groups</feature> -->	<!-- Share calendars to groups extension (basic sharing via ACL) -->
     <!-- <feature>schedule-changes</feature> -->			<!-- schedule-changes property extension (not implemented) -->
-    <!-- <feature>split-calendars</feature> -->			<!-- Calendars are split by component type (not implemented) -->
+    <feature>split-calendars</feature>			<!-- Calendars are split by component type -->
     <!-- <feature>supported-component-sets</feature> -->	<!-- CALDAV:supported-calendar-component-sets on calendar homes (not implemented) -->
     <!-- <feature>supported-component-sets-one</feature> -->	<!-- Only single component calendars allowed to be created (not implemented) -->
     <!-- <feature>timerange-low-limit</feature> -->		<!-- Time-range only valid one year back (not implemented) -->

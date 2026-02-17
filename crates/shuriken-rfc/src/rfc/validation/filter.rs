@@ -69,6 +69,7 @@ const SUPPORTED_CALENDAR_COMPONENTS: &[&str] = &[
     "VJOURNAL",  // Journal entries (RFC 5545 §3.6.3)
     "VFREEBUSY", // Free/busy info (RFC 5545 §3.6.4)
     "VTIMEZONE", // Timezone definitions (RFC 5545 §3.6.5)
+    "VALARM",    // Alarm sub-components (RFC 5545 §3.6.6)
 ];
 
 /// ## Summary
@@ -89,6 +90,7 @@ const SUPPORTED_CALENDAR_PROPERTIES: &[&str] = &[
     "STATUS",        // Event/task status
     "CLASS",         // Confidentiality class (PUBLIC, PRIVATE, CONFIDENTIAL)
     "CREATED",       // Creation date
+    "DTSTAMP",       // Timestamp
     "LAST-MODIFIED", // Last modification date
     "ATTENDEE",      // Attendee information
     "ORGANIZER",     // Event organizer
@@ -96,6 +98,7 @@ const SUPPORTED_CALENDAR_PROPERTIES: &[&str] = &[
     "RDATE",         // Recurrence date
     "EXDATE",        // Exception date
     "EXRULE",        // Exception rule
+    "RECURRENCE-ID", // Recurrence instance identifier
     "TRANSP",        // Transparency (OPAQUE, TRANSPARENT)
     "ATTACH",        // Attachment
     "RELATED-TO",    // Related to other components
@@ -118,6 +121,7 @@ const SUPPORTED_CALENDAR_PARAMETERS: &[&str] = &[
     "EMAIL",    // Email address
     "RSVP",     // RSVP expected (TRUE, FALSE)
     "RELATED",  // Related to (PARENT, CHILD)
+    "RANGE",    // RECURRENCE-ID range modifier
     "X-*",      // Custom parameters (any starting with X-)
 ];
 

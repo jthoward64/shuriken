@@ -65,6 +65,11 @@ fn write_response<W: std::io::Write>(
     // Write href
     write_text_element(writer, "D:href", response.href.as_str())?;
 
+    // Write optional response-level status (used for whole-resource errors like 404)
+    if let Some(status) = &response.status {
+        write_text_element(writer, "D:status", &status.status_line())?;
+    }
+
     // Write each propstat
     for propstat in &response.propstats {
         writer.write_event(Event::Start(BytesStart::new("D:propstat")))?;
@@ -228,6 +233,7 @@ mod tests {
 
         let response = PropstatResponse {
             href: Href::new("/calendars/user/default/"),
+            status: None,
             propstats: vec![propstat],
             error: None,
             description: None,
