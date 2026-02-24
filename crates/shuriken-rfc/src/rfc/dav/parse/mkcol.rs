@@ -15,6 +15,12 @@ pub struct MkcolRequest {
     pub description: Option<String>,
     /// Resource type (for Extended MKCOL).
     pub resource_type: Option<String>,
+    /// Supported calendar component types (CALDAV:supported-calendar-component-set).
+    /// e.g. `["VEVENT"]`, `["VTODO"]`, `["VEVENT", "VTODO"]`.
+    pub supported_components: Option<Vec<String>>,
+    /// True if the body contained non-settable (server-computed) properties such as
+    /// `DAV:getetag` or `DAV:getlastmodified`. The server must reject such requests.
+    pub has_protected_props: bool,
 }
 
 /// ## Summary
@@ -41,10 +47,22 @@ pub fn parse_mkcol(xml: &[u8]) -> ParseResult<MkcolRequest> {
     let mut buf = Vec::new();
     let mut request = MkcolRequest::default();
 
+    // Server-computed (protected) properties that cannot be set by clients.
+    const PROTECTED_PROPS: &[&str] = &[
+        "getetag",
+        "getlastmodified",
+        "getcontentlength",
+        "getcontenttype",
+        "creationdate",
+        "resourcetype", // not settable via prop — only via dedicated resourcetype element
+    ];
+
     let mut in_prop = false;
     let mut in_resourcetype = false;
+    let mut in_supported_components = false;
     let mut current_property: Option<String> = None;
     let mut text_content = String::new();
+    let mut supported_components_buf: Vec<String> = Vec::new();
 
     loop {
         match reader.read_event_into(&mut buf) {
@@ -57,6 +75,7 @@ pub fn parse_mkcol(xml: &[u8]) -> ParseResult<MkcolRequest> {
                         in_prop = true;
                     }
                     "resourcetype" if in_prop => {
+                        // resourcetype is handled structurally, not as a settable prop
                         in_resourcetype = true;
                     }
                     "displayname" if in_prop => {
@@ -71,11 +90,22 @@ pub fn parse_mkcol(xml: &[u8]) -> ParseResult<MkcolRequest> {
                         current_property = Some("addressbook-description".to_string());
                         text_content.clear();
                     }
+                    "supported-calendar-component-set" if in_prop => {
+                        in_supported_components = true;
+                    }
                     "calendar" if in_resourcetype => {
                         request.resource_type = Some("calendar".to_string());
                     }
                     "addressbook" if in_resourcetype => {
                         request.resource_type = Some("addressbook".to_string());
+                    }
+                    name if in_prop
+                        && !in_resourcetype
+                        && !in_supported_components
+                        && current_property.is_none()
+                        && PROTECTED_PROPS.contains(&name) =>
+                    {
+                        request.has_protected_props = true;
                     }
                     _ => {}
                 }
@@ -90,6 +120,23 @@ pub fn parse_mkcol(xml: &[u8]) -> ParseResult<MkcolRequest> {
                     }
                     "addressbook" if in_resourcetype => {
                         request.resource_type = Some("addressbook".to_string());
+                    }
+                    "comp" if in_supported_components => {
+                        // <C:comp name="VEVENT"/>
+                        for attr in e.attributes().flatten() {
+                            if attr.key.local_name().as_ref() == b"name" {
+                                if let Ok(val) = std::str::from_utf8(attr.value.as_ref()) {
+                                    supported_components_buf.push(val.to_uppercase());
+                                }
+                            }
+                        }
+                    }
+                    name if in_prop
+                        && !in_resourcetype
+                        && !in_supported_components
+                        && PROTECTED_PROPS.contains(&name) =>
+                    {
+                        request.has_protected_props = true;
                     }
                     _ => {}
                 }
@@ -111,6 +158,15 @@ pub fn parse_mkcol(xml: &[u8]) -> ParseResult<MkcolRequest> {
                     }
                     "resourcetype" => {
                         in_resourcetype = false;
+                    }
+                    "supported-calendar-component-set" => {
+                        if !supported_components_buf.is_empty() {
+                            request.supported_components = Some(supported_components_buf.clone());
+                        }
+                        in_supported_components = false;
+                    }
+                    "comp" if in_supported_components => {
+                        // handled by Empty event above; Start/End pair also possible
                     }
                     "displayname" if current_property.as_deref() == Some("displayname") => {
                         request.displayname = Some(text_content.trim().to_string());

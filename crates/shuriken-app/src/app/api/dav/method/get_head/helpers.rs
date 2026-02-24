@@ -347,8 +347,13 @@ fn set_response_headers_and_body(
         res.add_header("Last-Modified", lm_value, true);
     }
 
-    // Set Content-Type header
-    if let Ok(ct_value) = HeaderValue::from_str(instance.content_type.as_str()) {
+    // Set Content-Type header (add charset=utf-8 for text types per RFC 4918 §8.7)
+    use shuriken_db::db::enums::ContentType;
+    let content_type = match instance.content_type {
+        ContentType::TextCalendar => "text/calendar;charset=utf-8",
+        ContentType::TextVCard => "text/vcard;charset=utf-8",
+    };
+    if let Ok(ct_value) = HeaderValue::from_str(content_type) {
         #[expect(unused)]
         res.add_header("Content-Type", ct_value, true);
     }

@@ -1,6 +1,7 @@
 //! Collection creation and management service.
 
 use diesel::prelude::*;
+use diesel::result::DatabaseErrorKind;
 use diesel_async::scoped_futures::ScopedFutureExt;
 use diesel_async::{AsyncConnection, RunQueryDsl};
 
@@ -8,6 +9,7 @@ use crate::error::{ServiceError, ServiceResult};
 use shuriken_db::db::connection::DbConnection;
 use shuriken_db::db::enums::CollectionType;
 use shuriken_db::db::query::dav::collection;
+use shuriken_db::db::schema::dav_collection;
 use shuriken_db::model::dav::collection::{DavCollection, NewDavCollection};
 
 /// Context for collection creation.
@@ -24,6 +26,9 @@ pub struct CreateCollectionContext {
     pub description: Option<String>,
     /// Optional parent collection ID for nested collections.
     pub parent_collection_id: Option<uuid::Uuid>,
+    /// Optional supported calendar component types (e.g. ["VEVENT", "VTODO"]).
+    /// `None` means no restriction (all component types accepted).
+    pub supported_components: Option<Vec<String>>,
 }
 
 /// Result of a collection creation operation.
@@ -56,24 +61,26 @@ pub async fn create_collection(
     let displayname = ctx.displayname.clone();
     let description = ctx.description.clone();
     let parent_collection_id = ctx.parent_collection_id;
+    let supported_components = ctx.supported_components.clone();
 
     conn.transaction::<_, ServiceError, _>(move |tx| {
         let slug = slug.clone();
         let displayname = displayname.clone();
         let description = description.clone();
+        let supported_components = supported_components.clone();
 
         async move {
-            // Check if collection already exists with same slug and owner
-            let existing: Option<DavCollection> =
-                collection::by_slug_principal_and_parent(
-                    &slug,
-                    owner_principal_id,
-                    parent_collection_id,
-                )
-                    .first(tx)
-                    .await
-                    .optional()
-                    .map_err(ServiceError::from)?;
+            // Check if a non-deleted collection with this slug already exists for the
+            // owner. This mirrors the partial unique index:
+            //   UNIQUE (owner_principal_id, slug) WHERE deleted_at IS NULL
+            // We intentionally do NOT filter by parent_collection_id so the check
+            // matches the constraint exactly and avoids false negatives.
+            let existing: Option<DavCollection> = collection::by_slug_and_principal(&slug, owner_principal_id)
+                .filter(dav_collection::deleted_at.is_null())
+                .first(tx)
+                .await
+                .optional()
+                .map_err(ServiceError::from)?;
 
             if existing.is_some() {
                 return Err(ServiceError::Conflict(format!(
@@ -89,11 +96,20 @@ pub async fn create_collection(
                 timezone_tzid: None,
                 slug: &slug,
                 parent_collection_id,
+                supported_components,
             };
 
             let created = collection::create_collection(tx, &new_collection)
                 .await
-                .map_err(ServiceError::from)?;
+                .map_err(|e| {
+                    // Safety net: if the INSERT races with another request and the
+                    // unique constraint fires, treat it as a conflict.
+                    if let diesel::result::Error::DatabaseError(DatabaseErrorKind::UniqueViolation, _) = &e {
+                        ServiceError::Conflict(format!("collection with slug '{slug}' already exists"))
+                    } else {
+                        ServiceError::from(e)
+                    }
+                })?;
 
             Ok(CreateCollectionResult {
                 collection_id: created.id,

@@ -360,6 +360,15 @@ impl TestRunner {
                 }
             }
 
+            // Track end-deletes unconditionally (before verifications so cleanup
+            // always happens even when the test fails).
+            if request.end_delete {
+                if let Some(ruri) = &request.ruri {
+                    let resolved = self.context.substitute(ruri);
+                    self.end_deletes.push(resolved);
+                }
+            }
+
             // Run verifications
             for verification in &request.verifications {
                 if self
@@ -411,13 +420,6 @@ impl TestRunner {
                 }
             }
 
-            // Track end-deletes
-            if request.end_delete {
-                if let Some(ruri) = &request.ruri {
-                    let resolved = self.context.substitute(ruri);
-                    self.end_deletes.push(resolved);
-                }
-            }
         }
 
         Ok(TestOutcome::Passed)

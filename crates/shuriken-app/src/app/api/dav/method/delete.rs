@@ -71,20 +71,46 @@ pub async fn delete(req: &mut Request, res: &mut Response, depot: &Depot) {
         }
         (Ok(coll), Err(_)) => {
             // Collection exists but no instance
-            // Check if the path ends with a slash (collection) or a filename (missing instance)
             if path.ends_with('/') {
-                // This is a collection DELETE request
-                tracing::warn!(
-                    collection_id = %coll.id,
-                    path = %path,
-                    "DELETE on collections not yet supported"
-                );
-                res.status_code(StatusCode::FORBIDDEN);
-            } else {
-                // This is a request for a non-existent instance
-                tracing::debug!(path = %path, "Instance not found");
-                res.status_code(StatusCode::NOT_FOUND);
+                // Collection DELETE — soft-delete all instances then the collection itself
+                let (subjects, authorizer) = match get_auth_context(depot, &mut conn).await {
+                    Ok(ctx) => ctx,
+                    Err(status) => {
+                        res.status_code(status);
+                        return;
+                    }
+                };
+
+                let auth_resource = match get_resolved_location_from_depot(depot) {
+                    Ok(r) => r.clone(),
+                    Err(e) => {
+                        tracing::error!(error = %e, "ResourceLocation not found for collection DELETE");
+                        res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+                        return;
+                    }
+                };
+
+                if let Err(e) = authorizer.require(&subjects, &auth_resource, Action::Delete) {
+                    tracing::debug!(error = %e, "Authorization denied for collection DELETE");
+                    send_need_privileges_error(res, Action::Delete, req.uri().path());
+                    return;
+                }
+
+                match delete_collection(&mut conn, coll.id).await {
+                    Ok(()) => {
+                        tracing::info!(collection_id = %coll.id, "Collection deleted");
+                        res.status_code(StatusCode::NO_CONTENT);
+                    }
+                    Err(e) => {
+                        tracing::error!(error = %e, "Failed to delete collection");
+                        res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+                    }
+                }
+                return;
             }
+            // Non-trailing-slash path with no instance = 404
+            tracing::debug!(path = %path, "Instance not found");
+            res.status_code(StatusCode::NOT_FOUND);
             return;
         }
         _ => {
@@ -252,4 +278,39 @@ async fn check_delete_authorization(
 
     check_authorization(&authorizer, &subjects, resource, Action::Delete, "DELETE")
         .map_err(|(status, _resource, action)| (status, action))
+}
+
+/// Soft-deletes a collection and all its non-deleted instances.
+///
+/// Sets `deleted_at` on all instances in the collection and then on the collection itself.
+/// This frees the `(owner_principal_id, slug)` unique slot for reuse.
+///
+/// ## Errors
+/// Returns a database error if any operation fails.
+async fn delete_collection(
+    conn: &mut shuriken_db::db::connection::DbConnection<'_>,
+    collection_id: uuid::Uuid,
+) -> anyhow::Result<()> {
+    use diesel::prelude::*;
+    use diesel_async::RunQueryDsl;
+    use shuriken_db::db::schema::{dav_collection, dav_instance};
+
+    let now = chrono::Utc::now();
+
+    // Soft-delete all non-deleted instances in the collection
+    diesel::update(dav_instance::table)
+        .filter(dav_instance::collection_id.eq(collection_id))
+        .filter(dav_instance::deleted_at.is_null())
+        .set(dav_instance::deleted_at.eq(now))
+        .execute(conn)
+        .await?;
+
+    // Soft-delete the collection itself
+    diesel::update(dav_collection::table)
+        .filter(dav_collection::id.eq(collection_id))
+        .set(dav_collection::deleted_at.eq(now))
+        .execute(conn)
+        .await?;
+
+    Ok(())
 }

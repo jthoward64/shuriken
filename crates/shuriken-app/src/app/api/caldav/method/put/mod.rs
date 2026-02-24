@@ -158,6 +158,12 @@ pub async fn put(req: &mut Request, res: &mut Response, depot: &Depot) {
             body: &body,
             if_none_match,
             if_match,
+            collection_supported_components: collection.supported_components.as_ref().map(|v| {
+                v.iter()
+                    .filter_map(|s| s.as_deref())
+                    .map(str::to_uppercase)
+                    .collect::<Vec<_>>()
+            }),
         },
     )
     .await
@@ -225,6 +231,9 @@ struct PutRequest<'a> {
     body: &'a [u8],
     if_none_match: Option<String>,
     if_match: Option<String>,
+    /// Allowed component types from the collection's supported-calendar-component-set.
+    /// `None` means all component types are allowed.
+    collection_supported_components: Option<Vec<String>>,
 }
 
 /// Performs the PUT operation for a calendar object.
@@ -279,6 +288,31 @@ async fn perform_put(
         return Err(PutError::InvalidCalendarObjectResource(
             "VCALENDAR must contain VEVENT, VTODO, VJOURNAL, or VFREEBUSY".to_string(),
         ));
+    }
+
+    // RFC 4791 §5.3.2.1: supported-calendar-component - Enforce collection restriction.
+    // If the collection specifies allowed component types, reject any PUT that contains
+    // a component type not in that list.
+    if let Some(allowed) = &req.collection_supported_components {
+        let component_type = if has_event {
+            "VEVENT"
+        } else if has_todo {
+            "VTODO"
+        } else if has_journal {
+            "VJOURNAL"
+        } else {
+            "VFREEBUSY"
+        };
+        if !allowed.iter().any(|a| a == component_type) {
+            tracing::debug!(
+                component_type = %component_type,
+                allowed = ?allowed,
+                "PUT rejected: component type not in collection's supported-calendar-component-set"
+            );
+            return Err(PutError::UnsupportedCalendarComponent(format!(
+                "{component_type} not allowed in this collection"
+            )));
+        }
     }
 
     // Extract UID from the first supported component (for UID conflict checking)

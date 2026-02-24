@@ -77,6 +77,7 @@ Seven crates in `crates/`, plus `shuriken-app` which is the main binary:
 - **Component tree**: `dav_component` stores hierarchical iCalendar/vCard structure (VCALENDAR → VEVENT, etc.).
 - `dav_tombstone` enables correct sync after deletion.
 - Monotonic sync tokens and revisions power efficient client synchronization.
+- Any resource can be uniquely identified both by its UUID and its slug path — but all internal logic and authorization must use UUIDs. Slugs are converted to UUIDs at the edge (HTTP middleware) and never used for internal logic.
 
 ### Authorization
 
@@ -116,9 +117,9 @@ impl Seeder for MySeeder {
 
 ## Code Style
 
-- **Clippy**: pedantic lints are `deny` — must fix. Style/complexity/perf are `warn`.
+- **Clippy**: pedantic lints are `deny` — must fix. Style/complexity/perf are `warn`. Clippy warnings must be resolved promptly.
 - **Function length**: aim for <40 lines; <50 maximum. Split into parsing/service/serialization helpers.
-- **`#[expect]` over `#[allow]`**: documents intentional deviations, errors if the lint disappears.
+- **`#[expect]` over `#[allow]`**: documents intentional deviations, errors if the lint disappears. There is a very high bar for using expect, it should be reserved for cases where the code is made less clear by fixing the lint. I don't care if it requires you to split complex functions up (this is desireable anyway). Clippy warnings are all enabled for a reason.
 - **`#[must_use]`**: add to pure functions and builder methods.
 - **Option/Result**: prefer `strip_prefix`/`strip_suffix`, `map_or`, `is_some_and` over manual patterns.
 - **String building**: use `write!`/`writeln!` instead of repeated `format!` concatenations.
@@ -126,6 +127,7 @@ impl Seeder for MySeeder {
 - **DRY**: NEVER duplicate logic or constants. Extract shared code into helpers or modules. Duplication is the root of all evil.
 - **Structural types**: Invalid states should be unrepresentable. Use enums, newtypes, and private fields to enforce invariants.
 - **Strings**: Raw strings are not a good way to pass data around. Parsing strings should be handled in single locations and the parsed data should be passed around in structured types. Two locations should neve have the same string parsing logic. If you find yourself needing to parse the same string format (or similar ones) in multiple places, extract that logic into a helper function and reuse it.
+- **Loose coupling**: avoid tight coupling between modules and even individual logical components within modules. For example, the HTTP layer should not be tightly coupled to the service layer — it should only interact through well-defined interfaces and data structures. This allows for easier testing and future refactoring. If you find yourself fighting this constraint, it's a sign that you may need to extract a new module or service to handle the shared logic.
 
 ## Doc Comment Format
 

@@ -7,11 +7,14 @@ use salvo::http::StatusCode;
 use salvo::{Depot, Request, Response, handler};
 
 use crate::app::api::dav::extract::auth::get_auth_context;
+use crate::app::api::dav::response::error::write_precondition_error;
 use crate::app::api::dav::util::{build_full_url, owner_principal_id_from_subjects};
+use shuriken_db::db::enums::CollectionType;
+use shuriken_rfc::rfc::dav::core::PreconditionError;
 use shuriken_rfc::rfc::dav::parse::{MkcolRequest, parse_mkcol};
 use shuriken_service::auth::{
-    Action, PathSegment, ResourceIdentifier, ResourceLocation, get_resolved_location_from_depot,
-    get_terminal_collection_from_depot,
+    Action, PathSegment, ResourceIdentifier, ResourceLocation, get_collection_chain_from_depot,
+    get_resolved_location_from_depot, get_terminal_collection_from_depot,
 };
 use shuriken_service::dav::service::collection::{CreateCollectionContext, create_collection};
 use shuriken_service::error::ServiceError;
@@ -109,7 +112,27 @@ pub async fn mkcalendar(req: &mut Request, res: &mut Response, depot: &Depot) {
         }
     };
 
-    if let Err(e) = authorizer.require(&subjects, &parent_resource, Action::Edit) {
+    // Extract slug from path early so it can be used for the auth resource below.
+    let slug = path
+        .trim_end_matches('/')
+        .split('/')
+        .next_back()
+        .unwrap_or("calendar")
+        .to_string();
+
+    // When the parent resource only has [ResourceType, Owner] segments (creating a top-level
+    // collection), the path e.g. `/calendars/<uuid>` does not glob-match the Casbin policy
+    // `/calendars/<uuid>/**`. Include the new collection slug so the path becomes
+    // `/calendars/<uuid>/caltest1` which does match.
+    let auth_resource = if parent_resource.segments().len() == 2 {
+        let mut segments = parent_resource.segments().to_vec();
+        segments.push(PathSegment::Collection(ResourceIdentifier::Slug(slug.clone())));
+        ResourceLocation::from_segments(segments).unwrap_or_else(|_| parent_resource.clone())
+    } else {
+        parent_resource.clone()
+    };
+
+    if let Err(e) = authorizer.require(&subjects, &auth_resource, Action::Edit) {
         tracing::debug!(error = %e, "Authorization denied for MKCALENDAR");
         res.status_code(StatusCode::FORBIDDEN);
         return;
@@ -137,13 +160,14 @@ pub async fn mkcalendar(req: &mut Request, res: &mut Response, depot: &Depot) {
         }
     };
 
-    // Extract slug from path (last segment), trimming trailing slashes
-    let slug = path
-        .trim_end_matches('/')
-        .split('/')
-        .next_back()
-        .unwrap_or("calendar")
-        .to_string();
+    // Reject requests that contain server-computed (protected) properties like
+    // DAV:getetag. Per RFC 5689 §3, the server MUST return a failure response
+    // when a requested property cannot be set. We return 422 Unprocessable Entity.
+    if parsed_request.has_protected_props {
+        tracing::debug!(path = %path, "Rejecting MKCALENDAR: body contains non-settable properties");
+        res.status_code(StatusCode::UNPROCESSABLE_ENTITY);
+        return;
+    }
 
     tracing::debug!(path = %path, slug = %slug, "Extracted slug from MKCALENDAR path");
 
@@ -157,9 +181,40 @@ pub async fn mkcalendar(req: &mut Request, res: &mut Response, depot: &Depot) {
         }
     };
 
-    let parent_collection_id = get_terminal_collection_from_depot(depot)
-        .ok()
-        .map(|collection| collection.id);
+    // Check that we're not trying to create a calendar inside an existing calendar.
+    // RFC 4791 §4.2 forbids nesting calendar collections inside other calendars.
+    //
+    // The TRUE PARENT of the collection being created is:
+    // - chain[-2] if the target collection is in the chain (target already exists)
+    // - chain[-1] (terminal) if the target is NOT in the chain
+    // This is always checked regardless of whether the target exists, because a
+    // structural violation (parent is Calendar) takes priority over a conflict.
+    let chain_opt = get_collection_chain_from_depot(depot).ok();
+    let parent_collection = match get_terminal_collection_from_depot(depot) {
+        Ok(_) => {
+            // Target is in chain → parent is the second-to-last element
+            chain_opt.and_then(|chain| {
+                let n = chain.len();
+                if n >= 2 {
+                    chain.collections().get(n - 2).cloned()
+                } else {
+                    None
+                }
+            })
+        }
+        Err(_) => {
+            // Target not in chain → the chain's terminal is the parent
+            chain_opt.and_then(|chain| chain.terminal().cloned())
+        }
+    };
+    if let Some(parent) = &parent_collection {
+        if parent.collection_type == CollectionType::Calendar {
+            tracing::debug!(path = %path, "Rejecting MKCALENDAR inside an existing calendar collection");
+            write_precondition_error(res, &PreconditionError::CalendarCollectionLocationOk);
+            return;
+        }
+    }
+    let parent_collection_id = parent_collection.map(|c| c.id);
 
     // Create collection context
     let ctx = CreateCollectionContext {
@@ -169,6 +224,7 @@ pub async fn mkcalendar(req: &mut Request, res: &mut Response, depot: &Depot) {
         displayname: parsed_request.displayname,
         description: parsed_request.description,
         parent_collection_id,
+        supported_components: parsed_request.supported_components,
     };
 
     // Create the calendar collection
@@ -197,10 +253,14 @@ pub async fn mkcalendar(req: &mut Request, res: &mut Response, depot: &Depot) {
         }
         Err(e) => {
             tracing::error!("Failed to create calendar collection: {}", e);
-            res.status_code(match e {
-                ServiceError::Conflict(_) => StatusCode::CONFLICT,
-                _ => StatusCode::INTERNAL_SERVER_ERROR,
-            });
+            match e {
+                ServiceError::Conflict(_) => {
+                    write_precondition_error(res, &PreconditionError::ResourceMustBeNull);
+                }
+                _ => {
+                    res.status_code(StatusCode::INTERNAL_SERVER_ERROR);
+                }
+            }
         }
     }
 }

@@ -38,4 +38,5 @@ pub struct NewDavCollection<'a> {
     pub timezone_tzid: Option<&'a str>,
     pub slug: &'a str,
     pub parent_collection_id: Option<uuid::Uuid>,
+    pub supported_components: Option<Vec<String>>,
 }

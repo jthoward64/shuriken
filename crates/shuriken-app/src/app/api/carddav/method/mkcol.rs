@@ -132,6 +132,7 @@ pub async fn mkcol_extended(req: &mut Request, res: &mut Response, depot: &Depot
         displayname: parsed_request.displayname,
         description: parsed_request.description,
         parent_collection_id,
+        supported_components: None,
     };
 
     // Create the addressbook collection
