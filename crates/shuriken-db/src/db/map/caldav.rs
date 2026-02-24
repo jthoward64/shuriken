@@ -172,31 +172,31 @@ fn build_cal_index(
     });
 
     // Extract DTEND
-        let mut dtend_utc = component.get_property("DTEND").and_then(|prop| {
+    let mut dtend_utc = component.get_property("DTEND").and_then(|prop| {
         let tzid = prop.get_param_value("TZID");
         let dt = prop.as_datetime()?;
         ical_datetime_to_utc_with_resolver(dt, tzid, resolver)
     });
 
-        // Extract DUE (primarily used by VTODO)
-        let due_utc = component.get_property("DUE").and_then(|prop| {
-            let tzid = prop.get_param_value("TZID");
-            let dt = prop.as_datetime()?;
-            ical_datetime_to_utc_with_resolver(dt, tzid, resolver)
-        });
+    // Extract DUE (primarily used by VTODO)
+    let due_utc = component.get_property("DUE").and_then(|prop| {
+        let tzid = prop.get_param_value("TZID");
+        let dt = prop.as_datetime()?;
+        ical_datetime_to_utc_with_resolver(dt, tzid, resolver)
+    });
 
-        // Derive effective end when DTEND is omitted.
-        // RFC 5545 allows DURATION as an alternative to DTEND, and VTODO commonly uses DUE.
-        if dtend_utc.is_none() {
-            dtend_utc = due_utc.or_else(|| {
-                component
-                    .get_property("DURATION")
-                    .and_then(|prop| prop.as_duration())
-                    .and_then(|duration| {
-                        dtstart_utc.map(|start| start + ical_duration_to_chrono(duration))
-                    })
-            });
-        }
+    // Derive effective end when DTEND is omitted.
+    // RFC 5545 allows DURATION as an alternative to DTEND, and VTODO commonly uses DUE.
+    if dtend_utc.is_none() {
+        dtend_utc = due_utc.or_else(|| {
+            component
+                .get_property("DURATION")
+                .and_then(|prop| prop.as_duration())
+                .and_then(|duration| {
+                    dtstart_utc.map(|start| start + ical_duration_to_chrono(duration))
+                })
+        });
+    }
 
     // Extract all-day flag (only if VALUE=DATE is explicitly set)
     let all_day = component.get_property("DTSTART").and_then(|prop| {
@@ -205,10 +205,16 @@ fn build_cal_index(
     });
 
     // Extract RRULE
-    let rrule_text = component
-        .get_property("RRULE")
-        .and_then(|prop| prop.as_text())
-        .map(String::from);
+    let rrule_text = if component_type == crate::db::enums::ComponentType::VTodo {
+        component
+            .get_property("RRULE")
+            .map(|prop| prop.raw_value.clone())
+    } else {
+        component
+            .get_property("RRULE")
+            .and_then(|prop| prop.as_text())
+            .map(String::from)
+    };
 
     // Extract RECURRENCE-ID
     let recurrence_id_utc = component.get_property("RECURRENCE-ID").and_then(|prop| {

@@ -1,7 +1,7 @@
 //! Helper functions for extracting and processing recurrence data from iCalendar components.
 
 use crate::error::{RfcError, RfcResult};
-use crate::rfc::ical::core::{Component, DateTime as IcalDateTime, PropertyName};
+use crate::rfc::ical::core::{Component, DateTime as IcalDateTime};
 use crate::rfc::ical::expand::TimeZoneResolver;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use rrule::{RRule, RRuleSet, Tz, Unvalidated};

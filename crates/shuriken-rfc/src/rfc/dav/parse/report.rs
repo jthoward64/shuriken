@@ -1256,25 +1256,6 @@ fn parse_calendar_timezone_element(
         ));
     }
 
-    let uppercase_payload = timezone_payload.to_ascii_uppercase();
-    if !uppercase_payload.contains("BEGIN:VCALENDAR") {
-        return Err(ParseError::invalid_value(
-            "invalid timezone calendar-data: missing VCALENDAR root",
-        ));
-    }
-
-    if !uppercase_payload.contains("\nVERSION:") {
-        return Err(ParseError::invalid_value(
-            "invalid timezone calendar-data: VCALENDAR missing VERSION",
-        ));
-    }
-
-    if !uppercase_payload.contains("\nPRODID:") {
-        return Err(ParseError::invalid_value(
-            "invalid timezone calendar-data: VCALENDAR missing PRODID",
-        ));
-    }
-
     let parsed = crate::rfc::ical::parse::parse(timezone_payload).map_err(|err| {
         ParseError::invalid_value(format!("invalid timezone calendar-data: {err}"))
     })?;
@@ -1282,31 +1263,6 @@ fn parse_calendar_timezone_element(
     if parsed.root.children.is_empty() {
         return Err(ParseError::invalid_value(
             "invalid timezone calendar-data: missing VTIMEZONE component",
-        ));
-    }
-
-    if parsed.root.get_property("VERSION").is_none() {
-        return Err(ParseError::invalid_value(
-            "invalid timezone calendar-data: VCALENDAR missing VERSION",
-        ));
-    }
-
-    if parsed.root.get_property("PRODID").is_none() {
-        return Err(ParseError::invalid_value(
-            "invalid timezone calendar-data: VCALENDAR missing PRODID",
-        ));
-    }
-
-    let timezone_count = parsed
-        .root
-        .children
-        .iter()
-        .filter(|child| child.kind == Some(ComponentKind::Timezone))
-        .count();
-
-    if timezone_count != 1 {
-        return Err(ParseError::invalid_value(
-            "invalid timezone calendar-data: expected exactly one VTIMEZONE component",
         ));
     }
 

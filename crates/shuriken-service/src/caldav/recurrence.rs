@@ -3,7 +3,7 @@
 use crate::error::{ServiceError, ServiceResult};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use rrule::{RRule, RRuleSet, Tz, Unvalidated};
-use shuriken_rfc::rfc::ical::core::{Component, DateTime as IcalDateTime, PropertyName};
+use shuriken_rfc::rfc::ical::core::{Component, DateTime as IcalDateTime};
 use shuriken_rfc::rfc::ical::expand::TimeZoneResolver;
 
 /// Extracted recurrence data from a VEVENT component.

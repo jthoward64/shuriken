@@ -38,6 +38,22 @@ pub async fn report(req: &mut Request, res: &mut Response, depot: &Depot) {
         }
     };
 
+    // TEMP: log body preview for debugging
+    {
+        let preview = &body[..body.len().min(120)];
+        let preview_str = preview
+            .iter()
+            .map(|b| {
+                if b.is_ascii_graphic() || *b == b' ' {
+                    *b as char
+                } else {
+                    ' '
+                }
+            })
+            .collect::<String>();
+        tracing::debug!(path = %request_path, body_preview = %preview_str, "REPORT body preview");
+    }
+
     // Parse REPORT request
     let req_data = match shuriken_rfc::rfc::dav::parse::report::parse_report(body) {
         Ok(parsed_report) => parsed_report,
@@ -45,12 +61,11 @@ pub async fn report(req: &mut Request, res: &mut Response, depot: &Depot) {
             let error_text = e.to_string();
             let is_timezone_error = error_text.contains("timezone");
             if is_timezone_error {
-                let precondition = shuriken_rfc::rfc::dav::core::PreconditionError::
-                    ValidCalendarData(error_text.clone());
-                crate::app::api::dav::response::error::write_precondition_error(
-                    res,
-                    &precondition,
-                );
+                let precondition =
+                    shuriken_rfc::rfc::dav::core::PreconditionError::ValidCalendarData(
+                        error_text.clone(),
+                    );
+                crate::app::api::dav::response::error::write_precondition_error(res, &precondition);
                 tracing::warn!(
                     path = %request_path,
                     status = ?res.status_code,
