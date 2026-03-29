@@ -16,8 +16,10 @@
   },
   "dependencies": {
     "@effect/experimental": "^0.60.0",
+    "@effect/opentelemetry": "^0.63.0",
     "@effect/platform": "^0.96.0",
     "@effect/platform-bun": "^0.89.0",
+    "@opentelemetry/sdk-trace-base": "^2.6.1",
     "dotenv": "^17.3.1",
     "drizzle-orm": "beta",
     "effect": "^3.21.0",
