@@ -44,7 +44,7 @@ pub async fn build_instance_properties(
             && qname.local_name() == "calendar-data"
         {
             if let Some(data) = load_calendar_data(conn, instance, prop_name).await? {
-                properties.push(DavProperty::xml(
+                properties.push(DavProperty::content_data(
                     QName::new("urn:ietf:params:xml:ns:caldav", "calendar-data"),
                     data,
                 ));
@@ -57,7 +57,7 @@ pub async fn build_instance_properties(
             && qname.local_name() == "address-data"
         {
             if let Some(data) = load_address_data(conn, instance, prop_name).await? {
-                properties.push(DavProperty::xml(
+                properties.push(DavProperty::content_data(
                     QName::new("urn:ietf:params:xml:ns:carddav", "address-data"),
                     data,
                 ));

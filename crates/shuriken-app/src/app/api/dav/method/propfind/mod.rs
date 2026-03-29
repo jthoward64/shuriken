@@ -7,8 +7,10 @@ use salvo::{Depot, Request, Response, handler};
 
 use crate::app::api::dav::extract::auth::{check_authorization, get_auth_context};
 use crate::app::api::dav::extract::headers::{Depth, parse_depth};
+use crate::app::api::dav::response::error::write_precondition_error;
 use crate::app::api::dav::response::need_privileges::send_need_privileges_error;
 use shuriken_rfc::rfc::dav::build::multistatus::serialize_multistatus;
+use shuriken_rfc::rfc::dav::core::PreconditionError;
 use shuriken_rfc::rfc::dav::parse::propfind::parse_propfind;
 use shuriken_service::auth::{
     Action, get_resolved_location_from_depot, get_terminal_collection_from_depot,
@@ -41,6 +43,13 @@ pub async fn propfind(req: &mut Request, res: &mut Response, depot: &Depot) {
     // Parse Depth header (default to 0 for PROPFIND)
     let depth = parse_depth(req).unwrap_or_else(Depth::default_for_propfind);
     tracing::debug!(depth = ?depth, "Depth header parsed");
+
+    // RFC 4918 §9.1: Reject Depth:infinity requests
+    if matches!(depth, Depth::Infinity) {
+        tracing::debug!("Rejecting Depth:infinity PROPFIND");
+        write_precondition_error(res, &PreconditionError::PropfindFiniteDepth);
+        return;
+    }
 
     // Validate that the collection was resolved by DavPathMiddleware
     if get_terminal_collection_from_depot(depot).is_err() {

@@ -292,6 +292,15 @@ async fn resolve_single_property(qname: QName, ctx: &mut PropertyResolutionConte
         ("urn:ietf:params:xml:ns:carddav", _) => {
             resolve_carddav_property(qname, ctx.collection, ctx.found, ctx.not_found);
         }
+        ("http://calendarserver.org/ns/", "getctag") => {
+            // CalendarServer getctag extension: same value as DAV:sync-token
+            if let Some(coll) = ctx.collection {
+                ctx.found
+                    .push(DavProperty::text(qname, serialize_sync_token(coll.synctoken)));
+            } else {
+                ctx.not_found.push(DavProperty::empty(qname));
+            }
+        }
         _ => {
             // Unknown property - return as not found
             ctx.not_found.push(DavProperty::empty(qname));

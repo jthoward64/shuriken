@@ -178,6 +178,15 @@ impl DavProperty {
         }
     }
 
+    /// Creates a property with content data (iCalendar/vCard text).
+    #[must_use]
+    pub fn content_data(name: QName, data: impl Into<String>) -> Self {
+        Self {
+            name,
+            value: Some(PropertyValue::ContentData(data.into())),
+        }
+    }
+
     /// Creates a property with raw XML content.
     #[must_use]
     pub fn xml(name: QName, xml: impl Into<String>) -> Self {

@@ -1,0 +1,206 @@
+Check off items as they are completed. This is a list of test cases that are currently failing as found by `cargo run -p shuriken-caldavtester --example run_llm ...`
+
+Highest priority items are those that might mask other issues such as 403 or 404 errors that prevent the test from seeing the actual behavior of the server.
+
+Protocol for fixing an item:
+
+1. Select a test case from the list
+2. Determine the logical flow through the application for the test case
+3. Add or extend logging to view the behavior of the application during the test case
+4. Identify the expected behavior and how it differs from the actual behavior
+5. Implement a fix for the issue
+6. Rerun the test case using `run_llm` to confirm it now passes
+7. If the fix didn't work, repeat the process from step 2
+8. Once the test case passes, check it off the list and commit changes with a descriptive message about the fix
+
+- [ ]  `GET on resource/1`:  request #0 verifier `calendarDataMatch` failed: **calendarDataMatch: normalized iCalendar differs from expected file 'Resource/CalDAV/delete/1.txt'**
+- [ ]  `PUT VEVENT/1`:  request #1 verifier `calendarDataMatch` failed: **calendarDataMatch: normalized iCalendar differs from expected file 'Resource/CalDAV/recurrenceput/1.txt'**
+- [ ]  `PUT VEVENT/3`:  request #1 verifier `calendarDataMatch` failed: **calendarDataMatch: normalized iCalendar differs from expected file 'Resource/CalDAV/recurrenceput/21.ics'**
+- [ ]  `Put VTODO/1`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 403**
+- [ ]  `Put VTODO/2`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 403**
+- [ ]  `Put VTODO/3`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 403**
+- [ ]  `Put VTODO/4`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 403**
+- [ ]  `Put VTODO/5`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 403**
+- [ ]  `Problem VTODOs - various combinations of date-time/date values/1`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 403**
+- [ ]  `Problem VTODOs - various combinations of date-time/date values/2`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 403**
+- [ ]  `Problem VTODOs - various combinations of date-time/date values/3`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 403**
+- [ ]  `Problem VTODOs - various combinations of date-time/date values/4`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 403**
+- [ ]  `Problem VTODOs - various combinations of date-time/date values/5`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 403**
+- [ ]  `Problem VTODOs - various combinations of date-time/date values/6`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 403**
+- [ ]  `Problem VTODOs - various combinations of date-time/date values/7`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 403**
+- [ ]  `Problem VTODOs - various combinations of date-time/date values/8`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 403**
+- [ ]  `Problem VTODOs - various combinations of date-time/date values/9`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 403**
+- [ ]  `Problem VTODOs - various combinations of date-time/date values/10`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 403**
+- [ ]  `Problem VTODOs - various combinations of date-time/date values/11`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 403**
+- [ ]  `Problem VTODOs - various combinations of date-time/date values/12`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 403**
+- [ ]  `PUT with Content-Type parameters/3`:  request #0 verifier `propfindItems` failed: **okprops: property '{DAV:}getcontenttype' not found**
+- [ ]  `PUT with relaxed parsing/1`:  request #1 verifier `calendarDataMatch` failed: **calendarDataMatch: normalized iCalendar differs from expected file 'Resource/CalDAV/put/2.ics'**
+- [ ]  `PUT with relaxed parsing/2`:  request #1 verifier `calendarDataMatch` failed: **calendarDataMatch: normalized iCalendar differs from expected file 'Resource/CalDAV/put/5.ics'**
+- [ ]  `PUT with X- using VALUE != TEXT/1`:  request #1 verifier `calendarDataMatch` failed: **calendarDataMatch: normalized iCalendar differs from expected file 'Resource/CalDAV/put/13.ics'**
+- [ ]  `PUTs with ^ parameter encoding/1`:  request #1 verifier `calendarDataMatch` failed: **calendarDataMatch: normalized iCalendar differs from expected file 'Resource/CalDAV/put/7.ics'**
+- [ ]  `DELETE/2`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 404**
+- [ ]  `MKCALENDAR with body/3`:  request #0 verifier `propfindItems` failed: **Failed to parse multistatus XML: XML parse error: ill-formed document: expected `</meta>`, but `</head>` was found**
+- [ ]  `MKCALENDAR with body/4`:  request #0 verifier `prepostcondition` failed: **prepostcondition: expected status 400|403|409|507, got 422**
+- [ ]  `MKCALENDAR read-free-busy privilege/2`:  request #0 verifier `statusCode` failed: **Expected status 200, got 403**
+- [ ]  `regular home prop finds/3`:  request #0 verifier `prepostcondition` failed: **prepostcondition: expected status 400|403|409|507, got 207**
+- [ ]  `regular home prop finds/4`:  request #0 verifier `propfindItems` failed: **okprops: property '{DAV:}getcontentlength' not found**
+- [ ]  `regular calendar prop finds/3`:  request #0 verifier `prepostcondition` failed: **prepostcondition: expected status 400|403|409|507, got 207**
+- [ ]  `regular calendar prop finds/4`:  request #0 verifier `propfindItems` failed: **okprops: property '{DAV:}getcontentlength' not found**
+- [ ]  `prop names/3`:  request #0 verifier `prepostcondition` failed: **prepostcondition: expected status 400|403|409|507, got 207**
+- [ ]  `prop all/3`:  request #0 verifier `prepostcondition` failed: **prepostcondition: expected status 400|403|409|507, got 207**
+- [ ]  `prop errors/1`:  request #0 verifier `statusCode` failed: **Expected status 4xx, got 207**
+- [ ]  `prop errors/2`:  request #0 verifier `statusCode` failed: **Expected status 4xx, got 207**
+- [ ]  `Depth:infinity disabled/2`:  request #0 verifier `prepostcondition` failed: **prepostcondition: expected status 400|403|409|507, got 207**
+- [ ]  `Depth:infinity disabled/3`:  request #0 verifier `prepostcondition` failed: **prepostcondition: expected status 400|403|409|507, got 207**
+- [ ]  `Depth:infinity disabled/4`:  request #0 verifier `prepostcondition` failed: **prepostcondition: expected status 400|403|409|507, got 207**
+- [ ]  `Depth:infinity disabled/5`:  request #0 verifier `prepostcondition` failed: **prepostcondition: expected status 400|403|409|507, got 207**
+- [ ]  `Depth:infinity disabled/6`:  request #0 verifier `prepostcondition` failed: **prepostcondition: expected status 400|403|409|507, got 207**
+- [ ]  `Depth:infinity disabled/7`:  request #0 verifier `prepostcondition` failed: **prepostcondition: expected status 400|403|409|507, got 207**
+- [ ]  `prop patches/1`:  request #0 verifier `propfindItems` failed: **okprops: property '{DAV:}details' not found (expected to exist)**
+- [ ]  `prop patches/2`:  request #0 verifier `propfindItems` failed: **okprops: property '{DAV:}details' not found (expected to exist)**
+- [ ]  `prop patches/3`:  request #0 verifier `propfindItems` failed: **okprops: property '{DAV:}missing' not found (expected to exist)**
+- [ ]  `prop patches/4`:  request #1 verifier `propfindItems` failed: **okprops: property '{DAV:}details2' not found**
+- [ ]  `prop patches/6`:  request #0 verifier `statusCode` failed: **Expected status 404, got 400**
+- [ ]  `prop patch property attributes/1`:  request #0 verifier `propfindItems` failed: **okprops: property '{DAV:}details' not found (expected to exist)**
+- [ ]  `prop patch property attributes/2`:  request #0 verifier `propfindItems` failed: **okprops: property '{DAV:}details' not found (expected to exist)**
+- [ ]  `Check for the property on /principals//1`:  request #0 verifier `propfindItems` failed: **Failed to parse multistatus XML: XML parse error: ill-formed document: expected `</meta>`, but `</head>` was found**
+- [ ]  `Check for the property on /principals//2`:  request #0 verifier `statusCode` failed: **Expected status 401, got 404**
+- [ ]  `Check for the property on /principals//3`:  request #0 verifier `propfindItems` failed: **Failed to parse multistatus XML: XML parse error: ill-formed document: expected `</meta>`, but `</head>` was found**
+- [ ]  `Last_modified handling/3`:  request #0 verifier `statusCode` failed: **Expected status 304, got 207**
+- [ ]  `PUT/DELETE/COPY/MOVE/1`:  request #0 verifier `propfindItems` failed: **okprops: property '{http://calendarserver.org/ns/}getctag' not found (expected to exist)**
+- [ ]  `PUT/DELETE/COPY/MOVE/2`:  request #0 verifier `propfindItems` failed: **okprops: property '{http://calendarserver.org/ns/}getctag' not found**
+- [ ]  `PUT/DELETE/COPY/MOVE/3`:  request #1 verifier `propfindItems` failed: **okprops: property '{http://calendarserver.org/ns/}getctag!' not found**
+- [ ]  `PUT/DELETE/COPY/MOVE/4`:  request #1 verifier `propfindItems` failed: **okprops: property '{http://calendarserver.org/ns/}getctag!' not found**
+- [ ]  `PUT/DELETE/COPY/MOVE/5`:  request #1 verifier `propfindItems` failed: **okprops: property '{http://calendarserver.org/ns/}getctag!' not found**
+- [ ]  `Scheduling/1`:  request #0 verifier `propfindItems` failed: **okprops: property '{http://calendarserver.org/ns/}getctag' not found (expected to exist)**
+- [ ]  `Scheduling/2`:  request #0 verifier `propfindItems` failed: **okprops: property '{http://calendarserver.org/ns/}getctag' not found (expected to exist)**
+- [ ]  `Scheduling/3`:  Invalid HTTP metho`:`invalid HTTP method
+- [ ]  `Scheduling/4`:  request #0 verifier `propfindItems` failed: **okprops: property '{http://calendarserver.org/ns/}getctag!' not found**
+- [ ]  `Scheduling/5`:  request #0 verifier `propfindItems` failed: **okprops: property '{http://calendarserver.org/ns/}getctag!' not found**
+- [ ]  `Same for each Depth/1`:  request #0 verifier `propfindItems` failed: **okprops: property '{http://calendarserver.org/ns/}getctag' not found (expected to exist)**
+- [ ]  `Same for each Depth/4`:  request #0 verifier `propfindItems` failed: **okprops: property '{http://calendarserver.org/ns/}getctag' not found (expected to exist)**
+- [ ]  `Same for each Depth/7`:  request #0 verifier `propfindItems` failed: **okprops: property '{http://calendarserver.org/ns/}getctag' not found (expected to exist)**
+- [ ]  `multiget reports/8`:  request #0 verifier `xmlElementMatch` failed: **xmlElementMatch: path '/{DAV:}multistatus/{DAV:}response/{DAV:}propstat/{DAV:}status[*404]' does not exist**
+- [ ]  basic query reports/2a:  request #0 verifier 'multistatusItems' failed: **okhrefs: href '15.ics' not found in response (status=207, returned: [101.ics, 102.ics, 103.ics, 104.ics, 105.ics])**
+- [ ]  basic query reports/14a:  request #0 verifier 'multistatusItems' failed: **okhrefs: href '106.ics' not found in response (status=207, returned: [102.ics, 103.ics, 104.ics, 101.ics, 105.ics])**
+- [ ]  `basic query reports/16`:  request #0 verifier `multistatusItems` failed: **okhrefs: href '106.ics' not found in response (status=207, returned: [102.ics, 104.ics])**
+- [ ]  `time-range query reports/5`:  request #0 verifier `multistatusItems` failed: **okhrefs: href '6.ics' not found in response (status=207, returned: [])**
+- [ ]  `time-range query reports/8`:  request #0 verifier `multistatusItems` failed: **okhrefs: href '7.ics' not found in response (status=207, returned: [])**
+- [ ]  `time-range query reports/11`:  request #0 verifier `multistatusItems` failed: **okhrefs: href '106.ics' not found in response (status=207, returned: [101.ics, 105.ics])**
+- [ ]  `time-range query reports/13`:  request #0 verifier `multistatusItems` failed: **okhrefs: href '19.ics' not found in response (status=207, returned: [20.ics, 21.ics, 22.ics])**
+- [ ]  `time-range query reports/14`:  request #0 verifier `multistatusItems` failed: **okhrefs: href '18.ics' not found in response (status=207, returned: [5.ics, 6.ics, 7.ics, 8.ics, 9.ics, 10.ics, 11.ics, 12.ics, 13.ics, 14.ics, 19.ics, 20.ics, 21.ics, 22.ics])**
+- [ ]  `time-range query reports/18`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 403**
+- [ ]  `free-busy reports/1`:  request #0 verifier `freeBusy` failed: **freeBusy: expected busy period '20270103T150000Z/20270103T160000Z' not found**
+- [ ]  `free-busy reports/2`:  request #0 verifier `freeBusy` failed: **freeBusy: expected busy period '20270107T010000Z/20270107T020000Z' not found**
+- [ ]  `limit/expand recurrence in reports/5`:  request #0 verifier `multistatusItems` failed: **okhrefs: href '15.ics' not found in response (status=207, returned: [])**
+- [ ]  `limit/expand recurrence in reports/7`:  request #0 verifier `multistatusItems` failed: **okhrefs: href '27.ics' not found in response (status=207, returned: [])**
+- [ ]  `limit/expand recurrence in reports/8`:  request #0 verifier `multistatusItems` failed: **okhrefs: href '18.ics' not found in response (status=207, returned: [])**
+- [ ]  limit/expand recurrence in reports/9a:  request #0 verifier 'multistatusItems' failed: **okhrefs: href '18.ics' not found in response (status=207, returned: [])**
+- [ ]  `limit/expand recurrence in reports/10`:  request #0 verifier `multistatusItems` failed: **okhrefs: href '18.ics' not found in response (status=207, returned: [])**
+- [ ]  `limit/expand recurrence in reports/11`:  request #0 verifier `dataString` failed: **Response body does not contain 'DTSTART:20270102T190000Z'**
+- [ ]  `limit/expand recurrence in reports/12`:  request #2 verifier `multistatusItems` failed: **okhrefs: href '19.ics' not found in response (status=207, returned: [24.ics, 25.ics])**
+- [ ]  `VEVENTs/12`:  request #1 verifier `calendarDataMatch` failed: **calendarDataMatch: normalized iCalendar differs from expected file 'Resource/CalDAV/recurrenceput/25.ics'**
+- [ ]  `VTODOs/1`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 403**
+- [ ]  `VTODOs/2`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 403**
+- [ ]  `VTODOs/3`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 403**
+- [ ]  `VTODOs/4`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 403**
+- [ ]  `VTODOs/5`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 403**
+- [ ]  `VTODOs/6`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 403**
+- [ ]  `VTODOs/7`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 403**
+- [ ]  `GET on resource/1`:  request #1 verifier `addressDataMatch` failed: **addressDataMatch: normalized vCard differs from expected file 'Resource/CardDAV/vcardput/1.vcf'**
+- [ ]  `GET on resource/2`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 404**
+- [ ]  `GET on resource/3`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 404**
+- [ ]  `PUT VCARD/1`:  request #1 verifier `addressDataMatch` failed: **addressDataMatch: normalized vCard differs from expected file 'Resource/CardDAV/vcardput/1.vcf'**
+- [ ]  `PUT VCARD/2`:  request #1 verifier `addressDataMatch` failed: **addressDataMatch: normalized vCard differs from expected file 'Resource/CardDAV/vcardput/2.vcf'**
+- [ ]  `PUT VCARD/3`:  request #1 verifier `addressDataMatch` failed: **addressDataMatch: normalized vCard differs from expected file 'Resource/CardDAV/vcardput/3.vcf'**
+- [ ]  `PUT VCARD/4`:  request #1 verifier `addressDataMatch` failed: **addressDataMatch: normalized vCard differs from expected file 'Resource/CardDAV/vcardput/4.vcf'**
+- [ ]  `PUT VCARD/5`:  request #1 verifier `addressDataMatch` failed: **addressDataMatch: normalized vCard differs from expected file 'Resource/CardDAV/vcardput/5.vcf'**
+- [ ]  `PUT VCARD/6`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 400**
+- [ ]  `PUT VCARD/7`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 400**
+- [ ]  `PUT VCARD/8`:  request #1 verifier `addressDataMatch` failed: **addressDataMatch: normalized vCard differs from expected file 'Resource/CardDAV/vcardput/8.vcf'**
+- [ ]  `PUT VCARD/9`:  request #1 verifier `addressDataMatch` failed: **addressDataMatch: normalized vCard differs from expected file 'Resource/CardDAV/vcardput/9.vcf'**
+- [ ]  `PUT VCARD/10`:  request #1 verifier `addressDataMatch` failed: **addressDataMatch: normalized vCard differs from expected file 'Resource/CardDAV/vcardput/10.vcf'**
+- [ ]  `Test \ escapes/1`:  request #1 verifier `addressDataMatch` failed: **addressDataMatch: normalized vCard differs from expected file 'Resource/CardDAV/vcardput/11.vcf'**
+- [ ]  `Test \ escapes/2`:  request #1 verifier `addressDataMatch` failed: **addressDataMatch: normalized vCard differs from expected file 'Resource/CardDAV/vcardput/12.vcf'**
+- [ ]  `PUT with X- using VALUE != TEXT/1`:  request #1 verifier `addressDataMatch` failed: **addressDataMatch: normalized vCard differs from expected file 'Resource/CardDAV/vcardput/13.vcf'**
+- [ ]  `PUTs with ^ parameter encoding/1`:  request #1 verifier `addressDataMatch` failed: **addressDataMatch: normalized vCard differs from expected file 'Resource/CardDAV/vcardput/15.vcf'**
+- [ ]  `PUT groups/1`:  request #0 verifier `header` failed: **Header 'ETag' exists but should not**
+- [ ]  `PUT groups/2`:  request #0 verifier `statusCode` failed: **Expected status 403, got 204**
+- [ ]  `PUT groups/4`:  request #1 verifier `addressDataMatch` failed: **addressDataMatch: normalized vCard differs from expected file 'Resource/CardDAV/vcardput/19.vcf'**
+- [ ]  `MKCOL with body/1`:  request #0 verifier `statusCode` failed: **Expected status 403, got 409**
+- [ ]  `regular prop finds/3`:  request #0 verifier `prepostcondition` failed: **prepostcondition: expected status 400|403|409|507, got 207**
+- [ ]  `regular prop finds/4`:  request #0 verifier `propfindItems` failed: **okprops: property '{DAV:}getcontentlength' not found**
+- [ ]  `prop names/3`:  request #0 verifier `prepostcondition` failed: **prepostcondition: expected status 400|403|409|507, got 207**
+- [ ]  `prop all/3`:  request #0 verifier `prepostcondition` failed: **prepostcondition: expected status 400|403|409|507, got 207**
+- [ ]  `prop errors/1`:  request #0 verifier `statusCode` failed: **Expected status 4xx, got 207**
+- [ ]  `prop errors/2`:  request #0 verifier `statusCode` failed: **Expected status 4xx, got 207**
+- [ ]  `prop patches/1`:  request #0 verifier `propfindItems` failed: **okprops: property '{DAV:}details' not found (expected to exist)**
+- [ ]  `prop patches/2`:  request #0 verifier `propfindItems` failed: **okprops: property '{DAV:}details' not found (expected to exist)**
+- [ ]  `prop patches/3`:  request #0 verifier `propfindItems` failed: **okprops: property '{DAV:}missing' not found (expected to exist)**
+- [ ]  `prop patches/4`:  request #1 verifier `propfindItems` failed: **okprops: property '{DAV:}details2' not found**
+- [ ]  `prop patch property attributes/1`:  request #0 verifier `propfindItems` failed: **okprops: property '{DAV:}details' not found (expected to exist)**
+- [ ]  `prop patch property attributes/2`:  request #0 verifier `propfindItems` failed: **okprops: property '{DAV:}details' not found (expected to exist)**
+- [ ]  `Check for the property on /principals//1`:  request #0 verifier `propfindItems` failed: **okprops: property '{DAV:}current-user-principal' not found**
+- [ ]  `Check for the property on /principals//2`:  request #0 verifier `statusCode` failed: **Expected status 401, got 207**
+- [ ]  `Check for the property on /principals//3`:  request #0 verifier `propfindItems` failed: **okprops: property '{DAV:}current-user-principal' not found**
+- [ ]  `basic query reports/1`:  request #0 verifier `multistatusItems` failed: **Failed to parse multistatus XML: XML error in propstat: ill-formed document: expected `</HomePage>`, but `</CR:address-data>` was found**
+- [ ]  `basic query reports/2`:  request #0 verifier `multistatusItems` failed: **Failed to parse multistatus XML: XML error in propstat: ill-formed document: expected `</HomePage>`, but `</CR:address-data>` was found**
+- [ ]  `basic query reports/3`:  request #0 verifier `multistatusItems` failed: **okhrefs: href '6.vcf' not found in response (status=207, returned: [])**
+- [ ]  `basic query reports/4`:  request #0 verifier `multistatusItems` failed: **Failed to parse multistatus XML: XML error in propstat: ill-formed document: expected `</HomePage>`, but `</CR:address-data>` was found**
+- [ ]  `basic query reports/5`:  request #0 verifier `multistatusItems` failed: **okhrefs: href '7.vcf' not found in response (status=207, returned: [])**
+- [ ]  `basic query reports/6`:  request #0 verifier `multistatusItems` failed: **okhrefs: href '6.vcf' not found in response (status=207, returned: [])**
+- [ ]  `basic query reports/7`:  request #0 verifier `multistatusItems` failed: **Failed to parse multistatus XML: XML error in propstat: ill-formed document: expected `</HomePage>`, but `</CR:address-data>` was found**
+- [ ]  `basic query reports/8`:  request #0 verifier `multistatusItems` failed: **okhrefs: href '6.vcf' not found in response (status=207, returned: [])**
+- [ ]  `basic query reports/9`:  request #0 verifier `multistatusItems` failed: **okhrefs: href '15.vcf' not found in response (status=207, returned: [])**
+- [ ]  `basic query reports/10`:  request #0 verifier `multistatusItems` failed: **okhrefs: href '9.vcf' not found in response (status=207, returned: [019cc38f-3b5d-799d-b302-7f79122cf510.vcf])**
+- [ ]  `basic query reports/11`:  request #0 verifier `multistatusItems` failed: **Failed to parse multistatus XML: XML error in propstat: ill-formed document: expected `</Other>`, but `</CR:address-data>` was found**
+- [ ]  `basic query reports/12`:  request #0 verifier `multistatusItems` failed: **Failed to parse multistatus XML: XML error in propstat: ill-formed document: expected `</HomePage>`, but `</CR:address-data>` was found**
+- [ ]  `basic query reports/13`:  request #0 verifier `multistatusItems` failed: **Failed to parse multistatus XML: XML error in propstat: ill-formed document: expected `</HomePage>`, but `</CR:address-data>` was found**
+- [ ]  `basic query reports/14`:  request #0 verifier `multistatusItems` failed: **Failed to parse multistatus XML: XML error in propstat: ill-formed document: expected `</Other>`, but `</CR:address-data>` was found**
+- [ ]  `basic query reports/15`:  request #0 verifier `multistatusItems` failed: **Failed to parse multistatus XML: XML error in propstat: ill-formed document: expected `</HomePage>`, but `</CR:address-data>` was found**
+- [ ]  `basic query reports/16`:  request #0 verifier `multistatusItems` failed: **Failed to parse multistatus XML: XML error in propstat: ill-formed document: expected `</HomePage>`, but `</CR:address-data>` was found**
+- [ ]  `basic query reports/17`:  request #0 verifier `multistatusItems` failed: **Failed to parse multistatus XML: XML parse error: ill-formed document: expected `</meta>`, but `</head>` was found**
+- [ ]  `basic query reports/19`:  request #0 verifier `multistatusItems` failed: **Failed to parse multistatus XML: XML error in propstat: ill-formed document: expected `</HomePage>`, but `</CR:address-data>` was found**
+- [ ]  `basic query reports/20`:  request #0 verifier `multistatusItems` failed: **Failed to parse multistatus XML: XML error in propstat: ill-formed document: expected `</HomePage>`, but `</CR:address-data>` was found**
+- [ ]  `basic query reports/21`:  request #0 verifier `multistatusItems` failed: **okhrefs: href '11.vcf' not found in response (status=207, returned: [])**
+- [ ]  `basic query reports/22`:  request #0 verifier `multistatusItems` failed: **Failed to parse multistatus XML: XML error in propstat: ill-formed document: expected `</Other>`, but `</CR:address-data>` was found**
+- [ ]  `basic query reports/23`:  request #0 verifier `multistatusItems` failed: **okhrefs: href '1.vcf' not found in response (status=207, returned: [])**
+- [ ]  `basic query reports/24`:  request #0 verifier `multistatusItems` failed: **Failed to parse multistatus XML: XML error in propstat: ill-formed document: expected `</Other>`, but `</CR:address-data>` was found**
+- [ ]  `basic query reports/26`:  request #0 verifier `multistatusItems` failed: **Failed to parse multistatus XML: XML error in propstat: ill-formed document: expected `</Other>`, but `</CR:address-data>` was found**
+- [ ]  `basic query reports/27`:  request #0 verifier `multistatusItems` failed: **okhrefs: href '13.vcf' not found in response (status=207, returned: [])**
+- [ ]  `basic query reports/28`:  request #0 verifier `multistatusItems` failed: **Failed to parse multistatus XML: XML error in propstat: ill-formed document: expected `</Assistant>`, but `</CR:address-data>` was found**
+- [ ]  `basic query reports/29`:  request #0 verifier `multistatusItems` failed: **Failed to parse multistatus XML: XML error in propstat: ill-formed document: expected `</Other>`, but `</CR:address-data>` was found**
+- [ ]  `basic query reports/30`:  request #0 verifier `multistatusItems` failed: **okhrefs: href '5.vcf' not found in response (status=207, returned: [019cc38f-368b-77c1-a488-34966b09a56f.vcf])**
+- [ ]  `basic query reports/31`:  request #0 verifier `multistatusItems` failed: **okhrefs: href '6.vcf' not found in response (status=207, returned: [])**
+- [ ]  `basic query reports/32`:  request #0 verifier `multistatusItems` failed: **okhrefs: href '11.vcf' not found in response (status=207, returned: [])**
+- [ ]  `basic query reports/33`:  request #0 verifier `multistatusItems` failed: **okhrefs: href '6.vcf' not found in response (status=207, returned: [])**
+- [ ]  `multiget reports/1`:  request #0 verifier `multistatusItems` failed: **Failed to parse multistatus XML: XML error in propstat: ill-formed document: expected `</HomePage>`, but `</CR:address-data>` was found**
+- [ ]  `multiget reports/2`:  request #0 verifier `multistatusItems` failed: **Failed to parse multistatus XML: XML error in propstat: ill-formed document: expected `</HomePage>`, but `</CR:address-data>` was found**
+- [ ]  `multiget reports/3`:  request #0 verifier `multistatusItems` failed: **okhrefs: href '11.vcf' does not have a 2xx status**
+- [ ]  `multiget reports/4`:  request #0 verifier `multistatusItems` failed: **okhrefs: href '12.vcf' does not have a 2xx status**
+- [ ]  `support-report-set/1`:  request #0 verifier `propfindItems` failed: **Failed to parse multistatus XML: XML parse error: ill-formed document: expected `</meta>`, but `</head>` was found**
+- [ ]  `support-report-set/2`:  request #0 verifier `propfindItems` failed: **Failed to parse multistatus XML: XML parse error: ill-formed document: expected `</meta>`, but `</head>` was found**
+- [ ]  `support-report-set/3`:  request #0 verifier `xmlElementMatch` failed: **xmlElementMatch: path '/{DAV:}multistatus/{DAV:}response/{DAV:}propstat/{DAV:}prop/{DAV:}supported-report-set/{DAV:}supported-report/{DAV:}report/{DAV:}sync-collection' does not exist**
+- [ ]  `simple reports - empty token - no props/1`:  request #0 verifier `multistatusItems` failed: **Failed to parse multistatus XML: XML parse error: ill-formed document: expected `</meta>`, but `</head>` was found**
+- [ ]  `simple reports - empty token - no props/4`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 404**
+- [ ]  `simple reports - empty token - no props/5`:  request #0 verifier `multistatusItems` failed: **Failed to parse multistatus XML: XML parse error: ill-formed document: expected `</meta>`, but `</head>` was found**
+- [ ]  `simple reports - empty token - no props/8`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 404**
+- [ ]  `simple reports - empty token - no props/9`:  request #0 verifier `multistatusItems` failed: **Failed to parse multistatus XML: XML parse error: ill-formed document: expected `</meta>`, but `</head>` was found**
+- [ ]  `simple reports - empty token - no props/12`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 404**
+- [ ]  `simple reports - empty token - no props/13`:  request #0 verifier `multistatusItems` failed: **Failed to parse multistatus XML: XML parse error: ill-formed document: expected `</meta>`, but `</head>` was found**
+- [ ]  `simple reports - diff token - no props/1`:  request #0 verifier `multistatusItems` failed: **Failed to parse multistatus XML: XML parse error: ill-formed document: expected `</meta>`, but `</head>` was found**
+- [ ]  `simple reports - diff token - no props/2`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 404**
+- [ ]  `simple reports - diff token - no props/3`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 404**
+- [ ]  `simple reports - diff token - no props/4`:  request #0 verifier `multistatusItems` failed: **Failed to parse multistatus XML: XML parse error: ill-formed document: expected `</meta>`, but `</head>` was found**
+- [ ]  `simple reports - diff token - no props/5`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 404**
+- [ ]  `simple reports - diff token - no props/6`:  request #0 verifier `multistatusItems` failed: **Failed to parse multistatus XML: XML parse error: ill-formed document: expected `</meta>`, but `</head>` was found**
+- [ ]  `simple reports - empty token - props/1`:  request #0 verifier `multistatusItems` failed: **Failed to parse multistatus XML: XML parse error: ill-formed document: expected `</meta>`, but `</head>` was found**
+- [ ]  `simple reports - empty token - props/2`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 404**
+- [ ]  `simple reports - empty token - props/3`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 404**
+- [ ]  `simple reports - empty token - props/4`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 404**
+- [ ]  `simple reports - diff token - props/1`:  request #0 verifier `multistatusItems` failed: **Failed to parse multistatus XML: XML parse error: ill-formed document: expected `</meta>`, but `</head>` was found**
+- [ ]  `simple reports - diff token - props/2`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 404**
+- [ ]  `simple reports - diff token - props/3`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 404**
+- [ ]  `simple reports - diff token - props/4`:  request #0 verifier `multistatusItems` failed: **Failed to parse multistatus XML: XML parse error: ill-formed document: expected `</meta>`, but `</head>` was found**
+- [ ]  `simple reports - diff token - props/5`:  request #0 verifier `statusCode` failed: **Expected status 2xx, got 404**
+- [ ]  `simple reports - diff token - props/6`:  request #0 verifier `multistatusItems` failed: **Failed to parse multistatus XML: XML parse error: ill-formed document: expected `</meta>`, but `</head>` was found**

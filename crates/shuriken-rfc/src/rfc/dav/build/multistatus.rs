@@ -25,6 +25,7 @@ pub fn serialize_multistatus(multistatus: &Multistatus) -> Result<String, quick_
     elem.push_attribute(("xmlns:D", "DAV:"));
     elem.push_attribute(("xmlns:C", "urn:ietf:params:xml:ns:caldav"));
     elem.push_attribute(("xmlns:CR", "urn:ietf:params:xml:ns:carddav"));
+    elem.push_attribute(("xmlns:CS", "http://calendarserver.org/ns/"));
     writer.write_event(Event::Start(elem))?;
 
     // Write each response
