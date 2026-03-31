@@ -17,14 +17,77 @@
 		"enabled": true,
 		"rules": {
 			"recommended": true,
-			"style": "warn"
+			"style": {
+				"recommended": true,
+				"useNamingConvention": {
+					"level": "warn",
+					"options": {
+						"strictCase": false,
+						"requireAscii": true
+					}
+				},
+				"noCommonJs": "error",
+				"noEnum": "error",
+				"noDescendingSpecificity": "warn",
+				"noExportedImports": "error",
+				"noMagicNumbers": {
+					"level": "warn"
+				},
+				"noNamespace": "error",
+				"noParameterAssign": "error",
+				"noProcessEnv": "error",
+				"noSubstr": "warn",
+				"noYodaExpression": "warn",
+				"useAsConstAssertion": "warn",
+				"useAtIndex": "warn",
+				"useBlockStatements": "warn",
+				"useCollapsedElseIf": "warn",
+				"useCollapsedIf": "warn",
+				"useConsistentArrayType": {
+					"level": "warn",
+					"options": {
+						"syntax": "generic"
+					}
+				},
+				"useConsistentArrowReturn": "warn",
+				"useConsistentBuiltinInstantiation": "warn",
+				"useConsistentCurlyBraces": "warn",
+				"useConsistentMemberAccessibility": "warn",
+				"useConsistentObjectDefinitions": "warn",
+				"useConsistentTypeDefinitions": "warn",
+				"useForOf": "warn",
+				"useDefaultParameterLast": "warn",
+				"useFilenamingConvention": {
+					"level": "warn",
+					"options": {
+						"strictCase": false,
+						"requireAscii": true
+					}
+				},
+				"useGroupedAccessorPairs": "warn",
+				"useNumberNamespace": "warn",
+				"useObjectSpread": "warn",
+				"useReadonlyClassProperties": "warn"
+			},
+			"complexity": "warn",
+			"security": "error",
+			"correctness": "error",
+			"performance": "warn",
+			"suspicious": "error",
+			"a11y": "warn"
+		},
+		"domains": {
+			"test": "recommended"
 		}
 	},
 	"javascript": {
 		"formatter": {
 			"quoteStyle": "double",
 			"semicolons": "always"
-		}
+		},
+		"globals": [
+			"Bun"
+		]
 	},
 	"assist": {
 		"enabled": true,

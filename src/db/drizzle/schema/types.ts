@@ -54,29 +54,6 @@ export const tsvector = customType<{ data: string }>({
 	dataType: () => "tsvector",
 });
 
-/** tstzrange → [Temporal.Instant, Temporal.Instant] */
-export const tstzrange = customType<{
-	data: [Temporal.Instant, Temporal.Instant];
-	driverData: string;
-}>({
-	dataType: () => "tstzrange",
-	fromDriver(value: string): [Temporal.Instant, Temporal.Instant] {
-		// Format: '["2024-01-01 00:00:00+00","2024-12-31 23:59:59+00")'
-		const match = value.match(/^\s*[[(]\s*([^,]+)\s*,\s*([^\])]+)\s*[\])]\s*$/);
-		const [, start, end] = match || [];
-		if (!start || !end) {
-			throw new Error(`Invalid tstzrange format: ${value}`);
-		}
-		return [
-			Temporal.Instant.from(start.trim().replace(" ", "T")),
-			Temporal.Instant.from(end.trim().replace(" ", "T")),
-		];
-	},
-	toDriver(value: [Temporal.Instant, Temporal.Instant]): string {
-		return `[${value[0].toString()},${value[1].toString()}]`;
-	},
-});
-
 /** bytea → Buffer */
 export const bytea = customType<{ data: Buffer; driverData: Buffer }>({
 	dataType: () => "bytea",

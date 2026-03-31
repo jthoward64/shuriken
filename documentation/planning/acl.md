@@ -7,6 +7,8 @@ Protocol as specified in RFC 3744. The model must capture ordered ACE evaluation
 grant/deny semantics, aggregate privileges, recursive group membership, and the
 full set of pseudo-principals defined by the spec.
 
+NOTE: for simplicity this file refers to users and groups with slugs/names, in reality only UUIDs would be included in the policy
+
 ---
 
 ## RFC 3744 Concepts Summary

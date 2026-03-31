@@ -2194,14 +2194,14 @@
 			"table": "cal_index"
 		},
 		{
-			"type": "time",
+			"type": "timestamp",
 			"typeSchema": null,
 			"notNull": false,
 			"dimensions": 0,
 			"default": null,
 			"generated": null,
 			"identity": null,
-			"name": "value_time",
+			"name": "value_plain_datetime",
 			"entityType": "columns",
 			"schema": "public",
 			"table": "dav_property"
@@ -2266,19 +2266,6 @@
 			"entityType": "columns",
 			"schema": "public",
 			"table": "cal_index"
-		},
-		{
-			"type": "tstzrange",
-			"typeSchema": null,
-			"notNull": false,
-			"dimensions": 0,
-			"default": null,
-			"generated": null,
-			"identity": null,
-			"name": "value_tstzrange",
-			"entityType": "columns",
-			"schema": "public",
-			"table": "dav_property"
 		},
 		{
 			"type": "text",
@@ -4428,21 +4415,21 @@
 			"table": "dav_instance"
 		},
 		{
-			"value": "((((((((((((((\nCASE\n    WHEN (value_text IS NOT NULL) THEN 1\n    ELSE 0\nEND +\nCASE\n    WHEN (value_int IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_float IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_bool IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_date IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_tstz IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_bytes IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_json IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_text_array IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_date_array IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_tstz_array IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_time IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_interval IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_tstzrange IS NOT NULL) THEN 1\n    ELSE 0\nEND) <= 1)",
+			"value": "(((((((((((((\nCASE\n    WHEN (value_text IS NOT NULL) THEN 1\n    ELSE 0\nEND +\nCASE\n    WHEN (value_int IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_float IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_bool IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_date IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_tstz IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_plain_datetime IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_bytes IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_json IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_text_array IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_date_array IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_tstz_array IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_interval IS NOT NULL) THEN 1\n    ELSE 0\nEND) <= 1)",
 			"name": "chk_dav_property_single_value",
 			"entityType": "checks",
 			"schema": "public",
 			"table": "dav_property"
 		},
 		{
-			"value": "(((value_text IS NULL) OR (value_type = ANY (ARRAY['TEXT'::text, 'DURATION'::text, 'URI'::text, 'UTC_OFFSET'::text]))) AND ((value_int IS NULL) OR (value_type = 'INTEGER'::text)) AND ((value_float IS NULL) OR (value_type = 'FLOAT'::text)) AND ((value_bool IS NULL) OR (value_type = 'BOOLEAN'::text)) AND ((value_date IS NULL) OR (value_type = 'DATE'::text)) AND ((value_tstz IS NULL) OR (value_type = 'DATE_TIME'::text)) AND ((value_bytes IS NULL) OR (value_type = 'BINARY'::text)) AND ((value_json IS NULL) OR (value_type = 'JSON'::text)) AND ((value_text_array IS NULL) OR (value_type = 'TEXT_LIST'::text)) AND ((value_date_array IS NULL) OR (value_type = 'DATE_LIST'::text)) AND ((value_tstz_array IS NULL) OR (value_type = 'DATE_TIME_LIST'::text)) AND ((value_time IS NULL) OR (value_type = 'TIME'::text)) AND ((value_interval IS NULL) OR (value_type = ANY (ARRAY['DURATION_INTERVAL'::text, 'UTC_OFFSET_INTERVAL'::text]))) AND ((value_tstzrange IS NULL) OR (value_type = ANY (ARRAY['PERIOD'::text, 'PERIOD_LIST'::text]))))",
+			"value": "(((value_text IS NULL) OR (value_type = ANY (ARRAY['TEXT'::text, 'DURATION'::text, 'URI'::text, 'UTC_OFFSET'::text, 'TIME'::text, 'DATE_AND_OR_TIME'::text, 'RECUR'::text, 'CAL_ADDRESS'::text, 'PERIOD'::text]))) AND ((value_int IS NULL) OR (value_type = 'INTEGER'::text)) AND ((value_float IS NULL) OR (value_type = 'FLOAT'::text)) AND ((value_bool IS NULL) OR (value_type = 'BOOLEAN'::text)) AND ((value_date IS NULL) OR (value_type = 'DATE'::text)) AND ((value_tstz IS NULL) OR (value_type = 'DATE_TIME'::text)) AND ((value_plain_datetime IS NULL) OR (value_type = 'PLAIN_DATE_TIME'::text)) AND ((value_bytes IS NULL) OR (value_type = 'BINARY'::text)) AND ((value_json IS NULL) OR (value_type = 'JSON'::text)) AND ((value_text_array IS NULL) OR (value_type = ANY (ARRAY['TEXT_LIST'::text, 'PERIOD_LIST'::text]))) AND ((value_date_array IS NULL) OR (value_type = 'DATE_LIST'::text)) AND ((value_tstz_array IS NULL) OR (value_type = 'DATE_TIME_LIST'::text)) AND ((value_interval IS NULL) OR (value_type = ANY (ARRAY['DURATION_INTERVAL'::text, 'UTC_OFFSET_INTERVAL'::text]))))",
 			"name": "chk_dav_property_value_matches_type",
 			"entityType": "checks",
 			"schema": "public",
 			"table": "dav_property"
 		},
 		{
-			"value": "(value_type = ANY (ARRAY['TEXT'::text, 'INTEGER'::text, 'FLOAT'::text, 'BOOLEAN'::text, 'DATE'::text, 'DATE_TIME'::text, 'DURATION'::text, 'URI'::text, 'BINARY'::text, 'JSON'::text, 'TEXT_LIST'::text, 'DATE_LIST'::text, 'DATE_TIME_LIST'::text, 'TIME'::text, 'DURATION_INTERVAL'::text, 'UTC_OFFSET'::text, 'UTC_OFFSET_INTERVAL'::text, 'PERIOD'::text, 'PERIOD_LIST'::text]))",
+			"value": "(value_type = ANY (ARRAY['TEXT'::text, 'INTEGER'::text, 'FLOAT'::text, 'BOOLEAN'::text, 'DATE'::text, 'DATE_TIME'::text, 'PLAIN_DATE_TIME'::text, 'DURATION'::text, 'URI'::text, 'BINARY'::text, 'JSON'::text, 'TEXT_LIST'::text, 'DATE_LIST'::text, 'DATE_TIME_LIST'::text, 'DURATION_INTERVAL'::text, 'UTC_OFFSET'::text, 'UTC_OFFSET_INTERVAL'::text, 'PERIOD'::text, 'PERIOD_LIST'::text, 'TIME'::text, 'DATE_AND_OR_TIME'::text, 'RECUR'::text, 'CAL_ADDRESS'::text]))",
 			"name": "dav_property_value_type_check",
 			"entityType": "checks",
 			"schema": "public",

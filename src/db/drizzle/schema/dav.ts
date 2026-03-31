@@ -11,12 +11,11 @@ import {
 	jsonb,
 	pgTable,
 	text,
-	time,
 	uniqueIndex,
 	uuid,
 } from "drizzle-orm/pg-core";
 import { principal } from "./principal";
-import { bytea, dateStr, timestampTz, tstzrange } from "./types";
+import { bytea, dateStr, timestampStr, timestampTz } from "./types";
 
 export const davEntity = pgTable(
 	"dav_entity",
@@ -160,9 +159,8 @@ export const davProperty = pgTable(
 		valueTextArray: text("value_text_array").array(),
 		valueDateArray: dateStr("value_date_array").array(),
 		valueTstzArray: timestampTz("value_tstz_array").array(),
-		valueTime: time("value_time"),
+		valuePlainDatetime: timestampStr("value_plain_datetime"),
 		valueInterval: interval("value_interval"),
-		valueTstzrange: tstzrange("value_tstzrange"),
 		valueTextAsciiFold: text("value_text_ascii_fold").generatedAlwaysAs(
 			sql`ascii_casemap(value_text)`,
 		),
@@ -187,7 +185,7 @@ export const davProperty = pgTable(
 		index("idx_dav_property_name").using("btree", table.name.asc().nullsLast()),
 		check(
 			"chk_dav_property_single_value",
-			sql`((((((((((((((
+			sql`(((((((((((((
 CASE
     WHEN (value_text IS NOT NULL) THEN 1
     ELSE 0
@@ -213,6 +211,10 @@ CASE
     ELSE 0
 END) +
 CASE
+    WHEN (value_plain_datetime IS NOT NULL) THEN 1
+    ELSE 0
+END) +
+CASE
     WHEN (value_bytes IS NOT NULL) THEN 1
     ELSE 0
 END) +
@@ -233,25 +235,17 @@ CASE
     ELSE 0
 END) +
 CASE
-    WHEN (value_time IS NOT NULL) THEN 1
-    ELSE 0
-END) +
-CASE
     WHEN (value_interval IS NOT NULL) THEN 1
-    ELSE 0
-END) +
-CASE
-    WHEN (value_tstzrange IS NOT NULL) THEN 1
     ELSE 0
 END) <= 1)`,
 		),
 		check(
 			"chk_dav_property_value_matches_type",
-			sql`(((value_text IS NULL) OR (value_type = ANY (ARRAY['TEXT'::text, 'DURATION'::text, 'URI'::text, 'UTC_OFFSET'::text]))) AND ((value_int IS NULL) OR (value_type = 'INTEGER'::text)) AND ((value_float IS NULL) OR (value_type = 'FLOAT'::text)) AND ((value_bool IS NULL) OR (value_type = 'BOOLEAN'::text)) AND ((value_date IS NULL) OR (value_type = 'DATE'::text)) AND ((value_tstz IS NULL) OR (value_type = 'DATE_TIME'::text)) AND ((value_bytes IS NULL) OR (value_type = 'BINARY'::text)) AND ((value_json IS NULL) OR (value_type = 'JSON'::text)) AND ((value_text_array IS NULL) OR (value_type = 'TEXT_LIST'::text)) AND ((value_date_array IS NULL) OR (value_type = 'DATE_LIST'::text)) AND ((value_tstz_array IS NULL) OR (value_type = 'DATE_TIME_LIST'::text)) AND ((value_time IS NULL) OR (value_type = 'TIME'::text)) AND ((value_interval IS NULL) OR (value_type = ANY (ARRAY['DURATION_INTERVAL'::text, 'UTC_OFFSET_INTERVAL'::text]))) AND ((value_tstzrange IS NULL) OR (value_type = ANY (ARRAY['PERIOD'::text, 'PERIOD_LIST'::text]))))`,
+			sql`(((value_text IS NULL) OR (value_type = ANY (ARRAY['TEXT'::text, 'DURATION'::text, 'URI'::text, 'UTC_OFFSET'::text, 'TIME'::text, 'DATE_AND_OR_TIME'::text, 'RECUR'::text, 'CAL_ADDRESS'::text, 'PERIOD'::text]))) AND ((value_int IS NULL) OR (value_type = 'INTEGER'::text)) AND ((value_float IS NULL) OR (value_type = 'FLOAT'::text)) AND ((value_bool IS NULL) OR (value_type = 'BOOLEAN'::text)) AND ((value_date IS NULL) OR (value_type = 'DATE'::text)) AND ((value_tstz IS NULL) OR (value_type = 'DATE_TIME'::text)) AND ((value_plain_datetime IS NULL) OR (value_type = 'PLAIN_DATE_TIME'::text)) AND ((value_bytes IS NULL) OR (value_type = 'BINARY'::text)) AND ((value_json IS NULL) OR (value_type = 'JSON'::text)) AND ((value_text_array IS NULL) OR (value_type = ANY (ARRAY['TEXT_LIST'::text, 'PERIOD_LIST'::text]))) AND ((value_date_array IS NULL) OR (value_type = 'DATE_LIST'::text)) AND ((value_tstz_array IS NULL) OR (value_type = 'DATE_TIME_LIST'::text)) AND ((value_interval IS NULL) OR (value_type = ANY (ARRAY['DURATION_INTERVAL'::text, 'UTC_OFFSET_INTERVAL'::text]))))`,
 		),
 		check(
 			"dav_property_value_type_check",
-			sql`(value_type = ANY (ARRAY['TEXT'::text, 'INTEGER'::text, 'FLOAT'::text, 'BOOLEAN'::text, 'DATE'::text, 'DATE_TIME'::text, 'DURATION'::text, 'URI'::text, 'BINARY'::text, 'JSON'::text, 'TEXT_LIST'::text, 'DATE_LIST'::text, 'DATE_TIME_LIST'::text, 'TIME'::text, 'DURATION_INTERVAL'::text, 'UTC_OFFSET'::text, 'UTC_OFFSET_INTERVAL'::text, 'PERIOD'::text, 'PERIOD_LIST'::text]))`,
+			sql`(value_type = ANY (ARRAY['TEXT'::text, 'INTEGER'::text, 'FLOAT'::text, 'BOOLEAN'::text, 'DATE'::text, 'DATE_TIME'::text, 'PLAIN_DATE_TIME'::text, 'DURATION'::text, 'URI'::text, 'BINARY'::text, 'JSON'::text, 'TEXT_LIST'::text, 'DATE_LIST'::text, 'DATE_TIME_LIST'::text, 'DURATION_INTERVAL'::text, 'UTC_OFFSET'::text, 'UTC_OFFSET_INTERVAL'::text, 'PERIOD'::text, 'PERIOD_LIST'::text, 'TIME'::text, 'DATE_AND_OR_TIME'::text, 'RECUR'::text, 'CAL_ADDRESS'::text]))`,
 		),
 	],
 );

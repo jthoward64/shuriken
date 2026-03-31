@@ -4,10 +4,12 @@ A CalDAV/CardDAV server implementation in TypeScript.
 
 ## Runtime & Tooling
 
+- **NVM**: Run `nvm use 24` to activate the correct Node version
 - **Runtime**: Bun. Use `bun` for all scripts, package management, and test execution.
 - **Package manager**: Bun. Never use npm, yarn, or pnpm.
-- **TypeScript**: Strict mode. No `any` ever. Use `unknown` and then narrow with runtime checks as needed. 
-The only time `any` is allowed is internal to very small functions in order to satisfy *extremely* complex generics.
+- **Scripts**: bun run `check`, `lint`, `format`, and `test` scripts are defined
+- **TypeScript**: Strict mode. No `any` ever. Use `unknown` and then narrow with runtime checks as needed. The only time `any` is allowed is internal to very small functions in order to satisfy *extremely* complex generics.
+- **Biome**: Use Biome for linting and formatting
 
 ## Effect
 
@@ -91,6 +93,11 @@ All Bun-specific APIs (file I/O, `Bun.serve`, `Bun.file`, `Bun.password`, etc.) 
 - Attach a `requestId` (or trace ID) to every request and propagate it via Effect's `FiberRef` or a `Span`.
 - Log at entry and exit of service boundaries with enough context to reconstruct what happened.
 - The `dav_shadow` table exists specifically for verifying integrity. It should not be used for any other purpose, and will likely be removed in the future once we know we can trust the codebase.
+
+### Project structure
+
+- No barrel files (they encourage bad import practices and make it easy to accidentally create circular dependencies)
+- Many small files over fewer large ones; keep well defined boundaries between modules and codebase areas
 
 ## Documentation
 

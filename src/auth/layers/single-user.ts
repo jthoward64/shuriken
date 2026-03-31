@@ -1,0 +1,74 @@
+import { eq } from "drizzle-orm";
+import { Config, Effect, Layer } from "effect";
+import { AuthService } from "#/auth/service.ts";
+import { DatabaseClient } from "#/db/client.ts";
+import { user } from "#/db/drizzle/schema/index.ts";
+import type { AuthError, DatabaseError } from "#/domain/errors.ts";
+import { authError, databaseError } from "#/domain/errors.ts";
+import { PrincipalId, UserId } from "#/domain/ids.ts";
+import type { AuthenticatedPrincipal } from "#/domain/types/dav.ts";
+
+// ---------------------------------------------------------------------------
+// Single-user auth layer
+//
+// All requests are treated as a single authenticated user — no credentials
+// are checked. Useful for development and self-hosted single-user setups.
+//
+// The principal is resolved once at layer-build time and cached.
+// ---------------------------------------------------------------------------
+
+const resolvePrincipal = (
+	db: DatabaseClient,
+	email: string | undefined,
+): Effect.Effect<AuthenticatedPrincipal, AuthError | DatabaseError> =>
+	Effect.gen(function* () {
+		const rows = yield* Effect.tryPromise({
+			try: () =>
+				db
+					.select({
+						userId: user.id,
+						principalId: user.principalId,
+						name: user.name,
+					})
+					.from(user)
+					.where(email ? eq(user.email, email) : undefined)
+					.limit(1),
+			catch: (e) => databaseError(e),
+		});
+
+		const row = rows[0];
+		if (row) {
+			return {
+				principalId: PrincipalId(row.principalId),
+				userId: UserId(row.userId),
+				displayName: row.name,
+			};
+		}
+
+		return yield* Effect.fail(
+			authError(
+				email
+					? `Single-user principal not found for email: ${email}`
+					: "No users found in database for single-user mode",
+			),
+		);
+	});
+
+export const SingleUserAuthLayer = Layer.effect(
+	AuthService,
+	Effect.gen(function* () {
+		const db = yield* DatabaseClient;
+		const emailOpt = yield* Config.string("SINGLE_USER_EMAIL").pipe(
+			Config.option,
+		);
+		const email = emailOpt._tag === "Some" ? emailOpt.value : undefined;
+
+		// Resolve principal at layer-build time — cached for all requests
+		const principal = yield* resolvePrincipal(db, email);
+
+		return AuthService.of({
+			authenticate: (_headers, _clientIp) =>
+				Effect.succeed({ _tag: "Authenticated" as const, principal }),
+		});
+	}),
+);
