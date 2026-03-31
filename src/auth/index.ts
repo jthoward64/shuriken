@@ -1,11 +1,11 @@
 import { Config, Effect, type Layer } from "effect";
-import { BasicAuthLayer } from "#/auth/layers/basic.ts";
-import { ProxyAuthLayer } from "#/auth/layers/proxy.ts";
-import { SingleUserAuthLayer } from "#/auth/layers/single-user.ts";
-import type { AuthService } from "#/auth/service.ts";
-import type { DatabaseClient } from "#/db/client.ts";
-import type { AuthError, DatabaseError } from "#/domain/errors.ts";
-import type { CryptoService } from "#/platform/crypto.ts";
+import { BasicAuthLayer } from "#src/auth/layers/basic.ts";
+import { ProxyAuthLayer } from "#src/auth/layers/proxy.ts";
+import { SingleUserAuthLayer } from "#src/auth/layers/single-user.ts";
+import type { AuthService } from "#src/auth/service.ts";
+import type { DatabaseClient } from "#src/db/client.ts";
+import type { AuthError, DatabaseError } from "#src/domain/errors.ts";
+import type { CryptoService } from "#src/platform/crypto.ts";
 
 // ---------------------------------------------------------------------------
 // Auth layer selector — reads AUTH_MODE config at startup and returns the

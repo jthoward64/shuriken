@@ -1,7 +1,7 @@
 import { Effect, Layer } from "effect";
-import { conflict, notFound } from "#/domain/errors.ts";
-import type { CollectionId, PrincipalId } from "#/domain/ids.ts";
-import type { Slug } from "#/domain/types/path.ts";
+import { conflict, notFound } from "#src/domain/errors.ts";
+import type { CollectionId, PrincipalId } from "#src/domain/ids.ts";
+import type { Slug } from "#src/domain/types/path.ts";
 import { CollectionRepository, type NewCollection } from "./repository.ts";
 import { CollectionService } from "./service.ts";
 
@@ -18,14 +18,18 @@ export const CollectionServiceLive = Layer.effect(
 			findById: (id: CollectionId) =>
 				Effect.gen(function* () {
 					const row = yield* repo.findById(id);
-					if (row) { return row; }
+					if (row) {
+						return row;
+					}
 					return yield* Effect.fail(notFound(`Collection not found: ${id}`));
 				}),
 
 			findBySlug: (ownerPrincipalId: PrincipalId, slug: Slug) =>
 				Effect.gen(function* () {
 					const row = yield* repo.findBySlug(ownerPrincipalId, slug);
-					if (row) { return row; }
+					if (row) {
+						return row;
+					}
 					return yield* Effect.fail(notFound(`Collection not found: ${slug}`));
 				}),
 

@@ -1,10 +1,10 @@
 import type { InferSelectModel } from "drizzle-orm";
 import type { Effect } from "effect";
 import { Context } from "effect";
-import type { davCollection } from "#/db/drizzle/schema/index.ts";
-import type { DatabaseError } from "#/domain/errors.ts";
-import type { CollectionId, PrincipalId } from "#/domain/ids.ts";
-import type { Slug } from "#/domain/types/path.ts";
+import type { davCollection } from "#src/db/drizzle/schema/index.ts";
+import type { DatabaseError } from "#src/domain/errors.ts";
+import type { CollectionId, PrincipalId } from "#src/domain/ids.ts";
+import type { Slug } from "#src/domain/types/path.ts";
 
 // ---------------------------------------------------------------------------
 // CollectionRepository — data access for dav_collection rows

@@ -8,7 +8,7 @@
 		"format": "biome format",
 		"fix": "biome lint --fix || biome format --fix",
 		"check": "tsc --noEmit",
-		"run": "bun run src/index.ts",
+		"start": "bun run .",
 		"test": "bun test"
 	},
 	"devDependencies": {
@@ -19,7 +19,7 @@
 		"typescript": "^6"
 	},
 	"imports": {
-		"#/*": "./src/*"
+		"#src/*": "./src/*"
 	},
 	"dependencies": {
 		"@effect/experimental": "^0.60.0",

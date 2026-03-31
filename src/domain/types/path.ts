@@ -1,5 +1,5 @@
 import { Brand } from "effect";
-import type { CollectionId, InstanceId, PrincipalId } from "#/domain/ids.ts";
+import type { CollectionId, InstanceId, PrincipalId } from "#src/domain/ids.ts";
 
 // ---------------------------------------------------------------------------
 // Slug — raw URL path segment before UUID resolution

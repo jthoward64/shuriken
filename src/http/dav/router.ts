@@ -1,14 +1,14 @@
 import { Effect } from "effect";
-import { notFound } from "#/domain/errors.ts";
-import type { AppError, DavError } from "#/domain/errors.ts";
-import { HTTP_METHOD_NOT_ALLOWED } from "#/http/status.ts";
-import { CollectionId, InstanceId, PrincipalId } from "#/domain/ids.ts";
-import { CollectionRepository } from "#/services/collection/index.ts";
-import { InstanceRepository } from "#/services/instance/index.ts";
-import { PrincipalRepository } from "#/services/principal/index.ts";
-import { Slug } from "#/domain/types/path.ts";
-import type { ResolvedDavPath } from "#/domain/types/path.ts";
-import type { HttpRequestContext } from "#/http/context.ts";
+import type { AppError, DavError } from "#src/domain/errors.ts";
+import { notFound } from "#src/domain/errors.ts";
+import { CollectionId, InstanceId, PrincipalId } from "#src/domain/ids.ts";
+import type { ResolvedDavPath } from "#src/domain/types/path.ts";
+import { Slug } from "#src/domain/types/path.ts";
+import type { HttpRequestContext } from "#src/http/context.ts";
+import { HTTP_METHOD_NOT_ALLOWED } from "#src/http/status.ts";
+import { CollectionRepository } from "#src/services/collection/index.ts";
+import { InstanceRepository } from "#src/services/instance/index.ts";
+import { PrincipalRepository } from "#src/services/principal/index.ts";
 import { deleteHandler } from "./methods/delete.ts";
 import { getHandler } from "./methods/get.ts";
 import { mkcolHandler } from "./methods/mkcol.ts";
@@ -43,7 +43,7 @@ const parseDavPath = (
 	url: URL,
 ): Effect.Effect<
 	ResolvedDavPath,
-	DavError | import("#/domain/errors.ts").DatabaseError,
+	DavError | import("#src/domain/errors.ts").DatabaseError,
 	DavServices
 > => {
 	const path = url.pathname.replace(/\/$/, ""); // strip trailing slash

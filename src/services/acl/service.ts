@@ -1,8 +1,8 @@
 import type { Effect } from "effect";
 import { Context } from "effect";
-import type { DatabaseError, DavError } from "#/domain/errors.ts";
-import type { PrincipalId } from "#/domain/ids.ts";
-import type { DavPrivilege } from "#/domain/types/dav.ts";
+import type { DatabaseError, DavError } from "#src/domain/errors.ts";
+import type { PrincipalId } from "#src/domain/ids.ts";
+import type { DavPrivilege } from "#src/domain/types/dav.ts";
 
 // ---------------------------------------------------------------------------
 // AclService — RFC 3744 access control enforcement

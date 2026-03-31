@@ -1,9 +1,9 @@
 import { and, eq } from "drizzle-orm";
 import { Effect, Layer } from "effect";
-import { DatabaseClient, type DbClient } from "#/db/client.ts";
-import { casbinRule } from "#/db/drizzle/schema/index.ts";
-import { databaseError } from "#/domain/errors.ts";
-import type { DavPrivilege } from "#/domain/types/dav.ts";
+import { DatabaseClient, type DbClient } from "#src/db/client.ts";
+import { casbinRule } from "#src/db/drizzle/schema/index.ts";
+import { databaseError } from "#src/domain/errors.ts";
+import type { DavPrivilege } from "#src/domain/types/dav.ts";
 import { AclRepository, type PolicyRule, type RoleRule } from "./repository.ts";
 
 // ---------------------------------------------------------------------------

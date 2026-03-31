@@ -1,19 +1,19 @@
 import { Effect } from "effect";
-import { AuthService } from "#/auth/service.ts";
-import type { AppError } from "#/domain/errors.ts";
+import { AuthService } from "#src/auth/service.ts";
+import type { AppError } from "#src/domain/errors.ts";
+import {
+	type HttpRequestContext,
+	newRequestId,
+	setRequestId,
+} from "#src/http/context.ts";
+import { davRouter } from "#src/http/dav/router.ts";
+import { buildXml } from "#src/http/dav/xml/builder.ts";
+import { uiRouter } from "#src/http/ui/router.ts";
 import type {
 	CollectionRepository,
 	InstanceRepository,
 	PrincipalRepository,
-} from "#/layers.ts";
-import {
-	setRequestId,
-	newRequestId,
-	type HttpRequestContext,
-} from "#/http/context.ts";
-import { uiRouter } from "#/http/ui/router.ts";
-import { davRouter } from "#/http/dav/router.ts";
-import { buildXml } from "#/http/dav/xml/builder.ts";
+} from "#src/layers.ts";
 
 // ---------------------------------------------------------------------------
 // Top-level HTTP router

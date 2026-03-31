@@ -1,7 +1,7 @@
-import { XMLParser } from "fast-xml-parser";
 import { Effect } from "effect";
-import { xmlParseError } from "#/domain/errors.ts";
-import type { XmlParseError } from "#/domain/errors.ts";
+import { XMLParser } from "fast-xml-parser";
+import type { XmlParseError } from "#src/domain/errors.ts";
+import { xmlParseError } from "#src/domain/errors.ts";
 
 // ---------------------------------------------------------------------------
 // Effect-wrapped XML parser

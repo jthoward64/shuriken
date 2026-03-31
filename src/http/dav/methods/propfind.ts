@@ -1,8 +1,8 @@
 import { Effect } from "effect";
-import { davError } from "#/domain/errors.ts";
-import type { ResolvedDavPath } from "#/domain/types/path.ts";
-import type { HttpRequestContext } from "#/http/context.ts";
-import { HTTP_NOT_IMPLEMENTED } from "#/http/status.ts";
+import { davError } from "#src/domain/errors.ts";
+import type { ResolvedDavPath } from "#src/domain/types/path.ts";
+import type { HttpRequestContext } from "#src/http/context.ts";
+import { HTTP_NOT_IMPLEMENTED } from "#src/http/status.ts";
 
 // ---------------------------------------------------------------------------
 // PROPFIND handler — stub (RFC 4918 §9.1)
@@ -16,7 +16,11 @@ export const propfindHandler = (
 	Effect.succeed(
 		new Response(
 			JSON.stringify(
-				davError(HTTP_NOT_IMPLEMENTED, undefined, "PROPFIND not yet implemented"),
+				davError(
+					HTTP_NOT_IMPLEMENTED,
+					undefined,
+					"PROPFIND not yet implemented",
+				),
 			),
 			{ status: HTTP_NOT_IMPLEMENTED },
 		),

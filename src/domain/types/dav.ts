@@ -1,4 +1,4 @@
-import type { PrincipalId, UserId } from "#/domain/ids.ts";
+import type { PrincipalId, UserId } from "#src/domain/ids.ts";
 
 // ---------------------------------------------------------------------------
 // HTTP methods used in DAV

@@ -1,7 +1,7 @@
 import { Effect, Layer } from "effect";
-import { notFound } from "#/domain/errors.ts";
-import type { CollectionId, InstanceId } from "#/domain/ids.ts";
-import type { Slug } from "#/domain/types/path.ts";
+import { notFound } from "#src/domain/errors.ts";
+import type { CollectionId, InstanceId } from "#src/domain/ids.ts";
+import type { Slug } from "#src/domain/types/path.ts";
 import { InstanceRepository, type NewInstance } from "./repository.ts";
 import { InstanceService } from "./service.ts";
 
@@ -18,14 +18,18 @@ export const InstanceServiceLive = Layer.effect(
 			findById: (id: InstanceId) =>
 				Effect.gen(function* () {
 					const row = yield* repo.findById(id);
-					if (row) { return row; }
+					if (row) {
+						return row;
+					}
 					return yield* Effect.fail(notFound(`Instance not found: ${id}`));
 				}),
 
 			findBySlug: (collectionId: CollectionId, slug: Slug) =>
 				Effect.gen(function* () {
 					const row = yield* repo.findBySlug(collectionId, slug);
-					if (row) { return row; }
+					if (row) {
+						return row;
+					}
 					return yield* Effect.fail(notFound(`Instance not found: ${slug}`));
 				}),
 

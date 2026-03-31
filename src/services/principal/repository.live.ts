@@ -1,10 +1,10 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { Effect, Layer } from "effect";
-import { DatabaseClient } from "#/db/client.ts";
-import { principal, user } from "#/db/drizzle/schema/index.ts";
-import { databaseError } from "#/domain/errors.ts";
-import type { PrincipalId, UserId } from "#/domain/ids.ts";
-import type { Slug } from "#/domain/types/path.ts";
+import { DatabaseClient } from "#src/db/client.ts";
+import { principal, user } from "#src/db/drizzle/schema/index.ts";
+import { databaseError } from "#src/domain/errors.ts";
+import type { PrincipalId, UserId } from "#src/domain/ids.ts";
+import type { Slug } from "#src/domain/types/path.ts";
 import {
 	PrincipalRepository,
 	type PrincipalRow,
@@ -25,7 +25,7 @@ export const PrincipalRepositoryLive = Layer.effect(
 			id: PrincipalId,
 		): Effect.Effect<
 			PrincipalRow | null,
-			import("#/domain/errors.ts").DatabaseError
+			import("#src/domain/errors.ts").DatabaseError
 		> =>
 			Effect.tryPromise({
 				try: () =>
@@ -42,7 +42,7 @@ export const PrincipalRepositoryLive = Layer.effect(
 			slug: Slug,
 		): Effect.Effect<
 			PrincipalWithUser | null,
-			import("#/domain/errors.ts").DatabaseError
+			import("#src/domain/errors.ts").DatabaseError
 		> =>
 			Effect.tryPromise({
 				try: () =>
@@ -62,7 +62,7 @@ export const PrincipalRepositoryLive = Layer.effect(
 			email: string,
 		): Effect.Effect<
 			PrincipalWithUser | null,
-			import("#/domain/errors.ts").DatabaseError
+			import("#src/domain/errors.ts").DatabaseError
 		> =>
 			Effect.tryPromise({
 				try: () =>
@@ -82,7 +82,7 @@ export const PrincipalRepositoryLive = Layer.effect(
 			id: UserId,
 		): Effect.Effect<
 			UserRow | null,
-			import("#/domain/errors.ts").DatabaseError
+			import("#src/domain/errors.ts").DatabaseError
 		> =>
 			Effect.tryPromise({
 				try: () =>

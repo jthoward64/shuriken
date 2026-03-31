@@ -1,6 +1,6 @@
 import { Effect, Layer } from "effect";
-import type { PrincipalId } from "#/domain/ids.ts";
-import type { DavPrivilege } from "#/domain/types/dav.ts";
+import type { PrincipalId } from "#src/domain/ids.ts";
+import type { DavPrivilege } from "#src/domain/types/dav.ts";
 import { AclRepository } from "./repository.ts";
 import { AclService } from "./service.ts";
 
@@ -48,4 +48,4 @@ export const AclServiceLive = Layer.effect(
 );
 
 // Export the error helper for use by handlers calling check()
-export { needPrivileges } from "#/domain/errors.ts";
+export { needPrivileges } from "#src/domain/errors.ts";

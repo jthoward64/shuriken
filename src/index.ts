@@ -3,13 +3,15 @@ import "temporal-polyfill/global";
 
 import { BunRuntime } from "@effect/platform-bun";
 import { Config, Effect, ManagedRuntime } from "effect";
-import { handleRequest } from "#/http/router.ts";
-import { AppLayer } from "#/layers.ts";
+import { handleRequest } from "#src/http/router.ts";
+import { AppLayer } from "#src/layers.ts";
 
 const DEFAULT_PORT = 3000;
 
 const program = Effect.gen(function* () {
-	const port = yield* Config.integer("PORT").pipe(Config.withDefault(DEFAULT_PORT));
+	const port = yield* Config.integer("PORT").pipe(
+		Config.withDefault(DEFAULT_PORT),
+	);
 
 	const runtime = ManagedRuntime.make(AppLayer);
 

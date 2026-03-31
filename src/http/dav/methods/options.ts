@@ -1,6 +1,6 @@
 import { Effect } from "effect";
-import type { HttpRequestContext } from "#/http/context.ts";
-import type { ResolvedDavPath } from "#/domain/types/path.ts";
+import type { ResolvedDavPath } from "#src/domain/types/path.ts";
+import type { HttpRequestContext } from "#src/http/context.ts";
 
 // ---------------------------------------------------------------------------
 // OPTIONS handler — advertises DAV capabilities and allowed methods

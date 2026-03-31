@@ -1,7 +1,7 @@
 import { FiberRef } from "effect";
-import type { RequestId } from "#/domain/ids.ts";
-import { RequestId as mkRequestId } from "#/domain/ids.ts";
-import type { AuthResult } from "#/domain/types/dav.ts";
+import type { RequestId } from "#src/domain/ids.ts";
+import { RequestId as mkRequestId } from "#src/domain/ids.ts";
+import type { AuthResult } from "#src/domain/types/dav.ts";
 
 // ---------------------------------------------------------------------------
 // Request-scoped context propagated via FiberRef

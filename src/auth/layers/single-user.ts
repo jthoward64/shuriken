@@ -1,12 +1,12 @@
 import { eq } from "drizzle-orm";
 import { Config, Effect, Layer } from "effect";
-import { AuthService } from "#/auth/service.ts";
-import { DatabaseClient } from "#/db/client.ts";
-import { user } from "#/db/drizzle/schema/index.ts";
-import type { AuthError, DatabaseError } from "#/domain/errors.ts";
-import { authError, databaseError } from "#/domain/errors.ts";
-import { PrincipalId, UserId } from "#/domain/ids.ts";
-import type { AuthenticatedPrincipal } from "#/domain/types/dav.ts";
+import { AuthService } from "#src/auth/service.ts";
+import { DatabaseClient } from "#src/db/client.ts";
+import { user } from "#src/db/drizzle/schema/index.ts";
+import type { AuthError, DatabaseError } from "#src/domain/errors.ts";
+import { authError, databaseError } from "#src/domain/errors.ts";
+import { PrincipalId, UserId } from "#src/domain/ids.ts";
+import type { AuthenticatedPrincipal } from "#src/domain/types/dav.ts";
 
 // ---------------------------------------------------------------------------
 // Single-user auth layer

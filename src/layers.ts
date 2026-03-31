@@ -1,11 +1,11 @@
 import { Layer } from "effect";
-import { selectAuthLayer } from "#/auth/index.ts";
-import { DatabaseClientLive, type DatabaseClient } from "#/db/client.ts";
-import { CryptoServiceLive } from "#/platform/crypto.ts";
-import { AclDomainLayer } from "#/services/acl/index.ts";
-import { CollectionDomainLayer } from "#/services/collection/index.ts";
-import { InstanceDomainLayer } from "#/services/instance/index.ts";
-import { PrincipalDomainLayer } from "#/services/principal/index.ts";
+import { selectAuthLayer } from "#src/auth/index.ts";
+import { type DatabaseClient, DatabaseClientLive } from "#src/db/client.ts";
+import { CryptoServiceLive } from "#src/platform/crypto.ts";
+import { AclDomainLayer } from "#src/services/acl/index.ts";
+import { CollectionDomainLayer } from "#src/services/collection/index.ts";
+import { InstanceDomainLayer } from "#src/services/instance/index.ts";
+import { PrincipalDomainLayer } from "#src/services/principal/index.ts";
 
 // ---------------------------------------------------------------------------
 // Infrastructure layer — foundational services shared by all domain layers
@@ -49,13 +49,19 @@ export const AppLayer = Layer.mergeAll(
 // Re-export all service tags for use in handler R-type annotations
 // ---------------------------------------------------------------------------
 
-export { AuthService } from "#/auth/service.ts";
-export { DatabaseClient } from "#/db/client.ts";
-export { CryptoService } from "#/platform/crypto.ts";
-export { AclService } from "#/services/acl/index.ts";
-export { CollectionService } from "#/services/collection/index.ts";
-export { CollectionRepository } from "#/services/collection/index.ts";
-export { InstanceService } from "#/services/instance/index.ts";
-export { InstanceRepository } from "#/services/instance/index.ts";
-export { PrincipalService } from "#/services/principal/index.ts";
-export { PrincipalRepository } from "#/services/principal/index.ts";
+export { AuthService } from "#src/auth/service.ts";
+export { DatabaseClient } from "#src/db/client.ts";
+export { CryptoService } from "#src/platform/crypto.ts";
+export { AclService } from "#src/services/acl/index.ts";
+export {
+	CollectionRepository,
+	CollectionService,
+} from "#src/services/collection/index.ts";
+export {
+	InstanceRepository,
+	InstanceService,
+} from "#src/services/instance/index.ts";
+export {
+	PrincipalRepository,
+	PrincipalService,
+} from "#src/services/principal/index.ts";

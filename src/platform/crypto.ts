@@ -1,5 +1,5 @@
 import { Context, Effect, Layer } from "effect";
-import { type InternalError, internalError } from "#/domain/errors.ts";
+import { type InternalError, internalError } from "#src/domain/errors.ts";
 
 // ---------------------------------------------------------------------------
 // CryptoService — password hashing / verification

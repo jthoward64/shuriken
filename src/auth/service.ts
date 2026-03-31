@@ -1,6 +1,6 @@
 import { Context } from "effect";
-import type { AuthError, DatabaseError } from "#/domain/errors.ts";
-import type { AuthResult } from "#/domain/types/dav.ts";
+import type { AuthError, DatabaseError } from "#src/domain/errors.ts";
+import type { AuthResult } from "#src/domain/types/dav.ts";
 
 // ---------------------------------------------------------------------------
 // AuthService — authenticates an HTTP request and produces an AuthResult.

@@ -1,10 +1,10 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { Effect, Layer } from "effect";
-import { DatabaseClient, type DbClient } from "#/db/client.ts";
-import { davInstance } from "#/db/drizzle/schema/index.ts";
-import { databaseError } from "#/domain/errors.ts";
-import type { CollectionId, EntityId, InstanceId } from "#/domain/ids.ts";
-import type { Slug } from "#/domain/types/path.ts";
+import { DatabaseClient, type DbClient } from "#src/db/client.ts";
+import { davInstance } from "#src/db/drizzle/schema/index.ts";
+import { databaseError } from "#src/domain/errors.ts";
+import type { CollectionId, EntityId, InstanceId } from "#src/domain/ids.ts";
+import type { Slug } from "#src/domain/types/path.ts";
 import { InstanceRepository, type NewInstance } from "./repository.ts";
 
 // ---------------------------------------------------------------------------

@@ -1,8 +1,8 @@
 import type { Effect } from "effect";
 import { Context } from "effect";
-import type { DatabaseError, DavError } from "#/domain/errors.ts";
-import type { CollectionId, PrincipalId } from "#/domain/ids.ts";
-import type { Slug } from "#/domain/types/path.ts";
+import type { DatabaseError, DavError } from "#src/domain/errors.ts";
+import type { CollectionId, PrincipalId } from "#src/domain/ids.ts";
+import type { Slug } from "#src/domain/types/path.ts";
 import type { CollectionRow, NewCollection } from "./repository.ts";
 
 // ---------------------------------------------------------------------------

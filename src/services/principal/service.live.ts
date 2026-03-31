@@ -1,7 +1,7 @@
 import { Effect, Layer } from "effect";
-import { notFound } from "#/domain/errors.ts";
-import type { PrincipalId } from "#/domain/ids.ts";
-import type { Slug } from "#/domain/types/path.ts";
+import { notFound } from "#src/domain/errors.ts";
+import type { PrincipalId } from "#src/domain/ids.ts";
+import type { Slug } from "#src/domain/types/path.ts";
 import { PrincipalRepository } from "./repository.ts";
 import { PrincipalService } from "./service.ts";
 
@@ -30,14 +30,18 @@ export const PrincipalServiceLive = Layer.effect(
 			findBySlug: (slug: Slug) =>
 				Effect.gen(function* () {
 					const row = yield* repo.findBySlug(slug);
-					if (row) { return row; }
+					if (row) {
+						return row;
+					}
 					return yield* Effect.fail(notFound(`Principal not found: ${slug}`));
 				}),
 
 			findByEmail: (email: string) =>
 				Effect.gen(function* () {
 					const row = yield* repo.findByEmail(email);
-					if (row) { return row; }
+					if (row) {
+						return row;
+					}
 					return yield* Effect.fail(
 						notFound(`Principal not found for email: ${email}`),
 					);

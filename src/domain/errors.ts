@@ -121,7 +121,7 @@ import {
 	HTTP_METHOD_NOT_ALLOWED,
 	HTTP_NOT_FOUND,
 	type HttpStatus,
-} from "#/http/status.ts";
+} from "#src/http/status.ts";
 
 export interface DavError {
 	readonly _tag: "DavError";

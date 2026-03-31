@@ -1,10 +1,10 @@
 import type { InferSelectModel } from "drizzle-orm";
 import type { Effect } from "effect";
 import { Context } from "effect";
-import type { principal, user } from "#/db/drizzle/schema/index.ts";
-import type { DatabaseError } from "#/domain/errors.ts";
-import type { PrincipalId, UserId } from "#/domain/ids.ts";
-import type { Slug } from "#/domain/types/path.ts";
+import type { principal, user } from "#src/db/drizzle/schema/index.ts";
+import type { DatabaseError } from "#src/domain/errors.ts";
+import type { PrincipalId, UserId } from "#src/domain/ids.ts";
+import type { Slug } from "#src/domain/types/path.ts";
 
 // ---------------------------------------------------------------------------
 // PrincipalRepository — data access for principal + user rows
