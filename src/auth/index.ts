@@ -21,6 +21,7 @@ export const selectAuthLayer: Effect.Effect<
 	never
 > = Config.string("AUTH_MODE").pipe(
 	Config.withDefault("single-user"),
+	Effect.orDie,
 	Effect.map((mode) => {
 		switch (mode) {
 			case "basic":

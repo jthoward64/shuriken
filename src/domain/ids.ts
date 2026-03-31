@@ -29,6 +29,9 @@ export const RequestId = Brand.nominal<RequestId>();
 // UUIDv7 utilities
 // ---------------------------------------------------------------------------
 
+// UUIDv7 timestamp prefix length: first 48 bits = 12 hex chars
+const UUIDV7_TIMESTAMP_HEX_LENGTH = 12;
+
 /**
  * Extract the creation timestamp from a UUIDv7.
  *
@@ -36,6 +39,6 @@ export const RequestId = Brand.nominal<RequestId>();
  * The first 48 bits (12 hex chars) encode milliseconds since the Unix epoch.
  */
 export const extractInstantFromUuidV7 = (id: string): Temporal.Instant => {
-	const hex = id.replaceAll("-", "").slice(0, 12);
+	const hex = id.replaceAll("-", "").slice(0, UUIDV7_TIMESTAMP_HEX_LENGTH);
 	return Temporal.Instant.fromEpochMilliseconds(Number.parseInt(hex, 16));
 };

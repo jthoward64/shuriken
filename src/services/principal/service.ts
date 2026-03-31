@@ -12,13 +12,13 @@ import type { PrincipalWithUser } from "./repository.ts";
 export interface PrincipalServiceShape {
 	readonly findById: (
 		id: PrincipalId,
-	) => Effect<PrincipalWithUser, DavError | DatabaseError>;
+	) => Effect.Effect<PrincipalWithUser, DavError | DatabaseError>;
 	readonly findBySlug: (
 		slug: Slug,
-	) => Effect<PrincipalWithUser, DavError | DatabaseError>;
+	) => Effect.Effect<PrincipalWithUser, DavError | DatabaseError>;
 	readonly findByEmail: (
 		email: string,
-	) => Effect<PrincipalWithUser, DavError | DatabaseError>;
+	) => Effect.Effect<PrincipalWithUser, DavError | DatabaseError>;
 }
 
 export class PrincipalService extends Context.Tag("PrincipalService")<

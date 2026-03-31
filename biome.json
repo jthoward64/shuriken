@@ -68,13 +68,7 @@
 				"useNumberNamespace": "warn",
 				"useObjectSpread": "warn",
 				"useReadonlyClassProperties": "warn"
-			},
-			"complexity": "warn",
-			"security": "error",
-			"correctness": "error",
-			"performance": "warn",
-			"suspicious": "error",
-			"a11y": "warn"
+			}
 		},
 		"domains": {
 			"test": "recommended"

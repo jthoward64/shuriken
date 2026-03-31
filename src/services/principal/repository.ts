@@ -13,24 +13,24 @@ import type { Slug } from "#/domain/types/path.ts";
 export type PrincipalRow = InferSelectModel<typeof principal>;
 export type UserRow = InferSelectModel<typeof user>;
 
-export type PrincipalWithUser = {
+export interface PrincipalWithUser {
 	readonly principal: PrincipalRow;
 	readonly user: UserRow;
-};
+}
 
 export interface PrincipalRepositoryShape {
 	readonly findById: (
 		id: PrincipalId,
-	) => Effect<PrincipalRow | null, DatabaseError>;
+	) => Effect.Effect<PrincipalRow | null, DatabaseError>;
 	readonly findBySlug: (
 		slug: Slug,
-	) => Effect<PrincipalWithUser | null, DatabaseError>;
+	) => Effect.Effect<PrincipalWithUser | null, DatabaseError>;
 	readonly findByEmail: (
 		email: string,
-	) => Effect<PrincipalWithUser | null, DatabaseError>;
+	) => Effect.Effect<PrincipalWithUser | null, DatabaseError>;
 	readonly findUserByUserId: (
 		id: UserId,
-	) => Effect<UserRow | null, DatabaseError>;
+	) => Effect.Effect<UserRow | null, DatabaseError>;
 }
 
 export class PrincipalRepository extends Context.Tag("PrincipalRepository")<

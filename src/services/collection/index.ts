@@ -14,5 +14,5 @@ export { CollectionServiceLive } from "./service.live.ts";
 // ---------------------------------------------------------------------------
 
 export const CollectionDomainLayer = CollectionServiceLive.pipe(
-  Layer.provideMerge(CollectionRepositoryLive),
+	Layer.provideMerge(CollectionRepositoryLive),
 );

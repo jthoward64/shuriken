@@ -3,7 +3,7 @@ import { Config, Effect, Layer } from "effect";
 import { AuthService } from "#/auth/service.ts";
 import { DatabaseClient } from "#/db/client.ts";
 import { user } from "#/db/drizzle/schema/index.ts";
-import { databaseError } from "#/domain/errors.ts";
+import { type DatabaseError, databaseError } from "#/domain/errors.ts";
 import { PrincipalId, UserId } from "#/domain/ids.ts";
 import type { AuthResult } from "#/domain/types/dav.ts";
 
@@ -22,8 +22,8 @@ const isClientTrusted = (
 	clientIp: string | null,
 	trustedProxies: string,
 ): boolean => {
-	if (trustedProxies === "*") return true;
-	if (!clientIp) return false;
+	if (trustedProxies === "*") { return true; }
+	if (!clientIp) { return false; }
 	return trustedProxies
 		.split(",")
 		.map((s) => s.trim())
@@ -36,24 +36,26 @@ export const ProxyAuthLayer = Layer.effect(
 		const db = yield* DatabaseClient;
 		const proxyHeader = yield* Config.string("PROXY_HEADER").pipe(
 			Config.withDefault("X-Remote-User"),
+			Effect.orDie,
 		);
 		const trustedProxies = yield* Config.string("TRUSTED_PROXIES").pipe(
 			Config.withDefault("*"),
+			Effect.orDie,
 		);
 
 		return AuthService.of({
-			authenticate: (headers, clientIp) =>
-				Effect.gen(function* (): Effect.Effect<
-					AuthResult,
-					import("#/domain/errors.ts").DatabaseError
-				> {
+			authenticate: (
+				headers,
+				clientIp,
+			): Effect.Effect<AuthResult, DatabaseError> =>
+				Effect.gen(function* () {
 					// If the request doesn't come from a trusted proxy, ignore the header
 					if (!isClientTrusted(clientIp, trustedProxies)) {
 						return { _tag: "Unauthenticated" };
 					}
 
 					const username = headers.get(proxyHeader);
-					if (!username) return { _tag: "Unauthenticated" };
+					if (!username) { return { _tag: "Unauthenticated" }; }
 
 					const rows = yield* Effect.tryPromise({
 						try: () =>
@@ -70,7 +72,7 @@ export const ProxyAuthLayer = Layer.effect(
 					});
 
 					const row = rows[0];
-					if (!row) return { _tag: "Unauthenticated" };
+					if (!row) { return { _tag: "Unauthenticated" }; }
 
 					return {
 						_tag: "Authenticated",

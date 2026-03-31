@@ -1,5 +1,4 @@
 import { Effect, Layer } from "effect";
-import { needPrivileges } from "#/domain/errors.ts";
 import type { PrincipalId } from "#/domain/ids.ts";
 import type { DavPrivilege } from "#/domain/types/dav.ts";
 import { AclRepository } from "./repository.ts";
@@ -15,31 +14,38 @@ import { AclService } from "./service.ts";
 // ---------------------------------------------------------------------------
 
 export const AclServiceLive = Layer.effect(
-  AclService,
-  Effect.gen(function* () {
-    const _repo = yield* AclRepository;
+	AclService,
+	Effect.gen(function* () {
+		const _repo = yield* AclRepository;
 
-    return AclService.of({
-      check: (_principalId: PrincipalId, _resourceUrl: string, _privilege: DavPrivilege) =>
-        // TODO: implement RFC 3744 evaluation using casbin_rule table
-        Effect.void,
+		return AclService.of({
+			check: (
+				_principalId: PrincipalId,
+				_resourceUrl: string,
+				_privilege: DavPrivilege,
+			) =>
+				// TODO: implement RFC 3744 evaluation using casbin_rule table
+				Effect.void,
 
-      currentUserPrivileges: (_principalId: PrincipalId, _resourceUrl: string) =>
-        // TODO: return evaluated privilege set from casbin_rule table
-        Effect.succeed([
-          "DAV:read",
-          "DAV:write",
-          "DAV:write-properties",
-          "DAV:write-content",
-          "DAV:read-acl",
-          "DAV:read-current-user-privilege-set",
-          "DAV:write-acl",
-          "DAV:bind",
-          "DAV:unbind",
-        ] satisfies DavPrivilege[]),
-    });
-  }),
+			currentUserPrivileges: (
+				_principalId: PrincipalId,
+				_resourceUrl: string,
+			) =>
+				// TODO: return evaluated privilege set from casbin_rule table
+				Effect.succeed([
+					"DAV:read",
+					"DAV:write",
+					"DAV:write-properties",
+					"DAV:write-content",
+					"DAV:read-acl",
+					"DAV:read-current-user-privilege-set",
+					"DAV:write-acl",
+					"DAV:bind",
+					"DAV:unbind",
+				] satisfies Array<DavPrivilege>),
+		});
+	}),
 );
 
 // Export the error helper for use by handlers calling check()
-export { needPrivileges };
+export { needPrivileges } from "#/domain/errors.ts";

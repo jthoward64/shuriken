@@ -30,14 +30,14 @@ export const PrincipalServiceLive = Layer.effect(
 			findBySlug: (slug: Slug) =>
 				Effect.gen(function* () {
 					const row = yield* repo.findBySlug(slug);
-					if (row) return row;
+					if (row) { return row; }
 					return yield* Effect.fail(notFound(`Principal not found: ${slug}`));
 				}),
 
 			findByEmail: (email: string) =>
 				Effect.gen(function* () {
 					const row = yield* repo.findByEmail(email);
-					if (row) return row;
+					if (row) { return row; }
 					return yield* Effect.fail(
 						notFound(`Principal not found for email: ${email}`),
 					);

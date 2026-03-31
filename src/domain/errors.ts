@@ -114,44 +114,53 @@ export type DavPrecondition =
 // DAV protocol error — carries HTTP status + optional precondition element
 // ---------------------------------------------------------------------------
 
-export type DavError = {
+import {
+	HTTP_BAD_REQUEST,
+	HTTP_CONFLICT,
+	HTTP_FORBIDDEN,
+	HTTP_METHOD_NOT_ALLOWED,
+	HTTP_NOT_FOUND,
+	type HttpStatus,
+} from "#/http/status.ts";
+
+export interface DavError {
 	readonly _tag: "DavError";
-	readonly status: number;
+	readonly status: HttpStatus;
 	readonly precondition?: DavPrecondition;
 	readonly message?: string;
-};
+}
 
 export const davError = (
-	status: number,
+	status: HttpStatus,
 	precondition?: DavPrecondition,
 	message?: string,
 ): DavError => ({ _tag: "DavError", status, precondition, message });
 
 // Common shortcuts
 export const notFound = (message?: string): DavError =>
-	davError(404, undefined, message);
+	davError(HTTP_NOT_FOUND, undefined, message);
 
 export const methodNotAllowed = (message?: string): DavError =>
-	davError(405, undefined, message);
+	davError(HTTP_METHOD_NOT_ALLOWED, undefined, message);
 
 export const forbidden = (
 	precondition?: DavPrecondition,
 	message?: string,
-): DavError => davError(403, precondition, message);
+): DavError => davError(HTTP_FORBIDDEN, precondition, message);
 
 export const conflict = (
 	precondition?: DavPrecondition,
 	message?: string,
-): DavError => davError(409, precondition, message);
+): DavError => davError(HTTP_CONFLICT, precondition, message);
 
 export const needPrivileges = (message?: string): DavError =>
-	davError(403, "DAV:need-privileges", message);
+	davError(HTTP_FORBIDDEN, "DAV:need-privileges", message);
 
 export const validCalendarData = (message?: string): DavError =>
-	davError(400, "CALDAV:valid-calendar-data", message);
+	davError(HTTP_BAD_REQUEST, "CALDAV:valid-calendar-data", message);
 
 export const validAddressData = (message?: string): DavError =>
-	davError(400, "CARDDAV:valid-address-data", message);
+	davError(HTTP_BAD_REQUEST, "CARDDAV:valid-address-data", message);
 
 // ---------------------------------------------------------------------------
 // Union of all error types

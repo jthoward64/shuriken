@@ -13,27 +13,27 @@ import type { DavPrivilege } from "#/domain/types/dav.ts";
 // ---------------------------------------------------------------------------
 
 export interface AclServiceShape {
-  /**
-   * Check whether the given principal has the privilege on the resource.
-   * Returns `void` on success; fails with `davError(403, "DAV:need-privileges")`
-   * if the privilege is not granted.
-   */
-  readonly check: (
-    principalId: PrincipalId,
-    resourceUrl: string,
-    privilege: DavPrivilege,
-  ) => Effect<void, DavError | DatabaseError>;
+	/**
+	 * Check whether the given principal has the privilege on the resource.
+	 * Returns `void` on success; fails with `davError(403, "DAV:need-privileges")`
+	 * if the privilege is not granted.
+	 */
+	readonly check: (
+		principalId: PrincipalId,
+		resourceUrl: string,
+		privilege: DavPrivilege,
+	) => Effect.Effect<void, DavError | DatabaseError>;
 
-  /**
-   * Return the set of privileges the principal currently has on the resource.
-   */
-  readonly currentUserPrivileges: (
-    principalId: PrincipalId,
-    resourceUrl: string,
-  ) => Effect<ReadonlyArray<DavPrivilege>, DatabaseError>;
+	/**
+	 * Return the set of privileges the principal currently has on the resource.
+	 */
+	readonly currentUserPrivileges: (
+		principalId: PrincipalId,
+		resourceUrl: string,
+	) => Effect.Effect<ReadonlyArray<DavPrivilege>, DatabaseError>;
 }
 
 export class AclService extends Context.Tag("AclService")<
-  AclService,
-  AclServiceShape
+	AclService,
+	AclServiceShape
 >() {}

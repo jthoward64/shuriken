@@ -14,5 +14,5 @@ export { AclServiceLive } from "./service.live.ts";
 // ---------------------------------------------------------------------------
 
 export const AclDomainLayer = AclServiceLive.pipe(
-  Layer.provide(AclRepositoryLive),
+	Layer.provide(AclRepositoryLive),
 );

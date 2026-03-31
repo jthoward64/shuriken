@@ -14,5 +14,5 @@ export { InstanceServiceLive } from "./service.live.ts";
 // ---------------------------------------------------------------------------
 
 export const InstanceDomainLayer = InstanceServiceLive.pipe(
-  Layer.provideMerge(InstanceRepositoryLive),
+	Layer.provideMerge(InstanceRepositoryLive),
 );

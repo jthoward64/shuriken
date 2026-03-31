@@ -1,5 +1,6 @@
-import { type BunSQLDatabase, drizzle } from "drizzle-orm/bun-sql";
-import { Config, Effect, Layer } from "effect";
+import { drizzle } from "drizzle-orm/bun-sql";
+import type { BunSQLDatabase } from "drizzle-orm/bun-sql/postgres/driver";
+import { Config, Effect } from "effect";
 import * as schema from "./drizzle/schema/index.ts";
 
 // ---------------------------------------------------------------------------

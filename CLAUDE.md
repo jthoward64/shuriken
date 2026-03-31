@@ -9,7 +9,7 @@ A CalDAV/CardDAV server implementation in TypeScript.
 - **Package manager**: Bun. Never use npm, yarn, or pnpm.
 - **Scripts**: bun run `check`, `lint`, `format`, and `test` scripts are defined
 - **TypeScript**: Strict mode. No `any` ever. Use `unknown` and then narrow with runtime checks as needed. The only time `any` is allowed is internal to very small functions in order to satisfy *extremely* complex generics.
-- **Biome**: Use Biome for linting and formatting
+- **Biome**: Use Biome for linting and formatting. Warnings, errors, and infos should alls be fixed
 
 ## Effect
 

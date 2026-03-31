@@ -10,11 +10,11 @@ import type { XmlParseError } from "#/domain/errors.ts";
 // ---------------------------------------------------------------------------
 
 const parser = new XMLParser({
-  ignoreAttributes: false,
-  attributeNamePrefix: "@_",
-  allowBooleanAttributes: true,
-  parseTagValue: false, // Keep all values as strings; callers parse as needed
-  trimValues: true,
+	ignoreAttributes: false,
+	attributeNamePrefix: "@_",
+	allowBooleanAttributes: true,
+	parseTagValue: false, // Keep all values as strings; callers parse as needed
+	trimValues: true,
 });
 
 /**
@@ -22,7 +22,7 @@ const parser = new XMLParser({
  * The caller is responsible for validating the shape of the result.
  */
 export const parseXml = (body: string): Effect.Effect<unknown, XmlParseError> =>
-  Effect.try({
-    try: () => parser.parse(body) as unknown,
-    catch: (e) => xmlParseError(e),
-  });
+	Effect.try({
+		try: () => parser.parse(body) as unknown,
+		catch: (e) => xmlParseError(e),
+	});

@@ -3,8 +3,8 @@ import type { HttpRequestContext } from "#/http/context.ts";
 import type { ResolvedDavPath } from "#/domain/types/path.ts";
 
 export const reportHandler = (
-  _path: ResolvedDavPath,
-  _ctx: HttpRequestContext,
-  _req: Request,
+	_path: ResolvedDavPath,
+	_ctx: HttpRequestContext,
+	_req: Request,
 ): Effect.Effect<Response, never> =>
-  Effect.succeed(new Response(null, { status: 501 }));
+	Effect.succeed(new Response(null, { status: 501 }));

@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { Effect, Layer } from "effect";
 import { DatabaseClient, type DbClient } from "#/db/client.ts";
 import { davCollection } from "#/db/drizzle/schema/index.ts";
@@ -87,7 +87,7 @@ const softDelete = (db: DbClient, id: CollectionId) =>
 		try: () =>
 			db
 				.update(davCollection)
-				.set({ deletedAt: Temporal.Now.instant() })
+				.set({ deletedAt: sql`now()` })
 				.where(eq(davCollection.id, id))
 				.then(() => undefined),
 		catch: (e) => databaseError(e),

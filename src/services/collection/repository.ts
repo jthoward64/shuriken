@@ -12,32 +12,32 @@ import type { Slug } from "#/domain/types/path.ts";
 
 export type CollectionRow = InferSelectModel<typeof davCollection>;
 
-export type NewCollection = {
+export interface NewCollection {
 	readonly ownerPrincipalId: PrincipalId;
 	readonly collectionType: string;
 	readonly slug: Slug;
 	readonly displayName?: string;
 	readonly description?: string;
 	readonly timezoneTzid?: string;
-	readonly supportedComponents?: string[];
+	readonly supportedComponents?: Array<string>;
 	readonly parentCollectionId?: CollectionId;
-};
+}
 
 export interface CollectionRepositoryShape {
 	readonly findById: (
 		id: CollectionId,
-	) => Effect<CollectionRow | null, DatabaseError>;
+	) => Effect.Effect<CollectionRow | null, DatabaseError>;
 	readonly findBySlug: (
 		ownerPrincipalId: PrincipalId,
 		slug: Slug,
-	) => Effect<CollectionRow | null, DatabaseError>;
+	) => Effect.Effect<CollectionRow | null, DatabaseError>;
 	readonly listByOwner: (
 		ownerPrincipalId: PrincipalId,
-	) => Effect<ReadonlyArray<CollectionRow>, DatabaseError>;
+	) => Effect.Effect<ReadonlyArray<CollectionRow>, DatabaseError>;
 	readonly insert: (
 		input: NewCollection,
-	) => Effect<CollectionRow, DatabaseError>;
-	readonly softDelete: (id: CollectionId) => Effect<void, DatabaseError>;
+	) => Effect.Effect<CollectionRow, DatabaseError>;
+	readonly softDelete: (id: CollectionId) => Effect.Effect<void, DatabaseError>;
 }
 
 export class CollectionRepository extends Context.Tag("CollectionRepository")<

@@ -10,24 +10,26 @@ import type { InstanceRow, NewInstance } from "./repository.ts";
 // ---------------------------------------------------------------------------
 
 export interface InstanceServiceShape {
-  readonly findById: (
-    id: InstanceId,
-  ) => Effect<InstanceRow, DavError | DatabaseError>;
-  readonly findBySlug: (
-    collectionId: CollectionId,
-    slug: Slug,
-  ) => Effect<InstanceRow, DavError | DatabaseError>;
-  readonly listByCollection: (
-    collectionId: CollectionId,
-  ) => Effect<ReadonlyArray<InstanceRow>, DatabaseError>;
-  readonly put: (
-    input: NewInstance,
-    existingId?: InstanceId,
-  ) => Effect<InstanceRow, DavError | DatabaseError>;
-  readonly delete: (id: InstanceId) => Effect<void, DavError | DatabaseError>;
+	readonly findById: (
+		id: InstanceId,
+	) => Effect.Effect<InstanceRow, DavError | DatabaseError>;
+	readonly findBySlug: (
+		collectionId: CollectionId,
+		slug: Slug,
+	) => Effect.Effect<InstanceRow, DavError | DatabaseError>;
+	readonly listByCollection: (
+		collectionId: CollectionId,
+	) => Effect.Effect<ReadonlyArray<InstanceRow>, DatabaseError>;
+	readonly put: (
+		input: NewInstance,
+		existingId?: InstanceId,
+	) => Effect.Effect<InstanceRow, DavError | DatabaseError>;
+	readonly delete: (
+		id: InstanceId,
+	) => Effect.Effect<void, DavError | DatabaseError>;
 }
 
 export class InstanceService extends Context.Tag("InstanceService")<
-  InstanceService,
-  InstanceServiceShape
+	InstanceService,
+	InstanceServiceShape
 >() {}

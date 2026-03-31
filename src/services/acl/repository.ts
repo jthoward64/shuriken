@@ -16,39 +16,39 @@ import type { DavPrivilege } from "#/domain/types/dav.ts";
 
 export type CasbinRuleRow = InferSelectModel<typeof casbinRule>;
 
-export type PolicyRule = {
-  readonly ptype: "p";
-  readonly subject: string; // principal URL or special (DAV:all, etc.)
-  readonly resource: string; // resource URL
-  readonly privilege: DavPrivilege;
-  readonly effect: "allow" | "deny";
-};
+export interface PolicyRule {
+	readonly ptype: "p";
+	readonly subject: string; // principal URL or special (DAV:all, etc.)
+	readonly resource: string; // resource URL
+	readonly privilege: DavPrivilege;
+	readonly effect: "allow" | "deny";
+}
 
-export type RoleRule = {
-  readonly ptype: "g";
-  readonly user: string;
-  readonly role: string;
-};
+export interface RoleRule {
+	readonly ptype: "g";
+	readonly user: string;
+	readonly role: string;
+}
 
 export interface AclRepositoryShape {
-  readonly getRulesForResource: (
-    resourceUrl: string,
-  ) => Effect<ReadonlyArray<CasbinRuleRow>, DatabaseError>;
-  readonly insertRule: (
-    rule: PolicyRule | RoleRule,
-  ) => Effect<void, DatabaseError>;
-  readonly deleteRulesForResource: (
-    resourceUrl: string,
-  ) => Effect<void, DatabaseError>;
-  /** Raw check: does any "p" rule allow this (subject, resource, privilege)? */
-  readonly hasAllow: (
-    subject: string,
-    resourceUrl: string,
-    privilege: DavPrivilege,
-  ) => Effect<boolean, DatabaseError>;
+	readonly getRulesForResource: (
+		resourceUrl: string,
+	) => Effect.Effect<ReadonlyArray<CasbinRuleRow>, DatabaseError>;
+	readonly insertRule: (
+		rule: PolicyRule | RoleRule,
+	) => Effect.Effect<void, DatabaseError>;
+	readonly deleteRulesForResource: (
+		resourceUrl: string,
+	) => Effect.Effect<void, DatabaseError>;
+	/** Raw check: does any "p" rule allow this (subject, resource, privilege)? */
+	readonly hasAllow: (
+		subject: string,
+		resourceUrl: string,
+		privilege: DavPrivilege,
+	) => Effect.Effect<boolean, DatabaseError>;
 }
 
 export class AclRepository extends Context.Tag("AclRepository")<
-  AclRepository,
-  AclRepositoryShape
+	AclRepository,
+	AclRepositoryShape
 >() {}

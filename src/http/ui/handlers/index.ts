@@ -14,9 +14,9 @@ const HTML = `<!DOCTYPE html>
 </html>`;
 
 export const indexHandler = (_req: Request): Effect.Effect<Response, never> =>
-  Effect.succeed(
-    new Response(HTML, {
-      status: 200,
-      headers: { "Content-Type": "text/html; charset=utf-8" },
-    }),
-  );
+	Effect.succeed(
+		new Response(HTML, {
+			status: 200,
+			headers: { "Content-Type": "text/html; charset=utf-8" },
+		}),
+	);

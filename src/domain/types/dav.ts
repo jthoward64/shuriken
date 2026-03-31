@@ -49,11 +49,11 @@ export type PrincipalType = "user" | "group" | "system" | "public" | "resource";
 // Authenticated principal — produced by AuthService, consumed by services
 // ---------------------------------------------------------------------------
 
-export type AuthenticatedPrincipal = {
+export interface AuthenticatedPrincipal {
 	readonly principalId: PrincipalId;
 	readonly userId: UserId;
 	readonly displayName: string;
-};
+}
 
 // ---------------------------------------------------------------------------
 // AuthResult — union produced by the auth middleware

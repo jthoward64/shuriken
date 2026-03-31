@@ -5,4 +5,4 @@ import { Effect } from "effect";
 // ---------------------------------------------------------------------------
 
 export const staticHandler = (_req: Request): Effect.Effect<Response, never> =>
-  Effect.succeed(new Response(null, { status: 404 }));
+	Effect.succeed(new Response(null, { status: 404 }));

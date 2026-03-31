@@ -18,7 +18,7 @@ export const InfraLayer = Layer.merge(DatabaseClientLive, CryptoServiceLive);
 // ---------------------------------------------------------------------------
 
 export const AuthLayer = Layer.unwrapEffect(selectAuthLayer).pipe(
-  Layer.provide(InfraLayer),
+	Layer.provide(InfraLayer),
 );
 
 // ---------------------------------------------------------------------------
@@ -26,7 +26,7 @@ export const AuthLayer = Layer.unwrapEffect(selectAuthLayer).pipe(
 // ---------------------------------------------------------------------------
 
 const withInfra = <A, E>(layer: Layer.Layer<A, E, DatabaseClient>) =>
-  layer.pipe(Layer.provide(InfraLayer));
+	layer.pipe(Layer.provide(InfraLayer));
 
 // ---------------------------------------------------------------------------
 // AppLayer — full production layer composition
@@ -37,12 +37,12 @@ const withInfra = <A, E>(layer: Layer.Layer<A, E, DatabaseClient>) =>
 // ---------------------------------------------------------------------------
 
 export const AppLayer = Layer.mergeAll(
-  InfraLayer,
-  AuthLayer,
-  withInfra(PrincipalDomainLayer),
-  withInfra(CollectionDomainLayer),
-  withInfra(InstanceDomainLayer),
-  withInfra(AclDomainLayer),
+	InfraLayer,
+	AuthLayer,
+	withInfra(PrincipalDomainLayer),
+	withInfra(CollectionDomainLayer),
+	withInfra(InstanceDomainLayer),
+	withInfra(AclDomainLayer),
 );
 
 // ---------------------------------------------------------------------------

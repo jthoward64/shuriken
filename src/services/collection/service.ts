@@ -12,18 +12,20 @@ import type { CollectionRow, NewCollection } from "./repository.ts";
 export interface CollectionServiceShape {
 	readonly findById: (
 		id: CollectionId,
-	) => Effect<CollectionRow, DavError | DatabaseError>;
+	) => Effect.Effect<CollectionRow, DavError | DatabaseError>;
 	readonly findBySlug: (
 		ownerPrincipalId: PrincipalId,
 		slug: Slug,
-	) => Effect<CollectionRow, DavError | DatabaseError>;
+	) => Effect.Effect<CollectionRow, DavError | DatabaseError>;
 	readonly listByOwner: (
 		ownerPrincipalId: PrincipalId,
-	) => Effect<ReadonlyArray<CollectionRow>, DatabaseError>;
+	) => Effect.Effect<ReadonlyArray<CollectionRow>, DatabaseError>;
 	readonly create: (
 		input: NewCollection,
-	) => Effect<CollectionRow, DavError | DatabaseError>;
-	readonly delete: (id: CollectionId) => Effect<void, DavError | DatabaseError>;
+	) => Effect.Effect<CollectionRow, DavError | DatabaseError>;
+	readonly delete: (
+		id: CollectionId,
+	) => Effect.Effect<void, DavError | DatabaseError>;
 }
 
 export class CollectionService extends Context.Tag("CollectionService")<
