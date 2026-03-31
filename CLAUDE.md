@@ -51,6 +51,11 @@ All Bun-specific APIs (file I/O, `Bun.serve`, `Bun.file`, `Bun.password`, etc.) 
 - A polyfill is present; do not use `Date`, `Date.now()`, or `new Date()` in application code.
 - Store timestamps as timestamptz in the database; parse them back to Temporal objects at the DB boundary (drizzle is configured to return timestamps as strings).
 
+## XML
+
+- JS doesn't deal with XML well, so we parse XML using fast-xml-parser and then do things like validation, etc.
+- This is wrapped in effect using a transform
+
 ## DAV Entity Identity
 
 - DAV entities (`davCollection`, `davInstance`, etc.) can be addressed by either **slug** or **UUID**.
