@@ -22,11 +22,11 @@ import { reportHandler } from "./methods/report.ts";
 // DAV router — slug resolution + method dispatch
 //
 // URL patterns handled:
-//   /.well-known/caldav              → wellknown
-//   /.well-known/carddav             → wellknown
-//   /principals/:slug                → principal
-//   /principals/:slug/:collSlug      → collection
-//   /principals/:slug/:collSlug/:obj → instance
+//   /.well-known/caldav                   → wellknown
+//   /.well-known/carddav                  → wellknown
+//   /dav/principals/:slug                 → principal
+//   /dav/principals/:slug/:collSlug       → collection
+//   /dav/principals/:slug/:collSlug/:obj  → instance
 // ---------------------------------------------------------------------------
 
 type DavServices =
@@ -35,7 +35,7 @@ type DavServices =
 	| InstanceRepository;
 
 /** Parse and resolve a DAV URL path, converting slugs to branded UUIDs. */
-// Path segment counts for the /principals/:slug/... hierarchy
+// Path segment counts for the /dav/principals/:slug/... hierarchy (excluding "principals")
 const SEGMENTS_PRINCIPAL = 2;
 const SEGMENTS_COLLECTION = 3;
 
@@ -55,7 +55,12 @@ const parseDavPath = (
 		return Effect.succeed({ kind: "wellknown", name: "carddav" });
 	}
 
-	const segments = path.split("/").filter(Boolean);
+	// Strip /dav base prefix before parsing segments
+	const davPrefix = "/dav";
+	const davRelative = path.startsWith(davPrefix)
+		? path.slice(davPrefix.length)
+		: path;
+	const segments = davRelative.split("/").filter(Boolean);
 
 	if (segments[0] !== "principals" || segments.length < 2) {
 		return Effect.fail(notFound(`Unknown DAV path: ${path}`));
@@ -112,6 +117,16 @@ export const davRouter = (
 ): Effect.Effect<Response, AppError, DavServices> =>
 	Effect.gen(function* () {
 		const path = yield* parseDavPath(ctx.url);
+
+		// RFC 6764 §5: /.well-known/caldav and /.well-known/carddav must redirect
+		// to the DAV context path so clients can perform service discovery.
+		if (path.kind === "wellknown") {
+			return new Response(null, {
+				status: 301,
+				// biome-ignore lint/style/useNamingConvention: HTTP header name
+				headers: { Location: "/dav/" },
+			});
+		}
 
 		switch (req.method.toUpperCase()) {
 			case "OPTIONS":

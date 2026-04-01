@@ -32,7 +32,8 @@ type AppServices =
 	| InstanceRepository;
 
 const isDavPath = (pathname: string): boolean =>
-	pathname.startsWith("/principals/") ||
+	pathname === "/dav" ||
+	pathname.startsWith("/dav/") ||
 	pathname.startsWith("/.well-known/cal") ||
 	pathname.startsWith("/.well-known/card");
 
