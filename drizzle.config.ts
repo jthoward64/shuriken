@@ -10,8 +10,4 @@ export default defineConfig({
 		// biome-ignore lint/style/noNonNullAssertion: drizzle will handle missing value
 		url: process.env.DATABASE_URL!,
 	},
-	casing: "snake_case",
-	introspect: {
-		casing: "preserve",
-	},
 });

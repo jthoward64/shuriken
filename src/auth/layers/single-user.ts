@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
-import { Config, Effect, Layer, Option } from "effect";
+import { Effect, Layer, Option } from "effect";
 import { AuthService } from "#src/auth/service.ts";
+import { AppConfigService } from "#src/config.ts";
 import { DatabaseClient } from "#src/db/client.ts";
 import { user } from "#src/db/drizzle/schema/index.ts";
 import { AuthError, DatabaseError } from "#src/domain/errors.ts";
@@ -60,9 +61,7 @@ export const SingleUserAuthLayer = Layer.effect(
 	AuthService,
 	Effect.gen(function* () {
 		const db = yield* DatabaseClient;
-		const emailOpt = yield* Config.string("SINGLE_USER_EMAIL").pipe(
-			Config.option,
-		);
+		const { auth: { singleUserEmail: emailOpt } } = yield* AppConfigService;
 		const email = Option.map(emailOpt, Email);
 
 		// Resolve principal at layer-build time — cached for all requests

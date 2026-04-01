@@ -1,5 +1,6 @@
 import { Layer } from "effect";
 import { selectAuthLayer } from "#src/auth/index.ts";
+import { AppConfigLive } from "#src/config.ts";
 import { type DatabaseClient, DatabaseClientLive } from "#src/db/client.ts";
 import { CryptoServiceLive } from "#src/platform/crypto.ts";
 import { AclDomainLayer } from "#src/services/acl/index.ts";
@@ -9,9 +10,16 @@ import { PrincipalDomainLayer } from "#src/services/principal/index.ts";
 
 // ---------------------------------------------------------------------------
 // Infrastructure layer — foundational services shared by all domain layers
+//
+// AppConfigLive reads all env vars once. DatabaseClientLive depends on it for
+// DATABASE_URL; we satisfy that dependency here so InfraLayer is self-contained.
 // ---------------------------------------------------------------------------
 
-export const InfraLayer = Layer.merge(DatabaseClientLive, CryptoServiceLive);
+export const InfraLayer = Layer.mergeAll(
+	AppConfigLive,
+	DatabaseClientLive.pipe(Layer.provide(AppConfigLive)),
+	CryptoServiceLive,
+);
 
 // ---------------------------------------------------------------------------
 // Auth layer — concrete implementation selected at startup from AUTH_MODE

@@ -1,17 +1,21 @@
-import { Config } from "effect";
+import { Config, Effect } from "effect";
 
 // ---------------------------------------------------------------------------
 // Application configuration — all env vars read through Effect's Config API.
 // `dotenv/config` is imported in src/index.ts before this is evaluated,
 // so process.env is already populated with .env values when these run.
-// No code outside this file (and index.ts) should access process.env directly.
+//
+// AppConfigService is the single source of truth for runtime configuration.
+// All services that need configuration must depend on this service rather
+// than reading env vars directly. No code outside this file should call
+// Config.string/integer/etc. for application config.
 // ---------------------------------------------------------------------------
 
 const DEFAULT_PORT = 3000;
 
 export const ServerConfig = Config.all({
 	port: Config.integer("PORT").pipe(Config.withDefault(DEFAULT_PORT)),
-	host: Config.string("HOST").pipe(Config.withDefault("0.0.0.0")),
+	host: Config.string("HOST").pipe(Config.withDefault("::")),
 });
 
 export const DatabaseConfig = Config.all({
@@ -69,3 +73,18 @@ export const AppConfig = Config.all({
 });
 
 export type AppConfigType = Config.Config.Success<typeof AppConfig>;
+
+// ---------------------------------------------------------------------------
+// AppConfigService — Effect service wrapping the full application config.
+//
+// All services that need configuration must depend on this service rather
+// than reading env vars directly. This ensures a single, validated read
+// of all config at layer-build time.
+// ---------------------------------------------------------------------------
+
+export class AppConfigService extends Effect.Service<AppConfigService>()(
+	"AppConfigService",
+	{ effect: AppConfig },
+) {}
+
+export const AppConfigLive = AppConfigService.Default;

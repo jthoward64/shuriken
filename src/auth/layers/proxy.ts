@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
-import { Config, Effect, Layer, Option } from "effect";
+import { Effect, Layer, Option } from "effect";
 import { AuthService } from "#src/auth/service.ts";
+import { AppConfigService } from "#src/config.ts";
 import { DatabaseClient } from "#src/db/client.ts";
 import { user } from "#src/db/drizzle/schema/index.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
@@ -40,14 +41,7 @@ export const ProxyAuthLayer = Layer.effect(
 	AuthService,
 	Effect.gen(function* () {
 		const db = yield* DatabaseClient;
-		const proxyHeader = yield* Config.string("PROXY_HEADER").pipe(
-			Config.withDefault("X-Remote-User"),
-			Effect.orDie,
-		);
-		const trustedProxies = yield* Config.string("TRUSTED_PROXIES").pipe(
-			Config.withDefault("*"),
-			Effect.orDie,
-		);
+		const { auth: { proxyHeader, trustedProxies } } = yield* AppConfigService;
 
 		return AuthService.of({
 			authenticate: (
