@@ -1,10 +1,10 @@
-import "dotenv/config";
 import "temporal-polyfill/global";
 
 import { BunRuntime } from "@effect/platform-bun";
 import { Config, Effect, ManagedRuntime } from "effect";
 import { handleRequest } from "#src/http/router.ts";
 import { AppLayer } from "#src/layers.ts";
+import { HTTP_INTERNAL_SERVER_ERROR } from "./http/status";
 
 const DEFAULT_PORT = 3000;
 
@@ -18,9 +18,12 @@ const program = Effect.gen(function* () {
 	Bun.serve({
 		port,
 		fetch: (req, server) =>
-			runtime
-				.runPromise(handleRequest(req, server))
-				.catch(() => new Response("Internal Server Error", { status: 500 })),
+			runtime.runPromise(handleRequest(req, server)).catch((error) => {
+				console.error("Error handling request:", error);
+				return new Response("Internal Server Error", {
+					status: HTTP_INTERNAL_SERVER_ERROR,
+				});
+			}),
 	});
 
 	yield* Effect.log(`shuriken-ts listening on :${port}`);
