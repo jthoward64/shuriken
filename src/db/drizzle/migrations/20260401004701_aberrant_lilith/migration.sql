@@ -1,196 +1,9 @@
--- Current sql file was generated after introspecting the database
--- If you want to run this migration please uncomment this code before executing migrations
-
--- =============================================================================
--- FUNCTIONS (must come before any table that references them in generated columns)
--- =============================================================================
-
-CREATE OR REPLACE FUNCTION unicode_casemap_nfc(input text)
-RETURNS text
-LANGUAGE sql
-IMMUTABLE
-PARALLEL SAFE
-AS $$
-    /*
-     * Unicode casemap comparator (RFC 5051-inspired).
-     *
-     * This implementation:
-     *   - Applies Unicode case folding (Postgres casefold())
-     *   - Normalizes to NFC (canonical equivalence)
-     *
-     * NOTE:
-     * RFC 5051 specifies compatibility decomposition (≈ NFKD) after
-     * titlecasing. We intentionally use NFC here instead:
-     *
-     *   - Preserves semantic distinctions (e.g., ① ≠ 1)
-     *   - Matches modern Unicode and OS behavior
-     *   - Avoids over-aggressive compatibility folding
-     *
-     * This is a conscious, documented divergence from strict RFC 5051.
-     */
-    SELECT normalize(casefold(input COLLATE "und-x-icu"), NFC);
-$$;
---> statement-breakpoint
-CREATE OR REPLACE FUNCTION ascii_casemap(input text)
-RETURNS text
-LANGUAGE sql
-IMMUTABLE
-PARALLEL SAFE
-AS $$
-    /*
-     * ASCII-only casemap comparator (i;ascii-casemap).
-     *
-     * Only ASCII A–Z are case-folded.
-     * All non-ASCII characters are left unchanged.
-     *
-     * This matches RFC 4790 semantics exactly.
-     */
-    SELECT translate(
-        input,
-        'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
-        'abcdefghijklmnopqrstuvwxyz'
-    );
-$$;
---> statement-breakpoint
-CREATE OR REPLACE FUNCTION jsonb_unicode_casemap_nfc(input jsonb)
-RETURNS jsonb
-LANGUAGE sql
-IMMUTABLE
-PARALLEL SAFE
-AS $$
-    /*
-     * Unicode casemap for JSONB objects with string fields or string arrays.
-     *
-     * - Top-level string values are case-mapped.
-     * - Array elements that are strings are case-mapped.
-     * - Non-string values are preserved unchanged.
-     */
-    SELECT CASE
-        WHEN input IS NULL THEN NULL
-        ELSE (
-            SELECT COALESCE(
-                jsonb_object_agg(
-                    key,
-                    CASE
-                        WHEN jsonb_typeof(value) = 'string'
-                            THEN to_jsonb(unicode_casemap_nfc(value #>> '{}'))
-                        WHEN jsonb_typeof(value) = 'array'
-                            THEN (
-                                SELECT COALESCE(
-                                    jsonb_agg(
-                                        CASE
-                                            WHEN jsonb_typeof(elem) = 'string'
-                                                THEN to_jsonb(unicode_casemap_nfc(elem #>> '{}'))
-                                            ELSE elem
-                                        END
-                                    ),
-                                    '[]'::jsonb
-                                )
-                                FROM jsonb_array_elements(value) AS elem
-                            )
-                        ELSE value
-                    END
-                ),
-                '{}'::jsonb
-            )
-            FROM jsonb_each(input)
-        )
-    END;
-$$;
---> statement-breakpoint
-CREATE OR REPLACE FUNCTION jsonb_ascii_casemap(input jsonb)
-RETURNS jsonb
-LANGUAGE sql
-IMMUTABLE
-PARALLEL SAFE
-AS $$
-    /*
-     * ASCII casemap for JSONB objects with string fields or string arrays.
-     *
-     * - Top-level string values are case-mapped.
-     * - Array elements that are strings are case-mapped.
-     * - Non-string values are preserved unchanged.
-     */
-    SELECT CASE
-        WHEN input IS NULL THEN NULL
-        ELSE (
-            SELECT COALESCE(
-                jsonb_object_agg(
-                    key,
-                    CASE
-                        WHEN jsonb_typeof(value) = 'string'
-                            THEN to_jsonb(ascii_casemap(value #>> '{}'))
-                        WHEN jsonb_typeof(value) = 'array'
-                            THEN (
-                                SELECT COALESCE(
-                                    jsonb_agg(
-                                        CASE
-                                            WHEN jsonb_typeof(elem) = 'string'
-                                                THEN to_jsonb(ascii_casemap(elem #>> '{}'))
-                                            ELSE elem
-                                        END
-                                    ),
-                                    '[]'::jsonb
-                                )
-                                FROM jsonb_array_elements(value) AS elem
-                            )
-                        ELSE value
-                    END
-                ),
-                '{}'::jsonb
-            )
-            FROM jsonb_each(input)
-        )
-    END;
-$$;
---> statement-breakpoint
-CREATE OR REPLACE FUNCTION set_updated_at()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$;
---> statement-breakpoint
-CREATE OR REPLACE FUNCTION update_card_index_search_tsv()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-AS $$
-BEGIN
-    NEW.search_tsv := to_tsvector('english',
-        COALESCE(NEW.fn, '') || ' ' ||
-        COALESCE(NEW.data->>'n_family', '') || ' ' ||
-        COALESCE(NEW.data->>'n_given', '') || ' ' ||
-        COALESCE(NEW.data->>'org', '') || ' ' ||
-        COALESCE(NEW.data->>'title', '') || ' ' ||
-        COALESCE(
-            (SELECT string_agg(value::text, ' ')
-             FROM jsonb_array_elements_text(NEW.data->'emails')),
-            ''
-        ) || ' ' ||
-        COALESCE(
-            (SELECT string_agg(value::text, ' ')
-             FROM jsonb_array_elements_text(NEW.data->'phones')),
-            ''
-        )
-    );
-    RETURN NEW;
-END;
-$$;
---> statement-breakpoint
-
--- =============================================================================
--- TABLES
--- =============================================================================
-
 CREATE TABLE "auth_user" (
 	"id" uuid PRIMARY KEY DEFAULT uuidv7(),
 	"user_id" uuid NOT NULL,
 	"auth_source" text NOT NULL,
 	"auth_id" text NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamptz DEFAULT now() NOT NULL,
 	"auth_credential" text,
 	CONSTRAINT "auth_user_auth_source_auth_id_key" UNIQUE("auth_source","auth_id"),
 	CONSTRAINT "auth_user_auth_source_auth_id_unique" UNIQUE("auth_source","auth_id")
@@ -201,13 +14,13 @@ CREATE TABLE "cal_index" (
 	"component_id" uuid,
 	"component_type" text NOT NULL,
 	"uid" text,
-	"recurrence_id_utc" timestamp with time zone,
-	"dtstart_utc" timestamp with time zone,
-	"dtend_utc" timestamp with time zone,
+	"recurrence_id_utc" timestamptz,
+	"dtstart_utc" timestamptz,
+	"dtend_utc" timestamptz,
 	"all_day" boolean,
 	"rrule_text" text,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"deleted_at" timestamp with time zone,
+	"updated_at" timestamptz DEFAULT now() NOT NULL,
+	"deleted_at" timestamptz,
 	"metadata" jsonb DEFAULT '{}',
 	"search_tsv" tsvector GENERATED ALWAYS AS (to_tsvector('english'::regconfig, ((((COALESCE((metadata ->> 'summary'::text), ''::text) || ' '::text) || COALESCE((metadata ->> 'location'::text), ''::text)) || ' '::text) || COALESCE((metadata ->> 'description'::text), ''::text)))) STORED,
 	"metadata_ascii_fold" jsonb GENERATED ALWAYS AS (jsonb_ascii_casemap(metadata)) STORED,
@@ -221,16 +34,16 @@ CREATE TABLE "cal_timezone" (
 	"tzid" text NOT NULL CONSTRAINT "cal_timezone_tzid_key" UNIQUE,
 	"vtimezone_data" text NOT NULL,
 	"iana_name" text,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+	"created_at" timestamptz DEFAULT now() NOT NULL,
+	"updated_at" timestamptz DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "card_index" (
 	"entity_id" uuid PRIMARY KEY,
 	"uid" text,
 	"fn" text,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"deleted_at" timestamp with time zone,
+	"updated_at" timestamptz DEFAULT now() NOT NULL,
+	"deleted_at" timestamptz,
 	"data" jsonb DEFAULT '{}',
 	"search_tsv" tsvector,
 	"fn_ascii_fold" text GENERATED ALWAYS AS (ascii_casemap(fn)) STORED,
@@ -258,8 +71,8 @@ CREATE TABLE "dav_collection" (
 	"description" text,
 	"timezone_tzid" text,
 	"synctoken" bigint DEFAULT 0 NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"deleted_at" timestamp with time zone,
+	"updated_at" timestamptz DEFAULT now() NOT NULL,
+	"deleted_at" timestamptz,
 	"supported_components" text[],
 	"slug" text DEFAULT '' NOT NULL,
 	"parent_collection_id" uuid,
@@ -272,16 +85,16 @@ CREATE TABLE "dav_component" (
 	"parent_component_id" uuid,
 	"name" text NOT NULL,
 	"ordinal" integer DEFAULT 0 NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"deleted_at" timestamp with time zone
+	"updated_at" timestamptz DEFAULT now() NOT NULL,
+	"deleted_at" timestamptz
 );
 --> statement-breakpoint
 CREATE TABLE "dav_entity" (
 	"id" uuid PRIMARY KEY DEFAULT uuidv7(),
 	"entity_type" text NOT NULL,
 	"logical_uid" text,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"deleted_at" timestamp with time zone,
+	"updated_at" timestamptz DEFAULT now() NOT NULL,
+	"deleted_at" timestamptz,
 	CONSTRAINT "dav_entity_entity_type_check" CHECK ((entity_type = ANY (ARRAY['icalendar'::text, 'vcard'::text])))
 );
 --> statement-breakpoint
@@ -292,9 +105,9 @@ CREATE TABLE "dav_instance" (
 	"content_type" text NOT NULL,
 	"etag" text NOT NULL,
 	"sync_revision" bigint DEFAULT 0 NOT NULL,
-	"last_modified" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"deleted_at" timestamp with time zone,
+	"last_modified" timestamptz DEFAULT now() NOT NULL,
+	"updated_at" timestamptz DEFAULT now() NOT NULL,
+	"deleted_at" timestamptz,
 	"schedule_tag" text,
 	"slug" text DEFAULT '' NOT NULL,
 	CONSTRAINT "dav_instance_content_type_check" CHECK ((content_type = ANY (ARRAY['text/calendar'::text, 'text/vcard'::text])))
@@ -306,8 +119,8 @@ CREATE TABLE "dav_parameter" (
 	"name" text NOT NULL,
 	"value" text NOT NULL,
 	"ordinal" integer DEFAULT 0 NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"deleted_at" timestamp with time zone
+	"updated_at" timestamptz DEFAULT now() NOT NULL,
+	"deleted_at" timestamptz
 );
 --> statement-breakpoint
 CREATE TABLE "dav_property" (
@@ -320,21 +133,21 @@ CREATE TABLE "dav_property" (
 	"value_float" double precision,
 	"value_bool" boolean,
 	"value_date" date,
-	"value_tstz" timestamp with time zone,
+	"value_tstz" timestamptz,
 	"value_bytes" bytea,
 	"value_json" jsonb,
 	"ordinal" integer DEFAULT 0 NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"deleted_at" timestamp with time zone,
+	"updated_at" timestamptz DEFAULT now() NOT NULL,
+	"deleted_at" timestamptz,
 	"group_name" text,
 	"value_text_array" text[],
 	"value_date_array" date[],
-	"value_tstz_array" timestamp with time zone[],
+	"value_tstz_array" timestamptz[],
 	"value_plain_datetime" timestamp,
 	"value_interval" interval,
 	"value_text_ascii_fold" text GENERATED ALWAYS AS (ascii_casemap(value_text)) STORED,
 	"value_text_unicode_fold" text GENERATED ALWAYS AS (unicode_casemap_nfc(value_text)) STORED,
-	CONSTRAINT "chk_dav_property_single_value" CHECK (((((((((((((
+	CONSTRAINT "chk_dav_property_single_value" CHECK ((((((((((((((
 CASE
     WHEN (value_text IS NOT NULL) THEN 1
     ELSE 0
@@ -400,10 +213,10 @@ CREATE TABLE "dav_schedule_message" (
 	"status" text DEFAULT 'pending' NOT NULL,
 	"ical_data" text NOT NULL,
 	"diagnostics" jsonb,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"delivered_at" timestamp with time zone,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"deleted_at" timestamp with time zone,
+	"created_at" timestamptz DEFAULT now() NOT NULL,
+	"delivered_at" timestamptz,
+	"updated_at" timestamptz DEFAULT now() NOT NULL,
+	"deleted_at" timestamptz,
 	CONSTRAINT "dav_schedule_message_method_check" CHECK ((method = ANY (ARRAY['REQUEST'::text, 'REPLY'::text, 'CANCEL'::text, 'REFRESH'::text, 'COUNTER'::text, 'DECLINECOUNTER'::text, 'ADD'::text]))),
 	CONSTRAINT "dav_schedule_message_status_check" CHECK ((status = ANY (ARRAY['pending'::text, 'delivered'::text, 'failed'::text])))
 );
@@ -418,8 +231,8 @@ CREATE TABLE "dav_shadow" (
 	"raw_canonical" bytea,
 	"diagnostics" jsonb,
 	"request_id" text,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"deleted_at" timestamp with time zone,
+	"updated_at" timestamptz DEFAULT now() NOT NULL,
+	"deleted_at" timestamptz,
 	CONSTRAINT "chk_dav_shadow_ref" CHECK (((instance_id IS NOT NULL) OR (entity_id IS NOT NULL))),
 	CONSTRAINT "dav_shadow_content_type_check" CHECK ((content_type = ANY (ARRAY['text/calendar'::text, 'text/vcard'::text]))),
 	CONSTRAINT "dav_shadow_direction_check" CHECK ((direction = ANY (ARRAY['inbound'::text, 'outbound'::text])))
@@ -431,7 +244,7 @@ CREATE TABLE "dav_tombstone" (
 	"entity_id" uuid,
 	"synctoken" bigint NOT NULL,
 	"sync_revision" bigint NOT NULL,
-	"deleted_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"deleted_at" timestamptz DEFAULT now() NOT NULL,
 	"last_etag" text,
 	"logical_uid" text,
 	"uri_variants" text[] NOT NULL
@@ -439,7 +252,7 @@ CREATE TABLE "dav_tombstone" (
 --> statement-breakpoint
 CREATE TABLE "group" (
 	"id" uuid PRIMARY KEY DEFAULT uuidv7(),
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamptz DEFAULT now() NOT NULL,
 	"primary_name" uuid,
 	"principal_id" uuid NOT NULL
 );
@@ -448,13 +261,13 @@ CREATE TABLE "group_name" (
 	"id" uuid PRIMARY KEY DEFAULT uuidv7(),
 	"group_id" uuid NOT NULL,
 	"name" text NOT NULL CONSTRAINT "group_name_name_key" UNIQUE,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+	"updated_at" timestamptz DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "membership" (
 	"user_id" uuid,
 	"group_id" uuid,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamptz DEFAULT now() NOT NULL,
 	CONSTRAINT "membership_pkey" PRIMARY KEY("user_id","group_id")
 );
 --> statement-breakpoint
@@ -462,8 +275,8 @@ CREATE TABLE "principal" (
 	"id" uuid PRIMARY KEY DEFAULT uuidv7(),
 	"principal_type" text NOT NULL,
 	"display_name" text,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"deleted_at" timestamp with time zone,
+	"updated_at" timestamptz DEFAULT now() NOT NULL,
+	"deleted_at" timestamptz,
 	"slug" text DEFAULT '' NOT NULL,
 	CONSTRAINT "principal_principal_type_check" CHECK ((principal_type = ANY (ARRAY['user'::text, 'group'::text, 'system'::text, 'public'::text, 'resource'::text])))
 );
@@ -472,7 +285,7 @@ CREATE TABLE "user" (
 	"id" uuid PRIMARY KEY DEFAULT uuidv7(),
 	"name" text NOT NULL,
 	"email" text NOT NULL CONSTRAINT "user_email_key" UNIQUE,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamptz DEFAULT now() NOT NULL,
 	"principal_id" uuid NOT NULL
 );
 --> statement-breakpoint
@@ -535,10 +348,10 @@ CREATE INDEX "idx_dav_shadow_instance" ON "dav_shadow" ("instance_id");--> state
 CREATE INDEX "idx_dav_shadow_request_id" ON "dav_shadow" ("request_id");--> statement-breakpoint
 CREATE INDEX "idx_dav_tombstone_collection" ON "dav_tombstone" ("collection_id");--> statement-breakpoint
 CREATE INDEX "idx_dav_tombstone_deleted_at" ON "dav_tombstone" ("deleted_at");--> statement-breakpoint
-CREATE INDEX "idx_group_name_group_id" ON "group_name" ("group_id");--> statement-breakpoint
-CREATE INDEX "idx_group_name_name" ON "group_name" ("name");--> statement-breakpoint
 CREATE INDEX "idx_group_principal" ON "group" ("principal_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "uq_group_principal_id" ON "group" ("principal_id");--> statement-breakpoint
+CREATE INDEX "idx_group_name_group_id" ON "group_name" ("group_id");--> statement-breakpoint
+CREATE INDEX "idx_group_name_name" ON "group_name" ("name");--> statement-breakpoint
 CREATE INDEX "idx_membership_group_id" ON "membership" ("group_id");--> statement-breakpoint
 CREATE INDEX "idx_membership_user_id" ON "membership" ("user_id");--> statement-breakpoint
 CREATE INDEX "idx_principal_deleted_at" ON "principal" ("deleted_at");--> statement-breakpoint
@@ -548,35 +361,30 @@ CREATE UNIQUE INDEX "unique_principal_slug_per_type" ON "principal" ("principal_
 CREATE INDEX "idx_user_email_active" ON "user" ("email");--> statement-breakpoint
 CREATE INDEX "idx_user_principal" ON "user" ("principal_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "uq_user_principal_id" ON "user" ("principal_id");--> statement-breakpoint
-ALTER TABLE "group" ADD CONSTRAINT "fk_group_principal" FOREIGN KEY ("principal_id") REFERENCES "principal"("id") ON DELETE RESTRICT;--> statement-breakpoint
-ALTER TABLE "group" ADD CONSTRAINT "group_primary_name_fkey" FOREIGN KEY ("primary_name") REFERENCES "group_name"("id") ON DELETE SET NULL;--> statement-breakpoint
-ALTER TABLE "user" ADD CONSTRAINT "fk_user_principal" FOREIGN KEY ("principal_id") REFERENCES "principal"("id") ON DELETE RESTRICT;--> statement-breakpoint
-ALTER TABLE "auth_user" ADD CONSTRAINT "auth_user_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "user"("id") ON DELETE CASCADE;--> statement-breakpoint
-ALTER TABLE "group_name" ADD CONSTRAINT "group_name_group_id_fkey" FOREIGN KEY ("group_id") REFERENCES "group"("id") ON DELETE CASCADE;--> statement-breakpoint
-ALTER TABLE "membership" ADD CONSTRAINT "membership_group_id_fkey" FOREIGN KEY ("group_id") REFERENCES "group"("id") ON DELETE CASCADE;--> statement-breakpoint
-ALTER TABLE "membership" ADD CONSTRAINT "membership_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "user"("id") ON DELETE CASCADE;--> statement-breakpoint
-ALTER TABLE "dav_collection" ADD CONSTRAINT "dav_collection_owner_principal_id_fkey" FOREIGN KEY ("owner_principal_id") REFERENCES "principal"("id") ON DELETE RESTRICT;--> statement-breakpoint
+ALTER TABLE "auth_user" ADD CONSTRAINT "auth_user_user_id_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "user"("id") ON DELETE CASCADE;--> statement-breakpoint
+ALTER TABLE "cal_index" ADD CONSTRAINT "cal_index_entity_id_dav_entity_id_fkey" FOREIGN KEY ("entity_id") REFERENCES "dav_entity"("id") ON DELETE CASCADE;--> statement-breakpoint
+ALTER TABLE "cal_index" ADD CONSTRAINT "cal_index_component_id_dav_component_id_fkey" FOREIGN KEY ("component_id") REFERENCES "dav_component"("id") ON DELETE CASCADE;--> statement-breakpoint
+ALTER TABLE "card_index" ADD CONSTRAINT "card_index_entity_id_dav_entity_id_fkey" FOREIGN KEY ("entity_id") REFERENCES "dav_entity"("id") ON DELETE CASCADE;--> statement-breakpoint
+ALTER TABLE "dav_collection" ADD CONSTRAINT "dav_collection_owner_principal_id_principal_id_fkey" FOREIGN KEY ("owner_principal_id") REFERENCES "principal"("id") ON DELETE RESTRICT;--> statement-breakpoint
 ALTER TABLE "dav_collection" ADD CONSTRAINT "dav_collection_parent_collection_id_fkey" FOREIGN KEY ("parent_collection_id") REFERENCES "dav_collection"("id") ON DELETE CASCADE;--> statement-breakpoint
-ALTER TABLE "dav_instance" ADD CONSTRAINT "dav_instance_collection_id_fkey" FOREIGN KEY ("collection_id") REFERENCES "dav_collection"("id") ON DELETE RESTRICT;--> statement-breakpoint
-ALTER TABLE "dav_instance" ADD CONSTRAINT "dav_instance_entity_id_fkey" FOREIGN KEY ("entity_id") REFERENCES "dav_entity"("id") ON DELETE RESTRICT;--> statement-breakpoint
-ALTER TABLE "dav_tombstone" ADD CONSTRAINT "dav_tombstone_collection_id_fkey" FOREIGN KEY ("collection_id") REFERENCES "dav_collection"("id") ON DELETE RESTRICT;--> statement-breakpoint
-ALTER TABLE "dav_tombstone" ADD CONSTRAINT "dav_tombstone_entity_id_fkey" FOREIGN KEY ("entity_id") REFERENCES "dav_entity"("id") ON DELETE SET NULL;--> statement-breakpoint
-ALTER TABLE "dav_component" ADD CONSTRAINT "dav_component_entity_id_fkey" FOREIGN KEY ("entity_id") REFERENCES "dav_entity"("id") ON DELETE CASCADE;--> statement-breakpoint
+ALTER TABLE "dav_component" ADD CONSTRAINT "dav_component_entity_id_dav_entity_id_fkey" FOREIGN KEY ("entity_id") REFERENCES "dav_entity"("id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "dav_component" ADD CONSTRAINT "dav_component_parent_component_id_fkey" FOREIGN KEY ("parent_component_id") REFERENCES "dav_component"("id") ON DELETE CASCADE;--> statement-breakpoint
-ALTER TABLE "dav_property" ADD CONSTRAINT "dav_property_component_id_fkey" FOREIGN KEY ("component_id") REFERENCES "dav_component"("id") ON DELETE CASCADE;--> statement-breakpoint
-ALTER TABLE "dav_parameter" ADD CONSTRAINT "dav_parameter_property_id_fkey" FOREIGN KEY ("property_id") REFERENCES "dav_property"("id") ON DELETE CASCADE;--> statement-breakpoint
-ALTER TABLE "dav_shadow" ADD CONSTRAINT "dav_shadow_entity_id_fkey" FOREIGN KEY ("entity_id") REFERENCES "dav_entity"("id") ON DELETE CASCADE;--> statement-breakpoint
-ALTER TABLE "dav_shadow" ADD CONSTRAINT "dav_shadow_instance_id_fkey" FOREIGN KEY ("instance_id") REFERENCES "dav_instance"("id") ON DELETE CASCADE;--> statement-breakpoint
-ALTER TABLE "cal_index" ADD CONSTRAINT "cal_index_component_id_fkey" FOREIGN KEY ("component_id") REFERENCES "dav_component"("id") ON DELETE CASCADE;--> statement-breakpoint
-ALTER TABLE "cal_index" ADD CONSTRAINT "cal_index_entity_id_fkey" FOREIGN KEY ("entity_id") REFERENCES "dav_entity"("id") ON DELETE CASCADE;--> statement-breakpoint
-ALTER TABLE "card_index" ADD CONSTRAINT "card_index_entity_id_fkey" FOREIGN KEY ("entity_id") REFERENCES "dav_entity"("id") ON DELETE CASCADE;--> statement-breakpoint
-ALTER TABLE "dav_schedule_message" ADD CONSTRAINT "dav_schedule_message_collection_id_fkey" FOREIGN KEY ("collection_id") REFERENCES "dav_collection"("id") ON DELETE CASCADE;
+ALTER TABLE "dav_instance" ADD CONSTRAINT "dav_instance_collection_id_dav_collection_id_fkey" FOREIGN KEY ("collection_id") REFERENCES "dav_collection"("id") ON DELETE RESTRICT;--> statement-breakpoint
+ALTER TABLE "dav_instance" ADD CONSTRAINT "dav_instance_entity_id_dav_entity_id_fkey" FOREIGN KEY ("entity_id") REFERENCES "dav_entity"("id") ON DELETE RESTRICT;--> statement-breakpoint
+ALTER TABLE "dav_parameter" ADD CONSTRAINT "dav_parameter_property_id_dav_property_id_fkey" FOREIGN KEY ("property_id") REFERENCES "dav_property"("id") ON DELETE CASCADE;--> statement-breakpoint
+ALTER TABLE "dav_property" ADD CONSTRAINT "dav_property_component_id_dav_component_id_fkey" FOREIGN KEY ("component_id") REFERENCES "dav_component"("id") ON DELETE CASCADE;--> statement-breakpoint
+ALTER TABLE "dav_schedule_message" ADD CONSTRAINT "dav_schedule_message_collection_id_dav_collection_id_fkey" FOREIGN KEY ("collection_id") REFERENCES "dav_collection"("id") ON DELETE CASCADE;--> statement-breakpoint
+ALTER TABLE "dav_shadow" ADD CONSTRAINT "dav_shadow_instance_id_dav_instance_id_fkey" FOREIGN KEY ("instance_id") REFERENCES "dav_instance"("id") ON DELETE CASCADE;--> statement-breakpoint
+ALTER TABLE "dav_shadow" ADD CONSTRAINT "dav_shadow_entity_id_dav_entity_id_fkey" FOREIGN KEY ("entity_id") REFERENCES "dav_entity"("id") ON DELETE CASCADE;--> statement-breakpoint
+ALTER TABLE "dav_tombstone" ADD CONSTRAINT "dav_tombstone_collection_id_dav_collection_id_fkey" FOREIGN KEY ("collection_id") REFERENCES "dav_collection"("id") ON DELETE RESTRICT;--> statement-breakpoint
+ALTER TABLE "dav_tombstone" ADD CONSTRAINT "dav_tombstone_entity_id_dav_entity_id_fkey" FOREIGN KEY ("entity_id") REFERENCES "dav_entity"("id") ON DELETE SET NULL;--> statement-breakpoint
+ALTER TABLE "group" ADD CONSTRAINT "group_primary_name_group_name_id_fkey" FOREIGN KEY ("primary_name") REFERENCES "group_name"("id") ON DELETE SET NULL;--> statement-breakpoint
+ALTER TABLE "group" ADD CONSTRAINT "group_principal_id_principal_id_fkey" FOREIGN KEY ("principal_id") REFERENCES "principal"("id") ON DELETE RESTRICT;--> statement-breakpoint
+ALTER TABLE "group_name" ADD CONSTRAINT "group_name_group_id_group_id_fkey" FOREIGN KEY ("group_id") REFERENCES "group"("id") ON DELETE CASCADE;--> statement-breakpoint
+ALTER TABLE "membership" ADD CONSTRAINT "membership_user_id_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "user"("id") ON DELETE CASCADE;--> statement-breakpoint
+ALTER TABLE "membership" ADD CONSTRAINT "membership_group_id_group_id_fkey" FOREIGN KEY ("group_id") REFERENCES "group"("id") ON DELETE CASCADE;--> statement-breakpoint
+ALTER TABLE "user" ADD CONSTRAINT "user_principal_id_principal_id_fkey" FOREIGN KEY ("principal_id") REFERENCES "principal"("id") ON DELETE RESTRICT;
 --> statement-breakpoint
-
--- =============================================================================
--- UPDATED_AT TRIGGERS
--- =============================================================================
-
 CREATE TRIGGER set_updated_at BEFORE UPDATE ON "auth_user" FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 --> statement-breakpoint
 CREATE TRIGGER set_updated_at BEFORE UPDATE ON "cal_index" FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -611,46 +419,7 @@ CREATE TRIGGER set_updated_at BEFORE UPDATE ON "principal" FOR EACH ROW EXECUTE 
 --> statement-breakpoint
 CREATE TRIGGER set_updated_at BEFORE UPDATE ON "user" FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 --> statement-breakpoint
-
--- =============================================================================
--- CARD_INDEX SEARCH_TSV TRIGGER
--- =============================================================================
-
 CREATE TRIGGER card_index_search_tsv_trigger
     BEFORE INSERT OR UPDATE ON "card_index"
     FOR EACH ROW
     EXECUTE FUNCTION update_card_index_search_tsv();
---> statement-breakpoint
-
--- =============================================================================
--- CASBIN STATIC SEED DATA (RFC 3744)
--- =============================================================================
-
--- g2: privilege containment hierarchy (leaf → aggregate, static)
--- Allows a policy granting an aggregate to satisfy a request for a leaf.
-INSERT INTO "casbin_rule" (ptype, v0, v1) VALUES
-    -- DAV:write aggregates its four sub-privileges
-    ('g2', 'DAV:write-properties',              'DAV:write'),
-    ('g2', 'DAV:write-content',                 'DAV:write'),
-    ('g2', 'DAV:bind',                          'DAV:write'),
-    ('g2', 'DAV:unbind',                        'DAV:write'),
-    -- DAV:all aggregates everything
-    ('g2', 'DAV:read',                          'DAV:all'),
-    ('g2', 'DAV:write',                         'DAV:all'),
-    ('g2', 'DAV:write-properties',              'DAV:all'),
-    ('g2', 'DAV:write-content',                 'DAV:all'),
-    ('g2', 'DAV:bind',                          'DAV:all'),
-    ('g2', 'DAV:unbind',                        'DAV:all'),
-    ('g2', 'DAV:unlock',                        'DAV:all'),
-    ('g2', 'DAV:read-acl',                      'DAV:all'),
-    ('g2', 'DAV:read-current-user-privilege-set','DAV:all'),
-    ('g2', 'DAV:write-acl',                     'DAV:all');
---> statement-breakpoint
-
--- g: pseudo-principal hierarchy (static)
--- DAV:authenticated and DAV:unauthenticated both inherit DAV:all,
--- so any principal that the application assigns to either pseudo-principal
--- will transitively match DAV:all policies.
-INSERT INTO "casbin_rule" (ptype, v0, v1) VALUES
-    ('g', 'DAV:authenticated',   'DAV:all'),
-    ('g', 'DAV:unauthenticated', 'DAV:all');
