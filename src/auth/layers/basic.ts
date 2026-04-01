@@ -3,13 +3,13 @@ import { Effect, Layer, Option } from "effect";
 import { AuthService } from "#src/auth/service.ts";
 import { DatabaseClient } from "#src/db/client.ts";
 import { authUser, user } from "#src/db/drizzle/schema/index.ts";
-import {
-	type AuthError,
-	type DatabaseError,
-	databaseError,
-} from "#src/domain/errors.ts";
+import { type AuthError, DatabaseError } from "#src/domain/errors.ts";
 import { PrincipalId, UserId } from "#src/domain/ids.ts";
-import type { AuthResult } from "#src/domain/types/dav.ts";
+import {
+	Authenticated,
+	type AuthResult,
+	Unauthenticated,
+} from "#src/domain/types/dav.ts";
 import { CryptoService } from "#src/platform/crypto.ts";
 
 // ---------------------------------------------------------------------------
@@ -55,7 +55,7 @@ export const BasicAuthLayer = Layer.effect(
 			): Effect.Effect<AuthResult, AuthError | DatabaseError> =>
 				Option.match(parseBasicAuth(headers), {
 					onNone: () =>
-						Effect.succeed<AuthResult>({ _tag: "Unauthenticated" }),
+						Effect.succeed<AuthResult>(new Unauthenticated()),
 					onSome: (creds) =>
 						Effect.gen(function* () {
 							// Look up auth_user row for this username
@@ -77,12 +77,12 @@ export const BasicAuthLayer = Layer.effect(
 											),
 										)
 										.limit(1),
-								catch: (e) => databaseError(e),
+								catch: (e) => new DatabaseError({ cause: e }),
 							});
 
 							const row = rows[0];
 							if (!row?.authCredential) {
-								return { _tag: "Unauthenticated" };
+								return new Unauthenticated();
 							}
 
 							// InternalError from Bun.password is a defect (unexpected), not a domain error
@@ -90,17 +90,16 @@ export const BasicAuthLayer = Layer.effect(
 								.verifyPassword(creds.password, row.authCredential)
 								.pipe(Effect.orDie);
 							if (!valid) {
-								return { _tag: "Unauthenticated" };
+								return new Unauthenticated();
 							}
 
-							return {
-								_tag: "Authenticated",
+							return new Authenticated({
 								principal: {
 									principalId: PrincipalId(row.principalId),
 									userId: UserId(row.userId),
 									displayName: row.name,
 								},
-							};
+							});
 						}),
 				}),
 		});

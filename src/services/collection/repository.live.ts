@@ -2,7 +2,7 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { Effect, Layer, Option } from "effect";
 import { DatabaseClient, type DbClient } from "#src/db/client.ts";
 import { davCollection } from "#src/db/drizzle/schema/index.ts";
-import { databaseError } from "#src/domain/errors.ts";
+import { DatabaseError } from "#src/domain/errors.ts";
 import type { CollectionId, PrincipalId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
 import { CollectionRepository, type NewCollection } from "./repository.ts";
@@ -20,7 +20,7 @@ const findById = (db: DbClient, id: CollectionId) =>
 				.where(and(eq(davCollection.id, id), isNull(davCollection.deletedAt)))
 				.limit(1)
 				.then((r) => Option.fromNullable(r[0])),
-		catch: (e) => databaseError(e),
+		catch: (e) => new DatabaseError({ cause: e }),
 	});
 
 const findBySlug = (db: DbClient, ownerPrincipalId: PrincipalId, slug: Slug) =>
@@ -38,7 +38,7 @@ const findBySlug = (db: DbClient, ownerPrincipalId: PrincipalId, slug: Slug) =>
 				)
 				.limit(1)
 				.then((r) => Option.fromNullable(r[0])),
-		catch: (e) => databaseError(e),
+		catch: (e) => new DatabaseError({ cause: e }),
 	});
 
 const listByOwner = (db: DbClient, ownerPrincipalId: PrincipalId) =>
@@ -53,7 +53,7 @@ const listByOwner = (db: DbClient, ownerPrincipalId: PrincipalId) =>
 						isNull(davCollection.deletedAt),
 					),
 				),
-		catch: (e) => databaseError(e),
+		catch: (e) => new DatabaseError({ cause: e }),
 	});
 
 const insert = (db: DbClient, input: NewCollection) =>
@@ -79,7 +79,7 @@ const insert = (db: DbClient, input: NewCollection) =>
 					}
 					return row;
 				}),
-		catch: (e) => databaseError(e),
+		catch: (e) => new DatabaseError({ cause: e }),
 	});
 
 const softDelete = (db: DbClient, id: CollectionId) =>
@@ -90,7 +90,7 @@ const softDelete = (db: DbClient, id: CollectionId) =>
 				.set({ deletedAt: sql`now()` })
 				.where(eq(davCollection.id, id))
 				.then(() => undefined),
-		catch: (e) => databaseError(e),
+		catch: (e) => new DatabaseError({ cause: e }),
 	});
 
 export const CollectionRepositoryLive = Layer.effect(

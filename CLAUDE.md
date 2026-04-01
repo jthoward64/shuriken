@@ -18,7 +18,7 @@ All application logic must use [Effect](https://effect.website) (`effect` packag
 - Represent all operations as `Effect<A, E, R>` — never throw, never return bare `Promise`.
 - Write logic in small composable functions and effects.
 - Write wrappers for external APIs (HTTP, DB, file system) that return `Effect`.
-- Model errors as typed tagged unions (e.g. `{ _tag: "NotFound" }`), not raw `Error` subclasses.
+- Model errors as `Data.TaggedError` classes (e.g. `class NotFound extends Data.TaggedError("NotFound")<{ ... }> {}`); never use plain `{ _tag }` object literals or raw `Error` subclasses.
 - Use `Effect.Service` / `Context.Tag` for dependency injection; never import service implementations directly in business logic.
 - Use `Layer` to compose and provide dependencies at the application boundary.
 - Prefer `Schema` from `effect` for runtime validation and parsing at system boundaries (incoming requests, DB results).

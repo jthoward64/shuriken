@@ -2,7 +2,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { Effect, Layer, Option } from "effect";
 import { DatabaseClient } from "#src/db/client.ts";
 import { principal, user } from "#src/db/drizzle/schema/index.ts";
-import { databaseError } from "#src/domain/errors.ts";
+import { DatabaseError } from "#src/domain/errors.ts";
 import type { PrincipalId, UserId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
 import type { Email } from "#src/domain/types/strings.ts";
@@ -36,7 +36,7 @@ export const PrincipalRepositoryLive = Layer.effect(
 						.where(and(eq(principal.id, id), isNull(principal.deletedAt)))
 						.limit(1)
 						.then((r) => Option.fromNullable(r[0])),
-				catch: (e) => databaseError(e),
+				catch: (e) => new DatabaseError({ cause: e }),
 			});
 
 		const findBySlug = (
@@ -58,7 +58,7 @@ export const PrincipalRepositoryLive = Layer.effect(
 								r[0] ? { principal: r[0].principal, user: r[0].user } : null,
 							),
 						),
-				catch: (e) => databaseError(e),
+				catch: (e) => new DatabaseError({ cause: e }),
 			});
 
 		const findByEmail = (
@@ -80,7 +80,7 @@ export const PrincipalRepositoryLive = Layer.effect(
 								r[0] ? { principal: r[0].principal, user: r[0].user } : null,
 							),
 						),
-				catch: (e) => databaseError(e),
+				catch: (e) => new DatabaseError({ cause: e }),
 			});
 
 		const findUserByUserId = (
@@ -97,7 +97,7 @@ export const PrincipalRepositoryLive = Layer.effect(
 						.where(eq(user.id, id))
 						.limit(1)
 						.then((r) => Option.fromNullable(r[0])),
-				catch: (e) => databaseError(e),
+				catch: (e) => new DatabaseError({ cause: e }),
 			});
 
 		return PrincipalRepository.of({

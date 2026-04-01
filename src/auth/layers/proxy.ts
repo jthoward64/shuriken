@@ -3,9 +3,13 @@ import { Config, Effect, Layer, Option } from "effect";
 import { AuthService } from "#src/auth/service.ts";
 import { DatabaseClient } from "#src/db/client.ts";
 import { user } from "#src/db/drizzle/schema/index.ts";
-import { type DatabaseError, databaseError } from "#src/domain/errors.ts";
+import { DatabaseError } from "#src/domain/errors.ts";
 import { PrincipalId, UserId } from "#src/domain/ids.ts";
-import type { AuthResult } from "#src/domain/types/dav.ts";
+import {
+	Authenticated,
+	type AuthResult,
+	Unauthenticated,
+} from "#src/domain/types/dav.ts";
 
 // ---------------------------------------------------------------------------
 // Proxy auth layer
@@ -53,12 +57,12 @@ export const ProxyAuthLayer = Layer.effect(
 				Effect.gen(function* () {
 					// If the request doesn't come from a trusted proxy, ignore the header
 					if (!isClientTrusted(clientIp, trustedProxies)) {
-						return { _tag: "Unauthenticated" };
+						return new Unauthenticated();
 					}
 
 					const username = headers.get(proxyHeader);
 					if (!username) {
-						return { _tag: "Unauthenticated" };
+						return new Unauthenticated();
 					}
 
 					const rows = yield* Effect.tryPromise({
@@ -72,22 +76,21 @@ export const ProxyAuthLayer = Layer.effect(
 								.from(user)
 								.where(eq(user.email, username))
 								.limit(1),
-						catch: (e) => databaseError(e),
+						catch: (e) => new DatabaseError({ cause: e }),
 					});
 
 					const row = rows[0];
 					if (!row) {
-						return { _tag: "Unauthenticated" };
+						return new Unauthenticated();
 					}
 
-					return {
-						_tag: "Authenticated",
+					return new Authenticated({
 						principal: {
 							principalId: PrincipalId(row.principalId),
 							userId: UserId(row.userId),
 							displayName: row.name,
 						},
-					};
+					});
 				}),
 		});
 	}),

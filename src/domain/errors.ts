@@ -1,57 +1,36 @@
+import { Data, Effect, Option } from "effect";
+import {
+	HTTP_BAD_REQUEST,
+	HTTP_CONFLICT,
+	HTTP_FORBIDDEN,
+	HTTP_METHOD_NOT_ALLOWED,
+	HTTP_NOT_FOUND,
+	type HttpStatus,
+} from "#src/http/status.ts";
+
 // ---------------------------------------------------------------------------
 // Infrastructure errors — typed, non-DAV
 // ---------------------------------------------------------------------------
 
-export interface DatabaseError {
-	readonly _tag: "DatabaseError";
+export class DatabaseError extends Data.TaggedError("DatabaseError")<{
 	readonly cause: unknown;
-}
+}> {}
 
-export interface AuthError {
-	readonly _tag: "AuthError";
+export class AuthError extends Data.TaggedError("AuthError")<{
 	readonly reason: string;
-}
+}> {}
 
-export interface XmlParseError {
-	readonly _tag: "XmlParseError";
+export class XmlParseError extends Data.TaggedError("XmlParseError")<{
 	readonly cause: unknown;
-}
+}> {}
 
-export interface InternalError {
-	readonly _tag: "InternalError";
+export class InternalError extends Data.TaggedError("InternalError")<{
 	readonly cause: unknown;
-}
+}> {}
 
-export interface ConfigError {
-	readonly _tag: "ConfigError";
+export class ConfigError extends Data.TaggedError("ConfigError")<{
 	readonly key: string;
-}
-
-// Constructors
-export const databaseError = (cause: unknown): DatabaseError => ({
-	_tag: "DatabaseError",
-	cause,
-});
-
-export const authError = (reason: string): AuthError => ({
-	_tag: "AuthError",
-	reason,
-});
-
-export const xmlParseError = (cause: unknown): XmlParseError => ({
-	_tag: "XmlParseError",
-	cause,
-});
-
-export const internalError = (cause: unknown): InternalError => ({
-	_tag: "InternalError",
-	cause,
-});
-
-export const configError = (key: string): ConfigError => ({
-	_tag: "ConfigError",
-	key,
-});
+}> {}
 
 // ---------------------------------------------------------------------------
 // DAV precondition / postcondition XML element names (per RFC)
@@ -114,27 +93,17 @@ export type DavPrecondition =
 // DAV protocol error — carries HTTP status + optional precondition element
 // ---------------------------------------------------------------------------
 
-import {
-	HTTP_BAD_REQUEST,
-	HTTP_CONFLICT,
-	HTTP_FORBIDDEN,
-	HTTP_METHOD_NOT_ALLOWED,
-	HTTP_NOT_FOUND,
-	type HttpStatus,
-} from "#src/http/status.ts";
-
-export interface DavError {
-	readonly _tag: "DavError";
+export class DavError extends Data.TaggedError("DavError")<{
 	readonly status: HttpStatus;
 	readonly precondition?: DavPrecondition;
 	readonly message?: string;
-}
+}> {}
 
 export const davError = (
 	status: HttpStatus,
 	precondition?: DavPrecondition,
 	message?: string,
-): DavError => ({ _tag: "DavError", status, precondition, message });
+): DavError => new DavError({ status, precondition, message });
 
 // Common shortcuts
 export const notFound = (message?: string): DavError =>
@@ -165,8 +134,6 @@ export const validAddressData = (message?: string): DavError =>
 // ---------------------------------------------------------------------------
 // Effect helpers for common Option → DavError patterns
 // ---------------------------------------------------------------------------
-
-import { Effect, Option } from "effect";
 
 /**
  * Unwrap an Option, failing with a 404 DavError if it is None.

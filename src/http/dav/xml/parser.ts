@@ -1,7 +1,6 @@
 import { Effect } from "effect";
 import { XMLParser } from "fast-xml-parser";
-import type { XmlParseError } from "#src/domain/errors.ts";
-import { xmlParseError } from "#src/domain/errors.ts";
+import { XmlParseError } from "#src/domain/errors.ts";
 
 // ---------------------------------------------------------------------------
 // Effect-wrapped XML parser
@@ -24,5 +23,5 @@ const parser = new XMLParser({
 export const parseXml = (body: string): Effect.Effect<unknown, XmlParseError> =>
 	Effect.try({
 		try: () => parser.parse(body) as unknown,
-		catch: (e) => xmlParseError(e),
+		catch: (e) => new XmlParseError({ cause: e }),
 	});

@@ -3,9 +3,9 @@ import { Config, Effect, Layer, Option } from "effect";
 import { AuthService } from "#src/auth/service.ts";
 import { DatabaseClient } from "#src/db/client.ts";
 import { user } from "#src/db/drizzle/schema/index.ts";
-import type { AuthError, DatabaseError } from "#src/domain/errors.ts";
-import { authError, databaseError } from "#src/domain/errors.ts";
+import { AuthError, DatabaseError } from "#src/domain/errors.ts";
 import { PrincipalId, UserId } from "#src/domain/ids.ts";
+import { Authenticated } from "#src/domain/types/dav.ts";
 import type { AuthenticatedPrincipal } from "#src/domain/types/dav.ts";
 import { Email } from "#src/domain/types/strings.ts";
 
@@ -36,7 +36,7 @@ const resolvePrincipal = (
 						Option.getOrUndefined(Option.map(email, (e) => eq(user.email, e))),
 					)
 					.limit(1),
-			catch: (e) => databaseError(e),
+			catch: (e) => new DatabaseError({ cause: e }),
 		});
 
 		const row = rows[0];
@@ -48,14 +48,12 @@ const resolvePrincipal = (
 			};
 		}
 
-		return yield* Effect.fail(
-			authError(
-				Option.match(email, {
-					onSome: (e) => `Single-user principal not found for email: ${e}`,
-					onNone: () => "No users found in database for single-user mode",
-				}),
-			),
-		);
+		return yield* new AuthError({
+			reason: Option.match(email, {
+				onSome: (e) => `Single-user principal not found for email: ${e}`,
+				onNone: () => "No users found in database for single-user mode",
+			}),
+		});
 	});
 
 export const SingleUserAuthLayer = Layer.effect(
@@ -72,7 +70,7 @@ export const SingleUserAuthLayer = Layer.effect(
 
 		return AuthService.of({
 			authenticate: (_headers, _clientIp) =>
-				Effect.succeed({ _tag: "Authenticated" as const, principal }),
+				Effect.succeed(new Authenticated({ principal })),
 		});
 	}),
 );

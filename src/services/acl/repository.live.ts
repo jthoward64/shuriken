@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { Effect, Layer } from "effect";
 import { DatabaseClient, type DbClient } from "#src/db/client.ts";
 import { casbinRule } from "#src/db/drizzle/schema/index.ts";
-import { databaseError } from "#src/domain/errors.ts";
+import { DatabaseError } from "#src/domain/errors.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
 import type { ResourceUrl } from "#src/domain/types/path.ts";
 import { AclRepository, type PolicyRule, type RoleRule } from "./repository.ts";
@@ -18,7 +18,7 @@ const getRulesForResource = (db: DbClient, resourceUrl: ResourceUrl) =>
 				.select()
 				.from(casbinRule)
 				.where(and(eq(casbinRule.ptype, "p"), eq(casbinRule.v1, resourceUrl))),
-		catch: (e) => databaseError(e),
+		catch: (e) => new DatabaseError({ cause: e }),
 	});
 
 const insertRule = (db: DbClient, rule: PolicyRule | RoleRule) =>
@@ -51,7 +51,7 @@ const insertRule = (db: DbClient, rule: PolicyRule | RoleRule) =>
 				})
 				.then(() => undefined);
 		},
-		catch: (e) => databaseError(e),
+		catch: (e) => new DatabaseError({ cause: e }),
 	});
 
 const deleteRulesForResource = (db: DbClient, resourceUrl: ResourceUrl) =>
@@ -61,7 +61,7 @@ const deleteRulesForResource = (db: DbClient, resourceUrl: ResourceUrl) =>
 				.delete(casbinRule)
 				.where(and(eq(casbinRule.ptype, "p"), eq(casbinRule.v1, resourceUrl)))
 				.then(() => undefined),
-		catch: (e) => databaseError(e),
+		catch: (e) => new DatabaseError({ cause: e }),
 	});
 
 const hasAllow = (
@@ -86,7 +86,7 @@ const hasAllow = (
 				)
 				.limit(1)
 				.then((r) => r.length > 0),
-		catch: (e) => databaseError(e),
+		catch: (e) => new DatabaseError({ cause: e }),
 	});
 
 export const AclRepositoryLive = Layer.effect(

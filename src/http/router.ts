@@ -1,4 +1,4 @@
-import { Effect, Option } from "effect";
+import { Effect, Match, Option } from "effect";
 import { AuthService } from "#src/auth/service.ts";
 import type { AppError } from "#src/domain/errors.ts";
 import {
@@ -69,42 +69,36 @@ const davErrorBody = (precondition: string): Effect.Effect<string, never> => {
 };
 
 /** Map any AppError to a Response. */
-const mapErrorToResponse = (err: AppError): Effect.Effect<Response, never> => {
-	switch (err._tag) {
-		case "DavError": {
-			if (!err.precondition) {
-				return Effect.succeed(
-					new Response(err.message ?? null, { status: err.status }),
-				);
-			}
-			return Effect.flatMap(davErrorBody(err.precondition), (body) =>
-				Effect.succeed(
-					new Response(body, {
-						status: err.status,
-						headers: { "Content-Type": "application/xml; charset=utf-8" },
-					}),
-				),
-			);
-		}
-		case "AuthError":
-			return Effect.succeed(
+const mapErrorToResponse = (err: AppError): Effect.Effect<Response, never> =>
+	Match.value(err).pipe(
+		Match.tag("DavError", (e) =>
+			e.precondition
+				? Effect.flatMap(davErrorBody(e.precondition), (body) =>
+						Effect.succeed(
+							new Response(body, {
+								status: e.status,
+								headers: { "Content-Type": "application/xml; charset=utf-8" },
+							}),
+						),
+					)
+				: Effect.succeed(new Response(e.message ?? null, { status: e.status })),
+		),
+		Match.tag("AuthError", () =>
+			Effect.succeed(
 				new Response("Unauthorized", {
 					status: 401,
 					headers: { "WWW-Authenticate": 'Basic realm="shuriken"' },
 				}),
-			);
-		case "XmlParseError":
-			return Effect.succeed(
-				new Response("Bad Request: invalid XML", { status: 400 }),
-			);
-		case "DatabaseError":
-		case "InternalError":
-		case "ConfigError":
-			return Effect.succeed(
-				new Response("Internal Server Error", { status: 500 }),
-			);
-	}
-};
+			),
+		),
+		Match.tag("XmlParseError", () =>
+			Effect.succeed(new Response("Bad Request: invalid XML", { status: 400 })),
+		),
+		Match.tag("DatabaseError", "InternalError", "ConfigError", () =>
+			Effect.succeed(new Response("Internal Server Error", { status: 500 })),
+		),
+		Match.exhaustive,
+	);
 
 /**
  * Main request handler — entry point for every HTTP request.

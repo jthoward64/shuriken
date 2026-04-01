@@ -1,3 +1,4 @@
+import { Data } from "effect";
 import type { PrincipalId, UserId } from "#src/domain/ids.ts";
 
 // ---------------------------------------------------------------------------
@@ -60,12 +61,13 @@ export interface AuthenticatedPrincipal {
 // Defined here (not in auth/) so services can use it without depending on auth/
 // ---------------------------------------------------------------------------
 
-export type AuthResult =
-	| {
-			readonly _tag: "Authenticated";
-			readonly principal: AuthenticatedPrincipal;
-	  }
-	| { readonly _tag: "Unauthenticated" };
+export class Authenticated extends Data.TaggedClass("Authenticated")<{
+	readonly principal: AuthenticatedPrincipal;
+}> {}
+
+export class Unauthenticated extends Data.TaggedClass("Unauthenticated")<Record<never, never>> {}
+
+export type AuthResult = Authenticated | Unauthenticated;
 
 // ---------------------------------------------------------------------------
 // DAV privilege names (RFC 3744 + CalDAV + CardDAV)
