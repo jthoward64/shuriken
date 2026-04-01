@@ -16,14 +16,14 @@ export const InstanceServiceLive = Layer.effect(
 
 		return InstanceService.of({
 			findById: (id: InstanceId) =>
-				repo.findById(id).pipe(
-					Effect.flatMap(someOrNotFound(`Instance not found: ${id}`)),
-				),
+				repo
+					.findById(id)
+					.pipe(Effect.flatMap(someOrNotFound(`Instance not found: ${id}`))),
 
 			findBySlug: (collectionId: CollectionId, slug: Slug) =>
-				repo.findBySlug(collectionId, slug).pipe(
-					Effect.flatMap(someOrNotFound(`Instance not found: ${slug}`)),
-				),
+				repo
+					.findBySlug(collectionId, slug)
+					.pipe(Effect.flatMap(someOrNotFound(`Instance not found: ${slug}`))),
 
 			listByCollection: (collectionId: CollectionId) =>
 				repo.listByCollection(collectionId),
@@ -32,16 +32,24 @@ export const InstanceServiceLive = Layer.effect(
 				Effect.gen(function* () {
 					if (existingId) {
 						// Update existing instance etag + revision
-						const existing = yield* repo.findById(existingId).pipe(
-							Effect.flatMap(someOrNotFound(`Instance not found: ${existingId}`)),
-						);
+						const existing = yield* repo
+							.findById(existingId)
+							.pipe(
+								Effect.flatMap(
+									someOrNotFound(`Instance not found: ${existingId}`),
+								),
+							);
 						const newRevision = existing.syncRevision + 1;
 						yield* repo.updateEtag(existingId, input.etag, newRevision);
-						return yield* repo.findById(existingId).pipe(
-							Effect.flatMap(
-								someOrNotFound(`Instance not found after update: ${existingId}`),
-							),
-						);
+						return yield* repo
+							.findById(existingId)
+							.pipe(
+								Effect.flatMap(
+									someOrNotFound(
+										`Instance not found after update: ${existingId}`,
+									),
+								),
+							);
 					}
 					return yield* repo.insert(input);
 				}),

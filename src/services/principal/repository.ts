@@ -22,7 +22,7 @@ export interface PrincipalWithUser {
 export interface PrincipalRepositoryShape {
 	readonly findById: (
 		id: PrincipalId,
-	) => Effect.Effect<Option.Option<PrincipalRow>, DatabaseError>;
+	) => Effect.Effect<Option.Option<PrincipalWithUser>, DatabaseError>;
 	readonly findBySlug: (
 		slug: Slug,
 	) => Effect.Effect<Option.Option<PrincipalWithUser>, DatabaseError>;

@@ -16,14 +16,16 @@ export const CollectionServiceLive = Layer.effect(
 
 		return CollectionService.of({
 			findById: (id: CollectionId) =>
-				repo.findById(id).pipe(
-					Effect.flatMap(someOrNotFound(`Collection not found: ${id}`)),
-				),
+				repo
+					.findById(id)
+					.pipe(Effect.flatMap(someOrNotFound(`Collection not found: ${id}`))),
 
 			findBySlug: (ownerPrincipalId: PrincipalId, slug: Slug) =>
-				repo.findBySlug(ownerPrincipalId, slug).pipe(
-					Effect.flatMap(someOrNotFound(`Collection not found: ${slug}`)),
-				),
+				repo
+					.findBySlug(ownerPrincipalId, slug)
+					.pipe(
+						Effect.flatMap(someOrNotFound(`Collection not found: ${slug}`)),
+					),
 
 			listByOwner: (ownerPrincipalId: PrincipalId) =>
 				repo.listByOwner(ownerPrincipalId),

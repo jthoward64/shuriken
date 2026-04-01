@@ -1,6 +1,6 @@
-import Builder from "fast-xml-builder";
-import type { XMLBuilder } from "fast-xml-builder";
 import { Effect } from "effect";
+import type { XMLBuilder } from "fast-xml-builder";
+import Builder from "fast-xml-builder";
 
 // ---------------------------------------------------------------------------
 // Effect-wrapped XML builder

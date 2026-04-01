@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { index, pgTable, text, unique, uuid } from "drizzle-orm/pg-core";
-import { timestampTz } from "./types";
+import { redactedText, timestampTz } from "./types";
 import { user } from "./user";
 
 export const authUser = pgTable(
@@ -13,7 +13,7 @@ export const authUser = pgTable(
 		authSource: text("auth_source").notNull(),
 		authId: text("auth_id").notNull(),
 		updatedAt: timestampTz("updated_at").default(sql`now()`).notNull(),
-		authCredential: text("auth_credential"),
+		authCredential: redactedText("auth_credential"),
 	},
 	(table) => [
 		index("idx_auth_user_auth_source_auth_id").using(

@@ -8,7 +8,6 @@ import type { Slug } from "#src/domain/types/path.ts";
 import type { Email } from "#src/domain/types/strings.ts";
 import {
 	PrincipalRepository,
-	type PrincipalRow,
 	type PrincipalWithUser,
 	type UserRow,
 } from "./repository.ts";
@@ -25,7 +24,7 @@ export const PrincipalRepositoryLive = Layer.effect(
 		const findById = (
 			id: PrincipalId,
 		): Effect.Effect<
-			Option.Option<PrincipalRow>,
+			Option.Option<PrincipalWithUser>,
 			import("#src/domain/errors.ts").DatabaseError
 		> =>
 			Effect.tryPromise({
@@ -33,9 +32,14 @@ export const PrincipalRepositoryLive = Layer.effect(
 					db
 						.select()
 						.from(principal)
+						.innerJoin(user, eq(user.principalId, principal.id))
 						.where(and(eq(principal.id, id), isNull(principal.deletedAt)))
 						.limit(1)
-						.then((r) => Option.fromNullable(r[0])),
+						.then((r) =>
+							Option.fromNullable(
+								r[0] ? { principal: r[0].principal, user: r[0].user } : null,
+							),
+						),
 				catch: (e) => new DatabaseError({ cause: e }),
 			});
 

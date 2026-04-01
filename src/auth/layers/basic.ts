@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import { Effect, Layer, Option } from "effect";
+import { Effect, Layer, Option, Redacted } from "effect";
 import { AuthService } from "#src/auth/service.ts";
 import { DatabaseClient } from "#src/db/client.ts";
 import { authUser, user } from "#src/db/drizzle/schema/index.ts";
@@ -23,7 +23,7 @@ const BASIC_PREFIX = "Basic ";
 
 const parseBasicAuth = (
 	headers: Headers,
-): Option.Option<{ username: string; password: string }> => {
+): Option.Option<{ username: string; password: Redacted.Redacted<string> }> => {
 	const authorization = headers.get("Authorization");
 	if (!authorization?.startsWith(BASIC_PREFIX)) {
 		return Option.none();
@@ -38,7 +38,7 @@ const parseBasicAuth = (
 
 	return Option.some({
 		username: decoded.slice(0, colonIdx),
-		password: decoded.slice(colonIdx + 1),
+		password: Redacted.make(decoded.slice(colonIdx + 1)),
 	});
 };
 

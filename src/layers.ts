@@ -2,11 +2,13 @@ import { Layer } from "effect";
 import { selectAuthLayer } from "#src/auth/index.ts";
 import { AppConfigLive } from "#src/config.ts";
 import { type DatabaseClient, DatabaseClientLive } from "#src/db/client.ts";
-import { CryptoServiceLive } from "#src/platform/crypto.ts";
+import { type CryptoService, CryptoServiceLive } from "#src/platform/crypto.ts";
 import { AclDomainLayer } from "#src/services/acl/index.ts";
 import { CollectionDomainLayer } from "#src/services/collection/index.ts";
+import { GroupDomainLayer } from "#src/services/group/index.ts";
 import { InstanceDomainLayer } from "#src/services/instance/index.ts";
 import { PrincipalDomainLayer } from "#src/services/principal/index.ts";
+import { UserDomainLayer } from "#src/services/user/index.ts";
 
 // ---------------------------------------------------------------------------
 // Infrastructure layer — foundational services shared by all domain layers
@@ -33,7 +35,7 @@ export const AuthLayer = Layer.unwrapEffect(selectAuthLayer).pipe(
 // Domain layer helper — each domain layer needs DatabaseClient from InfraLayer
 // ---------------------------------------------------------------------------
 
-const withInfra = <A, E>(layer: Layer.Layer<A, E, DatabaseClient>) =>
+const withInfra = <A, E>(layer: Layer.Layer<A, E, DatabaseClient | CryptoService>) =>
 	layer.pipe(Layer.provide(InfraLayer));
 
 // ---------------------------------------------------------------------------
@@ -51,6 +53,8 @@ export const AppLayer = Layer.mergeAll(
 	withInfra(CollectionDomainLayer),
 	withInfra(InstanceDomainLayer),
 	withInfra(AclDomainLayer),
+	withInfra(UserDomainLayer),
+	withInfra(GroupDomainLayer),
 );
 
 // ---------------------------------------------------------------------------
@@ -70,6 +74,14 @@ export {
 	InstanceService,
 } from "#src/services/instance/index.ts";
 export {
+	GroupRepository,
+	GroupService,
+} from "#src/services/group/index.ts";
+export {
 	PrincipalRepository,
 	PrincipalService,
 } from "#src/services/principal/index.ts";
+export {
+	UserRepository,
+	UserService,
+} from "#src/services/user/index.ts";

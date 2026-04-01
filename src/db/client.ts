@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/bun-sql";
 import type { BunSQLDatabase } from "drizzle-orm/bun-sql/postgres/driver";
-import { Effect } from "effect";
+import { Effect, Redacted } from "effect";
 import { AppConfigService } from "#src/config.ts";
 import * as schema from "./drizzle/schema/index.ts";
 
@@ -17,10 +17,11 @@ export type DbClient = BunSQLDatabase<typeof schema>;
 export class DatabaseClient extends Effect.Service<DatabaseClient>()(
 	"DatabaseClient",
 	{
-		accessors: true,
 		effect: Effect.gen(function* () {
-			const { database: { url } } = yield* AppConfigService;
-			return drizzle(url, { schema });
+			const {
+				database: { url },
+			} = yield* AppConfigService;
+			return drizzle(Redacted.value(url), { schema });
 		}),
 	},
 ) {}

@@ -1,4 +1,5 @@
 import { customType } from "drizzle-orm/pg-core";
+import { Redacted } from "effect";
 import { Temporal } from "temporal-polyfill";
 
 /** TIMESTAMPTZ → Temporal.Instant (absolute point in time) */
@@ -57,4 +58,14 @@ export const tsvector = customType<{ data: string }>({
 /** bytea → Buffer */
 export const bytea = customType<{ data: Buffer; driverData: Buffer }>({
 	dataType: () => "bytea",
+});
+
+/** text → Redacted<string> — prevents sensitive values from appearing in logs */
+export const redactedText = customType<{
+	data: Redacted.Redacted<string>;
+	driverData: string;
+}>({
+	dataType: () => "text",
+	fromDriver: (value) => Redacted.make(value),
+	toDriver: (value) => Redacted.value(value),
 });
