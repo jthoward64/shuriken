@@ -88,10 +88,17 @@ const hasAllow = (
 		catch: (e) => databaseError(e),
 	});
 
+const getAllRules = (db: DbClient) =>
+	Effect.tryPromise({
+		try: () => db.select().from(casbinRule),
+		catch: (e) => databaseError(e),
+	});
+
 export const AclRepositoryLive = Layer.effect(
 	AclRepository,
 	Effect.map(DatabaseClient, (db) =>
 		AclRepository.of({
+			getAllRules: () => getAllRules(db),
 			getRulesForResource: (url) => getRulesForResource(db, url),
 			insertRule: (rule) => insertRule(db, rule),
 			deleteRulesForResource: (url) => deleteRulesForResource(db, url),

@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { Config, Effect, Layer } from "effect";
+import { getOrUndefined } from "effect/Option";
 import { AuthService } from "#src/auth/service.ts";
 import { DatabaseClient } from "#src/db/client.ts";
 import { user } from "#src/db/drizzle/schema/index.ts";
@@ -61,7 +62,7 @@ export const SingleUserAuthLayer = Layer.effect(
 		const emailOpt = yield* Config.string("SINGLE_USER_EMAIL").pipe(
 			Config.option,
 		);
-		const email = emailOpt._tag === "Some" ? emailOpt.value : undefined;
+		const email = getOrUndefined(emailOpt);
 
 		// Resolve principal at layer-build time — cached for all requests
 		const principal = yield* resolvePrincipal(db, email);

@@ -31,6 +31,10 @@ export interface RoleRule {
 }
 
 export interface AclRepositoryShape {
+	readonly getAllRules: () => Effect.Effect<
+		ReadonlyArray<CasbinRuleRow>,
+		DatabaseError
+	>;
 	readonly getRulesForResource: (
 		resourceUrl: string,
 	) => Effect.Effect<ReadonlyArray<CasbinRuleRow>, DatabaseError>;

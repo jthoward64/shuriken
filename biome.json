@@ -79,9 +79,7 @@
 			"quoteStyle": "double",
 			"semicolons": "always"
 		},
-		"globals": [
-			"Bun"
-		]
+		"globals": ["Bun"]
 	},
 	"assist": {
 		"enabled": true,

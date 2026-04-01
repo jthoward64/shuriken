@@ -219,7 +219,7 @@ r = sub, res, act
 
 ```ini
 [policy_effect]
-e = priority(p.eft) == allow
+e = priority(p.eft) || deny
 ```
 
 The Casbin `priority` effect evaluates policies in ascending priority order. The
@@ -231,13 +231,13 @@ RFC's first-applicable ordered ACE evaluation.
 ```ini
 [matchers]
 m = (g(r.sub, p.sub) || r.sub == p.sub) \
-    && keyMatch2(r.res, p.res) \
+    && globMatch(r.res, p.res) \
     && (r.act == p.act || g2(r.act, p.act))
 ```
 
 Breakdown:
 - `g(r.sub, p.sub) || r.sub == p.sub` — the requesting principal is the named principal or a member of it (direct or transitive group membership). Because `DAV:authenticated` and `DAV:unauthenticated` are loaded as roles of real principals, they are matched here automatically. `DAV:all` matches everyone because all principals ultimately inherit `DAV:all` via `g`.
-- `keyMatch2(r.res, p.res)` — resource path matching; supports wildcards for collection-level policies (e.g., `/papers/{*}` to cover all members of a collection).
+- `globMatch(r.res, p.res)` — resource path matching using minimatch glob semantics. `*` matches within a single path segment; `**` matches across segments recursively. Use `/papers/**` to cover all members and sub-collections of a collection, or `/papers/*` to cover only direct children. Exact paths (no wildcards) match only that resource. A collection itself (`/papers/`) does not match `/papers/**` or `/papers/*`, so the collection's own ACE and member ACEs are separate rows.
 - `r.act == p.act || g2(r.act, p.act)` — the requested privilege is the same as the policy privilege, or the requested privilege is a sub-privilege of an aggregate granted by the policy.
 
 ---
@@ -256,11 +256,11 @@ g = _, _
 g2 = _, _
 
 [policy_effect]
-e = priority(p.eft) == allow
+e = priority(p.eft) || deny
 
 [matchers]
 m = (g(r.sub, p.sub) || r.sub == p.sub) \
-    && keyMatch2(r.res, p.res) \
+    && globMatch(r.res, p.res) \
     && (r.act == p.act || g2(r.act, p.act))
 ```
 
@@ -444,11 +444,13 @@ Query `(principal:anonymous, /papers/, DAV:read)` (anonymous is unauthenticated)
    in `DAV:acl-restrictions` to avoid this complexity, or implement a full
    application-side negation evaluator?
 
-2. **Resource wildcards for collection ACLs**: Should collection ACLs use
-   `keyMatch2` patterns like `/papers/{*}` to cover all members, or should each
-   member resource get its own explicit policy rows populated at creation time?
-   The latter is more precise but writes more rows; the former requires the pattern
-   syntax to correctly scope inheritance.
+2. **Resource wildcards for collection ACLs**: Collection ACLs use `globMatch`
+   patterns. `/papers/**` covers all members and sub-collections recursively;
+   `/papers/*` covers only direct children (one level). The collection itself
+   (`/papers/`) does not match either wildcard, so it always needs its own
+   explicit row. Per-item override rows must be assigned a lower priority number
+   than the collection wildcard rows they override — this ordering convention must
+   be enforced by the application layer when writing policy rows.
 
 3. **Priority renumbering**: What gap size to use for ACE priorities, and what is
    the strategy when a gap is exhausted (batch renumber vs. fractional priority)?

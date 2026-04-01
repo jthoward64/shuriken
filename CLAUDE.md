@@ -26,6 +26,8 @@ All application logic must use [Effect](https://effect.website) (`effect` packag
 - Use `FiberRef` or `Span` to propagate request-scoped context (e.g. `requestId`) through the effect system for traceability.
 - Use `Effect.gen` for complex effectful logic that would be unwieldy with manual chaining.
 - Use `@effect/platform` for filesystem, kv storage, paths, workers, etc.
+- Functions should *accept* and return Options or Results where appropriate, rather than nullable/undefined values or throwing errors. This keeps consistency in types (we don't have to convert to/from undefined/null/throw at every boundary) and forces handling of edge cases.
+- Do not directly access internal properties of Effect objects (e.g. `_tag`, `_A`, `_E`, `_R`); use effect's combinators and utilities to work with them instead. The internal structure of Effect is an implementation detail that may change, and relying on it can lead to brittle code.
 - Reference: https://effect.website/llms.txt
 
 ## HTTP Server
