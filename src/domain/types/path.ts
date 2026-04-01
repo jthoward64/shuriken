@@ -2,6 +2,13 @@ import { Brand } from "effect";
 import type { CollectionId, InstanceId, PrincipalId } from "#src/domain/ids.ts";
 
 // ---------------------------------------------------------------------------
+// ResourceUrl — absolute DAV resource URL used in ACL rules
+// ---------------------------------------------------------------------------
+
+export type ResourceUrl = string & Brand.Brand<"ResourceUrl">;
+export const ResourceUrl = Brand.nominal<ResourceUrl>();
+
+// ---------------------------------------------------------------------------
 // Slug — raw URL path segment before UUID resolution
 // ---------------------------------------------------------------------------
 

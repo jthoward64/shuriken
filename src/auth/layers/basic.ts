@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Option } from "effect";
 import { AuthService } from "#src/auth/service.ts";
 import { DatabaseClient } from "#src/db/client.ts";
 import { authUser, user } from "#src/db/drizzle/schema/index.ts";
@@ -23,23 +23,23 @@ const BASIC_PREFIX = "Basic ";
 
 const parseBasicAuth = (
 	headers: Headers,
-): { username: string; password: string } | null => {
+): Option.Option<{ username: string; password: string }> => {
 	const authorization = headers.get("Authorization");
 	if (!authorization?.startsWith(BASIC_PREFIX)) {
-		return null;
+		return Option.none();
 	}
 
 	const encoded = authorization.slice(BASIC_PREFIX.length);
 	const decoded = atob(encoded);
 	const colonIdx = decoded.indexOf(":");
 	if (colonIdx === -1) {
-		return null;
+		return Option.none();
 	}
 
-	return {
+	return Option.some({
 		username: decoded.slice(0, colonIdx),
 		password: decoded.slice(colonIdx + 1),
-	};
+	});
 };
 
 export const BasicAuthLayer = Layer.effect(
@@ -53,55 +53,55 @@ export const BasicAuthLayer = Layer.effect(
 				headers,
 				_clientIp,
 			): Effect.Effect<AuthResult, AuthError | DatabaseError> =>
-				Effect.gen(function* () {
-					const creds = parseBasicAuth(headers);
-					if (!creds) {
-						return { _tag: "Unauthenticated" };
-					}
+				Option.match(parseBasicAuth(headers), {
+					onNone: () =>
+						Effect.succeed<AuthResult>({ _tag: "Unauthenticated" }),
+					onSome: (creds) =>
+						Effect.gen(function* () {
+							// Look up auth_user row for this username
+							const rows = yield* Effect.tryPromise({
+								try: () =>
+									db
+										.select({
+											authCredential: authUser.authCredential,
+											userId: user.id,
+											principalId: user.principalId,
+											name: user.name,
+										})
+										.from(authUser)
+										.innerJoin(user, eq(authUser.userId, user.id))
+										.where(
+											and(
+												eq(authUser.authSource, "local"),
+												eq(authUser.authId, creds.username),
+											),
+										)
+										.limit(1),
+								catch: (e) => databaseError(e),
+							});
 
-					// Look up auth_user row for this username
-					const rows = yield* Effect.tryPromise({
-						try: () =>
-							db
-								.select({
-									authCredential: authUser.authCredential,
-									userId: user.id,
-									principalId: user.principalId,
-									name: user.name,
-								})
-								.from(authUser)
-								.innerJoin(user, eq(authUser.userId, user.id))
-								.where(
-									and(
-										eq(authUser.authSource, "local"),
-										eq(authUser.authId, creds.username),
-									),
-								)
-								.limit(1),
-						catch: (e) => databaseError(e),
-					});
+							const row = rows[0];
+							if (!row?.authCredential) {
+								return { _tag: "Unauthenticated" };
+							}
 
-					const row = rows[0];
-					if (!row?.authCredential) {
-						return { _tag: "Unauthenticated" };
-					}
+							// InternalError from Bun.password is a defect (unexpected), not a domain error
+							const valid = yield* crypto
+								.verifyPassword(creds.password, row.authCredential)
+								.pipe(Effect.orDie);
+							if (!valid) {
+								return { _tag: "Unauthenticated" };
+							}
 
-					// InternalError from Bun.password is a defect (unexpected), not a domain error
-					const valid = yield* crypto
-						.verifyPassword(creds.password, row.authCredential)
-						.pipe(Effect.orDie);
-					if (!valid) {
-						return { _tag: "Unauthenticated" };
-					}
-
-					return {
-						_tag: "Authenticated",
-						principal: {
-							principalId: PrincipalId(row.principalId),
-							userId: UserId(row.userId),
-							displayName: row.name,
-						},
-					};
+							return {
+								_tag: "Authenticated",
+								principal: {
+									principalId: PrincipalId(row.principalId),
+									userId: UserId(row.userId),
+									displayName: row.name,
+								},
+							};
+						}),
 				}),
 		});
 	}),

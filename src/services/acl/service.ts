@@ -3,6 +3,7 @@ import { Context } from "effect";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import type { PrincipalId } from "#src/domain/ids.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
+import type { ResourceUrl } from "#src/domain/types/path.ts";
 
 // ---------------------------------------------------------------------------
 // AclService — RFC 3744 access control enforcement
@@ -20,7 +21,7 @@ export interface AclServiceShape {
 	 */
 	readonly check: (
 		principalId: PrincipalId,
-		resourceUrl: string,
+		resourceUrl: ResourceUrl,
 		privilege: DavPrivilege,
 	) => Effect.Effect<void, DavError | DatabaseError>;
 
@@ -29,7 +30,7 @@ export interface AclServiceShape {
 	 */
 	readonly currentUserPrivileges: (
 		principalId: PrincipalId,
-		resourceUrl: string,
+		resourceUrl: ResourceUrl,
 	) => Effect.Effect<ReadonlyArray<DavPrivilege>, DatabaseError>;
 }
 

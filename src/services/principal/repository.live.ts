@@ -1,10 +1,11 @@
 import { and, eq, isNull } from "drizzle-orm";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Option } from "effect";
 import { DatabaseClient } from "#src/db/client.ts";
 import { principal, user } from "#src/db/drizzle/schema/index.ts";
 import { databaseError } from "#src/domain/errors.ts";
 import type { PrincipalId, UserId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
+import type { Email } from "#src/domain/types/strings.ts";
 import {
 	PrincipalRepository,
 	type PrincipalRow,
@@ -24,7 +25,7 @@ export const PrincipalRepositoryLive = Layer.effect(
 		const findById = (
 			id: PrincipalId,
 		): Effect.Effect<
-			PrincipalRow | null,
+			Option.Option<PrincipalRow>,
 			import("#src/domain/errors.ts").DatabaseError
 		> =>
 			Effect.tryPromise({
@@ -34,14 +35,14 @@ export const PrincipalRepositoryLive = Layer.effect(
 						.from(principal)
 						.where(and(eq(principal.id, id), isNull(principal.deletedAt)))
 						.limit(1)
-						.then((r) => r[0] ?? null),
+						.then((r) => Option.fromNullable(r[0])),
 				catch: (e) => databaseError(e),
 			});
 
 		const findBySlug = (
 			slug: Slug,
 		): Effect.Effect<
-			PrincipalWithUser | null,
+			Option.Option<PrincipalWithUser>,
 			import("#src/domain/errors.ts").DatabaseError
 		> =>
 			Effect.tryPromise({
@@ -53,15 +54,17 @@ export const PrincipalRepositoryLive = Layer.effect(
 						.where(and(eq(principal.slug, slug), isNull(principal.deletedAt)))
 						.limit(1)
 						.then((r) =>
-							r[0] ? { principal: r[0].principal, user: r[0].user } : null,
+							Option.fromNullable(
+								r[0] ? { principal: r[0].principal, user: r[0].user } : null,
+							),
 						),
 				catch: (e) => databaseError(e),
 			});
 
 		const findByEmail = (
-			email: string,
+			email: Email,
 		): Effect.Effect<
-			PrincipalWithUser | null,
+			Option.Option<PrincipalWithUser>,
 			import("#src/domain/errors.ts").DatabaseError
 		> =>
 			Effect.tryPromise({
@@ -73,7 +76,9 @@ export const PrincipalRepositoryLive = Layer.effect(
 						.where(and(eq(user.email, email), isNull(principal.deletedAt)))
 						.limit(1)
 						.then((r) =>
-							r[0] ? { principal: r[0].principal, user: r[0].user } : null,
+							Option.fromNullable(
+								r[0] ? { principal: r[0].principal, user: r[0].user } : null,
+							),
 						),
 				catch: (e) => databaseError(e),
 			});
@@ -81,7 +86,7 @@ export const PrincipalRepositoryLive = Layer.effect(
 		const findUserByUserId = (
 			id: UserId,
 		): Effect.Effect<
-			UserRow | null,
+			Option.Option<UserRow>,
 			import("#src/domain/errors.ts").DatabaseError
 		> =>
 			Effect.tryPromise({
@@ -91,7 +96,7 @@ export const PrincipalRepositoryLive = Layer.effect(
 						.from(user)
 						.where(eq(user.id, id))
 						.limit(1)
-						.then((r) => r[0] ?? null),
+						.then((r) => Option.fromNullable(r[0])),
 				catch: (e) => databaseError(e),
 			});
 

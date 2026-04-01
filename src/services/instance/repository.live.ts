@@ -1,10 +1,11 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Option } from "effect";
 import { DatabaseClient, type DbClient } from "#src/db/client.ts";
 import { davInstance } from "#src/db/drizzle/schema/index.ts";
 import { databaseError } from "#src/domain/errors.ts";
 import type { CollectionId, EntityId, InstanceId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
+import type { ETag } from "#src/domain/types/strings.ts";
 import { InstanceRepository, type NewInstance } from "./repository.ts";
 
 // ---------------------------------------------------------------------------
@@ -19,7 +20,7 @@ const findById = (db: DbClient, id: InstanceId) =>
 				.from(davInstance)
 				.where(and(eq(davInstance.id, id), isNull(davInstance.deletedAt)))
 				.limit(1)
-				.then((r) => r[0] ?? null),
+				.then((r) => Option.fromNullable(r[0])),
 		catch: (e) => databaseError(e),
 	});
 
@@ -37,7 +38,7 @@ const findBySlug = (db: DbClient, collectionId: CollectionId, slug: Slug) =>
 					),
 				)
 				.limit(1)
-				.then((r) => r[0] ?? null),
+				.then((r) => Option.fromNullable(r[0])),
 		catch: (e) => databaseError(e),
 	});
 
@@ -84,7 +85,7 @@ const insertInstance = (db: DbClient, input: NewInstance) =>
 const updateEtag = (
 	db: DbClient,
 	id: InstanceId,
-	etag: string,
+	etag: ETag,
 	syncRevision: number,
 ) =>
 	Effect.tryPromise({

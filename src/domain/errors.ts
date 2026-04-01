@@ -163,6 +163,38 @@ export const validAddressData = (message?: string): DavError =>
 	davError(HTTP_BAD_REQUEST, "CARDDAV:valid-address-data", message);
 
 // ---------------------------------------------------------------------------
+// Effect helpers for common Option → DavError patterns
+// ---------------------------------------------------------------------------
+
+import { Effect, Option } from "effect";
+
+/**
+ * Unwrap an Option, failing with a 404 DavError if it is None.
+ * Intended for use with `Effect.flatMap`:
+ *   repo.findById(id).pipe(Effect.flatMap(someOrNotFound(`X not found: ${id}`)))
+ */
+export const someOrNotFound =
+	(message?: string) =>
+	<A>(opt: Option.Option<A>): Effect.Effect<A, DavError, never> =>
+		Option.match(opt, {
+			onNone: () => Effect.fail(notFound(message)),
+			onSome: Effect.succeed,
+		});
+
+/**
+ * Fail with a 409 conflict DavError if the Option is Some (i.e. resource already exists).
+ * Intended for use with `Effect.flatMap` before an insert:
+ *   repo.findBySlug(...).pipe(Effect.flatMap(noneOrConflict(`X already exists`)), Effect.flatMap(() => repo.insert(...)))
+ */
+export const noneOrConflict =
+	(precondition?: DavPrecondition, message?: string) =>
+	<A>(opt: Option.Option<A>): Effect.Effect<void, DavError, never> =>
+		Option.match(opt, {
+			onSome: () => Effect.fail(conflict(precondition, message)),
+			onNone: () => Effect.void,
+		});
+
+// ---------------------------------------------------------------------------
 // Union of all error types
 // ---------------------------------------------------------------------------
 

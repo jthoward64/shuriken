@@ -1,7 +1,8 @@
 import { Effect, Layer } from "effect";
-import { notFound } from "#src/domain/errors.ts";
+import { notFound, someOrNotFound } from "#src/domain/errors.ts";
 import type { PrincipalId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
+import type { Email } from "#src/domain/types/strings.ts";
 import { PrincipalRepository } from "./repository.ts";
 import { PrincipalService } from "./service.ts";
 
@@ -16,36 +17,26 @@ export const PrincipalServiceLive = Layer.effect(
 
 		return PrincipalService.of({
 			findById: (id: PrincipalId) =>
-				Effect.gen(function* () {
-					const row = yield* repo.findById(id);
-					if (row) {
+				repo.findById(id).pipe(
+					Effect.flatMap((_opt) =>
 						// Need the user too — fall back to findBySlug chain is awkward;
-						// for now return a minimal joined result.
+						// for now always fail.
 						// TODO: repo.findById should return PrincipalWithUser directly
-						return yield* Effect.fail(notFound(`Principal ${id} has no user`));
-					}
-					return yield* Effect.fail(notFound(`Principal not found: ${id}`));
-				}),
+						Effect.fail(notFound(`Principal ${id} has no user`)),
+					),
+				),
 
 			findBySlug: (slug: Slug) =>
-				Effect.gen(function* () {
-					const row = yield* repo.findBySlug(slug);
-					if (row) {
-						return row;
-					}
-					return yield* Effect.fail(notFound(`Principal not found: ${slug}`));
-				}),
+				repo.findBySlug(slug).pipe(
+					Effect.flatMap(someOrNotFound(`Principal not found: ${slug}`)),
+				),
 
-			findByEmail: (email: string) =>
-				Effect.gen(function* () {
-					const row = yield* repo.findByEmail(email);
-					if (row) {
-						return row;
-					}
-					return yield* Effect.fail(
-						notFound(`Principal not found for email: ${email}`),
-					);
-				}),
+			findByEmail: (email: Email) =>
+				repo.findByEmail(email).pipe(
+					Effect.flatMap(
+						someOrNotFound(`Principal not found for email: ${email}`),
+					),
+				),
 		});
 	}),
 );

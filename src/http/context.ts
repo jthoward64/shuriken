@@ -1,4 +1,4 @@
-import { FiberRef } from "effect";
+import { FiberRef, Option } from "effect";
 import type { RequestId } from "#src/domain/ids.ts";
 import { RequestId as mkRequestId } from "#src/domain/ids.ts";
 import type { AuthResult } from "#src/domain/types/dav.ts";
@@ -11,12 +11,13 @@ import type { AuthResult } from "#src/domain/types/dav.ts";
 // without needing it passed as a parameter.
 // ---------------------------------------------------------------------------
 
-export const RequestIdRef = FiberRef.unsafeMake<RequestId | undefined>(
-	undefined,
+export const RequestIdRef = FiberRef.unsafeMake<Option.Option<RequestId>>(
+	Option.none(),
 );
 
 export const getRequestId = FiberRef.get(RequestIdRef);
-export const setRequestId = (id: RequestId) => FiberRef.set(RequestIdRef, id);
+export const setRequestId = (id: RequestId) =>
+	FiberRef.set(RequestIdRef, Option.some(id));
 
 export const newRequestId = (): RequestId => mkRequestId(crypto.randomUUID());
 
@@ -31,6 +32,6 @@ export interface HttpRequestContext {
 	readonly url: URL;
 	readonly headers: Headers;
 	readonly auth: AuthResult;
-	/** Remote client IP from server.requestIP(req), or null if unavailable. */
-	readonly clientIp: string | null;
+	/** Remote client IP from server.requestIP(req), or None if unavailable. */
+	readonly clientIp: Option.Option<string>;
 }

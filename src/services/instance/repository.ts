@@ -1,10 +1,11 @@
 import type { InferSelectModel } from "drizzle-orm";
-import type { Effect } from "effect";
+import type { Effect, Option } from "effect";
 import { Context } from "effect";
 import type { davInstance } from "#src/db/drizzle/schema/index.ts";
 import type { DatabaseError } from "#src/domain/errors.ts";
 import type { CollectionId, EntityId, InstanceId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
+import type { ETag } from "#src/domain/types/strings.ts";
 
 // ---------------------------------------------------------------------------
 // InstanceRepository — data access for dav_instance rows
@@ -16,7 +17,7 @@ export interface NewInstance {
 	readonly collectionId: CollectionId;
 	readonly entityId: EntityId;
 	readonly contentType: string;
-	readonly etag: string;
+	readonly etag: ETag;
 	readonly slug: Slug;
 	readonly syncRevision?: number;
 	readonly scheduleTag?: string;
@@ -25,11 +26,11 @@ export interface NewInstance {
 export interface InstanceRepositoryShape {
 	readonly findById: (
 		id: InstanceId,
-	) => Effect.Effect<InstanceRow | null, DatabaseError>;
+	) => Effect.Effect<Option.Option<InstanceRow>, DatabaseError>;
 	readonly findBySlug: (
 		collectionId: CollectionId,
 		slug: Slug,
-	) => Effect.Effect<InstanceRow | null, DatabaseError>;
+	) => Effect.Effect<Option.Option<InstanceRow>, DatabaseError>;
 	readonly listByCollection: (
 		collectionId: CollectionId,
 	) => Effect.Effect<ReadonlyArray<InstanceRow>, DatabaseError>;
@@ -38,7 +39,7 @@ export interface InstanceRepositoryShape {
 	) => Effect.Effect<InstanceRow, DatabaseError>;
 	readonly updateEtag: (
 		id: InstanceId,
-		etag: string,
+		etag: ETag,
 		syncRevision: number,
 	) => Effect.Effect<void, DatabaseError>;
 	readonly softDelete: (id: InstanceId) => Effect.Effect<void, DatabaseError>;

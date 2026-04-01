@@ -11,7 +11,7 @@
         "@effect/platform-bun": "^0.89.0",
         "@opentelemetry/sdk-trace-base": "^2.6.1",
         "casbin": "^5.49.0",
-        "dotenv": "^17.3.1",
+        "drizzle-adapter": "^1.4.0",
         "drizzle-orm": "beta",
         "effect": "^3.21.0",
         "fast-xml-builder": "^1.1.4",
@@ -274,7 +274,7 @@
 
     "detect-libc": ["detect-libc@2.1.2", "", {}, "sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ=="],
 
-    "dotenv": ["dotenv@17.3.1", "", {}, "sha512-IO8C/dzEb6O3F9/twg6ZLXz164a2fhTnEWb95H23Dm4OuN+92NmEAlTrupP9VW6Jm3sO26tQlqyvyi4CsnY9GA=="],
+    "drizzle-adapter": ["drizzle-adapter@1.4.0", "", { "peerDependencies": { "casbin": "^5.0.0", "drizzle-orm": ">=0.29.0" } }, "sha512-UU4ZcGYIZeSSdfZaTlZBUNjQ+Aj1T64QsB/ayBsskHo6bRQiw5fbX3CSyc7yllTCZ+jE5207EKvwAJpHgT2nNw=="],
 
     "drizzle-kit": ["drizzle-kit@1.0.0-beta.20", "", { "dependencies": { "@drizzle-team/brocli": "^0.11.0", "@js-temporal/polyfill": "^0.5.1", "esbuild": "^0.25.10", "get-tsconfig": "^4.13.6", "jiti": "^2.6.1" }, "bin": { "drizzle-kit": "bin.cjs" } }, "sha512-qMUBnrOQIU+H32aF80BSn7lT1IQuKmofCypmkrKMuOMqvM0bhz5hjCHim1bLcXUzXYRtTSr6U2pe0MSV79WbAg=="],
 

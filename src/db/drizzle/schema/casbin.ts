@@ -1,16 +1,16 @@
-import { index, integer, pgTable, varchar } from "drizzle-orm/pg-core";
+import { index, integer, pgTable, text } from "drizzle-orm/pg-core";
 
 export const casbinRule = pgTable(
 	"casbin_rule",
 	{
 		id: integer().primaryKey().generatedAlwaysAsIdentity(),
-		ptype: varchar().notNull(),
-		v0: varchar().default("").notNull(),
-		v1: varchar().default("").notNull(),
-		v2: varchar().default("").notNull(),
-		v3: varchar().default("").notNull(),
-		v4: varchar().default("").notNull(),
-		v5: varchar().default("").notNull(),
+		ptype: text("ptype"),
+		v0: text("v0"),
+		v1: text("v1"),
+		v2: text("v2"),
+		v3: text("v3"),
+		v4: text("v4"),
+		v5: text("v5"),
 	},
 	(table) => [
 		index("idx_casbin_rule_ptype").using(

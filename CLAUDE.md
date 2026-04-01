@@ -28,6 +28,12 @@ All application logic must use [Effect](https://effect.website) (`effect` packag
 - Use `@effect/platform` for filesystem, kv storage, paths, workers, etc.
 - Functions should *accept* and return Options or Results where appropriate, rather than nullable/undefined values or throwing errors. This keeps consistency in types (we don't have to convert to/from undefined/null/throw at every boundary) and forces handling of edge cases.
 - Do not directly access internal properties of Effect objects (e.g. `_tag`, `_A`, `_E`, `_R`); use effect's combinators and utilities to work with them instead. The internal structure of Effect is an implementation detail that may change, and relying on it can lead to brittle code.
+- When working with `Option`, always prefer combinators over manual `isSome`/`isNone` + `.value` access:
+  - Transform the inner value: `Option.map(opt, f)` instead of `isSome(opt) ? f(opt.value) : Option.none()`
+  - Extract with a fallback: `Option.getOrElse(opt, () => default)` instead of `isSome(opt) ? opt.value : default`
+  - Extract as nullable: `Option.getOrUndefined(opt)` / `Option.getOrNull(opt)` instead of `isSome(opt) ? opt.value : undefined`
+  - Branch on Some/None: `Option.match(opt, { onSome: f, onNone: g })` instead of ternary with `.value`
+  - The only acceptable use of `isSome`/`isNone` is when no other options apply (for example mapping the option to a failure case)
 - Reference: https://effect.website/llms.txt
 
 ## HTTP Server
@@ -100,6 +106,7 @@ All Bun-specific APIs (file I/O, `Bun.serve`, `Bun.file`, `Bun.password`, etc.) 
 
 - No barrel files (they encourage bad import practices and make it easy to accidentally create circular dependencies)
 - Many small files over fewer large ones; keep well defined boundaries between modules and codebase areas
+- **Always prefer refactoring when it improves code quality**
 
 ## Documentation
 

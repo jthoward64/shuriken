@@ -28,6 +28,7 @@
 		"@effect/platform-bun": "^0.89.0",
 		"@opentelemetry/sdk-trace-base": "^2.6.1",
 		"casbin": "^5.49.0",
+		"drizzle-adapter": "^1.4.0",
 		"drizzle-orm": "beta",
 		"effect": "^3.21.0",
 		"fast-xml-builder": "^1.1.4",

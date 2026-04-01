@@ -1,5 +1,5 @@
 import { Effect, Layer } from "effect";
-import { conflict, notFound } from "#src/domain/errors.ts";
+import { noneOrConflict, someOrNotFound } from "#src/domain/errors.ts";
 import type { CollectionId, PrincipalId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
 import { CollectionRepository, type NewCollection } from "./repository.ts";
@@ -16,48 +16,34 @@ export const CollectionServiceLive = Layer.effect(
 
 		return CollectionService.of({
 			findById: (id: CollectionId) =>
-				Effect.gen(function* () {
-					const row = yield* repo.findById(id);
-					if (row) {
-						return row;
-					}
-					return yield* Effect.fail(notFound(`Collection not found: ${id}`));
-				}),
+				repo.findById(id).pipe(
+					Effect.flatMap(someOrNotFound(`Collection not found: ${id}`)),
+				),
 
 			findBySlug: (ownerPrincipalId: PrincipalId, slug: Slug) =>
-				Effect.gen(function* () {
-					const row = yield* repo.findBySlug(ownerPrincipalId, slug);
-					if (row) {
-						return row;
-					}
-					return yield* Effect.fail(notFound(`Collection not found: ${slug}`));
-				}),
+				repo.findBySlug(ownerPrincipalId, slug).pipe(
+					Effect.flatMap(someOrNotFound(`Collection not found: ${slug}`)),
+				),
 
 			listByOwner: (ownerPrincipalId: PrincipalId) =>
 				repo.listByOwner(ownerPrincipalId),
 
 			create: (input: NewCollection) =>
-				Effect.gen(function* () {
-					const existing = yield* repo.findBySlug(
-						input.ownerPrincipalId,
-						input.slug,
-					);
-					if (existing) {
-						return yield* Effect.fail(
-							conflict(undefined, `Collection already exists: ${input.slug}`),
-						);
-					}
-					return yield* repo.insert(input);
-				}),
+				repo.findBySlug(input.ownerPrincipalId, input.slug).pipe(
+					Effect.flatMap(
+						noneOrConflict(
+							undefined,
+							`Collection already exists: ${input.slug}`,
+						),
+					),
+					Effect.flatMap(() => repo.insert(input)),
+				),
 
 			delete: (id: CollectionId) =>
-				Effect.gen(function* () {
-					const existing = yield* repo.findById(id);
-					if (!existing) {
-						return yield* Effect.fail(notFound(`Collection not found: ${id}`));
-					}
-					yield* repo.softDelete(id);
-				}),
+				repo.findById(id).pipe(
+					Effect.flatMap(someOrNotFound(`Collection not found: ${id}`)),
+					Effect.flatMap(() => repo.softDelete(id)),
+				),
 		});
 	}),
 );

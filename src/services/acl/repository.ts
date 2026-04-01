@@ -4,6 +4,7 @@ import { Context } from "effect";
 import type { casbinRule } from "#src/db/drizzle/schema/index.ts";
 import type { DatabaseError } from "#src/domain/errors.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
+import type { ResourceUrl } from "#src/domain/types/path.ts";
 
 // ---------------------------------------------------------------------------
 // AclRepository — data access for casbin_rule rows
@@ -19,7 +20,7 @@ export type CasbinRuleRow = InferSelectModel<typeof casbinRule>;
 export interface PolicyRule {
 	readonly ptype: "p";
 	readonly subject: string; // principal URL or special (DAV:all, etc.)
-	readonly resource: string; // resource URL
+	readonly resource: ResourceUrl;
 	readonly privilege: DavPrivilege;
 	readonly effect: "allow" | "deny";
 }
@@ -31,23 +32,19 @@ export interface RoleRule {
 }
 
 export interface AclRepositoryShape {
-	readonly getAllRules: () => Effect.Effect<
-		ReadonlyArray<CasbinRuleRow>,
-		DatabaseError
-	>;
 	readonly getRulesForResource: (
-		resourceUrl: string,
+		resourceUrl: ResourceUrl,
 	) => Effect.Effect<ReadonlyArray<CasbinRuleRow>, DatabaseError>;
 	readonly insertRule: (
 		rule: PolicyRule | RoleRule,
 	) => Effect.Effect<void, DatabaseError>;
 	readonly deleteRulesForResource: (
-		resourceUrl: string,
+		resourceUrl: ResourceUrl,
 	) => Effect.Effect<void, DatabaseError>;
 	/** Raw check: does any "p" rule allow this (subject, resource, privilege)? */
 	readonly hasAllow: (
 		subject: string,
-		resourceUrl: string,
+		resourceUrl: ResourceUrl,
 		privilege: DavPrivilege,
 	) => Effect.Effect<boolean, DatabaseError>;
 }

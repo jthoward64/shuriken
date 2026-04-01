@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { Config, Effect, Layer } from "effect";
+import { Config, Effect, Layer, Option } from "effect";
 import { AuthService } from "#src/auth/service.ts";
 import { DatabaseClient } from "#src/db/client.ts";
 import { user } from "#src/db/drizzle/schema/index.ts";
@@ -19,20 +19,18 @@ import type { AuthResult } from "#src/domain/types/dav.ts";
 // ---------------------------------------------------------------------------
 
 const isClientTrusted = (
-	clientIp: string | null,
+	clientIp: Option.Option<string>,
 	trustedProxies: string,
-): boolean => {
-	if (trustedProxies === "*") {
-		return true;
-	}
-	if (!clientIp) {
-		return false;
-	}
-	return trustedProxies
-		.split(",")
-		.map((s) => s.trim())
-		.includes(clientIp);
-};
+): boolean =>
+	trustedProxies === "*" ||
+	Option.match(clientIp, {
+		onNone: () => false,
+		onSome: (ip) =>
+			trustedProxies
+				.split(",")
+				.map((s) => s.trim())
+				.includes(ip),
+	});
 
 export const ProxyAuthLayer = Layer.effect(
 	AuthService,

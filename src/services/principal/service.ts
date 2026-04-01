@@ -3,6 +3,7 @@ import { Context } from "effect";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import type { PrincipalId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
+import type { Email } from "#src/domain/types/strings.ts";
 import type { PrincipalWithUser } from "./repository.ts";
 
 // ---------------------------------------------------------------------------
@@ -17,7 +18,7 @@ export interface PrincipalServiceShape {
 		slug: Slug,
 	) => Effect.Effect<PrincipalWithUser, DavError | DatabaseError>;
 	readonly findByEmail: (
-		email: string,
+		email: Email,
 	) => Effect.Effect<PrincipalWithUser, DavError | DatabaseError>;
 }
 

@@ -4,13 +4,14 @@ import { DatabaseClient, type DbClient } from "#src/db/client.ts";
 import { casbinRule } from "#src/db/drizzle/schema/index.ts";
 import { databaseError } from "#src/domain/errors.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
+import type { ResourceUrl } from "#src/domain/types/path.ts";
 import { AclRepository, type PolicyRule, type RoleRule } from "./repository.ts";
 
 // ---------------------------------------------------------------------------
 // AclRepository — Drizzle implementation
 // ---------------------------------------------------------------------------
 
-const getRulesForResource = (db: DbClient, resourceUrl: string) =>
+const getRulesForResource = (db: DbClient, resourceUrl: ResourceUrl) =>
 	Effect.tryPromise({
 		try: () =>
 			db
@@ -53,7 +54,7 @@ const insertRule = (db: DbClient, rule: PolicyRule | RoleRule) =>
 		catch: (e) => databaseError(e),
 	});
 
-const deleteRulesForResource = (db: DbClient, resourceUrl: string) =>
+const deleteRulesForResource = (db: DbClient, resourceUrl: ResourceUrl) =>
 	Effect.tryPromise({
 		try: () =>
 			db
@@ -66,7 +67,7 @@ const deleteRulesForResource = (db: DbClient, resourceUrl: string) =>
 const hasAllow = (
 	db: DbClient,
 	subject: string,
-	resourceUrl: string,
+	resourceUrl: ResourceUrl,
 	privilege: DavPrivilege,
 ) =>
 	Effect.tryPromise({
@@ -88,17 +89,10 @@ const hasAllow = (
 		catch: (e) => databaseError(e),
 	});
 
-const getAllRules = (db: DbClient) =>
-	Effect.tryPromise({
-		try: () => db.select().from(casbinRule),
-		catch: (e) => databaseError(e),
-	});
-
 export const AclRepositoryLive = Layer.effect(
 	AclRepository,
 	Effect.map(DatabaseClient, (db) =>
 		AclRepository.of({
-			getAllRules: () => getAllRules(db),
 			getRulesForResource: (url) => getRulesForResource(db, url),
 			insertRule: (rule) => insertRule(db, rule),
 			deleteRulesForResource: (url) => deleteRulesForResource(db, url),

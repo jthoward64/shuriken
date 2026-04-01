@@ -1,5 +1,5 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Option } from "effect";
 import { DatabaseClient, type DbClient } from "#src/db/client.ts";
 import { davCollection } from "#src/db/drizzle/schema/index.ts";
 import { databaseError } from "#src/domain/errors.ts";
@@ -19,7 +19,7 @@ const findById = (db: DbClient, id: CollectionId) =>
 				.from(davCollection)
 				.where(and(eq(davCollection.id, id), isNull(davCollection.deletedAt)))
 				.limit(1)
-				.then((r) => r[0] ?? null),
+				.then((r) => Option.fromNullable(r[0])),
 		catch: (e) => databaseError(e),
 	});
 
@@ -37,7 +37,7 @@ const findBySlug = (db: DbClient, ownerPrincipalId: PrincipalId, slug: Slug) =>
 					),
 				)
 				.limit(1)
-				.then((r) => r[0] ?? null),
+				.then((r) => Option.fromNullable(r[0])),
 		catch: (e) => databaseError(e),
 	});
 

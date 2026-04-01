@@ -1,6 +1,5 @@
 import { eq } from "drizzle-orm";
-import { Config, Effect, Layer } from "effect";
-import { getOrUndefined } from "effect/Option";
+import { Config, Effect, Layer, Option } from "effect";
 import { AuthService } from "#src/auth/service.ts";
 import { DatabaseClient } from "#src/db/client.ts";
 import { user } from "#src/db/drizzle/schema/index.ts";
@@ -8,6 +7,7 @@ import type { AuthError, DatabaseError } from "#src/domain/errors.ts";
 import { authError, databaseError } from "#src/domain/errors.ts";
 import { PrincipalId, UserId } from "#src/domain/ids.ts";
 import type { AuthenticatedPrincipal } from "#src/domain/types/dav.ts";
+import { Email } from "#src/domain/types/strings.ts";
 
 // ---------------------------------------------------------------------------
 // Single-user auth layer
@@ -20,7 +20,7 @@ import type { AuthenticatedPrincipal } from "#src/domain/types/dav.ts";
 
 const resolvePrincipal = (
 	db: DatabaseClient,
-	email: string | undefined,
+	email: Option.Option<Email>,
 ): Effect.Effect<AuthenticatedPrincipal, AuthError | DatabaseError> =>
 	Effect.gen(function* () {
 		const rows = yield* Effect.tryPromise({
@@ -32,7 +32,9 @@ const resolvePrincipal = (
 						name: user.name,
 					})
 					.from(user)
-					.where(email ? eq(user.email, email) : undefined)
+					.where(
+						Option.getOrUndefined(Option.map(email, (e) => eq(user.email, e))),
+					)
 					.limit(1),
 			catch: (e) => databaseError(e),
 		});
@@ -48,9 +50,10 @@ const resolvePrincipal = (
 
 		return yield* Effect.fail(
 			authError(
-				email
-					? `Single-user principal not found for email: ${email}`
-					: "No users found in database for single-user mode",
+				Option.match(email, {
+					onSome: (e) => `Single-user principal not found for email: ${e}`,
+					onNone: () => "No users found in database for single-user mode",
+				}),
 			),
 		);
 	});
@@ -62,7 +65,7 @@ export const SingleUserAuthLayer = Layer.effect(
 		const emailOpt = yield* Config.string("SINGLE_USER_EMAIL").pipe(
 			Config.option,
 		);
-		const email = getOrUndefined(emailOpt);
+		const email = Option.map(emailOpt, Email);
 
 		// Resolve principal at layer-build time — cached for all requests
 		const principal = yield* resolvePrincipal(db, email);

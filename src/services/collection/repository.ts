@@ -1,5 +1,5 @@
 import type { InferSelectModel } from "drizzle-orm";
-import type { Effect } from "effect";
+import type { Effect, Option } from "effect";
 import { Context } from "effect";
 import type { davCollection } from "#src/db/drizzle/schema/index.ts";
 import type { DatabaseError } from "#src/domain/errors.ts";
@@ -26,11 +26,11 @@ export interface NewCollection {
 export interface CollectionRepositoryShape {
 	readonly findById: (
 		id: CollectionId,
-	) => Effect.Effect<CollectionRow | null, DatabaseError>;
+	) => Effect.Effect<Option.Option<CollectionRow>, DatabaseError>;
 	readonly findBySlug: (
 		ownerPrincipalId: PrincipalId,
 		slug: Slug,
-	) => Effect.Effect<CollectionRow | null, DatabaseError>;
+	) => Effect.Effect<Option.Option<CollectionRow>, DatabaseError>;
 	readonly listByOwner: (
 		ownerPrincipalId: PrincipalId,
 	) => Effect.Effect<ReadonlyArray<CollectionRow>, DatabaseError>;

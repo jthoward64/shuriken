@@ -13,6 +13,4 @@ export { AclServiceLive } from "./service.live.ts";
 // Requires: DatabaseClient (provided by InfraLayer in layers.ts)
 // ---------------------------------------------------------------------------
 
-export const AclDomainLayer = AclServiceLive.pipe(
-	Layer.provide(AclRepositoryLive),
-);
+export const AclDomainLayer = Layer.mergeAll(AclServiceLive, AclRepositoryLive);

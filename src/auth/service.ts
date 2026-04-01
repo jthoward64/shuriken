@@ -1,3 +1,4 @@
+import type { Option } from "effect";
 import { Context } from "effect";
 import type { AuthError, DatabaseError } from "#src/domain/errors.ts";
 import type { AuthResult } from "#src/domain/types/dav.ts";
@@ -19,7 +20,7 @@ export interface AuthServiceShape {
 	 */
 	readonly authenticate: (
 		headers: Headers,
-		clientIp: string | null,
+		clientIp: Option.Option<string>,
 	) => import("effect").Effect.Effect<AuthResult, AuthError | DatabaseError>;
 }
 

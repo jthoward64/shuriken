@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import type { AppError, DavError } from "#src/domain/errors.ts";
-import { notFound } from "#src/domain/errors.ts";
+import { notFound, someOrNotFound } from "#src/domain/errors.ts";
 import { CollectionId, InstanceId, PrincipalId } from "#src/domain/ids.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import { Slug } from "#src/domain/types/path.ts";
@@ -65,12 +65,9 @@ const parseDavPath = (
 
 	return Effect.gen(function* () {
 		const principalRepo = yield* PrincipalRepository;
-		const principalRow = yield* principalRepo.findBySlug(principalSlug);
-		if (!principalRow) {
-			return yield* Effect.fail(
-				notFound(`Principal not found: ${principalSlug}`),
-			);
-		}
+		const principalRow = yield* principalRepo.findBySlug(principalSlug).pipe(
+			Effect.flatMap(someOrNotFound(`Principal not found: ${principalSlug}`)),
+		);
 		const principalId = PrincipalId(principalRow.principal.id);
 
 		if (segments.length === SEGMENTS_PRINCIPAL) {
@@ -79,10 +76,9 @@ const parseDavPath = (
 
 		const collSlug = Slug(decodeURIComponent(segments[2] ?? ""));
 		const collRepo = yield* CollectionRepository;
-		const collRow = yield* collRepo.findBySlug(principalId, collSlug);
-		if (!collRow) {
-			return yield* Effect.fail(notFound(`Collection not found: ${collSlug}`));
-		}
+		const collRow = yield* collRepo.findBySlug(principalId, collSlug).pipe(
+			Effect.flatMap(someOrNotFound(`Collection not found: ${collSlug}`)),
+		);
 		const collectionId = CollectionId(collRow.id);
 
 		if (segments.length === SEGMENTS_COLLECTION) {
@@ -95,10 +91,9 @@ const parseDavPath = (
 
 		const objSlug = Slug(decodeURIComponent(segments[3] ?? ""));
 		const instRepo = yield* InstanceRepository;
-		const instRow = yield* instRepo.findBySlug(collectionId, objSlug);
-		if (!instRow) {
-			return yield* Effect.fail(notFound(`Instance not found: ${objSlug}`));
-		}
+		const instRow = yield* instRepo.findBySlug(collectionId, objSlug).pipe(
+			Effect.flatMap(someOrNotFound(`Instance not found: ${objSlug}`)),
+		);
 		const instanceId = InstanceId(instRow.id);
 
 		return {

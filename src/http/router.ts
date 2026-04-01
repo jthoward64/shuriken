@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import { AuthService } from "#src/auth/service.ts";
 import type { AppError } from "#src/domain/errors.ts";
 import {
@@ -117,7 +117,7 @@ export const handleRequest = (
 	server: import("bun").Server<unknown>,
 ): Effect.Effect<Response, never, AppServices> => {
 	const requestId = newRequestId();
-	const clientIp = server.requestIP(req)?.address ?? null;
+	const clientIp = Option.fromNullable(server.requestIP(req)?.address);
 	const url = new URL(req.url);
 
 	return Effect.gen(function* () {
