@@ -8,7 +8,9 @@ import { AppLayer } from "#src/layers.ts";
 import { HTTP_INTERNAL_SERVER_ERROR } from "./http/status";
 
 const program = Effect.gen(function* () {
-	const { server: { port } } = yield* AppConfigService;
+	const {
+		server: { port },
+	} = yield* AppConfigService;
 
 	const runtime = ManagedRuntime.make(AppLayer);
 
