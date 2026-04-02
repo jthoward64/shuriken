@@ -73,7 +73,10 @@ describe("CollectionRepository.findBySlug (integration)", () => {
 					slug: Slug("my-calendar"),
 					displayName: "My Calendar",
 				});
-				const found = yield* col.findBySlug(PrincipalId(principal.id), Slug("my-calendar"));
+				const found = yield* col.findBySlug(
+					PrincipalId(principal.id),
+					Slug("my-calendar"),
+				);
 				return { inserted, found };
 			}).pipe(Effect.provide(layer), Effect.orDie),
 		);
@@ -158,8 +161,16 @@ describe("CollectionRepository.listByOwner (integration)", () => {
 					credentials: [],
 				});
 				const ownerId = PrincipalId(principal.id);
-				yield* col.insert({ ownerPrincipalId: ownerId, collectionType: "calendar", slug: Slug("cal-a") });
-				yield* col.insert({ ownerPrincipalId: ownerId, collectionType: "addressbook", slug: Slug("ab-b") });
+				yield* col.insert({
+					ownerPrincipalId: ownerId,
+					collectionType: "calendar",
+					slug: Slug("cal-a"),
+				});
+				yield* col.insert({
+					ownerPrincipalId: ownerId,
+					collectionType: "addressbook",
+					slug: Slug("ab-b"),
+				});
 				return yield* col.listByOwner(ownerId);
 			}).pipe(Effect.provide(layer), Effect.orDie),
 		);
@@ -180,8 +191,16 @@ describe("CollectionRepository.listByOwner (integration)", () => {
 					credentials: [],
 				});
 				const ownerId = PrincipalId(principal.id);
-				const kept = yield* col.insert({ ownerPrincipalId: ownerId, collectionType: "calendar", slug: Slug("kept") });
-				const deleted = yield* col.insert({ ownerPrincipalId: ownerId, collectionType: "calendar", slug: Slug("deleted") });
+				const kept = yield* col.insert({
+					ownerPrincipalId: ownerId,
+					collectionType: "calendar",
+					slug: Slug("kept"),
+				});
+				const deleted = yield* col.insert({
+					ownerPrincipalId: ownerId,
+					collectionType: "calendar",
+					slug: Slug("deleted"),
+				});
 				yield* col.softDelete(CollectionId(deleted.id));
 				const list = yield* col.listByOwner(ownerId);
 				return { kept, list };
@@ -204,7 +223,7 @@ describe("CollectionRepository unique slug constraint (integration)", () => {
 	});
 
 	it("inserting two collections with the same owner + slug fails with DatabaseError", async () => {
-		const err = await runFailure(
+		const err = (await runFailure(
 			Effect.gen(function* () {
 				const user = yield* UserRepository;
 				const col = yield* CollectionRepository;
@@ -215,10 +234,18 @@ describe("CollectionRepository unique slug constraint (integration)", () => {
 					credentials: [],
 				});
 				const ownerId = PrincipalId(principal.id);
-				yield* col.insert({ ownerPrincipalId: ownerId, collectionType: "calendar", slug: Slug("duplicate") });
-				yield* col.insert({ ownerPrincipalId: ownerId, collectionType: "calendar", slug: Slug("duplicate") });
+				yield* col.insert({
+					ownerPrincipalId: ownerId,
+					collectionType: "calendar",
+					slug: Slug("duplicate"),
+				});
+				yield* col.insert({
+					ownerPrincipalId: ownerId,
+					collectionType: "calendar",
+					slug: Slug("duplicate"),
+				});
 			}).pipe(Effect.provide(layer)),
-		) as DatabaseError;
+		)) as DatabaseError;
 
 		expect(err._tag).toBe("DatabaseError");
 	});

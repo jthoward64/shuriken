@@ -10,7 +10,10 @@ import type {
 	PrincipalRow,
 	UserRow,
 } from "#src/services/principal/repository.ts";
-import type { AuthUserRow, UserWithPrincipal } from "#src/services/user/repository.ts";
+import type {
+	AuthUserRow,
+	UserWithPrincipal,
+} from "#src/services/user/repository.ts";
 
 // ---------------------------------------------------------------------------
 // Test row factories

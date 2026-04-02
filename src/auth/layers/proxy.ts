@@ -41,7 +41,9 @@ export const ProxyAuthLayer = Layer.effect(
 	AuthService,
 	Effect.gen(function* () {
 		const db = yield* DatabaseClient;
-		const { auth: { proxyHeader, trustedProxies } } = yield* AppConfigService;
+		const {
+			auth: { proxyHeader, trustedProxies },
+		} = yield* AppConfigService;
 
 		return AuthService.of({
 			authenticate: (

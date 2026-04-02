@@ -1,7 +1,11 @@
 import type { InferSelectModel } from "drizzle-orm";
 import type { Effect, Option } from "effect";
 import { Context } from "effect";
-import type { group, membership, principal } from "#src/db/drizzle/schema/index.ts";
+import type {
+	group,
+	membership,
+	principal,
+} from "#src/db/drizzle/schema/index.ts";
 import type { DatabaseError } from "#src/domain/errors.ts";
 import type { GroupId, UserId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";

@@ -100,12 +100,10 @@ export const AclServiceLive = Layer.effect(
 		const resolvePrincipalIds = (
 			principalId: PrincipalId,
 		): Effect.Effect<ReadonlyArray<PrincipalId>, never> =>
-			repo
-				.getGroupPrincipalIds(principalId)
-				.pipe(
-					Effect.map((groupIds) => [principalId, ...groupIds]),
-					Effect.orElseSucceed(() => [principalId]),
-				);
+			repo.getGroupPrincipalIds(principalId).pipe(
+				Effect.map((groupIds) => [principalId, ...groupIds]),
+				Effect.orElseSucceed(() => [principalId]),
+			);
 
 		return AclService.of({
 			check: (principalId, resourceUrl, privilege) =>

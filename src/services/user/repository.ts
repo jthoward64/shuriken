@@ -1,7 +1,11 @@
 import type { InferSelectModel } from "drizzle-orm";
 import type { Effect, Option, Redacted } from "effect";
 import { Context } from "effect";
-import type { authUser, principal, user } from "#src/db/drizzle/schema/index.ts";
+import type {
+	authUser,
+	principal,
+	user,
+} from "#src/db/drizzle/schema/index.ts";
 import type { DatabaseError } from "#src/domain/errors.ts";
 import type { UserId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";

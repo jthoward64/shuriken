@@ -57,9 +57,7 @@ export const AuthConfig = Config.all({
 	 * Comma-separated list of trusted proxy IPs, or "*" to trust all.
 	 * When AUTH_MODE=proxy, requests from untrusted IPs have the proxy header ignored.
 	 */
-	trustedProxies: Config.string("trustedProxies").pipe(
-		Config.withDefault("*"),
-	),
+	trustedProxies: Config.string("trustedProxies").pipe(Config.withDefault("*")),
 
 	/** Email of the single user in single-user mode. Optional; uses first user if absent. */
 	singleUserEmail: Config.string("singleUserEmail").pipe(Config.option),

@@ -6,8 +6,8 @@ import { DatabaseClient } from "#src/db/client.ts";
 import { user } from "#src/db/drizzle/schema/index.ts";
 import { AuthError, DatabaseError } from "#src/domain/errors.ts";
 import { PrincipalId, UserId } from "#src/domain/ids.ts";
-import { Authenticated } from "#src/domain/types/dav.ts";
 import type { AuthenticatedPrincipal } from "#src/domain/types/dav.ts";
+import { Authenticated } from "#src/domain/types/dav.ts";
 import { Email } from "#src/domain/types/strings.ts";
 
 // ---------------------------------------------------------------------------
@@ -61,7 +61,9 @@ export const SingleUserAuthLayer = Layer.effect(
 	AuthService,
 	Effect.gen(function* () {
 		const db = yield* DatabaseClient;
-		const { auth: { singleUserEmail: emailOpt } } = yield* AppConfigService;
+		const {
+			auth: { singleUserEmail: emailOpt },
+		} = yield* AppConfigService;
 		const email = Option.map(emailOpt, Email);
 
 		// Resolve principal at layer-build time — cached for all requests

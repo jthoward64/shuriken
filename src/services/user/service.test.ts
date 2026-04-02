@@ -1,14 +1,14 @@
 import { describe, expect, it } from "bun:test";
 import { Effect, Redacted } from "effect";
-import { UserId } from "#src/domain/ids.ts";
-import { Email } from "#src/domain/types/strings.ts";
-import { Slug } from "#src/domain/types/path.ts";
 import type { DavError } from "#src/domain/errors.ts";
+import { UserId } from "#src/domain/ids.ts";
+import { Slug } from "#src/domain/types/path.ts";
+import { Email } from "#src/domain/types/strings.ts";
 import { HTTP_CONFLICT, HTTP_NOT_FOUND } from "#src/http/status.ts";
-import { makeTestEnv } from "#src/testing/env.ts";
 import { runFailure, runSuccess } from "#src/testing/effect.ts";
-import { UserService } from "./service.ts";
+import { makeTestEnv } from "#src/testing/env.ts";
 import type { NewUser } from "./service.ts";
+import { UserService } from "./service.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -37,7 +37,9 @@ describe("UserService.create", () => {
 				Effect.orDie,
 			),
 		);
-		expect(env.stores.users.get(created.user.id)?.email).toBe("alice@example.com");
+		expect(env.stores.users.get(created.user.id)?.email).toBe(
+			"alice@example.com",
+		);
 		expect(env.stores.principals.get(created.principal.id)?.slug).toBe("alice");
 	});
 
@@ -68,7 +70,9 @@ describe("UserService.create", () => {
 		const cred = env.stores.credentials.get("local:alice-local");
 		expect(cred).toBeDefined();
 		// Raw "hunter2" stored here would mean CryptoService was bypassed
-		expect(Redacted.value(cred?.authCredential ?? Redacted.make(""))).toBe("test:hunter2");
+		expect(Redacted.value(cred?.authCredential ?? Redacted.make(""))).toBe(
+			"test:hunter2",
+		);
 	});
 
 	it("stores proxy credential with authId as the credential value (no password)", async () => {
@@ -91,7 +95,9 @@ describe("UserService.create", () => {
 		);
 		const cred = env.stores.credentials.get("proxy:alice@sso.corp");
 		expect(cred).toBeDefined();
-		expect(Redacted.value(cred?.authCredential ?? Redacted.make(""))).toBe("alice@sso.corp");
+		expect(Redacted.value(cred?.authCredential ?? Redacted.make(""))).toBe(
+			"alice@sso.corp",
+		);
 	});
 });
 
@@ -145,14 +151,14 @@ describe("UserService.update", () => {
 
 	it("fails with 404 for an unknown user id", async () => {
 		const env = makeTestEnv();
-		const err = await runFailure(
+		const err = (await runFailure(
 			UserService.pipe(
 				Effect.flatMap((s) =>
 					s.update(UserId(crypto.randomUUID()), { name: "Ghost" }),
 				),
 				Effect.provide(env.toLayer()),
 			),
-		) as DavError;
+		)) as DavError;
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_NOT_FOUND);
 	});
@@ -163,14 +169,14 @@ describe("UserService.update", () => {
 			.withUser({ id: aliceId, email: "alice@example.com", slug: "alice" })
 			.withUser({ email: "bob@example.com", slug: "bob" });
 
-		const err = await runFailure(
+		const err = (await runFailure(
 			UserService.pipe(
 				Effect.flatMap((s) =>
 					s.update(UserId(aliceId), { email: Email("bob@example.com") }),
 				),
 				Effect.provide(env.toLayer()),
 			),
-		) as DavError;
+		)) as DavError;
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_CONFLICT);
 	});
@@ -183,7 +189,7 @@ describe("UserService.update", () => {
 describe("UserService.addCredential", () => {
 	it("fails with 404 when the user does not exist", async () => {
 		const env = makeTestEnv();
-		const err = await runFailure(
+		const err = (await runFailure(
 			UserService.pipe(
 				Effect.flatMap((s) =>
 					s.addCredential(UserId(crypto.randomUUID()), {
@@ -193,7 +199,7 @@ describe("UserService.addCredential", () => {
 				),
 				Effect.provide(env.toLayer()),
 			),
-		) as DavError;
+		)) as DavError;
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_NOT_FOUND);
 	});
@@ -204,7 +210,7 @@ describe("UserService.addCredential", () => {
 			.withUser({ id: userId, email: "alice@example.com", slug: "alice" })
 			.withCredential({ userId, authSource: "local", authId: "alice" });
 
-		const err = await runFailure(
+		const err = (await runFailure(
 			UserService.pipe(
 				Effect.flatMap((s) =>
 					s.addCredential(UserId(userId), {
@@ -215,7 +221,7 @@ describe("UserService.addCredential", () => {
 				),
 				Effect.provide(env.toLayer()),
 			),
-		) as DavError;
+		)) as DavError;
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_CONFLICT);
 	});
@@ -246,7 +252,7 @@ describe("UserService.addCredential", () => {
 		);
 
 		// Duplicate add must conflict
-		const addErr = await runFailure(
+		const addErr = (await runFailure(
 			UserService.pipe(
 				Effect.flatMap((s) =>
 					s.addCredential(UserId(userId), {
@@ -257,7 +263,7 @@ describe("UserService.addCredential", () => {
 				),
 				Effect.provide(layer),
 			),
-		) as DavError;
+		)) as DavError;
 		expect(addErr.status).toBe(HTTP_CONFLICT);
 
 		// Remove clears the credential
@@ -291,14 +297,14 @@ describe("UserService.addCredential", () => {
 describe("UserService.removeCredential", () => {
 	it("fails with 404 when the user does not exist", async () => {
 		const env = makeTestEnv();
-		const err = await runFailure(
+		const err = (await runFailure(
 			UserService.pipe(
 				Effect.flatMap((s) =>
 					s.removeCredential(UserId(crypto.randomUUID()), "local", "nobody"),
 				),
 				Effect.provide(env.toLayer()),
 			),
-		) as DavError;
+		)) as DavError;
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_NOT_FOUND);
 	});

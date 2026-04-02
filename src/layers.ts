@@ -35,8 +35,9 @@ export const AuthLayer = Layer.unwrapEffect(selectAuthLayer).pipe(
 // Domain layer helper — each domain layer needs DatabaseClient from InfraLayer
 // ---------------------------------------------------------------------------
 
-const withInfra = <A, E>(layer: Layer.Layer<A, E, DatabaseClient | CryptoService>) =>
-	layer.pipe(Layer.provide(InfraLayer));
+const withInfra = <A, E>(
+	layer: Layer.Layer<A, E, DatabaseClient | CryptoService>,
+) => layer.pipe(Layer.provide(InfraLayer));
 
 // ---------------------------------------------------------------------------
 // AppLayer — full production layer composition
@@ -70,13 +71,13 @@ export {
 	CollectionService,
 } from "#src/services/collection/index.ts";
 export {
-	InstanceRepository,
-	InstanceService,
-} from "#src/services/instance/index.ts";
-export {
 	GroupRepository,
 	GroupService,
 } from "#src/services/group/index.ts";
+export {
+	InstanceRepository,
+	InstanceService,
+} from "#src/services/instance/index.ts";
 export {
 	PrincipalRepository,
 	PrincipalService,

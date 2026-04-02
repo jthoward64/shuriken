@@ -23,7 +23,9 @@ export const selectAuthLayer: Effect.Effect<
 	never,
 	AppConfigService
 > = Effect.gen(function* () {
-	const { auth: { mode } } = yield* AppConfigService;
+	const {
+		auth: { mode },
+	} = yield* AppConfigService;
 	switch (mode) {
 		case "basic":
 			return BasicAuthLayer;

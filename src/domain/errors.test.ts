@@ -8,8 +8,8 @@ import {
 	HTTP_NOT_FOUND,
 } from "#src/http/status.ts";
 import {
-	DavError,
 	conflict,
+	DavError,
 	davError,
 	forbidden,
 	methodNotAllowed,
@@ -27,7 +27,11 @@ import {
 
 describe("davError", () => {
 	it("sets status and optional precondition", () => {
-		const err = davError(HTTP_CONFLICT, "CALDAV:no-uid-conflict", "already exists");
+		const err = davError(
+			HTTP_CONFLICT,
+			"CALDAV:no-uid-conflict",
+			"already exists",
+		);
 		expect(err).toBeInstanceOf(DavError);
 		expect(err.status).toBe(HTTP_CONFLICT);
 		expect(err.precondition).toBe("CALDAV:no-uid-conflict");
@@ -137,9 +141,7 @@ describe("someOrNotFound", () => {
 	});
 
 	it("works without a message", async () => {
-		const exit = await Effect.runPromiseExit(
-			someOrNotFound()(Option.none()),
-		);
+		const exit = await Effect.runPromiseExit(someOrNotFound()(Option.none()));
 		expect(exit._tag).toBe("Failure");
 	});
 });

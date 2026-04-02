@@ -64,7 +64,10 @@ function patchIcuCasefold(sql: string): string {
 function patchDropConstraint(sql: string): string {
 	// Add IF EXISTS so PGlite tolerates DROP CONSTRAINT on names that were
 	// never created (e.g. when the _unique duplicate was omitted)
-	return sql.replace(/DROP CONSTRAINT "([^"]+)"/g, 'DROP CONSTRAINT IF EXISTS "$1"');
+	return sql.replace(
+		/DROP CONSTRAINT "([^"]+)"/g,
+		'DROP CONSTRAINT IF EXISTS "$1"',
+	);
 }
 
 function patchSqlForPglite(sql: string): string {

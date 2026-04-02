@@ -65,7 +65,10 @@ const create = (
 					throw new Error("group insert returned no rows");
 				}
 
-				return { principal: principalRow, group: groupRow } satisfies GroupWithPrincipal;
+				return {
+					principal: principalRow,
+					group: groupRow,
+				} satisfies GroupWithPrincipal;
 			}),
 		catch: (e) => new DatabaseError({ cause: e }),
 	});
@@ -96,7 +99,10 @@ const update = (
 			if (!row) {
 				throw new Error(`Group not found after update: ${id}`);
 			}
-			return { principal: row.principal, group: row.group } satisfies GroupWithPrincipal;
+			return {
+				principal: row.principal,
+				group: row.group,
+			} satisfies GroupWithPrincipal;
 		},
 		catch: (e) => new DatabaseError({ cause: e }),
 	});

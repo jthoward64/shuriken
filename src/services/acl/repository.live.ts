@@ -1,4 +1,4 @@
-import { type SQL, and, eq, inArray, or, sql } from "drizzle-orm";
+import { and, eq, inArray, or, type SQL, sql } from "drizzle-orm";
 import { Effect, Layer } from "effect";
 import { DatabaseClient, type DbClient } from "#src/db/client.ts";
 import {
@@ -20,14 +20,21 @@ import {
 // AclRepository — Drizzle implementation over dav_acl
 // ---------------------------------------------------------------------------
 
-const getAces = (db: DbClient, resourceId: string, resourceType: AclResourceType) =>
+const getAces = (
+	db: DbClient,
+	resourceId: string,
+	resourceType: AclResourceType,
+) =>
 	Effect.tryPromise({
 		try: () =>
 			db
 				.select()
 				.from(davAcl)
 				.where(
-					and(eq(davAcl.resourceId, resourceId), eq(davAcl.resourceType, resourceType)),
+					and(
+						eq(davAcl.resourceId, resourceId),
+						eq(davAcl.resourceType, resourceType),
+					),
 				)
 				.orderBy(davAcl.ordinal),
 		catch: (e) => new DatabaseError({ cause: e }),

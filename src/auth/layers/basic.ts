@@ -54,8 +54,7 @@ export const BasicAuthLayer = Layer.effect(
 				_clientIp,
 			): Effect.Effect<AuthResult, AuthError | DatabaseError> =>
 				Option.match(parseBasicAuth(headers), {
-					onNone: () =>
-						Effect.succeed<AuthResult>(new Unauthenticated()),
+					onNone: () => Effect.succeed<AuthResult>(new Unauthenticated()),
 					onSome: (creds) =>
 						Effect.gen(function* () {
 							// Look up auth_user row for this username

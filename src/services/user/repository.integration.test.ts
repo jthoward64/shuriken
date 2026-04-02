@@ -1,12 +1,12 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 import { Effect, Layer, Option, Redacted } from "effect";
 import { UserId } from "#src/domain/ids.ts";
-import { Email } from "#src/domain/types/strings.ts";
 import { Slug } from "#src/domain/types/path.ts";
-import { makePgliteDatabaseLayer } from "#src/testing/pglite.ts";
+import { Email } from "#src/domain/types/strings.ts";
 import { runSuccess } from "#src/testing/effect.ts";
-import { UserRepository } from "./repository.ts";
+import { makePgliteDatabaseLayer } from "#src/testing/pglite.ts";
 import { UserRepositoryLive } from "./repository.live.ts";
+import { UserRepository } from "./repository.ts";
 
 // ---------------------------------------------------------------------------
 // Integration tests for UserRepositoryLive
@@ -140,7 +140,9 @@ describe("UserRepository.create (integration)", () => {
 		const cred = Option.getOrThrow(result);
 		expect(cred.authSource).toBe("local");
 		expect(cred.authId).toBe("carol-local");
-		expect(Redacted.value(cred.authCredential ?? Redacted.make(""))).toBe("hashed-secret");
+		expect(Redacted.value(cred.authCredential ?? Redacted.make(""))).toBe(
+			"hashed-secret",
+		);
 	});
 });
 
@@ -166,7 +168,9 @@ describe("UserRepository.update (integration)", () => {
 							email: Email("alice@example.com"),
 							credentials: [],
 						});
-						return yield* r.update(UserId(created.user.id), { name: "Alice Smith" });
+						return yield* r.update(UserId(created.user.id), {
+							name: "Alice Smith",
+						});
 					}),
 				),
 				Effect.provide(layer),
@@ -190,7 +194,9 @@ describe("UserRepository.update (integration)", () => {
 							email: Email("bob@example.com"),
 							credentials: [],
 						});
-						return yield* r.update(UserId(created.user.id), { displayName: "Robert" });
+						return yield* r.update(UserId(created.user.id), {
+							displayName: "Robert",
+						});
 					}),
 				),
 				Effect.provide(layer),
