@@ -35,6 +35,5 @@ export const user = pgTable(
 			table.principalId.asc().nullsLast(),
 		),
 		unique("user_email_key").on(table.email),
-		unique("user_email_unique").on(table.email),
 	],
 );

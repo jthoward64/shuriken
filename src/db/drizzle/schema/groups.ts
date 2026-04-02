@@ -1,11 +1,8 @@
 import { sql } from "drizzle-orm";
 import {
-	type AnyPgColumn,
 	index,
 	pgTable,
 	primaryKey,
-	text,
-	unique,
 	uniqueIndex,
 	uuid,
 } from "drizzle-orm/pg-core";
@@ -17,14 +14,10 @@ export const group = pgTable(
 	"group",
 	{
 		id: uuid().default(sql`uuidv7()`).primaryKey(),
-		updatedAt: timestampTz("updated_at").default(sql`now()`).notNull(),
-		primaryName: uuid("primary_name").references(
-			(): AnyPgColumn => groupName.id,
-			{ onDelete: "set null" },
-		),
 		principalId: uuid("principal_id")
 			.notNull()
 			.references(() => principal.id, { onDelete: "restrict" }),
+		updatedAt: timestampTz("updated_at").default(sql`now()`).notNull(),
 	},
 	(table) => [
 		index("idx_group_principal").using(
@@ -35,26 +28,6 @@ export const group = pgTable(
 			"btree",
 			table.principalId.asc().nullsLast(),
 		),
-	],
-);
-
-export const groupName = pgTable(
-	"group_name",
-	{
-		id: uuid().default(sql`uuidv7()`).primaryKey(),
-		groupId: uuid("group_id")
-			.notNull()
-			.references((): AnyPgColumn => group.id, { onDelete: "cascade" }),
-		name: text().notNull(),
-		updatedAt: timestampTz("updated_at").default(sql`now()`).notNull(),
-	},
-	(table) => [
-		index("idx_group_name_group_id").using(
-			"btree",
-			table.groupId.asc().nullsLast(),
-		),
-		index("idx_group_name_name").using("btree", table.name.asc().nullsLast()),
-		unique("group_name_name_key").on(table.name),
 	],
 );
 

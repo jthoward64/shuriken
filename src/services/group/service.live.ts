@@ -1,5 +1,5 @@
 import { Effect, Layer } from "effect";
-import { noneOrConflict, someOrNotFound } from "#src/domain/errors.ts";
+import { someOrNotFound } from "#src/domain/errors.ts";
 import type { GroupId, UserId } from "#src/domain/ids.ts";
 import { GroupRepository } from "./repository.ts";
 import { GroupService, type NewGroup, type UpdateGroup } from "./service.ts";
@@ -14,36 +14,13 @@ export const GroupServiceLive = Layer.effect(
 		const repo = yield* GroupRepository;
 
 		return GroupService.of({
-			create: (input: NewGroup) =>
-				repo.findByName(input.primaryName).pipe(
-					Effect.flatMap(
-						noneOrConflict(
-							undefined,
-							`Group name already exists: ${input.primaryName}`,
-						),
-					),
-					Effect.flatMap(() => repo.create(input)),
-				),
+			create: (input: NewGroup) => repo.create(input),
 
 			update: (id: GroupId, input: UpdateGroup) =>
 				Effect.gen(function* () {
 					yield* repo
 						.findById(id)
 						.pipe(Effect.flatMap(someOrNotFound(`Group not found: ${id}`)));
-
-					if (input.primaryName !== undefined) {
-						yield* repo
-							.findByName(input.primaryName)
-							.pipe(
-								Effect.flatMap(
-									noneOrConflict(
-										undefined,
-										`Group name already exists: ${input.primaryName}`,
-									),
-								),
-							);
-					}
-
 					return yield* repo.update(id, input);
 				}),
 

@@ -4,7 +4,6 @@ A CalDAV/CardDAV server implementation in TypeScript.
 
 ## Runtime & Tooling
 
-- **NVM**: Run `nvm use 24` to activate the correct Node version
 - **Runtime**: Bun. Use `bun` for all scripts, package management, and test execution.
 - **Package manager**: Bun. Never use npm, yarn, or pnpm.
 - **Scripts**: bun run `check`, `lint`, `format`, and `test` scripts are defined
@@ -113,6 +112,7 @@ All Bun-specific APIs (file I/O, `Bun.serve`, `Bun.file`, `Bun.password`, etc.) 
 - RFC plain-text copies live in `documentation/rfcs/`. Consult these before implementing any DAV/CalDAV/CardDAV behaviour.
 - Planning documents live in `documentation/planning/`.
 - Key RFCs in scope: 4918 (WebDAV), 4791 (CalDAV), 6352 (CardDAV), 3744 (ACL), 6578 (sync), 5545 (iCalendar), 6350 (vCard), and others in `documentation/rfcs/`.
+- An index with descriptions and a dependency map is at `documentation/rfcs/index.md`.
 
 ## Testing
 

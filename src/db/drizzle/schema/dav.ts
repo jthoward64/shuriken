@@ -66,6 +66,14 @@ export const davCollection = pgTable(
 		supportedComponents: text("supported_components").array(),
 		slug: text().default("").notNull(),
 		parentCollectionId: uuid("parent_collection_id"),
+		// Client-set dead properties (RFC 4918 §4.1) — Clark-notation key, XML value string
+		clientProperties: jsonb("client_properties").default({}).notNull(),
+		// CalDAV per-collection constraints (RFC 4791 §5.2) — null = server-wide default
+		maxResourceSize: bigint("max_resource_size", { mode: "number" }),
+		minDateTime: timestampTz("min_date_time"),
+		maxDateTime: timestampTz("max_date_time"),
+		maxInstances: integer("max_instances"),
+		maxAttendeesPerInstance: integer("max_attendees_per_instance"),
 	},
 	(table) => [
 		foreignKey({
@@ -96,7 +104,7 @@ export const davCollection = pgTable(
 			.where(sql`(deleted_at IS NULL)`),
 		check(
 			"dav_collection_collection_type_check",
-			sql`(collection_type = ANY (ARRAY['collection'::text, 'calendar'::text, 'addressbook'::text]))`,
+			sql`(collection_type = ANY (ARRAY['collection'::text, 'calendar'::text, 'addressbook'::text, 'inbox'::text, 'outbox'::text]))`,
 		),
 	],
 );
@@ -304,6 +312,8 @@ export const davInstance = pgTable(
 		deletedAt: timestampTz("deleted_at"),
 		scheduleTag: text("schedule_tag"),
 		slug: text().default("").notNull(),
+		// Client-set dead properties (RFC 4918 §4.1) — Clark-notation key, XML value string
+		clientProperties: jsonb("client_properties").default({}).notNull(),
 	},
 	(table) => [
 		index("idx_dav_instance_collection").using(
@@ -355,11 +365,13 @@ export const davScheduleMessage = pgTable(
 		collectionId: uuid("collection_id")
 			.notNull()
 			.references(() => davCollection.id, { onDelete: "cascade" }),
+		entityId: uuid("entity_id")
+			.notNull()
+			.references(() => davEntity.id, { onDelete: "restrict" }),
 		sender: text().notNull(),
 		recipient: text().notNull(),
 		method: text().notNull(),
 		status: text().default("pending").notNull(),
-		icalData: text("ical_data").notNull(),
 		diagnostics: jsonb(),
 		createdAt: timestampTz("created_at").default(sql`now()`).notNull(),
 		deliveredAt: timestampTz("delivered_at"),

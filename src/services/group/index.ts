@@ -4,7 +4,6 @@ import { GroupServiceLive } from "./service.live.ts";
 
 export { GroupRepositoryLive } from "./repository.live.ts";
 export type {
-	GroupNameRow,
 	GroupRow,
 	GroupWithPrincipal,
 	MembershipRow,

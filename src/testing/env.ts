@@ -1,0 +1,785 @@
+import { Effect, Layer, Option, Redacted } from "effect";
+import { Temporal } from "temporal-polyfill";
+import type { Slug } from "#src/domain/types/path.ts";
+import type { Email } from "#src/domain/types/strings.ts";
+import { CryptoService } from "#src/platform/crypto.ts";
+import {
+	CollectionRepository,
+	type CollectionRepositoryShape,
+	type CollectionRow,
+	type NewCollection,
+} from "#src/services/collection/repository.ts";
+import { CollectionServiceLive } from "#src/services/collection/service.live.ts";
+import type { CollectionService } from "#src/services/collection/service.ts";
+import {
+	GroupRepository,
+	type GroupRepositoryShape,
+	type GroupRow,
+} from "#src/services/group/repository.ts";
+import { GroupServiceLive } from "#src/services/group/service.live.ts";
+import type { GroupService } from "#src/services/group/service.ts";
+import {
+	InstanceRepository,
+	type InstanceRepositoryShape,
+	type InstanceRow,
+	type NewInstance,
+} from "#src/services/instance/repository.ts";
+import { InstanceServiceLive } from "#src/services/instance/service.live.ts";
+import type { InstanceService } from "#src/services/instance/service.ts";
+import {
+	PrincipalRepository,
+	type PrincipalRepositoryShape,
+	type PrincipalRow,
+	type UserRow,
+} from "#src/services/principal/repository.ts";
+import { PrincipalServiceLive } from "#src/services/principal/service.live.ts";
+import type { PrincipalService } from "#src/services/principal/service.ts";
+import {
+	type AuthUserRow,
+	UserRepository,
+	type UserRepositoryShape,
+} from "#src/services/user/repository.ts";
+import { UserServiceLive } from "#src/services/user/service.live.ts";
+import type { UserService } from "#src/services/user/service.ts";
+
+// ---------------------------------------------------------------------------
+// TestCryptoLayer
+//
+// Identity-based crypto — no Bun.password dependency.
+// hashPassword prepends "test:" so verifyPassword can validate without bcrypt.
+// ---------------------------------------------------------------------------
+
+const TEST_HASH_PREFIX = "test:";
+
+export const TestCryptoLayer = Layer.succeed(CryptoService, {
+	hashPassword: (plain) =>
+		Effect.succeed(
+			Redacted.make(`${TEST_HASH_PREFIX}${Redacted.value(plain)}`),
+		),
+	verifyPassword: (plain, hash) =>
+		Effect.succeed(
+			Redacted.value(hash) === `${TEST_HASH_PREFIX}${Redacted.value(plain)}`,
+		),
+});
+
+// ---------------------------------------------------------------------------
+// TestStores — shared in-memory state across all in-memory repositories
+//
+// Repositories that operate on the same logical tables share the same Maps
+// (e.g. UserRepository and PrincipalRepository both use `principals` and
+// `users`), ensuring cross-service consistency without a real database.
+// ---------------------------------------------------------------------------
+
+export interface TestStores {
+	readonly principals: Map<string, PrincipalRow>; // principal.id → PrincipalRow (users only)
+	readonly users: Map<string, UserRow>; // user.id → UserRow
+	readonly credentials: Map<string, AuthUserRow>; // `${authSource}:${authId}` → AuthUserRow
+	readonly collections: Map<string, CollectionRow>; // collection.id → CollectionRow
+	readonly instances: Map<string, InstanceRow>; // instance.id → InstanceRow
+	readonly groupPrincipals: Map<string, PrincipalRow>; // principal.id → PrincipalRow (groups only)
+	readonly groups: Map<string, GroupRow>; // group.id → GroupRow
+	readonly memberships: Map<string, Set<string>>; // groupId → Set<userId>
+}
+
+const makeStores = (): TestStores => ({
+	principals: new Map(),
+	users: new Map(),
+	credentials: new Map(),
+	collections: new Map(),
+	instances: new Map(),
+	groupPrincipals: new Map(),
+	groups: new Map(),
+	memberships: new Map(),
+});
+
+// ---------------------------------------------------------------------------
+// Seed data types
+// ---------------------------------------------------------------------------
+
+export interface UserSeedData {
+	readonly id?: string;
+	readonly principalId?: string;
+	readonly slug?: string;
+	readonly name?: string;
+	readonly email?: string;
+	readonly displayName?: string;
+}
+
+export interface CollectionSeedData {
+	readonly id?: string;
+	readonly ownerPrincipalId: string;
+	readonly collectionType?: string;
+	readonly slug?: string;
+	readonly displayName?: string;
+}
+
+export interface GroupSeedData {
+	readonly id?: string;
+	readonly principalId?: string;
+	readonly slug?: string;
+	readonly displayName?: string;
+}
+
+export interface InstanceSeedData {
+	readonly id?: string;
+	readonly collectionId: string;
+	readonly entityId?: string;
+	readonly contentType?: string;
+	readonly etag?: string;
+	readonly slug?: string;
+}
+
+export interface CredentialSeedData {
+	readonly userId: string;
+	readonly authSource: string;
+	readonly authId: string;
+	readonly authCredential?: Redacted.Redacted<string>;
+}
+
+// ---------------------------------------------------------------------------
+// In-memory repository implementations
+// ---------------------------------------------------------------------------
+
+const makeUserRepo = (stores: TestStores): UserRepositoryShape => ({
+	findById: (id) =>
+		Effect.succeed(
+			Option.fromNullable(
+				(() => {
+					const userRow = stores.users.get(id);
+					if (!userRow) {
+						return null;
+					}
+					const principalRow = stores.principals.get(userRow.principalId);
+					if (!principalRow) {
+						return null;
+					}
+					return { user: userRow, principal: principalRow };
+				})(),
+			),
+		),
+
+	findByEmail: (email) =>
+		Effect.succeed(
+			Option.fromNullable(
+				(() => {
+					const userRow = [...stores.users.values()].find(
+						(u) => u.email === email,
+					);
+					if (!userRow) {
+						return null;
+					}
+					const principalRow = stores.principals.get(userRow.principalId);
+					if (!principalRow) {
+						return null;
+					}
+					return { user: userRow, principal: principalRow };
+				})(),
+			),
+		),
+
+	create: (input) =>
+		Effect.sync(() => {
+			const principalId = crypto.randomUUID();
+			const userId = crypto.randomUUID();
+			const now = Temporal.Now.instant();
+
+			const principalRow: PrincipalRow = {
+				id: principalId,
+				principalType: "user",
+				displayName: input.displayName ?? null,
+				updatedAt: now,
+				deletedAt: null,
+				slug: input.slug,
+			};
+			const userRow: UserRow = {
+				id: userId,
+				name: input.name,
+				email: input.email,
+				updatedAt: now,
+				principalId,
+			};
+
+			stores.principals.set(principalId, principalRow);
+			stores.users.set(userId, userRow);
+
+			for (const cred of input.credentials) {
+				const credRow: AuthUserRow = {
+					id: crypto.randomUUID(),
+					userId,
+					authSource: cred.authSource,
+					authId: cred.authId,
+					updatedAt: now,
+					authCredential: Option.getOrNull(cred.authCredential),
+				};
+				stores.credentials.set(`${cred.authSource}:${cred.authId}`, credRow);
+			}
+
+			return { user: userRow, principal: principalRow };
+		}),
+
+	update: (id, input) =>
+		Effect.sync(() => {
+			const existingUser = stores.users.get(id);
+			if (!existingUser) {
+				throw new Error(`[TestEnv] User not found: ${id}`);
+			}
+			const existingPrincipal = stores.principals.get(existingUser.principalId);
+			if (!existingPrincipal) {
+				throw new Error(
+					`[TestEnv] Principal not found: ${existingUser.principalId}`,
+				);
+			}
+
+			const now = Temporal.Now.instant();
+			const updatedUser: UserRow = {
+				...existingUser,
+				name: input.name ?? existingUser.name,
+				email: input.email ?? existingUser.email,
+				updatedAt: now,
+			};
+			const updatedPrincipal: PrincipalRow = {
+				...existingPrincipal,
+				displayName:
+					input.displayName !== undefined
+						? input.displayName
+						: existingPrincipal.displayName,
+				updatedAt: now,
+			};
+
+			stores.users.set(id, updatedUser);
+			stores.principals.set(existingUser.principalId, updatedPrincipal);
+
+			return { user: updatedUser, principal: updatedPrincipal };
+		}),
+
+	findCredential: (authSource, authId) =>
+		Effect.succeed(
+			Option.fromNullable(
+				stores.credentials.get(`${authSource}:${authId}`) ?? null,
+			),
+		),
+
+	insertCredential: (input) =>
+		Effect.sync(() => {
+			const now = Temporal.Now.instant();
+			const credRow: AuthUserRow = {
+				id: crypto.randomUUID(),
+				userId: input.userId,
+				authSource: input.authSource,
+				authId: input.authId,
+				updatedAt: now,
+				authCredential: Option.getOrNull(input.authCredential),
+			};
+			stores.credentials.set(`${input.authSource}:${input.authId}`, credRow);
+			return credRow;
+		}),
+
+	deleteCredential: (_userId, authSource, authId) =>
+		Effect.sync(() => {
+			stores.credentials.delete(`${authSource}:${authId}`);
+		}),
+});
+
+const makePrincipalRepo = (stores: TestStores): PrincipalRepositoryShape => ({
+	findById: (id) =>
+		Effect.succeed(
+			Option.fromNullable(
+				(() => {
+					const principalRow = stores.principals.get(id);
+					if (!principalRow) {
+						return null;
+					}
+					const userRow = [...stores.users.values()].find(
+						(u) => u.principalId === id,
+					);
+					if (!userRow) {
+						return null;
+					}
+					return { principal: principalRow, user: userRow };
+				})(),
+			),
+		),
+
+	findBySlug: (slug) =>
+		Effect.succeed(
+			Option.fromNullable(
+				(() => {
+					const principalRow = [...stores.principals.values()].find(
+						(p) => p.slug === slug && p.deletedAt === null,
+					);
+					if (!principalRow) {
+						return null;
+					}
+					const userRow = [...stores.users.values()].find(
+						(u) => u.principalId === principalRow.id,
+					);
+					if (!userRow) {
+						return null;
+					}
+					return { principal: principalRow, user: userRow };
+				})(),
+			),
+		),
+
+	findByEmail: (email) =>
+		Effect.succeed(
+			Option.fromNullable(
+				(() => {
+					const userRow = [...stores.users.values()].find(
+						(u) => u.email === email,
+					);
+					if (!userRow) {
+						return null;
+					}
+					const principalRow = stores.principals.get(userRow.principalId);
+					if (!principalRow) {
+						return null;
+					}
+					return { principal: principalRow, user: userRow };
+				})(),
+			),
+		),
+
+	findUserByUserId: (id) =>
+		Effect.succeed(Option.fromNullable(stores.users.get(id) ?? null)),
+});
+
+const makeCollectionRepo = (stores: TestStores): CollectionRepositoryShape => ({
+	findById: (id) =>
+		Effect.succeed(
+			Option.fromNullable(
+				(() => {
+					const row = stores.collections.get(id);
+					return row && row.deletedAt === null ? row : null;
+				})(),
+			),
+		),
+
+	findBySlug: (ownerPrincipalId, slug) =>
+		Effect.succeed(
+			Option.fromNullable(
+				[...stores.collections.values()].find(
+					(c) =>
+						c.ownerPrincipalId === ownerPrincipalId &&
+						c.slug === slug &&
+						c.deletedAt === null,
+				) ?? null,
+			),
+		),
+
+	listByOwner: (ownerPrincipalId) =>
+		Effect.succeed(
+			[...stores.collections.values()].filter(
+				(c) => c.ownerPrincipalId === ownerPrincipalId && c.deletedAt === null,
+			),
+		),
+
+	insert: (input: NewCollection) =>
+		Effect.sync(() => {
+			const now = Temporal.Now.instant();
+			const row: CollectionRow = {
+				id: crypto.randomUUID(),
+				ownerPrincipalId: input.ownerPrincipalId,
+				collectionType: input.collectionType,
+				displayName: input.displayName ?? null,
+				description: input.description ?? null,
+				timezoneTzid: input.timezoneTzid ?? null,
+				synctoken: 0,
+				updatedAt: now,
+				deletedAt: null,
+				supportedComponents: input.supportedComponents ?? null,
+				slug: input.slug,
+				parentCollectionId: input.parentCollectionId ?? null,
+				clientProperties: {},
+				maxResourceSize: null,
+				minDateTime: null,
+				maxDateTime: null,
+				maxInstances: null,
+				maxAttendeesPerInstance: null,
+			};
+			stores.collections.set(row.id, row);
+			return row;
+		}),
+
+	softDelete: (id) =>
+		Effect.sync(() => {
+			const row = stores.collections.get(id);
+			if (row) {
+				stores.collections.set(id, {
+					...row,
+					deletedAt: Temporal.Now.instant(),
+				});
+			}
+		}),
+});
+
+const makeInstanceRepo = (stores: TestStores): InstanceRepositoryShape => ({
+	findById: (id) =>
+		Effect.succeed(
+			Option.fromNullable(
+				(() => {
+					const row = stores.instances.get(id);
+					return row && row.deletedAt === null ? row : null;
+				})(),
+			),
+		),
+
+	findBySlug: (collectionId, slug) =>
+		Effect.succeed(
+			Option.fromNullable(
+				[...stores.instances.values()].find(
+					(i) =>
+						i.collectionId === collectionId &&
+						i.slug === slug &&
+						i.deletedAt === null,
+				) ?? null,
+			),
+		),
+
+	listByCollection: (collectionId) =>
+		Effect.succeed(
+			[...stores.instances.values()].filter(
+				(i) => i.collectionId === collectionId && i.deletedAt === null,
+			),
+		),
+
+	insert: (input: NewInstance) =>
+		Effect.sync(() => {
+			const now = Temporal.Now.instant();
+			const row: InstanceRow = {
+				id: crypto.randomUUID(),
+				collectionId: input.collectionId,
+				entityId: input.entityId,
+				contentType: input.contentType,
+				etag: input.etag,
+				syncRevision: input.syncRevision ?? 0,
+				lastModified: now,
+				updatedAt: now,
+				deletedAt: null,
+				scheduleTag: input.scheduleTag ?? null,
+				slug: input.slug,
+				clientProperties: {},
+			};
+			stores.instances.set(row.id, row);
+			return row;
+		}),
+
+	updateEtag: (id, etag, syncRevision) =>
+		Effect.sync(() => {
+			const row = stores.instances.get(id);
+			if (row) {
+				stores.instances.set(id, {
+					...row,
+					etag,
+					syncRevision,
+					updatedAt: Temporal.Now.instant(),
+				});
+			}
+		}),
+
+	softDelete: (id) =>
+		Effect.sync(() => {
+			const row = stores.instances.get(id);
+			if (row) {
+				stores.instances.set(id, {
+					...row,
+					deletedAt: Temporal.Now.instant(),
+				});
+			}
+		}),
+});
+
+const makeGroupRepo = (stores: TestStores): GroupRepositoryShape => ({
+	findById: (id) =>
+		Effect.succeed(
+			Option.fromNullable(
+				(() => {
+					const groupRow = stores.groups.get(id);
+					if (!groupRow) {
+						return null;
+					}
+					const principal = stores.groupPrincipals.get(groupRow.principalId);
+					if (!principal) {
+						return null;
+					}
+					return { principal, group: groupRow };
+				})(),
+			),
+		),
+
+	create: (input) =>
+		Effect.sync(() => {
+			const now = Temporal.Now.instant();
+			const principalId = crypto.randomUUID();
+			const groupId = crypto.randomUUID();
+
+			const principalRow: PrincipalRow = {
+				id: principalId,
+				principalType: "group",
+				displayName: input.displayName ?? null,
+				updatedAt: now,
+				deletedAt: null,
+				slug: input.slug,
+			};
+			const groupRow: GroupRow = {
+				id: groupId,
+				principalId,
+				updatedAt: now,
+			};
+
+			stores.groupPrincipals.set(principalId, principalRow);
+			stores.groups.set(groupId, groupRow);
+
+			return { principal: principalRow, group: groupRow };
+		}),
+
+	update: (id, input) =>
+		Effect.sync(() => {
+			const groupRow = stores.groups.get(id);
+			if (!groupRow) {
+				throw new Error(`[TestEnv] Group not found: ${id}`);
+			}
+			const principal = stores.groupPrincipals.get(groupRow.principalId);
+			if (!principal) {
+				throw new Error(
+					`[TestEnv] Group principal not found: ${groupRow.principalId}`,
+				);
+			}
+
+			const now = Temporal.Now.instant();
+
+			if (input.displayName !== undefined) {
+				stores.groupPrincipals.set(groupRow.principalId, {
+					...principal,
+					displayName: input.displayName,
+					updatedAt: now,
+				});
+			}
+
+			const updatedPrincipal =
+				stores.groupPrincipals.get(groupRow.principalId) ?? principal;
+
+			return { principal: updatedPrincipal, group: groupRow };
+		}),
+
+	addMember: (groupId, userId) =>
+		Effect.sync(() => {
+			const members = stores.memberships.get(groupId) ?? new Set<string>();
+			members.add(userId);
+			stores.memberships.set(groupId, members);
+		}),
+
+	removeMember: (groupId, userId) =>
+		Effect.sync(() => {
+			stores.memberships.get(groupId)?.delete(userId);
+		}),
+
+	hasMember: (groupId, userId) =>
+		Effect.succeed(stores.memberships.get(groupId)?.has(userId) ?? false),
+});
+
+// ---------------------------------------------------------------------------
+// TestEnvBuilder
+// ---------------------------------------------------------------------------
+
+export interface TestEnvBuilder {
+	/** Seed a user principal + user row with smart defaults. */
+	withUser(seed?: Partial<UserSeedData>): TestEnvBuilder;
+	/** Seed a collection row. ownerPrincipalId is required. */
+	withCollection(seed: CollectionSeedData): TestEnvBuilder;
+	/** Seed a group principal + group row with smart defaults. */
+	withGroup(seed?: Partial<GroupSeedData>): TestEnvBuilder;
+	/** Seed an instance row. collectionId is required. */
+	withInstance(seed: InstanceSeedData): TestEnvBuilder;
+	/** Seed a credential row for an existing user. */
+	withCredential(seed: CredentialSeedData): TestEnvBuilder;
+	/**
+	 * Build a fully-wired Effect Layer from the current state of the stores.
+	 * Provides UserService, CollectionService, GroupService, InstanceService,
+	 * PrincipalService, and CryptoService (TestCryptoLayer).
+	 */
+	toLayer(): Layer.Layer<
+		| UserService
+		| CollectionService
+		| GroupService
+		| InstanceService
+		| PrincipalService
+		| CryptoService
+	>;
+	/** Direct store access for advanced assertions. Prefer reading via services. */
+	readonly stores: TestStores;
+}
+
+/**
+ * Create a fresh test environment builder.
+ *
+ * Each call returns an independent environment with its own in-memory stores.
+ * Call `makeTestEnv()` inside each `it()` block to ensure test isolation.
+ *
+ * @example
+ * const env = makeTestEnv().withUser({ email: Email("alice@example.com") })
+ * const result = await runSuccess(
+ *   UserService.pipe(Effect.flatMap(s => s.findByEmail(Email("alice@example.com"))),
+ *   Effect.provide(env.toLayer()))
+ * )
+ */
+export const makeTestEnv = (): TestEnvBuilder => {
+	const stores = makeStores();
+	let userCounter = 0;
+
+	const self: TestEnvBuilder = {
+		stores,
+
+		withUser(seed: Partial<UserSeedData> = {}) {
+			const i = userCounter++;
+			const principalId = seed.principalId ?? crypto.randomUUID();
+			const userId = seed.id ?? crypto.randomUUID();
+			const now = Temporal.Now.instant();
+
+			stores.principals.set(principalId, {
+				id: principalId,
+				principalType: "user",
+				displayName: seed.displayName ?? null,
+				updatedAt: now,
+				deletedAt: null,
+				slug: (seed.slug ?? `test-user-${i}`) as Slug,
+			});
+			stores.users.set(userId, {
+				id: userId,
+				principalId,
+				name: seed.name ?? `Test User ${i}`,
+				email: (seed.email ?? `test${i}@example.com`) as Email,
+				updatedAt: now,
+			});
+			return self;
+		},
+
+		withCollection(seed: CollectionSeedData) {
+			const id = seed.id ?? crypto.randomUUID();
+			const now = Temporal.Now.instant();
+			stores.collections.set(id, {
+				id,
+				ownerPrincipalId: seed.ownerPrincipalId,
+				collectionType: seed.collectionType ?? "calendar",
+				displayName: seed.displayName ?? null,
+				description: null,
+				timezoneTzid: null,
+				synctoken: 0,
+				updatedAt: now,
+				deletedAt: null,
+				supportedComponents: null,
+				slug: (seed.slug ?? "test-calendar") as Slug,
+				parentCollectionId: null,
+				clientProperties: {},
+				maxResourceSize: null,
+				minDateTime: null,
+				maxDateTime: null,
+				maxInstances: null,
+				maxAttendeesPerInstance: null,
+			});
+			return self;
+		},
+
+		withGroup(seed: Partial<GroupSeedData> = {}) {
+			const principalId = seed.principalId ?? crypto.randomUUID();
+			const groupId = seed.id ?? crypto.randomUUID();
+			const now = Temporal.Now.instant();
+
+			stores.groupPrincipals.set(principalId, {
+				id: principalId,
+				principalType: "group",
+				displayName: seed.displayName ?? null,
+				updatedAt: now,
+				deletedAt: null,
+				slug: (seed.slug ?? "test-group") as Slug,
+			});
+			stores.groups.set(groupId, {
+				id: groupId,
+				principalId,
+				updatedAt: now,
+			});
+			return self;
+		},
+
+		withInstance(seed: InstanceSeedData) {
+			const id = seed.id ?? crypto.randomUUID();
+			const now = Temporal.Now.instant();
+			stores.instances.set(id, {
+				id,
+				collectionId: seed.collectionId,
+				entityId: seed.entityId ?? crypto.randomUUID(),
+				contentType: seed.contentType ?? "text/calendar",
+				etag: seed.etag ?? `"test-etag-${id}"`,
+				syncRevision: 0,
+				lastModified: now,
+				updatedAt: now,
+				deletedAt: null,
+				scheduleTag: null,
+				slug: (seed.slug ?? "test-event.ics") as Slug,
+				clientProperties: {},
+			});
+			return self;
+		},
+
+		withCredential(seed: CredentialSeedData) {
+			const now = Temporal.Now.instant();
+			const credRow: AuthUserRow = {
+				id: crypto.randomUUID(),
+				userId: seed.userId,
+				authSource: seed.authSource,
+				authId: seed.authId,
+				updatedAt: now,
+				authCredential: seed.authCredential ?? null,
+			};
+			stores.credentials.set(`${seed.authSource}:${seed.authId}`, credRow);
+			return self;
+		},
+
+		toLayer() {
+			const userRepoLayer = Layer.succeed(UserRepository, makeUserRepo(stores));
+			const principalRepoLayer = Layer.succeed(
+				PrincipalRepository,
+				makePrincipalRepo(stores),
+			);
+			const collectionRepoLayer = Layer.succeed(
+				CollectionRepository,
+				makeCollectionRepo(stores),
+			);
+			const instanceRepoLayer = Layer.succeed(
+				InstanceRepository,
+				makeInstanceRepo(stores),
+			);
+			const groupRepoLayer = Layer.succeed(
+				GroupRepository,
+				makeGroupRepo(stores),
+			);
+
+			const userServiceLayer = UserServiceLive.pipe(
+				Layer.provide(Layer.mergeAll(userRepoLayer, TestCryptoLayer)),
+			);
+			const principalServiceLayer = PrincipalServiceLive.pipe(
+				Layer.provide(principalRepoLayer),
+			);
+			const collectionServiceLayer = CollectionServiceLive.pipe(
+				Layer.provide(collectionRepoLayer),
+			);
+			const instanceServiceLayer = InstanceServiceLive.pipe(
+				Layer.provide(instanceRepoLayer),
+			);
+			const groupServiceLayer = GroupServiceLive.pipe(
+				Layer.provide(groupRepoLayer),
+			);
+
+			return Layer.mergeAll(
+				TestCryptoLayer,
+				userServiceLayer,
+				principalServiceLayer,
+				collectionServiceLayer,
+				instanceServiceLayer,
+				groupServiceLayer,
+			);
+		},
+	};
+
+	return self;
+};

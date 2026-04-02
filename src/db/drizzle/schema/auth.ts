@@ -29,9 +29,5 @@ export const authUser = pgTable(
 			table.authSource,
 			table.authId,
 		),
-		unique("auth_user_auth_source_auth_id_unique").on(
-			table.authSource,
-			table.authId,
-		),
 	],
 );

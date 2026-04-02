@@ -21,6 +21,7 @@
       "devDependencies": {
         "@biomejs/biome": "2.4.9",
         "@effect/language-service": "^0.84.2",
+        "@electric-sql/pglite": "^0.4.2",
         "@types/bun": "^1.3.11",
         "drizzle-kit": "beta",
         "typescript": "^6",
@@ -103,6 +104,8 @@
     "@effect/sql": ["@effect/sql@0.51.0", "", { "dependencies": { "uuid": "^11.0.3" }, "peerDependencies": { "@effect/experimental": "^0.60.0", "@effect/platform": "^0.96.0", "effect": "^3.21.0" } }, "sha512-e7hWe46QD15eMCr4kNBMVdItIVK/WLHJG+d8DLL1FjVf5Ra82k2mwUYIXplJewVbHjt3my6GSKPPd1ZrQjVd5A=="],
 
     "@effect/workflow": ["@effect/workflow@0.18.0", "", { "peerDependencies": { "@effect/experimental": "^0.60.0", "@effect/platform": "^0.96.0", "@effect/rpc": "^0.75.0", "effect": "^3.21.0" } }, "sha512-9Zp+x9ADtR0H6CRhU6wLyPcIRjO1PXjvSpUlFlBQ8piw7ldjPmnUWEY8YQuH6eExV2dalQ4z2LMiZ5Bd7XAJbA=="],
+
+    "@electric-sql/pglite": ["@electric-sql/pglite@0.4.2", "", {}, "sha512-1GUUl/MZpy5QWgWisD3Epho3GkJrZ1MzVgQpo2pifQWUs96F9rXKZxeVLPhkwFYck34CH/kQ8lis6wX9ifn3kg=="],
 
     "@esbuild/aix-ppc64": ["@esbuild/aix-ppc64@0.25.12", "", { "os": "aix", "cpu": "ppc64" }, "sha512-Hhmwd6CInZ3dwpuGTF8fJG6yoWmsToE+vYgD4nytZVxcu1ulHpUQRAB1UJ8+N1Am3Mz4+xOByoQoSZf4D+CpkA=="],
 

@@ -11,13 +11,11 @@ import type { GroupWithPrincipal } from "./repository.ts";
 
 export interface NewGroup {
 	readonly slug: Slug;
-	readonly primaryName: string;
 	readonly displayName?: string;
 }
 
 export interface UpdateGroup {
 	readonly displayName?: string;
-	readonly primaryName?: string;
 }
 
 // ---------------------------------------------------------------------------

@@ -1,20 +1,11 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { Effect, Layer, Option } from "effect";
 import { DatabaseClient, type DbClient } from "#src/db/client.ts";
-import {
-	group,
-	groupName,
-	membership,
-	principal,
-} from "#src/db/drizzle/schema/index.ts";
+import { group, membership, principal } from "#src/db/drizzle/schema/index.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
 import type { GroupId, UserId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
-import {
-	type GroupNameRow,
-	GroupRepository,
-	type GroupWithPrincipal,
-} from "./repository.ts";
+import { GroupRepository, type GroupWithPrincipal } from "./repository.ts";
 
 // ---------------------------------------------------------------------------
 // GroupRepository — Drizzle implementation
@@ -27,7 +18,6 @@ const findById = (db: DbClient, id: GroupId) =>
 				.select()
 				.from(group)
 				.innerJoin(principal, eq(principal.id, group.principalId))
-				.leftJoin(groupName, eq(groupName.id, group.primaryName))
 				.where(and(eq(group.id, id), isNull(principal.deletedAt)))
 				.limit(1)
 				.then((r) => {
@@ -38,21 +28,8 @@ const findById = (db: DbClient, id: GroupId) =>
 					return Option.some({
 						principal: row.principal,
 						group: row.group,
-						primaryGroupName: (row.group_name as GroupNameRow | null) ?? null,
 					} satisfies GroupWithPrincipal);
 				}),
-		catch: (e) => new DatabaseError({ cause: e }),
-	});
-
-const findByName = (db: DbClient, name: string) =>
-	Effect.tryPromise({
-		try: () =>
-			db
-				.select()
-				.from(groupName)
-				.where(eq(groupName.name, name))
-				.limit(1)
-				.then((r) => Option.fromNullable(r[0] as GroupNameRow | undefined)),
 		catch: (e) => new DatabaseError({ cause: e }),
 	});
 
@@ -60,14 +37,12 @@ const create = (
 	db: DbClient,
 	input: {
 		readonly slug: Slug;
-		readonly primaryName: string;
 		readonly displayName?: string;
 	},
 ) =>
 	Effect.tryPromise({
 		try: () =>
 			db.transaction(async (tx) => {
-				// 1. Insert principal
 				const principalRows = await tx
 					.insert(principal)
 					.values({
@@ -81,7 +56,6 @@ const create = (
 					throw new Error("principal insert returned no rows");
 				}
 
-				// 2. Insert group (primaryName null initially — circular FK)
 				const groupRows = await tx
 					.insert(group)
 					.values({ principalId: principalRow.id })
@@ -91,32 +65,7 @@ const create = (
 					throw new Error("group insert returned no rows");
 				}
 
-				// 3. Insert group_name
-				const nameRows = await tx
-					.insert(groupName)
-					.values({ groupId: groupRow.id, name: input.primaryName })
-					.returning();
-				const nameRow = nameRows[0];
-				if (!nameRow) {
-					throw new Error("group_name insert returned no rows");
-				}
-
-				// 4. Back-patch group.primaryName
-				const updatedGroupRows = await tx
-					.update(group)
-					.set({ primaryName: nameRow.id, updatedAt: sql`now()` })
-					.where(eq(group.id, groupRow.id))
-					.returning();
-				const updatedGroup = updatedGroupRows[0];
-				if (!updatedGroup) {
-					throw new Error("group update returned no rows");
-				}
-
-				return {
-					principal: principalRow,
-					group: updatedGroup,
-					primaryGroupName: nameRow,
-				} satisfies GroupWithPrincipal;
+				return { principal: principalRow, group: groupRow } satisfies GroupWithPrincipal;
 			}),
 		catch: (e) => new DatabaseError({ cause: e }),
 	});
@@ -124,7 +73,7 @@ const create = (
 const update = (
 	db: DbClient,
 	id: GroupId,
-	input: { readonly displayName?: string; readonly primaryName?: string },
+	input: { readonly displayName?: string },
 ) =>
 	Effect.tryPromise({
 		try: async () => {
@@ -136,20 +85,10 @@ const update = (
 					.where(and(eq(group.id, id), eq(principal.id, group.principalId)));
 			}
 
-			if (input.primaryName !== undefined) {
-				// Update the name of the group's primary group_name entry
-				await db
-					.update(groupName)
-					.set({ name: input.primaryName, updatedAt: sql`now()` })
-					.from(group)
-					.where(and(eq(group.id, id), eq(groupName.id, group.primaryName)));
-			}
-
 			const rows = await db
 				.select()
 				.from(group)
 				.innerJoin(principal, eq(principal.id, group.principalId))
-				.leftJoin(groupName, eq(groupName.id, group.primaryName))
 				.where(and(eq(group.id, id), isNull(principal.deletedAt)))
 				.limit(1);
 
@@ -157,11 +96,7 @@ const update = (
 			if (!row) {
 				throw new Error(`Group not found after update: ${id}`);
 			}
-			return {
-				principal: row.principal,
-				group: row.group,
-				primaryGroupName: (row.group_name as GroupNameRow | null) ?? null,
-			} satisfies GroupWithPrincipal;
+			return { principal: row.principal, group: row.group } satisfies GroupWithPrincipal;
 		},
 		catch: (e) => new DatabaseError({ cause: e }),
 	});
@@ -208,7 +143,6 @@ export const GroupRepositoryLive = Layer.effect(
 	Effect.map(DatabaseClient, (db) =>
 		GroupRepository.of({
 			findById: (id) => findById(db, id),
-			findByName: (name) => findByName(db, name),
 			create: (input) => create(db, input),
 			update: (id, input) => update(db, id, input),
 			addMember: (groupId, userId) => addMember(db, groupId, userId),

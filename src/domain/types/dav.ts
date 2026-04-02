@@ -40,7 +40,12 @@ export type DavCapabilityClass =
 // Collection / entity / content type discriminators
 // ---------------------------------------------------------------------------
 
-export type CollectionType = "collection" | "calendar" | "addressbook";
+export type CollectionType =
+	| "collection"
+	| "calendar"
+	| "addressbook"
+	| "inbox"
+	| "outbox";
 export type EntityType = "icalendar" | "vcard";
 export type ContentType = "text/calendar" | "text/vcard";
 

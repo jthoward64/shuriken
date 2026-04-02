@@ -1,122 +1,145 @@
-import { newEnforcer, newModelFromString } from "casbin";
-import DrizzleAdapter, { type DrizzleAdapterOptions } from "drizzle-adapter";
-import { Array as Arr, Effect, Layer, Option } from "effect";
-import { DatabaseClient } from "#src/db/client.ts";
-import { casbinRule } from "#src/db/drizzle/schema.ts";
+import { Array as Arr, Effect, Layer } from "effect";
 import { needPrivileges } from "#src/domain/errors.ts";
 import type { PrincipalId } from "#src/domain/ids.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
-import type { ResourceUrl } from "#src/domain/types/path.ts";
+import { AclRepository } from "./repository.ts";
 import { AclService } from "./service.ts";
 
 // ---------------------------------------------------------------------------
-// Casbin model — WebDAV ACL (RFC 3744)
+// Privilege hierarchy (RFC 3744 §3 + CalDAV §6)
+//
+// expandContainers(p) returns p plus all aggregate privileges that contain p.
+// When checking whether a principal has privilege P, we look for any ACE
+// granting P or any aggregate that implies P.
 // ---------------------------------------------------------------------------
 
-const MODEL_TEXT = `
-[request_definition]
-r = sub, res, act
+const PRIVILEGE_CONTAINERS: Readonly<
+	Partial<Record<DavPrivilege, ReadonlyArray<DavPrivilege>>>
+> = {
+	"DAV:write-properties": ["DAV:write", "DAV:all"],
+	"DAV:write-content": ["DAV:write", "DAV:all"],
+	"DAV:bind": ["DAV:write", "DAV:all"],
+	"DAV:unbind": ["DAV:write", "DAV:all"],
+	"DAV:write": ["DAV:all"],
+	"DAV:read": ["DAV:all"],
+	"DAV:unlock": ["DAV:all"],
+	"DAV:read-acl": ["DAV:all"],
+	"DAV:read-current-user-privilege-set": ["DAV:all"],
+	"DAV:write-acl": ["DAV:all"],
+	"CALDAV:schedule-deliver-invite": ["CALDAV:schedule-deliver", "DAV:all"],
+	"CALDAV:schedule-deliver-reply": ["CALDAV:schedule-deliver", "DAV:all"],
+	"CALDAV:schedule-deliver": ["DAV:all"],
+	"CALDAV:schedule-query-freebusy": ["CALDAV:schedule-send", "DAV:all"],
+	"CALDAV:schedule-send-invite": ["CALDAV:schedule-send", "DAV:all"],
+	"CALDAV:schedule-send-reply": ["CALDAV:schedule-send", "DAV:all"],
+	"CALDAV:schedule-send-freebusy": ["CALDAV:schedule-send", "DAV:all"],
+	"CALDAV:schedule-send": ["DAV:all"],
+};
 
-[policy_definition]
-p = sub, res, act, eft, priority
+// All privileges contained within each aggregate (for currentUserPrivileges expansion)
+const PRIVILEGE_CONTAINED: Readonly<
+	Partial<Record<DavPrivilege, ReadonlyArray<DavPrivilege>>>
+> = {
+	"DAV:write": [
+		"DAV:write-properties",
+		"DAV:write-content",
+		"DAV:bind",
+		"DAV:unbind",
+	],
+	"DAV:all": [
+		"DAV:read",
+		"DAV:write",
+		"DAV:write-properties",
+		"DAV:write-content",
+		"DAV:bind",
+		"DAV:unbind",
+		"DAV:unlock",
+		"DAV:read-acl",
+		"DAV:read-current-user-privilege-set",
+		"DAV:write-acl",
+		"CALDAV:schedule-deliver",
+		"CALDAV:schedule-deliver-invite",
+		"CALDAV:schedule-deliver-reply",
+		"CALDAV:schedule-query-freebusy",
+		"CALDAV:schedule-send",
+		"CALDAV:schedule-send-invite",
+		"CALDAV:schedule-send-reply",
+		"CALDAV:schedule-send-freebusy",
+	],
+	"CALDAV:schedule-deliver": [
+		"CALDAV:schedule-deliver-invite",
+		"CALDAV:schedule-deliver-reply",
+	],
+	"CALDAV:schedule-send": [
+		"CALDAV:schedule-send-invite",
+		"CALDAV:schedule-send-reply",
+		"CALDAV:schedule-send-freebusy",
+		"CALDAV:schedule-query-freebusy",
+	],
+};
 
-[role_definition]
-g = _, _
-g2 = _, _
+/** Returns the privilege itself plus all aggregates that contain it. */
+function expandContainers(p: DavPrivilege): ReadonlyArray<DavPrivilege> {
+	return [p, ...(PRIVILEGE_CONTAINERS[p] ?? [])];
+}
 
-[policy_effect]
-e = priority(p.eft) || deny
+/** Returns all concrete privileges implied by a granted aggregate (or the privilege itself). */
+function expandContained(p: DavPrivilege): ReadonlyArray<DavPrivilege> {
+	return [p, ...(PRIVILEGE_CONTAINED[p] ?? [])];
+}
 
-[matchers]
-m = (g(r.sub, p.sub) || r.sub == p.sub) && globMatch(r.res, p.res) && (r.act == p.act || g2(r.act, p.act))
-`;
-
-// Full set of privileges to enumerate for currentUserPrivileges.
-const ALL_PRIVILEGES: ReadonlyArray<DavPrivilege> = [
-	"DAV:read",
-	"DAV:write",
-	"DAV:write-properties",
-	"DAV:write-content",
-	"DAV:unlock",
-	"DAV:read-acl",
-	"DAV:read-current-user-privilege-set",
-	"DAV:write-acl",
-	"DAV:bind",
-	"DAV:unbind",
-	"DAV:all",
-	"CALDAV:schedule-deliver",
-	"CALDAV:schedule-deliver-invite",
-	"CALDAV:schedule-deliver-reply",
-	"CALDAV:schedule-query-freebusy",
-	"CALDAV:schedule-send",
-	"CALDAV:schedule-send-invite",
-	"CALDAV:schedule-send-reply",
-	"CALDAV:schedule-send-freebusy",
-];
-
-/** Format the casbin subject for a stored principal UUID. */
-const principalSubject = (id: PrincipalId): string => `principal:${id}`;
+// ---------------------------------------------------------------------------
+// AclServiceLive
+// ---------------------------------------------------------------------------
 
 export const AclServiceLive = Layer.effect(
 	AclService,
 	Effect.gen(function* () {
-		const db = yield* DatabaseClient;
+		const repo = yield* AclRepository;
 
-		const enforcer = yield* Effect.promise(async () => {
-			const adapter = await DrizzleAdapter.newAdapter({
-				db,
-				// Our schema uses text columns rather than varchar, so it is not in
-				// the adapter's closed table-type union. Column names are identical,
-				// making the cast safe at runtime.
-				table: casbinRule as unknown as DrizzleAdapterOptions["table"],
-			});
-			return newEnforcer(newModelFromString(MODEL_TEXT), adapter);
-		});
+		const resolvePrincipalIds = (
+			principalId: PrincipalId,
+		): Effect.Effect<ReadonlyArray<PrincipalId>, never> =>
+			repo
+				.getGroupPrincipalIds(principalId)
+				.pipe(
+					Effect.map((groupIds) => [principalId, ...groupIds]),
+					Effect.orElseSucceed(() => [principalId]),
+				);
 
 		return AclService.of({
-			check: (
-				principalId: PrincipalId,
-				resourceUrl: ResourceUrl,
-				privilege: DavPrivilege,
-			) =>
+			check: (principalId, resourceUrl, privilege) =>
 				Effect.gen(function* () {
-					const subject = principalSubject(principalId);
-					yield* Effect.promise(() =>
-						enforcer.addRoleForUser(subject, "DAV:authenticated"),
-					);
-					const allowed = yield* Effect.promise(() =>
-						enforcer.enforce(subject, resourceUrl, privilege),
+					const principalIds = yield* resolvePrincipalIds(principalId);
+					const privileges = expandContainers(privilege);
+					const allowed = yield* repo.hasPrivilege(
+						principalIds,
+						resourceUrl,
+						privileges,
+						true,
 					);
 					if (!allowed) {
 						return yield* Effect.fail(needPrivileges());
 					}
 				}),
 
-			currentUserPrivileges: (
-				principalId: PrincipalId,
-				resourceUrl: ResourceUrl,
-			) =>
+			currentUserPrivileges: (principalId, resourceUrl) =>
 				Effect.gen(function* () {
-					const subject = principalSubject(principalId);
-					yield* Effect.promise(() =>
-						enforcer.addRoleForUser(subject, "DAV:authenticated"),
+					const principalIds = yield* resolvePrincipalIds(principalId);
+					const grantedAggregates = yield* repo.getGrantedPrivileges(
+						principalIds,
+						resourceUrl,
+						true,
 					);
-					const results = yield* Effect.all(
-						ALL_PRIVILEGES.map((priv) =>
-							Effect.promise(() =>
-								enforcer.enforce(subject, resourceUrl, priv),
-							).pipe(
-								Effect.map((allowed) =>
-									allowed ? Option.some(priv) : Option.none(),
-								),
-							),
-						),
-						{ concurrency: "unbounded" },
-					);
-					return Arr.filterMap(results, (x) => x);
+					// Expand each granted privilege to all privileges it implies
+					const expanded = new Set<DavPrivilege>();
+					for (const p of grantedAggregates) {
+						for (const contained of expandContained(p)) {
+							expanded.add(contained);
+						}
+					}
+					return Arr.fromIterable(expanded);
 				}),
 		});
 	}),
 );
-
-export { needPrivileges } from "#src/domain/errors.ts";

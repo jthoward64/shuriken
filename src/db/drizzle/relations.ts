@@ -59,10 +59,6 @@ export const relations = defineRelations(schema, (r) => ({
 			from: r.principal.id.through(r.davCollection.ownerPrincipalId),
 			to: r.davCollection.id.through(r.davCollection.parentCollectionId),
 		}),
-		groupNames: r.many.groupName({
-			from: r.principal.id.through(r.group.principalId),
-			to: r.groupName.id.through(r.group.primaryName),
-		}),
 		users: r.many.user(),
 	},
 	davCollection: {
@@ -97,19 +93,15 @@ export const relations = defineRelations(schema, (r) => ({
 			from: r.davScheduleMessage.collectionId,
 			to: r.davCollection.id,
 		}),
+		davEntity: r.one.davEntity({
+			from: r.davScheduleMessage.entityId,
+			to: r.davEntity.id,
+		}),
 	},
 	davInstance: {
 		davEntities: r.many.davEntity(),
 	},
-	groupName: {
-		principals: r.many.principal(),
-		group: r.one.group({
-			from: r.groupName.groupId,
-			to: r.group.id,
-		}),
-	},
 	group: {
-		groupNames: r.many.groupName(),
 		users: r.many.user({
 			from: r.group.id.through(r.membership.groupId),
 			to: r.user.id.through(r.membership.userId),
