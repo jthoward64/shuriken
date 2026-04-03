@@ -41,7 +41,7 @@ All application logic must use [Effect](https://effect.website) (`effect` packag
   - Extract as nullable: `Option.getOrUndefined(opt)` / `Option.getOrNull(opt)` instead of `isSome(opt) ? opt.value : undefined`
   - Branch on Some/None: `Option.match(opt, { onSome: f, onNone: g })` instead of ternary with `.value`
   - The only acceptable use of `isSome`/`isNone` is when no other options apply (for example mapping the option to a failure case)
-- Reference: https://effect.website/llms.txt
+- Reference: index of docs available at https://effect.website/llms.txt and a complete API reference at https://effect-ts.github.io/effect/docs/effect
 
 ## HTTP Server
 
