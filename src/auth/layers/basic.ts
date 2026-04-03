@@ -21,7 +21,7 @@ import { CryptoService } from "#src/platform/crypto.ts";
 
 const BASIC_PREFIX = "Basic ";
 
-const parseBasicAuth = (
+export const parseBasicAuth = (
 	headers: Headers,
 ): Option.Option<{ username: string; password: Redacted.Redacted<string> }> => {
 	const authorization = headers.get("Authorization");

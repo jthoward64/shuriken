@@ -1,8 +1,18 @@
 import { Effect, Layer, Option, Redacted } from "effect";
 import { Temporal } from "temporal-polyfill";
+import type { DavPrivilege } from "#src/domain/types/dav.ts";
 import type { Slug } from "#src/domain/types/path.ts";
 import type { Email } from "#src/domain/types/strings.ts";
 import { CryptoService } from "#src/platform/crypto.ts";
+import {
+	AclRepository,
+	type AclRepositoryShape,
+	type AclResourceType,
+	type AceRow,
+	type NewAce,
+} from "#src/services/acl/repository.ts";
+import { AclServiceLive } from "#src/services/acl/service.live.ts";
+import type { AclService } from "#src/services/acl/service.ts";
 import {
 	CollectionRepository,
 	type CollectionRepositoryShape,
@@ -79,6 +89,7 @@ export interface TestStores {
 	readonly groupPrincipals: Map<string, PrincipalRow>; // principal.id → PrincipalRow (groups only)
 	readonly groups: Map<string, GroupRow>; // group.id → GroupRow
 	readonly memberships: Map<string, Set<string>>; // groupId → Set<userId>
+	readonly acl: Map<string, Array<AceRow>>; // resourceId → all ACEs for that resource
 }
 
 const makeStores = (): TestStores => ({
@@ -90,6 +101,7 @@ const makeStores = (): TestStores => ({
 	groupPrincipals: new Map(),
 	groups: new Map(),
 	memberships: new Map(),
+	acl: new Map(),
 });
 
 // ---------------------------------------------------------------------------
@@ -134,6 +146,22 @@ export interface CredentialSeedData {
 	readonly authSource: string;
 	readonly authId: string;
 	readonly authCredential?: Redacted.Redacted<string>;
+}
+
+export interface AceSeedData {
+	readonly resourceType: AclResourceType;
+	readonly resourceId: string;
+	readonly principalType:
+		| "principal"
+		| "all"
+		| "authenticated"
+		| "unauthenticated"
+		| "self";
+	readonly principalId?: string;
+	readonly privilege: DavPrivilege;
+	readonly grantDeny?: "grant" | "deny";
+	readonly protected?: boolean;
+	readonly ordinal?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -489,6 +517,125 @@ const makeInstanceRepo = (stores: TestStores): InstanceRepositoryShape => ({
 		}),
 });
 
+// ---------------------------------------------------------------------------
+// Principal-matching helper — mirrors the SQL logic in repository.live.ts
+// ---------------------------------------------------------------------------
+
+const matchesPrincipal = (
+	ace: AceRow,
+	principalIds: ReadonlyArray<string>,
+	isAuthenticated: boolean,
+): boolean => {
+	if (ace.principalType === "all") {
+		return true;
+	}
+	if (ace.principalType === "authenticated") {
+		return isAuthenticated;
+	}
+	if (ace.principalType === "unauthenticated") {
+		return !isAuthenticated;
+	}
+	if (ace.principalType === "principal" && ace.principalId !== null) {
+		return principalIds.includes(ace.principalId);
+	}
+	return false;
+};
+
+const makeAclRepo = (stores: TestStores): AclRepositoryShape => ({
+	getAces: (resourceId, resourceType) =>
+		Effect.succeed(
+			(stores.acl.get(resourceId) ?? [])
+				.filter((a) => a.resourceType === resourceType)
+				.sort((a, b) => a.ordinal - b.ordinal),
+		),
+
+	setAces: (resourceId, resourceType, aces) =>
+		Effect.sync(() => {
+			const existing = stores.acl.get(resourceId) ?? [];
+			const kept = existing.filter(
+				(a) => a.resourceType !== resourceType || a.protected,
+			);
+			const now = Temporal.Now.instant();
+			const newRows: Array<AceRow> = aces.map((ace) => ({
+				id: crypto.randomUUID(),
+				resourceType: ace.resourceType,
+				resourceId: ace.resourceId,
+				principalType: ace.principalType,
+				principalId: ace.principalId ?? null,
+				privilege: ace.privilege,
+				grantDeny: ace.grantDeny,
+				protected: ace.protected,
+				ordinal: ace.ordinal,
+				updatedAt: now,
+			}));
+			stores.acl.set(resourceId, [...kept, ...newRows]);
+		}),
+
+	grantAce: (ace: NewAce) =>
+		Effect.sync(() => {
+			const existing = stores.acl.get(ace.resourceId) ?? [];
+			stores.acl.set(ace.resourceId, [
+				...existing,
+				{
+					id: crypto.randomUUID(),
+					resourceType: ace.resourceType,
+					resourceId: ace.resourceId,
+					principalType: ace.principalType,
+					principalId: ace.principalId ?? null,
+					privilege: ace.privilege,
+					grantDeny: ace.grantDeny,
+					protected: ace.protected,
+					ordinal: ace.ordinal,
+					updatedAt: Temporal.Now.instant(),
+				},
+			]);
+		}),
+
+	hasPrivilege: (principalIds, resourceId, privileges, isAuthenticated) =>
+		Effect.succeed(
+			(stores.acl.get(resourceId) ?? []).some(
+				(ace) =>
+					ace.grantDeny === "grant" &&
+					(privileges as ReadonlyArray<string>).includes(ace.privilege) &&
+					matchesPrincipal(ace, principalIds, isAuthenticated),
+			),
+		),
+
+	getGrantedPrivileges: (principalIds, resourceId, isAuthenticated) =>
+		Effect.succeed(
+			[
+				...new Set(
+					(stores.acl.get(resourceId) ?? [])
+						.filter(
+							(ace) =>
+								ace.grantDeny === "grant" &&
+								matchesPrincipal(ace, principalIds, isAuthenticated),
+						)
+						.map((ace) => ace.privilege as DavPrivilege),
+				),
+			],
+		),
+
+	getGroupPrincipalIds: (userPrincipalId) =>
+		Effect.sync(() => {
+			const userRow = [...stores.users.values()].find(
+				(u) => u.principalId === userPrincipalId,
+			);
+			if (!userRow) {
+				return [];
+			}
+			return [...stores.memberships.entries()]
+				.filter(([, members]) => members.has(userRow.id))
+				.flatMap(([groupId]) => {
+					const groupRow = stores.groups.get(groupId);
+					if (!groupRow) {
+						return [];
+					}
+					return [groupRow.principalId as import("#src/domain/ids.ts").PrincipalId];
+				});
+		}),
+});
+
 const makeGroupRepo = (stores: TestStores): GroupRepositoryShape => ({
 	findById: (id) =>
 		Effect.succeed(
@@ -593,10 +740,12 @@ export interface TestEnvBuilder {
 	withInstance(seed: InstanceSeedData): TestEnvBuilder;
 	/** Seed a credential row for an existing user. */
 	withCredential(seed: CredentialSeedData): TestEnvBuilder;
+	/** Seed an ACE (Access Control Entry) on a resource. */
+	withAce(seed: AceSeedData): TestEnvBuilder;
 	/**
 	 * Build a fully-wired Effect Layer from the current state of the stores.
 	 * Provides UserService, CollectionService, GroupService, InstanceService,
-	 * PrincipalService, and CryptoService (TestCryptoLayer).
+	 * PrincipalService, AclService, and CryptoService (TestCryptoLayer).
 	 */
 	toLayer(): Layer.Layer<
 		| UserService
@@ -604,6 +753,7 @@ export interface TestEnvBuilder {
 		| GroupService
 		| InstanceService
 		| PrincipalService
+		| AclService
 		| CryptoService
 	>;
 	/** Direct store access for advanced assertions. Prefer reading via services. */
@@ -735,6 +885,27 @@ export const makeTestEnv = (): TestEnvBuilder => {
 			return self;
 		},
 
+		withAce(seed: AceSeedData) {
+			const now = Temporal.Now.instant();
+			const existing = stores.acl.get(seed.resourceId) ?? [];
+			stores.acl.set(seed.resourceId, [
+				...existing,
+				{
+					id: crypto.randomUUID(),
+					resourceType: seed.resourceType,
+					resourceId: seed.resourceId,
+					principalType: seed.principalType,
+					principalId: seed.principalId ?? null,
+					privilege: seed.privilege,
+					grantDeny: seed.grantDeny ?? "grant",
+					protected: seed.protected ?? false,
+					ordinal: seed.ordinal ?? 0,
+					updatedAt: now,
+				},
+			]);
+			return self;
+		},
+
 		toLayer() {
 			const userRepoLayer = Layer.succeed(UserRepository, makeUserRepo(stores));
 			const principalRepoLayer = Layer.succeed(
@@ -753,6 +924,7 @@ export const makeTestEnv = (): TestEnvBuilder => {
 				GroupRepository,
 				makeGroupRepo(stores),
 			);
+			const aclRepoLayer = Layer.succeed(AclRepository, makeAclRepo(stores));
 
 			const userServiceLayer = UserServiceLive.pipe(
 				Layer.provide(Layer.mergeAll(userRepoLayer, TestCryptoLayer)),
@@ -769,6 +941,9 @@ export const makeTestEnv = (): TestEnvBuilder => {
 			const groupServiceLayer = GroupServiceLive.pipe(
 				Layer.provide(groupRepoLayer),
 			);
+			const aclServiceLayer = AclServiceLive.pipe(
+				Layer.provide(aclRepoLayer),
+			);
 
 			return Layer.mergeAll(
 				TestCryptoLayer,
@@ -777,6 +952,7 @@ export const makeTestEnv = (): TestEnvBuilder => {
 				collectionServiceLayer,
 				instanceServiceLayer,
 				groupServiceLayer,
+				aclServiceLayer,
 			);
 		},
 	};

@@ -1,9 +1,10 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 import { Effect, Layer, Option, Redacted } from "effect";
+import type { DatabaseError } from "#src/domain/errors.ts";
 import { UserId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import { Email } from "#src/domain/types/strings.ts";
-import { runSuccess } from "#src/testing/effect.ts";
+import { runFailure, runSuccess } from "#src/testing/effect.ts";
 import { makePgliteDatabaseLayer } from "#src/testing/pglite.ts";
 import { UserRepositoryLive } from "./repository.live.ts";
 import { UserRepository } from "./repository.ts";
@@ -328,5 +329,129 @@ describe("UserRepository credential lifecycle (integration)", () => {
 
 		expect(Option.isSome(result.before)).toBe(true);
 		expect(Option.isNone(result.after)).toBe(true);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// findById — not found
+// ---------------------------------------------------------------------------
+
+describe("UserRepository.findById — not found (integration)", () => {
+	let layer: TestLayer;
+
+	beforeAll(() => {
+		layer = makeTestLayer();
+	});
+
+	it("returns None for an id that was never inserted", async () => {
+		const result = await runSuccess(
+			UserRepository.pipe(
+				Effect.flatMap((r) => r.findById(UserId(crypto.randomUUID()))),
+				Effect.provide(layer),
+				Effect.orDie,
+			),
+		);
+		expect(Option.isNone(result)).toBe(true);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// update — email branch (covers repository.live.ts line 134)
+// ---------------------------------------------------------------------------
+
+describe("UserRepository.update — email branch (integration)", () => {
+	let layer: TestLayer;
+
+	beforeAll(() => {
+		layer = makeTestLayer();
+	});
+
+	it("updating email persists the new address", async () => {
+		const result = await runSuccess(
+			UserRepository.pipe(
+				Effect.flatMap((r) =>
+					Effect.gen(function* () {
+						const created = yield* r.create({
+							slug: Slug("email-user"),
+							name: "Email User",
+							email: Email("old@example.com"),
+							credentials: [],
+						});
+						return yield* r.update(UserId(created.user.id), {
+							email: Email("new@example.com"),
+						});
+					}),
+				),
+				Effect.provide(layer),
+				Effect.orDie,
+			),
+		);
+
+		expect(result.user.email).toBe("new@example.com");
+		expect(result.user.name).toBe("Email User");
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Unique constraint violations
+// ---------------------------------------------------------------------------
+
+describe("UserRepository unique constraint violations (integration)", () => {
+	let layer: TestLayer;
+
+	beforeAll(() => {
+		layer = makeTestLayer();
+	});
+
+	it("two users with the same email fails with DatabaseError", async () => {
+		const err = (await runFailure(
+			UserRepository.pipe(
+				Effect.flatMap((r) =>
+					Effect.gen(function* () {
+						yield* r.create({
+							slug: Slug("dup-email-a"),
+							name: "Dup A",
+							email: Email("dup@example.com"),
+							credentials: [],
+						});
+						yield* r.create({
+							slug: Slug("dup-email-b"),
+							name: "Dup B",
+							email: Email("dup@example.com"),
+							credentials: [],
+						});
+					}),
+				),
+				Effect.provide(layer),
+			),
+		)) as DatabaseError;
+
+		expect(err._tag).toBe("DatabaseError");
+	});
+
+	it("two principals with the same slug fails with DatabaseError", async () => {
+		const err = (await runFailure(
+			UserRepository.pipe(
+				Effect.flatMap((r) =>
+					Effect.gen(function* () {
+						yield* r.create({
+							slug: Slug("dup-slug"),
+							name: "Dup Slug A",
+							email: Email("dup-slug-a@example.com"),
+							credentials: [],
+						});
+						yield* r.create({
+							slug: Slug("dup-slug"),
+							name: "Dup Slug B",
+							email: Email("dup-slug-b@example.com"),
+							credentials: [],
+						});
+					}),
+				),
+				Effect.provide(layer),
+			),
+		)) as DatabaseError;
+
+		expect(err._tag).toBe("DatabaseError");
 	});
 });

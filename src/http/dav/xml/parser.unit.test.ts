@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
+import type { XmlParseError } from "#src/domain/errors.ts";
+import { runFailure } from "#src/testing/effect.ts";
 import { parseXml } from "./parser.ts";
 
 // ---------------------------------------------------------------------------
@@ -119,5 +121,17 @@ describe("parseXml", () => {
 		const set = mk["D:set"] as Record<string, unknown>;
 		const prop = set["D:prop"] as Record<string, unknown>;
 		expect(prop["D:displayname"]).toBe("My Calendar");
+	});
+
+	// --- Malformed XML → XmlParseError ----------------------------------------
+
+	it("fails with XmlParseError for an unterminated attribute value", async () => {
+		// fast-xml-parser throws on an unterminated attribute value — the most
+		// reliable trigger for its validation path
+		const err = (await runFailure(
+			parseXml('<root attr="unclosed>'),
+		)) as XmlParseError;
+
+		expect(err._tag).toBe("XmlParseError");
 	});
 });

@@ -23,7 +23,7 @@ import {
 // TRUSTED_PROXIES="127.0.0.1,::1" → exact IP match (CIDR not yet supported)
 // ---------------------------------------------------------------------------
 
-const isClientTrusted = (
+export const isClientTrusted = (
 	clientIp: Option.Option<string>,
 	trustedProxies: string,
 ): boolean =>

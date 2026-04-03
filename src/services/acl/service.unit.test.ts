@@ -1,0 +1,313 @@
+import { describe, expect, it } from "bun:test";
+import { Effect } from "effect";
+import type { DavError } from "#src/domain/errors.ts";
+import { PrincipalId } from "#src/domain/ids.ts";
+import { ResourceUrl } from "#src/domain/types/path.ts";
+import { HTTP_FORBIDDEN } from "#src/http/status.ts";
+import { runFailure, runSuccess } from "#src/testing/effect.ts";
+import { makeTestEnv } from "#src/testing/env.ts";
+import { AclService } from "./service.ts";
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const RESOURCE = ResourceUrl("/dav/principals/alice/my-cal");
+
+// ---------------------------------------------------------------------------
+// AclService.check — privilege hierarchy
+// ---------------------------------------------------------------------------
+
+describe("AclService.check", () => {
+	it("passes when the principal has exactly the required privilege", async () => {
+		const principalId = PrincipalId(crypto.randomUUID());
+		const env = makeTestEnv().withAce({
+			resourceType: "collection",
+			resourceId: RESOURCE,
+			principalType: "principal",
+			principalId,
+			privilege: "DAV:read",
+			grantDeny: "grant",
+		});
+		await runSuccess(
+			AclService.pipe(
+				Effect.flatMap((s) => s.check(principalId, RESOURCE, "DAV:read")),
+				Effect.provide(env.toLayer()),
+				Effect.orDie,
+			),
+		);
+	});
+
+	it("passes via container: DAV:write satisfies a DAV:write-content check", async () => {
+		// expandContainers("DAV:write-content") → [DAV:write-content, DAV:write, DAV:all]
+		// Granting DAV:write means a check for DAV:write-content should pass.
+		const principalId = PrincipalId(crypto.randomUUID());
+		const env = makeTestEnv().withAce({
+			resourceType: "collection",
+			resourceId: RESOURCE,
+			principalType: "principal",
+			principalId,
+			privilege: "DAV:write",
+			grantDeny: "grant",
+		});
+		await runSuccess(
+			AclService.pipe(
+				Effect.flatMap((s) =>
+					s.check(principalId, RESOURCE, "DAV:write-content"),
+				),
+				Effect.provide(env.toLayer()),
+				Effect.orDie,
+			),
+		);
+	});
+
+	it("passes via DAV:all: granting DAV:all satisfies any privilege check", async () => {
+		const principalId = PrincipalId(crypto.randomUUID());
+		const env = makeTestEnv().withAce({
+			resourceType: "collection",
+			resourceId: RESOURCE,
+			principalType: "principal",
+			principalId,
+			privilege: "DAV:all",
+			grantDeny: "grant",
+		});
+		await runSuccess(
+			AclService.pipe(
+				Effect.flatMap((s) =>
+					s.check(principalId, RESOURCE, "DAV:read-acl"),
+				),
+				Effect.provide(env.toLayer()),
+				Effect.orDie,
+			),
+		);
+	});
+
+	it("fails with 403 DAV:need-privileges when no matching ACE exists", async () => {
+		const principalId = PrincipalId(crypto.randomUUID());
+		const env = makeTestEnv(); // no ACEs
+		const err = (await runFailure(
+			AclService.pipe(
+				Effect.flatMap((s) => s.check(principalId, RESOURCE, "DAV:read")),
+				Effect.provide(env.toLayer()),
+			),
+		)) as DavError;
+		expect(err._tag).toBe("DavError");
+		expect(err.status).toBe(HTTP_FORBIDDEN);
+		expect(err.precondition).toBe("DAV:need-privileges");
+	});
+
+	it("fails when the principal has a different privilege but not the checked one", async () => {
+		const principalId = PrincipalId(crypto.randomUUID());
+		// Grant DAV:read-acl — does NOT satisfy a DAV:read check
+		const env = makeTestEnv().withAce({
+			resourceType: "collection",
+			resourceId: RESOURCE,
+			principalType: "principal",
+			principalId,
+			privilege: "DAV:read-acl",
+			grantDeny: "grant",
+		});
+		const err = (await runFailure(
+			AclService.pipe(
+				Effect.flatMap((s) => s.check(principalId, RESOURCE, "DAV:read")),
+				Effect.provide(env.toLayer()),
+			),
+		)) as DavError;
+		expect(err.status).toBe(HTTP_FORBIDDEN);
+	});
+
+	it("passes when a group the principal belongs to holds the privilege", async () => {
+		const userId = crypto.randomUUID();
+		const groupId = crypto.randomUUID();
+		const groupPrincipalId = crypto.randomUUID();
+
+		const env = makeTestEnv()
+			.withUser({ id: userId })
+			.withGroup({ id: groupId, principalId: groupPrincipalId });
+
+		// Access env.stores to get the user's principalId
+		const userRow = env.stores.users.get(userId);
+		expect(userRow).toBeDefined();
+		const userPrincipalId = PrincipalId(userRow?.principalId ?? "");
+
+		// Add user to group
+		env.stores.memberships.set(groupId, new Set([userId]));
+
+		// Grant privilege to the group's principal, not the user's
+		env.withAce({
+			resourceType: "collection",
+			resourceId: RESOURCE,
+			principalType: "principal",
+			principalId: groupPrincipalId,
+			privilege: "DAV:read",
+			grantDeny: "grant",
+		});
+
+		await runSuccess(
+			AclService.pipe(
+				Effect.flatMap((s) => s.check(userPrincipalId, RESOURCE, "DAV:read")),
+				Effect.provide(env.toLayer()),
+				Effect.orDie,
+			),
+		);
+	});
+
+	it("passes for 'all' principal type regardless of caller identity", async () => {
+		const principalId = PrincipalId(crypto.randomUUID());
+		const env = makeTestEnv().withAce({
+			resourceType: "collection",
+			resourceId: RESOURCE,
+			principalType: "all",
+			privilege: "DAV:read",
+			grantDeny: "grant",
+		});
+		await runSuccess(
+			AclService.pipe(
+				Effect.flatMap((s) => s.check(principalId, RESOURCE, "DAV:read")),
+				Effect.provide(env.toLayer()),
+				Effect.orDie,
+			),
+		);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// AclService.currentUserPrivileges — expandContained
+// ---------------------------------------------------------------------------
+
+describe("AclService.currentUserPrivileges", () => {
+	it("DAV:read returns only itself (no contained privileges)", async () => {
+		const principalId = PrincipalId(crypto.randomUUID());
+		const env = makeTestEnv().withAce({
+			resourceType: "collection",
+			resourceId: RESOURCE,
+			principalType: "principal",
+			principalId,
+			privilege: "DAV:read",
+		});
+		const result = await runSuccess(
+			AclService.pipe(
+				Effect.flatMap((s) =>
+					s.currentUserPrivileges(principalId, RESOURCE),
+				),
+				Effect.provide(env.toLayer()),
+				Effect.orDie,
+			),
+		);
+		expect(result).toHaveLength(1);
+		expect(result).toContain("DAV:read");
+	});
+
+	it("DAV:write expands to include write-properties, write-content, bind, unbind", async () => {
+		const principalId = PrincipalId(crypto.randomUUID());
+		const env = makeTestEnv().withAce({
+			resourceType: "collection",
+			resourceId: RESOURCE,
+			principalType: "principal",
+			principalId,
+			privilege: "DAV:write",
+		});
+		const result = await runSuccess(
+			AclService.pipe(
+				Effect.flatMap((s) =>
+					s.currentUserPrivileges(principalId, RESOURCE),
+				),
+				Effect.provide(env.toLayer()),
+				Effect.orDie,
+			),
+		);
+		expect(result).toContain("DAV:write");
+		expect(result).toContain("DAV:write-properties");
+		expect(result).toContain("DAV:write-content");
+		expect(result).toContain("DAV:bind");
+		expect(result).toContain("DAV:unbind");
+	});
+
+	it("DAV:all expands to the full set of contained privileges", async () => {
+		// This list mirrors PRIVILEGE_CONTAINED["DAV:all"] in service.live.ts plus
+		// "DAV:all" itself (added by expandContained).  Update this list whenever
+		// that constant changes.
+		const expectedPrivileges = [
+			"DAV:all",
+			"DAV:read",
+			"DAV:write",
+			"DAV:write-properties",
+			"DAV:write-content",
+			"DAV:bind",
+			"DAV:unbind",
+			"DAV:unlock",
+			"DAV:read-acl",
+			"DAV:read-current-user-privilege-set",
+			"DAV:write-acl",
+			"CALDAV:schedule-deliver",
+			"CALDAV:schedule-deliver-invite",
+			"CALDAV:schedule-deliver-reply",
+			"CALDAV:schedule-query-freebusy",
+			"CALDAV:schedule-send",
+			"CALDAV:schedule-send-invite",
+			"CALDAV:schedule-send-reply",
+			"CALDAV:schedule-send-freebusy",
+		] as const;
+
+		const principalId = PrincipalId(crypto.randomUUID());
+		const env = makeTestEnv().withAce({
+			resourceType: "collection",
+			resourceId: RESOURCE,
+			principalType: "principal",
+			principalId,
+			privilege: "DAV:all",
+		});
+		const result = await runSuccess(
+			AclService.pipe(
+				Effect.flatMap((s) =>
+					s.currentUserPrivileges(principalId, RESOURCE),
+				),
+				Effect.provide(env.toLayer()),
+				Effect.orDie,
+			),
+		);
+		expect(result).toHaveLength(expectedPrivileges.length);
+		for (const p of expectedPrivileges) {
+			expect(result).toContain(p);
+		}
+	});
+
+	it("CALDAV:schedule-deliver expands to invite and reply children", async () => {
+		const principalId = PrincipalId(crypto.randomUUID());
+		const env = makeTestEnv().withAce({
+			resourceType: "collection",
+			resourceId: RESOURCE,
+			principalType: "principal",
+			principalId,
+			privilege: "CALDAV:schedule-deliver",
+		});
+		const result = await runSuccess(
+			AclService.pipe(
+				Effect.flatMap((s) =>
+					s.currentUserPrivileges(principalId, RESOURCE),
+				),
+				Effect.provide(env.toLayer()),
+				Effect.orDie,
+			),
+		);
+		expect(result).toContain("CALDAV:schedule-deliver");
+		expect(result).toContain("CALDAV:schedule-deliver-invite");
+		expect(result).toContain("CALDAV:schedule-deliver-reply");
+	});
+
+	it("returns empty array when no ACEs exist for the resource", async () => {
+		const principalId = PrincipalId(crypto.randomUUID());
+		const env = makeTestEnv();
+		const result = await runSuccess(
+			AclService.pipe(
+				Effect.flatMap((s) =>
+					s.currentUserPrivileges(principalId, RESOURCE),
+				),
+				Effect.provide(env.toLayer()),
+				Effect.orDie,
+			),
+		);
+		expect(Array.isArray(result)).toBe(true);
+		expect(result).toHaveLength(0);
+	});
+});

@@ -179,6 +179,40 @@ describe("CollectionRepository.listByOwner (integration)", () => {
 		expect(slugs).toEqual(["ab-b", "cal-a"]);
 	});
 
+	it("does not include another owner's collections in the result", async () => {
+		const result = await runSuccess(
+			Effect.gen(function* () {
+				const user = yield* UserRepository;
+				const col = yield* CollectionRepository;
+				const { principal: p1 } = yield* user.create({
+					slug: Slug("owner-a"),
+					name: "Owner A",
+					email: Email("owner-a@example.com"),
+					credentials: [],
+				});
+				const { principal: p2 } = yield* user.create({
+					slug: Slug("owner-b"),
+					name: "Owner B",
+					email: Email("owner-b@example.com"),
+					credentials: [],
+				});
+				yield* col.insert({
+					ownerPrincipalId: PrincipalId(p1.id),
+					collectionType: "calendar",
+					slug: Slug("p1-cal"),
+				});
+				yield* col.insert({
+					ownerPrincipalId: PrincipalId(p2.id),
+					collectionType: "addressbook",
+					slug: Slug("p2-ab"),
+				});
+				return yield* col.listByOwner(PrincipalId(p1.id));
+			}).pipe(Effect.provide(layer), Effect.orDie),
+		);
+		expect(result).toHaveLength(1);
+		expect(result[0]?.slug).toBe("p1-cal");
+	});
+
 	it("excludes soft-deleted collections from listByOwner", async () => {
 		const result = await runSuccess(
 			Effect.gen(function* () {
@@ -304,6 +338,17 @@ describe("CollectionRepository.softDelete (integration)", () => {
 				yield* col.softDelete(id);
 				return yield* col.findById(id);
 			}).pipe(Effect.provide(layer), Effect.orDie),
+		);
+		expect(Option.isNone(result)).toBe(true);
+	});
+
+	it("findById returns None for an id that was never inserted", async () => {
+		const result = await runSuccess(
+			CollectionRepository.pipe(
+				Effect.flatMap((r) => r.findById(CollectionId(crypto.randomUUID()))),
+				Effect.provide(layer),
+				Effect.orDie,
+			),
 		);
 		expect(Option.isNone(result)).toBe(true);
 	});
