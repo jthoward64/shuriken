@@ -11,6 +11,8 @@ CalDAV collections and entries:
 4. Create and retrieve entries (`PUT`, `GET`/`HEAD`)
 5. Discover collections and entries (`PROPFIND`)
 
+This plan is just a general guideline, actual implementation may deviate significantly as needed
+
 ## Key design decisions
 
 ### Normalized-only storage (no raw content column)
@@ -262,10 +264,13 @@ export const extractUid = (doc: IrDocument): Option.Option<string>
 
 ---
 
-### Step 4 — Entity, Component, and Property repositories
+### Step 4 — Entity, Component, and Property repositories + DomainEntityService
 
-These three repositories handle the normalized content layer. None requires a service wrapper —
-the logic is trivial CRUD.
+These repositories handle the normalized content layer. A thin `DomainEntityService` sits above
+them to unify the two-repository write path and create the right seam for future RFC-driven
+business logic (UID uniqueness per RFC 4791 §4.1, scheduling interception per RFC 6638,
+recurrence expansion per RFC 4791 §7.8 + RFC 5545 §3.8.5, free-busy aggregation per RFC 4791
+§7.10 + RFC 7953). Callers above this layer never touch the repositories directly.
 
 **New file**: `src/services/entity/repository.ts`
 
@@ -308,12 +313,64 @@ and reconstructs the `IrComponent` tree.
 `deleteByEntity` soft-deletes (sets `deletedAt`) all component rows for the entity, cascading
 to properties and parameters via DB foreign keys (already set up as `ON DELETE CASCADE`).
 
-Each gets a corresponding `*.live.ts` Drizzle implementation and an `index.ts` exporting the
-tag + layer.
+Each repository gets a corresponding `*.live.ts` Drizzle implementation and an `index.ts`
+exporting the tag + layer.
+
+**New file**: `src/services/domain-entity/service.ts`
+
+```typescript
+export interface DomainEntityServiceShape {
+  /**
+   * Creates a new entity + component tree in one transaction.
+   * Extracts the logical UID from the IR document automatically.
+   * Returns the new EntityId.
+   */
+  readonly create: (input: {
+    entityType: "icalendar" | "vcard";
+    document: IrDocument;
+  }) => Effect<EntityId, DatabaseError>;
+
+  /**
+   * Loads the IR document for an entity.
+   * Returns Option.none() if the entity does not exist or has been deleted.
+   */
+  readonly load: (id: EntityId) => Effect<Option<IrDocument>, DatabaseError>;
+
+  /**
+   * Atomically replaces the component tree for an existing entity.
+   * Deletes the old tree and inserts the new one in one transaction.
+   * Updates logicalUid if the UID in the document has changed.
+   */
+  readonly replace: (
+    id: EntityId,
+    document: IrDocument,
+  ) => Effect<void, DatabaseError>;
+
+  /**
+   * Soft-deletes the entity and its entire component tree.
+   */
+  readonly remove: (id: EntityId) => Effect<void, DatabaseError>;
+}
+
+export class DomainEntityService extends Effect.Service<DomainEntityService>()(
+  "DomainEntityService",
+  { accessors: true },
+) {}
+```
+
+The live implementation (`service.live.ts`) depends on `EntityRepository` and
+`ComponentRepository`. It coordinates both in Effect transactions; no caller above this layer
+needs to know both repositories exist.
+
+UID extraction (`extractUid` from the iCalendar/vCard codec) is called inside `create` and
+`replace` to keep `logicalUid` in sync on the entity row. Collection-scoped UID uniqueness
+enforcement (RFC 4791 §4.1) is intentionally **not** implemented here — it is collection-aware
+and will be added in the DAV instance/collection layer in a later step.
 
 **Update** `src/layers.ts`:
-- Add `withInfra(EntityDomainLayer)`, `withInfra(ComponentDomainLayer)` to `AppLayer`.
-- Export the new tags from the re-export block.
+- Add `withInfra(EntityDomainLayer)`, `withInfra(ComponentDomainLayer)`, and
+  `withInfra(DomainEntityServiceLive)` to `AppLayer`.
+- Export `DomainEntityService` from the re-export block (repositories are internal).
 
 **Test files** (written alongside the code):
 
@@ -324,6 +381,15 @@ tag + layer.
 - `deleteByEntity` soft-deletes all components; subsequent `loadTree` returns `Option.none()`
 - `insertTree` and `loadTree` round-trip TEXT, DATE_TIME, DATE, TEXT_LIST, and RECUR value types
 - `insertTree` and `loadTree` preserve `isKnown: false` properties verbatim
+
+`src/services/domain-entity/service.unit.test.ts` (test layers for both repositories):
+- `create` inserts an entity and persists the IR tree; returns the new `EntityId`
+- `create` sets `logicalUid` from the document's UID property when present
+- `load` returns the IR document that was created
+- `load` returns `Option.none()` for an unknown entity
+- `replace` swaps the component tree atomically; subsequent `load` returns the new document
+- `replace` updates `logicalUid` when the UID in the replacement document differs
+- `remove` causes subsequent `load` to return `Option.none()`
 
 ---
 
