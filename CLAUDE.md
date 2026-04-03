@@ -144,6 +144,7 @@ All Bun-specific APIs (file I/O, `Bun.serve`, `Bun.file`, `Bun.password`, etc.) 
 - Design all services with an interface (Effect `Service` / `Context.Tag`) and at least one test implementation from the start.
 - Avoid side effects in constructors or module-level code; initialize everything through Effect so tests can control lifecycle.
 - Prefer small, focused tests over large scenario tests; a failing test should point directly to the broken unit.
+- Test files should be named `{name}.{type}.test.ts` (e.g. `user/repository.integration.test.ts` would be an integration test for the user repository).
 
 ## Auth
 
