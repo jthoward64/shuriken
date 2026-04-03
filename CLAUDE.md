@@ -2,6 +2,14 @@
 
 A CalDAV/CardDAV server implementation in TypeScript.
 
+## Agent operations
+
+- If you find what might be a bug, always prompt the user for more information rather than assuming that it is or is not intentional.
+- If you are unsure about how to proceed, ask the user for guidance rather than making assumptions.
+- If you are asked to implement a feature or fix a bug, always ask for clarification and additional information as needed before starting to write code.
+- When writing code, always follow the coding principles and guidelines outlined in this document, and ask for feedback and review from the user to ensure that the code meets their expectations and requirements.
+- If you encounter a situation where the requirements are unclear or conflicting, ask the user to help prioritize and clarify the requirements before proceeding.
+
 ## Runtime & Tooling
 
 - **Runtime**: Bun. Use `bun` for all scripts, package management, and test execution.
