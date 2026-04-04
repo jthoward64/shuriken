@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import { resolve } from "node:path";
-import { PGlite } from "@electric-sql/pglite";
+import { MemoryFS, PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { Effect, Layer } from "effect";
 import { DatabaseClient } from "#src/db/client.ts";
@@ -60,11 +60,9 @@ $$ LANGUAGE plpgsql;
 
 /**
  * Replace `casefold(expr COLLATE "und-x-icu")` with `lower(expr)`.
- * PGlite has no ICU collation support; lower() is a safe approximation for
- * ASCII-range identifiers used in DAV slugs and property names.
- *
- * Pattern uses `[^)]+?` (non-greedy) and allows optional whitespace around
- * COLLATE so it handles formatting variations in migration output.
+ * PGlite has no ICU collation support; lower() lacks support for
+ * most Unicode casefolding rules but is sufficient for ASCII and
+ * and will work until PGLite adds ICU support.
  */
 function patchIcuCasefold(sql: string): string {
 	return sql.replace(
@@ -125,7 +123,8 @@ export const makePgliteDatabaseLayer = (): Layer.Layer<DatabaseClient, Error> =>
 		DatabaseClient,
 		Effect.tryPromise({
 			try: async () => {
-				const pg = new PGlite();
+				const memoryFs = new MemoryFS();
+				const pg = new PGlite({ fs: memoryFs });
 				await runMigrations(pg);
 				const db = drizzle({ client: pg, schema });
 				// PgliteDatabase and BunSQLDatabase share the same PgDatabase query
