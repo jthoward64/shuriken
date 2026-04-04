@@ -199,6 +199,85 @@ describe("ContentLinesCodec encode", () => {
 });
 
 // ---------------------------------------------------------------------------
+// RFC 6868 parameter value encoding/decoding
+// ---------------------------------------------------------------------------
+
+describe("RFC 6868 parameter value encoding", () => {
+	it("decodes ^' to double-quote in parameter values", async () => {
+		const text = "ATTENDEE;CN=Bob ^'Bobby^' Smith:mailto:bob@example.com\r\n";
+		const lines = await dec(text);
+		expect(lines[0]?.params[0]?.values[0]).toBe('Bob "Bobby" Smith');
+	});
+
+	it("decodes ^^ to ^ in parameter values", async () => {
+		const text = "SUMMARY;X-TAG=foo^^bar:value\r\n";
+		const lines = await dec(text);
+		expect(lines[0]?.params[0]?.values[0]).toBe("foo^bar");
+	});
+
+	it("decodes ^n to newline in parameter values", async () => {
+		const text = "SUMMARY;X-DESC=line1^nline2:value\r\n";
+		const lines = await dec(text);
+		expect(lines[0]?.params[0]?.values[0]).toBe("line1\nline2");
+	});
+
+	it("decodes ^N (uppercase) to newline in parameter values", async () => {
+		const text = "SUMMARY;X-DESC=line1^Nline2:value\r\n";
+		const lines = await dec(text);
+		expect(lines[0]?.params[0]?.values[0]).toBe("line1\nline2");
+	});
+
+	it("encodes double-quote in parameter value using ^'", async () => {
+		const lines: ReadonlyArray<ContentLine> = [
+			{
+				name: "ATTENDEE",
+				params: [{ name: "CN", values: ['Bob "Bobby" Smith'] }],
+				rawValue: "mailto:bob@example.com",
+			},
+		];
+		const text = await enc(lines);
+		expect(text).toContain("CN=Bob ^'Bobby^' Smith");
+	});
+
+	it("encodes ^ in parameter value using ^^", async () => {
+		const lines: ReadonlyArray<ContentLine> = [
+			{
+				name: "SUMMARY",
+				params: [{ name: "X-TAG", values: ["foo^bar"] }],
+				rawValue: "value",
+			},
+		];
+		const text = await enc(lines);
+		expect(text).toContain("X-TAG=foo^^bar");
+	});
+
+	it("encodes newline in parameter value using ^n", async () => {
+		const lines: ReadonlyArray<ContentLine> = [
+			{
+				name: "SUMMARY",
+				params: [{ name: "X-DESC", values: ["line1\nline2"] }],
+				rawValue: "value",
+			},
+		];
+		const text = await enc(lines);
+		expect(text).toContain("X-DESC=line1^nline2");
+	});
+
+	it("round-trips a parameter value containing all three RFC 6868 specials", async () => {
+		const original: ReadonlyArray<ContentLine> = [
+			{
+				name: "SUMMARY",
+				params: [{ name: "X-META", values: ['has^caret and "quote" and\nnewline'] }],
+				rawValue: "value",
+			},
+		];
+		const text = await enc(original);
+		const recovered = await dec(text);
+		expect(recovered[0]?.params[0]?.values[0]).toBe('has^caret and "quote" and\nnewline');
+	});
+});
+
+// ---------------------------------------------------------------------------
 // Round-trip
 // ---------------------------------------------------------------------------
 

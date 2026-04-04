@@ -43,13 +43,27 @@ const isUiPath = (pathname: string): boolean =>
 	pathname.startsWith("/ui/") ||
 	pathname.startsWith("/static/");
 
+/**
+ * Split a DavPrecondition string into an XML namespace prefix and local name.
+ * All DavPrecondition values follow the "NS:local-name" pattern enforced by
+ * the compile-time assertion in errors.ts.
+ */
+const splitPrecondition = (
+	precondition: string,
+): ["D" | "C" | "CR", string] => {
+	if (precondition.startsWith("CALDAV:")) {
+		return ["C", precondition.slice("CALDAV:".length)];
+	}
+	if (precondition.startsWith("CARDDAV:")) {
+		return ["CR", precondition.slice("CARDDAV:".length)];
+	}
+	// DAV: is the default; the compile-time assertion ensures no other prefix exists
+	return ["D", precondition.startsWith("DAV:") ? precondition.slice("DAV:".length) : precondition];
+};
+
 /** Serialize a DavError to an RFC 4918 §16 XML body. */
 const davErrorBody = (precondition: string): Effect.Effect<string, never> => {
-	const [nsPrefix, localName] = precondition.includes("CALDAV:")
-		? ["C", precondition.replace("CALDAV:", "")]
-		: precondition.includes("CARDDAV:")
-			? ["CR", precondition.replace("CARDDAV:", "")]
-			: ["D", precondition.replace("DAV:", "")];
+	const [nsPrefix, localName] = splitPrecondition(precondition);
 
 	const ns =
 		nsPrefix === "D"
@@ -94,6 +108,9 @@ const mapErrorToResponse = (err: AppError): Effect.Effect<Response, never> =>
 		),
 		Match.tag("XmlParseError", () =>
 			Effect.succeed(new Response("Bad Request: invalid XML", { status: 400 })),
+		),
+		Match.tag("ConflictError", (e) =>
+			Effect.succeed(new Response(e.message, { status: 409 })),
 		),
 		Match.tag("DatabaseError", "InternalError", "ConfigError", () =>
 			Effect.succeed(new Response("Internal Server Error", { status: 500 })),

@@ -1,6 +1,7 @@
 import type { Effect, Redacted } from "effect";
 import { Context } from "effect";
 import type {
+	ConflictError,
 	DatabaseError,
 	DavError,
 	InternalError,
@@ -45,7 +46,7 @@ export interface UserServiceShape {
 		input: NewUser,
 	) => Effect.Effect<
 		UserWithPrincipal,
-		DavError | DatabaseError | InternalError
+		DavError | DatabaseError | ConflictError | InternalError
 	>;
 	readonly update: (
 		id: UserId,

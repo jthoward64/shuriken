@@ -106,29 +106,33 @@ export const AclServiceLive = Layer.effect(
 			);
 
 		return AclService.of({
-			check: (principalId, resourceUrl, privilege) =>
+			check: (principalId, resourceId, resourceType, privilege) =>
 				Effect.gen(function* () {
 					const principalIds = yield* resolvePrincipalIds(principalId);
 					const privileges = expandContainers(privilege);
 					const allowed = yield* repo.hasPrivilege(
 						principalIds,
-						resourceUrl,
+						resourceId,
+						resourceType,
 						privileges,
 						true,
 					);
 					if (!allowed) {
 						return yield* Effect.fail(needPrivileges());
 					}
+					// TODO (Fix 12): walk parent-collection hierarchy for inherited ACEs
 				}),
 
-			currentUserPrivileges: (principalId, resourceUrl) =>
+			currentUserPrivileges: (principalId, resourceId, resourceType) =>
 				Effect.gen(function* () {
 					const principalIds = yield* resolvePrincipalIds(principalId);
 					const grantedAggregates = yield* repo.getGrantedPrivileges(
 						principalIds,
-						resourceUrl,
+						resourceId,
+						resourceType,
 						true,
 					);
+					// TODO (Fix 12): walk parent-collection hierarchy for inherited ACEs
 					// Expand each granted privilege to all privileges it implies
 					const expanded = new Set<DavPrivilege>();
 					for (const p of grantedAggregates) {

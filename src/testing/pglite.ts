@@ -57,15 +57,30 @@ $$ LANGUAGE plpgsql;
 // ---------------------------------------------------------------------------
 // patchSqlForPglite
 // ---------------------------------------------------------------------------
+
+/**
+ * Replace `casefold(expr COLLATE "und-x-icu")` with `lower(expr)`.
+ * PGlite has no ICU collation support; lower() is a safe approximation for
+ * ASCII-range identifiers used in DAV slugs and property names.
+ *
+ * Pattern uses `[^)]+?` (non-greedy) and allows optional whitespace around
+ * COLLATE so it handles formatting variations in migration output.
+ */
 function patchIcuCasefold(sql: string): string {
-	return sql.replace(/casefold\(([^)]+) COLLATE "und-x-icu"\)/g, "lower($1)");
+	return sql.replace(
+		/casefold\(([^)]+?)\s+COLLATE\s+"und-x-icu"\)/g,
+		"lower($1)",
+	);
 }
 
+/**
+ * Add `IF EXISTS` to `DROP CONSTRAINT` statements that don't already have it.
+ * PGlite rejects dropping a constraint that was never created (e.g. when a
+ * duplicate UNIQUE was omitted during migration patching).
+ */
 function patchDropConstraint(sql: string): string {
-	// Add IF EXISTS so PGlite tolerates DROP CONSTRAINT on names that were
-	// never created (e.g. when the _unique duplicate was omitted)
 	return sql.replace(
-		/DROP CONSTRAINT "([^"]+)"/g,
+		/DROP CONSTRAINT (?!IF EXISTS)"([^"]+)"/g,
 		'DROP CONSTRAINT IF EXISTS "$1"',
 	);
 }

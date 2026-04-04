@@ -6,7 +6,7 @@ import type {
 	membership,
 	principal,
 } from "#src/db/drizzle/schema/index.ts";
-import type { DatabaseError } from "#src/domain/errors.ts";
+import type { ConflictError, DatabaseError } from "#src/domain/errors.ts";
 import type { GroupId, UserId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
 
@@ -30,7 +30,7 @@ export interface GroupRepositoryShape {
 	readonly create: (input: {
 		readonly slug: Slug;
 		readonly displayName?: string;
-	}) => Effect.Effect<GroupWithPrincipal, DatabaseError>;
+	}) => Effect.Effect<GroupWithPrincipal, DatabaseError | ConflictError>;
 	readonly update: (
 		id: GroupId,
 		input: { readonly displayName?: string },

@@ -66,6 +66,7 @@ export interface AclRepositoryShape {
 	readonly hasPrivilege: (
 		principalIds: ReadonlyArray<PrincipalId>,
 		resourceId: string,
+		resourceType: AclResourceType,
 		privileges: ReadonlyArray<DavPrivilege>,
 		isAuthenticated: boolean,
 	) => Effect.Effect<boolean, DatabaseError>;
@@ -77,6 +78,7 @@ export interface AclRepositoryShape {
 	readonly getGrantedPrivileges: (
 		principalIds: ReadonlyArray<PrincipalId>,
 		resourceId: string,
+		resourceType: AclResourceType,
 		isAuthenticated: boolean,
 	) => Effect.Effect<ReadonlyArray<DavPrivilege>, DatabaseError>;
 

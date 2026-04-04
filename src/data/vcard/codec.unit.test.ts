@@ -200,6 +200,45 @@ describe("VCardCodec decode", () => {
 			expect(cats.value.value).toEqual(["a,b", "c"]);
 		}
 	});
+
+	it("REV with fixed-offset datetime decodes to DATE_TIME ZonedDateTime", async () => {
+		const text = vcard(
+			"BEGIN:VCARD",
+			"VERSION:4.0",
+			"FN:Test",
+			"REV:20060714T000000-0500",
+			"END:VCARD",
+		);
+		const doc = await run(text);
+		const rev = doc.root.properties.find((p) => p.name === "REV");
+		expect(rev?.value.type).toBe("DATE_TIME");
+		if (rev?.value.type === "DATE_TIME") {
+			expect(rev.value.value.year).toBe(2006);
+			expect(rev.value.value.month).toBe(7);
+			expect(rev.value.value.day).toBe(14);
+			expect(rev.value.value.hour).toBe(0);
+			// Fixed-offset zone ID: "-05:00"
+			expect(rev.value.value.timeZoneId).toBe("-05:00");
+		}
+	});
+
+	it("REV with fixed-offset datetime round-trips through encode/decode", async () => {
+		const text = vcard(
+			"BEGIN:VCARD",
+			"VERSION:4.0",
+			"FN:Test",
+			"REV:20060714T000000-0500",
+			"END:VCARD",
+		);
+		const doc1 = await run(text);
+		const encoded = await enc(doc1);
+		// Encoded form should inline the offset without colon
+		expect(encoded).toContain("REV:20060714T000000-0500");
+		const doc2 = await run(encoded);
+		const rev1 = doc1.root.properties.find((p) => p.name === "REV");
+		const rev2 = doc2.root.properties.find((p) => p.name === "REV");
+		expect(rev1?.value).toEqual(rev2?.value);
+	});
 });
 
 // ---------------------------------------------------------------------------

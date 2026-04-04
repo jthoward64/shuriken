@@ -432,12 +432,12 @@ const makeCollectionRepo = (stores: TestStores): CollectionRepositoryShape => ({
 	softDelete: (id) =>
 		Effect.sync(() => {
 			const row = stores.collections.get(id);
-			if (row) {
-				stores.collections.set(id, {
-					...row,
-					deletedAt: Temporal.Now.instant(),
-				});
+			if (!row) {
+				throw new Error(`Collection not found for deletion: ${id}`);
 			}
+			const deleted = { ...row, deletedAt: Temporal.Now.instant() };
+			stores.collections.set(id, deleted);
+			return deleted;
 		}),
 });
 
@@ -591,23 +591,25 @@ const makeAclRepo = (stores: TestStores): AclRepositoryShape => ({
 			]);
 		}),
 
-	hasPrivilege: (principalIds, resourceId, privileges, isAuthenticated) =>
+	hasPrivilege: (principalIds, resourceId, resourceType, privileges, isAuthenticated) =>
 		Effect.succeed(
 			(stores.acl.get(resourceId) ?? []).some(
 				(ace) =>
+					ace.resourceType === resourceType &&
 					ace.grantDeny === "grant" &&
 					(privileges as ReadonlyArray<string>).includes(ace.privilege) &&
 					matchesPrincipal(ace, principalIds, isAuthenticated),
 			),
 		),
 
-	getGrantedPrivileges: (principalIds, resourceId, isAuthenticated) =>
+	getGrantedPrivileges: (principalIds, resourceId, resourceType, isAuthenticated) =>
 		Effect.succeed(
 			[
 				...new Set(
 					(stores.acl.get(resourceId) ?? [])
 						.filter(
 							(ace) =>
+								ace.resourceType === resourceType &&
 								ace.grantDeny === "grant" &&
 								matchesPrincipal(ace, principalIds, isAuthenticated),
 						)

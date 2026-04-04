@@ -164,6 +164,61 @@ describe("ICalendarCodec decode", () => {
 		expect(err._tag).toBe("DavError");
 		expect(err.precondition).toBe("CALDAV:valid-calendar-data");
 	});
+
+	it("EXDATE;VALUE=DATE decodes comma-separated dates to DATE_LIST", async () => {
+		const text = ical(
+			"BEGIN:VCALENDAR",
+			"VERSION:2.0",
+			"PRODID:-//Test//EN",
+			"BEGIN:VEVENT",
+			"UID:exdate-test@example.com",
+			"DTSTAMP:20060717T210714Z",
+			"EXDATE;VALUE=DATE:20060102,20060103",
+			"END:VEVENT",
+			"END:VCALENDAR",
+		);
+		const doc = await run(text);
+		const vevent = doc.root.components[0];
+		const exdate = vevent?.properties.find((p) => p.name === "EXDATE");
+		expect(exdate?.value.type).toBe("DATE_LIST");
+		if (exdate?.value.type === "DATE_LIST") {
+			expect(exdate.value.value).toHaveLength(2);
+			expect(Temporal.PlainDate.compare(
+				exdate.value.value[0] as Temporal.PlainDate,
+				Temporal.PlainDate.from({ year: 2006, month: 1, day: 2 }),
+			)).toBe(0);
+			expect(Temporal.PlainDate.compare(
+				exdate.value.value[1] as Temporal.PlainDate,
+				Temporal.PlainDate.from({ year: 2006, month: 1, day: 3 }),
+			)).toBe(0);
+		}
+	});
+
+	it("TRIGGER;VALUE=DATE-TIME decodes to DATE_TIME (UTC)", async () => {
+		const text = ical(
+			"BEGIN:VCALENDAR",
+			"VERSION:2.0",
+			"PRODID:-//Test//EN",
+			"BEGIN:VEVENT",
+			"UID:trigger-test@example.com",
+			"DTSTAMP:20060717T210714Z",
+			"BEGIN:VALARM",
+			"ACTION:EMAIL",
+			"TRIGGER;VALUE=DATE-TIME:19980101T050000Z",
+			"END:VALARM",
+			"END:VEVENT",
+			"END:VCALENDAR",
+		);
+		const doc = await run(text);
+		const valarm = doc.root.components[0]?.components[0];
+		const trigger = valarm?.properties.find((p) => p.name === "TRIGGER");
+		expect(trigger?.value.type).toBe("DATE_TIME");
+		if (trigger?.value.type === "DATE_TIME") {
+			expect(trigger.value.value.timeZoneId).toBe("UTC");
+			expect(trigger.value.value.year).toBe(1998);
+			expect(trigger.value.value.hour).toBe(5);
+		}
+	});
 });
 
 // ---------------------------------------------------------------------------
@@ -192,6 +247,30 @@ describe("ICalendarCodec encode", () => {
 			expect(encoder.encode(line).byteLength).toBeLessThanOrEqual(75);
 		}
 		expect(out.endsWith("\r\n")).toBe(true);
+	});
+
+	it("DATE_LIST encode injects VALUE=DATE param when absent", async () => {
+		// Programmatically constructed DATE_LIST with no VALUE param must still
+		// round-trip correctly (decoder needs VALUE=DATE to parse it as DATE_LIST).
+		const text = ical(
+			"BEGIN:VCALENDAR",
+			"VERSION:2.0",
+			"PRODID:-//Test//EN",
+			"BEGIN:VEVENT",
+			"UID:date-list-encode@example.com",
+			"DTSTAMP:20060717T210714Z",
+			"EXDATE;VALUE=DATE:20060102,20060103",
+			"END:VEVENT",
+			"END:VCALENDAR",
+		);
+		const doc = await run(text);
+		const out = await enc(doc);
+		// Encoded output must include VALUE=DATE so a decoder can interpret it
+		expect(out).toContain("VALUE=DATE");
+		// Must also round-trip cleanly
+		const doc2 = await run(out);
+		const exdate2 = doc2.root.components[0]?.properties.find((p) => p.name === "EXDATE");
+		expect(exdate2?.value.type).toBe("DATE_LIST");
 	});
 
 	it("emits X-/unknown properties verbatim (no double-escaping)", async () => {

@@ -1,6 +1,6 @@
 import type { Effect } from "effect";
 import { Context } from "effect";
-import type { DatabaseError, DavError } from "#src/domain/errors.ts";
+import type { ConflictError, DatabaseError, DavError } from "#src/domain/errors.ts";
 import type { GroupId, UserId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
 import type { GroupWithPrincipal } from "./repository.ts";
@@ -25,7 +25,7 @@ export interface UpdateGroup {
 export interface GroupServiceShape {
 	readonly create: (
 		input: NewGroup,
-	) => Effect.Effect<GroupWithPrincipal, DavError | DatabaseError>;
+	) => Effect.Effect<GroupWithPrincipal, DavError | DatabaseError | ConflictError>;
 	readonly update: (
 		id: GroupId,
 		input: UpdateGroup,

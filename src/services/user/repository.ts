@@ -6,7 +6,7 @@ import type {
 	principal,
 	user,
 } from "#src/db/drizzle/schema/index.ts";
-import type { DatabaseError } from "#src/domain/errors.ts";
+import type { ConflictError, DatabaseError } from "#src/domain/errors.ts";
 import type { UserId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
 import type { Email } from "#src/domain/types/strings.ts";
@@ -43,7 +43,7 @@ export interface UserRepositoryShape {
 		readonly email: Email;
 		readonly displayName?: string;
 		readonly credentials: ReadonlyArray<HashedCredential>;
-	}) => Effect.Effect<UserWithPrincipal, DatabaseError>;
+	}) => Effect.Effect<UserWithPrincipal, DatabaseError | ConflictError>;
 	readonly update: (
 		id: UserId,
 		input: {

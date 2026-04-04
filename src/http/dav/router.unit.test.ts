@@ -153,9 +153,11 @@ describe("davRouter — unknown paths", () => {
 		expect(res.status).toBe(HTTP_NOT_FOUND);
 	});
 
-	it("/dav/principals with no slug segment returns 404", async () => {
+	it("/dav/principals with no slug segment resolves to principalCollection (not 404)", async () => {
+		// /dav/principals/ is a valid path (RFC 3744 §5.2 principal-collection-set).
+		// Returns 200 from the OPTIONS stub handler, not 404.
 		const res = await run("OPTIONS", "/dav/principals");
-		expect(res.status).toBe(HTTP_NOT_FOUND);
+		expect(res.status).not.toBe(HTTP_NOT_FOUND);
 	});
 });
 

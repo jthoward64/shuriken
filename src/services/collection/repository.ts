@@ -37,7 +37,7 @@ export interface CollectionRepositoryShape {
 	readonly insert: (
 		input: NewCollection,
 	) => Effect.Effect<CollectionRow, DatabaseError>;
-	readonly softDelete: (id: CollectionId) => Effect.Effect<void, DatabaseError>;
+	readonly softDelete: (id: CollectionId) => Effect.Effect<CollectionRow, DatabaseError>;
 }
 
 export class CollectionRepository extends Context.Tag("CollectionRepository")<

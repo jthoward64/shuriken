@@ -2,7 +2,7 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { Effect, Layer, Option } from "effect";
 import { DatabaseClient, type DbClient } from "#src/db/client.ts";
 import { authUser, principal, user } from "#src/db/drizzle/schema/index.ts";
-import { DatabaseError } from "#src/domain/errors.ts";
+import { ConflictError, DatabaseError, isPgUniqueViolation } from "#src/domain/errors.ts";
 import type { UserId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
 import type { Email } from "#src/domain/types/strings.ts";
@@ -61,7 +61,7 @@ const create = (
 		readonly credentials: ReadonlyArray<HashedCredential>;
 	},
 ) =>
-	Effect.tryPromise({
+	Effect.tryPromise<UserWithPrincipal, DatabaseError | ConflictError>({
 		try: () =>
 			db.transaction(async (tx) => {
 				const principalRows = await tx
@@ -104,7 +104,13 @@ const create = (
 					user: userRow,
 				} satisfies UserWithPrincipal;
 			}),
-		catch: (e) => new DatabaseError({ cause: e }),
+		catch: (e) =>
+			isPgUniqueViolation(e)
+				? new ConflictError({
+						field: "slug_or_email",
+						message: "User with this slug or email already exists",
+					})
+				: new DatabaseError({ cause: e }),
 	});
 
 const update = (

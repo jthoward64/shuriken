@@ -1,6 +1,5 @@
 import { Effect, ParseResult, Schema } from "effect";
-import type { DavError } from "../../domain/errors.ts";
-import { validCalendarData } from "../../domain/errors.ts";
+import { type DavError, validCalendarData } from "../../domain/errors.ts";
 import type { ContentLine } from "../content-line.ts";
 import {
 	type RawComponent,
@@ -196,13 +195,21 @@ const decodeICalProperty = (line: ContentLine): IrProperty => {
 	const tzid = getTzidParam(line.params);
 	const raw = line.rawValue;
 
+	// Promote singular-type overrides to their list equivalents when the property's
+	// default type is a list. This handles EXDATE;VALUE=DATE:20060102,20060103
+	// where VALUE=DATE overrides to "DATE" but the raw value is comma-separated.
+	const resolvedType: IcalValueOverride =
+		effectiveType === "DATE" && defaultType === "DATE_TIME_LIST"
+			? "DATE_LIST"
+			: effectiveType;
+
 	let value: IrValue;
 
-	if (effectiveType === "DATE_TIME_DYNAMIC" || effectiveType === "DATE_TIME") {
+	if (resolvedType === "DATE_TIME_DYNAMIC" || resolvedType === "DATE_TIME") {
 		// Determine DATE_TIME vs PLAIN_DATE_TIME from rawValue shape and TZID param
 		value = parseDateTimeString(raw, tzid);
 	} else {
-		switch (effectiveType) {
+		switch (resolvedType) {
 			case "DATE":
 				value = { type: "DATE", value: parsePlainDate(raw) };
 				break;
@@ -259,7 +266,7 @@ const decodeICalProperty = (line: ContentLine): IrProperty => {
 			case "TIME":
 			case "UTC_OFFSET_INTERVAL":
 			case "DURATION_INTERVAL":
-				value = { type: effectiveType, value: raw };
+				value = { type: resolvedType, value: raw };
 				break;
 			default:
 				value = { type: "TEXT", value: raw };
@@ -279,12 +286,40 @@ const decodeICalProperty = (line: ContentLine): IrProperty => {
 // ---------------------------------------------------------------------------
 
 const encodeICalProperty = (prop: IrProperty): ContentLine => {
+	// Guard: a named-timezone ZonedDateTime must have a TZID parameter; without it
+	// the encoded value is ambiguous (looks like a floating datetime).
+	// UTC and fixed-offset zones are self-describing (Z / ±HHMM suffix) so they
+	// do not require a TZID parameter.
+	if (prop.isKnown && prop.value.type === "DATE_TIME") {
+		const tzId = prop.value.value.timeZoneId;
+		const isSelfDescribing =
+			tzId === "UTC" || tzId.startsWith("+") || tzId.startsWith("-");
+		if (!isSelfDescribing && !prop.parameters.some((p) => p.name === "TZID")) {
+			throw new Error(
+				`Property "${prop.name}" has a non-UTC ZonedDateTime but no TZID parameter`,
+			);
+		}
+	}
+
 	const rawValue = prop.isKnown
 		? encodeIrValue(prop.value)
 		: (prop.value as { value: string }).value;
+
+	// When encoding a DATE_LIST value, ensure VALUE=DATE is present in the
+	// parameters. Without it a subsequent decode would interpret the comma-
+	// separated dates as DATE_TIME_LIST and fail to parse them.
+	let parameters = prop.parameters;
+	if (
+		prop.isKnown &&
+		prop.value.type === "DATE_LIST" &&
+		!parameters.some((p) => p.name === "VALUE")
+	) {
+		parameters = [{ name: "VALUE", value: "DATE" }, ...parameters];
+	}
+
 	return {
 		name: prop.name,
-		params: paramsFromIr(prop.parameters),
+		params: paramsFromIr(parameters),
 		rawValue,
 	};
 };

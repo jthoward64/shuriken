@@ -22,19 +22,31 @@ export const Slug = Brand.nominal<Slug>();
 
 export type ResolvedDavPath =
 	| {
+			/** /.well-known/caldav or /.well-known/carddav */
 			readonly kind: "wellknown";
 			readonly name: "caldav" | "carddav";
 	  }
 	| {
+			/** /dav/ — the root DAV collection */
+			readonly kind: "root";
+	  }
+	| {
+			/** /dav/principals/ — the principal-collection listing */
+			readonly kind: "principalCollection";
+	  }
+	| {
+			/** /dav/principals/:slug — a single principal home */
 			readonly kind: "principal";
 			readonly principalId: PrincipalId;
 	  }
 	| {
+			/** /dav/principals/:slug/:collSlug — a calendar/addressbook collection */
 			readonly kind: "collection";
 			readonly principalId: PrincipalId;
 			readonly collectionId: CollectionId;
 	  }
 	| {
+			/** /dav/principals/:slug/:collSlug/:obj — a single calendar/vCard resource */
 			readonly kind: "instance";
 			readonly principalId: PrincipalId;
 			readonly collectionId: CollectionId;

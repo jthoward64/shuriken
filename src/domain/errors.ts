@@ -32,9 +32,41 @@ export class ConfigError extends Data.TaggedError("ConfigError")<{
 	readonly key: string;
 }> {}
 
+/**
+ * A unique constraint violation that the caller can meaningfully distinguish
+ * from a general database error (e.g. "duplicate email" vs "connection lost").
+ * Maps to PostgreSQL error code 23505.
+ */
+export class ConflictError extends Data.TaggedError("ConflictError")<{
+	readonly field: string;
+	readonly message: string;
+}> {}
+
+/**
+ * Returns true when an error looks like a PostgreSQL unique-violation (23505).
+ * Works with pg/postgres.js/PGlite driver error shapes.
+ */
+export const isPgUniqueViolation = (cause: unknown): boolean =>
+	typeof cause === "object" &&
+	cause !== null &&
+	"code" in cause &&
+	(cause as { code: unknown }).code === "23505";
+
 // ---------------------------------------------------------------------------
 // DAV precondition / postcondition XML element names (per RFC)
 // Format: "<NS-PREFIX>:<local-name>" where NS-PREFIX identifies the namespace.
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// DAV precondition / postcondition XML element names (per RFC)
+//
+// Template literal types enforce the namespace prefix at compile time:
+//   "DAV:..."      → WebDAV (RFC 4918) and ACL (RFC 3744) namespaced errors
+//   "CALDAV:..."   → CalDAV (RFC 4791) namespaced errors
+//   "CARDDAV:..."  → CardDAV (RFC 6352) namespaced errors
+//
+// router.ts splits on the first ":" to determine the XML namespace, so all
+// precondition strings MUST follow the "NS:local-name" pattern.
 // ---------------------------------------------------------------------------
 
 /** RFC 4918 — WebDAV */
@@ -88,6 +120,16 @@ export type DavPrecondition =
 	| AclPrecondition
 	| CalDavPrecondition
 	| CardDavPrecondition;
+
+// Compile-time check: every DavPrecondition must follow "NS:local-name" format.
+// If a precondition string is added that doesn't match, this type assignment fails.
+type _AssertPreconditionHasNamespace = DavPrecondition extends
+	| `DAV:${string}`
+	| `CALDAV:${string}`
+	| `CARDDAV:${string}`
+	? true
+	: never;
+const _assertPreconditionHasNamespace: _AssertPreconditionHasNamespace = true;
 
 // ---------------------------------------------------------------------------
 // DAV protocol error — carries HTTP status + optional precondition element
@@ -167,6 +209,7 @@ export const noneOrConflict =
 
 export type AppError =
 	| DatabaseError
+	| ConflictError
 	| AuthError
 	| XmlParseError
 	| InternalError

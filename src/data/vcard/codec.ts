@@ -1,12 +1,11 @@
 import { Effect, ParseResult, Schema } from "effect";
-import type { DavError } from "../../domain/errors.ts";
-import { validAddressData } from "../../domain/errors.ts";
-import type { ContentLine } from "../content-line.ts";
+import { type DavError, validAddressData } from "../../domain/errors.ts";
 import {
 	type RawComponent,
 	RawComponentSchema,
 	TextToRawComponentCodec,
 } from "../component-tree.ts";
+import type { ContentLine } from "../content-line.ts";
 import {
 	escapeText,
 	formatPlainDate,
@@ -47,7 +46,7 @@ const VCARD_DEFAULT_TYPES = new Map<string, IrValueType>([
 	["XML", "TEXT"],
 	// Identification
 	["FN", "TEXT"],
-	["N", "TEXT"],
+	["N", "TEXT"],   // structured name: Surname;Given;Additional;Prefix;Suffix
 	["NICKNAME", "TEXT_LIST"],
 	["PHOTO", "URI"],
 	["BDAY", "DATE_AND_OR_TIME"],
@@ -249,6 +248,21 @@ const decodeVCardProperty = (line: ContentLine): IrProperty => {
 // ---------------------------------------------------------------------------
 
 const encodeVCardProperty = (prop: IrProperty): ContentLine => {
+	// Guard: a named-timezone ZonedDateTime must have a TZID parameter; without it
+	// the encoded value is ambiguous (looks like a floating datetime).
+	// UTC and fixed-offset zones are self-describing (Z / ±HHMM suffix) so they
+	// do not require a TZID parameter.
+	if (prop.isKnown && prop.value.type === "DATE_TIME") {
+		const tzId = prop.value.value.timeZoneId;
+		const isSelfDescribing =
+			tzId === "UTC" || tzId.startsWith("+") || tzId.startsWith("-");
+		if (!isSelfDescribing && !prop.parameters.some((p) => p.name === "TZID")) {
+			throw new Error(
+				`Property "${prop.name}" has a non-UTC ZonedDateTime but no TZID parameter`,
+			);
+		}
+	}
+
 	const rawValue = prop.isKnown
 		? encodeIrValue(prop.value)
 		: (prop.value as { value: string }).value;

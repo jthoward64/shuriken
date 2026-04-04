@@ -54,16 +54,51 @@ export type ContentLine = Schema.Schema.Type<typeof ContentLineSchema>;
 const stripQuotes = (v: string): string =>
 	v.startsWith('"') && v.endsWith('"') ? v.slice(1, -1) : v;
 
+/**
+ * RFC 6868: decode `^`-escape sequences in a parameter value.
+ *   `^^` → `^`    `^'` → `"`    `^n` / `^N` → newline
+ */
+const decodeParamValue = (v: string): string =>
+	v.replace(/\^(\^|'|n|N)/g, (_, ch: string) => {
+		if (ch === "'") {
+			return '"';
+		}
+		if (ch === "n" || ch === "N") {
+			return "\n";
+		}
+		return "^";
+	});
+
+/**
+ * RFC 6868: encode special characters in a parameter value.
+ *   `^` → `^^`    `"` → `^'`    newline → `^n`
+ * Applied before quoting so the encoded value never contains bare `"`.
+ */
+const encodeParamValue = (v: string): string =>
+	v.replace(/\^/g, "^^").replace(/\n/g, "^n").replace(/"/g, "^'");
+
 /** Return true if a parameter value requires quoting (contains ; : or ,). */
-const needsQuoting = (v: string): boolean => /[;:,"]/.test(v);
+const needsQuoting = (v: string): boolean => /[;:,]/.test(v);
+
+/**
+ * Serialize a single parameter value.
+ * Uses RFC 6868 `^`-encoding when the value contains `^`, `"`, or newline;
+ * falls back to double-quoting for values that contain only `;`, `:`, or `,`.
+ */
+const serializeParamValue = (v: string): string => {
+	if (/[\^"\n]/.test(v)) {
+		// RFC 6868 encoding required; still quote if ; : , are also present
+		const encoded = encodeParamValue(v);
+		return needsQuoting(encoded) ? `"${encoded}"` : encoded;
+	}
+	return needsQuoting(v) ? `"${v}"` : v;
+};
 
 /** Serialize a single ContentLine to its unfolded logical-line string. */
 const serializeLogicalLine = (line: ContentLine): string => {
 	const paramStr = line.params
 		.map((p) => {
-			const values = p.values
-				.map((v) => (needsQuoting(v) ? `"${v}"` : v))
-				.join(",");
+			const values = p.values.map(serializeParamValue).join(",");
 			return `${p.name}=${values}`;
 		})
 		.join(";");
@@ -169,7 +204,7 @@ const parseParam = (raw: string): ContentLineParam => {
 	}
 	const name = raw.slice(0, eqIdx).toUpperCase();
 	const rawValues = splitUnquoted(raw.slice(eqIdx + 1), ",");
-	return { name, values: rawValues.map(stripQuotes) };
+	return { name, values: rawValues.map((v) => decodeParamValue(stripQuotes(v))) };
 };
 
 /**

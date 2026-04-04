@@ -62,8 +62,18 @@ const parseDavPath = (
 		: path;
 	const segments = davRelative.split("/").filter(Boolean);
 
-	if (segments[0] !== "principals" || segments.length < 2) {
+	// /dav/ or /dav — root DAV collection
+	if (segments.length === 0) {
+		return Effect.succeed({ kind: "root" } satisfies ResolvedDavPath);
+	}
+
+	if (segments[0] !== "principals") {
 		return Effect.fail(notFound(`Unknown DAV path: ${path}`));
+	}
+
+	// /dav/principals/ — principal-collection listing
+	if (segments.length === 1) {
+		return Effect.succeed({ kind: "principalCollection" } satisfies ResolvedDavPath);
 	}
 
 	const principalSlug = Slug(decodeURIComponent(segments[1] ?? ""));
@@ -127,6 +137,9 @@ export const davRouter = (
 				headers: { Location: "/dav/" },
 			});
 		}
+
+		// /dav/ and /dav/principals/ are valid paths — fall through to method dispatch
+		// (handlers return 501 until implemented in Step 4)
 
 		switch (req.method.toUpperCase()) {
 			case "OPTIONS":

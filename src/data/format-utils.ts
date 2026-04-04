@@ -83,19 +83,38 @@ export const parsePlainDate = (raw: string): Temporal.PlainDate => {
 	return Temporal.PlainDate.from({ year, month, day });
 };
 
-// Regex for basic/extended datetime: YYYYMMDDTHHMMSS[Z] or YYYY-MM-DDTHH:MM:SS[Z]
-// Groups: 1=year, 2=month, 3=day, 4=hour, 5=minute, 6=second, 7="Z" (optional)
+// Regex for basic/extended datetime:
+//   YYYYMMDDTHHMMSS[Z]           (basic, UTC)
+//   YYYYMMDDTHHMMSS±HH[MM]       (basic, fixed offset — RFC 6350 §4.3.5)
+//   YYYY-MM-DDTHH:MM:SS[Z/±...] (extended)
+// Groups: 1=year, 2=month, 3=day, 4=hour, 5=minute, 6=second,
+//         7=suffix: "Z", "+HH:?MM", or "-HH:?MM" (optional — absent means floating)
 const DATE_TIME_RE =
-	/^(\d{4})-?(\d{2})-?(\d{2})T(\d{2}):?(\d{2}):?(\d{2})(Z?)$/;
+	/^(\d{4})-?(\d{2})-?(\d{2})T(\d{2}):?(\d{2}):?(\d{2})(Z|[+-]\d{2}:?\d{2})?$/;
+
+// "+HHMM" has sign + 4 digits = 5 chars; "+HH:MM" has 6 chars (already normalized)
+const OFFSET_NO_COLON_LEN = 5;
+// Position of the colon in "+HH:MM": after sign + 2 hour digits
+const OFFSET_HOUR_END = 3;
+
+/**
+ * Normalize a fixed-offset suffix to "+HH:MM" form (Temporal timezone ID format).
+ * Input may be "+HH:MM" (already normalized) or "+HHMM" (no colon).
+ */
+const normalizeOffset = (offset: string): string =>
+	offset.length === OFFSET_NO_COLON_LEN
+		? `${offset.slice(0, OFFSET_HOUR_END)}:${offset.slice(OFFSET_HOUR_END)}`
+		: offset;
 
 /**
  * Parse a datetime string and optional TZID parameter into a typed IrValue.
  *
  * Accepted forms (both iCalendar and vCard):
- *   "YYYYMMDDTHHMMSS"      → PLAIN_DATE_TIME (floating)
- *   "YYYYMMDDTHHMMSSZ"     → DATE_TIME (UTC ZonedDateTime)
+ *   "YYYYMMDDTHHMMSS"              → PLAIN_DATE_TIME (floating)
+ *   "YYYYMMDDTHHMMSSZ"             → DATE_TIME (UTC ZonedDateTime)
+ *   "YYYYMMDDTHHMMSS±HHMM"        → DATE_TIME (fixed-offset ZonedDateTime, RFC 6350 §4.3.5)
  *   "YYYYMMDDTHHMMSS" + tzid param → DATE_TIME (named-tz ZonedDateTime)
- *   "YYYY-MM-DDTHH:MM:SS[Z]"       → same
+ *   "YYYY-MM-DDTHH:MM:SS[Z/±...]" → same (extended form)
  */
 export const parseDateTimeString = (
 	raw: string,
@@ -116,23 +135,30 @@ export const parseDateTimeString = (
 	const hour = Number.parseInt(m[4] as string, 10);
 	const minute = Number.parseInt(m[5] as string, 10);
 	const second = Number.parseInt(m[6] as string, 10);
-	const isUtc = m[7] === "Z";
+	const suffix = m[7]; // "Z", "+HH:?MM", "-HH:?MM", or undefined
 
-	if (isUtc) {
+	const iso = `${pad4(year)}-${pad2(month)}-${pad2(day)}T${pad2(hour)}:${pad2(minute)}:${pad2(second)}`;
+
+	if (suffix === "Z") {
 		return {
 			type: "DATE_TIME",
-			value: Temporal.ZonedDateTime.from(
-				`${pad4(year)}-${pad2(month)}-${pad2(day)}T${pad2(hour)}:${pad2(minute)}:${pad2(second)}+00:00[UTC]`,
-			),
+			value: Temporal.ZonedDateTime.from(`${iso}+00:00[UTC]`),
+		};
+	}
+
+	if (suffix !== undefined) {
+		// Fixed numeric offset (+HH:MM or +HHMM)
+		const normalized = normalizeOffset(suffix);
+		return {
+			type: "DATE_TIME",
+			value: Temporal.ZonedDateTime.from(`${iso}${normalized}[${normalized}]`),
 		};
 	}
 
 	if (tzid) {
 		return {
 			type: "DATE_TIME",
-			value: Temporal.ZonedDateTime.from(
-				`${pad4(year)}-${pad2(month)}-${pad2(day)}T${pad2(hour)}:${pad2(minute)}:${pad2(second)}[${tzid}]`,
-			),
+			value: Temporal.ZonedDateTime.from(`${iso}[${tzid}]`),
 		};
 	}
 
@@ -193,14 +219,22 @@ export const formatPlainDate = (d: Temporal.PlainDate): string =>
 
 /**
  * Encode a ZonedDateTime:
- *   UTC timezone  → "YYYYMMDDTHHMMSSZ"
- *   other timezone → "YYYYMMDDTHHMMSS" (TZID param must be in IrProperty.parameters)
+ *   UTC timezone          → "YYYYMMDDTHHMMSSZ"
+ *   Fixed-offset timezone → "YYYYMMDDTHHMMSS±HHMM" (offset inlined, colon stripped)
+ *   Named timezone        → "YYYYMMDDTHHMMSS" (TZID param must be in IrProperty.parameters)
  */
 export const formatZonedDateTime = (dt: Temporal.ZonedDateTime): string => {
 	const d = `${pad4(dt.year)}${pad2(dt.month)}${pad2(dt.day)}`;
 	const t = `T${pad2(dt.hour)}${pad2(dt.minute)}${pad2(dt.second)}`;
-	const isUtc = dt.timeZoneId === "UTC";
-	return isUtc ? `${d}${t}Z` : `${d}${t}`;
+	const tzId = dt.timeZoneId;
+	if (tzId === "UTC") {
+		return `${d}${t}Z`;
+	}
+	if (tzId.startsWith("+") || tzId.startsWith("-")) {
+		// Fixed-offset zone: inline the offset, stripping the colon (iCal/vCard format)
+		return `${d}${t}${tzId.replace(":", "")}`;
+	}
+	return `${d}${t}`; // Named zone: TZID= param carries the zone
 };
 
 /** Encode a PlainDateTime → "YYYYMMDDTHHMMSS". */

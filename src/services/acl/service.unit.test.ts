@@ -1,8 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
 import type { DavError } from "#src/domain/errors.ts";
-import { PrincipalId } from "#src/domain/ids.ts";
-import { ResourceUrl } from "#src/domain/types/path.ts";
+import { CollectionId, PrincipalId } from "#src/domain/ids.ts";
 import { HTTP_FORBIDDEN } from "#src/http/status.ts";
 import { runFailure, runSuccess } from "#src/testing/effect.ts";
 import { makeTestEnv } from "#src/testing/env.ts";
@@ -12,7 +11,9 @@ import { AclService } from "./service.ts";
 // Helpers
 // ---------------------------------------------------------------------------
 
-const RESOURCE = ResourceUrl("/dav/principals/alice/my-cal");
+// A fixed UUID representing a collection resource (as stored in dav_acl.resource_id)
+const RID = CollectionId("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
+const RTYPE = "collection" as const;
 
 // ---------------------------------------------------------------------------
 // AclService.check — privilege hierarchy
@@ -22,8 +23,8 @@ describe("AclService.check", () => {
 	it("passes when the principal has exactly the required privilege", async () => {
 		const principalId = PrincipalId(crypto.randomUUID());
 		const env = makeTestEnv().withAce({
-			resourceType: "collection",
-			resourceId: RESOURCE,
+			resourceType: RTYPE,
+			resourceId: RID,
 			principalType: "principal",
 			principalId,
 			privilege: "DAV:read",
@@ -31,7 +32,7 @@ describe("AclService.check", () => {
 		});
 		await runSuccess(
 			AclService.pipe(
-				Effect.flatMap((s) => s.check(principalId, RESOURCE, "DAV:read")),
+				Effect.flatMap((s) => s.check(principalId, RID, RTYPE, "DAV:read")),
 				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
@@ -43,8 +44,8 @@ describe("AclService.check", () => {
 		// Granting DAV:write means a check for DAV:write-content should pass.
 		const principalId = PrincipalId(crypto.randomUUID());
 		const env = makeTestEnv().withAce({
-			resourceType: "collection",
-			resourceId: RESOURCE,
+			resourceType: RTYPE,
+			resourceId: RID,
 			principalType: "principal",
 			principalId,
 			privilege: "DAV:write",
@@ -53,7 +54,7 @@ describe("AclService.check", () => {
 		await runSuccess(
 			AclService.pipe(
 				Effect.flatMap((s) =>
-					s.check(principalId, RESOURCE, "DAV:write-content"),
+					s.check(principalId, RID, RTYPE, "DAV:write-content"),
 				),
 				Effect.provide(env.toLayer()),
 				Effect.orDie,
@@ -64,8 +65,8 @@ describe("AclService.check", () => {
 	it("passes via DAV:all: granting DAV:all satisfies any privilege check", async () => {
 		const principalId = PrincipalId(crypto.randomUUID());
 		const env = makeTestEnv().withAce({
-			resourceType: "collection",
-			resourceId: RESOURCE,
+			resourceType: RTYPE,
+			resourceId: RID,
 			principalType: "principal",
 			principalId,
 			privilege: "DAV:all",
@@ -74,7 +75,7 @@ describe("AclService.check", () => {
 		await runSuccess(
 			AclService.pipe(
 				Effect.flatMap((s) =>
-					s.check(principalId, RESOURCE, "DAV:read-acl"),
+					s.check(principalId, RID, RTYPE, "DAV:read-acl"),
 				),
 				Effect.provide(env.toLayer()),
 				Effect.orDie,
@@ -87,7 +88,7 @@ describe("AclService.check", () => {
 		const env = makeTestEnv(); // no ACEs
 		const err = (await runFailure(
 			AclService.pipe(
-				Effect.flatMap((s) => s.check(principalId, RESOURCE, "DAV:read")),
+				Effect.flatMap((s) => s.check(principalId, RID, RTYPE, "DAV:read")),
 				Effect.provide(env.toLayer()),
 			),
 		)) as DavError;
@@ -100,8 +101,8 @@ describe("AclService.check", () => {
 		const principalId = PrincipalId(crypto.randomUUID());
 		// Grant DAV:read-acl — does NOT satisfy a DAV:read check
 		const env = makeTestEnv().withAce({
-			resourceType: "collection",
-			resourceId: RESOURCE,
+			resourceType: RTYPE,
+			resourceId: RID,
 			principalType: "principal",
 			principalId,
 			privilege: "DAV:read-acl",
@@ -109,7 +110,7 @@ describe("AclService.check", () => {
 		});
 		const err = (await runFailure(
 			AclService.pipe(
-				Effect.flatMap((s) => s.check(principalId, RESOURCE, "DAV:read")),
+				Effect.flatMap((s) => s.check(principalId, RID, RTYPE, "DAV:read")),
 				Effect.provide(env.toLayer()),
 			),
 		)) as DavError;
@@ -135,8 +136,8 @@ describe("AclService.check", () => {
 
 		// Grant privilege to the group's principal, not the user's
 		env.withAce({
-			resourceType: "collection",
-			resourceId: RESOURCE,
+			resourceType: RTYPE,
+			resourceId: RID,
 			principalType: "principal",
 			principalId: groupPrincipalId,
 			privilege: "DAV:read",
@@ -145,7 +146,7 @@ describe("AclService.check", () => {
 
 		await runSuccess(
 			AclService.pipe(
-				Effect.flatMap((s) => s.check(userPrincipalId, RESOURCE, "DAV:read")),
+				Effect.flatMap((s) => s.check(userPrincipalId, RID, RTYPE, "DAV:read")),
 				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
@@ -155,15 +156,15 @@ describe("AclService.check", () => {
 	it("passes for 'all' principal type regardless of caller identity", async () => {
 		const principalId = PrincipalId(crypto.randomUUID());
 		const env = makeTestEnv().withAce({
-			resourceType: "collection",
-			resourceId: RESOURCE,
+			resourceType: RTYPE,
+			resourceId: RID,
 			principalType: "all",
 			privilege: "DAV:read",
 			grantDeny: "grant",
 		});
 		await runSuccess(
 			AclService.pipe(
-				Effect.flatMap((s) => s.check(principalId, RESOURCE, "DAV:read")),
+				Effect.flatMap((s) => s.check(principalId, RID, RTYPE, "DAV:read")),
 				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
@@ -179,8 +180,8 @@ describe("AclService.currentUserPrivileges", () => {
 	it("DAV:read returns only itself (no contained privileges)", async () => {
 		const principalId = PrincipalId(crypto.randomUUID());
 		const env = makeTestEnv().withAce({
-			resourceType: "collection",
-			resourceId: RESOURCE,
+			resourceType: RTYPE,
+			resourceId: RID,
 			principalType: "principal",
 			principalId,
 			privilege: "DAV:read",
@@ -188,7 +189,7 @@ describe("AclService.currentUserPrivileges", () => {
 		const result = await runSuccess(
 			AclService.pipe(
 				Effect.flatMap((s) =>
-					s.currentUserPrivileges(principalId, RESOURCE),
+					s.currentUserPrivileges(principalId, RID, RTYPE),
 				),
 				Effect.provide(env.toLayer()),
 				Effect.orDie,
@@ -201,8 +202,8 @@ describe("AclService.currentUserPrivileges", () => {
 	it("DAV:write expands to include write-properties, write-content, bind, unbind", async () => {
 		const principalId = PrincipalId(crypto.randomUUID());
 		const env = makeTestEnv().withAce({
-			resourceType: "collection",
-			resourceId: RESOURCE,
+			resourceType: RTYPE,
+			resourceId: RID,
 			principalType: "principal",
 			principalId,
 			privilege: "DAV:write",
@@ -210,7 +211,7 @@ describe("AclService.currentUserPrivileges", () => {
 		const result = await runSuccess(
 			AclService.pipe(
 				Effect.flatMap((s) =>
-					s.currentUserPrivileges(principalId, RESOURCE),
+					s.currentUserPrivileges(principalId, RID, RTYPE),
 				),
 				Effect.provide(env.toLayer()),
 				Effect.orDie,
@@ -251,8 +252,8 @@ describe("AclService.currentUserPrivileges", () => {
 
 		const principalId = PrincipalId(crypto.randomUUID());
 		const env = makeTestEnv().withAce({
-			resourceType: "collection",
-			resourceId: RESOURCE,
+			resourceType: RTYPE,
+			resourceId: RID,
 			principalType: "principal",
 			principalId,
 			privilege: "DAV:all",
@@ -260,7 +261,7 @@ describe("AclService.currentUserPrivileges", () => {
 		const result = await runSuccess(
 			AclService.pipe(
 				Effect.flatMap((s) =>
-					s.currentUserPrivileges(principalId, RESOURCE),
+					s.currentUserPrivileges(principalId, RID, RTYPE),
 				),
 				Effect.provide(env.toLayer()),
 				Effect.orDie,
@@ -275,8 +276,8 @@ describe("AclService.currentUserPrivileges", () => {
 	it("CALDAV:schedule-deliver expands to invite and reply children", async () => {
 		const principalId = PrincipalId(crypto.randomUUID());
 		const env = makeTestEnv().withAce({
-			resourceType: "collection",
-			resourceId: RESOURCE,
+			resourceType: RTYPE,
+			resourceId: RID,
 			principalType: "principal",
 			principalId,
 			privilege: "CALDAV:schedule-deliver",
@@ -284,7 +285,7 @@ describe("AclService.currentUserPrivileges", () => {
 		const result = await runSuccess(
 			AclService.pipe(
 				Effect.flatMap((s) =>
-					s.currentUserPrivileges(principalId, RESOURCE),
+					s.currentUserPrivileges(principalId, RID, RTYPE),
 				),
 				Effect.provide(env.toLayer()),
 				Effect.orDie,
@@ -301,7 +302,7 @@ describe("AclService.currentUserPrivileges", () => {
 		const result = await runSuccess(
 			AclService.pipe(
 				Effect.flatMap((s) =>
-					s.currentUserPrivileges(principalId, RESOURCE),
+					s.currentUserPrivileges(principalId, RID, RTYPE),
 				),
 				Effect.provide(env.toLayer()),
 				Effect.orDie,

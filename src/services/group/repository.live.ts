@@ -2,7 +2,7 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { Effect, Layer, Option } from "effect";
 import { DatabaseClient, type DbClient } from "#src/db/client.ts";
 import { group, membership, principal } from "#src/db/drizzle/schema/index.ts";
-import { DatabaseError } from "#src/domain/errors.ts";
+import { ConflictError, DatabaseError, isPgUniqueViolation } from "#src/domain/errors.ts";
 import type { GroupId, UserId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
 import { GroupRepository, type GroupWithPrincipal } from "./repository.ts";
@@ -40,7 +40,7 @@ const create = (
 		readonly displayName?: string;
 	},
 ) =>
-	Effect.tryPromise({
+	Effect.tryPromise<GroupWithPrincipal, DatabaseError | ConflictError>({
 		try: () =>
 			db.transaction(async (tx) => {
 				const principalRows = await tx
@@ -70,7 +70,13 @@ const create = (
 					group: groupRow,
 				} satisfies GroupWithPrincipal;
 			}),
-		catch: (e) => new DatabaseError({ cause: e }),
+		catch: (e) =>
+			isPgUniqueViolation(e)
+				? new ConflictError({
+						field: "slug",
+						message: "Group with this slug already exists",
+					})
+				: new DatabaseError({ cause: e }),
 	});
 
 const update = (

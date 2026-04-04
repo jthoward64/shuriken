@@ -89,7 +89,14 @@ const softDelete = (db: DbClient, id: CollectionId) =>
 				.update(davCollection)
 				.set({ deletedAt: sql`now()` })
 				.where(eq(davCollection.id, id))
-				.then(() => undefined),
+				.returning()
+				.then((rows) => {
+					const row = rows[0];
+					if (!row) {
+						throw new Error(`Collection not found for deletion: ${id}`);
+					}
+					return row;
+				}),
 		catch: (e) => new DatabaseError({ cause: e }),
 	});
 

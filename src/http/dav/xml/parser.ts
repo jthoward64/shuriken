@@ -1,6 +1,12 @@
 import { Effect } from "effect";
 import { XMLParser } from "fast-xml-parser";
-import { XmlParseError } from "#src/domain/errors.ts";
+import { type DavError, XmlParseError, davError } from "#src/domain/errors.ts";
+import { HTTP_REQUEST_ENTITY_TOO_LARGE } from "#src/http/status.ts";
+
+
+// Maximum size in bytes accepted for XML request bodies (PROPFIND, PROPPATCH, REPORT).
+// Rejects payloads larger than this with 413 before parsing.
+const MAX_XML_BODY_BYTES = 524_288; // 512 KiB
 
 // ---------------------------------------------------------------------------
 // Effect-wrapped XML parser
@@ -8,6 +14,10 @@ import { XmlParseError } from "#src/domain/errors.ts";
 // Pure functions — not an Effect.Service.  DAV handlers import directly.
 // ---------------------------------------------------------------------------
 
+// Note: fast-xml-parser does not expose a maxDepth option. Depth limiting is
+// handled at the body-size level via readXmlBody (512 KiB cap). A deeply
+// nested DAV payload that fits within that limit is accepted; this is an
+// acceptable trade-off given DAV XML structures are shallow in practice.
 const parser = new XMLParser({
 	ignoreAttributes: false,
 	attributeNamePrefix: "@_",
@@ -15,6 +25,23 @@ const parser = new XMLParser({
 	parseTagValue: false, // Keep all values as strings; callers parse as needed
 	trimValues: true,
 });
+
+/**
+ * Read and size-check the XML body of a DAV request.
+ * Rejects with 413 if the body exceeds MAX_XML_BODY_BYTES before parsing.
+ * Handlers should call this instead of `req.text()` directly.
+ */
+export const readXmlBody = (req: Request): Effect.Effect<string, DavError> =>
+	Effect.tryPromise({
+		try: () => req.text(),
+		catch: () => davError(HTTP_REQUEST_ENTITY_TOO_LARGE),
+	}).pipe(
+		Effect.flatMap((text) =>
+			text.length > MAX_XML_BODY_BYTES
+				? Effect.fail(davError(HTTP_REQUEST_ENTITY_TOO_LARGE))
+				: Effect.succeed(text),
+		),
+	);
 
 /**
  * Parse an XML string into an unknown object tree.

@@ -132,6 +132,7 @@ const hasPrivilege = (
 	db: DbClient,
 	principalIds: ReadonlyArray<PrincipalId>,
 	resourceId: string,
+	resourceType: AclResourceType,
 	privileges: ReadonlyArray<DavPrivilege>,
 	isAuthenticated: boolean,
 ) =>
@@ -143,6 +144,7 @@ const hasPrivilege = (
 				.where(
 					and(
 						eq(davAcl.resourceId, resourceId),
+						eq(davAcl.resourceType, resourceType),
 						eq(davAcl.grantDeny, "grant"),
 						inArray(davAcl.privilege, privileges as Array<DavPrivilege>),
 						buildPrincipalFilter(principalIds, isAuthenticated),
@@ -157,6 +159,7 @@ const getGrantedPrivileges = (
 	db: DbClient,
 	principalIds: ReadonlyArray<PrincipalId>,
 	resourceId: string,
+	resourceType: AclResourceType,
 	isAuthenticated: boolean,
 ) =>
 	Effect.tryPromise({
@@ -167,6 +170,7 @@ const getGrantedPrivileges = (
 				.where(
 					and(
 						eq(davAcl.resourceId, resourceId),
+						eq(davAcl.resourceType, resourceType),
 						eq(davAcl.grantDeny, "grant"),
 						buildPrincipalFilter(principalIds, isAuthenticated),
 					),
@@ -199,10 +203,10 @@ export const AclRepositoryLive = Layer.effect(
 			setAces: (resourceId, resourceType, aces) =>
 				setAces(db, resourceId, resourceType, aces),
 			grantAce: (ace) => grantAce(db, ace),
-			hasPrivilege: (principalIds, resourceId, privileges, isAuthenticated) =>
-				hasPrivilege(db, principalIds, resourceId, privileges, isAuthenticated),
-			getGrantedPrivileges: (principalIds, resourceId, isAuthenticated) =>
-				getGrantedPrivileges(db, principalIds, resourceId, isAuthenticated),
+			hasPrivilege: (principalIds, resourceId, resourceType, privileges, isAuthenticated) =>
+				hasPrivilege(db, principalIds, resourceId, resourceType, privileges, isAuthenticated),
+			getGrantedPrivileges: (principalIds, resourceId, resourceType, isAuthenticated) =>
+				getGrantedPrivileges(db, principalIds, resourceId, resourceType, isAuthenticated),
 			getGroupPrincipalIds: (userPrincipalId) =>
 				getGroupPrincipalIds(db, userPrincipalId),
 		}),

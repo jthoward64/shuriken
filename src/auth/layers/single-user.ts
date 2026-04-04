@@ -16,7 +16,9 @@ import { Email } from "#src/domain/types/strings.ts";
 // All requests are treated as a single authenticated user — no credentials
 // are checked. Useful for development and self-hosted single-user setups.
 //
-// The principal is resolved once at layer-build time and cached.
+// The principal is resolved per-request so that:
+//   - Layer build is infallible (no DB call at startup)
+//   - Changes to the user row are reflected without restarting the server
 // ---------------------------------------------------------------------------
 
 const resolvePrincipal = (
@@ -66,12 +68,13 @@ export const SingleUserAuthLayer = Layer.effect(
 		} = yield* AppConfigService;
 		const email = Option.map(emailOpt, Email);
 
-		// Resolve principal at layer-build time — cached for all requests
-		const principal = yield* resolvePrincipal(db, email);
-
 		return AuthService.of({
+			// Resolve per-request: layer build is infallible, user row changes
+			// are reflected immediately without restarting the server.
 			authenticate: (_headers, _clientIp) =>
-				Effect.succeed(new Authenticated({ principal })),
+				resolvePrincipal(db, email).pipe(
+					Effect.map((principal) => new Authenticated({ principal })),
+				),
 		});
 	}),
 );

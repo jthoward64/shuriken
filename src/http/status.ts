@@ -17,5 +17,6 @@ export const HTTP_FORBIDDEN = HttpStatus(403);
 export const HTTP_NOT_FOUND = HttpStatus(404);
 export const HTTP_METHOD_NOT_ALLOWED = HttpStatus(405);
 export const HTTP_CONFLICT = HttpStatus(409);
+export const HTTP_REQUEST_ENTITY_TOO_LARGE = HttpStatus(413);
 export const HTTP_INTERNAL_SERVER_ERROR = HttpStatus(500);
 export const HTTP_NOT_IMPLEMENTED = HttpStatus(501);

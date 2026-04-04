@@ -25,7 +25,7 @@ export interface CollectionServiceShape {
 	) => Effect.Effect<CollectionRow, DavError | DatabaseError>;
 	readonly delete: (
 		id: CollectionId,
-	) => Effect.Effect<void, DavError | DatabaseError>;
+	) => Effect.Effect<CollectionRow, DavError | DatabaseError>;
 }
 
 export class CollectionService extends Context.Tag("CollectionService")<
