@@ -1,6 +1,6 @@
 import { Effect, ParseResult, Schema } from "effect";
 import type { DavError } from "../../domain/errors.ts";
-import { validCalendarData } from "../../domain/errors.ts";
+import { validAddressData } from "../../domain/errors.ts";
 import type { ContentLine } from "../content-line.ts";
 import {
 	type RawComponent,
@@ -12,12 +12,11 @@ import {
 	formatPlainDate,
 	formatPlainDateTime,
 	formatZonedDateTime,
-	getTzidParam,
 	getValueParam,
 	paramsFromIr,
 	paramsToIr,
+	parseDateAndOrTime,
 	parseDateTimeString,
-	parsePlainDate,
 	parseTextList,
 	serializeTextList,
 	unescapeText,
@@ -31,100 +30,88 @@ import {
 	IrComponentSchema,
 	IrDocumentSchema,
 } from "../ir.ts";
+import { isVCard21, normalizeVCard21 } from "./vcard21.ts";
 
 // ---------------------------------------------------------------------------
-// iCal property default-type lookup (RFC 5545 §3.8)
+// vCard property default-type lookup (RFC 6350 §5)
 //
-// Keys are the uppercase property names produced by ContentLinesCodec.
-// Using a Map avoids naming-convention lint issues with ALL_CAPS/hyphenated keys.
+// Keys are uppercase property names. Using a Map avoids naming-convention lint
+// issues with ALL_CAPS keys in object literals.
 // ---------------------------------------------------------------------------
 
-const ICAL_DEFAULT_TYPES = new Map<string, IrValueType>([
-	// VCALENDAR
-	["CALSCALE", "TEXT"],
-	["METHOD", "TEXT"],
-	["PRODID", "TEXT"],
+const VCARD_DEFAULT_TYPES = new Map<string, IrValueType>([
+	// General
 	["VERSION", "TEXT"],
-	// Descriptive
-	["ATTACH", "URI"],
+	["SOURCE", "URI"],
+	["KIND", "TEXT"],
+	["XML", "TEXT"],
+	// Identification
+	["FN", "TEXT"],
+	["N", "TEXT"],
+	["NICKNAME", "TEXT_LIST"],
+	["PHOTO", "URI"],
+	["BDAY", "DATE_AND_OR_TIME"],
+	["ANNIVERSARY", "DATE_AND_OR_TIME"],
+	["GENDER", "TEXT"],
+	// Delivery addressing
+	["ADR", "TEXT"],
+	// Communications
+	["TEL", "TEXT"],
+	["EMAIL", "TEXT"],
+	["IMPP", "URI"],
+	["LANG", "TEXT"],
+	// Geographical
+	["TZ", "TEXT"],
+	["GEO", "URI"],
+	// Organizational
+	["TITLE", "TEXT"],
+	["ROLE", "TEXT"],
+	["LOGO", "URI"],
+	["ORG", "TEXT"],
+	["MEMBER", "URI"],
+	["RELATED", "URI"],
+	// Explanatory
 	["CATEGORIES", "TEXT_LIST"],
-	["CLASS", "TEXT"],
-	["COMMENT", "TEXT"],
-	["DESCRIPTION", "TEXT"],
-	["GEO", "TEXT"],
-	["LOCATION", "TEXT"],
-	["PERCENT-COMPLETE", "INTEGER"],
-	["PRIORITY", "INTEGER"],
-	["RESOURCES", "TEXT_LIST"],
-	["STATUS", "TEXT"],
-	["SUMMARY", "TEXT"],
-	// Date/time (DATE_TIME by default; VALUE=DATE overrides to DATE)
-	["COMPLETED", "DATE_TIME"],
-	["DTEND", "DATE_TIME"],
-	["DUE", "DATE_TIME"],
-	["DTSTART", "DATE_TIME"],
-	["RECURRENCE-ID", "DATE_TIME"],
-	["DURATION", "DURATION"],
-	["FREEBUSY", "PERIOD_LIST"],
-	["TRANSP", "TEXT"],
-	// Timezone
-	["TZID", "TEXT"],
-	["TZNAME", "TEXT"],
-	["TZOFFSETFROM", "UTC_OFFSET"],
-	["TZOFFSETTO", "UTC_OFFSET"],
-	["TZURL", "URI"],
-	// Relationship
-	["ATTENDEE", "CAL_ADDRESS"],
-	["CONTACT", "TEXT"],
-	["ORGANIZER", "CAL_ADDRESS"],
-	["RELATED-TO", "TEXT"],
+	["NOTE", "TEXT"],
+	["PRODID", "TEXT"],
+	["REV", "DATE_AND_OR_TIME"],
+	["SOUND", "URI"],
+	["UID", "URI"],
+	["CLIENTPIDMAP", "TEXT"],
 	["URL", "URI"],
-	["UID", "TEXT"],
-	// Recurrence
-	["EXDATE", "DATE_TIME_LIST"],
-	["EXRULE", "RECUR"],
-	["RDATE", "DATE_TIME_LIST"],
-	["RRULE", "RECUR"],
-	// Alarm
-	["ACTION", "TEXT"],
-	["REPEAT", "INTEGER"],
-	["TRIGGER", "DURATION"],
-	// Change management
-	["CREATED", "DATE_TIME"],
-	["DTSTAMP", "DATE_TIME"],
-	["LAST-MODIFIED", "DATE_TIME"],
-	["SEQUENCE", "INTEGER"],
-	["REQUEST-STATUS", "TEXT"],
+	// Security / Calendar
+	["KEY", "URI"],
+	["FBURL", "URI"],
+	["CALADRURI", "URI"],
+	["CALURI", "URI"],
 ]);
 
 // ---------------------------------------------------------------------------
-// iCal VALUE= parameter override map (UPPERCASE keys per RFC 5545 §3.2.20)
+// vCard VALUE= parameter override map (lowercase keys per RFC 6350 §5.2)
 //
-// "DATE_TIME_DYNAMIC" signals that the actual type (DATE_TIME vs PLAIN_DATE_TIME)
-// must be resolved from rawValue shape (Z suffix) and TZID param at parse time.
+// "DATE_TIME_DYNAMIC" means resolve DATE_TIME vs PLAIN_DATE_TIME at parse time.
 // ---------------------------------------------------------------------------
 
-type IcalValueOverride = IrValueType | "DATE_TIME_DYNAMIC";
+type VcardValueOverride = IrValueType | "DATE_TIME_DYNAMIC";
 
-const ICAL_VALUE_OVERRIDES = new Map<string, IcalValueOverride>([
-	["BINARY", "BINARY"],
-	["BOOLEAN", "BOOLEAN"],
-	["CAL-ADDRESS", "CAL_ADDRESS"],
-	["DATE", "DATE"],
-	["DATE-TIME", "DATE_TIME_DYNAMIC"],
-	["DURATION", "DURATION"],
-	["FLOAT", "FLOAT"],
-	["INTEGER", "INTEGER"],
-	["PERIOD", "PERIOD"],
-	["RECUR", "RECUR"],
-	["TEXT", "TEXT"],
-	["TIME", "TIME"],
-	["URI", "URI"],
-	["UTC-OFFSET", "UTC_OFFSET"],
+const VCARD_VALUE_OVERRIDES = new Map<string, VcardValueOverride>([
+	["text", "TEXT"],
+	["uri", "URI"],
+	["date", "DATE"],
+	["date-time", "DATE_TIME_DYNAMIC"],
+	["timestamp", "DATE_TIME_DYNAMIC"],
+	["date-and-or-time", "DATE_AND_OR_TIME"],
+	["time", "TIME"],
+	["boolean", "BOOLEAN"],
+	["integer", "INTEGER"],
+	["float", "FLOAT"],
+	["utc-offset", "UTC_OFFSET"],
+	["language-tag", "TEXT"],
+	["text-list", "TEXT_LIST"],
 ]);
 
 // ---------------------------------------------------------------------------
-// IrValue encoding (iCal-specific, delegates to format-utils for date/time)
+// IrValue encoding (vCard-specific, delegates to format-utils)
 // ---------------------------------------------------------------------------
 
 const encodeIrValue = (value: IrValue): string => {
@@ -154,16 +141,16 @@ const encodeIrValue = (value: IrValue): string => {
 			return btoa(String.fromCodePoint(...value.value));
 		case "JSON":
 			return JSON.stringify(value.value);
-		case "DURATION":
 		case "URI":
-		case "CAL_ADDRESS":
-		case "RECUR":
+		case "DATE_AND_OR_TIME":
+		case "TIME":
 		case "UTC_OFFSET":
 		case "UTC_OFFSET_INTERVAL":
+		case "DURATION":
 		case "DURATION_INTERVAL":
+		case "CAL_ADDRESS":
+		case "RECUR":
 		case "PERIOD":
-		case "TIME":
-		case "DATE_AND_OR_TIME":
 			return value.value;
 	}
 };
@@ -172,8 +159,8 @@ const encodeIrValue = (value: IrValue): string => {
 // Single ContentLine → IrProperty (decode direction)
 // ---------------------------------------------------------------------------
 
-const decodeICalProperty = (line: ContentLine): IrProperty => {
-	const isKnown = ICAL_DEFAULT_TYPES.has(line.name);
+const decodeVCardProperty = (line: ContentLine): IrProperty => {
+	const isKnown = VCARD_DEFAULT_TYPES.has(line.name);
 
 	// Unknown / X- properties: store rawValue verbatim as TEXT, no unescaping
 	if (!isKnown) {
@@ -185,46 +172,34 @@ const decodeICalProperty = (line: ContentLine): IrProperty => {
 		};
 	}
 
-	// Resolve effective value type, checking VALUE= override first
+	// Resolve effective value type — VALUE= param is lowercase in vCard
 	const valueParamRaw = getValueParam(line.params);
-	const overrideKey = valueParamRaw?.toUpperCase();
 	const override =
-		overrideKey !== undefined ? ICAL_VALUE_OVERRIDES.get(overrideKey) : undefined;
-	const defaultType = ICAL_DEFAULT_TYPES.get(line.name) as IrValueType;
-	const effectiveType: IcalValueOverride = override ?? defaultType;
+		valueParamRaw !== undefined
+			? VCARD_VALUE_OVERRIDES.get(valueParamRaw.toLowerCase())
+			: undefined;
+	const defaultType = VCARD_DEFAULT_TYPES.get(line.name) as IrValueType;
+	const effectiveType: VcardValueOverride = override ?? defaultType;
 
-	const tzid = getTzidParam(line.params);
 	const raw = line.rawValue;
-
 	let value: IrValue;
 
 	if (effectiveType === "DATE_TIME_DYNAMIC" || effectiveType === "DATE_TIME") {
-		// Determine DATE_TIME vs PLAIN_DATE_TIME from rawValue shape and TZID param
+		// TZID param is not common in vCard but handle it for completeness
+		const tzid = line.params.find((p) => p.name.toUpperCase() === "TZID")?.values[0];
 		value = parseDateTimeString(raw, tzid);
+	} else if (effectiveType === "DATE_AND_OR_TIME") {
+		// Parse what Temporal can represent; fall back to opaque string for partial dates
+		value = parseDateAndOrTime(raw);
 	} else {
 		switch (effectiveType) {
 			case "DATE":
-				value = { type: "DATE", value: parsePlainDate(raw) };
-				break;
-			case "DATE_TIME_LIST": {
-				// Each item may be UTC or TZID-qualified; TZID param applies to all
-				const parsed = raw.split(",").map((item) => {
-					const r = parseDateTimeString(item.trim(), tzid);
-					if (r.type !== "DATE_TIME") {
-						throw new Error(
-							`DATE_TIME_LIST item "${item}" is floating — TZID or Z required`,
-						);
-					}
-					return r.value;
-				});
-				value = { type: "DATE_TIME_LIST", value: parsed };
-				break;
-			}
-			case "DATE_LIST":
-				value = {
-					type: "DATE_LIST",
-					value: raw.split(",").map((item) => parsePlainDate(item.trim())),
-				};
+				value = parseDateAndOrTime(raw);
+				// parseDateAndOrTime may return DATE_AND_OR_TIME for edge cases;
+				// ensure we got a DATE when explicitly requested
+				if (value.type !== "DATE") {
+					value = { type: "TEXT", value: raw };
+				}
 				break;
 			case "TEXT":
 				value = { type: "TEXT", value: unescapeText(raw) };
@@ -247,18 +222,13 @@ const decodeICalProperty = (line: ContentLine): IrProperty => {
 					value: Uint8Array.from(atob(raw), (c) => c.codePointAt(0) ?? 0),
 				};
 				break;
-			case "PERIOD_LIST":
-				value = { type: "PERIOD_LIST", value: raw.split(",") };
-				break;
-			case "DURATION":
 			case "URI":
+			case "TIME":
+			case "UTC_OFFSET":
+			case "DURATION":
 			case "CAL_ADDRESS":
 			case "RECUR":
-			case "UTC_OFFSET":
 			case "PERIOD":
-			case "TIME":
-			case "UTC_OFFSET_INTERVAL":
-			case "DURATION_INTERVAL":
 				value = { type: effectiveType, value: raw };
 				break;
 			default:
@@ -278,7 +248,7 @@ const decodeICalProperty = (line: ContentLine): IrProperty => {
 // Single IrProperty → ContentLine (encode direction)
 // ---------------------------------------------------------------------------
 
-const encodeICalProperty = (prop: IrProperty): ContentLine => {
+const encodeVCardProperty = (prop: IrProperty): ContentLine => {
 	const rawValue = prop.isKnown
 		? encodeIrValue(prop.value)
 		: (prop.value as { value: string }).value;
@@ -295,21 +265,21 @@ const encodeICalProperty = (prop: IrProperty): ContentLine => {
 
 const convertRawToIrComponent = (raw: RawComponent): IrComponent => ({
 	name: raw.name,
-	properties: raw.contentLines.map(decodeICalProperty),
+	properties: raw.contentLines.map(decodeVCardProperty),
 	components: raw.children.map(convertRawToIrComponent),
 });
 
 const convertIrToRawComponent = (ir: IrComponent): RawComponent => ({
 	name: ir.name,
-	contentLines: ir.properties.map(encodeICalProperty),
+	contentLines: ir.properties.map(encodeVCardProperty),
 	children: ir.components.map(convertIrToRawComponent),
 });
 
 // ---------------------------------------------------------------------------
-// ICalPropertyInferrer: Schema<IrComponent, RawComponent>
+// VCardPropertyInferrer: Schema<IrComponent, RawComponent>
 // ---------------------------------------------------------------------------
 
-const ICalPropertyInferrer: Schema.Schema<IrComponent, RawComponent> =
+const VCardPropertyInferrer: Schema.Schema<IrComponent, RawComponent> =
 	Schema.transformOrFail(RawComponentSchema, IrComponentSchema, {
 		strict: true,
 		decode: (raw, _options, ast) =>
@@ -325,31 +295,31 @@ const ICalPropertyInferrer: Schema.Schema<IrComponent, RawComponent> =
 	});
 
 // ---------------------------------------------------------------------------
-// ICalDocumentCodec: Schema<IrDocument, IrComponent>
+// VCardDocumentCodec: Schema<IrDocument, IrComponent>
 // ---------------------------------------------------------------------------
 
-const ICalDocumentCodec: Schema.Schema<IrDocument, IrComponent> =
+const VCardDocumentCodec: Schema.Schema<IrDocument, IrComponent> =
 	Schema.transformOrFail(IrComponentSchema, IrDocumentSchema, {
 		strict: true,
 		decode: (component, _options, ast) => {
-			if (component.name !== "VCALENDAR") {
+			if (component.name !== "VCARD") {
 				return ParseResult.fail(
 					new ParseResult.Type(
 						ast,
 						component,
-						`Expected VCALENDAR root component, got "${component.name}"`,
+						`Expected VCARD root component, got "${component.name}"`,
 					),
 				);
 			}
-			return ParseResult.succeed({ kind: "icalendar" as const, root: component });
+			return ParseResult.succeed({ kind: "vcard" as const, root: component });
 		},
 		encode: (doc, _options, ast) => {
-			if (doc.kind !== "icalendar") {
+			if (doc.kind !== "vcard") {
 				return ParseResult.fail(
 					new ParseResult.Type(
 						ast,
 						doc,
-						`Expected icalendar document, got kind "${doc.kind}"`,
+						`Expected vcard document, got kind "${doc.kind}"`,
 					),
 				);
 			}
@@ -362,33 +332,36 @@ const ICalDocumentCodec: Schema.Schema<IrDocument, IrComponent> =
 // ---------------------------------------------------------------------------
 
 /**
- * Full bidirectional codec: string ↔ IrDocument (iCalendar).
+ * Full bidirectional codec: string ↔ IrDocument (vCard).
+ *
+ * Handles vCard 3.0 and 4.0. For vCard 2.1 use `decodeVCard` which
+ * normalizes the input before passing it here.
  *
  * Pipeline:
- *   string →[TextToRawComponentCodec] RawComponent
- *          →[ICalPropertyInferrer]    IrComponent
- *          →[ICalDocumentCodec]       IrDocument
+ *   string →[TextToRawComponentCodec]  RawComponent
+ *          →[VCardPropertyInferrer]    IrComponent
+ *          →[VCardDocumentCodec]       IrDocument
  */
-export const ICalendarCodec: Schema.Schema<IrDocument, string> =
+export const VCardCodec: Schema.Schema<IrDocument, string> =
 	TextToRawComponentCodec.pipe(
-		Schema.compose(ICalPropertyInferrer),
-		Schema.compose(ICalDocumentCodec),
+		Schema.compose(VCardPropertyInferrer),
+		Schema.compose(VCardDocumentCodec),
 	);
 
 /**
- * Decode iCalendar text → IrDocument.
- * Maps Schema.ParseError → validCalendarData DavError.
+ * Decode vCard text (2.1, 3.0, or 4.0) → IrDocument.
+ * Maps Schema.ParseError → validAddressData DavError.
  */
-export const decodeICalendar = (
-	text: string,
-): Effect.Effect<IrDocument, DavError> =>
-	Schema.decodeUnknown(ICalendarCodec)(text).pipe(
-		Effect.mapError((e) => validCalendarData(e.message)),
+export const decodeVCard = (text: string): Effect.Effect<IrDocument, DavError> => {
+	const normalized = isVCard21(text) ? normalizeVCard21(text) : text;
+	return Schema.decodeUnknown(VCardCodec)(normalized).pipe(
+		Effect.mapError((e) => validAddressData(e.message)),
 	);
+};
 
 /**
- * Encode IrDocument → iCalendar text.
+ * Encode IrDocument → vCard 4.0 text.
  * Encoding a structurally valid IrDocument cannot fail; panics on internal error.
  */
-export const encodeICalendar = (doc: IrDocument): Effect.Effect<string, never> =>
-	Schema.encode(ICalendarCodec)(doc).pipe(Effect.orDie);
+export const encodeVCard = (doc: IrDocument): Effect.Effect<string, never> =>
+	Schema.encode(VCardCodec)(doc).pipe(Effect.orDie);
