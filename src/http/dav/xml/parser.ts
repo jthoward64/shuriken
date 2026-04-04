@@ -30,11 +30,17 @@ const parser = new XMLParser({
  * Read and size-check the XML body of a DAV request.
  * Rejects with 413 if the body exceeds MAX_XML_BODY_BYTES before parsing.
  * Handlers should call this instead of `req.text()` directly.
+ *
+ * Note: the size check uses character count, not UTF-8 byte count. For
+ * XML bodies that are overwhelmingly ASCII (as DAV XML is), this is a safe
+ * approximation — a multi-byte character is at least one character, so the
+ * check may accept slightly more than 512 KiB of raw bytes, but never less.
  */
 export const readXmlBody = (req: Request): Effect.Effect<string, DavError> =>
 	Effect.tryPromise({
 		try: () => req.text(),
-		catch: () => davError(HTTP_REQUEST_ENTITY_TOO_LARGE),
+		catch: (e) =>
+			davError(HTTP_REQUEST_ENTITY_TOO_LARGE, undefined, String(e)),
 	}).pipe(
 		Effect.flatMap((text) =>
 			text.length > MAX_XML_BODY_BYTES

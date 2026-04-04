@@ -41,9 +41,11 @@ const upsert = (
 				})
 				.onConflictDoUpdate({
 					target: calTimezone.tzid,
+					// Only overwrite ianaName when a value is explicitly provided;
+					// Option.none() preserves whatever was previously stored.
 					set: {
 						vtimezoneData,
-						ianaName: Option.getOrNull(ianaName),
+						...(Option.isSome(ianaName) ? { ianaName: ianaName.value } : {}),
 						updatedAt: sql`now()`,
 					},
 				})

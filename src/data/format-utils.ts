@@ -94,8 +94,8 @@ const DATE_TIME_RE =
 
 // "+HHMM" has sign + 4 digits = 5 chars; "+HH:MM" has 6 chars (already normalized)
 const OFFSET_NO_COLON_LEN = 5;
-// Position of the colon in "+HH:MM": after sign + 2 hour digits
-const OFFSET_HOUR_END = 3;
+// Index of the colon position in "+HH:MM": sign (1) + 2 hour digits = 3
+const OFFSET_COLON_POS = 3;
 
 /**
  * Normalize a fixed-offset suffix to "+HH:MM" form (Temporal timezone ID format).
@@ -103,7 +103,7 @@ const OFFSET_HOUR_END = 3;
  */
 const normalizeOffset = (offset: string): string =>
 	offset.length === OFFSET_NO_COLON_LEN
-		? `${offset.slice(0, OFFSET_HOUR_END)}:${offset.slice(OFFSET_HOUR_END)}`
+		? `${offset.slice(0, OFFSET_COLON_POS)}:${offset.slice(OFFSET_COLON_POS)}`
 		: offset;
 
 /**
