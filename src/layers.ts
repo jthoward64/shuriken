@@ -5,6 +5,7 @@ import { type DatabaseClient, DatabaseClientLive } from "#src/db/client.ts";
 import { type CryptoService, CryptoServiceLive } from "#src/platform/crypto.ts";
 import { AclDomainLayer } from "#src/services/acl/index.ts";
 import { CollectionDomainLayer } from "#src/services/collection/index.ts";
+import { DomainEntityDomainLayer } from "#src/services/domain-entity/index.ts";
 import { GroupDomainLayer } from "#src/services/group/index.ts";
 import { InstanceDomainLayer } from "#src/services/instance/index.ts";
 import { PrincipalDomainLayer } from "#src/services/principal/index.ts";
@@ -56,6 +57,7 @@ export const AppLayer = Layer.mergeAll(
 	withInfra(AclDomainLayer),
 	withInfra(UserDomainLayer),
 	withInfra(GroupDomainLayer),
+	withInfra(DomainEntityDomainLayer),
 );
 
 // ---------------------------------------------------------------------------
@@ -70,6 +72,7 @@ export {
 	CollectionRepository,
 	CollectionService,
 } from "#src/services/collection/index.ts";
+export { DomainEntityService } from "#src/services/domain-entity/index.ts";
 export {
 	GroupRepository,
 	GroupService,

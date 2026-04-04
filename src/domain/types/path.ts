@@ -51,4 +51,15 @@ export type ResolvedDavPath =
 			readonly principalId: PrincipalId;
 			readonly collectionId: CollectionId;
 			readonly instanceId: InstanceId;
+	  }
+	| {
+			readonly kind: "new-collection";
+			readonly principalId: PrincipalId;
+			readonly slug: Slug;
+	  }
+	| {
+			readonly kind: "new-instance";
+			readonly principalId: PrincipalId;
+			readonly collectionId: CollectionId;
+			readonly slug: Slug;
 	  };

@@ -1,7 +1,8 @@
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import type { AppError, DavError } from "#src/domain/errors.ts";
 import { notFound, someOrNotFound } from "#src/domain/errors.ts";
-import { CollectionId, InstanceId, PrincipalId } from "#src/domain/ids.ts";
+import { CollectionId, InstanceId, PrincipalId, isUuid } from "#src/domain/ids.ts";
+
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
@@ -34,11 +35,21 @@ type DavServices =
 	| CollectionRepository
 	| InstanceRepository;
 
-/** Parse and resolve a DAV URL path, converting slugs to branded UUIDs. */
 // Path segment counts for the /dav/principals/:slug/... hierarchy (excluding "principals")
 const SEGMENTS_PRINCIPAL = 2;
 const SEGMENTS_COLLECTION = 3;
 
+/** Parse and resolve a DAV URL path, converting slugs/UUIDs to branded UUIDs.
+ *
+ * Each path segment is detected as either a UUID or a slug:
+ * - UUID segments are resolved via `findById` and ownership is verified against
+ *   the parent (collection must belong to the resolved principal; instance must
+ *   belong to the resolved collection).
+ * - Slug segments are resolved via `findBySlug` as before.
+ * - Missing resources still yield `new-collection` / `new-instance` regardless
+ *   of whether the segment looked like a UUID, so PUT/MKCOL to a UUID-style URL
+ *   is handled correctly.
+ */
 const parseDavPath = (
 	url: URL,
 ): Effect.Effect<
@@ -73,28 +84,51 @@ const parseDavPath = (
 
 	// /dav/principals/ — principal-collection listing
 	if (segments.length === 1) {
-		return Effect.succeed({ kind: "principalCollection" } satisfies ResolvedDavPath);
+		return Effect.succeed({
+			kind: "principalCollection",
+		} satisfies ResolvedDavPath);
 	}
 
-	const principalSlug = Slug(decodeURIComponent(segments[1] ?? ""));
+	const seg1 = decodeURIComponent(segments[1] ?? "");
 
 	return Effect.gen(function* () {
 		const principalRepo = yield* PrincipalRepository;
-		const principalRow = yield* principalRepo.findBySlug(principalSlug).pipe(
-			Effect.flatMap(someOrNotFound(`Principal not found: ${principalSlug}`)),
-		);
+		const principalRow = yield* (
+			isUuid(seg1)
+				? principalRepo.findById(PrincipalId(seg1))
+				: principalRepo.findBySlug(Slug(seg1))
+		).pipe(Effect.flatMap(someOrNotFound(`Principal not found: ${seg1}`)));
 		const principalId = PrincipalId(principalRow.principal.id);
 
 		if (segments.length === SEGMENTS_PRINCIPAL) {
 			return { kind: "principal", principalId } satisfies ResolvedDavPath;
 		}
 
-		const collSlug = Slug(decodeURIComponent(segments[2] ?? ""));
+		const seg2 = decodeURIComponent(segments[2] ?? "");
 		const collRepo = yield* CollectionRepository;
-		const collRow = yield* collRepo.findBySlug(principalId, collSlug).pipe(
-			Effect.flatMap(someOrNotFound(`Collection not found: ${collSlug}`)),
+		const collRowOpt = yield* (
+			isUuid(seg2)
+				? collRepo.findById(CollectionId(seg2)).pipe(
+						Effect.flatMap(
+							Option.match({
+								onNone: () => Effect.succeed(Option.none()),
+								onSome: (row) =>
+									row.ownerPrincipalId === principalId
+										? Effect.succeed(Option.some(row))
+										: Effect.fail(notFound(`Collection not found: ${seg2}`)),
+							}),
+						),
+					)
+				: collRepo.findBySlug(principalId, Slug(seg2))
 		);
-		const collectionId = CollectionId(collRow.id);
+		if (Option.isNone(collRowOpt)) {
+			return {
+				kind: "new-collection",
+				principalId,
+				slug: Slug(seg2),
+			} satisfies ResolvedDavPath;
+		}
+		const collectionId = CollectionId(collRowOpt.value.id);
 
 		if (segments.length === SEGMENTS_COLLECTION) {
 			return {
@@ -104,18 +138,37 @@ const parseDavPath = (
 			} satisfies ResolvedDavPath;
 		}
 
-		const objSlug = Slug(decodeURIComponent(segments[3] ?? ""));
+		const seg3 = decodeURIComponent(segments[3] ?? "");
 		const instRepo = yield* InstanceRepository;
-		const instRow = yield* instRepo.findBySlug(collectionId, objSlug).pipe(
-			Effect.flatMap(someOrNotFound(`Instance not found: ${objSlug}`)),
+		const instRowOpt = yield* (
+			isUuid(seg3)
+				? instRepo.findById(InstanceId(seg3)).pipe(
+						Effect.flatMap(
+							Option.match({
+								onNone: () => Effect.succeed(Option.none()),
+								onSome: (row) =>
+									row.collectionId === collectionId
+										? Effect.succeed(Option.some(row))
+										: Effect.fail(notFound(`Instance not found: ${seg3}`)),
+							}),
+						),
+					)
+				: instRepo.findBySlug(collectionId, Slug(seg3))
 		);
-		const instanceId = InstanceId(instRow.id);
+		if (Option.isNone(instRowOpt)) {
+			return {
+				kind: "new-instance",
+				principalId,
+				collectionId,
+				slug: Slug(seg3),
+			} satisfies ResolvedDavPath;
+		}
 
 		return {
 			kind: "instance",
 			principalId,
 			collectionId,
-			instanceId,
+			instanceId: InstanceId(instRowOpt.value.id),
 		} satisfies ResolvedDavPath;
 	});
 };

@@ -36,6 +36,12 @@ export const RequestId = Brand.nominal<RequestId>();
 // UUIDv7 timestamp prefix length: first 48 bits = 12 hex chars
 const UUIDV7_TIMESTAMP_HEX_LENGTH = 12;
 
+const UUID_RE =
+	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Returns true if the string is a valid UUID (any version, case-insensitive). */
+export const isUuid = (s: string): boolean => UUID_RE.test(s);
+
 /**
  * Extract the creation timestamp from a UUIDv7.
  *
