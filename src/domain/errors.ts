@@ -43,14 +43,33 @@ export class ConflictError extends Data.TaggedError("ConflictError")<{
 }> {}
 
 /**
- * Returns true when an error looks like a PostgreSQL unique-violation (23505).
- * Works with pg/postgres.js/PGlite driver error shapes.
+ * Returns true when an error (or any nested `cause`) has PostgreSQL error code
+ * 23505 (unique-constraint violation).
+ *
+ * Drizzle wraps driver errors in `DrizzleQueryError`, so the PG error code
+ * lives at `e.cause.code`, not directly on `e`. We recurse one level to
+ * handle both shapes:
+ *   - Direct PG error:        { code: "23505", ... }
+ *   - Drizzle-wrapped error:  { cause: { code: "23505", ... }, ... }
  */
-export const isPgUniqueViolation = (cause: unknown): boolean =>
-	typeof cause === "object" &&
-	cause !== null &&
-	"code" in cause &&
-	(cause as { code: unknown }).code === "23505";
+export const isPgUniqueViolation = (cause: unknown): boolean => {
+	if (
+		typeof cause === "object" &&
+		cause !== null &&
+		"code" in cause &&
+		(cause as { code: unknown }).code === "23505"
+	) {
+		return true;
+	}
+	if (
+		typeof cause === "object" &&
+		cause !== null &&
+		"cause" in cause
+	) {
+		return isPgUniqueViolation((cause as { cause: unknown }).cause);
+	}
+	return false;
+};
 
 // ---------------------------------------------------------------------------
 // DAV precondition / postcondition XML element names (per RFC)

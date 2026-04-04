@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 import { Effect, Layer, Option, Redacted } from "effect";
-import type { DatabaseError } from "#src/domain/errors.ts";
+import type { ConflictError } from "#src/domain/errors.ts";
 import { UserId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import { Email } from "#src/domain/types/strings.ts";
@@ -403,7 +403,7 @@ describe("UserRepository unique constraint violations (integration)", () => {
 		layer = makeTestLayer();
 	});
 
-	it("two users with the same email fails with DatabaseError", async () => {
+	it("two users with the same email fails with ConflictError", async () => {
 		const err = (await runFailure(
 			UserRepository.pipe(
 				Effect.flatMap((r) =>
@@ -424,12 +424,12 @@ describe("UserRepository unique constraint violations (integration)", () => {
 				),
 				Effect.provide(layer),
 			),
-		)) as DatabaseError;
+		)) as ConflictError;
 
-		expect(err._tag).toBe("DatabaseError");
+		expect(err._tag).toBe("ConflictError");
 	});
 
-	it("two principals with the same slug fails with DatabaseError", async () => {
+	it("two principals with the same slug fails with ConflictError", async () => {
 		const err = (await runFailure(
 			UserRepository.pipe(
 				Effect.flatMap((r) =>
@@ -450,8 +450,8 @@ describe("UserRepository unique constraint violations (integration)", () => {
 				),
 				Effect.provide(layer),
 			),
-		)) as DatabaseError;
+		)) as ConflictError;
 
-		expect(err._tag).toBe("DatabaseError");
+		expect(err._tag).toBe("ConflictError");
 	});
 });

@@ -20,6 +20,7 @@ export const calTimezone = pgTable(
 		tzid: text().notNull(),
 		vtimezoneData: text("vtimezone_data").notNull(),
 		ianaName: text("iana_name"),
+		lastModifiedAt: timestampTz("last_modified_at"),
 		createdAt: timestampTz("created_at").default(sql`now()`).notNull(),
 		updatedAt: timestampTz("updated_at").default(sql`now()`).notNull(),
 	},
