@@ -1,28 +1,49 @@
-CREATE OR REPLACE FUNCTION unicode_casemap_nfc(input text)
-RETURNS text
-LANGUAGE sql
-IMMUTABLE
-PARALLEL SAFE
-AS $$
-    /*
-     * Unicode casemap comparator (RFC 5051-inspired).
-     *
-     * This implementation:
-     *   - Applies Unicode case folding (Postgres casefold())
-     *   - Normalizes to NFC (canonical equivalence)
-     *
-     * NOTE:
-     * RFC 5051 specifies compatibility decomposition (≈ NFKD) after
-     * titlecasing. We intentionally use NFC here instead:
-     *
-     *   - Preserves semantic distinctions (e.g., ① ≠ 1)
-     *   - Matches modern Unicode and OS behavior
-     *   - Avoids over-aggressive compatibility folding
-     *
-     * This is a conscious, documented divergence from strict RFC 5051.
-     */
-    SELECT normalize(casefold(input COLLATE "und-x-icu"), NFC);
-$$;
+DO $wrapper$
+BEGIN
+  /*
+   * Unicode casemap comparator (RFC 5051-inspired).
+   *
+   * Applies Unicode case folding + NFC normalization.
+   * ICU availability is checked once at migration time so the
+   * installed function body has zero branching overhead.
+   *
+   * NOTE:
+   * RFC 5051 specifies compatibility decomposition (≈ NFKD) after
+   * titlecasing. We intentionally use NFC here instead:
+   *
+   *   - Preserves semantic distinctions (e.g., ① ≠ 1)
+   *   - Matches modern Unicode and OS behavior
+   *   - Avoids over-aggressive compatibility folding
+   *
+   * This is a conscious, documented divergence from strict RFC 5051.
+   */
+  IF EXISTS (SELECT 1 FROM pg_collation WHERE collname = 'und-x-icu') THEN
+    -- ICU available: full Unicode case folding via casefold()
+    EXECUTE $fn$
+      CREATE OR REPLACE FUNCTION unicode_casemap_nfc(input text)
+      RETURNS text
+      LANGUAGE sql
+      IMMUTABLE
+      PARALLEL SAFE
+      AS $body$
+        SELECT normalize(casefold(input COLLATE "und-x-icu"), NFC);
+      $body$;
+    $fn$;
+  ELSE
+    -- No ICU (e.g. test environments): ASCII lower() as best-effort fallback
+    EXECUTE $fn$
+      CREATE OR REPLACE FUNCTION unicode_casemap_nfc(input text)
+      RETURNS text
+      LANGUAGE sql
+      IMMUTABLE
+      PARALLEL SAFE
+      AS $body$
+        SELECT normalize(lower(input), NFC);
+      $body$;
+    $fn$;
+  END IF;
+END
+$wrapper$;
 --> statement-breakpoint
 CREATE OR REPLACE FUNCTION ascii_casemap(input text)
 RETURNS text
@@ -172,3 +193,33 @@ BEGIN
     RETURN NEW;
 END;
 $$;
+--> statement-breakpoint
+DO $wrapper$
+BEGIN
+  -- uuidv7() is built-in as of PostgreSQL 18; only create the polyfill on older versions.
+  IF (SELECT current_setting('server_version_num')::int) < 180000 THEN
+    CREATE OR REPLACE FUNCTION uuidv7() RETURNS uuid AS $$
+    DECLARE
+      ms bigint;
+      ts_hex text;
+      rand_a text;
+      rand_b text;
+      rand_c text;
+    BEGIN
+      ms      := (extract(epoch from clock_timestamp()) * 1000)::bigint;
+      ts_hex  := lpad(to_hex(ms), 12, '0');
+      rand_a  := lpad(to_hex((random() * 4095)::bigint), 3, '0');
+      rand_b  := lpad(to_hex(((random() * 1023)::bigint | 2048)), 4, '0');
+      rand_c  := lpad(to_hex((random() * 281474976710655)::bigint), 12, '0');
+      RETURN (
+        substring(ts_hex, 1, 8) || '-' ||
+        substring(ts_hex, 9, 4) || '-' ||
+        '7' || rand_a || '-' ||
+        rand_b || '-' ||
+        rand_c
+      )::uuid;
+    END;
+    $$ LANGUAGE plpgsql;
+  END IF;
+END
+$wrapper$;

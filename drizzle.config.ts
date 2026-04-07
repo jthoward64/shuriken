@@ -1,4 +1,3 @@
-import "dotenv/config";
 import process from "node:process";
 import { defineConfig } from "drizzle-kit";
 
@@ -10,4 +9,5 @@ export default defineConfig({
 		// biome-ignore lint/style/noNonNullAssertion: drizzle will handle missing value
 		url: process.env.DATABASE_URL!,
 	},
+	verbose: true,
 });

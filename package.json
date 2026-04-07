@@ -10,7 +10,9 @@
 		"check": "tsc --noEmit",
 		"start": "bun .",
 		"serve": "bun --watch .",
-		"test": "bun test"
+		"test": "bun test",
+		"migrations:gen": "drizzle-kit generate",
+		"migrations:run": "drizzle-kit migrate"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.4.9",

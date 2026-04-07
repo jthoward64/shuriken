@@ -1,5 +1,6 @@
 import { drizzle } from "drizzle-orm/bun-sql";
 import type { BunSQLDatabase } from "drizzle-orm/bun-sql/postgres/driver";
+import type { PgAsyncDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { Effect, Redacted } from "effect";
 import { AppConfigService } from "#src/config.ts";
 import * as schema from "./drizzle/schema/index.ts";
@@ -21,7 +22,12 @@ export class DatabaseClient extends Effect.Service<DatabaseClient>()(
 			const {
 				database: { url },
 			} = yield* AppConfigService;
-			return drizzle(Redacted.value(url), { schema });
+			// biome-ignore lint/suspicious/noExplicitAny: Default type params are any
+			const db: PgAsyncDatabase<PgQueryResultHKT, any, any, any> = drizzle(
+				Redacted.value(url),
+				{ schema },
+			);
+			return db;
 		}),
 	},
 ) {}
