@@ -8,7 +8,9 @@ import {
 import { type ResolvedDavPath, Slug } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { HTTP_METHOD_NOT_ALLOWED } from "#src/http/status.ts";
+import type { AclService } from "#src/services/acl/index.ts";
 import { CollectionRepository } from "#src/services/collection/index.ts";
+import type { CollectionService } from "#src/services/collection/index.ts";
 import { InstanceRepository } from "#src/services/instance/index.ts";
 import { PrincipalRepository } from "#src/services/principal/index.ts";
 import { deleteHandler } from "./methods/delete.ts";
@@ -40,7 +42,9 @@ import { reportHandler } from "./methods/report.ts";
 type DavServices =
 	| PrincipalRepository
 	| CollectionRepository
-	| InstanceRepository;
+	| InstanceRepository
+	| CollectionService
+	| AclService;
 
 // Segment counts after stripping /dav (index 0 = "principals")
 const SEGMENTS_PRINCIPAL = 2; // ["principals", ":slug"]

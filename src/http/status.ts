@@ -10,6 +10,7 @@ export type HttpStatus = number & Brand.Brand<"HttpStatus">;
 export const HttpStatus = Brand.nominal<HttpStatus>();
 
 export const HTTP_OK = HttpStatus(200);
+export const HTTP_CREATED = HttpStatus(201);
 export const HTTP_MOVED_PERMANENTLY = HttpStatus(301);
 export const HTTP_BAD_REQUEST = HttpStatus(400);
 export const HTTP_UNAUTHORIZED = HttpStatus(401);

@@ -8,11 +8,14 @@ import {
 	HTTP_NOT_FOUND,
 	HTTP_OK,
 } from "#src/http/status.ts";
+import { AclServiceAllowAll } from "#src/services/acl/index.ts";
 import type { CollectionRow } from "#src/services/collection/repository.ts";
 import {
 	CollectionRepository,
 	type CollectionRepositoryShape,
 } from "#src/services/collection/repository.ts";
+import { CollectionService } from "#src/services/collection/service.ts";
+import type { CollectionServiceShape } from "#src/services/collection/service.ts";
 import type { InstanceRow } from "#src/services/instance/repository.ts";
 import {
 	InstanceRepository,
@@ -52,10 +55,19 @@ interface RouterSeeds {
 	readonly instances?: ReadonlyMap<string, string>;
 }
 
-/** Build a Layer providing the three repo services from simple slug→id maps. */
+/** Minimal CollectionService stub — router tests only exercise path resolution, not collection ops. */
+const stubCollectionService: CollectionServiceShape = {
+	findById: () => Effect.die("not implemented in router tests"),
+	findBySlug: () => Effect.die("not implemented in router tests"),
+	listByOwner: () => Effect.die("not implemented in router tests"),
+	create: () => Effect.die("not implemented in router tests"),
+	delete: () => Effect.die("not implemented in router tests"),
+};
+
+/** Build a Layer providing all DAV router requirements from simple slug→id maps. */
 const makeRouterLayer = (
 	seeds: RouterSeeds = {},
-): Layer.Layer<PrincipalRepository | CollectionRepository | InstanceRepository> => {
+): Layer.Layer<PrincipalRepository | CollectionRepository | InstanceRepository | CollectionService | import("#src/services/acl/index.ts").AclService> => {
 	const principals = seeds.principals ?? new Map<string, string>();
 	const collections = seeds.collections ?? new Map<string, string>();
 	const instances = seeds.instances ?? new Map<string, string>();
@@ -114,6 +126,8 @@ const makeRouterLayer = (
 		Layer.succeed(PrincipalRepository, principalRepo),
 		Layer.succeed(CollectionRepository, collectionRepo),
 		Layer.succeed(InstanceRepository, instanceRepo),
+		Layer.succeed(CollectionService, stubCollectionService),
+		AclServiceAllowAll,
 	);
 };
 
