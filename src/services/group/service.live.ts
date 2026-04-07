@@ -14,27 +14,43 @@ export const GroupServiceLive = Layer.effect(
 		const repo = yield* GroupRepository;
 
 		return GroupService.of({
-			create: (input: NewGroup) => repo.create(input),
+			create: Effect.fn("GroupService.create")(function* (input: NewGroup) {
+				yield* Effect.logTrace("group.create", { slug: input.slug });
+				return yield* repo.create(input);
+			}),
 
-			update: (id: GroupId, input: UpdateGroup) =>
-				Effect.gen(function* () {
-					yield* repo
-						.findById(id)
-						.pipe(Effect.flatMap(someOrNotFound(`Group not found: ${id}`)));
-					return yield* repo.update(id, input);
-				}),
+			update: Effect.fn("GroupService.update")(function* (
+				id: GroupId,
+				input: UpdateGroup,
+			) {
+				yield* Effect.logTrace("group.update", { id });
+				yield* repo
+					.findById(id)
+					.pipe(Effect.flatMap(someOrNotFound(`Group not found: ${id}`)));
+				return yield* repo.update(id, input);
+			}),
 
-			addMember: (groupId: GroupId, userId: UserId) =>
-				repo.findById(groupId).pipe(
+			addMember: Effect.fn("GroupService.addMember")(function* (
+				groupId: GroupId,
+				userId: UserId,
+			) {
+				yield* Effect.logTrace("group.addMember", { groupId, userId });
+				return yield* repo.findById(groupId).pipe(
 					Effect.flatMap(someOrNotFound(`Group not found: ${groupId}`)),
 					Effect.flatMap(() => repo.addMember(groupId, userId)),
-				),
+				);
+			}),
 
-			removeMember: (groupId: GroupId, userId: UserId) =>
-				repo.findById(groupId).pipe(
+			removeMember: Effect.fn("GroupService.removeMember")(function* (
+				groupId: GroupId,
+				userId: UserId,
+			) {
+				yield* Effect.logTrace("group.removeMember", { groupId, userId });
+				return yield* repo.findById(groupId).pipe(
 					Effect.flatMap(someOrNotFound(`Group not found: ${groupId}`)),
 					Effect.flatMap(() => repo.removeMember(groupId, userId)),
-				),
+				);
+			}),
 		});
 	}),
 );

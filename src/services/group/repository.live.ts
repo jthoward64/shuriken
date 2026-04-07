@@ -11,8 +11,12 @@ import { GroupRepository, type GroupWithPrincipal } from "./repository.ts";
 // GroupRepository — Drizzle implementation
 // ---------------------------------------------------------------------------
 
-const findById = (db: DbClient, id: GroupId) =>
-	Effect.tryPromise({
+const findById = Effect.fn("GroupRepository.findById")(function* (
+	db: DbClient,
+	id: GroupId,
+) {
+	yield* Effect.logTrace("repo.group.findById", { id });
+	return yield* Effect.tryPromise({
 		try: () =>
 			db
 				.select()
@@ -32,15 +36,17 @@ const findById = (db: DbClient, id: GroupId) =>
 				}),
 		catch: (e) => new DatabaseError({ cause: e }),
 	});
+}, Effect.tapError((e) => Effect.logWarning("repo.group.findById failed", e.cause)));
 
-const create = (
+const create = Effect.fn("GroupRepository.create")(function* (
 	db: DbClient,
 	input: {
 		readonly slug: Slug;
 		readonly displayName?: string;
 	},
-) =>
-	Effect.tryPromise<GroupWithPrincipal, DatabaseError | ConflictError>({
+) {
+	yield* Effect.logTrace("repo.group.create", { slug: input.slug });
+	return yield* Effect.tryPromise<GroupWithPrincipal, DatabaseError | ConflictError>({
 		try: () =>
 			db.transaction(async (tx) => {
 				const principalRows = await tx
@@ -78,13 +84,15 @@ const create = (
 					})
 				: new DatabaseError({ cause: e }),
 	});
+}, Effect.tapError((e) => Effect.logWarning("repo.group.create failed", e.cause)));
 
-const update = (
+const update = Effect.fn("GroupRepository.update")(function* (
 	db: DbClient,
 	id: GroupId,
 	input: { readonly displayName?: string },
-) =>
-	Effect.tryPromise({
+) {
+	yield* Effect.logTrace("repo.group.update", { id });
+	return yield* Effect.tryPromise({
 		try: async () => {
 			if (input.displayName !== undefined) {
 				await db
@@ -112,9 +120,15 @@ const update = (
 		},
 		catch: (e) => new DatabaseError({ cause: e }),
 	});
+}, Effect.tapError((e) => Effect.logWarning("repo.group.update failed", e.cause)));
 
-const addMember = (db: DbClient, groupId: GroupId, userId: UserId) =>
-	Effect.tryPromise({
+const addMember = Effect.fn("GroupRepository.addMember")(function* (
+	db: DbClient,
+	groupId: GroupId,
+	userId: UserId,
+) {
+	yield* Effect.logTrace("repo.group.addMember", { groupId, userId });
+	return yield* Effect.tryPromise({
 		try: () =>
 			db
 				.insert(membership)
@@ -123,9 +137,15 @@ const addMember = (db: DbClient, groupId: GroupId, userId: UserId) =>
 				.then(() => undefined),
 		catch: (e) => new DatabaseError({ cause: e }),
 	});
+}, Effect.tapError((e) => Effect.logWarning("repo.group.addMember failed", e.cause)));
 
-const removeMember = (db: DbClient, groupId: GroupId, userId: UserId) =>
-	Effect.tryPromise({
+const removeMember = Effect.fn("GroupRepository.removeMember")(function* (
+	db: DbClient,
+	groupId: GroupId,
+	userId: UserId,
+) {
+	yield* Effect.logTrace("repo.group.removeMember", { groupId, userId });
+	return yield* Effect.tryPromise({
 		try: () =>
 			db
 				.delete(membership)
@@ -135,9 +155,15 @@ const removeMember = (db: DbClient, groupId: GroupId, userId: UserId) =>
 				.then(() => undefined),
 		catch: (e) => new DatabaseError({ cause: e }),
 	});
+}, Effect.tapError((e) => Effect.logWarning("repo.group.removeMember failed", e.cause)));
 
-const hasMember = (db: DbClient, groupId: GroupId, userId: UserId) =>
-	Effect.tryPromise({
+const hasMember = Effect.fn("GroupRepository.hasMember")(function* (
+	db: DbClient,
+	groupId: GroupId,
+	userId: UserId,
+) {
+	yield* Effect.logTrace("repo.group.hasMember", { groupId, userId });
+	return yield* Effect.tryPromise({
 		try: () =>
 			db
 				.select()
@@ -149,6 +175,7 @@ const hasMember = (db: DbClient, groupId: GroupId, userId: UserId) =>
 				.then((r) => r.length > 0),
 		catch: (e) => new DatabaseError({ cause: e }),
 	});
+}, Effect.tapError((e) => Effect.logWarning("repo.group.hasMember failed", e.cause)));
 
 export const GroupRepositoryLive = Layer.effect(
 	GroupRepository,

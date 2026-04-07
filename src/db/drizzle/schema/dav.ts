@@ -95,10 +95,11 @@ export const davCollection = pgTable(
 		index("idx_dav_collection_type_active")
 			.using("btree", table.collectionType.asc().nullsLast())
 			.where(sql`(deleted_at IS NULL)`),
-		uniqueIndex("unique_collection_slug_per_owner")
+		uniqueIndex("unique_collection_slug_per_owner_type")
 			.using(
 				"btree",
 				table.ownerPrincipalId.asc().nullsLast(),
+				table.collectionType.asc().nullsLast(),
 				table.slug.asc().nullsLast(),
 			)
 			.where(sql`(deleted_at IS NULL)`),

@@ -20,12 +20,13 @@ import {
 // AclRepository — Drizzle implementation over dav_acl
 // ---------------------------------------------------------------------------
 
-const getAces = (
+const getAces = Effect.fn("AclRepository.getAces")(function* (
 	db: DbClient,
 	resourceId: string,
 	resourceType: AclResourceType,
-) =>
-	Effect.tryPromise({
+) {
+	yield* Effect.logTrace("repo.acl.getAces", { resourceId, resourceType });
+	return yield* Effect.tryPromise({
 		try: () =>
 			db
 				.select()
@@ -39,14 +40,20 @@ const getAces = (
 				.orderBy(davAcl.ordinal),
 		catch: (e) => new DatabaseError({ cause: e }),
 	});
+}, Effect.tapError((e) => Effect.logWarning("repo.acl.getAces failed", e.cause)));
 
-const setAces = (
+const setAces = Effect.fn("AclRepository.setAces")(function* (
 	db: DbClient,
 	resourceId: string,
 	resourceType: AclResourceType,
 	aces: ReadonlyArray<NewAce>,
-) =>
-	Effect.tryPromise({
+) {
+	yield* Effect.logTrace("repo.acl.setAces", {
+		resourceId,
+		resourceType,
+		count: aces.length,
+	});
+	return yield* Effect.tryPromise({
 		try: () =>
 			db.transaction(async (tx) => {
 				// Delete all non-protected ACEs for this resource
@@ -77,9 +84,17 @@ const setAces = (
 			}),
 		catch: (e) => new DatabaseError({ cause: e }),
 	});
+}, Effect.tapError((e) => Effect.logWarning("repo.acl.setAces failed", e.cause)));
 
-const grantAce = (db: DbClient, ace: NewAce) =>
-	Effect.tryPromise({
+const grantAce = Effect.fn("AclRepository.grantAce")(function* (
+	db: DbClient,
+	ace: NewAce,
+) {
+	yield* Effect.logTrace("repo.acl.grantAce", {
+		resourceId: ace.resourceId,
+		privilege: ace.privilege,
+	});
+	return yield* Effect.tryPromise({
 		try: () =>
 			db
 				.insert(davAcl)
@@ -96,6 +111,7 @@ const grantAce = (db: DbClient, ace: NewAce) =>
 				.then(() => undefined),
 		catch: (e) => new DatabaseError({ cause: e }),
 	});
+}, Effect.tapError((e) => Effect.logWarning("repo.acl.grantAce failed", e.cause)));
 
 // ---------------------------------------------------------------------------
 // Principal filter helper
@@ -128,15 +144,16 @@ function buildPrincipalFilter(
 	return or(...conditions) as SQL;
 }
 
-const hasPrivilege = (
+const hasPrivilege = Effect.fn("AclRepository.hasPrivilege")(function* (
 	db: DbClient,
 	principalIds: ReadonlyArray<PrincipalId>,
 	resourceId: string,
 	resourceType: AclResourceType,
 	privileges: ReadonlyArray<DavPrivilege>,
 	isAuthenticated: boolean,
-) =>
-	Effect.tryPromise({
+) {
+	yield* Effect.logTrace("repo.acl.hasPrivilege", { resourceId, resourceType });
+	return yield* Effect.tryPromise({
 		try: () =>
 			db
 				.select({ id: davAcl.id })
@@ -154,45 +171,61 @@ const hasPrivilege = (
 				.then((r) => r.length > 0),
 		catch: (e) => new DatabaseError({ cause: e }),
 	});
+}, Effect.tapError((e) => Effect.logWarning("repo.acl.hasPrivilege failed", e.cause)));
 
-const getGrantedPrivileges = (
-	db: DbClient,
-	principalIds: ReadonlyArray<PrincipalId>,
-	resourceId: string,
-	resourceType: AclResourceType,
-	isAuthenticated: boolean,
-) =>
-	Effect.tryPromise({
-		try: () =>
-			db
-				.selectDistinct({ privilege: davAcl.privilege })
-				.from(davAcl)
-				.where(
-					and(
-						eq(davAcl.resourceId, resourceId),
-						eq(davAcl.resourceType, resourceType),
-						eq(davAcl.grantDeny, "grant"),
-						buildPrincipalFilter(principalIds, isAuthenticated),
-					),
-				)
-				.then((rows) => rows.map((r) => r.privilege as DavPrivilege)),
-		catch: (e) => new DatabaseError({ cause: e }),
-	});
+const getGrantedPrivileges = Effect.fn("AclRepository.getGrantedPrivileges")(
+	function* (
+		db: DbClient,
+		principalIds: ReadonlyArray<PrincipalId>,
+		resourceId: string,
+		resourceType: AclResourceType,
+		isAuthenticated: boolean,
+	) {
+		yield* Effect.logTrace("repo.acl.getGrantedPrivileges", {
+			resourceId,
+			resourceType,
+		});
+		return yield* Effect.tryPromise({
+			try: () =>
+				db
+					.selectDistinct({ privilege: davAcl.privilege })
+					.from(davAcl)
+					.where(
+						and(
+							eq(davAcl.resourceId, resourceId),
+							eq(davAcl.resourceType, resourceType),
+							eq(davAcl.grantDeny, "grant"),
+							buildPrincipalFilter(principalIds, isAuthenticated),
+						),
+					)
+					.then((rows) => rows.map((r) => r.privilege as DavPrivilege)),
+			catch: (e) => new DatabaseError({ cause: e }),
+		});
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.acl.getGrantedPrivileges failed", e.cause),
+	),
+);
 
-// Resolve all group principal IDs for a given user principal.
-// Used by the service to expand the principal set before privilege checks.
-const getGroupPrincipalIds = (db: DbClient, userPrincipalId: PrincipalId) =>
-	Effect.tryPromise({
-		try: () =>
-			db
-				.select({ principalId: group.principalId })
-				.from(group)
-				.innerJoin(membership, eq(membership.groupId, group.id))
-				.innerJoin(user, eq(user.id, membership.userId))
-				.where(eq(user.principalId, userPrincipalId))
-				.then((rows) => rows.map((r) => r.principalId as PrincipalId)),
-		catch: (e) => new DatabaseError({ cause: e }),
-	});
+const getGroupPrincipalIds = Effect.fn("AclRepository.getGroupPrincipalIds")(
+	function* (db: DbClient, userPrincipalId: PrincipalId) {
+		yield* Effect.logTrace("repo.acl.getGroupPrincipalIds", { userPrincipalId });
+		return yield* Effect.tryPromise({
+			try: () =>
+				db
+					.select({ principalId: group.principalId })
+					.from(group)
+					.innerJoin(membership, eq(membership.groupId, group.id))
+					.innerJoin(user, eq(user.id, membership.userId))
+					.where(eq(user.principalId, userPrincipalId))
+					.then((rows) => rows.map((r) => r.principalId as PrincipalId)),
+			catch: (e) => new DatabaseError({ cause: e }),
+		});
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.acl.getGroupPrincipalIds failed", e.cause),
+	),
+);
 
 export const AclRepositoryLive = Layer.effect(
 	AclRepository,

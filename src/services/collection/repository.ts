@@ -29,6 +29,7 @@ export interface CollectionRepositoryShape {
 	) => Effect.Effect<Option.Option<CollectionRow>, DatabaseError>;
 	readonly findBySlug: (
 		ownerPrincipalId: PrincipalId,
+		collectionType: string,
 		slug: Slug,
 	) => Effect.Effect<Option.Option<CollectionRow>, DatabaseError>;
 	readonly listByOwner: (

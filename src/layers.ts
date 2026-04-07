@@ -9,6 +9,7 @@ import { DomainEntityDomainLayer } from "#src/services/domain-entity/index.ts";
 import { GroupDomainLayer } from "#src/services/group/index.ts";
 import { InstanceDomainLayer } from "#src/services/instance/index.ts";
 import { PrincipalDomainLayer } from "#src/services/principal/index.ts";
+import { ProvisioningDomainLayer } from "#src/services/provisioning/index.ts";
 import { UserDomainLayer } from "#src/services/user/index.ts";
 
 // ---------------------------------------------------------------------------
@@ -59,6 +60,7 @@ export const AppLayer = Layer.mergeAll(
 	withInfra(UserDomainLayer),
 	withInfra(GroupDomainLayer),
 	withInfra(DomainEntityDomainLayer),
+	ProvisioningDomainLayer.pipe(Layer.provide(InfraLayer)),
 );
 
 // ---------------------------------------------------------------------------

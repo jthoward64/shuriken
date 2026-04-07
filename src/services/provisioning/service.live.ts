@@ -1,0 +1,58 @@
+import { Effect, Layer } from "effect";
+import type { PrincipalId } from "#src/domain/ids.ts";
+import { Slug } from "#src/domain/types/path.ts";
+import { CollectionService } from "#src/services/collection/service.ts";
+import { UserService } from "#src/services/user/service.ts";
+import { ProvisioningService, type ProvisionUserInput } from "./service.ts";
+
+// ---------------------------------------------------------------------------
+// ProvisioningService — live implementation
+// ---------------------------------------------------------------------------
+
+export const ProvisioningServiceLive = Layer.effect(
+	ProvisioningService,
+	Effect.gen(function* () {
+		const users = yield* UserService;
+		const collections = yield* CollectionService;
+
+		return ProvisioningService.of({
+			provisionUser: Effect.fn("ProvisioningService.provisionUser")(function* (
+				input: ProvisionUserInput,
+			) {
+				yield* Effect.logInfo("provisioning user", { email: input.email });
+
+				const user = yield* users.create({
+					slug: input.slug,
+					name: input.name,
+					email: input.email,
+				});
+
+				// Drizzle infers the uuid column as string; cast to branded type
+				const principalId = user.principal.id as PrincipalId;
+
+				const calendar = yield* collections.create({
+					ownerPrincipalId: principalId,
+					collectionType: "calendar",
+					slug: Slug("primary"),
+					displayName: "Primary Calendar",
+					supportedComponents: ["VEVENT", "VTODO", "VJOURNAL"],
+				});
+
+				const addressBook = yield* collections.create({
+					ownerPrincipalId: principalId,
+					collectionType: "addressbook",
+					slug: Slug("primary"),
+					displayName: "Primary Address Book",
+					supportedComponents: ["VCARD"],
+				});
+
+				yield* Effect.logInfo("user provisioned", {
+					email: input.email,
+					userId: user.user.id,
+				});
+
+				return { user, calendar, addressBook };
+			}),
+		});
+	}),
+);

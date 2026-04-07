@@ -1,0 +1,4636 @@
+{
+  "version": "8",
+  "dialect": "postgres",
+  "id": "de25cf36-0603-4b28-aee3-0f45517a0fb3",
+  "prevIds": [
+    "3ca4b166-ed6c-4446-997d-2d998f0e1153"
+  ],
+  "ddl": [
+    {
+      "isRlsEnabled": false,
+      "name": "auth_user",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "cal_index",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "cal_timezone",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "card_index",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "dav_acl",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "dav_collection",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "dav_component",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "dav_entity",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "dav_instance",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "dav_parameter",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "dav_property",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "dav_schedule_message",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "dav_shadow",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "dav_tombstone",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "group",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "membership",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "principal",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "user",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "uuidv7()",
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "auth_user"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "user_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "auth_user"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "auth_source",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "auth_user"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "auth_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "auth_user"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "auth_user"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "auth_credential",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "auth_user"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "entity_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "cal_index"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "component_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "cal_index"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "component_type",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "cal_index"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "uid",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "cal_index"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "recurrence_id_utc",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "cal_index"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "dtstart_utc",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "cal_index"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "dtend_utc",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "cal_index"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "all_day",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "cal_index"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "rrule_text",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "cal_index"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "cal_index"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "deleted_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "cal_index"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": "'{}'",
+      "generated": null,
+      "identity": null,
+      "name": "metadata",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "cal_index"
+    },
+    {
+      "type": "tsvector",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": {
+        "as": "to_tsvector('english'::regconfig, ((((COALESCE((metadata ->> 'summary'::text), ''::text) || ' '::text) || COALESCE((metadata ->> 'location'::text), ''::text)) || ' '::text) || COALESCE((metadata ->> 'description'::text), ''::text)))",
+        "type": "stored"
+      },
+      "identity": null,
+      "name": "search_tsv",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "cal_index"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": {
+        "as": "jsonb_ascii_casemap(metadata)",
+        "type": "stored"
+      },
+      "identity": null,
+      "name": "metadata_ascii_fold",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "cal_index"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": {
+        "as": "jsonb_unicode_casemap_nfc(metadata)",
+        "type": "stored"
+      },
+      "identity": null,
+      "name": "metadata_unicode_fold",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "cal_index"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "uuidv7()",
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "cal_timezone"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "tzid",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "cal_timezone"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "vtimezone_data",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "cal_timezone"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "iana_name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "cal_timezone"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "last_modified_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "cal_timezone"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "cal_timezone"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "cal_timezone"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "entity_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "card_index"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "uid",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "card_index"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "fn",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "card_index"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "card_index"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "deleted_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "card_index"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": "'{}'",
+      "generated": null,
+      "identity": null,
+      "name": "data",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "card_index"
+    },
+    {
+      "type": "tsvector",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "search_tsv",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "card_index"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": {
+        "as": "ascii_casemap(fn)",
+        "type": "stored"
+      },
+      "identity": null,
+      "name": "fn_ascii_fold",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "card_index"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": {
+        "as": "unicode_casemap_nfc(fn)",
+        "type": "stored"
+      },
+      "identity": null,
+      "name": "fn_unicode_fold",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "card_index"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": {
+        "as": "jsonb_ascii_casemap(data)",
+        "type": "stored"
+      },
+      "identity": null,
+      "name": "data_ascii_fold",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "card_index"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": {
+        "as": "jsonb_unicode_casemap_nfc(data)",
+        "type": "stored"
+      },
+      "identity": null,
+      "name": "data_unicode_fold",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "card_index"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "uuidv7()",
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_acl"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "resource_type",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_acl"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "resource_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_acl"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "principal_type",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_acl"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "principal_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_acl"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "privilege",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_acl"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'grant'",
+      "generated": null,
+      "identity": null,
+      "name": "grant_deny",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_acl"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
+      "generated": null,
+      "identity": null,
+      "name": "protected",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_acl"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "0",
+      "generated": null,
+      "identity": null,
+      "name": "ordinal",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_acl"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_acl"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "uuidv7()",
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_collection"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "owner_principal_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_collection"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "collection_type",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_collection"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "display_name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_collection"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "description",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_collection"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "timezone_tzid",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_collection"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "0",
+      "generated": null,
+      "identity": null,
+      "name": "synctoken",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_collection"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_collection"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "deleted_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_collection"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 1,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "supported_components",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_collection"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "''",
+      "generated": null,
+      "identity": null,
+      "name": "slug",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_collection"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "parent_collection_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_collection"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'{}'",
+      "generated": null,
+      "identity": null,
+      "name": "client_properties",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_collection"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "max_resource_size",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_collection"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "min_date_time",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_collection"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "max_date_time",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_collection"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "max_instances",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_collection"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "max_attendees_per_instance",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_collection"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "uuidv7()",
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_component"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "entity_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_component"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "parent_component_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_component"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_component"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "0",
+      "generated": null,
+      "identity": null,
+      "name": "ordinal",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_component"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_component"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "deleted_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_component"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "uuidv7()",
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_entity"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "entity_type",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_entity"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "logical_uid",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_entity"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_entity"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "deleted_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_entity"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "uuidv7()",
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_instance"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "collection_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_instance"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "entity_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_instance"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "content_type",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_instance"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "etag",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_instance"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "0",
+      "generated": null,
+      "identity": null,
+      "name": "sync_revision",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_instance"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "last_modified",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_instance"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_instance"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "deleted_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_instance"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "schedule_tag",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_instance"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "''",
+      "generated": null,
+      "identity": null,
+      "name": "slug",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_instance"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'{}'",
+      "generated": null,
+      "identity": null,
+      "name": "client_properties",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_instance"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "uuidv7()",
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_parameter"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "property_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_parameter"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_parameter"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "value",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_parameter"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "0",
+      "generated": null,
+      "identity": null,
+      "name": "ordinal",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_parameter"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_parameter"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "deleted_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_parameter"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "uuidv7()",
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_property"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "component_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_property"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_property"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "value_type",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_property"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "value_text",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_property"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "value_int",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_property"
+    },
+    {
+      "type": "double precision",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "value_float",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_property"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "value_bool",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_property"
+    },
+    {
+      "type": "date",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "value_date",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_property"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "value_tstz",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_property"
+    },
+    {
+      "type": "bytea",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "value_bytes",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_property"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "value_json",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_property"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "0",
+      "generated": null,
+      "identity": null,
+      "name": "ordinal",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_property"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_property"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "deleted_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_property"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "group_name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_property"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 1,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "value_text_array",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_property"
+    },
+    {
+      "type": "date",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 1,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "value_date_array",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_property"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 1,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "value_tstz_array",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_property"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "value_plain_datetime",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_property"
+    },
+    {
+      "type": "interval",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "value_interval",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_property"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": {
+        "as": "ascii_casemap(value_text)",
+        "type": "stored"
+      },
+      "identity": null,
+      "name": "value_text_ascii_fold",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_property"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": {
+        "as": "unicode_casemap_nfc(value_text)",
+        "type": "stored"
+      },
+      "identity": null,
+      "name": "value_text_unicode_fold",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_property"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "uuidv7()",
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_schedule_message"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "collection_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_schedule_message"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "entity_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_schedule_message"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "sender",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_schedule_message"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "recipient",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_schedule_message"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "method",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_schedule_message"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'pending'",
+      "generated": null,
+      "identity": null,
+      "name": "status",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_schedule_message"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "diagnostics",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_schedule_message"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_schedule_message"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "delivered_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_schedule_message"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_schedule_message"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "deleted_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_schedule_message"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "uuidv7()",
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_shadow"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "instance_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_shadow"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "entity_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_shadow"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "direction",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_shadow"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "content_type",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_shadow"
+    },
+    {
+      "type": "bytea",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "raw_original",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_shadow"
+    },
+    {
+      "type": "bytea",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "raw_canonical",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_shadow"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "diagnostics",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_shadow"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "request_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_shadow"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_shadow"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "deleted_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_shadow"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "uuidv7()",
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_tombstone"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "collection_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_tombstone"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "entity_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_tombstone"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "synctoken",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_tombstone"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "sync_revision",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_tombstone"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "deleted_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_tombstone"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "last_etag",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_tombstone"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "logical_uid",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_tombstone"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 1,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "uri_variants",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dav_tombstone"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "uuidv7()",
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "group"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "principal_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "group"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "group"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "user_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "membership"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "group_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "membership"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "membership"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "uuidv7()",
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "principal"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "principal_type",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "principal"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "display_name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "principal"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "principal"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "deleted_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "principal"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "''",
+      "generated": null,
+      "identity": null,
+      "name": "slug",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "principal"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "uuidv7()",
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "user"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "user"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "email",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "user"
+    },
+    {
+      "type": "timestamptz",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "user"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "principal_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "user"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "auth_source",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "auth_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_auth_user_auth_source_auth_id",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "auth_user"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "user_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_auth_user_user_id",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "auth_user"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "component_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": "(deleted_at IS NULL)",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_cal_index_component_active",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "cal_index"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "deleted_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_cal_index_deleted_at",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "cal_index"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "dtend_utc",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_cal_index_dtend",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "cal_index"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "dtstart_utc",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_cal_index_dtstart",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "cal_index"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "metadata",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "gin",
+      "concurrently": false,
+      "name": "idx_cal_index_metadata",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "cal_index"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "search_tsv",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "gin",
+      "concurrently": false,
+      "name": "idx_cal_index_search_tsv",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "cal_index"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "dtstart_utc",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "dtend_utc",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": "(deleted_at IS NULL)",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_cal_index_timerange",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "cal_index"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "uid",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_cal_index_uid",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "cal_index"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "uid",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": "((deleted_at IS NULL) AND (uid IS NOT NULL))",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_cal_index_uid_active",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "cal_index"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "tzid",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_cal_timezone_tzid",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "cal_timezone"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "data",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "gin",
+      "concurrently": false,
+      "name": "idx_card_index_data",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "card_index"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "deleted_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_card_index_deleted_at",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "card_index"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "search_tsv",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "gin",
+      "concurrently": false,
+      "name": "idx_card_index_search_tsv",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "card_index"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "uid",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_card_index_uid",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "card_index"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "uid",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": "((deleted_at IS NULL) AND (uid IS NOT NULL))",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_card_index_uid_active",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "card_index"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "resource_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "principal_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "privilege",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_acl_resource_principal",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_acl"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "resource_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "ordinal",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_acl_resource_ordinal",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_acl"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "resource_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "principal_type",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_acl_resource_principal_type",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_acl"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "deleted_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_collection_deleted_at",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_collection"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "owner_principal_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_collection_owner",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_collection"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "owner_principal_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": "(deleted_at IS NULL)",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_collection_owner_active",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_collection"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "collection_type",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": "(deleted_at IS NULL)",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_collection_type_active",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_collection"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "owner_principal_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "collection_type",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "slug",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": "(deleted_at IS NULL)",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "unique_collection_slug_per_owner_type",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_collection"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "deleted_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_component_deleted_at",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_component"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "entity_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_component_entity",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_component"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "parent_component_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_component_parent",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_component"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "deleted_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_entity_deleted_at",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_entity"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "logical_uid",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_entity_logical_uid",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_entity"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "logical_uid",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": "((deleted_at IS NULL) AND (logical_uid IS NOT NULL))",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_entity_logical_uid_active",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_entity"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "entity_type",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_entity_type",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_entity"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "collection_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_instance_collection",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_instance"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "collection_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": "(deleted_at IS NULL)",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_instance_collection_active",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_instance"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "deleted_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_instance_deleted_at",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_instance"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "entity_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_instance_entity",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_instance"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "collection_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "sync_revision",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "deleted_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_instance_sync_query",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_instance"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "collection_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "sync_revision",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": "(deleted_at IS NULL)",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_instance_sync_revision",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_instance"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "collection_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "slug",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": "(deleted_at IS NULL)",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "unique_instance_slug_per_collection",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_instance"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "deleted_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_parameter_deleted_at",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_parameter"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "name",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_parameter_name",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_parameter"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "property_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_parameter_property",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_parameter"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "property_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "name",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_parameter_property_name",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_parameter"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "component_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_property_component",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_property"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "component_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "name",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_property_component_name",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_property"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "deleted_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_property_deleted_at",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_property"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "name",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_property_name",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_property"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "collection_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_schedule_message_collection",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_schedule_message"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "created_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_schedule_message_created",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_schedule_message"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "deleted_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_schedule_message_deleted_at",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_schedule_message"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "recipient",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": "(deleted_at IS NULL)",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_schedule_message_recipient",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_schedule_message"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "status",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": "(deleted_at IS NULL)",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_schedule_message_status",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_schedule_message"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "deleted_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_shadow_deleted_at",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_shadow"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "entity_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_shadow_entity",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_shadow"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "instance_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_shadow_instance",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_shadow"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "request_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_shadow_request_id",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_shadow"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "collection_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_tombstone_collection",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_tombstone"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "deleted_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_dav_tombstone_deleted_at",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "dav_tombstone"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "principal_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_group_principal",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "group"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "principal_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "uq_group_principal_id",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "group"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "group_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_membership_group_id",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "membership"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "user_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_membership_user_id",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "membership"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "deleted_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_principal_deleted_at",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "principal"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "principal_type",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_principal_principal_type",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "principal"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "principal_type",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": "(deleted_at IS NULL)",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_principal_type_active",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "principal"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "principal_type",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "slug",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": "(deleted_at IS NULL)",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "unique_principal_slug_per_type",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "principal"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "email",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_user_email_active",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "user"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "principal_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_user_principal",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "user"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "principal_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "uq_user_principal_id",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "user"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "user",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "auth_user_user_id_user_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "auth_user"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "entity_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "dav_entity",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "cal_index_entity_id_dav_entity_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "cal_index"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "component_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "dav_component",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "cal_index_component_id_dav_component_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "cal_index"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "entity_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "dav_entity",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "card_index_entity_id_dav_entity_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "card_index"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "principal_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "principal",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "dav_acl_principal_id_principal_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "dav_acl"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "owner_principal_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "principal",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "name": "dav_collection_owner_principal_id_principal_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "dav_collection"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "parent_collection_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "dav_collection",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "dav_collection_parent_collection_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "dav_collection"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "entity_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "dav_entity",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "dav_component_entity_id_dav_entity_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "dav_component"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "parent_component_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "dav_component",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "dav_component_parent_component_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "dav_component"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "collection_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "dav_collection",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "name": "dav_instance_collection_id_dav_collection_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "dav_instance"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "entity_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "dav_entity",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "name": "dav_instance_entity_id_dav_entity_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "dav_instance"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "property_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "dav_property",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "dav_parameter_property_id_dav_property_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "dav_parameter"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "component_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "dav_component",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "dav_property_component_id_dav_component_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "dav_property"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "collection_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "dav_collection",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "dav_schedule_message_collection_id_dav_collection_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "dav_schedule_message"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "entity_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "dav_entity",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "name": "dav_schedule_message_entity_id_dav_entity_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "dav_schedule_message"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "instance_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "dav_instance",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "dav_shadow_instance_id_dav_instance_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "dav_shadow"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "entity_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "dav_entity",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "dav_shadow_entity_id_dav_entity_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "dav_shadow"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "collection_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "dav_collection",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "name": "dav_tombstone_collection_id_dav_collection_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "dav_tombstone"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "entity_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "dav_entity",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "name": "dav_tombstone_entity_id_dav_entity_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "dav_tombstone"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "principal_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "principal",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "name": "group_principal_id_principal_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "group"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "user",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "membership_user_id_user_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "membership"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "group_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "group",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "membership_group_id_group_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "membership"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "principal_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "principal",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "name": "user_principal_id_principal_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "user"
+    },
+    {
+      "columns": [
+        "entity_id",
+        "component_id"
+      ],
+      "nameExplicit": true,
+      "name": "cal_index_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "cal_index"
+    },
+    {
+      "columns": [
+        "user_id",
+        "group_id"
+      ],
+      "nameExplicit": true,
+      "name": "membership_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "membership"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "auth_user_pkey",
+      "schema": "public",
+      "table": "auth_user",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "cal_timezone_pkey",
+      "schema": "public",
+      "table": "cal_timezone",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "entity_id"
+      ],
+      "nameExplicit": false,
+      "name": "card_index_pkey",
+      "schema": "public",
+      "table": "card_index",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "dav_acl_pkey",
+      "schema": "public",
+      "table": "dav_acl",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "dav_collection_pkey",
+      "schema": "public",
+      "table": "dav_collection",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "dav_component_pkey",
+      "schema": "public",
+      "table": "dav_component",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "dav_entity_pkey",
+      "schema": "public",
+      "table": "dav_entity",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "dav_instance_pkey",
+      "schema": "public",
+      "table": "dav_instance",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "dav_parameter_pkey",
+      "schema": "public",
+      "table": "dav_parameter",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "dav_property_pkey",
+      "schema": "public",
+      "table": "dav_property",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "dav_schedule_message_pkey",
+      "schema": "public",
+      "table": "dav_schedule_message",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "dav_shadow_pkey",
+      "schema": "public",
+      "table": "dav_shadow",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "dav_tombstone_pkey",
+      "schema": "public",
+      "table": "dav_tombstone",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "group_pkey",
+      "schema": "public",
+      "table": "group",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "principal_pkey",
+      "schema": "public",
+      "table": "principal",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "user_pkey",
+      "schema": "public",
+      "table": "user",
+      "entityType": "pks"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "auth_source",
+        "auth_id"
+      ],
+      "nullsNotDistinct": false,
+      "name": "auth_user_auth_source_auth_id_key",
+      "entityType": "uniques",
+      "schema": "public",
+      "table": "auth_user"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "tzid"
+      ],
+      "nullsNotDistinct": false,
+      "name": "cal_timezone_tzid_key",
+      "entityType": "uniques",
+      "schema": "public",
+      "table": "cal_timezone"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "email"
+      ],
+      "nullsNotDistinct": false,
+      "name": "user_email_key",
+      "entityType": "uniques",
+      "schema": "public",
+      "table": "user"
+    },
+    {
+      "value": "(component_type = ANY (ARRAY['VEVENT'::text, 'VTODO'::text, 'VJOURNAL'::text, 'VFREEBUSY'::text]))",
+      "name": "chk_cal_index_component_type",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "cal_index"
+    },
+    {
+      "value": "(grant_deny = ANY (ARRAY['grant'::text, 'deny'::text]))",
+      "name": "dav_acl_grant_deny_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "dav_acl"
+    },
+    {
+      "value": "(principal_type = ANY (ARRAY['principal'::text, 'all'::text, 'authenticated'::text, 'unauthenticated'::text, 'self'::text]))",
+      "name": "dav_acl_principal_type_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "dav_acl"
+    },
+    {
+      "value": "(resource_type = ANY (ARRAY['collection'::text, 'instance'::text, 'principal'::text]))",
+      "name": "dav_acl_resource_type_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "dav_acl"
+    },
+    {
+      "value": "(principal_type <> 'principal'::text OR principal_id IS NOT NULL)",
+      "name": "dav_acl_principal_id_required",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "dav_acl"
+    },
+    {
+      "value": "(collection_type = ANY (ARRAY['collection'::text, 'calendar'::text, 'addressbook'::text, 'inbox'::text, 'outbox'::text]))",
+      "name": "dav_collection_collection_type_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "dav_collection"
+    },
+    {
+      "value": "(entity_type = ANY (ARRAY['icalendar'::text, 'vcard'::text]))",
+      "name": "dav_entity_entity_type_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "dav_entity"
+    },
+    {
+      "value": "(content_type = ANY (ARRAY['text/calendar'::text, 'text/vcard'::text]))",
+      "name": "dav_instance_content_type_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "dav_instance"
+    },
+    {
+      "value": "(((((((((((((\nCASE\n    WHEN (value_text IS NOT NULL) THEN 1\n    ELSE 0\nEND +\nCASE\n    WHEN (value_int IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_float IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_bool IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_date IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_tstz IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_plain_datetime IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_bytes IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_json IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_text_array IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_date_array IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_tstz_array IS NOT NULL) THEN 1\n    ELSE 0\nEND) +\nCASE\n    WHEN (value_interval IS NOT NULL) THEN 1\n    ELSE 0\nEND) <= 1)",
+      "name": "chk_dav_property_single_value",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "dav_property"
+    },
+    {
+      "value": "(((value_text IS NULL) OR (value_type = ANY (ARRAY['TEXT'::text, 'DURATION'::text, 'URI'::text, 'UTC_OFFSET'::text, 'TIME'::text, 'DATE_AND_OR_TIME'::text, 'RECUR'::text, 'CAL_ADDRESS'::text, 'PERIOD'::text]))) AND ((value_int IS NULL) OR (value_type = 'INTEGER'::text)) AND ((value_float IS NULL) OR (value_type = 'FLOAT'::text)) AND ((value_bool IS NULL) OR (value_type = 'BOOLEAN'::text)) AND ((value_date IS NULL) OR (value_type = 'DATE'::text)) AND ((value_tstz IS NULL) OR (value_type = 'DATE_TIME'::text)) AND ((value_plain_datetime IS NULL) OR (value_type = 'PLAIN_DATE_TIME'::text)) AND ((value_bytes IS NULL) OR (value_type = 'BINARY'::text)) AND ((value_json IS NULL) OR (value_type = 'JSON'::text)) AND ((value_text_array IS NULL) OR (value_type = ANY (ARRAY['TEXT_LIST'::text, 'PERIOD_LIST'::text]))) AND ((value_date_array IS NULL) OR (value_type = 'DATE_LIST'::text)) AND ((value_tstz_array IS NULL) OR (value_type = 'DATE_TIME_LIST'::text)) AND ((value_interval IS NULL) OR (value_type = ANY (ARRAY['DURATION_INTERVAL'::text, 'UTC_OFFSET_INTERVAL'::text]))))",
+      "name": "chk_dav_property_value_matches_type",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "dav_property"
+    },
+    {
+      "value": "(value_type = ANY (ARRAY['TEXT'::text, 'INTEGER'::text, 'FLOAT'::text, 'BOOLEAN'::text, 'DATE'::text, 'DATE_TIME'::text, 'PLAIN_DATE_TIME'::text, 'DURATION'::text, 'URI'::text, 'BINARY'::text, 'JSON'::text, 'TEXT_LIST'::text, 'DATE_LIST'::text, 'DATE_TIME_LIST'::text, 'DURATION_INTERVAL'::text, 'UTC_OFFSET'::text, 'UTC_OFFSET_INTERVAL'::text, 'PERIOD'::text, 'PERIOD_LIST'::text, 'TIME'::text, 'DATE_AND_OR_TIME'::text, 'RECUR'::text, 'CAL_ADDRESS'::text]))",
+      "name": "dav_property_value_type_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "dav_property"
+    },
+    {
+      "value": "(method = ANY (ARRAY['REQUEST'::text, 'REPLY'::text, 'CANCEL'::text, 'REFRESH'::text, 'COUNTER'::text, 'DECLINECOUNTER'::text, 'ADD'::text]))",
+      "name": "dav_schedule_message_method_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "dav_schedule_message"
+    },
+    {
+      "value": "(status = ANY (ARRAY['pending'::text, 'delivered'::text, 'failed'::text]))",
+      "name": "dav_schedule_message_status_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "dav_schedule_message"
+    },
+    {
+      "value": "((instance_id IS NOT NULL) OR (entity_id IS NOT NULL))",
+      "name": "chk_dav_shadow_ref",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "dav_shadow"
+    },
+    {
+      "value": "(content_type = ANY (ARRAY['text/calendar'::text, 'text/vcard'::text]))",
+      "name": "dav_shadow_content_type_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "dav_shadow"
+    },
+    {
+      "value": "(direction = ANY (ARRAY['inbound'::text, 'outbound'::text]))",
+      "name": "dav_shadow_direction_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "dav_shadow"
+    },
+    {
+      "value": "(principal_type = ANY (ARRAY['user'::text, 'group'::text, 'system'::text, 'public'::text, 'resource'::text]))",
+      "name": "principal_principal_type_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "principal"
+    }
+  ],
+  "renames": []
+}

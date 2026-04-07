@@ -3,7 +3,7 @@ import { Effect, Layer, Option, Redacted } from "effect";
 import { AuthService } from "#src/auth/service.ts";
 import { DatabaseClient } from "#src/db/client.ts";
 import { authUser, user } from "#src/db/drizzle/schema/index.ts";
-import { type AuthError, DatabaseError } from "#src/domain/errors.ts";
+import { DatabaseError } from "#src/domain/errors.ts";
 import { PrincipalId, UserId } from "#src/domain/ids.ts";
 import {
 	Authenticated,
@@ -49,14 +49,18 @@ export const BasicAuthLayer = Layer.effect(
 		const crypto = yield* CryptoService;
 
 		return AuthService.of({
-			authenticate: (
-				headers,
-				_clientIp,
-			): Effect.Effect<AuthResult, AuthError | DatabaseError> =>
-				Option.match(parseBasicAuth(headers), {
-					onNone: () => Effect.succeed<AuthResult>(new Unauthenticated()),
+			authenticate: Effect.fn("auth.authenticate")(function* (headers, _clientIp) {
+				return yield* Option.match(parseBasicAuth(headers), {
+					onNone: () =>
+						Effect.logTrace("basic auth: no credentials").pipe(
+							Effect.andThen(Effect.succeed<AuthResult>(new Unauthenticated())),
+						),
 					onSome: (creds) =>
 						Effect.gen(function* () {
+							yield* Effect.logTrace("basic auth attempt", {
+								username: creds.username,
+							});
+
 							// Look up auth_user row for this username
 							const rows = yield* Effect.tryPromise({
 								try: () =>
@@ -81,7 +85,10 @@ export const BasicAuthLayer = Layer.effect(
 
 							const row = rows[0];
 							if (!row?.authCredential) {
-								return new Unauthenticated();
+								yield* Effect.logDebug("basic auth: user not found", {
+									username: creds.username,
+								});
+								return new Unauthenticated() as AuthResult;
 							}
 
 							// InternalError from Bun.password is a defect (unexpected), not a domain error
@@ -89,18 +96,25 @@ export const BasicAuthLayer = Layer.effect(
 								.verifyPassword(creds.password, row.authCredential)
 								.pipe(Effect.orDie);
 							if (!valid) {
-								return new Unauthenticated();
+								yield* Effect.logDebug("basic auth: invalid password", {
+									username: creds.username,
+								});
+								return new Unauthenticated() as AuthResult;
 							}
 
+							yield* Effect.logTrace("basic auth: succeeded", {
+								userId: row.userId,
+							});
 							return new Authenticated({
 								principal: {
 									principalId: PrincipalId(row.principalId),
 									userId: UserId(row.userId),
 									displayName: row.name,
 								},
-							});
+							}) as AuthResult;
 						}),
-				}),
+				});
+			}),
 		});
 	}),
 );

@@ -1,9 +1,11 @@
 import { Effect, Option } from "effect";
-import type { AppError, DavError } from "#src/domain/errors.ts";
-import { notFound, someOrNotFound } from "#src/domain/errors.ts";
+import { type AppError, type DavError, notFound, someOrNotFound } from "#src/domain/errors.ts";
 import { CollectionId, InstanceId, PrincipalId, isUuid } from "#src/domain/ids.ts";
-import type { ResolvedDavPath } from "#src/domain/types/path.ts";
-import { Slug } from "#src/domain/types/path.ts";
+import {
+	NAMESPACE_TO_COLLECTION_TYPE,
+	parseCollectionNamespace,
+} from "#src/domain/types/collection-namespace.ts";
+import { type ResolvedDavPath, Slug } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { HTTP_METHOD_NOT_ALLOWED } from "#src/http/status.ts";
 import { CollectionRepository } from "#src/services/collection/index.ts";
@@ -22,11 +24,17 @@ import { reportHandler } from "./methods/report.ts";
 // DAV router — slug resolution + method dispatch
 //
 // URL patterns handled:
-//   /.well-known/caldav                   → wellknown
-//   /.well-known/carddav                  → wellknown
-//   /dav/principals/:slug                 → principal
-//   /dav/principals/:slug/:collSlug       → collection
-//   /dav/principals/:slug/:collSlug/:obj  → instance
+//   /.well-known/caldav                          → wellknown
+//   /.well-known/carddav                         → wellknown
+//   /dav/                                        → root
+//   /dav/principals/                             → principalCollection
+//   /dav/principals/:slug                        → principal
+//   /dav/principals/:slug/:ns/:collSlug          → collection
+//   /dav/principals/:slug/:ns/:collSlug/:obj     → instance
+//
+// :ns is a CollectionNamespace segment ("cal", "card", "inbox", "outbox", "col")
+// that scopes slugs per collection type, allowing the same slug to exist
+// across different types under one principal.
 // ---------------------------------------------------------------------------
 
 type DavServices =
@@ -34,9 +42,10 @@ type DavServices =
 	| CollectionRepository
 	| InstanceRepository;
 
-// Path segment counts for the /dav/principals/:slug/... hierarchy (excluding "principals")
-const SEGMENTS_PRINCIPAL = 2;
-const SEGMENTS_COLLECTION = 3;
+// Segment counts after stripping /dav (index 0 = "principals")
+const SEGMENTS_PRINCIPAL = 2; // ["principals", ":slug"]
+const SEGMENTS_NAMESPACE = 3; // ["principals", ":slug", ":ns"]
+const SEGMENTS_COLLECTION = 4; // ["principals", ":slug", ":ns", ":collSlug"]
 
 /** Parse and resolve a DAV URL path, converting slugs/UUIDs to branded UUIDs.
  *
@@ -103,28 +112,43 @@ export const parseDavPath = (
 			return { kind: "principal", principalId } satisfies ResolvedDavPath;
 		}
 
+		// seg2 must be a known collection namespace — reject anything else
 		const seg2 = decodeURIComponent(segments[2] ?? "");
+		const namespaceOpt = parseCollectionNamespace(seg2);
+		if (Option.isNone(namespaceOpt)) {
+			return yield* notFound(`Unknown collection namespace: ${seg2}`);
+		}
+		const namespace = namespaceOpt.value;
+		const collectionType = NAMESPACE_TO_COLLECTION_TYPE[namespace];
+
+		// Paths that stop at the namespace level (/dav/principals/:slug/:ns) are not valid
+		if (segments.length === SEGMENTS_NAMESPACE) {
+			return yield* notFound(`Invalid DAV path: ${path}`);
+		}
+
+		const seg3 = decodeURIComponent(segments[3] ?? "");
 		const collRepo = yield* CollectionRepository;
 		const collRowOpt = yield* (
-			isUuid(seg2)
-				? collRepo.findById(CollectionId(seg2)).pipe(
+			isUuid(seg3)
+				? collRepo.findById(CollectionId(seg3)).pipe(
 						Effect.flatMap(
 							Option.match({
 								onNone: () => Effect.succeed(Option.none()),
 								onSome: (row) =>
 									row.ownerPrincipalId === principalId
 										? Effect.succeed(Option.some(row))
-										: Effect.fail(notFound(`Collection not found: ${seg2}`)),
+										: Effect.fail(notFound(`Collection not found: ${seg3}`)),
 							}),
 						),
 					)
-				: collRepo.findBySlug(principalId, Slug(seg2))
+				: collRepo.findBySlug(principalId, collectionType, Slug(seg3))
 		);
 		if (Option.isNone(collRowOpt)) {
 			return {
 				kind: "new-collection",
 				principalId,
-				slug: Slug(seg2),
+				namespace,
+				slug: Slug(seg3),
 			} satisfies ResolvedDavPath;
 		}
 		const collectionId = CollectionId(collRowOpt.value.id);
@@ -133,39 +157,42 @@ export const parseDavPath = (
 			return {
 				kind: "collection",
 				principalId,
+				namespace,
 				collectionId,
 			} satisfies ResolvedDavPath;
 		}
 
-		const seg3 = decodeURIComponent(segments[3] ?? "");
+		const seg4 = decodeURIComponent(segments[4] ?? "");
 		const instRepo = yield* InstanceRepository;
 		const instRowOpt = yield* (
-			isUuid(seg3)
-				? instRepo.findById(InstanceId(seg3)).pipe(
+			isUuid(seg4)
+				? instRepo.findById(InstanceId(seg4)).pipe(
 						Effect.flatMap(
 							Option.match({
 								onNone: () => Effect.succeed(Option.none()),
 								onSome: (row) =>
 									row.collectionId === collectionId
 										? Effect.succeed(Option.some(row))
-										: Effect.fail(notFound(`Instance not found: ${seg3}`)),
+										: Effect.fail(notFound(`Instance not found: ${seg4}`)),
 							}),
 						),
 					)
-				: instRepo.findBySlug(collectionId, Slug(seg3))
+				: instRepo.findBySlug(collectionId, Slug(seg4))
 		);
 		if (Option.isNone(instRowOpt)) {
 			return {
 				kind: "new-instance",
 				principalId,
+				namespace,
 				collectionId,
-				slug: Slug(seg3),
+				slug: Slug(seg4),
 			} satisfies ResolvedDavPath;
 		}
 
 		return {
 			kind: "instance",
 			principalId,
+			namespace,
 			collectionId,
 			instanceId: InstanceId(instRowOpt.value.id),
 		} satisfies ResolvedDavPath;
@@ -179,10 +206,12 @@ export const davRouter = (
 ): Effect.Effect<Response, AppError, DavServices> =>
 	Effect.gen(function* () {
 		const path = yield* parseDavPath(ctx.url);
+		yield* Effect.logTrace("dav path resolved", { kind: path.kind });
 
 		// RFC 6764 §5: /.well-known/caldav and /.well-known/carddav must redirect
 		// to the DAV context path so clients can perform service discovery.
 		if (path.kind === "wellknown") {
+			yield* Effect.logTrace("dav well-known redirect", { name: path.name });
 			return new Response(null, {
 				status: 301,
 				// biome-ignore lint/style/useNamingConvention: HTTP header name
@@ -193,7 +222,10 @@ export const davRouter = (
 		// /dav/ and /dav/principals/ are valid paths — fall through to method dispatch
 		// (handlers return 501 until implemented in Step 4)
 
-		switch (req.method.toUpperCase()) {
+		const method = req.method.toUpperCase();
+		yield* Effect.logTrace("dav method dispatch", { method, kind: path.kind });
+
+		switch (method) {
 			case "OPTIONS":
 				return yield* optionsHandler(path, ctx);
 			case "PROPFIND":
@@ -214,6 +246,7 @@ export const davRouter = (
 			case "MKADDRESSBOOK":
 				return yield* mkcolHandler(path, ctx, req);
 			default:
+				yield* Effect.logInfo("dav method not allowed", { method });
 				return new Response(null, {
 					status: HTTP_METHOD_NOT_ALLOWED,
 					headers: {
@@ -227,4 +260,7 @@ export const davRouter = (
 		Effect.catchTag("DavError", (err) =>
 			Effect.succeed(new Response(null, { status: err.status })),
 		),
+		Effect.withSpan("dav.route", {
+			attributes: { "dav.path": ctx.url.pathname },
+		}),
 	);

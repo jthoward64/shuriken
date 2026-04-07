@@ -17,8 +17,12 @@ import {
 // UserRepository — Drizzle implementation
 // ---------------------------------------------------------------------------
 
-const findById = (db: DbClient, id: UserId) =>
-	Effect.tryPromise({
+const findById = Effect.fn("UserRepository.findById")(function* (
+	db: DbClient,
+	id: UserId,
+) {
+	yield* Effect.logTrace("repo.user.findById", { id });
+	return yield* Effect.tryPromise({
 		try: () =>
 			db
 				.select()
@@ -33,9 +37,14 @@ const findById = (db: DbClient, id: UserId) =>
 				),
 		catch: (e) => new DatabaseError({ cause: e }),
 	});
+}, Effect.tapError((e) => Effect.logWarning("repo.user.findById failed", e.cause)));
 
-const findByEmail = (db: DbClient, email: Email) =>
-	Effect.tryPromise({
+const findByEmail = Effect.fn("UserRepository.findByEmail")(function* (
+	db: DbClient,
+	email: Email,
+) {
+	yield* Effect.logTrace("repo.user.findByEmail");
+	return yield* Effect.tryPromise({
 		try: () =>
 			db
 				.select()
@@ -50,8 +59,9 @@ const findByEmail = (db: DbClient, email: Email) =>
 				),
 		catch: (e) => new DatabaseError({ cause: e }),
 	});
+}, Effect.tapError((e) => Effect.logWarning("repo.user.findByEmail failed", e.cause)));
 
-const create = (
+const create = Effect.fn("UserRepository.create")(function* (
 	db: DbClient,
 	input: {
 		readonly slug: Slug;
@@ -60,8 +70,9 @@ const create = (
 		readonly displayName?: string;
 		readonly credentials: ReadonlyArray<HashedCredential>;
 	},
-) =>
-	Effect.tryPromise<UserWithPrincipal, DatabaseError | ConflictError>({
+) {
+	yield* Effect.logTrace("repo.user.create", { slug: input.slug });
+	return yield* Effect.tryPromise<UserWithPrincipal, DatabaseError | ConflictError>({
 		try: () =>
 			db.transaction(async (tx) => {
 				const principalRows = await tx
@@ -112,8 +123,9 @@ const create = (
 					})
 				: new DatabaseError({ cause: e }),
 	});
+}, Effect.tapError((e) => Effect.logWarning("repo.user.create failed", e.cause)));
 
-const update = (
+const update = Effect.fn("UserRepository.update")(function* (
 	db: DbClient,
 	id: UserId,
 	input: {
@@ -121,8 +133,9 @@ const update = (
 		readonly email?: Email;
 		readonly displayName?: string;
 	},
-) =>
-	Effect.tryPromise({
+) {
+	yield* Effect.logTrace("repo.user.update", { id });
+	return yield* Effect.tryPromise({
 		try: async () => {
 			if (input.displayName !== undefined) {
 				await db
@@ -163,9 +176,15 @@ const update = (
 		},
 		catch: (e) => new DatabaseError({ cause: e }),
 	});
+}, Effect.tapError((e) => Effect.logWarning("repo.user.update failed", e.cause)));
 
-const findCredential = (db: DbClient, authSource: string, authId: string) =>
-	Effect.tryPromise({
+const findCredential = Effect.fn("UserRepository.findCredential")(function* (
+	db: DbClient,
+	authSource: string,
+	authId: string,
+) {
+	yield* Effect.logTrace("repo.user.findCredential", { authSource });
+	return yield* Effect.tryPromise({
 		try: () =>
 			db
 				.select()
@@ -177,52 +196,69 @@ const findCredential = (db: DbClient, authSource: string, authId: string) =>
 				.then((r) => Option.fromNullable(r[0] as AuthUserRow | undefined)),
 		catch: (e) => new DatabaseError({ cause: e }),
 	});
+}, Effect.tapError((e) => Effect.logWarning("repo.user.findCredential failed", e.cause)));
 
-const insertCredential = (
-	db: DbClient,
-	input: HashedCredential & { readonly userId: UserId },
-) =>
-	Effect.tryPromise({
-		try: () =>
-			db
-				.insert(authUser)
-				.values({
-					userId: input.userId,
-					authSource: input.authSource,
-					authId: input.authId,
-					authCredential: Option.getOrNull(input.authCredential),
-				})
-				.returning()
-				.then((r) => {
-					const row = r[0];
-					if (!row) {
-						throw new Error("auth_user insert returned no rows");
-					}
-					return row;
-				}),
-		catch: (e) => new DatabaseError({ cause: e }),
-	});
+const insertCredential = Effect.fn("UserRepository.insertCredential")(
+	function* (
+		db: DbClient,
+		input: HashedCredential & { readonly userId: UserId },
+	) {
+		yield* Effect.logTrace("repo.user.insertCredential", {
+			authSource: input.authSource,
+		});
+		return yield* Effect.tryPromise({
+			try: () =>
+				db
+					.insert(authUser)
+					.values({
+						userId: input.userId,
+						authSource: input.authSource,
+						authId: input.authId,
+						authCredential: Option.getOrNull(input.authCredential),
+					})
+					.returning()
+					.then((r) => {
+						const row = r[0];
+						if (!row) {
+							throw new Error("auth_user insert returned no rows");
+						}
+						return row;
+					}),
+			catch: (e) => new DatabaseError({ cause: e }),
+		});
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.user.insertCredential failed", e.cause),
+	),
+);
 
-const deleteCredential = (
-	db: DbClient,
-	userId: UserId,
-	authSource: string,
-	authId: string,
-) =>
-	Effect.tryPromise({
-		try: () =>
-			db
-				.delete(authUser)
-				.where(
-					and(
-						eq(authUser.userId, userId),
-						eq(authUser.authSource, authSource),
-						eq(authUser.authId, authId),
-					),
-				)
-				.then(() => undefined),
-		catch: (e) => new DatabaseError({ cause: e }),
-	});
+const deleteCredential = Effect.fn("UserRepository.deleteCredential")(
+	function* (
+		db: DbClient,
+		userId: UserId,
+		authSource: string,
+		authId: string,
+	) {
+		yield* Effect.logTrace("repo.user.deleteCredential", { userId, authSource });
+		return yield* Effect.tryPromise({
+			try: () =>
+				db
+					.delete(authUser)
+					.where(
+						and(
+							eq(authUser.userId, userId),
+							eq(authUser.authSource, authSource),
+							eq(authUser.authId, authId),
+						),
+					)
+					.then(() => undefined),
+			catch: (e) => new DatabaseError({ cause: e }),
+		});
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.user.deleteCredential failed", e.cause),
+	),
+);
 
 export const UserRepositoryLive = Layer.effect(
 	UserRepository,

@@ -12,8 +12,12 @@ import { InstanceRepository, type NewInstance } from "./repository.ts";
 // InstanceRepository — Drizzle implementation
 // ---------------------------------------------------------------------------
 
-const findById = (db: DbClient, id: InstanceId) =>
-	Effect.tryPromise({
+const findById = Effect.fn("InstanceRepository.findById")(function* (
+	db: DbClient,
+	id: InstanceId,
+) {
+	yield* Effect.logTrace("repo.instance.findById", { id });
+	return yield* Effect.tryPromise({
 		try: () =>
 			db
 				.select()
@@ -23,9 +27,15 @@ const findById = (db: DbClient, id: InstanceId) =>
 				.then((r) => Option.fromNullable(r[0])),
 		catch: (e) => new DatabaseError({ cause: e }),
 	});
+}, Effect.tapError((e) => Effect.logWarning("repo.instance.findById failed", e.cause)));
 
-const findBySlug = (db: DbClient, collectionId: CollectionId, slug: Slug) =>
-	Effect.tryPromise({
+const findBySlug = Effect.fn("InstanceRepository.findBySlug")(function* (
+	db: DbClient,
+	collectionId: CollectionId,
+	slug: Slug,
+) {
+	yield* Effect.logTrace("repo.instance.findBySlug", { collectionId, slug });
+	return yield* Effect.tryPromise({
 		try: () =>
 			db
 				.select()
@@ -41,24 +51,39 @@ const findBySlug = (db: DbClient, collectionId: CollectionId, slug: Slug) =>
 				.then((r) => Option.fromNullable(r[0])),
 		catch: (e) => new DatabaseError({ cause: e }),
 	});
+}, Effect.tapError((e) => Effect.logWarning("repo.instance.findBySlug failed", e.cause)));
 
-const listByCollection = (db: DbClient, collectionId: CollectionId) =>
-	Effect.tryPromise({
-		try: () =>
-			db
-				.select()
-				.from(davInstance)
-				.where(
-					and(
-						eq(davInstance.collectionId, collectionId),
-						isNull(davInstance.deletedAt),
+const listByCollection = Effect.fn("InstanceRepository.listByCollection")(
+	function* (db: DbClient, collectionId: CollectionId) {
+		yield* Effect.logTrace("repo.instance.listByCollection", { collectionId });
+		return yield* Effect.tryPromise({
+			try: () =>
+				db
+					.select()
+					.from(davInstance)
+					.where(
+						and(
+							eq(davInstance.collectionId, collectionId),
+							isNull(davInstance.deletedAt),
+						),
 					),
-				),
-		catch: (e) => new DatabaseError({ cause: e }),
-	});
+			catch: (e) => new DatabaseError({ cause: e }),
+		});
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.instance.listByCollection failed", e.cause),
+	),
+);
 
-const insertInstance = (db: DbClient, input: NewInstance) =>
-	Effect.tryPromise({
+const insertInstance = Effect.fn("InstanceRepository.insert")(function* (
+	db: DbClient,
+	input: NewInstance,
+) {
+	yield* Effect.logTrace("repo.instance.insert", {
+		collectionId: input.collectionId,
+		slug: input.slug,
+	});
+	return yield* Effect.tryPromise({
 		try: () =>
 			db
 				.insert(davInstance)
@@ -81,14 +106,16 @@ const insertInstance = (db: DbClient, input: NewInstance) =>
 				}),
 		catch: (e) => new DatabaseError({ cause: e }),
 	});
+}, Effect.tapError((e) => Effect.logWarning("repo.instance.insert failed", e.cause)));
 
-const updateEtag = (
+const updateEtag = Effect.fn("InstanceRepository.updateEtag")(function* (
 	db: DbClient,
 	id: InstanceId,
 	etag: ETag,
 	syncRevision: number,
-) =>
-	Effect.tryPromise({
+) {
+	yield* Effect.logTrace("repo.instance.updateEtag", { id, syncRevision });
+	return yield* Effect.tryPromise({
 		try: () =>
 			db
 				.update(davInstance)
@@ -97,9 +124,14 @@ const updateEtag = (
 				.then(() => undefined),
 		catch: (e) => new DatabaseError({ cause: e }),
 	});
+}, Effect.tapError((e) => Effect.logWarning("repo.instance.updateEtag failed", e.cause)));
 
-const softDelete = (db: DbClient, id: InstanceId) =>
-	Effect.tryPromise({
+const softDelete = Effect.fn("InstanceRepository.softDelete")(function* (
+	db: DbClient,
+	id: InstanceId,
+) {
+	yield* Effect.logTrace("repo.instance.softDelete", { id });
+	return yield* Effect.tryPromise({
 		try: () =>
 			db
 				.update(davInstance)
@@ -108,6 +140,7 @@ const softDelete = (db: DbClient, id: InstanceId) =>
 				.then(() => undefined),
 		catch: (e) => new DatabaseError({ cause: e }),
 	});
+}, Effect.tapError((e) => Effect.logWarning("repo.instance.softDelete failed", e.cause)));
 
 export const InstanceRepositoryLive = Layer.effect(
 	InstanceRepository,

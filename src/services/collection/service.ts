@@ -15,6 +15,7 @@ export interface CollectionServiceShape {
 	) => Effect.Effect<CollectionRow, DavError | DatabaseError>;
 	readonly findBySlug: (
 		ownerPrincipalId: PrincipalId,
+		collectionType: string,
 		slug: Slug,
 	) => Effect.Effect<CollectionRow, DavError | DatabaseError>;
 	readonly listByOwner: (

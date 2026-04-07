@@ -8,6 +8,10 @@ import {
 } from "#src/http/context.ts";
 import { davRouter } from "#src/http/dav/router.ts";
 import { buildXml } from "#src/http/dav/xml/builder.ts";
+import {
+	HTTP_BAD_REQUEST,
+	HTTP_INTERNAL_SERVER_ERROR,
+} from "#src/http/status.ts";
 import { uiRouter } from "#src/http/ui/router.ts";
 import type {
 	CollectionRepository,
@@ -112,8 +116,15 @@ const mapErrorToResponse = (err: AppError): Effect.Effect<Response, never> =>
 		Match.tag("ConflictError", (e) =>
 			Effect.succeed(new Response(e.message, { status: 409 })),
 		),
-		Match.tag("DatabaseError", "InternalError", "ConfigError", () =>
-			Effect.succeed(new Response("Internal Server Error", { status: 500 })),
+		Match.tag("DatabaseError", "InternalError", (e) =>
+			Effect.succeed(new Response("Internal Server Error", { status: 500 })).pipe(
+				Effect.tap(() => Effect.logWarning("server error", e.cause)),
+			),
+		),
+		Match.tag("ConfigError", (e) =>
+			Effect.succeed(new Response("Internal Server Error", { status: 500 })).pipe(
+				Effect.tap(() => Effect.logWarning("config error", { key: e.key })),
+			),
 		),
 		Match.exhaustive,
 	);
@@ -134,6 +145,7 @@ export const handleRequest = (
 
 	return Effect.gen(function* () {
 		yield* setRequestId(requestId);
+		yield* Effect.logTrace("request received");
 
 		const authService = yield* AuthService;
 		const auth = yield* authService.authenticate(req.headers, clientIp);
@@ -155,9 +167,20 @@ export const handleRequest = (
 			return yield* uiRouter(req);
 		}
 
+		yield* Effect.logDebug("no route matched");
 		return new Response("Not Found", { status: 404 });
 	}).pipe(
 		Effect.annotateLogs({ requestId, method: req.method, path: url.pathname }),
 		Effect.catchAll(mapErrorToResponse),
+		Effect.tap((response) =>
+			response.status >= HTTP_INTERNAL_SERVER_ERROR
+				? Effect.logWarning("request failed", { status: response.status })
+				: response.status >= HTTP_BAD_REQUEST
+					? Effect.logDebug("request complete", { status: response.status })
+					: Effect.logTrace("request complete", { status: response.status }),
+		),
+		Effect.withSpan("http.request", {
+			attributes: { "http.method": req.method, "http.path": url.pathname },
+		}),
 	);
 };

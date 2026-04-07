@@ -383,12 +383,13 @@ const makeCollectionRepo = (stores: TestStores): CollectionRepositoryShape => ({
 			),
 		),
 
-	findBySlug: (ownerPrincipalId, slug) =>
+	findBySlug: (ownerPrincipalId, collectionType, slug) =>
 		Effect.succeed(
 			Option.fromNullable(
 				[...stores.collections.values()].find(
 					(c) =>
 						c.ownerPrincipalId === ownerPrincipalId &&
+						c.collectionType === collectionType &&
 						c.slug === slug &&
 						c.deletedAt === null,
 				) ?? null,

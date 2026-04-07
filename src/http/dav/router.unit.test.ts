@@ -78,13 +78,13 @@ const makeRouterLayer = (
 	};
 
 	const collectionRepo: CollectionRepositoryShape = {
-		findBySlug: (principalId, slug) => {
-			const key = `${principalId}:${slug}`;
+		findBySlug: (principalId, collectionType, slug) => {
+			const key = `${principalId}:${collectionType}:${slug}`;
 			const id = collections.get(key);
 			if (!id) {
 				return Effect.succeed(Option.none());
 			}
-			const row = { id, slug, ownerPrincipalId: principalId, deletedAt: null } as unknown as CollectionRow;
+			const row = { id, slug, ownerPrincipalId: principalId, collectionType, deletedAt: null } as unknown as CollectionRow;
 			return Effect.succeed(Option.some(row));
 		},
 		findById: () => Effect.succeed(Option.none()),
@@ -204,25 +204,35 @@ describe("davRouter — principal slug resolution", () => {
 // ---------------------------------------------------------------------------
 
 describe("davRouter — collection slug resolution", () => {
-	it("OPTIONS /dav/principals/alice/my-cal returns 200 when collection exists", async () => {
+	it("OPTIONS /dav/principals/alice/cal/my-cal returns 200 when collection exists", async () => {
 		const aliceId = crypto.randomUUID();
 		const calId = crypto.randomUUID();
 		const res = await run(
 			"OPTIONS",
-			"/dav/principals/alice/my-cal",
+			"/dav/principals/alice/cal/my-cal",
 			{
 				principals: new Map([["alice", aliceId]]),
-				collections: new Map([[`${aliceId}:my-cal`, calId]]),
+				collections: new Map([[`${aliceId}:calendar:my-cal`, calId]]),
 			},
 		);
 		expect(res.status).toBe(HTTP_OK);
 	});
 
-	it("OPTIONS /dav/principals/alice/unknown returns 404 when collection not seeded", async () => {
+	it("OPTIONS /dav/principals/alice/cal/unknown returns 404 when collection not seeded", async () => {
 		const aliceId = crypto.randomUUID();
 		const res = await run(
 			"OPTIONS",
-			"/dav/principals/alice/unknown",
+			"/dav/principals/alice/cal/unknown",
+			{ principals: new Map([["alice", aliceId]]) },
+		);
+		expect(res.status).toBe(HTTP_NOT_FOUND);
+	});
+
+	it("OPTIONS /dav/principals/alice/unknown-ns returns 404 for unknown namespace", async () => {
+		const aliceId = crypto.randomUUID();
+		const res = await run(
+			"OPTIONS",
+			"/dav/principals/alice/unknown-ns/my-cal",
 			{ principals: new Map([["alice", aliceId]]) },
 		);
 		expect(res.status).toBe(HTTP_NOT_FOUND);
@@ -234,31 +244,31 @@ describe("davRouter — collection slug resolution", () => {
 // ---------------------------------------------------------------------------
 
 describe("davRouter — instance slug resolution", () => {
-	it("OPTIONS .../my-cal/event.ics returns 200 when instance exists", async () => {
+	it("OPTIONS .../cal/my-cal/event.ics returns 200 when instance exists", async () => {
 		const aliceId = crypto.randomUUID();
 		const calId = crypto.randomUUID();
 		const instId = crypto.randomUUID();
 		const res = await run(
 			"OPTIONS",
-			"/dav/principals/alice/my-cal/event.ics",
+			"/dav/principals/alice/cal/my-cal/event.ics",
 			{
 				principals: new Map([["alice", aliceId]]),
-				collections: new Map([[`${aliceId}:my-cal`, calId]]),
+				collections: new Map([[`${aliceId}:calendar:my-cal`, calId]]),
 				instances: new Map([[`${calId}:event.ics`, instId]]),
 			},
 		);
 		expect(res.status).toBe(HTTP_OK);
 	});
 
-	it("OPTIONS .../my-cal/missing.ics returns 404 when instance not seeded", async () => {
+	it("OPTIONS .../cal/my-cal/missing.ics returns 404 when instance not seeded", async () => {
 		const aliceId = crypto.randomUUID();
 		const calId = crypto.randomUUID();
 		const res = await run(
 			"OPTIONS",
-			"/dav/principals/alice/my-cal/missing.ics",
+			"/dav/principals/alice/cal/my-cal/missing.ics",
 			{
 				principals: new Map([["alice", aliceId]]),
-				collections: new Map([[`${aliceId}:my-cal`, calId]]),
+				collections: new Map([[`${aliceId}:calendar:my-cal`, calId]]),
 			},
 		);
 		expect(res.status).toBe(HTTP_NOT_FOUND);
@@ -270,7 +280,7 @@ describe("davRouter — instance slug resolution", () => {
 // ---------------------------------------------------------------------------
 
 describe("davRouter — method dispatch", () => {
-	it("unrecognized method PATCH returns 405 with an Allow header", async () => {
+	it("unrecognized method PATCH on a principal returns 405 with an Allow header", async () => {
 		const aliceId = crypto.randomUUID();
 		const res = await run(
 			"PATCH",
@@ -301,12 +311,13 @@ describe("davRouter — DavError → bare Response", () => {
 describe("davRouter — new-resource path resolution", () => {
 	it("missing collection under existing principal resolves to new-collection with correct fields", async () => {
 		const aliceId = crypto.randomUUID();
-		const path = await runPath("/dav/principals/alice/new-cal", {
+		const path = await runPath("/dav/principals/alice/cal/new-cal", {
 			principals: new Map([["alice", aliceId]]),
 		});
 		expect(path.kind).toBe("new-collection");
 		if (path.kind === "new-collection") {
 			expect(String(path.principalId)).toBe(aliceId);
+			expect(path.namespace).toBe("cal");
 			expect(String(path.slug)).toBe("new-cal");
 		}
 	});
@@ -314,13 +325,14 @@ describe("davRouter — new-resource path resolution", () => {
 	it("missing instance under existing collection resolves to new-instance with correct fields", async () => {
 		const aliceId = crypto.randomUUID();
 		const calId = crypto.randomUUID();
-		const path = await runPath("/dav/principals/alice/my-cal/event.ics", {
+		const path = await runPath("/dav/principals/alice/cal/my-cal/event.ics", {
 			principals: new Map([["alice", aliceId]]),
-			collections: new Map([[`${aliceId}:my-cal`, calId]]),
+			collections: new Map([[`${aliceId}:calendar:my-cal`, calId]]),
 		});
 		expect(path.kind).toBe("new-instance");
 		if (path.kind === "new-instance") {
 			expect(String(path.principalId)).toBe(aliceId);
+			expect(path.namespace).toBe("cal");
 			expect(String(path.collectionId)).toBe(calId);
 			expect(String(path.slug)).toBe("event.ics");
 		}

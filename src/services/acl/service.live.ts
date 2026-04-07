@@ -106,25 +106,45 @@ export const AclServiceLive = Layer.effect(
 			);
 
 		return AclService.of({
-			check: (principalId, resourceId, resourceType, privilege) =>
-				Effect.gen(function* () {
-					const principalIds = yield* resolvePrincipalIds(principalId);
-					const privileges = expandContainers(privilege);
-					const allowed = yield* repo.hasPrivilege(
-						principalIds,
+			check: Effect.fn("AclService.check")(function* (
+				principalId,
+				resourceId,
+				resourceType,
+				privilege,
+			) {
+				yield* Effect.logTrace("acl.check", {
+					principalId,
+					resourceId,
+					resourceType,
+					privilege,
+				});
+				const principalIds = yield* resolvePrincipalIds(principalId);
+				const privileges = expandContainers(privilege);
+				const allowed = yield* repo.hasPrivilege(
+					principalIds,
+					resourceId,
+					resourceType,
+					privileges,
+					true,
+				);
+				if (!allowed) {
+					yield* Effect.logDebug("acl.check: denied", {
+						principalId,
+						resourceId,
+						privilege,
+					});
+					return yield* Effect.fail(needPrivileges());
+				}
+				// TODO (Fix 12): walk parent-collection hierarchy for inherited ACEs
+			}),
+
+			currentUserPrivileges: Effect.fn("AclService.currentUserPrivileges")(
+				function* (principalId, resourceId, resourceType) {
+					yield* Effect.logTrace("acl.currentUserPrivileges", {
+						principalId,
 						resourceId,
 						resourceType,
-						privileges,
-						true,
-					);
-					if (!allowed) {
-						return yield* Effect.fail(needPrivileges());
-					}
-					// TODO (Fix 12): walk parent-collection hierarchy for inherited ACEs
-				}),
-
-			currentUserPrivileges: (principalId, resourceId, resourceType) =>
-				Effect.gen(function* () {
+					});
 					const principalIds = yield* resolvePrincipalIds(principalId);
 					const grantedAggregates = yield* repo.getGrantedPrivileges(
 						principalIds,
@@ -141,7 +161,8 @@ export const AclServiceLive = Layer.effect(
 						}
 					}
 					return Arr.fromIterable(expanded);
-				}),
+				},
+			),
 		});
 	}),
 );

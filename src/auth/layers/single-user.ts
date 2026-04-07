@@ -71,10 +71,18 @@ export const SingleUserAuthLayer = Layer.effect(
 		return AuthService.of({
 			// Resolve per-request: layer build is infallible, user row changes
 			// are reflected immediately without restarting the server.
-			authenticate: (_headers, _clientIp) =>
-				resolvePrincipal(db, email).pipe(
-					Effect.map((principal) => new Authenticated({ principal })),
+			authenticate: Effect.fn("auth.authenticate")(
+				function* (_headers, _clientIp) {
+					yield* Effect.logTrace("single-user auth");
+					const principal = yield* resolvePrincipal(db, email);
+					return new Authenticated({ principal });
+				},
+				Effect.tapError((e) =>
+					e instanceof AuthError
+						? Effect.logWarning("single-user auth failed", { reason: e.reason })
+						: Effect.void,
 				),
+			),
 		});
 	}),
 );

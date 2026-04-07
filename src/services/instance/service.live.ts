@@ -15,50 +15,69 @@ export const InstanceServiceLive = Layer.effect(
 		const repo = yield* InstanceRepository;
 
 		return InstanceService.of({
-			findById: (id: InstanceId) =>
-				repo
+			findById: Effect.fn("InstanceService.findById")(function* (
+				id: InstanceId,
+			) {
+				yield* Effect.logTrace("instance.findById", { id });
+				return yield* repo
 					.findById(id)
-					.pipe(Effect.flatMap(someOrNotFound(`Instance not found: ${id}`))),
+					.pipe(Effect.flatMap(someOrNotFound(`Instance not found: ${id}`)));
+			}),
 
-			findBySlug: (collectionId: CollectionId, slug: Slug) =>
-				repo
+			findBySlug: Effect.fn("InstanceService.findBySlug")(function* (
+				collectionId: CollectionId,
+				slug: Slug,
+			) {
+				yield* Effect.logTrace("instance.findBySlug", { collectionId, slug });
+				return yield* repo
 					.findBySlug(collectionId, slug)
-					.pipe(Effect.flatMap(someOrNotFound(`Instance not found: ${slug}`))),
+					.pipe(Effect.flatMap(someOrNotFound(`Instance not found: ${slug}`)));
+			}),
 
-			listByCollection: (collectionId: CollectionId) =>
-				repo.listByCollection(collectionId),
+			listByCollection: Effect.fn("InstanceService.listByCollection")(
+				function* (collectionId: CollectionId) {
+					yield* Effect.logTrace("instance.listByCollection", { collectionId });
+					return yield* repo.listByCollection(collectionId);
+				},
+			),
 
-			put: (input: NewInstance, existingId?: InstanceId) =>
-				Effect.gen(function* () {
-					if (existingId) {
-						// Update existing instance etag + revision
-						const existing = yield* repo
-							.findById(existingId)
-							.pipe(
-								Effect.flatMap(
-									someOrNotFound(`Instance not found: ${existingId}`),
-								),
-							);
-						const newRevision = existing.syncRevision + 1;
-						yield* repo.updateEtag(existingId, input.etag, newRevision);
-						return yield* repo
-							.findById(existingId)
-							.pipe(
-								Effect.flatMap(
-									someOrNotFound(
-										`Instance not found after update: ${existingId}`,
-									),
-								),
-							);
-					}
-					return yield* repo.insert(input);
-				}),
+			put: Effect.fn("InstanceService.put")(function* (
+				input: NewInstance,
+				existingId?: InstanceId,
+			) {
+				yield* Effect.logTrace("instance.put", {
+					collectionId: input.collectionId,
+					existingId,
+				});
+				if (existingId) {
+					// Update existing instance etag + revision
+					const existing = yield* repo
+						.findById(existingId)
+						.pipe(
+							Effect.flatMap(
+								someOrNotFound(`Instance not found: ${existingId}`),
+							),
+						);
+					const newRevision = existing.syncRevision + 1;
+					yield* repo.updateEtag(existingId, input.etag, newRevision);
+					return yield* repo
+						.findById(existingId)
+						.pipe(
+							Effect.flatMap(
+								someOrNotFound(`Instance not found after update: ${existingId}`),
+							),
+						);
+				}
+				return yield* repo.insert(input);
+			}),
 
-			delete: (id: InstanceId) =>
-				repo.findById(id).pipe(
+			delete: Effect.fn("InstanceService.delete")(function* (id: InstanceId) {
+				yield* Effect.logTrace("instance.delete", { id });
+				return yield* repo.findById(id).pipe(
 					Effect.flatMap(someOrNotFound(`Instance not found: ${id}`)),
 					Effect.flatMap(() => repo.softDelete(id)),
-				),
+				);
+			}),
 		});
 	}),
 );

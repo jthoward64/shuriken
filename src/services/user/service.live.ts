@@ -55,66 +55,79 @@ export const UserServiceLive = Layer.effect(
 		const crypto = yield* CryptoService;
 
 		return UserService.of({
-			create: (input: NewUser) =>
-				Effect.gen(function* () {
-					const credentials: Array<{
-						authSource: string;
-						authId: string;
-						authCredential: Option.Option<Redacted.Redacted<string>>;
-					}> = [];
-					for (const cred of input.credentials ?? []) {
-						credentials.push(yield* hashCredential(crypto, cred));
-					}
-					return yield* repo.create({ ...input, credentials });
-				}),
+			create: Effect.fn("UserService.create")(function* (input: NewUser) {
+				yield* Effect.logTrace("user.create", { slug: input.slug });
+				const credentials: Array<{
+					authSource: string;
+					authId: string;
+					authCredential: Option.Option<Redacted.Redacted<string>>;
+				}> = [];
+				for (const cred of input.credentials ?? []) {
+					credentials.push(yield* hashCredential(crypto, cred));
+				}
+				return yield* repo.create({ ...input, credentials });
+			}),
 
-			update: (id: UserId, input: UpdateUser) =>
-				Effect.gen(function* () {
-					yield* repo
-						.findById(id)
-						.pipe(Effect.flatMap(someOrNotFound(`User not found: ${id}`)));
+			update: Effect.fn("UserService.update")(function* (
+				id: UserId,
+				input: UpdateUser,
+			) {
+				yield* Effect.logTrace("user.update", { id });
+				yield* repo
+					.findById(id)
+					.pipe(Effect.flatMap(someOrNotFound(`User not found: ${id}`)));
 
-					if (input.email !== undefined) {
-						const existing = yield* repo.findByEmail(input.email);
-						if (Option.isSome(existing) && existing.value.user.id !== id) {
-							return yield* conflict(
-								undefined,
-								`Email already in use: ${input.email}`,
-							);
-						}
-					}
-
-					return yield* repo.update(id, input);
-				}),
-
-			addCredential: (userId: UserId, credential: NewCredential) =>
-				Effect.gen(function* () {
-					yield* repo
-						.findById(userId)
-						.pipe(Effect.flatMap(someOrNotFound(`User not found: ${userId}`)));
-
-					yield* repo
-						.findCredential(credential.source, credential.authId)
-						.pipe(
-							Effect.flatMap(
-								noneOrConflict(
-									undefined,
-									`Credential already exists: ${credential.source}/${credential.authId}`,
-								),
-							),
+				if (input.email !== undefined) {
+					const existing = yield* repo.findByEmail(input.email);
+					if (Option.isSome(existing) && existing.value.user.id !== id) {
+						return yield* conflict(
+							undefined,
+							`Email already in use: ${input.email}`,
 						);
+					}
+				}
 
-					const hashed = yield* hashCredential(crypto, credential);
-					yield* repo.insertCredential({ userId, ...hashed });
-				}),
+				return yield* repo.update(id, input);
+			}),
 
-			removeCredential: (userId: UserId, authSource: string, authId: string) =>
-				Effect.gen(function* () {
-					yield* repo
-						.findById(userId)
-						.pipe(Effect.flatMap(someOrNotFound(`User not found: ${userId}`)));
-					yield* repo.deleteCredential(userId, authSource, authId);
-				}),
+			addCredential: Effect.fn("UserService.addCredential")(function* (
+				userId: UserId,
+				credential: NewCredential,
+			) {
+				yield* Effect.logTrace("user.addCredential", {
+					userId,
+					source: credential.source,
+				});
+				yield* repo
+					.findById(userId)
+					.pipe(Effect.flatMap(someOrNotFound(`User not found: ${userId}`)));
+
+				yield* repo
+					.findCredential(credential.source, credential.authId)
+					.pipe(
+						Effect.flatMap(
+							noneOrConflict(
+								undefined,
+								`Credential already exists: ${credential.source}/${credential.authId}`,
+							),
+						),
+					);
+
+				const hashed = yield* hashCredential(crypto, credential);
+				yield* repo.insertCredential({ userId, ...hashed });
+			}),
+
+			removeCredential: Effect.fn("UserService.removeCredential")(function* (
+				userId: UserId,
+				authSource: string,
+				authId: string,
+			) {
+				yield* Effect.logTrace("user.removeCredential", { userId, authSource });
+				yield* repo
+					.findById(userId)
+					.pipe(Effect.flatMap(someOrNotFound(`User not found: ${userId}`)));
+				yield* repo.deleteCredential(userId, authSource, authId);
+			}),
 		});
 	}),
 );

@@ -16,24 +16,36 @@ export const PrincipalServiceLive = Layer.effect(
 		const repo = yield* PrincipalRepository;
 
 		return PrincipalService.of({
-			findById: (id: PrincipalId) =>
-				repo
+			findById: Effect.fn("PrincipalService.findById")(function* (
+				id: PrincipalId,
+			) {
+				yield* Effect.logTrace("principal.findById", { id });
+				return yield* repo
 					.findById(id)
-					.pipe(Effect.flatMap(someOrNotFound(`Principal not found: ${id}`))),
+					.pipe(Effect.flatMap(someOrNotFound(`Principal not found: ${id}`)));
+			}),
 
-			findBySlug: (slug: Slug) =>
-				repo
+			findBySlug: Effect.fn("PrincipalService.findBySlug")(function* (
+				slug: Slug,
+			) {
+				yield* Effect.logTrace("principal.findBySlug", { slug });
+				return yield* repo
 					.findBySlug(slug)
-					.pipe(Effect.flatMap(someOrNotFound(`Principal not found: ${slug}`))),
+					.pipe(Effect.flatMap(someOrNotFound(`Principal not found: ${slug}`)));
+			}),
 
-			findByEmail: (email: Email) =>
-				repo
+			findByEmail: Effect.fn("PrincipalService.findByEmail")(function* (
+				email: Email,
+			) {
+				yield* Effect.logTrace("principal.findByEmail");
+				return yield* repo
 					.findByEmail(email)
 					.pipe(
 						Effect.flatMap(
 							someOrNotFound(`Principal not found for email: ${email}`),
 						),
-					),
+					);
+			}),
 		});
 	}),
 );

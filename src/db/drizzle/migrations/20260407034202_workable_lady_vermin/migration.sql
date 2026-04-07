@@ -1,0 +1,2 @@
+DROP INDEX "unique_collection_slug_per_owner";--> statement-breakpoint
+CREATE UNIQUE INDEX "unique_collection_slug_per_owner_type" ON "dav_collection" ("owner_principal_id","collection_type","slug") WHERE (deleted_at IS NULL);

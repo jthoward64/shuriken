@@ -1,5 +1,6 @@
 import { Brand } from "effect";
 import type { CollectionId, InstanceId, PrincipalId } from "#src/domain/ids.ts";
+import type { CollectionNamespace } from "#src/domain/types/collection-namespace.ts";
 
 // ---------------------------------------------------------------------------
 // ResourceUrl — absolute DAV resource URL used in ACL rules
@@ -40,26 +41,30 @@ export type ResolvedDavPath =
 			readonly principalId: PrincipalId;
 	  }
 	| {
-			/** /dav/principals/:slug/:collSlug — a calendar/addressbook collection */
+			/** /dav/principals/:slug/:ns/:collSlug — a calendar/addressbook collection */
 			readonly kind: "collection";
 			readonly principalId: PrincipalId;
+			readonly namespace: CollectionNamespace;
 			readonly collectionId: CollectionId;
 	  }
 	| {
-			/** /dav/principals/:slug/:collSlug/:obj — a single calendar/vCard resource */
+			/** /dav/principals/:slug/:ns/:collSlug/:obj — a single calendar/vCard resource */
 			readonly kind: "instance";
 			readonly principalId: PrincipalId;
+			readonly namespace: CollectionNamespace;
 			readonly collectionId: CollectionId;
 			readonly instanceId: InstanceId;
 	  }
 	| {
 			readonly kind: "new-collection";
 			readonly principalId: PrincipalId;
+			readonly namespace: CollectionNamespace;
 			readonly slug: Slug;
 	  }
 	| {
 			readonly kind: "new-instance";
 			readonly principalId: PrincipalId;
+			readonly namespace: CollectionNamespace;
 			readonly collectionId: CollectionId;
 			readonly slug: Slug;
 	  };

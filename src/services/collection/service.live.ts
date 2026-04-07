@@ -15,23 +15,48 @@ export const CollectionServiceLive = Layer.effect(
 		const repo = yield* CollectionRepository;
 
 		return CollectionService.of({
-			findById: (id: CollectionId) =>
-				repo
+			findById: Effect.fn("CollectionService.findById")(function* (
+				id: CollectionId,
+			) {
+				yield* Effect.logTrace("collection.findById", { id });
+				return yield* repo
 					.findById(id)
-					.pipe(Effect.flatMap(someOrNotFound(`Collection not found: ${id}`))),
+					.pipe(Effect.flatMap(someOrNotFound(`Collection not found: ${id}`)));
+			}),
 
-			findBySlug: (ownerPrincipalId: PrincipalId, slug: Slug) =>
-				repo
-					.findBySlug(ownerPrincipalId, slug)
+			findBySlug: Effect.fn("CollectionService.findBySlug")(function* (
+				ownerPrincipalId: PrincipalId,
+				collectionType: string,
+				slug: Slug,
+			) {
+				yield* Effect.logTrace("collection.findBySlug", {
+					ownerPrincipalId,
+					collectionType,
+					slug,
+				});
+				return yield* repo
+					.findBySlug(ownerPrincipalId, collectionType, slug)
 					.pipe(
 						Effect.flatMap(someOrNotFound(`Collection not found: ${slug}`)),
-					),
+					);
+			}),
 
-			listByOwner: (ownerPrincipalId: PrincipalId) =>
-				repo.listByOwner(ownerPrincipalId),
+			listByOwner: Effect.fn("CollectionService.listByOwner")(function* (
+				ownerPrincipalId: PrincipalId,
+			) {
+				yield* Effect.logTrace("collection.listByOwner", { ownerPrincipalId });
+				return yield* repo.listByOwner(ownerPrincipalId);
+			}),
 
-			create: (input: NewCollection) =>
-				repo.findBySlug(input.ownerPrincipalId, input.slug).pipe(
+			create: Effect.fn("CollectionService.create")(function* (
+				input: NewCollection,
+			) {
+				yield* Effect.logTrace("collection.create", {
+					ownerPrincipalId: input.ownerPrincipalId,
+					slug: input.slug,
+					collectionType: input.collectionType,
+				});
+				return yield* repo.findBySlug(input.ownerPrincipalId, input.collectionType, input.slug).pipe(
 					Effect.flatMap(
 						noneOrConflict(
 							undefined,
@@ -39,13 +64,18 @@ export const CollectionServiceLive = Layer.effect(
 						),
 					),
 					Effect.flatMap(() => repo.insert(input)),
-				),
+				);
+			}),
 
-			delete: (id: CollectionId) =>
-				repo.findById(id).pipe(
+			delete: Effect.fn("CollectionService.delete")(function* (
+				id: CollectionId,
+			) {
+				yield* Effect.logTrace("collection.delete", { id });
+				return yield* repo.findById(id).pipe(
 					Effect.flatMap(someOrNotFound(`Collection not found: ${id}`)),
 					Effect.flatMap(() => repo.softDelete(id)),
-				),
+				);
+			}),
 		});
 	}),
 );

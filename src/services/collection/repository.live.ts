@@ -11,8 +11,12 @@ import { CollectionRepository, type NewCollection } from "./repository.ts";
 // CollectionRepository — Drizzle implementation
 // ---------------------------------------------------------------------------
 
-const findById = (db: DbClient, id: CollectionId) =>
-	Effect.tryPromise({
+const findById = Effect.fn("CollectionRepository.findById")(function* (
+	db: DbClient,
+	id: CollectionId,
+) {
+	yield* Effect.logTrace("repo.collection.findById", { id });
+	return yield* Effect.tryPromise({
 		try: () =>
 			db
 				.select()
@@ -22,9 +26,16 @@ const findById = (db: DbClient, id: CollectionId) =>
 				.then((r) => Option.fromNullable(r[0])),
 		catch: (e) => new DatabaseError({ cause: e }),
 	});
+}, Effect.tapError((e) => Effect.logWarning("repo.collection.findById failed", e.cause)));
 
-const findBySlug = (db: DbClient, ownerPrincipalId: PrincipalId, slug: Slug) =>
-	Effect.tryPromise({
+const findBySlug = Effect.fn("CollectionRepository.findBySlug")(function* (
+	db: DbClient,
+	ownerPrincipalId: PrincipalId,
+	collectionType: string,
+	slug: Slug,
+) {
+	yield* Effect.logTrace("repo.collection.findBySlug", { ownerPrincipalId, collectionType, slug });
+	return yield* Effect.tryPromise({
 		try: () =>
 			db
 				.select()
@@ -32,6 +43,7 @@ const findBySlug = (db: DbClient, ownerPrincipalId: PrincipalId, slug: Slug) =>
 				.where(
 					and(
 						eq(davCollection.ownerPrincipalId, ownerPrincipalId),
+						eq(davCollection.collectionType, collectionType),
 						eq(davCollection.slug, slug),
 						isNull(davCollection.deletedAt),
 					),
@@ -40,9 +52,14 @@ const findBySlug = (db: DbClient, ownerPrincipalId: PrincipalId, slug: Slug) =>
 				.then((r) => Option.fromNullable(r[0])),
 		catch: (e) => new DatabaseError({ cause: e }),
 	});
+}, Effect.tapError((e) => Effect.logWarning("repo.collection.findBySlug failed", e.cause)));
 
-const listByOwner = (db: DbClient, ownerPrincipalId: PrincipalId) =>
-	Effect.tryPromise({
+const listByOwner = Effect.fn("CollectionRepository.listByOwner")(function* (
+	db: DbClient,
+	ownerPrincipalId: PrincipalId,
+) {
+	yield* Effect.logTrace("repo.collection.listByOwner", { ownerPrincipalId });
+	return yield* Effect.tryPromise({
 		try: () =>
 			db
 				.select()
@@ -55,9 +72,17 @@ const listByOwner = (db: DbClient, ownerPrincipalId: PrincipalId) =>
 				),
 		catch: (e) => new DatabaseError({ cause: e }),
 	});
+}, Effect.tapError((e) => Effect.logWarning("repo.collection.listByOwner failed", e.cause)));
 
-const insert = (db: DbClient, input: NewCollection) =>
-	Effect.tryPromise({
+const insert = Effect.fn("CollectionRepository.insert")(function* (
+	db: DbClient,
+	input: NewCollection,
+) {
+	yield* Effect.logTrace("repo.collection.insert", {
+		ownerPrincipalId: input.ownerPrincipalId,
+		slug: input.slug,
+	});
+	return yield* Effect.tryPromise({
 		try: () =>
 			db
 				.insert(davCollection)
@@ -81,9 +106,14 @@ const insert = (db: DbClient, input: NewCollection) =>
 				}),
 		catch: (e) => new DatabaseError({ cause: e }),
 	});
+}, Effect.tapError((e) => Effect.logWarning("repo.collection.insert failed", e.cause)));
 
-const softDelete = (db: DbClient, id: CollectionId) =>
-	Effect.tryPromise({
+const softDelete = Effect.fn("CollectionRepository.softDelete")(function* (
+	db: DbClient,
+	id: CollectionId,
+) {
+	yield* Effect.logTrace("repo.collection.softDelete", { id });
+	return yield* Effect.tryPromise({
 		try: () =>
 			db
 				.update(davCollection)
@@ -99,13 +129,14 @@ const softDelete = (db: DbClient, id: CollectionId) =>
 				}),
 		catch: (e) => new DatabaseError({ cause: e }),
 	});
+}, Effect.tapError((e) => Effect.logWarning("repo.collection.softDelete failed", e.cause)));
 
 export const CollectionRepositoryLive = Layer.effect(
 	CollectionRepository,
 	Effect.map(DatabaseClient, (db) =>
 		CollectionRepository.of({
 			findById: (id) => findById(db, id),
-			findBySlug: (owner, slug) => findBySlug(db, owner, slug),
+			findBySlug: (owner, collectionType, slug) => findBySlug(db, owner, collectionType, slug),
 			listByOwner: (owner) => listByOwner(db, owner),
 			insert: (input) => insert(db, input),
 			softDelete: (id) => softDelete(db, id),

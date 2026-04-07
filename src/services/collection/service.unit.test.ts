@@ -189,13 +189,14 @@ describe("CollectionService.findBySlug", () => {
 		const principalId = PrincipalId(crypto.randomUUID());
 		env.withUser({ principalId }).withCollection({
 			ownerPrincipalId: principalId,
+			collectionType: "calendar",
 			slug: "my-cal",
 		});
 
 		const result = await runSuccess(
 			CollectionService.pipe(
 				Effect.flatMap((s) =>
-					s.findBySlug(principalId, Slug("my-cal")),
+					s.findBySlug(principalId, "calendar", Slug("my-cal")),
 				),
 				Effect.provide(env.toLayer()),
 				Effect.orDie,
@@ -214,7 +215,7 @@ describe("CollectionService.findBySlug", () => {
 		const err = (await runFailure(
 			CollectionService.pipe(
 				Effect.flatMap((s) =>
-					s.findBySlug(principalId, Slug("no-such-cal")),
+					s.findBySlug(principalId, "calendar", Slug("no-such-cal")),
 				),
 				Effect.provide(env.toLayer()),
 			),

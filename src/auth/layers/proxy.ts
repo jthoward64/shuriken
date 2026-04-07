@@ -6,11 +6,7 @@ import { DatabaseClient } from "#src/db/client.ts";
 import { user } from "#src/db/drizzle/schema/index.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
 import { PrincipalId, UserId } from "#src/domain/ids.ts";
-import {
-	Authenticated,
-	type AuthResult,
-	Unauthenticated,
-} from "#src/domain/types/dav.ts";
+import { Authenticated, Unauthenticated } from "#src/domain/types/dav.ts";
 
 // ---------------------------------------------------------------------------
 // Proxy auth layer
@@ -131,48 +127,52 @@ export const ProxyAuthLayer = Layer.effect(
 		} = yield* AppConfigService;
 
 		return AuthService.of({
-			authenticate: (
-				headers,
-				clientIp,
-			): Effect.Effect<AuthResult, DatabaseError> =>
-				Effect.gen(function* () {
-					// If the request doesn't come from a trusted proxy, ignore the header
-					if (!isClientTrusted(clientIp, trustedProxies)) {
-						return new Unauthenticated();
-					}
-
-					const username = headers.get(proxyHeader);
-					if (!username) {
-						return new Unauthenticated();
-					}
-
-					const rows = yield* Effect.tryPromise({
-						try: () =>
-							db
-								.select({
-									userId: user.id,
-									principalId: user.principalId,
-									name: user.name,
-								})
-								.from(user)
-								.where(eq(user.email, username))
-								.limit(1),
-						catch: (e) => new DatabaseError({ cause: e }),
+			authenticate: Effect.fn("auth.authenticate")(function* (headers, clientIp) {
+				// If the request doesn't come from a trusted proxy, ignore the header
+				if (!isClientTrusted(clientIp, trustedProxies)) {
+					yield* Effect.logDebug("proxy auth: untrusted client", {
+						clientIp: Option.getOrUndefined(clientIp),
 					});
+					return new Unauthenticated();
+				}
 
-					const row = rows[0];
-					if (!row) {
-						return new Unauthenticated();
-					}
+				const username = headers.get(proxyHeader);
+				if (!username) {
+					yield* Effect.logDebug("proxy auth: header absent", { proxyHeader });
+					return new Unauthenticated();
+				}
 
-					return new Authenticated({
-						principal: {
-							principalId: PrincipalId(row.principalId),
-							userId: UserId(row.userId),
-							displayName: row.name,
-						},
-					});
-				}),
+				yield* Effect.logTrace("proxy auth attempt", { username });
+
+				const rows = yield* Effect.tryPromise({
+					try: () =>
+						db
+							.select({
+								userId: user.id,
+								principalId: user.principalId,
+								name: user.name,
+							})
+							.from(user)
+							.where(eq(user.email, username))
+							.limit(1),
+					catch: (e) => new DatabaseError({ cause: e }),
+				});
+
+				const row = rows[0];
+				if (!row) {
+					yield* Effect.logDebug("proxy auth: user not found", { username });
+					return new Unauthenticated();
+				}
+
+				yield* Effect.logTrace("proxy auth: succeeded", { userId: row.userId });
+				return new Authenticated({
+					principal: {
+						principalId: PrincipalId(row.principalId),
+						userId: UserId(row.userId),
+						displayName: row.name,
+					},
+				});
+			}),
 		});
 	}),
 );

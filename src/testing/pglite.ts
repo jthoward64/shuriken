@@ -54,7 +54,9 @@ export const makePgliteDatabaseLayer = (): Layer.Layer<DatabaseClient, Error> =>
 					await writeFile(DUMP_PATH, dump.stream());
 					needGenerateDump = false;
 				}
-				return DatabaseClient.make(db);
+				// PGlite is structurally compatible for all Drizzle operations we use;
+				// the QueryResultHKT difference is only a compile-time type parameter.
+				return DatabaseClient.make(db as unknown as DatabaseClient);
 			},
 			// @effect-diagnostics-next-line globalErrorInEffectFailure:off
 			catch: (e) => new Error(`PGlite migration failed: ${String(e)}`),

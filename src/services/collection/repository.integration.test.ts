@@ -47,7 +47,7 @@ describe("CollectionRepository.findBySlug (integration)", () => {
 		const ownerId = PrincipalId(crypto.randomUUID());
 		const result = await runSuccess(
 			CollectionRepository.pipe(
-				Effect.flatMap((r) => r.findBySlug(ownerId, Slug("no-such-calendar"))),
+				Effect.flatMap((r) => r.findBySlug(ownerId, "calendar", Slug("no-such-calendar"))),
 				Effect.provide(layer),
 				Effect.orDie,
 			),
@@ -75,6 +75,7 @@ describe("CollectionRepository.findBySlug (integration)", () => {
 				});
 				const found = yield* col.findBySlug(
 					PrincipalId(principal.id),
+					"calendar",
 					Slug("my-calendar"),
 				);
 				return { inserted, found };
@@ -113,7 +114,7 @@ describe("CollectionRepository.findBySlug (integration)", () => {
 					collectionType: "calendar",
 					slug: Slug("shared-slug"),
 				});
-				return yield* col.findBySlug(PrincipalId(p2.id), Slug("shared-slug"));
+				return yield* col.findBySlug(PrincipalId(p2.id), "calendar", Slug("shared-slug"));
 			}).pipe(Effect.provide(layer), Effect.orDie),
 		);
 
@@ -371,7 +372,7 @@ describe("CollectionRepository.softDelete (integration)", () => {
 					slug: Slug("gone"),
 				});
 				yield* col.softDelete(CollectionId(inserted.id));
-				return yield* col.findBySlug(ownerId, Slug("gone"));
+				return yield* col.findBySlug(ownerId, "calendar", Slug("gone"));
 			}).pipe(Effect.provide(layer), Effect.orDie),
 		);
 		expect(Option.isNone(result)).toBe(true);
