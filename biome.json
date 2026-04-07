@@ -23,7 +23,20 @@
 					"level": "warn",
 					"options": {
 						"strictCase": false,
-						"requireAscii": true
+						"requireAscii": true,
+						"conventions": [
+							{
+								"selector": {
+									"kind": "objectLiteralProperty"
+								},
+								"formats": [
+									"camelCase",
+									"PascalCase",
+									"CONSTANT_CASE",
+									"snake_case"
+								]
+							}
+						]
 					}
 				},
 				"noCommonJs": "error",
@@ -79,11 +92,16 @@
 			"quoteStyle": "double",
 			"semicolons": "always"
 		},
-		"globals": ["Bun"]
+		"globals": [
+			"Bun"
+		]
 	},
 	"overrides": [
 		{
-			"includes": ["**/*.test.ts", "**/*.test.tsx"],
+			"includes": [
+				"**/*.test.ts",
+				"**/*.test.tsx"
+			],
 			"linter": {
 				"rules": {
 					"style": {

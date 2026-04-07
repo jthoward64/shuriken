@@ -53,6 +53,9 @@ export const makePgliteDatabaseLayer = (): Layer.Layer<DatabaseClient, Error> =>
 					const dump = await pg.dumpDataDir("gzip");
 					await writeFile(DUMP_PATH, dump.stream());
 					needGenerateDump = false;
+					// Reset so the next clone comes from the dump (which has migrations),
+					// not from the un-migrated instance that was cached before migration ran.
+					cachedPgLiteInstance = undefined;
 				}
 				// PGlite is structurally compatible for all Drizzle operations we use;
 				// the QueryResultHKT difference is only a compile-time type parameter.

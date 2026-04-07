@@ -5,6 +5,8 @@ import {
 	HTTP_FORBIDDEN,
 	HTTP_METHOD_NOT_ALLOWED,
 	HTTP_NOT_FOUND,
+	HTTP_PRECONDITION_FAILED,
+	HTTP_UNSUPPORTED_MEDIA_TYPE,
 	type HttpStatus,
 } from "#src/http/status.ts";
 
@@ -191,6 +193,16 @@ export const validCalendarData = (message?: string): DavError =>
 
 export const validAddressData = (message?: string): DavError =>
 	davError(HTTP_BAD_REQUEST, "CARDDAV:valid-address-data", message);
+
+export const preconditionFailed = (
+	precondition?: DavPrecondition,
+	message?: string,
+): DavError => davError(HTTP_PRECONDITION_FAILED, precondition, message);
+
+export const unsupportedMediaType = (
+	precondition?: DavPrecondition,
+	message?: string,
+): DavError => davError(HTTP_UNSUPPORTED_MEDIA_TYPE, precondition, message);
 
 // ---------------------------------------------------------------------------
 // Effect helpers for common Option → DavError patterns

@@ -10,6 +10,10 @@ import {
 } from "#src/http/status.ts";
 import { AclServiceAllowAll } from "#src/services/acl/index.ts";
 import type { CollectionRow } from "#src/services/collection/repository.ts";
+import { ComponentRepository } from "#src/services/component/index.ts";
+import type { ComponentRepositoryShape } from "#src/services/component/repository.ts";
+import { EntityRepository } from "#src/services/entity/index.ts";
+import type { EntityRepositoryShape } from "#src/services/entity/repository.ts";
 import {
 	CollectionRepository,
 	type CollectionRepositoryShape,
@@ -21,7 +25,10 @@ import {
 	InstanceRepository,
 	type InstanceRepositoryShape,
 } from "#src/services/instance/repository.ts";
+import { InstanceService } from "#src/services/instance/service.ts";
+import type { InstanceServiceShape } from "#src/services/instance/service.ts";
 import type { PrincipalWithUser } from "#src/services/principal/repository.ts";
+import { PrincipalService, type PrincipalServiceShape } from "#src/services/principal/service.ts";
 import {
 	PrincipalRepository,
 	type PrincipalRepositoryShape,
@@ -64,10 +71,41 @@ const stubCollectionService: CollectionServiceShape = {
 	delete: () => Effect.die("not implemented in router tests"),
 };
 
+/** Minimal InstanceService stub — router tests only exercise path resolution. */
+const stubInstanceService: InstanceServiceShape = {
+	findById: () => Effect.die("not implemented in router tests"),
+	findBySlug: () => Effect.die("not implemented in router tests"),
+	listByCollection: () => Effect.die("not implemented in router tests"),
+	put: () => Effect.die("not implemented in router tests"),
+	delete: () => Effect.die("not implemented in router tests"),
+};
+
+/** Minimal PrincipalService stub — router tests only exercise path resolution. */
+const stubPrincipalService: PrincipalServiceShape = {
+	findById: () => Effect.die("not implemented in router tests"),
+	findBySlug: () => Effect.die("not implemented in router tests"),
+	findByEmail: () => Effect.die("not implemented in router tests"),
+};
+
+/** No-op EntityRepository — router path resolution never touches entity/component storage. */
+const noopEntityRepo: EntityRepositoryShape = {
+	insert: () => Effect.die("not implemented in router tests"),
+	findById: () => Effect.succeed(Option.none()),
+	updateLogicalUid: () => Effect.void,
+	softDelete: () => Effect.void,
+};
+
+/** No-op ComponentRepository — router path resolution never touches entity/component storage. */
+const noopComponentRepo: ComponentRepositoryShape = {
+	insertTree: () => Effect.die("not implemented in router tests"),
+	loadTree: () => Effect.succeed(Option.none()),
+	deleteByEntity: () => Effect.void,
+};
+
 /** Build a Layer providing all DAV router requirements from simple slug→id maps. */
 const makeRouterLayer = (
 	seeds: RouterSeeds = {},
-): Layer.Layer<PrincipalRepository | CollectionRepository | InstanceRepository | CollectionService | import("#src/services/acl/index.ts").AclService> => {
+): Layer.Layer<PrincipalRepository | CollectionRepository | InstanceRepository | CollectionService | InstanceService | PrincipalService | import("#src/services/acl/index.ts").AclService | EntityRepository | ComponentRepository> => {
 	const principals = seeds.principals ?? new Map<string, string>();
 	const collections = seeds.collections ?? new Map<string, string>();
 	const instances = seeds.instances ?? new Map<string, string>();
@@ -127,6 +165,10 @@ const makeRouterLayer = (
 		Layer.succeed(CollectionRepository, collectionRepo),
 		Layer.succeed(InstanceRepository, instanceRepo),
 		Layer.succeed(CollectionService, stubCollectionService),
+		Layer.succeed(InstanceService, stubInstanceService),
+		Layer.succeed(PrincipalService, stubPrincipalService),
+		Layer.succeed(EntityRepository, noopEntityRepo),
+		Layer.succeed(ComponentRepository, noopComponentRepo),
 		AclServiceAllowAll,
 	);
 };

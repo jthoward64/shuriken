@@ -20,6 +20,10 @@ import type {
 } from "#src/layers.ts";
 import type { AclService } from "#src/services/acl/index.ts";
 import type { CollectionService } from "#src/services/collection/index.ts";
+import type { ComponentRepository } from "#src/services/component/index.ts";
+import type { EntityRepository } from "#src/services/entity/index.ts";
+import type { InstanceService } from "#src/services/instance/index.ts";
+import type { PrincipalService } from "#src/services/principal/service.ts";
 
 // ---------------------------------------------------------------------------
 // Top-level HTTP router
@@ -37,7 +41,11 @@ type AppServices =
 	| CollectionRepository
 	| InstanceRepository
 	| CollectionService
-	| AclService;
+	| InstanceService
+	| AclService
+	| PrincipalService
+	| EntityRepository
+	| ComponentRepository;
 
 const isDavPath = (pathname: string): boolean =>
 	pathname === "/dav" ||

@@ -1,6 +1,16 @@
 import { Effect, Option } from "effect";
-import { type AppError, type DavError, notFound, someOrNotFound } from "#src/domain/errors.ts";
-import { CollectionId, InstanceId, PrincipalId, isUuid } from "#src/domain/ids.ts";
+import {
+	type AppError,
+	type DavError,
+	notFound,
+	someOrNotFound,
+} from "#src/domain/errors.ts";
+import {
+	CollectionId,
+	InstanceId,
+	isUuid,
+	PrincipalId,
+} from "#src/domain/ids.ts";
 import {
 	NAMESPACE_TO_COLLECTION_TYPE,
 	parseCollectionNamespace,
@@ -9,10 +19,14 @@ import { type ResolvedDavPath, Slug } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { HTTP_METHOD_NOT_ALLOWED } from "#src/http/status.ts";
 import type { AclService } from "#src/services/acl/index.ts";
-import { CollectionRepository } from "#src/services/collection/index.ts";
 import type { CollectionService } from "#src/services/collection/index.ts";
+import { CollectionRepository } from "#src/services/collection/index.ts";
+import type { ComponentRepository } from "#src/services/component/index.ts";
+import type { EntityRepository } from "#src/services/entity/index.ts";
+import type { InstanceService } from "#src/services/instance/index.ts";
 import { InstanceRepository } from "#src/services/instance/index.ts";
 import { PrincipalRepository } from "#src/services/principal/index.ts";
+import type { PrincipalService } from "#src/services/principal/service.ts";
 import { deleteHandler } from "./methods/delete.ts";
 import { getHandler } from "./methods/get.ts";
 import { mkcolHandler } from "./methods/mkcol.ts";
@@ -44,7 +58,11 @@ type DavServices =
 	| CollectionRepository
 	| InstanceRepository
 	| CollectionService
-	| AclService;
+	| InstanceService
+	| AclService
+	| PrincipalService
+	| EntityRepository
+	| ComponentRepository;
 
 // Segment counts after stripping /dav (index 0 = "principals")
 const SEGMENTS_PRINCIPAL = 2; // ["principals", ":slug"]
@@ -132,21 +150,19 @@ export const parseDavPath = (
 
 		const seg3 = decodeURIComponent(segments[3] ?? "");
 		const collRepo = yield* CollectionRepository;
-		const collRowOpt = yield* (
-			isUuid(seg3)
-				? collRepo.findById(CollectionId(seg3)).pipe(
-						Effect.flatMap(
-							Option.match({
-								onNone: () => Effect.succeed(Option.none()),
-								onSome: (row) =>
-									row.ownerPrincipalId === principalId
-										? Effect.succeed(Option.some(row))
-										: Effect.fail(notFound(`Collection not found: ${seg3}`)),
-							}),
-						),
-					)
-				: collRepo.findBySlug(principalId, collectionType, Slug(seg3))
-		);
+		const collRowOpt = yield* isUuid(seg3)
+			? collRepo.findById(CollectionId(seg3)).pipe(
+					Effect.flatMap(
+						Option.match({
+							onNone: () => Effect.succeed(Option.none()),
+							onSome: (row) =>
+								row.ownerPrincipalId === principalId
+									? Effect.succeed(Option.some(row))
+									: Effect.fail(notFound(`Collection not found: ${seg3}`)),
+						}),
+					),
+				)
+			: collRepo.findBySlug(principalId, collectionType, Slug(seg3));
 		if (Option.isNone(collRowOpt)) {
 			return {
 				kind: "new-collection",
@@ -168,21 +184,19 @@ export const parseDavPath = (
 
 		const seg4 = decodeURIComponent(segments[4] ?? "");
 		const instRepo = yield* InstanceRepository;
-		const instRowOpt = yield* (
-			isUuid(seg4)
-				? instRepo.findById(InstanceId(seg4)).pipe(
-						Effect.flatMap(
-							Option.match({
-								onNone: () => Effect.succeed(Option.none()),
-								onSome: (row) =>
-									row.collectionId === collectionId
-										? Effect.succeed(Option.some(row))
-										: Effect.fail(notFound(`Instance not found: ${seg4}`)),
-							}),
-						),
-					)
-				: instRepo.findBySlug(collectionId, Slug(seg4))
-		);
+		const instRowOpt = yield* isUuid(seg4)
+			? instRepo.findById(InstanceId(seg4)).pipe(
+					Effect.flatMap(
+						Option.match({
+							onNone: () => Effect.succeed(Option.none()),
+							onSome: (row) =>
+								row.collectionId === collectionId
+									? Effect.succeed(Option.some(row))
+									: Effect.fail(notFound(`Instance not found: ${seg4}`)),
+						}),
+					),
+				)
+			: instRepo.findBySlug(collectionId, Slug(seg4));
 		if (Option.isNone(instRowOpt)) {
 			return {
 				kind: "new-instance",
@@ -218,7 +232,6 @@ export const davRouter = (
 			yield* Effect.logTrace("dav well-known redirect", { name: path.name });
 			return new Response(null, {
 				status: 301,
-				// biome-ignore lint/style/useNamingConvention: HTTP header name
 				headers: { Location: "/dav/" },
 			});
 		}
@@ -254,7 +267,6 @@ export const davRouter = (
 				return new Response(null, {
 					status: HTTP_METHOD_NOT_ALLOWED,
 					headers: {
-						// biome-ignore lint/style/useNamingConvention: HTTP header name
 						Allow:
 							"OPTIONS, GET, HEAD, PUT, DELETE, PROPFIND, PROPPATCH, MKCOL, REPORT",
 					},

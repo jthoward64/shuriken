@@ -42,7 +42,9 @@ const EMPTY_PROPS: MkcolProps = {
  * the extended-MKCOL body is optional per RFC 5689 §5.
  */
 const extractMkcolProps = (tree: unknown): MkcolProps => {
-	if (typeof tree !== "object" || tree === null) { return EMPTY_PROPS; }
+	if (typeof tree !== "object" || tree === null) {
+		return EMPTY_PROPS;
+	}
 
 	const root = tree as Record<string, unknown>;
 
@@ -53,17 +55,19 @@ const extractMkcolProps = (tree: unknown): MkcolProps => {
 		| Record<string, unknown>
 		| undefined;
 
-	if (typeof rootEl !== "object" || rootEl === null) { return EMPTY_PROPS; }
+	if (typeof rootEl !== "object" || rootEl === null) {
+		return EMPTY_PROPS;
+	}
 
-	const set = rootEl[`{${DAV_NS}}set`] as
-		| Record<string, unknown>
-		| undefined;
-	if (typeof set !== "object" || set === null) { return EMPTY_PROPS; }
+	const set = rootEl[`{${DAV_NS}}set`] as Record<string, unknown> | undefined;
+	if (typeof set !== "object" || set === null) {
+		return EMPTY_PROPS;
+	}
 
-	const prop = set[`{${DAV_NS}}prop`] as
-		| Record<string, unknown>
-		| undefined;
-	if (typeof prop !== "object" || prop === null) { return EMPTY_PROPS; }
+	const prop = set[`{${DAV_NS}}prop`] as Record<string, unknown> | undefined;
+	if (typeof prop !== "object" || prop === null) {
+		return EMPTY_PROPS;
+	}
 
 	const displayName =
 		typeof prop[`{${DAV_NS}}displayname`] === "string"
@@ -120,9 +124,7 @@ const parseMkcolBody = (req: Request): Effect.Effect<MkcolProps, DavError> =>
 				return Effect.succeed(EMPTY_PROPS);
 			}
 			return parseXml(body).pipe(
-				Effect.map((parsed) =>
-					extractMkcolProps(normalizeClarkNames(parsed)),
-				),
+				Effect.map((parsed) => extractMkcolProps(normalizeClarkNames(parsed))),
 				Effect.catchTag("XmlParseError", () => Effect.succeed(EMPTY_PROPS)),
 			);
 		}),
@@ -137,7 +139,11 @@ export const mkcolHandler = (
 	path: ResolvedDavPath,
 	ctx: HttpRequestContext,
 	req: Request,
-): Effect.Effect<Response, DavError | DatabaseError, CollectionService | AclService> =>
+): Effect.Effect<
+	Response,
+	DavError | DatabaseError,
+	CollectionService | AclService
+> =>
 	Effect.gen(function* () {
 		if (path.kind !== "new-collection") {
 			return yield* methodNotAllowed();
@@ -175,7 +181,6 @@ export const mkcolHandler = (
 
 		return new Response(null, {
 			status: HTTP_CREATED,
-			// biome-ignore lint/style/useNamingConvention: HTTP header name
 			headers: { Location: location },
 		});
 	});

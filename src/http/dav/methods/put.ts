@@ -1,10 +1,199 @@
-import { Effect } from "effect";
-import type { ResolvedDavPath } from "#src/domain/types/path.ts";
+import { Effect, Option } from "effect";
+import { makeEtag } from "#src/data/etag.ts";
+import { decodeICalendar, encodeICalendar } from "#src/data/icalendar/codec.ts";
+import { extractUid as extractICalUid } from "#src/data/icalendar/uid.ts";
+import { decodeVCard, encodeVCard } from "#src/data/vcard/codec.ts";
+import { extractUid as extractVCardUid } from "#src/data/vcard/uid.ts";
+import {
+	type DatabaseError,
+	type DavError,
+	forbidden,
+	methodNotAllowed,
+	preconditionFailed,
+	unsupportedMediaType,
+} from "#src/domain/errors.ts";
+import { CollectionId, EntityId } from "#src/domain/ids.ts";
+import type { ResolvedDavPath, Slug } from "#src/domain/types/path.ts";
+import { ETag } from "#src/domain/types/strings.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
+import { HTTP_CREATED, HTTP_NO_CONTENT } from "#src/http/status.ts";
+import { AclService } from "#src/services/acl/index.ts";
+import { ComponentRepository } from "#src/services/component/index.ts";
+import { EntityRepository } from "#src/services/entity/index.ts";
+import { InstanceService } from "#src/services/instance/index.ts";
 
+// ---------------------------------------------------------------------------
+// PUT handler — RFC 4918 §9.7, RFC 4791 §5.3.2, RFC 6352 §5.3.2
+// ---------------------------------------------------------------------------
+
+/** Handles PUT for CalDAV/CardDAV instances (create or replace). */
 export const putHandler = (
-	_path: ResolvedDavPath,
-	_ctx: HttpRequestContext,
-	_req: Request,
-): Effect.Effect<Response, never> =>
-	Effect.succeed(new Response(null, { status: 501 }));
+	path: ResolvedDavPath,
+	ctx: HttpRequestContext,
+	req: Request,
+): Effect.Effect<
+	Response,
+	DavError | DatabaseError,
+	InstanceService | EntityRepository | ComponentRepository | AclService
+> =>
+	Effect.gen(function* () {
+		// 1. Only new-instance and instance paths accept PUT.
+		if (path.kind !== "new-instance" && path.kind !== "instance") {
+			return yield* methodNotAllowed();
+		}
+
+		// 2. Require an authenticated principal.
+		if (ctx.auth._tag !== "Authenticated") {
+			return yield* forbidden("DAV:need-privileges");
+		}
+		const principal = ctx.auth.principal;
+
+		// 3. Validate Content-Type.
+		const rawContentType = req.headers.get("Content-Type") ?? "";
+		const baseContentType =
+			rawContentType.split(";")[0]?.trim().toLowerCase() ?? "";
+
+		let entityType: "icalendar" | "vcard";
+		let contentType: string;
+
+		if (baseContentType === "text/calendar") {
+			entityType = "icalendar";
+			contentType = "text/calendar";
+		} else if (baseContentType === "text/vcard") {
+			entityType = "vcard";
+			contentType = "text/vcard";
+		} else {
+			const precondition =
+				path.namespace === "card"
+					? "CARDDAV:supported-address-data"
+					: "CALDAV:supported-calendar-data";
+			return yield* unsupportedMediaType(precondition);
+		}
+
+		// 4. Read body.
+		const body = yield* Effect.promise(() => req.text());
+
+		// 5. Parse into IrDocument.
+		const doc =
+			entityType === "icalendar"
+				? yield* decodeICalendar(body)
+				: yield* decodeVCard(body);
+
+		// 6. Extract logical UID.
+		const logicalUid = Option.getOrNull(
+			entityType === "icalendar" ? extractICalUid(doc) : extractVCardUid(doc),
+		);
+
+		// 7. Serialize canonical form.
+		const canonical =
+			entityType === "icalendar"
+				? yield* encodeICalendar(doc)
+				: yield* encodeVCard(doc);
+
+		// 8. Compute ETag.
+		const etag = ETag(yield* makeEtag(canonical));
+
+		// 9 + 10. Dispatch on path kind.
+		if (path.kind === "new-instance") {
+			// ACL check: write-content on the parent collection.
+			const acl = yield* AclService;
+			yield* acl.check(
+				principal.principalId,
+				path.collectionId,
+				"collection",
+				"DAV:write-content",
+			);
+
+			// If-Match on a non-existent resource is always a precondition failure.
+			const ifMatch = req.headers.get("If-Match");
+			if (ifMatch !== null) {
+				return yield* preconditionFailed();
+			}
+
+			// Create entity row.
+			const entityRepo = yield* EntityRepository;
+			const entityRow = yield* entityRepo.insert({ entityType, logicalUid });
+
+			// Persist component tree.
+			const componentRepo = yield* ComponentRepository;
+			yield* componentRepo.insertTree(EntityId(entityRow.id), doc.root);
+
+			// Create instance row.
+			const instanceSvc = yield* InstanceService;
+			yield* instanceSvc.put({
+				collectionId: path.collectionId,
+				entityId: EntityId(entityRow.id),
+				contentType,
+				etag,
+				slug: path.slug,
+			});
+
+			return new Response(null, {
+				status: HTTP_CREATED,
+				headers: { ETag: etag },
+			});
+		}
+
+		// path.kind === "instance" — update existing resource.
+
+		// ACL check: write-content on the instance.
+		const acl = yield* AclService;
+		yield* acl.check(
+			principal.principalId,
+			path.instanceId,
+			"instance",
+			"DAV:write-content",
+		);
+
+		// Fetch existing instance to validate conditional headers and get entityId.
+		const instanceSvc = yield* InstanceService;
+		const existingInstance = yield* instanceSvc.findById(path.instanceId);
+
+		// If-Match: must match the current ETag (or be "*").
+		const ifMatch = req.headers.get("If-Match");
+		if (
+			ifMatch !== null &&
+			ifMatch !== "*" &&
+			ifMatch !== existingInstance.etag
+		) {
+			return yield* preconditionFailed();
+		}
+
+		// If-None-Match: "*" fails when the resource already exists.
+		const ifNoneMatch = req.headers.get("If-None-Match");
+		if (ifNoneMatch === "*") {
+			return yield* preconditionFailed();
+		}
+
+		// Replace component tree.
+		const componentRepo = yield* ComponentRepository;
+		yield* componentRepo.deleteByEntity(EntityId(existingInstance.entityId));
+
+		const entityRepo = yield* EntityRepository;
+		yield* entityRepo.updateLogicalUid(
+			EntityId(existingInstance.entityId),
+			logicalUid,
+		);
+
+		yield* componentRepo.insertTree(
+			EntityId(existingInstance.entityId),
+			doc.root,
+		);
+
+		// Update instance ETag and sync revision.
+		yield* instanceSvc.put(
+			{
+				collectionId: CollectionId(existingInstance.collectionId),
+				entityId: EntityId(existingInstance.entityId),
+				contentType,
+				etag,
+				slug: existingInstance.slug as Slug,
+			},
+			path.instanceId,
+		);
+
+		return new Response(null, {
+			status: HTTP_NO_CONTENT,
+			headers: { ETag: etag },
+		});
+	});

@@ -23,9 +23,7 @@ export const optionsHandler = (
 		new Response(null, {
 			status: 200,
 			headers: {
-				// biome-ignore lint/style/useNamingConvention: HTTP header names are uppercase
 				DAV: DAV_CAPABILITIES,
-				// biome-ignore lint/style/useNamingConvention: HTTP header names are uppercase
 				Allow: ALLOWED_METHODS,
 				"Content-Length": "0",
 				"MS-Author-Via": "DAV",

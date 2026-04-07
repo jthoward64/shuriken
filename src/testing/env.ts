@@ -1,5 +1,7 @@
 import { Effect, Layer, Option, Redacted } from "effect";
 import { Temporal } from "temporal-polyfill";
+import type { IrComponent } from "#src/data/ir.ts";
+import { ComponentId } from "#src/domain/ids.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
 import type { Slug } from "#src/domain/types/path.ts";
 import type { Email } from "#src/domain/types/strings.ts";
@@ -21,6 +23,13 @@ import {
 } from "#src/services/collection/repository.ts";
 import { CollectionServiceLive } from "#src/services/collection/service.live.ts";
 import type { CollectionService } from "#src/services/collection/service.ts";
+import { ComponentRepository } from "#src/services/component/index.ts";
+import type { ComponentRepositoryShape } from "#src/services/component/repository.ts";
+import { EntityRepository } from "#src/services/entity/index.ts";
+import type {
+	EntityRepositoryShape,
+	EntityRow,
+} from "#src/services/entity/repository.ts";
 import {
 	GroupRepository,
 	type GroupRepositoryShape,
@@ -90,6 +99,8 @@ export interface TestStores {
 	readonly groups: Map<string, GroupRow>; // group.id → GroupRow
 	readonly memberships: Map<string, Set<string>>; // groupId → Set<userId>
 	readonly acl: Map<string, Array<AceRow>>; // resourceId → all ACEs for that resource
+	readonly entities: Map<string, EntityRow>; // entityId → EntityRow
+	readonly components: Map<string, IrComponent>; // entityId → root IrComponent
 }
 
 const makeStores = (): TestStores => ({
@@ -102,6 +113,8 @@ const makeStores = (): TestStores => ({
 	groups: new Map(),
 	memberships: new Map(),
 	acl: new Map(),
+	entities: new Map(),
+	components: new Map(),
 });
 
 // ---------------------------------------------------------------------------
@@ -639,6 +652,56 @@ const makeAclRepo = (stores: TestStores): AclRepositoryShape => ({
 		}),
 });
 
+const makeEntityRepo = (stores: TestStores): EntityRepositoryShape => ({
+	insert: ({ entityType, logicalUid }) =>
+		Effect.sync(() => {
+			const id = crypto.randomUUID();
+			const row: EntityRow = {
+				id,
+				entityType,
+				logicalUid: logicalUid ?? null,
+				updatedAt: null as unknown as EntityRow["updatedAt"],
+				deletedAt: null,
+			};
+			stores.entities.set(id, row);
+			return row;
+		}),
+
+	findById: (id) =>
+		Effect.succeed(Option.fromNullable(stores.entities.get(id) ?? null)),
+
+	updateLogicalUid: (id, uid) =>
+		Effect.sync(() => {
+			const row = stores.entities.get(id);
+			if (row) {
+				stores.entities.set(id, { ...row, logicalUid: uid });
+			}
+		}),
+
+	softDelete: (id) =>
+		Effect.sync(() => {
+			stores.entities.delete(id);
+		}),
+});
+
+const makeComponentRepo = (stores: TestStores): ComponentRepositoryShape => ({
+	insertTree: (entityId, root) =>
+		Effect.sync(() => {
+			stores.components.set(entityId, root);
+			return ComponentId(crypto.randomUUID());
+		}),
+
+	loadTree: (entityId, _entityType) =>
+		Effect.succeed(
+			Option.fromNullable(stores.components.get(entityId) ?? null),
+		),
+
+	deleteByEntity: (entityId) =>
+		Effect.sync(() => {
+			stores.components.delete(entityId);
+		}),
+});
+
 const makeGroupRepo = (stores: TestStores): GroupRepositoryShape => ({
 	findById: (id) =>
 		Effect.succeed(
@@ -758,6 +821,8 @@ export interface TestEnvBuilder {
 		| PrincipalService
 		| AclService
 		| CryptoService
+		| EntityRepository
+		| ComponentRepository
 	>;
 	/** Direct store access for advanced assertions. Prefer reading via services. */
 	readonly stores: TestStores;
@@ -928,6 +993,14 @@ export const makeTestEnv = (): TestEnvBuilder => {
 				makeGroupRepo(stores),
 			);
 			const aclRepoLayer = Layer.succeed(AclRepository, makeAclRepo(stores));
+			const entityRepoLayer = Layer.succeed(
+				EntityRepository,
+				makeEntityRepo(stores),
+			);
+			const componentRepoLayer = Layer.succeed(
+				ComponentRepository,
+				makeComponentRepo(stores),
+			);
 
 			const userServiceLayer = UserServiceLive.pipe(
 				Layer.provide(Layer.mergeAll(userRepoLayer, TestCryptoLayer)),
@@ -956,6 +1029,8 @@ export const makeTestEnv = (): TestEnvBuilder => {
 				instanceServiceLayer,
 				groupServiceLayer,
 				aclServiceLayer,
+				entityRepoLayer,
+				componentRepoLayer,
 			);
 		},
 	};
