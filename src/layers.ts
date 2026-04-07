@@ -3,7 +3,7 @@ import { selectAuthLayer } from "#src/auth/index.ts";
 import { AppConfigLive } from "#src/config.ts";
 import { type DatabaseClient, DatabaseClientLive } from "#src/db/client.ts";
 import { type CryptoService, CryptoServiceLive } from "#src/platform/crypto.ts";
-import { AclDomainLayer } from "#src/services/acl/index.ts";
+import { AclServiceAllowAll } from "#src/services/acl/index.ts";
 import { CollectionDomainLayer } from "#src/services/collection/index.ts";
 import { DomainEntityDomainLayer } from "#src/services/domain-entity/index.ts";
 import { GroupDomainLayer } from "#src/services/group/index.ts";
@@ -54,7 +54,8 @@ export const AppLayer = Layer.mergeAll(
 	withInfra(PrincipalDomainLayer),
 	withInfra(CollectionDomainLayer),
 	withInfra(InstanceDomainLayer),
-	withInfra(AclDomainLayer),
+	// TODO: swap AclServiceAllowAll for withInfra(AclDomainLayer) once ACL is wired into handlers
+	AclServiceAllowAll,
 	withInfra(UserDomainLayer),
 	withInfra(GroupDomainLayer),
 	withInfra(DomainEntityDomainLayer),

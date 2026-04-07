@@ -2,7 +2,6 @@ import { Effect, Option } from "effect";
 import type { AppError, DavError } from "#src/domain/errors.ts";
 import { notFound, someOrNotFound } from "#src/domain/errors.ts";
 import { CollectionId, InstanceId, PrincipalId, isUuid } from "#src/domain/ids.ts";
-
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
@@ -50,7 +49,7 @@ const SEGMENTS_COLLECTION = 3;
  *   of whether the segment looked like a UUID, so PUT/MKCOL to a UUID-style URL
  *   is handled correctly.
  */
-const parseDavPath = (
+export const parseDavPath = (
 	url: URL,
 ): Effect.Effect<
 	ResolvedDavPath,

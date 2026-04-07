@@ -23,7 +23,7 @@ import {
 	PrincipalRepository,
 	type PrincipalRepositoryShape,
 } from "#src/services/principal/repository.ts";
-import { davRouter } from "./router.ts";
+import { davRouter, parseDavPath } from "./router.ts";
 
 // ---------------------------------------------------------------------------
 // Test infrastructure
@@ -124,6 +124,13 @@ const run = (method: string, pathname: string, seeds?: RouterSeeds) => {
 		davRouter(req, ctx).pipe(Effect.provide(makeRouterLayer(seeds))),
 	);
 };
+
+const runPath = (pathname: string, seeds?: RouterSeeds) =>
+	Effect.runPromise(
+		parseDavPath(new URL(`http://localhost${pathname}`)).pipe(
+			Effect.provide(makeRouterLayer(seeds)),
+		),
+	);
 
 // ---------------------------------------------------------------------------
 // Well-known redirects (RFC 6764 §5)
@@ -284,5 +291,49 @@ describe("davRouter — DavError → bare Response", () => {
 		const res = await run("OPTIONS", "/dav/principals/ghost/");
 		expect(res.status).toBe(HTTP_NOT_FOUND);
 		expect(await res.text()).toBe("");
+	});
+});
+
+// ---------------------------------------------------------------------------
+// new-resource path resolution
+// ---------------------------------------------------------------------------
+
+describe("davRouter — new-resource path resolution", () => {
+	it("missing collection under existing principal resolves to new-collection with correct fields", async () => {
+		const aliceId = crypto.randomUUID();
+		const path = await runPath("/dav/principals/alice/new-cal", {
+			principals: new Map([["alice", aliceId]]),
+		});
+		expect(path.kind).toBe("new-collection");
+		if (path.kind === "new-collection") {
+			expect(String(path.principalId)).toBe(aliceId);
+			expect(String(path.slug)).toBe("new-cal");
+		}
+	});
+
+	it("missing instance under existing collection resolves to new-instance with correct fields", async () => {
+		const aliceId = crypto.randomUUID();
+		const calId = crypto.randomUUID();
+		const path = await runPath("/dav/principals/alice/my-cal/event.ics", {
+			principals: new Map([["alice", aliceId]]),
+			collections: new Map([[`${aliceId}:my-cal`, calId]]),
+		});
+		expect(path.kind).toBe("new-instance");
+		if (path.kind === "new-instance") {
+			expect(String(path.principalId)).toBe(aliceId);
+			expect(String(path.collectionId)).toBe(calId);
+			expect(String(path.slug)).toBe("event.ics");
+		}
+	});
+
+	it("missing principal still rejects with a DavError (not silently converted to new-collection)", async () => {
+		const exit = await Effect.runPromise(
+			Effect.exit(
+				parseDavPath(new URL("http://localhost/dav/principals/nobody/new-cal")).pipe(
+					Effect.provide(makeRouterLayer()),
+				),
+			),
+		);
+		expect(exit._tag).toBe("Failure");
 	});
 });
