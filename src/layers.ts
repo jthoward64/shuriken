@@ -1,15 +1,19 @@
-import { Layer } from "effect";
+import { Layer, Logger } from "effect";
 import { selectAuthLayer } from "#src/auth/index.ts";
 import { AppConfigLive } from "#src/config.ts";
 import { type DatabaseClient, DatabaseClientLive } from "#src/db/client.ts";
 import { type CryptoService, CryptoServiceLive } from "#src/platform/crypto.ts";
 import { AclServiceAllowAll } from "#src/services/acl/index.ts";
+import { CalIndexRepositoryLive } from "#src/services/cal-index/index.ts";
+import { CardIndexRepositoryLive } from "#src/services/card-index/index.ts";
 import { CollectionDomainLayer } from "#src/services/collection/index.ts";
 import { DomainEntityDomainLayer } from "#src/services/domain-entity/index.ts";
 import { GroupDomainLayer } from "#src/services/group/index.ts";
 import { InstanceDomainLayer } from "#src/services/instance/index.ts";
 import { PrincipalDomainLayer } from "#src/services/principal/index.ts";
 import { ProvisioningDomainLayer } from "#src/services/provisioning/index.ts";
+import { TimezoneDomainLayer } from "#src/services/timezone/index.ts";
+import { TombstoneRepositoryLive } from "#src/services/tombstone/index.ts";
 import { UserDomainLayer } from "#src/services/user/index.ts";
 
 // ---------------------------------------------------------------------------
@@ -50,6 +54,7 @@ const withInfra = <A, E>(
 // ---------------------------------------------------------------------------
 
 export const AppLayer = Layer.mergeAll(
+	Logger.pretty,
 	InfraLayer,
 	AuthLayer,
 	withInfra(PrincipalDomainLayer),
@@ -60,7 +65,11 @@ export const AppLayer = Layer.mergeAll(
 	withInfra(UserDomainLayer),
 	withInfra(GroupDomainLayer),
 	withInfra(DomainEntityDomainLayer),
+	withInfra(TimezoneDomainLayer),
 	ProvisioningDomainLayer.pipe(Layer.provide(InfraLayer)),
+	TombstoneRepositoryLive.pipe(Layer.provide(InfraLayer)),
+	CalIndexRepositoryLive.pipe(Layer.provide(InfraLayer)),
+	CardIndexRepositoryLive.pipe(Layer.provide(InfraLayer)),
 );
 
 // ---------------------------------------------------------------------------
@@ -71,6 +80,16 @@ export { AuthService } from "#src/auth/service.ts";
 export { DatabaseClient } from "#src/db/client.ts";
 export { CryptoService } from "#src/platform/crypto.ts";
 export { AclService } from "#src/services/acl/index.ts";
+export {
+	type CalComponentType,
+	CalIndexRepository,
+} from "#src/services/cal-index/index.ts";
+export {
+	type CardCollation,
+	type CardIndexField,
+	CardIndexRepository,
+	type CardMatchType,
+} from "#src/services/card-index/index.ts";
 export {
 	CollectionRepository,
 	CollectionService,
@@ -88,6 +107,11 @@ export {
 	PrincipalRepository,
 	PrincipalService,
 } from "#src/services/principal/index.ts";
+export { CalTimezoneRepository } from "#src/services/timezone/index.ts";
+export {
+	TombstoneRepository,
+	type TombstoneRow,
+} from "#src/services/tombstone/index.ts";
 export {
 	UserRepository,
 	UserService,

@@ -94,9 +94,13 @@ const translateClarkKeysInValue = (value: unknown, ns: NsRegistry): unknown => {
  *
  * All Clark-notation property keys are converted to prefix:localname using a
  * shared NsRegistry; all xmlns:* declarations appear once on D:multistatus.
+ *
+ * When `syncToken` is provided (RFC 6578 DAV:sync-collection), it is emitted
+ * as `<D:sync-token>` inside `<D:multistatus>`.
  */
 export const buildMultistatus = (
 	responses: ReadonlyArray<DavResponse>,
+	syncToken?: string,
 ): Effect.Effect<string, never> => {
 	const ns = makeNsRegistry();
 
@@ -139,6 +143,7 @@ export const buildMultistatus = (
 		"D:multistatus": {
 			...ns.declarations(),
 			...multistatusObj,
+			...(syncToken !== undefined ? { "D:sync-token": syncToken } : {}),
 		},
 	};
 
@@ -147,11 +152,15 @@ export const buildMultistatus = (
 
 /**
  * Wrap a buildMultistatus result in a 207 Response.
+ *
+ * When `syncToken` is provided (RFC 6578 DAV:sync-collection), it is emitted
+ * as `<D:sync-token>` inside `<D:multistatus>`.
  */
 export const multistatusResponse = (
 	responses: ReadonlyArray<DavResponse>,
+	syncToken?: string,
 ): Effect.Effect<Response, never> =>
-	buildMultistatus(responses).pipe(
+	buildMultistatus(responses, syncToken).pipe(
 		Effect.map(
 			(body) =>
 				new Response(body, {

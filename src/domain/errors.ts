@@ -133,6 +133,7 @@ export type CalDavPrecondition =
 export type CardDavPrecondition =
 	| "CARDDAV:supported-address-data" // 415 / 403
 	| "CARDDAV:valid-address-data" // 400 / 403
+	| "CARDDAV:valid-filter" // 400
 	| "CARDDAV:no-uid-conflict" // 409
 	| "CARDDAV:max-resource-size"; // 413
 

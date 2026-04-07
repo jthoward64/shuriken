@@ -7,12 +7,13 @@ import {
 	uniqueIndex,
 	uuid,
 } from "drizzle-orm/pg-core";
+import type { UuidString } from "#src/domain/ids.ts";
 import { timestampTz } from "./types";
 
 export const principal = pgTable(
 	"principal",
 	{
-		id: uuid().default(sql`uuidv7()`).primaryKey(),
+		id: uuid().default(sql`uuidv7()`).primaryKey().$type<UuidString>(),
 		principalType: text("principal_type").notNull(),
 		displayName: text("display_name"),
 		updatedAt: timestampTz("updated_at").default(sql`now()`).notNull(),

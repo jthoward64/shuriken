@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { Effect, Layer, Option } from "effect";
 import { DatabaseClient, type DbClient } from "#src/db/client.ts";
 import { davInstance } from "#src/db/drizzle/schema/index.ts";
@@ -75,6 +75,56 @@ const listByCollection = Effect.fn("InstanceRepository.listByCollection")(
 	),
 );
 
+const findChangedSince = Effect.fn("InstanceRepository.findChangedSince")(
+	function* (db: DbClient, collectionId: CollectionId, sinceSyncRevision: number) {
+		yield* Effect.logTrace("repo.instance.findChangedSince", {
+			collectionId,
+			sinceSyncRevision,
+		});
+		return yield* Effect.tryPromise({
+			try: () =>
+				db
+					.select()
+					.from(davInstance)
+					.where(
+						and(
+							eq(davInstance.collectionId, collectionId),
+							gt(davInstance.syncRevision, sinceSyncRevision),
+							isNull(davInstance.deletedAt),
+						),
+					)
+					.orderBy(davInstance.syncRevision),
+			catch: (e) => new DatabaseError({ cause: e }),
+		});
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.instance.findChangedSince failed", e.cause),
+	),
+);
+
+const findByIds = Effect.fn("InstanceRepository.findByIds")(function* (
+	db: DbClient,
+	ids: ReadonlyArray<InstanceId>,
+) {
+	yield* Effect.logTrace("repo.instance.findByIds", { count: ids.length });
+	if (ids.length === 0) {
+		return [];
+	}
+	return yield* Effect.tryPromise({
+		try: () =>
+			db
+				.select()
+				.from(davInstance)
+				.where(
+					and(
+						inArray(davInstance.id, ids as Array<InstanceId>),
+						isNull(davInstance.deletedAt),
+					),
+				),
+		catch: (e) => new DatabaseError({ cause: e }),
+	});
+}, Effect.tapError((e) => Effect.logWarning("repo.instance.findByIds failed", e.cause)));
+
 const insertInstance = Effect.fn("InstanceRepository.insert")(function* (
 	db: DbClient,
 	input: NewInstance,
@@ -93,7 +143,6 @@ const insertInstance = Effect.fn("InstanceRepository.insert")(function* (
 					contentType: input.contentType,
 					etag: input.etag,
 					slug: input.slug,
-					syncRevision: input.syncRevision ?? 1,
 					scheduleTag: input.scheduleTag,
 				})
 				.returning()
@@ -112,14 +161,13 @@ const updateEtag = Effect.fn("InstanceRepository.updateEtag")(function* (
 	db: DbClient,
 	id: InstanceId,
 	etag: ETag,
-	syncRevision: number,
 ) {
-	yield* Effect.logTrace("repo.instance.updateEtag", { id, syncRevision });
+	yield* Effect.logTrace("repo.instance.updateEtag", { id });
 	return yield* Effect.tryPromise({
 		try: () =>
 			db
 				.update(davInstance)
-				.set({ etag, syncRevision, updatedAt: sql`now()` })
+				.set({ etag, updatedAt: sql`now()` })
 				.where(eq(davInstance.id, id))
 				.then(() => undefined),
 		catch: (e) => new DatabaseError({ cause: e }),
@@ -149,8 +197,10 @@ export const InstanceRepositoryLive = Layer.effect(
 			findById: (id) => findById(db, id),
 			findBySlug: (col, slug) => findBySlug(db, col, slug),
 			listByCollection: (col) => listByCollection(db, col),
+			findChangedSince: (col, since) => findChangedSince(db, col, since),
+			findByIds: (ids) => findByIds(db, ids),
 			insert: (input) => insertInstance(db, input),
-			updateEtag: (id, etag, rev) => updateEtag(db, id, etag, rev),
+			updateEtag: (id, etag) => updateEtag(db, id, etag),
 			softDelete: (id) => softDelete(db, id),
 		}),
 	),

@@ -13,15 +13,20 @@
 // ---------------------------------------------------------------------------
 
 import { Effect } from "effect";
-import type { Temporal } from "temporal-polyfill";
-import type { ClarkName, IrDeadProperties } from "#src/data/ir.ts";
+import { type ClarkName, cn, type IrDeadProperties } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import { forbidden, notFound } from "#src/domain/errors.ts";
 import { COLLECTION_TYPE_TO_NAMESPACE } from "#src/domain/types/collection-namespace.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
+import {
+	buildInstanceProps,
+	type PropfindKind,
+	splitPropstats,
+	toRfc1123,
+} from "#src/http/dav/methods/instance-props.ts";
 import { normalizeClarkNames } from "#src/http/dav/xml/clark.ts";
-import type { DavResponse, Propstat } from "#src/http/dav/xml/multistatus.ts";
+import type { DavResponse } from "#src/http/dav/xml/multistatus.ts";
 import { multistatusResponse } from "#src/http/dav/xml/multistatus.ts";
 import { parseXml, readXmlBody } from "#src/http/dav/xml/parser.ts";
 import { AclService } from "#src/services/acl/index.ts";
@@ -39,54 +44,25 @@ const DAV_NS = "DAV:";
 const CALDAV_NS = "urn:ietf:params:xml:ns:caldav";
 const CARDDAV_NS = "urn:ietf:params:xml:ns:carddav";
 
-const cn = (ns: string, local: string): ClarkName =>
-	`{${ns}}${local}` as ClarkName;
-
 // Well-known Clark keys
 const RESOURCETYPE = cn(DAV_NS, "resourcetype");
 const DISPLAYNAME = cn(DAV_NS, "displayname");
 const GETLASTMODIFIED = cn(DAV_NS, "getlastmodified");
-const GETETAG = cn(DAV_NS, "getetag");
-const GETCONTENTTYPE = cn(DAV_NS, "getcontenttype");
 const SYNC_TOKEN = cn(DAV_NS, "sync-token");
 const CAL_DESCRIPTION = cn(CALDAV_NS, "calendar-description");
-const CAL_SUPPORTED_COMPONENTS = cn(CALDAV_NS, "supported-calendar-component-set");
+const CAL_SUPPORTED_COMPONENTS = cn(
+	CALDAV_NS,
+	"supported-calendar-component-set",
+);
 const CARD_DESCRIPTION = cn(CARDDAV_NS, "addressbook-description");
-
-// ---------------------------------------------------------------------------
-// RFC 1123 date formatter  (required by DAV:getlastmodified)
-// ---------------------------------------------------------------------------
-
-const RFC1123_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
-const RFC1123_MONTHS = [
-	"Jan", "Feb", "Mar", "Apr", "May", "Jun",
-	"Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-] as const;
-
-const toRfc1123 = (instant: Temporal.Instant): string => {
-	// Convert to a UTC ZonedDateTime so we have calendar fields
-	const zdt = instant.toZonedDateTimeISO("UTC");
-	// Temporal.dayOfWeek: 1=Mon … 7=Sun. RFC 1123 needs 0=Sun index.
-	const daysInWeek = 7;
-	const day = RFC1123_DAYS[zdt.dayOfWeek % daysInWeek];
-	const month = RFC1123_MONTHS[zdt.month - 1];
-	const dd = String(zdt.day).padStart(2, "0");
-	const hh = String(zdt.hour).padStart(2, "0");
-	const mm = String(zdt.minute).padStart(2, "0");
-	const ss = String(zdt.second).padStart(2, "0");
-	return `${day}, ${dd} ${month} ${zdt.year} ${hh}:${mm}:${ss} GMT`;
-};
 
 // ---------------------------------------------------------------------------
 // PROPFIND body parsing
 // ---------------------------------------------------------------------------
 
-type PropfindKind =
-	| { readonly type: "allprop" }
-	| { readonly type: "propname" }
-	| { readonly type: "prop"; readonly names: ReadonlySet<ClarkName> };
-
-const parsePropfindBody = (req: Request): Effect.Effect<PropfindKind, DavError> =>
+const parsePropfindBody = (
+	req: Request,
+): Effect.Effect<PropfindKind, DavError> =>
 	readXmlBody(req).pipe(
 		Effect.flatMap((body) => {
 			if (body.trim() === "") {
@@ -129,65 +105,45 @@ const parsePropfindBody = (req: Request): Effect.Effect<PropfindKind, DavError> 
 // Resource URL builders
 // ---------------------------------------------------------------------------
 
+/**
+ * Href for a directly-accessed collection: mirrors the URL segments the client
+ * used (slug or UUID) so that response hrefs match the request URL.
+ */
 const collectionHref = (
 	origin: string,
-	principalId: string,
-	collectionRow: CollectionRow,
-): string => {
-	const ns =
-		COLLECTION_TYPE_TO_NAMESPACE[
-			collectionRow.collectionType as keyof typeof COLLECTION_TYPE_TO_NAMESPACE
-		] ?? "col";
-	return `${origin}/dav/principals/${principalId}/${ns}/${collectionRow.id}/`;
-};
+	principalSeg: string,
+	ns: string,
+	collectionSeg: string,
+): string => `${origin}/dav/principals/${principalSeg}/${ns}/${collectionSeg}/`;
 
+/**
+ * Href for a directly-accessed instance: mirrors the URL segments the client used.
+ */
 const instanceHref = (
 	origin: string,
-	principalId: string,
-	collectionRow: CollectionRow,
+	principalSeg: string,
+	ns: string,
+	collectionSeg: string,
+	instanceSeg: string,
+): string =>
+	`${origin}/dav/principals/${principalSeg}/${ns}/${collectionSeg}/${instanceSeg}`;
+
+/**
+ * Href for a depth:1 member instance that the client did not directly address.
+ * Uses UUIDs, which are stable identifiers the client can use for subsequent requests.
+ */
+const memberInstanceHref = (
+	origin: string,
+	principalSeg: string,
+	ns: string,
+	collectionSeg: string,
 	instanceRow: InstanceRow,
-): string => {
-	const ns =
-		COLLECTION_TYPE_TO_NAMESPACE[
-			collectionRow.collectionType as keyof typeof COLLECTION_TYPE_TO_NAMESPACE
-		] ?? "col";
-	return `${origin}/dav/principals/${principalId}/${ns}/${collectionRow.id}/${instanceRow.id}`;
-};
+): string =>
+	`${origin}/dav/principals/${principalSeg}/${ns}/${collectionSeg}/${instanceRow.id}`;
 
 // ---------------------------------------------------------------------------
 // Property builders
 // ---------------------------------------------------------------------------
-
-/**
- * Split a property map into found (200) and not-found (404) propstats.
- * For `allprop`/`propname`, all properties go into the found block.
- */
-const splitPropstats = (
-	allProps: Readonly<Record<ClarkName, unknown>>,
-	request: PropfindKind,
-): ReadonlyArray<Propstat> => {
-	if (request.type !== "prop") {
-		// allprop / propname: single 200 block with everything
-		return [{ props: allProps, status: 200 }];
-	}
-
-	const found: Record<ClarkName, unknown> = {};
-	const missing: Record<ClarkName, unknown> = {};
-
-	for (const name of request.names) {
-		if (name in allProps) {
-			found[name] = allProps[name];
-		} else {
-			missing[name] = "";
-		}
-	}
-
-	const propstats: Array<Propstat> = [{ props: found, status: 200 }];
-	if (Object.keys(missing).length > 0) {
-		propstats.push({ props: missing, status: 404 });
-	}
-	return propstats;
-};
 
 // ---------------------------------------------------------------------------
 // Collection → DavResponse
@@ -256,27 +212,6 @@ const collectionResponse = (
 // Instance → DavResponse
 // ---------------------------------------------------------------------------
 
-const buildInstanceProps = (
-	row: InstanceRow,
-): Readonly<Record<ClarkName, unknown>> => {
-	const props: Record<ClarkName, unknown> = {
-		[RESOURCETYPE]: {},
-		[GETETAG]: `"${row.etag}"`,
-		[GETCONTENTTYPE]: `${row.contentType}; charset=utf-8`,
-		[GETLASTMODIFIED]: toRfc1123(row.lastModified),
-	};
-
-	// Dead properties
-	const dead = row.clientProperties as IrDeadProperties | null;
-	if (dead) {
-		for (const [clark, xmlValue] of Object.entries(dead)) {
-			props[clark as ClarkName] = xmlValue;
-		}
-	}
-
-	return props;
-};
-
 const instanceResponse = (
 	href: string,
 	row: InstanceRow,
@@ -334,12 +269,17 @@ export const propfindHandler = (
 
 		if (path.kind === "principal") {
 			// Minimal principal response — display name and resource type
-			yield* acl.check(actingPrincipalId, path.principalId, "principal", "DAV:read");
+			yield* acl.check(
+				actingPrincipalId,
+				path.principalId,
+				"principal",
+				"DAV:read",
+			);
 			const principalSvc = yield* PrincipalService;
 			const principalRow = yield* principalSvc.findById(path.principalId);
 			const displayName =
 				principalRow.principal.displayName ?? principalRow.user.name;
-			const principalHref = `${origin}/dav/principals/${path.principalId}/`;
+			const principalHref = `${origin}/dav/principals/${path.principalSeg}/`;
 			const allProps: Record<ClarkName, unknown> = {
 				[RESOURCETYPE]: { "{DAV:}principal": "" },
 				[DISPLAYNAME]: displayName,
@@ -348,25 +288,63 @@ export const propfindHandler = (
 				href: principalHref,
 				propstats: splitPropstats(allProps, propfind),
 			});
+
+			if (depth === 1) {
+				const collections = yield* collSvc.listByOwner(path.principalId);
+				for (const coll of collections) {
+					const ns =
+						(COLLECTION_TYPE_TO_NAMESPACE as Record<string, string>)[
+							coll.collectionType
+						] ?? "col";
+					const href = collectionHref(origin, path.principalSeg, ns, coll.slug);
+					responses.push(collectionResponse(href, coll, propfind));
+				}
+			}
 		} else if (path.kind === "collection") {
-			yield* acl.check(actingPrincipalId, path.collectionId, "collection", "DAV:read");
+			yield* acl.check(
+				actingPrincipalId,
+				path.collectionId,
+				"collection",
+				"DAV:read",
+			);
 			const collRow = yield* collSvc.findById(path.collectionId);
-			const href = collectionHref(origin, path.principalId, collRow);
+			const href = collectionHref(
+				origin,
+				path.principalSeg,
+				path.namespace,
+				path.collectionSeg,
+			);
 			responses.push(collectionResponse(href, collRow, propfind));
 
 			if (depth === 1) {
 				const instances = yield* instSvc.listByCollection(path.collectionId);
 				for (const inst of instances) {
-					const iHref = instanceHref(origin, path.principalId, collRow, inst);
+					const iHref = memberInstanceHref(
+						origin,
+						path.principalSeg,
+						path.namespace,
+						path.collectionSeg,
+						inst,
+					);
 					responses.push(instanceResponse(iHref, inst, propfind));
 				}
 			}
 		} else {
 			// path.kind === "instance"
-			yield* acl.check(actingPrincipalId, path.instanceId, "instance", "DAV:read");
+			yield* acl.check(
+				actingPrincipalId,
+				path.instanceId,
+				"instance",
+				"DAV:read",
+			);
 			const instRow = yield* instSvc.findById(path.instanceId);
-			const collRow = yield* collSvc.findById(path.collectionId);
-			const href = instanceHref(origin, path.principalId, collRow, instRow);
+			const href = instanceHref(
+				origin,
+				path.principalSeg,
+				path.namespace,
+				path.collectionSeg,
+				path.instanceSeg,
+			);
 			responses.push(instanceResponse(href, instRow, propfind));
 		}
 

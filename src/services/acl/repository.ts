@@ -3,7 +3,7 @@ import type { Effect } from "effect";
 import { Context } from "effect";
 import type { davAcl } from "#src/db/drizzle/schema/index.ts";
 import type { DatabaseError } from "#src/domain/errors.ts";
-import type { PrincipalId } from "#src/domain/ids.ts";
+import type { PrincipalId, UuidString } from "#src/domain/ids.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
 
 // ---------------------------------------------------------------------------
@@ -26,14 +26,14 @@ export type AclResourceType = "collection" | "instance" | "principal";
 
 export interface NewAce {
 	readonly resourceType: AclResourceType;
-	readonly resourceId: string;
+	readonly resourceId: UuidString;
 	readonly principalType:
 		| "principal"
 		| "all"
 		| "authenticated"
 		| "unauthenticated"
 		| "self";
-	readonly principalId?: string;
+	readonly principalId?: UuidString;
 	readonly privilege: DavPrivilege;
 	readonly grantDeny: "grant" | "deny";
 	readonly protected: boolean;
@@ -43,13 +43,13 @@ export interface NewAce {
 export interface AclRepositoryShape {
 	/** All ACEs for a resource, ordered by ordinal. Used for PROPFIND DAV:acl. */
 	readonly getAces: (
-		resourceId: string,
+		resourceId: UuidString,
 		resourceType: AclResourceType,
 	) => Effect.Effect<ReadonlyArray<AceRow>, DatabaseError>;
 
 	/** Replace all non-protected ACEs on a resource. Used by the ACL method. */
 	readonly setAces: (
-		resourceId: string,
+		resourceId: UuidString,
 		resourceType: AclResourceType,
 		aces: ReadonlyArray<NewAce>,
 	) => Effect.Effect<void, DatabaseError>;
@@ -65,7 +65,7 @@ export interface AclRepositoryShape {
 	 */
 	readonly hasPrivilege: (
 		principalIds: ReadonlyArray<PrincipalId>,
-		resourceId: string,
+		resourceId: UuidString,
 		resourceType: AclResourceType,
 		privileges: ReadonlyArray<DavPrivilege>,
 		isAuthenticated: boolean,
@@ -77,7 +77,7 @@ export interface AclRepositoryShape {
 	 */
 	readonly getGrantedPrivileges: (
 		principalIds: ReadonlyArray<PrincipalId>,
-		resourceId: string,
+		resourceId: UuidString,
 		resourceType: AclResourceType,
 		isAuthenticated: boolean,
 	) => Effect.Effect<ReadonlyArray<DavPrivilege>, DatabaseError>;

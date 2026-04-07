@@ -36,30 +36,44 @@ export type ResolvedDavPath =
 			readonly kind: "principalCollection";
 	  }
 	| {
-			/** /dav/principals/:slug — a single principal home */
+			/** /dav/principals/:seg — a single principal home */
 			readonly kind: "principal";
 			readonly principalId: PrincipalId;
+			/** URL-decoded path segment as the client sent it (slug or UUID string). */
+			readonly principalSeg: string;
 	  }
 	| {
-			/** /dav/principals/:slug/:ns/:collSlug — a calendar/addressbook collection */
+			/** /dav/principals/:seg/:ns/:collSeg — a calendar/addressbook collection */
 			readonly kind: "collection";
 			readonly principalId: PrincipalId;
 			readonly namespace: CollectionNamespace;
 			readonly collectionId: CollectionId;
+			/** URL-decoded path segment as the client sent it (slug or UUID string). */
+			readonly principalSeg: string;
+			/** URL-decoded path segment as the client sent it (slug or UUID string). */
+			readonly collectionSeg: string;
 	  }
 	| {
-			/** /dav/principals/:slug/:ns/:collSlug/:obj — a single calendar/vCard resource */
+			/** /dav/principals/:seg/:ns/:collSeg/:instSeg — a single calendar/vCard resource */
 			readonly kind: "instance";
 			readonly principalId: PrincipalId;
 			readonly namespace: CollectionNamespace;
 			readonly collectionId: CollectionId;
 			readonly instanceId: InstanceId;
+			/** URL-decoded path segment as the client sent it (slug or UUID string). */
+			readonly principalSeg: string;
+			/** URL-decoded path segment as the client sent it (slug or UUID string). */
+			readonly collectionSeg: string;
+			/** URL-decoded path segment as the client sent it (slug or UUID string). */
+			readonly instanceSeg: string;
 	  }
 	| {
 			readonly kind: "new-collection";
 			readonly principalId: PrincipalId;
 			readonly namespace: CollectionNamespace;
 			readonly slug: Slug;
+			/** URL-decoded path segment as the client sent it (slug or UUID string). */
+			readonly principalSeg: string;
 	  }
 	| {
 			readonly kind: "new-instance";
@@ -67,4 +81,8 @@ export type ResolvedDavPath =
 			readonly namespace: CollectionNamespace;
 			readonly collectionId: CollectionId;
 			readonly slug: Slug;
+			/** URL-decoded path segment as the client sent it (slug or UUID string). */
+			readonly principalSeg: string;
+			/** URL-decoded path segment as the client sent it (slug or UUID string). */
+			readonly collectionSeg: string;
 	  };

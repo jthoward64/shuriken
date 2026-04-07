@@ -1,11 +1,11 @@
 import { Effect, ParseResult, Schema } from "effect";
 import { type DavError, validCalendarData } from "../../domain/errors.ts";
-import type { ContentLine } from "../content-line.ts";
 import {
 	type RawComponent,
 	RawComponentSchema,
 	TextToRawComponentCodec,
 } from "../component-tree.ts";
+import type { ContentLine } from "../content-line.ts";
 import {
 	escapeText,
 	formatPlainDate,
@@ -363,3 +363,19 @@ export const decodeICalendar = (
  */
 export const encodeICalendar = (doc: IrDocument): Effect.Effect<string, never> =>
 	Schema.encode(ICalendarCodec)(doc).pipe(Effect.orDie);
+
+/**
+ * Serialize a single IrComponent (e.g. VTIMEZONE) to iCalendar content-line text,
+ * including BEGIN: and END: lines. Cannot fail on a structurally valid component.
+ *
+ * Pipeline (encode direction):
+ *   IrComponent →[ICalPropertyInferrer.encode] RawComponent
+ *               →[TextToRawComponentCodec.encode] string
+ */
+export const encodeICalComponent = (
+	component: IrComponent,
+): Effect.Effect<string, never> =>
+	Schema.encode(ICalPropertyInferrer)(component).pipe(
+		Effect.flatMap((raw) => Schema.encode(TextToRawComponentCodec)(raw)),
+		Effect.orDie,
+	);

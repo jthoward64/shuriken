@@ -1,5 +1,6 @@
 import { Redacted } from "effect";
 import { Temporal } from "temporal-polyfill";
+import type { UuidString } from "#src/domain/ids.ts";
 import type { CollectionRow } from "#src/services/collection/repository.ts";
 import type {
 	GroupRow,
@@ -37,7 +38,7 @@ export const makePrincipalRow = (
 });
 
 export const makeUserRow = (
-	principalId: string,
+	principalId: UuidString,
 	overrides: Partial<UserRow> = {},
 ): UserRow => ({
 	id: crypto.randomUUID(),
@@ -60,7 +61,7 @@ export const makeUserWithPrincipal = (
 };
 
 export const makeAuthUserRow = (
-	userId: string,
+	userId: UuidString,
 	overrides: Partial<AuthUserRow> = {},
 ): AuthUserRow => ({
 	id: crypto.randomUUID(),
@@ -73,7 +74,7 @@ export const makeAuthUserRow = (
 });
 
 export const makeCollectionRow = (
-	ownerPrincipalId: string,
+	ownerPrincipalId: UuidString,
 	overrides: Partial<CollectionRow> = {},
 ): CollectionRow => ({
 	id: crypto.randomUUID(),
@@ -98,7 +99,7 @@ export const makeCollectionRow = (
 });
 
 export const makeInstanceRow = (
-	collectionId: string,
+	collectionId: UuidString,
 	overrides: Partial<InstanceRow> = {},
 ): InstanceRow => ({
 	id: crypto.randomUUID(),
@@ -129,7 +130,7 @@ export const makeGroupPrincipalRow = (
 });
 
 export const makeGroupRow = (
-	principalId: string,
+	principalId: UuidString,
 	overrides: Partial<GroupRow> = {},
 ): GroupRow => ({
 	id: crypto.randomUUID(),

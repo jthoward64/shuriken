@@ -33,6 +33,7 @@ import {
 	PrincipalRepository,
 	type PrincipalRepositoryShape,
 } from "#src/services/principal/repository.ts";
+import { CalTimezoneRepository } from "#src/services/timezone/repository.ts";
 import { davRouter, parseDavPath } from "./router.ts";
 
 // ---------------------------------------------------------------------------
@@ -102,13 +103,41 @@ const noopComponentRepo: ComponentRepositoryShape = {
 	deleteByEntity: () => Effect.void,
 };
 
+/** No-op CalTimezoneRepository — router path resolution never touches timezone storage. */
+const noopCalTimezoneRepo = CalTimezoneRepository.of({
+	findByTzid: () => Effect.die("not implemented in router tests"),
+	upsert: () => Effect.die("not implemented in router tests"),
+});
+
 /** Build a Layer providing all DAV router requirements from simple slug→id maps. */
 const makeRouterLayer = (
 	seeds: RouterSeeds = {},
-): Layer.Layer<PrincipalRepository | CollectionRepository | InstanceRepository | CollectionService | InstanceService | PrincipalService | import("#src/services/acl/index.ts").AclService | EntityRepository | ComponentRepository> => {
+): Layer.Layer<PrincipalRepository | CollectionRepository | InstanceRepository | CollectionService | InstanceService | PrincipalService | import("#src/services/acl/index.ts").AclService | EntityRepository | ComponentRepository | CalTimezoneRepository> => {
 	const principals = seeds.principals ?? new Map<string, string>();
 	const collections = seeds.collections ?? new Map<string, string>();
 	const instances = seeds.instances ?? new Map<string, string>();
+
+	// Build reverse maps (id → slug) so UUID-based lookups also work.
+	const principalById = new Map<string, string>(
+		[...principals.entries()].map(([slug, id]) => [id, slug]),
+	);
+	// collection entries are keyed as `${principalId}:${collectionType}:${slug}` → id.
+	// For findById we only need id → {principalId, collectionType, slug}.
+	const collectionById = new Map<string, { principalId: string; collectionType: string; slug: string }>(
+		[...collections.entries()].map(([key, id]) => {
+			const [principalId, collectionType, slug] = key.split(":") as [string, string, string];
+			return [id, { principalId, collectionType, slug }];
+		}),
+	);
+	// instance entries: `${collectionId}:${slug}` → id.
+	const instanceById = new Map<string, { collectionId: string; slug: string }>(
+		[...instances.entries()].map(([key, id]) => {
+			const colonIdx = key.indexOf(":");
+			const collectionId = key.slice(0, colonIdx);
+			const slug = key.slice(colonIdx + 1);
+			return [id, { collectionId, slug }];
+		}),
+	);
 
 	const principalRepo: PrincipalRepositoryShape = {
 		findBySlug: (slug) => {
@@ -122,7 +151,15 @@ const makeRouterLayer = (
 			} as unknown as PrincipalWithUser;
 			return Effect.succeed(Option.some(row));
 		},
-		findById: () => Effect.succeed(Option.none()),
+		findById: (id) => {
+			const slug = principalById.get(id);
+			if (!slug) { return Effect.succeed(Option.none()); }
+			const row = {
+				principal: { id, slug, principalType: "user", displayName: null, updatedAt: null, deletedAt: null },
+				user: { id: crypto.randomUUID(), principalId: id, name: slug, email: `${slug}@test`, updatedAt: null },
+			} as unknown as PrincipalWithUser;
+			return Effect.succeed(Option.some(row));
+		},
 		findByEmail: () => Effect.succeed(Option.none()),
 		findUserByUserId: () => Effect.succeed(Option.none()),
 	};
@@ -137,7 +174,12 @@ const makeRouterLayer = (
 			const row = { id, slug, ownerPrincipalId: principalId, collectionType, deletedAt: null } as unknown as CollectionRow;
 			return Effect.succeed(Option.some(row));
 		},
-		findById: () => Effect.succeed(Option.none()),
+		findById: (id) => {
+			const meta = collectionById.get(id);
+			if (!meta) { return Effect.succeed(Option.none()); }
+			const row = { id, slug: meta.slug, ownerPrincipalId: meta.principalId, collectionType: meta.collectionType, deletedAt: null } as unknown as CollectionRow;
+			return Effect.succeed(Option.some(row));
+		},
 		listByOwner: () => Effect.succeed([]),
 		insert: () => Effect.die("not implemented in router tests"),
 		softDelete: () => Effect.die("not implemented in router tests"),
@@ -153,8 +195,15 @@ const makeRouterLayer = (
 			const row = { id, slug, collectionId, deletedAt: null } as unknown as InstanceRow;
 			return Effect.succeed(Option.some(row));
 		},
-		findById: () => Effect.succeed(Option.none()),
+		findById: (id) => {
+			const meta = instanceById.get(id);
+			if (!meta) { return Effect.succeed(Option.none()); }
+			const row = { id, slug: meta.slug, collectionId: meta.collectionId, deletedAt: null } as unknown as InstanceRow;
+			return Effect.succeed(Option.some(row));
+		},
 		listByCollection: () => Effect.succeed([]),
+		findChangedSince: () => Effect.die("not implemented in router tests"),
+		findByIds: () => Effect.die("not implemented in router tests"),
 		insert: () => Effect.die("not implemented in router tests"),
 		updateEtag: () => Effect.die("not implemented in router tests"),
 		softDelete: () => Effect.die("not implemented in router tests"),
@@ -169,6 +218,7 @@ const makeRouterLayer = (
 		Layer.succeed(PrincipalService, stubPrincipalService),
 		Layer.succeed(EntityRepository, noopEntityRepo),
 		Layer.succeed(ComponentRepository, noopComponentRepo),
+		Layer.succeed(CalTimezoneRepository, noopCalTimezoneRepo),
 		AclServiceAllowAll,
 	);
 };
@@ -239,6 +289,16 @@ describe("davRouter — principal slug resolution", () => {
 		expect(res.status).toBe(HTTP_OK);
 	});
 
+	it("OPTIONS /dav/principals/{uuid}/ returns 200 when principal is accessed via its own UUID", async () => {
+		const aliceId = crypto.randomUUID();
+		const res = await run(
+			"OPTIONS",
+			`/dav/principals/${aliceId}/`,
+			{ principals: new Map([["alice", aliceId]]) },
+		);
+		expect(res.status).toBe(HTTP_OK);
+	});
+
 	it("OPTIONS /dav/principals/nobody/ returns 404 when principal is not seeded", async () => {
 		const res = await run("OPTIONS", "/dav/principals/nobody/");
 		expect(res.status).toBe(HTTP_NOT_FOUND);
@@ -266,6 +326,20 @@ describe("davRouter — collection slug resolution", () => {
 		const res = await run(
 			"OPTIONS",
 			"/dav/principals/alice/cal/my-cal",
+			{
+				principals: new Map([["alice", aliceId]]),
+				collections: new Map([[`${aliceId}:calendar:my-cal`, calId]]),
+			},
+		);
+		expect(res.status).toBe(HTTP_OK);
+	});
+
+	it("OPTIONS /dav/principals/{uuid}/cal/{uuid}/ returns 200 when accessed via canonical UUID path", async () => {
+		const aliceId = crypto.randomUUID();
+		const calId = crypto.randomUUID();
+		const res = await run(
+			"OPTIONS",
+			`/dav/principals/${aliceId}/cal/${calId}/`,
 			{
 				principals: new Map([["alice", aliceId]]),
 				collections: new Map([[`${aliceId}:calendar:my-cal`, calId]]),
@@ -307,6 +381,22 @@ describe("davRouter — instance slug resolution", () => {
 		const res = await run(
 			"OPTIONS",
 			"/dav/principals/alice/cal/my-cal/event.ics",
+			{
+				principals: new Map([["alice", aliceId]]),
+				collections: new Map([[`${aliceId}:calendar:my-cal`, calId]]),
+				instances: new Map([[`${calId}:event.ics`, instId]]),
+			},
+		);
+		expect(res.status).toBe(HTTP_OK);
+	});
+
+	it("OPTIONS on a canonical UUID instance path returns 200", async () => {
+		const aliceId = crypto.randomUUID();
+		const calId = crypto.randomUUID();
+		const instId = crypto.randomUUID();
+		const res = await run(
+			"OPTIONS",
+			`/dav/principals/${aliceId}/cal/${calId}/${instId}`,
 			{
 				principals: new Map([["alice", aliceId]]),
 				collections: new Map([[`${aliceId}:calendar:my-cal`, calId]]),

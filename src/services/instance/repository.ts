@@ -19,7 +19,6 @@ export interface NewInstance {
 	readonly contentType: string;
 	readonly etag: ETag;
 	readonly slug: Slug;
-	readonly syncRevision?: number;
 	readonly scheduleTag?: string;
 }
 
@@ -34,13 +33,20 @@ export interface InstanceRepositoryShape {
 	readonly listByCollection: (
 		collectionId: CollectionId,
 	) => Effect.Effect<ReadonlyArray<InstanceRow>, DatabaseError>;
+	readonly findChangedSince: (
+		collectionId: CollectionId,
+		sinceSyncRevision: number,
+	) => Effect.Effect<ReadonlyArray<InstanceRow>, DatabaseError>;
+	readonly findByIds: (
+		ids: ReadonlyArray<InstanceId>,
+	) => Effect.Effect<ReadonlyArray<InstanceRow>, DatabaseError>;
 	readonly insert: (
 		input: NewInstance,
 	) => Effect.Effect<InstanceRow, DatabaseError>;
+	/** The sync trigger owns sync_revision; callers must not pass it. */
 	readonly updateEtag: (
 		id: InstanceId,
 		etag: ETag,
-		syncRevision: number,
 	) => Effect.Effect<void, DatabaseError>;
 	readonly softDelete: (id: InstanceId) => Effect.Effect<void, DatabaseError>;
 }

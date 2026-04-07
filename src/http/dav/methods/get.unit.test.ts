@@ -72,6 +72,9 @@ const instancePath: ResolvedDavPath = {
 	namespace: "cal",
 	collectionId: TEST_COLLECTION_ID,
 	instanceId: TEST_INSTANCE_ID,
+	principalSeg: String(TEST_PRINCIPAL_ID),
+	collectionSeg: String(TEST_COLLECTION_ID),
+	instanceSeg: String(TEST_INSTANCE_ID),
 };
 
 type GetEffect<A> = Effect.Effect<
@@ -238,6 +241,9 @@ describe("getHandler — vCard", () => {
 			namespace: "card",
 			collectionId: TEST_COLLECTION_ID,
 			instanceId: TEST_INSTANCE_ID,
+			principalSeg: String(TEST_PRINCIPAL_ID),
+			collectionSeg: String(TEST_COLLECTION_ID),
+			instanceSeg: String(TEST_INSTANCE_ID),
 		};
 		const res = await run(env, getHandler(path, authenticatedCtx));
 
@@ -296,6 +302,8 @@ describe("getHandler — method not allowed", () => {
 			principalId: TEST_PRINCIPAL_ID,
 			namespace: "cal",
 			collectionId: TEST_COLLECTION_ID,
+			principalSeg: String(TEST_PRINCIPAL_ID),
+			collectionSeg: String(TEST_COLLECTION_ID),
 		};
 		const err = (await runErr(
 			env,
@@ -310,6 +318,7 @@ describe("getHandler — method not allowed", () => {
 		const path: ResolvedDavPath = {
 			kind: "principal",
 			principalId: TEST_PRINCIPAL_ID,
+			principalSeg: String(TEST_PRINCIPAL_ID),
 		};
 		const err = (await runErr(
 			env,
@@ -327,6 +336,8 @@ describe("getHandler — method not allowed", () => {
 			namespace: "cal",
 			collectionId: TEST_COLLECTION_ID,
 			slug: "event.ics" as ReturnType<typeof import("#src/domain/types/path.ts").Slug>,
+			principalSeg: String(TEST_PRINCIPAL_ID),
+			collectionSeg: String(TEST_COLLECTION_ID),
 		};
 		const err = (await runErr(
 			env,

@@ -1,16 +1,16 @@
 import { Effect, Layer, Option, Redacted } from "effect";
 import { Temporal } from "temporal-polyfill";
 import type { IrComponent } from "#src/data/ir.ts";
-import { ComponentId } from "#src/domain/ids.ts";
+import { ComponentId, type UuidString } from "#src/domain/ids.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
 import type { Slug } from "#src/domain/types/path.ts";
 import type { Email } from "#src/domain/types/strings.ts";
 import { CryptoService } from "#src/platform/crypto.ts";
 import {
+	type AceRow,
 	AclRepository,
 	type AclRepositoryShape,
 	type AclResourceType,
-	type AceRow,
 	type NewAce,
 } from "#src/services/acl/repository.ts";
 import { AclServiceLive } from "#src/services/acl/service.live.ts";
@@ -53,6 +53,11 @@ import {
 } from "#src/services/principal/repository.ts";
 import { PrincipalServiceLive } from "#src/services/principal/service.live.ts";
 import type { PrincipalService } from "#src/services/principal/service.ts";
+import {
+	CalTimezoneRepository,
+	type CalTimezoneRow,
+} from "#src/services/timezone/index.ts";
+import type { CalTimezoneRepositoryShape } from "#src/services/timezone/repository.ts";
 import {
 	type AuthUserRow,
 	UserRepository,
@@ -101,6 +106,7 @@ export interface TestStores {
 	readonly acl: Map<string, Array<AceRow>>; // resourceId → all ACEs for that resource
 	readonly entities: Map<string, EntityRow>; // entityId → EntityRow
 	readonly components: Map<string, IrComponent>; // entityId → root IrComponent
+	readonly calTimezones: Map<string, CalTimezoneRow>; // tzid → CalTimezoneRow
 }
 
 const makeStores = (): TestStores => ({
@@ -115,6 +121,7 @@ const makeStores = (): TestStores => ({
 	acl: new Map(),
 	entities: new Map(),
 	components: new Map(),
+	calTimezones: new Map(),
 });
 
 // ---------------------------------------------------------------------------
@@ -122,8 +129,8 @@ const makeStores = (): TestStores => ({
 // ---------------------------------------------------------------------------
 
 export interface UserSeedData {
-	readonly id?: string;
-	readonly principalId?: string;
+	readonly id?: UuidString;
+	readonly principalId?: UuidString;
 	readonly slug?: string;
 	readonly name?: string;
 	readonly email?: string;
@@ -131,31 +138,31 @@ export interface UserSeedData {
 }
 
 export interface CollectionSeedData {
-	readonly id?: string;
-	readonly ownerPrincipalId: string;
+	readonly id?: UuidString;
+	readonly ownerPrincipalId: UuidString;
 	readonly collectionType?: string;
 	readonly slug?: string;
 	readonly displayName?: string;
 }
 
 export interface GroupSeedData {
-	readonly id?: string;
-	readonly principalId?: string;
+	readonly id?: UuidString;
+	readonly principalId?: UuidString;
 	readonly slug?: string;
 	readonly displayName?: string;
 }
 
 export interface InstanceSeedData {
-	readonly id?: string;
-	readonly collectionId: string;
-	readonly entityId?: string;
+	readonly id?: UuidString;
+	readonly collectionId: UuidString;
+	readonly entityId?: UuidString;
 	readonly contentType?: string;
 	readonly etag?: string;
 	readonly slug?: string;
 }
 
 export interface CredentialSeedData {
-	readonly userId: string;
+	readonly userId: UuidString;
 	readonly authSource: string;
 	readonly authId: string;
 	readonly authCredential?: Redacted.Redacted<string>;
@@ -163,14 +170,14 @@ export interface CredentialSeedData {
 
 export interface AceSeedData {
 	readonly resourceType: AclResourceType;
-	readonly resourceId: string;
+	readonly resourceId: UuidString;
 	readonly principalType:
 		| "principal"
 		| "all"
 		| "authenticated"
 		| "unauthenticated"
 		| "self";
-	readonly principalId?: string;
+	readonly principalId?: UuidString;
 	readonly privilege: DavPrivilege;
 	readonly grantDeny?: "grant" | "deny";
 	readonly protected?: boolean;
@@ -485,16 +492,36 @@ const makeInstanceRepo = (stores: TestStores): InstanceRepositoryShape => ({
 			),
 		),
 
+	findChangedSince: (collectionId, sinceSyncRevision) =>
+		Effect.succeed(
+			[...stores.instances.values()].filter(
+				(i) =>
+					i.collectionId === collectionId &&
+					i.syncRevision > sinceSyncRevision &&
+					i.deletedAt === null,
+			),
+		),
+
+	findByIds: (ids) =>
+		Effect.succeed(
+			ids
+				.map((id) => stores.instances.get(id))
+				.filter(
+					(i): i is InstanceRow => i !== undefined && i.deletedAt === null,
+				),
+		),
+
 	insert: (input: NewInstance) =>
 		Effect.sync(() => {
 			const now = Temporal.Now.instant();
+			// Simulate DB trigger: syncRevision = 1 on first insert
 			const row: InstanceRow = {
 				id: crypto.randomUUID(),
 				collectionId: input.collectionId,
 				entityId: input.entityId,
 				contentType: input.contentType,
 				etag: input.etag,
-				syncRevision: input.syncRevision ?? 0,
+				syncRevision: 1,
 				lastModified: now,
 				updatedAt: now,
 				deletedAt: null,
@@ -506,14 +533,15 @@ const makeInstanceRepo = (stores: TestStores): InstanceRepositoryShape => ({
 			return row;
 		}),
 
-	updateEtag: (id, etag, syncRevision) =>
+	updateEtag: (id, etag) =>
 		Effect.sync(() => {
 			const row = stores.instances.get(id);
 			if (row) {
+				// Simulate DB trigger: increment syncRevision on each update
 				stores.instances.set(id, {
 					...row,
 					etag,
-					syncRevision,
+					syncRevision: row.syncRevision + 1,
 					updatedAt: Temporal.Now.instant(),
 				});
 			}
@@ -605,7 +633,13 @@ const makeAclRepo = (stores: TestStores): AclRepositoryShape => ({
 			]);
 		}),
 
-	hasPrivilege: (principalIds, resourceId, resourceType, privileges, isAuthenticated) =>
+	hasPrivilege: (
+		principalIds,
+		resourceId,
+		resourceType,
+		privileges,
+		isAuthenticated,
+	) =>
 		Effect.succeed(
 			(stores.acl.get(resourceId) ?? []).some(
 				(ace) =>
@@ -616,21 +650,24 @@ const makeAclRepo = (stores: TestStores): AclRepositoryShape => ({
 			),
 		),
 
-	getGrantedPrivileges: (principalIds, resourceId, resourceType, isAuthenticated) =>
-		Effect.succeed(
-			[
-				...new Set(
-					(stores.acl.get(resourceId) ?? [])
-						.filter(
-							(ace) =>
-								ace.resourceType === resourceType &&
-								ace.grantDeny === "grant" &&
-								matchesPrincipal(ace, principalIds, isAuthenticated),
-						)
-						.map((ace) => ace.privilege as DavPrivilege),
-				),
-			],
-		),
+	getGrantedPrivileges: (
+		principalIds,
+		resourceId,
+		resourceType,
+		isAuthenticated,
+	) =>
+		Effect.succeed([
+			...new Set(
+				(stores.acl.get(resourceId) ?? [])
+					.filter(
+						(ace) =>
+							ace.resourceType === resourceType &&
+							ace.grantDeny === "grant" &&
+							matchesPrincipal(ace, principalIds, isAuthenticated),
+					)
+					.map((ace) => ace.privilege as DavPrivilege),
+			),
+		]),
 
 	getGroupPrincipalIds: (userPrincipalId) =>
 		Effect.sync(() => {
@@ -647,7 +684,9 @@ const makeAclRepo = (stores: TestStores): AclRepositoryShape => ({
 					if (!groupRow) {
 						return [];
 					}
-					return [groupRow.principalId as import("#src/domain/ids.ts").PrincipalId];
+					return [
+						groupRow.principalId as import("#src/domain/ids.ts").PrincipalId,
+					];
 				});
 		}),
 });
@@ -699,6 +738,30 @@ const makeComponentRepo = (stores: TestStores): ComponentRepositoryShape => ({
 	deleteByEntity: (entityId) =>
 		Effect.sync(() => {
 			stores.components.delete(entityId);
+		}),
+});
+
+const makeCalTimezoneRepo = (
+	stores: TestStores,
+): CalTimezoneRepositoryShape => ({
+	findByTzid: (tzid) =>
+		Effect.succeed(Option.fromNullable(stores.calTimezones.get(tzid) ?? null)),
+
+	upsert: (tzid, vtimezoneData, ianaName, lastModified) =>
+		Effect.sync(() => {
+			const existing = stores.calTimezones.get(tzid);
+			const now = Temporal.Now.instant();
+			const row: CalTimezoneRow = {
+				id: existing?.id ?? crypto.randomUUID(),
+				tzid,
+				vtimezoneData,
+				ianaName: Option.getOrNull(ianaName),
+				lastModifiedAt: Option.getOrNull(lastModified),
+				createdAt: existing?.createdAt ?? now,
+				updatedAt: now,
+			};
+			stores.calTimezones.set(tzid, row);
+			return row;
 		}),
 });
 
@@ -823,6 +886,7 @@ export interface TestEnvBuilder {
 		| CryptoService
 		| EntityRepository
 		| ComponentRepository
+		| CalTimezoneRepository
 	>;
 	/** Direct store access for advanced assertions. Prefer reading via services. */
 	readonly stores: TestStores;
@@ -1001,6 +1065,10 @@ export const makeTestEnv = (): TestEnvBuilder => {
 				ComponentRepository,
 				makeComponentRepo(stores),
 			);
+			const calTimezoneRepoLayer = Layer.succeed(
+				CalTimezoneRepository,
+				makeCalTimezoneRepo(stores),
+			);
 
 			const userServiceLayer = UserServiceLive.pipe(
 				Layer.provide(Layer.mergeAll(userRepoLayer, TestCryptoLayer)),
@@ -1017,9 +1085,7 @@ export const makeTestEnv = (): TestEnvBuilder => {
 			const groupServiceLayer = GroupServiceLive.pipe(
 				Layer.provide(groupRepoLayer),
 			);
-			const aclServiceLayer = AclServiceLive.pipe(
-				Layer.provide(aclRepoLayer),
-			);
+			const aclServiceLayer = AclServiceLive.pipe(Layer.provide(aclRepoLayer));
 
 			return Layer.mergeAll(
 				TestCryptoLayer,
@@ -1031,6 +1097,7 @@ export const makeTestEnv = (): TestEnvBuilder => {
 				aclServiceLayer,
 				entityRepoLayer,
 				componentRepoLayer,
+				calTimezoneRepoLayer,
 			);
 		},
 	};

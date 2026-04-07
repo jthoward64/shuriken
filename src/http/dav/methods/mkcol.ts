@@ -168,7 +168,7 @@ export const mkcolHandler = (
 			yield* parseMkcolBody(req);
 
 		const collectionSvc = yield* CollectionService;
-		const collectionRow = yield* collectionSvc.create({
+		yield* collectionSvc.create({
 			ownerPrincipalId: path.principalId,
 			collectionType,
 			slug: path.slug,
@@ -177,7 +177,7 @@ export const mkcolHandler = (
 			supportedComponents: supportedComponents as Array<string> | undefined,
 		});
 
-		const location = `${ctx.url.origin}/dav/principals/${path.principalId}/${path.namespace}/${collectionRow.id}/`;
+		const location = `${ctx.url.origin}/dav/principals/${path.principalSeg}/${path.namespace}/${path.slug}/`;
 
 		return new Response(null, {
 			status: HTTP_CREATED,

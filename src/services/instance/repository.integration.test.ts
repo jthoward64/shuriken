@@ -371,8 +371,8 @@ describe("InstanceRepository.updateEtag (integration)", () => {
 		layer = makeTestLayer();
 	});
 
-	it("updateEtag persists the new etag and syncRevision", async () => {
-		const result = await runSuccess(
+	it("updateEtag persists the new etag; sync trigger owns syncRevision", async () => {
+		const { insertedRevision, found } = await runSuccess(
 			Effect.gen(function* () {
 				const userRepo = yield* UserRepository;
 				const colRepo = yield* CollectionRepository;
@@ -396,22 +396,19 @@ describe("InstanceRepository.updateEtag (integration)", () => {
 					contentType: "text/calendar",
 					etag: ETag('"v1"'),
 					slug: Slug("item.ics"),
-					syncRevision: 1,
 				});
 
-				yield* instanceRepo.updateEtag(
-					InstanceId(inserted.id),
-					ETag('"v2"'),
-					2,
-				);
-				return yield* instanceRepo.findById(InstanceId(inserted.id));
+				yield* instanceRepo.updateEtag(InstanceId(inserted.id), ETag('"v2"'));
+				const found = yield* instanceRepo.findById(InstanceId(inserted.id));
+				return { insertedRevision: inserted.syncRevision, found };
 			}).pipe(Effect.provide(layer), Effect.orDie),
 		);
 
-		expect(Option.isSome(result)).toBe(true);
-		const found = Option.getOrThrow(result);
-		expect(found.etag).toBe('"v2"');
-		expect(found.syncRevision).toBe(2);
+		expect(Option.isSome(found)).toBe(true);
+		const row = Option.getOrThrow(found);
+		expect(row.etag).toBe('"v2"');
+		// syncRevision is managed by the DB trigger; it increments on each change
+		expect(row.syncRevision).toBeGreaterThan(insertedRevision);
 	});
 });
 

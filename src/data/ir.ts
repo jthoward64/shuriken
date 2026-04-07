@@ -6,16 +6,17 @@ import type { Temporal } from "temporal-polyfill";
 // has no built-in support for Temporal types.
 // ---------------------------------------------------------------------------
 
-export const PlainDateSchema: Schema.Schema<Temporal.PlainDate> = Schema.declare(
-	(u): u is Temporal.PlainDate =>
-		typeof u === "object" &&
-		u !== null &&
-		typeof (u as Temporal.PlainDate).year === "number" &&
-		typeof (u as Temporal.PlainDate).month === "number" &&
-		typeof (u as Temporal.PlainDate).day === "number" &&
-		!("hour" in u),
-	{ identifier: "Temporal.PlainDate" },
-);
+export const PlainDateSchema: Schema.Schema<Temporal.PlainDate> =
+	Schema.declare(
+		(u): u is Temporal.PlainDate =>
+			typeof u === "object" &&
+			u !== null &&
+			typeof (u as Temporal.PlainDate).year === "number" &&
+			typeof (u as Temporal.PlainDate).month === "number" &&
+			typeof (u as Temporal.PlainDate).day === "number" &&
+			!("hour" in u),
+		{ identifier: "Temporal.PlainDate" },
+	);
 
 export const ZonedDateTimeSchema: Schema.Schema<Temporal.ZonedDateTime> =
 	Schema.declare(
@@ -243,6 +244,7 @@ export type IrDocument = Schema.Schema.Type<typeof IrDocumentSchema>;
 
 // Clark notation: "{namespace}localName", e.g. "{http://apple.com/ns/ical/}calendar-color"
 export type ClarkName = `{${string}}${string}`;
+export const cn = (ns: string, local: string): ClarkName => `{${ns}}${local}`;
 
 export interface IrDeadProperty {
 	readonly name: ClarkName;

@@ -1,20 +1,22 @@
 import { Brand } from "effect";
 import "temporal-polyfill/global";
 
+export type UuidString = `${string}-${string}-${string}-${string}-${string}`;
+
 // ---------------------------------------------------------------------------
 // Branded UUID types
 // ---------------------------------------------------------------------------
 
-export type PrincipalId = string & Brand.Brand<"PrincipalId">;
-export type UserId = string & Brand.Brand<"UserId">;
-export type GroupId = string & Brand.Brand<"GroupId">;
-export type AuthUserId = string & Brand.Brand<"AuthUserId">;
-export type GroupNameId = string & Brand.Brand<"GroupNameId">;
-export type CollectionId = string & Brand.Brand<"CollectionId">;
-export type InstanceId = string & Brand.Brand<"InstanceId">;
-export type EntityId = string & Brand.Brand<"EntityId">;
-export type ComponentId = string & Brand.Brand<"ComponentId">;
-export type PropertyId = string & Brand.Brand<"PropertyId">;
+export type PrincipalId = UuidString & Brand.Brand<"PrincipalId">;
+export type UserId = UuidString & Brand.Brand<"UserId">;
+export type GroupId = UuidString & Brand.Brand<"GroupId">;
+export type AuthUserId = UuidString & Brand.Brand<"AuthUserId">;
+export type GroupNameId = UuidString & Brand.Brand<"GroupNameId">;
+export type CollectionId = UuidString & Brand.Brand<"CollectionId">;
+export type InstanceId = UuidString & Brand.Brand<"InstanceId">;
+export type EntityId = UuidString & Brand.Brand<"EntityId">;
+export type ComponentId = UuidString & Brand.Brand<"ComponentId">;
+export type PropertyId = UuidString & Brand.Brand<"PropertyId">;
 export type RequestId = string & Brand.Brand<"RequestId">;
 
 export const PrincipalId = Brand.nominal<PrincipalId>();
@@ -40,7 +42,7 @@ const UUID_RE =
 	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Returns true if the string is a valid UUID (any version, case-insensitive). */
-export const isUuid = (s: string): boolean => UUID_RE.test(s);
+export const isUuid = (s: string): s is UuidString => UUID_RE.test(s);
 
 /**
  * Extract the creation timestamp from a UUIDv7.
@@ -48,7 +50,7 @@ export const isUuid = (s: string): boolean => UUID_RE.test(s);
  * UUIDv7 layout: tttttttt-tttt-7xxx-xxxx-xxxxxxxxxxxx
  * The first 48 bits (12 hex chars) encode milliseconds since the Unix epoch.
  */
-export const extractInstantFromUuidV7 = (id: string): Temporal.Instant => {
+export const extractInstantFromUuidV7 = (id: UuidString): Temporal.Instant => {
 	const hex = id.replaceAll("-", "").slice(0, UUIDV7_TIMESTAMP_HEX_LENGTH);
 	return Temporal.Instant.fromEpochMilliseconds(Number.parseInt(hex, 16));
 };

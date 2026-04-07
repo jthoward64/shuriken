@@ -10,6 +10,7 @@ import { GroupDomainLayer } from "#src/services/group/index.ts";
 import { InstanceDomainLayer } from "#src/services/instance/index.ts";
 import { PrincipalDomainLayer } from "#src/services/principal/index.ts";
 import { ProvisioningDomainLayer } from "#src/services/provisioning/index.ts";
+import { TimezoneDomainLayer } from "#src/services/timezone/index.ts";
 import { UserDomainLayer } from "#src/services/user/index.ts";
 import { TestCryptoLayer } from "#src/testing/env.ts";
 import { makePgliteDatabaseLayer } from "#src/testing/pglite.ts";
@@ -73,6 +74,7 @@ export const makeScriptRunnerLayer = () => {
 		withTestInfra(UserDomainLayer),
 		withTestInfra(GroupDomainLayer),
 		withTestInfra(DomainEntityDomainLayer),
+		withTestInfra(TimezoneDomainLayer),
 		withTestInfra(ProvisioningDomainLayer),
 	);
 };

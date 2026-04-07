@@ -80,6 +80,15 @@ All Bun-specific APIs (file I/O, `Bun.serve`, `Bun.file`, `Bun.password`, etc.) 
 - **Slugs must be resolved to UUIDs at the edge** (request parsing / routing layer) before entering any business logic.
 - All internal code deals exclusively with UUIDs. Never pass a raw slug string into a service or repository function.
 
+## DAV URL and href policy
+
+- Both slug-based and UUID-based paths are accepted for every DAV resource; slugs are resolved to UUIDs inside `parseDavPath` before any handler sees them.
+- `ResolvedDavPath` carries `principalSeg`, `collectionSeg`, and `instanceSeg` — the URL-decoded path segments exactly as the client sent them — alongside the resolved UUID fields. Handlers use the seg fields when constructing hrefs so that response URLs mirror what the client used.
+- **PROPFIND `<href>` construction**:
+  - For a resource the client directly addressed (depth:0), the href uses the seg values from the path (slug or UUID, whatever the client sent).
+  - For depth:1 member instances that the client did not directly address, UUIDs are used — they are stable identifiers and clients will use them for subsequent per-resource requests.
+  - MKCOL/MKCALENDAR/MKADDRESSBOOK `Location` headers follow the same rule: the principal seg is mirrored from the request, and the new collection's slug is used (since that is what the client named it).
+
 ## Coding Principles
 
 ### Make Invalid State Unrepresentable

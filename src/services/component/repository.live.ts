@@ -3,7 +3,12 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { Effect, Layer, Option } from "effect";
 import type { Temporal } from "temporal-polyfill";
 import { isKnownIcalProperty } from "#src/data/icalendar/known.ts";
-import type { IrComponent, IrParameter, IrProperty, IrValue } from "#src/data/ir.ts";
+import type {
+	IrComponent,
+	IrParameter,
+	IrProperty,
+	IrValue,
+} from "#src/data/ir.ts";
 import { isKnownVcardProperty } from "#src/data/vcard/known.ts";
 import { DatabaseClient, type DbClient } from "#src/db/client.ts";
 import {
@@ -12,7 +17,11 @@ import {
 	davProperty,
 } from "#src/db/drizzle/schema/index.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
-import { ComponentId, type EntityId } from "#src/domain/ids.ts";
+import {
+	ComponentId,
+	type EntityId,
+	type UuidString,
+} from "#src/domain/ids.ts";
 import { ComponentRepository } from "./repository.ts";
 
 // ---------------------------------------------------------------------------
@@ -123,11 +132,15 @@ const dbColumnsToIrValue = (
 		case "BOOLEAN":
 			return { type: "BOOLEAN", value: row.valueBool ?? false };
 		case "DATE": {
-			if (!row.valueDate) { throw new Error("DATE property missing valueDate"); }
+			if (!row.valueDate) {
+				throw new Error("DATE property missing valueDate");
+			}
 			return { type: "DATE", value: row.valueDate };
 		}
 		case "DATE_TIME": {
-			if (!row.valueTstz) { throw new Error("DATE_TIME property missing valueTstz"); }
+			if (!row.valueTstz) {
+				throw new Error("DATE_TIME property missing valueTstz");
+			}
 			return {
 				type: "DATE_TIME",
 				value: row.valueTstz.toZonedDateTimeISO(tzid ?? "UTC"),
@@ -140,10 +153,14 @@ const dbColumnsToIrValue = (
 			return { type: "PLAIN_DATE_TIME", value: row.valuePlainDatetime };
 		}
 		case "BINARY": {
-			if (!row.valueBytes) { throw new Error("BINARY property missing valueBytes"); }
+			if (!row.valueBytes) {
+				throw new Error("BINARY property missing valueBytes");
+			}
 			return {
 				type: "BINARY",
-				value: new Uint8Array(row.valueBytes).slice() as Uint8Array<ArrayBuffer>,
+				value: new Uint8Array(
+					row.valueBytes,
+				).slice() as Uint8Array<ArrayBuffer>,
 			};
 		}
 		case "JSON":
@@ -180,20 +197,24 @@ const insertComponentInTx = async (
 	tx: DrizzleTx,
 	entityId: EntityId,
 	component: IrComponent,
-	parentComponentId: string | null,
+	parentComponentId: UuidString | null,
 	ordinal: number,
-): Promise<string> => {
+): Promise<UuidString> => {
 	const compRows = await tx
 		.insert(davComponent)
 		.values({ entityId, parentComponentId, name: component.name, ordinal })
 		.returning();
 	const compRow = compRows[0];
-	if (!compRow) { throw new Error("Component insert returned no rows"); }
+	if (!compRow) {
+		throw new Error("Component insert returned no rows");
+	}
 	const componentId = compRow.id;
 
 	for (let i = 0; i < component.properties.length; i++) {
 		const prop = component.properties[i];
-		if (!prop) { continue; }
+		if (!prop) {
+			continue;
+		}
 		const valueColumns = irValueToDbColumns(prop.value);
 		const propRows = await tx
 			.insert(davProperty)
@@ -206,21 +227,30 @@ const insertComponentInTx = async (
 			})
 			.returning();
 		const propRow = propRows[0];
-		if (!propRow) { throw new Error("Property insert returned no rows"); }
+		if (!propRow) {
+			throw new Error("Property insert returned no rows");
+		}
 		const propertyId = propRow.id;
 
 		for (let j = 0; j < prop.parameters.length; j++) {
 			const param = prop.parameters[j];
-			if (!param) { continue; }
-			await tx
-				.insert(davParameter)
-				.values({ propertyId, name: param.name, value: param.value, ordinal: j });
+			if (!param) {
+				continue;
+			}
+			await tx.insert(davParameter).values({
+				propertyId,
+				name: param.name,
+				value: param.value,
+				ordinal: j,
+			});
 		}
 	}
 
 	for (let i = 0; i < component.components.length; i++) {
 		const child = component.components[i];
-		if (!child) { continue; }
+		if (!child) {
+			continue;
+		}
 		await insertComponentInTx(tx, entityId, child, componentId, i);
 	}
 
@@ -267,10 +297,17 @@ const loadTree = (
 			const components = await db
 				.select()
 				.from(davComponent)
-				.where(and(eq(davComponent.entityId, entityId), isNull(davComponent.deletedAt)))
+				.where(
+					and(
+						eq(davComponent.entityId, entityId),
+						isNull(davComponent.deletedAt),
+					),
+				)
 				.orderBy(davComponent.ordinal);
 
-			if (components.length === 0) { return Option.none(); }
+			if (components.length === 0) {
+				return Option.none();
+			}
 
 			const componentIds = components.map((c) => c.id);
 
@@ -278,7 +315,12 @@ const loadTree = (
 			const properties = await db
 				.select()
 				.from(davProperty)
-				.where(and(inArray(davProperty.componentId, componentIds), isNull(davProperty.deletedAt)))
+				.where(
+					and(
+						inArray(davProperty.componentId, componentIds),
+						isNull(davProperty.deletedAt),
+					),
+				)
 				.orderBy(davProperty.ordinal);
 
 			// 3. Load all active parameter rows for those properties
@@ -289,7 +331,10 @@ const loadTree = (
 					.select()
 					.from(davParameter)
 					.where(
-						and(inArray(davParameter.propertyId, propertyIds), isNull(davParameter.deletedAt)),
+						and(
+							inArray(davParameter.propertyId, propertyIds),
+							isNull(davParameter.deletedAt),
+						),
 					)
 					.orderBy(davParameter.ordinal);
 			}
@@ -330,7 +375,9 @@ const loadTree = (
 				}
 			}
 
-			if (!rootComp) { return Option.none(); }
+			if (!rootComp) {
+				return Option.none();
+			}
 
 			return Option.some(
 				buildIrComponent(rootComp, childrenByParentId, propertiesByCompId),
@@ -349,7 +396,12 @@ const deleteByEntity = (db: DbClient, entityId: EntityId) =>
 			db
 				.update(davComponent)
 				.set({ deletedAt: sql`now()` })
-				.where(and(eq(davComponent.entityId, entityId), isNull(davComponent.deletedAt)))
+				.where(
+					and(
+						eq(davComponent.entityId, entityId),
+						isNull(davComponent.deletedAt),
+					),
+				)
 				.then(() => undefined),
 		catch: (e) => new DatabaseError({ cause: e }),
 	});

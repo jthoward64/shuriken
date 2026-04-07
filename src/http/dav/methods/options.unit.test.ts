@@ -16,6 +16,7 @@ const TEST_PRINCIPAL_ID = PrincipalId("00000000-0000-0000-0000-000000000000");
 const fakePath: ResolvedDavPath = {
 	kind: "principal",
 	principalId: TEST_PRINCIPAL_ID,
+	principalSeg: String(TEST_PRINCIPAL_ID),
 };
 
 const fakeCtx: HttpRequestContext = {

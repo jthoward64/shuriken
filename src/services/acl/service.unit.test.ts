@@ -74,9 +74,7 @@ describe("AclService.check", () => {
 		});
 		await runSuccess(
 			AclService.pipe(
-				Effect.flatMap((s) =>
-					s.check(principalId, RID, RTYPE, "DAV:read-acl"),
-				),
+				Effect.flatMap((s) => s.check(principalId, RID, RTYPE, "DAV:read-acl")),
 				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
@@ -129,7 +127,10 @@ describe("AclService.check", () => {
 		// Access env.stores to get the user's principalId
 		const userRow = env.stores.users.get(userId);
 		expect(userRow).toBeDefined();
-		const userPrincipalId = PrincipalId(userRow?.principalId ?? "");
+		if (!userRow) {
+			throw new Error("User row not found");
+		}
+		const userPrincipalId = PrincipalId(userRow.principalId);
 
 		// Add user to group
 		env.stores.memberships.set(groupId, new Set([userId]));
@@ -188,9 +189,7 @@ describe("AclService.currentUserPrivileges", () => {
 		});
 		const result = await runSuccess(
 			AclService.pipe(
-				Effect.flatMap((s) =>
-					s.currentUserPrivileges(principalId, RID, RTYPE),
-				),
+				Effect.flatMap((s) => s.currentUserPrivileges(principalId, RID, RTYPE)),
 				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
@@ -210,9 +209,7 @@ describe("AclService.currentUserPrivileges", () => {
 		});
 		const result = await runSuccess(
 			AclService.pipe(
-				Effect.flatMap((s) =>
-					s.currentUserPrivileges(principalId, RID, RTYPE),
-				),
+				Effect.flatMap((s) => s.currentUserPrivileges(principalId, RID, RTYPE)),
 				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
@@ -260,9 +257,7 @@ describe("AclService.currentUserPrivileges", () => {
 		});
 		const result = await runSuccess(
 			AclService.pipe(
-				Effect.flatMap((s) =>
-					s.currentUserPrivileges(principalId, RID, RTYPE),
-				),
+				Effect.flatMap((s) => s.currentUserPrivileges(principalId, RID, RTYPE)),
 				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
@@ -284,9 +279,7 @@ describe("AclService.currentUserPrivileges", () => {
 		});
 		const result = await runSuccess(
 			AclService.pipe(
-				Effect.flatMap((s) =>
-					s.currentUserPrivileges(principalId, RID, RTYPE),
-				),
+				Effect.flatMap((s) => s.currentUserPrivileges(principalId, RID, RTYPE)),
 				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
@@ -301,9 +294,7 @@ describe("AclService.currentUserPrivileges", () => {
 		const env = makeTestEnv();
 		const result = await runSuccess(
 			AclService.pipe(
-				Effect.flatMap((s) =>
-					s.currentUserPrivileges(principalId, RID, RTYPE),
-				),
+				Effect.flatMap((s) => s.currentUserPrivileges(principalId, RID, RTYPE)),
 				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),

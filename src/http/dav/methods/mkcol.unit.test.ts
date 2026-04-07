@@ -50,6 +50,7 @@ const makeNewCollectionPath = (
 	principalId: TEST_PRINCIPAL_ID,
 	namespace,
 	slug: Slug("my-new-cal"),
+	principalSeg: String(TEST_PRINCIPAL_ID),
 });
 
 const authenticatedCtx = makeCtx(
@@ -102,7 +103,7 @@ describe("mkcolHandler — MKCALENDAR", () => {
 		expect(res.headers.get("Location")).not.toBeNull();
 	});
 
-	it("Location header is a UUID-based URL under the cal namespace", async () => {
+	it("Location header reflects the principal segment and slug used in the request", async () => {
 		const env = makeEnv();
 		const path = makeNewCollectionPath("cal");
 
@@ -114,10 +115,8 @@ describe("mkcolHandler — MKCALENDAR", () => {
 		);
 
 		const location = res.headers.get("Location") ?? "";
-		expect(location).toMatch(
-			new RegExp(
-				`/dav/principals/${TEST_PRINCIPAL_ID}/cal/[0-9a-f-]+/$`,
-			),
+		expect(location).toBe(
+			`http://localhost/dav/principals/${TEST_PRINCIPAL_ID}/cal/my-new-cal/`,
 		);
 	});
 
@@ -334,6 +333,8 @@ describe("mkcolHandler — method not allowed", () => {
 			principalId: TEST_PRINCIPAL_ID,
 			namespace: "cal",
 			collectionId: CollectionId(crypto.randomUUID()),
+			principalSeg: String(TEST_PRINCIPAL_ID),
+			collectionSeg: "some-collection",
 		};
 
 		const err = (await runFailure(
@@ -354,6 +355,9 @@ describe("mkcolHandler — method not allowed", () => {
 			namespace: "cal",
 			collectionId: CollectionId(crypto.randomUUID()),
 			instanceId: InstanceId(crypto.randomUUID()),
+			principalSeg: String(TEST_PRINCIPAL_ID),
+			collectionSeg: "some-collection",
+			instanceSeg: "some-instance",
 		};
 
 		const err = (await runFailure(
@@ -371,6 +375,7 @@ describe("mkcolHandler — method not allowed", () => {
 		const principalPath: ResolvedDavPath = {
 			kind: "principal",
 			principalId: TEST_PRINCIPAL_ID,
+			principalSeg: String(TEST_PRINCIPAL_ID),
 		};
 
 		const err = (await runFailure(

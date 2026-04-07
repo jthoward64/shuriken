@@ -1,7 +1,7 @@
 import "temporal-polyfill/global";
 
 import { BunRuntime } from "@effect/platform-bun";
-import { Effect, ManagedRuntime } from "effect";
+import { Effect, Layer, Logger, ManagedRuntime } from "effect";
 import { AppConfigLive, AppConfigService } from "#src/config.ts";
 import { handleRequest } from "#src/http/router.ts";
 import { AppLayer } from "#src/layers.ts";
@@ -42,4 +42,6 @@ const program = Effect.gen(function* () {
 	return yield* Effect.never;
 });
 
-BunRuntime.runMain(program.pipe(Effect.provide(AppConfigLive)));
+BunRuntime.runMain(
+	program.pipe(Effect.provide(Layer.mergeAll(Logger.pretty, AppConfigLive))),
+);

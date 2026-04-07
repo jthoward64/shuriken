@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { index, jsonb, pgTable, text, uuid } from "drizzle-orm/pg-core";
+import type { UuidString } from "#src/domain/ids.ts";
 import { davEntity } from "./dav";
 import { timestampTz, tsvector } from "./types";
 
@@ -8,7 +9,8 @@ export const cardIndex = pgTable(
 	{
 		entityId: uuid("entity_id")
 			.primaryKey()
-			.references(() => davEntity.id, { onDelete: "cascade" }),
+			.references(() => davEntity.id, { onDelete: "cascade" })
+			.$type<UuidString>(),
 		uid: text(),
 		fn: text(),
 		updatedAt: timestampTz("updated_at").default(sql`now()`).notNull(),

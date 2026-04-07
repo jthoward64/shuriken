@@ -14,13 +14,14 @@ import {
 	uniqueIndex,
 	uuid,
 } from "drizzle-orm/pg-core";
+import type { UuidString } from "#src/domain/ids.ts";
 import { principal } from "./principal";
 import { bytea, dateStr, timestampStr, timestampTz } from "./types";
 
 export const davEntity = pgTable(
 	"dav_entity",
 	{
-		id: uuid().default(sql`uuidv7()`).primaryKey(),
+		id: uuid().default(sql`uuidv7()`).primaryKey().$type<UuidString>(),
 		entityType: text("entity_type").notNull(),
 		logicalUid: text("logical_uid"),
 		updatedAt: timestampTz("updated_at").default(sql`now()`).notNull(),
@@ -52,10 +53,11 @@ export const davEntity = pgTable(
 export const davCollection = pgTable(
 	"dav_collection",
 	{
-		id: uuid().default(sql`uuidv7()`).primaryKey(),
+		id: uuid().default(sql`uuidv7()`).primaryKey().$type<UuidString>(),
 		ownerPrincipalId: uuid("owner_principal_id")
 			.notNull()
-			.references(() => principal.id, { onDelete: "restrict" }),
+			.references(() => principal.id, { onDelete: "restrict" })
+			.$type<UuidString>(),
 		collectionType: text("collection_type").notNull(),
 		displayName: text("display_name"),
 		description: text(),
@@ -65,7 +67,7 @@ export const davCollection = pgTable(
 		deletedAt: timestampTz("deleted_at"),
 		supportedComponents: text("supported_components").array(),
 		slug: text().default("").notNull(),
-		parentCollectionId: uuid("parent_collection_id"),
+		parentCollectionId: uuid("parent_collection_id").$type<UuidString>(),
 		// Client-set dead properties (RFC 4918 §4.1) — Clark-notation key, XML value string
 		clientProperties: jsonb("client_properties").default({}).notNull(),
 		// CalDAV per-collection constraints (RFC 4791 §5.2) — null = server-wide default
@@ -113,11 +115,12 @@ export const davCollection = pgTable(
 export const davComponent = pgTable(
 	"dav_component",
 	{
-		id: uuid().default(sql`uuidv7()`).primaryKey(),
+		id: uuid().default(sql`uuidv7()`).primaryKey().$type<UuidString>(),
 		entityId: uuid("entity_id")
 			.notNull()
-			.references(() => davEntity.id, { onDelete: "cascade" }),
-		parentComponentId: uuid("parent_component_id"),
+			.references(() => davEntity.id, { onDelete: "cascade" })
+			.$type<UuidString>(),
+		parentComponentId: uuid("parent_component_id").$type<UuidString>(),
 		name: text().notNull(),
 		ordinal: integer().default(0).notNull(),
 		updatedAt: timestampTz("updated_at").default(sql`now()`).notNull(),
@@ -147,10 +150,11 @@ export const davComponent = pgTable(
 export const davProperty = pgTable(
 	"dav_property",
 	{
-		id: uuid().default(sql`uuidv7()`).primaryKey(),
+		id: uuid().default(sql`uuidv7()`).primaryKey().$type<UuidString>(),
 		componentId: uuid("component_id")
 			.notNull()
-			.references(() => davComponent.id, { onDelete: "cascade" }),
+			.references(() => davComponent.id, { onDelete: "cascade" })
+			.$type<UuidString>(),
 		name: text().notNull(),
 		valueType: text("value_type").notNull(),
 		valueText: text("value_text"),
@@ -262,10 +266,11 @@ END) <= 1)`,
 export const davParameter = pgTable(
 	"dav_parameter",
 	{
-		id: uuid().default(sql`uuidv7()`).primaryKey(),
+		id: uuid().default(sql`uuidv7()`).primaryKey().$type<UuidString>(),
 		propertyId: uuid("property_id")
 			.notNull()
-			.references(() => davProperty.id, { onDelete: "cascade" }),
+			.references(() => davProperty.id, { onDelete: "cascade" })
+			.$type<UuidString>(),
 		name: text().notNull(),
 		value: text().notNull(),
 		ordinal: integer().default(0).notNull(),
@@ -296,13 +301,15 @@ export const davParameter = pgTable(
 export const davInstance = pgTable(
 	"dav_instance",
 	{
-		id: uuid().default(sql`uuidv7()`).primaryKey(),
+		id: uuid().default(sql`uuidv7()`).primaryKey().$type<UuidString>(),
 		collectionId: uuid("collection_id")
 			.notNull()
-			.references(() => davCollection.id, { onDelete: "restrict" }),
+			.references(() => davCollection.id, { onDelete: "restrict" })
+			.$type<UuidString>(),
 		entityId: uuid("entity_id")
 			.notNull()
-			.references(() => davEntity.id, { onDelete: "restrict" }),
+			.references(() => davEntity.id, { onDelete: "restrict" })
+			.$type<UuidString>(),
 		contentType: text("content_type").notNull(),
 		etag: text().notNull(),
 		syncRevision: bigint("sync_revision", { mode: "number" })
@@ -362,13 +369,15 @@ export const davInstance = pgTable(
 export const davScheduleMessage = pgTable(
 	"dav_schedule_message",
 	{
-		id: uuid().default(sql`uuidv7()`).primaryKey(),
+		id: uuid().default(sql`uuidv7()`).primaryKey().$type<UuidString>(),
 		collectionId: uuid("collection_id")
 			.notNull()
-			.references(() => davCollection.id, { onDelete: "cascade" }),
+			.references(() => davCollection.id, { onDelete: "cascade" })
+			.$type<UuidString>(),
 		entityId: uuid("entity_id")
 			.notNull()
-			.references(() => davEntity.id, { onDelete: "restrict" }),
+			.references(() => davEntity.id, { onDelete: "restrict" })
+			.$type<UuidString>(),
 		sender: text().notNull(),
 		recipient: text().notNull(),
 		method: text().notNull(),
@@ -412,13 +421,17 @@ export const davScheduleMessage = pgTable(
 export const davShadow = pgTable(
 	"dav_shadow",
 	{
-		id: uuid().default(sql`uuidv7()`).primaryKey(),
-		instanceId: uuid("instance_id").references(() => davInstance.id, {
-			onDelete: "cascade",
-		}),
-		entityId: uuid("entity_id").references(() => davEntity.id, {
-			onDelete: "cascade",
-		}),
+		id: uuid().default(sql`uuidv7()`).primaryKey().$type<UuidString>(),
+		instanceId: uuid("instance_id")
+			.references(() => davInstance.id, {
+				onDelete: "cascade",
+			})
+			.$type<UuidString>(),
+		entityId: uuid("entity_id")
+			.references(() => davEntity.id, {
+				onDelete: "cascade",
+			})
+			.$type<UuidString>(),
 		direction: text().notNull(),
 		contentType: text("content_type").notNull(),
 		rawOriginal: bytea("raw_original"),
@@ -463,13 +476,16 @@ export const davShadow = pgTable(
 export const davTombstone = pgTable(
 	"dav_tombstone",
 	{
-		id: uuid().default(sql`uuidv7()`).primaryKey(),
+		id: uuid().default(sql`uuidv7()`).primaryKey().$type<UuidString>(),
 		collectionId: uuid("collection_id")
 			.notNull()
-			.references(() => davCollection.id, { onDelete: "restrict" }),
-		entityId: uuid("entity_id").references(() => davEntity.id, {
-			onDelete: "set null",
-		}),
+			.references(() => davCollection.id, { onDelete: "restrict" })
+			.$type<UuidString>(),
+		entityId: uuid("entity_id")
+			.references(() => davEntity.id, {
+				onDelete: "set null",
+			})
+			.$type<UuidString>(),
 		synctoken: bigint({ mode: "number" }).notNull(),
 		syncRevision: bigint("sync_revision", { mode: "number" }).notNull(),
 		deletedAt: timestampTz("deleted_at").default(sql`now()`).notNull(),

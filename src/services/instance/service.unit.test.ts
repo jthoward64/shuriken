@@ -26,7 +26,7 @@ const makeInput = (collectionId: CollectionId, slug = "event.ics") => ({
 // ---------------------------------------------------------------------------
 
 describe("InstanceService.put — create path", () => {
-	it("inserts and returns the new instance with syncRevision 0", async () => {
+	it("inserts and returns the new instance with syncRevision 1 (simulated trigger)", async () => {
 		const env = makeTestEnv();
 		const collectionId = CollectionId(crypto.randomUUID());
 
@@ -38,7 +38,7 @@ describe("InstanceService.put — create path", () => {
 			),
 		);
 
-		expect(result.syncRevision).toBe(0);
+		expect(result.syncRevision).toBe(1);
 		expect(result.slug).toBe("event.ics");
 		expect(result.collectionId).toBe(collectionId);
 		expect(env.stores.instances.size).toBe(1);

@@ -1,14 +1,12 @@
 import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
-import type { ClarkName } from "#src/data/ir.ts";
+import { cn } from "#src/data/ir.ts";
 import { buildMultistatus, multistatusResponse } from "./multistatus.ts";
 import { parseXml } from "./parser.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-const cn = (ns: string, local: string): ClarkName => `{${ns}}${local}` as ClarkName;
 const DAV = "DAV:";
 const CALDAV = "urn:ietf:params:xml:ns:caldav";
 
@@ -34,14 +32,17 @@ describe("buildMultistatus", () => {
 				{ href: "/dav/", propstats: [{ props: {}, status: 200 }] },
 			]),
 		);
-		expect(xml).toContain('xmlns');
+		expect(xml).toContain("xmlns");
 		expect(xml).toContain("DAV:");
 	});
 
 	it("includes the href for each response", async () => {
 		const xml = await run(
 			buildMultistatus([
-				{ href: "/dav/principals/alice/", propstats: [{ props: {}, status: 200 }] },
+				{
+					href: "/dav/principals/alice/",
+					propstats: [{ props: {}, status: 200 }],
+				},
 			]),
 		);
 		expect(xml).toContain("/dav/principals/alice/");
@@ -84,7 +85,10 @@ describe("buildMultistatus", () => {
 				},
 			]),
 		);
-		const parsed = await run(parseXml(xml).pipe(Effect.orDie)) as Record<string, unknown>;
+		const parsed = (await run(parseXml(xml).pipe(Effect.orDie))) as Record<
+			string,
+			unknown
+		>;
 		// Should have at least two propstat elements (fast-xml-parser may array them)
 		const ms = parsed["D:multistatus"] as Record<string, unknown>;
 		const resp = ms["D:response"] as Record<string, unknown>;
@@ -192,6 +196,8 @@ describe("multistatusResponse", () => {
 				{ href: "/dav/", propstats: [{ props: {}, status: 200 }] },
 			]),
 		);
-		expect(res.headers.get("Content-Type")).toBe("application/xml; charset=utf-8");
+		expect(res.headers.get("Content-Type")).toBe(
+			"application/xml; charset=utf-8",
+		);
 	});
 });

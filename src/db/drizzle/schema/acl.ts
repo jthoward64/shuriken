@@ -8,6 +8,7 @@ import {
 	text,
 	uuid,
 } from "drizzle-orm/pg-core";
+import type { UuidString } from "#src/domain/ids.ts";
 import { principal } from "./principal";
 import { timestampTz } from "./types";
 
@@ -38,15 +39,17 @@ import { timestampTz } from "./types";
 export const davAcl = pgTable(
 	"dav_acl",
 	{
-		id: uuid().default(sql`uuidv7()`).primaryKey(),
+		id: uuid().default(sql`uuidv7()`).primaryKey().$type<UuidString>(),
 		// Resource being controlled (polymorphic — no DB-level FK)
 		resourceType: text("resource_type").notNull(),
-		resourceId: uuid("resource_id").notNull(),
+		resourceId: uuid("resource_id").notNull().$type<UuidString>(),
 		// Principal matching
 		principalType: text("principal_type").notNull(),
-		principalId: uuid("principal_id").references(() => principal.id, {
-			onDelete: "cascade",
-		}),
+		principalId: uuid("principal_id")
+			.references(() => principal.id, {
+				onDelete: "cascade",
+			})
+			.$type<UuidString>(),
 		// Privilege — DAV namespaced string, e.g. 'DAV:read', 'CALDAV:read-free-busy'
 		privilege: text().notNull(),
 		// Grant or deny (deny reserved for server-generated ACEs when grant-only is lifted)

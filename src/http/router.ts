@@ -24,6 +24,7 @@ import type { ComponentRepository } from "#src/services/component/index.ts";
 import type { EntityRepository } from "#src/services/entity/index.ts";
 import type { InstanceService } from "#src/services/instance/index.ts";
 import type { PrincipalService } from "#src/services/principal/service.ts";
+import type { CalTimezoneRepository } from "#src/services/timezone/index.ts";
 
 // ---------------------------------------------------------------------------
 // Top-level HTTP router
@@ -45,7 +46,8 @@ type AppServices =
 	| AclService
 	| PrincipalService
 	| EntityRepository
-	| ComponentRepository;
+	| ComponentRepository
+	| CalTimezoneRepository;
 
 const isDavPath = (pathname: string): boolean =>
 	pathname === "/dav" ||

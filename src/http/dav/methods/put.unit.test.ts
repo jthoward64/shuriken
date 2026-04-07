@@ -27,6 +27,7 @@ import type { AclService } from "#src/services/acl/index.ts";
 import type { ComponentRepository } from "#src/services/component/index.ts";
 import type { EntityRepository } from "#src/services/entity/index.ts";
 import type { InstanceService } from "#src/services/instance/index.ts";
+import type { CalTimezoneRepository } from "#src/services/timezone/index.ts";
 import { runFailure, runSuccess } from "#src/testing/effect.ts";
 import { makeTestEnv } from "#src/testing/env.ts";
 import { putHandler } from "./put.ts";
@@ -74,6 +75,8 @@ const makeNewInstancePath = (
 	namespace,
 	collectionId: TEST_COLLECTION_ID,
 	slug: Slug("event.ics"),
+	principalSeg: String(TEST_PRINCIPAL_ID),
+	collectionSeg: String(TEST_COLLECTION_ID),
 });
 
 const makeInstancePath = (
@@ -84,11 +87,37 @@ const makeInstancePath = (
 	namespace,
 	collectionId: TEST_COLLECTION_ID,
 	instanceId: TEST_INSTANCE_ID,
+	principalSeg: String(TEST_PRINCIPAL_ID),
+	collectionSeg: String(TEST_COLLECTION_ID),
+	instanceSeg: String(TEST_INSTANCE_ID),
 });
 
 // Minimal valid iCalendar
 const ICAL_BODY =
 	"BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Test//EN\r\nBEGIN:VEVENT\r\nUID:test-event-uid@example.com\r\nDTSTAMP:20240101T000000Z\r\nDTSTART:20240101T120000Z\r\nSUMMARY:Test Event\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
+
+// iCalendar with one VTIMEZONE (TZID: America/New_York)
+const ICAL_BODY_WITH_VTIMEZONE =
+	"BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Test//EN\r\n" +
+	"BEGIN:VTIMEZONE\r\nTZID:America/New_York\r\n" +
+	"BEGIN:STANDARD\r\nTZOFFSETFROM:-0400\r\nTZOFFSETTO:-0500\r\n" +
+	"DTSTART:19671029T020000\r\nEND:STANDARD\r\nEND:VTIMEZONE\r\n" +
+	"BEGIN:VEVENT\r\nUID:tz-event@example.com\r\nDTSTAMP:20240101T000000Z\r\n" +
+	"DTSTART;TZID=America/New_York:20240101T120000\r\nSUMMARY:TZ Event\r\nEND:VEVENT\r\n" +
+	"END:VCALENDAR\r\n";
+
+// iCalendar with two VTIMEZONEs
+const ICAL_BODY_WITH_TWO_VTIMEZONES =
+	"BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Test//EN\r\n" +
+	"BEGIN:VTIMEZONE\r\nTZID:America/New_York\r\n" +
+	"BEGIN:STANDARD\r\nTZOFFSETFROM:-0400\r\nTZOFFSETTO:-0500\r\n" +
+	"DTSTART:19671029T020000\r\nEND:STANDARD\r\nEND:VTIMEZONE\r\n" +
+	"BEGIN:VTIMEZONE\r\nTZID:Europe/London\r\n" +
+	"BEGIN:STANDARD\r\nTZOFFSETFROM:+0100\r\nTZOFFSETTO:+0000\r\n" +
+	"DTSTART:19961027T010000\r\nEND:STANDARD\r\nEND:VTIMEZONE\r\n" +
+	"BEGIN:VEVENT\r\nUID:multi-tz@example.com\r\nDTSTAMP:20240101T000000Z\r\n" +
+	"DTSTART;TZID=America/New_York:20240101T120000\r\nSUMMARY:Multi-TZ\r\nEND:VEVENT\r\n" +
+	"END:VCALENDAR\r\n";
 
 // Minimal valid iCalendar with different content (for ETag-change test)
 const ICAL_BODY_2 =
@@ -142,12 +171,12 @@ const makeEnv = () =>
 type PutEffect<A> = Effect.Effect<
 	A,
 	DavError | DatabaseError,
-	AclService | InstanceService | ComponentRepository | EntityRepository
+	AclService | InstanceService | ComponentRepository | EntityRepository | CalTimezoneRepository
 >;
 type PutFailEffect = Effect.Effect<
 	unknown,
 	DavError | DatabaseError,
-	AclService | InstanceService | ComponentRepository | EntityRepository
+	AclService | InstanceService | ComponentRepository | EntityRepository | CalTimezoneRepository
 >;
 
 const run = <A>(env: ReturnType<typeof makeTestEnv>, effect: PutEffect<A>) =>
@@ -386,6 +415,8 @@ describe("putHandler — method not allowed", () => {
 			principalId: TEST_PRINCIPAL_ID,
 			namespace: "cal",
 			collectionId: TEST_COLLECTION_ID,
+			principalSeg: String(TEST_PRINCIPAL_ID),
+			collectionSeg: String(TEST_COLLECTION_ID),
 		};
 		const err = (await runErr(
 			env,
@@ -400,6 +431,7 @@ describe("putHandler — method not allowed", () => {
 		const path: ResolvedDavPath = {
 			kind: "principal",
 			principalId: TEST_PRINCIPAL_ID,
+			principalSeg: String(TEST_PRINCIPAL_ID),
 		};
 		const err = (await runErr(
 			env,
@@ -423,5 +455,70 @@ describe("putHandler — authentication", () => {
 		)) as DavError;
 		expect(err._tag).toBe("DavError");
 		expect(err.precondition).toBe("DAV:need-privileges");
+	});
+});
+
+// ---------------------------------------------------------------------------
+// VTIMEZONE / cal_timezone upsert
+// ---------------------------------------------------------------------------
+
+describe("putHandler — cal_timezone upsert", () => {
+	it("upserts VTIMEZONE into cal_timezone when iCalendar contains one", async () => {
+		const env = makeEnv();
+		await run(
+			env,
+			putHandler(
+				makeNewInstancePath(),
+				authenticatedCtx,
+				new Request("http://localhost/", {
+					method: "PUT",
+					body: ICAL_BODY_WITH_VTIMEZONE,
+					headers: { "Content-Type": "text/calendar" },
+				}),
+			),
+		);
+		expect(env.stores.calTimezones.size).toBe(1);
+		expect(env.stores.calTimezones.has("America/New_York")).toBe(true);
+	});
+
+	it("upserts all VTIMEZONEs when iCalendar contains more than one", async () => {
+		const env = makeEnv();
+		await run(
+			env,
+			putHandler(
+				makeNewInstancePath(),
+				authenticatedCtx,
+				new Request("http://localhost/", {
+					method: "PUT",
+					body: ICAL_BODY_WITH_TWO_VTIMEZONES,
+					headers: { "Content-Type": "text/calendar" },
+				}),
+			),
+		);
+		expect(env.stores.calTimezones.size).toBe(2);
+		expect(env.stores.calTimezones.has("America/New_York")).toBe(true);
+		expect(env.stores.calTimezones.has("Europe/London")).toBe(true);
+	});
+
+	it("does not upsert anything when iCalendar has no VTIMEZONE", async () => {
+		const env = makeEnv();
+		await run(
+			env,
+			putHandler(makeNewInstancePath(), authenticatedCtx, makeICalRequest()),
+		);
+		expect(env.stores.calTimezones.size).toBe(0);
+	});
+
+	it("does not upsert anything for a vCard PUT", async () => {
+		const env = makeEnv().withCollection({
+			id: TEST_COLLECTION_ID,
+			ownerPrincipalId: TEST_PRINCIPAL_ID,
+			collectionType: "addressbook",
+		});
+		await run(
+			env,
+			putHandler(makeNewInstancePath("card"), authenticatedCtx, makeVCardRequest()),
+		);
+		expect(env.stores.calTimezones.size).toBe(0);
 	});
 });

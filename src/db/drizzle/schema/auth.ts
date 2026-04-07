@@ -1,15 +1,17 @@
 import { sql } from "drizzle-orm";
 import { index, pgTable, text, unique, uuid } from "drizzle-orm/pg-core";
+import type { UuidString } from "#src/domain/ids.ts";
 import { redactedText, timestampTz } from "./types";
 import { user } from "./user";
 
 export const authUser = pgTable(
 	"auth_user",
 	{
-		id: uuid().default(sql`uuidv7()`).primaryKey(),
+		id: uuid().default(sql`uuidv7()`).primaryKey().$type<UuidString>(),
 		userId: uuid("user_id")
 			.notNull()
-			.references(() => user.id, { onDelete: "cascade" }),
+			.references(() => user.id, { onDelete: "cascade" })
+			.$type<UuidString>(),
 		authSource: text("auth_source").notNull(),
 		authId: text("auth_id").notNull(),
 		updatedAt: timestampTz("updated_at").default(sql`now()`).notNull(),

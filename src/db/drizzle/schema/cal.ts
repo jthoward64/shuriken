@@ -10,13 +10,14 @@ import {
 	unique,
 	uuid,
 } from "drizzle-orm/pg-core";
+import type { UuidString } from "#src/domain/ids.ts";
 import { davComponent, davEntity } from "./dav";
 import { timestampTz, tsvector } from "./types";
 
 export const calTimezone = pgTable(
 	"cal_timezone",
 	{
-		id: uuid().default(sql`uuidv7()`).primaryKey(),
+		id: uuid().default(sql`uuidv7()`).primaryKey().$type<UuidString>(),
 		tzid: text().notNull(),
 		vtimezoneData: text("vtimezone_data").notNull(),
 		ianaName: text("iana_name"),
@@ -35,10 +36,12 @@ export const calIndex = pgTable(
 	{
 		entityId: uuid("entity_id")
 			.notNull()
-			.references(() => davEntity.id, { onDelete: "cascade" }),
+			.references(() => davEntity.id, { onDelete: "cascade" })
+			.$type<UuidString>(),
 		componentId: uuid("component_id")
 			.notNull()
-			.references(() => davComponent.id, { onDelete: "cascade" }),
+			.references(() => davComponent.id, { onDelete: "cascade" })
+			.$type<UuidString>(),
 		componentType: text("component_type").notNull(),
 		uid: text(),
 		recurrenceIdUtc: timestampTz("recurrence_id_utc"),

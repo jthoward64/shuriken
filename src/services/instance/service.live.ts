@@ -50,16 +50,8 @@ export const InstanceServiceLive = Layer.effect(
 					existingId,
 				});
 				if (existingId) {
-					// Update existing instance etag + revision
-					const existing = yield* repo
-						.findById(existingId)
-						.pipe(
-							Effect.flatMap(
-								someOrNotFound(`Instance not found: ${existingId}`),
-							),
-						);
-					const newRevision = existing.syncRevision + 1;
-					yield* repo.updateEtag(existingId, input.etag, newRevision);
+					// Update existing instance etag (sync_revision is set by DB trigger)
+					yield* repo.updateEtag(existingId, input.etag);
 					return yield* repo
 						.findById(existingId)
 						.pipe(

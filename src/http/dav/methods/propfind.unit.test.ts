@@ -100,6 +100,8 @@ describe("propfindHandler — Depth: infinity", () => {
 			principalId: TEST_PRINCIPAL_ID,
 			namespace: "cal",
 			collectionId: TEST_COLLECTION_ID,
+			principalSeg: String(TEST_PRINCIPAL_ID),
+			collectionSeg: String(TEST_COLLECTION_ID),
 		};
 
 		const err = (await runFailure(
@@ -126,6 +128,7 @@ describe("propfindHandler — new-resource paths", () => {
 			principalId: TEST_PRINCIPAL_ID,
 			namespace: "cal",
 			slug: Slug("missing"),
+			principalSeg: String(TEST_PRINCIPAL_ID),
 		};
 
 		const err = (await runFailure(
@@ -145,6 +148,8 @@ describe("propfindHandler — new-resource paths", () => {
 			namespace: "cal",
 			collectionId: TEST_COLLECTION_ID,
 			slug: Slug("missing.ics"),
+			principalSeg: String(TEST_PRINCIPAL_ID),
+			collectionSeg: String(TEST_COLLECTION_ID),
 		};
 
 		const err = (await runFailure(
@@ -169,6 +174,8 @@ describe("propfindHandler — collection, Depth: 0", () => {
 			principalId: TEST_PRINCIPAL_ID,
 			namespace: "cal",
 			collectionId: TEST_COLLECTION_ID,
+			principalSeg: String(TEST_PRINCIPAL_ID),
+			collectionSeg: String(TEST_COLLECTION_ID),
 		};
 
 		const res = await runSuccess(
@@ -192,6 +199,8 @@ describe("propfindHandler — collection, Depth: 0", () => {
 			principalId: TEST_PRINCIPAL_ID,
 			namespace: "cal",
 			collectionId: TEST_COLLECTION_ID,
+			principalSeg: String(TEST_PRINCIPAL_ID),
+			collectionSeg: String(TEST_COLLECTION_ID),
 		};
 
 		const res = await runSuccess(
@@ -216,6 +225,8 @@ describe("propfindHandler — collection, Depth: 0", () => {
 			principalId: TEST_PRINCIPAL_ID,
 			namespace: "cal",
 			collectionId: TEST_COLLECTION_ID,
+			principalSeg: String(TEST_PRINCIPAL_ID),
+			collectionSeg: String(TEST_COLLECTION_ID),
 		};
 
 		const res = await runSuccess(
@@ -240,6 +251,8 @@ describe("propfindHandler — collection, Depth: 0", () => {
 			principalId: TEST_PRINCIPAL_ID,
 			namespace: "cal",
 			collectionId: TEST_COLLECTION_ID,
+			principalSeg: String(TEST_PRINCIPAL_ID),
+			collectionSeg: String(TEST_COLLECTION_ID),
 		};
 
 		const req = new Request("http://localhost/", { method: "PROPFIND" }); // no Depth header
@@ -278,6 +291,8 @@ describe("propfindHandler — collection, Depth: 1", () => {
 			principalId: TEST_PRINCIPAL_ID,
 			namespace: "cal",
 			collectionId: TEST_COLLECTION_ID,
+			principalSeg: String(TEST_PRINCIPAL_ID),
+			collectionSeg: String(TEST_COLLECTION_ID),
 		};
 
 		const res = await runSuccess(
@@ -304,6 +319,8 @@ describe("propfindHandler — collection, Depth: 1", () => {
 			principalId: TEST_PRINCIPAL_ID,
 			namespace: "cal",
 			collectionId: TEST_COLLECTION_ID,
+			principalSeg: String(TEST_PRINCIPAL_ID),
+			collectionSeg: String(TEST_COLLECTION_ID),
 		};
 
 		const res = await runSuccess(
@@ -345,6 +362,9 @@ describe("propfindHandler — instance, Depth: 0", () => {
 			namespace: "cal",
 			collectionId: TEST_COLLECTION_ID,
 			instanceId: TEST_INSTANCE_ID,
+			principalSeg: String(TEST_PRINCIPAL_ID),
+			collectionSeg: String(TEST_COLLECTION_ID),
+			instanceSeg: String(TEST_INSTANCE_ID),
 		};
 
 		const res = await runSuccess(
@@ -373,6 +393,8 @@ describe("propfindHandler — named prop", () => {
 			principalId: TEST_PRINCIPAL_ID,
 			namespace: "cal",
 			collectionId: TEST_COLLECTION_ID,
+			principalSeg: String(TEST_PRINCIPAL_ID),
+			collectionSeg: String(TEST_COLLECTION_ID),
 		};
 		const body = `<D:propfind xmlns:D="DAV:"><D:prop><D:displayname/></D:prop></D:propfind>`;
 
@@ -394,6 +416,8 @@ describe("propfindHandler — named prop", () => {
 			principalId: TEST_PRINCIPAL_ID,
 			namespace: "cal",
 			collectionId: TEST_COLLECTION_ID,
+			principalSeg: String(TEST_PRINCIPAL_ID),
+			collectionSeg: String(TEST_COLLECTION_ID),
 		};
 		// Request a property that doesn't exist on a collection
 		const body = `<D:propfind xmlns:D="DAV:"><D:prop><D:getetag/></D:prop></D:propfind>`;
@@ -420,6 +444,7 @@ describe("propfindHandler — principal", () => {
 		const path: ResolvedDavPath = {
 			kind: "principal",
 			principalId: TEST_PRINCIPAL_ID,
+			principalSeg: String(TEST_PRINCIPAL_ID),
 		};
 
 		const res = await runSuccess(

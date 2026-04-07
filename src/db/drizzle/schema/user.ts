@@ -7,19 +7,21 @@ import {
 	uniqueIndex,
 	uuid,
 } from "drizzle-orm/pg-core";
+import type { UuidString } from "#src/domain/ids.ts";
 import { principal } from "./principal";
 import { timestampTz } from "./types";
 
 export const user = pgTable(
 	"user",
 	{
-		id: uuid().default(sql`uuidv7()`).primaryKey(),
+		id: uuid().default(sql`uuidv7()`).primaryKey().$type<UuidString>(),
 		name: text().notNull(),
 		email: text().notNull(),
 		updatedAt: timestampTz("updated_at").default(sql`now()`).notNull(),
 		principalId: uuid("principal_id")
 			.notNull()
-			.references(() => principal.id, { onDelete: "restrict" }),
+			.references(() => principal.id, { onDelete: "restrict" })
+			.$type<UuidString>(),
 	},
 	(table) => [
 		index("idx_user_email_active").using(

@@ -27,6 +27,7 @@ import type { InstanceService } from "#src/services/instance/index.ts";
 import { InstanceRepository } from "#src/services/instance/index.ts";
 import { PrincipalRepository } from "#src/services/principal/index.ts";
 import type { PrincipalService } from "#src/services/principal/service.ts";
+import type { CalTimezoneRepository } from "#src/services/timezone/index.ts";
 import { deleteHandler } from "./methods/delete.ts";
 import { getHandler } from "./methods/get.ts";
 import { mkcolHandler } from "./methods/mkcol.ts";
@@ -62,7 +63,8 @@ type DavServices =
 	| AclService
 	| PrincipalService
 	| EntityRepository
-	| ComponentRepository;
+	| ComponentRepository
+	| CalTimezoneRepository;
 
 // Segment counts after stripping /dav (index 0 = "principals")
 const SEGMENTS_PRINCIPAL = 2; // ["principals", ":slug"]
@@ -131,7 +133,7 @@ export const parseDavPath = (
 		const principalId = PrincipalId(principalRow.principal.id);
 
 		if (segments.length === SEGMENTS_PRINCIPAL) {
-			return { kind: "principal", principalId } satisfies ResolvedDavPath;
+			return { kind: "principal", principalId, principalSeg: seg1 } satisfies ResolvedDavPath;
 		}
 
 		// seg2 must be a known collection namespace — reject anything else
@@ -169,6 +171,7 @@ export const parseDavPath = (
 				principalId,
 				namespace,
 				slug: Slug(seg3),
+				principalSeg: seg1,
 			} satisfies ResolvedDavPath;
 		}
 		const collectionId = CollectionId(collRowOpt.value.id);
@@ -179,6 +182,8 @@ export const parseDavPath = (
 				principalId,
 				namespace,
 				collectionId,
+				principalSeg: seg1,
+				collectionSeg: seg3,
 			} satisfies ResolvedDavPath;
 		}
 
@@ -204,6 +209,8 @@ export const parseDavPath = (
 				namespace,
 				collectionId,
 				slug: Slug(seg4),
+				principalSeg: seg1,
+				collectionSeg: seg3,
 			} satisfies ResolvedDavPath;
 		}
 
@@ -213,6 +220,9 @@ export const parseDavPath = (
 			namespace,
 			collectionId,
 			instanceId: InstanceId(instRowOpt.value.id),
+			principalSeg: seg1,
+			collectionSeg: seg3,
+			instanceSeg: seg4,
 		} satisfies ResolvedDavPath;
 	});
 };

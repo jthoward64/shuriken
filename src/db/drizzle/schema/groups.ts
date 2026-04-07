@@ -6,6 +6,7 @@ import {
 	uniqueIndex,
 	uuid,
 } from "drizzle-orm/pg-core";
+import type { UuidString } from "#src/domain/ids.ts";
 import { principal } from "./principal";
 import { timestampTz } from "./types";
 import { user } from "./user";
@@ -13,10 +14,11 @@ import { user } from "./user";
 export const group = pgTable(
 	"group",
 	{
-		id: uuid().default(sql`uuidv7()`).primaryKey(),
+		id: uuid().default(sql`uuidv7()`).primaryKey().$type<UuidString>(),
 		principalId: uuid("principal_id")
 			.notNull()
-			.references(() => principal.id, { onDelete: "restrict" }),
+			.references(() => principal.id, { onDelete: "restrict" })
+			.$type<UuidString>(),
 		updatedAt: timestampTz("updated_at").default(sql`now()`).notNull(),
 	},
 	(table) => [
@@ -36,10 +38,12 @@ export const membership = pgTable(
 	{
 		userId: uuid("user_id")
 			.notNull()
-			.references(() => user.id, { onDelete: "cascade" }),
+			.references(() => user.id, { onDelete: "cascade" })
+			.$type<UuidString>(),
 		groupId: uuid("group_id")
 			.notNull()
-			.references(() => group.id, { onDelete: "cascade" }),
+			.references(() => group.id, { onDelete: "cascade" })
+			.$type<UuidString>(),
 		updatedAt: timestampTz("updated_at").default(sql`now()`).notNull(),
 	},
 	(table) => [

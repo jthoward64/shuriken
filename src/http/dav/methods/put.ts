@@ -1,6 +1,7 @@
 import { Effect, Option } from "effect";
 import { makeEtag } from "#src/data/etag.ts";
 import { decodeICalendar, encodeICalendar } from "#src/data/icalendar/codec.ts";
+import { extractVtimezones } from "#src/data/icalendar/timezone.ts";
 import { extractUid as extractICalUid } from "#src/data/icalendar/uid.ts";
 import { decodeVCard, encodeVCard } from "#src/data/vcard/codec.ts";
 import { extractUid as extractVCardUid } from "#src/data/vcard/uid.ts";
@@ -21,6 +22,7 @@ import { AclService } from "#src/services/acl/index.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
 import { EntityRepository } from "#src/services/entity/index.ts";
 import { InstanceService } from "#src/services/instance/index.ts";
+import { CalTimezoneRepository } from "#src/services/timezone/index.ts";
 
 // ---------------------------------------------------------------------------
 // PUT handler — RFC 4918 §9.7, RFC 4791 §5.3.2, RFC 6352 §5.3.2
@@ -34,7 +36,7 @@ export const putHandler = (
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError,
-	InstanceService | EntityRepository | ComponentRepository | AclService
+	InstanceService | EntityRepository | ComponentRepository | CalTimezoneRepository | AclService
 > =>
 	Effect.gen(function* () {
 		// 1. Only new-instance and instance paths accept PUT.
@@ -78,6 +80,19 @@ export const putHandler = (
 			entityType === "icalendar"
 				? yield* decodeICalendar(body)
 				: yield* decodeVCard(body);
+
+		// 5a. Cache VTIMEZONE definitions in cal_timezone (iCalendar only).
+		//     Each VTIMEZONE is upserted with RFC 5545 §3.6.5 LAST-MODIFIED conflict
+		//     resolution handled by the repository (newer definition wins).
+		if (entityType === "icalendar") {
+			const tzRepo = yield* CalTimezoneRepository;
+			const vtimezones = yield* extractVtimezones(doc);
+			yield* Effect.forEach(
+				vtimezones,
+				(tz) => tzRepo.upsert(tz.tzid, tz.vtimezoneData, tz.ianaName, tz.lastModified),
+				{ discard: true },
+			);
+		}
 
 		// 6. Extract logical UID.
 		const logicalUid = Option.getOrNull(
