@@ -6,18 +6,18 @@
 // ---------------------------------------------------------------------------
 
 import { Effect } from "effect";
-import type { ClarkName, IrDocument } from "#src/data/ir.ts";
 import { encodeICalendar } from "#src/data/icalendar/codec.ts";
+import type { ClarkName, IrDocument } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import { methodNotAllowed } from "#src/domain/errors.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
+import type { AclService } from "#src/services/acl/index.ts";
+import type { ComponentRepository } from "#src/services/component/index.ts";
+import type { InstanceService } from "#src/services/instance/index.ts";
 import { parseCalendarDataSpec, subsetIrDocument } from "./calendar-data.ts";
 import { multigetHandler } from "./multiget.ts";
 import { extractHrefs, extractPropNames } from "./parse.ts";
-import { AclService } from "#src/services/acl/index.ts";
-import { ComponentRepository } from "#src/services/component/index.ts";
-import { InstanceService } from "#src/services/instance/index.ts";
 
 const CALDAV_NS = "urn:ietf:params:xml:ns:caldav";
 const cn = (local: string): ClarkName => `{${CALDAV_NS}}${local}` as ClarkName;

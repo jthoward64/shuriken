@@ -1,9 +1,11 @@
 import { Layer, Option, Redacted } from "effect";
 import { BasicAuthLayer } from "#src/auth/layers/basic.ts";
 import { AppConfigService, type AppConfigType } from "#src/config.ts";
-import type { CryptoService } from "#src/platform/crypto.ts";
 import type { DatabaseClient } from "#src/db/client.ts";
+import type { CryptoService } from "#src/platform/crypto.ts";
 import { AclServiceAllowAll } from "#src/services/acl/index.ts";
+import { CalIndexRepositoryLive } from "#src/services/cal-index/index.ts";
+import { CardIndexRepositoryLive } from "#src/services/card-index/index.ts";
 import { CollectionDomainLayer } from "#src/services/collection/index.ts";
 import { DomainEntityDomainLayer } from "#src/services/domain-entity/index.ts";
 import { GroupDomainLayer } from "#src/services/group/index.ts";
@@ -11,6 +13,7 @@ import { InstanceDomainLayer } from "#src/services/instance/index.ts";
 import { PrincipalDomainLayer } from "#src/services/principal/index.ts";
 import { ProvisioningDomainLayer } from "#src/services/provisioning/index.ts";
 import { TimezoneDomainLayer } from "#src/services/timezone/index.ts";
+import { TombstoneRepositoryLive } from "#src/services/tombstone/index.ts";
 import { UserDomainLayer } from "#src/services/user/index.ts";
 import { TestCryptoLayer } from "#src/testing/env.ts";
 import { makePgliteDatabaseLayer } from "#src/testing/pglite.ts";
@@ -76,5 +79,8 @@ export const makeScriptRunnerLayer = () => {
 		withTestInfra(DomainEntityDomainLayer),
 		withTestInfra(TimezoneDomainLayer),
 		withTestInfra(ProvisioningDomainLayer),
+		withTestInfra(TombstoneRepositoryLive),
+		withTestInfra(CalIndexRepositoryLive),
+		withTestInfra(CardIndexRepositoryLive),
 	);
 };

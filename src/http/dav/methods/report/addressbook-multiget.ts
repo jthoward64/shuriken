@@ -12,12 +12,12 @@ import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import { methodNotAllowed } from "#src/domain/errors.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
+import type { AclService } from "#src/services/acl/index.ts";
+import type { ComponentRepository } from "#src/services/component/index.ts";
+import type { InstanceService } from "#src/services/instance/index.ts";
 import { parseAddressDataSpec, subsetVCardDocument } from "./address-data.ts";
 import { multigetHandler } from "./multiget.ts";
 import { extractHrefs, extractPropNames } from "./parse.ts";
-import { AclService } from "#src/services/acl/index.ts";
-import { ComponentRepository } from "#src/services/component/index.ts";
-import { InstanceService } from "#src/services/instance/index.ts";
 
 const CARDDAV_NS = "urn:ietf:params:xml:ns:carddav";
 const cn = (local: string): ClarkName => `{${CARDDAV_NS}}${local}` as ClarkName;

@@ -19,12 +19,15 @@ import type {
 	PrincipalRepository,
 } from "#src/layers.ts";
 import type { AclService } from "#src/services/acl/index.ts";
+import type { CalIndexRepository } from "#src/services/cal-index/index.ts";
+import type { CardIndexRepository } from "#src/services/card-index/index.ts";
 import type { CollectionService } from "#src/services/collection/index.ts";
 import type { ComponentRepository } from "#src/services/component/index.ts";
 import type { EntityRepository } from "#src/services/entity/index.ts";
 import type { InstanceService } from "#src/services/instance/index.ts";
 import type { PrincipalService } from "#src/services/principal/service.ts";
 import type { CalTimezoneRepository } from "#src/services/timezone/index.ts";
+import type { TombstoneRepository } from "#src/services/tombstone/index.ts";
 
 // ---------------------------------------------------------------------------
 // Top-level HTTP router
@@ -47,7 +50,10 @@ type AppServices =
 	| PrincipalService
 	| EntityRepository
 	| ComponentRepository
-	| CalTimezoneRepository;
+	| CalTimezoneRepository
+	| TombstoneRepository
+	| CalIndexRepository
+	| CardIndexRepository;
 
 const isDavPath = (pathname: string): boolean =>
 	pathname === "/dav" ||
@@ -76,7 +82,12 @@ const splitPrecondition = (
 		return ["CR", precondition.slice("CARDDAV:".length)];
 	}
 	// DAV: is the default; the compile-time assertion ensures no other prefix exists
-	return ["D", precondition.startsWith("DAV:") ? precondition.slice("DAV:".length) : precondition];
+	return [
+		"D",
+		precondition.startsWith("DAV:")
+			? precondition.slice("DAV:".length)
+			: precondition,
+	];
 };
 
 /** Serialize a DavError to an RFC 4918 §16 XML body. */
@@ -131,12 +142,14 @@ const mapErrorToResponse = (err: AppError): Effect.Effect<Response, never> =>
 			Effect.succeed(new Response(e.message, { status: 409 })),
 		),
 		Match.tag("DatabaseError", "InternalError", (e) =>
-			Effect.succeed(new Response("Internal Server Error", { status: 500 })).pipe(
-				Effect.tap(() => Effect.logWarning("server error", e.cause)),
-			),
+			Effect.succeed(
+				new Response("Internal Server Error", { status: 500 }),
+			).pipe(Effect.tap(() => Effect.logWarning("server error", e.cause))),
 		),
 		Match.tag("ConfigError", (e) =>
-			Effect.succeed(new Response("Internal Server Error", { status: 500 })).pipe(
+			Effect.succeed(
+				new Response("Internal Server Error", { status: 500 }),
+			).pipe(
 				Effect.tap(() => Effect.logWarning("config error", { key: e.key })),
 			),
 		),

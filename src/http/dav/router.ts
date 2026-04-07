@@ -19,6 +19,8 @@ import { type ResolvedDavPath, Slug } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { HTTP_METHOD_NOT_ALLOWED } from "#src/http/status.ts";
 import type { AclService } from "#src/services/acl/index.ts";
+import type { CalIndexRepository } from "#src/services/cal-index/index.ts";
+import type { CardIndexRepository } from "#src/services/card-index/index.ts";
 import type { CollectionService } from "#src/services/collection/index.ts";
 import { CollectionRepository } from "#src/services/collection/index.ts";
 import type { ComponentRepository } from "#src/services/component/index.ts";
@@ -28,6 +30,7 @@ import { InstanceRepository } from "#src/services/instance/index.ts";
 import { PrincipalRepository } from "#src/services/principal/index.ts";
 import type { PrincipalService } from "#src/services/principal/service.ts";
 import type { CalTimezoneRepository } from "#src/services/timezone/index.ts";
+import type { TombstoneRepository } from "#src/services/tombstone/index.ts";
 import { deleteHandler } from "./methods/delete.ts";
 import { getHandler } from "./methods/get.ts";
 import { mkcolHandler } from "./methods/mkcol.ts";
@@ -64,7 +67,10 @@ type DavServices =
 	| PrincipalService
 	| EntityRepository
 	| ComponentRepository
-	| CalTimezoneRepository;
+	| CalTimezoneRepository
+	| TombstoneRepository
+	| CalIndexRepository
+	| CardIndexRepository;
 
 // Segment counts after stripping /dav (index 0 = "principals")
 const SEGMENTS_PRINCIPAL = 2; // ["principals", ":slug"]
@@ -133,7 +139,11 @@ export const parseDavPath = (
 		const principalId = PrincipalId(principalRow.principal.id);
 
 		if (segments.length === SEGMENTS_PRINCIPAL) {
-			return { kind: "principal", principalId, principalSeg: seg1 } satisfies ResolvedDavPath;
+			return {
+				kind: "principal",
+				principalId,
+				principalSeg: seg1,
+			} satisfies ResolvedDavPath;
 		}
 
 		// seg2 must be a known collection namespace — reject anything else

@@ -9,31 +9,37 @@ import {
 	HTTP_OK,
 } from "#src/http/status.ts";
 import { AclServiceAllowAll } from "#src/services/acl/index.ts";
+import { CalIndexRepository } from "#src/services/cal-index/index.ts";
+import { CardIndexRepository } from "#src/services/card-index/index.ts";
 import type { CollectionRow } from "#src/services/collection/repository.ts";
-import { ComponentRepository } from "#src/services/component/index.ts";
-import type { ComponentRepositoryShape } from "#src/services/component/repository.ts";
-import { EntityRepository } from "#src/services/entity/index.ts";
-import type { EntityRepositoryShape } from "#src/services/entity/repository.ts";
 import {
 	CollectionRepository,
 	type CollectionRepositoryShape,
 } from "#src/services/collection/repository.ts";
-import { CollectionService } from "#src/services/collection/service.ts";
 import type { CollectionServiceShape } from "#src/services/collection/service.ts";
+import { CollectionService } from "#src/services/collection/service.ts";
+import { ComponentRepository } from "#src/services/component/index.ts";
+import type { ComponentRepositoryShape } from "#src/services/component/repository.ts";
+import { EntityRepository } from "#src/services/entity/index.ts";
+import type { EntityRepositoryShape } from "#src/services/entity/repository.ts";
 import type { InstanceRow } from "#src/services/instance/repository.ts";
 import {
 	InstanceRepository,
 	type InstanceRepositoryShape,
 } from "#src/services/instance/repository.ts";
-import { InstanceService } from "#src/services/instance/service.ts";
 import type { InstanceServiceShape } from "#src/services/instance/service.ts";
+import { InstanceService } from "#src/services/instance/service.ts";
 import type { PrincipalWithUser } from "#src/services/principal/repository.ts";
-import { PrincipalService, type PrincipalServiceShape } from "#src/services/principal/service.ts";
 import {
 	PrincipalRepository,
 	type PrincipalRepositoryShape,
 } from "#src/services/principal/repository.ts";
+import {
+	PrincipalService,
+	type PrincipalServiceShape,
+} from "#src/services/principal/service.ts";
 import { CalTimezoneRepository } from "#src/services/timezone/repository.ts";
+import { TombstoneRepository } from "#src/services/tombstone/index.ts";
 import { davRouter, parseDavPath } from "./router.ts";
 
 // ---------------------------------------------------------------------------
@@ -112,7 +118,21 @@ const noopCalTimezoneRepo = CalTimezoneRepository.of({
 /** Build a Layer providing all DAV router requirements from simple slug→id maps. */
 const makeRouterLayer = (
 	seeds: RouterSeeds = {},
-): Layer.Layer<PrincipalRepository | CollectionRepository | InstanceRepository | CollectionService | InstanceService | PrincipalService | import("#src/services/acl/index.ts").AclService | EntityRepository | ComponentRepository | CalTimezoneRepository> => {
+): Layer.Layer<
+	| PrincipalRepository
+	| CollectionRepository
+	| InstanceRepository
+	| CollectionService
+	| InstanceService
+	| PrincipalService
+	| import("#src/services/acl/index.ts").AclService
+	| EntityRepository
+	| ComponentRepository
+	| CalTimezoneRepository
+	| TombstoneRepository
+	| CalIndexRepository
+	| CardIndexRepository
+> => {
 	const principals = seeds.principals ?? new Map<string, string>();
 	const collections = seeds.collections ?? new Map<string, string>();
 	const instances = seeds.instances ?? new Map<string, string>();
@@ -123,9 +143,16 @@ const makeRouterLayer = (
 	);
 	// collection entries are keyed as `${principalId}:${collectionType}:${slug}` → id.
 	// For findById we only need id → {principalId, collectionType, slug}.
-	const collectionById = new Map<string, { principalId: string; collectionType: string; slug: string }>(
+	const collectionById = new Map<
+		string,
+		{ principalId: string; collectionType: string; slug: string }
+	>(
 		[...collections.entries()].map(([key, id]) => {
-			const [principalId, collectionType, slug] = key.split(":") as [string, string, string];
+			const [principalId, collectionType, slug] = key.split(":") as [
+				string,
+				string,
+				string,
+			];
 			return [id, { principalId, collectionType, slug }];
 		}),
 	);
@@ -146,17 +173,45 @@ const makeRouterLayer = (
 				return Effect.succeed(Option.none());
 			}
 			const row = {
-				principal: { id, slug, principalType: "user", displayName: null, updatedAt: null, deletedAt: null },
-				user: { id: crypto.randomUUID(), principalId: id, name: slug, email: `${slug}@test`, updatedAt: null },
+				principal: {
+					id,
+					slug,
+					principalType: "user",
+					displayName: null,
+					updatedAt: null,
+					deletedAt: null,
+				},
+				user: {
+					id: crypto.randomUUID(),
+					principalId: id,
+					name: slug,
+					email: `${slug}@test`,
+					updatedAt: null,
+				},
 			} as unknown as PrincipalWithUser;
 			return Effect.succeed(Option.some(row));
 		},
 		findById: (id) => {
 			const slug = principalById.get(id);
-			if (!slug) { return Effect.succeed(Option.none()); }
+			if (!slug) {
+				return Effect.succeed(Option.none());
+			}
 			const row = {
-				principal: { id, slug, principalType: "user", displayName: null, updatedAt: null, deletedAt: null },
-				user: { id: crypto.randomUUID(), principalId: id, name: slug, email: `${slug}@test`, updatedAt: null },
+				principal: {
+					id,
+					slug,
+					principalType: "user",
+					displayName: null,
+					updatedAt: null,
+					deletedAt: null,
+				},
+				user: {
+					id: crypto.randomUUID(),
+					principalId: id,
+					name: slug,
+					email: `${slug}@test`,
+					updatedAt: null,
+				},
 			} as unknown as PrincipalWithUser;
 			return Effect.succeed(Option.some(row));
 		},
@@ -171,13 +226,27 @@ const makeRouterLayer = (
 			if (!id) {
 				return Effect.succeed(Option.none());
 			}
-			const row = { id, slug, ownerPrincipalId: principalId, collectionType, deletedAt: null } as unknown as CollectionRow;
+			const row = {
+				id,
+				slug,
+				ownerPrincipalId: principalId,
+				collectionType,
+				deletedAt: null,
+			} as unknown as CollectionRow;
 			return Effect.succeed(Option.some(row));
 		},
 		findById: (id) => {
 			const meta = collectionById.get(id);
-			if (!meta) { return Effect.succeed(Option.none()); }
-			const row = { id, slug: meta.slug, ownerPrincipalId: meta.principalId, collectionType: meta.collectionType, deletedAt: null } as unknown as CollectionRow;
+			if (!meta) {
+				return Effect.succeed(Option.none());
+			}
+			const row = {
+				id,
+				slug: meta.slug,
+				ownerPrincipalId: meta.principalId,
+				collectionType: meta.collectionType,
+				deletedAt: null,
+			} as unknown as CollectionRow;
 			return Effect.succeed(Option.some(row));
 		},
 		listByOwner: () => Effect.succeed([]),
@@ -192,13 +261,25 @@ const makeRouterLayer = (
 			if (!id) {
 				return Effect.succeed(Option.none());
 			}
-			const row = { id, slug, collectionId, deletedAt: null } as unknown as InstanceRow;
+			const row = {
+				id,
+				slug,
+				collectionId,
+				deletedAt: null,
+			} as unknown as InstanceRow;
 			return Effect.succeed(Option.some(row));
 		},
 		findById: (id) => {
 			const meta = instanceById.get(id);
-			if (!meta) { return Effect.succeed(Option.none()); }
-			const row = { id, slug: meta.slug, collectionId: meta.collectionId, deletedAt: null } as unknown as InstanceRow;
+			if (!meta) {
+				return Effect.succeed(Option.none());
+			}
+			const row = {
+				id,
+				slug: meta.slug,
+				collectionId: meta.collectionId,
+				deletedAt: null,
+			} as unknown as InstanceRow;
 			return Effect.succeed(Option.some(row));
 		},
 		listByCollection: () => Effect.succeed([]),
@@ -219,6 +300,16 @@ const makeRouterLayer = (
 		Layer.succeed(EntityRepository, noopEntityRepo),
 		Layer.succeed(ComponentRepository, noopComponentRepo),
 		Layer.succeed(CalTimezoneRepository, noopCalTimezoneRepo),
+		Layer.succeed(TombstoneRepository, {
+			findSinceRevision: () => Effect.die("not implemented in router tests"),
+		}),
+		Layer.succeed(CalIndexRepository, {
+			findByTimeRange: () => Effect.die("not implemented in router tests"),
+			findByComponentType: () => Effect.die("not implemented in router tests"),
+		}),
+		Layer.succeed(CardIndexRepository, {
+			findByText: () => Effect.die("not implemented in router tests"),
+		}),
 		AclServiceAllowAll,
 	);
 };
@@ -281,21 +372,17 @@ describe("davRouter — unknown paths", () => {
 describe("davRouter — principal slug resolution", () => {
 	it("OPTIONS /dav/principals/alice/ returns 200 when alice exists", async () => {
 		const aliceId = crypto.randomUUID();
-		const res = await run(
-			"OPTIONS",
-			"/dav/principals/alice/",
-			{ principals: new Map([["alice", aliceId]]) },
-		);
+		const res = await run("OPTIONS", "/dav/principals/alice/", {
+			principals: new Map([["alice", aliceId]]),
+		});
 		expect(res.status).toBe(HTTP_OK);
 	});
 
 	it("OPTIONS /dav/principals/{uuid}/ returns 200 when principal is accessed via its own UUID", async () => {
 		const aliceId = crypto.randomUUID();
-		const res = await run(
-			"OPTIONS",
-			`/dav/principals/${aliceId}/`,
-			{ principals: new Map([["alice", aliceId]]) },
-		);
+		const res = await run("OPTIONS", `/dav/principals/${aliceId}/`, {
+			principals: new Map([["alice", aliceId]]),
+		});
 		expect(res.status).toBe(HTTP_OK);
 	});
 
@@ -306,11 +393,9 @@ describe("davRouter — principal slug resolution", () => {
 
 	it("URL-encoded slug %40alice is decoded to @alice before lookup", async () => {
 		const id = crypto.randomUUID();
-		const res = await run(
-			"OPTIONS",
-			"/dav/principals/%40alice/",
-			{ principals: new Map([["@alice", id]]) },
-		);
+		const res = await run("OPTIONS", "/dav/principals/%40alice/", {
+			principals: new Map([["@alice", id]]),
+		});
 		expect(res.status).toBe(HTTP_OK);
 	});
 });
@@ -323,14 +408,10 @@ describe("davRouter — collection slug resolution", () => {
 	it("OPTIONS /dav/principals/alice/cal/my-cal returns 200 when collection exists", async () => {
 		const aliceId = crypto.randomUUID();
 		const calId = crypto.randomUUID();
-		const res = await run(
-			"OPTIONS",
-			"/dav/principals/alice/cal/my-cal",
-			{
-				principals: new Map([["alice", aliceId]]),
-				collections: new Map([[`${aliceId}:calendar:my-cal`, calId]]),
-			},
-		);
+		const res = await run("OPTIONS", "/dav/principals/alice/cal/my-cal", {
+			principals: new Map([["alice", aliceId]]),
+			collections: new Map([[`${aliceId}:calendar:my-cal`, calId]]),
+		});
 		expect(res.status).toBe(HTTP_OK);
 	});
 
@@ -350,11 +431,9 @@ describe("davRouter — collection slug resolution", () => {
 
 	it("OPTIONS /dav/principals/alice/cal/unknown returns 404 when collection not seeded", async () => {
 		const aliceId = crypto.randomUUID();
-		const res = await run(
-			"OPTIONS",
-			"/dav/principals/alice/cal/unknown",
-			{ principals: new Map([["alice", aliceId]]) },
-		);
+		const res = await run("OPTIONS", "/dav/principals/alice/cal/unknown", {
+			principals: new Map([["alice", aliceId]]),
+		});
 		expect(res.status).toBe(HTTP_NOT_FOUND);
 	});
 
@@ -428,11 +507,9 @@ describe("davRouter — instance slug resolution", () => {
 describe("davRouter — method dispatch", () => {
 	it("unrecognized method PATCH on a principal returns 405 with an Allow header", async () => {
 		const aliceId = crypto.randomUUID();
-		const res = await run(
-			"PATCH",
-			"/dav/principals/alice/",
-			{ principals: new Map([["alice", aliceId]]) },
-		);
+		const res = await run("PATCH", "/dav/principals/alice/", {
+			principals: new Map([["alice", aliceId]]),
+		});
 		expect(res.status).toBe(HTTP_METHOD_NOT_ALLOWED);
 		expect(res.headers.get("Allow")).toContain("OPTIONS");
 	});
@@ -487,9 +564,9 @@ describe("davRouter — new-resource path resolution", () => {
 	it("missing principal still rejects with a DavError (not silently converted to new-collection)", async () => {
 		const exit = await Effect.runPromise(
 			Effect.exit(
-				parseDavPath(new URL("http://localhost/dav/principals/nobody/new-cal")).pipe(
-					Effect.provide(makeRouterLayer()),
-				),
+				parseDavPath(
+					new URL("http://localhost/dav/principals/nobody/new-cal"),
+				).pipe(Effect.provide(makeRouterLayer())),
 			),
 		);
 		expect(exit._tag).toBe("Failure");

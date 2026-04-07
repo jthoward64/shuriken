@@ -62,7 +62,11 @@ const parseCompSpec = (el: unknown): CompSpec => {
 	if (propEls) {
 		const arr = Array.isArray(propEls) ? propEls : [propEls];
 		for (const p of arr) {
-			if (typeof p === "object" && p !== null && typeof (p as Record<string, unknown>)["@_name"] === "string") {
+			if (
+				typeof p === "object" &&
+				p !== null &&
+				typeof (p as Record<string, unknown>)["@_name"] === "string"
+			) {
 				props.add((p as Record<string, unknown>)["@_name"] as string);
 			}
 		}
@@ -113,8 +117,7 @@ const subsetComponent = (comp: IrComponent, spec: CompSpec): IrComponent => {
 		? comp.properties
 		: comp.properties.filter(
 				(p) =>
-					spec.props.has(p.name) ||
-					isAlwaysRequiredProp(comp.name, p.name),
+					spec.props.has(p.name) || isAlwaysRequiredProp(comp.name, p.name),
 			);
 
 	// Sub-components
@@ -129,7 +132,9 @@ const subsetComponent = (comp: IrComponent, spec: CompSpec): IrComponent => {
 				return [sub];
 			}
 			const subSpec = spec.comps.find((c) => c.name === sub.name);
-			if (!subSpec) return [];
+			if (!subSpec) {
+				return [];
+			}
 			return [subsetComponent(sub, subSpec)];
 		});
 	}
@@ -142,7 +147,10 @@ const subsetComponent = (comp: IrComponent, spec: CompSpec): IrComponent => {
  * RFC 4791 §8.6.1: VERSION in VCALENDAR is always returned.
  */
 const isAlwaysRequiredProp = (compName: string, propName: string): boolean => {
-	if (compName === "VCALENDAR" && (propName === "VERSION" || propName === "PRODID")) {
+	if (
+		compName === "VCALENDAR" &&
+		(propName === "VERSION" || propName === "PRODID")
+	) {
 		return true;
 	}
 	return false;
