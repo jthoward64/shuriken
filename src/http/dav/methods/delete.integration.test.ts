@@ -164,6 +164,73 @@ describe("DELETE instance", () => {
 		);
 		expectAllPass(results);
 	});
+
+	// RFC 7232 §3.1: If-Match with the correct ETag should allow the DELETE.
+	it("returns 204 when If-Match matches the current ETag", async () => {
+		const results = await runScript(
+			[
+				put(
+					"/dav/principals/test/cal/primary/ifmatch-del.ics",
+					EVENT,
+					"text/calendar",
+					{ as: "test", expect: { status: 201 } },
+				),
+				(prev) =>
+					del("/dav/principals/test/cal/primary/ifmatch-del.ics", {
+						as: "test",
+						headers: { "If-Match": prev[0]?.headers.etag ?? "" },
+						expect: { status: 204 },
+					}),
+			],
+			singleUser(),
+		);
+		expectAllPass(results);
+	});
+
+	// RFC 7232 §3.1: If-Match with a stale ETag must be rejected with 412.
+	it("returns 412 when If-Match does not match the current ETag", async () => {
+		const results = await runScript(
+			[
+				put(
+					"/dav/principals/test/cal/primary/ifmatch-stale.ics",
+					EVENT,
+					"text/calendar",
+					{ as: "test", expect: { status: 201 } },
+				),
+				del("/dav/principals/test/cal/primary/ifmatch-stale.ics", {
+					as: "test",
+					headers: { "If-Match": '"stale-etag-value"' },
+					expect: { status: 412 },
+				}),
+			],
+			singleUser(),
+		);
+		expectAllPass(results);
+	});
+
+	// Deleting an already-deleted resource must return 404, not 204 again.
+	it("returns 404 on a second DELETE of the same instance", async () => {
+		const results = await runScript(
+			[
+				put(
+					"/dav/principals/test/cal/primary/double-del.ics",
+					EVENT,
+					"text/calendar",
+					{ as: "test", expect: { status: 201 } },
+				),
+				del("/dav/principals/test/cal/primary/double-del.ics", {
+					as: "test",
+					expect: { status: 204 },
+				}),
+				del("/dav/principals/test/cal/primary/double-del.ics", {
+					as: "test",
+					expect: { status: 404 },
+				}),
+			],
+			singleUser(),
+		);
+		expectAllPass(results);
+	});
 });
 
 // ---------------------------------------------------------------------------

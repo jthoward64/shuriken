@@ -1,4 +1,4 @@
-import { Cause, Effect, Exit, Option } from "effect";
+import { Cause, Effect, Exit, Logger, LogLevel, Option } from "effect";
 
 // ---------------------------------------------------------------------------
 // Effect test helpers
@@ -13,7 +13,8 @@ import { Cause, Effect, Exit, Option } from "effect";
  */
 export const runSuccess = <A>(
 	effect: Effect.Effect<A, never, never>,
-): Promise<A> => Effect.runPromise(effect);
+): Promise<A> =>
+	Effect.runPromise(effect.pipe(Logger.withMinimumLogLevel(LogLevel.None)));
 
 /**
  * Run an effect and return the typed failure value.
@@ -22,7 +23,9 @@ export const runSuccess = <A>(
 export const runFailure = async <E>(
 	effect: Effect.Effect<unknown, E, never>,
 ): Promise<E> => {
-	const exit = await Effect.runPromiseExit(effect);
+	const exit = await Effect.runPromiseExit(
+		effect.pipe(Logger.withMinimumLogLevel(LogLevel.None)),
+	);
 	if (Exit.isSuccess(exit)) {
 		throw new Error(
 			`Expected effect to fail but it succeeded with: ${String(exit.value)}`,

@@ -82,6 +82,26 @@ describe("optionsHandler", () => {
 		}
 	});
 
+	// RFC 4918 §9.8/§9.9: COPY and MOVE are WebDAV methods and must be advertised.
+	it("includes COPY and MOVE in the Allow header (RFC 4918 §9.8/§9.9)", async () => {
+		const res = await Effect.runPromise(optionsHandler(fakePath, fakeCtx));
+		const methods = (res.headers.get("Allow") ?? "")
+			.split(",")
+			.map((m) => m.trim());
+		expect(methods).toContain("COPY");
+		expect(methods).toContain("MOVE");
+	});
+
+	// RFC 3744 §8.1: ACL is a required method for WebDAV Access Control and
+	// must be listed so that clients know they can set access control entries.
+	it("includes ACL in the Allow header (RFC 3744 §8.1)", async () => {
+		const res = await Effect.runPromise(optionsHandler(fakePath, fakeCtx));
+		const methods = (res.headers.get("Allow") ?? "")
+			.split(",")
+			.map((m) => m.trim());
+		expect(methods).toContain("ACL");
+	});
+
 	it("includes MS-Author-Via: DAV for CalDAV client compatibility", async () => {
 		const res = await Effect.runPromise(optionsHandler(fakePath, fakeCtx));
 		expect(res.headers.get("MS-Author-Via")).toBe("DAV");

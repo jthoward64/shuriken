@@ -99,4 +99,80 @@ describe("MKADDRESSBOOK", () => {
 			expect(result.headers.location).toContain("my-book");
 		}
 	});
+
+	// RFC 5689 §5.1 and RFC 6352 §6.3.2: MKADDRESSBOOK may carry a body to set
+	// initial properties, analogous to MKCALENDAR with a body.
+	it("creates an addressbook with extended body (displayname + description)", async () => {
+		const results = await runScript(
+			[
+				{
+					name: "MKADDRESSBOOK with body",
+					method: "MKADDRESSBOOK",
+					path: "/dav/principals/test/card/named-book/",
+					as: "test",
+					headers: { "Content-Type": "application/xml; charset=utf-8" },
+					body: `<?xml version="1.0" encoding="utf-8"?>
+<C:mkcol xmlns:C="urn:ietf:params:xml:ns:carddav" xmlns:D="DAV:">
+  <D:set>
+    <D:prop>
+      <D:displayname>My Contacts</D:displayname>
+      <C:addressbook-description>A test addressbook</C:addressbook-description>
+    </D:prop>
+  </D:set>
+</C:mkcol>`,
+					expect: { status: 201 },
+				},
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+	});
+});
+
+describe("MKCALENDAR — Location header", () => {
+	// RFC 4791 §5.3.1: the server MUST return a Location header pointing to the
+	// canonical URL of the newly created calendar collection.
+	it("Location header reflects the slug used in the request", async () => {
+		const results = await runScript(
+			[
+				mkcol("/dav/principals/test/cal/loc-check/", {
+					as: "test",
+					expect: { status: 201 },
+				}),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+		// The Location must end with the slug that was used in the request
+		expect(results[0]?.headers.location).toMatch(/loc-check\/?$/);
+	});
+});
+
+describe("MKCALENDAR — conflict", () => {
+	// RFC 4918 §9.3.1: MKCOL MUST fail with 409 Conflict if any intermediate
+	// collection in the request URI path does not exist.
+	// In this server the principal namespace (/cal/, /card/) is virtual, so the
+	// relevant case is attempting to create a calendar for a principal that does
+	// not exist — the server cannot create the resource because the ancestor is
+	// unmapped.
+	it("MKCALENDAR under a non-existent principal returns 403 or 404", async () => {
+		const results = await runScript(
+			[
+				mkcol("/dav/principals/ghost/cal/my-calendar/", {
+					as: "test",
+					// The acting principal owns no resource under /principals/ghost/,
+					// so the server should refuse with 403 (DAV:need-privileges).
+					expect: { status: 403 },
+				}),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+	});
 });

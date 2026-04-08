@@ -2,7 +2,12 @@ import { Effect, ManagedRuntime, Redacted } from "effect";
 import { UserId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import { Email } from "#src/domain/types/strings.ts";
+import {
+	GROUPS_VIRTUAL_RESOURCE_ID,
+	USERS_VIRTUAL_RESOURCE_ID,
+} from "#src/domain/virtual-resources.ts";
 import { handleRequest } from "#src/http/router.ts";
+import { AclRepository } from "#src/services/acl/index.ts";
 import { ProvisioningService } from "#src/services/provisioning/index.ts";
 import { UserService } from "#src/services/user/index.ts";
 import { makeScriptRunnerLayer } from "./layer.ts";
@@ -52,11 +57,12 @@ const provisionUsers = (
 ): Effect.Effect<
 	ReadonlyMap<string, ScriptUser>,
 	never,
-	ProvisioningService | UserService
+	ProvisioningService | UserService | AclRepository
 > =>
 	Effect.gen(function* () {
 		const provisioningSvc = yield* ProvisioningService;
 		const userSvc = yield* UserService;
+		const aclRepo = yield* AclRepository;
 
 		for (const scriptUser of users) {
 			const localPart = scriptUser.email.split("@")[0] ?? scriptUser.id;
@@ -75,6 +81,29 @@ const provisionUsers = (
 					password: Redacted.make(scriptUser.id),
 				})
 				.pipe(Effect.orDie);
+
+			// Grant admin users DAV:all on the virtual resources so they can
+			// access the /dav/users/ and /dav/groups/ admin API endpoints.
+			if (scriptUser.admin === true) {
+				const principalId = provisioned.user.principal.id;
+				for (const resourceId of [
+					USERS_VIRTUAL_RESOURCE_ID,
+					GROUPS_VIRTUAL_RESOURCE_ID,
+				]) {
+					yield* aclRepo
+						.grantAce({
+							resourceType: "virtual",
+							resourceId,
+							principalType: "principal",
+							principalId,
+							privilege: "DAV:all",
+							grantDeny: "grant",
+							protected: false,
+							ordinal: 0,
+						})
+						.pipe(Effect.orDie);
+				}
+			}
 		}
 
 		return new Map(users.map((u) => [u.id, u]));

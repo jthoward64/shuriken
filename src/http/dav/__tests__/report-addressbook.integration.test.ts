@@ -147,6 +147,31 @@ const queryFnEqualsAliceSmith = `<?xml version="1.0" encoding="utf-8"?>
   </C:filter>
 </C:addressbook-query>`;
 
+// address-data subsetting: return only UID and FN (not the full vCard body)
+// RFC 6352 §8.6.1 — <C:address-data> may contain <C:prop name="..."/> children
+// to restrict the returned properties.
+const multigetAliceSubsetted = `<?xml version="1.0" encoding="utf-8"?>
+<C:addressbook-multiget xmlns:C="urn:ietf:params:xml:ns:carddav" xmlns:D="DAV:">
+  <D:prop>
+    <D:getetag/>
+    <C:address-data>
+      <C:prop name="UID"/>
+      <C:prop name="FN"/>
+    </C:address-data>
+  </D:prop>
+  <D:href>/dav/principals/test/card/primary/alice.vcf</D:href>
+</C:addressbook-multiget>`;
+
+// addressbook-multiget with no hrefs — should return 207 with no resource responses
+// RFC 6352 §8.7: analogous to calendar-multiget; an empty href list is valid
+const multigetNoHrefs = `<?xml version="1.0" encoding="utf-8"?>
+<C:addressbook-multiget xmlns:C="urn:ietf:params:xml:ns:carddav" xmlns:D="DAV:">
+  <D:prop>
+    <D:getetag/>
+    <C:address-data/>
+  </D:prop>
+</C:addressbook-multiget>`;
+
 // anyof: match FN contains Alice OR FN contains Bob → both
 const queryAnyof = `<?xml version="1.0" encoding="utf-8"?>
 <C:addressbook-query xmlns:C="urn:ietf:params:xml:ns:carddav" xmlns:D="DAV:">
@@ -177,6 +202,22 @@ const queryAllof = `<?xml version="1.0" encoding="utf-8"?>
     </C:prop-filter>
     <C:prop-filter name="FN">
       <C:text-match collation="i;unicode-casemap" match-type="contains">Bob</C:text-match>
+    </C:prop-filter>
+  </C:filter>
+</C:addressbook-query>`;
+
+// is-not-defined on EMAIL (not present in test vCards) → both contacts match
+// RFC 6352 §10.5.1: prop-filter with is-not-defined matches vCards that
+// do NOT have the named property.
+const queryEmailIsNotDefined = `<?xml version="1.0" encoding="utf-8"?>
+<C:addressbook-query xmlns:C="urn:ietf:params:xml:ns:carddav" xmlns:D="DAV:">
+  <D:prop>
+    <D:getetag/>
+    <C:address-data/>
+  </D:prop>
+  <C:filter test="anyof">
+    <C:prop-filter name="EMAIL">
+      <C:is-not-defined/>
     </C:prop-filter>
   </C:filter>
 </C:addressbook-query>`;
@@ -458,5 +499,73 @@ describe("addressbook-query REPORT", () => {
 		for (const result of results) {
 			expect(result.failures, result.step.name).toEqual([]);
 		}
+	});
+
+	// RFC 6352 §10.5.1: prop-filter with is-not-defined on EMAIL (not present in
+	// either test vCard) should match both contacts.
+	it("is-not-defined on absent property (EMAIL) returns all contacts", async () => {
+		const results = await runScript(
+			[
+				...SETUP,
+				report("/dav/principals/test/card/primary/", queryEmailIsNotDefined, {
+					as: "test",
+					expect: {
+						status: 207,
+						bodyContains: [ALICE_UID, BOB_UID],
+					},
+				}),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+	});
+});
+
+describe("addressbook-multiget REPORT — edge cases", () => {
+	// RFC 6352 §8.7: a multiget with no <D:href> elements is valid and should
+	// return 207 with no resource responses.
+	it("multiget with no hrefs returns 207 with empty response set", async () => {
+		const results = await runScript(
+			[
+				...SETUP,
+				report("/dav/principals/test/card/primary/", multigetNoHrefs, {
+					as: "test",
+					expect: {
+						status: 207,
+						bodyNotContains: [ALICE_UID, BOB_UID],
+					},
+				}),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+	});
+
+	// RFC 6352 §8.6.1: <C:address-data> subsetting should return only the
+	// requested vCard properties (UID and FN), not the full vCard body.
+	it("address-data subsetting returns only requested vCard properties", async () => {
+		const results = await runScript(
+			[
+				...SETUP,
+				report("/dav/principals/test/card/primary/", multigetAliceSubsetted, {
+					as: "test",
+					expect: {
+						status: 207,
+						bodyContains: ["FN", "Alice Smith"],
+					},
+				}),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+		// The full vCard body would include "VERSION:4.0" — a property NOT in the
+		// subset request. It must be absent from the response body.
+		expect(results[2]?.body).not.toContain("VERSION:4.0");
 	});
 });

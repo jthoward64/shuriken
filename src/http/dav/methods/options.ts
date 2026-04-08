@@ -10,7 +10,7 @@ import type { HttpRequestContext } from "#src/http/context.ts";
 
 const DAV_CAPABILITIES = "1, 3, extended-mkcol, calendar-access, addressbook";
 const ALLOWED_METHODS =
-	"OPTIONS, GET, HEAD, PUT, DELETE, PROPFIND, PROPPATCH, MKCOL, REPORT, MKCALENDAR, MKADDRESSBOOK, ACL";
+	"OPTIONS, GET, HEAD, PUT, DELETE, PROPFIND, PROPPATCH, MKCOL, REPORT, MKCALENDAR, MKADDRESSBOOK, ACL, COPY, MOVE";
 
 export const optionsHandler = (
 	path: ResolvedDavPath,

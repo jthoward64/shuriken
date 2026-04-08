@@ -53,6 +53,27 @@ const SETUP = [
 ];
 
 // ---------------------------------------------------------------------------
+// VTODO sample (no makeVTodo helper, so built directly)
+// ---------------------------------------------------------------------------
+
+const TODO_UID = "report-cal-todo@example.com";
+
+const todoCalendar = [
+	"BEGIN:VCALENDAR",
+	"VERSION:2.0",
+	"PRODID:-//Test//Test//EN",
+	"BEGIN:VTODO",
+	`UID:${TODO_UID}`,
+	"DTSTAMP:20260101T000000Z",
+	"DTSTART:20260301T100000Z",
+	"DUE:20260301T110000Z",
+	"SUMMARY:Test Todo",
+	"END:VTODO",
+	"END:VCALENDAR",
+	"",
+].join("\r\n");
+
+// ---------------------------------------------------------------------------
 // calendar-multiget bodies
 // ---------------------------------------------------------------------------
 
@@ -203,6 +224,98 @@ const queryMissingFilter = `<?xml version="1.0" encoding="utf-8"?>
     <D:getetag/>
   </D:prop>
 </C:calendar-query>`;
+
+// Range starting exactly at janEvent DTEND — event should NOT appear (half-open [start,end))
+// RFC 4791 §9.9: DTEND must be > range start for condition (a); DTSTART must be >= start for (b)
+const queryRangeStartAtJanEnd = `<?xml version="1.0" encoding="utf-8"?>
+<C:calendar-query xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:D="DAV:">
+  <D:prop>
+    <D:getetag/>
+    <C:calendar-data/>
+  </D:prop>
+  <C:filter>
+    <C:comp-filter name="VCALENDAR">
+      <C:comp-filter name="VEVENT">
+        <C:time-range start="20260115T110000Z" end="20260116T000000Z"/>
+      </C:comp-filter>
+    </C:comp-filter>
+  </C:filter>
+</C:calendar-query>`;
+
+// Range starting exactly at janEvent DTSTART — event MUST appear (RFC 4791 §9.9 condition b)
+const queryRangeStartAtJanStart = `<?xml version="1.0" encoding="utf-8"?>
+<C:calendar-query xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:D="DAV:">
+  <D:prop>
+    <D:getetag/>
+    <C:calendar-data/>
+  </D:prop>
+  <C:filter>
+    <C:comp-filter name="VCALENDAR">
+      <C:comp-filter name="VEVENT">
+        <C:time-range start="20260115T100000Z" end="20260115T110000Z"/>
+      </C:comp-filter>
+    </C:comp-filter>
+  </C:filter>
+</C:calendar-query>`;
+
+// VTODO comp-filter — returns objects that have a VTODO component
+const queryAllVTodos = `<?xml version="1.0" encoding="utf-8"?>
+<C:calendar-query xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:D="DAV:">
+  <D:prop>
+    <D:getetag/>
+    <C:calendar-data/>
+  </D:prop>
+  <C:filter>
+    <C:comp-filter name="VCALENDAR">
+      <C:comp-filter name="VTODO"/>
+    </C:comp-filter>
+  </C:filter>
+</C:calendar-query>`;
+
+// prop-filter is-not-defined on LOCATION (never set) — both events should match
+const queryLocationIsNotDefined = `<?xml version="1.0" encoding="utf-8"?>
+<C:calendar-query xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:D="DAV:">
+  <D:prop>
+    <D:getetag/>
+    <C:calendar-data/>
+  </D:prop>
+  <C:filter>
+    <C:comp-filter name="VCALENDAR">
+      <C:comp-filter name="VEVENT">
+        <C:prop-filter name="LOCATION">
+          <C:is-not-defined/>
+        </C:prop-filter>
+      </C:comp-filter>
+    </C:comp-filter>
+  </C:filter>
+</C:calendar-query>`;
+
+// prop-filter is-not-defined on SUMMARY (always present) — no events should match
+const querySummaryIsNotDefined = `<?xml version="1.0" encoding="utf-8"?>
+<C:calendar-query xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:D="DAV:">
+  <D:prop>
+    <D:getetag/>
+    <C:calendar-data/>
+  </D:prop>
+  <C:filter>
+    <C:comp-filter name="VCALENDAR">
+      <C:comp-filter name="VEVENT">
+        <C:prop-filter name="SUMMARY">
+          <C:is-not-defined/>
+        </C:prop-filter>
+      </C:comp-filter>
+    </C:comp-filter>
+  </C:filter>
+</C:calendar-query>`;
+
+// calendar-multiget with no hrefs — should return 207 with no resource responses
+const multigetNoHrefs = `<?xml version="1.0" encoding="utf-8"?>
+<C:calendar-multiget xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:D="DAV:">
+  <D:prop>
+    <D:getetag/>
+    <C:calendar-data/>
+  </D:prop>
+</C:calendar-multiget>`;
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -422,6 +535,179 @@ describe("calendar-query REPORT", () => {
 					as: "test",
 					expect: {
 						status: 403,
+					},
+				}),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+	});
+
+	// RFC 4791 §9.9: time-range is a half-open interval [start, end).
+	// An event whose DTEND equals the range start does NOT match because
+	// condition (a) requires DTEND > start (strict), and condition (b)
+	// requires DTSTART >= start — but janEvent DTSTART (10:00) < range start (11:00).
+	it("time-range where event DTEND equals range start returns no match", async () => {
+		const results = await runScript(
+			[
+				...SETUP,
+				report(
+					"/dav/principals/test/cal/report-cal/",
+					queryRangeStartAtJanEnd,
+					{
+						as: "test",
+						expect: {
+							status: 207,
+							bodyNotContains: [JAN_UID, FEB_UID],
+						},
+					},
+				),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+	});
+
+	// RFC 4791 §9.9 condition (b): DTSTART >= start AND DTSTART < end.
+	// An event whose DTSTART equals the range start matches.
+	it("time-range where event DTSTART equals range start returns a match", async () => {
+		const results = await runScript(
+			[
+				...SETUP,
+				report(
+					"/dav/principals/test/cal/report-cal/",
+					queryRangeStartAtJanStart,
+					{
+						as: "test",
+						expect: {
+							status: 207,
+							bodyContains: JAN_UID,
+							bodyNotContains: FEB_UID,
+						},
+					},
+				),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+	});
+
+	// RFC 4791 §9.7.1: prop-filter with is-not-defined matches components that
+	// do NOT have the named property.  LOCATION is absent on both test events,
+	// so both should appear in the result.
+	it("prop-filter is-not-defined on absent property (LOCATION) returns all events", async () => {
+		const results = await runScript(
+			[
+				...SETUP,
+				report(
+					"/dav/principals/test/cal/report-cal/",
+					queryLocationIsNotDefined,
+					{
+						as: "test",
+						expect: {
+							status: 207,
+							bodyContains: [JAN_UID, FEB_UID],
+						},
+					},
+				),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+	});
+
+	// prop-filter is-not-defined on SUMMARY (always present) must exclude all events.
+	it("prop-filter is-not-defined on present property (SUMMARY) returns no events", async () => {
+		const results = await runScript(
+			[
+				...SETUP,
+				report(
+					"/dav/principals/test/cal/report-cal/",
+					querySummaryIsNotDefined,
+					{
+						as: "test",
+						expect: {
+							status: 207,
+							bodyNotContains: [JAN_UID, FEB_UID],
+						},
+					},
+				),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+	});
+});
+
+describe("calendar-query REPORT — VTODO", () => {
+	const setupWithTodo = [
+		mkcol("/dav/principals/test/cal/report-cal-todo/", {
+			as: "test",
+			expect: { status: 201 },
+		}),
+		put(
+			"/dav/principals/test/cal/report-cal-todo/todo.ics",
+			todoCalendar,
+			"text/calendar; charset=utf-8",
+			{ as: "test", expect: { status: 201 } },
+		),
+		put(
+			"/dav/principals/test/cal/report-cal-todo/jan.ics",
+			janEvent,
+			"text/calendar; charset=utf-8",
+			{ as: "test", expect: { status: 201 } },
+		),
+	];
+
+	// RFC 4791 §9.7.1: a comp-filter on VTODO should match only objects that
+	// contain a VTODO component, not VEVENT objects.
+	it("VTODO comp-filter returns only VTODO objects", async () => {
+		const results = await runScript(
+			[
+				...setupWithTodo,
+				report(
+					"/dav/principals/test/cal/report-cal-todo/",
+					queryAllVTodos,
+					{
+						as: "test",
+						expect: {
+							status: 207,
+							bodyContains: TODO_UID,
+							bodyNotContains: JAN_UID,
+						},
+					},
+				),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+	});
+});
+
+describe("calendar-multiget REPORT — edge cases", () => {
+	// RFC 4791 §7.9: multiget with no <D:href> elements should return a
+	// 207 Multi-Status with no resource responses.
+	it("multiget with no hrefs returns 207 with empty response set", async () => {
+		const results = await runScript(
+			[
+				...SETUP,
+				report("/dav/principals/test/cal/report-cal/", multigetNoHrefs, {
+					as: "test",
+					expect: {
+						status: 207,
+						bodyNotContains: [JAN_UID, FEB_UID],
 					},
 				}),
 			],

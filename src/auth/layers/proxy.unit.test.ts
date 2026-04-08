@@ -74,4 +74,84 @@ describe("isClientTrusted", () => {
 		expect(isClientTrusted(Option.some("172.16.0.1"), proxies)).toBe(false);
 		expect(isClientTrusted(Option.some("fe80::1"), proxies)).toBe(false);
 	});
+
+	// IPv4 /0 — matches all IPv4 addresses
+	it("IPv4 /0 CIDR matches any IPv4 address", () => {
+		expect(isClientTrusted(Option.some("0.0.0.0"), "0.0.0.0/0")).toBe(true);
+		expect(isClientTrusted(Option.some("255.255.255.255"), "0.0.0.0/0")).toBe(
+			true,
+		);
+		expect(isClientTrusted(Option.some("10.0.0.1"), "0.0.0.0/0")).toBe(true);
+	});
+
+	// IPv6 /0 — matches all IPv6 addresses
+	it("IPv6 /0 CIDR matches any IPv6 address", () => {
+		expect(isClientTrusted(Option.some("::1"), "::/0")).toBe(true);
+		expect(isClientTrusted(Option.some("fd00::1"), "::/0")).toBe(true);
+		expect(isClientTrusted(Option.some("2001:db8::1"), "::/0")).toBe(true);
+	});
+
+	// Invalid CIDR entries — should return false rather than throw
+	it("returns false for an IPv4 CIDR with invalid bits (NaN)", () => {
+		expect(isClientTrusted(Option.some("10.0.0.1"), "10.0.0.0/abc")).toBe(false);
+	});
+
+	it("returns false for an IPv4 CIDR with bits > 32", () => {
+		expect(isClientTrusted(Option.some("10.0.0.1"), "10.0.0.0/33")).toBe(false);
+	});
+
+	it("returns false for an IPv4 CIDR with bits < 0", () => {
+		expect(isClientTrusted(Option.some("10.0.0.1"), "10.0.0.0/-1")).toBe(false);
+	});
+
+	it("returns false for an IPv6 CIDR with bits > 128", () => {
+		expect(isClientTrusted(Option.some("::1"), "::1/129")).toBe(false);
+	});
+
+	it("returns false for an IPv6 CIDR with invalid bits (NaN)", () => {
+		expect(isClientTrusted(Option.some("::1"), "::/nope")).toBe(false);
+	});
+
+	// Entry without slash — exact IP comparison
+	it("exact IPv4 entry without slash matches only that IP", () => {
+		expect(isClientTrusted(Option.some("192.168.1.1"), "192.168.1.1")).toBe(
+			true,
+		);
+		expect(isClientTrusted(Option.some("192.168.1.2"), "192.168.1.1")).toBe(
+			false,
+		);
+	});
+
+	// Full IPv6 (non-compressed) exact match
+	it("matches full uncompressed IPv6 address exactly", () => {
+		expect(
+			isClientTrusted(
+				Option.some("2001:0db8:0000:0000:0000:0000:0000:0001"),
+				"2001:0db8:0000:0000:0000:0000:0000:0001",
+			),
+		).toBe(true);
+	});
+
+	// Empty trusted proxies list — no entries match
+	it("returns false when trustedProxies is an empty string", () => {
+		expect(isClientTrusted(Option.some("127.0.0.1"), "")).toBe(false);
+	});
+
+	// Single-entry list with only whitespace after trimming
+	it("ignores empty (whitespace-only) entries after trim", () => {
+		expect(isClientTrusted(Option.some("127.0.0.1"), "127.0.0.1, ")).toBe(true);
+	});
+
+	// IPv6 CIDR where network part contains ":"
+	it("IPv6 CIDR /64 matches addresses in the same /64 prefix", () => {
+		expect(isClientTrusted(Option.some("2001:db8::1"), "2001:db8::/64")).toBe(
+			true,
+		);
+		expect(isClientTrusted(Option.some("2001:db8::ffff"), "2001:db8::/64")).toBe(
+			true,
+		);
+		expect(isClientTrusted(Option.some("2001:db9::1"), "2001:db8::/64")).toBe(
+			false,
+		);
+	});
 });

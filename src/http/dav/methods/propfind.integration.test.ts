@@ -42,6 +42,36 @@ const PROPFIND_MISSING_PROP = `<?xml version="1.0" encoding="utf-8"?>
   </D:prop>
 </D:propfind>`;
 
+// RFC 4918 §9.1: propname returns all live property names without values.
+const PROPFIND_PROPNAME = `<?xml version="1.0" encoding="utf-8"?>
+<D:propfind xmlns:D="DAV:">
+  <D:propname/>
+</D:propfind>`;
+
+// RFC 4791 §6.2.1: calendar-home-set is a required CalDAV principal property.
+const PROPFIND_CALENDAR_HOME_SET = `<?xml version="1.0" encoding="utf-8"?>
+<D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+  <D:prop>
+    <C:calendar-home-set/>
+  </D:prop>
+</D:propfind>`;
+
+// RFC 6352 §6.2.1: addressbook-home-set is a required CardDAV principal property.
+const PROPFIND_ADDRESSBOOK_HOME_SET = `<?xml version="1.0" encoding="utf-8"?>
+<D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:carddav">
+  <D:prop>
+    <C:addressbook-home-set/>
+  </D:prop>
+</D:propfind>`;
+
+// RFC 5397 §3: current-user-principal lets clients discover their own principal URL.
+const PROPFIND_CURRENT_USER_PRINCIPAL = `<?xml version="1.0" encoding="utf-8"?>
+<D:propfind xmlns:D="DAV:">
+  <D:prop>
+    <D:current-user-principal/>
+  </D:prop>
+</D:propfind>`;
+
 describe("PROPFIND collection", () => {
 	it("Depth:0 on calendar collection returns resourcetype with caldav:calendar", async () => {
 		const results = await runScript(
@@ -250,6 +280,157 @@ describe("PROPFIND instance", () => {
 		for (const result of results) {
 			expect(result.failures, result.step.name).toEqual([]);
 		}
+	});
+});
+
+describe("PROPFIND propname", () => {
+	// RFC 4918 §9.1: <D:propname/> returns the names of all live properties
+	// without their values. The response must be 207 and the body must contain
+	// property name elements (not their values).
+	it("propname on calendar collection returns property names without values", async () => {
+		const results = await runScript(
+			[
+				propfind("/dav/principals/test/cal/primary/", PROPFIND_PROPNAME, {
+					as: "test",
+					headers: { Depth: "0" },
+					expect: { status: 207 },
+				}),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+		// Property names must appear in the response body
+		expect(results[0]?.body).toContain("resourcetype");
+		expect(results[0]?.body).toContain("displayname");
+		// Values must not appear — the sync-token value is a URN, so its absence
+		// proves that only names (not content) were returned.
+		expect(results[0]?.body).not.toContain("urn:ietf:params:xml:ns:sync:");
+	});
+});
+
+describe("PROPFIND non-existent resource", () => {
+	// RFC 4918 §9.1: PROPFIND on a URL that maps to no resource must return 404.
+	it("PROPFIND on a non-existent collection path returns 404", async () => {
+		const results = await runScript(
+			[
+				propfind(
+					"/dav/principals/test/cal/does-not-exist/",
+					PROPFIND_ALLPROP,
+					{
+						as: "test",
+						headers: { Depth: "0" },
+						expect: { status: 404 },
+					},
+				),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+	});
+
+	it("PROPFIND on a non-existent instance path returns 404", async () => {
+		const results = await runScript(
+			[
+				propfind(
+					"/dav/principals/test/cal/primary/no-such-event.ics",
+					PROPFIND_ALLPROP,
+					{
+						as: "test",
+						headers: { Depth: "0" },
+						expect: { status: 404 },
+					},
+				),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+	});
+});
+
+describe("PROPFIND CalDAV/CardDAV discovery properties", () => {
+	// RFC 4791 §6.2.1: CALDAV:calendar-home-set MUST be supported on principal
+	// resources so that clients can discover the user's calendar collections.
+	it("calendar-home-set on principal returns a 200 propstat with a href value", async () => {
+		const results = await runScript(
+			[
+				propfind(
+					"/dav/principals/test/",
+					PROPFIND_CALENDAR_HOME_SET,
+					{
+						as: "test",
+						headers: { Depth: "0" },
+						expect: { status: 207 },
+					},
+				),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+		// Must appear in a 200 propstat, not a 404 propstat
+		expect(results[0]?.body).toContain("calendar-home-set");
+		expect(results[0]?.body).not.toContain(
+			`<D:status>HTTP/1.1 404 Not Found</D:status>`,
+		);
+	});
+
+	// RFC 6352 §6.2.1: CARDDAV:addressbook-home-set MUST be supported on
+	// principal resources for addressbook discovery.
+	it("addressbook-home-set on principal returns a 200 propstat with a href value", async () => {
+		const results = await runScript(
+			[
+				propfind(
+					"/dav/principals/test/",
+					PROPFIND_ADDRESSBOOK_HOME_SET,
+					{
+						as: "test",
+						headers: { Depth: "0" },
+						expect: { status: 207 },
+					},
+				),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+		expect(results[0]?.body).toContain("addressbook-home-set");
+		expect(results[0]?.body).not.toContain(
+			`<D:status>HTTP/1.1 404 Not Found</D:status>`,
+		);
+	});
+
+	// RFC 5397 §3: DAV:current-user-principal allows a client to discover its
+	// own principal URL without having to know the slug in advance.
+	it("current-user-principal on any resource returns the acting principal href", async () => {
+		const results = await runScript(
+			[
+				propfind(
+					"/dav/principals/test/cal/primary/",
+					PROPFIND_CURRENT_USER_PRINCIPAL,
+					{
+						as: "test",
+						headers: { Depth: "0" },
+						expect: { status: 207 },
+					},
+				),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+		expect(results[0]?.body).toContain("current-user-principal");
+		expect(results[0]?.body).not.toContain(
+			`<D:status>HTTP/1.1 404 Not Found</D:status>`,
+		);
 	});
 });
 

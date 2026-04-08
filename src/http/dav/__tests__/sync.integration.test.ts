@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { makeCalEvent } from "#src/testing/data.ts";
+import { makeCalEvent, makeVCard } from "#src/testing/data.ts";
 import {
+	del,
 	mkcol,
 	propfind,
 	put,
@@ -299,6 +300,57 @@ describe("sync-collection REPORT — error cases", () => {
 		}
 	});
 
+	// RFC 6578 §3.2: when a collection member is deleted, the server MUST report
+	// a DAV:response for the deleted member URI with a DAV:status of 404 (Not Found)
+	// in the next delta sync after the deletion.
+	it("delta sync after DELETE reports deleted instance as 404", async () => {
+		const results = await runScript(
+			[
+				mkcol("/dav/principals/test/cal/sync-cal/", {
+					as: "test",
+					expect: { status: 201 },
+				}),
+				put(
+					"/dav/principals/test/cal/sync-cal/event1.ics",
+					event1,
+					"text/calendar; charset=utf-8",
+					{ as: "test", expect: { status: 201 } },
+				),
+				// Capture the current sync-token before the deletion
+				report("/dav/principals/test/cal/sync-cal/", syncInitial, {
+					as: "test",
+					expect: { status: 207 },
+				}),
+				// Delete the event
+				del("/dav/principals/test/cal/sync-cal/event1.ics", {
+					as: "test",
+					expect: { status: 204 },
+				}),
+				// Delta sync — deleted item must appear with 404
+				(prev) => {
+					const syncToken = extractSyncToken(prev[2]?.body ?? "");
+					return report(
+						"/dav/principals/test/cal/sync-cal/",
+						syncWithToken(syncToken),
+						{
+							as: "test",
+							expect: {
+								status: 207,
+								bodyContains: "404",
+							},
+						},
+					);
+				},
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+		// The deleted href must appear in the response, not be silently omitted
+		expect(results[4]?.body).toContain("event1.ics");
+	});
+
 	it("sync-collection on an instance path returns 405", async () => {
 		const results = await runScript(
 			[
@@ -318,5 +370,94 @@ describe("sync-collection REPORT — error cases", () => {
 		for (const result of results) {
 			expect(result.failures, result.step.name).toEqual([]);
 		}
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Addressbook sync
+// ---------------------------------------------------------------------------
+
+const contact1 = makeVCard({ uid: "sync-card-001@example.com", fn: "Sync Contact One" });
+const contact2 = makeVCard({ uid: "sync-card-002@example.com", fn: "Sync Contact Two" });
+
+describe("sync-collection REPORT — addressbook", () => {
+	// RFC 6578 applies to any WebDAV collection type, not just calendars.
+	// The primary addressbook is provisioned automatically; verify sync works on it.
+	it("initial sync on addressbook with contacts returns both hrefs", async () => {
+		const results = await runScript(
+			[
+				put(
+					"/dav/principals/test/card/primary/c1.vcf",
+					contact1,
+					"text/vcard; charset=utf-8",
+					{ as: "test", expect: { status: 201 } },
+				),
+				put(
+					"/dav/principals/test/card/primary/c2.vcf",
+					contact2,
+					"text/vcard; charset=utf-8",
+					{ as: "test", expect: { status: 201 } },
+				),
+				report("/dav/principals/test/card/primary/", syncInitial, {
+					as: "test",
+					expect: {
+						status: 207,
+						bodyContains: "urn:ietf:params:xml:ns:sync:",
+					},
+				}),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+		const syncBody = results[2]?.body ?? "";
+		const hrefCount = (syncBody.match(/<D:href>/g) ?? []).length;
+		expect(hrefCount).toBe(2);
+	});
+
+	it("delta sync on addressbook after adding a contact returns only the new contact", async () => {
+		const results = await runScript(
+			[
+				put(
+					"/dav/principals/test/card/primary/c1.vcf",
+					contact1,
+					"text/vcard; charset=utf-8",
+					{ as: "test", expect: { status: 201 } },
+				),
+				// Capture sync-token after first PUT
+				report("/dav/principals/test/card/primary/", syncInitial, {
+					as: "test",
+					expect: { status: 207 },
+				}),
+				// Add a second contact after the snapshot
+				put(
+					"/dav/principals/test/card/primary/c2.vcf",
+					contact2,
+					"text/vcard; charset=utf-8",
+					{ as: "test", expect: { status: 201 } },
+				),
+				// Delta sync — only c2 should appear
+				(prev) => {
+					const syncToken = extractSyncToken(prev[1]?.body ?? "");
+					return report(
+						"/dav/principals/test/card/primary/",
+						syncWithToken(syncToken),
+						{
+							as: "test",
+							expect: { status: 207 },
+						},
+					);
+				},
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+		const deltaBody = results[3]?.body ?? "";
+		const hrefCount = (deltaBody.match(/<D:href>/g) ?? []).length;
+		expect(hrefCount).toBe(1);
+		expect(deltaBody).toContain("c2.vcf");
 	});
 });

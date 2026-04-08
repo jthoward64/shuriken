@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { makeCalEvent } from "#src/testing/data.ts";
 import {
+	del,
 	mkcol,
 	PROPFIND_ALLPROP,
 	propfind,
@@ -81,6 +82,21 @@ describe("cross-user access (alice vs bob)", () => {
 		}
 	});
 
+	it("Alice cannot MKCALENDAR in Bob's namespace", async () => {
+		const results = await runScript(
+			[
+				mkcol("/dav/principals/bob/cal/alice-intrusion/", {
+					as: "alice",
+					expect: { status: 403 },
+				}),
+			],
+			twoUsers(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+	});
+
 	it("Alice cannot PUT into Bob's collection", async () => {
 		const results = await runScript(
 			[
@@ -90,6 +106,27 @@ describe("cross-user access (alice vs bob)", () => {
 					"text/calendar; charset=utf-8",
 					{ as: "alice", expect: { status: 403 } },
 				),
+			],
+			twoUsers(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+	});
+
+	it("Alice cannot DELETE from Bob's collection", async () => {
+		const results = await runScript(
+			[
+				put(
+					"/dav/principals/bob/cal/primary/event.ics",
+					event,
+					"text/calendar; charset=utf-8",
+					{ as: "bob", expect: { status: 201 } },
+				),
+				del("/dav/principals/bob/cal/primary/event.ics", {
+					as: "alice",
+					expect: { status: 403 },
+				}),
 			],
 			twoUsers(),
 		);

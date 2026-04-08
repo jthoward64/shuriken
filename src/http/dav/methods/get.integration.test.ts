@@ -83,6 +83,22 @@ describe("GET", () => {
 		}
 	});
 
+	// RFC 4918 §9.4: GET is not defined on collection or principal resources.
+	it("returns 405 on a principal URL", async () => {
+		const results = await runScript(
+			[
+				get("/dav/principals/test/", {
+					as: "test",
+					expect: { status: 405 },
+				}),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+	});
+
 	it("returns 404 on an unknown instance path (new-instance kind)", async () => {
 		const results = await runScript(
 			[
@@ -96,6 +112,35 @@ describe("GET", () => {
 		for (const result of results) {
 			expect(result.failures, result.step.name).toEqual([]);
 		}
+	});
+
+	// RFC 7232 §3.3: If-None-Match: * on a resource that exists must return 304 or
+	// the full response depending on whether the server implements conditional GETs.
+	// The ETag from PUT must round-trip through the GET response.
+	it("ETag in GET response matches ETag returned by PUT", async () => {
+		const results = await runScript(
+			[
+				put(
+					"/dav/principals/test/cal/primary/etag-check.ics",
+					EVENT,
+					"text/calendar; charset=utf-8",
+					{ as: "test", expect: { status: 201 } },
+				),
+				get("/dav/principals/test/cal/primary/etag-check.ics", {
+					as: "test",
+					expect: { status: 200 },
+				}),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+		const putEtag = results[0]?.headers.etag;
+		const getEtag = results[1]?.headers.etag;
+		expect(putEtag).toBeTruthy();
+		expect(getEtag).toBeTruthy();
+		expect(getEtag).toBe(putEtag);
 	});
 });
 

@@ -38,6 +38,12 @@ export interface ScriptUser {
 	readonly slug: string;
 	/** Defaults to the local part of email if omitted. */
 	readonly name?: string;
+	/**
+	 * When true, the user is granted DAV:all on the USERS_VIRTUAL_RESOURCE_ID and
+	 * GROUPS_VIRTUAL_RESOURCE_ID virtual resources, giving them full access to the
+	 * /dav/users/ and /dav/groups/ admin API endpoints.
+	 */
+	readonly admin?: boolean;
 }
 
 // ---------------------------------------------------------------------------

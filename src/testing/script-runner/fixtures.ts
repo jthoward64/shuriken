@@ -43,6 +43,23 @@ export const makeUser = (
 	...overrides,
 });
 
+/**
+ * Make an admin ScriptUser with DAV:all granted on the virtual resources
+ * (USERS_VIRTUAL_RESOURCE_ID and GROUPS_VIRTUAL_RESOURCE_ID). Admin users can
+ * access the /dav/users/ and /dav/groups/ management API endpoints.
+ */
+export const makeAdminUser = (
+	id: string,
+	overrides?: Partial<ScriptUser>,
+): ScriptUser => makeUser(id, { admin: true, ...overrides });
+
+/** Single admin user — has access to groups/users management API. */
+export const singleAdminUser = (): ScriptOptions => ({
+	users: [
+		{ id: "admin", email: "admin@example.com", slug: "admin", admin: true },
+	],
+});
+
 // ---------------------------------------------------------------------------
 // Step options — common fields that can be passed to any step helper
 // ---------------------------------------------------------------------------

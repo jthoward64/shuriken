@@ -1,9 +1,9 @@
-import { Layer, Option, Redacted } from "effect";
+import { Layer, Logger, LogLevel, Option, Redacted } from "effect";
 import { BasicAuthLayer } from "#src/auth/layers/basic.ts";
 import { AppConfigService, type AppConfigType } from "#src/config.ts";
 import type { DatabaseClient } from "#src/db/client.ts";
 import type { CryptoService } from "#src/platform/crypto.ts";
-import { AclDomainLayer } from "#src/services/acl/index.ts";
+import { AclDomainLayer, AclRepositoryLive } from "#src/services/acl/index.ts";
 import { CalIndexRepositoryLive } from "#src/services/cal-index/index.ts";
 import { CardIndexRepositoryLive } from "#src/services/card-index/index.ts";
 import { CollectionDomainLayer } from "#src/services/collection/index.ts";
@@ -68,11 +68,13 @@ export const makeScriptRunnerLayer = () => {
 
 	return Layer.mergeAll(
 		testInfraLayer,
+		Logger.minimumLogLevel(LogLevel.None),
 		BasicAuthLayer.pipe(Layer.provide(testInfraLayer)),
 		withTestInfra(PrincipalDomainLayer),
 		withTestInfra(CollectionDomainLayer),
 		withTestInfra(InstanceDomainLayer),
 		withTestInfra(AclDomainLayer),
+		withTestInfra(AclRepositoryLive),
 		withTestInfra(UserDomainLayer),
 		withTestInfra(GroupDomainLayer),
 		withTestInfra(DomainEntityDomainLayer),

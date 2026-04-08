@@ -54,4 +54,26 @@ describe("parseBasicAuth", () => {
 		expect(creds.username).toBe("alice");
 		expect(Redacted.value(creds.password)).toBe("pass:with:colons");
 	});
+
+	// RFC 7617 §2: username may be empty (leading colon in decoded value).
+	it("returns Some with empty username when credentials start with a colon", () => {
+		const result = parseBasicAuth(makeHeaders(`Basic ${encode(":secret")}`));
+		expect(Option.isSome(result)).toBe(true);
+		const creds = Option.getOrThrow(result);
+		expect(creds.username).toBe("");
+		expect(Redacted.value(creds.password)).toBe("secret");
+	});
+
+	// The scheme comparison is case-sensitive: "basic " (lowercase) must not match.
+	it("returns None when scheme is not exactly 'Basic ' (case-sensitive)", () => {
+		expect(
+			Option.isNone(
+				parseBasicAuth(makeHeaders(`basic ${encode("alice:secret")}`)),
+			),
+		).toBe(true);
+	});
+
+	it("returns None when Authorization header is empty string", () => {
+		expect(Option.isNone(parseBasicAuth(makeHeaders("")))).toBe(true);
+	});
 });

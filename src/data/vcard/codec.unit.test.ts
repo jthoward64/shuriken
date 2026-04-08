@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { Effect, Option } from "effect";
 import { Temporal } from "temporal-polyfill";
+import type { IrDocument } from "#src/data/ir.ts";
 import { runFailure } from "#src/testing/effect.ts";
 import { decodeVCard, encodeVCard } from "./codec.ts";
 import { extractUid } from "./uid.ts";
@@ -397,5 +398,356 @@ describe("vCard 2.1 normalization", () => {
 		// TEL should have been decoded with TYPE param
 		const tel = doc.root.properties.find((p) => p.name === "TEL");
 		expect(tel).toBeDefined();
+	});
+});
+
+// ---------------------------------------------------------------------------
+// VALUE= parameter overrides
+// ---------------------------------------------------------------------------
+
+describe("VCardCodec decode — VALUE= overrides", () => {
+	it("VALUE=text overrides URI property to TEXT", async () => {
+		const text = vcard(
+			"BEGIN:VCARD",
+			"VERSION:4.0",
+			"FN:Test",
+			"PHOTO;VALUE=text:plain text value",
+			"END:VCARD",
+		);
+		const doc = await run(text);
+		const prop = doc.root.properties.find((p) => p.name === "PHOTO");
+		expect(prop?.value.type).toBe("TEXT");
+		if (prop?.value.type === "TEXT") {
+			expect(prop.value.value).toBe("plain text value");
+		}
+	});
+
+	it("VALUE=boolean decodes as BOOLEAN", async () => {
+		const text = vcard(
+			"BEGIN:VCARD",
+			"VERSION:4.0",
+			"FN:Test",
+			"NOTE;VALUE=boolean:TRUE",
+			"END:VCARD",
+		);
+		const doc = await run(text);
+		const prop = doc.root.properties.find((p) => p.name === "NOTE");
+		expect(prop?.value.type).toBe("BOOLEAN");
+		if (prop?.value.type === "BOOLEAN") {
+			expect(prop.value.value).toBe(true);
+		}
+	});
+
+	it("VALUE=integer decodes as INTEGER", async () => {
+		const text = vcard(
+			"BEGIN:VCARD",
+			"VERSION:4.0",
+			"FN:Test",
+			"NOTE;VALUE=integer:42",
+			"END:VCARD",
+		);
+		const doc = await run(text);
+		const prop = doc.root.properties.find((p) => p.name === "NOTE");
+		expect(prop?.value.type).toBe("INTEGER");
+		if (prop?.value.type === "INTEGER") {
+			expect(prop.value.value).toBe(42);
+		}
+	});
+
+	it("VALUE=float decodes as FLOAT", async () => {
+		const text = vcard(
+			"BEGIN:VCARD",
+			"VERSION:4.0",
+			"FN:Test",
+			"NOTE;VALUE=float:3.14",
+			"END:VCARD",
+		);
+		const doc = await run(text);
+		const prop = doc.root.properties.find((p) => p.name === "NOTE");
+		expect(prop?.value.type).toBe("FLOAT");
+		if (prop?.value.type === "FLOAT") {
+			expect(prop.value.value).toBeCloseTo(3.14);
+		}
+	});
+
+	it("VALUE=utc-offset decodes as UTC_OFFSET", async () => {
+		const text = vcard(
+			"BEGIN:VCARD",
+			"VERSION:4.0",
+			"FN:Test",
+			"TZ;VALUE=utc-offset:+0530",
+			"END:VCARD",
+		);
+		const doc = await run(text);
+		const prop = doc.root.properties.find((p) => p.name === "TZ");
+		expect(prop?.value.type).toBe("UTC_OFFSET");
+		if (prop?.value.type === "UTC_OFFSET") {
+			expect(prop.value.value).toBe("+0530");
+		}
+	});
+
+	it("VALUE=time decodes as TIME", async () => {
+		const text = vcard(
+			"BEGIN:VCARD",
+			"VERSION:4.0",
+			"FN:Test",
+			"NOTE;VALUE=time:120000",
+			"END:VCARD",
+		);
+		const doc = await run(text);
+		const prop = doc.root.properties.find((p) => p.name === "NOTE");
+		expect(prop?.value.type).toBe("TIME");
+		if (prop?.value.type === "TIME") {
+			expect(prop.value.value).toBe("120000");
+		}
+	});
+
+	it("VALUE=language-tag maps to TEXT", async () => {
+		const text = vcard(
+			"BEGIN:VCARD",
+			"VERSION:4.0",
+			"FN:Test",
+			"LANG;VALUE=language-tag:en-US",
+			"END:VCARD",
+		);
+		const doc = await run(text);
+		const prop = doc.root.properties.find((p) => p.name === "LANG");
+		expect(prop?.value.type).toBe("TEXT");
+		if (prop?.value.type === "TEXT") {
+			expect(prop.value.value).toBe("en-US");
+		}
+	});
+
+	it("VALUE=text-list decodes as TEXT_LIST", async () => {
+		const text = vcard(
+			"BEGIN:VCARD",
+			"VERSION:4.0",
+			"FN:Test",
+			"NOTE;VALUE=text-list:a,b,c",
+			"END:VCARD",
+		);
+		const doc = await run(text);
+		const prop = doc.root.properties.find((p) => p.name === "NOTE");
+		expect(prop?.value.type).toBe("TEXT_LIST");
+		if (prop?.value.type === "TEXT_LIST") {
+			expect(prop.value.value).toEqual(["a", "b", "c"]);
+		}
+	});
+
+	it("VALUE=date-time (UTC Z) decodes as DATE_TIME ZonedDateTime", async () => {
+		const text = vcard(
+			"BEGIN:VCARD",
+			"VERSION:4.0",
+			"FN:Test",
+			"BDAY;VALUE=date-time:20060718T210714Z",
+			"END:VCARD",
+		);
+		const doc = await run(text);
+		const prop = doc.root.properties.find((p) => p.name === "BDAY");
+		expect(prop?.value.type).toBe("DATE_TIME");
+		if (prop?.value.type === "DATE_TIME") {
+			expect(prop.value.value.timeZoneId).toBe("UTC");
+			expect(prop.value.value.year).toBe(2006);
+		}
+	});
+
+	it("VALUE=timestamp (floating) decodes as PLAIN_DATE_TIME", async () => {
+		const text = vcard(
+			"BEGIN:VCARD",
+			"VERSION:4.0",
+			"FN:Test",
+			"BDAY;VALUE=timestamp:20060718T210714",
+			"END:VCARD",
+		);
+		const doc = await run(text);
+		const prop = doc.root.properties.find((p) => p.name === "BDAY");
+		expect(prop?.value.type).toBe("PLAIN_DATE_TIME");
+		if (prop?.value.type === "PLAIN_DATE_TIME") {
+			expect(prop.value.value.year).toBe(2006);
+			expect(prop.value.value.hour).toBe(21);
+		}
+	});
+
+	it("VALUE=date-time with TZID decodes as DATE_TIME with named zone", async () => {
+		const text = vcard(
+			"BEGIN:VCARD",
+			"VERSION:4.0",
+			"FN:Test",
+			"BDAY;VALUE=date-time;TZID=America/New_York:20060718T150000",
+			"END:VCARD",
+		);
+		const doc = await run(text);
+		const prop = doc.root.properties.find((p) => p.name === "BDAY");
+		expect(prop?.value.type).toBe("DATE_TIME");
+		if (prop?.value.type === "DATE_TIME") {
+			expect(prop.value.value.timeZoneId).toBe("America/New_York");
+			expect(prop.value.value.year).toBe(2006);
+		}
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Encode — additional value types
+// ---------------------------------------------------------------------------
+
+describe("VCardCodec encode — additional value types", () => {
+	it("encodes BOOLEAN as TRUE/FALSE", async () => {
+		const text = vcard(
+			"BEGIN:VCARD",
+			"VERSION:4.0",
+			"FN:Test",
+			"NOTE;VALUE=boolean:FALSE",
+			"END:VCARD",
+		);
+		const doc = await run(text);
+		const out = await enc(doc);
+		expect(out).toContain("FALSE");
+	});
+
+	it("encodes INTEGER as decimal string", async () => {
+		const text = vcard(
+			"BEGIN:VCARD",
+			"VERSION:4.0",
+			"FN:Test",
+			"NOTE;VALUE=integer:99",
+			"END:VCARD",
+		);
+		const doc = await run(text);
+		const out = await enc(doc);
+		expect(out).toContain("99");
+	});
+
+	it("encodes FLOAT as decimal string", async () => {
+		const text = vcard(
+			"BEGIN:VCARD",
+			"VERSION:4.0",
+			"FN:Test",
+			"NOTE;VALUE=float:1.5",
+			"END:VCARD",
+		);
+		const doc = await run(text);
+		const out = await enc(doc);
+		expect(out).toContain("1.5");
+	});
+
+	it("encodes BINARY as base64", async () => {
+		// BINARY requires VALUE=binary (not standard for vCard but exercisable via raw IR)
+		const base64 = btoa("test");
+		const doc: IrDocument = {
+			kind: "vcard",
+			root: {
+				name: "VCARD",
+				properties: [
+					{
+						name: "FN",
+						parameters: [],
+						value: { type: "TEXT", value: "Test" },
+						isKnown: true,
+					},
+					{
+						name: "PHOTO",
+						parameters: [{ name: "VALUE", value: "binary" }],
+						value: {
+							type: "BINARY",
+							value: Uint8Array.from(
+								atob(base64),
+								(c) => c.codePointAt(0) ?? 0,
+							),
+						},
+						isKnown: true,
+					},
+				],
+				components: [],
+			},
+		};
+		const out = await enc(doc);
+		expect(out).toContain(base64);
+	});
+
+	it("encodes JSON as JSON string", async () => {
+		const doc: IrDocument = {
+			kind: "vcard",
+			root: {
+				name: "VCARD",
+				properties: [
+					{
+						name: "FN",
+						parameters: [],
+						value: { type: "TEXT", value: "Test" },
+						isKnown: true,
+					},
+					{
+						name: "X-META",
+						parameters: [],
+						// isKnown=false: stored verbatim; use TEXT for round-trip
+						value: { type: "TEXT", value: '{"key":"val"}' },
+						isKnown: false,
+					},
+				],
+				components: [],
+			},
+		};
+		const out = await enc(doc);
+		expect(out).toContain('{"key":"val"}');
+	});
+
+	it("encodes DATE_AND_OR_TIME value as opaque string", async () => {
+		const text = vcard(
+			"BEGIN:VCARD",
+			"VERSION:4.0",
+			"FN:Test",
+			"BDAY:--0412",
+			"END:VCARD",
+		);
+		const doc = await run(text);
+		const out = await enc(doc);
+		expect(out).toContain("--0412");
+	});
+
+	it("encodes PLAIN_DATE_TIME without Z suffix", async () => {
+		const text = vcard(
+			"BEGIN:VCARD",
+			"VERSION:4.0",
+			"FN:Test",
+			"BDAY;VALUE=timestamp:20060718T210714",
+			"END:VCARD",
+		);
+		const doc = await run(text);
+		const out = await enc(doc);
+		expect(out).toContain("20060718T210714");
+		// Must NOT have Z suffix (floating)
+		expect(out).not.toContain("20060718T210714Z");
+	});
+
+	it("encodeVCardProperty throws when named-timezone DATE_TIME lacks TZID", async () => {
+		const doc: IrDocument = {
+			kind: "vcard",
+			root: {
+				name: "VCARD",
+				properties: [
+					{
+						name: "FN",
+						parameters: [],
+						value: { type: "TEXT", value: "Test" },
+						isKnown: true,
+					},
+					{
+						// Named timezone but no TZID parameter — should throw
+						name: "REV",
+						parameters: [],
+						value: {
+							type: "DATE_TIME",
+							value: Temporal.ZonedDateTime.from(
+								"2006-07-18T21:07:14-04:00[America/New_York]",
+							),
+						},
+						isKnown: true,
+					},
+				],
+				components: [],
+			},
+		};
+		// encodeVCard uses Effect.orDie — the thrown Error becomes a defect
+		await expect(Effect.runPromise(encodeVCard(doc))).rejects.toThrow();
 	});
 });
