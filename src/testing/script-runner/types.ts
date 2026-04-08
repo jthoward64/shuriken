@@ -56,6 +56,25 @@ export interface ScriptStep {
 	readonly expect?: ScriptExpectation;
 }
 
+// ---------------------------------------------------------------------------
+// ScriptStepFactory — lazy step computed from prior results
+//
+// Use this when a step needs data from an earlier response (e.g. an ETag
+// captured from a PUT response that must be used in a subsequent If-Match
+// header). The factory receives all results collected so far and returns a
+// fully-defined ScriptStep.
+// ---------------------------------------------------------------------------
+
+export type ScriptStepFactory = (
+	prev: ReadonlyArray<ScriptStepResult>,
+) => ScriptStep;
+
+/**
+ * A step can either be a static ScriptStep or a factory that produces one
+ * from earlier results. Pass these to `runScript`.
+ */
+export type ScriptStepOrFactory = ScriptStep | ScriptStepFactory;
+
 export interface ScriptExpectation {
 	/** Assert the response status code equals this value. */
 	readonly status?: number;
@@ -86,6 +105,8 @@ export interface ScriptStepResult {
 	readonly step: ScriptStep;
 	readonly status: number;
 	readonly body: string;
+	/** Response headers as a plain record for easy inspection in tests. */
+	readonly headers: Readonly<Record<string, string>>;
 	/** Empty array means the step passed all expectations. */
 	readonly failures: ReadonlyArray<string>;
 }

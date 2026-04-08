@@ -47,9 +47,14 @@ export const addressbookMultigetHandler = (
 
 		const hrefs = extractHrefs(tree);
 		const propNames = extractPropNames(tree);
-		const dataTree =
+		// <C:address-data> is nested inside <D:prop>, not at the top level
+		const propEl =
 			typeof tree === "object" && tree !== null
-				? (tree as Record<string, unknown>)[ADDRESS_DATA]
+				? (tree as Record<string, unknown>)["{DAV:}prop"]
+				: undefined;
+		const dataTree =
+			typeof propEl === "object" && propEl !== null
+				? (propEl as Record<string, unknown>)[ADDRESS_DATA]
 				: undefined;
 		const spec = parseAddressDataSpec(dataTree);
 

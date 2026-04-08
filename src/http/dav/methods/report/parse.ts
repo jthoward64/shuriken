@@ -35,9 +35,12 @@ export const parseReportBody = (
 						string,
 						unknown
 					>;
-					// The root element key is the report type in Clark notation
-					const reportType = Object.keys(normalized).find(
-						(k) => !k.startsWith("@_"),
+					// The root element key is the report type in Clark notation.
+					// After normalizeClarkNames, legitimate element keys are Clark
+					// names like `{namespace}localname`. We skip `?xml` (the XML
+					// declaration emitted by fast-xml-parser) and `@_*` attributes.
+					const reportType = Object.keys(normalized).find((k) =>
+						k.startsWith("{"),
 					) as ClarkName | undefined;
 					if (!reportType) {
 						return { type: cn(DAV_NS, "unknown") as ClarkName, tree: {} };

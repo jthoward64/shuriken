@@ -57,6 +57,11 @@ const extractFnPreFilter = (
 	collation: CardCollation;
 	matchType: CardMatchType;
 } | null => {
+	// Multiple prop-filters with anyof semantics require a union of index results.
+	// Fall back to full scan to avoid false negatives.
+	if (filter.propFilters.length !== 1) {
+		return null;
+	}
 	const fnFilter = filter.propFilters.find(
 		(pf) => pf.name.toUpperCase() === "FN",
 	);
@@ -145,7 +150,7 @@ export const addressbookQueryHandler = (
 						fnHint.matchType,
 					)
 					.pipe(
-						Effect.flatMap((entityIds) =>
+							Effect.flatMap((entityIds) =>
 							instRepo.findByIds(
 								entityIds.map((id) => InstanceId(id as UuidString)),
 							),

@@ -26,7 +26,7 @@ const findByTimeRange = Effect.fn("CalIndexRepository.findByTimeRange")(
 		return yield* Effect.tryPromise({
 			try: () =>
 				db
-					.selectDistinct({ entityId: calIndex.entityId })
+					.selectDistinct({ instanceId: davInstance.id })
 					.from(calIndex)
 					.innerJoin(
 						davInstance,
@@ -61,7 +61,7 @@ const findByTimeRange = Effect.fn("CalIndexRepository.findByTimeRange")(
 							),
 						),
 					)
-					.then((rows) => rows.map((r) => r.entityId)),
+					.then((rows) => rows.map((r) => r.instanceId)),
 			catch: (e) => new DatabaseError({ cause: e }),
 		});
 	},
@@ -83,7 +83,7 @@ const findByComponentType = Effect.fn("CalIndexRepository.findByComponentType")(
 		return yield* Effect.tryPromise({
 			try: () =>
 				db
-					.selectDistinct({ entityId: calIndex.entityId })
+					.selectDistinct({ instanceId: davInstance.id })
 					.from(calIndex)
 					.innerJoin(
 						davInstance,
@@ -99,7 +99,7 @@ const findByComponentType = Effect.fn("CalIndexRepository.findByComponentType")(
 							isNull(calIndex.deletedAt),
 						),
 					)
-					.then((rows) => rows.map((r) => r.entityId)),
+					.then((rows) => rows.map((r) => r.instanceId)),
 			catch: (e) => new DatabaseError({ cause: e }),
 		});
 	},

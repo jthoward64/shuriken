@@ -35,33 +35,39 @@ let cachedPgLiteInstance: PGlite | undefined;
 
 // @effect-diagnostics-next-line globalErrorInEffectCatch:off
 export const makePgliteDatabaseLayer = (): Layer.Layer<DatabaseClient, Error> =>
-	Layer.effect(
+	Layer.scoped(
 		DatabaseClient,
-		Effect.tryPromise({
-			try: async () => {
-				if (!cachedPgLiteInstance) {
-					cachedPgLiteInstance = await makePgLiteInstance();
-				}
-				const pg = await cachedPgLiteInstance.clone();
-				const db = drizzle({ client: pg as PGlite, schema });
-				if (needGenerateDump) {
-					await migrate(
-						readMigrationFiles({ migrationsFolder: MIGRATIONS_FOLDER }),
-						db,
-						{ migrationsFolder: MIGRATIONS_FOLDER },
-					);
-					const dump = await pg.dumpDataDir("gzip");
-					await writeFile(DUMP_PATH, dump.stream());
-					needGenerateDump = false;
-					// Reset so the next clone comes from the dump (which has migrations),
-					// not from the un-migrated instance that was cached before migration ran.
-					cachedPgLiteInstance = undefined;
-				}
-				// PGlite is structurally compatible for all Drizzle operations we use;
-				// the QueryResultHKT difference is only a compile-time type parameter.
-				return DatabaseClient.make(db as unknown as DatabaseClient);
-			},
-			// @effect-diagnostics-next-line globalErrorInEffectFailure:off
-			catch: (e) => new Error(`PGlite migration failed: ${String(e)}`),
-		}),
+		Effect.acquireRelease(
+			Effect.tryPromise({
+				try: async () => {
+					if (!cachedPgLiteInstance) {
+						cachedPgLiteInstance = await makePgLiteInstance();
+					}
+					const pg = await cachedPgLiteInstance.clone();
+					const db = drizzle({ client: pg as PGlite, schema });
+					if (needGenerateDump) {
+						await migrate(
+							readMigrationFiles({ migrationsFolder: MIGRATIONS_FOLDER }),
+							db,
+							{ migrationsFolder: MIGRATIONS_FOLDER },
+						);
+						const dump = await pg.dumpDataDir("gzip");
+						await writeFile(DUMP_PATH, dump.stream());
+						needGenerateDump = false;
+						// Reset so the next clone comes from the dump (which has migrations),
+						// not from the un-migrated instance that was cached before migration ran.
+						cachedPgLiteInstance = undefined;
+					}
+					// PGlite is structurally compatible for all Drizzle operations we use;
+					// the QueryResultHKT difference is only a compile-time type parameter.
+					return {
+						client: DatabaseClient.make(db as unknown as DatabaseClient),
+						pg,
+					};
+				},
+				// @effect-diagnostics-next-line globalErrorInEffectFailure:off
+				catch: (e) => new Error(`PGlite setup failed: ${String(e)}`),
+			}),
+			({ pg }) => Effect.promise(() => pg.close()),
+		).pipe(Effect.map(({ client }) => client)),
 	);

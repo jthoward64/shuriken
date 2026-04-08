@@ -47,9 +47,14 @@ export const calendarMultigetHandler = (
 
 		const hrefs = extractHrefs(tree);
 		const propNames = extractPropNames(tree);
-		const dataTree =
+		// <C:calendar-data> is nested inside <D:prop>, not at the top level
+		const propEl =
 			typeof tree === "object" && tree !== null
-				? (tree as Record<string, unknown>)[CALENDAR_DATA]
+				? (tree as Record<string, unknown>)["{DAV:}prop"]
+				: undefined;
+		const dataTree =
+			typeof propEl === "object" && propEl !== null
+				? (propEl as Record<string, unknown>)[CALENDAR_DATA]
 				: undefined;
 		const spec = parseCalendarDataSpec(dataTree);
 

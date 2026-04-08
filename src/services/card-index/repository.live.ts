@@ -111,7 +111,7 @@ const findByText = Effect.fn("CardIndexRepository.findByText")(function* (
 			}
 
 			return db
-				.selectDistinct({ entityId: cardIndex.entityId })
+				.selectDistinct({ instanceId: davInstance.id })
 				.from(cardIndex)
 				.innerJoin(
 					davInstance,
@@ -122,7 +122,7 @@ const findByText = Effect.fn("CardIndexRepository.findByText")(function* (
 					),
 				)
 				.where(and(isNull(cardIndex.deletedAt), fieldCondition))
-				.then((rows) => rows.map((r) => r.entityId));
+				.then((rows) => rows.map((r) => r.instanceId));
 		},
 		catch: (e) => new DatabaseError({ cause: e }),
 	});

@@ -13,11 +13,15 @@
 	"claudeCode.environmentVariables": [
 		{
 			"name": "PATH",
-			"value": "/home/tagho/.local/share/nvm/v24.12.0/bin:${env:PATH}"
+			"value": "/home/tagho/.local/share/nvm/v24.12.0/bin:/home/tagho/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin"
 		},
 		{
 			"name": "nvm_current_version",
 			"value": "24.12.0"
+		},
+		{
+			"name": "CLAUDECODE",
+			"value": "1"
 		}
 	]
 }

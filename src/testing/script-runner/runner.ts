@@ -1,7 +1,7 @@
 import { Effect, ManagedRuntime, Redacted } from "effect";
 import { UserId } from "#src/domain/ids.ts";
-import { Email } from "#src/domain/types/strings.ts";
 import { Slug } from "#src/domain/types/path.ts";
+import { Email } from "#src/domain/types/strings.ts";
 import { handleRequest } from "#src/http/router.ts";
 import { ProvisioningService } from "#src/services/provisioning/index.ts";
 import { UserService } from "#src/services/user/index.ts";
@@ -9,6 +9,7 @@ import { makeScriptRunnerLayer } from "./layer.ts";
 import type {
 	ScriptOptions,
 	ScriptStep,
+	ScriptStepOrFactory,
 	ScriptStepResult,
 	ScriptUser,
 } from "./types.ts";
@@ -136,7 +137,9 @@ const checkExpectations = (
 
 	for (const substr of contains) {
 		if (!body.includes(substr)) {
-			failures.push(`expected body to contain ${JSON.stringify(substr)}`);
+			failures.push(
+				`expected body to contain ${JSON.stringify(substr)}, got ${JSON.stringify(body)}`,
+			);
 		}
 	}
 
@@ -149,7 +152,9 @@ const checkExpectations = (
 
 	for (const substr of notContains) {
 		if (body.includes(substr)) {
-			failures.push(`expected body NOT to contain ${JSON.stringify(substr)}`);
+			failures.push(
+				`expected body NOT to contain ${JSON.stringify(substr)}, got ${JSON.stringify(body)}`,
+			);
 		}
 	}
 
@@ -179,7 +184,7 @@ const checkExpectations = (
 // ---------------------------------------------------------------------------
 
 export const runScript = async (
-	steps: ReadonlyArray<ScriptStep>,
+	steps: ReadonlyArray<ScriptStepOrFactory>,
 	options?: ScriptOptions,
 ): Promise<ReadonlyArray<ScriptStepResult>> => {
 	const users = options?.users ?? [DEFAULT_USER];
@@ -191,13 +196,25 @@ export const runScript = async (
 
 		const results: Array<ScriptStepResult> = [];
 
-		for (const step of steps) {
+		for (const stepOrFactory of steps) {
+			// Resolve lazy factory steps using accumulated results so far
+			const step =
+				typeof stepOrFactory === "function"
+					? stepOrFactory(results)
+					: stepOrFactory;
+
 			const req = buildRequest(step, userMap);
 			const response = await runtime.runPromise(handleRequest(req, mockServer));
 			const body = await response.text();
 			const failures = checkExpectations(step, response.status, body);
 
-			results.push({ step, status: response.status, body, failures });
+			// Capture response headers as a plain record
+			const headers: Record<string, string> = {};
+			response.headers.forEach((value, key) => {
+				headers[key] = value;
+			});
+
+			results.push({ step, status: response.status, body, headers, failures });
 		}
 
 		return results;

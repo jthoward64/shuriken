@@ -130,6 +130,52 @@ export const get = (path: string, options?: StepOptions): ScriptStep => ({
 	expect: options?.expect ?? { status: 200 },
 });
 
+/** OPTIONS — capability discovery. Expects 200 by default. */
+export const options = (path: string, opts?: StepOptions): ScriptStep => ({
+	name: opts?.name ?? `OPTIONS ${path}`,
+	method: "OPTIONS",
+	path,
+	as: opts?.as,
+	headers: opts?.headers,
+	expect: opts?.expect ?? { status: 200 },
+});
+
+/** REPORT — DAV report query. Expects 207 by default. */
+export const report = (
+	path: string,
+	body: string,
+	opts?: StepOptions,
+): ScriptStep => ({
+	name: opts?.name ?? `REPORT ${path}`,
+	method: "REPORT",
+	path,
+	as: opts?.as,
+	headers: {
+		"Content-Type": "application/xml; charset=utf-8",
+		...opts?.headers,
+	},
+	body,
+	expect: opts?.expect ?? { status: 207 },
+});
+
+/** PROPPATCH — update properties. Expects 207 by default. */
+export const proppatch = (
+	path: string,
+	body: string,
+	opts?: StepOptions,
+): ScriptStep => ({
+	name: opts?.name ?? `PROPPATCH ${path}`,
+	method: "PROPPATCH",
+	path,
+	as: opts?.as,
+	headers: {
+		"Content-Type": "application/xml; charset=utf-8",
+		...opts?.headers,
+	},
+	body,
+	expect: opts?.expect ?? { status: 207 },
+});
+
 // ---------------------------------------------------------------------------
 // Common PROPFIND XML bodies
 // ---------------------------------------------------------------------------
