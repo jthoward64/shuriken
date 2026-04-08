@@ -22,15 +22,15 @@ import {
 } from "../format-utils.ts";
 import {
 	type IrComponent,
+	IrComponentSchema,
 	type IrDocument,
+	IrDocumentSchema,
 	type IrProperty,
 	type IrValue,
 	type IrValueType,
-	IrComponentSchema,
-	IrDocumentSchema,
 } from "../ir.ts";
-import { isVCard21, normalizeVCard21 } from "./vcard21.ts";
 import { VCARD_DEFAULT_TYPES } from "./known.ts";
+import { isVCard21, normalizeVCard21 } from "./vcard21.ts";
 
 // ---------------------------------------------------------------------------
 // vCard VALUE= parameter override map (lowercase keys per RFC 6350 §5.2)

@@ -23,12 +23,12 @@ import {
 } from "../format-utils.ts";
 import {
 	type IrComponent,
+	IrComponentSchema,
 	type IrDocument,
+	IrDocumentSchema,
 	type IrProperty,
 	type IrValue,
 	type IrValueType,
-	IrComponentSchema,
-	IrDocumentSchema,
 } from "../ir.ts";
 import { ICAL_DEFAULT_TYPES } from "./known.ts";
 

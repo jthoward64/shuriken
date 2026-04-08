@@ -9,6 +9,7 @@ import type {
 import type { ConflictError, DatabaseError } from "#src/domain/errors.ts";
 import type { GroupId, UserId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
+import type { UserWithPrincipal } from "#src/services/user/repository.ts";
 
 // ---------------------------------------------------------------------------
 // GroupRepository — data access for group + principal + membership
@@ -27,6 +28,24 @@ export interface GroupRepositoryShape {
 	readonly findById: (
 		id: GroupId,
 	) => Effect.Effect<Option.Option<GroupWithPrincipal>, DatabaseError>;
+	readonly findBySlug: (
+		slug: Slug,
+	) => Effect.Effect<Option.Option<GroupWithPrincipal>, DatabaseError>;
+	readonly list: () => Effect.Effect<
+		ReadonlyArray<GroupWithPrincipal>,
+		DatabaseError
+	>;
+	readonly listMembers: (
+		groupId: GroupId,
+	) => Effect.Effect<ReadonlyArray<UserWithPrincipal>, DatabaseError>;
+	readonly listByMember: (
+		userId: UserId,
+	) => Effect.Effect<ReadonlyArray<GroupWithPrincipal>, DatabaseError>;
+	readonly softDelete: (id: GroupId) => Effect.Effect<void, DatabaseError>;
+	readonly setMembers: (
+		groupId: GroupId,
+		userIds: ReadonlyArray<UserId>,
+	) => Effect.Effect<void, DatabaseError>;
 	readonly create: (input: {
 		readonly slug: Slug;
 		readonly displayName?: string;

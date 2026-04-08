@@ -8,7 +8,7 @@ import {
 	preconditionFailed,
 } from "#src/domain/errors.ts";
 import { InstanceId, type PrincipalId } from "#src/domain/ids.ts";
-import { Slug, type ResolvedDavPath } from "#src/domain/types/path.ts";
+import { type ResolvedDavPath, Slug } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import {
 	HTTP_BAD_GATEWAY,

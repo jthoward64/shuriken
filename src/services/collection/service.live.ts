@@ -4,8 +4,8 @@ import type { CollectionId, PrincipalId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
 import { AclRepository } from "#src/services/acl/repository.ts";
 import {
-	CollectionRepository,
 	type CollectionPropertyChanges,
+	CollectionRepository,
 	type NewCollection,
 } from "./repository.ts";
 import { CollectionService } from "./service.ts";

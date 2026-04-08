@@ -1,8 +1,8 @@
 {
 	"version": "8",
 	"dialect": "postgres",
-	"id": "842bb3d1-f0ba-4179-8c6b-351049e823ef",
-	"prevIds": ["0e0cac84-dedb-44d9-8d51-3c3ed9f3043f"],
+	"id": "5e9e15dd-1959-4fec-8509-13dd0b9d8505",
+	"prevIds": ["842bb3d1-f0ba-4179-8c6b-351049e823ef"],
 	"ddl": [
 		{
 			"isRlsEnabled": false,
@@ -4408,7 +4408,7 @@
 			"table": "dav_acl"
 		},
 		{
-			"value": "(resource_type = ANY (ARRAY['collection'::text, 'instance'::text, 'principal'::text]))",
+			"value": "(resource_type = ANY (ARRAY['collection'::text, 'instance'::text, 'principal'::text, 'virtual'::text]))",
 			"name": "dav_acl_resource_type_check",
 			"entityType": "checks",
 			"schema": "public",

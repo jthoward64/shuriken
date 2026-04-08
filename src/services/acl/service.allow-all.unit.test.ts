@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
 import { CollectionId, PrincipalId } from "#src/domain/ids.ts";
-import { AclService } from "./service.ts";
 import { AclServiceAllowAll } from "./service.allow-all.ts";
+import { AclService } from "./service.ts";
 
 // ---------------------------------------------------------------------------
 // Test fixtures

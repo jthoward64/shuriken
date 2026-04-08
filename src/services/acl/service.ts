@@ -1,7 +1,12 @@
 import type { Effect } from "effect";
 import { Context } from "effect";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
-import type { CollectionId, InstanceId, PrincipalId } from "#src/domain/ids.ts";
+import type {
+	CollectionId,
+	InstanceId,
+	PrincipalId,
+	VirtualResourceId,
+} from "#src/domain/ids.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
 import type { AclResourceType, NewAce } from "./repository.ts";
 
@@ -14,7 +19,11 @@ import type { AclResourceType, NewAce } from "./repository.ts";
 //   instance    → instanceId
 // ---------------------------------------------------------------------------
 
-export type AclResourceId = CollectionId | InstanceId | PrincipalId;
+export type AclResourceId =
+	| CollectionId
+	| InstanceId
+	| PrincipalId
+	| VirtualResourceId;
 
 // ---------------------------------------------------------------------------
 // AclService — RFC 3744 access control enforcement

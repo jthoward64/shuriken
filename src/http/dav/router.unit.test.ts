@@ -22,6 +22,7 @@ import { ComponentRepository } from "#src/services/component/index.ts";
 import type { ComponentRepositoryShape } from "#src/services/component/repository.ts";
 import { EntityRepository } from "#src/services/entity/index.ts";
 import type { EntityRepositoryShape } from "#src/services/entity/repository.ts";
+import { GroupRepository, GroupService } from "#src/services/group/index.ts";
 import type { InstanceRow } from "#src/services/instance/repository.ts";
 import {
 	InstanceRepository,
@@ -40,6 +41,7 @@ import {
 } from "#src/services/principal/service.ts";
 import { CalTimezoneRepository } from "#src/services/timezone/repository.ts";
 import { TombstoneRepository } from "#src/services/tombstone/index.ts";
+import { UserRepository, UserService } from "#src/services/user/index.ts";
 import { davRouter, parseDavPath } from "./router.ts";
 
 // ---------------------------------------------------------------------------
@@ -132,6 +134,10 @@ const makeRouterLayer = (
 	| TombstoneRepository
 	| CalIndexRepository
 	| CardIndexRepository
+	| UserRepository
+	| GroupRepository
+	| UserService
+	| GroupService
 > => {
 	const principals = seeds.principals ?? new Map<string, string>();
 	const collections = seeds.collections ?? new Map<string, string>();
@@ -311,6 +317,55 @@ const makeRouterLayer = (
 		}),
 		Layer.succeed(CardIndexRepository, {
 			findByText: () => Effect.die("not implemented in router tests"),
+		}),
+		Layer.succeed(UserRepository, {
+			findById: () => Effect.succeed(Option.none()),
+			findBySlug: () => Effect.succeed(Option.none()),
+			findByEmail: () => Effect.succeed(Option.none()),
+			list: () => Effect.succeed([]),
+			softDelete: () => Effect.void,
+			create: () => Effect.die("not implemented in router tests"),
+			update: () => Effect.die("not implemented in router tests"),
+			findCredential: () => Effect.succeed(Option.none()),
+			insertCredential: () => Effect.die("not implemented in router tests"),
+			deleteCredential: () => Effect.void,
+		}),
+		Layer.succeed(GroupRepository, {
+			findById: () => Effect.succeed(Option.none()),
+			findBySlug: () => Effect.succeed(Option.none()),
+			list: () => Effect.succeed([]),
+			listMembers: () => Effect.succeed([]),
+			listByMember: () => Effect.succeed([]),
+			softDelete: () => Effect.void,
+			setMembers: () => Effect.void,
+			create: () => Effect.die("not implemented in router tests"),
+			update: () => Effect.die("not implemented in router tests"),
+			addMember: () => Effect.void,
+			removeMember: () => Effect.void,
+			hasMember: () => Effect.succeed(false),
+		}),
+		Layer.succeed(UserService, {
+			create: () => Effect.die("not implemented in router tests"),
+			findById: () => Effect.die("not implemented in router tests"),
+			findBySlug: () => Effect.die("not implemented in router tests"),
+			list: () => Effect.succeed([]),
+			update: () => Effect.die("not implemented in router tests"),
+			delete: () => Effect.die("not implemented in router tests"),
+			addCredential: () => Effect.die("not implemented in router tests"),
+			removeCredential: () => Effect.die("not implemented in router tests"),
+			setCredential: () => Effect.die("not implemented in router tests"),
+		}),
+		Layer.succeed(GroupService, {
+			create: () => Effect.die("not implemented in router tests"),
+			findById: () => Effect.die("not implemented in router tests"),
+			list: () => Effect.succeed([]),
+			listMembers: () => Effect.succeed([]),
+			listByMember: () => Effect.succeed([]),
+			update: () => Effect.die("not implemented in router tests"),
+			delete: () => Effect.die("not implemented in router tests"),
+			setMembers: () => Effect.die("not implemented in router tests"),
+			addMember: () => Effect.die("not implemented in router tests"),
+			removeMember: () => Effect.die("not implemented in router tests"),
 		}),
 		AclServiceAllowAll,
 	);

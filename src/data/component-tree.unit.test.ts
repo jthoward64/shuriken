@@ -1,11 +1,11 @@
 import { describe, expect, it } from "bun:test";
 import { Effect, Schema } from "effect";
 import { runFailure } from "#src/testing/effect.ts";
-import type { ContentLine } from "./content-line.ts";
 import {
 	RawComponentCodec,
 	TextToRawComponentCodec,
 } from "./component-tree.ts";
+import type { ContentLine } from "./content-line.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers

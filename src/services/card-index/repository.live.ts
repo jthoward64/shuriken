@@ -5,9 +5,9 @@ import { cardIndex, davInstance } from "#src/db/drizzle/schema/index.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
 import type { CollectionId } from "#src/domain/ids.ts";
 import {
-	CardIndexRepository,
-	type CardIndexField,
 	type CardCollation,
+	type CardIndexField,
+	CardIndexRepository,
 	type CardMatchType,
 } from "./repository.ts";
 

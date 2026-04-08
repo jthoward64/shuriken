@@ -229,9 +229,11 @@ describe("aclHandler — path gating", () => {
 	it("returns 405 for principalCollection path", async () => {
 		const env = makeBaseEnv();
 		const err = await runDavFailure(
-			aclHandler(makePrincipalCollectionPath(), authenticatedCtx, emptyRequest).pipe(
-				Effect.provide(env.toLayer()),
-			),
+			aclHandler(
+				makePrincipalCollectionPath(),
+				authenticatedCtx,
+				emptyRequest,
+			).pipe(Effect.provide(env.toLayer())),
 		);
 		expect(err.status).toBe(HTTP_METHOD_NOT_ALLOWED);
 	});
@@ -265,7 +267,10 @@ describe("aclHandler — authorization", () => {
 	it("returns 403 DAV:need-privileges when acting principal has no write-acl", async () => {
 		const env = makeTestEnv()
 			.withUser({ principalId: TEST_PRINCIPAL_ID })
-			.withCollection({ id: TEST_COLLECTION_ID, ownerPrincipalId: TEST_PRINCIPAL_ID });
+			.withCollection({
+				id: TEST_COLLECTION_ID,
+				ownerPrincipalId: TEST_PRINCIPAL_ID,
+			});
 		const err = await runDavFailure(
 			aclHandler(makeCollectionPath(), authenticatedCtx, emptyRequest).pipe(
 				Effect.provide(env.toLayer()),
@@ -287,9 +292,11 @@ describe("aclHandler — grant-only restriction", () => {
 			{ principal: "<D:all/>", privileges: ["read"], deny: true },
 		]);
 		const err = await runDavFailure(
-			aclHandler(makeCollectionPath(), authenticatedCtx, makeRequest(body)).pipe(
-				Effect.provide(env.toLayer()),
-			),
+			aclHandler(
+				makeCollectionPath(),
+				authenticatedCtx,
+				makeRequest(body),
+			).pipe(Effect.provide(env.toLayer())),
 		);
 		expect(err.status).toBe(HTTP_FORBIDDEN);
 		expect(err.precondition).toBe("DAV:grant-only");
@@ -301,9 +308,11 @@ describe("aclHandler — no-invert restriction", () => {
 		const env = makeBaseEnv();
 		const body = `<D:acl xmlns:D="DAV:"><D:ace><D:principal><D:invert><D:all/></D:invert></D:principal><D:grant><D:privilege><D:read/></D:privilege></D:grant></D:ace></D:acl>`;
 		const err = await runDavFailure(
-			aclHandler(makeCollectionPath(), authenticatedCtx, makeRequest(body)).pipe(
-				Effect.provide(env.toLayer()),
-			),
+			aclHandler(
+				makeCollectionPath(),
+				authenticatedCtx,
+				makeRequest(body),
+			).pipe(Effect.provide(env.toLayer())),
 		);
 		expect(err.status).toBe(HTTP_FORBIDDEN);
 		expect(err.precondition).toBe("DAV:no-invert");
@@ -315,9 +324,11 @@ describe("aclHandler — no property principal", () => {
 		const env = makeBaseEnv();
 		const body = `<D:acl xmlns:D="DAV:"><D:ace><D:principal><D:property><D:owner/></D:property></D:principal><D:grant><D:privilege><D:read/></D:privilege></D:grant></D:ace></D:acl>`;
 		const err = await runDavFailure(
-			aclHandler(makeCollectionPath(), authenticatedCtx, makeRequest(body)).pipe(
-				Effect.provide(env.toLayer()),
-			),
+			aclHandler(
+				makeCollectionPath(),
+				authenticatedCtx,
+				makeRequest(body),
+			).pipe(Effect.provide(env.toLayer())),
 		);
 		expect(err.status).toBe(HTTP_FORBIDDEN);
 		expect(err.precondition).toBe("DAV:not-supported-privilege");
@@ -338,9 +349,11 @@ describe("aclHandler — href principal validation", () => {
 			},
 		]);
 		const err = await runDavFailure(
-			aclHandler(makeCollectionPath(), authenticatedCtx, makeRequest(body)).pipe(
-				Effect.provide(env.toLayer()),
-			),
+			aclHandler(
+				makeCollectionPath(),
+				authenticatedCtx,
+				makeRequest(body),
+			).pipe(Effect.provide(env.toLayer())),
 		);
 		expect(err.status).toBe(HTTP_FORBIDDEN);
 		expect(err.precondition).toBe("DAV:recognized-principal");
@@ -355,10 +368,11 @@ describe("aclHandler — href principal validation", () => {
 			},
 		]);
 		const res = await runSuccess(
-			aclHandler(makeCollectionPath(), authenticatedCtx, makeRequest(body)).pipe(
-				Effect.provide(env.toLayer()),
-				Effect.orDie,
-			),
+			aclHandler(
+				makeCollectionPath(),
+				authenticatedCtx,
+				makeRequest(body),
+			).pipe(Effect.provide(env.toLayer()), Effect.orDie),
 		);
 		expect(res.status).toBe(HTTP_OK);
 
@@ -378,10 +392,11 @@ describe("aclHandler — href principal validation", () => {
 			},
 		]);
 		const res = await runSuccess(
-			aclHandler(makeCollectionPath(), authenticatedCtx, makeRequest(body)).pipe(
-				Effect.provide(env.toLayer()),
-				Effect.orDie,
-			),
+			aclHandler(
+				makeCollectionPath(),
+				authenticatedCtx,
+				makeRequest(body),
+			).pipe(Effect.provide(env.toLayer()), Effect.orDie),
 		);
 		expect(res.status).toBe(HTTP_OK);
 
@@ -400,9 +415,11 @@ describe("aclHandler — privilege validation", () => {
 		const env = makeBaseEnv();
 		const body = `<D:acl xmlns:D="DAV:"><D:ace><D:principal><D:all/></D:principal><D:grant><D:privilege><D:fake-privilege/></D:privilege></D:grant></D:ace></D:acl>`;
 		const err = await runDavFailure(
-			aclHandler(makeCollectionPath(), authenticatedCtx, makeRequest(body)).pipe(
-				Effect.provide(env.toLayer()),
-			),
+			aclHandler(
+				makeCollectionPath(),
+				authenticatedCtx,
+				makeRequest(body),
+			).pipe(Effect.provide(env.toLayer())),
 		);
 		expect(err.status).toBe(HTTP_FORBIDDEN);
 		expect(err.precondition).toBe("DAV:not-supported-privilege");
@@ -426,10 +443,11 @@ describe("aclHandler — pseudo-principals", () => {
 				{ principal: principalXml, privileges: ["read"] },
 			]);
 			const res = await runSuccess(
-				aclHandler(makeCollectionPath(), authenticatedCtx, makeRequest(body)).pipe(
-					Effect.provide(env.toLayer()),
-					Effect.orDie,
-				),
+				aclHandler(
+					makeCollectionPath(),
+					authenticatedCtx,
+					makeRequest(body),
+				).pipe(Effect.provide(env.toLayer()), Effect.orDie),
 			);
 			expect(res.status).toBe(HTTP_OK);
 		});
@@ -459,14 +477,13 @@ describe("aclHandler — successful writes", () => {
 
 	it("writes a single ACE with ordinal 0", async () => {
 		const env = makeBaseEnv();
-		const body = makeAclXml([
-			{ principal: "<D:all/>", privileges: ["read"] },
-		]);
+		const body = makeAclXml([{ principal: "<D:all/>", privileges: ["read"] }]);
 		await runSuccess(
-			aclHandler(makeCollectionPath(), authenticatedCtx, makeRequest(body)).pipe(
-				Effect.provide(env.toLayer()),
-				Effect.orDie,
-			),
+			aclHandler(
+				makeCollectionPath(),
+				authenticatedCtx,
+				makeRequest(body),
+			).pipe(Effect.provide(env.toLayer()), Effect.orDie),
 		);
 
 		const aces = env.stores.acl.get(TEST_COLLECTION_ID) ?? [];
@@ -486,10 +503,11 @@ describe("aclHandler — successful writes", () => {
 			{ principal: "<D:self/>", privileges: ["read-acl"] },
 		]);
 		await runSuccess(
-			aclHandler(makeCollectionPath(), authenticatedCtx, makeRequest(body)).pipe(
-				Effect.provide(env.toLayer()),
-				Effect.orDie,
-			),
+			aclHandler(
+				makeCollectionPath(),
+				authenticatedCtx,
+				makeRequest(body),
+			).pipe(Effect.provide(env.toLayer()), Effect.orDie),
 		);
 
 		const aces = (env.stores.acl.get(TEST_COLLECTION_ID) ?? [])
@@ -507,10 +525,11 @@ describe("aclHandler — successful writes", () => {
 			{ principal: "<D:all/>", privileges: ["read", "read-acl"] },
 		]);
 		await runSuccess(
-			aclHandler(makeCollectionPath(), authenticatedCtx, makeRequest(body)).pipe(
-				Effect.provide(env.toLayer()),
-				Effect.orDie,
-			),
+			aclHandler(
+				makeCollectionPath(),
+				authenticatedCtx,
+				makeRequest(body),
+			).pipe(Effect.provide(env.toLayer()), Effect.orDie),
 		);
 
 		const aces = (env.stores.acl.get(TEST_COLLECTION_ID) ?? []).filter(
@@ -528,10 +547,11 @@ describe("aclHandler — successful writes", () => {
 		const env = makeBaseEnv();
 		const body = makeAclXml([{ principal: "<D:all/>", privileges: ["read"] }]);
 		await runSuccess(
-			aclHandler(makeCollectionPath(), authenticatedCtx, makeRequest(body)).pipe(
-				Effect.provide(env.toLayer()),
-				Effect.orDie,
-			),
+			aclHandler(
+				makeCollectionPath(),
+				authenticatedCtx,
+				makeRequest(body),
+			).pipe(Effect.provide(env.toLayer()), Effect.orDie),
 		);
 
 		const aces = (env.stores.acl.get(TEST_COLLECTION_ID) ?? []).filter(

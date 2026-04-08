@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import { makeCalEvent } from "#src/testing/data.ts";
 import {
-	PROPFIND_ALLPROP,
 	mkcol,
+	PROPFIND_ALLPROP,
 	propfind,
 	put,
 	twoUsers,

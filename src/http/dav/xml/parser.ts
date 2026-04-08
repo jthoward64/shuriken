@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import { XMLParser } from "fast-xml-parser";
-import { type DavError, XmlParseError, davError } from "#src/domain/errors.ts";
+import { type DavError, davError, XmlParseError } from "#src/domain/errors.ts";
 import { HTTP_REQUEST_ENTITY_TOO_LARGE } from "#src/http/status.ts";
 
 // Maximum size in bytes accepted for XML request bodies (PROPFIND, PROPPATCH, REPORT).

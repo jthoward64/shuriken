@@ -17,6 +17,7 @@ export type InstanceId = UuidString & Brand.Brand<"InstanceId">;
 export type EntityId = UuidString & Brand.Brand<"EntityId">;
 export type ComponentId = UuidString & Brand.Brand<"ComponentId">;
 export type PropertyId = UuidString & Brand.Brand<"PropertyId">;
+export type VirtualResourceId = UuidString & Brand.Brand<"VirtualResourceId">;
 export type RequestId = string & Brand.Brand<"RequestId">;
 
 export const PrincipalId = Brand.nominal<PrincipalId>();
@@ -29,6 +30,7 @@ export const InstanceId = Brand.nominal<InstanceId>();
 export const EntityId = Brand.nominal<EntityId>();
 export const ComponentId = Brand.nominal<ComponentId>();
 export const PropertyId = Brand.nominal<PropertyId>();
+export const VirtualResourceId = Brand.nominal<VirtualResourceId>();
 export const RequestId = Brand.nominal<RequestId>();
 
 // ---------------------------------------------------------------------------

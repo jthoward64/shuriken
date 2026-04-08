@@ -7,6 +7,7 @@ import type {
 } from "#src/domain/errors.ts";
 import type { GroupId, UserId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
+import type { UserWithPrincipal } from "#src/services/user/repository.ts";
 import type { GroupWithPrincipal } from "./repository.ts";
 
 // ---------------------------------------------------------------------------
@@ -33,10 +34,33 @@ export interface GroupServiceShape {
 		GroupWithPrincipal,
 		DavError | DatabaseError | ConflictError
 	>;
+	readonly findById: (
+		id: GroupId,
+	) => Effect.Effect<GroupWithPrincipal, DavError | DatabaseError>;
+	readonly list: () => Effect.Effect<
+		ReadonlyArray<GroupWithPrincipal>,
+		DatabaseError
+	>;
+	readonly listMembers: (
+		groupId: GroupId,
+	) => Effect.Effect<
+		ReadonlyArray<UserWithPrincipal>,
+		DavError | DatabaseError
+	>;
+	readonly listByMember: (
+		userId: UserId,
+	) => Effect.Effect<ReadonlyArray<GroupWithPrincipal>, DatabaseError>;
 	readonly update: (
 		id: GroupId,
 		input: UpdateGroup,
 	) => Effect.Effect<GroupWithPrincipal, DavError | DatabaseError>;
+	readonly delete: (
+		id: GroupId,
+	) => Effect.Effect<void, DavError | DatabaseError>;
+	readonly setMembers: (
+		groupId: GroupId,
+		userIds: ReadonlyArray<UserId>,
+	) => Effect.Effect<void, DavError | DatabaseError>;
 	readonly addMember: (
 		groupId: GroupId,
 		userId: UserId,

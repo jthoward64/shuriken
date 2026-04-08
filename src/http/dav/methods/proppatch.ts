@@ -213,7 +213,16 @@ export const proppatchHandler = (
 			path.kind === "new-instance" ||
 			path.kind === "root" ||
 			path.kind === "principalCollection" ||
-			path.kind === "wellknown"
+			path.kind === "wellknown" ||
+			path.kind === "userCollection" ||
+			path.kind === "user" ||
+			path.kind === "newUser" ||
+			path.kind === "groupCollection" ||
+			path.kind === "group" ||
+			path.kind === "newGroup" ||
+			path.kind === "groupMembers" ||
+			path.kind === "groupMember" ||
+			path.kind === "newGroupMember"
 		) {
 			return yield* notFound();
 		}
@@ -310,8 +319,12 @@ export const proppatchHandler = (
 
 			yield* collSvc.updateProperties(path.collectionId, {
 				clientProperties: newDead as IrDeadProperties,
-				...(newDisplayName !== undefined ? { displayName: newDisplayName } : {}),
-				...(newDescription !== undefined ? { description: newDescription } : {}),
+				...(newDisplayName !== undefined
+					? { displayName: newDisplayName }
+					: {}),
+				...(newDescription !== undefined
+					? { description: newDescription }
+					: {}),
 			});
 
 			return yield* multistatusResponse([
@@ -421,7 +434,8 @@ export const proppatchHandler = (
 			]);
 		}
 
-		const currentDead = (principalRow.clientProperties ?? {}) as IrDeadProperties;
+		const currentDead = (principalRow.clientProperties ??
+			{}) as IrDeadProperties;
 		const newDead: Record<ClarkName, unknown> = { ...currentDead };
 		for (const name of deadNames) {
 			if (set.has(name)) {

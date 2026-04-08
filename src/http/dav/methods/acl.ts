@@ -18,14 +18,14 @@ import { cn } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import { forbidden, methodNotAllowed, notFound } from "#src/domain/errors.ts";
 import { isUuid, PrincipalId, type UuidString } from "#src/domain/ids.ts";
-import type { AclResourceId } from "#src/services/acl/service.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
 import type { ResolvedDavPath, Slug } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
-import { HTTP_OK } from "#src/http/status.ts";
 import { normalizeClarkNames } from "#src/http/dav/xml/clark.ts";
 import { parseXml, readXmlBody } from "#src/http/dav/xml/parser.ts";
+import { HTTP_OK } from "#src/http/status.ts";
 import type { AclResourceType, NewAce } from "#src/services/acl/index.ts";
+import type { AclResourceId } from "#src/services/acl/service.ts";
 import { AclService } from "#src/services/acl/service.ts";
 import { PrincipalRepository } from "#src/services/principal/repository.ts";
 
@@ -63,7 +63,10 @@ const PRIVILEGE_MAP = new Map<string, DavPrivilege>([
 	[cn(DAV_NS, "write-content"), "DAV:write-content"],
 	[cn(DAV_NS, "unlock"), "DAV:unlock"],
 	[cn(DAV_NS, "read-acl"), "DAV:read-acl"],
-	[cn(DAV_NS, "read-current-user-privilege-set"), "DAV:read-current-user-privilege-set"],
+	[
+		cn(DAV_NS, "read-current-user-privilege-set"),
+		"DAV:read-current-user-privilege-set",
+	],
 	[cn(DAV_NS, "write-acl"), "DAV:write-acl"],
 	[cn(DAV_NS, "bind"), "DAV:bind"],
 	[cn(DAV_NS, "unbind"), "DAV:unbind"],
@@ -222,11 +225,7 @@ const resolveHrefPrincipal = (
 		}
 
 		// Last non-empty path segment is the principal slug or UUID
-		const seg = path
-			.replace(/\/$/, "")
-			.split("/")
-			.filter(Boolean)
-			.at(-1);
+		const seg = path.replace(/\/$/, "").split("/").filter(Boolean).at(-1);
 
 		if (seg === undefined) {
 			return yield* Effect.fail(forbidden("DAV:recognized-principal"));
@@ -261,11 +260,23 @@ export const aclHandler = (
 		if (
 			path.kind === "wellknown" ||
 			path.kind === "root" ||
-			path.kind === "principalCollection"
+			path.kind === "principalCollection" ||
+			path.kind === "userCollection" ||
+			path.kind === "groupCollection" ||
+			path.kind === "groupMembers"
 		) {
 			return yield* Effect.fail(methodNotAllowed());
 		}
-		if (path.kind === "new-collection" || path.kind === "new-instance") {
+		if (
+			path.kind === "new-collection" ||
+			path.kind === "new-instance" ||
+			path.kind === "newUser" ||
+			path.kind === "newGroup" ||
+			path.kind === "newGroupMember" ||
+			path.kind === "user" ||
+			path.kind === "group" ||
+			path.kind === "groupMember"
+		) {
 			return yield* Effect.fail(notFound());
 		}
 
@@ -292,7 +303,12 @@ export const aclHandler = (
 
 		// Must have DAV:write-acl on the resource
 		const acl = yield* AclService;
-		yield* acl.check(actingPrincipalId, resourceId, resourceType, "DAV:write-acl");
+		yield* acl.check(
+			actingPrincipalId,
+			resourceId,
+			resourceType,
+			"DAV:write-acl",
+		);
 
 		yield* Effect.logTrace("acl.method", { resourceId, resourceType });
 

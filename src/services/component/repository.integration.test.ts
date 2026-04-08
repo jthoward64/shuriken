@@ -3,10 +3,10 @@ import { Effect, Layer, Option } from "effect";
 import { Temporal } from "temporal-polyfill";
 import type { IrComponent } from "#src/data/ir.ts";
 import { EntityId } from "#src/domain/ids.ts";
-import { runSuccess } from "#src/testing/effect.ts";
-import { makePgliteDatabaseLayer } from "#src/testing/pglite.ts";
 import { EntityRepositoryLive } from "#src/services/entity/repository.live.ts";
 import { EntityRepository } from "#src/services/entity/repository.ts";
+import { runSuccess } from "#src/testing/effect.ts";
+import { makePgliteDatabaseLayer } from "#src/testing/pglite.ts";
 import { ComponentRepositoryLive } from "./repository.live.ts";
 import { ComponentRepository } from "./repository.ts";
 

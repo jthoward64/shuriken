@@ -5,6 +5,7 @@ import {
 	someOrNotFound,
 } from "#src/domain/errors.ts";
 import type { PrincipalId, UserId } from "#src/domain/ids.ts";
+import type { Slug } from "#src/domain/types/path.ts";
 import {
 	CryptoService,
 	type CryptoServiceShape,
@@ -57,6 +58,25 @@ export const UserServiceLive = Layer.effect(
 		const aclRepo = yield* AclRepository;
 
 		return UserService.of({
+			list: Effect.fn("UserService.list")(function* () {
+				yield* Effect.logTrace("user.list");
+				return yield* repo.list();
+			}),
+
+			findBySlug: Effect.fn("UserService.findBySlug")(function* (slug: Slug) {
+				yield* Effect.logTrace("user.findBySlug", { slug });
+				return yield* repo
+					.findBySlug(slug)
+					.pipe(Effect.flatMap(someOrNotFound(`User not found: ${slug}`)));
+			}),
+
+			findById: Effect.fn("UserService.findById")(function* (id: UserId) {
+				yield* Effect.logTrace("user.findById", { id });
+				return yield* repo
+					.findById(id)
+					.pipe(Effect.flatMap(someOrNotFound(`User not found: ${id}`)));
+			}),
+
 			create: Effect.fn("UserService.create")(function* (input: NewUser) {
 				yield* Effect.logTrace("user.create", { slug: input.slug });
 				const credentials: Array<{
@@ -140,6 +160,35 @@ export const UserServiceLive = Layer.effect(
 					.findById(userId)
 					.pipe(Effect.flatMap(someOrNotFound(`User not found: ${userId}`)));
 				yield* repo.deleteCredential(userId, authSource, authId);
+			}),
+
+			delete: Effect.fn("UserService.delete")(function* (id: UserId) {
+				yield* Effect.logTrace("user.delete", { id });
+				yield* repo
+					.findById(id)
+					.pipe(Effect.flatMap(someOrNotFound(`User not found: ${id}`)));
+				yield* repo.softDelete(id);
+			}),
+
+			setCredential: Effect.fn("UserService.setCredential")(function* (
+				userId: UserId,
+				credential: NewCredential,
+			) {
+				yield* Effect.logTrace("user.setCredential", {
+					userId,
+					source: credential.source,
+				});
+				yield* repo
+					.findById(userId)
+					.pipe(Effect.flatMap(someOrNotFound(`User not found: ${userId}`)));
+				// Delete any existing credential for this source+authId, then insert fresh
+				yield* repo.deleteCredential(
+					userId,
+					credential.source,
+					credential.authId,
+				);
+				const hashed = yield* hashCredential(crypto, credential);
+				yield* repo.insertCredential({ userId, ...hashed });
 			}),
 		});
 	}),

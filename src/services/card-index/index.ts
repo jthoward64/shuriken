@@ -1,8 +1,8 @@
+export { CardIndexRepositoryLive } from "./repository.live.ts";
 export {
-	CardIndexRepository,
 	type CardCollation,
 	type CardIndexField,
-	type CardMatchType,
+	CardIndexRepository,
 	type CardIndexRepositoryShape,
+	type CardMatchType,
 } from "./repository.ts";
-export { CardIndexRepositoryLive } from "./repository.live.ts";

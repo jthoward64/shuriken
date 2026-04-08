@@ -7,8 +7,8 @@ import type { PrincipalId, UserId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
 import type { Email } from "#src/domain/types/strings.ts";
 import {
-	PrincipalRepository,
 	type PrincipalPropertyChanges,
+	PrincipalRepository,
 	type UserRow,
 } from "./repository.ts";
 
@@ -54,9 +54,7 @@ export const PrincipalRepositoryLive = Layer.effect(
 							.select()
 							.from(principal)
 							.innerJoin(user, eq(user.principalId, principal.id))
-							.where(
-								and(eq(principal.slug, slug), isNull(principal.deletedAt)),
-							)
+							.where(and(eq(principal.slug, slug), isNull(principal.deletedAt)))
 							.limit(1)
 							.then((r) =>
 								Option.fromNullable(
@@ -80,9 +78,7 @@ export const PrincipalRepositoryLive = Layer.effect(
 							.select()
 							.from(user)
 							.innerJoin(principal, eq(principal.id, user.principalId))
-							.where(
-								and(eq(user.email, email), isNull(principal.deletedAt)),
-							)
+							.where(and(eq(user.email, email), isNull(principal.deletedAt)))
 							.limit(1)
 							.then((r) =>
 								Option.fromNullable(
@@ -97,9 +93,7 @@ export const PrincipalRepositoryLive = Layer.effect(
 			),
 		);
 
-		const findUserByUserId = Effect.fn(
-			"PrincipalRepository.findUserByUserId",
-		)(
+		const findUserByUserId = Effect.fn("PrincipalRepository.findUserByUserId")(
 			function* (id: UserId) {
 				yield* Effect.logTrace("repo.principal.findUserByUserId", { id });
 				return yield* Effect.tryPromise({
@@ -118,9 +112,7 @@ export const PrincipalRepositoryLive = Layer.effect(
 			),
 		);
 
-		const updateProperties = Effect.fn(
-			"PrincipalRepository.updateProperties",
-		)(
+		const updateProperties = Effect.fn("PrincipalRepository.updateProperties")(
 			function* (id: PrincipalId, changes: PrincipalPropertyChanges) {
 				yield* Effect.logTrace("repo.principal.updateProperties", { id });
 				const setValues: Record<string, unknown> = {
@@ -135,9 +127,7 @@ export const PrincipalRepositoryLive = Layer.effect(
 						db
 							.update(principal)
 							.set(setValues)
-							.where(
-								and(eq(principal.id, id), isNull(principal.deletedAt)),
-							)
+							.where(and(eq(principal.id, id), isNull(principal.deletedAt)))
 							.returning()
 							.then((rows) => {
 								const row = rows[0];

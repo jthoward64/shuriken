@@ -6,10 +6,10 @@ import type {
 	DavError,
 	InternalError,
 } from "#src/domain/errors.ts";
+import type { Slug } from "#src/domain/types/path.ts";
+import type { Email } from "#src/domain/types/strings.ts";
 import type { CollectionRow } from "#src/services/collection/repository.ts";
 import type { UserWithPrincipal } from "#src/services/user/repository.ts";
-import type { Email } from "#src/domain/types/strings.ts";
-import type { Slug } from "#src/domain/types/path.ts";
 
 // ---------------------------------------------------------------------------
 // Input / output types

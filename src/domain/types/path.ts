@@ -1,5 +1,11 @@
 import { Brand } from "effect";
-import type { CollectionId, InstanceId, PrincipalId } from "#src/domain/ids.ts";
+import type {
+	CollectionId,
+	GroupId,
+	InstanceId,
+	PrincipalId,
+	UserId,
+} from "#src/domain/ids.ts";
 import type { CollectionNamespace } from "#src/domain/types/collection-namespace.ts";
 
 // ---------------------------------------------------------------------------
@@ -85,4 +91,65 @@ export type ResolvedDavPath =
 			readonly principalSeg: string;
 			/** URL-decoded path segment as the client sent it (slug or UUID string). */
 			readonly collectionSeg: string;
+	  }
+	| {
+			/** /dav/users/ — the admin user collection */
+			readonly kind: "userCollection";
+	  }
+	| {
+			/** /dav/users/:seg — a single managed user */
+			readonly kind: "user";
+			readonly principalId: PrincipalId;
+			readonly userId: UserId;
+			/** URL-decoded path segment as the client sent it (slug or UUID string). */
+			readonly userSeg: string;
+	  }
+	| {
+			/** /dav/users/:seg — path segment that does not resolve to an existing user */
+			readonly kind: "newUser";
+			readonly slug: Slug;
+	  }
+	| {
+			/** /dav/groups/ — the admin group collection */
+			readonly kind: "groupCollection";
+	  }
+	| {
+			/** /dav/groups/:seg — a single managed group */
+			readonly kind: "group";
+			readonly principalId: PrincipalId;
+			readonly groupId: GroupId;
+			/** URL-decoded path segment as the client sent it (slug or UUID string). */
+			readonly groupSeg: string;
+	  }
+	| {
+			/** /dav/groups/:seg — path segment that does not resolve to an existing group */
+			readonly kind: "newGroup";
+			readonly slug: Slug;
+	  }
+	| {
+			/** /dav/groups/:seg/members/ — the member sub-collection of a group */
+			readonly kind: "groupMembers";
+			readonly principalId: PrincipalId;
+			readonly groupId: GroupId;
+			/** URL-decoded path segment as the client sent it (slug or UUID string). */
+			readonly groupSeg: string;
+	  }
+	| {
+			/** /dav/groups/:seg/members/:memberSeg — a resolved group membership */
+			readonly kind: "groupMember";
+			readonly principalId: PrincipalId;
+			readonly groupId: GroupId;
+			readonly memberUserId: UserId;
+			/** URL-decoded path segment as the client sent it (slug or UUID string). */
+			readonly groupSeg: string;
+			/** URL-decoded path segment as the client sent it (slug or UUID string). */
+			readonly memberSeg: string;
+	  }
+	| {
+			/** /dav/groups/:seg/members/:memberSeg — member slug that does not resolve */
+			readonly kind: "newGroupMember";
+			readonly principalId: PrincipalId;
+			readonly groupId: GroupId;
+			readonly groupSeg: string;
+			readonly slug: Slug;
 	  };

@@ -24,10 +24,15 @@ import type { CardIndexRepository } from "#src/services/card-index/index.ts";
 import type { CollectionService } from "#src/services/collection/index.ts";
 import type { ComponentRepository } from "#src/services/component/index.ts";
 import type { EntityRepository } from "#src/services/entity/index.ts";
+import type {
+	GroupRepository,
+	GroupService,
+} from "#src/services/group/index.ts";
 import type { InstanceService } from "#src/services/instance/index.ts";
 import type { PrincipalService } from "#src/services/principal/service.ts";
 import type { CalTimezoneRepository } from "#src/services/timezone/index.ts";
 import type { TombstoneRepository } from "#src/services/tombstone/index.ts";
+import type { UserRepository, UserService } from "#src/services/user/index.ts";
 
 // ---------------------------------------------------------------------------
 // Top-level HTTP router
@@ -53,7 +58,11 @@ type AppServices =
 	| CalTimezoneRepository
 	| TombstoneRepository
 	| CalIndexRepository
-	| CardIndexRepository;
+	| CardIndexRepository
+	| UserRepository
+	| GroupRepository
+	| UserService
+	| GroupService;
 
 const isDavPath = (pathname: string): boolean =>
 	pathname === "/dav" ||

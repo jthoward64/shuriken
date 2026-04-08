@@ -6,7 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import type { Temporal } from "temporal-polyfill";
-import { cn, type ClarkName, type IrDeadProperties } from "#src/data/ir.ts";
+import { type ClarkName, cn, type IrDeadProperties } from "#src/data/ir.ts";
 import type { Propstat } from "#src/http/dav/xml/multistatus.ts";
 import type { InstanceRow } from "#src/services/instance/repository.ts";
 

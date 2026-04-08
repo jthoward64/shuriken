@@ -1,7 +1,12 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { Effect, Layer, Option } from "effect";
 import { DatabaseClient, type DbClient } from "#src/db/client.ts";
-import { group, membership, principal } from "#src/db/drizzle/schema/index.ts";
+import {
+	group,
+	membership,
+	principal,
+	user,
+} from "#src/db/drizzle/schema/index.ts";
 import {
 	ConflictError,
 	DatabaseError,
@@ -9,6 +14,7 @@ import {
 } from "#src/domain/errors.ts";
 import type { GroupId, UserId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
+import type { UserWithPrincipal } from "#src/services/user/repository.ts";
 import { GroupRepository, type GroupWithPrincipal } from "./repository.ts";
 
 // ---------------------------------------------------------------------------
@@ -199,11 +205,184 @@ const hasMember = Effect.fn("GroupRepository.hasMember")(
 	),
 );
 
+const findBySlug = Effect.fn("GroupRepository.findBySlug")(
+	function* (db: DbClient, slug: Slug) {
+		yield* Effect.logTrace("repo.group.findBySlug", { slug });
+		return yield* Effect.tryPromise({
+			try: () =>
+				db
+					.select()
+					.from(group)
+					.innerJoin(principal, eq(principal.id, group.principalId))
+					.where(
+						and(
+							eq(principal.slug, slug),
+							eq(principal.principalType, "group"),
+							isNull(principal.deletedAt),
+						),
+					)
+					.limit(1)
+					.then((r) => {
+						if (!r[0]) {
+							return Option.none<GroupWithPrincipal>();
+						}
+						const row = r[0];
+						return Option.some({
+							principal: row.principal,
+							group: row.group,
+						} satisfies GroupWithPrincipal);
+					}),
+			catch: (e) => new DatabaseError({ cause: e }),
+		});
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.group.findBySlug failed", e.cause),
+	),
+);
+
+const list = Effect.fn("GroupRepository.list")(
+	function* (db: DbClient) {
+		yield* Effect.logTrace("repo.group.list");
+		return yield* Effect.tryPromise({
+			try: () =>
+				db
+					.select()
+					.from(group)
+					.innerJoin(principal, eq(principal.id, group.principalId))
+					.where(isNull(principal.deletedAt))
+					.orderBy(principal.slug)
+					.then((rows) =>
+						rows.map(
+							(r) =>
+								({
+									principal: r.principal,
+									group: r.group,
+								}) satisfies GroupWithPrincipal,
+						),
+					),
+			catch: (e) => new DatabaseError({ cause: e }),
+		});
+	},
+	Effect.tapError((e) => Effect.logWarning("repo.group.list failed", e.cause)),
+);
+
+const listMembers = Effect.fn("GroupRepository.listMembers")(
+	function* (db: DbClient, groupId: GroupId) {
+		yield* Effect.logTrace("repo.group.listMembers", { groupId });
+		return yield* Effect.tryPromise({
+			try: () =>
+				db
+					.select()
+					.from(user)
+					.innerJoin(principal, eq(principal.id, user.principalId))
+					.innerJoin(membership, eq(membership.userId, user.id))
+					.where(
+						and(eq(membership.groupId, groupId), isNull(principal.deletedAt)),
+					)
+					.orderBy(principal.slug)
+					.then((rows) =>
+						rows.map(
+							(r) =>
+								({
+									principal: r.principal,
+									user: r.user,
+								}) satisfies UserWithPrincipal,
+						),
+					),
+			catch: (e) => new DatabaseError({ cause: e }),
+		});
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.group.listMembers failed", e.cause),
+	),
+);
+
+const listByMember = Effect.fn("GroupRepository.listByMember")(
+	function* (db: DbClient, userId: UserId) {
+		yield* Effect.logTrace("repo.group.listByMember", { userId });
+		return yield* Effect.tryPromise({
+			try: () =>
+				db
+					.select()
+					.from(group)
+					.innerJoin(principal, eq(principal.id, group.principalId))
+					.innerJoin(membership, eq(membership.groupId, group.id))
+					.where(
+						and(eq(membership.userId, userId), isNull(principal.deletedAt)),
+					)
+					.orderBy(principal.slug)
+					.then((rows) =>
+						rows.map(
+							(r) =>
+								({
+									principal: r.principal,
+									group: r.group,
+								}) satisfies GroupWithPrincipal,
+						),
+					),
+			catch: (e) => new DatabaseError({ cause: e }),
+		});
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.group.listByMember failed", e.cause),
+	),
+);
+
+const softDelete = Effect.fn("GroupRepository.softDelete")(
+	function* (db: DbClient, id: GroupId) {
+		yield* Effect.logTrace("repo.group.softDelete", { id });
+		return yield* Effect.tryPromise({
+			try: () =>
+				db
+					.update(principal)
+					.set({ deletedAt: sql`now()`, updatedAt: sql`now()` })
+					.from(group)
+					.where(and(eq(group.id, id), eq(principal.id, group.principalId)))
+					.then(() => undefined),
+			catch: (e) => new DatabaseError({ cause: e }),
+		});
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.group.softDelete failed", e.cause),
+	),
+);
+
+const setMembers = Effect.fn("GroupRepository.setMembers")(
+	function* (db: DbClient, groupId: GroupId, userIds: ReadonlyArray<UserId>) {
+		yield* Effect.logTrace("repo.group.setMembers", {
+			groupId,
+			count: userIds.length,
+		});
+		return yield* Effect.tryPromise({
+			try: () =>
+				db.transaction(async (tx) => {
+					await tx.delete(membership).where(eq(membership.groupId, groupId));
+					if (userIds.length > 0) {
+						await tx
+							.insert(membership)
+							.values(userIds.map((userId) => ({ groupId, userId })))
+							.onConflictDoNothing();
+					}
+				}),
+			catch: (e) => new DatabaseError({ cause: e }),
+		});
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.group.setMembers failed", e.cause),
+	),
+);
+
 export const GroupRepositoryLive = Layer.effect(
 	GroupRepository,
 	Effect.map(DatabaseClient, (db) =>
 		GroupRepository.of({
 			findById: (id) => findById(db, id),
+			findBySlug: (slug) => findBySlug(db, slug),
+			list: () => list(db),
+			listMembers: (groupId) => listMembers(db, groupId),
+			listByMember: (userId) => listByMember(db, userId),
+			softDelete: (id) => softDelete(db, id),
+			setMembers: (groupId, userIds) => setMembers(db, groupId, userIds),
 			create: (input) => create(db, input),
 			update: (id, input) => update(db, id, input),
 			addMember: (groupId, userId) => addMember(db, groupId, userId),

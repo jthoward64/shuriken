@@ -34,9 +34,17 @@ export interface UserRepositoryShape {
 	readonly findById: (
 		id: UserId,
 	) => Effect.Effect<Option.Option<UserWithPrincipal>, DatabaseError>;
+	readonly findBySlug: (
+		slug: Slug,
+	) => Effect.Effect<Option.Option<UserWithPrincipal>, DatabaseError>;
 	readonly findByEmail: (
 		email: Email,
 	) => Effect.Effect<Option.Option<UserWithPrincipal>, DatabaseError>;
+	readonly list: () => Effect.Effect<
+		ReadonlyArray<UserWithPrincipal>,
+		DatabaseError
+	>;
+	readonly softDelete: (id: UserId) => Effect.Effect<void, DatabaseError>;
 	readonly create: (input: {
 		readonly slug: Slug;
 		readonly name: string;

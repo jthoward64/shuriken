@@ -4,7 +4,7 @@ import {
 	type DavError,
 	davError,
 } from "#src/domain/errors.ts";
-import { EntityId, InstanceId, type CollectionId } from "#src/domain/ids.ts";
+import { type CollectionId, EntityId, InstanceId } from "#src/domain/ids.ts";
 import { HTTP_BAD_REQUEST } from "#src/http/status.ts";
 import { CollectionRepository } from "#src/services/collection/index.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";

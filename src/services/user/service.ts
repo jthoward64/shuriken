@@ -48,10 +48,23 @@ export interface UserServiceShape {
 		UserWithPrincipal,
 		DavError | DatabaseError | ConflictError | InternalError
 	>;
+	readonly list: () => Effect.Effect<
+		ReadonlyArray<UserWithPrincipal>,
+		DatabaseError
+	>;
+	readonly findById: (
+		id: UserId,
+	) => Effect.Effect<UserWithPrincipal, DavError | DatabaseError>;
+	readonly findBySlug: (
+		slug: Slug,
+	) => Effect.Effect<UserWithPrincipal, DavError | DatabaseError>;
 	readonly update: (
 		id: UserId,
 		input: UpdateUser,
 	) => Effect.Effect<UserWithPrincipal, DavError | DatabaseError>;
+	readonly delete: (
+		id: UserId,
+	) => Effect.Effect<void, DavError | DatabaseError>;
 	readonly addCredential: (
 		userId: UserId,
 		credential: NewCredential,
@@ -61,6 +74,10 @@ export interface UserServiceShape {
 		authSource: string,
 		authId: string,
 	) => Effect.Effect<void, DavError | DatabaseError>;
+	readonly setCredential: (
+		userId: UserId,
+		credential: NewCredential,
+	) => Effect.Effect<void, DavError | DatabaseError | InternalError>;
 }
 
 export class UserService extends Context.Tag("UserService")<

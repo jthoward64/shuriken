@@ -258,9 +258,7 @@ const updateClientProperties = Effect.fn(
 					.then((rows) => {
 						const row = rows[0];
 						if (!row) {
-							throw new Error(
-								`Instance not found for property update: ${id}`,
-							);
+							throw new Error(`Instance not found for property update: ${id}`);
 						}
 						return row;
 					}),
@@ -268,10 +266,7 @@ const updateClientProperties = Effect.fn(
 		});
 	},
 	Effect.tapError((e) =>
-		Effect.logWarning(
-			"repo.instance.updateClientProperties failed",
-			e.cause,
-		),
+		Effect.logWarning("repo.instance.updateClientProperties failed", e.cause),
 	),
 );
 

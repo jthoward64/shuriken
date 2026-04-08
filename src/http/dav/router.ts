@@ -7,9 +7,11 @@ import {
 } from "#src/domain/errors.ts";
 import {
 	CollectionId,
+	GroupId,
 	InstanceId,
 	isUuid,
 	PrincipalId,
+	UserId,
 } from "#src/domain/ids.ts";
 import {
 	NAMESPACE_TO_COLLECTION_TYPE,
@@ -25,16 +27,26 @@ import type { CollectionService } from "#src/services/collection/index.ts";
 import { CollectionRepository } from "#src/services/collection/index.ts";
 import type { ComponentRepository } from "#src/services/component/index.ts";
 import type { EntityRepository } from "#src/services/entity/index.ts";
+import type { GroupService } from "#src/services/group/index.ts";
+import { GroupRepository } from "#src/services/group/index.ts";
 import type { InstanceService } from "#src/services/instance/index.ts";
 import { InstanceRepository } from "#src/services/instance/index.ts";
 import { PrincipalRepository } from "#src/services/principal/index.ts";
 import type { PrincipalService } from "#src/services/principal/service.ts";
 import type { CalTimezoneRepository } from "#src/services/timezone/index.ts";
 import type { TombstoneRepository } from "#src/services/tombstone/index.ts";
+import type { UserService } from "#src/services/user/index.ts";
+import { UserRepository } from "#src/services/user/index.ts";
 import { aclHandler } from "./methods/acl.ts";
 import { copyHandler } from "./methods/copy.ts";
 import { deleteHandler } from "./methods/delete.ts";
 import { getHandler } from "./methods/get.ts";
+import { groupDeleteHandler } from "./methods/groups/delete.ts";
+import { groupMemberDeleteHandler } from "./methods/groups/member-delete.ts";
+import { groupMemberPutHandler } from "./methods/groups/member-put.ts";
+import { groupMkcolHandler } from "./methods/groups/mkcol.ts";
+import { groupPropfindHandler } from "./methods/groups/propfind.ts";
+import { groupProppatchHandler } from "./methods/groups/proppatch.ts";
 import { mkcolHandler } from "./methods/mkcol.ts";
 import { moveHandler } from "./methods/move.ts";
 import { optionsHandler } from "./methods/options.ts";
@@ -42,6 +54,10 @@ import { propfindHandler } from "./methods/propfind.ts";
 import { proppatchHandler } from "./methods/proppatch.ts";
 import { putHandler } from "./methods/put.ts";
 import { reportHandler } from "./methods/report.ts";
+import { userDeleteHandler } from "./methods/users/delete.ts";
+import { userMkcolHandler } from "./methods/users/mkcol.ts";
+import { userPropfindHandler } from "./methods/users/propfind.ts";
+import { userProppatchHandler } from "./methods/users/proppatch.ts";
 
 // ---------------------------------------------------------------------------
 // DAV router — slug resolution + method dispatch
@@ -73,12 +89,20 @@ type DavServices =
 	| CalTimezoneRepository
 	| TombstoneRepository
 	| CalIndexRepository
-	| CardIndexRepository;
+	| CardIndexRepository
+	| UserRepository
+	| GroupRepository
+	| UserService
+	| GroupService;
 
 // Segment counts after stripping /dav (index 0 = "principals")
 const SEGMENTS_PRINCIPAL = 2; // ["principals", ":slug"]
 const SEGMENTS_NAMESPACE = 3; // ["principals", ":slug", ":ns"]
 const SEGMENTS_COLLECTION = 4; // ["principals", ":slug", ":ns", ":collSlug"]
+
+// Segment counts for /dav/groups/ tree (index 0 = "groups")
+const SEGMENTS_GROUP = 2; // ["groups", ":slug"]
+const SEGMENTS_GROUP_MEMBERS = 3; // ["groups", ":slug", "members"]
 
 /** Parse and resolve a DAV URL path, converting slugs/UUIDs to branded UUIDs.
  *
@@ -117,6 +141,107 @@ export const parseDavPath = (
 	// /dav/ or /dav — root DAV collection
 	if (segments.length === 0) {
 		return Effect.succeed({ kind: "root" } satisfies ResolvedDavPath);
+	}
+
+	// /dav/users/ tree
+	if (segments[0] === "users") {
+		if (segments.length === 1) {
+			return Effect.succeed({
+				kind: "userCollection",
+			} satisfies ResolvedDavPath);
+		}
+		const userSeg = decodeURIComponent(segments[1] ?? "");
+		return Effect.gen(function* () {
+			const userRepo = yield* UserRepository;
+			const userOpt = yield* isUuid(userSeg)
+				? userRepo.findById(UserId(userSeg))
+				: userRepo.findBySlug(Slug(userSeg));
+			if (Option.isNone(userOpt)) {
+				return {
+					kind: "newUser",
+					slug: Slug(userSeg),
+				} satisfies ResolvedDavPath;
+			}
+			const row = userOpt.value;
+			return {
+				kind: "user",
+				principalId: PrincipalId(row.principal.id),
+				userId: UserId(row.user.id),
+				userSeg,
+			} satisfies ResolvedDavPath;
+		});
+	}
+
+	// /dav/groups/ tree
+	if (segments[0] === "groups") {
+		if (segments.length === 1) {
+			return Effect.succeed({
+				kind: "groupCollection",
+			} satisfies ResolvedDavPath);
+		}
+		const groupSeg = decodeURIComponent(segments[1] ?? "");
+		return Effect.gen(function* () {
+			const groupRepo = yield* GroupRepository;
+			const groupOpt = yield* isUuid(groupSeg)
+				? groupRepo.findById(GroupId(groupSeg))
+				: groupRepo.findBySlug(Slug(groupSeg));
+			if (Option.isNone(groupOpt)) {
+				return {
+					kind: "newGroup",
+					slug: Slug(groupSeg),
+				} satisfies ResolvedDavPath;
+			}
+			const groupRow = groupOpt.value;
+			const principalId = PrincipalId(groupRow.principal.id);
+			const groupId = GroupId(groupRow.group.id);
+
+			// /dav/groups/:slug/members/
+			if (segments.length === SEGMENTS_GROUP) {
+				return {
+					kind: "group",
+					principalId,
+					groupId,
+					groupSeg,
+				} satisfies ResolvedDavPath;
+			}
+
+			const seg2 = decodeURIComponent(segments[2] ?? "");
+			if (seg2 !== "members") {
+				return yield* Effect.fail(notFound(`Unknown DAV path: ${path}`));
+			}
+
+			if (segments.length === SEGMENTS_GROUP_MEMBERS) {
+				return {
+					kind: "groupMembers",
+					principalId,
+					groupId,
+					groupSeg,
+				} satisfies ResolvedDavPath;
+			}
+
+			const memberSeg = decodeURIComponent(segments[3] ?? "");
+			const userRepo = yield* UserRepository;
+			const memberOpt = yield* isUuid(memberSeg)
+				? userRepo.findById(UserId(memberSeg))
+				: userRepo.findBySlug(Slug(memberSeg));
+			if (Option.isNone(memberOpt)) {
+				return {
+					kind: "newGroupMember",
+					principalId,
+					groupId,
+					groupSeg,
+					slug: Slug(memberSeg),
+				} satisfies ResolvedDavPath;
+			}
+			return {
+				kind: "groupMember",
+				principalId,
+				groupId,
+				memberUserId: UserId(memberOpt.value.user.id),
+				groupSeg,
+				memberSeg,
+			} satisfies ResolvedDavPath;
+		});
 	}
 
 	if (segments[0] !== "principals") {
@@ -264,6 +389,53 @@ export const davRouter = (
 
 		const method = req.method.toUpperCase();
 		yield* Effect.logTrace("dav method dispatch", { method, kind: path.kind });
+
+		// Dispatch user/group admin paths first before the principal/collection handlers
+		if (
+			path.kind === "userCollection" ||
+			path.kind === "user" ||
+			path.kind === "newUser"
+		) {
+			switch (method) {
+				case "PROPFIND":
+					return yield* userPropfindHandler(path, ctx);
+				case "PROPPATCH":
+					return yield* userProppatchHandler(path, ctx, req);
+				case "MKCOL":
+					return yield* userMkcolHandler(path, ctx, req);
+				case "DELETE":
+					return yield* userDeleteHandler(path, ctx);
+				default:
+					break;
+			}
+		}
+
+		if (
+			path.kind === "groupCollection" ||
+			path.kind === "group" ||
+			path.kind === "newGroup" ||
+			path.kind === "groupMembers" ||
+			path.kind === "groupMember" ||
+			path.kind === "newGroupMember"
+		) {
+			switch (method) {
+				case "PROPFIND":
+					return yield* groupPropfindHandler(path, ctx);
+				case "PROPPATCH":
+					return yield* groupProppatchHandler(path, ctx, req);
+				case "MKCOL":
+					return yield* groupMkcolHandler(path, ctx, req);
+				case "DELETE":
+					if (path.kind === "groupMember") {
+						return yield* groupMemberDeleteHandler(path, ctx);
+					}
+					return yield* groupDeleteHandler(path, ctx);
+				case "PUT":
+					return yield* groupMemberPutHandler(path, ctx);
+				default:
+					break;
+			}
+		}
 
 		switch (method) {
 			case "OPTIONS":

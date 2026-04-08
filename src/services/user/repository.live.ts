@@ -253,6 +253,75 @@ const insertCredential = Effect.fn("UserRepository.insertCredential")(
 	),
 );
 
+const findBySlug = Effect.fn("UserRepository.findBySlug")(
+	function* (db: DbClient, slug: Slug) {
+		yield* Effect.logTrace("repo.user.findBySlug", { slug });
+		return yield* Effect.tryPromise({
+			try: () =>
+				db
+					.select()
+					.from(user)
+					.innerJoin(principal, eq(principal.id, user.principalId))
+					.where(
+						and(
+							eq(principal.slug, slug),
+							eq(principal.principalType, "user"),
+							isNull(principal.deletedAt),
+						),
+					)
+					.limit(1)
+					.then((r) =>
+						Option.fromNullable(
+							r[0] ? { principal: r[0].principal, user: r[0].user } : null,
+						),
+					),
+			catch: (e) => new DatabaseError({ cause: e }),
+		});
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.user.findBySlug failed", e.cause),
+	),
+);
+
+const list = Effect.fn("UserRepository.list")(
+	function* (db: DbClient) {
+		yield* Effect.logTrace("repo.user.list");
+		return yield* Effect.tryPromise({
+			try: () =>
+				db
+					.select()
+					.from(user)
+					.innerJoin(principal, eq(principal.id, user.principalId))
+					.where(isNull(principal.deletedAt))
+					.orderBy(principal.slug)
+					.then((rows) =>
+						rows.map((r) => ({ principal: r.principal, user: r.user })),
+					),
+			catch: (e) => new DatabaseError({ cause: e }),
+		});
+	},
+	Effect.tapError((e) => Effect.logWarning("repo.user.list failed", e.cause)),
+);
+
+const softDelete = Effect.fn("UserRepository.softDelete")(
+	function* (db: DbClient, id: UserId) {
+		yield* Effect.logTrace("repo.user.softDelete", { id });
+		return yield* Effect.tryPromise({
+			try: () =>
+				db
+					.update(principal)
+					.set({ deletedAt: sql`now()`, updatedAt: sql`now()` })
+					.from(user)
+					.where(and(eq(user.id, id), eq(principal.id, user.principalId)))
+					.then(() => undefined),
+			catch: (e) => new DatabaseError({ cause: e }),
+		});
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.user.softDelete failed", e.cause),
+	),
+);
+
 const deleteCredential = Effect.fn("UserRepository.deleteCredential")(
 	function* (db: DbClient, userId: UserId, authSource: string, authId: string) {
 		yield* Effect.logTrace("repo.user.deleteCredential", {
@@ -284,7 +353,10 @@ export const UserRepositoryLive = Layer.effect(
 	Effect.map(DatabaseClient, (db) =>
 		UserRepository.of({
 			findById: (id) => findById(db, id),
+			findBySlug: (slug) => findBySlug(db, slug),
 			findByEmail: (email) => findByEmail(db, email),
+			list: () => list(db),
+			softDelete: (id) => softDelete(db, id),
 			create: (input) => create(db, input),
 			update: (id, input) => update(db, id, input),
 			findCredential: (source, authId) => findCredential(db, source, authId),

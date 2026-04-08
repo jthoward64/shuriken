@@ -235,7 +235,7 @@ const getResourceParent = Effect.fn("AclRepository.getResourceParent")(
 			resourceId,
 			resourceType,
 		});
-		if (resourceType === "principal") {
+		if (resourceType === "principal" || resourceType === "virtual") {
 			return Option.none<{
 				readonly id: UuidString;
 				readonly type: AclResourceType;

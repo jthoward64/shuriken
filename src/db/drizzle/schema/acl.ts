@@ -90,7 +90,7 @@ export const davAcl = pgTable(
 		),
 		check(
 			"dav_acl_resource_type_check",
-			sql`(resource_type = ANY (ARRAY['collection'::text, 'instance'::text, 'principal'::text]))`,
+			sql`(resource_type = ANY (ARRAY['collection'::text, 'instance'::text, 'principal'::text, 'virtual'::text]))`,
 		),
 		check(
 			"dav_acl_principal_id_required",

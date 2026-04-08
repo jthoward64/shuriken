@@ -6,8 +6,8 @@ import { DatabaseError } from "#src/domain/errors.ts";
 import type { CollectionId, PrincipalId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
 import {
-	CollectionRepository,
 	type CollectionPropertyChanges,
+	CollectionRepository,
 	type NewCollection,
 } from "./repository.ts";
 
@@ -212,9 +212,7 @@ const updateProperties = Effect.fn("CollectionRepository.updateProperties")(
 				db
 					.update(davCollection)
 					.set(setValues)
-					.where(
-						and(eq(davCollection.id, id), isNull(davCollection.deletedAt)),
-					)
+					.where(and(eq(davCollection.id, id), isNull(davCollection.deletedAt)))
 					.returning()
 					.then((rows) => {
 						const row = rows[0];

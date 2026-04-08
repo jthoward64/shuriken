@@ -242,13 +242,22 @@ export const propfindHandler = (
 		}
 		const depth = depthHeader === "1" ? 1 : 0;
 
-		// 404 for path kinds we don't serve yet
+		// 404 for path kinds we don't serve yet (user/group paths handled by dedicated handlers)
 		if (
 			path.kind === "new-collection" ||
 			path.kind === "new-instance" ||
 			path.kind === "root" ||
 			path.kind === "principalCollection" ||
-			path.kind === "wellknown"
+			path.kind === "wellknown" ||
+			path.kind === "userCollection" ||
+			path.kind === "user" ||
+			path.kind === "newUser" ||
+			path.kind === "groupCollection" ||
+			path.kind === "group" ||
+			path.kind === "newGroup" ||
+			path.kind === "groupMembers" ||
+			path.kind === "groupMember" ||
+			path.kind === "newGroupMember"
 		) {
 			return yield* notFound();
 		}
@@ -285,7 +294,8 @@ export const propfindHandler = (
 				[DISPLAYNAME]: displayName,
 			};
 			// Dead properties
-			const dead = principalRow.principal.clientProperties as IrDeadProperties | null;
+			const dead = principalRow.principal
+				.clientProperties as IrDeadProperties | null;
 			if (dead) {
 				for (const [clark, xmlValue] of Object.entries(dead)) {
 					allProps[clark as ClarkName] = xmlValue;

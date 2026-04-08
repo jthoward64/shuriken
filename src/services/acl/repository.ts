@@ -22,7 +22,11 @@ import type { DavPrivilege } from "#src/domain/types/dav.ts";
 
 export type AceRow = InferSelectModel<typeof davAcl>;
 
-export type AclResourceType = "collection" | "instance" | "principal";
+export type AclResourceType =
+	| "collection"
+	| "instance"
+	| "principal"
+	| "virtual";
 
 export interface NewAce {
 	readonly resourceType: AclResourceType;

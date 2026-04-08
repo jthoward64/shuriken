@@ -4,8 +4,8 @@ import type { PrincipalId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
 import type { Email } from "#src/domain/types/strings.ts";
 import {
-	PrincipalRepository,
 	type PrincipalPropertyChanges,
+	PrincipalRepository,
 } from "./repository.ts";
 import { PrincipalService } from "./service.ts";
 

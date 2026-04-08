@@ -16,8 +16,8 @@ import {
 import { AclServiceLive } from "#src/services/acl/service.live.ts";
 import type { AclService } from "#src/services/acl/service.ts";
 import {
-	CollectionRepository,
 	type CollectionPropertyChanges,
+	CollectionRepository,
 	type CollectionRepositoryShape,
 	type CollectionRow,
 	type NewCollection,
@@ -47,8 +47,8 @@ import {
 import { InstanceServiceLive } from "#src/services/instance/service.live.ts";
 import type { InstanceService } from "#src/services/instance/service.ts";
 import {
-	PrincipalRepository,
 	type PrincipalPropertyChanges,
+	PrincipalRepository,
 	type PrincipalRepositoryShape,
 	type PrincipalRow,
 	type UserRow,
@@ -240,6 +240,7 @@ const makeUserRepo = (stores: TestStores): UserRepositoryShape => ({
 				updatedAt: now,
 				deletedAt: null,
 				slug: input.slug,
+				clientProperties: {},
 			};
 			const userRow: UserRow = {
 				id: userId,
@@ -327,6 +328,54 @@ const makeUserRepo = (stores: TestStores): UserRepositoryShape => ({
 	deleteCredential: (_userId, authSource, authId) =>
 		Effect.sync(() => {
 			stores.credentials.delete(`${authSource}:${authId}`);
+		}),
+
+	findBySlug: (slug) =>
+		Effect.succeed(
+			Option.fromNullable(
+				(() => {
+					const principal = [...stores.principals.values()].find(
+						(p) => p.slug === slug && p.deletedAt === null,
+					);
+					if (!principal) {
+						return null;
+					}
+					const userRow = [...stores.users.values()].find(
+						(u) => u.principalId === principal.id,
+					);
+					if (!userRow) {
+						return null;
+					}
+					return { user: userRow, principal };
+				})(),
+			),
+		),
+
+	list: () =>
+		Effect.succeed(
+			[...stores.users.values()].flatMap((userRow) => {
+				const principal = stores.principals.get(userRow.principalId);
+				if (!principal || principal.deletedAt !== null) {
+					return [];
+				}
+				return [{ user: userRow, principal }];
+			}),
+		),
+
+	softDelete: (id) =>
+		Effect.sync(() => {
+			const userRow = stores.users.get(id);
+			if (!userRow) {
+				return;
+			}
+			const principal = stores.principals.get(userRow.principalId);
+			if (!principal) {
+				return;
+			}
+			stores.principals.set(userRow.principalId, {
+				...principal,
+				deletedAt: Temporal.Now.instant(),
+			});
 		}),
 });
 
@@ -982,6 +1031,88 @@ const makeGroupRepo = (stores: TestStores): GroupRepositoryShape => ({
 
 	hasMember: (groupId, userId) =>
 		Effect.succeed(stores.memberships.get(groupId)?.has(userId) ?? false),
+
+	findBySlug: (slug) =>
+		Effect.succeed(
+			Option.fromNullable(
+				(() => {
+					const principal = [...stores.groupPrincipals.values()].find(
+						(p) => p.slug === slug && p.deletedAt === null,
+					);
+					if (!principal) {
+						return null;
+					}
+					const groupRow = [...stores.groups.values()].find(
+						(g) => g.principalId === principal.id,
+					);
+					if (!groupRow) {
+						return null;
+					}
+					return { principal, group: groupRow };
+				})(),
+			),
+		),
+
+	list: () =>
+		Effect.succeed(
+			[...stores.groups.values()].flatMap((groupRow) => {
+				const principal = stores.groupPrincipals.get(groupRow.principalId);
+				if (!principal || principal.deletedAt !== null) {
+					return [];
+				}
+				return [{ principal, group: groupRow }];
+			}),
+		),
+
+	listMembers: (groupId) =>
+		Effect.succeed(
+			[...(stores.memberships.get(groupId) ?? new Set())].flatMap((userId) => {
+				const userRow = stores.users.get(userId);
+				if (!userRow) {
+					return [];
+				}
+				const principal = stores.principals.get(userRow.principalId);
+				if (!principal || principal.deletedAt !== null) {
+					return [];
+				}
+				return [{ user: userRow, principal }];
+			}),
+		),
+
+	listByMember: (userId) =>
+		Effect.succeed(
+			[...stores.groups.entries()].flatMap(([groupId, groupRow]) => {
+				if (!stores.memberships.get(groupId)?.has(userId)) {
+					return [];
+				}
+				const principal = stores.groupPrincipals.get(groupRow.principalId);
+				if (!principal || principal.deletedAt !== null) {
+					return [];
+				}
+				return [{ principal, group: groupRow }];
+			}),
+		),
+
+	softDelete: (id) =>
+		Effect.sync(() => {
+			const groupRow = stores.groups.get(id);
+			if (!groupRow) {
+				return;
+			}
+			const principal = stores.groupPrincipals.get(groupRow.principalId);
+			if (!principal) {
+				return;
+			}
+			stores.groupPrincipals.set(groupRow.principalId, {
+				...principal,
+				deletedAt: Temporal.Now.instant(),
+			});
+		}),
+
+	setMembers: (groupId, userIds) =>
+		Effect.sync(() => {
+			stores.memberships.set(groupId, new Set(userIds));
+		}),
 });
 
 // ---------------------------------------------------------------------------
