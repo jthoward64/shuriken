@@ -2,7 +2,12 @@ import { Effect, Layer } from "effect";
 import { noneOrConflict, someOrNotFound } from "#src/domain/errors.ts";
 import type { CollectionId, PrincipalId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
-import { CollectionRepository, type NewCollection } from "./repository.ts";
+import { AclRepository } from "#src/services/acl/repository.ts";
+import {
+	CollectionRepository,
+	type CollectionPropertyChanges,
+	type NewCollection,
+} from "./repository.ts";
 import { CollectionService } from "./service.ts";
 
 // ---------------------------------------------------------------------------
@@ -13,6 +18,7 @@ export const CollectionServiceLive = Layer.effect(
 	CollectionService,
 	Effect.gen(function* () {
 		const repo = yield* CollectionRepository;
+		const aclRepo = yield* AclRepository;
 
 		return CollectionService.of({
 			findById: Effect.fn("CollectionService.findById")(function* (
@@ -56,15 +62,28 @@ export const CollectionServiceLive = Layer.effect(
 					slug: input.slug,
 					collectionType: input.collectionType,
 				});
-				return yield* repo.findBySlug(input.ownerPrincipalId, input.collectionType, input.slug).pipe(
-					Effect.flatMap(
-						noneOrConflict(
-							undefined,
-							`Collection already exists: ${input.slug}`,
+				yield* repo
+					.findBySlug(input.ownerPrincipalId, input.collectionType, input.slug)
+					.pipe(
+						Effect.flatMap(
+							noneOrConflict(
+								undefined,
+								`Collection already exists: ${input.slug}`,
+							),
 						),
-					),
-					Effect.flatMap(() => repo.insert(input)),
-				);
+					);
+				const collection = yield* repo.insert(input);
+				yield* aclRepo.grantAce({
+					resourceType: "collection",
+					resourceId: collection.id,
+					principalType: "principal",
+					principalId: input.ownerPrincipalId,
+					privilege: "DAV:all",
+					grantDeny: "grant",
+					protected: true,
+					ordinal: 0,
+				});
+				return collection;
 			}),
 
 			delete: Effect.fn("CollectionService.delete")(function* (
@@ -76,6 +95,13 @@ export const CollectionServiceLive = Layer.effect(
 					Effect.flatMap(() => repo.softDelete(id)),
 				);
 			}),
+
+			updateProperties: Effect.fn("CollectionService.updateProperties")(
+				function* (id: CollectionId, changes: CollectionPropertyChanges) {
+					yield* Effect.logTrace("collection.updateProperties", { id });
+					return yield* repo.updateProperties(id, changes);
+				},
+			),
 		});
 	}),
 );

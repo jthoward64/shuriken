@@ -93,9 +93,7 @@ describe("EntityRepository.findById (integration)", () => {
 	it("returns None for an unknown id", async () => {
 		const result = await runSuccess(
 			EntityRepository.pipe(
-				Effect.flatMap((r) =>
-					r.findById(EntityId(crypto.randomUUID())),
-				),
+				Effect.flatMap((r) => r.findById(EntityId(crypto.randomUUID()))),
 				Effect.provide(layer),
 				Effect.orDie,
 			),

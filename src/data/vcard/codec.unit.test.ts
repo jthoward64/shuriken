@@ -74,11 +74,7 @@ describe("VCardCodec decode", () => {
 	});
 
 	it("fails with validAddressData when root component is not VCARD", async () => {
-		const text = vcard(
-			"BEGIN:VCALENDAR",
-			"VERSION:2.0",
-			"END:VCALENDAR",
-		);
+		const text = vcard("BEGIN:VCALENDAR", "VERSION:2.0", "END:VCALENDAR");
 		const err = await runFailure(decodeVCard(text));
 		expect(err._tag).toBe("DavError");
 		expect(err.precondition).toBe("CARDDAV:valid-address-data");
@@ -130,10 +126,12 @@ describe("VCardCodec decode", () => {
 		const bday = doc.root.properties.find((p) => p.name === "BDAY");
 		expect(bday?.value.type).toBe("DATE");
 		if (bday?.value.type === "DATE") {
-			expect(Temporal.PlainDate.compare(
-				bday.value.value,
-				Temporal.PlainDate.from({ year: 1985, month: 4, day: 12 }),
-			)).toBe(0);
+			expect(
+				Temporal.PlainDate.compare(
+					bday.value.value,
+					Temporal.PlainDate.from({ year: 1985, month: 4, day: 12 }),
+				),
+			).toBe(0);
 		}
 	});
 
@@ -373,8 +371,7 @@ describe("vCard 2.1 normalization", () => {
 	});
 
 	it("decodes QUOTED-PRINTABLE values", () => {
-		const raw =
-			"NOTE;ENCODING=QUOTED-PRINTABLE:Hello=20World";
+		const raw = "NOTE;ENCODING=QUOTED-PRINTABLE:Hello=20World";
 		const out = normalizeVCard21(raw);
 		expect(out).toContain("Hello World");
 	});

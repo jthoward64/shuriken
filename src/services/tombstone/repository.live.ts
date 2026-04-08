@@ -11,7 +11,11 @@ import { TombstoneRepository } from "./repository.ts";
 // ---------------------------------------------------------------------------
 
 const findSinceRevision = Effect.fn("TombstoneRepository.findSinceRevision")(
-	function* (db: DbClient, collectionId: CollectionId, sinceSyncRevision: number) {
+	function* (
+		db: DbClient,
+		collectionId: CollectionId,
+		sinceSyncRevision: number,
+	) {
 		yield* Effect.logTrace("repo.tombstone.findSinceRevision", {
 			collectionId,
 			sinceSyncRevision,

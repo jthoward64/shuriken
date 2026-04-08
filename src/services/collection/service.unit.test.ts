@@ -113,9 +113,7 @@ describe("CollectionService.delete", () => {
 			),
 		);
 
-		expect(
-			env.stores.collections.get(collectionId)?.deletedAt,
-		).not.toBeNull();
+		expect(env.stores.collections.get(collectionId)?.deletedAt).not.toBeNull();
 	});
 
 	it("fails with 404 when the collection does not exist", async () => {
@@ -123,9 +121,7 @@ describe("CollectionService.delete", () => {
 
 		const err = (await runFailure(
 			CollectionService.pipe(
-				Effect.flatMap((s) =>
-					s.delete(CollectionId(crypto.randomUUID())),
-				),
+				Effect.flatMap((s) => s.delete(CollectionId(crypto.randomUUID()))),
 				Effect.provide(env.toLayer()),
 			),
 		)) as DavError;
@@ -167,9 +163,7 @@ describe("CollectionService.findById", () => {
 
 		const err = (await runFailure(
 			CollectionService.pipe(
-				Effect.flatMap((s) =>
-					s.findById(CollectionId(crypto.randomUUID())),
-				),
+				Effect.flatMap((s) => s.findById(CollectionId(crypto.randomUUID()))),
 				Effect.provide(env.toLayer()),
 			),
 		)) as DavError;
@@ -303,4 +297,3 @@ describe("CollectionService.listByOwner", () => {
 		expect(result[0]?.slug).toBe("kept");
 	});
 });
-

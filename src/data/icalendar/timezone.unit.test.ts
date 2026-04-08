@@ -13,8 +13,18 @@ const makeVcalendar = (components: ReadonlyArray<IrComponent>): IrDocument => ({
 	root: {
 		name: "VCALENDAR",
 		properties: [
-			{ name: "VERSION", parameters: [], value: { type: "TEXT", value: "2.0" }, isKnown: true },
-			{ name: "PRODID", parameters: [], value: { type: "TEXT", value: "-//Test//EN" }, isKnown: true },
+			{
+				name: "VERSION",
+				parameters: [],
+				value: { type: "TEXT", value: "2.0" },
+				isKnown: true,
+			},
+			{
+				name: "PRODID",
+				parameters: [],
+				value: { type: "TEXT", value: "-//Test//EN" },
+				isKnown: true,
+			},
 		],
 		components,
 	},
@@ -25,25 +35,52 @@ const makeVcard = (): IrDocument => ({
 	root: {
 		name: "VCARD",
 		properties: [
-			{ name: "FN", parameters: [], value: { type: "TEXT", value: "Test" }, isKnown: false },
+			{
+				name: "FN",
+				parameters: [],
+				value: { type: "TEXT", value: "Test" },
+				isKnown: false,
+			},
 		],
 		components: [],
 	},
 });
 
 /** A minimal VTIMEZONE with only TZID (no LAST-MODIFIED, no X-LIC-LOCATION). */
-const makeVtimezone = (tzid: string, extra: Partial<{
-	ianaName: string;
-	lastModified: Temporal.ZonedDateTime;
-}> = {}): IrComponent => ({
+const makeVtimezone = (
+	tzid: string,
+	extra: Partial<{
+		ianaName: string;
+		lastModified: Temporal.ZonedDateTime;
+	}> = {},
+): IrComponent => ({
 	name: "VTIMEZONE",
 	properties: [
-		{ name: "TZID", parameters: [], value: { type: "TEXT", value: tzid }, isKnown: true },
+		{
+			name: "TZID",
+			parameters: [],
+			value: { type: "TEXT", value: tzid },
+			isKnown: true,
+		},
 		...(extra.ianaName !== undefined
-			? [{ name: "X-LIC-LOCATION", parameters: [], value: { type: "TEXT" as const, value: extra.ianaName }, isKnown: false }]
+			? [
+					{
+						name: "X-LIC-LOCATION",
+						parameters: [],
+						value: { type: "TEXT" as const, value: extra.ianaName },
+						isKnown: false,
+					},
+				]
 			: []),
 		...(extra.lastModified !== undefined
-			? [{ name: "LAST-MODIFIED", parameters: [], value: { type: "DATE_TIME" as const, value: extra.lastModified }, isKnown: true }]
+			? [
+					{
+						name: "LAST-MODIFIED",
+						parameters: [],
+						value: { type: "DATE_TIME" as const, value: extra.lastModified },
+						isKnown: true,
+					},
+				]
 			: []),
 	],
 	// Minimal STANDARD sub-component so encoding produces a non-trivial result
@@ -51,9 +88,27 @@ const makeVtimezone = (tzid: string, extra: Partial<{
 		{
 			name: "STANDARD",
 			properties: [
-				{ name: "TZOFFSETFROM", parameters: [], value: { type: "UTC_OFFSET", value: "-0500" }, isKnown: true },
-				{ name: "TZOFFSETTO", parameters: [], value: { type: "UTC_OFFSET", value: "-0500" }, isKnown: true },
-				{ name: "DTSTART", parameters: [], value: { type: "PLAIN_DATE_TIME", value: Temporal.PlainDateTime.from("1970-01-01T00:00:00") }, isKnown: true },
+				{
+					name: "TZOFFSETFROM",
+					parameters: [],
+					value: { type: "UTC_OFFSET", value: "-0500" },
+					isKnown: true,
+				},
+				{
+					name: "TZOFFSETTO",
+					parameters: [],
+					value: { type: "UTC_OFFSET", value: "-0500" },
+					isKnown: true,
+				},
+				{
+					name: "DTSTART",
+					parameters: [],
+					value: {
+						type: "PLAIN_DATE_TIME",
+						value: Temporal.PlainDateTime.from("1970-01-01T00:00:00"),
+					},
+					isKnown: true,
+				},
 			],
 			components: [],
 		},
@@ -78,7 +133,12 @@ describe("extractVtimezones", () => {
 			{
 				name: "VEVENT",
 				properties: [
-					{ name: "UID", parameters: [], value: { type: "TEXT", value: "uid@example.com" }, isKnown: true },
+					{
+						name: "UID",
+						parameters: [],
+						value: { type: "TEXT", value: "uid@example.com" },
+						isKnown: true,
+					},
 				],
 				components: [],
 			},
@@ -135,9 +195,9 @@ describe("extractVtimezones", () => {
 		const [result] = await run(extractVtimezones(doc));
 		const lm = result?.lastModified ?? Option.none<Temporal.Instant>();
 		expect(Option.isSome(lm)).toBe(true);
-		expect(
-			Option.getOrThrow(lm).equals(lastModifiedZdt.toInstant()),
-		).toBe(true);
+		expect(Option.getOrThrow(lm).equals(lastModifiedZdt.toInstant())).toBe(
+			true,
+		);
 	});
 
 	it("returns Option.none for lastModified when LAST-MODIFIED is absent", async () => {

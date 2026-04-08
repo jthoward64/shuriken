@@ -1,5 +1,5 @@
 import type { InferSelectModel } from "drizzle-orm";
-import type { Effect } from "effect";
+import type { Effect, Option } from "effect";
 import { Context } from "effect";
 import type { davAcl } from "#src/db/drizzle/schema/index.ts";
 import type { DatabaseError } from "#src/domain/errors.ts";
@@ -89,6 +89,23 @@ export interface AclRepositoryShape {
 	readonly getGroupPrincipalIds: (
 		userPrincipalId: PrincipalId,
 	) => Effect.Effect<ReadonlyArray<PrincipalId>, DatabaseError>;
+
+	/**
+	 * Return the immediate ACL-inheritance parent of a resource, used by the
+	 * service to walk the hierarchy when no direct ACE matches.
+	 *
+	 * - instance  → its collection
+	 * - collection with parent_collection_id → that parent collection
+	 * - collection without parent → its owner principal
+	 * - principal → None (top of the hierarchy)
+	 */
+	readonly getResourceParent: (
+		resourceId: UuidString,
+		resourceType: AclResourceType,
+	) => Effect.Effect<
+		Option.Option<{ readonly id: UuidString; readonly type: AclResourceType }>,
+		DatabaseError
+	>;
 }
 
 export class AclRepository extends Context.Tag("AclRepository")<

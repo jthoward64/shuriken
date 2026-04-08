@@ -47,7 +47,9 @@ describe("CollectionRepository.findBySlug (integration)", () => {
 		const ownerId = PrincipalId(crypto.randomUUID());
 		const result = await runSuccess(
 			CollectionRepository.pipe(
-				Effect.flatMap((r) => r.findBySlug(ownerId, "calendar", Slug("no-such-calendar"))),
+				Effect.flatMap((r) =>
+					r.findBySlug(ownerId, "calendar", Slug("no-such-calendar")),
+				),
 				Effect.provide(layer),
 				Effect.orDie,
 			),
@@ -114,7 +116,11 @@ describe("CollectionRepository.findBySlug (integration)", () => {
 					collectionType: "calendar",
 					slug: Slug("shared-slug"),
 				});
-				return yield* col.findBySlug(PrincipalId(p2.id), "calendar", Slug("shared-slug"));
+				return yield* col.findBySlug(
+					PrincipalId(p2.id),
+					"calendar",
+					Slug("shared-slug"),
+				);
 			}).pipe(Effect.provide(layer), Effect.orDie),
 		);
 

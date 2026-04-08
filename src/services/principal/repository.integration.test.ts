@@ -60,9 +60,7 @@ describe("PrincipalRepository.findById (integration)", () => {
 					email: Email("alice@example.com"),
 					credentials: [],
 				});
-				const found = yield* principalRepo.findById(
-					PrincipalId(principal.id),
-				);
+				const found = yield* principalRepo.findById(PrincipalId(principal.id));
 				return { user, found };
 			}).pipe(Effect.provide(layer), Effect.orDie),
 		);

@@ -132,7 +132,8 @@ const decodeVCardProperty = (line: ContentLine): IrProperty => {
 
 	if (effectiveType === "DATE_TIME_DYNAMIC" || effectiveType === "DATE_TIME") {
 		// TZID param is not common in vCard but handle it for completeness
-		const tzid = line.params.find((p) => p.name.toUpperCase() === "TZID")?.values[0];
+		const tzid = line.params.find((p) => p.name.toUpperCase() === "TZID")
+			?.values[0];
 		value = parseDateTimeString(raw, tzid);
 	} else if (effectiveType === "DATE_AND_OR_TIME") {
 		// Parse what Temporal can represent; fall back to opaque string for partial dates
@@ -313,7 +314,9 @@ export const VCardCodec: Schema.Schema<IrDocument, string> =
  * Decode vCard text (2.1, 3.0, or 4.0) → IrDocument.
  * Maps Schema.ParseError → validAddressData DavError.
  */
-export const decodeVCard = (text: string): Effect.Effect<IrDocument, DavError> => {
+export const decodeVCard = (
+	text: string,
+): Effect.Effect<IrDocument, DavError> => {
 	const normalized = isVCard21(text) ? normalizeVCard21(text) : text;
 	return Schema.decodeUnknown(VCardCodec)(normalized).pipe(
 		Effect.mapError((e) => validAddressData(e.message)),

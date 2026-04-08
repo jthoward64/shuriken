@@ -1,0 +1,1 @@
+ALTER TABLE "principal" ADD COLUMN "client_properties" jsonb DEFAULT '{}' NOT NULL;

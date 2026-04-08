@@ -156,7 +156,11 @@ describe("RawComponentCodec round-trip", () => {
 			{ name: "BEGIN", params: [], rawValue: "VCALENDAR" },
 			{ name: "VERSION", params: [], rawValue: "2.0" },
 			{ name: "BEGIN", params: [], rawValue: "VEVENT" },
-			{ name: "DTSTART", params: [{ name: "TZID", values: ["America/New_York"] }], rawValue: "19980119T020000" },
+			{
+				name: "DTSTART",
+				params: [{ name: "TZID", values: ["America/New_York"] }],
+				rawValue: "19980119T020000",
+			},
 			{ name: "END", params: [], rawValue: "VEVENT" },
 			{ name: "END", params: [], rawValue: "VCALENDAR" },
 		];

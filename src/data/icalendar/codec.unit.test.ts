@@ -183,14 +183,18 @@ describe("ICalendarCodec decode", () => {
 		expect(exdate?.value.type).toBe("DATE_LIST");
 		if (exdate?.value.type === "DATE_LIST") {
 			expect(exdate.value.value).toHaveLength(2);
-			expect(Temporal.PlainDate.compare(
-				exdate.value.value[0] as Temporal.PlainDate,
-				Temporal.PlainDate.from({ year: 2006, month: 1, day: 2 }),
-			)).toBe(0);
-			expect(Temporal.PlainDate.compare(
-				exdate.value.value[1] as Temporal.PlainDate,
-				Temporal.PlainDate.from({ year: 2006, month: 1, day: 3 }),
-			)).toBe(0);
+			expect(
+				Temporal.PlainDate.compare(
+					exdate.value.value[0] as Temporal.PlainDate,
+					Temporal.PlainDate.from({ year: 2006, month: 1, day: 2 }),
+				),
+			).toBe(0);
+			expect(
+				Temporal.PlainDate.compare(
+					exdate.value.value[1] as Temporal.PlainDate,
+					Temporal.PlainDate.from({ year: 2006, month: 1, day: 3 }),
+				),
+			).toBe(0);
 		}
 	});
 
@@ -269,7 +273,9 @@ describe("ICalendarCodec encode", () => {
 		expect(out).toContain("VALUE=DATE");
 		// Must also round-trip cleanly
 		const doc2 = await run(out);
-		const exdate2 = doc2.root.components[0]?.properties.find((p) => p.name === "EXDATE");
+		const exdate2 = doc2.root.components[0]?.properties.find(
+			(p) => p.name === "EXDATE",
+		);
 		expect(exdate2?.value.type).toBe("DATE_LIST");
 	});
 
@@ -409,14 +415,20 @@ describe("ICalendarCodec Temporal integration", () => {
 		const doc1 = await run(text);
 		const encoded = await enc(doc1);
 		const doc2 = await run(encoded);
-		const dtstart1 = doc1.root.components[0]?.properties.find((p) => p.name === "DTSTART");
-		const dtstart2 = doc2.root.components[0]?.properties.find((p) => p.name === "DTSTART");
+		const dtstart1 = doc1.root.components[0]?.properties.find(
+			(p) => p.name === "DTSTART",
+		);
+		const dtstart2 = doc2.root.components[0]?.properties.find(
+			(p) => p.name === "DTSTART",
+		);
 		expect(dtstart1?.value).toEqual(dtstart2?.value);
 		if (dtstart2?.value.type === "DATE") {
-			expect(Temporal.PlainDate.compare(
-				dtstart2.value.value,
-				Temporal.PlainDate.from({ year: 2006, month: 1, day: 2 }),
-			)).toBe(0);
+			expect(
+				Temporal.PlainDate.compare(
+					dtstart2.value.value,
+					Temporal.PlainDate.from({ year: 2006, month: 1, day: 2 }),
+				),
+			).toBe(0);
 		}
 	});
 });

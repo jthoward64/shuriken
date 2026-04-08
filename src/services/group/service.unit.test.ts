@@ -99,9 +99,7 @@ describe("GroupService.addMember", () => {
 
 		await runSuccess(
 			GroupService.pipe(
-				Effect.flatMap((s) =>
-					s.addMember(GroupId(groupId), UserId(userId)),
-				),
+				Effect.flatMap((s) => s.addMember(GroupId(groupId), UserId(userId))),
 				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
@@ -144,9 +142,7 @@ describe("GroupService.removeMember", () => {
 
 		await runSuccess(
 			GroupService.pipe(
-				Effect.flatMap((s) =>
-					s.removeMember(GroupId(groupId), UserId(userId)),
-				),
+				Effect.flatMap((s) => s.removeMember(GroupId(groupId), UserId(userId))),
 				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),

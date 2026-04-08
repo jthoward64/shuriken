@@ -60,7 +60,9 @@ const BARE_PREF = "PREF";
  * Returns the normalized parameter string (without leading `;`).
  */
 const normalizeParamSection = (paramSection: string): string => {
-	if (!paramSection) { return ""; }
+	if (!paramSection) {
+		return "";
+	}
 
 	const segments = paramSection.split(";").filter((s) => s.length > 0);
 	const typeValues: Array<string> = [];
@@ -157,17 +159,25 @@ const normalizeLine = (line: string): string => {
 	let colonIdx = -1;
 	for (let i = 0; i < line.length; i++) {
 		const ch = line[i];
-		if (ch === '"') { inQuote = !inQuote; }
-		else if (ch === ":" && !inQuote) { colonIdx = i; break; }
+		if (ch === '"') {
+			inQuote = !inQuote;
+		} else if (ch === ":" && !inQuote) {
+			colonIdx = i;
+			break;
+		}
 	}
-	if (colonIdx === -1) { return line; }
+	if (colonIdx === -1) {
+		return line;
+	}
 
 	const nameAndParams = line.slice(0, colonIdx);
 	const value = line.slice(colonIdx + 1);
 
 	// Split nameAndParams at the first ";" to get property name vs param block
 	const firstSemicolon = nameAndParams.indexOf(";");
-	if (firstSemicolon === -1) { return line; } // no params → nothing to normalize
+	if (firstSemicolon === -1) {
+		return line;
+	} // no params → nothing to normalize
 
 	const propName = nameAndParams.slice(0, firstSemicolon);
 	const rawParams = nameAndParams.slice(firstSemicolon + 1);
@@ -175,7 +185,9 @@ const normalizeLine = (line: string): string => {
 	// Check for any bare params (segments without "=")
 	const segments = rawParams.split(";");
 	const hasBareParam = segments.some((s) => s.length > 0 && !s.includes("="));
-	if (!hasBareParam) { return line; }
+	if (!hasBareParam) {
+		return line;
+	}
 
 	const normalized = normalizeParamSection(rawParams);
 	return normalized

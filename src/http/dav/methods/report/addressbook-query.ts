@@ -150,7 +150,7 @@ export const addressbookQueryHandler = (
 						fnHint.matchType,
 					)
 					.pipe(
-							Effect.flatMap((entityIds) =>
+						Effect.flatMap((entityIds) =>
 							instRepo.findByIds(
 								entityIds.map((id) => InstanceId(id as UuidString)),
 							),

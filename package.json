@@ -6,7 +6,7 @@
 	"scripts": {
 		"lint": "biome lint",
 		"format": "biome format",
-		"fix": "biome lint --fix || biome format --fix",
+		"fix": "biome lint --fix; biome format --fix",
 		"check": "tsc --noEmit",
 		"start": "bun .",
 		"serve": "bun --watch .",

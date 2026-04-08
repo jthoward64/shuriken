@@ -1,4 +1,5 @@
 import { Layer } from "effect";
+import { AclRepositoryLive } from "#src/services/acl/index.ts";
 import { CollectionRepositoryLive } from "./repository.live.ts";
 import { CollectionServiceLive } from "./service.live.ts";
 
@@ -15,4 +16,4 @@ export { CollectionService } from "./service.ts";
 
 export const CollectionDomainLayer = CollectionServiceLive.pipe(
 	Layer.provideMerge(CollectionRepositoryLive),
-);
+).pipe(Layer.provide(AclRepositoryLive));

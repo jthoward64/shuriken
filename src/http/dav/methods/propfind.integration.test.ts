@@ -192,7 +192,6 @@ const instanceVCard = makeVCard({
 });
 
 describe("PROPFIND instance", () => {
-
 	it("Depth:0 on calendar instance returns getetag, getcontenttype, resourcetype, getlastmodified", async () => {
 		const results = await runScript(
 			[
@@ -202,14 +201,18 @@ describe("PROPFIND instance", () => {
 					"text/calendar; charset=utf-8",
 					{ as: "test", expect: { status: 201 } },
 				),
-				propfind("/dav/principals/test/cal/primary/inst.ics", PROPFIND_GETETAG, {
-					as: "test",
-					headers: { Depth: "0" },
-					expect: {
-						status: 207,
-						bodyContains: ["getetag", "getcontenttype", "getlastmodified"],
+				propfind(
+					"/dav/principals/test/cal/primary/inst.ics",
+					PROPFIND_GETETAG,
+					{
+						as: "test",
+						headers: { Depth: "0" },
+						expect: {
+							status: 207,
+							bodyContains: ["getetag", "getcontenttype", "getlastmodified"],
+						},
 					},
-				}),
+				),
 			],
 			singleUser(),
 		);

@@ -1,8 +1,8 @@
-import { Array as Arr, Effect, Layer } from "effect";
-import { needPrivileges } from "#src/domain/errors.ts";
-import type { PrincipalId } from "#src/domain/ids.ts";
+import { Array as Arr, Effect, Layer, Option } from "effect";
+import { type DatabaseError, needPrivileges } from "#src/domain/errors.ts";
+import type { PrincipalId, UuidString } from "#src/domain/ids.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
-import { AclRepository } from "./repository.ts";
+import { AclRepository, type AclResourceType } from "./repository.ts";
 import { AclService } from "./service.ts";
 
 // ---------------------------------------------------------------------------
@@ -105,38 +105,101 @@ export const AclServiceLive = Layer.effect(
 				Effect.orElseSucceed(() => [principalId]),
 			);
 
+		// ---------------------------------------------------------------------------
+		// Ancestor-chain walking helpers (Fix 12)
+		//
+		// Both helpers close over `repo`; callers pass in the resolved principalIds
+		// (and privileges for checkAncestors) so the closures stay pure functions.
+		// ---------------------------------------------------------------------------
+
+		const checkAncestors = (
+			principalIds: ReadonlyArray<PrincipalId>,
+			privileges: ReadonlyArray<DavPrivilege>,
+			resourceId: UuidString,
+			resourceType: AclResourceType,
+		): Effect.Effect<boolean, DatabaseError> =>
+			repo.getResourceParent(resourceId, resourceType).pipe(
+				Effect.flatMap(
+					Option.match({
+						onNone: () => Effect.succeed(false),
+						onSome: ({ id, type }) =>
+							repo
+								.hasPrivilege(principalIds, id, type, privileges, true)
+								.pipe(
+									Effect.flatMap((ok) =>
+										ok
+											? Effect.succeed(true)
+											: checkAncestors(principalIds, privileges, id, type),
+									),
+								),
+					}),
+				),
+			);
+
+		const collectAncestorPrivileges = (
+			principalIds: ReadonlyArray<PrincipalId>,
+			resourceId: UuidString,
+			resourceType: AclResourceType,
+		): Effect.Effect<ReadonlyArray<DavPrivilege>, DatabaseError> =>
+			repo.getResourceParent(resourceId, resourceType).pipe(
+				Effect.flatMap(
+					Option.match({
+						onNone: () => Effect.succeed<ReadonlyArray<DavPrivilege>>([]),
+						onSome: ({ id, type }) =>
+							Effect.zipWith(
+								repo.getGrantedPrivileges(principalIds, id, type, true),
+								collectAncestorPrivileges(principalIds, id, type),
+								(direct, inherited) => [...direct, ...inherited],
+							),
+					}),
+				),
+			);
+
 		return AclService.of({
-			check: Effect.fn("AclService.check")(function* (
-				principalId,
-				resourceId,
-				resourceType,
-				privilege,
-			) {
-				yield* Effect.logTrace("acl.check", {
-					principalId,
-					resourceId,
-					resourceType,
-					privilege,
-				});
-				const principalIds = yield* resolvePrincipalIds(principalId);
-				const privileges = expandContainers(privilege);
-				const allowed = yield* repo.hasPrivilege(
-					principalIds,
-					resourceId,
-					resourceType,
-					privileges,
-					true,
-				);
-				if (!allowed) {
-					yield* Effect.logDebug("acl.check: denied", {
+			setAces: Effect.fn("AclService.setAces")(
+				function* (resourceId, resourceType, aces) {
+					yield* Effect.logTrace("acl.setAces", { resourceId, resourceType });
+					yield* repo.setAces(resourceId, resourceType, aces);
+				},
+			),
+
+			check: Effect.fn("AclService.check")(
+				function* (principalId, resourceId, resourceType, privilege) {
+					yield* Effect.logTrace("acl.check", {
 						principalId,
 						resourceId,
+						resourceType,
 						privilege,
 					});
-					return yield* Effect.fail(needPrivileges());
-				}
-				// TODO (Fix 12): walk parent-collection hierarchy for inherited ACEs
-			}),
+					const principalIds = yield* resolvePrincipalIds(principalId);
+					const privileges = expandContainers(privilege);
+					const allowed = yield* repo.hasPrivilege(
+						principalIds,
+						resourceId,
+						resourceType,
+						privileges,
+						true,
+					);
+					if (allowed) {
+						return;
+					}
+					// Walk ancestor chain before giving up
+					const inheritedAllowed = yield* checkAncestors(
+						principalIds,
+						privileges,
+						resourceId,
+						resourceType,
+					);
+					if (!inheritedAllowed) {
+						yield* Effect.logDebug("acl.check: denied", {
+							principalId,
+							resourceId,
+							privilege,
+						});
+						return yield* Effect.fail(needPrivileges());
+					}
+				},
+			),
 
 			currentUserPrivileges: Effect.fn("AclService.currentUserPrivileges")(
 				function* (principalId, resourceId, resourceType) {
@@ -146,16 +209,20 @@ export const AclServiceLive = Layer.effect(
 						resourceType,
 					});
 					const principalIds = yield* resolvePrincipalIds(principalId);
-					const grantedAggregates = yield* repo.getGrantedPrivileges(
+					const direct = yield* repo.getGrantedPrivileges(
 						principalIds,
 						resourceId,
 						resourceType,
 						true,
 					);
-					// TODO (Fix 12): walk parent-collection hierarchy for inherited ACEs
+					const inherited = yield* collectAncestorPrivileges(
+						principalIds,
+						resourceId,
+						resourceType,
+					);
 					// Expand each granted privilege to all privileges it implies
 					const expanded = new Set<DavPrivilege>();
-					for (const p of grantedAggregates) {
+					for (const p of [...direct, ...inherited]) {
 						for (const contained of expandContained(p)) {
 							expanded.add(contained);
 						}

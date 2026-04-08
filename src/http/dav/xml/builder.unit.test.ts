@@ -87,7 +87,10 @@ describe("buildXml", () => {
 			},
 		};
 		const xml = await Effect.runPromise(buildXml(obj));
-		const parsed = await Effect.runPromise(parseXml(xml)) as Record<string, unknown>;
+		const parsed = (await Effect.runPromise(parseXml(xml))) as Record<
+			string,
+			unknown
+		>;
 
 		const error = parsed["D:error"] as Record<string, unknown>;
 		expect(error["@_xmlns:D"]).toBe("DAV:");
@@ -100,12 +103,18 @@ describe("buildXml", () => {
 				"@_xmlns:D": "DAV:",
 				"D:response": [
 					{ "D:href": "/dav/principals/alice/", "D:status": "HTTP/1.1 200 OK" },
-					{ "D:href": "/dav/principals/bob/", "D:status": "HTTP/1.1 403 Forbidden" },
+					{
+						"D:href": "/dav/principals/bob/",
+						"D:status": "HTTP/1.1 403 Forbidden",
+					},
 				],
 			},
 		};
 		const xml = await Effect.runPromise(buildXml(obj));
-		const parsed = await Effect.runPromise(parseXml(xml)) as Record<string, unknown>;
+		const parsed = (await Effect.runPromise(parseXml(xml))) as Record<
+			string,
+			unknown
+		>;
 
 		const ms = parsed["D:multistatus"] as Record<string, unknown>;
 		const responses = ms["D:response"] as Array<Record<string, unknown>>;

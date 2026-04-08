@@ -37,8 +37,10 @@ const ALL_PRIVILEGES: ReadonlyArray<DavPrivilege> = [
 export const AclServiceAllowAll = Layer.succeed(
 	AclService,
 	AclService.of({
-		check: (_principalId, _resourceId, _resourceType, _privilege) => Effect.void,
+		check: (_principalId, _resourceId, _resourceType, _privilege) =>
+			Effect.void,
 		currentUserPrivileges: (_principalId, _resourceId, _resourceType) =>
 			Effect.succeed(ALL_PRIVILEGES),
+		setAces: (_resourceId, _resourceType, _aces) => Effect.void,
 	}),
 );

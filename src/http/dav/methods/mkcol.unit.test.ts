@@ -1,7 +1,13 @@
 import { describe, expect, it } from "bun:test";
 import { Effect, Option } from "effect";
 import type { DavError } from "#src/domain/errors.ts";
-import { CollectionId, InstanceId, PrincipalId, RequestId, UserId } from "#src/domain/ids.ts";
+import {
+	CollectionId,
+	InstanceId,
+	PrincipalId,
+	RequestId,
+	UserId,
+} from "#src/domain/ids.ts";
 import {
 	Authenticated,
 	type AuthenticatedPrincipal,
@@ -73,15 +79,13 @@ const emptyRequest = makeRequest();
  * Required because the real AclServiceLive checks ACE entries.
  */
 const makeEnv = () =>
-	makeTestEnv()
-		.withUser({ principalId: TEST_PRINCIPAL_ID })
-		.withAce({
-			resourceType: "principal",
-			resourceId: TEST_PRINCIPAL_ID,
-			principalType: "principal",
-			principalId: TEST_PRINCIPAL_ID,
-			privilege: "DAV:bind",
-		});
+	makeTestEnv().withUser({ principalId: TEST_PRINCIPAL_ID }).withAce({
+		resourceType: "principal",
+		resourceId: TEST_PRINCIPAL_ID,
+		principalType: "principal",
+		principalId: TEST_PRINCIPAL_ID,
+		privilege: "DAV:bind",
+	});
 
 // ---------------------------------------------------------------------------
 // MKCALENDAR
@@ -307,11 +311,7 @@ describe("mkcolHandler — extended-MKCOL body", () => {
 		const path = makeNewCollectionPath("cal");
 
 		const res = await runSuccess(
-			mkcolHandler(
-				path,
-				authenticatedCtx,
-				makeRequest("<not-closed-tag"),
-			).pipe(
+			mkcolHandler(path, authenticatedCtx, makeRequest("<not-closed-tag")).pipe(
 				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),

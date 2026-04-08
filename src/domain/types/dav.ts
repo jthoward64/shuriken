@@ -70,7 +70,9 @@ export class Authenticated extends Data.TaggedClass("Authenticated")<{
 	readonly principal: AuthenticatedPrincipal;
 }> {}
 
-export class Unauthenticated extends Data.TaggedClass("Unauthenticated")<Record<never, never>> {}
+export class Unauthenticated extends Data.TaggedClass("Unauthenticated")<
+	Record<never, never>
+> {}
 
 export type AuthResult = Authenticated | Unauthenticated;
 

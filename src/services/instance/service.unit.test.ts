@@ -221,9 +221,7 @@ describe("InstanceService.findById", () => {
 
 		const err = (await runFailure(
 			InstanceService.pipe(
-				Effect.flatMap((s) =>
-					s.findById(InstanceId(crypto.randomUUID())),
-				),
+				Effect.flatMap((s) => s.findById(InstanceId(crypto.randomUUID()))),
 				Effect.provide(env.toLayer()),
 			),
 		)) as DavError;
@@ -245,9 +243,7 @@ describe("InstanceService.findBySlug", () => {
 
 		const result = await runSuccess(
 			InstanceService.pipe(
-				Effect.flatMap((s) =>
-					s.findBySlug(collectionId, Slug("contact.vcf")),
-				),
+				Effect.flatMap((s) => s.findBySlug(collectionId, Slug("contact.vcf"))),
 				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
@@ -262,9 +258,7 @@ describe("InstanceService.findBySlug", () => {
 
 		const err = (await runFailure(
 			InstanceService.pipe(
-				Effect.flatMap((s) =>
-					s.findBySlug(collectionId, Slug("missing.ics")),
-				),
+				Effect.flatMap((s) => s.findBySlug(collectionId, Slug("missing.ics"))),
 				Effect.provide(env.toLayer()),
 			),
 		)) as DavError;

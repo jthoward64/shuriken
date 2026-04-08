@@ -61,7 +61,6 @@ const makeCtx = (
 	clientIp: Option.none(),
 });
 
-
 const authenticatedCtx = makeCtx(
 	new Authenticated({ principal: authenticatedPrincipal }),
 );
@@ -127,7 +126,10 @@ const ICAL_BODY_2 =
 const VCARD_BODY =
 	"BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Test User\r\nUID:urn:uuid:4fbe8971-0bc3-424c-9c26-36c3e1eff6b1\r\nEND:VCARD\r\n";
 
-const makeICalRequest = (body = ICAL_BODY, extraHeaders?: Record<string, string>) =>
+const makeICalRequest = (
+	body = ICAL_BODY,
+	extraHeaders?: Record<string, string>,
+) =>
 	new Request("http://localhost/", {
 		method: "PUT",
 		body,
@@ -171,12 +173,20 @@ const makeEnv = () =>
 type PutEffect<A> = Effect.Effect<
 	A,
 	DavError | DatabaseError,
-	AclService | InstanceService | ComponentRepository | EntityRepository | CalTimezoneRepository
+	| AclService
+	| InstanceService
+	| ComponentRepository
+	| EntityRepository
+	| CalTimezoneRepository
 >;
 type PutFailEffect = Effect.Effect<
 	unknown,
 	DavError | DatabaseError,
-	AclService | InstanceService | ComponentRepository | EntityRepository | CalTimezoneRepository
+	| AclService
+	| InstanceService
+	| ComponentRepository
+	| EntityRepository
+	| CalTimezoneRepository
 >;
 
 const run = <A>(env: ReturnType<typeof makeTestEnv>, effect: PutEffect<A>) =>
@@ -208,7 +218,11 @@ describe("putHandler — new-instance (create)", () => {
 		});
 		const res = await run(
 			env,
-			putHandler(makeNewInstancePath("card"), authenticatedCtx, makeVCardRequest()),
+			putHandler(
+				makeNewInstancePath("card"),
+				authenticatedCtx,
+				makeVCardRequest(),
+			),
 		);
 		expect(res.status).toBe(HTTP_CREATED);
 		expect(res.headers.get("ETag")).not.toBeNull();
@@ -261,7 +275,11 @@ describe("putHandler — instance (update)", () => {
 
 		const res1 = await run(
 			env,
-			putHandler(makeInstancePath(), authenticatedCtx, makeICalRequest(ICAL_BODY)),
+			putHandler(
+				makeInstancePath(),
+				authenticatedCtx,
+				makeICalRequest(ICAL_BODY),
+			),
 		);
 		const etag1 = res1.headers.get("ETag");
 
@@ -269,12 +287,19 @@ describe("putHandler — instance (update)", () => {
 		const instances = [...env.stores.instances.values()];
 		const instance = instances[0];
 		if (instance) {
-			env.stores.instances.set(instance.id, { ...instance, etag: etag1 ?? instance.etag });
+			env.stores.instances.set(instance.id, {
+				...instance,
+				etag: etag1 ?? instance.etag,
+			});
 		}
 
 		const res2 = await run(
 			env,
-			putHandler(makeInstancePath(), authenticatedCtx, makeICalRequest(ICAL_BODY_2)),
+			putHandler(
+				makeInstancePath(),
+				authenticatedCtx,
+				makeICalRequest(ICAL_BODY_2),
+			),
 		);
 		const etag2 = res2.headers.get("ETag");
 
@@ -517,7 +542,11 @@ describe("putHandler — cal_timezone upsert", () => {
 		});
 		await run(
 			env,
-			putHandler(makeNewInstancePath("card"), authenticatedCtx, makeVCardRequest()),
+			putHandler(
+				makeNewInstancePath("card"),
+				authenticatedCtx,
+				makeVCardRequest(),
+			),
 		);
 		expect(env.stores.calTimezones.size).toBe(0);
 	});

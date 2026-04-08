@@ -14,7 +14,6 @@ const dec = (text: string) => Effect.runPromise(decodeEffect(text));
 const enc = (lines: ReadonlyArray<ContentLine>) =>
 	Effect.runPromise(encodeEffect(lines));
 
-
 // ---------------------------------------------------------------------------
 // Decoding
 // ---------------------------------------------------------------------------
@@ -70,10 +69,14 @@ describe("ContentLinesCodec decode", () => {
 	});
 
 	it("parses a property with multiple parameters", async () => {
-		const text = "ATTENDEE;RSVP=TRUE;ROLE=REQ-PARTICIPANT:mailto:jsmith@example.com\r\n";
+		const text =
+			"ATTENDEE;RSVP=TRUE;ROLE=REQ-PARTICIPANT:mailto:jsmith@example.com\r\n";
 		const lines = await dec(text);
 		expect(lines[0]?.params).toHaveLength(2);
-		expect(lines[0]?.params[0]).toMatchObject({ name: "RSVP", values: ["TRUE"] });
+		expect(lines[0]?.params[0]).toMatchObject({
+			name: "RSVP",
+			values: ["TRUE"],
+		});
 		expect(lines[0]?.params[1]).toMatchObject({
 			name: "ROLE",
 			values: ["REQ-PARTICIPANT"],
@@ -108,7 +111,7 @@ describe("ContentLinesCodec decode", () => {
 	});
 
 	it("splits multi-value param values at unquoted commas", async () => {
-		const text = 'X-PROP;TYPE=HOME,WORK:val\r\n';
+		const text = "X-PROP;TYPE=HOME,WORK:val\r\n";
 		const lines = await dec(text);
 		expect(lines[0]?.params[0]).toMatchObject({
 			name: "TYPE",
@@ -146,7 +149,9 @@ describe("ContentLinesCodec encode", () => {
 	it("folds lines at 75 UTF-8 octets", async () => {
 		// 75 x's → fits on one physical line; 76 x's → must fold
 		const longValue = "x".repeat(76);
-		const lines = [{ name: "X-LONG", params: [], rawValue: longValue }] as const;
+		const lines = [
+			{ name: "X-LONG", params: [], rawValue: longValue },
+		] as const;
 		const text = await enc(lines);
 		const physicalLines = text.split("\r\n").filter((l) => l.length > 0);
 		// First physical line must be ≤75 bytes
@@ -267,13 +272,17 @@ describe("RFC 6868 parameter value encoding", () => {
 		const original: ReadonlyArray<ContentLine> = [
 			{
 				name: "SUMMARY",
-				params: [{ name: "X-META", values: ['has^caret and "quote" and\nnewline'] }],
+				params: [
+					{ name: "X-META", values: ['has^caret and "quote" and\nnewline'] },
+				],
 				rawValue: "value",
 			},
 		];
 		const text = await enc(original);
 		const recovered = await dec(text);
-		expect(recovered[0]?.params[0]?.values[0]).toBe('has^caret and "quote" and\nnewline');
+		expect(recovered[0]?.params[0]?.values[0]).toBe(
+			'has^caret and "quote" and\nnewline',
+		);
 	});
 });
 

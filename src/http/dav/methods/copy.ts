@@ -14,12 +14,19 @@ import { CollectionId, EntityId, type PrincipalId } from "#src/domain/ids.ts";
 import { type ResolvedDavPath, Slug } from "#src/domain/types/path.ts";
 import { ETag } from "#src/domain/types/strings.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
-import { HTTP_BAD_GATEWAY, HTTP_CREATED, HTTP_NO_CONTENT } from "#src/http/status.ts";
+import {
+	HTTP_BAD_GATEWAY,
+	HTTP_CREATED,
+	HTTP_NO_CONTENT,
+} from "#src/http/status.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
 import { EntityRepository } from "#src/services/entity/index.ts";
-import { InstanceRepository, InstanceService } from "#src/services/instance/index.ts";
+import {
+	InstanceRepository,
+	InstanceService,
+} from "#src/services/instance/index.ts";
 import { parseDavPath } from "../router.ts";
 import {
 	deleteCollection,
@@ -59,9 +66,21 @@ export const copyHandler = (
 		const overwrite = parseOverwrite(req);
 
 		if (path.kind === "instance") {
-			return yield* copyInstance(path, principal.principalId, destUrl, overwrite, req);
+			return yield* copyInstance(
+				path,
+				principal.principalId,
+				destUrl,
+				overwrite,
+				req,
+			);
 		}
-		return yield* copyCollection(path, principal.principalId, destUrl, overwrite, req);
+		return yield* copyCollection(
+			path,
+			principal.principalId,
+			destUrl,
+			overwrite,
+			req,
+		);
 	});
 
 // ---------------------------------------------------------------------------
@@ -79,7 +98,10 @@ const copyInstance = (
 		const destPath = yield* parseDavPath(destUrl);
 
 		// RFC 4918 §9.8.5: source and destination must differ.
-		if (destPath.kind === "instance" && destPath.instanceId === path.instanceId) {
+		if (
+			destPath.kind === "instance" &&
+			destPath.instanceId === path.instanceId
+		) {
 			return yield* forbidden();
 		}
 
@@ -102,7 +124,8 @@ const copyInstance = (
 			.findById(EntityId(sourceInstance.entityId))
 			.pipe(Effect.flatMap(someOrNotFound("Source entity not found")));
 
-		const entityType = sourceInstance.contentType === "text/calendar" ? "icalendar" : "vcard";
+		const entityType =
+			sourceInstance.contentType === "text/calendar" ? "icalendar" : "vcard";
 
 		const componentRepo = yield* ComponentRepository;
 		const irRoot = yield* componentRepo
@@ -117,14 +140,24 @@ const copyInstance = (
 				return yield* preconditionFailed();
 			}
 			destExisted = true;
-			yield* acl.check(principalId, destPath.collectionId, "collection", "DAV:bind");
+			yield* acl.check(
+				principalId,
+				destPath.collectionId,
+				"collection",
+				"DAV:bind",
+			);
 			const destInstance = yield* instanceSvc.findById(destPath.instanceId);
 			// Preserve the existing destination slug (its URL identity).
 			destSlug = Slug(destInstance.slug);
 			yield* deleteInstance(destInstance);
 		} else {
 			// destPath.kind === "new-instance"
-			yield* acl.check(principalId, destPath.collectionId, "collection", "DAV:bind");
+			yield* acl.check(
+				principalId,
+				destPath.collectionId,
+				"collection",
+				"DAV:bind",
+			);
 			destSlug = destPath.slug;
 		}
 
@@ -176,7 +209,10 @@ const copyCollection = (
 		const destPath = yield* parseDavPath(destUrl);
 
 		// RFC 4918 §9.8.5: source and destination must differ.
-		if (destPath.kind === "collection" && destPath.collectionId === path.collectionId) {
+		if (
+			destPath.kind === "collection" &&
+			destPath.collectionId === path.collectionId
+		) {
 			return yield* forbidden();
 		}
 
@@ -221,7 +257,8 @@ const copyCollection = (
 			displayName: sourceCollection.displayName ?? undefined,
 			description: sourceCollection.description ?? undefined,
 			timezoneTzid: sourceCollection.timezoneTzid ?? undefined,
-			supportedComponents: (sourceCollection.supportedComponents as Array<string>) ?? undefined,
+			supportedComponents:
+				(sourceCollection.supportedComponents as Array<string>) ?? undefined,
 		});
 
 		// Depth: infinity — copy all instances.

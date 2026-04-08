@@ -3,7 +3,7 @@ import { Context } from "effect";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import type { CollectionId, InstanceId, PrincipalId } from "#src/domain/ids.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
-import type { AclResourceType } from "./repository.ts";
+import type { AclResourceType, NewAce } from "./repository.ts";
 
 // ---------------------------------------------------------------------------
 // AclResourceId — the UUID of the resource being access-checked.
@@ -48,6 +48,17 @@ export interface AclServiceShape {
 		resourceId: AclResourceId,
 		resourceType: AclResourceType,
 	) => Effect.Effect<ReadonlyArray<DavPrivilege>, DatabaseError>;
+
+	/**
+	 * Replace all non-protected ACEs on a resource with the given list.
+	 * Protected (server-managed) ACEs are preserved.
+	 * Used by the ACL HTTP method handler (RFC 3744 §8.1).
+	 */
+	readonly setAces: (
+		resourceId: AclResourceId,
+		resourceType: AclResourceType,
+		aces: ReadonlyArray<NewAce>,
+	) => Effect.Effect<void, DatabaseError>;
 }
 
 export class AclService extends Context.Tag("AclService")<

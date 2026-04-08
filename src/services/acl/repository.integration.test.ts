@@ -1,8 +1,14 @@
 import { beforeAll, describe, expect, it } from "bun:test";
-import { Effect, Layer } from "effect";
-import { PrincipalId } from "#src/domain/ids.ts";
+import { Effect, Layer, Option } from "effect";
+import { CollectionId, EntityId, PrincipalId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
-import { Email } from "#src/domain/types/strings.ts";
+import { Email, type ETag } from "#src/domain/types/strings.ts";
+import { CollectionRepositoryLive } from "#src/services/collection/repository.live.ts";
+import { CollectionRepository } from "#src/services/collection/repository.ts";
+import { EntityRepositoryLive } from "#src/services/entity/repository.live.ts";
+import { EntityRepository } from "#src/services/entity/repository.ts";
+import { InstanceRepositoryLive } from "#src/services/instance/repository.live.ts";
+import { InstanceRepository } from "#src/services/instance/repository.ts";
 import { UserRepositoryLive } from "#src/services/user/repository.live.ts";
 import { UserRepository } from "#src/services/user/repository.ts";
 import { runSuccess } from "#src/testing/effect.ts";
@@ -42,9 +48,7 @@ describe("AclRepository.grantAce and getAces (integration)", () => {
 	it("getAces returns empty list for a resource with no ACEs", async () => {
 		const result = await runSuccess(
 			AclRepository.pipe(
-				Effect.flatMap((r) =>
-					r.getAces(crypto.randomUUID(), "collection"),
-				),
+				Effect.flatMap((r) => r.getAces(crypto.randomUUID(), "collection")),
 				Effect.provide(layer),
 				Effect.orDie,
 			),
@@ -425,11 +429,149 @@ describe("AclRepository.getGroupPrincipalIds (integration)", () => {
 					email: Email("solo@example.com"),
 					credentials: [],
 				});
-				return yield* aclRepo.getGroupPrincipalIds(
-					PrincipalId(principal.id),
-				);
+				return yield* aclRepo.getGroupPrincipalIds(PrincipalId(principal.id));
 			}).pipe(Effect.provide(layer), Effect.orDie),
 		);
 		expect(result).toHaveLength(0);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// getResourceParent
+// ---------------------------------------------------------------------------
+
+describe("AclRepository.getResourceParent (integration)", () => {
+	type FullLayer = Layer.Layer<
+		| AclRepository
+		| UserRepository
+		| CollectionRepository
+		| EntityRepository
+		| InstanceRepository,
+		Error
+	>;
+	let layer: FullLayer;
+
+	beforeAll(() => {
+		const db = makePgliteDatabaseLayer();
+		layer = Layer.mergeAll(
+			AclRepositoryLive.pipe(Layer.provide(db)),
+			UserRepositoryLive.pipe(Layer.provide(db)),
+			CollectionRepositoryLive.pipe(Layer.provide(db)),
+			EntityRepositoryLive.pipe(Layer.provide(db)),
+			InstanceRepositoryLive.pipe(Layer.provide(db)),
+		);
+	});
+
+	it("returns None for a principal (top of hierarchy)", async () => {
+		const result = await runSuccess(
+			AclRepository.pipe(
+				Effect.flatMap((r) =>
+					r.getResourceParent(crypto.randomUUID(), "principal"),
+				),
+				Effect.provide(layer),
+				Effect.orDie,
+			),
+		);
+		expect(Option.isNone(result)).toBe(true);
+	});
+
+	it("returns the owner principal for a root collection (no parent_collection_id)", async () => {
+		const result = await runSuccess(
+			Effect.gen(function* () {
+				const userRepo = yield* UserRepository;
+				const collectionRepo = yield* CollectionRepository;
+				const aclRepo = yield* AclRepository;
+
+				const { principal } = yield* userRepo.create({
+					slug: Slug("rp-root-owner"),
+					name: "Root Owner",
+					email: Email("rp-root@example.com"),
+					credentials: [],
+				});
+				const collection = yield* collectionRepo.insert({
+					ownerPrincipalId: PrincipalId(principal.id),
+					collectionType: "calendar",
+					slug: Slug("rp-root-cal"),
+				});
+				return yield* aclRepo.getResourceParent(collection.id, "collection");
+			}).pipe(Effect.provide(layer), Effect.orDie),
+		);
+		expect(Option.isSome(result)).toBe(true);
+		if (Option.isSome(result)) {
+			expect(result.value.type).toBe("principal");
+		}
+	});
+
+	it("returns the parent collection for a nested collection", async () => {
+		const result = await runSuccess(
+			Effect.gen(function* () {
+				const userRepo = yield* UserRepository;
+				const collectionRepo = yield* CollectionRepository;
+				const aclRepo = yield* AclRepository;
+
+				const { principal } = yield* userRepo.create({
+					slug: Slug("rp-nested-owner"),
+					name: "Nested Owner",
+					email: Email("rp-nested@example.com"),
+					credentials: [],
+				});
+				const parent = yield* collectionRepo.insert({
+					ownerPrincipalId: PrincipalId(principal.id),
+					collectionType: "collection",
+					slug: Slug("rp-parent-col"),
+				});
+				const child = yield* collectionRepo.insert({
+					ownerPrincipalId: PrincipalId(principal.id),
+					collectionType: "collection",
+					slug: Slug("rp-child-col"),
+					parentCollectionId: CollectionId(parent.id),
+				});
+				return yield* aclRepo.getResourceParent(child.id, "collection");
+			}).pipe(Effect.provide(layer), Effect.orDie),
+		);
+		expect(Option.isSome(result)).toBe(true);
+		if (Option.isSome(result)) {
+			expect(result.value.type).toBe("collection");
+		}
+	});
+
+	it("returns the parent collection for an instance", async () => {
+		const result = await runSuccess(
+			Effect.gen(function* () {
+				const userRepo = yield* UserRepository;
+				const collectionRepo = yield* CollectionRepository;
+				const entityRepo = yield* EntityRepository;
+				const instanceRepo = yield* InstanceRepository;
+				const aclRepo = yield* AclRepository;
+
+				const { principal } = yield* userRepo.create({
+					slug: Slug("rp-inst-owner"),
+					name: "Inst Owner",
+					email: Email("rp-inst@example.com"),
+					credentials: [],
+				});
+				const collection = yield* collectionRepo.insert({
+					ownerPrincipalId: PrincipalId(principal.id),
+					collectionType: "calendar",
+					slug: Slug("rp-inst-cal"),
+				});
+				const entity = yield* entityRepo.insert({
+					entityType: "icalendar",
+					logicalUid: null,
+				});
+				const instance = yield* instanceRepo.insert({
+					collectionId: CollectionId(collection.id),
+					entityId: EntityId(entity.id),
+					contentType: "text/calendar",
+					etag: `"test-etag"` as ETag,
+					slug: Slug("rp-event.ics"),
+				});
+				return yield* aclRepo.getResourceParent(instance.id, "instance");
+			}).pipe(Effect.provide(layer), Effect.orDie),
+		);
+		expect(Option.isSome(result)).toBe(true);
+		if (Option.isSome(result)) {
+			expect(result.value.type).toBe("collection");
+		}
 	});
 });

@@ -52,9 +52,7 @@ const buildTree = (lines: ReadonlyArray<ContentLine>): RawComponent => {
 			const componentName = line.rawValue.toUpperCase();
 			const top = stack.pop();
 			if (top === undefined) {
-				throw new Error(
-					`Unexpected END:${componentName} — no open component`,
-				);
+				throw new Error(`Unexpected END:${componentName} — no open component`);
 			}
 			if (top.name !== componentName) {
 				throw new Error(
@@ -99,11 +97,11 @@ const buildTree = (lines: ReadonlyArray<ContentLine>): RawComponent => {
  * (recursively), then END:name.
  */
 const flattenTree = (component: RawComponent): Array<ContentLine> => [
-		{ name: "BEGIN", params: [], rawValue: component.name },
-		...component.contentLines,
-		...component.children.flatMap(flattenTree),
-		{ name: "END", params: [], rawValue: component.name },
-	];
+	{ name: "BEGIN", params: [], rawValue: component.name },
+	...component.contentLines,
+	...component.children.flatMap(flattenTree),
+	{ name: "END", params: [], rawValue: component.name },
+];
 
 // ---------------------------------------------------------------------------
 // RawComponentCodec
@@ -124,14 +122,12 @@ export const RawComponentCodec: Schema.Schema<
 		decode: (lines, _options, ast) =>
 			Effect.try({
 				try: () => buildTree(lines),
-				catch: (e) =>
-					new ParseResult.Type(ast, lines, String(e)),
+				catch: (e) => new ParseResult.Type(ast, lines, String(e)),
 			}),
 		encode: (component, _options, ast) =>
 			Effect.try({
 				try: () => flattenTree(component),
-				catch: (e) =>
-					new ParseResult.Type(ast, component, String(e)),
+				catch: (e) => new ParseResult.Type(ast, component, String(e)),
 			}),
 	},
 );

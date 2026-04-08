@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { Effect, Layer, Option } from "effect";
 import { DatabaseClient } from "#src/db/client.ts";
 import { principal, user } from "#src/db/drizzle/schema/index.ts";
@@ -6,7 +6,11 @@ import { DatabaseError } from "#src/domain/errors.ts";
 import type { PrincipalId, UserId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
 import type { Email } from "#src/domain/types/strings.ts";
-import { PrincipalRepository, type UserRow } from "./repository.ts";
+import {
+	PrincipalRepository,
+	type PrincipalPropertyChanges,
+	type UserRow,
+} from "./repository.ts";
 
 // ---------------------------------------------------------------------------
 // PrincipalRepository — Drizzle implementation
@@ -50,7 +54,9 @@ export const PrincipalRepositoryLive = Layer.effect(
 							.select()
 							.from(principal)
 							.innerJoin(user, eq(user.principalId, principal.id))
-							.where(and(eq(principal.slug, slug), isNull(principal.deletedAt)))
+							.where(
+								and(eq(principal.slug, slug), isNull(principal.deletedAt)),
+							)
 							.limit(1)
 							.then((r) =>
 								Option.fromNullable(
@@ -74,7 +80,9 @@ export const PrincipalRepositoryLive = Layer.effect(
 							.select()
 							.from(user)
 							.innerJoin(principal, eq(principal.id, user.principalId))
-							.where(and(eq(user.email, email), isNull(principal.deletedAt)))
+							.where(
+								and(eq(user.email, email), isNull(principal.deletedAt)),
+							)
 							.limit(1)
 							.then((r) =>
 								Option.fromNullable(
@@ -89,7 +97,9 @@ export const PrincipalRepositoryLive = Layer.effect(
 			),
 		);
 
-		const findUserByUserId = Effect.fn("PrincipalRepository.findUserByUserId")(
+		const findUserByUserId = Effect.fn(
+			"PrincipalRepository.findUserByUserId",
+		)(
 			function* (id: UserId) {
 				yield* Effect.logTrace("repo.principal.findUserByUserId", { id });
 				return yield* Effect.tryPromise({
@@ -108,11 +118,50 @@ export const PrincipalRepositoryLive = Layer.effect(
 			),
 		);
 
+		const updateProperties = Effect.fn(
+			"PrincipalRepository.updateProperties",
+		)(
+			function* (id: PrincipalId, changes: PrincipalPropertyChanges) {
+				yield* Effect.logTrace("repo.principal.updateProperties", { id });
+				const setValues: Record<string, unknown> = {
+					clientProperties: changes.clientProperties,
+					updatedAt: sql`now()`,
+				};
+				if (changes.displayName !== undefined) {
+					setValues.displayName = changes.displayName;
+				}
+				return yield* Effect.tryPromise({
+					try: () =>
+						db
+							.update(principal)
+							.set(setValues)
+							.where(
+								and(eq(principal.id, id), isNull(principal.deletedAt)),
+							)
+							.returning()
+							.then((rows) => {
+								const row = rows[0];
+								if (!row) {
+									throw new Error(
+										`Principal not found for property update: ${id}`,
+									);
+								}
+								return row;
+							}),
+					catch: (e) => new DatabaseError({ cause: e }),
+				});
+			},
+			Effect.tapError((e: DatabaseError) =>
+				Effect.logWarning("repo.principal.updateProperties failed", e.cause),
+			),
+		);
+
 		return PrincipalRepository.of({
 			findById,
 			findBySlug,
 			findByEmail,
 			findUserByUserId,
+			updateProperties,
 		});
 	}),
 );

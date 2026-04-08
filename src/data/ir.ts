@@ -253,4 +253,7 @@ export interface IrDeadProperty {
 }
 
 // Shape stored in / read from the clientProperties JSONB column.
-export type IrDeadProperties = Readonly<Record<ClarkName, string>>;
+// Values may be strings (plain-text property values) or objects (nested XML
+// subtrees as parsed by fast-xml-parser).  The server never interprets them —
+// it only round-trips them through PROPPATCH / PROPFIND.
+export type IrDeadProperties = Readonly<Record<ClarkName, unknown>>;

@@ -1,4 +1,5 @@
 import { Effect, Layer } from "effect";
+import type { IrDeadProperties } from "#src/data/ir.ts";
 import { someOrNotFound } from "#src/domain/errors.ts";
 import type { CollectionId, InstanceId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
@@ -56,7 +57,9 @@ export const InstanceServiceLive = Layer.effect(
 						.findById(existingId)
 						.pipe(
 							Effect.flatMap(
-								someOrNotFound(`Instance not found after update: ${existingId}`),
+								someOrNotFound(
+									`Instance not found after update: ${existingId}`,
+								),
 							),
 						);
 				}
@@ -69,6 +72,13 @@ export const InstanceServiceLive = Layer.effect(
 					Effect.flatMap(someOrNotFound(`Instance not found: ${id}`)),
 					Effect.flatMap(() => repo.softDelete(id)),
 				);
+			}),
+
+			updateClientProperties: Effect.fn(
+				"InstanceService.updateClientProperties",
+			)(function* (id: InstanceId, clientProperties: IrDeadProperties) {
+				yield* Effect.logTrace("instance.updateClientProperties", { id });
+				return yield* repo.updateClientProperties(id, clientProperties);
 			}),
 		});
 	}),

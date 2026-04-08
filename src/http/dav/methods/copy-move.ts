@@ -1,5 +1,9 @@
 import { Effect } from "effect";
-import { type DatabaseError, type DavError, davError } from "#src/domain/errors.ts";
+import {
+	type DatabaseError,
+	type DavError,
+	davError,
+} from "#src/domain/errors.ts";
 import { EntityId, InstanceId, type CollectionId } from "#src/domain/ids.ts";
 import { HTTP_BAD_REQUEST } from "#src/http/status.ts";
 import { CollectionRepository } from "#src/services/collection/index.ts";
@@ -26,7 +30,8 @@ export const parseDestination = (req: Request): Effect.Effect<URL, DavError> =>
 		}
 		return yield* Effect.try({
 			try: () => new URL(raw),
-			catch: () => davError(HTTP_BAD_REQUEST, undefined, "Malformed Destination header"),
+			catch: () =>
+				davError(HTTP_BAD_REQUEST, undefined, "Malformed Destination header"),
 		});
 	});
 
@@ -81,7 +86,11 @@ export const parseDepth = (
  */
 export const deleteInstance = (
 	instance: InstanceRow,
-): Effect.Effect<void, DatabaseError, InstanceRepository | EntityRepository | ComponentRepository> =>
+): Effect.Effect<
+	void,
+	DatabaseError,
+	InstanceRepository | EntityRepository | ComponentRepository
+> =>
 	Effect.gen(function* () {
 		const instanceRepo = yield* InstanceRepository;
 		const entityRepo = yield* EntityRepository;
@@ -103,7 +112,10 @@ export const deleteCollection = (
 ): Effect.Effect<
 	void,
 	DatabaseError,
-	InstanceRepository | CollectionRepository | EntityRepository | ComponentRepository
+	| InstanceRepository
+	| CollectionRepository
+	| EntityRepository
+	| ComponentRepository
 > =>
 	Effect.gen(function* () {
 		const instanceRepo = yield* InstanceRepository;

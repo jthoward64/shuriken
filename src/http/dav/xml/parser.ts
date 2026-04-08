@@ -3,7 +3,6 @@ import { XMLParser } from "fast-xml-parser";
 import { type DavError, XmlParseError, davError } from "#src/domain/errors.ts";
 import { HTTP_REQUEST_ENTITY_TOO_LARGE } from "#src/http/status.ts";
 
-
 // Maximum size in bytes accepted for XML request bodies (PROPFIND, PROPPATCH, REPORT).
 // Rejects payloads larger than this with 413 before parsing.
 const MAX_XML_BODY_BYTES = 524_288; // 512 KiB
@@ -39,8 +38,7 @@ const parser = new XMLParser({
 export const readXmlBody = (req: Request): Effect.Effect<string, DavError> =>
 	Effect.tryPromise({
 		try: () => req.text(),
-		catch: (e) =>
-			davError(HTTP_REQUEST_ENTITY_TOO_LARGE, undefined, String(e)),
+		catch: (e) => davError(HTTP_REQUEST_ENTITY_TOO_LARGE, undefined, String(e)),
 	}).pipe(
 		Effect.flatMap((text) =>
 			text.length > MAX_XML_BODY_BYTES

@@ -15,10 +15,16 @@ import type { IrDocument } from "../ir.ts";
  *   - the UID value type is not TEXT (unexpected — UID is always TEXT in iCal)
  */
 export const extractUid = (doc: IrDocument): Option.Option<string> => {
-	if (doc.kind !== "icalendar") { return Option.none(); }
+	if (doc.kind !== "icalendar") {
+		return Option.none();
+	}
 	const firstChild = doc.root.components.at(0);
-	if (firstChild === undefined) { return Option.none(); }
+	if (firstChild === undefined) {
+		return Option.none();
+	}
 	const prop = firstChild.properties.find((p) => p.name === "UID");
-	if (prop === undefined || prop.value.type !== "TEXT") { return Option.none(); }
+	if (prop === undefined || prop.value.type !== "TEXT") {
+		return Option.none();
+	}
 	return Option.some(prop.value.value);
 };

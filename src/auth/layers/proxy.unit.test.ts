@@ -17,11 +17,15 @@ describe("isClientTrusted", () => {
 	});
 
 	it("returns true when clientIp matches an entry", () => {
-		expect(isClientTrusted(Option.some("127.0.0.1"), "127.0.0.1,::1")).toBe(true);
+		expect(isClientTrusted(Option.some("127.0.0.1"), "127.0.0.1,::1")).toBe(
+			true,
+		);
 	});
 
 	it("returns false when clientIp matches no entry", () => {
-		expect(isClientTrusted(Option.some("10.0.0.1"), "127.0.0.1,::1")).toBe(false);
+		expect(isClientTrusted(Option.some("10.0.0.1"), "127.0.0.1,::1")).toBe(
+			false,
+		);
 	});
 
 	it("trims whitespace around comma-separated entries", () => {
@@ -31,8 +35,12 @@ describe("isClientTrusted", () => {
 	});
 
 	it("matches IPv4 address inside a CIDR block", () => {
-		expect(isClientTrusted(Option.some("192.168.1.50"), "192.168.1.0/24")).toBe(true);
-		expect(isClientTrusted(Option.some("192.168.2.1"), "192.168.1.0/24")).toBe(false);
+		expect(isClientTrusted(Option.some("192.168.1.50"), "192.168.1.0/24")).toBe(
+			true,
+		);
+		expect(isClientTrusted(Option.some("192.168.2.1"), "192.168.1.0/24")).toBe(
+			false,
+		);
 	});
 
 	it("matches IPv4 /32 CIDR as exact match", () => {
@@ -51,8 +59,12 @@ describe("isClientTrusted", () => {
 	});
 
 	it("matches IPv6 /128 CIDR as exact match", () => {
-		expect(isClientTrusted(Option.some("2001:db8::1"), "2001:db8::1/128")).toBe(true);
-		expect(isClientTrusted(Option.some("2001:db8::2"), "2001:db8::1/128")).toBe(false);
+		expect(isClientTrusted(Option.some("2001:db8::1"), "2001:db8::1/128")).toBe(
+			true,
+		);
+		expect(isClientTrusted(Option.some("2001:db8::2"), "2001:db8::1/128")).toBe(
+			false,
+		);
 	});
 
 	it("handles mixed IPv4 and IPv6 CIDR entries", () => {

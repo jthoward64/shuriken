@@ -4,7 +4,11 @@ import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import type { PrincipalId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
 import type { Email } from "#src/domain/types/strings.ts";
-import type { PrincipalWithUser } from "./repository.ts";
+import type {
+	PrincipalPropertyChanges,
+	PrincipalRow,
+	PrincipalWithUser,
+} from "./repository.ts";
 
 // ---------------------------------------------------------------------------
 // PrincipalService — business logic for principal management
@@ -20,6 +24,10 @@ export interface PrincipalServiceShape {
 	readonly findByEmail: (
 		email: Email,
 	) => Effect.Effect<PrincipalWithUser, DavError | DatabaseError>;
+	readonly updateProperties: (
+		id: PrincipalId,
+		changes: PrincipalPropertyChanges,
+	) => Effect.Effect<PrincipalRow, DatabaseError>;
 }
 
 export class PrincipalService extends Context.Tag("PrincipalService")<

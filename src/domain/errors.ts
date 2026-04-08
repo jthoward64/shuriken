@@ -63,11 +63,7 @@ export const isPgUniqueViolation = (cause: unknown): boolean => {
 	) {
 		return true;
 	}
-	if (
-		typeof cause === "object" &&
-		cause !== null &&
-		"cause" in cause
-	) {
+	if (typeof cause === "object" && cause !== null && "cause" in cause) {
 		return isPgUniqueViolation((cause as { cause: unknown }).cause);
 	}
 	return false;
@@ -111,7 +107,12 @@ export type AclPrecondition =
 	| "DAV:recognized-principal"
 	| "DAV:allowed-principal"
 	| "DAV:grant-only"
-	| "DAV:no-invert";
+	| "DAV:no-invert"
+	| "DAV:no-ace-conflict"
+	| "DAV:no-protected-ace-conflict"
+	| "DAV:no-inherited-ace-conflict"
+	| "DAV:limited-number-of-aces"
+	| "DAV:deny-before-grant";
 
 /** RFC 4791 — CalDAV */
 export type CalDavPrecondition =

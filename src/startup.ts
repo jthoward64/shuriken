@@ -44,9 +44,7 @@ export const singleUserStartup: Effect.Effect<
 	const alreadyExists = yield* principalSvc.findByEmail(email).pipe(
 		Effect.as(true),
 		Effect.catchTag("DavError", (e) =>
-			e.status === HTTP_NOT_FOUND
-				? Effect.succeed(false)
-				: Effect.fail(e),
+			e.status === HTTP_NOT_FOUND ? Effect.succeed(false) : Effect.fail(e),
 		),
 	);
 

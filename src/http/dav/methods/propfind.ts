@@ -284,6 +284,13 @@ export const propfindHandler = (
 				[RESOURCETYPE]: { "{DAV:}principal": "" },
 				[DISPLAYNAME]: displayName,
 			};
+			// Dead properties
+			const dead = principalRow.principal.clientProperties as IrDeadProperties | null;
+			if (dead) {
+				for (const [clark, xmlValue] of Object.entries(dead)) {
+					allProps[clark as ClarkName] = xmlValue;
+				}
+			}
 			responses.push({
 				href: principalHref,
 				propstats: splitPropstats(allProps, propfind),

@@ -1,4 +1,5 @@
 import { Layer } from "effect";
+import { AclRepositoryLive } from "#src/services/acl/index.ts";
 import { UserRepositoryLive } from "./repository.live.ts";
 import { UserServiceLive } from "./service.live.ts";
 
@@ -20,4 +21,4 @@ export { UserService } from "./service.ts";
 
 export const UserDomainLayer = UserServiceLive.pipe(
 	Layer.provideMerge(UserRepositoryLive),
-);
+).pipe(Layer.provide(AclRepositoryLive));

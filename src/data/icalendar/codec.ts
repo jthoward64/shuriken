@@ -124,7 +124,9 @@ const decodeICalProperty = (line: ContentLine): IrProperty => {
 	const valueParamRaw = getValueParam(line.params);
 	const overrideKey = valueParamRaw?.toUpperCase();
 	const override =
-		overrideKey !== undefined ? ICAL_VALUE_OVERRIDES.get(overrideKey) : undefined;
+		overrideKey !== undefined
+			? ICAL_VALUE_OVERRIDES.get(overrideKey)
+			: undefined;
 	const defaultType = ICAL_DEFAULT_TYPES.get(line.name) as IrValueType;
 	const effectiveType: IcalValueOverride = override ?? defaultType;
 
@@ -312,7 +314,10 @@ const ICalDocumentCodec: Schema.Schema<IrDocument, IrComponent> =
 					),
 				);
 			}
-			return ParseResult.succeed({ kind: "icalendar" as const, root: component });
+			return ParseResult.succeed({
+				kind: "icalendar" as const,
+				root: component,
+			});
 		},
 		encode: (doc, _options, ast) => {
 			if (doc.kind !== "icalendar") {
@@ -361,7 +366,9 @@ export const decodeICalendar = (
  * Encode IrDocument → iCalendar text.
  * Encoding a structurally valid IrDocument cannot fail; panics on internal error.
  */
-export const encodeICalendar = (doc: IrDocument): Effect.Effect<string, never> =>
+export const encodeICalendar = (
+	doc: IrDocument,
+): Effect.Effect<string, never> =>
 	Schema.encode(ICalendarCodec)(doc).pipe(Effect.orDie);
 
 /**

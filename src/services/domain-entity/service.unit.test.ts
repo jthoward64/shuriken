@@ -4,7 +4,10 @@ import type { IrComponent, IrDocument } from "#src/data/ir.ts";
 import { ComponentId, EntityId } from "#src/domain/ids.ts";
 import type { ComponentRepositoryShape } from "#src/services/component/repository.ts";
 import { ComponentRepository } from "#src/services/component/repository.ts";
-import type { EntityRepositoryShape, EntityRow } from "#src/services/entity/repository.ts";
+import type {
+	EntityRepositoryShape,
+	EntityRow,
+} from "#src/services/entity/repository.ts";
 import { EntityRepository } from "#src/services/entity/repository.ts";
 import { runSuccess } from "#src/testing/effect.ts";
 import { DomainEntityServiceLive } from "./service.live.ts";
@@ -32,12 +35,16 @@ const makeTestEntityRepository = () => {
 		},
 		findById: (id) => {
 			const row = store.get(id);
-			if (!row) { return Effect.succeed(Option.none()); }
+			if (!row) {
+				return Effect.succeed(Option.none());
+			}
 			return Effect.succeed(Option.some(row));
 		},
 		updateLogicalUid: (id, uid) => {
 			const row = store.get(id);
-			if (row) { store.set(id, { ...row, logicalUid: uid }); }
+			if (row) {
+				store.set(id, { ...row, logicalUid: uid });
+			}
 			return Effect.void;
 		},
 		softDelete: (id) => {
@@ -59,7 +66,9 @@ const makeTestComponentRepository = () => {
 		},
 		loadTree: (entityId, _entityType) => {
 			const tree = store.get(entityId);
-			return Effect.succeed(tree !== undefined ? Option.some(tree) : Option.none());
+			return Effect.succeed(
+				tree !== undefined ? Option.some(tree) : Option.none(),
+			);
 		},
 		deleteByEntity: (entityId) => {
 			store.delete(entityId);
@@ -152,7 +161,10 @@ describe("DomainEntityService.create", () => {
 		const entityId = await runSuccess(
 			DomainEntityService.pipe(
 				Effect.flatMap((s) =>
-					s.create({ entityType: "icalendar", document: minimalIcalDocument() }),
+					s.create({
+						entityType: "icalendar",
+						document: minimalIcalDocument(),
+					}),
 				),
 				Effect.provide(layer),
 				Effect.orDie,
@@ -194,7 +206,10 @@ describe("DomainEntityService.create", () => {
 		const entityId = await runSuccess(
 			DomainEntityService.pipe(
 				Effect.flatMap((s) =>
-					s.create({ entityType: "vcard", document: minimalVcardDocument(uid) }),
+					s.create({
+						entityType: "vcard",
+						document: minimalVcardDocument(uid),
+					}),
 				),
 				Effect.provide(layer),
 				Effect.orDie,
@@ -212,7 +227,10 @@ describe("DomainEntityService.create", () => {
 		const entityId = await runSuccess(
 			DomainEntityService.pipe(
 				Effect.flatMap((s) =>
-					s.create({ entityType: "icalendar", document: minimalIcalDocument() }),
+					s.create({
+						entityType: "icalendar",
+						document: minimalIcalDocument(),
+					}),
 				),
 				Effect.provide(layer),
 				Effect.orDie,
@@ -237,7 +255,10 @@ describe("DomainEntityService.load", () => {
 		const result = await runSuccess(
 			Effect.gen(function* () {
 				const svc = yield* DomainEntityService;
-				const entityId = yield* svc.create({ entityType: "icalendar", document: doc });
+				const entityId = yield* svc.create({
+					entityType: "icalendar",
+					document: doc,
+				});
 				return yield* svc.load(entityId);
 			}).pipe(Effect.provide(layer), Effect.orDie),
 		);
@@ -309,7 +330,9 @@ describe("DomainEntityService.replace", () => {
 		);
 
 		const doc = Option.getOrThrow(loaded);
-		const uid = doc.root.components[0]?.properties.find((p) => p.name === "UID")?.value;
+		const uid = doc.root.components[0]?.properties.find(
+			(p) => p.name === "UID",
+		)?.value;
 		expect(uid).toEqual({ type: "TEXT", value: "uid-v2" });
 	});
 

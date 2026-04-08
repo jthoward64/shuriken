@@ -61,6 +61,7 @@ const STATUS_REASONS: Readonly<Record<number, string>> = {
 	413: "Request Entity Too Large",
 	415: "Unsupported Media Type",
 	423: "Locked",
+	424: "Failed Dependency",
 	500: "Internal Server Error",
 	501: "Not Implemented",
 };
@@ -113,8 +114,10 @@ export const buildMultistatus = (
 			// and recursively translate Clark keys inside property values too.
 			const xmlProps: Record<string, unknown> = {};
 			for (const [clark, value] of Object.entries(ps.props)) {
-				xmlProps[ns.toXmlKey(clark as ClarkName)] =
-					translateClarkKeysInValue(value, ns);
+				xmlProps[ns.toXmlKey(clark as ClarkName)] = translateClarkKeysInValue(
+					value,
+					ns,
+				);
 			}
 
 			return {

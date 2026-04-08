@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
 	check,
 	index,
+	jsonb,
 	pgTable,
 	text,
 	uniqueIndex,
@@ -19,6 +20,8 @@ export const principal = pgTable(
 		updatedAt: timestampTz("updated_at").default(sql`now()`).notNull(),
 		deletedAt: timestampTz("deleted_at"),
 		slug: text().default("").notNull(),
+		// RFC 4918 §4.1 dead properties — stored as Clark-notation keyed JSONB object.
+		clientProperties: jsonb("client_properties").default({}).notNull(),
 	},
 	(table) => [
 		index("idx_principal_deleted_at").using(

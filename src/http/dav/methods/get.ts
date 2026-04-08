@@ -26,8 +26,18 @@ import { InstanceService } from "#src/services/instance/index.ts";
 // RFC 1123 date formatter (required by Last-Modified header)
 const RFC1123_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 const RFC1123_MONTHS = [
-	"Jan", "Feb", "Mar", "Apr", "May", "Jun",
-	"Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+	"Jan",
+	"Feb",
+	"Mar",
+	"Apr",
+	"May",
+	"Jun",
+	"Jul",
+	"Aug",
+	"Sep",
+	"Oct",
+	"Nov",
+	"Dec",
 ] as const;
 
 const toRfc1123 = (instant: Temporal.Instant): string => {
@@ -82,7 +92,8 @@ export const getHandler = (
 		const instance = yield* instanceSvc.findById(path.instanceId);
 
 		// 5. Determine entity type from content type.
-		const baseContentType = instance.contentType.split(";")[0]?.trim().toLowerCase() ?? "";
+		const baseContentType =
+			instance.contentType.split(";")[0]?.trim().toLowerCase() ?? "";
 		const entityType: "icalendar" | "vcard" =
 			baseContentType === "text/vcard" ? "vcard" : "icalendar";
 

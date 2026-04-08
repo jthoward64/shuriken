@@ -47,7 +47,9 @@ const syncInitial = `<?xml version="1.0" encoding="utf-8"?>
   </D:prop>
 </D:sync-collection>`;
 
-const syncWithToken = (token: string): string => `<?xml version="1.0" encoding="utf-8"?>
+const syncWithToken = (
+	token: string,
+): string => `<?xml version="1.0" encoding="utf-8"?>
 <D:sync-collection xmlns:D="DAV:">
   <D:sync-token>${token}</D:sync-token>
   <D:sync-level>1</D:sync-level>
@@ -306,14 +308,10 @@ describe("sync-collection REPORT — error cases", () => {
 					"text/calendar; charset=utf-8",
 					{ as: "test", expect: { status: 201 } },
 				),
-				report(
-					"/dav/principals/test/cal/primary/event.ics",
-					syncInitial,
-					{
-						as: "test",
-						expect: { status: 405 },
-					},
-				),
+				report("/dav/principals/test/cal/primary/event.ics", syncInitial, {
+					as: "test",
+					expect: { status: 405 },
+				}),
 			],
 			singleUser(),
 		);

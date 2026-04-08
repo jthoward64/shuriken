@@ -44,10 +44,14 @@ export const DomainEntityServiceLive = Layer.effect(
 			load: (id) =>
 				Effect.gen(function* () {
 					const entity = yield* entityRepo.findById(id);
-					if (Option.isNone(entity)) { return Option.none<IrDocument>(); }
+					if (Option.isNone(entity)) {
+						return Option.none<IrDocument>();
+					}
 					const kind = entity.value.entityType as "icalendar" | "vcard";
 					const tree = yield* compRepo.loadTree(id, kind);
-					if (Option.isNone(tree)) { return Option.none<IrDocument>(); }
+					if (Option.isNone(tree)) {
+						return Option.none<IrDocument>();
+					}
 					return Option.some<IrDocument>({ kind, root: tree.value });
 				}),
 

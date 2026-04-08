@@ -92,16 +92,11 @@
 			"quoteStyle": "double",
 			"semicolons": "always"
 		},
-		"globals": [
-			"Bun"
-		]
+		"globals": ["Bun"]
 	},
 	"overrides": [
 		{
-			"includes": [
-				"**/*.test.ts",
-				"**/*.test.tsx"
-			],
+			"includes": ["**/*.test.ts", "**/*.test.tsx"],
 			"linter": {
 				"rules": {
 					"style": {

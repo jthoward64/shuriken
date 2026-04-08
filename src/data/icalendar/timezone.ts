@@ -27,7 +27,9 @@ const getTextProp = (
 	name: string,
 ): string | undefined => {
 	const prop = component.properties.find((p) => p.name === name);
-	if (prop === undefined || prop.value.type !== "TEXT") { return undefined; }
+	if (prop === undefined || prop.value.type !== "TEXT") {
+		return undefined;
+	}
 	return prop.value.value;
 };
 
@@ -36,7 +38,9 @@ const getLastModified = (
 	component: IrComponent,
 ): Option.Option<Temporal.Instant> => {
 	const prop = component.properties.find((p) => p.name === "LAST-MODIFIED");
-	if (prop === undefined || prop.value.type !== "DATE_TIME") { return Option.none(); }
+	if (prop === undefined || prop.value.type !== "DATE_TIME") {
+		return Option.none();
+	}
 	return Option.some(prop.value.value.toInstant());
 };
 
@@ -68,9 +72,13 @@ export const extractVtimezones = (
 	// Pair each VTIMEZONE with its TZID value; skip components missing TZID.
 	const candidates = doc.root.components.flatMap(
 		(component): Array<{ component: IrComponent; tzid: string }> => {
-			if (component.name !== "VTIMEZONE") { return []; }
+			if (component.name !== "VTIMEZONE") {
+				return [];
+			}
 			const tzid = getTextProp(component, "TZID");
-			if (tzid === undefined) { return []; }
+			if (tzid === undefined) {
+				return [];
+			}
 			return [{ component, tzid }];
 		},
 	);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
 import type { DavError } from "#src/domain/errors.ts";
-import { CollectionId, PrincipalId } from "#src/domain/ids.ts";
+import { CollectionId, InstanceId, PrincipalId } from "#src/domain/ids.ts";
 import { HTTP_FORBIDDEN } from "#src/http/status.ts";
 import { runFailure, runSuccess } from "#src/testing/effect.ts";
 import { makeTestEnv } from "#src/testing/env.ts";
@@ -301,5 +301,202 @@ describe("AclService.currentUserPrivileges", () => {
 		);
 		expect(Array.isArray(result)).toBe(true);
 		expect(result).toHaveLength(0);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// AclService.check — inheritance (Fix 12)
+// ---------------------------------------------------------------------------
+
+describe("AclService.check — inheritance", () => {
+	it("passes on an instance when the parent collection has the required privilege", async () => {
+		const principalId = PrincipalId(crypto.randomUUID());
+		const collectionId = CollectionId(crypto.randomUUID());
+		const instanceId = InstanceId(crypto.randomUUID());
+
+		const env = makeTestEnv();
+		env.withUser({ principalId });
+		env.withCollection({ id: collectionId, ownerPrincipalId: principalId });
+		env.withInstance({ id: instanceId, collectionId });
+		env.withAce({
+			resourceType: "collection",
+			resourceId: collectionId,
+			principalType: "principal",
+			principalId,
+			privilege: "DAV:read",
+			grantDeny: "grant",
+		});
+
+		await runSuccess(
+			AclService.pipe(
+				Effect.flatMap((s) =>
+					s.check(principalId, instanceId, "instance", "DAV:read"),
+				),
+				Effect.provide(env.toLayer()),
+				Effect.orDie,
+			),
+		);
+	});
+
+	it("passes on a collection when the owner principal has DAV:all", async () => {
+		const principalId = PrincipalId(crypto.randomUUID());
+		const collectionId = CollectionId(crypto.randomUUID());
+
+		const env = makeTestEnv();
+		env.withUser({ principalId });
+		env.withCollection({ id: collectionId, ownerPrincipalId: principalId });
+		// No direct ACE on the collection — only on the principal
+		env.withAce({
+			resourceType: "principal",
+			resourceId: principalId,
+			principalType: "principal",
+			principalId,
+			privilege: "DAV:all",
+			grantDeny: "grant",
+		});
+
+		await runSuccess(
+			AclService.pipe(
+				Effect.flatMap((s) =>
+					s.check(principalId, collectionId, "collection", "DAV:write-content"),
+				),
+				Effect.provide(env.toLayer()),
+				Effect.orDie,
+			),
+		);
+	});
+
+	it("fails with 403 when no ACE exists on the instance or any ancestor", async () => {
+		const principalId = PrincipalId(crypto.randomUUID());
+		const collectionId = CollectionId(crypto.randomUUID());
+		const instanceId = InstanceId(crypto.randomUUID());
+
+		const env = makeTestEnv();
+		env.withUser({ principalId });
+		env.withCollection({ id: collectionId, ownerPrincipalId: principalId });
+		env.withInstance({ id: instanceId, collectionId });
+		// No ACEs anywhere
+
+		const err = (await runFailure(
+			AclService.pipe(
+				Effect.flatMap((s) =>
+					s.check(principalId, instanceId, "instance", "DAV:read"),
+				),
+				Effect.provide(env.toLayer()),
+			),
+		)) as DavError;
+
+		expect(err._tag).toBe("DavError");
+		expect(err.status).toBe(HTTP_FORBIDDEN);
+	});
+
+	it("fails when the collection ACE covers a different privilege only", async () => {
+		const principalId = PrincipalId(crypto.randomUUID());
+		const collectionId = CollectionId(crypto.randomUUID());
+		const instanceId = InstanceId(crypto.randomUUID());
+
+		const env = makeTestEnv();
+		env.withUser({ principalId });
+		env.withCollection({ id: collectionId, ownerPrincipalId: principalId });
+		env.withInstance({ id: instanceId, collectionId });
+		// Collection only grants DAV:read-acl — not enough for DAV:write-content
+		env.withAce({
+			resourceType: "collection",
+			resourceId: collectionId,
+			principalType: "principal",
+			principalId,
+			privilege: "DAV:read-acl",
+			grantDeny: "grant",
+		});
+
+		const err = (await runFailure(
+			AclService.pipe(
+				Effect.flatMap((s) =>
+					s.check(principalId, instanceId, "instance", "DAV:write-content"),
+				),
+				Effect.provide(env.toLayer()),
+			),
+		)) as DavError;
+
+		expect(err.status).toBe(HTTP_FORBIDDEN);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// AclService.currentUserPrivileges — inheritance (Fix 12)
+// ---------------------------------------------------------------------------
+
+describe("AclService.currentUserPrivileges — inheritance", () => {
+	it("returns privileges from parent collection when instance has no direct ACEs", async () => {
+		const principalId = PrincipalId(crypto.randomUUID());
+		const collectionId = CollectionId(crypto.randomUUID());
+		const instanceId = InstanceId(crypto.randomUUID());
+
+		const env = makeTestEnv();
+		env.withUser({ principalId });
+		env.withCollection({ id: collectionId, ownerPrincipalId: principalId });
+		env.withInstance({ id: instanceId, collectionId });
+		env.withAce({
+			resourceType: "collection",
+			resourceId: collectionId,
+			principalType: "principal",
+			principalId,
+			privilege: "DAV:read",
+			grantDeny: "grant",
+		});
+
+		const result = await runSuccess(
+			AclService.pipe(
+				Effect.flatMap((s) =>
+					s.currentUserPrivileges(principalId, instanceId, "instance"),
+				),
+				Effect.provide(env.toLayer()),
+				Effect.orDie,
+			),
+		);
+
+		expect(result).toContain("DAV:read");
+	});
+
+	it("merges direct and inherited privileges", async () => {
+		const principalId = PrincipalId(crypto.randomUUID());
+		const collectionId = CollectionId(crypto.randomUUID());
+		const instanceId = InstanceId(crypto.randomUUID());
+
+		const env = makeTestEnv();
+		env.withUser({ principalId });
+		env.withCollection({ id: collectionId, ownerPrincipalId: principalId });
+		env.withInstance({ id: instanceId, collectionId });
+		// Direct ACE on instance: DAV:read
+		env.withAce({
+			resourceType: "instance",
+			resourceId: instanceId,
+			principalType: "principal",
+			principalId,
+			privilege: "DAV:read",
+			grantDeny: "grant",
+		});
+		// Inherited from collection: DAV:write-content
+		env.withAce({
+			resourceType: "collection",
+			resourceId: collectionId,
+			principalType: "principal",
+			principalId,
+			privilege: "DAV:write-content",
+			grantDeny: "grant",
+		});
+
+		const result = await runSuccess(
+			AclService.pipe(
+				Effect.flatMap((s) =>
+					s.currentUserPrivileges(principalId, instanceId, "instance"),
+				),
+				Effect.provide(env.toLayer()),
+				Effect.orDie,
+			),
+		);
+
+		expect(result).toContain("DAV:read");
+		expect(result).toContain("DAV:write-content");
 	});
 });

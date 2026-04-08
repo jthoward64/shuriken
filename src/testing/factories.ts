@@ -34,6 +34,7 @@ export const makePrincipalRow = (
 	updatedAt: now(),
 	deletedAt: null,
 	slug: "test-user",
+	clientProperties: {},
 	...overrides,
 });
 
@@ -126,6 +127,7 @@ export const makeGroupPrincipalRow = (
 	updatedAt: now(),
 	deletedAt: null,
 	slug: "test-group",
+	clientProperties: {},
 	...overrides,
 });
 

@@ -25,7 +25,9 @@ const insertEntity = (
 				.returning()
 				.then((r) => {
 					const row = r[0];
-					if (!row) { throw new Error("Entity insert returned no rows"); }
+					if (!row) {
+						throw new Error("Entity insert returned no rows");
+					}
 					return row;
 				}),
 		catch: (e) => new DatabaseError({ cause: e }),

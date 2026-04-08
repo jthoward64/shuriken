@@ -1,6 +1,7 @@
 import type { InferSelectModel } from "drizzle-orm";
 import type { Effect, Option } from "effect";
 import { Context } from "effect";
+import type { IrDeadProperties } from "#src/data/ir.ts";
 import type { davInstance } from "#src/db/drizzle/schema/index.ts";
 import type { DatabaseError } from "#src/domain/errors.ts";
 import type { CollectionId, EntityId, InstanceId } from "#src/domain/ids.ts";
@@ -55,6 +56,11 @@ export interface InstanceRepositoryShape {
 		id: InstanceId,
 		targetCollectionId: CollectionId,
 		targetSlug: Slug,
+	) => Effect.Effect<InstanceRow, DatabaseError>;
+	/** Update dead properties in place without touching entity content or ETag. */
+	readonly updateClientProperties: (
+		id: InstanceId,
+		clientProperties: IrDeadProperties,
 	) => Effect.Effect<InstanceRow, DatabaseError>;
 }
 

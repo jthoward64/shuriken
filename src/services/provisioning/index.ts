@@ -1,14 +1,15 @@
 import { Layer } from "effect";
-import { CollectionServiceLive } from "#src/services/collection/service.live.ts";
+import { AclRepositoryLive } from "#src/services/acl/index.ts";
 import { CollectionRepositoryLive } from "#src/services/collection/index.ts";
-import { UserServiceLive } from "#src/services/user/service.live.ts";
+import { CollectionServiceLive } from "#src/services/collection/service.live.ts";
 import { UserRepositoryLive } from "#src/services/user/index.ts";
+import { UserServiceLive } from "#src/services/user/service.live.ts";
 import { ProvisioningServiceLive } from "./service.live.ts";
 
 export { ProvisioningServiceLive } from "./service.live.ts";
 export type {
-	ProvisionUserInput,
 	ProvisionedUser,
+	ProvisionUserInput,
 } from "./service.ts";
 export { ProvisioningService } from "./service.ts";
 
@@ -19,9 +20,11 @@ export { ProvisioningService } from "./service.ts";
 
 const CollectionDep = CollectionServiceLive.pipe(
 	Layer.provideMerge(CollectionRepositoryLive),
-);
+).pipe(Layer.provide(AclRepositoryLive));
 
-const UserDep = UserServiceLive.pipe(Layer.provideMerge(UserRepositoryLive));
+const UserDep = UserServiceLive.pipe(
+	Layer.provideMerge(UserRepositoryLive),
+).pipe(Layer.provide(AclRepositoryLive));
 
 export const ProvisioningDomainLayer = ProvisioningServiceLive.pipe(
 	Layer.provide(Layer.mergeAll(CollectionDep, UserDep)),

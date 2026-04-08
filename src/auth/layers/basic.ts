@@ -49,72 +49,76 @@ export const BasicAuthLayer = Layer.effect(
 		const crypto = yield* CryptoService;
 
 		return AuthService.of({
-			authenticate: Effect.fn("auth.authenticate")(function* (headers, _clientIp) {
-				return yield* Option.match(parseBasicAuth(headers), {
-					onNone: () =>
-						Effect.logTrace("basic auth: no credentials").pipe(
-							Effect.andThen(Effect.succeed<AuthResult>(new Unauthenticated())),
-						),
-					onSome: (creds) =>
-						Effect.gen(function* () {
-							yield* Effect.logTrace("basic auth attempt", {
-								username: creds.username,
-							});
-
-							// Look up auth_user row for this username
-							const rows = yield* Effect.tryPromise({
-								try: () =>
-									db
-										.select({
-											authCredential: authUser.authCredential,
-											userId: user.id,
-											principalId: user.principalId,
-											name: user.name,
-										})
-										.from(authUser)
-										.innerJoin(user, eq(authUser.userId, user.id))
-										.where(
-											and(
-												eq(authUser.authSource, "local"),
-												eq(authUser.authId, creds.username),
-											),
-										)
-										.limit(1),
-								catch: (e) => new DatabaseError({ cause: e }),
-							});
-
-							const row = rows[0];
-							if (!row?.authCredential) {
-								yield* Effect.logDebug("basic auth: user not found", {
+			authenticate: Effect.fn("auth.authenticate")(
+				function* (headers, _clientIp) {
+					return yield* Option.match(parseBasicAuth(headers), {
+						onNone: () =>
+							Effect.logTrace("basic auth: no credentials").pipe(
+								Effect.andThen(
+									Effect.succeed<AuthResult>(new Unauthenticated()),
+								),
+							),
+						onSome: (creds) =>
+							Effect.gen(function* () {
+								yield* Effect.logTrace("basic auth attempt", {
 									username: creds.username,
 								});
-								return new Unauthenticated() as AuthResult;
-							}
 
-							// InternalError from Bun.password is a defect (unexpected), not a domain error
-							const valid = yield* crypto
-								.verifyPassword(creds.password, row.authCredential)
-								.pipe(Effect.orDie);
-							if (!valid) {
-								yield* Effect.logDebug("basic auth: invalid password", {
-									username: creds.username,
+								// Look up auth_user row for this username
+								const rows = yield* Effect.tryPromise({
+									try: () =>
+										db
+											.select({
+												authCredential: authUser.authCredential,
+												userId: user.id,
+												principalId: user.principalId,
+												name: user.name,
+											})
+											.from(authUser)
+											.innerJoin(user, eq(authUser.userId, user.id))
+											.where(
+												and(
+													eq(authUser.authSource, "local"),
+													eq(authUser.authId, creds.username),
+												),
+											)
+											.limit(1),
+									catch: (e) => new DatabaseError({ cause: e }),
 								});
-								return new Unauthenticated() as AuthResult;
-							}
 
-							yield* Effect.logTrace("basic auth: succeeded", {
-								userId: row.userId,
-							});
-							return new Authenticated({
-								principal: {
-									principalId: PrincipalId(row.principalId),
-									userId: UserId(row.userId),
-									displayName: row.name,
-								},
-							}) as AuthResult;
-						}),
-				});
-			}),
+								const row = rows[0];
+								if (!row?.authCredential) {
+									yield* Effect.logDebug("basic auth: user not found", {
+										username: creds.username,
+									});
+									return new Unauthenticated() as AuthResult;
+								}
+
+								// InternalError from Bun.password is a defect (unexpected), not a domain error
+								const valid = yield* crypto
+									.verifyPassword(creds.password, row.authCredential)
+									.pipe(Effect.orDie);
+								if (!valid) {
+									yield* Effect.logDebug("basic auth: invalid password", {
+										username: creds.username,
+									});
+									return new Unauthenticated() as AuthResult;
+								}
+
+								yield* Effect.logTrace("basic auth: succeeded", {
+									userId: row.userId,
+								});
+								return new Authenticated({
+									principal: {
+										principalId: PrincipalId(row.principalId),
+										userId: UserId(row.userId),
+										displayName: row.name,
+									},
+								}) as AuthResult;
+							}),
+					});
+				},
+			),
 		});
 	}),
 );

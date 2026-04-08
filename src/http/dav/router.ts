@@ -31,6 +31,7 @@ import { PrincipalRepository } from "#src/services/principal/index.ts";
 import type { PrincipalService } from "#src/services/principal/service.ts";
 import type { CalTimezoneRepository } from "#src/services/timezone/index.ts";
 import type { TombstoneRepository } from "#src/services/tombstone/index.ts";
+import { aclHandler } from "./methods/acl.ts";
 import { copyHandler } from "./methods/copy.ts";
 import { deleteHandler } from "./methods/delete.ts";
 import { getHandler } from "./methods/get.ts";
@@ -288,13 +289,15 @@ export const davRouter = (
 			case "MKCALENDAR":
 			case "MKADDRESSBOOK":
 				return yield* mkcolHandler(path, ctx, req);
+			case "ACL":
+				return yield* aclHandler(path, ctx, req);
 			default:
 				yield* Effect.logInfo("dav method not allowed", { method });
 				return new Response(null, {
 					status: HTTP_METHOD_NOT_ALLOWED,
 					headers: {
 						Allow:
-							"OPTIONS, GET, HEAD, PUT, DELETE, COPY, MOVE, PROPFIND, PROPPATCH, MKCOL, REPORT",
+							"OPTIONS, GET, HEAD, PUT, DELETE, COPY, MOVE, PROPFIND, PROPPATCH, MKCOL, REPORT, MKCALENDAR, MKADDRESSBOOK, ACL",
 					},
 				});
 		}

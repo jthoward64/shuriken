@@ -1,5 +1,6 @@
 import type { Effect } from "effect";
 import { Context } from "effect";
+import type { IrDeadProperties } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import type { CollectionId, InstanceId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
@@ -27,6 +28,10 @@ export interface InstanceServiceShape {
 	readonly delete: (
 		id: InstanceId,
 	) => Effect.Effect<void, DavError | DatabaseError>;
+	readonly updateClientProperties: (
+		id: InstanceId,
+		clientProperties: IrDeadProperties,
+	) => Effect.Effect<InstanceRow, DatabaseError>;
 }
 
 export class InstanceService extends Context.Tag("InstanceService")<

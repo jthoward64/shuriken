@@ -36,7 +36,11 @@ export const putHandler = (
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError,
-	InstanceService | EntityRepository | ComponentRepository | CalTimezoneRepository | AclService
+	| InstanceService
+	| EntityRepository
+	| ComponentRepository
+	| CalTimezoneRepository
+	| AclService
 > =>
 	Effect.gen(function* () {
 		// 1. Only new-instance and instance paths accept PUT.
@@ -89,7 +93,13 @@ export const putHandler = (
 			const vtimezones = yield* extractVtimezones(doc);
 			yield* Effect.forEach(
 				vtimezones,
-				(tz) => tzRepo.upsert(tz.tzid, tz.vtimezoneData, tz.ianaName, tz.lastModified),
+				(tz) =>
+					tzRepo.upsert(
+						tz.tzid,
+						tz.vtimezoneData,
+						tz.ianaName,
+						tz.lastModified,
+					),
 				{ discard: true },
 			);
 		}

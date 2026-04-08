@@ -1,6 +1,7 @@
 import type { InferSelectModel } from "drizzle-orm";
 import type { Effect, Option } from "effect";
 import { Context } from "effect";
+import type { IrDeadProperties } from "#src/data/ir.ts";
 import type { davCollection } from "#src/db/drizzle/schema/index.ts";
 import type { DatabaseError } from "#src/domain/errors.ts";
 import type { CollectionId, PrincipalId } from "#src/domain/ids.ts";
@@ -23,6 +24,14 @@ export interface NewCollection {
 	readonly parentCollectionId?: CollectionId;
 }
 
+export interface CollectionPropertyChanges {
+	readonly clientProperties: IrDeadProperties;
+	/** undefined = leave unchanged; null = clear the value */
+	readonly displayName?: string | null;
+	/** undefined = leave unchanged; null = clear the value */
+	readonly description?: string | null;
+}
+
 export interface CollectionRepositoryShape {
 	readonly findById: (
 		id: CollectionId,
@@ -38,13 +47,20 @@ export interface CollectionRepositoryShape {
 	readonly insert: (
 		input: NewCollection,
 	) => Effect.Effect<CollectionRow, DatabaseError>;
-	readonly softDelete: (id: CollectionId) => Effect.Effect<CollectionRow, DatabaseError>;
+	readonly softDelete: (
+		id: CollectionId,
+	) => Effect.Effect<CollectionRow, DatabaseError>;
 	/** Move a collection to a different owner principal and/or slug in-place.
 	 * All instances follow automatically via their collectionId FK. */
 	readonly relocate: (
 		id: CollectionId,
 		targetOwnerPrincipalId: PrincipalId,
 		targetSlug: Slug,
+	) => Effect.Effect<CollectionRow, DatabaseError>;
+	/** Update dead properties and/or modifiable live properties atomically. */
+	readonly updateProperties: (
+		id: CollectionId,
+		changes: CollectionPropertyChanges,
 	) => Effect.Effect<CollectionRow, DatabaseError>;
 }
 

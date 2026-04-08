@@ -1,13 +1,25 @@
 import { Effect } from "effect";
-import { type DatabaseError, type DavError, forbidden, methodNotAllowed, notFound } from "#src/domain/errors.ts";
+import {
+	type DatabaseError,
+	type DavError,
+	forbidden,
+	methodNotAllowed,
+	notFound,
+} from "#src/domain/errors.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { HTTP_NO_CONTENT } from "#src/http/status.ts";
 import { AclService } from "#src/services/acl/index.ts";
-import { type CollectionRepository, CollectionService } from "#src/services/collection/index.ts";
+import {
+	type CollectionRepository,
+	CollectionService,
+} from "#src/services/collection/index.ts";
 import type { ComponentRepository } from "#src/services/component/index.ts";
 import type { EntityRepository } from "#src/services/entity/index.ts";
-import { type InstanceRepository, InstanceService } from "#src/services/instance/index.ts";
+import {
+	type InstanceRepository,
+	InstanceService,
+} from "#src/services/instance/index.ts";
 import { deleteCollection, deleteInstance } from "./copy-move.ts";
 
 // ---------------------------------------------------------------------------

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import { Effect, Option } from "effect";
-import type { DatabaseError, DavError, InternalError } from "#src/domain/errors.ts";
+import type {
+	DatabaseError,
+	DavError,
+	InternalError,
+} from "#src/domain/errors.ts";
 import {
 	CollectionId,
 	EntityId,
@@ -336,7 +340,9 @@ describe("getHandler — method not allowed", () => {
 			principalId: TEST_PRINCIPAL_ID,
 			namespace: "cal",
 			collectionId: TEST_COLLECTION_ID,
-			slug: "event.ics" as ReturnType<typeof import("#src/domain/types/path.ts").Slug>,
+			slug: "event.ics" as ReturnType<
+				typeof import("#src/domain/types/path.ts").Slug
+			>,
 			principalSeg: String(TEST_PRINCIPAL_ID),
 			collectionSeg: String(TEST_COLLECTION_ID),
 		};

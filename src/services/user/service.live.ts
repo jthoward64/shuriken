@@ -4,11 +4,12 @@ import {
 	noneOrConflict,
 	someOrNotFound,
 } from "#src/domain/errors.ts";
-import type { UserId } from "#src/domain/ids.ts";
+import type { PrincipalId, UserId } from "#src/domain/ids.ts";
 import {
 	CryptoService,
 	type CryptoServiceShape,
 } from "#src/platform/crypto.ts";
+import { AclRepository } from "#src/services/acl/repository.ts";
 import { UserRepository } from "./repository.ts";
 import {
 	type NewCredential,
@@ -53,6 +54,7 @@ export const UserServiceLive = Layer.effect(
 	Effect.gen(function* () {
 		const repo = yield* UserRepository;
 		const crypto = yield* CryptoService;
+		const aclRepo = yield* AclRepository;
 
 		return UserService.of({
 			create: Effect.fn("UserService.create")(function* (input: NewUser) {
@@ -65,7 +67,18 @@ export const UserServiceLive = Layer.effect(
 				for (const cred of input.credentials ?? []) {
 					credentials.push(yield* hashCredential(crypto, cred));
 				}
-				return yield* repo.create({ ...input, credentials });
+				const result = yield* repo.create({ ...input, credentials });
+				yield* aclRepo.grantAce({
+					resourceType: "principal",
+					resourceId: result.principal.id,
+					principalType: "principal",
+					principalId: result.principal.id as PrincipalId,
+					privilege: "DAV:all",
+					grantDeny: "grant",
+					protected: true,
+					ordinal: 0,
+				});
+				return result;
 			}),
 
 			update: Effect.fn("UserService.update")(function* (

@@ -3,7 +3,11 @@ import { Context } from "effect";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import type { CollectionId, PrincipalId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
-import type { CollectionRow, NewCollection } from "./repository.ts";
+import type {
+	CollectionPropertyChanges,
+	CollectionRow,
+	NewCollection,
+} from "./repository.ts";
 
 // ---------------------------------------------------------------------------
 // CollectionService — business logic for DAV collection management
@@ -27,6 +31,10 @@ export interface CollectionServiceShape {
 	readonly delete: (
 		id: CollectionId,
 	) => Effect.Effect<CollectionRow, DavError | DatabaseError>;
+	readonly updateProperties: (
+		id: CollectionId,
+		changes: CollectionPropertyChanges,
+	) => Effect.Effect<CollectionRow, DatabaseError>;
 }
 
 export class CollectionService extends Context.Tag("CollectionService")<

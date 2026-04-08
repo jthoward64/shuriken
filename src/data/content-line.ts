@@ -35,7 +35,9 @@ export const ContentLineParamSchema = Schema.Struct({
 	// Single-value params have exactly one entry.
 	values: Schema.Array(Schema.String),
 });
-export type ContentLineParam = Schema.Schema.Type<typeof ContentLineParamSchema>;
+export type ContentLineParam = Schema.Schema.Type<
+	typeof ContentLineParamSchema
+>;
 
 export const ContentLineSchema = Schema.Struct({
 	// Upper-cased component or property name (e.g. "DTSTART", "BEGIN").
@@ -136,7 +138,9 @@ const foldLogicalLine = (line: string): string => {
 		while (chunkEnd < line.length) {
 			const cp = line.codePointAt(chunkEnd) ?? 0;
 			const byteLen = getUtf8ByteLen(cp);
-			if (chunkBytes + byteLen > maxBytes) { break; }
+			if (chunkBytes + byteLen > maxBytes) {
+				break;
+			}
 			chunkBytes += byteLen;
 			// Advance by 2 for surrogate pairs, 1 otherwise
 			chunkEnd += cp >= SurrogatePairMin ? Utf8Width2 : Utf8Width1;
@@ -144,7 +148,9 @@ const foldLogicalLine = (line: string): string => {
 
 		// Guard: if we couldn't advance even one code point (shouldn't happen in
 		// practice with valid UTF-8), force-advance to avoid an infinite loop.
-		if (chunkEnd === charOffset) { chunkEnd += 1; }
+		if (chunkEnd === charOffset) {
+			chunkEnd += 1;
+		}
 
 		parts.push(line.slice(charOffset, chunkEnd));
 		charOffset = chunkEnd;
@@ -204,7 +210,10 @@ const parseParam = (raw: string): ContentLineParam => {
 	}
 	const name = raw.slice(0, eqIdx).toUpperCase();
 	const rawValues = splitUnquoted(raw.slice(eqIdx + 1), ",");
-	return { name, values: rawValues.map((v) => decodeParamValue(stripQuotes(v))) };
+	return {
+		name,
+		values: rawValues.map((v) => decodeParamValue(stripQuotes(v))),
+	};
 };
 
 /**
@@ -237,7 +246,9 @@ const parseLogicalLine = (line: string): ContentLine => {
 	// Split name+params at unquoted `;`
 	const segments = splitUnquoted(nameAndParams, ";");
 	const name = (segments[0] ?? "").toUpperCase();
-	if (!name) { throw new Error(`Content line has empty name: "${line}"`); }
+	if (!name) {
+		throw new Error(`Content line has empty name: "${line}"`);
+	}
 
 	const params = segments.slice(1).map(parseParam);
 
@@ -255,26 +266,20 @@ const parseLogicalLine = (line: string): ContentLine => {
 export const ContentLinesCodec: Schema.Schema<
 	ReadonlyArray<ContentLine>,
 	string
-> = Schema.transformOrFail(
-	Schema.String,
-	Schema.Array(ContentLineSchema),
-	{
-		strict: true,
-		decode: (text, _options, ast) =>
-			Effect.try({
-				try: () => splitAndUnfold(text).map(parseLogicalLine),
-				catch: (e) =>
-					new ParseResult.Type(ast, text, String(e)),
-			}),
-		encode: (lines, _options, ast) =>
-			Effect.try({
-				try: () =>
-					lines
-						.map((l) => foldLogicalLine(serializeLogicalLine(l)))
-						.join("\r\n")
-						.concat("\r\n"),
-				catch: (e) =>
-					new ParseResult.Type(ast, lines, String(e)),
-			}),
-	},
-);
+> = Schema.transformOrFail(Schema.String, Schema.Array(ContentLineSchema), {
+	strict: true,
+	decode: (text, _options, ast) =>
+		Effect.try({
+			try: () => splitAndUnfold(text).map(parseLogicalLine),
+			catch: (e) => new ParseResult.Type(ast, text, String(e)),
+		}),
+	encode: (lines, _options, ast) =>
+		Effect.try({
+			try: () =>
+				lines
+					.map((l) => foldLogicalLine(serializeLogicalLine(l)))
+					.join("\r\n")
+					.concat("\r\n"),
+			catch: (e) => new ParseResult.Type(ast, lines, String(e)),
+		}),
+});

@@ -1,6 +1,7 @@
 import type { InferSelectModel } from "drizzle-orm";
 import type { Effect, Option } from "effect";
 import { Context } from "effect";
+import type { IrDeadProperties } from "#src/data/ir.ts";
 import type { principal, user } from "#src/db/drizzle/schema/index.ts";
 import type { DatabaseError } from "#src/domain/errors.ts";
 import type { PrincipalId, UserId } from "#src/domain/ids.ts";
@@ -19,6 +20,12 @@ export interface PrincipalWithUser {
 	readonly user: UserRow;
 }
 
+export interface PrincipalPropertyChanges {
+	readonly clientProperties: IrDeadProperties;
+	/** undefined = leave unchanged; null = clear the value */
+	readonly displayName?: string | null;
+}
+
 export interface PrincipalRepositoryShape {
 	readonly findById: (
 		id: PrincipalId,
@@ -32,6 +39,11 @@ export interface PrincipalRepositoryShape {
 	readonly findUserByUserId: (
 		id: UserId,
 	) => Effect.Effect<Option.Option<UserRow>, DatabaseError>;
+	/** Update dead properties and/or displayName on the principal row. */
+	readonly updateProperties: (
+		id: PrincipalId,
+		changes: PrincipalPropertyChanges,
+	) => Effect.Effect<PrincipalRow, DatabaseError>;
 }
 
 export class PrincipalRepository extends Context.Tag("PrincipalRepository")<

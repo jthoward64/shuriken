@@ -1,8 +1,10 @@
 import { and, eq, inArray, or, type SQL, sql } from "drizzle-orm";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Option } from "effect";
 import { DatabaseClient, type DbClient } from "#src/db/client.ts";
 import {
 	davAcl,
+	davCollection,
+	davInstance,
 	group,
 	membership,
 	user,
@@ -223,6 +225,79 @@ const getGrantedPrivileges = Effect.fn("AclRepository.getGrantedPrivileges")(
 	),
 );
 
+const getResourceParent = Effect.fn("AclRepository.getResourceParent")(
+	function* (
+		db: DbClient,
+		resourceId: UuidString,
+		resourceType: AclResourceType,
+	) {
+		yield* Effect.logTrace("repo.acl.getResourceParent", {
+			resourceId,
+			resourceType,
+		});
+		if (resourceType === "principal") {
+			return Option.none<{
+				readonly id: UuidString;
+				readonly type: AclResourceType;
+			}>();
+		}
+		if (resourceType === "instance") {
+			return yield* Effect.tryPromise({
+				try: () =>
+					db
+						.select({ collectionId: davInstance.collectionId })
+						.from(davInstance)
+						.where(eq(davInstance.id, resourceId))
+						.limit(1)
+						.then((rows) =>
+							rows[0]
+								? Option.some({
+										id: rows[0].collectionId as UuidString,
+										type: "collection" as const,
+									})
+								: Option.none(),
+						),
+				catch: (e) => new DatabaseError({ cause: e }),
+			});
+		}
+		// collection
+		return yield* Effect.tryPromise({
+			try: () =>
+				db
+					.select({
+						parentCollectionId: davCollection.parentCollectionId,
+						ownerPrincipalId: davCollection.ownerPrincipalId,
+					})
+					.from(davCollection)
+					.where(eq(davCollection.id, resourceId))
+					.limit(1)
+					.then((rows) => {
+						const row = rows[0];
+						if (!row) {
+							return Option.none<{
+								readonly id: UuidString;
+								readonly type: AclResourceType;
+							}>();
+						}
+						if (row.parentCollectionId) {
+							return Option.some({
+								id: row.parentCollectionId as UuidString,
+								type: "collection" as const,
+							});
+						}
+						return Option.some({
+							id: row.ownerPrincipalId as UuidString,
+							type: "principal" as const,
+						});
+					}),
+			catch: (e) => new DatabaseError({ cause: e }),
+		});
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.acl.getResourceParent failed", e.cause),
+	),
+);
+
 const getGroupPrincipalIds = Effect.fn("AclRepository.getGroupPrincipalIds")(
 	function* (db: DbClient, userPrincipalId: PrincipalId) {
 		yield* Effect.logTrace("repo.acl.getGroupPrincipalIds", {
@@ -284,6 +359,8 @@ export const AclRepositoryLive = Layer.effect(
 				),
 			getGroupPrincipalIds: (userPrincipalId) =>
 				getGroupPrincipalIds(db, userPrincipalId),
+			getResourceParent: (resourceId, resourceType) =>
+				getResourceParent(db, resourceId, resourceType),
 		}),
 	),
 );

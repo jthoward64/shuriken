@@ -56,7 +56,9 @@ const insertEntity = (
 					.values({ entityType })
 					.returning();
 				const row = rows[0];
-				if (!row) { throw new Error("dav_entity insert returned no rows"); }
+				if (!row) {
+					throw new Error("dav_entity insert returned no rows");
+				}
 				return EntityId(row.id);
 			}),
 		),
@@ -140,10 +142,7 @@ describe("InstanceRepository.findBySlug (integration)", () => {
 		const result = await runSuccess(
 			InstanceRepository.pipe(
 				Effect.flatMap((r) =>
-					r.findBySlug(
-						CollectionId(crypto.randomUUID()),
-						Slug("no-such.ics"),
-					),
+					r.findBySlug(CollectionId(crypto.randomUUID()), Slug("no-such.ics")),
 				),
 				Effect.provide(layer),
 				Effect.orDie,

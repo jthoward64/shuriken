@@ -121,7 +121,10 @@ describe("normalizeClarkNames", () => {
 		// child overrides D to caldav, so its name resolves with the caldav NS
 		expect("{urn:ietf:params:xml:ns:caldav}child" in root).toBe(true);
 		// grandchild also inherits the caldav D prefix
-		const child = root["{urn:ietf:params:xml:ns:caldav}child"] as Record<string, unknown>;
+		const child = root["{urn:ietf:params:xml:ns:caldav}child"] as Record<
+			string,
+			unknown
+		>;
 		expect("{urn:ietf:params:xml:ns:caldav}grandchild" in child).toBe(true);
 	});
 });

@@ -142,7 +142,9 @@ export const copy = (
 		as: options?.as,
 		headers: {
 			Destination: destUri,
-			...(options?.overwrite !== undefined ? { Overwrite: options.overwrite } : {}),
+			...(options?.overwrite !== undefined
+				? { Overwrite: options.overwrite }
+				: {}),
 			...(options?.depth !== undefined ? { Depth: options.depth } : {}),
 			...options?.headers,
 		},
@@ -171,7 +173,9 @@ export const move = (
 		as: options?.as,
 		headers: {
 			Destination: destUri,
-			...(options?.overwrite !== undefined ? { Overwrite: options.overwrite } : {}),
+			...(options?.overwrite !== undefined
+				? { Overwrite: options.overwrite }
+				: {}),
 			...options?.headers,
 		},
 		expect: options?.expect ?? { status: 201 },

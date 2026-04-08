@@ -17,6 +17,7 @@ import { AclServiceLive } from "#src/services/acl/service.live.ts";
 import type { AclService } from "#src/services/acl/service.ts";
 import {
 	CollectionRepository,
+	type CollectionPropertyChanges,
 	type CollectionRepositoryShape,
 	type CollectionRow,
 	type NewCollection,
@@ -47,6 +48,7 @@ import { InstanceServiceLive } from "#src/services/instance/service.live.ts";
 import type { InstanceService } from "#src/services/instance/service.ts";
 import {
 	PrincipalRepository,
+	type PrincipalPropertyChanges,
 	type PrincipalRepositoryShape,
 	type PrincipalRow,
 	type UserRow,
@@ -390,6 +392,24 @@ const makePrincipalRepo = (stores: TestStores): PrincipalRepositoryShape => ({
 
 	findUserByUserId: (id) =>
 		Effect.succeed(Option.fromNullable(stores.users.get(id) ?? null)),
+
+	updateProperties: (id, changes: PrincipalPropertyChanges) =>
+		Effect.sync(() => {
+			const row = stores.principals.get(id);
+			if (!row || row.deletedAt !== null) {
+				throw new Error(`Principal not found for property update: ${id}`);
+			}
+			const updated: PrincipalRow = {
+				...row,
+				clientProperties: changes.clientProperties,
+				...(changes.displayName !== undefined
+					? { displayName: changes.displayName }
+					: {}),
+				updatedAt: Temporal.Now.instant(),
+			};
+			stores.principals.set(id, updated);
+			return updated;
+		}),
 });
 
 const makeCollectionRepo = (stores: TestStores): CollectionRepositoryShape => ({
@@ -471,6 +491,27 @@ const makeCollectionRepo = (stores: TestStores): CollectionRepositoryShape => ({
 				...row,
 				ownerPrincipalId: targetOwnerPrincipalId,
 				slug: targetSlug,
+				updatedAt: Temporal.Now.instant(),
+			};
+			stores.collections.set(id, updated);
+			return updated;
+		}),
+
+	updateProperties: (id, changes: CollectionPropertyChanges) =>
+		Effect.sync(() => {
+			const row = stores.collections.get(id);
+			if (!row || row.deletedAt !== null) {
+				throw new Error(`Collection not found for property update: ${id}`);
+			}
+			const updated: CollectionRow = {
+				...row,
+				clientProperties: changes.clientProperties,
+				...(changes.displayName !== undefined
+					? { displayName: changes.displayName }
+					: {}),
+				...(changes.description !== undefined
+					? { description: changes.description }
+					: {}),
 				updatedAt: Temporal.Now.instant(),
 			};
 			stores.collections.set(id, updated);
@@ -584,6 +625,21 @@ const makeInstanceRepo = (stores: TestStores): InstanceRepositoryShape => ({
 				...row,
 				collectionId: targetCollectionId,
 				slug: targetSlug,
+				updatedAt: Temporal.Now.instant(),
+			};
+			stores.instances.set(id, updated);
+			return updated;
+		}),
+
+	updateClientProperties: (id, clientProperties) =>
+		Effect.sync(() => {
+			const row = stores.instances.get(id);
+			if (!row || row.deletedAt !== null) {
+				throw new Error(`Instance not found for property update: ${id}`);
+			}
+			const updated: InstanceRow = {
+				...row,
+				clientProperties,
 				updatedAt: Temporal.Now.instant(),
 			};
 			stores.instances.set(id, updated);
@@ -721,6 +777,47 @@ const makeAclRepo = (stores: TestStores): AclRepositoryShape => ({
 					];
 				});
 		}),
+
+	getResourceParent: (resourceId, resourceType) =>
+		Effect.sync(() => {
+			if (resourceType === "instance") {
+				const inst = stores.instances.get(resourceId);
+				if (!inst) {
+					return Option.none<{
+						readonly id: UuidString;
+						readonly type: AclResourceType;
+					}>();
+				}
+				return Option.some({
+					id: inst.collectionId as UuidString,
+					type: "collection" as const,
+				});
+			}
+			if (resourceType === "collection") {
+				const col = stores.collections.get(resourceId);
+				if (!col) {
+					return Option.none<{
+						readonly id: UuidString;
+						readonly type: AclResourceType;
+					}>();
+				}
+				if (col.parentCollectionId) {
+					return Option.some({
+						id: col.parentCollectionId as UuidString,
+						type: "collection" as const,
+					});
+				}
+				return Option.some({
+					id: col.ownerPrincipalId as UuidString,
+					type: "principal" as const,
+				});
+			}
+			// principal — top of the hierarchy
+			return Option.none<{
+				readonly id: UuidString;
+				readonly type: AclResourceType;
+			}>();
+		}),
 });
 
 const makeEntityRepo = (stores: TestStores): EntityRepositoryShape => ({
@@ -828,6 +925,7 @@ const makeGroupRepo = (stores: TestStores): GroupRepositoryShape => ({
 				updatedAt: now,
 				deletedAt: null,
 				slug: input.slug,
+				clientProperties: {},
 			};
 			const groupRow: GroupRow = {
 				id: groupId,
@@ -915,6 +1013,8 @@ export interface TestEnvBuilder {
 		| InstanceService
 		| PrincipalService
 		| AclService
+		| AclRepository
+		| PrincipalRepository
 		| CryptoService
 		| EntityRepository
 		| ComponentRepository
@@ -957,6 +1057,7 @@ export const makeTestEnv = (): TestEnvBuilder => {
 				updatedAt: now,
 				deletedAt: null,
 				slug: (seed.slug ?? `test-user-${i}`) as Slug,
+				clientProperties: {},
 			});
 			stores.users.set(userId, {
 				id: userId,
@@ -1006,6 +1107,7 @@ export const makeTestEnv = (): TestEnvBuilder => {
 				updatedAt: now,
 				deletedAt: null,
 				slug: (seed.slug ?? "test-group") as Slug,
+				clientProperties: {},
 			});
 			stores.groups.set(groupId, {
 				id: groupId,
@@ -1103,13 +1205,15 @@ export const makeTestEnv = (): TestEnvBuilder => {
 			);
 
 			const userServiceLayer = UserServiceLive.pipe(
-				Layer.provide(Layer.mergeAll(userRepoLayer, TestCryptoLayer)),
+				Layer.provide(
+					Layer.mergeAll(userRepoLayer, TestCryptoLayer, aclRepoLayer),
+				),
 			);
 			const principalServiceLayer = PrincipalServiceLive.pipe(
 				Layer.provide(principalRepoLayer),
 			);
 			const collectionServiceLayer = CollectionServiceLive.pipe(
-				Layer.provide(collectionRepoLayer),
+				Layer.provide(Layer.mergeAll(collectionRepoLayer, aclRepoLayer)),
 			);
 			const instanceServiceLayer = InstanceServiceLive.pipe(
 				Layer.provide(instanceRepoLayer),
@@ -1127,6 +1231,8 @@ export const makeTestEnv = (): TestEnvBuilder => {
 				instanceServiceLayer,
 				groupServiceLayer,
 				aclServiceLayer,
+				aclRepoLayer,
+				principalRepoLayer,
 				entityRepoLayer,
 				componentRepoLayer,
 				calTimezoneRepoLayer,

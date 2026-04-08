@@ -10,12 +10,28 @@ import {
 import { InstanceId, type PrincipalId } from "#src/domain/ids.ts";
 import { Slug, type ResolvedDavPath } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
-import { HTTP_BAD_GATEWAY, HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_NO_CONTENT } from "#src/http/status.ts";
+import {
+	HTTP_BAD_GATEWAY,
+	HTTP_BAD_REQUEST,
+	HTTP_CREATED,
+	HTTP_NO_CONTENT,
+} from "#src/http/status.ts";
 import { AclService } from "#src/services/acl/index.ts";
-import { CollectionRepository, CollectionService } from "#src/services/collection/index.ts";
-import { InstanceRepository, InstanceService } from "#src/services/instance/index.ts";
+import {
+	CollectionRepository,
+	CollectionService,
+} from "#src/services/collection/index.ts";
+import {
+	InstanceRepository,
+	InstanceService,
+} from "#src/services/instance/index.ts";
 import { parseDavPath } from "../router.ts";
-import { deleteCollection, deleteInstance, parseDestination, parseOverwrite } from "./copy-move.ts";
+import {
+	deleteCollection,
+	deleteInstance,
+	parseDestination,
+	parseOverwrite,
+} from "./copy-move.ts";
 
 // ---------------------------------------------------------------------------
 // MOVE handler — RFC 4918 §9.9
@@ -47,9 +63,20 @@ export const moveHandler = (
 		const overwrite = parseOverwrite(req);
 
 		if (path.kind === "instance") {
-			return yield* moveInstance(path, principal.principalId, destUrl, overwrite);
+			return yield* moveInstance(
+				path,
+				principal.principalId,
+				destUrl,
+				overwrite,
+			);
 		}
-		return yield* moveCollection(path, principal.principalId, destUrl, overwrite, req);
+		return yield* moveCollection(
+			path,
+			principal.principalId,
+			destUrl,
+			overwrite,
+			req,
+		);
 	});
 
 // ---------------------------------------------------------------------------
@@ -66,7 +93,10 @@ const moveInstance = (
 		const destPath = yield* parseDavPath(destUrl);
 
 		// RFC 4918 §9.9: source and destination must differ.
-		if (destPath.kind === "instance" && destPath.instanceId === path.instanceId) {
+		if (
+			destPath.kind === "instance" &&
+			destPath.instanceId === path.instanceId
+		) {
 			return yield* forbidden();
 		}
 
@@ -78,8 +108,18 @@ const moveInstance = (
 		const acl = yield* AclService;
 
 		// ACL: unbind from source collection, bind to destination collection.
-		yield* acl.check(principalId, path.collectionId, "collection", "DAV:unbind");
-		yield* acl.check(principalId, destPath.collectionId, "collection", "DAV:bind");
+		yield* acl.check(
+			principalId,
+			path.collectionId,
+			"collection",
+			"DAV:unbind",
+		);
+		yield* acl.check(
+			principalId,
+			destPath.collectionId,
+			"collection",
+			"DAV:bind",
+		);
 
 		let destExisted = false;
 		let destSlug: Slug;
@@ -103,9 +143,15 @@ const moveInstance = (
 		// Preserves entity identity, ETag, lastModified, and clientProperties.
 		// RFC §9.9.1: DAV:creationdate SHOULD remain the same.
 		const instanceRepo = yield* InstanceRepository;
-		yield* instanceRepo.relocate(InstanceId(path.instanceId), destPath.collectionId, destSlug);
+		yield* instanceRepo.relocate(
+			InstanceId(path.instanceId),
+			destPath.collectionId,
+			destSlug,
+		);
 
-		return new Response(null, { status: destExisted ? HTTP_NO_CONTENT : HTTP_CREATED });
+		return new Response(null, {
+			status: destExisted ? HTTP_NO_CONTENT : HTTP_CREATED,
+		});
 	});
 
 // ---------------------------------------------------------------------------
@@ -123,7 +169,10 @@ const moveCollection = (
 		// RFC 4918 §9.9: collection MOVE MUST act as Depth:infinity.
 		// Reject any explicit Depth value other than "infinity".
 		const depthHeader = req.headers.get("Depth");
-		if (depthHeader !== null && depthHeader.trim().toLowerCase() !== "infinity") {
+		if (
+			depthHeader !== null &&
+			depthHeader.trim().toLowerCase() !== "infinity"
+		) {
 			return yield* Effect.fail(
 				davError(
 					HTTP_BAD_REQUEST,
@@ -136,7 +185,10 @@ const moveCollection = (
 		const destPath = yield* parseDavPath(destUrl);
 
 		// RFC 4918 §9.9: source and destination must differ.
-		if (destPath.kind === "collection" && destPath.collectionId === path.collectionId) {
+		if (
+			destPath.kind === "collection" &&
+			destPath.collectionId === path.collectionId
+		) {
 			return yield* forbidden();
 		}
 
@@ -149,7 +201,12 @@ const moveCollection = (
 
 		// ACL: unbind from source principal, bind to destination principal.
 		yield* acl.check(principalId, path.principalId, "principal", "DAV:unbind");
-		yield* acl.check(principalId, destPath.principalId, "principal", "DAV:bind");
+		yield* acl.check(
+			principalId,
+			destPath.principalId,
+			"principal",
+			"DAV:bind",
+		);
 
 		// Verify source exists (returns 404 via service if not found).
 		const collectionSvc = yield* CollectionService;
@@ -174,7 +231,13 @@ const moveCollection = (
 		// Move collection in-place: update ownerPrincipalId + slug.
 		// All instances follow automatically via their collectionId FK.
 		const collectionRepo = yield* CollectionRepository;
-		yield* collectionRepo.relocate(path.collectionId, destPath.principalId, destSlug);
+		yield* collectionRepo.relocate(
+			path.collectionId,
+			destPath.principalId,
+			destSlug,
+		);
 
-		return new Response(null, { status: destExisted ? HTTP_NO_CONTENT : HTTP_CREATED });
+		return new Response(null, {
+			status: destExisted ? HTTP_NO_CONTENT : HTTP_CREATED,
+		});
 	});

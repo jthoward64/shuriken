@@ -54,79 +54,86 @@ const likePattern = (foldedText: string, matchType: CardMatchType): string => {
 	}
 };
 
-const findByText = Effect.fn("CardIndexRepository.findByText")(function* (
-	db: DbClient,
-	collectionId: CollectionId,
-	text: string,
-	field: CardIndexField,
-	collation: CardCollation,
-	matchType: CardMatchType,
-) {
-	yield* Effect.logTrace("repo.card-index.findByText", {
-		collectionId,
-		field,
-		matchType,
-	});
+const findByText = Effect.fn("CardIndexRepository.findByText")(
+	function* (
+		db: DbClient,
+		collectionId: CollectionId,
+		text: string,
+		field: CardIndexField,
+		collation: CardCollation,
+		matchType: CardMatchType,
+	) {
+		yield* Effect.logTrace("repo.card-index.findByText", {
+			collectionId,
+			field,
+			matchType,
+		});
 
-	const folded = foldText(text, collation);
-	const pattern = likePattern(folded, matchType);
-	const useUnicode = collation === "i;unicode-casemap";
+		const folded = foldText(text, collation);
+		const pattern = likePattern(folded, matchType);
+		const useUnicode = collation === "i;unicode-casemap";
 
-	return yield* Effect.tryPromise({
-		try: () => {
-			// Build the WHERE predicate against the appropriate fold column.
-			let fieldCondition: ReturnType<typeof sql>;
+		return yield* Effect.tryPromise({
+			try: () => {
+				// Build the WHERE predicate against the appropriate fold column.
+				let fieldCondition: ReturnType<typeof sql>;
 
-			if (field === "fn") {
-				const col = useUnicode ? cardIndex.fnUnicodeFold : cardIndex.fnAsciiFold;
-				if (matchType === "equals") {
-					fieldCondition = sql`${col} = ${folded}`;
+				if (field === "fn") {
+					const col = useUnicode
+						? cardIndex.fnUnicodeFold
+						: cardIndex.fnAsciiFold;
+					if (matchType === "equals") {
+						fieldCondition = sql`${col} = ${folded}`;
+					} else {
+						fieldCondition = sql`${col} LIKE ${pattern} ESCAPE '\\'`;
+					}
+				} else if (field === "uid") {
+					// uid column has no fold version; compare case-insensitively
+					if (matchType === "equals") {
+						fieldCondition = sql`lower(${cardIndex.uid}) = ${folded}`;
+					} else {
+						fieldCondition = sql`lower(${cardIndex.uid}) LIKE ${pattern} ESCAPE '\\'`;
+					}
 				} else {
-					fieldCondition = sql`${col} LIKE ${pattern} ESCAPE '\\'`;
-				}
-			} else if (field === "uid") {
-				// uid column has no fold version; compare case-insensitively
-				if (matchType === "equals") {
-					fieldCondition = sql`lower(${cardIndex.uid}) = ${folded}`;
-				} else {
-					fieldCondition = sql`lower(${cardIndex.uid}) LIKE ${pattern} ESCAPE '\\'`;
-				}
-			} else {
-				// email / tel: stored as JSON arrays in data_ascii_fold / data_unicode_fold
-				const dataCol = useUnicode
-					? cardIndex.dataUnicodeFold
-					: cardIndex.dataAsciiFold;
-				const jsonKey = field === "email" ? "emails" : "phones";
+					// email / tel: stored as JSON arrays in data_ascii_fold / data_unicode_fold
+					const dataCol = useUnicode
+						? cardIndex.dataUnicodeFold
+						: cardIndex.dataAsciiFold;
+					const jsonKey = field === "email" ? "emails" : "phones";
 
-				if (matchType === "equals") {
-					// Array containment check: the folded array contains the folded text
-					fieldCondition = sql`${dataCol}->${jsonKey} @> to_jsonb(${folded}::text)`;
-				} else {
-					// For partial matches, check if any array element matches the pattern
-					fieldCondition = sql`EXISTS (
+					if (matchType === "equals") {
+						// Array containment check: the folded array contains the folded text
+						fieldCondition = sql`${dataCol}->${jsonKey} @> to_jsonb(${folded}::text)`;
+					} else {
+						// For partial matches, check if any array element matches the pattern
+						fieldCondition = sql`EXISTS (
 						SELECT 1 FROM jsonb_array_elements_text(${dataCol}->${jsonKey}) _e
 						WHERE _e LIKE ${pattern} ESCAPE '\\'
 					)`;
+					}
 				}
-			}
 
-			return db
-				.selectDistinct({ instanceId: davInstance.id })
-				.from(cardIndex)
-				.innerJoin(
-					davInstance,
-					and(
-						eq(cardIndex.entityId, davInstance.entityId),
-						eq(davInstance.collectionId, collectionId),
-						isNull(davInstance.deletedAt),
-					),
-				)
-				.where(and(isNull(cardIndex.deletedAt), fieldCondition))
-				.then((rows) => rows.map((r) => r.instanceId));
-		},
-		catch: (e) => new DatabaseError({ cause: e }),
-	});
-}, Effect.tapError((e) => Effect.logWarning("repo.card-index.findByText failed", e.cause)));
+				return db
+					.selectDistinct({ instanceId: davInstance.id })
+					.from(cardIndex)
+					.innerJoin(
+						davInstance,
+						and(
+							eq(cardIndex.entityId, davInstance.entityId),
+							eq(davInstance.collectionId, collectionId),
+							isNull(davInstance.deletedAt),
+						),
+					)
+					.where(and(isNull(cardIndex.deletedAt), fieldCondition))
+					.then((rows) => rows.map((r) => r.instanceId));
+			},
+			catch: (e) => new DatabaseError({ cause: e }),
+		});
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.card-index.findByText failed", e.cause),
+	),
+);
 
 export const CardIndexRepositoryLive = Layer.effect(
 	CardIndexRepository,

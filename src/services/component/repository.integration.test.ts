@@ -223,9 +223,9 @@ describe("ComponentRepository value type round-trips (integration)", () => {
 	});
 
 	it("round-trips DATE_TIME (ZonedDateTime UTC) value", async () => {
-		const zdt = Temporal.Instant.from("2026-04-04T14:00:00Z").toZonedDateTimeISO(
-			"UTC",
-		);
+		const zdt = Temporal.Instant.from(
+			"2026-04-04T14:00:00Z",
+		).toZonedDateTimeISO("UTC");
 		const result = await runSuccess(
 			Effect.gen(function* () {
 				const entity = yield* makeEntity();
@@ -251,9 +251,7 @@ describe("ComponentRepository value type round-trips (integration)", () => {
 		const v = root.properties[0]?.value;
 		expect(v?.type).toBe("DATE_TIME");
 		if (v?.type === "DATE_TIME") {
-			expect(
-				Temporal.ZonedDateTime.compare(v.value, zdt),
-			).toBe(0);
+			expect(Temporal.ZonedDateTime.compare(v.value, zdt)).toBe(0);
 		}
 	});
 

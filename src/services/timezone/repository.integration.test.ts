@@ -16,7 +16,9 @@ import { CalTimezoneRepository } from "./repository.ts";
 type TestLayer = Layer.Layer<CalTimezoneRepository, Error>;
 
 function makeTestLayer(): TestLayer {
-	return CalTimezoneRepositoryLive.pipe(Layer.provide(makePgliteDatabaseLayer()));
+	return CalTimezoneRepositoryLive.pipe(
+		Layer.provide(makePgliteDatabaseLayer()),
+	);
 }
 
 const TZID = "America/New_York";
@@ -79,7 +81,9 @@ describe("CalTimezoneRepository.upsert — insert (integration)", () => {
 
 	it("inserts a new row and returns it with the correct fields", async () => {
 		const ianaName = Option.some("America/New_York");
-		const lastModified = Option.some(Temporal.Instant.from("2020-01-01T00:00:00Z"));
+		const lastModified = Option.some(
+			Temporal.Instant.from("2020-01-01T00:00:00Z"),
+		);
 
 		const row = await runSuccess(
 			CalTimezoneRepository.pipe(
@@ -101,7 +105,12 @@ describe("CalTimezoneRepository.upsert — insert (integration)", () => {
 		const row = await runSuccess(
 			CalTimezoneRepository.pipe(
 				Effect.flatMap((r) =>
-					r.upsert("Pacific/Auckland", VTIMEZONE_DATA, Option.none(), Option.none()),
+					r.upsert(
+						"Pacific/Auckland",
+						VTIMEZONE_DATA,
+						Option.none(),
+						Option.none(),
+					),
 				),
 				Effect.provide(layer),
 				Effect.orDie,
@@ -129,9 +138,19 @@ describe("CalTimezoneRepository.upsert — conflict resolution (integration)", (
 				const repo = yield* CalTimezoneRepository;
 				const stored = Temporal.Instant.from("2019-01-01T00:00:00Z");
 				// First insert with a known lastModified
-				yield* repo.upsert(TZID, VTIMEZONE_DATA, Option.none(), Option.some(stored));
+				yield* repo.upsert(
+					TZID,
+					VTIMEZONE_DATA,
+					Option.none(),
+					Option.some(stored),
+				);
 				// Upsert again with no lastModified (recency unknown → must overwrite)
-				yield* repo.upsert(TZID, VTIMEZONE_DATA_V2, Option.none(), Option.none());
+				yield* repo.upsert(
+					TZID,
+					VTIMEZONE_DATA_V2,
+					Option.none(),
+					Option.none(),
+				);
 				return yield* repo.findByTzid(TZID);
 			}).pipe(Effect.provide(layer), Effect.orDie),
 		);
@@ -145,8 +164,18 @@ describe("CalTimezoneRepository.upsert — conflict resolution (integration)", (
 				const repo = yield* CalTimezoneRepository;
 				const older = Temporal.Instant.from("2018-01-01T00:00:00Z");
 				const newer = Temporal.Instant.from("2022-01-01T00:00:00Z");
-				yield* repo.upsert(tzid, VTIMEZONE_DATA, Option.none(), Option.some(older));
-				yield* repo.upsert(tzid, VTIMEZONE_DATA_V2, Option.none(), Option.some(newer));
+				yield* repo.upsert(
+					tzid,
+					VTIMEZONE_DATA,
+					Option.none(),
+					Option.some(older),
+				);
+				yield* repo.upsert(
+					tzid,
+					VTIMEZONE_DATA_V2,
+					Option.none(),
+					Option.some(newer),
+				);
 				return yield* repo.findByTzid(tzid);
 			}).pipe(Effect.provide(layer), Effect.orDie),
 		);
@@ -160,8 +189,18 @@ describe("CalTimezoneRepository.upsert — conflict resolution (integration)", (
 				const repo = yield* CalTimezoneRepository;
 				const newer = Temporal.Instant.from("2022-01-01T00:00:00Z");
 				const older = Temporal.Instant.from("2018-01-01T00:00:00Z");
-				yield* repo.upsert(tzid, VTIMEZONE_DATA, Option.none(), Option.some(newer));
-				yield* repo.upsert(tzid, VTIMEZONE_DATA_V2, Option.none(), Option.some(older));
+				yield* repo.upsert(
+					tzid,
+					VTIMEZONE_DATA,
+					Option.none(),
+					Option.some(newer),
+				);
+				yield* repo.upsert(
+					tzid,
+					VTIMEZONE_DATA_V2,
+					Option.none(),
+					Option.some(older),
+				);
 				return yield* repo.findByTzid(tzid);
 			}).pipe(Effect.provide(layer), Effect.orDie),
 		);
@@ -187,7 +226,12 @@ describe("CalTimezoneRepository.upsert — ianaName rules (integration)", () => 
 			Effect.gen(function* () {
 				const repo = yield* CalTimezoneRepository;
 				yield* repo.upsert(tzid, VTIMEZONE_DATA, Option.none(), Option.none());
-				yield* repo.upsert(tzid, VTIMEZONE_DATA, Option.some("America/New_York"), Option.none());
+				yield* repo.upsert(
+					tzid,
+					VTIMEZONE_DATA,
+					Option.some("America/New_York"),
+					Option.none(),
+				);
 				return yield* repo.findByTzid(tzid);
 			}).pipe(Effect.provide(layer), Effect.orDie),
 		);
@@ -199,9 +243,19 @@ describe("CalTimezoneRepository.upsert — ianaName rules (integration)", () => 
 		const result = await runSuccess(
 			Effect.gen(function* () {
 				const repo = yield* CalTimezoneRepository;
-				yield* repo.upsert(tzid, VTIMEZONE_DATA, Option.some("America/Chicago"), Option.none());
+				yield* repo.upsert(
+					tzid,
+					VTIMEZONE_DATA,
+					Option.some("America/Chicago"),
+					Option.none(),
+				);
 				// Second upsert with Option.none() must NOT clear the ianaName
-				yield* repo.upsert(tzid, VTIMEZONE_DATA_V2, Option.none(), Option.none());
+				yield* repo.upsert(
+					tzid,
+					VTIMEZONE_DATA_V2,
+					Option.none(),
+					Option.none(),
+				);
 				return yield* repo.findByTzid(tzid);
 			}).pipe(Effect.provide(layer), Effect.orDie),
 		);

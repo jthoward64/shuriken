@@ -36,9 +36,7 @@ describe("PrincipalService.findById", () => {
 
 		const err = (await runFailure(
 			PrincipalService.pipe(
-				Effect.flatMap((s) =>
-					s.findById(PrincipalId(crypto.randomUUID())),
-				),
+				Effect.flatMap((s) => s.findById(PrincipalId(crypto.randomUUID()))),
 				Effect.provide(env.toLayer()),
 			),
 		)) as DavError;
@@ -95,9 +93,7 @@ describe("PrincipalService.findByEmail", () => {
 
 		const result = await runSuccess(
 			PrincipalService.pipe(
-				Effect.flatMap((s) =>
-					s.findByEmail(Email("carol@example.com")),
-				),
+				Effect.flatMap((s) => s.findByEmail(Email("carol@example.com"))),
 				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
@@ -112,9 +108,7 @@ describe("PrincipalService.findByEmail", () => {
 
 		const err = (await runFailure(
 			PrincipalService.pipe(
-				Effect.flatMap((s) =>
-					s.findByEmail(Email("ghost@example.com")),
-				),
+				Effect.flatMap((s) => s.findByEmail(Email("ghost@example.com"))),
 				Effect.provide(env.toLayer()),
 			),
 		)) as DavError;
