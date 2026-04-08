@@ -7,7 +7,6 @@
 // ---------------------------------------------------------------------------
 
 import { Effect, Option } from "effect";
-import { Temporal } from "temporal-polyfill";
 import { encodeICalendar } from "#src/data/icalendar/codec.ts";
 import type { ClarkName, IrDocument } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
@@ -162,19 +161,19 @@ export const calendarQueryHandler = (
 			if (componentType && timeRange) {
 				// Compute calendar week [weekStart, weekEnd) containing timeRange.start
 				// for the RRULE week-bucket SQL pre-filter.
-				const weekStart = (() => {
+				const { weekStart, weekEnd } = (() => {
 					if (timeRange.start === null) {
-						return null;
+						return { weekStart: null, weekEnd: null };
 					}
 					const zdt = timeRange.start.toZonedDateTimeISO("UTC");
-					return zdt
+					const startOfWeek = zdt
 						.subtract({ days: zdt.dayOfWeek - 1 })
-						.with({ hour: 0, minute: 0, second: 0, millisecond: 0, microsecond: 0, nanosecond: 0 })
-						.toInstant();
+						.with({ hour: 0, minute: 0, second: 0, millisecond: 0, microsecond: 0, nanosecond: 0 });
+					return {
+						weekStart: startOfWeek.toInstant(),
+						weekEnd: startOfWeek.add({ weeks: 1 }).toInstant(),
+					};
 				})();
-				const weekEnd = weekStart !== null
-					? weekStart.add(Temporal.Duration.from({ weeks: 1 }))
-					: null;
 
 				// Time-range pre-filter via cal_index
 				return calIdx
