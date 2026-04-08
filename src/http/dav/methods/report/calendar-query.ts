@@ -7,10 +7,11 @@
 // ---------------------------------------------------------------------------
 
 import { Effect, Option } from "effect";
+import { Temporal } from "temporal-polyfill";
 import { encodeICalendar } from "#src/data/icalendar/codec.ts";
 import type { ClarkName, IrDocument } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
-import { methodNotAllowed } from "#src/domain/errors.ts";
+import { forbidden, methodNotAllowed } from "#src/domain/errors.ts";
 import type { EntityId, UuidString } from "#src/domain/ids.ts";
 import { InstanceId } from "#src/domain/ids.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
@@ -114,12 +115,12 @@ export const calendarQueryHandler = (
 			);
 		}
 
-		const acl = yield* AclService;
-		const actingPrincipalId =
-			ctx.auth._tag === "Authenticated"
-				? ctx.auth.principal.principalId
-				: path.principalId;
+		if (ctx.auth._tag !== "Authenticated") {
+			return yield* forbidden("DAV:need-privileges");
+		}
+		const actingPrincipalId = ctx.auth.principal.principalId;
 
+		const acl = yield* AclService;
 		yield* acl.check(
 			actingPrincipalId,
 			path.collectionId,
@@ -159,6 +160,22 @@ export const calendarQueryHandler = (
 
 		const instances = yield* (() => {
 			if (componentType && timeRange) {
+				// Compute calendar week [weekStart, weekEnd) containing timeRange.start
+				// for the RRULE week-bucket SQL pre-filter.
+				const weekStart = (() => {
+					if (timeRange.start === null) {
+						return null;
+					}
+					const zdt = timeRange.start.toZonedDateTimeISO("UTC");
+					return zdt
+						.subtract({ days: zdt.dayOfWeek - 1 })
+						.with({ hour: 0, minute: 0, second: 0, millisecond: 0, microsecond: 0, nanosecond: 0 })
+						.toInstant();
+				})();
+				const weekEnd = weekStart !== null
+					? weekStart.add(Temporal.Duration.from({ weeks: 1 }))
+					: null;
+
 				// Time-range pre-filter via cal_index
 				return calIdx
 					.findByTimeRange(
@@ -166,6 +183,8 @@ export const calendarQueryHandler = (
 						componentType,
 						timeRange.start,
 						timeRange.end,
+						weekStart,
+						weekEnd,
 					)
 					.pipe(
 						Effect.flatMap((entityIds) =>

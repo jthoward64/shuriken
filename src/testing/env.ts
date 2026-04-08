@@ -15,6 +15,7 @@ import {
 } from "#src/services/acl/repository.ts";
 import { AclServiceLive } from "#src/services/acl/service.live.ts";
 import type { AclService } from "#src/services/acl/service.ts";
+import { CalIndexRepository } from "#src/services/cal-index/index.ts";
 import {
 	type CollectionPropertyChanges,
 	CollectionRepository,
@@ -919,6 +920,13 @@ const makeComponentRepo = (stores: TestStores): ComponentRepositoryShape => ({
 		}),
 });
 
+// No-op: unit tests don't exercise the RRULE index path.
+const makeCalIndexRepo = (): typeof CalIndexRepository.Service => ({
+	findByTimeRange: () => Effect.succeed([]),
+	findByComponentType: () => Effect.succeed([]),
+	indexRruleOccurrences: () => Effect.void,
+});
+
 const makeCalTimezoneRepo = (
 	stores: TestStores,
 ): CalTimezoneRepositoryShape => ({
@@ -1150,6 +1158,7 @@ export interface TestEnvBuilder {
 		| EntityRepository
 		| ComponentRepository
 		| CalTimezoneRepository
+		| CalIndexRepository
 	>;
 	/** Direct store access for advanced assertions. Prefer reading via services. */
 	readonly stores: TestStores;
@@ -1334,6 +1343,10 @@ export const makeTestEnv = (): TestEnvBuilder => {
 				CalTimezoneRepository,
 				makeCalTimezoneRepo(stores),
 			);
+			const calIndexRepoLayer = Layer.succeed(
+				CalIndexRepository,
+				makeCalIndexRepo(),
+			);
 
 			const userServiceLayer = UserServiceLive.pipe(
 				Layer.provide(
@@ -1367,6 +1380,7 @@ export const makeTestEnv = (): TestEnvBuilder => {
 				entityRepoLayer,
 				componentRepoLayer,
 				calTimezoneRepoLayer,
+				calIndexRepoLayer,
 			);
 		},
 	};

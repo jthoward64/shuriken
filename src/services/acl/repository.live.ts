@@ -1,4 +1,4 @@
-import { and, eq, inArray, or, type SQL, sql } from "drizzle-orm";
+import { and, eq, inArray, or, type SQL } from "drizzle-orm";
 import { Effect, Layer, Option } from "effect";
 import { DatabaseClient, type DbClient } from "#src/db/client.ts";
 import {
@@ -137,17 +137,19 @@ function buildPrincipalFilter(
 	principalIds: ReadonlyArray<PrincipalId>,
 	isAuthenticated: boolean,
 ): SQL {
-	const conditions: Array<SQL> = [sql`${davAcl.principalType} = 'all'`];
-
-	if (isAuthenticated) {
-		conditions.push(sql`${davAcl.principalType} = 'authenticated'`);
-	} else {
-		conditions.push(sql`${davAcl.principalType} = 'unauthenticated'`);
-	}
+	const conditions: Array<SQL | undefined> = [
+		eq(davAcl.principalType, "all"),
+		isAuthenticated
+			? eq(davAcl.principalType, "authenticated")
+			: eq(davAcl.principalType, "unauthenticated"),
+	];
 
 	if (principalIds.length > 0) {
 		conditions.push(
-			sql`(${davAcl.principalType} = 'principal' AND ${davAcl.principalId} = ANY(${principalIds}))`,
+			and(
+				eq(davAcl.principalType, "principal"),
+				inArray(davAcl.principalId, principalIds as ReadonlyArray<UuidString>),
+			),
 		);
 	}
 

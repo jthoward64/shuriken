@@ -5,6 +5,7 @@ import {
 	PROPFIND_ALLPROP,
 	propfind,
 	put,
+	report,
 	twoUsers,
 } from "#src/testing/script-runner/fixtures.ts";
 import { runScript } from "#src/testing/script-runner/runner.ts";
@@ -17,8 +18,19 @@ const event = makeCalEvent({
 });
 
 describe("unauthenticated access", () => {
-	// TODO: ACL enforcement not yet implemented — AclServiceAllowAll is used in tests.
-	it.todo("PROPFIND on principal without auth returns 403");
+	it("PROPFIND on principal without auth returns 403", async () => {
+		const results = await runScript(
+			[
+				propfind("/dav/principals/alice/", PROPFIND_ALLPROP, {
+					expect: { status: 403 },
+				}),
+			],
+			twoUsers(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+	});
 
 	it("PUT without auth returns 403", async () => {
 		const results = await runScript(
@@ -53,10 +65,62 @@ describe("unauthenticated access", () => {
 });
 
 describe("cross-user access (alice vs bob)", () => {
-	// TODO: ACL enforcement not yet implemented — AclServiceAllowAll is used in tests.
-	it.todo("Alice cannot PROPFIND Bob's collection");
-	it.todo("Alice cannot PUT into Bob's collection");
-	it.todo("Alice cannot REPORT (calendar-multiget) on Bob's collection");
+	it("Alice cannot PROPFIND Bob's collection", async () => {
+		const results = await runScript(
+			[
+				propfind("/dav/principals/bob/cal/primary/", PROPFIND_ALLPROP, {
+					as: "alice",
+					headers: { Depth: "1" },
+					expect: { status: 403 },
+				}),
+			],
+			twoUsers(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+	});
+
+	it("Alice cannot PUT into Bob's collection", async () => {
+		const results = await runScript(
+			[
+				put(
+					"/dav/principals/bob/cal/primary/event.ics",
+					event,
+					"text/calendar; charset=utf-8",
+					{ as: "alice", expect: { status: 403 } },
+				),
+			],
+			twoUsers(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+	});
+
+	it("Alice cannot REPORT (calendar-multiget) on Bob's collection", async () => {
+		const multigetBody = `<?xml version="1.0" encoding="utf-8"?>
+<C:calendar-multiget xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:D="DAV:">
+  <D:prop>
+    <D:getetag/>
+    <C:calendar-data/>
+  </D:prop>
+  <D:href>/dav/principals/bob/cal/primary/event.ics</D:href>
+</C:calendar-multiget>`;
+
+		const results = await runScript(
+			[
+				report("/dav/principals/bob/cal/primary/", multigetBody, {
+					as: "alice",
+					expect: { status: 403 },
+				}),
+			],
+			twoUsers(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+	});
 });
 
 describe("user isolation", () => {

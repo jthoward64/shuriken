@@ -23,6 +23,8 @@ import type { ComponentRepositoryShape } from "#src/services/component/repositor
 import { EntityRepository } from "#src/services/entity/index.ts";
 import type { EntityRepositoryShape } from "#src/services/entity/repository.ts";
 import { GroupRepository, GroupService } from "#src/services/group/index.ts";
+import type { GroupRepositoryShape } from "#src/services/group/repository.ts";
+import type { GroupServiceShape } from "#src/services/group/service.ts";
 import type { InstanceRow } from "#src/services/instance/repository.ts";
 import {
 	InstanceRepository,
@@ -42,11 +44,28 @@ import {
 import { CalTimezoneRepository } from "#src/services/timezone/repository.ts";
 import { TombstoneRepository } from "#src/services/tombstone/index.ts";
 import { UserRepository, UserService } from "#src/services/user/index.ts";
+import type { UserRepositoryShape } from "#src/services/user/repository.ts";
+import type { UserServiceShape } from "#src/services/user/service.ts";
 import { davRouter, parseDavPath } from "./router.ts";
 
 // ---------------------------------------------------------------------------
 // Test infrastructure
 // ---------------------------------------------------------------------------
+
+/**
+ * Creates a stub implementation of a service/repository interface.
+ * Any method not in `overrides` returns `Effect.die("not implemented in router tests: <method>")`.
+ */
+const stubService = <T extends object>(overrides: Partial<T> = {}): T =>
+	new Proxy(overrides as T, {
+		get(target, prop, receiver) {
+			if (prop in target) {
+				return Reflect.get(target, prop, receiver);
+			}
+			return () =>
+				Effect.die(`not implemented in router tests: ${String(prop)}`);
+		},
+	});
 
 /** Build a minimal HttpRequestContext for a given method + pathname. */
 const makeCtx = (method: string, pathname: string) => ({
@@ -72,50 +91,35 @@ interface RouterSeeds {
 }
 
 /** Minimal CollectionService stub — router tests only exercise path resolution, not collection ops. */
-const stubCollectionService: CollectionServiceShape = {
-	findById: () => Effect.die("not implemented in router tests"),
-	findBySlug: () => Effect.die("not implemented in router tests"),
-	listByOwner: () => Effect.die("not implemented in router tests"),
-	create: () => Effect.die("not implemented in router tests"),
-	delete: () => Effect.die("not implemented in router tests"),
-};
+const stubCollectionService: CollectionServiceShape =
+	stubService<CollectionServiceShape>();
 
 /** Minimal InstanceService stub — router tests only exercise path resolution. */
-const stubInstanceService: InstanceServiceShape = {
-	findById: () => Effect.die("not implemented in router tests"),
-	findBySlug: () => Effect.die("not implemented in router tests"),
-	listByCollection: () => Effect.die("not implemented in router tests"),
-	put: () => Effect.die("not implemented in router tests"),
-	delete: () => Effect.die("not implemented in router tests"),
-};
+const stubInstanceService: InstanceServiceShape =
+	stubService<InstanceServiceShape>();
 
 /** Minimal PrincipalService stub — router tests only exercise path resolution. */
-const stubPrincipalService: PrincipalServiceShape = {
-	findById: () => Effect.die("not implemented in router tests"),
-	findBySlug: () => Effect.die("not implemented in router tests"),
-	findByEmail: () => Effect.die("not implemented in router tests"),
-};
+const stubPrincipalService: PrincipalServiceShape =
+	stubService<PrincipalServiceShape>();
 
 /** No-op EntityRepository — router path resolution never touches entity/component storage. */
-const noopEntityRepo: EntityRepositoryShape = {
-	insert: () => Effect.die("not implemented in router tests"),
-	findById: () => Effect.succeed(Option.none()),
-	updateLogicalUid: () => Effect.void,
-	softDelete: () => Effect.void,
-};
+const noopEntityRepo: EntityRepositoryShape = stubService<EntityRepositoryShape>(
+	{
+		findById: () => Effect.succeed(Option.none()),
+		updateLogicalUid: () => Effect.void,
+		softDelete: () => Effect.void,
+	},
+);
 
 /** No-op ComponentRepository — router path resolution never touches entity/component storage. */
-const noopComponentRepo: ComponentRepositoryShape = {
-	insertTree: () => Effect.die("not implemented in router tests"),
-	loadTree: () => Effect.succeed(Option.none()),
-	deleteByEntity: () => Effect.void,
-};
+const noopComponentRepo: ComponentRepositoryShape =
+	stubService<ComponentRepositoryShape>({
+		loadTree: () => Effect.succeed(Option.none()),
+		deleteByEntity: () => Effect.void,
+	});
 
 /** No-op CalTimezoneRepository — router path resolution never touches timezone storage. */
-const noopCalTimezoneRepo = CalTimezoneRepository.of({
-	findByTzid: () => Effect.die("not implemented in router tests"),
-	upsert: () => Effect.die("not implemented in router tests"),
-});
+const noopCalTimezoneRepo = CalTimezoneRepository.of(stubService());
 
 /** Build a Layer providing all DAV router requirements from simple slug→id maps. */
 const makeRouterLayer = (
@@ -172,131 +176,125 @@ const makeRouterLayer = (
 		}),
 	);
 
-	const principalRepo: PrincipalRepositoryShape = {
-		findBySlug: (slug) => {
-			const id = principals.get(slug);
-			if (!id) {
-				return Effect.succeed(Option.none());
-			}
-			const row = {
-				principal: {
+	const principalRepo: PrincipalRepositoryShape =
+		stubService<PrincipalRepositoryShape>({
+			findBySlug: (slug) => {
+				const id = principals.get(slug);
+				if (!id) {
+					return Effect.succeed(Option.none());
+				}
+				const row = {
+					principal: {
+						id,
+						slug,
+						principalType: "user",
+						displayName: null,
+						updatedAt: null,
+						deletedAt: null,
+					},
+					user: {
+						id: crypto.randomUUID(),
+						principalId: id,
+						name: slug,
+						email: `${slug}@test`,
+						updatedAt: null,
+					},
+				} as unknown as PrincipalWithUser;
+				return Effect.succeed(Option.some(row));
+			},
+			findById: (id) => {
+				const slug = principalById.get(id);
+				if (!slug) {
+					return Effect.succeed(Option.none());
+				}
+				const row = {
+					principal: {
+						id,
+						slug,
+						principalType: "user",
+						displayName: null,
+						updatedAt: null,
+						deletedAt: null,
+					},
+					user: {
+						id: crypto.randomUUID(),
+						principalId: id,
+						name: slug,
+						email: `${slug}@test`,
+						updatedAt: null,
+					},
+				} as unknown as PrincipalWithUser;
+				return Effect.succeed(Option.some(row));
+			},
+			findByEmail: () => Effect.succeed(Option.none()),
+			findUserByUserId: () => Effect.succeed(Option.none()),
+		});
+
+	const collectionRepo: CollectionRepositoryShape =
+		stubService<CollectionRepositoryShape>({
+			findBySlug: (principalId, collectionType, slug) => {
+				const key = `${principalId}:${collectionType}:${slug}`;
+				const id = collections.get(key);
+				if (!id) {
+					return Effect.succeed(Option.none());
+				}
+				const row = {
 					id,
 					slug,
-					principalType: "user",
-					displayName: null,
-					updatedAt: null,
+					ownerPrincipalId: principalId,
+					collectionType,
 					deletedAt: null,
-				},
-				user: {
-					id: crypto.randomUUID(),
-					principalId: id,
-					name: slug,
-					email: `${slug}@test`,
-					updatedAt: null,
-				},
-			} as unknown as PrincipalWithUser;
-			return Effect.succeed(Option.some(row));
-		},
-		findById: (id) => {
-			const slug = principalById.get(id);
-			if (!slug) {
-				return Effect.succeed(Option.none());
-			}
-			const row = {
-				principal: {
+				} as unknown as CollectionRow;
+				return Effect.succeed(Option.some(row));
+			},
+			findById: (id) => {
+				const meta = collectionById.get(id);
+				if (!meta) {
+					return Effect.succeed(Option.none());
+				}
+				const row = {
+					id,
+					slug: meta.slug,
+					ownerPrincipalId: meta.principalId,
+					collectionType: meta.collectionType,
+					deletedAt: null,
+				} as unknown as CollectionRow;
+				return Effect.succeed(Option.some(row));
+			},
+			listByOwner: () => Effect.succeed([]),
+		});
+
+	const instanceRepo: InstanceRepositoryShape =
+		stubService<InstanceRepositoryShape>({
+			findBySlug: (collectionId, slug) => {
+				const key = `${collectionId}:${slug}`;
+				const id = instances.get(key);
+				if (!id) {
+					return Effect.succeed(Option.none());
+				}
+				const row = {
 					id,
 					slug,
-					principalType: "user",
-					displayName: null,
-					updatedAt: null,
+					collectionId,
 					deletedAt: null,
-				},
-				user: {
-					id: crypto.randomUUID(),
-					principalId: id,
-					name: slug,
-					email: `${slug}@test`,
-					updatedAt: null,
-				},
-			} as unknown as PrincipalWithUser;
-			return Effect.succeed(Option.some(row));
-		},
-		findByEmail: () => Effect.succeed(Option.none()),
-		findUserByUserId: () => Effect.succeed(Option.none()),
-	};
-
-	const collectionRepo: CollectionRepositoryShape = {
-		findBySlug: (principalId, collectionType, slug) => {
-			const key = `${principalId}:${collectionType}:${slug}`;
-			const id = collections.get(key);
-			if (!id) {
-				return Effect.succeed(Option.none());
-			}
-			const row = {
-				id,
-				slug,
-				ownerPrincipalId: principalId,
-				collectionType,
-				deletedAt: null,
-			} as unknown as CollectionRow;
-			return Effect.succeed(Option.some(row));
-		},
-		findById: (id) => {
-			const meta = collectionById.get(id);
-			if (!meta) {
-				return Effect.succeed(Option.none());
-			}
-			const row = {
-				id,
-				slug: meta.slug,
-				ownerPrincipalId: meta.principalId,
-				collectionType: meta.collectionType,
-				deletedAt: null,
-			} as unknown as CollectionRow;
-			return Effect.succeed(Option.some(row));
-		},
-		listByOwner: () => Effect.succeed([]),
-		insert: () => Effect.die("not implemented in router tests"),
-		softDelete: () => Effect.die("not implemented in router tests"),
-		relocate: () => Effect.die("not implemented in router tests"),
-	};
-
-	const instanceRepo: InstanceRepositoryShape = {
-		findBySlug: (collectionId, slug) => {
-			const key = `${collectionId}:${slug}`;
-			const id = instances.get(key);
-			if (!id) {
-				return Effect.succeed(Option.none());
-			}
-			const row = {
-				id,
-				slug,
-				collectionId,
-				deletedAt: null,
-			} as unknown as InstanceRow;
-			return Effect.succeed(Option.some(row));
-		},
-		findById: (id) => {
-			const meta = instanceById.get(id);
-			if (!meta) {
-				return Effect.succeed(Option.none());
-			}
-			const row = {
-				id,
-				slug: meta.slug,
-				collectionId: meta.collectionId,
-				deletedAt: null,
-			} as unknown as InstanceRow;
-			return Effect.succeed(Option.some(row));
-		},
-		listByCollection: () => Effect.succeed([]),
-		findChangedSince: () => Effect.die("not implemented in router tests"),
-		findByIds: () => Effect.die("not implemented in router tests"),
-		insert: () => Effect.die("not implemented in router tests"),
-		updateEtag: () => Effect.die("not implemented in router tests"),
-		softDelete: () => Effect.die("not implemented in router tests"),
-		relocate: () => Effect.die("not implemented in router tests"),
-	};
+				} as unknown as InstanceRow;
+				return Effect.succeed(Option.some(row));
+			},
+			findById: (id) => {
+				const meta = instanceById.get(id);
+				if (!meta) {
+					return Effect.succeed(Option.none());
+				}
+				const row = {
+					id,
+					slug: meta.slug,
+					collectionId: meta.collectionId,
+					deletedAt: null,
+				} as unknown as InstanceRow;
+				return Effect.succeed(Option.some(row));
+			},
+			listByCollection: () => Effect.succeed([]),
+		});
 
 	return Layer.mergeAll(
 		Layer.succeed(PrincipalRepository, principalRepo),
@@ -308,65 +306,48 @@ const makeRouterLayer = (
 		Layer.succeed(EntityRepository, noopEntityRepo),
 		Layer.succeed(ComponentRepository, noopComponentRepo),
 		Layer.succeed(CalTimezoneRepository, noopCalTimezoneRepo),
-		Layer.succeed(TombstoneRepository, {
-			findSinceRevision: () => Effect.die("not implemented in router tests"),
-		}),
-		Layer.succeed(CalIndexRepository, {
-			findByTimeRange: () => Effect.die("not implemented in router tests"),
-			findByComponentType: () => Effect.die("not implemented in router tests"),
-		}),
-		Layer.succeed(CardIndexRepository, {
-			findByText: () => Effect.die("not implemented in router tests"),
-		}),
-		Layer.succeed(UserRepository, {
-			findById: () => Effect.succeed(Option.none()),
-			findBySlug: () => Effect.succeed(Option.none()),
-			findByEmail: () => Effect.succeed(Option.none()),
-			list: () => Effect.succeed([]),
-			softDelete: () => Effect.void,
-			create: () => Effect.die("not implemented in router tests"),
-			update: () => Effect.die("not implemented in router tests"),
-			findCredential: () => Effect.succeed(Option.none()),
-			insertCredential: () => Effect.die("not implemented in router tests"),
-			deleteCredential: () => Effect.void,
-		}),
-		Layer.succeed(GroupRepository, {
-			findById: () => Effect.succeed(Option.none()),
-			findBySlug: () => Effect.succeed(Option.none()),
-			list: () => Effect.succeed([]),
-			listMembers: () => Effect.succeed([]),
-			listByMember: () => Effect.succeed([]),
-			softDelete: () => Effect.void,
-			setMembers: () => Effect.void,
-			create: () => Effect.die("not implemented in router tests"),
-			update: () => Effect.die("not implemented in router tests"),
-			addMember: () => Effect.void,
-			removeMember: () => Effect.void,
-			hasMember: () => Effect.succeed(false),
-		}),
-		Layer.succeed(UserService, {
-			create: () => Effect.die("not implemented in router tests"),
-			findById: () => Effect.die("not implemented in router tests"),
-			findBySlug: () => Effect.die("not implemented in router tests"),
-			list: () => Effect.succeed([]),
-			update: () => Effect.die("not implemented in router tests"),
-			delete: () => Effect.die("not implemented in router tests"),
-			addCredential: () => Effect.die("not implemented in router tests"),
-			removeCredential: () => Effect.die("not implemented in router tests"),
-			setCredential: () => Effect.die("not implemented in router tests"),
-		}),
-		Layer.succeed(GroupService, {
-			create: () => Effect.die("not implemented in router tests"),
-			findById: () => Effect.die("not implemented in router tests"),
-			list: () => Effect.succeed([]),
-			listMembers: () => Effect.succeed([]),
-			listByMember: () => Effect.succeed([]),
-			update: () => Effect.die("not implemented in router tests"),
-			delete: () => Effect.die("not implemented in router tests"),
-			setMembers: () => Effect.die("not implemented in router tests"),
-			addMember: () => Effect.die("not implemented in router tests"),
-			removeMember: () => Effect.die("not implemented in router tests"),
-		}),
+		Layer.succeed(TombstoneRepository, stubService()),
+		Layer.succeed(CalIndexRepository, stubService()),
+		Layer.succeed(CardIndexRepository, stubService()),
+		Layer.succeed(
+			UserRepository,
+			stubService<UserRepositoryShape>({
+				findById: () => Effect.succeed(Option.none()),
+				findBySlug: () => Effect.succeed(Option.none()),
+				findByEmail: () => Effect.succeed(Option.none()),
+				list: () => Effect.succeed([]),
+				softDelete: () => Effect.void,
+				findCredential: () => Effect.succeed(Option.none()),
+				deleteCredential: () => Effect.void,
+			}),
+		),
+		Layer.succeed(
+			GroupRepository,
+			stubService<GroupRepositoryShape>({
+				findById: () => Effect.succeed(Option.none()),
+				findBySlug: () => Effect.succeed(Option.none()),
+				list: () => Effect.succeed([]),
+				listMembers: () => Effect.succeed([]),
+				listByMember: () => Effect.succeed([]),
+				softDelete: () => Effect.void,
+				setMembers: () => Effect.void,
+				addMember: () => Effect.void,
+				removeMember: () => Effect.void,
+				hasMember: () => Effect.succeed(false),
+			}),
+		),
+		Layer.succeed(
+			UserService,
+			stubService<UserServiceShape>({ list: () => Effect.succeed([]) }),
+		),
+		Layer.succeed(
+			GroupService,
+			stubService<GroupServiceShape>({
+				list: () => Effect.succeed([]),
+				listMembers: () => Effect.succeed([]),
+				listByMember: () => Effect.succeed([]),
+			}),
+		),
 		AclServiceAllowAll,
 	);
 };

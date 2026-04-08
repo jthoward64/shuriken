@@ -2,16 +2,15 @@
 // iCalendar filter parsing and evaluation — RFC 4791 §9.7–9.9
 //
 // Parses <CALDAV:filter> elements and evaluates them against an IrDocument.
-//
-// RRULE / Recurrence limitation:
-//   Events with rrule_text always pass time-range filters (conservative
-//   behavior). Full recurrence expansion is deferred.
-//   TODO(recurrence): expand rrule_text for accurate overlap when recurrence
-//   expansion is implemented.
 // ---------------------------------------------------------------------------
 
 import { Effect } from "effect";
 import { Temporal } from "temporal-polyfill";
+import {
+	getDtendInstant,
+	getDtstartInstant,
+} from "#src/data/icalendar/ir-helpers.ts";
+import { hasOccurrenceInRange } from "#src/data/icalendar/recurrence/recurrence-check.ts";
 import type { IrComponent, IrDocument, IrProperty } from "#src/data/ir.ts";
 import type { DavError } from "#src/domain/errors.ts";
 import { forbidden } from "#src/domain/errors.ts";
@@ -182,12 +181,18 @@ const parseChildren = <T>(
 export const evaluateCalFilter = (
 	doc: IrDocument,
 	filter: CalFilter,
-): boolean => evalCompFilter(doc.root, filter.compFilter);
+): boolean => evalCompFilter(doc.root, filter.compFilter, doc.root);
 
-const evalCompFilter = (comp: IrComponent, f: CompFilter): boolean => {
+const evalCompFilter = (
+	comp: IrComponent,
+	f: CompFilter,
+	vcalRoot: IrComponent,
+): boolean => {
 	if (f.name !== comp.name) {
 		// comp-filter applies to a different component name — look in children
-		return comp.components.some((child) => evalCompFilter(child, f));
+		return comp.components.some((child) =>
+			evalCompFilter(child, f, vcalRoot),
+		);
 	}
 
 	if (f.isNotDefined) {
@@ -196,7 +201,7 @@ const evalCompFilter = (comp: IrComponent, f: CompFilter): boolean => {
 	}
 
 	// Time-range filter on the component
-	if (f.timeRange && !evalComponentTimeRange(comp, f.timeRange)) {
+	if (f.timeRange && !evalComponentTimeRange(comp, f.timeRange, vcalRoot)) {
 		return false;
 	}
 
@@ -214,7 +219,7 @@ const evalCompFilter = (comp: IrComponent, f: CompFilter): boolean => {
 			if (matchingChildren.length > 0) {
 				return false;
 			}
-		} else if (!matchingChildren.some((c) => evalCompFilter(c, cf))) {
+		} else if (!matchingChildren.some((c) => evalCompFilter(c, cf, vcalRoot))) {
 			return false;
 		}
 	}
@@ -288,29 +293,27 @@ const evalTextMatch = (text: string, tm: TextMatch): boolean => {
 	return tm.negate ? !matches : matches;
 };
 
-/**
- * Evaluate a time-range filter on a component.
- *
- * RRULE components always pass (conservative recurrence handling).
- * TODO(recurrence): expand rrule_text for accurate overlap when recurrence
- * expansion is implemented.
- */
 const evalComponentTimeRange = (
 	comp: IrComponent,
 	range: { start?: Temporal.Instant; end?: Temporal.Instant },
+	vcalRoot: IrComponent,
 ): boolean => {
-	// Conservative: always pass if the component has an RRULE
-	const hasRrule = comp.properties.some((p) => p.name === "RRULE");
-	if (hasRrule) {
-		return true;
+	const rruleProp = comp.properties.find((p) => p.name === "RRULE");
+	if (rruleProp) {
+		return hasOccurrenceInRange(
+			vcalRoot,
+			comp,
+			range.start ?? Temporal.Instant.fromEpochMilliseconds(0),
+			range.end ?? Temporal.Instant.fromEpochMilliseconds(Number.MAX_SAFE_INTEGER),
+		);
 	}
 
-	const dtstart = getDtstart(comp);
+	const dtstart = getDtstartInstant(comp);
 	if (!dtstart) {
 		return true; // No DTSTART → pass conservatively
 	}
 
-	const dtend = getDtend(comp) ?? dtstart; // Use DTSTART as DTEND if absent (zero-duration)
+	const dtend = getDtendInstant(comp) ?? dtstart; // Use DTSTART as DTEND if absent (zero-duration)
 
 	const startMs = dtstart.epochMilliseconds;
 	const endMs = dtend.epochMilliseconds;
@@ -322,36 +325,6 @@ const evalComponentTimeRange = (
 		return false;
 	}
 	return true;
-};
-
-const getDtstart = (comp: IrComponent): Temporal.Instant | undefined => {
-	const prop = comp.properties.find((p) => p.name === "DTSTART");
-	if (!prop) {
-		return undefined;
-	}
-	return instantFromIrValue(prop);
-};
-
-const getDtend = (comp: IrComponent): Temporal.Instant | undefined => {
-	const prop =
-		comp.properties.find((p) => p.name === "DTEND") ??
-		comp.properties.find((p) => p.name === "DUE");
-	if (!prop) {
-		return undefined;
-	}
-	return instantFromIrValue(prop);
-};
-
-const instantFromIrValue = (prop: IrProperty): Temporal.Instant | undefined => {
-	const v = prop.value;
-	if (v.type === "DATE_TIME") {
-		return v.value.toInstant();
-	}
-	if (v.type === "DATE") {
-		// Treat all-day events as starting at UTC midnight
-		return Temporal.Instant.from(`${v.value.toString()}T00:00:00Z`);
-	}
-	return undefined; // PLAIN_DATE_TIME (floating) — no timezone context
 };
 
 const propValueText = (prop: IrProperty): string => {
@@ -376,5 +349,3 @@ const propValueText = (prop: IrProperty): string => {
 	}
 	return "";
 };
-
-export type { Temporal } from "temporal-polyfill";

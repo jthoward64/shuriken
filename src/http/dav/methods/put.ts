@@ -19,6 +19,7 @@ import { ETag } from "#src/domain/types/strings.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { HTTP_CREATED, HTTP_NO_CONTENT } from "#src/http/status.ts";
 import { AclService } from "#src/services/acl/index.ts";
+import { CalIndexRepository } from "#src/services/cal-index/index.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
 import { EntityRepository } from "#src/services/entity/index.ts";
 import { InstanceService } from "#src/services/instance/index.ts";
@@ -41,6 +42,7 @@ export const putHandler = (
 	| ComponentRepository
 	| CalTimezoneRepository
 	| AclService
+	| CalIndexRepository
 > =>
 	Effect.gen(function* () {
 		// 1. Only new-instance and instance paths accept PUT.
@@ -153,6 +155,10 @@ export const putHandler = (
 				slug: path.slug,
 			});
 
+			// Populate precomputed RRULE shape columns used by the week-bucket SQL filter.
+			const calIdx = yield* CalIndexRepository;
+			yield* calIdx.indexRruleOccurrences(EntityId(entityRow.id));
+
 			return new Response(null, {
 				status: HTTP_CREATED,
 				headers: { ETag: etag },
@@ -216,6 +222,10 @@ export const putHandler = (
 			},
 			path.instanceId,
 		);
+
+		// Populate precomputed RRULE shape columns used by the week-bucket SQL filter.
+		const calIdx = yield* CalIndexRepository;
+		yield* calIdx.indexRruleOccurrences(EntityId(existingInstance.entityId));
 
 		return new Response(null, {
 			status: HTTP_NO_CONTENT,

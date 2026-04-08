@@ -24,6 +24,7 @@ import {
 	HTTP_UNSUPPORTED_MEDIA_TYPE,
 } from "#src/http/status.ts";
 import type { AclService } from "#src/services/acl/index.ts";
+import type { CalIndexRepository } from "#src/services/cal-index/index.ts";
 import type { ComponentRepository } from "#src/services/component/index.ts";
 import type { EntityRepository } from "#src/services/entity/index.ts";
 import type { InstanceService } from "#src/services/instance/index.ts";
@@ -178,6 +179,7 @@ type PutEffect<A> = Effect.Effect<
 	| ComponentRepository
 	| EntityRepository
 	| CalTimezoneRepository
+	| CalIndexRepository
 >;
 type PutFailEffect = Effect.Effect<
 	unknown,
@@ -187,6 +189,7 @@ type PutFailEffect = Effect.Effect<
 	| ComponentRepository
 	| EntityRepository
 	| CalTimezoneRepository
+	| CalIndexRepository
 >;
 
 const run = <A>(env: ReturnType<typeof makeTestEnv>, effect: PutEffect<A>) =>

@@ -262,11 +262,11 @@ export const propfindHandler = (
 			return yield* notFound();
 		}
 
-		// Extract acting principal — all remaining path kinds carry principalId
-		const actingPrincipalId =
-			ctx.auth._tag === "Authenticated"
-				? ctx.auth.principal.principalId
-				: path.principalId;
+		// Require authentication — all non-OPTIONS methods require credentials
+		if (ctx.auth._tag !== "Authenticated") {
+			return yield* forbidden("DAV:need-privileges");
+		}
+		const actingPrincipalId = ctx.auth.principal.principalId;
 
 		const propfind = yield* parsePropfindBody(req);
 		const acl = yield* AclService;

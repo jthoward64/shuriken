@@ -9,10 +9,10 @@ import { Effect } from "effect";
 import type { ClarkName, IrDocument } from "#src/data/ir.ts";
 import { encodeVCard } from "#src/data/vcard/codec.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
-import { methodNotAllowed } from "#src/domain/errors.ts";
+import { forbidden, methodNotAllowed } from "#src/domain/errors.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
-import type { AclService } from "#src/services/acl/index.ts";
+import { AclService } from "#src/services/acl/index.ts";
 import type { ComponentRepository } from "#src/services/component/index.ts";
 import type { InstanceService } from "#src/services/instance/index.ts";
 import { parseAddressDataSpec, subsetVCardDocument } from "./address-data.ts";
@@ -40,10 +40,13 @@ export const addressbookMultigetHandler = (
 			);
 		}
 
-		const actingPrincipalId =
-			ctx.auth._tag === "Authenticated"
-				? ctx.auth.principal.principalId
-				: path.principalId;
+		if (ctx.auth._tag !== "Authenticated") {
+			return yield* forbidden("DAV:need-privileges");
+		}
+		const actingPrincipalId = ctx.auth.principal.principalId;
+
+		const acl = yield* AclService;
+		yield* acl.check(actingPrincipalId, path.collectionId, "collection", "DAV:read");
 
 		const hrefs = extractHrefs(tree);
 		const propNames = extractPropNames(tree);

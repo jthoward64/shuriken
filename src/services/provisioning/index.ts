@@ -27,5 +27,5 @@ const UserDep = UserServiceLive.pipe(
 ).pipe(Layer.provide(AclRepositoryLive));
 
 export const ProvisioningDomainLayer = ProvisioningServiceLive.pipe(
-	Layer.provide(Layer.mergeAll(CollectionDep, UserDep)),
+	Layer.provide(Layer.mergeAll(CollectionDep, UserDep, AclRepositoryLive)),
 );

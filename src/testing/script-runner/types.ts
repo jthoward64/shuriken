@@ -17,7 +17,12 @@ export type HttpMethod =
 	| "PROPFIND"
 	| "PROPPATCH"
 	| "PUT"
-	| "REPORT";
+	| "REPORT"
+	| "MKCALENDAR"
+	| "MKADDRESSBOOK"
+	| "ACL"
+	| "UNLOCK"
+	| "LOCK";
 
 // ---------------------------------------------------------------------------
 // ScriptUser — a user to provision before executing the script's steps

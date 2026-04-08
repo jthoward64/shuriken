@@ -6,6 +6,7 @@ import {
 	jsonb,
 	pgTable,
 	primaryKey,
+	smallint,
 	text,
 	unique,
 	uuid,
@@ -49,6 +50,17 @@ export const calIndex = pgTable(
 		dtendUtc: timestampTz("dtend_utc"),
 		allDay: boolean("all_day"),
 		rruleText: text("rrule_text"),
+		// RRULE shape fields — used for SQL week-bucket pre-filtering.
+		// rruleUntilUtc, rruleFreq, rruleInterval: extracted in the PG trigger via regex.
+		// rruleOccurrenceMonths, rruleOccurrenceDayMin, rruleOccurrenceDayMax:
+		// precomputed by TypeScript (rrule-temporal) after save and written via
+		// CalIndexRepository.indexRruleOccurrences().
+		rruleUntilUtc: timestampTz("rrule_until_utc"),
+		rruleFreq: text("rrule_freq"),
+		rruleInterval: smallint("rrule_interval"),
+		rruleOccurrenceMonths: smallint("rrule_occurrence_months").array(),
+		rruleOccurrenceDayMin: smallint("rrule_occurrence_day_min"),
+		rruleOccurrenceDayMax: smallint("rrule_occurrence_day_max"),
 		updatedAt: timestampTz("updated_at").default(sql`now()`).notNull(),
 		deletedAt: timestampTz("deleted_at"),
 		metadata: jsonb().default({}),

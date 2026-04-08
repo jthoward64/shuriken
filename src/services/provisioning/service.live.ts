@@ -1,6 +1,7 @@
 import { Effect, Layer } from "effect";
 import type { PrincipalId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
+import { AclRepository } from "#src/services/acl/repository.ts";
 import { CollectionService } from "#src/services/collection/service.ts";
 import { UserService } from "#src/services/user/service.ts";
 import { ProvisioningService, type ProvisionUserInput } from "./service.ts";
@@ -14,6 +15,8 @@ export const ProvisioningServiceLive = Layer.effect(
 	Effect.gen(function* () {
 		const users = yield* UserService;
 		const collections = yield* CollectionService;
+
+		const acl = yield* AclRepository;
 
 		return ProvisioningService.of({
 			provisionUser: Effect.fn("ProvisioningService.provisionUser")(function* (
@@ -44,6 +47,20 @@ export const ProvisioningServiceLive = Layer.effect(
 					slug: Slug("primary"),
 					displayName: "Primary Address Book",
 					supportedComponents: ["VCARD"],
+				});
+
+				// Grant the owner full access to their own principal resource.
+				// This is the root of the ACL inheritance hierarchy; all collection
+				// and instance ACEs inherit from the owner principal's ACL.
+				yield* acl.grantAce({
+					resourceType: "principal",
+					resourceId: principalId,
+					principalType: "principal",
+					principalId,
+					privilege: "DAV:all",
+					grantDeny: "grant",
+					protected: true,
+					ordinal: 0,
 				});
 
 				yield* Effect.logInfo("user provisioned", {

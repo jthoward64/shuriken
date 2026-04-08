@@ -2,7 +2,7 @@ import type { Effect } from "effect";
 import { Context } from "effect";
 import type { Temporal } from "temporal-polyfill";
 import type { DatabaseError } from "#src/domain/errors.ts";
-import type { CollectionId } from "#src/domain/ids.ts";
+import type { CollectionId, EntityId } from "#src/domain/ids.ts";
 
 // ---------------------------------------------------------------------------
 // CalIndexRepository — data access for cal_index rows
@@ -25,10 +25,10 @@ export interface CalIndexRepositoryShape {
 	 *
 	 * Overlap condition: dtstart_utc < end AND (dtend_utc > start OR dtend_utc IS NULL)
 	 *
-	 * **Recurrence caveat**: entities with a non-null rrule_text always pass
-	 * this filter regardless of dtstart/dtend (conservative behavior).
-	 * TODO(recurrence): expand rrule_text for accurate overlap when recurrence
-	 * expansion is implemented.
+	 * RRULE rows are filtered with a week-bucket heuristic keyed on
+	 * `weekStart`/`weekEnd` (the calendar week containing `start`). The
+	 * in-memory filter (hasOccurrenceInRange) performs the exact check
+	 * afterwards.
 	 *
 	 * Pass null for start or end to leave that side open-ended.
 	 */
@@ -37,6 +37,8 @@ export interface CalIndexRepositoryShape {
 		componentType: CalComponentType,
 		start: Temporal.Instant | null,
 		end: Temporal.Instant | null,
+		weekStart: Temporal.Instant | null,
+		weekEnd: Temporal.Instant | null,
 	) => Effect.Effect<ReadonlyArray<string>, DatabaseError>;
 
 	/**
@@ -47,6 +49,20 @@ export interface CalIndexRepositoryShape {
 		collectionId: CollectionId,
 		componentType: CalComponentType,
 	) => Effect.Effect<ReadonlyArray<string>, DatabaseError>;
+
+	/**
+	 * After a PUT saves a recurring instance, populate the precomputed RRULE
+	 * shape columns (`rrule_occurrence_months`, `rrule_occurrence_day_min`,
+	 * `rrule_occurrence_day_max`) in cal_index.
+	 *
+	 * These are used by the week-bucket SQL pre-filter in `findByTimeRange` to
+	 * accurately exclude YEARLY/MONTHLY rules whose occurrences fall outside
+	 * the queried week. They cannot be computed inside the PG trigger because
+	 * `rrule-temporal` is required for correct BY-rule expansion.
+	 */
+	readonly indexRruleOccurrences: (
+		entityId: EntityId,
+	) => Effect.Effect<void, DatabaseError>;
 }
 
 export class CalIndexRepository extends Context.Tag("CalIndexRepository")<

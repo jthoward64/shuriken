@@ -10,7 +10,7 @@ import { Effect, Option } from "effect";
 import type { ClarkName, IrDocument } from "#src/data/ir.ts";
 import { encodeVCard } from "#src/data/vcard/codec.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
-import { methodNotAllowed } from "#src/domain/errors.ts";
+import { forbidden, methodNotAllowed } from "#src/domain/errors.ts";
 import type { EntityId, UuidString } from "#src/domain/ids.ts";
 import { InstanceId } from "#src/domain/ids.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
@@ -100,12 +100,12 @@ export const addressbookQueryHandler = (
 			);
 		}
 
-		const acl = yield* AclService;
-		const actingPrincipalId =
-			ctx.auth._tag === "Authenticated"
-				? ctx.auth.principal.principalId
-				: path.principalId;
+		if (ctx.auth._tag !== "Authenticated") {
+			return yield* forbidden("DAV:need-privileges");
+		}
+		const actingPrincipalId = ctx.auth.principal.principalId;
 
+		const acl = yield* AclService;
 		yield* acl.check(
 			actingPrincipalId,
 			path.collectionId,
