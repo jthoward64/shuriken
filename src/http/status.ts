@@ -25,3 +25,4 @@ export const HTTP_REQUEST_ENTITY_TOO_LARGE = HttpStatus(413);
 export const HTTP_UNSUPPORTED_MEDIA_TYPE = HttpStatus(415);
 export const HTTP_INTERNAL_SERVER_ERROR = HttpStatus(500);
 export const HTTP_NOT_IMPLEMENTED = HttpStatus(501);
+export const HTTP_BAD_GATEWAY = HttpStatus(502);

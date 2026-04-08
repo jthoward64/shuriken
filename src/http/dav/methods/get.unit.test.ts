@@ -18,6 +18,7 @@ import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import {
 	HTTP_METHOD_NOT_ALLOWED,
+	HTTP_NOT_FOUND,
 	HTTP_OK,
 } from "#src/http/status.ts";
 import type { AclService } from "#src/services/acl/index.ts";
@@ -328,7 +329,7 @@ describe("getHandler — method not allowed", () => {
 		expect(err.status).toBe(HTTP_METHOD_NOT_ALLOWED);
 	});
 
-	it("returns 405 for kind: new-instance", async () => {
+	it("returns 404 for kind: new-instance", async () => {
 		const env = makeTestEnv();
 		const path: ResolvedDavPath = {
 			kind: "new-instance",
@@ -344,7 +345,7 @@ describe("getHandler — method not allowed", () => {
 			getHandler(path, authenticatedCtx),
 		)) as DavError;
 		expect(err._tag).toBe("DavError");
-		expect(err.status).toBe(HTTP_METHOD_NOT_ALLOWED);
+		expect(err.status).toBe(HTTP_NOT_FOUND);
 	});
 });
 

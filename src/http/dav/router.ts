@@ -31,9 +31,11 @@ import { PrincipalRepository } from "#src/services/principal/index.ts";
 import type { PrincipalService } from "#src/services/principal/service.ts";
 import type { CalTimezoneRepository } from "#src/services/timezone/index.ts";
 import type { TombstoneRepository } from "#src/services/tombstone/index.ts";
+import { copyHandler } from "./methods/copy.ts";
 import { deleteHandler } from "./methods/delete.ts";
 import { getHandler } from "./methods/get.ts";
 import { mkcolHandler } from "./methods/mkcol.ts";
+import { moveHandler } from "./methods/move.ts";
 import { optionsHandler } from "./methods/options.ts";
 import { propfindHandler } from "./methods/propfind.ts";
 import { proppatchHandler } from "./methods/proppatch.ts";
@@ -278,6 +280,10 @@ export const davRouter = (
 				return yield* putHandler(path, ctx, req);
 			case "DELETE":
 				return yield* deleteHandler(path, ctx);
+			case "COPY":
+				return yield* copyHandler(path, ctx, req);
+			case "MOVE":
+				return yield* moveHandler(path, ctx, req);
 			case "MKCOL":
 			case "MKCALENDAR":
 			case "MKADDRESSBOOK":
@@ -288,7 +294,7 @@ export const davRouter = (
 					status: HTTP_METHOD_NOT_ALLOWED,
 					headers: {
 						Allow:
-							"OPTIONS, GET, HEAD, PUT, DELETE, PROPFIND, PROPPATCH, MKCOL, REPORT",
+							"OPTIONS, GET, HEAD, PUT, DELETE, COPY, MOVE, PROPFIND, PROPPATCH, MKCOL, REPORT",
 					},
 				});
 		}

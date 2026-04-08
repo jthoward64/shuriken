@@ -19,9 +19,9 @@ describe("OPTIONS", () => {
 		);
 		for (const result of results) {
 			expect(result.failures, result.step.name).toEqual([]);
-			expect(result.headers["dav"]).toContain("calendar-access");
-			expect(result.headers["dav"]).toContain("addressbook");
-			expect(result.headers["dav"]).toContain("extended-mkcol");
+			expect(result.headers.dav).toContain("calendar-access");
+			expect(result.headers.dav).toContain("addressbook");
+			expect(result.headers.dav).toContain("extended-mkcol");
 		}
 	});
 
@@ -37,7 +37,7 @@ describe("OPTIONS", () => {
 		);
 		for (const result of results) {
 			expect(result.failures, result.step.name).toEqual([]);
-			expect(result.headers["dav"]).toContain("calendar-access");
+			expect(result.headers.dav).toContain("calendar-access");
 		}
 	});
 
@@ -53,7 +53,7 @@ describe("OPTIONS", () => {
 		);
 		for (const result of results) {
 			expect(result.failures, result.step.name).toEqual([]);
-			const allow = result.headers["allow"] ?? "";
+			const allow = result.headers.allow ?? "";
 			expect(allow).toContain("REPORT");
 			expect(allow).toContain("MKCALENDAR");
 			expect(allow).toContain("MKADDRESSBOOK");

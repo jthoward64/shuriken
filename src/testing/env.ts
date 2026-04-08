@@ -460,6 +460,22 @@ const makeCollectionRepo = (stores: TestStores): CollectionRepositoryShape => ({
 			stores.collections.set(id, deleted);
 			return deleted;
 		}),
+
+	relocate: (id, targetOwnerPrincipalId, targetSlug) =>
+		Effect.sync(() => {
+			const row = stores.collections.get(id);
+			if (!row || row.deletedAt !== null) {
+				throw new Error(`Collection not found for relocation: ${id}`);
+			}
+			const updated = {
+				...row,
+				ownerPrincipalId: targetOwnerPrincipalId,
+				slug: targetSlug,
+				updatedAt: Temporal.Now.instant(),
+			};
+			stores.collections.set(id, updated);
+			return updated;
+		}),
 });
 
 const makeInstanceRepo = (stores: TestStores): InstanceRepositoryShape => ({
@@ -556,6 +572,22 @@ const makeInstanceRepo = (stores: TestStores): InstanceRepositoryShape => ({
 					deletedAt: Temporal.Now.instant(),
 				});
 			}
+		}),
+
+	relocate: (id, targetCollectionId, targetSlug) =>
+		Effect.sync(() => {
+			const row = stores.instances.get(id);
+			if (!row || row.deletedAt !== null) {
+				throw new Error(`Instance not found for relocation: ${id}`);
+			}
+			const updated = {
+				...row,
+				collectionId: targetCollectionId,
+				slug: targetSlug,
+				updatedAt: Temporal.Now.instant(),
+			};
+			stores.instances.set(id, updated);
+			return updated;
 		}),
 });
 

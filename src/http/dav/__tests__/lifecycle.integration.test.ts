@@ -1,9 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import { makeCalEvent, makeVCard } from "#src/testing/data.ts";
 import {
-	PROPFIND_ALLPROP,
 	get,
 	mkcol,
+	PROPFIND_ALLPROP,
 	propfind,
 	put,
 	singleUser,
@@ -28,7 +28,10 @@ const eventV2 = makeCalEvent({
 	dtend: "20260115T130000Z",
 });
 
-const vcard = makeVCard({ uid: "lifecycle-001@example.com", fn: "Lifecycle Contact" });
+const vcard = makeVCard({
+	uid: "lifecycle-001@example.com",
+	fn: "Lifecycle Contact",
+});
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -59,7 +62,7 @@ describe("PUT → GET lifecycle", () => {
 		}
 		const getResult = results[1];
 		expect(getResult?.headers["content-type"]).toContain("text/calendar");
-		expect(getResult?.headers["etag"]).toBeTruthy();
+		expect(getResult?.headers.etag).toBeTruthy();
 	});
 
 	it("vCard GET after PUT returns correct Content-Type and FN", async () => {
@@ -161,7 +164,7 @@ describe("PUT update with conditional headers", () => {
 						"text/calendar; charset=utf-8",
 						{
 							as: "test",
-							headers: { "If-Match": prev[0]?.headers["etag"] ?? "" },
+							headers: { "If-Match": prev[0]?.headers.etag ?? "" },
 							expect: { status: 204 },
 						},
 					),

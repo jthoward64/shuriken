@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { makeCalEvent, makeVCalendar, makeVEvent } from "#src/testing/data.ts";
+import { makeCalEvent } from "#src/testing/data.ts";
 import {
 	mkcol,
 	put,
@@ -375,18 +375,14 @@ describe("calendar-query REPORT", () => {
 		const results = await runScript(
 			[
 				...SETUP,
-				report(
-					"/dav/principals/test/cal/report-cal/",
-					querySummaryNotJanuary,
-					{
-						as: "test",
-						expect: {
-							status: 207,
-							bodyContains: FEB_UID,
-							bodyNotContains: JAN_UID,
-						},
+				report("/dav/principals/test/cal/report-cal/", querySummaryNotJanuary, {
+					as: "test",
+					expect: {
+						status: 207,
+						bodyContains: FEB_UID,
+						bodyNotContains: JAN_UID,
 					},
-				),
+				}),
 			],
 			singleUser(),
 		);

@@ -252,6 +252,7 @@ const makeRouterLayer = (
 		listByOwner: () => Effect.succeed([]),
 		insert: () => Effect.die("not implemented in router tests"),
 		softDelete: () => Effect.die("not implemented in router tests"),
+		relocate: () => Effect.die("not implemented in router tests"),
 	};
 
 	const instanceRepo: InstanceRepositoryShape = {
@@ -288,6 +289,7 @@ const makeRouterLayer = (
 		insert: () => Effect.die("not implemented in router tests"),
 		updateEtag: () => Effect.die("not implemented in router tests"),
 		softDelete: () => Effect.die("not implemented in router tests"),
+		relocate: () => Effect.die("not implemented in router tests"),
 	};
 
 	return Layer.mergeAll(

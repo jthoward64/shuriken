@@ -38,11 +38,21 @@ export const makeVEvent = (opts: {
 		`DTEND:${opts.dtend}`,
 		`SUMMARY:${opts.summary}`,
 	];
-	if (opts.rrule !== undefined) lines.push(`RRULE:${opts.rrule}`);
-	if (opts.description !== undefined) lines.push(`DESCRIPTION:${opts.description}`);
-	if (opts.location !== undefined) lines.push(`LOCATION:${opts.location}`);
-	if (opts.status !== undefined) lines.push(`STATUS:${opts.status}`);
-	if (opts.extra !== undefined) lines.push(opts.extra);
+	if (opts.rrule !== undefined) {
+		lines.push(`RRULE:${opts.rrule}`);
+	}
+	if (opts.description !== undefined) {
+		lines.push(`DESCRIPTION:${opts.description}`);
+	}
+	if (opts.location !== undefined) {
+		lines.push(`LOCATION:${opts.location}`);
+	}
+	if (opts.status !== undefined) {
+		lines.push(`STATUS:${opts.status}`);
+	}
+	if (opts.extra !== undefined) {
+		lines.push(opts.extra);
+	}
 	lines.push("END:VEVENT");
 	return lines.join(CRLF);
 };
@@ -91,7 +101,9 @@ export const makeVCard = (opts: {
 		`UID:${opts.uid}`,
 		`FN:${opts.fn}`,
 	];
-	if (opts.extra !== undefined) lines.push(opts.extra);
+	if (opts.extra !== undefined) {
+		lines.push(opts.extra);
+	}
 	lines.push("END:VCARD");
 	lines.push("");
 	return lines.join(CRLF);

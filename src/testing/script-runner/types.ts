@@ -8,9 +8,11 @@
 // ---------------------------------------------------------------------------
 
 export type HttpMethod =
+	| "COPY"
 	| "DELETE"
 	| "GET"
 	| "MKCOL"
+	| "MOVE"
 	| "OPTIONS"
 	| "PROPFIND"
 	| "PROPPATCH"

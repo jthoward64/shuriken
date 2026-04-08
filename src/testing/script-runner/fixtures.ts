@@ -120,6 +120,64 @@ export const del = (path: string, options?: StepOptions): ScriptStep => ({
 	expect: options?.expect ?? { status: 204 },
 });
 
+/** COPY — duplicate a resource at the destination. Expects 201 by default.
+ *
+ * The `destination` may be an absolute URI or a path (prefixed with
+ * `http://localhost` automatically). The default Overwrite is "T". */
+export const copy = (
+	path: string,
+	destination: string,
+	options?: StepOptions & {
+		readonly overwrite?: "T" | "F";
+		readonly depth?: "0" | "infinity";
+	},
+): ScriptStep => {
+	const destUri = destination.startsWith("http")
+		? destination
+		: `http://localhost${destination}`;
+	return {
+		name: options?.name ?? `COPY ${path} -> ${destination}`,
+		method: "COPY",
+		path,
+		as: options?.as,
+		headers: {
+			Destination: destUri,
+			...(options?.overwrite !== undefined ? { Overwrite: options.overwrite } : {}),
+			...(options?.depth !== undefined ? { Depth: options.depth } : {}),
+			...options?.headers,
+		},
+		expect: options?.expect ?? { status: 201 },
+	};
+};
+
+/** MOVE — relocate a resource to the destination. Expects 201 by default.
+ *
+ * The `destination` may be an absolute URI or a path (prefixed with
+ * `http://localhost` automatically). The default Overwrite is "T". */
+export const move = (
+	path: string,
+	destination: string,
+	options?: StepOptions & {
+		readonly overwrite?: "T" | "F";
+	},
+): ScriptStep => {
+	const destUri = destination.startsWith("http")
+		? destination
+		: `http://localhost${destination}`;
+	return {
+		name: options?.name ?? `MOVE ${path} -> ${destination}`,
+		method: "MOVE",
+		path,
+		as: options?.as,
+		headers: {
+			Destination: destUri,
+			...(options?.overwrite !== undefined ? { Overwrite: options.overwrite } : {}),
+			...options?.headers,
+		},
+		expect: options?.expect ?? { status: 201 },
+	};
+};
+
 /** GET — retrieve a resource. Expects 200 by default. */
 export const get = (path: string, options?: StepOptions): ScriptStep => ({
 	name: options?.name ?? `GET ${path}`,

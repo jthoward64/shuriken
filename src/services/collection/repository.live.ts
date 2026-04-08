@@ -108,6 +108,31 @@ const insert = Effect.fn("CollectionRepository.insert")(function* (
 	});
 }, Effect.tapError((e) => Effect.logWarning("repo.collection.insert failed", e.cause)));
 
+const relocate = Effect.fn("CollectionRepository.relocate")(function* (
+	db: DbClient,
+	id: CollectionId,
+	targetOwnerPrincipalId: PrincipalId,
+	targetSlug: Slug,
+) {
+	yield* Effect.logTrace("repo.collection.relocate", { id, targetOwnerPrincipalId, targetSlug });
+	return yield* Effect.tryPromise({
+		try: () =>
+			db
+				.update(davCollection)
+				.set({ ownerPrincipalId: targetOwnerPrincipalId, slug: targetSlug, updatedAt: sql`now()` })
+				.where(and(eq(davCollection.id, id), isNull(davCollection.deletedAt)))
+				.returning()
+				.then((rows) => {
+					const row = rows[0];
+					if (!row) {
+						throw new Error(`Collection not found for relocation: ${id}`);
+					}
+					return row;
+				}),
+		catch: (e) => new DatabaseError({ cause: e }),
+	});
+}, Effect.tapError((e) => Effect.logWarning("repo.collection.relocate failed", e.cause)));
+
 const softDelete = Effect.fn("CollectionRepository.softDelete")(function* (
 	db: DbClient,
 	id: CollectionId,
@@ -140,6 +165,7 @@ export const CollectionRepositoryLive = Layer.effect(
 			listByOwner: (owner) => listByOwner(db, owner),
 			insert: (input) => insert(db, input),
 			softDelete: (id) => softDelete(db, id),
+			relocate: (id, owner, slug) => relocate(db, id, owner, slug),
 		}),
 	),
 );

@@ -39,6 +39,13 @@ export interface CollectionRepositoryShape {
 		input: NewCollection,
 	) => Effect.Effect<CollectionRow, DatabaseError>;
 	readonly softDelete: (id: CollectionId) => Effect.Effect<CollectionRow, DatabaseError>;
+	/** Move a collection to a different owner principal and/or slug in-place.
+	 * All instances follow automatically via their collectionId FK. */
+	readonly relocate: (
+		id: CollectionId,
+		targetOwnerPrincipalId: PrincipalId,
+		targetSlug: Slug,
+	) => Effect.Effect<CollectionRow, DatabaseError>;
 }
 
 export class CollectionRepository extends Context.Tag("CollectionRepository")<

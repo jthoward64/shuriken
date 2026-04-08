@@ -190,6 +190,31 @@ const softDelete = Effect.fn("InstanceRepository.softDelete")(function* (
 	});
 }, Effect.tapError((e) => Effect.logWarning("repo.instance.softDelete failed", e.cause)));
 
+const relocate = Effect.fn("InstanceRepository.relocate")(function* (
+	db: DbClient,
+	id: InstanceId,
+	targetCollectionId: CollectionId,
+	targetSlug: Slug,
+) {
+	yield* Effect.logTrace("repo.instance.relocate", { id, targetCollectionId, targetSlug });
+	return yield* Effect.tryPromise({
+		try: () =>
+			db
+				.update(davInstance)
+				.set({ collectionId: targetCollectionId, slug: targetSlug, updatedAt: sql`now()` })
+				.where(and(eq(davInstance.id, id), isNull(davInstance.deletedAt)))
+				.returning()
+				.then((rows) => {
+					const row = rows[0];
+					if (!row) {
+						throw new Error(`Instance not found for relocation: ${id}`);
+					}
+					return row;
+				}),
+		catch: (e) => new DatabaseError({ cause: e }),
+	});
+}, Effect.tapError((e) => Effect.logWarning("repo.instance.relocate failed", e.cause)));
+
 export const InstanceRepositoryLive = Layer.effect(
 	InstanceRepository,
 	Effect.map(DatabaseClient, (db) =>
@@ -202,6 +227,7 @@ export const InstanceRepositoryLive = Layer.effect(
 			insert: (input) => insertInstance(db, input),
 			updateEtag: (id, etag) => updateEtag(db, id, etag),
 			softDelete: (id) => softDelete(db, id),
+			relocate: (id, col, slug) => relocate(db, id, col, slug),
 		}),
 	),
 );

@@ -9,6 +9,7 @@ import {
 	InternalError,
 	forbidden,
 	methodNotAllowed,
+	notFound,
 } from "#src/domain/errors.ts";
 import { EntityId } from "#src/domain/ids.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
@@ -52,6 +53,11 @@ export const getHandler = (
 > =>
 	Effect.gen(function* () {
 		// 1. Only instance paths accept GET/HEAD.
+		// new-instance/new-collection means the path is structurally valid but
+		// the resource does not exist → 404. Any other kind → 405.
+		if (path.kind === "new-instance" || path.kind === "new-collection") {
+			return yield* notFound("Resource not found");
+		}
 		if (path.kind !== "instance") {
 			return yield* methodNotAllowed();
 		}

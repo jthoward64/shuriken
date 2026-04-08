@@ -49,6 +49,13 @@ export interface InstanceRepositoryShape {
 		etag: ETag,
 	) => Effect.Effect<void, DatabaseError>;
 	readonly softDelete: (id: InstanceId) => Effect.Effect<void, DatabaseError>;
+	/** Move an instance to a different collection and/or slug in-place.
+	 * Preserves entity identity, etag, lastModified, and clientProperties. */
+	readonly relocate: (
+		id: InstanceId,
+		targetCollectionId: CollectionId,
+		targetSlug: Slug,
+	) => Effect.Effect<InstanceRow, DatabaseError>;
 }
 
 export class InstanceRepository extends Context.Tag("InstanceRepository")<

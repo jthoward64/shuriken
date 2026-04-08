@@ -39,7 +39,7 @@ describe("GET", () => {
 		}
 		const getResult = results[1];
 		expect(getResult?.headers["content-type"]).toContain("text/calendar");
-		expect(getResult?.headers["etag"]).toBeTruthy();
+		expect(getResult?.headers.etag).toBeTruthy();
 	});
 
 	it("returns the vCard body with correct Content-Type after PUT", async () => {
@@ -83,12 +83,12 @@ describe("GET", () => {
 		}
 	});
 
-	it("returns 405 on an unknown instance path (new-instance kind)", async () => {
+	it("returns 404 on an unknown instance path (new-instance kind)", async () => {
 		const results = await runScript(
 			[
 				get("/dav/principals/test/cal/primary/no-such-event.ics", {
 					as: "test",
-					expect: { status: 405 },
+					expect: { status: 404 },
 				}),
 			],
 			singleUser(),
@@ -124,7 +124,7 @@ describe("HEAD", () => {
 			expect(result.failures, result.step.name).toEqual([]);
 		}
 		const headResult = results[1];
-		expect(headResult?.headers["etag"]).toBeTruthy();
+		expect(headResult?.headers.etag).toBeTruthy();
 		expect(headResult?.headers["content-type"]).toContain("text/calendar");
 	});
 });
