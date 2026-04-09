@@ -190,9 +190,7 @@ const evalCompFilter = (
 ): boolean => {
 	if (f.name !== comp.name) {
 		// comp-filter applies to a different component name — look in children
-		return comp.components.some((child) =>
-			evalCompFilter(child, f, vcalRoot),
-		);
+		return comp.components.some((child) => evalCompFilter(child, f, vcalRoot));
 	}
 
 	if (f.isNotDefined) {
@@ -304,7 +302,8 @@ const evalComponentTimeRange = (
 			vcalRoot,
 			comp,
 			range.start ?? Temporal.Instant.fromEpochMilliseconds(0),
-			range.end ?? Temporal.Instant.fromEpochMilliseconds(Number.MAX_SAFE_INTEGER),
+			range.end ??
+				Temporal.Instant.fromEpochMilliseconds(Number.MAX_SAFE_INTEGER),
 		);
 	}
 

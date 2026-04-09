@@ -46,7 +46,12 @@ export const addressbookMultigetHandler = (
 		const actingPrincipalId = ctx.auth.principal.principalId;
 
 		const acl = yield* AclService;
-		yield* acl.check(actingPrincipalId, path.collectionId, "collection", "DAV:read");
+		yield* acl.check(
+			actingPrincipalId,
+			path.collectionId,
+			"collection",
+			"DAV:read",
+		);
 
 		const hrefs = extractHrefs(tree);
 		const propNames = extractPropNames(tree);

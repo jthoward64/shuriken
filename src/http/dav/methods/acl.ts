@@ -277,7 +277,8 @@ export const aclHandler = (
 			path.kind === "groupMemberNonExistent" ||
 			path.kind === "user" ||
 			path.kind === "group" ||
-			path.kind === "groupMember"
+			path.kind === "groupMember" ||
+			path.kind === "unknownPrincipal"
 		) {
 			return yield* Effect.fail(notFound());
 		}

@@ -69,7 +69,9 @@ export const PrincipalRepositoryLive = Layer.effect(
 			),
 		);
 
-		const findPrincipalBySlug = Effect.fn("PrincipalRepository.findPrincipalBySlug")(
+		const findPrincipalBySlug = Effect.fn(
+			"PrincipalRepository.findPrincipalBySlug",
+		)(
 			function* (slug: Slug) {
 				yield* Effect.logTrace("repo.principal.findPrincipalBySlug", { slug });
 				return yield* Effect.tryPromise({

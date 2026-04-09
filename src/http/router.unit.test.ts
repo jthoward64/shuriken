@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { Effect, Layer } from "effect";
 import { AuthService } from "#src/auth/service.ts";
 import { AuthError, DatabaseError } from "#src/domain/errors.ts";
+import type { PrincipalId, UserId } from "#src/domain/ids.ts";
 import { Authenticated, type Unauthenticated } from "#src/domain/types/dav.ts";
 import {
 	CollectionRepository as CollectionRepoTag,
@@ -11,7 +12,6 @@ import {
 import { AclService } from "#src/services/acl/index.ts";
 import { CalIndexRepository } from "#src/services/cal-index/index.ts";
 import { CardIndexRepository } from "#src/services/card-index/index.ts";
-import type { CollectionRepository } from "#src/services/collection/index.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
 import { EntityRepository } from "#src/services/entity/index.ts";
@@ -49,13 +49,8 @@ const authLayer = (
 
 const authenticated = new Authenticated({
 	principal: {
-		id: "00000000-0000-4000-8000-000000000001" as Parameters<
-			typeof Authenticated
-		>[0]["principal"]["id"],
-		slug: "test",
-		userId: "00000000-0000-4000-8000-000000000001" as Parameters<
-			typeof Authenticated
-		>[0]["principal"]["userId"],
+		principalId: "00000000-0000-4000-8000-000000000001" as PrincipalId,
+		userId: "00000000-0000-4000-8000-000000000002" as UserId,
 		displayName: "Test User",
 	},
 });
@@ -66,6 +61,7 @@ const stubLayers = Layer.mergeAll(
 	Layer.succeed(PrincipalRepository, {
 		findById: die,
 		findBySlug: die,
+		findPrincipalBySlug: die,
 		findByEmail: die,
 		findUserByUserId: die,
 		updateProperties: die,
@@ -78,7 +74,7 @@ const stubLayers = Layer.mergeAll(
 		softDelete: die,
 		relocate: die,
 		updateProperties: die,
-	} as unknown as CollectionRepository),
+	}),
 	Layer.succeed(InstanceRepository, {
 		findById: die,
 		findBySlug: die,

@@ -26,7 +26,10 @@ const zdtProp = (name: string, isoStr: string) => ({
 const textProp = (name: string, value: string) => ({
 	name,
 	parameters: [] as [],
-	value: { type: name === "RRULE" ? ("RECUR" as const) : ("TEXT" as const), value },
+	value: {
+		type: name === "RRULE" ? ("RECUR" as const) : ("TEXT" as const),
+		value,
+	},
 	isKnown: true,
 });
 
@@ -58,10 +61,10 @@ const makeVevent = (
 	dtstart: ReturnType<typeof zdtProp> | ReturnType<typeof dateProp>,
 	rrule: string,
 	extra: Array<
-		ReturnType<typeof zdtProp> |
-		ReturnType<typeof dateProp> |
-		ReturnType<typeof zdtListProp> |
-		ReturnType<typeof textProp>
+		| ReturnType<typeof zdtProp>
+		| ReturnType<typeof dateProp>
+		| ReturnType<typeof zdtListProp>
+		| ReturnType<typeof textProp>
 	> = [],
 ): IrComponent => ({
 	name: "VEVENT",

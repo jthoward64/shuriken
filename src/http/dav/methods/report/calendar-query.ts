@@ -166,9 +166,14 @@ export const calendarQueryHandler = (
 						return { weekStart: null, weekEnd: null };
 					}
 					const zdt = timeRange.start.toZonedDateTimeISO("UTC");
-					const startOfWeek = zdt
-						.subtract({ days: zdt.dayOfWeek - 1 })
-						.with({ hour: 0, minute: 0, second: 0, millisecond: 0, microsecond: 0, nanosecond: 0 });
+					const startOfWeek = zdt.subtract({ days: zdt.dayOfWeek - 1 }).with({
+						hour: 0,
+						minute: 0,
+						second: 0,
+						millisecond: 0,
+						microsecond: 0,
+						nanosecond: 0,
+					});
 					return {
 						weekStart: startOfWeek.toInstant(),
 						weekEnd: startOfWeek.add({ weeks: 1 }).toInstant(),

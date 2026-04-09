@@ -12,8 +12,8 @@ import {
 // Fixtures
 // ---------------------------------------------------------------------------
 
-const CardavNs = "urn:ietf:params:xml:ns:carddav";
-const cn = (l: string): string => `{${CardavNs}}${l}`;
+const CarddavNs = "urn:ietf:params:xml:ns:carddav";
+const cn = (l: string): string => `{${CarddavNs}}${l}`;
 
 const textProp = (
 	name: string,
@@ -128,11 +128,11 @@ describe("parseCardFilter — valid inputs", () => {
 		);
 		expect(result.propFilters).toHaveLength(1);
 		const pf = result.propFilters[0];
-		expect(pf.name).toBe("FN");
-		expect(pf.test).toBe("allof");
-		expect(pf.isNotDefined).toBe(false);
-		expect(pf.textMatches).toEqual([]);
-		expect(pf.paramFilters).toEqual([]);
+		expect(pf?.name).toBe("FN");
+		expect(pf?.test).toBe("allof");
+		expect(pf?.isNotDefined).toBe(false);
+		expect(pf?.textMatches).toEqual([]);
+		expect(pf?.paramFilters).toEqual([]);
 	});
 
 	it("parses multiple prop-filters from array", async () => {
@@ -148,9 +148,9 @@ describe("parseCardFilter — valid inputs", () => {
 			}),
 		);
 		expect(result.propFilters).toHaveLength(3);
-		expect(result.propFilters[0].name).toBe("FN");
-		expect(result.propFilters[1].name).toBe("EMAIL");
-		expect(result.propFilters[2].name).toBe("TEL");
+		expect(result.propFilters[0]?.name).toBe("FN");
+		expect(result.propFilters[1]?.name).toBe("EMAIL");
+		expect(result.propFilters[2]?.name).toBe("TEL");
 	});
 
 	it("parses is-not-defined inside prop-filter", async () => {
@@ -164,7 +164,7 @@ describe("parseCardFilter — valid inputs", () => {
 				},
 			}),
 		);
-		expect(result.propFilters[0].isNotDefined).toBe(true);
+		expect(result.propFilters[0]?.isNotDefined).toBe(true);
 	});
 
 	it("parses prop-filter test=anyof", async () => {
@@ -178,7 +178,7 @@ describe("parseCardFilter — valid inputs", () => {
 				},
 			}),
 		);
-		expect(result.propFilters[0].test).toBe("anyof");
+		expect(result.propFilters[0]?.test).toBe("anyof");
 	});
 
 	it("parses text-match with all attributes", async () => {
@@ -197,11 +197,11 @@ describe("parseCardFilter — valid inputs", () => {
 				},
 			}),
 		);
-		const tm = result.propFilters[0].textMatches[0];
-		expect(tm.value).toBe("Alice");
-		expect(tm.collation).toBe("i;unicode-casemap");
-		expect(tm.matchType).toBe("starts-with");
-		expect(tm.negate).toBe(true);
+		const tm = result.propFilters[0]?.textMatches[0];
+		expect(tm?.value).toBe("Alice");
+		expect(tm?.collation).toBe("i;unicode-casemap");
+		expect(tm?.matchType).toBe("starts-with");
+		expect(tm?.negate).toBe(true);
 	});
 
 	it("parses text-match defaults (ascii-casemap, contains, no negate)", async () => {
@@ -215,10 +215,10 @@ describe("parseCardFilter — valid inputs", () => {
 				},
 			}),
 		);
-		const tm = result.propFilters[0].textMatches[0];
-		expect(tm.collation).toBe("i;ascii-casemap");
-		expect(tm.matchType).toBe("contains");
-		expect(tm.negate).toBe(false);
+		const tm = result.propFilters[0]?.textMatches[0];
+		expect(tm?.collation).toBe("i;ascii-casemap");
+		expect(tm?.matchType).toBe("contains");
+		expect(tm?.negate).toBe(false);
 	});
 
 	it("parses text-match with invalid match-type as contains", async () => {
@@ -235,7 +235,7 @@ describe("parseCardFilter — valid inputs", () => {
 				},
 			}),
 		);
-		expect(result.propFilters[0].textMatches[0].matchType).toBe("contains");
+		expect(result.propFilters[0]?.textMatches[0]?.matchType).toBe("contains");
 	});
 
 	it("parses all four match types", async () => {
@@ -255,7 +255,7 @@ describe("parseCardFilter — valid inputs", () => {
 					},
 				}),
 			);
-			expect(result.propFilters[0].textMatches[0].matchType).toBe(matchType);
+			expect(result.propFilters[0]?.textMatches[0]?.matchType).toBe(matchType);
 		}
 	});
 
@@ -273,10 +273,10 @@ describe("parseCardFilter — valid inputs", () => {
 				},
 			}),
 		);
-		expect(result.propFilters[0].textMatches).toHaveLength(2);
-		expect(result.propFilters[0].textMatches[0].value).toBe("Alice");
-		expect(result.propFilters[0].textMatches[1].value).toBe("Bob");
-		expect(result.propFilters[0].textMatches[1].matchType).toBe("ends-with");
+		expect(result.propFilters[0]?.textMatches).toHaveLength(2);
+		expect(result.propFilters[0]?.textMatches[0]?.value).toBe("Alice");
+		expect(result.propFilters[0]?.textMatches[1]?.value).toBe("Bob");
+		expect(result.propFilters[0]?.textMatches[1]?.matchType).toBe("ends-with");
 	});
 
 	it("parses param-filter with is-not-defined", async () => {
@@ -293,10 +293,10 @@ describe("parseCardFilter — valid inputs", () => {
 				},
 			}),
 		);
-		const paramFilter = result.propFilters[0].paramFilters[0];
-		expect(paramFilter.name).toBe("TYPE");
-		expect(paramFilter.isNotDefined).toBe(true);
-		expect(paramFilter.textMatch).toBeUndefined();
+		const paramFilter = result.propFilters[0]?.paramFilters[0];
+		expect(paramFilter?.name).toBe("TYPE");
+		expect(paramFilter?.isNotDefined).toBe(true);
+		expect(paramFilter?.textMatch).toBeUndefined();
 	});
 
 	it("parses param-filter with text-match", async () => {
@@ -313,9 +313,9 @@ describe("parseCardFilter — valid inputs", () => {
 				},
 			}),
 		);
-		const paramFilter = result.propFilters[0].paramFilters[0];
-		expect(paramFilter.textMatch).toBeDefined();
-		expect(paramFilter.textMatch?.value).toBe("work");
+		const paramFilter = result.propFilters[0]?.paramFilters[0];
+		expect(paramFilter?.textMatch).toBeDefined();
+		expect(paramFilter?.textMatch?.value).toBe("work");
 	});
 
 	it("parses multiple param-filters as array", async () => {
@@ -332,10 +332,10 @@ describe("parseCardFilter — valid inputs", () => {
 				},
 			}),
 		);
-		expect(result.propFilters[0].paramFilters).toHaveLength(2);
-		expect(result.propFilters[0].paramFilters[0].name).toBe("TYPE");
-		expect(result.propFilters[0].paramFilters[1].name).toBe("PREF");
-		expect(result.propFilters[0].paramFilters[1].isNotDefined).toBe(true);
+		expect(result.propFilters[0]?.paramFilters).toHaveLength(2);
+		expect(result.propFilters[0]?.paramFilters[0]?.name).toBe("TYPE");
+		expect(result.propFilters[0]?.paramFilters[1]?.name).toBe("PREF");
+		expect(result.propFilters[0]?.paramFilters[1]?.isNotDefined).toBe(true);
 	});
 });
 
@@ -709,9 +709,7 @@ describe("evaluateCardFilter — param-filter", () => {
 				doc,
 				allof([
 					propFilter("EMAIL", {
-						paramFilters: [
-							{ name: "TYPE", isNotDefined: true, textMatches: [] },
-						],
+						paramFilters: [{ name: "TYPE", isNotDefined: true }],
 					}),
 				]),
 			),
@@ -727,9 +725,7 @@ describe("evaluateCardFilter — param-filter", () => {
 				doc,
 				allof([
 					propFilter("EMAIL", {
-						paramFilters: [
-							{ name: "TYPE", isNotDefined: true, textMatches: [] },
-						],
+						paramFilters: [{ name: "TYPE", isNotDefined: true }],
 					}),
 				]),
 			),
@@ -743,7 +739,7 @@ describe("evaluateCardFilter — param-filter", () => {
 				doc,
 				allof([
 					propFilter("EMAIL", {
-						paramFilters: [{ name: "TYPE", textMatches: [] }],
+						paramFilters: [{ name: "TYPE" }],
 					}),
 				]),
 			),
@@ -759,7 +755,7 @@ describe("evaluateCardFilter — param-filter", () => {
 				doc,
 				allof([
 					propFilter("EMAIL", {
-						paramFilters: [{ name: "TYPE", textMatches: [] }],
+						paramFilters: [{ name: "TYPE" }],
 					}),
 				]),
 			),
@@ -775,7 +771,7 @@ describe("evaluateCardFilter — param-filter", () => {
 				doc,
 				allof([
 					propFilter("EMAIL", {
-						paramFilters: [{ name: "TYPE", textMatches: [] }],
+						paramFilters: [{ name: "TYPE" }],
 					}),
 				]),
 			),
@@ -795,7 +791,6 @@ describe("evaluateCardFilter — param-filter", () => {
 							{
 								name: "TYPE",
 								textMatch: textMatch("work", { matchType: "equals" }),
-								textMatches: [],
 							},
 						],
 					}),
@@ -817,7 +812,6 @@ describe("evaluateCardFilter — param-filter", () => {
 							{
 								name: "TYPE",
 								textMatch: textMatch("work", { matchType: "equals" }),
-								textMatches: [],
 							},
 						],
 					}),
@@ -843,7 +837,6 @@ describe("evaluateCardFilter — param-filter", () => {
 							{
 								name: "TYPE",
 								textMatch: textMatch("work", { matchType: "equals" }),
-								textMatches: [],
 							},
 						],
 					}),

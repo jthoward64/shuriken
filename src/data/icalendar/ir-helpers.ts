@@ -7,14 +7,11 @@ import { Temporal } from "temporal-polyfill";
 import type { IrComponent, IrProperty } from "#src/data/ir.ts";
 
 /** Retrieve the DTSTART property from a component, or undefined if absent. */
-export const getDtstartProp = (
-	comp: IrComponent,
-): IrProperty | undefined => comp.properties.find((p) => p.name === "DTSTART");
+export const getDtstartProp = (comp: IrComponent): IrProperty | undefined =>
+	comp.properties.find((p) => p.name === "DTSTART");
 
 /** Retrieve the DTEND (or DUE for VTODO) property, or undefined if absent. */
-export const getDtendProp = (
-	comp: IrComponent,
-): IrProperty | undefined =>
+export const getDtendProp = (comp: IrComponent): IrProperty | undefined =>
 	comp.properties.find((p) => p.name === "DTEND") ??
 	comp.properties.find((p) => p.name === "DUE");
 

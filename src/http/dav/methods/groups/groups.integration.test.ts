@@ -27,7 +27,9 @@ const mkgroup = (slug: string, as: string, body?: string) => ({
 	method: "MKCOL" as const,
 	path: `/dav/groups/${slug}/`,
 	as,
-	headers: body ? { "Content-Type": "application/xml; charset=utf-8" } : {},
+	headers: body
+		? { "Content-Type": "application/xml; charset=utf-8" }
+		: undefined,
 	body,
 	expect: { status: 201 },
 });

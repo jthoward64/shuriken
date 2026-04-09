@@ -241,9 +241,9 @@ const indexRruleOccurrences = Effect.fn(
 				continue;
 			}
 
-			const months = [
-				...new Set(sample.map((d) => d.month)),
-			].sort((a, b) => a - b);
+			const months = [...new Set(sample.map((d) => d.month))].sort(
+				(a, b) => a - b,
+			);
 			const dayMin = Math.min(...sample.map((d) => d.day));
 			const dayMax = Math.max(...sample.map((d) => d.day));
 
@@ -262,10 +262,7 @@ const indexRruleOccurrences = Effect.fn(
 		}
 	},
 	Effect.tapError((e) =>
-		Effect.logWarning(
-			"repo.cal-index.indexRruleOccurrences failed",
-			e.cause,
-		),
+		Effect.logWarning("repo.cal-index.indexRruleOccurrences failed", e.cause),
 	),
 );
 
@@ -273,12 +270,26 @@ export const CalIndexRepositoryLive = Layer.effect(
 	CalIndexRepository,
 	Effect.map(DatabaseClient, (db) =>
 		CalIndexRepository.of({
-			findByTimeRange: (collectionId, componentType, start, end, weekStart, weekEnd) =>
-				findByTimeRange(db, collectionId, componentType, start, end, weekStart, weekEnd),
+			findByTimeRange: (
+				collectionId,
+				componentType,
+				start,
+				end,
+				weekStart,
+				weekEnd,
+			) =>
+				findByTimeRange(
+					db,
+					collectionId,
+					componentType,
+					start,
+					end,
+					weekStart,
+					weekEnd,
+				),
 			findByComponentType: (collectionId, componentType) =>
 				findByComponentType(db, collectionId, componentType),
-			indexRruleOccurrences: (entityId) =>
-				indexRruleOccurrences(db, entityId),
+			indexRruleOccurrences: (entityId) => indexRruleOccurrences(db, entityId),
 		}),
 	),
 );

@@ -20,7 +20,9 @@ import type { IrComponent, IrValue } from "#src/data/ir.ts";
 // ---------------------------------------------------------------------------
 
 /** Single date/time IrValue → @js-temporal/polyfill ZonedDateTime, or undefined. */
-const irSingleValueToJsZdt = (v: IrValue): JSTemporal.ZonedDateTime | undefined => {
+const irSingleValueToJsZdt = (
+	v: IrValue,
+): JSTemporal.ZonedDateTime | undefined => {
 	if (v.type === "DATE_TIME") {
 		return JSTemporal.ZonedDateTime.from(v.value.toString());
 	}
@@ -78,7 +80,9 @@ export const hasOccurrenceInRange = (
 
 	// 2. DTSTART → @js-temporal/polyfill ZonedDateTime
 	const dtstartProp = vevent.properties.find((p) => p.name === "DTSTART");
-	const dtstart = dtstartProp ? irSingleValueToJsZdt(dtstartProp.value) : undefined;
+	const dtstart = dtstartProp
+		? irSingleValueToJsZdt(dtstartProp.value)
+		: undefined;
 
 	// 3a. exDate from EXDATE properties
 	const exDate: Array<JSTemporal.ZonedDateTime> = [];
@@ -101,7 +105,9 @@ export const hasOccurrenceInRange = (
 			if (sibUid?.type !== "TEXT" || sibUid.value !== uid) {
 				continue;
 			}
-			const recIdProp = sibling.properties.find((p) => p.name === "RECURRENCE-ID");
+			const recIdProp = sibling.properties.find(
+				(p) => p.name === "RECURRENCE-ID",
+			);
 			if (!recIdProp) {
 				continue;
 			}

@@ -222,7 +222,8 @@ export const proppatchHandler = (
 			path.kind === "newGroup" ||
 			path.kind === "groupMembers" ||
 			path.kind === "groupMember" ||
-			path.kind === "groupMemberNonExistent"
+			path.kind === "groupMemberNonExistent" ||
+			path.kind === "unknownPrincipal"
 		) {
 			return yield* notFound();
 		}

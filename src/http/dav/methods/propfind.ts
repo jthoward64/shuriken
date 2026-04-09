@@ -251,7 +251,8 @@ export const propfindHandler = (
 			path.kind === "newGroup" ||
 			path.kind === "groupMembers" ||
 			path.kind === "groupMember" ||
-			path.kind === "groupMemberNonExistent"
+			path.kind === "groupMemberNonExistent" ||
+			path.kind === "unknownPrincipal"
 		) {
 			return yield* notFound();
 		}
@@ -355,7 +356,9 @@ export const propfindHandler = (
 					);
 					const instProps: Record<ClarkName, unknown> = {
 						...buildInstanceProps(inst),
-						[CURRENT_USER_PRINCIPAL]: { [cn(DAV_NS, "href")]: actingPrincipalHref },
+						[CURRENT_USER_PRINCIPAL]: {
+							[cn(DAV_NS, "href")]: actingPrincipalHref,
+						},
 					};
 					responses.push({
 						href: iHref,

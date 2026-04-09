@@ -377,8 +377,14 @@ describe("sync-collection REPORT — error cases", () => {
 // Addressbook sync
 // ---------------------------------------------------------------------------
 
-const contact1 = makeVCard({ uid: "sync-card-001@example.com", fn: "Sync Contact One" });
-const contact2 = makeVCard({ uid: "sync-card-002@example.com", fn: "Sync Contact Two" });
+const contact1 = makeVCard({
+	uid: "sync-card-001@example.com",
+	fn: "Sync Contact One",
+});
+const contact2 = makeVCard({
+	uid: "sync-card-002@example.com",
+	fn: "Sync Contact Two",
+});
 
 describe("sync-collection REPORT — addressbook", () => {
 	// RFC 6578 applies to any WebDAV collection type, not just calendars.

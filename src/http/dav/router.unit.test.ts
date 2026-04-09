@@ -103,13 +103,12 @@ const stubPrincipalService: PrincipalServiceShape =
 	stubService<PrincipalServiceShape>();
 
 /** No-op EntityRepository — router path resolution never touches entity/component storage. */
-const noopEntityRepo: EntityRepositoryShape = stubService<EntityRepositoryShape>(
-	{
+const noopEntityRepo: EntityRepositoryShape =
+	stubService<EntityRepositoryShape>({
 		findById: () => Effect.succeed(Option.none()),
 		updateLogicalUid: () => Effect.void,
 		softDelete: () => Effect.void,
-	},
-);
+	});
 
 /** No-op ComponentRepository — router path resolution never touches entity/component storage. */
 const noopComponentRepo: ComponentRepositoryShape =

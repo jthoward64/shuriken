@@ -398,11 +398,7 @@ export const davRouter = (
 		// Principal does not exist — MKCOL/MKCALENDAR/PUT → 409 (missing intermediate
 		// collection, RFC 4918 §9.3.1 / §9.7); everything else → 404.
 		if (path.kind === "unknownPrincipal") {
-			if (
-				method === "MKCOL" ||
-				method === "MKCALENDAR" ||
-				method === "PUT"
-			) {
+			if (method === "MKCOL" || method === "MKCALENDAR" || method === "PUT") {
 				return yield* conflict();
 			}
 			return yield* Effect.fail(notFound());

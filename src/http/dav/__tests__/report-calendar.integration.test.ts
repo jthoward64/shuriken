@@ -675,18 +675,14 @@ describe("calendar-query REPORT — VTODO", () => {
 		const results = await runScript(
 			[
 				...setupWithTodo,
-				report(
-					"/dav/principals/test/cal/report-cal-todo/",
-					queryAllVTodos,
-					{
-						as: "test",
-						expect: {
-							status: 207,
-							bodyContains: TODO_UID,
-							bodyNotContains: JAN_UID,
-						},
+				report("/dav/principals/test/cal/report-cal-todo/", queryAllVTodos, {
+					as: "test",
+					expect: {
+						status: 207,
+						bodyContains: TODO_UID,
+						bodyNotContains: JAN_UID,
 					},
-				),
+				}),
 			],
 			singleUser(),
 		);

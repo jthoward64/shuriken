@@ -93,7 +93,9 @@ describe("isClientTrusted", () => {
 
 	// Invalid CIDR entries — should return false rather than throw
 	it("returns false for an IPv4 CIDR with invalid bits (NaN)", () => {
-		expect(isClientTrusted(Option.some("10.0.0.1"), "10.0.0.0/abc")).toBe(false);
+		expect(isClientTrusted(Option.some("10.0.0.1"), "10.0.0.0/abc")).toBe(
+			false,
+		);
 	});
 
 	it("returns false for an IPv4 CIDR with bits > 32", () => {
@@ -147,9 +149,9 @@ describe("isClientTrusted", () => {
 		expect(isClientTrusted(Option.some("2001:db8::1"), "2001:db8::/64")).toBe(
 			true,
 		);
-		expect(isClientTrusted(Option.some("2001:db8::ffff"), "2001:db8::/64")).toBe(
-			true,
-		);
+		expect(
+			isClientTrusted(Option.some("2001:db8::ffff"), "2001:db8::/64"),
+		).toBe(true);
 		expect(isClientTrusted(Option.some("2001:db9::1"), "2001:db8::/64")).toBe(
 			false,
 		);

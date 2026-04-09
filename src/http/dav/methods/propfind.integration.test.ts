@@ -315,15 +315,11 @@ describe("PROPFIND non-existent resource", () => {
 	it("PROPFIND on a non-existent collection path returns 404", async () => {
 		const results = await runScript(
 			[
-				propfind(
-					"/dav/principals/test/cal/does-not-exist/",
-					PROPFIND_ALLPROP,
-					{
-						as: "test",
-						headers: { Depth: "0" },
-						expect: { status: 404 },
-					},
-				),
+				propfind("/dav/principals/test/cal/does-not-exist/", PROPFIND_ALLPROP, {
+					as: "test",
+					headers: { Depth: "0" },
+					expect: { status: 404 },
+				}),
 			],
 			singleUser(),
 		);
@@ -359,15 +355,11 @@ describe("PROPFIND CalDAV/CardDAV discovery properties", () => {
 	it("calendar-home-set on principal returns a 200 propstat with a href value", async () => {
 		const results = await runScript(
 			[
-				propfind(
-					"/dav/principals/test/",
-					PROPFIND_CALENDAR_HOME_SET,
-					{
-						as: "test",
-						headers: { Depth: "0" },
-						expect: { status: 207 },
-					},
-				),
+				propfind("/dav/principals/test/", PROPFIND_CALENDAR_HOME_SET, {
+					as: "test",
+					headers: { Depth: "0" },
+					expect: { status: 207 },
+				}),
 			],
 			singleUser(),
 		);
@@ -386,15 +378,11 @@ describe("PROPFIND CalDAV/CardDAV discovery properties", () => {
 	it("addressbook-home-set on principal returns a 200 propstat with a href value", async () => {
 		const results = await runScript(
 			[
-				propfind(
-					"/dav/principals/test/",
-					PROPFIND_ADDRESSBOOK_HOME_SET,
-					{
-						as: "test",
-						headers: { Depth: "0" },
-						expect: { status: 207 },
-					},
-				),
+				propfind("/dav/principals/test/", PROPFIND_ADDRESSBOOK_HOME_SET, {
+					as: "test",
+					headers: { Depth: "0" },
+					expect: { status: 207 },
+				}),
 			],
 			singleUser(),
 		);
