@@ -166,25 +166,47 @@ export const calendarQueryHandler = (
 
 		const instances = yield* (() => {
 			if (componentType && timeRange) {
-				// Compute calendar week [weekStart, weekEnd) containing timeRange.start
-				// for the RRULE week-bucket SQL pre-filter.
+				// Compute the week-bucket range [weekStart, weekEnd) covering the
+				// full query range so the RRULE SQL pre-filter admits every week in
+				// which an occurrence might fall.  False positives are acceptable
+				// (the in-memory filter does the exact check); false negatives are not.
 				const { weekStart, weekEnd } = (() => {
 					if (timeRange.start === null) {
 						return { weekStart: null, weekEnd: null };
 					}
-					const zdt = timeRange.start.toZonedDateTimeISO("UTC");
-					const startOfWeek = zdt.subtract({ days: zdt.dayOfWeek - 1 }).with({
-						hour: 0,
-						minute: 0,
-						second: 0,
-						millisecond: 0,
-						microsecond: 0,
-						nanosecond: 0,
-					});
-					return {
-						weekStart: startOfWeek.toInstant(),
-						weekEnd: startOfWeek.add({ weeks: 1 }).toInstant(),
-					};
+					const zdtStart = timeRange.start.toZonedDateTimeISO("UTC");
+					const weekStart = zdtStart
+						.subtract({ days: zdtStart.dayOfWeek - 1 })
+						.with({
+							hour: 0,
+							minute: 0,
+							second: 0,
+							millisecond: 0,
+							microsecond: 0,
+							nanosecond: 0,
+						})
+						.toInstant();
+					// Extend weekEnd to the end of the week containing timeRange.end
+					// so multi-week queries don't miss events in later weeks.
+					const weekEnd = (() => {
+						if (timeRange.end === null) {
+							return weekStart.add({ hours: 168 });
+						}
+						const zdtEnd = timeRange.end.toZonedDateTimeISO("UTC");
+						return zdtEnd
+							.subtract({ days: zdtEnd.dayOfWeek - 1 })
+							.with({
+								hour: 0,
+								minute: 0,
+								second: 0,
+								millisecond: 0,
+								microsecond: 0,
+								nanosecond: 0,
+							})
+							.toInstant()
+							.add({ hours: 168 });
+					})();
+					return { weekStart, weekEnd };
 				})();
 
 				// Time-range pre-filter via cal_index

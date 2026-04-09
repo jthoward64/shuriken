@@ -3,6 +3,7 @@ import {
 	type AppError,
 	conflict,
 	type DavError,
+	type DavPrecondition,
 	notFound,
 } from "#src/domain/errors.ts";
 import {
@@ -61,6 +62,31 @@ import { userDeleteHandler } from "./methods/users/delete.ts";
 import { userMkcolHandler } from "./methods/users/mkcol.ts";
 import { userPropfindHandler } from "./methods/users/propfind.ts";
 import { userProppatchHandler } from "./methods/users/proppatch.ts";
+
+// ---------------------------------------------------------------------------
+// DAV error XML body builder — RFC 4918 §8.7 / RFC 4791 §5.3.2
+// ---------------------------------------------------------------------------
+
+const PRECONDITION_NS: Readonly<Record<string, string>> = {
+	DAV: "DAV:",
+	CALDAV: "urn:ietf:params:xml:ns:caldav",
+	CARDDAV: "urn:ietf:params:xml:ns:carddav",
+};
+
+/**
+ * Build a minimal <D:error> XML body for a DavError precondition.
+ * Preconditions follow "PREFIX:local-name" convention defined in errors.ts.
+ */
+const buildDavErrorBody = (precondition: DavPrecondition): string => {
+	const colon = precondition.indexOf(":");
+	const prefix = precondition.slice(0, colon);
+	const local = precondition.slice(colon + 1);
+	const ns = PRECONDITION_NS[prefix] ?? "DAV:";
+	if (prefix === "DAV") {
+		return `<?xml version="1.0" encoding="UTF-8"?><D:error xmlns:D="DAV:"><D:${local}/></D:error>`;
+	}
+	return `<?xml version="1.0" encoding="UTF-8"?><D:error xmlns:D="DAV:" xmlns:E="${ns}"><E:${local}/></D:error>`;
+};
 
 // ---------------------------------------------------------------------------
 // DAV router — slug resolution + method dispatch
@@ -491,16 +517,18 @@ export const davRouter = (
 				});
 		}
 	}).pipe(
-		Effect.catchTag("DavError", (err) =>
-			Effect.succeed(
-				new Response(null, {
-					status: err.status,
-					...(err.status === HTTP_UNAUTHORIZED && {
-						headers: { "WWW-Authenticate": 'Basic realm="shuriken"' },
-					}),
-				}),
-			),
-		),
+		Effect.catchTag("DavError", (err) => {
+			const body = err.precondition ? buildDavErrorBody(err.precondition) : null;
+			const headers: Record<string, string> = body
+				? { "Content-Type": "application/xml; charset=utf-8" }
+				: {};
+			if (err.status === HTTP_UNAUTHORIZED) {
+				headers["WWW-Authenticate"] = 'Basic realm="shuriken"';
+			}
+			return Effect.succeed(
+				new Response(body, { status: err.status, headers }),
+			);
+		}),
 		Effect.withSpan("dav.route", {
 			attributes: { "dav.path": ctx.url.pathname },
 		}),

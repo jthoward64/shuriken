@@ -10,22 +10,9 @@ Once an item is complete, it should be deleted from this list (not checked or ma
 
 ## RFC 4918 — WebDAV Core
 
-### BUG: All DAV error responses are bare HTTP status codes — XML error bodies stripped
-
-[router.ts:491-493](src/http/dav/router.ts#L491-L493) — The route handler wraps the entire method dispatch in:
-
-```ts
-Effect.catchTag("DavError", (err) =>
-    Effect.succeed(new Response(null, { status: err.status })),
-),
-```
-
-This catches every `DavError` before the outer error formatter can run, discarding the RFC-required `<D:error>` XML precondition body. All error responses — `403 DAV:need-privileges`, `403 CALDAV:valid-calendar-object-resource`, `412 DAV:condition-failure`, etc. — are returned as empty bodies. RFC 4918 §8.7 and RFC 4791 §5.3.2 require structured XML error bodies for many conditions. Clients rely on these to show meaningful error messages and to differentiate error types.
-
 ### MISSING: COPY does not transfer dead properties or ACL entries
 
 [copy.ts:165-193](src/http/dav/methods/copy.ts#L165-L193), [copy.ts:253-315](src/http/dav/methods/copy.ts#L253-L315) — When copying an instance or collection, `clientProperties` (dead properties) are not passed to the new row. RFC 4918 §9.8.2 says a COPY SHOULD preserve all live and dead properties. In addition, ACL entries (from `dav_acl`) on the source collection are not copied to the destination — the destination starts with only the owner's protected `DAV:all` ACE.
-
 
 ### MISSING: `DAV:getcontentlength` not returned for instances
 
@@ -128,15 +115,6 @@ RFC 4791 §7.10 — Allows clients to query free/busy time over a calendar colle
 - A VTODO with COMPLETED must match when COMPLETED falls within the range.
 - The rule table in RFC 4791 §9.9 has ~8 distinct cases for VTODO.
 
-### BUG: Calendar time-range SQL pre-filter produces false negatives for multi-week queries
-
-[calendar-query.ts:164-180](src/http/dav/methods/report/calendar-query.ts#L164-L180), [repository.live.ts:26-98](src/services/cal-index/repository.live.ts#L26-L98) — The week-bucket RRULE SQL pre-filter is designed for single-week queries. For multi-week or month-view queries, it produces false negatives:
-
-1. **WEEKLY with interval > 1**: The clause checks if `FLOOR(weeks_from_dtstart_to_weekStart) % interval = 0`. If the query range spans multiple weeks, only the first week (the one containing `timeRange.start`) is checked. A biweekly event that occurs in week 2 of a 4-week query range is not in week 1's bucket, so the SQL returns false → the event is silently omitted from results.
-
-2. **MONTHLY events**: The day-range intersection check compares `dayMin <= EXTRACT(DAY FROM weekEnd)` and `dayMax >= EXTRACT(DAY FROM weekStart)`. For a query starting April 1 (weekEnd = April 7), a monthly event on the 15th (`dayMin = dayMax = 15`) fails `15 <= 7` → not returned, even though April 15 is within the month-long query range.
-
-The in-memory `evaluateCalFilter` is only called for events that pass the SQL pre-filter. Events excluded by the SQL filter are silently dropped — they are never given the in-memory check. The comment in `rruleWeekBucketClause` explicitly says "False negatives are not [acceptable]", so this is an acknowledged requirement violation. Fix: either extend the week-bucket to cover the full query range, or abandon the RRULE week-bucket heuristic for queries that span more than one week.
 
 ### INCOMPLETE: VFREEBUSY time-range filter not specifically handled
 
@@ -234,14 +212,12 @@ RFC 6764 §5 — Clients use PROPFIND on `/.well-known/caldav` and `/.well-known
 
 | Priority | Item |
 |----------|------|
-| P0 | All DAV error XML bodies stripped by router-level `catchTag("DavError")` |
 | P1 | `DAV:acl` / `DAV:owner` not in PROPFIND |
 | P1 | `CALDAV:schedule-inbox-url` / `CALDAV:schedule-outbox-url` not in PROPFIND |
 | P1 | `CALDAV:calendar-timezone` not in PROPFIND (and not settable via PROPPATCH) |
 | P1 | `CALDAV:supported-calendar-component` not enforced on PUT |
 | P2 | UID uniqueness enforcement (calendar and addressbook) |
 | P2 | CalDAV PUT semantic validation (`valid-calendar-object-resource`) — empty VCALENDAR, mixed UIDs |
-| P0 | Calendar time-range SQL pre-filter produces false negatives for multi-week/month queries (WEEKLY interval>1, MONTHLY) |
 | P2 | VTODO time-range filter completeness |
 | P2 | `DAV:group-member-set` / `DAV:group-membership` not in PROPFIND |
 | P2 | `CALDAV:free-busy-query` REPORT missing |
