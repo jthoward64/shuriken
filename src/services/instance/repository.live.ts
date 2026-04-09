@@ -155,6 +155,9 @@ const insertInstance = Effect.fn("InstanceRepository.insert")(
 						...(input.clientProperties !== undefined
 							? { clientProperties: input.clientProperties }
 							: {}),
+						...(input.contentLength !== undefined
+							? { contentLength: input.contentLength }
+							: {}),
 					})
 					.returning()
 					.then((r) => {
@@ -173,13 +176,22 @@ const insertInstance = Effect.fn("InstanceRepository.insert")(
 );
 
 const updateEtag = Effect.fn("InstanceRepository.updateEtag")(
-	function* (db: DbClient, id: InstanceId, etag: ETag) {
+	function* (
+		db: DbClient,
+		id: InstanceId,
+		etag: ETag,
+		contentLength?: number,
+	) {
 		yield* Effect.logTrace("repo.instance.updateEtag", { id });
 		return yield* Effect.tryPromise({
 			try: () =>
 				db
 					.update(davInstance)
-					.set({ etag, updatedAt: sql`now()` })
+					.set({
+						etag,
+						updatedAt: sql`now()`,
+						...(contentLength !== undefined ? { contentLength } : {}),
+					})
 					.where(eq(davInstance.id, id))
 					.then(() => undefined),
 			catch: (e) => new DatabaseError({ cause: e }),
@@ -283,7 +295,8 @@ export const InstanceRepositoryLive = Layer.effect(
 			findChangedSince: (col, since) => findChangedSince(db, col, since),
 			findByIds: (ids) => findByIds(db, ids),
 			insert: (input) => insertInstance(db, input),
-			updateEtag: (id, etag) => updateEtag(db, id, etag),
+			updateEtag: (id, etag, contentLength) =>
+				updateEtag(db, id, etag, contentLength),
 			softDelete: (id) => softDelete(db, id),
 			relocate: (id, col, slug) => relocate(db, id, col, slug),
 			updateClientProperties: (id, props) =>

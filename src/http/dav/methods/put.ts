@@ -155,8 +155,9 @@ export const putHandler = (
 				? yield* encodeICalendar(doc)
 				: yield* encodeVCard(doc);
 
-		// 8. Compute ETag.
+		// 8. Compute ETag and content length.
 		const etag = ETag(yield* makeEtag(canonical));
+		const contentLength = new TextEncoder().encode(canonical).byteLength;
 
 		// 9 + 10. Dispatch on path kind.
 		if (path.kind === "new-instance") {
@@ -224,6 +225,7 @@ export const putHandler = (
 				contentType,
 				etag,
 				slug: path.slug,
+				contentLength,
 			});
 
 			// Populate precomputed RRULE shape columns used by the week-bucket SQL filter.
@@ -309,6 +311,7 @@ export const putHandler = (
 				contentType,
 				etag,
 				slug: existingInstance.slug as Slug,
+				contentLength,
 			},
 			path.instanceId,
 		);

@@ -189,6 +189,7 @@ const copyInstance = (
 			etag,
 			slug: destSlug,
 			clientProperties: sourceInstance.clientProperties as IrDeadProperties,
+			contentLength: new TextEncoder().encode(canonical).byteLength,
 		});
 
 		// RFC 4918 §9.8.2: copy non-protected ACEs from source to destination.
@@ -369,6 +370,7 @@ const copyCollection = (
 							slug: Slug(inst.slug),
 							clientProperties:
 								inst.clientProperties as IrDeadProperties,
+							contentLength: new TextEncoder().encode(canonical).byteLength,
 						});
 
 						// Copy non-protected ACEs for each instance.

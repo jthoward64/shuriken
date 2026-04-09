@@ -53,6 +53,7 @@ const RESOURCETYPE = cn(DAV_NS, "resourcetype");
 const GETETAG = cn(DAV_NS, "getetag");
 const GETCONTENTTYPE = cn(DAV_NS, "getcontenttype");
 const GETLASTMODIFIED = cn(DAV_NS, "getlastmodified");
+const GETCONTENTLENGTH = cn(DAV_NS, "getcontentlength");
 const LOCK_DISCOVERY = cn(DAV_NS, "lockdiscovery");
 const SUPPORTED_LOCK = cn(DAV_NS, "supportedlock");
 const ACL_RESTRICTIONS = cn(DAV_NS, "acl-restrictions");
@@ -143,6 +144,10 @@ export const buildInstanceProps = (
 			[cn(DAV_NS, "no-invert")]: "",
 		},
 	};
+
+	if (row.contentLength !== null && row.contentLength !== undefined) {
+		props[GETCONTENTLENGTH] = String(row.contentLength);
+	}
 
 	if (row.scheduleTag) {
 		props[SCHEDULE_TAG] = row.scheduleTag;

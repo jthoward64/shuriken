@@ -8,14 +8,6 @@ Once an item is complete, it should be deleted from this list (not checked or ma
 
 ---
 
-## RFC 4918 — WebDAV Core
-
-### MISSING: `DAV:getcontentlength` not returned for instances
-
-RFC 4918 §15.4 — Instance PROPFIND responses omit `DAV:getcontentlength`. Clients may need this to know data sizes before downloading. Should reflect the serialized body length.
-
----
-
 ## RFC 6638 — CalDAV Scheduling
 
 Scheduling infrastructure exists at the schema level (`dav_schedule_message`, inbox/outbox collection types) but is almost entirely unimplemented at the HTTP layer.
@@ -56,6 +48,5 @@ RFC 7809 §4.3 — When a client indicates it supports timezones by reference (v
 
 | Priority | Item |
 |----------|------|
-| P3 | `DAV:getcontentlength` not returned for instances |
 | P4 | RFC 7809 (timezones by reference) — full implementation |
 | P4 | CalDAV scheduling (RFC 6638) — POST to outbox, auto-delivery |

@@ -369,6 +369,9 @@ export const davInstance = pgTable(
 		updatedAt: timestampTz("updated_at").default(sql`now()`).notNull(),
 		deletedAt: timestampTz("deleted_at"),
 		scheduleTag: text("schedule_tag"),
+		// Byte length of the serialized iCalendar/vCard body (RFC 4918 §15.4 DAV:getcontentlength).
+		// Populated on every PUT; null on pre-migration rows.
+		contentLength: bigint("content_length", { mode: "number" }),
 		slug: text().default("").notNull(),
 		// Client-set dead properties (RFC 4918 §4.1) — Clark-notation key, XML value string
 		clientProperties: jsonb("client_properties").default({}).notNull(),

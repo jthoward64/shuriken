@@ -22,6 +22,8 @@ export interface NewInstance {
 	readonly slug: Slug;
 	readonly scheduleTag?: string;
 	readonly clientProperties?: IrDeadProperties;
+	/** Byte length of the serialized UTF-8 body — stored for DAV:getcontentlength. */
+	readonly contentLength?: number;
 }
 
 export interface InstanceRepositoryShape {
@@ -49,6 +51,7 @@ export interface InstanceRepositoryShape {
 	readonly updateEtag: (
 		id: InstanceId,
 		etag: ETag,
+		contentLength?: number,
 	) => Effect.Effect<void, DatabaseError>;
 	readonly softDelete: (id: InstanceId) => Effect.Effect<void, DatabaseError>;
 	/** Move an instance to a different collection and/or slug in-place.

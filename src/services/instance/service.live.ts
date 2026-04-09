@@ -52,7 +52,7 @@ export const InstanceServiceLive = Layer.effect(
 				});
 				if (existingId) {
 					// Update existing instance etag (sync_revision is set by DB trigger)
-					yield* repo.updateEtag(existingId, input.etag);
+					yield* repo.updateEtag(existingId, input.etag, input.contentLength);
 					return yield* repo
 						.findById(existingId)
 						.pipe(

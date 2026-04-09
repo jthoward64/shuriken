@@ -684,12 +684,13 @@ const makeInstanceRepo = (stores: TestStores): InstanceRepositoryShape => ({
 				scheduleTag: input.scheduleTag ?? null,
 				slug: input.slug,
 				clientProperties: {},
+				contentLength: input.contentLength ?? null,
 			};
 			stores.instances.set(row.id, row);
 			return row;
 		}),
 
-	updateEtag: (id, etag) =>
+	updateEtag: (id, etag, contentLength) =>
 		Effect.sync(() => {
 			const row = stores.instances.get(id);
 			if (row) {
@@ -699,6 +700,7 @@ const makeInstanceRepo = (stores: TestStores): InstanceRepositoryShape => ({
 					etag,
 					syncRevision: row.syncRevision + 1,
 					updatedAt: Temporal.Now.instant(),
+					...(contentLength !== undefined ? { contentLength } : {}),
 				});
 			}
 		}),
@@ -1332,6 +1334,7 @@ export const makeTestEnv = (): TestEnvBuilder => {
 				scheduleTag: null,
 				slug: (seed.slug ?? "test-event.ics") as Slug,
 				clientProperties: {},
+				contentLength: null,
 			});
 			return self;
 		},

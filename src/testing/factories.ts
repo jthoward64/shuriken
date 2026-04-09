@@ -115,6 +115,7 @@ export const makeInstanceRow = (
 	scheduleTag: null,
 	slug: "test-event.ics",
 	clientProperties: {},
+	contentLength: null,
 	...overrides,
 });
 
