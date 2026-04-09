@@ -6,7 +6,7 @@
 
 import { Effect } from "effect";
 import { type ClarkName, cn } from "#src/data/ir.ts";
-import type { DavError } from "#src/domain/errors.ts";
+import { badRequest, type DavError } from "#src/domain/errors.ts";
 import { normalizeClarkNames } from "#src/http/dav/xml/clark.ts";
 import { parseXml, readXmlBody } from "#src/http/dav/xml/parser.ts";
 
@@ -51,10 +51,7 @@ export const parseReportBody = (
 					};
 				}),
 				Effect.catchTag("XmlParseError", () =>
-					Effect.succeed({
-						type: cn(DAV_NS, "unknown") as ClarkName,
-						tree: {},
-					}),
+					Effect.fail(badRequest("Malformed REPORT XML")),
 				),
 			),
 		),

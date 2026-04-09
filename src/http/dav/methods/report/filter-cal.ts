@@ -142,6 +142,14 @@ const parseTextMatch = (el: unknown): TextMatch | undefined => {
 	return { value, collation, matchType, negate };
 };
 
+const tryParseInstant = (s: string): Temporal.Instant | undefined => {
+	try {
+		return Temporal.Instant.from(s);
+	} catch {
+		return undefined;
+	}
+};
+
 const parseTimeRange = (
 	el: unknown,
 ): { start?: Temporal.Instant; end?: Temporal.Instant } | undefined => {
@@ -151,11 +159,11 @@ const parseTimeRange = (
 	const obj = el as Record<string, unknown>;
 	const start =
 		typeof obj["@_start"] === "string"
-			? Temporal.Instant.from(obj["@_start"])
+			? tryParseInstant(obj["@_start"])
 			: undefined;
 	const end =
 		typeof obj["@_end"] === "string"
-			? Temporal.Instant.from(obj["@_end"])
+			? tryParseInstant(obj["@_end"])
 			: undefined;
 	if (!start && !end) {
 		return undefined;

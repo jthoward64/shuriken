@@ -30,7 +30,12 @@ export const parseBasicAuth = (
 	}
 
 	const encoded = authorization.slice(BASIC_PREFIX.length);
-	const decoded = atob(encoded);
+	let decoded: string;
+	try {
+		decoded = atob(encoded);
+	} catch {
+		return Option.none();
+	}
 	const colonIdx = decoded.indexOf(":");
 	if (colonIdx === -1) {
 		return Option.none();

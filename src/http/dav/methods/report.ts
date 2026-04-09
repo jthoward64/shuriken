@@ -81,7 +81,7 @@ export const reportHandler = (
 
 			default:
 				return yield* forbidden(
-					"CALDAV:supported-filter",
+					"DAV:supported-report",
 					`Unsupported REPORT type: ${type}`,
 				);
 		}

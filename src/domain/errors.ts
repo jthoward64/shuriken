@@ -96,6 +96,7 @@ export type WebDavPrecondition =
 	| "DAV:propfind-finite-depth" // 403
 	| "DAV:cannot-modify-protected-property" // 403
 	| "DAV:number-of-matches-within-limits" // postcondition (no specific status)
+	| "DAV:supported-report" // 403 — unsupported REPORT type (RFC 4918 §9.13)
 	| "DAV:valid-sync-token"; // 400 / 409
 
 /** RFC 3744 — WebDAV Access Control */
@@ -181,6 +182,9 @@ export const forbidden = (
 	precondition?: DavPrecondition,
 	message?: string,
 ): DavError => davError(HTTP_FORBIDDEN, precondition, message);
+
+export const badRequest = (message?: string): DavError =>
+	davError(HTTP_BAD_REQUEST, undefined, message);
 
 export const conflict = (
 	precondition?: DavPrecondition,

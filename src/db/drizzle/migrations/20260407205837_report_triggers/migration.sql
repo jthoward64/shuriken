@@ -71,7 +71,6 @@ FOR EACH ROW EXECUTE FUNCTION sync_token_on_instance_change();
 -- NOTE: Events with rrule_text always pass time-range filters in
 -- CalIndexRepository.findByTimeRange (conservative behavior). Full recurrence
 -- expansion is deferred.
--- TODO(recurrence): expand rrule_text for accurate overlap when implemented.
 -- ---------------------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION maintain_cal_index_on_instance_change()

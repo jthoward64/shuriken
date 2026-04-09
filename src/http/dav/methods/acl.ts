@@ -16,7 +16,7 @@
 import { Effect, Option } from "effect";
 import { cn } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
-import { forbidden, methodNotAllowed, notFound } from "#src/domain/errors.ts";
+import { badRequest, forbidden, methodNotAllowed, notFound } from "#src/domain/errors.ts";
 import { isUuid, PrincipalId, type UuidString } from "#src/domain/ids.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
 import type { ResolvedDavPath, Slug } from "#src/domain/types/path.ts";
@@ -120,7 +120,7 @@ const parseAclBody = (
 
 		const raw = yield* parseXml(body).pipe(
 			Effect.catchTag("XmlParseError", () =>
-				Effect.fail(forbidden(undefined, "Invalid ACL XML")),
+				Effect.fail(badRequest("Invalid ACL XML")),
 			),
 		);
 

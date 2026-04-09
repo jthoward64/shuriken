@@ -113,7 +113,7 @@ export const buildInstanceProps = (
 ): Readonly<Record<ClarkName, unknown>> => {
 	const props: Record<ClarkName, unknown> = {
 		[RESOURCETYPE]: {},
-		[GETETAG]: `"${row.etag}"`,
+		[GETETAG]: row.etag,
 		[GETCONTENTTYPE]: `${row.contentType}; charset=utf-8`,
 		[GETLASTMODIFIED]: toRfc1123(row.lastModified),
 	};
