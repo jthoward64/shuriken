@@ -124,14 +124,14 @@ describe("PUT iCalendar", () => {
 	// into an addressbook collection (CARDDAV:supported-address-data precondition
 	// from RFC 6352 §5.3.2.1). When this is enforced, add a test expecting 415.
 
-	it("returns 403 when unauthenticated", async () => {
+	it("returns 401 when unauthenticated", async () => {
 		const results = await runScript(
 			[
 				put(
 					"/dav/principals/test/cal/primary/event.ics",
 					EVENT,
 					"text/calendar; charset=utf-8",
-					{ expect: { status: 403 } },
+					{ expect: { status: 401 } },
 				),
 			],
 			singleUser(),

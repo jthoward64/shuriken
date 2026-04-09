@@ -9,6 +9,7 @@ import {
 	notFound,
 	preconditionFailed,
 	someOrNotFound,
+	unauthorized,
 } from "#src/domain/errors.ts";
 import { CollectionId, EntityId, type PrincipalId } from "#src/domain/ids.ts";
 import { type ResolvedDavPath, Slug } from "#src/domain/types/path.ts";
@@ -55,7 +56,7 @@ export const copyHandler = (
 		}
 
 		if (ctx.auth._tag !== "Authenticated") {
-			return yield* forbidden("DAV:need-privileges");
+			return yield* unauthorized();
 		}
 		const principal = ctx.auth.principal;
 

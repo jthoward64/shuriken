@@ -144,12 +144,21 @@ const subsetComponent = (comp: IrComponent, spec: CompSpec): IrComponent => {
 
 /**
  * Properties that must always be included regardless of the spec.
- * RFC 4791 §8.6.1: VERSION in VCALENDAR is always returned.
+ * RFC 4791 §8.6.1: VERSION/PRODID in VCALENDAR are always returned.
+ * RFC 4791 §9.6.1: UID and RECURRENCE-ID must always be returned in calendar components.
  */
 const isAlwaysRequiredProp = (compName: string, propName: string): boolean => {
 	if (
 		compName === "VCALENDAR" &&
 		(propName === "VERSION" || propName === "PRODID")
+	) {
+		return true;
+	}
+	if (
+		(compName === "VEVENT" ||
+			compName === "VTODO" ||
+			compName === "VJOURNAL") &&
+		(propName === "UID" || propName === "RECURRENCE-ID")
 	) {
 		return true;
 	}

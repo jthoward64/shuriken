@@ -10,7 +10,7 @@
 import { Effect } from "effect";
 import { type ClarkName, cn } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
-import { conflict, forbidden, methodNotAllowed } from "#src/domain/errors.ts";
+import { conflict, methodNotAllowed, unauthorized } from "#src/domain/errors.ts";
 import { COLLECTION_TYPE_TO_NAMESPACE } from "#src/domain/types/collection-namespace.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
@@ -87,7 +87,7 @@ export const syncCollectionHandler = (
 		}
 
 		if (ctx.auth._tag !== "Authenticated") {
-			return yield* forbidden("DAV:need-privileges");
+			return yield* unauthorized();
 		}
 		const actingPrincipalId = ctx.auth.principal.principalId;
 

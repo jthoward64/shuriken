@@ -141,7 +141,7 @@ describe("DELETE instance", () => {
 				),
 				del("/dav/principals/test/cal/primary/auth-event.ics", {
 					// no `as` → unauthenticated
-					expect: { status: 403 },
+					expect: { status: 401 },
 				}),
 			],
 			singleUser(),
@@ -333,7 +333,7 @@ describe("DELETE collection", () => {
 				}),
 				del("/dav/principals/test/cal/no-auth-del/", {
 					// no `as` → unauthenticated
-					expect: { status: 403 },
+					expect: { status: 401 },
 				}),
 			],
 			singleUser(),

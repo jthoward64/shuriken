@@ -255,7 +255,7 @@ describe("COPY instance", () => {
 		expectAllPass(results);
 	});
 
-	it("returns 403 when unauthenticated", async () => {
+	it("returns 401 when unauthenticated", async () => {
 		const results = await runScript(
 			[
 				put(
@@ -268,7 +268,7 @@ describe("COPY instance", () => {
 					"/dav/principals/test/cal/primary/auth-src.ics",
 					"/dav/principals/test/cal/primary/auth-dst.ics",
 					// no `as` → unauthenticated
-					{ expect: { status: 403 } },
+					{ expect: { status: 401 } },
 				),
 			],
 			singleUser(),
@@ -566,7 +566,7 @@ describe("COPY collection", () => {
 		expectAllPass(results);
 	});
 
-	it("returns 403 when unauthenticated", async () => {
+	it("returns 401 when unauthenticated", async () => {
 		const results = await runScript(
 			[
 				mkcol("/dav/principals/test/cal/auth-col/", {
@@ -577,7 +577,7 @@ describe("COPY collection", () => {
 					"/dav/principals/test/cal/auth-col/",
 					"/dav/principals/test/cal/auth-col-dst/",
 					// no `as` → unauthenticated
-					{ expect: { status: 403 } },
+					{ expect: { status: 401 } },
 				),
 			],
 			singleUser(),

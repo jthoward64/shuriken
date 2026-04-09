@@ -1,6 +1,6 @@
 import { Effect, Option } from "effect";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
-import { forbidden, methodNotAllowed } from "#src/domain/errors.ts";
+import { methodNotAllowed, unauthorized } from "#src/domain/errors.ts";
 import type { UserId } from "#src/domain/ids.ts";
 import type { ResolvedDavPath, Slug } from "#src/domain/types/path.ts";
 import {
@@ -130,7 +130,7 @@ export const groupProppatchHandler = (
 		}
 
 		if (ctx.auth._tag !== "Authenticated") {
-			return yield* forbidden("DAV:need-privileges");
+			return yield* unauthorized();
 		}
 		const requester = ctx.auth.principal;
 		const acl = yield* AclService;

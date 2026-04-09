@@ -19,11 +19,11 @@ const event = makeCalEvent({
 });
 
 describe("unauthenticated access", () => {
-	it("PROPFIND on principal without auth returns 403", async () => {
+	it("PROPFIND on principal without auth returns 401", async () => {
 		const results = await runScript(
 			[
 				propfind("/dav/principals/alice/", PROPFIND_ALLPROP, {
-					expect: { status: 403 },
+					expect: { status: 401 },
 				}),
 			],
 			twoUsers(),
@@ -33,14 +33,14 @@ describe("unauthenticated access", () => {
 		}
 	});
 
-	it("PUT without auth returns 403", async () => {
+	it("PUT without auth returns 401", async () => {
 		const results = await runScript(
 			[
 				put(
 					"/dav/principals/alice/cal/primary/event.ics",
 					event,
 					"text/calendar; charset=utf-8",
-					{ expect: { status: 403 } },
+					{ expect: { status: 401 } },
 				),
 			],
 			twoUsers(),
@@ -50,11 +50,11 @@ describe("unauthenticated access", () => {
 		}
 	});
 
-	it("MKCALENDAR without auth returns 403", async () => {
+	it("MKCALENDAR without auth returns 401", async () => {
 		const results = await runScript(
 			[
 				mkcol("/dav/principals/alice/cal/new-cal/", {
-					expect: { status: 403 },
+					expect: { status: 401 },
 				}),
 			],
 			twoUsers(),

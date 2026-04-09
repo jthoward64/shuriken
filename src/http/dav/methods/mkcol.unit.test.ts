@@ -394,7 +394,7 @@ describe("mkcolHandler — method not allowed", () => {
 // ---------------------------------------------------------------------------
 
 describe("mkcolHandler — authentication", () => {
-	it("returns 403 need-privileges for unauthenticated requests", async () => {
+	it("returns 401 for unauthenticated requests", async () => {
 		const env = makeTestEnv();
 		const path = makeNewCollectionPath("cal");
 
@@ -405,6 +405,6 @@ describe("mkcolHandler — authentication", () => {
 		)) as DavError;
 
 		expect(err._tag).toBe("DavError");
-		expect(err.precondition).toBe("DAV:need-privileges");
+		expect(err.status).toBe(401);
 	});
 });

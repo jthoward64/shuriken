@@ -4,7 +4,7 @@ import type {
 	DatabaseError,
 	DavError,
 } from "#src/domain/errors.ts";
-import { forbidden, methodNotAllowed } from "#src/domain/errors.ts";
+import { methodNotAllowed, unauthorized } from "#src/domain/errors.ts";
 import type { ResolvedDavPath, Slug } from "#src/domain/types/path.ts";
 import {
 	GROUPS_VIRTUAL_RESOURCE_ID,
@@ -92,7 +92,7 @@ export const groupMkcolHandler = (
 		}
 
 		if (ctx.auth._tag !== "Authenticated") {
-			return yield* forbidden("DAV:need-privileges");
+			return yield* unauthorized();
 		}
 		const requester = ctx.auth.principal;
 

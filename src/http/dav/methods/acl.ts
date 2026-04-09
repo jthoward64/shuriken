@@ -16,7 +16,7 @@
 import { Effect, Option } from "effect";
 import { cn } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
-import { badRequest, forbidden, methodNotAllowed, notFound } from "#src/domain/errors.ts";
+import { badRequest, forbidden, methodNotAllowed, notFound, unauthorized } from "#src/domain/errors.ts";
 import { isUuid, PrincipalId, type UuidString } from "#src/domain/ids.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
 import type { ResolvedDavPath, Slug } from "#src/domain/types/path.ts";
@@ -299,7 +299,7 @@ export const aclHandler = (
 		}
 
 		if (ctx.auth._tag !== "Authenticated") {
-			return yield* forbidden("DAV:need-privileges");
+			return yield* unauthorized();
 		}
 		const actingPrincipalId = ctx.auth.principal.principalId;
 

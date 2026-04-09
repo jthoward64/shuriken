@@ -6,6 +6,7 @@ import {
 	methodNotAllowed,
 	notFound,
 	preconditionFailed,
+	unauthorized,
 } from "#src/domain/errors.ts";
 import { InstanceId, type PrincipalId } from "#src/domain/ids.ts";
 import { type ResolvedDavPath, Slug } from "#src/domain/types/path.ts";
@@ -52,7 +53,7 @@ export const moveHandler = (
 		}
 
 		if (ctx.auth._tag !== "Authenticated") {
-			return yield* forbidden("DAV:need-privileges");
+			return yield* unauthorized();
 		}
 		const principal = ctx.auth.principal;
 

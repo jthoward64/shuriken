@@ -310,7 +310,7 @@ describe("MOVE instance", () => {
 		expectAllPass(results);
 	});
 
-	it("returns 403 when unauthenticated", async () => {
+	it("returns 401 when unauthenticated", async () => {
 		const results = await runScript(
 			[
 				put(
@@ -323,7 +323,7 @@ describe("MOVE instance", () => {
 					"/dav/principals/test/cal/primary/auth-mv.ics",
 					"/dav/principals/test/cal/primary/auth-mv-dst.ics",
 					// no `as` → unauthenticated
-					{ expect: { status: 403 } },
+					{ expect: { status: 401 } },
 				),
 			],
 			singleUser(),
@@ -615,7 +615,7 @@ describe("MOVE collection", () => {
 		expectAllPass(results);
 	});
 
-	it("returns 403 when unauthenticated", async () => {
+	it("returns 401 when unauthenticated", async () => {
 		const results = await runScript(
 			[
 				mkcol("/dav/principals/test/cal/auth-mv-col/", {
@@ -626,7 +626,7 @@ describe("MOVE collection", () => {
 					"/dav/principals/test/cal/auth-mv-col/",
 					"/dav/principals/test/cal/auth-mv-col-dst/",
 					// no `as` → unauthenticated
-					{ expect: { status: 403 } },
+					{ expect: { status: 401 } },
 				),
 			],
 			singleUser(),

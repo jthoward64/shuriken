@@ -243,7 +243,7 @@ const evalPropFilter = (comp: IrComponent, f: PropFilter): boolean => {
 		return false;
 	}
 
-	for (const prop of props) {
+	return props.some((prop) => {
 		if (f.textMatch && !evalTextMatch(propValueText(prop), f.textMatch)) {
 			return false;
 		}
@@ -252,8 +252,8 @@ const evalPropFilter = (comp: IrComponent, f: PropFilter): boolean => {
 				return false;
 			}
 		}
-	}
-	return true;
+		return true;
+	});
 };
 
 const evalParamFilter = (prop: IrProperty, f: ParamFilter): boolean => {

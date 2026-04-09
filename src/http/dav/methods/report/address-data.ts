@@ -64,11 +64,19 @@ export const parseAddressDataSpec = (tree: unknown): AddressDataSpec => {
 // ---------------------------------------------------------------------------
 
 /**
+ * vCard properties that must always be included regardless of the spec.
+ * RFC 6350 §6.7.9: VERSION is always mandatory.
+ * RFC 6350 §6.2.1: FN is always required in vCard 4.0.
+ */
+const isAlwaysRequiredVCardProp = (propName: string): boolean =>
+	propName === "VERSION" || propName === "FN";
+
+/**
  * Apply an AddressDataSpec to a vCard IrDocument, returning a new IrDocument
  * with only the requested properties.
  *
- * RFC 6352 §8.6.1: only the properties listed in <C:prop name="..."/> children
- * are returned. No implicit additions are made — the client controls the subset.
+ * RFC 6352 §8.5.1: mandatory vCard properties (VERSION, FN) must always be
+ * included even when the client requests a specific subset.
  */
 export const subsetVCardDocument = (
 	doc: IrDocument,
@@ -78,8 +86,8 @@ export const subsetVCardDocument = (
 		return doc;
 	}
 
-	const filteredProperties = doc.root.properties.filter((p) =>
-		spec.props.has(p.name),
+	const filteredProperties = doc.root.properties.filter(
+		(p) => spec.props.has(p.name) || isAlwaysRequiredVCardProp(p.name),
 	);
 
 	return {

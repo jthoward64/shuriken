@@ -678,24 +678,31 @@ describe("evaluateCardFilter — prop-filter", () => {
 		).toBe(false);
 	});
 
-	it("multiple properties with same name — all must pass text-matches", () => {
-		// Both FN values must satisfy the filter
+	it("multiple properties with same name — any one passing is sufficient (anyof per RFC 6352 §8.6.3)", () => {
+		// At least one EMAIL value must satisfy the filter
 		const doc = makeDoc([
 			textProp("EMAIL", "alice@example.com"),
 			textProp("EMAIL", "alice@work.org"),
 		]);
-		// "alice" appears in both — passes
+		// "alice" appears in both — passes (either would satisfy)
 		expect(
 			evaluateCardFilter(
 				doc,
 				allof([propFilter("EMAIL", { textMatches: [textMatch("alice")] })]),
 			),
 		).toBe(true);
-		// "example" only in first — fails (second must also match)
+		// "example" only in first — still passes (first one satisfies)
 		expect(
 			evaluateCardFilter(
 				doc,
 				allof([propFilter("EMAIL", { textMatches: [textMatch("example")] })]),
+			),
+		).toBe(true);
+		// "zzz" in neither — fails
+		expect(
+			evaluateCardFilter(
+				doc,
+				allof([propFilter("EMAIL", { textMatches: [textMatch("zzz")] })]),
 			),
 		).toBe(false);
 	});

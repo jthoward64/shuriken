@@ -19,7 +19,7 @@ import {
 } from "#src/domain/types/collection-namespace.ts";
 import { type ResolvedDavPath, Slug } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
-import { HTTP_METHOD_NOT_ALLOWED } from "#src/http/status.ts";
+import { HTTP_METHOD_NOT_ALLOWED, HTTP_UNAUTHORIZED } from "#src/http/status.ts";
 import type { AclService } from "#src/services/acl/index.ts";
 import type { CalIndexRepository } from "#src/services/cal-index/index.ts";
 import type { CardIndexRepository } from "#src/services/card-index/index.ts";
@@ -489,7 +489,14 @@ export const davRouter = (
 		}
 	}).pipe(
 		Effect.catchTag("DavError", (err) =>
-			Effect.succeed(new Response(null, { status: err.status })),
+			Effect.succeed(
+				new Response(null, {
+					status: err.status,
+					...(err.status === HTTP_UNAUTHORIZED && {
+						headers: { "WWW-Authenticate": 'Basic realm="shuriken"' },
+					}),
+				}),
+			),
 		),
 		Effect.withSpan("dav.route", {
 			attributes: { "dav.path": ctx.url.pathname },

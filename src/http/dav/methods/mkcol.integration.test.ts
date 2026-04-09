@@ -49,11 +49,11 @@ describe("MKCALENDAR", () => {
 		}
 	});
 
-	it("returns 403 when unauthenticated", async () => {
+	it("returns 401 when unauthenticated", async () => {
 		const results = await runScript(
 			[
 				mkcol("/dav/principals/test/cal/should-fail/", {
-					expect: { status: 403 },
+					expect: { status: 401 },
 				}),
 			],
 			singleUser(),

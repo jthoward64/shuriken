@@ -6,10 +6,10 @@ import { encodeVCard } from "#src/data/vcard/codec.ts";
 import {
 	type DatabaseError,
 	type DavError,
-	forbidden,
 	InternalError,
 	methodNotAllowed,
 	notFound,
+	unauthorized,
 } from "#src/domain/errors.ts";
 import { EntityId } from "#src/domain/ids.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
@@ -74,7 +74,7 @@ export const getHandler = (
 
 		// 2. Require an authenticated principal.
 		if (ctx.auth._tag !== "Authenticated") {
-			return yield* forbidden("DAV:need-privileges");
+			return yield* unauthorized();
 		}
 		const principal = ctx.auth.principal;
 

@@ -192,12 +192,12 @@ describe("PROPFIND /dav/users/ — collection", () => {
 		}
 	});
 
-	it("returns 403 when unauthenticated", async () => {
+	it("returns 401 when unauthenticated", async () => {
 		const results = await runScript(
 			[
 				propfind("/dav/users/", PROPFIND_ALLPROP, {
 					headers: { Depth: "0" },
-					expect: { status: 403 },
+					expect: { status: 401 },
 				}),
 			],
 			singleAdminUser(),
@@ -264,12 +264,12 @@ describe("PROPFIND /dav/users/:slug — single user", () => {
 		}
 	});
 
-	it("returns 403 for unauthenticated access", async () => {
+	it("returns 401 for unauthenticated access", async () => {
 		const results = await runScript(
 			[
 				propfind("/dav/users/admin/", PROPFIND_ALLPROP, {
 					headers: { Depth: "0" },
-					expect: { status: 403 },
+					expect: { status: 401 },
 				}),
 			],
 			singleAdminUser(),
@@ -357,14 +357,14 @@ describe("MKCOL /dav/users/:slug", () => {
 		}
 	});
 
-	it("returns 403 when unauthenticated", async () => {
+	it("returns 401 when unauthenticated", async () => {
 		const results = await runScript(
 			[
 				{
 					name: "MKCOL unauthenticated",
 					method: "MKCOL" as const,
 					path: "/dav/users/sneaky/",
-					expect: { status: 403 },
+					expect: { status: 401 },
 				},
 			],
 			singleAdminUser(),
@@ -444,11 +444,11 @@ describe("DELETE /dav/users/:slug", () => {
 		}
 	});
 
-	it("returns 403 when unauthenticated", async () => {
+	it("returns 401 when unauthenticated", async () => {
 		const results = await runScript(
 			[
 				mkuser("untouched-user", "admin"),
-				del("/dav/users/untouched-user/", { expect: { status: 403 } }),
+				del("/dav/users/untouched-user/", { expect: { status: 401 } }),
 			],
 			singleAdminUser(),
 		);
@@ -622,11 +622,11 @@ describe("PROPPATCH /dav/users/:slug", () => {
 		}
 	});
 
-	it("returns 403 when unauthenticated", async () => {
+	it("returns 401 when unauthenticated", async () => {
 		const results = await runScript(
 			[
 				proppatch("/dav/users/admin/", setDisplayname("Sneaky"), {
-					expect: { status: 403 },
+					expect: { status: 401 },
 				}),
 			],
 			singleAdminUser(),

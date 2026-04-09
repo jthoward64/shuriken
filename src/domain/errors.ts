@@ -6,6 +6,7 @@ import {
 	HTTP_METHOD_NOT_ALLOWED,
 	HTTP_NOT_FOUND,
 	HTTP_PRECONDITION_FAILED,
+	HTTP_UNAUTHORIZED,
 	HTTP_UNSUPPORTED_MEDIA_TYPE,
 	type HttpStatus,
 } from "#src/http/status.ts";
@@ -185,6 +186,9 @@ export const forbidden = (
 
 export const badRequest = (message?: string): DavError =>
 	davError(HTTP_BAD_REQUEST, undefined, message);
+
+export const unauthorized = (message?: string): DavError =>
+	davError(HTTP_UNAUTHORIZED, undefined, message);
 
 export const conflict = (
 	precondition?: DavPrecondition,

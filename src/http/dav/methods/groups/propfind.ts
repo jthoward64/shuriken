@@ -2,7 +2,7 @@ import { Effect } from "effect";
 import type { ClarkName } from "#src/data/ir.ts";
 import { cn } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
-import { forbidden, methodNotAllowed, notFound } from "#src/domain/errors.ts";
+import { methodNotAllowed, notFound, unauthorized } from "#src/domain/errors.ts";
 import { GroupId } from "#src/domain/ids.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import {
@@ -98,7 +98,7 @@ export const groupPropfindHandler = (
 		}
 
 		if (ctx.auth._tag !== "Authenticated") {
-			return yield* forbidden("DAV:need-privileges");
+			return yield* unauthorized();
 		}
 		const requester = ctx.auth.principal;
 		const acl = yield* AclService;

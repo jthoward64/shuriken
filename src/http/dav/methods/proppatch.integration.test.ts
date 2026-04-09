@@ -332,14 +332,14 @@ describe("PROPPATCH instance", () => {
 // ---------------------------------------------------------------------------
 
 describe("PROPPATCH — auth", () => {
-	it("returns 403 when unauthenticated", async () => {
+	it("returns 401 when unauthenticated", async () => {
 		const results = await runScript(
 			[
 				proppatch(
 					"/dav/principals/test/cal/primary/",
 					setDisplayname("Sneaky"),
 					// no `as` → unauthenticated
-					{ expect: { status: 403 } },
+					{ expect: { status: 401 } },
 				),
 			],
 			singleUser(),

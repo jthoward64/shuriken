@@ -161,13 +161,13 @@ describe("PROPFIND /dav/groups/ — collection", () => {
 		}
 	});
 
-	it("returns 403 when unauthenticated", async () => {
+	it("returns 401 when unauthenticated", async () => {
 		const results = await runScript(
 			[
 				propfind("/dav/groups/", PROPFIND_ALLPROP, {
 					// no `as` → unauthenticated
 					headers: { Depth: "0" },
-					expect: { status: 403 },
+					expect: { status: 401 },
 				}),
 			],
 			singleAdminUser(),
@@ -252,14 +252,14 @@ describe("PROPFIND /dav/groups/:slug — single group", () => {
 		}
 	});
 
-	it("returns 403 for unauthenticated access", async () => {
+	it("returns 401 for unauthenticated access", async () => {
 		const results = await runScript(
 			[
 				mkgroup("secret", "admin"),
 				propfind("/dav/groups/secret/", PROPFIND_ALLPROP, {
 					// no `as`
 					headers: { Depth: "0" },
-					expect: { status: 403 },
+					expect: { status: 401 },
 				}),
 			],
 			singleAdminUser(),
@@ -310,13 +310,13 @@ describe("PROPFIND /dav/groups/:slug/members/", () => {
 		}
 	});
 
-	it("returns 403 for unauthenticated access", async () => {
+	it("returns 401 for unauthenticated access", async () => {
 		const results = await runScript(
 			[
 				mkgroup("gamma", "admin"),
 				propfind("/dav/groups/gamma/members/", PROPFIND_ALLPROP, {
 					headers: { Depth: "0" },
-					expect: { status: 403 },
+					expect: { status: 401 },
 				}),
 			],
 			singleAdminUser(),
@@ -380,14 +380,14 @@ describe("MKCOL /dav/groups/:slug", () => {
 		}
 	});
 
-	it("returns 403 when unauthenticated", async () => {
+	it("returns 401 when unauthenticated", async () => {
 		const results = await runScript(
 			[
 				{
 					name: "MKCOL unauthenticated",
 					method: "MKCOL" as const,
 					path: "/dav/groups/sneaky/",
-					expect: { status: 403 },
+					expect: { status: 401 },
 				},
 			],
 			singleAdminUser(),
@@ -463,11 +463,11 @@ describe("DELETE /dav/groups/:slug", () => {
 		}
 	});
 
-	it("returns 403 when unauthenticated", async () => {
+	it("returns 401 when unauthenticated", async () => {
 		const results = await runScript(
 			[
 				mkgroup("untouched", "admin"),
-				del("/dav/groups/untouched/", { expect: { status: 403 } }),
+				del("/dav/groups/untouched/", { expect: { status: 401 } }),
 			],
 			singleAdminUser(),
 		);
@@ -561,7 +561,7 @@ describe("PUT /dav/groups/:slug/members/:userSlug", () => {
 		}
 	});
 
-	it("returns 403 when unauthenticated", async () => {
+	it("returns 401 when unauthenticated", async () => {
 		const results = await runScript(
 			[
 				mkgroup("g2", "admin"),
@@ -569,7 +569,7 @@ describe("PUT /dav/groups/:slug/members/:userSlug", () => {
 					name: "PUT member unauthenticated",
 					method: "PUT" as const,
 					path: "/dav/groups/g2/members/admin",
-					expect: { status: 403 },
+					expect: { status: 401 },
 				},
 			],
 			singleAdminUser(),
@@ -640,7 +640,7 @@ describe("DELETE /dav/groups/:slug/members/:userSlug", () => {
 		}
 	});
 
-	it("returns 403 when unauthenticated", async () => {
+	it("returns 401 when unauthenticated", async () => {
 		const results = await runScript(
 			[
 				mkgroup("g4", "admin"),
@@ -649,7 +649,7 @@ describe("DELETE /dav/groups/:slug/members/:userSlug", () => {
 					name: "DELETE member unauthenticated",
 					method: "DELETE" as const,
 					path: "/dav/groups/g4/members/admin",
-					expect: { status: 403 },
+					expect: { status: 401 },
 				},
 			],
 			singleAdminUser(),
@@ -811,12 +811,12 @@ describe("PROPPATCH /dav/groups/:slug", () => {
 		}
 	});
 
-	it("returns 403 when unauthenticated", async () => {
+	it("returns 401 when unauthenticated", async () => {
 		const results = await runScript(
 			[
 				mkgroup("patch-target", "admin"),
 				proppatch("/dav/groups/patch-target/", setDisplayname("Sneaky"), {
-					expect: { status: 403 },
+					expect: { status: 401 },
 				}),
 			],
 			singleAdminUser(),

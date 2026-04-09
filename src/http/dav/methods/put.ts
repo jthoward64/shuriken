@@ -8,9 +8,9 @@ import { extractUid as extractVCardUid } from "#src/data/vcard/uid.ts";
 import {
 	type DatabaseError,
 	type DavError,
-	forbidden,
 	methodNotAllowed,
 	preconditionFailed,
+	unauthorized,
 	unsupportedMediaType,
 } from "#src/domain/errors.ts";
 import { CollectionId, EntityId } from "#src/domain/ids.ts";
@@ -52,7 +52,7 @@ export const putHandler = (
 
 		// 2. Require an authenticated principal.
 		if (ctx.auth._tag !== "Authenticated") {
-			return yield* forbidden("DAV:need-privileges");
+			return yield* unauthorized();
 		}
 		const principal = ctx.auth.principal;
 

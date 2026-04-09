@@ -10,7 +10,7 @@ import { Effect, Option } from "effect";
 import { encodeICalendar } from "#src/data/icalendar/codec.ts";
 import type { ClarkName, IrDocument } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
-import { forbidden, methodNotAllowed } from "#src/domain/errors.ts";
+import { methodNotAllowed, unauthorized } from "#src/domain/errors.ts";
 import type { EntityId, UuidString } from "#src/domain/ids.ts";
 import { InstanceId } from "#src/domain/ids.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
@@ -115,7 +115,7 @@ export const calendarQueryHandler = (
 		}
 
 		if (ctx.auth._tag !== "Authenticated") {
-			return yield* forbidden("DAV:need-privileges");
+			return yield* unauthorized();
 		}
 		const actingPrincipalId = ctx.auth.principal.principalId;
 
@@ -135,8 +135,15 @@ export const calendarQueryHandler = (
 		const filterTree = obj[cn("filter")];
 		const filter = yield* parseCalFilter({ [cn("filter")]: filterTree });
 
-		// Parse optional calendar-data subsetting spec
-		const dataTree = obj[CALENDAR_DATA];
+		// Parse optional calendar-data subsetting spec (<C:calendar-data> is inside <D:prop>)
+		const propEl =
+			typeof tree === "object" && tree !== null
+				? (tree as Record<string, unknown>)["{DAV:}prop"]
+				: undefined;
+		const dataTree =
+			typeof propEl === "object" && propEl !== null
+				? (propEl as Record<string, unknown>)[CALENDAR_DATA]
+				: undefined;
 		const spec = parseCalendarDataSpec(dataTree);
 
 		// Determine prop names

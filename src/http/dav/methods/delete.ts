@@ -2,10 +2,10 @@ import { Effect } from "effect";
 import {
 	type DatabaseError,
 	type DavError,
-	forbidden,
 	methodNotAllowed,
 	notFound,
 	preconditionFailed,
+	unauthorized,
 } from "#src/domain/errors.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
@@ -53,7 +53,7 @@ export const deleteHandler = (
 		}
 
 		if (ctx.auth._tag !== "Authenticated") {
-			return yield* forbidden("DAV:need-privileges");
+			return yield* unauthorized();
 		}
 		const principal = ctx.auth.principal;
 

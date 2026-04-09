@@ -172,8 +172,8 @@ const evalPropFilter = (
 		return false;
 	}
 
-	// All text matches and param filters must pass for each matched property
-	for (const prop of props) {
+	// The filter passes if any one property instance matches all its conditions.
+	return props.some((prop) => {
 		const textOk = evalTextMatches(propValueText(prop), f.test, f.textMatches);
 		if (!textOk) {
 			return false;
@@ -183,8 +183,8 @@ const evalPropFilter = (
 				return false;
 			}
 		}
-	}
-	return true;
+		return true;
+	});
 };
 
 const evalTextMatches = (

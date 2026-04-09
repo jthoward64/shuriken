@@ -546,7 +546,8 @@ describe("addressbook-multiget REPORT — edge cases", () => {
 	});
 
 	// RFC 6352 §8.6.1: <C:address-data> subsetting should return only the
-	// requested vCard properties (UID and FN), not the full vCard body.
+	// requested vCard properties (UID and FN). RFC 6352 §8.5.1 + RFC 6350
+	// require VERSION to always be present even when not explicitly requested.
 	it("address-data subsetting returns only requested vCard properties", async () => {
 		const results = await runScript(
 			[
@@ -564,8 +565,7 @@ describe("addressbook-multiget REPORT — edge cases", () => {
 		for (const result of results) {
 			expect(result.failures, result.step.name).toEqual([]);
 		}
-		// The full vCard body would include "VERSION:4.0" — a property NOT in the
-		// subset request. It must be absent from the response body.
-		expect(results[2]?.body).not.toContain("VERSION:4.0");
+		// VERSION must always be present per RFC 6352 §8.5.1 (mandatory vCard property)
+		expect(results[2]?.body).toContain("VERSION:4.0");
 	});
 });

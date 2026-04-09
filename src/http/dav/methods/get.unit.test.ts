@@ -360,13 +360,13 @@ describe("getHandler — method not allowed", () => {
 // ---------------------------------------------------------------------------
 
 describe("getHandler — authentication", () => {
-	it("returns 403 need-privileges for unauthenticated requests", async () => {
+	it("returns 401 for unauthenticated requests", async () => {
 		const env = makeTestEnv();
 		const err = (await runErr(
 			env,
 			getHandler(instancePath, unauthenticatedCtx),
 		)) as DavError;
 		expect(err._tag).toBe("DavError");
-		expect(err.precondition).toBe("DAV:need-privileges");
+		expect(err.status).toBe(401);
 	});
 });

@@ -103,7 +103,7 @@ describe("ACL — basic success", () => {
 
 describe("ACL — authorization", () => {
 	// Unauthenticated requests must be rejected before the request body is read.
-	it("returns 403 when unauthenticated", async () => {
+	it("returns 401 when unauthenticated", async () => {
 		const results = await runScript(
 			[
 				{
@@ -111,7 +111,7 @@ describe("ACL — authorization", () => {
 					method: "ACL" as const,
 					path: "/dav/principals/test/cal/primary/",
 					// no `as` → unauthenticated
-					expect: { status: 403 },
+					expect: { status: 401 },
 				},
 			],
 			singleUser(),

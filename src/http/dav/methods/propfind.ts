@@ -15,7 +15,7 @@
 import { Effect } from "effect";
 import { type ClarkName, cn, type IrDeadProperties } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
-import { forbidden, notFound } from "#src/domain/errors.ts";
+import { forbidden, notFound, unauthorized } from "#src/domain/errors.ts";
 import { COLLECTION_TYPE_TO_NAMESPACE } from "#src/domain/types/collection-namespace.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
@@ -184,11 +184,11 @@ const buildCollectionProps = (
 		row.supportedComponents !== null &&
 		row.supportedComponents.length > 0
 	) {
-		const comps: Record<string, unknown> = {};
-		for (const comp of row.supportedComponents) {
-			comps[`{${CALDAV_NS}}comp`] = { "@_name": comp };
-		}
-		props[CAL_SUPPORTED_COMPONENTS] = comps;
+		props[CAL_SUPPORTED_COMPONENTS] = {
+			[`{${CALDAV_NS}}comp`]: row.supportedComponents.map((c) => ({
+				"@_name": c,
+			})),
+		};
 	}
 
 	// Dead properties
@@ -259,7 +259,7 @@ export const propfindHandler = (
 
 		// Require authentication — all non-OPTIONS methods require credentials
 		if (ctx.auth._tag !== "Authenticated") {
-			return yield* forbidden("DAV:need-privileges");
+			return yield* unauthorized();
 		}
 		const actingPrincipalId = ctx.auth.principal.principalId;
 
