@@ -1,6 +1,7 @@
 import { Effect, Option } from "effect";
 import { makeEtag } from "#src/data/etag.ts";
 import { encodeICalendar } from "#src/data/icalendar/codec.ts";
+import type { IrDeadProperties } from "#src/data/ir.ts";
 import { encodeVCard } from "#src/data/vcard/codec.ts";
 import {
 	conflict,
@@ -11,7 +12,8 @@ import {
 	someOrNotFound,
 	unauthorized,
 } from "#src/domain/errors.ts";
-import { CollectionId, EntityId, type PrincipalId } from "#src/domain/ids.ts";
+import { CollectionId, EntityId, InstanceId, type PrincipalId } from "#src/domain/ids.ts";
+import type { DavPrivilege } from "#src/domain/types/dav.ts";
 import { type ResolvedDavPath, Slug } from "#src/domain/types/path.ts";
 import { ETag } from "#src/domain/types/strings.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
@@ -178,15 +180,36 @@ const copyInstance = (
 				: yield* encodeVCard({ kind: "vcard", root: irRoot });
 		const etag = ETag(yield* makeEtag(canonical));
 
-		// Insert new instance at destination.
+		// Insert new instance at destination, preserving dead properties.
 		const instanceRepo = yield* InstanceRepository;
-		yield* instanceRepo.insert({
+		const newInstance = yield* instanceRepo.insert({
 			collectionId: destPath.collectionId,
 			entityId: EntityId(newEntity.id),
 			contentType: sourceInstance.contentType,
 			etag,
 			slug: destSlug,
+			clientProperties: sourceInstance.clientProperties as IrDeadProperties,
 		});
+
+		// RFC 4918 §9.8.2: copy non-protected ACEs from source to destination.
+		const sourceAces = yield* acl.getAces(path.instanceId, "instance");
+		const nonProtectedAces = sourceAces.filter((a) => !a.protected);
+		if (nonProtectedAces.length > 0) {
+			yield* acl.setAces(
+				InstanceId(newInstance.id),
+				"instance",
+				nonProtectedAces.map((a, i) => ({
+					resourceType: "instance" as const,
+					resourceId: newInstance.id,
+					principalType: a.principalType,
+					principalId: a.principalId ?? undefined,
+					privilege: a.privilege as DavPrivilege,
+					grantDeny: a.grantDeny,
+					protected: false,
+					ordinal: i,
+				})),
+			);
+		}
 
 		return new Response(null, {
 			status: destExisted ? HTTP_NO_CONTENT : HTTP_CREATED,
@@ -262,6 +285,41 @@ const copyCollection = (
 				(sourceCollection.supportedComponents as Array<string>) ?? undefined,
 		});
 
+		// RFC 4918 §9.8.2: copy dead properties to the new collection.
+		const srcCollectionProps =
+			sourceCollection.clientProperties as IrDeadProperties;
+		if (Object.keys(srcCollectionProps).length > 0) {
+			yield* collectionSvc.updateProperties(
+				CollectionId(newCollection.id),
+				{ clientProperties: srcCollectionProps },
+			);
+		}
+
+		// RFC 4918 §9.8.2: copy non-protected ACEs from source collection.
+		const collectionSourceAces = yield* acl.getAces(
+			path.collectionId,
+			"collection",
+		);
+		const collectionNonProtectedAces = collectionSourceAces.filter(
+			(a) => !a.protected,
+		);
+		if (collectionNonProtectedAces.length > 0) {
+			yield* acl.setAces(
+				CollectionId(newCollection.id),
+				"collection",
+				collectionNonProtectedAces.map((a, i) => ({
+					resourceType: "collection" as const,
+					resourceId: newCollection.id,
+					principalType: a.principalType,
+					principalId: a.principalId ?? undefined,
+					privilege: a.privilege as DavPrivilege,
+					grantDeny: a.grantDeny,
+					protected: false,
+					ordinal: i,
+				})),
+			);
+		}
+
 		// Depth: infinity — copy all instances.
 		if (depth === "infinity") {
 			const instanceRepo = yield* InstanceRepository;
@@ -303,13 +361,38 @@ const copyCollection = (
 								: yield* encodeVCard({ kind: "vcard", root: irRoot });
 						const etag = ETag(yield* makeEtag(canonical));
 
-						yield* instanceRepo.insert({
+						const newInst = yield* instanceRepo.insert({
 							collectionId: CollectionId(newCollection.id),
 							entityId: EntityId(newEntity.id),
 							contentType: inst.contentType,
 							etag,
 							slug: Slug(inst.slug),
+							clientProperties:
+								inst.clientProperties as IrDeadProperties,
 						});
+
+						// Copy non-protected ACEs for each instance.
+						const instAces = yield* acl.getAces(
+							InstanceId(inst.id),
+							"instance",
+						);
+						const instNonProtected = instAces.filter((a) => !a.protected);
+						if (instNonProtected.length > 0) {
+							yield* acl.setAces(
+								InstanceId(newInst.id),
+								"instance",
+								instNonProtected.map((a, i) => ({
+									resourceType: "instance" as const,
+									resourceId: newInst.id,
+									principalType: a.principalType,
+									principalId: a.principalId ?? undefined,
+									privilege: a.privilege as DavPrivilege,
+									grantDeny: a.grantDeny,
+									protected: false,
+									ordinal: i,
+								})),
+							);
+						}
 					}),
 				{ discard: true },
 			);

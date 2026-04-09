@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from "bun:test";
 import { Effect, Layer, Option } from "effect";
 import { Temporal } from "temporal-polyfill";
 import type { IrComponent } from "#src/data/ir.ts";
+import type { EntityType } from "#src/db/drizzle/schema/index.ts";
 import { EntityId } from "#src/domain/ids.ts";
 import { EntityRepositoryLive } from "#src/services/entity/repository.live.ts";
 import { EntityRepository } from "#src/services/entity/repository.ts";
@@ -31,7 +32,7 @@ function makeTestLayer(): TestLayer {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const makeEntity = (entityType: "icalendar" | "vcard" = "icalendar") =>
+const makeEntity = (entityType: EntityType = "icalendar") =>
 	EntityRepository.pipe(
 		Effect.flatMap((r) => r.insert({ entityType, logicalUid: null })),
 	);

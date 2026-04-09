@@ -21,6 +21,7 @@ export interface NewInstance {
 	readonly etag: ETag;
 	readonly slug: Slug;
 	readonly scheduleTag?: string;
+	readonly clientProperties?: IrDeadProperties;
 }
 
 export interface InstanceRepositoryShape {

@@ -1,7 +1,12 @@
 import type { InferSelectModel } from "drizzle-orm";
 import type { Effect, Option } from "effect";
 import { Context } from "effect";
-import type { davAcl } from "#src/db/drizzle/schema/index.ts";
+import type {
+	davAcl,
+	GrantDeny,
+	PrincipalType,
+	ResourceType,
+} from "#src/db/drizzle/schema/index.ts";
 import type { DatabaseError } from "#src/domain/errors.ts";
 import type { PrincipalId, UuidString } from "#src/domain/ids.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
@@ -22,24 +27,16 @@ import type { DavPrivilege } from "#src/domain/types/dav.ts";
 
 export type AceRow = InferSelectModel<typeof davAcl>;
 
-export type AclResourceType =
-	| "collection"
-	| "instance"
-	| "principal"
-	| "virtual";
+/** @deprecated Use ResourceType from schema directly */
+export type AclResourceType = ResourceType;
 
 export interface NewAce {
-	readonly resourceType: AclResourceType;
+	readonly resourceType: ResourceType;
 	readonly resourceId: UuidString;
-	readonly principalType:
-		| "principal"
-		| "all"
-		| "authenticated"
-		| "unauthenticated"
-		| "self";
+	readonly principalType: PrincipalType;
 	readonly principalId?: UuidString;
 	readonly privilege: DavPrivilege;
-	readonly grantDeny: "grant" | "deny";
+	readonly grantDeny: GrantDeny;
 	readonly protected: boolean;
 	readonly ordinal: number;
 }
@@ -48,13 +45,13 @@ export interface AclRepositoryShape {
 	/** All ACEs for a resource, ordered by ordinal. Used for PROPFIND DAV:acl. */
 	readonly getAces: (
 		resourceId: UuidString,
-		resourceType: AclResourceType,
+		resourceType: ResourceType,
 	) => Effect.Effect<ReadonlyArray<AceRow>, DatabaseError>;
 
 	/** Replace all non-protected ACEs on a resource. Used by the ACL method. */
 	readonly setAces: (
 		resourceId: UuidString,
-		resourceType: AclResourceType,
+		resourceType: ResourceType,
 		aces: ReadonlyArray<NewAce>,
 	) => Effect.Effect<void, DatabaseError>;
 
@@ -70,7 +67,7 @@ export interface AclRepositoryShape {
 	readonly hasPrivilege: (
 		principalIds: ReadonlyArray<PrincipalId>,
 		resourceId: UuidString,
-		resourceType: AclResourceType,
+		resourceType: ResourceType,
 		privileges: ReadonlyArray<DavPrivilege>,
 		isAuthenticated: boolean,
 	) => Effect.Effect<boolean, DatabaseError>;
@@ -82,7 +79,7 @@ export interface AclRepositoryShape {
 	readonly getGrantedPrivileges: (
 		principalIds: ReadonlyArray<PrincipalId>,
 		resourceId: UuidString,
-		resourceType: AclResourceType,
+		resourceType: ResourceType,
 		isAuthenticated: boolean,
 	) => Effect.Effect<ReadonlyArray<DavPrivilege>, DatabaseError>;
 
@@ -105,9 +102,9 @@ export interface AclRepositoryShape {
 	 */
 	readonly getResourceParent: (
 		resourceId: UuidString,
-		resourceType: AclResourceType,
+		resourceType: ResourceType,
 	) => Effect.Effect<
-		Option.Option<{ readonly id: UuidString; readonly type: AclResourceType }>,
+		Option.Option<{ readonly id: UuidString; readonly type: ResourceType }>,
 		DatabaseError
 	>;
 }

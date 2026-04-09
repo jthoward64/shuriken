@@ -65,6 +65,8 @@ const stubLayers = Layer.mergeAll(
 		findByEmail: die,
 		findUserByUserId: die,
 		updateProperties: die,
+		listAll: die,
+		searchByDisplayName: die,
 	}),
 	Layer.succeed(CollectionRepoTag, {
 		findById: die,

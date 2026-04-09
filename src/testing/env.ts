@@ -4,6 +4,8 @@ import type { IrComponent } from "#src/data/ir.ts";
 import type {
 	CollectionType,
 	ContentType,
+	GrantDeny,
+	PrincipalType,
 } from "#src/db/drizzle/schema/index.ts";
 import { ComponentId, type UuidString } from "#src/domain/ids.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
@@ -178,15 +180,10 @@ export interface CredentialSeedData {
 export interface AceSeedData {
 	readonly resourceType: AclResourceType;
 	readonly resourceId: UuidString;
-	readonly principalType:
-		| "principal"
-		| "all"
-		| "authenticated"
-		| "unauthenticated"
-		| "self";
+	readonly principalType: PrincipalType;
 	readonly principalId?: UuidString;
 	readonly privilege: DavPrivilege;
-	readonly grantDeny?: "grant" | "deny";
+	readonly grantDeny?: GrantDeny;
 	readonly protected?: boolean;
 	readonly ordinal?: number;
 }
@@ -472,6 +469,45 @@ const makePrincipalRepo = (stores: TestStores): PrincipalRepositoryShape => ({
 			};
 			stores.principals.set(id, updated);
 			return updated;
+		}),
+
+	listAll: () =>
+		Effect.sync(() => {
+			const results: Array<{ principal: PrincipalRow; user: typeof stores.users extends Map<string, infer U> ? U : never }> = [];
+			for (const principalRow of stores.principals.values()) {
+				if (principalRow.deletedAt !== null) {
+					continue;
+				}
+				const userRow = [...stores.users.values()].find(
+					(u) => u.principalId === principalRow.id,
+				);
+				if (userRow) {
+					results.push({ principal: principalRow, user: userRow });
+				}
+			}
+			return results;
+		}),
+
+	searchByDisplayName: (query) =>
+		Effect.sync(() => {
+			const lower = query.toLowerCase();
+			const results: Array<{ principal: PrincipalRow; user: typeof stores.users extends Map<string, infer U> ? U : never }> = [];
+			for (const principalRow of stores.principals.values()) {
+				if (principalRow.deletedAt !== null) {
+					continue;
+				}
+				const userRow = [...stores.users.values()].find(
+					(u) => u.principalId === principalRow.id,
+				);
+				if (!userRow) {
+					continue;
+				}
+				const displayName = (principalRow.displayName ?? principalRow.slug).toLowerCase();
+				if (displayName.includes(lower) || userRow.email.toLowerCase().includes(lower)) {
+					results.push({ principal: principalRow, user: userRow });
+				}
+			}
+			return results;
 		}),
 });
 

@@ -79,6 +79,7 @@ const CAL_SUPPORTED_COLLATION_SET = cn(CALDAV_NS, "supported-collation-set");
 const CARD_SUPPORTED_COLLATION_SET = cn(CARDDAV_NS, "supported-collation-set");
 const DAV_GROUP_MEMBER_SET = cn(DAV_NS, "group-member-set");
 const DAV_GROUP_MEMBERSHIP = cn(DAV_NS, "group-membership");
+const DAV_ALTERNATE_URI_SET = cn(DAV_NS, "alternate-URI-set");
 
 // The two collation URIs the server supports for <text-match> filters.
 // RFC 4791 §5.2.10 / RFC 6352 §6.2.3.
@@ -524,6 +525,10 @@ export const propfindHandler = (
 				[CARD_HOME_SET]: { [cn(DAV_NS, "href")]: principalHref },
 				// RFC 6638 §2.4.1: email addresses for attendee lookup
 				[CAL_USER_ADDRESS_SET]: {
+					[cn(DAV_NS, "href")]: `mailto:${principalRow.user.email}`,
+				},
+				// RFC 3744 §4.1: alternate URIs for this principal (e.g. mailto:)
+				[DAV_ALTERNATE_URI_SET]: {
 					[cn(DAV_NS, "href")]: `mailto:${principalRow.user.email}`,
 				},
 				// RFC 6638 §2.2: scheduling collection URLs

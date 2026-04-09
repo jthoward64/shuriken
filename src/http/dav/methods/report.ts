@@ -5,12 +5,14 @@
 // the appropriate sub-handler.
 //
 // Supported report types:
-//   {DAV:}sync-collection                   — RFC 6578
-//   {urn:...caldav}calendar-multiget        — RFC 4791 §7.9
-//   {urn:...caldav}calendar-query           — RFC 4791 §7.8
-//   {urn:...caldav}free-busy-query          — RFC 4791 §7.10
-//   {urn:...carddav}addressbook-multiget    — RFC 6352 §8.7
-//   {urn:...carddav}addressbook-query       — RFC 6352 §8.6
+//   {DAV:}sync-collection                        — RFC 6578
+//   {DAV:}principal-match                        — RFC 3744 §9.3
+//   {DAV:}principal-property-search              — RFC 3744 §9.4
+//   {urn:...caldav}calendar-multiget             — RFC 4791 §7.9
+//   {urn:...caldav}calendar-query                — RFC 4791 §7.8
+//   {urn:...caldav}free-busy-query               — RFC 4791 §7.10
+//   {urn:...carddav}addressbook-multiget         — RFC 6352 §8.7
+//   {urn:...carddav}addressbook-query            — RFC 6352 §8.6
 // ---------------------------------------------------------------------------
 
 import { Effect } from "effect";
@@ -27,6 +29,7 @@ import type {
 	InstanceRepository,
 	InstanceService,
 } from "#src/services/instance/index.ts";
+import type { PrincipalRepository } from "#src/services/principal/index.ts";
 import type { TombstoneRepository } from "#src/services/tombstone/index.ts";
 import { addressbookMultigetHandler } from "./report/addressbook-multiget.ts";
 import { addressbookQueryHandler } from "./report/addressbook-query.ts";
@@ -34,6 +37,8 @@ import { calendarMultigetHandler } from "./report/calendar-multiget.ts";
 import { calendarQueryHandler } from "./report/calendar-query.ts";
 import { freeBusyQueryHandler } from "./report/free-busy-query.ts";
 import { parseReportBody } from "./report/parse.ts";
+import { principalMatchHandler } from "./report/principal-match.ts";
+import { principalPropertySearchHandler } from "./report/principal-property-search.ts";
 import { syncCollectionHandler } from "./report/sync-collection.ts";
 
 const DAV_NS = "DAV:";
@@ -41,6 +46,8 @@ const CALDAV_NS = "urn:ietf:params:xml:ns:caldav";
 const CARDDAV_NS = "urn:ietf:params:xml:ns:carddav";
 
 const SYNC_COLLECTION = `{${DAV_NS}}sync-collection`;
+const PRINCIPAL_MATCH = `{${DAV_NS}}principal-match`;
+const PRINCIPAL_PROPERTY_SEARCH = `{${DAV_NS}}principal-property-search`;
 const CALENDAR_MULTIGET = `{${CALDAV_NS}}calendar-multiget`;
 const CALENDAR_QUERY = `{${CALDAV_NS}}calendar-query`;
 const FREE_BUSY_QUERY = `{${CALDAV_NS}}free-busy-query`;
@@ -61,6 +68,7 @@ export const reportHandler = (
 	| ComponentRepository
 	| CalIndexRepository
 	| CardIndexRepository
+	| PrincipalRepository
 	| AclService
 > =>
 	Effect.gen(function* () {
@@ -69,6 +77,12 @@ export const reportHandler = (
 		switch (type) {
 			case SYNC_COLLECTION:
 				return yield* syncCollectionHandler(path, ctx, tree);
+
+			case PRINCIPAL_MATCH:
+				return yield* principalMatchHandler(path, ctx, tree);
+
+			case PRINCIPAL_PROPERTY_SEARCH:
+				return yield* principalPropertySearchHandler(path, ctx, tree);
 
 			case CALENDAR_MULTIGET:
 				return yield* calendarMultigetHandler(path, ctx, tree);

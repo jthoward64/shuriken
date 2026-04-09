@@ -1,6 +1,7 @@
 import type { Effect, Option } from "effect";
 import { Context } from "effect";
 import type { IrComponent } from "#src/data/ir.ts";
+import type { EntityType } from "#src/db/drizzle/schema/index.ts";
 import type { DatabaseError } from "#src/domain/errors.ts";
 import type { ComponentId, EntityId } from "#src/domain/ids.ts";
 
@@ -27,7 +28,7 @@ export interface ComponentRepositoryShape {
 	 */
 	readonly loadTree: (
 		entityId: EntityId,
-		entityType: "icalendar" | "vcard",
+		entityType: EntityType,
 	) => Effect.Effect<Option.Option<IrComponent>, DatabaseError>;
 
 	/**

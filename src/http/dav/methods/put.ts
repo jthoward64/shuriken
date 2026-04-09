@@ -15,6 +15,7 @@ import {
 	unauthorized,
 	unsupportedMediaType,
 } from "#src/domain/errors.ts";
+import type { EntityType } from "#src/db/drizzle/schema/index.ts";
 import { CollectionId, EntityId } from "#src/domain/ids.ts";
 import type { ResolvedDavPath, Slug } from "#src/domain/types/path.ts";
 import { ETag } from "#src/domain/types/strings.ts";
@@ -65,7 +66,7 @@ export const putHandler = (
 		const baseContentType =
 			rawContentType.split(";")[0]?.trim().toLowerCase() ?? "";
 
-		let entityType: "icalendar" | "vcard";
+		let entityType: EntityType;
 		let contentType: "text/calendar" | "text/vcard";
 
 		if (baseContentType === "text/calendar") {

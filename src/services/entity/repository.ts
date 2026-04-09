@@ -1,7 +1,7 @@
 import type { InferSelectModel } from "drizzle-orm";
 import type { Effect, Option } from "effect";
 import { Context } from "effect";
-import type { davEntity } from "#src/db/drizzle/schema/index.ts";
+import type { davEntity, EntityType } from "#src/db/drizzle/schema/index.ts";
 import type { DatabaseError } from "#src/domain/errors.ts";
 import type { CollectionId, EntityId } from "#src/domain/ids.ts";
 
@@ -13,7 +13,7 @@ export type EntityRow = InferSelectModel<typeof davEntity>;
 
 export interface EntityRepositoryShape {
 	readonly insert: (input: {
-		readonly entityType: "icalendar" | "vcard";
+		readonly entityType: EntityType;
 		readonly logicalUid: string | null;
 	}) => Effect.Effect<EntityRow, DatabaseError>;
 

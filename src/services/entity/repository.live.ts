@@ -1,7 +1,11 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { Effect, Layer, Option } from "effect";
 import { DatabaseClient, type DbClient } from "#src/db/client.ts";
-import { davEntity, davInstance } from "#src/db/drizzle/schema/index.ts";
+import {
+	davEntity,
+	davInstance,
+	type EntityType,
+} from "#src/db/drizzle/schema/index.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
 import type { CollectionId, EntityId } from "#src/domain/ids.ts";
 import { EntityRepository } from "./repository.ts";
@@ -12,7 +16,7 @@ import { EntityRepository } from "./repository.ts";
 
 const insertEntity = (
 	db: DbClient,
-	input: { entityType: "icalendar" | "vcard"; logicalUid: string | null },
+	input: { entityType: EntityType; logicalUid: string | null },
 ) =>
 	Effect.tryPromise({
 		try: () =>

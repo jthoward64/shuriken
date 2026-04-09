@@ -389,6 +389,66 @@ const evalVtodoTimeRange = (
 	return true;
 };
 
+/**
+ * VFREEBUSY time-range matching — RFC 4791 §9.9 rule table.
+ *
+ *   Y DTSTART + DTEND: (start <= DTEND) AND (end > DTSTART)
+ *   N FREEBUSY only:   any period p: (start < p.end) AND (end > p.start)
+ *   N neither:         FALSE
+ *
+ * Note: DURATION is explicitly ignored for VFREEBUSY per the RFC.
+ */
+const evalVfreebusyTimeRange = (
+	comp: IrComponent,
+	range: { start?: Temporal.Instant; end?: Temporal.Instant },
+): boolean => {
+	const dtstart = getDtstartInstant(comp);
+	const dtend = getDtendInstant(comp);
+
+	if (dtstart && dtend) {
+		// Y | *: (range.start <= DTEND) AND (range.end > DTSTART)
+		const startOk = !range.start || range.start.epochMilliseconds <= dtend.epochMilliseconds;
+		const endOk = !range.end || range.end.epochMilliseconds > dtstart.epochMilliseconds;
+		return startOk && endOk;
+	}
+
+	// N | Y: check each FREEBUSY period
+	for (const prop of comp.properties) {
+		if (prop.name !== "FREEBUSY") {
+			continue;
+		}
+		const periodStrings: Array<string> =
+			prop.value.type === "PERIOD"
+				? [prop.value.value]
+				: prop.value.type === "PERIOD_LIST"
+					? (prop.value.value as ReadonlyArray<string>).slice()
+					: [];
+		for (const ps of periodStrings) {
+			const slash = ps.indexOf("/");
+			if (slash === -1) {
+				continue;
+			}
+			try {
+				const pStart = Temporal.Instant.from(ps.slice(0, slash));
+				const endPart = ps.slice(slash + 1);
+				const pEnd = endPart.startsWith("P") || endPart.startsWith("-P")
+					? pStart.add(Temporal.Duration.from(endPart))
+					: Temporal.Instant.from(endPart);
+				const startOk = !range.start || range.start.epochMilliseconds < pEnd.epochMilliseconds;
+				const endOk = !range.end || range.end.epochMilliseconds > pStart.epochMilliseconds;
+				if (startOk && endOk) {
+					return true;
+				}
+			} catch {
+				// Invalid period — skip
+			}
+		}
+	}
+
+	// N | N: FALSE; N | Y but no period matched: FALSE
+	return false;
+};
+
 const evalComponentTimeRange = (
 	comp: IrComponent,
 	range: { start?: Temporal.Instant; end?: Temporal.Instant },
@@ -409,7 +469,11 @@ const evalComponentTimeRange = (
 		return evalVtodoTimeRange(comp, range);
 	}
 
-	// VEVENT / VFREEBUSY: DTSTART < end AND effective_DTEND > start.
+	if (comp.name === "VFREEBUSY") {
+		return evalVfreebusyTimeRange(comp, range);
+	}
+
+	// VEVENT: DTSTART < end AND effective_DTEND > start.
 	const dtstart = getDtstartInstant(comp);
 	if (!dtstart) {
 		return true; // No DTSTART → pass conservatively

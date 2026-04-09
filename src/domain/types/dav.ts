@@ -1,5 +1,11 @@
 import { Data } from "effect";
 import type { PrincipalId, UserId } from "#src/domain/ids.ts";
+export type {
+	CollectionType,
+	ContentType,
+	EntityType,
+	PrincipalKind as PrincipalType,
+} from "#src/db/drizzle/schema/index.ts";
 
 // ---------------------------------------------------------------------------
 // HTTP methods used in DAV
@@ -35,21 +41,6 @@ export type DavCapabilityClass =
 	| "calendar-access"
 	| "addressbook"
 	| "extended-mkcol";
-
-// ---------------------------------------------------------------------------
-// Collection / entity / content type discriminators
-// ---------------------------------------------------------------------------
-
-export type CollectionType =
-	| "collection"
-	| "calendar"
-	| "addressbook"
-	| "inbox"
-	| "outbox";
-export type EntityType = "icalendar" | "vcard";
-export type ContentType = "text/calendar" | "text/vcard";
-
-export type PrincipalType = "user" | "group" | "system" | "public" | "resource";
 
 // ---------------------------------------------------------------------------
 // Authenticated principal — produced by AuthService, consumed by services

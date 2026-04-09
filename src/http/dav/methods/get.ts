@@ -11,6 +11,7 @@ import {
 	notFound,
 	unauthorized,
 } from "#src/domain/errors.ts";
+import type { EntityType } from "#src/db/drizzle/schema/index.ts";
 import { EntityId } from "#src/domain/ids.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
@@ -94,7 +95,7 @@ export const getHandler = (
 		// 5. Determine entity type from content type.
 		const baseContentType =
 			instance.contentType.split(";")[0]?.trim().toLowerCase() ?? "";
-		const entityType: "icalendar" | "vcard" =
+		const entityType: EntityType =
 			baseContentType === "text/vcard" ? "vcard" : "icalendar";
 
 		// 6. Load component tree.

@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, ilike, isNull, or, sql } from "drizzle-orm";
 import { Effect, Layer, Option } from "effect";
 import { DatabaseClient } from "#src/db/client.ts";
 import { principal, user } from "#src/db/drizzle/schema/index.ts";
@@ -167,6 +167,59 @@ export const PrincipalRepositoryLive = Layer.effect(
 			),
 		);
 
+		const listAll = Effect.fn("PrincipalRepository.listAll")(
+			function* () {
+				yield* Effect.logTrace("repo.principal.listAll");
+				return yield* Effect.tryPromise({
+					try: () =>
+						db
+							.select()
+							.from(principal)
+							.innerJoin(user, eq(user.principalId, principal.id))
+							.where(isNull(principal.deletedAt))
+							.then((rows) =>
+								rows.map((r) => ({ principal: r.principal, user: r.user })),
+							),
+					catch: (e) => new DatabaseError({ cause: e }),
+				});
+			},
+			Effect.tapError((e: DatabaseError) =>
+				Effect.logWarning("repo.principal.listAll failed", e.cause),
+			),
+		);
+
+		const searchByDisplayName = Effect.fn(
+			"PrincipalRepository.searchByDisplayName",
+		)(
+			function* (query: string) {
+				yield* Effect.logTrace("repo.principal.searchByDisplayName", { query });
+				const pattern = `%${query}%`;
+				return yield* Effect.tryPromise({
+					try: () =>
+						db
+							.select()
+							.from(principal)
+							.innerJoin(user, eq(user.principalId, principal.id))
+							.where(
+								and(
+									isNull(principal.deletedAt),
+									or(
+										ilike(principal.displayName, pattern),
+										ilike(user.email, pattern),
+									),
+								),
+							)
+							.then((rows) =>
+								rows.map((r) => ({ principal: r.principal, user: r.user })),
+							),
+					catch: (e) => new DatabaseError({ cause: e }),
+				});
+			},
+			Effect.tapError((e: DatabaseError) =>
+				Effect.logWarning("repo.principal.searchByDisplayName failed", e.cause),
+			),
+		);
+
 		return PrincipalRepository.of({
 			findById,
 			findBySlug,
@@ -174,6 +227,8 @@ export const PrincipalRepositoryLive = Layer.effect(
 			findByEmail,
 			findUserByUserId,
 			updateProperties,
+			listAll,
+			searchByDisplayName,
 		});
 	}),
 );

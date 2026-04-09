@@ -152,6 +152,9 @@ const insertInstance = Effect.fn("InstanceRepository.insert")(
 						etag: input.etag,
 						slug: input.slug,
 						scheduleTag: input.scheduleTag,
+						...(input.clientProperties !== undefined
+							? { clientProperties: input.clientProperties }
+							: {}),
 					})
 					.returning()
 					.then((r) => {

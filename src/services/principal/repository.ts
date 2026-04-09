@@ -48,6 +48,19 @@ export interface PrincipalRepositoryShape {
 		id: PrincipalId,
 		changes: PrincipalPropertyChanges,
 	) => Effect.Effect<PrincipalRow, DatabaseError>;
+	/** Return all non-deleted user principals (with user join). */
+	readonly listAll: () => Effect.Effect<
+		ReadonlyArray<PrincipalWithUser>,
+		DatabaseError
+	>;
+	/**
+	 * Search user principals whose displayName (case-insensitive substring)
+	 * contains the given string.  Falls back to searching by email if no
+	 * displayName is set.
+	 */
+	readonly searchByDisplayName: (
+		query: string,
+	) => Effect.Effect<ReadonlyArray<PrincipalWithUser>, DatabaseError>;
 }
 
 export class PrincipalRepository extends Context.Tag("PrincipalRepository")<

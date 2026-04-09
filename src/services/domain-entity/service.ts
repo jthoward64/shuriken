@@ -1,6 +1,7 @@
 import type { Effect, Option } from "effect";
 import { Context } from "effect";
 import type { IrDocument } from "#src/data/ir.ts";
+import type { EntityType } from "#src/db/drizzle/schema/index.ts";
 import type { DatabaseError } from "#src/domain/errors.ts";
 import type { EntityId } from "#src/domain/ids.ts";
 
@@ -20,7 +21,7 @@ export interface DomainEntityServiceShape {
 	 * Returns the new EntityId.
 	 */
 	readonly create: (input: {
-		readonly entityType: "icalendar" | "vcard";
+		readonly entityType: EntityType;
 		readonly document: IrDocument;
 	}) => Effect.Effect<EntityId, DatabaseError>;
 

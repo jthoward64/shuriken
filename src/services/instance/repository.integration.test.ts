@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 import { Effect, Layer, Option } from "effect";
 import { DatabaseClient } from "#src/db/client.ts";
-import { davEntity } from "#src/db/drizzle/schema/index.ts";
+import { davEntity, type EntityType } from "#src/db/drizzle/schema/index.ts";
 import {
 	CollectionId,
 	EntityId,
@@ -46,7 +46,7 @@ function makeTestLayer(): TestLayer {
 
 /** Insert a bare dav_entity row and return its UUID. */
 const insertEntity = (
-	entityType: "icalendar" | "vcard" = "icalendar",
+	entityType: EntityType = "icalendar",
 ): Effect.Effect<EntityId, never, DatabaseClient> =>
 	DatabaseClient.pipe(
 		Effect.flatMap((db) =>

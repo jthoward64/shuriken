@@ -15,6 +15,7 @@ import {
 	davComponent,
 	davParameter,
 	davProperty,
+	type EntityType,
 } from "#src/db/drizzle/schema/index.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
 import {
@@ -283,11 +284,7 @@ const buildIrComponent = (
 	return { name: compRow.name, properties, components: children };
 };
 
-const loadTree = (
-	db: DbClient,
-	entityId: EntityId,
-	entityType: "icalendar" | "vcard",
-) =>
+const loadTree = (db: DbClient, entityId: EntityId, entityType: EntityType) =>
 	Effect.tryPromise({
 		try: async (): Promise<Option.Option<IrComponent>> => {
 			const isKnown =

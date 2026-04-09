@@ -2,6 +2,7 @@ import { Effect, Layer, Option } from "effect";
 import { extractUid as icalExtractUid } from "#src/data/icalendar/uid.ts";
 import type { IrDocument } from "#src/data/ir.ts";
 import { extractUid as vcardExtractUid } from "#src/data/vcard/uid.ts";
+import type { EntityType } from "#src/db/drizzle/schema/index.ts";
 import { EntityId } from "#src/domain/ids.ts";
 import { ComponentRepository } from "#src/services/component/repository.ts";
 import { EntityRepository } from "#src/services/entity/repository.ts";
@@ -47,7 +48,7 @@ export const DomainEntityServiceLive = Layer.effect(
 					if (Option.isNone(entity)) {
 						return Option.none<IrDocument>();
 					}
-					const kind = entity.value.entityType as "icalendar" | "vcard";
+					const kind = entity.value.entityType as EntityType;
 					const tree = yield* compRepo.loadTree(id, kind);
 					if (Option.isNone(tree)) {
 						return Option.none<IrDocument>();
