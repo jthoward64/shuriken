@@ -8,8 +8,9 @@ import {
 	preconditionFailed,
 	unauthorized,
 } from "#src/domain/errors.ts";
-import { InstanceId, type PrincipalId } from "#src/domain/ids.ts";
+import { EntityId, type PrincipalId } from "#src/domain/ids.ts";
 import { type ResolvedDavPath, Slug } from "#src/domain/types/path.ts";
+import { ETag } from "#src/domain/types/strings.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import {
 	HTTP_BAD_GATEWAY,
@@ -122,6 +123,10 @@ const moveInstance = (
 			"DAV:bind",
 		);
 
+		// Fetch source instance before mutating anything.
+		const instanceSvc = yield* InstanceService;
+		const sourceInstance = yield* instanceSvc.findById(path.instanceId);
+
 		let destExisted = false;
 		let destSlug: Slug;
 
@@ -130,7 +135,6 @@ const moveInstance = (
 				return yield* preconditionFailed();
 			}
 			destExisted = true;
-			const instanceSvc = yield* InstanceService;
 			const destInstance = yield* instanceSvc.findById(destPath.instanceId);
 			// Capture slug before deleting so we can move source into the same slot.
 			destSlug = Slug(destInstance.slug);
@@ -140,15 +144,26 @@ const moveInstance = (
 			destSlug = destPath.slug;
 		}
 
-		// Move source instance in-place: update collectionId + slug.
-		// Preserves entity identity, ETag, lastModified, and clientProperties.
-		// RFC §9.9.1: DAV:creationdate SHOULD remain the same.
+		// Insert a new instance row at the destination (same entity, preserving ETag
+		// and content). RFC §9.9.1: DAV:creationdate SHOULD remain the same — we
+		// preserve entity identity by reusing the existing entityId.
 		const instanceRepo = yield* InstanceRepository;
-		yield* instanceRepo.relocate(
-			InstanceId(path.instanceId),
-			destPath.collectionId,
-			destSlug,
-		);
+		yield* instanceRepo.insert({
+			collectionId: destPath.collectionId,
+			entityId: EntityId(sourceInstance.entityId),
+			contentType: sourceInstance.contentType,
+			etag: ETag(sourceInstance.etag),
+			slug: destSlug,
+			...(sourceInstance.scheduleTag
+				? { scheduleTag: sourceInstance.scheduleTag }
+				: {}),
+		});
+
+		// Soft-delete the source instance. The DB trigger fires on the deletedAt
+		// change, increments the source collection's sync-token, and creates the
+		// tombstone entry that sync-collection clients need to learn the resource
+		// was removed (RFC 6578 §6.1).
+		yield* instanceRepo.softDelete(path.instanceId);
 
 		return new Response(null, {
 			status: destExisted ? HTTP_NO_CONTENT : HTTP_CREATED,

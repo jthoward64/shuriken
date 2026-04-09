@@ -464,6 +464,9 @@ describe("sync-collection REPORT — addressbook", () => {
 		const deltaBody = results[3]?.body ?? "";
 		const hrefCount = (deltaBody.match(/<D:href>/g) ?? []).length;
 		expect(hrefCount).toBe(1);
-		expect(deltaBody).toContain("c2.vcf");
+		// sync-collection uses stable UUID hrefs for member resources
+		expect(deltaBody).toMatch(
+			/\/dav\/principals\/test\/card\/primary\/[0-9a-f-]{36}/,
+		);
 	});
 });

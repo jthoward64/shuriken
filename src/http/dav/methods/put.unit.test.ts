@@ -26,6 +26,7 @@ import {
 } from "#src/http/status.ts";
 import type { AclService } from "#src/services/acl/index.ts";
 import type { CalIndexRepository } from "#src/services/cal-index/index.ts";
+import type { CollectionService } from "#src/services/collection/index.ts";
 import type { ComponentRepository } from "#src/services/component/index.ts";
 import type { EntityRepository } from "#src/services/entity/index.ts";
 import type { InstanceService } from "#src/services/instance/index.ts";
@@ -181,6 +182,7 @@ type PutEffect<A> = Effect.Effect<
 	| EntityRepository
 	| CalTimezoneRepository
 	| CalIndexRepository
+	| CollectionService
 >;
 type PutFailEffect = Effect.Effect<
 	unknown,
@@ -191,6 +193,7 @@ type PutFailEffect = Effect.Effect<
 	| EntityRepository
 	| CalTimezoneRepository
 	| CalIndexRepository
+	| CollectionService
 >;
 
 const run = <A>(env: ReturnType<typeof makeTestEnv>, effect: PutEffect<A>) =>

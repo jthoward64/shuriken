@@ -12,7 +12,7 @@ Once an item is complete, it should be deleted from this list (not checked or ma
 
 ### MISSING: COPY does not transfer dead properties or ACL entries
 
-[copy.ts:165-193](src/http/dav/methods/copy.ts#L165-L193), [copy.ts:253-315](src/http/dav/methods/copy.ts#L253-L315) — When copying an instance or collection, `clientProperties` (dead properties) are not passed to the new row. RFC 4918 §9.8.2 says a COPY SHOULD preserve all live and dead properties. In addition, ACL entries (from `dav_acl`) on the source collection are not copied to the destination — the destination starts with only the owner's protected `DAV:all` ACE.
+[copy.ts:165-193](src/http/dav/methods/copy.ts#L165-L193), [copy.ts:253-315](src/http/dav/methods/copy.ts#L253-L315) — When copying an instance or collection, `clientProperties` (dead properties) are not passed to the new row and ACL entries are not copied. RFC 4918 §9.8.2 says a COPY SHOULD preserve all live and dead properties.
 
 ### MISSING: `DAV:getcontentlength` not returned for instances
 
@@ -26,10 +26,6 @@ RFC 4918 §9.1 — Clients may combine `<allprop/>` with an `<include>` element 
 
 [propfind.ts:238-258](src/http/dav/methods/propfind.ts#L238-L258) — `root` and `principalCollection` path kinds are 404'd. Clients that start discovery at `/dav/` (via `.well-known` redirect) need to PROPFIND the root to find `CALDAV:calendar-home-set` or follow `DAV:current-user-principal`.
 
-### MISSING: COPY does not preserve dead properties
-
-RFC 4918 §9.8.2 — When COPYing a resource, dead properties (clientProperties) should be copied to the destination. Currently only the component tree and instance metadata are copied; `clientProperties` is not transferred.
-
 ### MISSING: GET/HEAD does not handle conditional request headers
 
 RFC 7232 §3 — The GET handler never inspects `If-None-Match` or `If-Modified-Since`. A client that already has the resource can send `If-None-Match: "etag"` to receive a 304 Not Modified instead of re-downloading the full body. Many CalDAV clients rely on this to avoid redundant transfers during sync. The current implementation always returns 200 with the full body.
@@ -42,19 +38,9 @@ RFC 7232 §3 — The GET handler never inspects `If-None-Match` or `If-Modified-
 
 ## RFC 3744 — WebDAV ACL
 
-### MISSING: ACL-related properties not returned in PROPFIND
-
-RFC 3744 §5 — The following properties should be discoverable via PROPFIND but are not returned:
-
-- `DAV:acl` (§5.5) — the actual ACE list for the resource
-- `DAV:owner` (§5.1) — the principal that owns the resource
-
-Many clients (especially Apple Calendar) require these to fully administer access control.
-
 ### MISSING: `DAV:group-member-set` / `DAV:group-membership` not returned
 
 RFC 3744 §4.3, §4.4 — Group principals should return `DAV:group-member-set` (their members), and user principals should return `DAV:group-membership` (groups they belong to). Neither is exposed through PROPFIND.
-
 
 ### MISSING: `DAV:principal-match` REPORT not implemented
 
@@ -72,10 +58,6 @@ RFC 3744 §4.1 — Principals should expose an `alternate-URI-set` property list
 
 ## RFC 4791 — CalDAV
 
-### MISSING: `CALDAV:calendar-timezone` not returned in PROPFIND
-
-RFC 4791 §5.2.2 — Calendar collections have a `timezoneTzid` field in the database schema but this is never exposed as `CALDAV:calendar-timezone` in PROPFIND responses. Clients use this to know the default timezone for the collection and for floating-time event interpretation.
-
 ### MISSING: `CALDAV:max-resource-size`, date/instance limit properties not returned
 
 RFC 4791 §5.2.5–5.2.9 — The database schema stores `maxResourceSize`, `minDateTime`, `maxDateTime`, `maxInstances`, `maxAttendeesPerInstance`, but none are returned in PROPFIND and none are enforced during PUT. Clients that query for these will get 404 propstat; servers that should reject oversized/out-of-range data silently accept it.
@@ -88,10 +70,6 @@ RFC 4791 §5.2.10 — Clients need to know which collations are supported for `<
 
 RFC 4791 §5.3.2 — "A calendar object resource MUST NOT specify an iCalendar UID property value that already exists in a calendar collection." The PUT handler does not check for duplicate UIDs (with the exception of the same resource being updated). Two separate PUT requests with the same UID will create two separate resources.
 
-### MISSING: `CALDAV:supported-calendar-component` not enforced on PUT
-
-RFC 4791 §5.2.3 — When a calendar collection only supports e.g. VEVENT (as declared in `supported-calendar-component-set`), a PUT of a VTODO resource should be rejected with 403 `CALDAV:supported-calendar-component`. The PUT handler does not read `supportedComponents` from the collection row and accepts any component type unconditionally.
-
 ### MISSING: CalDAV PUT does not validate calendar object resource semantics
 
 RFC 4791 §4.1 and §5.3.2 — Two semantic validation rules are not enforced at PUT time, both of which should fail with `CALDAV:valid-calendar-object-resource` (403):
@@ -99,14 +77,9 @@ RFC 4791 §4.1 and §5.3.2 — Two semantic validation rules are not enforced at
 1. **Empty VCALENDAR**: A VCALENDAR with no child components (no VEVENT, VTODO, etc.) should be rejected. Currently stored and served as-is.
 2. **Mixed UIDs**: All components within a single calendar object resource MUST share the same UID (recurrence exceptions are identified by RECURRENCE-ID on a component with the same UID). Two VEVENTs with different UIDs in one PUT body are silently accepted.
 
-### MISSING: `CALDAV:calendar-timezone` not settable via PROPPATCH
-
-RFC 4791 §5.2.2 — `CALDAV:calendar-timezone` is a writable property that clients may set to indicate the default timezone for a calendar collection. The database stores `timezoneTzid` on `dav_collection` but `COLLECTION_LIVE_PROPS` in [proppatch.ts:58-71](src/http/dav/methods/proppatch.ts#L58-L71) does not include this property, so it falls through to dead-property handling (stored as raw XML, not as `timezoneTzid`). This means the timezone is never read back during event interpretation.
-
 ### MISSING: `CALDAV:free-busy-query` REPORT not implemented
 
 RFC 4791 §7.10 — Allows clients to query free/busy time over a calendar collection without fetching individual events. Not dispatched in [report.ts](src/http/dav/methods/report.ts).
-
 
 ### INCOMPLETE: VTODO time-range filter does not follow RFC 4791 §9.9 rules
 
@@ -114,7 +87,6 @@ RFC 4791 §7.10 — Allows clients to query free/busy time over a calendar colle
 - A VTODO with neither DTSTART nor DUE always matches any time range.
 - A VTODO with COMPLETED must match when COMPLETED falls within the range.
 - The rule table in RFC 4791 §9.9 has ~8 distinct cases for VTODO.
-
 
 ### INCOMPLETE: VFREEBUSY time-range filter not specifically handled
 
@@ -137,10 +109,6 @@ RFC 6638 §3.3 — Clients send `POST` to the scheduling outbox to trigger free-
 ### MISSING: Scheduling auto-delivery not implemented
 
 RFC 6638 §3.4 — When a resource containing `ORGANIZER`/`ATTENDEE` is PUT to a calendar, the server must process iTIP scheduling messages (deliver `REQUEST` to attendee inboxes, etc.). The PUT handler does not trigger any scheduling logic.
-
-### MISSING: `CALDAV:schedule-inbox-url` / `CALDAV:schedule-outbox-url` not in PROPFIND
-
-RFC 6638 §2.2 — Principal PROPFIND should include these properties pointing to the inbox and outbox collection URLs. Clients cannot find the scheduling endpoints without them.
 
 ### MISSING: `CALDAV:calendar-free-busy-set` property not implemented
 
@@ -165,16 +133,6 @@ RFC 6352 §5.1 — "The server MUST ensure that the 'UID' content line value is 
 ---
 
 ## RFC 6578 — Collection Synchronization
-
-### BUG: MOVE does not create a tombstone in the source collection
-
-[move.ts:145-150](src/http/dav/methods/move.ts#L145-L150), [repository.live.ts:208-243](src/services/instance/repository.live.ts#L208-L243) — When an instance is MOVEd, `instanceRepo.relocate` issues an UPDATE that changes `collectionId` and `slug` but does NOT set `deleted_at`. The DB trigger `sync_token_before_instance_change` fires on the UPDATE, but:
-
-1. It increments the **destination** collection's synctoken (using `NEW.collection_id`) and sets `sync_revision`.
-2. The source collection's synctoken is **never incremented**.
-3. The tombstone creation branch (`NEW.deleted_at IS NOT NULL AND OLD.deleted_at IS NULL`) is never triggered since `deleted_at` is not changed.
-
-Result: clients that had previously synced the source collection will never be told the resource was removed. A subsequent `sync-collection` REPORT on the source collection will not include a 404 entry for the moved resource, violating RFC 6578 §6.1. Fix: before calling `relocate`, soft-delete the instance in the source collection (which creates the tombstone and increments the source synctoken), then insert a new instance at the destination.
 
 ### MISSING: `<DAV:sync-level>` element not validated in sync-collection REPORT
 
@@ -212,10 +170,6 @@ RFC 6764 §5 — Clients use PROPFIND on `/.well-known/caldav` and `/.well-known
 
 | Priority | Item |
 |----------|------|
-| P1 | `DAV:acl` / `DAV:owner` not in PROPFIND |
-| P1 | `CALDAV:schedule-inbox-url` / `CALDAV:schedule-outbox-url` not in PROPFIND |
-| P1 | `CALDAV:calendar-timezone` not in PROPFIND (and not settable via PROPPATCH) |
-| P1 | `CALDAV:supported-calendar-component` not enforced on PUT |
 | P2 | UID uniqueness enforcement (calendar and addressbook) |
 | P2 | CalDAV PUT semantic validation (`valid-calendar-object-resource`) — empty VCALENDAR, mixed UIDs |
 | P2 | VTODO time-range filter completeness |
@@ -224,8 +178,8 @@ RFC 6764 §5 — Clients use PROPFIND on `/.well-known/caldav` and `/.well-known
 | P2 | `DAV:principal-match` / `DAV:principal-property-search` REPORTs missing |
 | P2 | Collection constraints not enforced during PUT |
 | P2 | Root PROPFIND returns 404 |
+| P2 | Provisioning creates no scheduling inbox/outbox collections |
 | P3 | COPY does not transfer dead properties or ACL entries |
-| P1 | MOVE does not create tombstone in source collection — RFC 6578 delta sync broken for source |
 | P3 | `sync-level` not validated in sync-collection |
 | P3 | `CALDAV:max-resource-size` and limit properties not returned |
 | P3 | Collation set properties not returned |
@@ -234,5 +188,4 @@ RFC 6764 §5 — Clients use PROPFIND on `/.well-known/caldav` and `/.well-known
 | P3 | GET does not set `Content-Length` |
 | P3 | `allprop` + `include` not supported |
 | P4 | RFC 7809 (timezones by reference) — full implementation |
-| P2 | Provisioning creates no scheduling inbox/outbox collections |
 | P4 | CalDAV scheduling (RFC 6638) — POST to outbox, auto-delivery |

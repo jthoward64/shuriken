@@ -75,6 +75,18 @@ const COLLECTION_LIVE_PROPS = new Map<
 	],
 ]);
 
+// Clark name for the calendar-timezone live property (handled specially below).
+const CALENDAR_TIMEZONE_PROP = cn(CALDAV_NS, "calendar-timezone");
+
+/**
+ * Extract the TZID from a raw VTIMEZONE/VCALENDAR iCalendar text string.
+ * Returns null if no TZID line is found.
+ */
+const extractTzidFromVtimezone = (raw: string): string | null => {
+	const match = /^TZID[;:]([^\r\n]+)/m.exec(raw);
+	return match?.[1]?.trim() ?? null;
+};
+
 // Maps Clark name → DB field on principal
 const PRINCIPAL_LIVE_PROPS = new Map<ClarkName, "displayName">([
 	[cn(DAV_NS, "displayname"), "displayName"],
@@ -270,6 +282,12 @@ export const proppatchHandler = (
 			for (const name of allNames) {
 				if (PROTECTED_PROPS.has(name)) {
 					failedNames.add(name);
+				} else if (name === CALENDAR_TIMEZONE_PROP) {
+					// calendar-timezone is a live property for calendar collections only.
+					// It is handled separately below — skip dead-property storage.
+					if (collRow.collectionType !== "calendar") {
+						failedNames.add(name);
+					}
 				} else {
 					const live = COLLECTION_LIVE_PROPS.get(name);
 					if (live) {
@@ -323,6 +341,19 @@ export const proppatchHandler = (
 				}
 			}
 
+			// CALDAV:calendar-timezone — RFC 4791 §5.2.2: extract TZID from the
+			// VTIMEZONE body sent by the client and store it in timezoneTzid.
+			let newTimezoneTzid: string | null | undefined;
+			if (collRow.collectionType === "calendar") {
+				if (set.has(CALENDAR_TIMEZONE_PROP)) {
+					const rawVal = set.get(CALENDAR_TIMEZONE_PROP);
+					const valStr = typeof rawVal === "string" ? rawVal : "";
+					newTimezoneTzid = extractTzidFromVtimezone(valStr);
+				} else if (remove.has(CALENDAR_TIMEZONE_PROP)) {
+					newTimezoneTzid = null;
+				}
+			}
+
 			yield* collSvc.updateProperties(path.collectionId, {
 				clientProperties: newDead as IrDeadProperties,
 				...(newDisplayName !== undefined
@@ -330,6 +361,9 @@ export const proppatchHandler = (
 					: {}),
 				...(newDescription !== undefined
 					? { description: newDescription }
+					: {}),
+				...(newTimezoneTzid !== undefined
+					? { timezoneTzid: newTimezoneTzid }
 					: {}),
 			});
 

@@ -41,6 +41,7 @@ export const AclServiceAllowAll = Layer.succeed(
 			Effect.void,
 		currentUserPrivileges: (_principalId, _resourceId, _resourceType) =>
 			Effect.succeed(ALL_PRIVILEGES),
+		getAces: (_resourceId, _resourceType) => Effect.succeed([]),
 		setAces: (_resourceId, _resourceType, _aces) => Effect.void,
 	}),
 );

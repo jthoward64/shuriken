@@ -106,6 +106,7 @@ const stubLayers = Layer.mergeAll(
 	Layer.succeed(AclService, {
 		check: die,
 		currentUserPrivileges: die,
+		getAces: die,
 		setAces: die,
 	}),
 	Layer.succeed(PrincipalService, {

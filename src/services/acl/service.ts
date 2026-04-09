@@ -8,7 +8,7 @@ import type {
 	VirtualResourceId,
 } from "#src/domain/ids.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
-import type { AclResourceType, NewAce } from "./repository.ts";
+import type { AceRow, AclResourceType, NewAce } from "./repository.ts";
 
 // ---------------------------------------------------------------------------
 // AclResourceId — the UUID of the resource being access-checked.
@@ -57,6 +57,16 @@ export interface AclServiceShape {
 		resourceId: AclResourceId,
 		resourceType: AclResourceType,
 	) => Effect.Effect<ReadonlyArray<DavPrivilege>, DatabaseError>;
+
+	/**
+	 * Return all ACEs for the resource, ordered by ordinal.
+	 * Used by PROPFIND to expose DAV:acl (RFC 3744 §5.5).
+	 * Callers must hold DAV:read-acl before surfacing this to clients.
+	 */
+	readonly getAces: (
+		resourceId: AclResourceId,
+		resourceType: AclResourceType,
+	) => Effect.Effect<ReadonlyArray<AceRow>, DatabaseError>;
 
 	/**
 	 * Replace all non-protected ACEs on a resource with the given list.

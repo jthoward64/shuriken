@@ -207,6 +207,9 @@ const updateProperties = Effect.fn("CollectionRepository.updateProperties")(
 		if (changes.description !== undefined) {
 			setValues.description = changes.description;
 		}
+		if (changes.timezoneTzid !== undefined) {
+			setValues.timezoneTzid = changes.timezoneTzid;
+		}
 		return yield* Effect.tryPromise({
 			try: () =>
 				db

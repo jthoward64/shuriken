@@ -30,6 +30,8 @@ export interface CollectionPropertyChanges {
 	readonly displayName?: string | null;
 	/** undefined = leave unchanged; null = clear the value */
 	readonly description?: string | null;
+	/** undefined = leave unchanged; null = clear the value */
+	readonly timezoneTzid?: string | null;
 }
 
 export interface CollectionRepositoryShape {

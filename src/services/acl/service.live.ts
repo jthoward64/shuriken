@@ -157,6 +157,13 @@ export const AclServiceLive = Layer.effect(
 			);
 
 		return AclService.of({
+			getAces: Effect.fn("AclService.getAces")(
+				function* (resourceId, resourceType) {
+					yield* Effect.logTrace("acl.getAces", { resourceId, resourceType });
+					return yield* repo.getAces(resourceId, resourceType);
+				},
+			),
+
 			setAces: Effect.fn("AclService.setAces")(
 				function* (resourceId, resourceType, aces) {
 					yield* Effect.logTrace("acl.setAces", { resourceId, resourceType });

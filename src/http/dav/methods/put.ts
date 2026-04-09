@@ -8,6 +8,7 @@ import { extractUid as extractVCardUid } from "#src/data/vcard/uid.ts";
 import {
 	type DatabaseError,
 	type DavError,
+	forbidden,
 	methodNotAllowed,
 	preconditionFailed,
 	unauthorized,
@@ -20,6 +21,7 @@ import type { HttpRequestContext } from "#src/http/context.ts";
 import { HTTP_CREATED, HTTP_NO_CONTENT } from "#src/http/status.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import { CalIndexRepository } from "#src/services/cal-index/index.ts";
+import { CollectionService } from "#src/services/collection/index.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
 import { EntityRepository } from "#src/services/entity/index.ts";
 import { InstanceService } from "#src/services/instance/index.ts";
@@ -43,6 +45,7 @@ export const putHandler = (
 	| CalTimezoneRepository
 	| AclService
 	| CalIndexRepository
+	| CollectionService
 > =>
 	Effect.gen(function* () {
 		// 1. Only new-instance and instance paths accept PUT.
@@ -145,6 +148,23 @@ export const putHandler = (
 				return yield* preconditionFailed();
 			}
 
+			// RFC 4791 §5.2.3: reject if the component type is not in the collection's
+			// supported-calendar-component-set.
+			if (entityType === "icalendar") {
+				const collSvc = yield* CollectionService;
+				const collRow = yield* collSvc.findById(path.collectionId);
+				const supported = collRow.supportedComponents;
+				if (supported !== null && supported.length > 0) {
+					const docTypes = doc.root.components
+						.filter((c) => c.name !== "VTIMEZONE")
+						.map((c) => c.name);
+					const allowedSet = new Set<string>(supported);
+					if (docTypes.some((t) => !allowedSet.has(t))) {
+						return yield* forbidden("CALDAV:supported-calendar-component");
+					}
+				}
+			}
+
 			// Create entity row.
 			const entityRepo = yield* EntityRepository;
 			const entityRow = yield* entityRepo.insert({ entityType, logicalUid });
@@ -202,6 +222,25 @@ export const putHandler = (
 		const ifNoneMatch = req.headers.get("If-None-Match");
 		if (ifNoneMatch === "*") {
 			return yield* preconditionFailed();
+		}
+
+		// RFC 4791 §5.2.3: reject if the component type is not in the collection's
+		// supported-calendar-component-set (applies to updates too).
+		if (entityType === "icalendar") {
+			const collSvc = yield* CollectionService;
+			const collRow = yield* collSvc.findById(
+				CollectionId(existingInstance.collectionId),
+			);
+			const supported = collRow.supportedComponents;
+			if (supported !== null && supported.length > 0) {
+				const docTypes = doc.root.components
+					.filter((c) => c.name !== "VTIMEZONE")
+					.map((c) => c.name);
+				const allowedSet = new Set<string>(supported);
+				if (docTypes.some((t) => !allowedSet.has(t))) {
+					return yield* forbidden("CALDAV:supported-calendar-component");
+				}
+			}
 		}
 
 		// Replace component tree.

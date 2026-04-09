@@ -12,7 +12,7 @@
 // Missing Depth header defaults to 0 per RFC 4918 §9.1.
 // ---------------------------------------------------------------------------
 
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import { type ClarkName, cn, type IrDeadProperties } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import { forbidden, notFound, unauthorized } from "#src/domain/errors.ts";
@@ -32,11 +32,13 @@ import type { DavResponse } from "#src/http/dav/xml/multistatus.ts";
 import { multistatusResponse } from "#src/http/dav/xml/multistatus.ts";
 import { parseXml, readXmlBody } from "#src/http/dav/xml/parser.ts";
 import { AclService } from "#src/services/acl/index.ts";
+import type { AceRow } from "#src/services/acl/repository.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
 import type { CollectionRow } from "#src/services/collection/repository.ts";
 import { InstanceService } from "#src/services/instance/index.ts";
 import type { InstanceRow } from "#src/services/instance/repository.ts";
 import { PrincipalService } from "#src/services/principal/service.ts";
+import { CalTimezoneRepository } from "#src/services/timezone/index.ts";
 
 // ---------------------------------------------------------------------------
 // Namespace constants
@@ -67,6 +69,11 @@ const ACL_RESTRICTIONS = cn(DAV_NS, "acl-restrictions");
 const SUPPORTED_REPORT_SET = cn(DAV_NS, "supported-report-set");
 const PRINCIPAL_URL = cn(DAV_NS, "principal-URL");
 const CURRENT_USER_PRIVILEGE_SET = cn(DAV_NS, "current-user-privilege-set");
+const DAV_ACL = cn(DAV_NS, "acl");
+const DAV_OWNER = cn(DAV_NS, "owner");
+const CALENDAR_TIMEZONE = cn(CALDAV_NS, "calendar-timezone");
+const SCHEDULE_INBOX_URL = cn(CALDAV_NS, "schedule-inbox-URL");
+const SCHEDULE_OUTBOX_URL = cn(CALDAV_NS, "schedule-outbox-URL");
 
 // ---------------------------------------------------------------------------
 // ACL helpers
@@ -137,6 +144,53 @@ const ACL_RESTRICTIONS_VALUE: Readonly<Record<ClarkName, unknown>> = {
 	[cn(DAV_NS, "grant-only")]: "",
 	[cn(DAV_NS, "no-invert")]: "",
 };
+
+/**
+ * Build the DAV:acl property value from a list of ACE rows.
+ *
+ * RFC 3744 §5.5 — each ACE specifies a principal, a grant/deny, and
+ * optionally the protected marker. We surface the full ACL to any
+ * caller that holds DAV:read-acl (callers must gate on that privilege).
+ */
+const buildAclValue = (
+	aces: ReadonlyArray<AceRow>,
+	origin: string,
+): ReadonlyArray<Record<ClarkName, unknown>> =>
+	aces.map((ace) => {
+		const principal: Record<ClarkName, unknown> =
+			ace.principalType === "all"
+				? { [cn(DAV_NS, "all")]: "" }
+				: ace.principalType === "authenticated"
+					? { [cn(DAV_NS, "authenticated")]: "" }
+					: ace.principalType === "unauthenticated"
+						? { [cn(DAV_NS, "unauthenticated")]: "" }
+						: ace.principalType === "self"
+							? { [cn(DAV_NS, "self")]: "" }
+							: ({
+									[cn(DAV_NS, "href")]: `${origin}/dav/principals/${ace.principalId}/`,
+								} as Record<ClarkName, unknown>);
+
+		const aceObj: Record<ClarkName, unknown> = {
+			[cn(DAV_NS, "principal")]: principal,
+		};
+		if (ace.grantDeny === "grant") {
+			aceObj[cn(DAV_NS, "grant")] = {
+				[cn(DAV_NS, "privilege")]: {
+					[privilegeToClark(ace.privilege as DavPrivilege)]: "",
+				},
+			};
+		} else {
+			aceObj[cn(DAV_NS, "deny")] = {
+				[cn(DAV_NS, "privilege")]: {
+					[privilegeToClark(ace.privilege as DavPrivilege)]: "",
+				},
+			};
+		}
+		if (ace.protected) {
+			aceObj[cn(DAV_NS, "protected")] = "";
+		}
+		return { [cn(DAV_NS, "ace")]: aceObj } as Record<ClarkName, unknown>;
+	});
 
 // ---------------------------------------------------------------------------
 // PROPFIND body parsing
@@ -309,7 +363,7 @@ export const propfindHandler = (
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError,
-	CollectionService | InstanceService | AclService | PrincipalService
+	CollectionService | InstanceService | AclService | PrincipalService | CalTimezoneRepository
 > =>
 	Effect.gen(function* () {
 		// Reject Depth: infinity (RFC 4918 §9.1 + DAV:propfind-finite-depth)
@@ -375,6 +429,9 @@ export const propfindHandler = (
 			const displayName =
 				principalRow.principal.displayName ?? principalRow.user.name;
 			const principalHref = `${origin}/dav/principals/${path.principalSeg}/`;
+			// RFC 6638 §2.2: scheduling inbox/outbox URLs for this principal.
+			const inboxHref = `${origin}/dav/principals/${path.principalSeg}/cal/inbox/`;
+			const outboxHref = `${origin}/dav/principals/${path.principalSeg}/cal/outbox/`;
 			const allProps: Record<ClarkName, unknown> = {
 				[RESOURCETYPE]: { "{DAV:}principal": "" },
 				[DISPLAYNAME]: displayName,
@@ -390,11 +447,21 @@ export const propfindHandler = (
 				[CAL_USER_ADDRESS_SET]: {
 					[cn(DAV_NS, "href")]: `mailto:${principalRow.user.email}`,
 				},
+				// RFC 6638 §2.2: scheduling collection URLs
+				[SCHEDULE_INBOX_URL]: { [cn(DAV_NS, "href")]: inboxHref },
+				[SCHEDULE_OUTBOX_URL]: { [cn(DAV_NS, "href")]: outboxHref },
 				// RFC 3744 §5.6: server operates grant-only, no-invert
 				[ACL_RESTRICTIONS]: ACL_RESTRICTIONS_VALUE,
 				// RFC 3744 §5.4: privileges the acting principal has on this resource
 				[CURRENT_USER_PRIVILEGE_SET]: buildPrivilegeSet(principalPrivileges),
 			};
+			// DAV:acl — RFC 3744 §5.5: only when the caller holds read-acl.
+			if (
+				(principalPrivileges as ReadonlyArray<string>).includes("DAV:read-acl")
+			) {
+				const aces = yield* acl.getAces(path.principalId, "principal");
+				allProps[DAV_ACL] = buildAclValue(aces, origin);
+			}
 			// Dead properties
 			const dead = principalRow.principal
 				.clientProperties as IrDeadProperties | null;
@@ -438,11 +505,30 @@ export const propfindHandler = (
 				path.namespace,
 				path.collectionSeg,
 			);
+			const ownerHref = `${origin}/dav/principals/${collRow.ownerPrincipalId}/`;
 			const collProps: Record<ClarkName, unknown> = {
 				...buildCollectionProps(collRow),
 				[CURRENT_USER_PRINCIPAL]: { [cn(DAV_NS, "href")]: actingPrincipalHref },
 				[CURRENT_USER_PRIVILEGE_SET]: buildPrivilegeSet(collectionPrivileges),
+				// RFC 3744 §5.1: owner of this resource
+				[DAV_OWNER]: { [cn(DAV_NS, "href")]: ownerHref },
 			};
+			// CALDAV:calendar-timezone — RFC 4791 §5.2.2
+			if (collRow.collectionType === "calendar" && collRow.timezoneTzid) {
+				const tzRepo = yield* CalTimezoneRepository;
+				const tzOpt = yield* tzRepo.findByTzid(collRow.timezoneTzid);
+				const tzData = Option.getOrUndefined(tzOpt);
+				if (tzData !== undefined) {
+					collProps[CALENDAR_TIMEZONE] = tzData.vtimezoneData;
+				}
+			}
+			// DAV:acl — RFC 3744 §5.5: only when the caller holds read-acl.
+			if (
+				(collectionPrivileges as ReadonlyArray<string>).includes("DAV:read-acl")
+			) {
+				const aces = yield* acl.getAces(path.collectionId, "collection");
+				collProps[DAV_ACL] = buildAclValue(aces, origin);
+			}
 			responses.push({
 				href,
 				propstats: splitPropstats(collProps, propfind),
@@ -469,7 +555,16 @@ export const propfindHandler = (
 							[cn(DAV_NS, "href")]: actingPrincipalHref,
 						},
 						[CURRENT_USER_PRIVILEGE_SET]: buildPrivilegeSet(instPrivileges),
+						// RFC 3744 §5.1: owner inherited from the parent collection
+						[DAV_OWNER]: { [cn(DAV_NS, "href")]: ownerHref },
 					};
+					// DAV:acl — RFC 3744 §5.5: only when the caller holds read-acl.
+					if (
+						(instPrivileges as ReadonlyArray<string>).includes("DAV:read-acl")
+					) {
+						const instAces = yield* acl.getAces(InstanceId(inst.id), "instance");
+						instProps[DAV_ACL] = buildAclValue(instAces, origin);
+					}
 					responses.push({
 						href: iHref,
 						propstats: splitPropstats(instProps, propfind),
@@ -490,6 +585,9 @@ export const propfindHandler = (
 				"instance",
 			);
 			const instRow = yield* instSvc.findById(path.instanceId);
+			// DAV:owner comes from the parent collection.
+			const instCollRow = yield* collSvc.findById(path.collectionId);
+			const ownerHref = `${origin}/dav/principals/${instCollRow.ownerPrincipalId}/`;
 			const href = instanceHref(
 				origin,
 				path.principalSeg,
@@ -501,7 +599,16 @@ export const propfindHandler = (
 				...buildInstanceProps(instRow),
 				[CURRENT_USER_PRINCIPAL]: { [cn(DAV_NS, "href")]: actingPrincipalHref },
 				[CURRENT_USER_PRIVILEGE_SET]: buildPrivilegeSet(instancePrivileges),
+				// RFC 3744 §5.1: owner inherited from the parent collection
+				[DAV_OWNER]: { [cn(DAV_NS, "href")]: ownerHref },
 			};
+			// DAV:acl — RFC 3744 §5.5: only when the caller holds read-acl.
+			if (
+				(instancePrivileges as ReadonlyArray<string>).includes("DAV:read-acl")
+			) {
+				const aces = yield* acl.getAces(path.instanceId, "instance");
+				instProps[DAV_ACL] = buildAclValue(aces, origin);
+			}
 			responses.push({
 				href,
 				propstats: splitPropstats(instProps, propfind),
