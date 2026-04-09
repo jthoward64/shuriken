@@ -6,7 +6,7 @@
 //   instance    → instance properties only
 //   principal   → minimal home-set properties
 //   new-collection / new-instance → 404
-//   root / principalCollection / wellknown → 404 (not yet implemented)
+//   principalCollection / wellknown → 404 (router handles well-known redirect before PROPFIND)
 //
 // Depth: infinity is rejected with 403 DAV:propfind-finite-depth (RFC 4918 §9.1).
 // Missing Depth header defaults to 0 per RFC 4918 §9.1.
@@ -16,7 +16,7 @@ import { Effect, Option } from "effect";
 import { type ClarkName, cn, type IrDeadProperties } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import { forbidden, notFound, unauthorized } from "#src/domain/errors.ts";
-import { InstanceId } from "#src/domain/ids.ts";
+import { GroupId, InstanceId, UserId } from "#src/domain/ids.ts";
 import { COLLECTION_TYPE_TO_NAMESPACE } from "#src/domain/types/collection-namespace.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
@@ -35,6 +35,7 @@ import { AclService } from "#src/services/acl/index.ts";
 import type { AceRow } from "#src/services/acl/repository.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
 import type { CollectionRow } from "#src/services/collection/repository.ts";
+import { GroupService } from "#src/services/group/index.ts";
 import { InstanceService } from "#src/services/instance/index.ts";
 import type { InstanceRow } from "#src/services/instance/repository.ts";
 import { PrincipalService } from "#src/services/principal/service.ts";
@@ -74,6 +75,23 @@ const DAV_OWNER = cn(DAV_NS, "owner");
 const CALENDAR_TIMEZONE = cn(CALDAV_NS, "calendar-timezone");
 const SCHEDULE_INBOX_URL = cn(CALDAV_NS, "schedule-inbox-URL");
 const SCHEDULE_OUTBOX_URL = cn(CALDAV_NS, "schedule-outbox-URL");
+const CAL_SUPPORTED_COLLATION_SET = cn(CALDAV_NS, "supported-collation-set");
+const CARD_SUPPORTED_COLLATION_SET = cn(CARDDAV_NS, "supported-collation-set");
+const DAV_GROUP_MEMBER_SET = cn(DAV_NS, "group-member-set");
+const DAV_GROUP_MEMBERSHIP = cn(DAV_NS, "group-membership");
+
+// The two collation URIs the server supports for <text-match> filters.
+// RFC 4791 §5.2.10 / RFC 6352 §6.2.3.
+const SUPPORTED_COLLATIONS: ReadonlyArray<Record<ClarkName, unknown>> = [
+	{ [cn(CALDAV_NS, "collation")]: "i;ascii-casemap" } as Record<
+		ClarkName,
+		unknown
+	>,
+	{ [cn(CALDAV_NS, "collation")]: "i;unicode-casemap" } as Record<
+		ClarkName,
+		unknown
+	>,
+];
 
 // ---------------------------------------------------------------------------
 // ACL helpers
@@ -167,7 +185,8 @@ const buildAclValue = (
 						: ace.principalType === "self"
 							? { [cn(DAV_NS, "self")]: "" }
 							: ({
-									[cn(DAV_NS, "href")]: `${origin}/dav/principals/${ace.principalId}/`,
+									[cn(DAV_NS, "href")]:
+										`${origin}/dav/principals/${ace.principalId}/`,
 								} as Record<ClarkName, unknown>);
 
 		const aceObj: Record<ClarkName, unknown> = {
@@ -214,6 +233,17 @@ const parsePropfindBody = (
 						return { type: "allprop" } satisfies PropfindKind;
 					}
 					if (cn(DAV_NS, "allprop") in propfind) {
+						// RFC 4918 §9.1: allprop MAY be combined with <include> to
+						// request properties not returned by default.
+						const includeEl = propfind[cn(DAV_NS, "include")];
+						if (typeof includeEl === "object" && includeEl !== null) {
+							const extra = new Set<ClarkName>(
+								Object.keys(includeEl).filter(
+									(k) => !k.startsWith("@_"),
+								) as Array<ClarkName>,
+							);
+							return { type: "allprop", extra } satisfies PropfindKind;
+						}
 						return { type: "allprop" } satisfies PropfindKind;
 					}
 					if (cn(DAV_NS, "propname") in propfind) {
@@ -281,6 +311,20 @@ const memberInstanceHref = (
 // Property builders
 // ---------------------------------------------------------------------------
 
+/**
+ * Convert a Temporal.Instant (from the DB) to an iCalendar DATETIME string
+ * (e.g. "20240115T120000Z"). Uses epochMilliseconds to avoid polyfill type
+ * conflicts between temporal-polyfill and temporal-spec.
+ */
+const toICalDatetime = (instant: { epochMilliseconds: number }): string => {
+	const d = new Date(instant.epochMilliseconds);
+	const pad = (n: number, len = 2): string => String(n).padStart(len, "0");
+	return (
+		`${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}` +
+		`T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`
+	);
+};
+
 // ---------------------------------------------------------------------------
 // Collection → DavResponse
 // ---------------------------------------------------------------------------
@@ -328,6 +372,33 @@ const buildCollectionProps = (
 		};
 	}
 
+	// RFC 4791 §5.2.5–5.2.9: capacity / limit properties (calendar only).
+	// RFC 6352 §6.2.3: CARDDAV:max-resource-size (addressbook only).
+	if (row.collectionType === "calendar") {
+		if (row.maxResourceSize !== null) {
+			props[cn(CALDAV_NS, "max-resource-size")] = String(row.maxResourceSize);
+		}
+		if (row.minDateTime !== null) {
+			props[cn(CALDAV_NS, "min-date-time")] = toICalDatetime(row.minDateTime);
+		}
+		if (row.maxDateTime !== null) {
+			props[cn(CALDAV_NS, "max-date-time")] = toICalDatetime(row.maxDateTime);
+		}
+		if (row.maxInstances !== null) {
+			props[cn(CALDAV_NS, "max-instances")] = String(row.maxInstances);
+		}
+		if (row.maxAttendeesPerInstance !== null) {
+			props[cn(CALDAV_NS, "max-attendees-per-instance")] = String(
+				row.maxAttendeesPerInstance,
+			);
+		}
+	} else if (
+		row.collectionType === "addressbook" &&
+		row.maxResourceSize !== null
+	) {
+		props[cn(CARDDAV_NS, "max-resource-size")] = String(row.maxResourceSize);
+	}
+
 	// Dead properties
 	const dead = row.clientProperties as IrDeadProperties | null;
 	if (dead) {
@@ -363,7 +434,12 @@ export const propfindHandler = (
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError,
-	CollectionService | InstanceService | AclService | PrincipalService | CalTimezoneRepository
+	| CollectionService
+	| InstanceService
+	| AclService
+	| PrincipalService
+	| CalTimezoneRepository
+	| GroupService
 > =>
 	Effect.gen(function* () {
 		// Reject Depth: infinity (RFC 4918 §9.1 + DAV:propfind-finite-depth)
@@ -377,14 +453,12 @@ export const propfindHandler = (
 		if (
 			path.kind === "new-collection" ||
 			path.kind === "new-instance" ||
-			path.kind === "root" ||
 			path.kind === "principalCollection" ||
 			path.kind === "wellknown" ||
 			path.kind === "userCollection" ||
 			path.kind === "user" ||
 			path.kind === "newUser" ||
 			path.kind === "groupCollection" ||
-			path.kind === "group" ||
 			path.kind === "newGroup" ||
 			path.kind === "groupMembers" ||
 			path.kind === "groupMember" ||
@@ -432,6 +506,11 @@ export const propfindHandler = (
 			// RFC 6638 §2.2: scheduling inbox/outbox URLs for this principal.
 			const inboxHref = `${origin}/dav/principals/${path.principalSeg}/cal/inbox/`;
 			const outboxHref = `${origin}/dav/principals/${path.principalSeg}/cal/outbox/`;
+			// RFC 3744 §4.4: list the groups this principal belongs to.
+			const groupSvc = yield* GroupService;
+			const memberOfGroups = yield* groupSvc.listByMember(
+				UserId(principalRow.user.id),
+			);
 			const allProps: Record<ClarkName, unknown> = {
 				[RESOURCETYPE]: { "{DAV:}principal": "" },
 				[DISPLAYNAME]: displayName,
@@ -450,6 +529,10 @@ export const propfindHandler = (
 				// RFC 6638 §2.2: scheduling collection URLs
 				[SCHEDULE_INBOX_URL]: { [cn(DAV_NS, "href")]: inboxHref },
 				[SCHEDULE_OUTBOX_URL]: { [cn(DAV_NS, "href")]: outboxHref },
+				// RFC 3744 §4.4: groups this user belongs to
+				[DAV_GROUP_MEMBERSHIP]: memberOfGroups.map((g) => ({
+					[cn(DAV_NS, "href")]: `${origin}/dav/groups/${g.principal.id}/`,
+				})),
 				// RFC 3744 §5.6: server operates grant-only, no-invert
 				[ACL_RESTRICTIONS]: ACL_RESTRICTIONS_VALUE,
 				// RFC 3744 §5.4: privileges the acting principal has on this resource
@@ -522,6 +605,12 @@ export const propfindHandler = (
 					collProps[CALENDAR_TIMEZONE] = tzData.vtimezoneData;
 				}
 			}
+			// Collation sets — RFC 4791 §5.2.10 / RFC 6352 §6.2.3
+			if (collRow.collectionType === "calendar") {
+				collProps[CAL_SUPPORTED_COLLATION_SET] = SUPPORTED_COLLATIONS;
+			} else if (collRow.collectionType === "addressbook") {
+				collProps[CARD_SUPPORTED_COLLATION_SET] = SUPPORTED_COLLATIONS;
+			}
 			// DAV:acl — RFC 3744 §5.5: only when the caller holds read-acl.
 			if (
 				(collectionPrivileges as ReadonlyArray<string>).includes("DAV:read-acl")
@@ -562,7 +651,10 @@ export const propfindHandler = (
 					if (
 						(instPrivileges as ReadonlyArray<string>).includes("DAV:read-acl")
 					) {
-						const instAces = yield* acl.getAces(InstanceId(inst.id), "instance");
+						const instAces = yield* acl.getAces(
+							InstanceId(inst.id),
+							"instance",
+						);
 						instProps[DAV_ACL] = buildAclValue(instAces, origin);
 					}
 					responses.push({
@@ -571,6 +663,51 @@ export const propfindHandler = (
 					});
 				}
 			}
+		} else if (path.kind === "root") {
+			// RFC 6764 §6.1 / RFC 5397 §3: root resource exposes DAV:current-user-principal
+			// so auto-discovery clients can bootstrap without knowing any principal URL.
+			responses.push({
+				href: `${origin}/dav/`,
+				propstats: splitPropstats(
+					{
+						[RESOURCETYPE]: { [cn(DAV_NS, "collection")]: "" },
+						[CURRENT_USER_PRINCIPAL]: {
+							[cn(DAV_NS, "href")]: actingPrincipalHref,
+						},
+					},
+					propfind,
+				),
+			});
+		} else if (path.kind === "group") {
+			// RFC 3744 §4.3: group principals expose DAV:group-member-set.
+			yield* acl.check(
+				actingPrincipalId,
+				path.principalId,
+				"principal",
+				"DAV:read",
+			);
+			const groupSvc = yield* GroupService;
+			const groupRow = yield* groupSvc.findById(GroupId(path.groupId));
+			const members = yield* groupSvc.listMembers(GroupId(path.groupId));
+			const groupHref = `${origin}/dav/groups/${path.groupSeg}/`;
+			const memberHrefs = members.map((m) => ({
+				[cn(DAV_NS, "href")]: `${origin}/dav/principals/${m.principal.id}/`,
+			}));
+			responses.push({
+				href: groupHref,
+				propstats: splitPropstats(
+					{
+						[RESOURCETYPE]: { [cn(DAV_NS, "principal")]: "" },
+						[DISPLAYNAME]:
+							groupRow.principal.displayName ?? groupRow.principal.slug,
+						[DAV_GROUP_MEMBER_SET]: memberHrefs,
+						[CURRENT_USER_PRINCIPAL]: {
+							[cn(DAV_NS, "href")]: actingPrincipalHref,
+						},
+					},
+					propfind,
+				),
+			});
 		} else {
 			// path.kind === "instance"
 			yield* acl.check(

@@ -2,7 +2,11 @@ import type { InferSelectModel } from "drizzle-orm";
 import type { Effect, Option } from "effect";
 import { Context } from "effect";
 import type { IrDeadProperties } from "#src/data/ir.ts";
-import type { davCollection } from "#src/db/drizzle/schema/index.ts";
+import type {
+	CollectionType,
+	davCollection,
+} from "#src/db/drizzle/schema/index.ts";
+export type { CollectionType } from "#src/db/drizzle/schema/index.ts";
 import type { DatabaseError } from "#src/domain/errors.ts";
 import type { CollectionId, PrincipalId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
@@ -15,7 +19,7 @@ export type CollectionRow = InferSelectModel<typeof davCollection>;
 
 export interface NewCollection {
 	readonly ownerPrincipalId: PrincipalId;
-	readonly collectionType: string;
+	readonly collectionType: CollectionType;
 	readonly slug: Slug;
 	readonly displayName?: string;
 	readonly description?: string;
@@ -40,7 +44,7 @@ export interface CollectionRepositoryShape {
 	) => Effect.Effect<Option.Option<CollectionRow>, DatabaseError>;
 	readonly findBySlug: (
 		ownerPrincipalId: PrincipalId,
-		collectionType: string,
+		collectionType: CollectionType,
 		slug: Slug,
 	) => Effect.Effect<Option.Option<CollectionRow>, DatabaseError>;
 	readonly listByOwner: (

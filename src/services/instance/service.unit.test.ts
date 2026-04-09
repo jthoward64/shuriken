@@ -16,7 +16,7 @@ import { InstanceService } from "./service.ts";
 const makeInput = (collectionId: CollectionId, slug = "event.ics") => ({
 	collectionId,
 	entityId: EntityId(crypto.randomUUID()),
-	contentType: "text/calendar",
+	contentType: "text/calendar" as const,
 	etag: ETag('"initial"'),
 	slug: Slug(slug),
 });

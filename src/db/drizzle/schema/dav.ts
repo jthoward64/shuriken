@@ -16,13 +16,27 @@ import {
 } from "drizzle-orm/pg-core";
 import type { UuidString } from "#src/domain/ids.ts";
 import { principal } from "./principal";
-import { bytea, dateStr, timestampStr, timestampTz } from "./types";
+import {
+	bytea,
+	dateStr,
+	drizzleEnum,
+	type GetDrizzleEnumType,
+	timestampStr,
+	timestampTz,
+} from "./types";
+
+const entityTypeEnum = drizzleEnum(
+	"entity_type",
+	["icalendar", "vcard"] as const,
+	"text",
+);
+export type EntityType = GetDrizzleEnumType<typeof entityTypeEnum>;
 
 export const davEntity = pgTable(
 	"dav_entity",
 	{
 		id: uuid().default(sql`uuidv7()`).primaryKey().$type<UuidString>(),
-		entityType: text("entity_type").notNull(),
+		entityType: text("entity_type").notNull().$type<EntityType>(),
 		logicalUid: text("logical_uid"),
 		updatedAt: timestampTz("updated_at").default(sql`now()`).notNull(),
 		deletedAt: timestampTz("deleted_at"),
@@ -43,12 +57,23 @@ export const davEntity = pgTable(
 			"btree",
 			table.entityType.asc().nullsLast(),
 		),
-		check(
-			"dav_entity_entity_type_check",
-			sql`(entity_type = ANY (ARRAY['icalendar'::text, 'vcard'::text]))`,
-		),
+		check("dav_entity_entity_type_check", entityTypeEnum.sql),
 	],
 );
+
+const collectionTypeEnum = drizzleEnum(
+	"collection_type",
+	["collection", "calendar", "addressbook", "inbox", "outbox"] as const,
+	"text",
+);
+export type CollectionType = GetDrizzleEnumType<typeof collectionTypeEnum>;
+
+const contentTypeEnum = drizzleEnum(
+	"content_type",
+	["text/calendar", "text/vcard"] as const,
+	"text",
+);
+export type ContentType = GetDrizzleEnumType<typeof contentTypeEnum>;
 
 export const davCollection = pgTable(
 	"dav_collection",
@@ -58,7 +83,7 @@ export const davCollection = pgTable(
 			.notNull()
 			.references(() => principal.id, { onDelete: "restrict" })
 			.$type<UuidString>(),
-		collectionType: text("collection_type").notNull(),
+		collectionType: text("collection_type").notNull().$type<CollectionType>(),
 		displayName: text("display_name"),
 		description: text(),
 		timezoneTzid: text("timezone_tzid"),
@@ -105,10 +130,7 @@ export const davCollection = pgTable(
 				table.slug.asc().nullsLast(),
 			)
 			.where(sql`(deleted_at IS NULL)`),
-		check(
-			"dav_collection_collection_type_check",
-			sql`(collection_type = ANY (ARRAY['collection'::text, 'calendar'::text, 'addressbook'::text, 'inbox'::text, 'outbox'::text]))`,
-		),
+		check("dav_collection_collection_type_check", collectionTypeEnum.sql),
 	],
 );
 
@@ -147,6 +169,37 @@ export const davComponent = pgTable(
 	],
 );
 
+const valueTypeEnum = drizzleEnum(
+	"value_type",
+	[
+		"TEXT",
+		"INTEGER",
+		"FLOAT",
+		"BOOLEAN",
+		"DATE",
+		"DATE_TIME",
+		"PLAIN_DATE_TIME",
+		"DURATION",
+		"URI",
+		"BINARY",
+		"JSON",
+		"TEXT_LIST",
+		"DATE_LIST",
+		"DATE_TIME_LIST",
+		"DURATION_INTERVAL",
+		"UTC_OFFSET",
+		"UTC_OFFSET_INTERVAL",
+		"PERIOD",
+		"PERIOD_LIST",
+		"TIME",
+		"DATE_AND_OR_TIME",
+		"RECUR",
+		"CAL_ADDRESS",
+	] as const,
+	"text",
+);
+export type ValueType = GetDrizzleEnumType<typeof valueTypeEnum>;
+
 export const davProperty = pgTable(
 	"dav_property",
 	{
@@ -156,7 +209,7 @@ export const davProperty = pgTable(
 			.references(() => davComponent.id, { onDelete: "cascade" })
 			.$type<UuidString>(),
 		name: text().notNull(),
-		valueType: text("value_type").notNull(),
+		valueType: text("value_type").notNull().$type<ValueType>(),
 		valueText: text("value_text"),
 		valueInt: bigint("value_int", { mode: "number" }),
 		valueFloat: doublePrecision("value_float"),
@@ -256,10 +309,7 @@ END) <= 1)`,
 			"chk_dav_property_value_matches_type",
 			sql`(((value_text IS NULL) OR (value_type = ANY (ARRAY['TEXT'::text, 'DURATION'::text, 'URI'::text, 'UTC_OFFSET'::text, 'TIME'::text, 'DATE_AND_OR_TIME'::text, 'RECUR'::text, 'CAL_ADDRESS'::text, 'PERIOD'::text]))) AND ((value_int IS NULL) OR (value_type = 'INTEGER'::text)) AND ((value_float IS NULL) OR (value_type = 'FLOAT'::text)) AND ((value_bool IS NULL) OR (value_type = 'BOOLEAN'::text)) AND ((value_date IS NULL) OR (value_type = 'DATE'::text)) AND ((value_tstz IS NULL) OR (value_type = 'DATE_TIME'::text)) AND ((value_plain_datetime IS NULL) OR (value_type = 'PLAIN_DATE_TIME'::text)) AND ((value_bytes IS NULL) OR (value_type = 'BINARY'::text)) AND ((value_json IS NULL) OR (value_type = 'JSON'::text)) AND ((value_text_array IS NULL) OR (value_type = ANY (ARRAY['TEXT_LIST'::text, 'PERIOD_LIST'::text]))) AND ((value_date_array IS NULL) OR (value_type = 'DATE_LIST'::text)) AND ((value_tstz_array IS NULL) OR (value_type = 'DATE_TIME_LIST'::text)) AND ((value_interval IS NULL) OR (value_type = ANY (ARRAY['DURATION_INTERVAL'::text, 'UTC_OFFSET_INTERVAL'::text]))))`,
 		),
-		check(
-			"dav_property_value_type_check",
-			sql`(value_type = ANY (ARRAY['TEXT'::text, 'INTEGER'::text, 'FLOAT'::text, 'BOOLEAN'::text, 'DATE'::text, 'DATE_TIME'::text, 'PLAIN_DATE_TIME'::text, 'DURATION'::text, 'URI'::text, 'BINARY'::text, 'JSON'::text, 'TEXT_LIST'::text, 'DATE_LIST'::text, 'DATE_TIME_LIST'::text, 'DURATION_INTERVAL'::text, 'UTC_OFFSET'::text, 'UTC_OFFSET_INTERVAL'::text, 'PERIOD'::text, 'PERIOD_LIST'::text, 'TIME'::text, 'DATE_AND_OR_TIME'::text, 'RECUR'::text, 'CAL_ADDRESS'::text]))`,
-		),
+		check("dav_property_value_type_check", valueTypeEnum.sql),
 	],
 );
 
@@ -310,7 +360,7 @@ export const davInstance = pgTable(
 			.notNull()
 			.references(() => davEntity.id, { onDelete: "restrict" })
 			.$type<UuidString>(),
-		contentType: text("content_type").notNull(),
+		contentType: text("content_type").notNull().$type<ContentType>(),
 		etag: text().notNull(),
 		syncRevision: bigint("sync_revision", { mode: "number" })
 			.default(0)
@@ -359,12 +409,31 @@ export const davInstance = pgTable(
 				table.slug.asc().nullsLast(),
 			)
 			.where(sql`(deleted_at IS NULL)`),
-		check(
-			"dav_instance_content_type_check",
-			sql`(content_type = ANY (ARRAY['text/calendar'::text, 'text/vcard'::text]))`,
-		),
+		check("dav_instance_content_type_check", contentTypeEnum.sql),
 	],
 );
+
+const scheduleMethodEnum = drizzleEnum(
+	"method",
+	[
+		"REQUEST",
+		"REPLY",
+		"CANCEL",
+		"REFRESH",
+		"COUNTER",
+		"DECLINECOUNTER",
+		"ADD",
+	] as const,
+	"text",
+);
+export type ScheduleMethod = GetDrizzleEnumType<typeof scheduleMethodEnum>;
+
+const scheduleStatusEnum = drizzleEnum(
+	"status",
+	["pending", "delivered", "failed"] as const,
+	"text",
+);
+export type ScheduleStatus = GetDrizzleEnumType<typeof scheduleStatusEnum>;
 
 export const davScheduleMessage = pgTable(
 	"dav_schedule_message",
@@ -380,8 +449,8 @@ export const davScheduleMessage = pgTable(
 			.$type<UuidString>(),
 		sender: text().notNull(),
 		recipient: text().notNull(),
-		method: text().notNull(),
-		status: text().default("pending").notNull(),
+		method: text().notNull().$type<ScheduleMethod>(),
+		status: text().default("pending").notNull().$type<ScheduleStatus>(),
 		diagnostics: jsonb(),
 		createdAt: timestampTz("created_at").default(sql`now()`).notNull(),
 		deliveredAt: timestampTz("delivered_at"),
@@ -407,16 +476,17 @@ export const davScheduleMessage = pgTable(
 		index("idx_dav_schedule_message_status")
 			.using("btree", table.status.asc().nullsLast())
 			.where(sql`(deleted_at IS NULL)`),
-		check(
-			"dav_schedule_message_method_check",
-			sql`(method = ANY (ARRAY['REQUEST'::text, 'REPLY'::text, 'CANCEL'::text, 'REFRESH'::text, 'COUNTER'::text, 'DECLINECOUNTER'::text, 'ADD'::text]))`,
-		),
-		check(
-			"dav_schedule_message_status_check",
-			sql`(status = ANY (ARRAY['pending'::text, 'delivered'::text, 'failed'::text]))`,
-		),
+		check("dav_schedule_message_method_check", scheduleMethodEnum.sql),
+		check("dav_schedule_message_status_check", scheduleStatusEnum.sql),
 	],
 );
+
+const shadowDirectionEnum = drizzleEnum(
+	"direction",
+	["inbound", "outbound"] as const,
+	"text",
+);
+export type ShadowDirection = GetDrizzleEnumType<typeof shadowDirectionEnum>;
 
 export const davShadow = pgTable(
 	"dav_shadow",
@@ -432,8 +502,8 @@ export const davShadow = pgTable(
 				onDelete: "cascade",
 			})
 			.$type<UuidString>(),
-		direction: text().notNull(),
-		contentType: text("content_type").notNull(),
+		direction: text().notNull().$type<ShadowDirection>(),
+		contentType: text("content_type").notNull().$type<ContentType>(),
 		rawOriginal: bytea("raw_original"),
 		rawCanonical: bytea("raw_canonical"),
 		diagnostics: jsonb(),
@@ -462,14 +532,8 @@ export const davShadow = pgTable(
 			"chk_dav_shadow_ref",
 			sql`((instance_id IS NOT NULL) OR (entity_id IS NOT NULL))`,
 		),
-		check(
-			"dav_shadow_content_type_check",
-			sql`(content_type = ANY (ARRAY['text/calendar'::text, 'text/vcard'::text]))`,
-		),
-		check(
-			"dav_shadow_direction_check",
-			sql`(direction = ANY (ARRAY['inbound'::text, 'outbound'::text]))`,
-		),
+		check("dav_shadow_content_type_check", contentTypeEnum.sql),
+		check("dav_shadow_direction_check", shadowDirectionEnum.sql),
 	],
 );
 

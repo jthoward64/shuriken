@@ -1,9 +1,9 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { Effect, Layer, Option } from "effect";
 import { DatabaseClient, type DbClient } from "#src/db/client.ts";
-import { davEntity } from "#src/db/drizzle/schema/index.ts";
+import { davEntity, davInstance } from "#src/db/drizzle/schema/index.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
-import type { EntityId } from "#src/domain/ids.ts";
+import type { CollectionId, EntityId } from "#src/domain/ids.ts";
 import { EntityRepository } from "./repository.ts";
 
 // ---------------------------------------------------------------------------
@@ -71,6 +71,30 @@ const softDelete = (db: DbClient, id: EntityId) =>
 		catch: (e) => new DatabaseError({ cause: e }),
 	});
 
+const existsByUid = (
+	db: DbClient,
+	collectionId: CollectionId,
+	logicalUid: string,
+) =>
+	Effect.tryPromise({
+		try: () =>
+			db
+				.select({ id: davEntity.id })
+				.from(davEntity)
+				.innerJoin(davInstance, eq(davInstance.entityId, davEntity.id))
+				.where(
+					and(
+						eq(davInstance.collectionId, collectionId),
+						eq(davEntity.logicalUid, logicalUid),
+						isNull(davInstance.deletedAt),
+						isNull(davEntity.deletedAt),
+					),
+				)
+				.limit(1)
+				.then((r) => r.length > 0),
+		catch: (e) => new DatabaseError({ cause: e }),
+	});
+
 export const EntityRepositoryLive = Layer.effect(
 	EntityRepository,
 	Effect.map(DatabaseClient, (db) =>
@@ -79,6 +103,7 @@ export const EntityRepositoryLive = Layer.effect(
 			findById: (id) => findById(db, id),
 			updateLogicalUid: (id, uid) => updateLogicalUid(db, id, uid),
 			softDelete: (id) => softDelete(db, id),
+			existsByUid: (collectionId, uid) => existsByUid(db, collectionId, uid),
 		}),
 	),
 );

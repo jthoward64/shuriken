@@ -10,7 +10,7 @@ import {
 } from "drizzle-orm/pg-core";
 import type { UuidString } from "#src/domain/ids.ts";
 import { principal } from "./principal";
-import { timestampTz } from "./types";
+import { drizzleEnum, type GetDrizzleEnumType, timestampTz } from "./types";
 
 // ---------------------------------------------------------------------------
 // dav_acl — RFC 3744 Access Control List
@@ -36,15 +36,36 @@ import { timestampTz } from "./types";
 // Sync token URN format (RFC 6578): urn:shuriken:sync:{collection_uuid}:{synctoken_integer}
 // ---------------------------------------------------------------------------
 
+const grantDenyEnum = drizzleEnum(
+	"grant_deny",
+	["grant", "deny"] as const,
+	"text",
+);
+export type GrantDeny = GetDrizzleEnumType<typeof grantDenyEnum>;
+
+const principalTypeEnum = drizzleEnum(
+	"principal_type",
+	["principal", "all", "authenticated", "unauthenticated", "self"] as const,
+	"text",
+);
+export type PrincipalType = GetDrizzleEnumType<typeof principalTypeEnum>;
+
+const resourceTypeEnum = drizzleEnum(
+	"resource_type",
+	["collection", "instance", "principal", "virtual"] as const,
+	"text",
+);
+export type ResourceType = GetDrizzleEnumType<typeof resourceTypeEnum>;
+
 export const davAcl = pgTable(
 	"dav_acl",
 	{
 		id: uuid().default(sql`uuidv7()`).primaryKey().$type<UuidString>(),
 		// Resource being controlled (polymorphic — no DB-level FK)
-		resourceType: text("resource_type").notNull(),
+		resourceType: text("resource_type").notNull().$type<ResourceType>(),
 		resourceId: uuid("resource_id").notNull().$type<UuidString>(),
 		// Principal matching
-		principalType: text("principal_type").notNull(),
+		principalType: text("principal_type").notNull().$type<PrincipalType>(),
 		principalId: uuid("principal_id")
 			.references(() => principal.id, {
 				onDelete: "cascade",
@@ -53,7 +74,7 @@ export const davAcl = pgTable(
 		// Privilege — DAV namespaced string, e.g. 'DAV:read', 'CALDAV:read-free-busy'
 		privilege: text().notNull(),
 		// Grant or deny (deny reserved for server-generated ACEs when grant-only is lifted)
-		grantDeny: text("grant_deny").notNull().default("grant"),
+		grantDeny: text("grant_deny").notNull().default("grant").$type<GrantDeny>(),
 		// Server-generated ACEs cannot be removed via the ACL method
 		protected: boolean().notNull().default(false),
 		// Evaluation order within a resource's ACL
@@ -80,18 +101,9 @@ export const davAcl = pgTable(
 			table.resourceId.asc().nullsLast(),
 			table.principalType.asc().nullsLast(),
 		),
-		check(
-			"dav_acl_grant_deny_check",
-			sql`(grant_deny = ANY (ARRAY['grant'::text, 'deny'::text]))`,
-		),
-		check(
-			"dav_acl_principal_type_check",
-			sql`(principal_type = ANY (ARRAY['principal'::text, 'all'::text, 'authenticated'::text, 'unauthenticated'::text, 'self'::text]))`,
-		),
-		check(
-			"dav_acl_resource_type_check",
-			sql`(resource_type = ANY (ARRAY['collection'::text, 'instance'::text, 'principal'::text, 'virtual'::text]))`,
-		),
+		check("dav_acl_grant_deny_check", grantDenyEnum.sql),
+		check("dav_acl_principal_type_check", principalTypeEnum.sql),
+		check("dav_acl_resource_type_check", resourceTypeEnum.sql),
 		check(
 			"dav_acl_principal_id_required",
 			sql`(principal_type <> 'principal'::text OR principal_id IS NOT NULL)`,

@@ -13,7 +13,19 @@ import {
 } from "drizzle-orm/pg-core";
 import type { UuidString } from "#src/domain/ids.ts";
 import { davComponent, davEntity } from "./dav";
-import { timestampTz, tsvector } from "./types";
+import {
+	drizzleEnum,
+	type GetDrizzleEnumType,
+	timestampTz,
+	tsvector,
+} from "./types";
+
+const componentTypeEnum = drizzleEnum(
+	"component_type",
+	["VEVENT", "VTODO", "VJOURNAL", "VFREEBUSY"] as const,
+	"text",
+);
+export type ComponentType = GetDrizzleEnumType<typeof componentTypeEnum>;
 
 export const calTimezone = pgTable(
 	"cal_timezone",
@@ -43,7 +55,7 @@ export const calIndex = pgTable(
 			.notNull()
 			.references(() => davComponent.id, { onDelete: "cascade" })
 			.$type<UuidString>(),
-		componentType: text("component_type").notNull(),
+		componentType: text("component_type").notNull().$type<ComponentType>(),
 		uid: text(),
 		recurrenceIdUtc: timestampTz("recurrence_id_utc"),
 		dtstartUtc: timestampTz("dtstart_utc"),
@@ -113,9 +125,6 @@ export const calIndex = pgTable(
 		index("idx_cal_index_uid_active")
 			.using("btree", table.uid.asc().nullsLast())
 			.where(sql`((deleted_at IS NULL) AND (uid IS NOT NULL))`),
-		check(
-			"chk_cal_index_component_type",
-			sql`(component_type = ANY (ARRAY['VEVENT'::text, 'VTODO'::text, 'VJOURNAL'::text, 'VFREEBUSY'::text]))`,
-		),
+		check("chk_cal_index_component_type", componentTypeEnum.sql),
 	],
 );

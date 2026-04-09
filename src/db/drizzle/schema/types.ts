@@ -1,6 +1,23 @@
+import { type SQL, sql } from "drizzle-orm";
 import { customType } from "drizzle-orm/pg-core";
 import { Redacted } from "effect";
 import { Temporal } from "temporal-polyfill";
+
+interface DrizzleEnumConfig<V> {
+	sql: SQL<unknown>;
+	$type: V;
+}
+export type GetDrizzleEnumType<C> =
+	C extends DrizzleEnumConfig<infer V> ? V : never;
+
+export function drizzleEnum<V>(column: string, values: Array<V>, type: "text") {
+	const arrayContent = values.map((v) => `'${v}'::${type}`).join(", ");
+	return {
+		sql: sql`(${sql.raw(column)} = ANY (ARRAY[${sql.raw(arrayContent)}]))`,
+		// biome-ignore lint/style/useNamingConvention: Special property, not a real value
+		$type: null as unknown as V,
+	} satisfies DrizzleEnumConfig<V>;
+}
 
 /** TIMESTAMPTZ → Temporal.Instant (absolute point in time) */
 export const timestampTz = customType<{

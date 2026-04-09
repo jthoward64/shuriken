@@ -9,13 +9,20 @@ import {
 	uuid,
 } from "drizzle-orm/pg-core";
 import type { UuidString } from "#src/domain/ids.ts";
-import { timestampTz } from "./types";
+import { drizzleEnum, type GetDrizzleEnumType, timestampTz } from "./types";
+
+const principalTypeEnum = drizzleEnum(
+	"principal_type",
+	["user", "group", "system", "public", "resource"] as const,
+	"text",
+);
+export type PrincipalKind = GetDrizzleEnumType<typeof principalTypeEnum>;
 
 export const principal = pgTable(
 	"principal",
 	{
 		id: uuid().default(sql`uuidv7()`).primaryKey().$type<UuidString>(),
-		principalType: text("principal_type").notNull(),
+		principalType: text("principal_type").notNull().$type<PrincipalKind>(),
 		displayName: text("display_name"),
 		updatedAt: timestampTz("updated_at").default(sql`now()`).notNull(),
 		deletedAt: timestampTz("deleted_at"),
@@ -42,9 +49,6 @@ export const principal = pgTable(
 				table.slug.asc().nullsLast(),
 			)
 			.where(sql`(deleted_at IS NULL)`),
-		check(
-			"principal_principal_type_check",
-			sql`(principal_type = ANY (ARRAY['user'::text, 'group'::text, 'system'::text, 'public'::text, 'resource'::text]))`,
-		),
+		check("principal_principal_type_check", principalTypeEnum.sql),
 	],
 );

@@ -8,6 +8,7 @@ import { Effect } from "effect";
 import { Temporal } from "temporal-polyfill";
 import {
 	effectiveDtend,
+	getDtendInstant,
 	getDtstartInstant,
 	instantFromIrValue,
 } from "#src/data/icalendar/ir-helpers.ts";
@@ -313,6 +314,81 @@ const evalTextMatch = (text: string, tm: TextMatch): boolean => {
 	return tm.negate ? !matches : matches;
 };
 
+/**
+ * VTODO time-range matching — RFC 4791 §9.9 rule table.
+ *
+ * Cases based on which of DTSTART / DUE(+DURATION) / COMPLETED are present:
+ *   DTSTART + DUE/DURATION : DTSTART < end  AND  effective_DUE > start
+ *   DTSTART only           : DTSTART >= start AND DTSTART < end
+ *   DUE only               : DUE > start    AND  DUE <= end
+ *   neither                : always matches
+ *   COMPLETED (any case)   : if COMPLETED is in [start, end), also match (OR)
+ */
+const evalVtodoTimeRange = (
+	comp: IrComponent,
+	range: { start?: Temporal.Instant; end?: Temporal.Instant },
+): boolean => {
+	const dtstart = getDtstartInstant(comp);
+	const due = getDtendInstant(comp); // getDtendProp checks DUE for VTODO
+	const hasDuration = comp.properties.some((p) => p.name === "DURATION");
+
+	// COMPLETED override — if COMPLETED is within the range, always match.
+	const completedProp = comp.properties.find((p) => p.name === "COMPLETED");
+	if (completedProp) {
+		const completed = instantFromIrValue(completedProp);
+		if (completed !== undefined) {
+			const cMs = completed.epochMilliseconds;
+			if (
+				(range.start === undefined || cMs >= range.start.epochMilliseconds) &&
+				(range.end === undefined || cMs < range.end.epochMilliseconds)
+			) {
+				return true;
+			}
+		}
+	}
+
+	if (dtstart !== undefined && (due !== undefined || hasDuration)) {
+		// DTSTART + DUE/DURATION: DTSTART < end AND effective_DUE > start
+		const effectiveDue = effectiveDtend(comp, dtstart);
+		const startMs = dtstart.epochMilliseconds;
+		const dueMs = effectiveDue.epochMilliseconds;
+		if (range.end !== undefined && startMs >= range.end.epochMilliseconds) {
+			return false;
+		}
+		if (range.start !== undefined && dueMs <= range.start.epochMilliseconds) {
+			return false;
+		}
+		return true;
+	}
+
+	if (dtstart !== undefined) {
+		// Only DTSTART: DTSTART >= start AND DTSTART < end
+		const ms = dtstart.epochMilliseconds;
+		if (range.start !== undefined && ms < range.start.epochMilliseconds) {
+			return false;
+		}
+		if (range.end !== undefined && ms >= range.end.epochMilliseconds) {
+			return false;
+		}
+		return true;
+	}
+
+	if (due !== undefined) {
+		// Only DUE: DUE > start AND DUE <= end
+		const dueMs = due.epochMilliseconds;
+		if (range.start !== undefined && dueMs <= range.start.epochMilliseconds) {
+			return false;
+		}
+		if (range.end !== undefined && dueMs > range.end.epochMilliseconds) {
+			return false;
+		}
+		return true;
+	}
+
+	// Neither DTSTART nor DUE → always matches.
+	return true;
+};
+
 const evalComponentTimeRange = (
 	comp: IrComponent,
 	range: { start?: Temporal.Instant; end?: Temporal.Instant },
@@ -329,6 +405,11 @@ const evalComponentTimeRange = (
 		);
 	}
 
+	if (comp.name === "VTODO") {
+		return evalVtodoTimeRange(comp, range);
+	}
+
+	// VEVENT / VFREEBUSY: DTSTART < end AND effective_DTEND > start.
 	const dtstart = getDtstartInstant(comp);
 	if (!dtstart) {
 		return true; // No DTSTART → pass conservatively

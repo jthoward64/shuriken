@@ -98,7 +98,8 @@ export type WebDavPrecondition =
 	| "DAV:cannot-modify-protected-property" // 403
 	| "DAV:number-of-matches-within-limits" // postcondition (no specific status)
 	| "DAV:supported-report" // 403 — unsupported REPORT type (RFC 4918 §9.13)
-	| "DAV:valid-sync-token"; // 400 / 409
+	| "DAV:valid-sync-token" // 400 / 409
+	| "DAV:supported-sync-level"; // 403 — RFC 6578 §6.4
 
 /** RFC 3744 — WebDAV Access Control */
 export type AclPrecondition =

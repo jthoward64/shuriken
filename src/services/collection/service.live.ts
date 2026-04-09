@@ -6,6 +6,7 @@ import { AclRepository } from "#src/services/acl/repository.ts";
 import {
 	type CollectionPropertyChanges,
 	CollectionRepository,
+	type CollectionType,
 	type NewCollection,
 } from "./repository.ts";
 import { CollectionService } from "./service.ts";
@@ -32,7 +33,7 @@ export const CollectionServiceLive = Layer.effect(
 
 			findBySlug: Effect.fn("CollectionService.findBySlug")(function* (
 				ownerPrincipalId: PrincipalId,
-				collectionType: string,
+				collectionType: CollectionType,
 				slug: Slug,
 			) {
 				yield* Effect.logTrace("collection.findBySlug", {

@@ -12,6 +12,7 @@ import { type ClarkName, cn } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import {
 	conflict,
+	forbidden,
 	methodNotAllowed,
 	unauthorized,
 } from "#src/domain/errors.ts";
@@ -105,6 +106,13 @@ export const syncCollectionHandler = (
 
 		const collSvc = yield* CollectionService;
 		const collRow = yield* collSvc.findById(path.collectionId);
+
+		// Validate sync-level — RFC 6578 §6.4: the server MUST reject unsupported levels.
+		// The only supported level is "1" (shallow sync).
+		const syncLevel = childText(tree, cn(DAV_NS, "sync-level"));
+		if (syncLevel !== undefined && syncLevel !== "1") {
+			return yield* forbidden("DAV:supported-sync-level");
+		}
 
 		// Parse sync-token from request body
 		const rawToken = childText(tree, cn(DAV_NS, "sync-token")) ?? "";

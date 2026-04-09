@@ -1,7 +1,10 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { Effect, Layer, Option } from "effect";
 import { DatabaseClient, type DbClient } from "#src/db/client.ts";
-import { davCollection } from "#src/db/drizzle/schema/index.ts";
+import {
+	type CollectionType,
+	davCollection,
+} from "#src/db/drizzle/schema/index.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
 import type { CollectionId, PrincipalId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
@@ -38,7 +41,7 @@ const findBySlug = Effect.fn("CollectionRepository.findBySlug")(
 	function* (
 		db: DbClient,
 		ownerPrincipalId: PrincipalId,
-		collectionType: string,
+		collectionType: CollectionType,
 		slug: Slug,
 	) {
 		yield* Effect.logTrace("repo.collection.findBySlug", {

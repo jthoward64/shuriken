@@ -1,6 +1,10 @@
 import { Effect, Layer, Option, Redacted } from "effect";
 import { Temporal } from "temporal-polyfill";
 import type { IrComponent } from "#src/data/ir.ts";
+import type {
+	CollectionType,
+	ContentType,
+} from "#src/db/drizzle/schema/index.ts";
 import { ComponentId, type UuidString } from "#src/domain/ids.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
 import type { Slug } from "#src/domain/types/path.ts";
@@ -143,7 +147,7 @@ export interface UserSeedData {
 export interface CollectionSeedData {
 	readonly id?: UuidString;
 	readonly ownerPrincipalId: UuidString;
-	readonly collectionType?: string;
+	readonly collectionType?: CollectionType;
 	readonly slug?: string;
 	readonly displayName?: string;
 }
@@ -159,7 +163,7 @@ export interface InstanceSeedData {
 	readonly id?: UuidString;
 	readonly collectionId: UuidString;
 	readonly entityId?: UuidString;
-	readonly contentType?: string;
+	readonly contentType?: ContentType;
 	readonly etag?: string;
 	readonly slug?: string;
 }
@@ -909,6 +913,16 @@ const makeEntityRepo = (stores: TestStores): EntityRepositoryShape => ({
 		Effect.sync(() => {
 			stores.entities.delete(id);
 		}),
+
+	existsByUid: (collectionId, logicalUid) =>
+		Effect.sync(() =>
+			[...stores.instances.values()].some(
+				(inst) =>
+					inst.collectionId === collectionId &&
+					inst.deletedAt === null &&
+					stores.entities.get(inst.entityId)?.logicalUid === logicalUid,
+			),
+		),
 });
 
 const makeComponentRepo = (stores: TestStores): ComponentRepositoryShape => ({

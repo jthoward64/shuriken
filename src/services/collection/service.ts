@@ -6,6 +6,7 @@ import type { Slug } from "#src/domain/types/path.ts";
 import type {
 	CollectionPropertyChanges,
 	CollectionRow,
+	CollectionType,
 	NewCollection,
 } from "./repository.ts";
 
@@ -19,7 +20,7 @@ export interface CollectionServiceShape {
 	) => Effect.Effect<CollectionRow, DavError | DatabaseError>;
 	readonly findBySlug: (
 		ownerPrincipalId: PrincipalId,
-		collectionType: string,
+		collectionType: CollectionType,
 		slug: Slug,
 	) => Effect.Effect<CollectionRow, DavError | DatabaseError>;
 	readonly listByOwner: (

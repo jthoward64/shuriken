@@ -2,7 +2,7 @@ import type { InferSelectModel } from "drizzle-orm";
 import type { Effect, Option } from "effect";
 import { Context } from "effect";
 import type { IrDeadProperties } from "#src/data/ir.ts";
-import type { davInstance } from "#src/db/drizzle/schema/index.ts";
+import type { ContentType, davInstance } from "#src/db/drizzle/schema/index.ts";
 import type { DatabaseError } from "#src/domain/errors.ts";
 import type { CollectionId, EntityId, InstanceId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
@@ -17,7 +17,7 @@ export type InstanceRow = InferSelectModel<typeof davInstance>;
 export interface NewInstance {
 	readonly collectionId: CollectionId;
 	readonly entityId: EntityId;
-	readonly contentType: string;
+	readonly contentType: ContentType;
 	readonly etag: ETag;
 	readonly slug: Slug;
 	readonly scheduleTag?: string;

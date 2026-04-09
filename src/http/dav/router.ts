@@ -518,7 +518,9 @@ export const davRouter = (
 		}
 	}).pipe(
 		Effect.catchTag("DavError", (err) => {
-			const body = err.precondition ? buildDavErrorBody(err.precondition) : null;
+			const body = err.precondition
+				? buildDavErrorBody(err.precondition)
+				: null;
 			const headers: Record<string, string> = body
 				? { "Content-Type": "application/xml; charset=utf-8" }
 				: {};

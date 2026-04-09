@@ -16,7 +16,11 @@ import {
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
-import { HTTP_CREATED, HTTP_METHOD_NOT_ALLOWED, HTTP_UNAUTHORIZED } from "#src/http/status.ts";
+import {
+	HTTP_CREATED,
+	HTTP_METHOD_NOT_ALLOWED,
+	HTTP_UNAUTHORIZED,
+} from "#src/http/status.ts";
 import { runFailure, runSuccess } from "#src/testing/effect.ts";
 import { makeTestEnv } from "#src/testing/env.ts";
 import { mkcolHandler } from "./mkcol.ts";

@@ -127,16 +127,44 @@ export const getHandler = (
 				: yield* encodeVCard(doc);
 
 		// 9. Build response headers.
+		const bodyBytes = new TextEncoder().encode(body);
 		const headers = new Headers({
 			"Content-Type": `${instance.contentType}; charset=utf-8`,
 			ETag: instance.etag,
 			"Last-Modified": toRfc1123(instance.lastModified),
+			"Content-Length": String(bodyBytes.byteLength),
 		});
+
+		// RFC 7232 §3 — conditional GET: check If-None-Match and If-Modified-Since.
+		const ifNoneMatch = ctx.headers.get("If-None-Match");
+		if (ifNoneMatch !== null) {
+			// Weak comparison: strip quotes and W/ prefix before comparing.
+			const normalize = (tag: string): string =>
+				tag.trim().replace(/^W\//, "").replace(/^"|"$/g, "");
+			const serverTag = normalize(instance.etag);
+			const clientTags = ifNoneMatch
+				.split(",")
+				.map((t: string) => normalize(t));
+			if (clientTags.includes(serverTag) || ifNoneMatch.trim() === "*") {
+				return new Response(null, { status: 304, headers });
+			}
+		} else {
+			const ifModifiedSince = ctx.headers.get("If-Modified-Since");
+			if (ifModifiedSince !== null) {
+				const sinceMs = Date.parse(ifModifiedSince);
+				if (
+					!Number.isNaN(sinceMs) &&
+					instance.lastModified.epochMilliseconds <= sinceMs
+				) {
+					return new Response(null, { status: 304, headers });
+				}
+			}
+		}
 
 		// 10. HEAD returns headers only; GET includes body.
 		const isHead = ctx.method.toUpperCase() === "HEAD";
 
-		return new Response(isHead ? null : body, {
+		return new Response(isHead ? null : bodyBytes, {
 			status: HTTP_OK,
 			headers,
 		});

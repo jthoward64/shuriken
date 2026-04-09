@@ -6,6 +6,7 @@ import { extractUid as extractICalUid } from "#src/data/icalendar/uid.ts";
 import { decodeVCard, encodeVCard } from "#src/data/vcard/codec.ts";
 import { extractUid as extractVCardUid } from "#src/data/vcard/uid.ts";
 import {
+	conflict,
 	type DatabaseError,
 	type DavError,
 	forbidden,
@@ -65,7 +66,7 @@ export const putHandler = (
 			rawContentType.split(";")[0]?.trim().toLowerCase() ?? "";
 
 		let entityType: "icalendar" | "vcard";
-		let contentType: string;
+		let contentType: "text/calendar" | "text/vcard";
 
 		if (baseContentType === "text/calendar") {
 			entityType = "icalendar";
@@ -122,6 +123,31 @@ export const putHandler = (
 			entityType === "icalendar" ? extractICalUid(doc) : extractVCardUid(doc),
 		);
 
+		// 6b. CalDAV semantic validation — RFC 4791 §4.1, §5.3.2.
+		//     Applies to every iCalendar PUT (both new and update).
+		if (entityType === "icalendar") {
+			const nonTzComponents = doc.root.components.filter(
+				(c) => c.name !== "VTIMEZONE",
+			);
+			// Rule 1: empty VCALENDAR (no content components other than VTIMEZONE).
+			if (nonTzComponents.length === 0) {
+				return yield* forbidden("CALDAV:valid-calendar-object-resource");
+			}
+			// Rule 2: mixed UIDs — all content components must share the same UID.
+			const componentUids = new Set(
+				nonTzComponents.flatMap((c) => {
+					const uidProp = c.properties.find((p) => p.name === "UID");
+					if (!uidProp || uidProp.value.type !== "TEXT") {
+						return [];
+					}
+					return [uidProp.value.value];
+				}),
+			);
+			if (componentUids.size > 1) {
+				return yield* forbidden("CALDAV:valid-calendar-object-resource");
+			}
+		}
+
 		// 7. Serialize canonical form.
 		const canonical =
 			entityType === "icalendar"
@@ -165,8 +191,24 @@ export const putHandler = (
 				}
 			}
 
-			// Create entity row.
+			// UID uniqueness — RFC 4791 §5.3.2 / RFC 6352 §5.1.
+			// Reject if another active instance in this collection already holds the same UID.
 			const entityRepo = yield* EntityRepository;
+			if (logicalUid !== null) {
+				const uidConflict = yield* entityRepo.existsByUid(
+					path.collectionId,
+					logicalUid,
+				);
+				if (uidConflict) {
+					return yield* conflict(
+						entityType === "icalendar"
+							? "CALDAV:no-uid-conflict"
+							: "CARDDAV:no-uid-conflict",
+					);
+				}
+			}
+
+			// Create entity row.
 			const entityRow = yield* entityRepo.insert({ entityType, logicalUid });
 
 			// Persist component tree.

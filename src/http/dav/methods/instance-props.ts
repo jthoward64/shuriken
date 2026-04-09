@@ -63,7 +63,7 @@ const SCHEDULE_TAG = cn(CALDAV_NS, "schedule-tag");
 // ---------------------------------------------------------------------------
 
 export type PropfindKind =
-	| { readonly type: "allprop" }
+	| { readonly type: "allprop"; readonly extra?: ReadonlySet<ClarkName> }
 	| { readonly type: "propname" }
 	| { readonly type: "prop"; readonly names: ReadonlySet<ClarkName> };
 
@@ -88,7 +88,22 @@ export const splitPropstats = (
 		return [{ props: names, status: 200 }];
 	}
 	if (request.type === "allprop") {
-		return [{ props: allProps, status: 200 }];
+		if (!request.extra || request.extra.size === 0) {
+			return [{ props: allProps, status: 200 }];
+		}
+		// RFC 4918 §9.1: allprop+include — return allprop in 200, plus any
+		// extra included properties that are present; missing extras go to 404.
+		const missing: Record<ClarkName, unknown> = {};
+		for (const name of request.extra) {
+			if (!(name in allProps)) {
+				missing[name] = "";
+			}
+		}
+		const propstats: Array<Propstat> = [{ props: allProps, status: 200 }];
+		if (Object.keys(missing).length > 0) {
+			propstats.push({ props: missing, status: 404 });
+		}
+		return propstats;
 	}
 
 	const found: Record<ClarkName, unknown> = {};

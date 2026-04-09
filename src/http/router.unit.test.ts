@@ -120,6 +120,7 @@ const stubLayers = Layer.mergeAll(
 		findById: die,
 		updateLogicalUid: die,
 		softDelete: die,
+		existsByUid: die,
 	}),
 	Layer.succeed(ComponentRepository, {
 		insertTree: die,

@@ -19,7 +19,6 @@ const fakePath: ResolvedDavPath = {
 	principalSeg: String(TEST_PRINCIPAL_ID),
 };
 
-
 const fakeCtx: HttpRequestContext = {
 	requestId: RequestId("test-request-id"),
 	method: "OPTIONS",

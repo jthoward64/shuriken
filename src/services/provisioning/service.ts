@@ -25,6 +25,8 @@ export interface ProvisionedUser {
 	readonly user: UserWithPrincipal;
 	readonly calendar: CollectionRow;
 	readonly addressBook: CollectionRow;
+	readonly inbox: CollectionRow;
+	readonly outbox: CollectionRow;
 }
 
 // ---------------------------------------------------------------------------

@@ -49,6 +49,21 @@ export const ProvisioningServiceLive = Layer.effect(
 					supportedComponents: ["VCARD"],
 				});
 
+				// RFC 6638 §2.2: each CalDAV principal must have a scheduling inbox and outbox.
+				const inbox = yield* collections.create({
+					ownerPrincipalId: principalId,
+					collectionType: "inbox",
+					slug: Slug("inbox"),
+					displayName: "Scheduling Inbox",
+				});
+
+				const outbox = yield* collections.create({
+					ownerPrincipalId: principalId,
+					collectionType: "outbox",
+					slug: Slug("outbox"),
+					displayName: "Scheduling Outbox",
+				});
+
 				// Grant the owner full access to their own principal resource.
 				// This is the root of the ACL inheritance hierarchy; all collection
 				// and instance ACEs inherit from the owner principal's ACL.
@@ -68,7 +83,7 @@ export const ProvisioningServiceLive = Layer.effect(
 					userId: user.user.id,
 				});
 
-				return { user, calendar, addressBook };
+				return { user, calendar, addressBook, inbox, outbox };
 			}),
 		});
 	}),
