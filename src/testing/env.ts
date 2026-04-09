@@ -440,6 +440,15 @@ const makePrincipalRepo = (stores: TestStores): PrincipalRepositoryShape => ({
 			),
 		),
 
+	findPrincipalBySlug: (slug) =>
+		Effect.succeed(
+			Option.fromNullable(
+				[...stores.principals.values()].find(
+					(p) => p.slug === slug && p.deletedAt === null,
+				) ?? null,
+			),
+		),
+
 	findUserByUserId: (id) =>
 		Effect.succeed(Option.fromNullable(stores.users.get(id) ?? null)),
 

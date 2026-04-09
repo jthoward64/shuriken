@@ -33,6 +33,10 @@ export interface PrincipalRepositoryShape {
 	readonly findBySlug: (
 		slug: Slug,
 	) => Effect.Effect<Option.Option<PrincipalWithUser>, DatabaseError>;
+	/** Find any principal (user OR group) by slug — no user join required. */
+	readonly findPrincipalBySlug: (
+		slug: Slug,
+	) => Effect.Effect<Option.Option<PrincipalRow>, DatabaseError>;
 	readonly findByEmail: (
 		email: Email,
 	) => Effect.Effect<Option.Option<PrincipalWithUser>, DatabaseError>;

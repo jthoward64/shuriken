@@ -139,7 +139,8 @@ export const syncCollectionHandler = (
 			const instSvc = yield* InstanceService;
 			const instances = yield* instSvc.listByCollection(path.collectionId);
 			for (const inst of instances) {
-				const href = `${origin}/dav/principals/${path.principalSeg}/${ns}/${path.collectionSeg}/${inst.id}`;
+				const seg = inst.slug || inst.id;
+				const href = `${origin}/dav/principals/${path.principalSeg}/${ns}/${path.collectionSeg}/${seg}`;
 				responses.push({
 					href,
 					propstats: splitPropstats(buildInstanceProps(inst), propfind),
@@ -156,7 +157,8 @@ export const syncCollectionHandler = (
 			]);
 
 			for (const inst of changedInstances) {
-				const href = `${origin}/dav/principals/${path.principalSeg}/${ns}/${path.collectionSeg}/${inst.id}`;
+				const seg = inst.slug || inst.id;
+				const href = `${origin}/dav/principals/${path.principalSeg}/${ns}/${path.collectionSeg}/${seg}`;
 				responses.push({
 					href,
 					propstats: splitPropstats(buildInstanceProps(inst), propfind),
@@ -164,13 +166,12 @@ export const syncCollectionHandler = (
 			}
 
 			for (const tombstone of tombstones) {
-				// Use the UUID variant (index 1 in uri_variants) as the href
-				const uuidVariant =
-					tombstone.uriVariants[1] ?? tombstone.uriVariants[0];
-				if (!uuidVariant) {
+				// Use the slug variant (index 0) which is the client-supplied name.
+				const slugVariant = tombstone.uriVariants[0];
+				if (!slugVariant) {
 					continue;
 				}
-				const href = `${origin}/dav/principals/${path.principalSeg}/${ns}/${path.collectionSeg}/${uuidVariant}`;
+				const href = `${origin}/dav/principals/${path.principalSeg}/${ns}/${path.collectionSeg}/${slugVariant}`;
 				responses.push({
 					href,
 					propstats: [{ props: {} as Record<ClarkName, unknown>, status: 404 }],

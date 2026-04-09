@@ -78,6 +78,14 @@ export const putHandler = (
 			return yield* unsupportedMediaType(precondition);
 		}
 
+		// Validate entity type matches the collection namespace.
+		if (path.namespace === "cal" && entityType !== "icalendar") {
+			return yield* unsupportedMediaType("CALDAV:supported-calendar-data");
+		}
+		if (path.namespace === "card" && entityType !== "vcard") {
+			return yield* unsupportedMediaType("CARDDAV:supported-address-data");
+		}
+
 		// 4. Read body.
 		const body = yield* Effect.promise(() => req.text());
 

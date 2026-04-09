@@ -222,15 +222,15 @@ export const proppatchHandler = (
 			path.kind === "newGroup" ||
 			path.kind === "groupMembers" ||
 			path.kind === "groupMember" ||
-			path.kind === "newGroupMember"
+			path.kind === "groupMemberNonExistent"
 		) {
 			return yield* notFound();
 		}
 
-		const actingPrincipalId =
-			ctx.auth._tag === "Authenticated"
-				? ctx.auth.principal.principalId
-				: path.principalId;
+		if (ctx.auth._tag !== "Authenticated") {
+			return yield* forbidden("DAV:need-privileges");
+		}
+		const actingPrincipalId = ctx.auth.principal.principalId;
 
 		const { set, remove } = yield* parseProppatchBody(req);
 		const acl = yield* AclService;

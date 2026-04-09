@@ -49,12 +49,15 @@ const RESOURCETYPE = cn(DAV_NS, "resourcetype");
 const DISPLAYNAME = cn(DAV_NS, "displayname");
 const GETLASTMODIFIED = cn(DAV_NS, "getlastmodified");
 const SYNC_TOKEN = cn(DAV_NS, "sync-token");
+const CURRENT_USER_PRINCIPAL = cn(DAV_NS, "current-user-principal");
 const CAL_DESCRIPTION = cn(CALDAV_NS, "calendar-description");
+const CAL_HOME_SET = cn(CALDAV_NS, "calendar-home-set");
 const CAL_SUPPORTED_COMPONENTS = cn(
 	CALDAV_NS,
 	"supported-calendar-component-set",
 );
 const CARD_DESCRIPTION = cn(CARDDAV_NS, "addressbook-description");
+const CARD_HOME_SET = cn(CARDDAV_NS, "addressbook-home-set");
 
 // ---------------------------------------------------------------------------
 // PROPFIND body parsing
@@ -212,15 +215,6 @@ const collectionResponse = (
 // Instance → DavResponse
 // ---------------------------------------------------------------------------
 
-const instanceResponse = (
-	href: string,
-	row: InstanceRow,
-	request: PropfindKind,
-): DavResponse => ({
-	href,
-	propstats: splitPropstats(buildInstanceProps(row), request),
-});
-
 // ---------------------------------------------------------------------------
 // Handler
 // ---------------------------------------------------------------------------
@@ -257,7 +251,7 @@ export const propfindHandler = (
 			path.kind === "newGroup" ||
 			path.kind === "groupMembers" ||
 			path.kind === "groupMember" ||
-			path.kind === "newGroupMember"
+			path.kind === "groupMemberNonExistent"
 		) {
 			return yield* notFound();
 		}
@@ -276,6 +270,9 @@ export const propfindHandler = (
 		const origin = ctx.url.origin;
 		const responses: Array<DavResponse> = [];
 
+		// href pointing to the acting principal — used by current-user-principal
+		const actingPrincipalHref = `${origin}/dav/principals/${actingPrincipalId}/`;
+
 		if (path.kind === "principal") {
 			// Minimal principal response — display name and resource type
 			yield* acl.check(
@@ -292,6 +289,12 @@ export const propfindHandler = (
 			const allProps: Record<ClarkName, unknown> = {
 				[RESOURCETYPE]: { "{DAV:}principal": "" },
 				[DISPLAYNAME]: displayName,
+				// RFC 5397 §3: the acting user's principal URL
+				[CURRENT_USER_PRINCIPAL]: { [cn(DAV_NS, "href")]: actingPrincipalHref },
+				// RFC 4791 §6.2.1: home URL for calendar discovery
+				[CAL_HOME_SET]: { [cn(DAV_NS, "href")]: principalHref },
+				// RFC 6352 §6.2.1: home URL for addressbook discovery
+				[CARD_HOME_SET]: { [cn(DAV_NS, "href")]: principalHref },
 			};
 			// Dead properties
 			const dead = principalRow.principal
@@ -331,7 +334,14 @@ export const propfindHandler = (
 				path.namespace,
 				path.collectionSeg,
 			);
-			responses.push(collectionResponse(href, collRow, propfind));
+			const collProps: Record<ClarkName, unknown> = {
+				...buildCollectionProps(collRow),
+				[CURRENT_USER_PRINCIPAL]: { [cn(DAV_NS, "href")]: actingPrincipalHref },
+			};
+			responses.push({
+				href,
+				propstats: splitPropstats(collProps, propfind),
+			});
 
 			if (depth === 1) {
 				const instances = yield* instSvc.listByCollection(path.collectionId);
@@ -343,7 +353,14 @@ export const propfindHandler = (
 						path.collectionSeg,
 						inst,
 					);
-					responses.push(instanceResponse(iHref, inst, propfind));
+					const instProps: Record<ClarkName, unknown> = {
+						...buildInstanceProps(inst),
+						[CURRENT_USER_PRINCIPAL]: { [cn(DAV_NS, "href")]: actingPrincipalHref },
+					};
+					responses.push({
+						href: iHref,
+						propstats: splitPropstats(instProps, propfind),
+					});
 				}
 			}
 		} else {
@@ -362,7 +379,14 @@ export const propfindHandler = (
 				path.collectionSeg,
 				path.instanceSeg,
 			);
-			responses.push(instanceResponse(href, instRow, propfind));
+			const instProps: Record<ClarkName, unknown> = {
+				...buildInstanceProps(instRow),
+				[CURRENT_USER_PRINCIPAL]: { [cn(DAV_NS, "href")]: actingPrincipalHref },
+			};
+			responses.push({
+				href,
+				propstats: splitPropstats(instProps, propfind),
+			});
 		}
 
 		return yield* multistatusResponse(responses);

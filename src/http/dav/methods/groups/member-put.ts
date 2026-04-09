@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
-import { forbidden, methodNotAllowed } from "#src/domain/errors.ts";
+import { forbidden, methodNotAllowed, notFound } from "#src/domain/errors.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import { GROUPS_VIRTUAL_RESOURCE_ID } from "#src/domain/virtual-resources.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
@@ -18,6 +18,9 @@ export const groupMemberPutHandler = (
 	AclService | GroupService
 > =>
 	Effect.gen(function* () {
+		if (path.kind === "groupMemberNonExistent") {
+			return yield* notFound();
+		}
 		if (path.kind !== "groupMember") {
 			return yield* methodNotAllowed();
 		}

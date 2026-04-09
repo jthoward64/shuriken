@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
-import { forbidden, methodNotAllowed } from "#src/domain/errors.ts";
+import { forbidden, methodNotAllowed, notFound } from "#src/domain/errors.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import { USERS_VIRTUAL_RESOURCE_ID } from "#src/domain/virtual-resources.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
@@ -18,6 +18,9 @@ export const userDeleteHandler = (
 	AclService | UserService
 > =>
 	Effect.gen(function* () {
+		if (path.kind === "newUser") {
+			return yield* notFound();
+		}
 		if (path.kind !== "user") {
 			return yield* methodNotAllowed();
 		}

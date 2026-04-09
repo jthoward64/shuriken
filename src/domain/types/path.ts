@@ -147,9 +147,19 @@ export type ResolvedDavPath =
 	  }
 	| {
 			/** /dav/groups/:seg/members/:memberSeg — member slug that does not resolve */
-			readonly kind: "newGroupMember";
+			readonly kind: "groupMemberNonExistent";
 			readonly principalId: PrincipalId;
 			readonly groupId: GroupId;
 			readonly groupSeg: string;
 			readonly slug: Slug;
+	  }
+	| {
+			/**
+			 * /dav/principals/:seg or any deeper path where the principal does not
+			 * exist.  Handlers that would *create* a resource (MKCOL, MKCALENDAR, PUT)
+			 * MUST return 409 Conflict per RFC 4918 §9.3.1 / §9.7 (missing intermediate
+			 * collection).  All other methods return 404.
+			 */
+			readonly kind: "unknownPrincipal";
+			readonly principalSeg: string;
 	  };

@@ -599,14 +599,12 @@ describe("davRouter — new-resource path resolution", () => {
 		}
 	});
 
-	it("missing principal still rejects with a DavError (not silently converted to new-collection)", async () => {
-		const exit = await Effect.runPromise(
-			Effect.exit(
-				parseDavPath(
-					new URL("http://localhost/dav/principals/nobody/new-cal"),
-				).pipe(Effect.provide(makeRouterLayer())),
-			),
+	it("missing principal resolves to unknownPrincipal (not new-collection)", async () => {
+		const path = await Effect.runPromise(
+			parseDavPath(
+				new URL("http://localhost/dav/principals/nobody/cal/new-cal"),
+			).pipe(Effect.provide(makeRouterLayer())),
 		);
-		expect(exit._tag).toBe("Failure");
+		expect(path.kind).toBe("unknownPrincipal");
 	});
 });

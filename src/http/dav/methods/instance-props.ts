@@ -74,7 +74,15 @@ export const splitPropstats = (
 	allProps: Readonly<Record<ClarkName, unknown>>,
 	request: PropfindKind,
 ): ReadonlyArray<Propstat> => {
-	if (request.type !== "prop") {
+	if (request.type === "propname") {
+		// RFC 4918 §9.1: propname returns only property names as empty elements.
+		const names: Record<ClarkName, unknown> = {};
+		for (const name of Object.keys(allProps) as Array<ClarkName>) {
+			names[name] = "";
+		}
+		return [{ props: names, status: 200 }];
+	}
+	if (request.type === "allprop") {
 		return [{ props: allProps, status: 200 }];
 	}
 

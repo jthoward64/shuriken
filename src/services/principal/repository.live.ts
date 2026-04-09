@@ -69,6 +69,25 @@ export const PrincipalRepositoryLive = Layer.effect(
 			),
 		);
 
+		const findPrincipalBySlug = Effect.fn("PrincipalRepository.findPrincipalBySlug")(
+			function* (slug: Slug) {
+				yield* Effect.logTrace("repo.principal.findPrincipalBySlug", { slug });
+				return yield* Effect.tryPromise({
+					try: () =>
+						db
+							.select()
+							.from(principal)
+							.where(and(eq(principal.slug, slug), isNull(principal.deletedAt)))
+							.limit(1)
+							.then((r) => Option.fromNullable(r[0] ?? null)),
+					catch: (e) => new DatabaseError({ cause: e }),
+				});
+			},
+			Effect.tapError((e: DatabaseError) =>
+				Effect.logWarning("repo.principal.findPrincipalBySlug failed", e.cause),
+			),
+		);
+
 		const findByEmail = Effect.fn("PrincipalRepository.findByEmail")(
 			function* (email: Email) {
 				yield* Effect.logTrace("repo.principal.findByEmail");
@@ -149,6 +168,7 @@ export const PrincipalRepositoryLive = Layer.effect(
 		return PrincipalRepository.of({
 			findById,
 			findBySlug,
+			findPrincipalBySlug,
 			findByEmail,
 			findUserByUserId,
 			updateProperties,

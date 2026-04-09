@@ -1,9 +1,9 @@
 import { Effect, Option } from "effect";
 import {
 	type AppError,
+	conflict,
 	type DavError,
 	notFound,
-	someOrNotFound,
 } from "#src/domain/errors.ts";
 import {
 	CollectionId,
@@ -226,7 +226,7 @@ export const parseDavPath = (
 				: userRepo.findBySlug(Slug(memberSeg));
 			if (Option.isNone(memberOpt)) {
 				return {
-					kind: "newGroupMember",
+					kind: "groupMemberNonExistent",
 					principalId,
 					groupId,
 					groupSeg,
@@ -259,11 +259,16 @@ export const parseDavPath = (
 
 	return Effect.gen(function* () {
 		const principalRepo = yield* PrincipalRepository;
-		const principalRow = yield* (
-			isUuid(seg1)
-				? principalRepo.findById(PrincipalId(seg1))
-				: principalRepo.findBySlug(Slug(seg1))
-		).pipe(Effect.flatMap(someOrNotFound(`Principal not found: ${seg1}`)));
+		const principalOpt = yield* isUuid(seg1)
+			? principalRepo.findById(PrincipalId(seg1))
+			: principalRepo.findBySlug(Slug(seg1));
+		if (Option.isNone(principalOpt)) {
+			return {
+				kind: "unknownPrincipal",
+				principalSeg: seg1,
+			} satisfies ResolvedDavPath;
+		}
+		const principalRow = principalOpt.value;
 		const principalId = PrincipalId(principalRow.principal.id);
 
 		if (segments.length === SEGMENTS_PRINCIPAL) {
@@ -390,6 +395,19 @@ export const davRouter = (
 		const method = req.method.toUpperCase();
 		yield* Effect.logTrace("dav method dispatch", { method, kind: path.kind });
 
+		// Principal does not exist — MKCOL/MKCALENDAR/PUT → 409 (missing intermediate
+		// collection, RFC 4918 §9.3.1 / §9.7); everything else → 404.
+		if (path.kind === "unknownPrincipal") {
+			if (
+				method === "MKCOL" ||
+				method === "MKCALENDAR" ||
+				method === "PUT"
+			) {
+				return yield* conflict();
+			}
+			return yield* Effect.fail(notFound());
+		}
+
 		// Dispatch user/group admin paths first before the principal/collection handlers
 		if (
 			path.kind === "userCollection" ||
@@ -416,7 +434,7 @@ export const davRouter = (
 			path.kind === "newGroup" ||
 			path.kind === "groupMembers" ||
 			path.kind === "groupMember" ||
-			path.kind === "newGroupMember"
+			path.kind === "groupMemberNonExistent"
 		) {
 			switch (method) {
 				case "PROPFIND":

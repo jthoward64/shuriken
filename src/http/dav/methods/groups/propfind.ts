@@ -2,7 +2,7 @@ import { Effect } from "effect";
 import type { ClarkName } from "#src/data/ir.ts";
 import { cn } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
-import { forbidden, methodNotAllowed } from "#src/domain/errors.ts";
+import { forbidden, methodNotAllowed, notFound } from "#src/domain/errors.ts";
 import { GroupId } from "#src/domain/ids.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import {
@@ -86,6 +86,9 @@ export const groupPropfindHandler = (
 	AclService | GroupService
 > =>
 	Effect.gen(function* () {
+		if (path.kind === "newGroup") {
+			return yield* notFound();
+		}
 		if (
 			path.kind !== "groupCollection" &&
 			path.kind !== "group" &&

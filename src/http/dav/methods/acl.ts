@@ -232,13 +232,15 @@ const resolveHrefPrincipal = (
 		}
 
 		const repo = yield* PrincipalRepository;
-		const result = isUuid(seg)
-			? yield* repo.findById(PrincipalId(seg as UuidString))
-			: yield* repo.findBySlug(seg as Slug);
+		const result = yield* isUuid(seg)
+			? repo
+					.findById(PrincipalId(seg as UuidString))
+					.pipe(Effect.map(Option.map((row) => row.principal)))
+			: repo.findPrincipalBySlug(seg as Slug);
 
 		return yield* Option.match(result, {
 			onNone: () => Effect.fail(forbidden("DAV:recognized-principal")),
-			onSome: (row) => Effect.succeed(row.principal.id as PrincipalId),
+			onSome: (principal) => Effect.succeed(principal.id as PrincipalId),
 		});
 	});
 
@@ -272,7 +274,7 @@ export const aclHandler = (
 			path.kind === "new-instance" ||
 			path.kind === "newUser" ||
 			path.kind === "newGroup" ||
-			path.kind === "newGroupMember" ||
+			path.kind === "groupMemberNonExistent" ||
 			path.kind === "user" ||
 			path.kind === "group" ||
 			path.kind === "groupMember"
@@ -295,11 +297,10 @@ export const aclHandler = (
 			resourceType = "instance";
 		}
 
-		// Acting principal (use path.principalId as fallback for unauthenticated)
-		const actingPrincipalId =
-			ctx.auth._tag === "Authenticated"
-				? ctx.auth.principal.principalId
-				: path.principalId;
+		if (ctx.auth._tag !== "Authenticated") {
+			return yield* forbidden("DAV:need-privileges");
+		}
+		const actingPrincipalId = ctx.auth.principal.principalId;
 
 		// Must have DAV:write-acl on the resource
 		const acl = yield* AclService;

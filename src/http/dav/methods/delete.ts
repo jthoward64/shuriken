@@ -5,6 +5,7 @@ import {
 	forbidden,
 	methodNotAllowed,
 	notFound,
+	preconditionFailed,
 } from "#src/domain/errors.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
@@ -70,6 +71,12 @@ export const deleteHandler = (
 			// Fetch instance to get entityId (findById returns 404 if not found).
 			const instanceSvc = yield* InstanceService;
 			const instance = yield* instanceSvc.findById(path.instanceId);
+
+			// RFC 7232 §3.1: If-Match must match the current ETag.
+			const ifMatch = ctx.headers.get("If-Match");
+			if (ifMatch !== null && ifMatch !== "*" && ifMatch !== instance.etag) {
+				return yield* preconditionFailed();
+			}
 
 			yield* deleteInstance(instance);
 

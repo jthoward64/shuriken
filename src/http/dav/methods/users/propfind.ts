@@ -2,7 +2,7 @@ import { Effect } from "effect";
 import type { ClarkName } from "#src/data/ir.ts";
 import { cn } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
-import { forbidden, methodNotAllowed } from "#src/domain/errors.ts";
+import { forbidden, methodNotAllowed, notFound } from "#src/domain/errors.ts";
 import type { UserId } from "#src/domain/ids.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import {
@@ -67,6 +67,9 @@ export const userPropfindHandler = (
 	AclService | UserService | GroupService
 > =>
 	Effect.gen(function* () {
+		if (path.kind === "newUser") {
+			return yield* notFound();
+		}
 		if (path.kind !== "userCollection" && path.kind !== "user") {
 			return yield* methodNotAllowed();
 		}

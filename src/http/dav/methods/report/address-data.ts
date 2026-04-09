@@ -67,8 +67,8 @@ export const parseAddressDataSpec = (tree: unknown): AddressDataSpec => {
  * Apply an AddressDataSpec to a vCard IrDocument, returning a new IrDocument
  * with only the requested properties.
  *
- * VERSION and FN are always preserved as they are mandatory in vCard 4.0 and
- * required for clients to correctly interpret the object.
+ * RFC 6352 §8.6.1: only the properties listed in <C:prop name="..."/> children
+ * are returned. No implicit additions are made — the client controls the subset.
  */
 export const subsetVCardDocument = (
 	doc: IrDocument,
@@ -78,12 +78,8 @@ export const subsetVCardDocument = (
 		return doc;
 	}
 
-	const filteredProperties = doc.root.properties.filter(
-		(p) =>
-			spec.props.has(p.name) ||
-			p.name === "VERSION" ||
-			p.name === "FN" ||
-			p.name === "UID",
+	const filteredProperties = doc.root.properties.filter((p) =>
+		spec.props.has(p.name),
 	);
 
 	return {
