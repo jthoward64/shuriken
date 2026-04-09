@@ -24,6 +24,7 @@ import {
 	HTTP_METHOD_NOT_ALLOWED,
 	HTTP_NOT_FOUND,
 	HTTP_OK,
+	HTTP_UNAUTHORIZED,
 } from "#src/http/status.ts";
 import type { AclService } from "#src/services/acl/index.ts";
 import type { ComponentRepository } from "#src/services/component/index.ts";
@@ -367,6 +368,6 @@ describe("getHandler — authentication", () => {
 			getHandler(instancePath, unauthenticatedCtx),
 		)) as DavError;
 		expect(err._tag).toBe("DavError");
-		expect(err.status).toBe(401);
+		expect(err.status).toBe(HTTP_UNAUTHORIZED);
 	});
 });

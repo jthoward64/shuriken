@@ -7,8 +7,9 @@
 import { Effect } from "effect";
 import { Temporal } from "temporal-polyfill";
 import {
-	getDtendInstant,
+	effectiveDtend,
 	getDtstartInstant,
+	instantFromIrValue,
 } from "#src/data/icalendar/ir-helpers.ts";
 import { hasOccurrenceInRange } from "#src/data/icalendar/recurrence/recurrence-check.ts";
 import type { IrComponent, IrDocument, IrProperty } from "#src/data/ir.ts";
@@ -244,6 +245,19 @@ const evalPropFilter = (comp: IrComponent, f: PropFilter): boolean => {
 	}
 
 	return props.some((prop) => {
+		if (f.timeRange) {
+			const instant = instantFromIrValue(prop);
+			if (!instant) {
+				return false;
+			} // floating time, no timezone → no match
+			const { start, end } = f.timeRange;
+			if (start && instant.epochMilliseconds < start.epochMilliseconds) {
+				return false;
+			}
+			if (end && instant.epochMilliseconds >= end.epochMilliseconds) {
+				return false;
+			}
+		}
 		if (f.textMatch && !evalTextMatch(propValueText(prop), f.textMatch)) {
 			return false;
 		}
@@ -320,7 +334,7 @@ const evalComponentTimeRange = (
 		return true; // No DTSTART → pass conservatively
 	}
 
-	const dtend = getDtendInstant(comp) ?? dtstart; // Use DTSTART as DTEND if absent (zero-duration)
+	const dtend = effectiveDtend(comp, dtstart); // RFC 4791 §9.9: DTEND, or DTSTART + DURATION, or DTSTART
 
 	const startMs = dtstart.epochMilliseconds;
 	const endMs = dtend.epochMilliseconds;

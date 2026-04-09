@@ -50,3 +50,28 @@ export const getDtendInstant = (
 	const prop = getDtendProp(comp);
 	return prop ? instantFromIrValue(prop) : undefined;
 };
+
+/**
+ * Effective DTEND per RFC 4791 §9.9:
+ *   - DTEND/DUE if present
+ *   - else DTSTART + DURATION if DURATION is present
+ *   - else DTSTART (zero-duration / instant)
+ */
+export const effectiveDtend = (
+	comp: IrComponent,
+	dtstart: Temporal.Instant,
+): Temporal.Instant => {
+	const explicit = getDtendInstant(comp);
+	if (explicit) {
+		return explicit;
+	}
+	const durationProp = comp.properties.find((p) => p.name === "DURATION");
+	if (durationProp && durationProp.value.type === "DURATION") {
+		try {
+			return dtstart.add(Temporal.Duration.from(durationProp.value.value));
+		} catch (_e) {
+			// Ambiguous or invalid duration (e.g. months) — fall through
+		}
+	}
+	return dtstart;
+};

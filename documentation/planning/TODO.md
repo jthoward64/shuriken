@@ -22,70 +22,10 @@ Effect.catchTag("DavError", (err) =>
 
 This catches every `DavError` before the outer error formatter can run, discarding the RFC-required `<D:error>` XML precondition body. All error responses — `403 DAV:need-privileges`, `403 CALDAV:valid-calendar-object-resource`, `412 DAV:condition-failure`, etc. — are returned as empty bodies. RFC 4918 §8.7 and RFC 4791 §5.3.2 require structured XML error bodies for many conditions. Clients rely on these to show meaningful error messages and to differentiate error types.
 
-### BUG: `evalPropFilter` ignores `timeRange`
-
-[filter-cal.ts:228-249](src/http/dav/methods/report/filter-cal.ts#L228-L249) — A `<CALDAV:prop-filter>` may contain a `<CALDAV:time-range>` child (RFC 4791 §9.7). The parsed `f.timeRange` field is populated but `evalPropFilter` never checks it. Clients using `<prop-filter name="DTSTART"><time-range .../></prop-filter>` receive incorrect results.
-
-### BUG: PUT to a new resource checks `DAV:write-content` instead of `DAV:bind`
-
-[put.ts:134-140](src/http/dav/methods/put.ts#L134-L140) — When creating a new instance (path.kind === "new-instance"), the ACL check uses:
-
-```ts
-yield* acl.check(principal.principalId, path.collectionId, "collection", "DAV:write-content");
-```
-
-`DAV:write-content` covers updating the content of an *existing* resource. Creating a new resource by PUT requires `DAV:bind` on the parent collection (RFC 3744 §3.6: "The principal may create a new member of a collection via MKCOL, PUT, POST, and COPY"). A user who has `DAV:write-content` but not `DAV:bind` could not create new events, and vice versa.
-
-### BUG: ACL privilege hierarchy missing `DAV:read` → `DAV:read-current-user-privilege-set` relationship
-
-[service.live.ts:16-37](src/services/acl/service.live.ts#L16-L37) — Per RFC 3744 §3.1, `DAV:read` is an aggregate privilege that contains `DAV:read-current-user-privilege-set`. The current `PRIVILEGE_CONTAINERS` map has:
-
-```ts
-"DAV:read-current-user-privilege-set": ["DAV:all"],
-```
-
-It should include `"DAV:read"` as well:
-
-```ts
-"DAV:read-current-user-privilege-set": ["DAV:read", "DAV:all"],
-```
-
-And `PRIVILEGE_CONTAINED["DAV:read"]` is missing — it should be `["DAV:read-current-user-privilege-set"]`. Effect: a user granted `DAV:read` on a resource cannot read `DAV:current-user-privilege-set` even though the privilege hierarchy implies they should be able to.
-
-### BUG: multiget ACL failures abort the entire request instead of returning per-resource 403
-
-[multiget.ts:121-126](src/http/dav/methods/report/multiget.ts#L121-L126) — When `acl.check` fails for an individual href inside a multiget REPORT, it throws a `DavError` which propagates out of the loop and aborts the entire request. RFC 4791 §7.9.1 says the server MUST include a 403 `<D:response>` entry for resources the principal cannot read, rather than failing the whole request. Fix: wrap the per-instance ACL check in an `Effect.orElse` and push a 403 `DavResponse` for denied instances.
-
-### BUG: sync-collection silently drops tombstones with no URI variants
-
-[sync-collection.ts:169-175](src/http/dav/methods/report/sync-collection.ts#L169-L175):
-
-```ts
-const slugVariant = tombstone.uriVariants[0];
-if (!slugVariant) {
-    continue; // silently skipped!
-}
-```
-
-RFC 6578 §6.1 requires every deleted resource to appear in the sync response as a 404 `<D:response>`. A tombstone with an empty `uriVariants` array causes that deletion to be silently omitted from the response, desynchronizing the client. Should fall back to the instance UUID or the tombstone's own ID.
-
 ### MISSING: COPY does not transfer dead properties or ACL entries
 
 [copy.ts:165-193](src/http/dav/methods/copy.ts#L165-L193), [copy.ts:253-315](src/http/dav/methods/copy.ts#L253-L315) — When copying an instance or collection, `clientProperties` (dead properties) are not passed to the new row. RFC 4918 §9.8.2 says a COPY SHOULD preserve all live and dead properties. In addition, ACL entries (from `dav_acl`) on the source collection are not copied to the destination — the destination starts with only the owner's protected `DAV:all` ACE.
 
-### MISSING: `OPTIONS` returns 404 for non-existent resource URLs
-
-[options.ts:19-21](src/http/dav/methods/options.ts#L19-L21) — RFC 4918 §9.2 requires OPTIONS to succeed on any URL, including non-existent resources. Clients rely on this to discover allowed methods before creating a resource. Should return 200 with capabilities instead of 404.
-
-### MISSING: `DAV:supported-report-set` property not returned in PROPFIND
-
-RFC 4918 §9.1 — Clients (Apple Calendar, Thunderbird, etc.) issue a PROPFIND for `DAV:supported-report-set` to discover which REPORTs are available on a resource. This property is never returned, causing some clients to fall back to less efficient protocols or fail entirely.
-
-Should be returned for collections and principals, listing the supported REPORTs appropriate to the resource type (e.g., `calendar-query`, `calendar-multiget`, `sync-collection` for calendar collections).
-
-### MISSING: `DAV:lockdiscovery` and `DAV:supportedlock` never returned
-
-Both are listed in `PROTECTED_PROPS` in [proppatch.ts:42-51](src/http/dav/methods/proppatch.ts#L42-L51) so they cannot be set, but they are never included in PROPFIND responses. RFC 4918 §15.8 and §15.10 require these to be discoverable. For a non-locking server, `lockdiscovery` is an empty element and `supportedlock` lists no entries.
 
 ### MISSING: `DAV:getcontentlength` not returned for instances
 
@@ -120,23 +60,14 @@ RFC 7232 §3 — The GET handler never inspects `If-None-Match` or `If-Modified-
 RFC 3744 §5 — The following properties should be discoverable via PROPFIND but are not returned:
 
 - `DAV:acl` (§5.5) — the actual ACE list for the resource
-- `DAV:current-user-privilege-set` (§5.4) — privileges the current user has on the resource
-- `DAV:acl-restrictions` (§5.6) — server's ACL restrictions (grant-only, no-invert)
 - `DAV:owner` (§5.1) — the principal that owns the resource
 
-Many clients (especially Apple Calendar) require `DAV:current-user-privilege-set` to decide which operations to offer the user.
-
-### MISSING: `DAV:principal-URL` not returned for principals
-
-RFC 3744 §4.2 — Principal resources must include `DAV:principal-URL`. Without this, clients cannot confirm which URL is the canonical identifier for the current-user-principal.
+Many clients (especially Apple Calendar) require these to fully administer access control.
 
 ### MISSING: `DAV:group-member-set` / `DAV:group-membership` not returned
 
 RFC 3744 §4.3, §4.4 — Group principals should return `DAV:group-member-set` (their members), and user principals should return `DAV:group-membership` (groups they belong to). Neither is exposed through PROPFIND.
 
-### MISSING: `DAV:acl-restrictions` not returned — clients cannot discover grant-only policy
-
-[acl.ts:11-14](src/http/dav/methods/acl.ts#L11-L14) — The server operates grant-only (DENY ACEs are rejected with `DAV:grant-only` by the ACL handler) but never advertises this via `DAV:acl-restrictions` in PROPFIND. Per RFC 3744 §5.6 and §8.1.3, servers MUST return `DAV:acl-restrictions` on any resource that has an ACL. Without it, clients have no way to know they cannot send DENY ACEs and may send malformed ACL requests before receiving the 403 error. Note: `DAV:acl-restrictions` is also not returned as part of the unimplemented ACL-related PROPFIND properties tracked above.
 
 ### MISSING: `DAV:principal-match` REPORT not implemented
 
@@ -189,15 +120,6 @@ RFC 4791 §5.2.2 — `CALDAV:calendar-timezone` is a writable property that clie
 
 RFC 4791 §7.10 — Allows clients to query free/busy time over a calendar collection without fetching individual events. Not dispatched in [report.ts](src/http/dav/methods/report.ts).
 
-### INCOMPLETE: VEVENT time-range filter ignores DURATION property
-
-[filter-cal.ts:314-316](src/http/dav/methods/report/filter-cal.ts#L314-L316):
-
-```ts
-const dtend = getDtendInstant(comp) ?? dtstart; // Use DTSTART as DTEND if absent (zero-duration)
-```
-
-RFC 4791 §9.9 specifies: when DTEND is absent but DURATION is present, the effective end is `DTSTART + DURATION`. A 2-hour event with no DTEND will have `dtend = dtstart` in the current code, making it appear as a zero-duration point and likely miss queries that should hit it. Fix: when DTEND is absent, check for a DURATION property and add it to DTSTART.
 
 ### INCOMPLETE: VTODO time-range filter does not follow RFC 4791 §9.9 rules
 
@@ -242,14 +164,6 @@ RFC 6638 §3.4 — When a resource containing `ORGANIZER`/`ATTENDEE` is PUT to a
 
 RFC 6638 §2.2 — Principal PROPFIND should include these properties pointing to the inbox and outbox collection URLs. Clients cannot find the scheduling endpoints without them.
 
-### MISSING: `CALDAV:calendar-user-address-set` not in PROPFIND
-
-RFC 6638 §2.4.1 — Principals should expose their email addresses as `CALDAV:calendar-user-address-set` (list of `mailto:` URIs). Clients use this for attendee lookup and invite routing.
-
-### MISSING: `CALDAV:schedule-tag` not returned in instance PROPFIND
-
-RFC 6638 §3.2.9 — Calendar object resources must include the `CALDAV:schedule-tag` property. The schema stores `scheduleTag` on `dav_instance` but it is not included in `buildInstanceProps` or PROPFIND responses.
-
 ### MISSING: `CALDAV:calendar-free-busy-set` property not implemented
 
 RFC 6638 §2.1 — Each principal's calendar home should identify which calendars contribute to free-busy via this property. Not stored or returned.
@@ -273,10 +187,6 @@ RFC 6352 §5.1 — "The server MUST ensure that the 'UID' content line value is 
 ---
 
 ## RFC 6578 — Collection Synchronization
-
-### BUG: sync-collection uses slug hrefs but query/multiget handlers use UUID hrefs
-
-[sync-collection.ts:142-143](src/http/dav/methods/report/sync-collection.ts#L142-L143) vs [calendar-query.ts:238](src/http/dav/methods/report/calendar-query.ts#L238) — `sync-collection` builds hrefs using `inst.slug || inst.id` (slug preferred), but `calendar-query`, `addressbook-query`, and `calendar-multiget` always use `inst.id` (UUID). A client that caches hrefs from a sync-collection REPORT and then receives a different URL for the same resource from a calendar-query REPORT would treat them as separate resources, causing duplicates. Per the CLAUDE.md DAV URL policy and RFC 6578 §3.3, the server must return consistent hrefs. All REPORT handlers that enumerate instances they did not directly address should use UUIDs consistently.
 
 ### BUG: MOVE does not create a tombstone in the source collection
 
@@ -325,39 +235,24 @@ RFC 6764 §5 — Clients use PROPFIND on `/.well-known/caldav` and `/.well-known
 | Priority | Item |
 |----------|------|
 | P0 | All DAV error XML bodies stripped by router-level `catchTag("DavError")` |
-| P0 | `evalPropFilter` ignores `timeRange` (CalDAV) |
-| P1 | PUT to new resource checks `DAV:write-content` instead of `DAV:bind` |
-| P1 | sync-collection silently drops tombstones with no URI variants |
-| P1 | ACL privilege hierarchy: `DAV:read` should contain `DAV:read-current-user-privilege-set` |
-| P2 | `DAV:acl-restrictions` not returned — clients unaware of grant-only server policy |
-| P1 | multiget ACL failures abort the entire REPORT instead of returning per-resource 403 |
-| P1 | `DAV:current-user-privilege-set` not in PROPFIND |
-| P1 | `DAV:supported-report-set` not in PROPFIND |
-| P1 | `DAV:acl` / `DAV:acl-restrictions` not in PROPFIND |
+| P1 | `DAV:acl` / `DAV:owner` not in PROPFIND |
 | P1 | `CALDAV:schedule-inbox-url` / `CALDAV:schedule-outbox-url` not in PROPFIND |
-| P1 | `CALDAV:calendar-user-address-set` not in PROPFIND |
-| P1 | `CALDAV:schedule-tag` not in instance PROPFIND |
 | P1 | `CALDAV:calendar-timezone` not in PROPFIND (and not settable via PROPPATCH) |
 | P1 | `CALDAV:supported-calendar-component` not enforced on PUT |
 | P2 | UID uniqueness enforcement (calendar and addressbook) |
 | P2 | CalDAV PUT semantic validation (`valid-calendar-object-resource`) — empty VCALENDAR, mixed UIDs |
 | P0 | Calendar time-range SQL pre-filter produces false negatives for multi-week/month queries (WEEKLY interval>1, MONTHLY) |
-| P2 | VEVENT time-range filter ignores `DURATION` property (treats events as zero-duration) |
 | P2 | VTODO time-range filter completeness |
-| P2 | OPTIONS 404 for non-existent resources |
-| P2 | `DAV:principal-URL` not in PROPFIND |
 | P2 | `DAV:group-member-set` / `DAV:group-membership` not in PROPFIND |
 | P2 | `CALDAV:free-busy-query` REPORT missing |
 | P2 | `DAV:principal-match` / `DAV:principal-property-search` REPORTs missing |
 | P2 | Collection constraints not enforced during PUT |
 | P2 | Root PROPFIND returns 404 |
 | P3 | COPY does not transfer dead properties or ACL entries |
-| P1 | sync-collection uses slug hrefs; query/multiget use UUID hrefs — inconsistent, can cause client duplicates |
 | P1 | MOVE does not create tombstone in source collection — RFC 6578 delta sync broken for source |
 | P3 | `sync-level` not validated in sync-collection |
 | P3 | `CALDAV:max-resource-size` and limit properties not returned |
 | P3 | Collation set properties not returned |
-| P3 | `DAV:lockdiscovery` / `DAV:supportedlock` not returned |
 | P3 | `DAV:getcontentlength` not returned for instances |
 | P3 | GET/HEAD does not handle conditional request headers (`If-None-Match`, `If-Modified-Since`) |
 | P3 | GET does not set `Content-Length` |

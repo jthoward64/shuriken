@@ -19,7 +19,10 @@ import {
 } from "#src/domain/types/collection-namespace.ts";
 import { type ResolvedDavPath, Slug } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
-import { HTTP_METHOD_NOT_ALLOWED, HTTP_UNAUTHORIZED } from "#src/http/status.ts";
+import {
+	HTTP_METHOD_NOT_ALLOWED,
+	HTTP_UNAUTHORIZED,
+} from "#src/http/status.ts";
 import type { AclService } from "#src/services/acl/index.ts";
 import type { CalIndexRepository } from "#src/services/cal-index/index.ts";
 import type { CardIndexRepository } from "#src/services/card-index/index.ts";

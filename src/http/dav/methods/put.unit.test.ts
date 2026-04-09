@@ -21,6 +21,7 @@ import {
 	HTTP_METHOD_NOT_ALLOWED,
 	HTTP_NO_CONTENT,
 	HTTP_PRECONDITION_FAILED,
+	HTTP_UNAUTHORIZED,
 	HTTP_UNSUPPORTED_MEDIA_TYPE,
 } from "#src/http/status.ts";
 import type { AclService } from "#src/services/acl/index.ts";
@@ -145,8 +146,8 @@ const makeVCardRequest = (body = VCARD_BODY) =>
 	});
 
 /**
- * Base test env: user + calendar collection + write-content ACE on the
- * collection (for new-instance) and on the instance (for existing-instance).
+ * Base test env: user + calendar collection + bind ACE on the collection
+ * (for new-instance) and write-content ACE on the instance (for existing-instance).
  */
 const makeEnv = () =>
 	makeTestEnv()
@@ -161,7 +162,7 @@ const makeEnv = () =>
 			resourceId: TEST_COLLECTION_ID,
 			principalType: "principal",
 			principalId: TEST_PRINCIPAL_ID,
-			privilege: "DAV:write-content",
+			privilege: "DAV:bind",
 		})
 		.withAce({
 			resourceType: "instance",
@@ -482,7 +483,7 @@ describe("putHandler — authentication", () => {
 			putHandler(makeNewInstancePath(), unauthenticatedCtx, makeICalRequest()),
 		)) as DavError;
 		expect(err._tag).toBe("DavError");
-		expect(err.status).toBe(401);
+		expect(err.status).toBe(HTTP_UNAUTHORIZED);
 	});
 });
 

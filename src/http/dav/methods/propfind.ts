@@ -16,7 +16,9 @@ import { Effect } from "effect";
 import { type ClarkName, cn, type IrDeadProperties } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import { forbidden, notFound, unauthorized } from "#src/domain/errors.ts";
+import { InstanceId } from "#src/domain/ids.ts";
 import { COLLECTION_TYPE_TO_NAMESPACE } from "#src/domain/types/collection-namespace.ts";
+import type { DavPrivilege } from "#src/domain/types/dav.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import {
@@ -56,8 +58,85 @@ const CAL_SUPPORTED_COMPONENTS = cn(
 	CALDAV_NS,
 	"supported-calendar-component-set",
 );
+const CAL_USER_ADDRESS_SET = cn(CALDAV_NS, "calendar-user-address-set");
 const CARD_DESCRIPTION = cn(CARDDAV_NS, "addressbook-description");
 const CARD_HOME_SET = cn(CARDDAV_NS, "addressbook-home-set");
+const LOCK_DISCOVERY = cn(DAV_NS, "lockdiscovery");
+const SUPPORTED_LOCK = cn(DAV_NS, "supportedlock");
+const ACL_RESTRICTIONS = cn(DAV_NS, "acl-restrictions");
+const SUPPORTED_REPORT_SET = cn(DAV_NS, "supported-report-set");
+const PRINCIPAL_URL = cn(DAV_NS, "principal-URL");
+const CURRENT_USER_PRIVILEGE_SET = cn(DAV_NS, "current-user-privilege-set");
+
+// ---------------------------------------------------------------------------
+// ACL helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Convert a DavPrivilege string ("DAV:read", "CALDAV:schedule-deliver", …)
+ * to Clark notation so the multistatus builder can translate it to a prefix.
+ */
+const DAV_PREFIX = "DAV:";
+const CALDAV_PREFIX = "CALDAV:";
+const CARDDAV_PREFIX = "CARDDAV:";
+
+const privilegeToClark = (p: DavPrivilege): ClarkName => {
+	if (p.startsWith(DAV_PREFIX)) {
+		return cn(DAV_NS, p.slice(DAV_PREFIX.length));
+	}
+	if (p.startsWith(CALDAV_PREFIX)) {
+		return cn(CALDAV_NS, p.slice(CALDAV_PREFIX.length));
+	}
+	if (p.startsWith(CARDDAV_PREFIX)) {
+		return cn(CARDDAV_NS, p.slice(CARDDAV_PREFIX.length));
+	}
+	return cn(DAV_NS, p);
+};
+
+/** Build the DAV:current-user-privilege-set value from a privilege list. */
+const buildPrivilegeSet = (
+	privileges: ReadonlyArray<DavPrivilege>,
+): Array<Record<ClarkName, unknown>> =>
+	privileges.map(
+		(p) =>
+			({
+				[cn(DAV_NS, "privilege")]: { [privilegeToClark(p)]: "" },
+			}) as Record<ClarkName, unknown>,
+	);
+
+/** Build the DAV:supported-report-set value for a given collection type. */
+const buildSupportedReportSet = (
+	collectionType: string,
+): ReadonlyArray<Record<ClarkName, unknown>> => {
+	const makeEntry = (name: ClarkName): Record<ClarkName, unknown> =>
+		({
+			[cn(DAV_NS, "supported-report")]: {
+				[cn(DAV_NS, "report")]: { [name]: "" },
+			},
+		}) as Record<ClarkName, unknown>;
+
+	if (collectionType === "calendar") {
+		return [
+			makeEntry(cn(CALDAV_NS, "calendar-query")),
+			makeEntry(cn(CALDAV_NS, "calendar-multiget")),
+			makeEntry(cn(DAV_NS, "sync-collection")),
+		];
+	}
+	if (collectionType === "addressbook") {
+		return [
+			makeEntry(cn(CARDDAV_NS, "addressbook-query")),
+			makeEntry(cn(CARDDAV_NS, "addressbook-multiget")),
+			makeEntry(cn(DAV_NS, "sync-collection")),
+		];
+	}
+	return [makeEntry(cn(DAV_NS, "sync-collection"))];
+};
+
+/** Shared ACL restrictions value (grant-only, no-invert per RFC 3744 §5.6). */
+const ACL_RESTRICTIONS_VALUE: Readonly<Record<ClarkName, unknown>> = {
+	[cn(DAV_NS, "grant-only")]: "",
+	[cn(DAV_NS, "no-invert")]: "",
+};
 
 // ---------------------------------------------------------------------------
 // PROPFIND body parsing
@@ -168,6 +247,10 @@ const buildCollectionProps = (
 		[RESOURCETYPE]: resourcetype,
 		[GETLASTMODIFIED]: toRfc1123(row.updatedAt),
 		[SYNC_TOKEN]: `urn:ietf:params:xml:ns:sync:${row.synctoken}`,
+		[LOCK_DISCOVERY]: "",
+		[SUPPORTED_LOCK]: "",
+		[ACL_RESTRICTIONS]: ACL_RESTRICTIONS_VALUE,
+		[SUPPORTED_REPORT_SET]: buildSupportedReportSet(row.collectionType),
 	};
 
 	if (row.displayName !== null) {
@@ -282,6 +365,11 @@ export const propfindHandler = (
 				"principal",
 				"DAV:read",
 			);
+			const principalPrivileges = yield* acl.currentUserPrivileges(
+				actingPrincipalId,
+				path.principalId,
+				"principal",
+			);
 			const principalSvc = yield* PrincipalService;
 			const principalRow = yield* principalSvc.findById(path.principalId);
 			const displayName =
@@ -292,10 +380,20 @@ export const propfindHandler = (
 				[DISPLAYNAME]: displayName,
 				// RFC 5397 §3: the acting user's principal URL
 				[CURRENT_USER_PRINCIPAL]: { [cn(DAV_NS, "href")]: actingPrincipalHref },
+				// RFC 3744 §4.2: canonical URL for this principal resource
+				[PRINCIPAL_URL]: { [cn(DAV_NS, "href")]: principalHref },
 				// RFC 4791 §6.2.1: home URL for calendar discovery
 				[CAL_HOME_SET]: { [cn(DAV_NS, "href")]: principalHref },
 				// RFC 6352 §6.2.1: home URL for addressbook discovery
 				[CARD_HOME_SET]: { [cn(DAV_NS, "href")]: principalHref },
+				// RFC 6638 §2.4.1: email addresses for attendee lookup
+				[CAL_USER_ADDRESS_SET]: {
+					[cn(DAV_NS, "href")]: `mailto:${principalRow.user.email}`,
+				},
+				// RFC 3744 §5.6: server operates grant-only, no-invert
+				[ACL_RESTRICTIONS]: ACL_RESTRICTIONS_VALUE,
+				// RFC 3744 §5.4: privileges the acting principal has on this resource
+				[CURRENT_USER_PRIVILEGE_SET]: buildPrivilegeSet(principalPrivileges),
 			};
 			// Dead properties
 			const dead = principalRow.principal
@@ -328,6 +426,11 @@ export const propfindHandler = (
 				"collection",
 				"DAV:read",
 			);
+			const collectionPrivileges = yield* acl.currentUserPrivileges(
+				actingPrincipalId,
+				path.collectionId,
+				"collection",
+			);
 			const collRow = yield* collSvc.findById(path.collectionId);
 			const href = collectionHref(
 				origin,
@@ -338,6 +441,7 @@ export const propfindHandler = (
 			const collProps: Record<ClarkName, unknown> = {
 				...buildCollectionProps(collRow),
 				[CURRENT_USER_PRINCIPAL]: { [cn(DAV_NS, "href")]: actingPrincipalHref },
+				[CURRENT_USER_PRIVILEGE_SET]: buildPrivilegeSet(collectionPrivileges),
 			};
 			responses.push({
 				href,
@@ -354,11 +458,17 @@ export const propfindHandler = (
 						path.collectionSeg,
 						inst,
 					);
+					const instPrivileges = yield* acl.currentUserPrivileges(
+						actingPrincipalId,
+						InstanceId(inst.id),
+						"instance",
+					);
 					const instProps: Record<ClarkName, unknown> = {
 						...buildInstanceProps(inst),
 						[CURRENT_USER_PRINCIPAL]: {
 							[cn(DAV_NS, "href")]: actingPrincipalHref,
 						},
+						[CURRENT_USER_PRIVILEGE_SET]: buildPrivilegeSet(instPrivileges),
 					};
 					responses.push({
 						href: iHref,
@@ -374,6 +484,11 @@ export const propfindHandler = (
 				"instance",
 				"DAV:read",
 			);
+			const instancePrivileges = yield* acl.currentUserPrivileges(
+				actingPrincipalId,
+				path.instanceId,
+				"instance",
+			);
 			const instRow = yield* instSvc.findById(path.instanceId);
 			const href = instanceHref(
 				origin,
@@ -385,6 +500,7 @@ export const propfindHandler = (
 			const instProps: Record<ClarkName, unknown> = {
 				...buildInstanceProps(instRow),
 				[CURRENT_USER_PRINCIPAL]: { [cn(DAV_NS, "href")]: actingPrincipalHref },
+				[CURRENT_USER_PRIVILEGE_SET]: buildPrivilegeSet(instancePrivileges),
 			};
 			responses.push({
 				href,

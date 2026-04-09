@@ -117,13 +117,25 @@ export const multigetHandler = (
 				continue;
 			}
 
-			// ACL check
-			yield* acl.check(
-				params.actingPrincipalId,
-				InstanceId(inst.id),
-				"instance",
-				"DAV:read",
-			);
+			// ACL check — per-resource 403 on failure (RFC 4791 §7.9.1)
+			const canRead = yield* acl
+				.check(
+					params.actingPrincipalId,
+					InstanceId(inst.id),
+					"instance",
+					"DAV:read",
+				)
+				.pipe(
+					Effect.map(() => true),
+					Effect.catchTag("DavError", () => Effect.succeed(false)),
+				);
+			if (!canRead) {
+				responses.push({
+					href,
+					propstats: [{ props: {} as Record<ClarkName, unknown>, status: 403 }],
+				});
+				continue;
+			}
 
 			// Load component tree
 			const treeOpt = yield* compRepo.loadTree(

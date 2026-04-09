@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { Effect, Option } from "effect";
 import { PrincipalId, RequestId } from "#src/domain/ids.ts";
 import { Unauthenticated } from "#src/domain/types/dav.ts";
-import type { ResolvedDavPath } from "#src/domain/types/path.ts";
+import { type ResolvedDavPath, Slug } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { HTTP_OK } from "#src/http/status.ts";
 import { optionsHandler } from "./options.ts";
@@ -18,6 +18,7 @@ const fakePath: ResolvedDavPath = {
 	principalId: TEST_PRINCIPAL_ID,
 	principalSeg: String(TEST_PRINCIPAL_ID),
 };
+
 
 const fakeCtx: HttpRequestContext = {
 	requestId: RequestId("test-request-id"),
@@ -111,5 +112,18 @@ describe("optionsHandler", () => {
 		const res = await Effect.runPromise(optionsHandler(fakePath, fakeCtx));
 		const text = await res.text();
 		expect(text).toBe("");
+	});
+
+	// RFC 4918 §9.2: OPTIONS MUST succeed on any URL, including non-existent ones.
+	it("returns 200 on a non-existent (new-collection) path", async () => {
+		const newCollPath: ResolvedDavPath = {
+			kind: "new-collection",
+			principalId: TEST_PRINCIPAL_ID,
+			principalSeg: String(TEST_PRINCIPAL_ID),
+			namespace: "cal",
+			slug: Slug("does-not-exist"),
+		};
+		const res = await Effect.runPromise(optionsHandler(newCollPath, fakeCtx));
+		expect(res.status).toBe(HTTP_OK);
 	});
 });

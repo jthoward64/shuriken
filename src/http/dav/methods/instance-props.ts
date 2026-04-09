@@ -47,11 +47,16 @@ export const toRfc1123 = (instant: Temporal.Instant): string => {
 // ---------------------------------------------------------------------------
 
 const DAV_NS = "DAV:";
+const CALDAV_NS = "urn:ietf:params:xml:ns:caldav";
 
 const RESOURCETYPE = cn(DAV_NS, "resourcetype");
 const GETETAG = cn(DAV_NS, "getetag");
 const GETCONTENTTYPE = cn(DAV_NS, "getcontenttype");
 const GETLASTMODIFIED = cn(DAV_NS, "getlastmodified");
+const LOCK_DISCOVERY = cn(DAV_NS, "lockdiscovery");
+const SUPPORTED_LOCK = cn(DAV_NS, "supportedlock");
+const ACL_RESTRICTIONS = cn(DAV_NS, "acl-restrictions");
+const SCHEDULE_TAG = cn(CALDAV_NS, "schedule-tag");
 
 // ---------------------------------------------------------------------------
 // PropfindKind — shared type for prop request parsing results
@@ -116,7 +121,17 @@ export const buildInstanceProps = (
 		[GETETAG]: row.etag,
 		[GETCONTENTTYPE]: `${row.contentType}; charset=utf-8`,
 		[GETLASTMODIFIED]: toRfc1123(row.lastModified),
+		[LOCK_DISCOVERY]: "",
+		[SUPPORTED_LOCK]: "",
+		[ACL_RESTRICTIONS]: {
+			[cn(DAV_NS, "grant-only")]: "",
+			[cn(DAV_NS, "no-invert")]: "",
+		},
 	};
+
+	if (row.scheduleTag) {
+		props[SCHEDULE_TAG] = row.scheduleTag;
+	}
 
 	const dead = row.clientProperties as IrDeadProperties | null;
 	if (dead) {

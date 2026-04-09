@@ -10,7 +10,11 @@
 import { Effect } from "effect";
 import { type ClarkName, cn } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
-import { conflict, methodNotAllowed, unauthorized } from "#src/domain/errors.ts";
+import {
+	conflict,
+	methodNotAllowed,
+	unauthorized,
+} from "#src/domain/errors.ts";
 import { COLLECTION_TYPE_TO_NAMESPACE } from "#src/domain/types/collection-namespace.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
@@ -139,8 +143,7 @@ export const syncCollectionHandler = (
 			const instSvc = yield* InstanceService;
 			const instances = yield* instSvc.listByCollection(path.collectionId);
 			for (const inst of instances) {
-				const seg = inst.slug || inst.id;
-				const href = `${origin}/dav/principals/${path.principalSeg}/${ns}/${path.collectionSeg}/${seg}`;
+				const href = `${origin}/dav/principals/${path.principalSeg}/${ns}/${path.collectionSeg}/${inst.id}`;
 				responses.push({
 					href,
 					propstats: splitPropstats(buildInstanceProps(inst), propfind),
@@ -157,8 +160,7 @@ export const syncCollectionHandler = (
 			]);
 
 			for (const inst of changedInstances) {
-				const seg = inst.slug || inst.id;
-				const href = `${origin}/dav/principals/${path.principalSeg}/${ns}/${path.collectionSeg}/${seg}`;
+				const href = `${origin}/dav/principals/${path.principalSeg}/${ns}/${path.collectionSeg}/${inst.id}`;
 				responses.push({
 					href,
 					propstats: splitPropstats(buildInstanceProps(inst), propfind),
@@ -166,12 +168,9 @@ export const syncCollectionHandler = (
 			}
 
 			for (const tombstone of tombstones) {
-				// Use the slug variant (index 0) which is the client-supplied name.
-				const slugVariant = tombstone.uriVariants[0];
-				if (!slugVariant) {
-					continue;
-				}
-				const href = `${origin}/dav/principals/${path.principalSeg}/${ns}/${path.collectionSeg}/${slugVariant}`;
+				// Prefer the client-supplied slug variant; fall back to the tombstone UUID.
+				const seg = tombstone.uriVariants[0] ?? tombstone.id;
+				const href = `${origin}/dav/principals/${path.principalSeg}/${ns}/${path.collectionSeg}/${seg}`;
 				responses.push({
 					href,
 					propstats: [{ props: {} as Record<ClarkName, unknown>, status: 404 }],

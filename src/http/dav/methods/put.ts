@@ -130,13 +130,13 @@ export const putHandler = (
 
 		// 9 + 10. Dispatch on path kind.
 		if (path.kind === "new-instance") {
-			// ACL check: write-content on the parent collection.
+			// ACL check: bind on the parent collection (RFC 3744 §3.6 — creating a new member).
 			const acl = yield* AclService;
 			yield* acl.check(
 				principal.principalId,
 				path.collectionId,
 				"collection",
-				"DAV:write-content",
+				"DAV:bind",
 			);
 
 			// If-Match on a non-existent resource is always a precondition failure.

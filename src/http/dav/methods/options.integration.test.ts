@@ -72,18 +72,20 @@ describe("OPTIONS", () => {
 		}
 	});
 
-	it("returns 404 on a new-collection (non-existent) path", async () => {
+	// RFC 4918 §9.2: OPTIONS MUST succeed on any URL, including non-existent ones.
+	it("returns 200 on a non-existent (new-collection) path", async () => {
 		const results = await runScript(
 			[
 				options("/dav/principals/test/cal/does-not-exist/", {
 					as: "test",
-					expect: { status: 404 },
+					expect: { status: 200 },
 				}),
 			],
 			singleUser(),
 		);
 		for (const result of results) {
 			expect(result.failures, result.step.name).toEqual([]);
+			expect(result.headers.dav).toContain("calendar-access");
 		}
 	});
 

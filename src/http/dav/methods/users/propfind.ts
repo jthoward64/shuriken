@@ -2,7 +2,11 @@ import { Effect } from "effect";
 import type { ClarkName } from "#src/data/ir.ts";
 import { cn } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
-import { methodNotAllowed, notFound, unauthorized } from "#src/domain/errors.ts";
+import {
+	methodNotAllowed,
+	notFound,
+	unauthorized,
+} from "#src/domain/errors.ts";
 import type { UserId } from "#src/domain/ids.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import {

@@ -1,6 +1,10 @@
 import { Effect } from "effect";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
-import { methodNotAllowed, notFound, unauthorized } from "#src/domain/errors.ts";
+import {
+	methodNotAllowed,
+	notFound,
+	unauthorized,
+} from "#src/domain/errors.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import { GROUPS_VIRTUAL_RESOURCE_ID } from "#src/domain/virtual-resources.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";

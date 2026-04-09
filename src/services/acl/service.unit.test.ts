@@ -178,7 +178,7 @@ describe("AclService.check", () => {
 // ---------------------------------------------------------------------------
 
 describe("AclService.currentUserPrivileges", () => {
-	it("DAV:read returns only itself (no contained privileges)", async () => {
+	it("DAV:read expands to include read-current-user-privilege-set (RFC 3744 §5.4)", async () => {
 		const principalId = PrincipalId(crypto.randomUUID());
 		const env = makeTestEnv().withAce({
 			resourceType: RTYPE,
@@ -194,8 +194,8 @@ describe("AclService.currentUserPrivileges", () => {
 				Effect.orDie,
 			),
 		);
-		expect(result).toHaveLength(1);
 		expect(result).toContain("DAV:read");
+		expect(result).toContain("DAV:read-current-user-privilege-set");
 	});
 
 	it("DAV:write expands to include write-properties, write-content, bind, unbind", async () => {

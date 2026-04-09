@@ -466,12 +466,13 @@ describe("davRouter — collection slug resolution", () => {
 		expect(res.status).toBe(HTTP_OK);
 	});
 
-	it("OPTIONS /dav/principals/alice/cal/unknown returns 404 when collection not seeded", async () => {
+	// RFC 4918 §9.2: OPTIONS succeeds on any URL, including non-existent collections.
+	it("OPTIONS /dav/principals/alice/cal/unknown returns 200 when collection not seeded", async () => {
 		const aliceId = crypto.randomUUID();
 		const res = await run("OPTIONS", "/dav/principals/alice/cal/unknown", {
 			principals: new Map([["alice", aliceId]]),
 		});
-		expect(res.status).toBe(HTTP_NOT_FOUND);
+		expect(res.status).toBe(HTTP_OK);
 	});
 
 	it("OPTIONS /dav/principals/alice/unknown-ns returns 404 for unknown namespace", async () => {
@@ -522,7 +523,8 @@ describe("davRouter — instance slug resolution", () => {
 		expect(res.status).toBe(HTTP_OK);
 	});
 
-	it("OPTIONS .../cal/my-cal/missing.ics returns 404 when instance not seeded", async () => {
+	// RFC 4918 §9.2: OPTIONS succeeds on any URL, including non-existent instances.
+	it("OPTIONS .../cal/my-cal/missing.ics returns 200 when instance not seeded", async () => {
 		const aliceId = crypto.randomUUID();
 		const calId = crypto.randomUUID();
 		const res = await run(
@@ -533,7 +535,7 @@ describe("davRouter — instance slug resolution", () => {
 				collections: new Map([[`${aliceId}:calendar:my-cal`, calId]]),
 			},
 		);
-		expect(res.status).toBe(HTTP_NOT_FOUND);
+		expect(res.status).toBe(HTTP_OK);
 	});
 });
 

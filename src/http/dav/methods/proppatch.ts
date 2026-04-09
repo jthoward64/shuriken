@@ -15,7 +15,12 @@
 import { Effect } from "effect";
 import { type ClarkName, cn, type IrDeadProperties } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
-import { badRequest, forbidden, notFound, unauthorized } from "#src/domain/errors.ts";
+import {
+	badRequest,
+	forbidden,
+	notFound,
+	unauthorized,
+} from "#src/domain/errors.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { normalizeClarkNames } from "#src/http/dav/xml/clark.ts";

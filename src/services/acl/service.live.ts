@@ -24,7 +24,7 @@ const PRIVILEGE_CONTAINERS: Readonly<
 	"DAV:read": ["DAV:all"],
 	"DAV:unlock": ["DAV:all"],
 	"DAV:read-acl": ["DAV:all"],
-	"DAV:read-current-user-privilege-set": ["DAV:all"],
+	"DAV:read-current-user-privilege-set": ["DAV:read", "DAV:all"],
 	"DAV:write-acl": ["DAV:all"],
 	"CALDAV:schedule-deliver-invite": ["CALDAV:schedule-deliver", "DAV:all"],
 	"CALDAV:schedule-deliver-reply": ["CALDAV:schedule-deliver", "DAV:all"],
@@ -40,6 +40,7 @@ const PRIVILEGE_CONTAINERS: Readonly<
 const PRIVILEGE_CONTAINED: Readonly<
 	Partial<Record<DavPrivilege, ReadonlyArray<DavPrivilege>>>
 > = {
+	"DAV:read": ["DAV:read-current-user-privilege-set"],
 	"DAV:write": [
 		"DAV:write-properties",
 		"DAV:write-content",
