@@ -13,6 +13,7 @@
 // ---------------------------------------------------------------------------
 
 import { Effect, Option } from "effect";
+import { Temporal } from "temporal-polyfill";
 import { type ClarkName, cn, type IrDeadProperties } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import { forbidden, notFound, unauthorized } from "#src/domain/errors.ts";
@@ -314,15 +315,16 @@ const memberInstanceHref = (
 
 /**
  * Convert a Temporal.Instant (from the DB) to an iCalendar DATETIME string
- * (e.g. "20240115T120000Z"). Uses epochMilliseconds to avoid polyfill type
- * conflicts between temporal-polyfill and temporal-spec.
+ * (e.g. "20240115T120000Z").
  */
 const toICalDatetime = (instant: { epochMilliseconds: number }): string => {
-	const d = new Date(instant.epochMilliseconds);
+	const d = Temporal.Instant.fromEpochMilliseconds(
+		instant.epochMilliseconds,
+	).toZonedDateTimeISO("UTC");
 	const pad = (n: number, len = 2): string => String(n).padStart(len, "0");
 	return (
-		`${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}` +
-		`T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`
+		`${d.year}${pad(d.month)}${pad(d.day)}` +
+		`T${pad(d.hour)}${pad(d.minute)}${pad(d.second)}Z`
 	);
 };
 

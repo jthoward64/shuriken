@@ -10,6 +10,7 @@ import {
 	effectiveDtend,
 	getDtendInstant,
 	getDtstartInstant,
+	getDtstartProp,
 	instantFromIrValue,
 } from "#src/data/icalendar/ir-helpers.ts";
 import { hasOccurrenceInRange } from "#src/data/icalendar/recurrence/recurrence-check.ts";
@@ -315,78 +316,172 @@ const evalTextMatch = (text: string, tm: TextMatch): boolean => {
 };
 
 /**
- * VTODO time-range matching — RFC 4791 §9.9 rule table.
+ * VTODO time-range matching — RFC 4791 §9.9 rule table (full 8-row implementation).
  *
- * Cases based on which of DTSTART / DUE(+DURATION) / COMPLETED are present:
- *   DTSTART + DUE/DURATION : DTSTART < end  AND  effective_DUE > start
- *   DTSTART only           : DTSTART >= start AND DTSTART < end
- *   DUE only               : DUE > start    AND  DUE <= end
- *   neither                : always matches
- *   COMPLETED (any case)   : if COMPLETED is in [start, end), also match (OR)
+ * +-------+------+-----+-----------+---------+-------------------------------------------+
+ * |DTSTART|DURATN| DUE | COMPLETED | CREATED | Condition                                 |
+ * +-------+------+-----+-----------+---------+-------------------------------------------+
+ * |   Y   |  Y   |  N  |     *     |    *    | (start <= DTSTART+DURATION) AND           |
+ * |       |      |     |           |         | ((end > DTSTART) OR (end >= DTSTART+DUR)) |
+ * +-------+------+-----+-----------+---------+-------------------------------------------+
+ * |   Y   |  N   |  Y  |     *     |    *    | ((start < DUE) OR (start <= DTSTART)) AND |
+ * |       |      |     |           |         | ((end > DTSTART) OR (end >= DUE))         |
+ * +-------+------+-----+-----------+---------+-------------------------------------------+
+ * |   Y   |  N   |  N  |     *     |    *    | (start <= DTSTART) AND (end > DTSTART)    |
+ * +-------+------+-----+-----------+---------+-------------------------------------------+
+ * |   N   |  N   |  Y  |     *     |    *    | (start < DUE) AND (end >= DUE)            |
+ * +-------+------+-----+-----------+---------+-------------------------------------------+
+ * |   N   |  N   |  N  |     Y     |    Y    | ((start <= CREATED) OR (start <=COMPLETED)|
+ * |       |      |     |           |         | AND ((end >= CREATED) OR (end >=COMPLETED)|
+ * +-------+------+-----+-----------+---------+-------------------------------------------+
+ * |   N   |  N   |  N  |     Y     |    N    | (start <= COMPLETED) AND (end >= COMPLETED|
+ * +-------+------+-----+-----------+---------+-------------------------------------------+
+ * |   N   |  N   |  N  |     N     |    Y    | (end > CREATED)                           |
+ * +-------+------+-----+-----------+---------+-------------------------------------------+
+ * |   N   |  N   |  N  |     N     |    N    | TRUE                                      |
+ * +-------+------+-----+-----------+---------+-------------------------------------------+
  */
 const evalVtodoTimeRange = (
 	comp: IrComponent,
 	range: { start?: Temporal.Instant; end?: Temporal.Instant },
 ): boolean => {
+	const { start, end } = range;
 	const dtstart = getDtstartInstant(comp);
 	const due = getDtendInstant(comp); // getDtendProp checks DUE for VTODO
 	const hasDuration = comp.properties.some((p) => p.name === "DURATION");
 
-	// COMPLETED override — if COMPLETED is within the range, always match.
 	const completedProp = comp.properties.find((p) => p.name === "COMPLETED");
-	if (completedProp) {
-		const completed = instantFromIrValue(completedProp);
-		if (completed !== undefined) {
-			const cMs = completed.epochMilliseconds;
-			if (
-				(range.start === undefined || cMs >= range.start.epochMilliseconds) &&
-				(range.end === undefined || cMs < range.end.epochMilliseconds)
-			) {
-				return true;
-			}
-		}
+	const completed = completedProp ? instantFromIrValue(completedProp) : undefined;
+
+	const createdProp = comp.properties.find((p) => p.name === "CREATED");
+	const created = createdProp ? instantFromIrValue(createdProp) : undefined;
+
+	// RFC: rows with Y in DTSTART column — COMPLETED/CREATED columns are "*" (irrelevant).
+	if (dtstart !== undefined && hasDuration && due === undefined) {
+		// Y, Y, N: (start <= DTSTART+DURATION) AND ((end > DTSTART) OR (end >= DTSTART+DURATION))
+		const effectiveDue = effectiveDtend(comp, dtstart);
+		const startOk =
+			start === undefined ||
+			start.epochMilliseconds <= effectiveDue.epochMilliseconds;
+		const endOk =
+			end === undefined ||
+			end.epochMilliseconds > dtstart.epochMilliseconds ||
+			end.epochMilliseconds >= effectiveDue.epochMilliseconds;
+		return startOk && endOk;
 	}
 
-	if (dtstart !== undefined && (due !== undefined || hasDuration)) {
-		// DTSTART + DUE/DURATION: DTSTART < end AND effective_DUE > start
-		const effectiveDue = effectiveDtend(comp, dtstart);
-		const startMs = dtstart.epochMilliseconds;
-		const dueMs = effectiveDue.epochMilliseconds;
-		if (range.end !== undefined && startMs >= range.end.epochMilliseconds) {
-			return false;
-		}
-		if (range.start !== undefined && dueMs <= range.start.epochMilliseconds) {
-			return false;
-		}
-		return true;
+	if (dtstart !== undefined && due !== undefined) {
+		// Y, N, Y: ((start < DUE) OR (start <= DTSTART)) AND ((end > DTSTART) OR (end >= DUE))
+		const startOk =
+			start === undefined ||
+			start.epochMilliseconds < due.epochMilliseconds ||
+			start.epochMilliseconds <= dtstart.epochMilliseconds;
+		const endOk =
+			end === undefined ||
+			end.epochMilliseconds > dtstart.epochMilliseconds ||
+			end.epochMilliseconds >= due.epochMilliseconds;
+		return startOk && endOk;
 	}
 
 	if (dtstart !== undefined) {
-		// Only DTSTART: DTSTART >= start AND DTSTART < end
-		const ms = dtstart.epochMilliseconds;
-		if (range.start !== undefined && ms < range.start.epochMilliseconds) {
-			return false;
-		}
-		if (range.end !== undefined && ms >= range.end.epochMilliseconds) {
-			return false;
-		}
-		return true;
+		// Y, N, N: (start <= DTSTART) AND (end > DTSTART)
+		const startOk =
+			start === undefined ||
+			start.epochMilliseconds <= dtstart.epochMilliseconds;
+		const endOk =
+			end === undefined || end.epochMilliseconds > dtstart.epochMilliseconds;
+		return startOk && endOk;
 	}
 
 	if (due !== undefined) {
-		// Only DUE: DUE > start AND DUE <= end
-		const dueMs = due.epochMilliseconds;
-		if (range.start !== undefined && dueMs <= range.start.epochMilliseconds) {
-			return false;
-		}
-		if (range.end !== undefined && dueMs > range.end.epochMilliseconds) {
-			return false;
-		}
-		return true;
+		// N, N, Y: (start < DUE) AND (end >= DUE)
+		const startOk =
+			start === undefined || start.epochMilliseconds < due.epochMilliseconds;
+		const endOk =
+			end === undefined || end.epochMilliseconds >= due.epochMilliseconds;
+		return startOk && endOk;
 	}
 
-	// Neither DTSTART nor DUE → always matches.
+	// N, N, N — dispatch on COMPLETED / CREATED presence.
+	if (completed !== undefined && created !== undefined) {
+		// ((start <= CREATED) OR (start <= COMPLETED)) AND ((end >= CREATED) OR (end >= COMPLETED))
+		const startOk =
+			start === undefined ||
+			start.epochMilliseconds <= created.epochMilliseconds ||
+			start.epochMilliseconds <= completed.epochMilliseconds;
+		const endOk =
+			end === undefined ||
+			end.epochMilliseconds >= created.epochMilliseconds ||
+			end.epochMilliseconds >= completed.epochMilliseconds;
+		return startOk && endOk;
+	}
+
+	if (completed !== undefined) {
+		// (start <= COMPLETED) AND (end >= COMPLETED)
+		const startOk =
+			start === undefined ||
+			start.epochMilliseconds <= completed.epochMilliseconds;
+		const endOk =
+			end === undefined ||
+			end.epochMilliseconds >= completed.epochMilliseconds;
+		return startOk && endOk;
+	}
+
+	if (created !== undefined) {
+		// (end > CREATED)
+		return end === undefined || end.epochMilliseconds > created.epochMilliseconds;
+	}
+
+	// N, N, N, N, N → TRUE
 	return true;
+};
+
+/**
+ * VJOURNAL time-range matching — RFC 4791 §9.9 rule table.
+ *
+ * +-------+-----------+---------------------------------------------+
+ * |DTSTART| DATE-TIME?| Condition                                   |
+ * +-------+-----------+---------------------------------------------+
+ * |   Y   |     Y     | (start <= DTSTART) AND (end > DTSTART)      |
+ * |   Y   |     N     | (start < DTSTART+P1D) AND (end > DTSTART)   |
+ * |   N   |     *     | FALSE                                       |
+ * +-------+-----------+---------------------------------------------+
+ */
+const evalVjournalTimeRange = (
+	comp: IrComponent,
+	range: { start?: Temporal.Instant; end?: Temporal.Instant },
+): boolean => {
+	const dtstartProp = getDtstartProp(comp);
+	if (!dtstartProp) {
+		return false;
+	}
+	const dtstart = instantFromIrValue(dtstartProp);
+	if (dtstart === undefined) {
+		return false; // Floating — no timezone context
+	}
+	const { start, end } = range;
+
+	const isDateTime =
+		dtstartProp.value.type === "DATE_TIME" ||
+		dtstartProp.value.type === "PLAIN_DATE_TIME";
+
+	if (isDateTime) {
+		// (start <= DTSTART) AND (end > DTSTART)
+		const startOk =
+			start === undefined || start.epochMilliseconds <= dtstart.epochMilliseconds;
+		const endOk =
+			end === undefined || end.epochMilliseconds > dtstart.epochMilliseconds;
+		return startOk && endOk;
+	}
+
+	// DATE value: effective duration is 1 day
+	const dtendPlusOneDay = dtstart.add({ hours: 24 });
+	const startOk =
+		start === undefined ||
+		start.epochMilliseconds < dtendPlusOneDay.epochMilliseconds;
+	const endOk =
+		end === undefined || end.epochMilliseconds > dtstart.epochMilliseconds;
+	return startOk && endOk;
 };
 
 /**
@@ -471,6 +566,10 @@ const evalComponentTimeRange = (
 
 	if (comp.name === "VFREEBUSY") {
 		return evalVfreebusyTimeRange(comp, range);
+	}
+
+	if (comp.name === "VJOURNAL") {
+		return evalVjournalTimeRange(comp, range);
 	}
 
 	// VEVENT: DTSTART < end AND effective_DTEND > start.

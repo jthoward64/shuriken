@@ -14,6 +14,7 @@ import {
 	effectiveDtend,
 	getDtstartInstant,
 } from "#src/data/icalendar/ir-helpers.ts";
+import { getOccurrenceInstantsInRange } from "#src/data/icalendar/recurrence/recurrence-check.ts";
 import type { IrComponent } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import {
@@ -120,8 +121,8 @@ const pad2 = (n: number) => String(n).padStart(PAD2, "0");
 const pad4 = (n: number) => String(n).padStart(PAD4, "0");
 
 const formatUtcDt = (instant: Temporal.Instant): string => {
-	const d = new Date(instant.epochMilliseconds);
-	return `${pad4(d.getUTCFullYear())}${pad2(d.getUTCMonth() + 1)}${pad2(d.getUTCDate())}T${pad2(d.getUTCHours())}${pad2(d.getUTCMinutes())}${pad2(d.getUTCSeconds())}Z`;
+	const d = instant.toZonedDateTimeISO("UTC");
+	return `${pad4(d.year)}${pad2(d.month)}${pad2(d.day)}T${pad2(d.hour)}${pad2(d.minute)}${pad2(d.second)}Z`;
 };
 
 // ---------------------------------------------------------------------------
@@ -153,8 +154,7 @@ const buildVfreebusyText = (
 	queryEnd: Temporal.Instant,
 	periods: ReadonlyArray<Period>,
 ): string => {
-	const now = new Date();
-	const dtstamp = `${pad4(now.getUTCFullYear())}${pad2(now.getUTCMonth() + 1)}${pad2(now.getUTCDate())}T${pad2(now.getUTCHours())}${pad2(now.getUTCMinutes())}${pad2(now.getUTCSeconds())}Z`;
+	const dtstamp = formatUtcDt(Temporal.Now.instant());
 
 	const lines: Array<string> = [
 		"BEGIN:VCALENDAR",
@@ -294,31 +294,75 @@ export const freeBusyQueryHandler = (
 					if (fbType === null) {
 						continue;
 					}
-					const dtstart = getDtstartInstant(comp);
-					if (!dtstart) {
-						continue; // Floating time — no timezone context, skip
-					}
-					const dtend = effectiveDtend(comp, dtstart);
 
-					// Skip if outside query range
-					if (
-						dtstart.epochMilliseconds >= queryEnd.epochMilliseconds ||
-						dtend.epochMilliseconds <= queryStart.epochMilliseconds
-					) {
+					const hasRrule = comp.properties.some((p) => p.name === "RRULE");
+
+					// Recurrence-ID overrides are handled by their master's RRULE expansion;
+					// skip them here unless they are themselves the master (no RECURRENCE-ID).
+					const isOverride = comp.properties.some(
+						(p) => p.name === "RECURRENCE-ID",
+					);
+					if (isOverride) {
 						continue;
 					}
 
-					// Clamp to query range
-					const periodStart =
-						dtstart.epochMilliseconds < queryStart.epochMilliseconds
-							? queryStart
-							: dtstart;
-					const periodEnd =
-						dtend.epochMilliseconds > queryEnd.epochMilliseconds
-							? queryEnd
-							: dtend;
+					// Collect (dtstart, dtend) pairs — one per occurrence for recurring events,
+					// or just the single instance for non-recurring events.
+					const occurrencePairs: Array<{
+						start: Temporal.Instant;
+						end: Temporal.Instant;
+					}> = [];
 
-					periods.push({ start: periodStart, end: periodEnd, fbType });
+					if (hasRrule) {
+						const masterDtstart = getDtstartInstant(comp);
+						if (!masterDtstart) {
+							continue; // Floating — no timezone context, skip
+						}
+						const duration = effectiveDtend(comp, masterDtstart).epochMilliseconds -
+							masterDtstart.epochMilliseconds;
+
+						const starts = getOccurrenceInstantsInRange(
+							root,
+							comp,
+							queryStart,
+							queryEnd,
+						);
+						for (const start of starts) {
+							occurrencePairs.push({
+								start,
+								end: Temporal.Instant.fromEpochMilliseconds(
+									start.epochMilliseconds + duration,
+								),
+							});
+						}
+					} else {
+						const dtstart = getDtstartInstant(comp);
+						if (!dtstart) {
+							continue; // Floating time — no timezone context, skip
+						}
+						const dtend = effectiveDtend(comp, dtstart);
+						// Skip if entirely outside query range
+						if (
+							dtstart.epochMilliseconds >= queryEnd.epochMilliseconds ||
+							dtend.epochMilliseconds <= queryStart.epochMilliseconds
+						) {
+							continue;
+						}
+						occurrencePairs.push({ start: dtstart, end: dtend });
+					}
+
+					for (const { start: occStart, end: occEnd } of occurrencePairs) {
+						// Clamp to query range
+						const periodStart =
+							occStart.epochMilliseconds < queryStart.epochMilliseconds
+								? queryStart
+								: occStart;
+						const periodEnd =
+							occEnd.epochMilliseconds > queryEnd.epochMilliseconds
+								? queryEnd
+								: occEnd;
+						periods.push({ start: periodStart, end: periodEnd, fbType });
+					}
 				} else if (comp.name === "VFREEBUSY") {
 					for (const prop of comp.properties) {
 						if (prop.name !== "FREEBUSY") {

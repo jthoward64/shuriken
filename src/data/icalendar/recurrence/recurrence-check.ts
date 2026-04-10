@@ -12,7 +12,7 @@
 
 import { Temporal as JSTemporal } from "@js-temporal/polyfill";
 import { RRuleTemporal } from "rrule-temporal";
-import type { Temporal } from "temporal-polyfill";
+import { Temporal } from "temporal-polyfill";
 import type { IrComponent, IrValue } from "#src/data/ir.ts";
 
 // ---------------------------------------------------------------------------
@@ -54,6 +54,93 @@ const irDateListToJsZdts = (v: IrValue): Array<JSTemporal.ZonedDateTime> => {
 // ---------------------------------------------------------------------------
 // hasOccurrenceInRange
 // ---------------------------------------------------------------------------
+
+/**
+ * Returns the DTSTART instants of all master RRULE occurrences in
+ * [queryStart, queryEnd).
+ *
+ * @param vcalRoot   The VCALENDAR root component — used to find RECURRENCE-ID
+ *                   sibling overrides that should be excluded from the master.
+ * @param vevent     The master recurring component (VEVENT / VTODO etc.).
+ * @param queryStart Inclusive start of the query time range.
+ * @param queryEnd   Exclusive end of the query time range.
+ */
+export const getOccurrenceInstantsInRange = (
+	vcalRoot: IrComponent,
+	vevent: IrComponent,
+	queryStart: Temporal.Instant,
+	queryEnd: Temporal.Instant,
+): ReadonlyArray<Temporal.Instant> => {
+	const rruleProp = vevent.properties.find((p) => p.name === "RRULE");
+	if (!rruleProp || rruleProp.value.type !== "RECUR") {
+		return [];
+	}
+	const rruleString = rruleProp.value.value;
+
+	const dtstartProp = vevent.properties.find((p) => p.name === "DTSTART");
+	const dtstart = dtstartProp
+		? irSingleValueToJsZdt(dtstartProp.value)
+		: undefined;
+
+	const exDate: Array<JSTemporal.ZonedDateTime> = [];
+	for (const prop of vevent.properties) {
+		if (prop.name === "EXDATE") {
+			exDate.push(...irDateListToJsZdts(prop.value));
+		}
+	}
+
+	const uidValue = vevent.properties.find((p) => p.name === "UID")?.value;
+	const uid = uidValue?.type === "TEXT" ? uidValue.value : undefined;
+	if (uid !== undefined) {
+		for (const sibling of vcalRoot.components) {
+			if (sibling === vevent || sibling.name !== vevent.name) {
+				continue;
+			}
+			const sibUid = sibling.properties.find((p) => p.name === "UID")?.value;
+			if (sibUid?.type !== "TEXT" || sibUid.value !== uid) {
+				continue;
+			}
+			const recIdProp = sibling.properties.find(
+				(p) => p.name === "RECURRENCE-ID",
+			);
+			if (!recIdProp) {
+				continue;
+			}
+			const jsZdt = irSingleValueToJsZdt(recIdProp.value);
+			if (jsZdt) {
+				exDate.push(jsZdt);
+			}
+		}
+	}
+
+	const rDate: Array<JSTemporal.ZonedDateTime> = [];
+	for (const prop of vevent.properties) {
+		if (prop.name === "RDATE") {
+			rDate.push(...irDateListToJsZdts(prop.value));
+		}
+	}
+
+	const baseRule = new RRuleTemporal({
+		rruleString,
+		...(dtstart !== undefined ? { dtstart } : {}),
+	});
+	const rule =
+		exDate.length > 0 || rDate.length > 0
+			? baseRule.with({
+					...(exDate.length > 0 ? { exDate } : {}),
+					...(rDate.length > 0 ? { rDate } : {}),
+				})
+			: baseRule;
+
+	const occurrences = rule.between(
+		new Date(queryStart.epochMilliseconds - 1),
+		new Date(queryEnd.epochMilliseconds),
+		false,
+	);
+	return occurrences.map((d) =>
+		Temporal.Instant.fromEpochMilliseconds(d.epochMilliseconds),
+	);
+};
 
 /**
  * Returns true if the master RRULE event has at least one occurrence in
