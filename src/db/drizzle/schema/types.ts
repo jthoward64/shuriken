@@ -22,7 +22,7 @@ export function drizzleEnum<V>(column: string, values: Array<V>, type: "text") {
 /** TIMESTAMPTZ → Temporal.Instant (absolute point in time) */
 export const timestampTz = customType<{
 	data: Temporal.Instant;
-	driverData: string;
+	driverData: string | Date;
 }>({
 	dataType: () => "timestamptz",
 	fromDriver(value: Date | string): Temporal.Instant {
@@ -39,7 +39,7 @@ export const timestampTz = customType<{
 /** TIMESTAMP (no TZ) → Temporal.PlainDateTime */
 export const timestampStr = customType<{
 	data: Temporal.PlainDateTime;
-	driverData: string;
+	driverData: string | Date;
 }>({
 	dataType: () => "timestamp",
 	fromDriver(value: Date | string): Temporal.PlainDateTime {
@@ -56,11 +56,14 @@ export const timestampStr = customType<{
 /** DATE → Temporal.PlainDate */
 export const dateStr = customType<{
 	data: Temporal.PlainDate;
-	driverData: string;
+	driverData: string | Date;
 }>({
 	dataType: () => "date",
-	fromDriver(value: string): Temporal.PlainDate {
-		return Temporal.PlainDate.from(value);
+	fromDriver(value: string | Date): Temporal.PlainDate {
+		if (typeof value === "string") {
+			return Temporal.PlainDate.from(value);
+		}
+		return Temporal.PlainDate.from(value.toISOString().slice(0, -1));
 	},
 	toDriver(value: Temporal.PlainDate): string {
 		return value.toString();
