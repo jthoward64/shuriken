@@ -12,7 +12,7 @@
 //   - Other properties in a failed request → 424 Failed Dependency
 // ---------------------------------------------------------------------------
 
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import { type ClarkName, cn, type IrDeadProperties } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import {
@@ -21,6 +21,7 @@ import {
 	notFound,
 	unauthorized,
 } from "#src/domain/errors.ts";
+import { CollectionId, isUuid } from "#src/domain/ids.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { normalizeClarkNames } from "#src/http/dav/xml/clark.ts";
@@ -31,6 +32,8 @@ import { AclService } from "#src/services/acl/index.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
 import { InstanceService } from "#src/services/instance/index.ts";
 import { PrincipalService } from "#src/services/principal/service.ts";
+import { IanaTimezoneService } from "#src/services/timezone/iana.ts";
+import { CalTimezoneRepository } from "#src/services/timezone/index.ts";
 
 // ---------------------------------------------------------------------------
 // Namespace constants
@@ -75,8 +78,17 @@ const COLLECTION_LIVE_PROPS = new Map<
 	],
 ]);
 
-// Clark name for the calendar-timezone live property (handled specially below).
+// Clark names for timezone live properties (handled specially below).
 const CALENDAR_TIMEZONE_PROP = cn(CALDAV_NS, "calendar-timezone");
+// RFC 7809 §5.2 — TZID-only alternative to calendar-timezone
+const CALENDAR_TIMEZONE_ID_PROP = cn(CALDAV_NS, "calendar-timezone-id");
+// RFC 6638 §9.1 — schedule-calendar-transp (calendar/inbox/outbox collections)
+const SCHEDULE_CALENDAR_TRANSP_PROP = cn(CALDAV_NS, "schedule-calendar-transp");
+// RFC 6638 §9.2 — schedule-default-calendar-URL (inbox only)
+const SCHEDULE_DEFAULT_CAL_URL_PROP = cn(
+	CALDAV_NS,
+	"schedule-default-calendar-URL",
+);
 
 /**
  * Extract the TZID from a raw VTIMEZONE/VCALENDAR iCalendar text string.
@@ -222,7 +234,12 @@ export const proppatchHandler = (
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError,
-	CollectionService | InstanceService | AclService | PrincipalService
+	| CollectionService
+	| InstanceService
+	| AclService
+	| PrincipalService
+	| IanaTimezoneService
+	| CalTimezoneRepository
 > =>
 	Effect.gen(function* () {
 		if (
@@ -282,10 +299,27 @@ export const proppatchHandler = (
 			for (const name of allNames) {
 				if (PROTECTED_PROPS.has(name)) {
 					failedNames.add(name);
-				} else if (name === CALENDAR_TIMEZONE_PROP) {
-					// calendar-timezone is a live property for calendar collections only.
-					// It is handled separately below — skip dead-property storage.
+				} else if (
+					name === CALENDAR_TIMEZONE_PROP ||
+					name === CALENDAR_TIMEZONE_ID_PROP
+				) {
+					// calendar-timezone and calendar-timezone-id are live properties for
+					// calendar collections only. Both are handled separately below.
 					if (collRow.collectionType !== "calendar") {
+						failedNames.add(name);
+					}
+				} else if (name === SCHEDULE_CALENDAR_TRANSP_PROP) {
+					// Valid on calendar, inbox, and outbox collections only.
+					if (
+						collRow.collectionType !== "calendar" &&
+						collRow.collectionType !== "inbox" &&
+						collRow.collectionType !== "outbox"
+					) {
+						failedNames.add(name);
+					}
+				} else if (name === SCHEDULE_DEFAULT_CAL_URL_PROP) {
+					// Valid on inbox collections only.
+					if (collRow.collectionType !== "inbox") {
 						failedNames.add(name);
 					}
 				} else {
@@ -341,17 +375,115 @@ export const proppatchHandler = (
 				}
 			}
 
-			// CALDAV:calendar-timezone — RFC 4791 §5.2.2: extract TZID from the
-			// VTIMEZONE body sent by the client and store it in timezoneTzid.
+			// CALDAV:calendar-timezone — RFC 4791 §5.2.2
+			// CALDAV:calendar-timezone-id — RFC 7809 §5.2
+			//
+			// Both properties control the same underlying timezoneTzid field.
+			// calendar-timezone wins if both are present (it carries full VTIMEZONE data).
+			// When either is set, we also upsert the VTIMEZONE data into cal_timezone so
+			// the cache is populated from PROPPATCH (not only from PUT).
 			let newTimezoneTzid: string | null | undefined;
 			if (collRow.collectionType === "calendar") {
 				if (set.has(CALENDAR_TIMEZONE_PROP)) {
 					const rawVal = set.get(CALENDAR_TIMEZONE_PROP);
 					const valStr = typeof rawVal === "string" ? rawVal : "";
-					newTimezoneTzid = extractTzidFromVtimezone(valStr);
-				} else if (remove.has(CALENDAR_TIMEZONE_PROP)) {
+					const tzid = extractTzidFromVtimezone(valStr);
+					if (tzid !== null && valStr) {
+						// Upsert the client-provided VTIMEZONE into the cache.
+						const tzRepo = yield* CalTimezoneRepository;
+						yield* tzRepo.upsert(tzid, valStr, Option.none(), Option.none());
+					}
+					newTimezoneTzid = tzid;
+				} else if (set.has(CALENDAR_TIMEZONE_ID_PROP)) {
+					// calendar-timezone-id: validate TZID against known IANA timezones.
+					const rawVal = set.get(CALENDAR_TIMEZONE_ID_PROP);
+					const tzid =
+						typeof rawVal === "string"
+							? rawVal.trim()
+							: typeof rawVal === "object" &&
+								  rawVal !== null &&
+								  "#text" in (rawVal as Record<string, unknown>)
+								? String((rawVal as Record<string, unknown>)["#text"]).trim()
+								: null;
+					if (tzid) {
+						const ianaSvc = yield* IanaTimezoneService;
+						if (!ianaSvc.isKnownTzid(tzid)) {
+							return yield* forbidden("CALDAV:valid-calendar-timezone");
+						}
+						// Upsert the IANA VTIMEZONE into the cache.
+						const vtOpt = ianaSvc.getVtimezone(tzid);
+						if (Option.isSome(vtOpt)) {
+							const tzRepo = yield* CalTimezoneRepository;
+							yield* tzRepo.upsert(
+								tzid,
+								vtOpt.value,
+								Option.none(),
+								Option.none(),
+							);
+						}
+						newTimezoneTzid = tzid;
+					}
+				} else if (
+					remove.has(CALENDAR_TIMEZONE_PROP) ||
+					remove.has(CALENDAR_TIMEZONE_ID_PROP)
+				) {
 					newTimezoneTzid = null;
 				}
+			}
+
+			// RFC 6638 §9.1: schedule-calendar-transp
+			let newScheduleTransp: "opaque" | "transparent" | null | undefined;
+			if (set.has(SCHEDULE_CALENDAR_TRANSP_PROP)) {
+				const rawVal = set.get(SCHEDULE_CALENDAR_TRANSP_PROP);
+				// Value is an element like <C:opaque/> or <C:transparent/>
+				if (
+					typeof rawVal === "object" &&
+					rawVal !== null &&
+					`{${CALDAV_NS}}opaque` in (rawVal as Record<string, unknown>)
+				) {
+					newScheduleTransp = "opaque";
+				} else if (
+					typeof rawVal === "object" &&
+					rawVal !== null &&
+					`{${CALDAV_NS}}transparent` in (rawVal as Record<string, unknown>)
+				) {
+					newScheduleTransp = "transparent";
+				}
+			} else if (remove.has(SCHEDULE_CALENDAR_TRANSP_PROP)) {
+				newScheduleTransp = null; // reset to default "opaque"
+			}
+
+			// RFC 6638 §9.2: schedule-default-calendar-URL
+			let newScheduleDefaultCalendarId: CollectionId | null | undefined;
+			if (set.has(SCHEDULE_DEFAULT_CAL_URL_PROP)) {
+				const rawVal = set.get(SCHEDULE_DEFAULT_CAL_URL_PROP);
+				// Value is an element containing a <D:href>
+				const hrefObj =
+					typeof rawVal === "object" && rawVal !== null
+						? (rawVal as Record<string, unknown>)
+						: null;
+				const hrefStr = hrefObj
+					? String(hrefObj[`{${DAV_NS}}href`] ?? "")
+					: "";
+				// Extract the last non-empty path segment as the collection UUID/slug.
+				const segments = hrefStr.replace(/\/$/, "").split("/");
+				const lastSeg = segments.at(-1) ?? "";
+				if (isUuid(lastSeg)) {
+					// Look up the collection to validate it exists and belongs to this principal.
+					const targetOpt = yield* collSvc
+						.findById(CollectionId(lastSeg))
+						.pipe(Effect.option);
+					const target = Option.getOrNull(targetOpt);
+					if (
+						target !== null &&
+						target.collectionType === "calendar" &&
+						target.ownerPrincipalId === path.principalId
+					) {
+						newScheduleDefaultCalendarId = CollectionId(lastSeg);
+					}
+				}
+			} else if (remove.has(SCHEDULE_DEFAULT_CAL_URL_PROP)) {
+				newScheduleDefaultCalendarId = null;
 			}
 
 			yield* collSvc.updateProperties(path.collectionId, {
@@ -364,6 +496,12 @@ export const proppatchHandler = (
 					: {}),
 				...(newTimezoneTzid !== undefined
 					? { timezoneTzid: newTimezoneTzid }
+					: {}),
+				...(newScheduleTransp !== undefined
+					? { scheduleTransp: newScheduleTransp }
+					: {}),
+				...(newScheduleDefaultCalendarId !== undefined
+					? { scheduleDefaultCalendarId: newScheduleDefaultCalendarId }
 					: {}),
 			});
 

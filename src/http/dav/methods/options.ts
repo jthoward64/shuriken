@@ -7,9 +7,10 @@ import type { HttpRequestContext } from "#src/http/context.ts";
 // RFC 4918 §9.2: OPTIONS MUST succeed on any URL, including non-existent ones.
 // ---------------------------------------------------------------------------
 
-const DAV_CAPABILITIES = "1, 3, extended-mkcol, calendar-access, addressbook";
+const DAV_CAPABILITIES =
+	"1, 3, extended-mkcol, calendar-access, addressbook, calendar-auto-schedule, calendar-no-timezone";
 const ALLOWED_METHODS =
-	"OPTIONS, GET, HEAD, PUT, DELETE, PROPFIND, PROPPATCH, MKCOL, REPORT, MKCALENDAR, MKADDRESSBOOK, ACL, COPY, MOVE";
+	"OPTIONS, GET, HEAD, POST, PUT, DELETE, PROPFIND, PROPPATCH, MKCOL, REPORT, MKCALENDAR, MKADDRESSBOOK, ACL, COPY, MOVE";
 
 export const optionsHandler = (
 	_path: ResolvedDavPath,

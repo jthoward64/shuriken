@@ -41,6 +41,7 @@
 		"fast-xml-builder": "^1.1.4",
 		"fast-xml-parser": "^5.5.9",
 		"rrule-temporal": "^1.5.2",
-		"temporal-polyfill": "^0.3.2"
+		"temporal-polyfill": "^0.3.2",
+		"timezones-ical-library": "^2.1.3"
 	}
 }

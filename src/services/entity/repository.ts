@@ -3,7 +3,7 @@ import type { Effect, Option } from "effect";
 import { Context } from "effect";
 import type { davEntity, EntityType } from "#src/db/drizzle/schema/index.ts";
 import type { DatabaseError } from "#src/domain/errors.ts";
-import type { CollectionId, EntityId } from "#src/domain/ids.ts";
+import type { CollectionId, EntityId, PrincipalId } from "#src/domain/ids.ts";
 
 // ---------------------------------------------------------------------------
 // EntityRepository — data access for dav_entity rows
@@ -31,6 +31,15 @@ export interface EntityRepositoryShape {
 	/** Returns true if any active instance in the given collection has the given logical UID. */
 	readonly existsByUid: (
 		collectionId: CollectionId,
+		logicalUid: string,
+	) => Effect.Effect<boolean, DatabaseError>;
+
+	/**
+	 * RFC 6638 §3.2.4.1: Returns true if any active instance in ANY calendar
+	 * collection owned by the given principal has the given logical UID.
+	 */
+	readonly existsByUidForPrincipal: (
+		principalId: PrincipalId,
 		logicalUid: string,
 	) => Effect.Effect<boolean, DatabaseError>;
 }

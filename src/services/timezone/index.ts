@@ -1,3 +1,7 @@
+export {
+	IanaTimezoneService,
+	type IanaTimezoneServiceShape,
+} from "./iana.ts";
 export { CalTimezoneRepositoryLive } from "./repository.live.ts";
 export { CalTimezoneRepository, type CalTimezoneRow } from "./repository.ts";
 

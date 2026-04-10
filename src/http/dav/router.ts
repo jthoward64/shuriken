@@ -37,7 +37,11 @@ import type { InstanceService } from "#src/services/instance/index.ts";
 import { InstanceRepository } from "#src/services/instance/index.ts";
 import { PrincipalRepository } from "#src/services/principal/index.ts";
 import type { PrincipalService } from "#src/services/principal/service.ts";
-import type { CalTimezoneRepository } from "#src/services/timezone/index.ts";
+import type { SchedulingService } from "#src/services/scheduling/index.ts";
+import type {
+	CalTimezoneRepository,
+	IanaTimezoneService,
+} from "#src/services/timezone/index.ts";
 import type { TombstoneRepository } from "#src/services/tombstone/index.ts";
 import type { UserService } from "#src/services/user/index.ts";
 import { UserRepository } from "#src/services/user/index.ts";
@@ -55,6 +59,7 @@ import { mkcolHandler } from "./methods/mkcol.ts";
 import { moveHandler } from "./methods/move.ts";
 import { optionsHandler } from "./methods/options.ts";
 import { propfindHandler } from "./methods/propfind.ts";
+import { postHandler } from "./methods/post.ts";
 import { proppatchHandler } from "./methods/proppatch.ts";
 import { putHandler } from "./methods/put.ts";
 import { reportHandler } from "./methods/report.ts";
@@ -116,13 +121,15 @@ type DavServices =
 	| EntityRepository
 	| ComponentRepository
 	| CalTimezoneRepository
+	| IanaTimezoneService
 	| TombstoneRepository
 	| CalIndexRepository
 	| CardIndexRepository
 	| UserRepository
 	| GroupRepository
 	| UserService
-	| GroupService;
+	| GroupService
+	| SchedulingService;
 
 // Segment counts after stripping /dav (index 0 = "principals")
 const SEGMENTS_PRINCIPAL = 2; // ["principals", ":slug"]
@@ -504,6 +511,8 @@ export const davRouter = (
 			case "MKCALENDAR":
 			case "MKADDRESSBOOK":
 				return yield* mkcolHandler(path, ctx, req);
+			case "POST":
+				return yield* postHandler(path, ctx, req);
 			case "ACL":
 				return yield* aclHandler(path, ctx, req);
 			default:

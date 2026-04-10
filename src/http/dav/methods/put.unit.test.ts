@@ -31,6 +31,7 @@ import type { ComponentRepository } from "#src/services/component/index.ts";
 import type { EntityRepository } from "#src/services/entity/index.ts";
 import type { InstanceService } from "#src/services/instance/index.ts";
 import type { CalTimezoneRepository } from "#src/services/timezone/index.ts";
+import type { SchedulingService } from "#src/services/scheduling/service.ts";
 import { runFailure, runSuccess } from "#src/testing/effect.ts";
 import { makeTestEnv } from "#src/testing/env.ts";
 import { putHandler } from "./put.ts";
@@ -62,6 +63,7 @@ const makeCtx = (
 	headers: new Headers(),
 	auth,
 	clientIp: Option.none(),
+	caldavTimezones: null,
 });
 
 const authenticatedCtx = makeCtx(
@@ -183,6 +185,7 @@ type PutEffect<A> = Effect.Effect<
 	| CalTimezoneRepository
 	| CalIndexRepository
 	| CollectionService
+	| SchedulingService
 >;
 type PutFailEffect = Effect.Effect<
 	unknown,
@@ -194,6 +197,7 @@ type PutFailEffect = Effect.Effect<
 	| CalTimezoneRepository
 	| CalIndexRepository
 	| CollectionService
+	| SchedulingService
 >;
 
 const run = <A>(env: ReturnType<typeof makeTestEnv>, effect: PutEffect<A>) =>

@@ -15,8 +15,9 @@ import {
 	unauthorized,
 	unsupportedMediaType,
 } from "#src/domain/errors.ts";
+import { SchedulingService } from "#src/services/scheduling/index.ts";
 import type { EntityType } from "#src/db/drizzle/schema/index.ts";
-import { CollectionId, EntityId } from "#src/domain/ids.ts";
+import { CollectionId, EntityId, InstanceId } from "#src/domain/ids.ts";
 import type { ResolvedDavPath, Slug } from "#src/domain/types/path.ts";
 import { ETag } from "#src/domain/types/strings.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
@@ -48,11 +49,17 @@ export const putHandler = (
 	| AclService
 	| CalIndexRepository
 	| CollectionService
+	| SchedulingService
 > =>
 	Effect.gen(function* () {
 		// 1. Only new-instance and instance paths accept PUT.
 		if (path.kind !== "new-instance" && path.kind !== "instance") {
 			return yield* methodNotAllowed();
+		}
+
+		// RFC 6638 §3.2.3.1: PUT to scheduling inbox or outbox is not allowed.
+		if (path.namespace === "inbox" || path.namespace === "outbox") {
+			return yield* forbidden("CALDAV:valid-calendar-object-resource");
 		}
 
 		// 2. Require an authenticated principal.
@@ -210,6 +217,28 @@ export const putHandler = (
 				}
 			}
 
+			// RFC 6638 §3.2.4.1: SOR UID must also be unique across ALL calendar
+			// collections owned by the principal (not just the target collection).
+			if (entityType === "icalendar" && logicalUid !== null) {
+				const isSorCandidate =
+					doc.root.components.some(
+						(c) =>
+							(c.name === "VEVENT" || c.name === "VTODO") &&
+							c.properties.some((p) => p.name === "ORGANIZER") &&
+							c.properties.some((p) => p.name === "ATTENDEE"),
+					);
+				if (isSorCandidate) {
+					const entityRepo2 = yield* EntityRepository;
+					const crossConflict = yield* entityRepo2.existsByUidForPrincipal(
+						principal.principalId,
+						logicalUid,
+					);
+					if (crossConflict) {
+						return yield* conflict("CALDAV:unique-scheduling-object-resource");
+					}
+				}
+			}
+
 			// Create entity row.
 			const entityRow = yield* entityRepo.insert({ entityType, logicalUid });
 
@@ -219,7 +248,7 @@ export const putHandler = (
 
 			// Create instance row.
 			const instanceSvc = yield* InstanceService;
-			yield* instanceSvc.put({
+			const newInstance = yield* instanceSvc.put({
 				collectionId: path.collectionId,
 				entityId: EntityId(entityRow.id),
 				contentType,
@@ -232,9 +261,28 @@ export const putHandler = (
 			const calIdx = yield* CalIndexRepository;
 			yield* calIdx.indexRruleOccurrences(EntityId(entityRow.id));
 
+			// RFC 6638: process implicit scheduling after successful write.
+			const schedulingSvc = yield* SchedulingService;
+			const schedTagOpt =
+				entityType === "icalendar"
+					? yield* schedulingSvc.processAfterPut({
+							actingPrincipalId: principal.principalId,
+							entityId: EntityId(entityRow.id),
+							instanceId: InstanceId(newInstance.id),
+							collectionId: path.collectionId,
+							doc,
+							previousDoc: Option.none(),
+							suppressReply: req.headers.get("Schedule-Reply") === "no",
+						})
+					: Option.none<string>();
+
+			const responseHeaders: Record<string, string> = { ETag: etag };
+			if (Option.isSome(schedTagOpt)) {
+				responseHeaders["Schedule-Tag"] = schedTagOpt.value;
+			}
 			return new Response(null, {
 				status: HTTP_CREATED,
-				headers: { ETag: etag },
+				headers: responseHeaders,
 			});
 		}
 
@@ -269,6 +317,15 @@ export const putHandler = (
 			return yield* preconditionFailed();
 		}
 
+		// If-Schedule-Tag-Match: RFC 6638 §3.2.1 — must match the current schedule-tag.
+		const ifScheduleTagMatch = req.headers.get("If-Schedule-Tag-Match");
+		if (
+			ifScheduleTagMatch !== null &&
+			ifScheduleTagMatch !== existingInstance.scheduleTag
+		) {
+			return yield* preconditionFailed();
+		}
+
 		// RFC 4791 §5.2.3: reject if the component type is not in the collection's
 		// supported-calendar-component-set (applies to updates too).
 		if (entityType === "icalendar") {
@@ -288,8 +345,28 @@ export const putHandler = (
 			}
 		}
 
-		// Replace component tree.
+		// Load existing component tree (needed for scheduling validation and reply diffing).
 		const componentRepo = yield* ComponentRepository;
+		const prevTreeOpt = yield* componentRepo.loadTree(
+			EntityId(existingInstance.entityId),
+			"icalendar",
+		);
+		const prevDoc = Option.map(prevTreeOpt, (root) => ({
+			kind: "icalendar" as const,
+			root,
+		}));
+
+		// RFC 6638: validate attendee-only change rules before overwriting.
+		if (entityType === "icalendar" && Option.isSome(prevDoc)) {
+			const schedulingSvc = yield* SchedulingService;
+			yield* schedulingSvc.validateSchedulingChange({
+				actingPrincipalId: principal.principalId,
+				oldDoc: prevDoc.value,
+				newDoc: doc,
+			});
+		}
+
+		// Replace component tree.
 		yield* componentRepo.deleteByEntity(EntityId(existingInstance.entityId));
 
 		const entityRepo = yield* EntityRepository;
@@ -320,8 +397,27 @@ export const putHandler = (
 		const calIdx = yield* CalIndexRepository;
 		yield* calIdx.indexRruleOccurrences(EntityId(existingInstance.entityId));
 
+		// RFC 6638: process implicit scheduling after successful update.
+		const schedulingSvcUpdate = yield* SchedulingService;
+		const schedTagOptUpdate =
+			entityType === "icalendar"
+				? yield* schedulingSvcUpdate.processAfterPut({
+						actingPrincipalId: principal.principalId,
+						entityId: EntityId(existingInstance.entityId),
+						instanceId: path.instanceId,
+						collectionId: CollectionId(existingInstance.collectionId),
+						doc,
+						previousDoc: prevDoc,
+						suppressReply: req.headers.get("Schedule-Reply") === "no",
+					})
+				: Option.none<string>();
+
+		const updateHeaders: Record<string, string> = { ETag: etag };
+		if (Option.isSome(schedTagOptUpdate)) {
+			updateHeaders["Schedule-Tag"] = schedTagOptUpdate.value;
+		}
 		return new Response(null, {
 			status: HTTP_NO_CONTENT,
-			headers: { ETag: etag },
+			headers: updateHeaders,
 		});
 	});

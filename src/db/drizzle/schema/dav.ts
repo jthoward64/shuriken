@@ -101,6 +101,14 @@ export const davCollection = pgTable(
 		maxDateTime: timestampTz("max_date_time"),
 		maxInstances: integer("max_instances"),
 		maxAttendeesPerInstance: integer("max_attendees_per_instance"),
+		// RFC 6638 §9.1: whether events in this calendar contribute to free-busy computation
+		scheduleTransp: text("schedule_transp")
+			.default("opaque")
+			.$type<"opaque" | "transparent">(),
+		// RFC 6638 §9.2: inbox-only — which calendar receives auto-placed invite copies
+		scheduleDefaultCalendarId: uuid(
+			"schedule_default_calendar_id",
+		).$type<UuidString>(),
 	},
 	(table) => [
 		foreignKey({
@@ -108,6 +116,15 @@ export const davCollection = pgTable(
 			foreignColumns: [table.id],
 			name: "dav_collection_parent_collection_id_fkey",
 		}).onDelete("cascade"),
+		foreignKey({
+			columns: [table.scheduleDefaultCalendarId],
+			foreignColumns: [table.id],
+			name: "dav_collection_schedule_default_calendar_id_fkey",
+		}).onDelete("set null"),
+		check(
+			"dav_collection_schedule_transp_check",
+			sql`schedule_transp IN ('opaque', 'transparent')`,
+		),
 		index("idx_dav_collection_deleted_at").using(
 			"btree",
 			table.deletedAt.asc().nullsLast(),

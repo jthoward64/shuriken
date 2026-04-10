@@ -19,6 +19,8 @@ import { HTTP_OK } from "#src/http/status.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
 import { InstanceService } from "#src/services/instance/index.ts";
+import { IanaTimezoneService } from "#src/services/timezone/iana.ts";
+import { stripKnownVtimezones } from "./report/calendar-data.ts";
 
 // ---------------------------------------------------------------------------
 // GET/HEAD handler — RFC 4918 §9.4
@@ -60,7 +62,7 @@ export const getHandler = (
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError | InternalError,
-	InstanceService | ComponentRepository | AclService
+	InstanceService | ComponentRepository | AclService | IanaTimezoneService
 > =>
 	Effect.gen(function* () {
 		// 1. Only instance paths accept GET/HEAD.
@@ -116,10 +118,17 @@ export const getHandler = (
 		});
 
 		// 7. Reconstruct IrDocument.
-		const doc: IrDocument =
+		let doc: IrDocument =
 			entityType === "icalendar"
 				? { kind: "icalendar", root }
 				: { kind: "vcard", root };
+
+		// 7a. RFC 7809 §3.1.3: strip VTIMEZONE components for known IANA timezones
+		// when the client requests timezones by reference (CalDAV-Timezones: F).
+		if (entityType === "icalendar" && ctx.caldavTimezones === "F") {
+			const ianaSvc = yield* IanaTimezoneService;
+			doc = stripKnownVtimezones(doc, ianaSvc.isKnownTzid.bind(ianaSvc));
+		}
 
 		// 8. Serialize to text.
 		const body =

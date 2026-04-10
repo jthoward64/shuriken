@@ -29,6 +29,7 @@ import {
 import type { AclService } from "#src/services/acl/index.ts";
 import type { ComponentRepository } from "#src/services/component/index.ts";
 import type { InstanceService } from "#src/services/instance/index.ts";
+import type { IanaTimezoneService } from "#src/services/timezone/iana.ts";
 import { runFailure, runSuccess } from "#src/testing/effect.ts";
 import { makeTestEnv } from "#src/testing/env.ts";
 import { getHandler } from "./get.ts";
@@ -61,6 +62,7 @@ const makeCtx = (
 	headers: new Headers(),
 	auth,
 	clientIp: Option.none(),
+	caldavTimezones: null,
 });
 
 const authenticatedCtx = makeCtx(
@@ -86,12 +88,12 @@ const instancePath: ResolvedDavPath = {
 type GetEffect<A> = Effect.Effect<
 	A,
 	DavError | DatabaseError | InternalError,
-	AclService | InstanceService | ComponentRepository
+	AclService | InstanceService | ComponentRepository | IanaTimezoneService
 >;
 type GetFailEffect = Effect.Effect<
 	unknown,
 	unknown,
-	AclService | InstanceService | ComponentRepository
+	AclService | InstanceService | ComponentRepository | IanaTimezoneService
 >;
 
 const run = <A>(env: ReturnType<typeof makeTestEnv>, effect: GetEffect<A>) =>

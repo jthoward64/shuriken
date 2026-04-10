@@ -1,12 +1,14 @@
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import {
 	type DatabaseError,
 	type DavError,
+	forbidden,
 	methodNotAllowed,
 	notFound,
 	preconditionFailed,
 	unauthorized,
 } from "#src/domain/errors.ts";
+import { EntityId } from "#src/domain/ids.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { HTTP_NO_CONTENT } from "#src/http/status.ts";
@@ -15,12 +17,13 @@ import {
 	type CollectionRepository,
 	CollectionService,
 } from "#src/services/collection/index.ts";
-import type { ComponentRepository } from "#src/services/component/index.ts";
+import { ComponentRepository } from "#src/services/component/index.ts";
 import type { EntityRepository } from "#src/services/entity/index.ts";
 import {
 	type InstanceRepository,
 	InstanceService,
 } from "#src/services/instance/index.ts";
+import { SchedulingService } from "#src/services/scheduling/index.ts";
 import { deleteCollection, deleteInstance } from "./copy-move.ts";
 
 // ---------------------------------------------------------------------------
@@ -41,6 +44,7 @@ export const deleteHandler = (
 	| EntityRepository
 	| ComponentRepository
 	| AclService
+	| SchedulingService
 > =>
 	Effect.gen(function* () {
 		// new-instance/new-collection → resource does not exist (404).
@@ -78,6 +82,26 @@ export const deleteHandler = (
 				return yield* preconditionFailed();
 			}
 
+			// RFC 6638: process scheduling before deletion (sends CANCEL or REPLY DECLINED).
+			if (instance.contentType === "text/calendar") {
+				const componentRepo = yield* ComponentRepository;
+				const treeOpt = yield* componentRepo.loadTree(
+					EntityId(instance.entityId),
+					"icalendar",
+				);
+				if (Option.isSome(treeOpt)) {
+					const schedulingSvc = yield* SchedulingService;
+					yield* Effect.ignore(
+						schedulingSvc.processAfterDelete({
+							actingPrincipalId: principal.principalId,
+							doc: { kind: "icalendar", root: treeOpt.value },
+							suppressReply:
+								ctx.headers.get("Schedule-Reply") === "no",
+						}),
+					);
+				}
+			}
+
 			yield* deleteInstance(instance);
 
 			return new Response(null, { status: HTTP_NO_CONTENT });
@@ -94,7 +118,15 @@ export const deleteHandler = (
 
 		// Verify the collection exists (returns 404 via service if not found).
 		const collectionSvc = yield* CollectionService;
-		yield* collectionSvc.findById(path.collectionId);
+		const collRow = yield* collectionSvc.findById(path.collectionId);
+
+		// RFC 6638: inbox and outbox are server-managed; clients must not delete them.
+		if (
+			collRow.collectionType === "inbox" ||
+			collRow.collectionType === "outbox"
+		) {
+			return yield* forbidden();
+		}
 
 		// Delete all active instances then the collection (RFC 4918 §9.6.1).
 		yield* deleteCollection(path.collectionId);

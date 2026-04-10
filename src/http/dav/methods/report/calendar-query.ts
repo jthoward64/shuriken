@@ -10,7 +10,7 @@ import { Effect, Option } from "effect";
 import { encodeICalendar } from "#src/data/icalendar/codec.ts";
 import type { ClarkName, IrDocument } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
-import { methodNotAllowed, unauthorized } from "#src/domain/errors.ts";
+import { forbidden, methodNotAllowed, unauthorized } from "#src/domain/errors.ts";
 import type { EntityId, UuidString } from "#src/domain/ids.ts";
 import { InstanceId } from "#src/domain/ids.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
@@ -30,7 +30,12 @@ import {
 	InstanceRepository,
 	InstanceService,
 } from "#src/services/instance/index.ts";
-import { parseCalendarDataSpec, subsetIrDocument } from "./calendar-data.ts";
+import { IanaTimezoneService } from "#src/services/timezone/iana.ts";
+import {
+	parseCalendarDataSpec,
+	stripKnownVtimezones,
+	subsetIrDocument,
+} from "./calendar-data.ts";
 import { evaluateCalFilter, parseCalFilter } from "./filter-cal.ts";
 import { extractPropNames } from "./parse.ts";
 
@@ -106,6 +111,7 @@ export const calendarQueryHandler = (
 	| ComponentRepository
 	| CalIndexRepository
 	| AclService
+	| IanaTimezoneService
 > =>
 	Effect.gen(function* () {
 		if (path.kind !== "collection") {
@@ -134,6 +140,27 @@ export const calendarQueryHandler = (
 				: {};
 		const filterTree = obj[cn("filter")];
 		const filter = yield* parseCalFilter({ [cn("filter")]: filterTree });
+
+		// RFC 7809 §6.2: parse optional <C:timezone-id> for floating-datetime context.
+		// Validate against known IANA timezones; fail with CALDAV:valid-timezone if unknown.
+		// (Floating-datetime resolution using this context is not yet implemented — RFC 4791
+		// §7.8.5 says filters against floating times with no timezone context MAY return no
+		// match, which is the current behaviour.)
+		const ianaSvc = yield* IanaTimezoneService;
+		const timezoneIdEl = obj[cn("timezone-id")];
+		const timezoneIdStr =
+			typeof timezoneIdEl === "string"
+				? timezoneIdEl.trim()
+				: typeof timezoneIdEl === "object" &&
+					  timezoneIdEl !== null &&
+					  "#text" in (timezoneIdEl as Record<string, unknown>)
+					? String(
+							(timezoneIdEl as Record<string, unknown>)["#text"],
+						).trim()
+					: null;
+		if (timezoneIdStr !== null && timezoneIdStr !== "" && !ianaSvc.isKnownTzid(timezoneIdStr)) {
+			return yield* forbidden("CALDAV:valid-timezone");
+		}
 
 		// Parse optional calendar-data subsetting spec (<C:calendar-data> is inside <D:prop>)
 		const propEl =
@@ -248,6 +275,12 @@ export const calendarQueryHandler = (
 		const origin = ctx.url.origin;
 		const responses: Array<DavResponse> = [];
 
+		// RFC 7809 §3.1.3: resolve the VTIMEZONE stripping function once per request.
+		const stripTimezones =
+			ctx.caldavTimezones === "F"
+				? (doc: IrDocument) => stripKnownVtimezones(doc, ianaSvc.isKnownTzid)
+				: (doc: IrDocument) => doc;
+
 		for (const inst of instances) {
 			const treeOpt = yield* compRepo.loadTree(
 				inst.entityId as unknown as EntityId,
@@ -262,7 +295,9 @@ export const calendarQueryHandler = (
 				continue;
 			}
 
-			const dataStr = yield* encodeICalendar(subsetIrDocument(irDoc, spec));
+			const dataStr = yield* encodeICalendar(
+				stripTimezones(subsetIrDocument(irDoc, spec)),
+			);
 
 			const href = `${origin}/dav/principals/${path.principalSeg}/${path.namespace}/${path.collectionSeg}/${inst.id}`;
 			const allProps: Record<ClarkName, unknown> = {

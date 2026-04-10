@@ -36,6 +36,10 @@ export interface CollectionPropertyChanges {
 	readonly description?: string | null;
 	/** undefined = leave unchanged; null = clear the value */
 	readonly timezoneTzid?: string | null;
+	/** RFC 6638 §9.1: schedule-calendar-transp. undefined = leave unchanged; null = reset to "opaque" */
+	readonly scheduleTransp?: "opaque" | "transparent" | null;
+	/** RFC 6638 §9.2: schedule-default-calendar-URL (inbox only). undefined = leave unchanged; null = clear */
+	readonly scheduleDefaultCalendarId?: CollectionId | null;
 }
 
 export interface CollectionRepositoryShape {

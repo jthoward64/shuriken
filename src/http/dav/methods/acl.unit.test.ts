@@ -68,6 +68,7 @@ const authenticatedCtx: HttpRequestContext = {
 	headers: new Headers(),
 	auth: new Authenticated({ principal: authenticatedPrincipal }),
 	clientIp: Option.none(),
+	caldavTimezones: null,
 };
 
 // ---------------------------------------------------------------------------

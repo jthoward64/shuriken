@@ -26,6 +26,7 @@ const fakeCtx: HttpRequestContext = {
 	headers: new Headers(),
 	auth: new Unauthenticated(),
 	clientIp: Option.none(),
+	caldavTimezones: null,
 };
 
 describe("optionsHandler", () => {

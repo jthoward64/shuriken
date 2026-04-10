@@ -12,11 +12,14 @@ import {
 	HTTP_BAD_REQUEST,
 	HTTP_INTERNAL_SERVER_ERROR,
 } from "#src/http/status.ts";
+import { timezonesHandler } from "#src/http/timezones/handler.ts";
 import { uiRouter } from "#src/http/ui/router.ts";
 import type {
 	CollectionRepository,
+	IanaTimezoneService,
 	InstanceRepository,
 	PrincipalRepository,
+	SchedulingService,
 } from "#src/layers.ts";
 import type { AclService } from "#src/services/acl/index.ts";
 import type { CalIndexRepository } from "#src/services/cal-index/index.ts";
@@ -40,7 +43,7 @@ import type { UserRepository, UserService } from "#src/services/user/index.ts";
 // Responsibilities:
 //   1. Assign requestId, annotate logs
 //   2. Authenticate the request
-//   3. Route to DAV or UI based on path prefix
+//   3. Route to DAV, timezone service, or UI based on path prefix
 //   4. Map all errors to HTTP responses
 // ---------------------------------------------------------------------------
 
@@ -56,19 +59,24 @@ type AppServices =
 	| EntityRepository
 	| ComponentRepository
 	| CalTimezoneRepository
+	| IanaTimezoneService
 	| TombstoneRepository
 	| CalIndexRepository
 	| CardIndexRepository
 	| UserRepository
 	| GroupRepository
 	| UserService
-	| GroupService;
+	| GroupService
+	| SchedulingService;
 
 const isDavPath = (pathname: string): boolean =>
 	pathname === "/dav" ||
 	pathname.startsWith("/dav/") ||
 	pathname.startsWith("/.well-known/cal") ||
 	pathname.startsWith("/.well-known/card");
+
+const isTimezonePath = (pathname: string): boolean =>
+	pathname === "/timezones";
 
 const isUiPath = (pathname: string): boolean =>
 	pathname === "/" ||
@@ -186,6 +194,11 @@ export const handleRequest = (
 		const authService = yield* AuthService;
 		const auth = yield* authService.authenticate(req.headers, clientIp);
 
+		const caldavTimezones = req.headers.get("CalDAV-Timezones") as
+			| "T"
+			| "F"
+			| null;
+
 		const ctx: HttpRequestContext = {
 			requestId,
 			method: req.method,
@@ -193,10 +206,15 @@ export const handleRequest = (
 			headers: req.headers,
 			auth,
 			clientIp,
+			caldavTimezones,
 		};
 
 		if (isDavPath(url.pathname)) {
 			return yield* davRouter(req, ctx);
+		}
+
+		if (isTimezonePath(url.pathname)) {
+			return yield* timezonesHandler(req, url);
 		}
 
 		if (isUiPath(url.pathname)) {

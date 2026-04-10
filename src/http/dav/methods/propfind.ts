@@ -74,6 +74,10 @@ const CURRENT_USER_PRIVILEGE_SET = cn(DAV_NS, "current-user-privilege-set");
 const DAV_ACL = cn(DAV_NS, "acl");
 const DAV_OWNER = cn(DAV_NS, "owner");
 const CALENDAR_TIMEZONE = cn(CALDAV_NS, "calendar-timezone");
+// RFC 7809 §5.1 — timezone service URLs (on calendar home / principal)
+const TIMEZONE_SERVICE_SET = cn(CALDAV_NS, "timezone-service-set");
+// RFC 7809 §5.2 — TZID shorthand for calendar-timezone (on calendar collection)
+const CALENDAR_TIMEZONE_ID = cn(CALDAV_NS, "calendar-timezone-id");
 const SCHEDULE_INBOX_URL = cn(CALDAV_NS, "schedule-inbox-URL");
 const SCHEDULE_OUTBOX_URL = cn(CALDAV_NS, "schedule-outbox-URL");
 const CAL_SUPPORTED_COLLATION_SET = cn(CALDAV_NS, "supported-collation-set");
@@ -81,6 +85,12 @@ const CARD_SUPPORTED_COLLATION_SET = cn(CARDDAV_NS, "supported-collation-set");
 const DAV_GROUP_MEMBER_SET = cn(DAV_NS, "group-member-set");
 const DAV_GROUP_MEMBERSHIP = cn(DAV_NS, "group-membership");
 const DAV_ALTERNATE_URI_SET = cn(DAV_NS, "alternate-URI-set");
+// RFC 6638 §9.1 — schedule-calendar-transp (opaque|transparent)
+const SCHEDULE_CALENDAR_TRANSP = cn(CALDAV_NS, "schedule-calendar-transp");
+// RFC 6638 §9.2 — schedule-default-calendar-URL (inbox only)
+const SCHEDULE_DEFAULT_CAL_URL = cn(CALDAV_NS, "schedule-default-calendar-URL");
+// RFC 6638 §2.4.2 — calendar-user-type (on principal resources)
+const CAL_USER_TYPE = cn(CALDAV_NS, "calendar-user-type");
 
 // The two collation URIs the server supports for <text-match> filters.
 // RFC 4791 §5.2.10 / RFC 6352 §6.2.3.
@@ -153,6 +163,14 @@ const buildSupportedReportSet = (
 		return [
 			makeEntry(cn(CARDDAV_NS, "addressbook-query")),
 			makeEntry(cn(CARDDAV_NS, "addressbook-multiget")),
+			makeEntry(cn(DAV_NS, "sync-collection")),
+		];
+	}
+	// RFC 6638 §2.3: inbox and outbox MUST support calendar-query and calendar-multiget
+	if (collectionType === "inbox" || collectionType === "outbox") {
+		return [
+			makeEntry(cn(CALDAV_NS, "calendar-query")),
+			makeEntry(cn(CALDAV_NS, "calendar-multiget")),
 			makeEntry(cn(DAV_NS, "sync-collection")),
 		];
 	}
@@ -334,6 +352,7 @@ const toICalDatetime = (instant: { epochMilliseconds: number }): string => {
 
 const buildCollectionProps = (
 	row: CollectionRow,
+	origin = "",
 ): Readonly<Record<ClarkName, unknown>> => {
 	const resourcetype: Record<string, unknown> = {
 		"{DAV:}collection": "",
@@ -342,6 +361,12 @@ const buildCollectionProps = (
 		resourcetype[`{${CALDAV_NS}}calendar`] = "";
 	} else if (row.collectionType === "addressbook") {
 		resourcetype[`{${CARDDAV_NS}}addressbook`] = "";
+	} else if (row.collectionType === "inbox") {
+		// RFC 6638 §2.2: scheduling inbox resourcetype
+		resourcetype[`{${CALDAV_NS}}schedule-inbox`] = "";
+	} else if (row.collectionType === "outbox") {
+		// RFC 6638 §2.1: scheduling outbox resourcetype
+		resourcetype[`{${CALDAV_NS}}schedule-outbox`] = "";
 	}
 
 	const props: Record<ClarkName, unknown> = {
@@ -402,6 +427,30 @@ const buildCollectionProps = (
 		props[cn(CARDDAV_NS, "max-resource-size")] = String(row.maxResourceSize);
 	}
 
+	// RFC 6638 §9.1: schedule-calendar-transp (calendar, inbox, outbox only)
+	if (
+		row.collectionType === "calendar" ||
+		row.collectionType === "inbox" ||
+		row.collectionType === "outbox"
+	) {
+		const transp = row.scheduleTransp ?? "opaque";
+		props[SCHEDULE_CALENDAR_TRANSP] = {
+			[cn(CALDAV_NS, transp)]: "",
+		};
+	}
+
+	// RFC 6638 §9.2: schedule-default-calendar-URL (inbox only, when set)
+	if (
+		origin !== "" &&
+		row.collectionType === "inbox" &&
+		row.scheduleDefaultCalendarId !== null
+	) {
+		props[SCHEDULE_DEFAULT_CAL_URL] = {
+			[cn(DAV_NS, "href")]:
+				`${origin}/dav/principals/${row.ownerPrincipalId}/cal/${row.scheduleDefaultCalendarId}/`,
+		};
+	}
+
 	// Dead properties
 	const dead = row.clientProperties as IrDeadProperties | null;
 	if (dead) {
@@ -417,9 +466,10 @@ const collectionResponse = (
 	href: string,
 	row: CollectionRow,
 	request: PropfindKind,
+	origin = "",
 ): DavResponse => ({
 	href,
-	propstats: splitPropstats(buildCollectionProps(row), request),
+	propstats: splitPropstats(buildCollectionProps(row, origin), request),
 });
 
 // ---------------------------------------------------------------------------
@@ -536,6 +586,11 @@ export const propfindHandler = (
 				// RFC 6638 §2.2: scheduling collection URLs
 				[SCHEDULE_INBOX_URL]: { [cn(DAV_NS, "href")]: inboxHref },
 				[SCHEDULE_OUTBOX_URL]: { [cn(DAV_NS, "href")]: outboxHref },
+				// RFC 7809 §5.1: timezone distribution service used by this server.
+				// SHOULD NOT be returned in allprop per spec, but included here for
+				// consistency with other live properties. Clients that request it
+				// explicitly will always receive it.
+				[TIMEZONE_SERVICE_SET]: { [cn(DAV_NS, "href")]: `${origin}/timezones` },
 				// RFC 3744 §4.4: groups this user belongs to
 				[DAV_GROUP_MEMBERSHIP]: memberOfGroups.map((g) => ({
 					[cn(DAV_NS, "href")]: `${origin}/dav/groups/${g.principal.id}/`,
@@ -544,6 +599,11 @@ export const propfindHandler = (
 				[ACL_RESTRICTIONS]: ACL_RESTRICTIONS_VALUE,
 				// RFC 3744 §5.4: privileges the acting principal has on this resource
 				[CURRENT_USER_PRIVILEGE_SET]: buildPrivilegeSet(principalPrivileges),
+				// RFC 6638 §2.4.2: calendar user type (INDIVIDUAL, GROUP, etc.)
+				[CAL_USER_TYPE]:
+					principalRow.principal.principalType === "group"
+						? "GROUP"
+						: "INDIVIDUAL",
 			};
 			// DAV:acl — RFC 3744 §5.5: only when the caller holds read-acl.
 			if (
@@ -573,7 +633,7 @@ export const propfindHandler = (
 							coll.collectionType
 						] ?? "col";
 					const href = collectionHref(origin, path.principalSeg, ns, coll.slug);
-					responses.push(collectionResponse(href, coll, propfind));
+					responses.push(collectionResponse(href, coll, propfind, origin));
 				}
 			}
 		} else if (path.kind === "collection") {
@@ -597,13 +657,14 @@ export const propfindHandler = (
 			);
 			const ownerHref = `${origin}/dav/principals/${collRow.ownerPrincipalId}/`;
 			const collProps: Record<ClarkName, unknown> = {
-				...buildCollectionProps(collRow),
+				...buildCollectionProps(collRow, origin),
 				[CURRENT_USER_PRINCIPAL]: { [cn(DAV_NS, "href")]: actingPrincipalHref },
 				[CURRENT_USER_PRIVILEGE_SET]: buildPrivilegeSet(collectionPrivileges),
 				// RFC 3744 §5.1: owner of this resource
 				[DAV_OWNER]: { [cn(DAV_NS, "href")]: ownerHref },
 			};
 			// CALDAV:calendar-timezone — RFC 4791 §5.2.2
+			// CALDAV:calendar-timezone-id — RFC 7809 §5.2 (TZID shorthand)
 			if (collRow.collectionType === "calendar" && collRow.timezoneTzid) {
 				const tzRepo = yield* CalTimezoneRepository;
 				const tzOpt = yield* tzRepo.findByTzid(collRow.timezoneTzid);
@@ -611,6 +672,8 @@ export const propfindHandler = (
 				if (tzData !== undefined) {
 					collProps[CALENDAR_TIMEZONE] = tzData.vtimezoneData;
 				}
+				// calendar-timezone-id is the TZID string; always present when timezone is set.
+				collProps[CALENDAR_TIMEZONE_ID] = collRow.timezoneTzid;
 			}
 			// Collation sets — RFC 4791 §5.2.10 / RFC 6352 §6.2.3
 			if (collRow.collectionType === "calendar") {

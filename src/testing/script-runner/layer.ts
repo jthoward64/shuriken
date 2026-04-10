@@ -15,6 +15,8 @@ import { ProvisioningDomainLayer } from "#src/services/provisioning/index.ts";
 import { TimezoneDomainLayer } from "#src/services/timezone/index.ts";
 import { TombstoneRepositoryLive } from "#src/services/tombstone/index.ts";
 import { UserDomainLayer } from "#src/services/user/index.ts";
+import { SchedulingDomainLayer } from "#src/services/scheduling/index.ts";
+import { IanaTimezoneService } from "#src/services/timezone/index.ts";
 import { TestCryptoLayer } from "#src/testing/env.ts";
 import { makePgliteDatabaseLayer } from "#src/testing/pglite.ts";
 
@@ -66,7 +68,7 @@ export const makeScriptRunnerLayer = () => {
 		layer: Layer.Layer<A, E, DatabaseClient | CryptoService>,
 	) => layer.pipe(Layer.provide(testInfraLayer));
 
-	return Layer.mergeAll(
+	const testBaseLayer = Layer.mergeAll(
 		testInfraLayer,
 		Logger.minimumLogLevel(LogLevel.None),
 		BasicAuthLayer.pipe(Layer.provide(testInfraLayer)),
@@ -79,9 +81,15 @@ export const makeScriptRunnerLayer = () => {
 		withTestInfra(GroupDomainLayer),
 		withTestInfra(DomainEntityDomainLayer),
 		withTestInfra(TimezoneDomainLayer),
+		IanaTimezoneService.Default,
 		withTestInfra(ProvisioningDomainLayer),
 		withTestInfra(TombstoneRepositoryLive),
 		withTestInfra(CalIndexRepositoryLive),
 		withTestInfra(CardIndexRepositoryLive),
+	);
+
+	return Layer.merge(
+		testBaseLayer,
+		SchedulingDomainLayer.pipe(Layer.provide(testBaseLayer)),
 	);
 };

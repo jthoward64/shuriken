@@ -131,7 +131,17 @@ export type CalDavPrecondition =
 	| "CALDAV:valid-filter" // 400
 	| "CALDAV:supported-filter" // 403
 	| "CALDAV:supported-collation" // 403
-	| "CALDAV:valid-calendar-timezone"; // 400
+	| "CALDAV:valid-calendar-timezone" // 400
+	| "CALDAV:valid-timezone" // RFC 7809 §6.2 — unknown TZID in timezone-id element
+	// RFC 6638 — CalDAV Scheduling
+	| "CALDAV:unique-scheduling-object-resource" // 403
+	| "CALDAV:same-organizer-in-all-components" // 403
+	| "CALDAV:allowed-organizer-scheduling-object-change" // 403
+	| "CALDAV:allowed-attendee-scheduling-object-change" // 403
+	| "CALDAV:valid-scheduling-message" // 403
+	| "CALDAV:valid-organizer" // 403
+	| "CALDAV:default-calendar-needed" // 403
+	| "CALDAV:valid-schedule-default-calendar-URL"; // 403
 
 /** RFC 6352 — CardDAV */
 export type CardDavPrecondition =

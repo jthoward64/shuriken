@@ -62,6 +62,8 @@ import {
 } from "#src/services/principal/repository.ts";
 import { PrincipalServiceLive } from "#src/services/principal/service.live.ts";
 import type { PrincipalService } from "#src/services/principal/service.ts";
+import { SchedulingService } from "#src/services/scheduling/service.ts";
+import { IanaTimezoneService } from "#src/services/timezone/iana.ts";
 import {
 	CalTimezoneRepository,
 	type CalTimezoneRow,
@@ -564,6 +566,8 @@ const makeCollectionRepo = (stores: TestStores): CollectionRepositoryShape => ({
 				maxDateTime: null,
 				maxInstances: null,
 				maxAttendeesPerInstance: null,
+				scheduleTransp: "opaque",
+				scheduleDefaultCalendarId: null,
 			};
 			stores.collections.set(row.id, row);
 			return row;
@@ -961,6 +965,9 @@ const makeEntityRepo = (stores: TestStores): EntityRepositoryShape => ({
 					stores.entities.get(inst.entityId)?.logicalUid === logicalUid,
 			),
 		),
+
+	existsByUidForPrincipal: (_principalId, _logicalUid) =>
+		Effect.succeed(false),
 });
 
 const makeComponentRepo = (stores: TestStores): ComponentRepositoryShape => ({
@@ -1220,6 +1227,8 @@ export interface TestEnvBuilder {
 		| ComponentRepository
 		| CalTimezoneRepository
 		| CalIndexRepository
+		| IanaTimezoneService
+		| SchedulingService
 	>;
 	/** Direct store access for advanced assertions. Prefer reading via services. */
 	readonly stores: TestStores;
@@ -1292,6 +1301,8 @@ export const makeTestEnv = (): TestEnvBuilder => {
 				maxDateTime: null,
 				maxInstances: null,
 				maxAttendeesPerInstance: null,
+				scheduleTransp: "opaque",
+				scheduleDefaultCalendarId: null,
 			});
 			return self;
 		},
@@ -1409,6 +1420,13 @@ export const makeTestEnv = (): TestEnvBuilder => {
 				CalIndexRepository,
 				makeCalIndexRepo(),
 			);
+			const schedulingServiceLayer = Layer.succeed(SchedulingService, {
+				processAfterPut: (_opts) => Effect.succeed(Option.none()),
+				validateSchedulingChange: (_opts) => Effect.void,
+				processAfterDelete: (_opts) => Effect.void,
+				processOutboxPost: (_opts) =>
+					Effect.succeed("BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n"),
+			});
 
 			const userServiceLayer = UserServiceLive.pipe(
 				Layer.provide(
@@ -1443,6 +1461,8 @@ export const makeTestEnv = (): TestEnvBuilder => {
 				componentRepoLayer,
 				calTimezoneRepoLayer,
 				calIndexRepoLayer,
+				IanaTimezoneService.Default,
+				schedulingServiceLayer,
 			);
 		},
 	};

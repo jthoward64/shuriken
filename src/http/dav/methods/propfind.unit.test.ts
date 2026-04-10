@@ -48,6 +48,7 @@ const makeCtx = (auth: HttpRequestContext["auth"]): HttpRequestContext => ({
 	headers: new Headers(),
 	auth,
 	clientIp: Option.none(),
+	caldavTimezones: null,
 });
 
 const authenticatedCtx = makeCtx(

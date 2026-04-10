@@ -96,6 +96,8 @@ export const makeCollectionRow = (
 	maxDateTime: null,
 	maxInstances: null,
 	maxAttendeesPerInstance: null,
+	scheduleTransp: "opaque",
+	scheduleDefaultCalendarId: null,
 	...overrides,
 });
 

@@ -42,6 +42,8 @@ import {
 	type PrincipalServiceShape,
 } from "#src/services/principal/service.ts";
 import { CalTimezoneRepository } from "#src/services/timezone/repository.ts";
+import { SchedulingService } from "#src/services/scheduling/service.ts";
+import { IanaTimezoneService } from "#src/services/timezone/iana.ts";
 import { TombstoneRepository } from "#src/services/tombstone/index.ts";
 import { UserRepository, UserService } from "#src/services/user/index.ts";
 import type { UserRepositoryShape } from "#src/services/user/repository.ts";
@@ -75,6 +77,7 @@ const makeCtx = (method: string, pathname: string) => ({
 	headers: new Headers(),
 	auth: new Unauthenticated(),
 	clientIp: Option.none(),
+	caldavTimezones: null,
 });
 
 /**
@@ -141,6 +144,8 @@ const makeRouterLayer = (
 	| GroupRepository
 	| UserService
 	| GroupService
+	| SchedulingService
+	| IanaTimezoneService
 > => {
 	const principals = seeds.principals ?? new Map<string, string>();
 	const collections = seeds.collections ?? new Map<string, string>();
@@ -348,6 +353,14 @@ const makeRouterLayer = (
 			}),
 		),
 		AclServiceAllowAll,
+		Layer.succeed(SchedulingService, {
+			processAfterPut: (_opts) => Effect.succeed(Option.none()),
+			validateSchedulingChange: (_opts) => Effect.void,
+			processAfterDelete: (_opts) => Effect.void,
+			processOutboxPost: (_opts) =>
+				Effect.succeed("BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n"),
+		}),
+		IanaTimezoneService.Default,
 	);
 };
 

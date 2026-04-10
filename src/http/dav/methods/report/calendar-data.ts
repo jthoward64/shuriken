@@ -142,6 +142,47 @@ const subsetComponent = (comp: IrComponent, spec: CompSpec): IrComponent => {
 	return { ...comp, properties, components };
 };
 
+// ---------------------------------------------------------------------------
+// stripKnownVtimezones — RFC 7809 §3.1.3 (CalDAV-Timezones: F)
+// ---------------------------------------------------------------------------
+
+/**
+ * Remove VTIMEZONE sub-components from a VCALENDAR IrDocument whose TZID is
+ * a standard IANA timezone known to the server.
+ *
+ * Called when the client sends `CalDAV-Timezones: F`, indicating it will fetch
+ * timezone definitions from the advertised timezone service rather than
+ * expecting them to be embedded. VTIMEZONE components for custom or unknown
+ * TZIDs are always preserved so clients can still interpret them.
+ */
+export const stripKnownVtimezones = (
+	doc: IrDocument,
+	isKnownTzid: (tzid: string) => boolean,
+): IrDocument => {
+	if (doc.kind !== "icalendar") {
+		return doc;
+	}
+	const root = doc.root;
+	const filteredComponents = root.components.filter((sub) => {
+		if (sub.name !== "VTIMEZONE") {
+			return true;
+		}
+		const tzidProp = sub.properties.find((p) => p.name === "TZID");
+		if (!tzidProp) {
+			// Malformed VTIMEZONE without TZID — keep it to avoid data loss.
+			return true;
+		}
+		const tzid =
+			tzidProp.value.type === "TEXT" ? tzidProp.value.value : null;
+		if (tzid === null) {
+			return true;
+		}
+		// Strip only if the TZID is a known IANA timezone.
+		return !isKnownTzid(tzid);
+	});
+	return { ...doc, root: { ...root, components: filteredComponents } };
+};
+
 /**
  * Properties that must always be included regardless of the spec.
  * RFC 4791 §8.6.1: VERSION/PRODID in VCALENDAR are always returned.

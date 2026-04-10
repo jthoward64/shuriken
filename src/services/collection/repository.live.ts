@@ -213,6 +213,12 @@ const updateProperties = Effect.fn("CollectionRepository.updateProperties")(
 		if (changes.timezoneTzid !== undefined) {
 			setValues.timezoneTzid = changes.timezoneTzid;
 		}
+		if (changes.scheduleTransp !== undefined) {
+			setValues.scheduleTransp = changes.scheduleTransp ?? "opaque";
+		}
+		if (changes.scheduleDefaultCalendarId !== undefined) {
+			setValues.scheduleDefaultCalendarId = changes.scheduleDefaultCalendarId;
+		}
 		return yield* Effect.tryPromise({
 			try: () =>
 				db

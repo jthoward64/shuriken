@@ -29,7 +29,8 @@ const PRIVILEGE_CONTAINERS: Readonly<
 	"CALDAV:schedule-deliver-invite": ["CALDAV:schedule-deliver", "DAV:all"],
 	"CALDAV:schedule-deliver-reply": ["CALDAV:schedule-deliver", "DAV:all"],
 	"CALDAV:schedule-deliver": ["DAV:all"],
-	"CALDAV:schedule-query-freebusy": ["CALDAV:schedule-send", "DAV:all"],
+	// RFC 6638 §6.3: schedule-query-freebusy is a sub-privilege of schedule-deliver (inbox), not schedule-send
+	"CALDAV:schedule-query-freebusy": ["CALDAV:schedule-deliver", "DAV:all"],
 	"CALDAV:schedule-send-invite": ["CALDAV:schedule-send", "DAV:all"],
 	"CALDAV:schedule-send-reply": ["CALDAV:schedule-send", "DAV:all"],
 	"CALDAV:schedule-send-freebusy": ["CALDAV:schedule-send", "DAV:all"],
@@ -70,12 +71,13 @@ const PRIVILEGE_CONTAINED: Readonly<
 	"CALDAV:schedule-deliver": [
 		"CALDAV:schedule-deliver-invite",
 		"CALDAV:schedule-deliver-reply",
+		// RFC 6638 §6.3: schedule-query-freebusy is a sub-privilege of schedule-deliver (inbox)
+		"CALDAV:schedule-query-freebusy",
 	],
 	"CALDAV:schedule-send": [
 		"CALDAV:schedule-send-invite",
 		"CALDAV:schedule-send-reply",
 		"CALDAV:schedule-send-freebusy",
-		"CALDAV:schedule-query-freebusy",
 	],
 };
 

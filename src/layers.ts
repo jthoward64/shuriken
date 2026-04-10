@@ -12,7 +12,11 @@ import { GroupDomainLayer } from "#src/services/group/index.ts";
 import { InstanceDomainLayer } from "#src/services/instance/index.ts";
 import { PrincipalDomainLayer } from "#src/services/principal/index.ts";
 import { ProvisioningDomainLayer } from "#src/services/provisioning/index.ts";
-import { TimezoneDomainLayer } from "#src/services/timezone/index.ts";
+import { SchedulingDomainLayer } from "#src/services/scheduling/index.ts";
+import {
+	IanaTimezoneService,
+	TimezoneDomainLayer,
+} from "#src/services/timezone/index.ts";
 import { TombstoneRepositoryLive } from "#src/services/tombstone/index.ts";
 import { UserDomainLayer } from "#src/services/user/index.ts";
 
@@ -53,7 +57,8 @@ const withInfra = <A, E>(
 //   2. Add `withInfra(<Name>DomainLayer)` here
 // ---------------------------------------------------------------------------
 
-export const AppLayer = Layer.mergeAll(
+// BaseAppLayer — all services except those with cross-domain dependencies.
+const BaseAppLayer = Layer.mergeAll(
 	Logger.pretty,
 	InfraLayer,
 	AuthLayer,
@@ -65,10 +70,21 @@ export const AppLayer = Layer.mergeAll(
 	withInfra(GroupDomainLayer),
 	withInfra(DomainEntityDomainLayer),
 	withInfra(TimezoneDomainLayer),
+	IanaTimezoneService.Default,
 	ProvisioningDomainLayer.pipe(Layer.provide(InfraLayer)),
 	TombstoneRepositoryLive.pipe(Layer.provide(InfraLayer)),
 	CalIndexRepositoryLive.pipe(Layer.provide(InfraLayer)),
 	CardIndexRepositoryLive.pipe(Layer.provide(InfraLayer)),
+);
+
+// AppLayer — adds SchedulingDomainLayer, which depends on cross-domain services
+// already provided by BaseAppLayer (DatabaseClient, AclService, ComponentRepository,
+// EntityRepository, InstanceService, PrincipalRepository, CryptoService).
+// Merge both: BaseAppLayer is used to satisfy SchedulingDomainLayer's requirements
+// and Effect's Layer sharing ensures services are only initialized once.
+export const AppLayer = Layer.merge(
+	BaseAppLayer,
+	SchedulingDomainLayer.pipe(Layer.provide(BaseAppLayer)),
 );
 
 // ---------------------------------------------------------------------------
@@ -106,7 +122,11 @@ export {
 	PrincipalRepository,
 	PrincipalService,
 } from "#src/services/principal/index.ts";
-export { CalTimezoneRepository } from "#src/services/timezone/index.ts";
+export { SchedulingService } from "#src/services/scheduling/index.ts";
+export {
+	CalTimezoneRepository,
+	IanaTimezoneService,
+} from "#src/services/timezone/index.ts";
 export {
 	TombstoneRepository,
 	type TombstoneRow,

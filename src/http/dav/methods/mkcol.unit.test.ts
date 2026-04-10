@@ -51,6 +51,7 @@ const makeCtx = (
 	headers: new Headers(),
 	auth,
 	clientIp: Option.none(),
+	caldavTimezones: null,
 });
 
 const makeNewCollectionPath = (

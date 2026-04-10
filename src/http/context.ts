@@ -34,4 +34,11 @@ export interface HttpRequestContext {
 	readonly auth: AuthResult;
 	/** Remote client IP from server.requestIP(req), or None if unavailable. */
 	readonly clientIp: Option.Option<string>;
+	/**
+	 * Parsed CalDAV-Timezones request header (RFC 7809 §7.1).
+	 *   "T" — client wants VTIMEZONE components included in responses
+	 *   "F" — client does not want VTIMEZONE components for standard IANA timezones
+	 *   null — header absent; server uses default behavior (include all)
+	 */
+	readonly caldavTimezones: "T" | "F" | null;
 }

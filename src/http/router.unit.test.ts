@@ -18,6 +18,8 @@ import { EntityRepository } from "#src/services/entity/index.ts";
 import { GroupRepository, GroupService } from "#src/services/group/index.ts";
 import { InstanceService } from "#src/services/instance/index.ts";
 import { PrincipalService } from "#src/services/principal/service.ts";
+import { SchedulingService } from "#src/services/scheduling/service.ts";
+import { IanaTimezoneService } from "#src/services/timezone/iana.ts";
 import { CalTimezoneRepository } from "#src/services/timezone/index.ts";
 import { TombstoneRepository } from "#src/services/tombstone/index.ts";
 import { UserRepository, UserService } from "#src/services/user/index.ts";
@@ -123,6 +125,7 @@ const stubLayers = Layer.mergeAll(
 		updateLogicalUid: die,
 		softDelete: die,
 		existsByUid: die,
+		existsByUidForPrincipal: die,
 	}),
 	Layer.succeed(ComponentRepository, {
 		insertTree: die,
@@ -193,6 +196,13 @@ const stubLayers = Layer.mergeAll(
 		addMember: die,
 		removeMember: die,
 	}),
+	Layer.succeed(SchedulingService, {
+		processAfterPut: die,
+		validateSchedulingChange: die,
+		processAfterDelete: die,
+		processOutboxPost: die,
+	}),
+	IanaTimezoneService.Default,
 );
 
 const runWith = (

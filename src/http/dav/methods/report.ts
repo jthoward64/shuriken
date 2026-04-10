@@ -30,6 +30,7 @@ import type {
 	InstanceService,
 } from "#src/services/instance/index.ts";
 import type { PrincipalRepository } from "#src/services/principal/index.ts";
+import type { IanaTimezoneService } from "#src/services/timezone/iana.ts";
 import type { TombstoneRepository } from "#src/services/tombstone/index.ts";
 import { addressbookMultigetHandler } from "./report/addressbook-multiget.ts";
 import { addressbookQueryHandler } from "./report/addressbook-query.ts";
@@ -68,6 +69,7 @@ export const reportHandler = (
 	| ComponentRepository
 	| CalIndexRepository
 	| CardIndexRepository
+	| IanaTimezoneService
 	| PrincipalRepository
 	| AclService
 > =>

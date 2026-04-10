@@ -2,12 +2,13 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { Effect, Layer, Option } from "effect";
 import { DatabaseClient, type DbClient } from "#src/db/client.ts";
 import {
+	davCollection,
 	davEntity,
 	davInstance,
 	type EntityType,
 } from "#src/db/drizzle/schema/index.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
-import type { CollectionId, EntityId } from "#src/domain/ids.ts";
+import type { CollectionId, EntityId, PrincipalId } from "#src/domain/ids.ts";
 import { EntityRepository } from "./repository.ts";
 
 // ---------------------------------------------------------------------------
@@ -99,6 +100,36 @@ const existsByUid = (
 		catch: (e) => new DatabaseError({ cause: e }),
 	});
 
+const existsByUidForPrincipal = (
+	db: DbClient,
+	principalId: PrincipalId,
+	logicalUid: string,
+) =>
+	Effect.tryPromise({
+		try: () =>
+			db
+				.select({ id: davEntity.id })
+				.from(davEntity)
+				.innerJoin(davInstance, eq(davInstance.entityId, davEntity.id))
+				.innerJoin(
+					davCollection,
+					eq(davCollection.id, davInstance.collectionId),
+				)
+				.where(
+					and(
+						eq(davCollection.ownerPrincipalId, principalId),
+						eq(davCollection.collectionType, "calendar"),
+						eq(davEntity.logicalUid, logicalUid),
+						isNull(davInstance.deletedAt),
+						isNull(davEntity.deletedAt),
+						isNull(davCollection.deletedAt),
+					),
+				)
+				.limit(1)
+				.then((r) => r.length > 0),
+		catch: (e) => new DatabaseError({ cause: e }),
+	});
+
 export const EntityRepositoryLive = Layer.effect(
 	EntityRepository,
 	Effect.map(DatabaseClient, (db) =>
@@ -108,6 +139,8 @@ export const EntityRepositoryLive = Layer.effect(
 			updateLogicalUid: (id, uid) => updateLogicalUid(db, id, uid),
 			softDelete: (id) => softDelete(db, id),
 			existsByUid: (collectionId, uid) => existsByUid(db, collectionId, uid),
+			existsByUidForPrincipal: (principalId, uid) =>
+				existsByUidForPrincipal(db, principalId, uid),
 		}),
 	),
 );

@@ -15,7 +15,12 @@ import type { HttpRequestContext } from "#src/http/context.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import type { ComponentRepository } from "#src/services/component/index.ts";
 import type { InstanceService } from "#src/services/instance/index.ts";
-import { parseCalendarDataSpec, subsetIrDocument } from "./calendar-data.ts";
+import { IanaTimezoneService } from "#src/services/timezone/iana.ts";
+import {
+	parseCalendarDataSpec,
+	stripKnownVtimezones,
+	subsetIrDocument,
+} from "./calendar-data.ts";
 import { multigetHandler } from "./multiget.ts";
 import { extractHrefs, extractPropNames } from "./parse.ts";
 
@@ -31,7 +36,7 @@ export const calendarMultigetHandler = (
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError,
-	InstanceService | ComponentRepository | AclService
+	InstanceService | ComponentRepository | AclService | IanaTimezoneService
 > =>
 	Effect.gen(function* () {
 		if (path.kind !== "collection") {
@@ -66,6 +71,13 @@ export const calendarMultigetHandler = (
 				: undefined;
 		const spec = parseCalendarDataSpec(dataTree);
 
+		// RFC 7809 §3.1.3: resolve the VTIMEZONE stripping function once per request.
+		const ianaSvc = yield* IanaTimezoneService;
+		const stripTimezones =
+			ctx.caldavTimezones === "F"
+				? (doc: IrDocument) => stripKnownVtimezones(doc, ianaSvc.isKnownTzid)
+				: (doc: IrDocument) => doc;
+
 		return yield* multigetHandler({
 			hrefs,
 			collectionId: path.collectionId,
@@ -76,6 +88,6 @@ export const calendarMultigetHandler = (
 			dataClarkName: CALENDAR_DATA,
 			dataTree,
 			serializeData: (doc: IrDocument) =>
-				encodeICalendar(subsetIrDocument(doc, spec)),
+				encodeICalendar(stripTimezones(subsetIrDocument(doc, spec))),
 		});
 	});
