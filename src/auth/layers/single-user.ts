@@ -3,7 +3,7 @@ import { Effect, Layer, Option } from "effect";
 import { AuthService } from "#src/auth/service.ts";
 import { AppConfigService } from "#src/config.ts";
 import { DatabaseClient } from "#src/db/client.ts";
-import { user } from "#src/db/drizzle/schema/index.ts";
+import { principal, user } from "#src/db/drizzle/schema/index.ts";
 import { AuthError, DatabaseError } from "#src/domain/errors.ts";
 import { PrincipalId, UserId } from "#src/domain/ids.ts";
 import type { AuthenticatedPrincipal } from "#src/domain/types/dav.ts";
@@ -32,9 +32,10 @@ const resolvePrincipal = (
 					.select({
 						userId: user.id,
 						principalId: user.principalId,
-						name: user.name,
+						displayName: principal.displayName,
 					})
 					.from(user)
+					.innerJoin(principal, eq(user.principalId, principal.id))
 					.where(
 						Option.getOrUndefined(Option.map(email, (e) => eq(user.email, e))),
 					)
@@ -47,7 +48,7 @@ const resolvePrincipal = (
 			return {
 				principalId: PrincipalId(row.principalId),
 				userId: UserId(row.userId),
-				displayName: row.name,
+				displayName: Option.fromNullable(row.displayName),
 			};
 		}
 

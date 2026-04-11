@@ -1,5 +1,6 @@
-import { Data } from "effect";
+import { Data, type Option } from "effect";
 import type { PrincipalId, UserId } from "#src/domain/ids.ts";
+
 export type {
 	CollectionType,
 	ContentType,
@@ -49,7 +50,7 @@ export type DavCapabilityClass =
 export interface AuthenticatedPrincipal {
 	readonly principalId: PrincipalId;
 	readonly userId: UserId;
-	readonly displayName: string;
+	readonly displayName: Option.Option<string>;
 }
 
 // ---------------------------------------------------------------------------

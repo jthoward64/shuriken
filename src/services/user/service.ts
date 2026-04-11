@@ -25,16 +25,14 @@ export type NewCredential =
 
 export interface NewUser {
 	readonly slug: Slug;
-	readonly name: string;
 	readonly email: Email;
 	readonly displayName?: string;
 	readonly credentials?: ReadonlyArray<NewCredential>;
 }
 
 export interface UpdateUser {
-	readonly name?: string;
-	readonly email?: Email;
 	readonly displayName?: string;
+	readonly email?: Email;
 }
 
 // ---------------------------------------------------------------------------

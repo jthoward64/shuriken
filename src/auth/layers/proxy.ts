@@ -3,7 +3,7 @@ import { Effect, Layer, Option } from "effect";
 import { AuthService } from "#src/auth/service.ts";
 import { AppConfigService } from "#src/config.ts";
 import { DatabaseClient } from "#src/db/client.ts";
-import { user } from "#src/db/drizzle/schema/index.ts";
+import { principal, user } from "#src/db/drizzle/schema/index.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
 import { PrincipalId, UserId } from "#src/domain/ids.ts";
 import { Authenticated, Unauthenticated } from "#src/domain/types/dav.ts";
@@ -156,9 +156,10 @@ export const ProxyAuthLayer = Layer.effect(
 								.select({
 									userId: user.id,
 									principalId: user.principalId,
-									name: user.name,
+									displayName: principal.displayName,
 								})
 								.from(user)
+								.innerJoin(principal, eq(user.principalId, principal.id))
 								.where(eq(user.email, username))
 								.limit(1),
 						catch: (e) => new DatabaseError({ cause: e }),
@@ -177,7 +178,7 @@ export const ProxyAuthLayer = Layer.effect(
 						principal: {
 							principalId: PrincipalId(row.principalId),
 							userId: UserId(row.userId),
-							displayName: row.name,
+							displayName: Option.fromNullable(row.displayName),
 						},
 					});
 				},

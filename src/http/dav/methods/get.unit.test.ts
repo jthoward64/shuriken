@@ -47,7 +47,7 @@ const TEST_ENTITY_ID = EntityId("00000000-0000-0000-0000-000000000005");
 const authenticatedPrincipal: AuthenticatedPrincipal = {
 	principalId: TEST_PRINCIPAL_ID,
 	userId: TEST_USER_ID,
-	displayName: "Test User",
+	displayName: Option.some("Test User"),
 };
 
 const makeCtx = (

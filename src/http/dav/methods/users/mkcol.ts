@@ -7,7 +7,7 @@ import type {
 } from "#src/domain/errors.ts";
 import { methodNotAllowed, unauthorized } from "#src/domain/errors.ts";
 import type { ResolvedDavPath, Slug } from "#src/domain/types/path.ts";
-import type { Email } from "#src/domain/types/strings.ts";
+import { Email } from "#src/domain/types/strings.ts";
 import {
 	SHURIKEN_NS,
 	USERS_VIRTUAL_RESOURCE_ID,
@@ -118,13 +118,17 @@ export const userMkcolHandler = (
 			"DAV:bind",
 		);
 
-		const { displayName, name, email } = yield* parseBody(req);
+		const { displayName, email } = yield* parseBody(req);
+
+		if (email === undefined) {
+			// Email is required to create a user; fail with 400 Bad Request if missing.
+			return new Response("Email is required", { status: 400 });
+		}
 
 		const userSvc = yield* UserService;
 		yield* userSvc.create({
 			slug: path.slug as Slug,
-			name: name ?? path.slug,
-			email: (email ?? "") as Email,
+			email: Email(email),
 			displayName,
 		});
 

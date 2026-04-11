@@ -15,7 +15,6 @@ export const user = pgTable(
 	"user",
 	{
 		id: uuid().default(sql`uuidv7()`).primaryKey().$type<UuidString>(),
-		name: text().notNull(),
 		email: text().notNull(),
 		updatedAt: timestampTz("updated_at").default(sql`now()`).notNull(),
 		principalId: uuid("principal_id")

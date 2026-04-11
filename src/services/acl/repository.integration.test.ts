@@ -425,7 +425,6 @@ describe("AclRepository.getGroupPrincipalIds (integration)", () => {
 				const aclRepo = yield* AclRepository;
 				const { principal } = yield* userRepo.create({
 					slug: Slug("solo-user"),
-					name: "Solo",
 					email: Email("solo@example.com"),
 					credentials: [],
 				});
@@ -484,7 +483,7 @@ describe("AclRepository.getResourceParent (integration)", () => {
 
 				const { principal } = yield* userRepo.create({
 					slug: Slug("rp-root-owner"),
-					name: "Root Owner",
+					displayName: "Root Owner",
 					email: Email("rp-root@example.com"),
 					credentials: [],
 				});
@@ -511,7 +510,7 @@ describe("AclRepository.getResourceParent (integration)", () => {
 
 				const { principal } = yield* userRepo.create({
 					slug: Slug("rp-nested-owner"),
-					name: "Nested Owner",
+					displayName: "Nested Owner",
 					email: Email("rp-nested@example.com"),
 					credentials: [],
 				});
@@ -546,7 +545,7 @@ describe("AclRepository.getResourceParent (integration)", () => {
 
 				const { principal } = yield* userRepo.create({
 					slug: Slug("rp-inst-owner"),
-					name: "Inst Owner",
+					displayName: "Inst Owner",
 					email: Email("rp-inst@example.com"),
 					credentials: [],
 				});

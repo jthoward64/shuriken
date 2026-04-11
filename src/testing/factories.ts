@@ -30,7 +30,7 @@ export const makePrincipalRow = (
 ): PrincipalRow => ({
 	id: crypto.randomUUID(),
 	principalType: "user",
-	displayName: null,
+	displayName: "Test User",
 	updatedAt: now(),
 	deletedAt: null,
 	slug: "test-user",
@@ -44,7 +44,6 @@ export const makeUserRow = (
 ): UserRow => ({
 	id: crypto.randomUUID(),
 	principalId,
-	name: "Test User",
 	email: "test@example.com",
 	updatedAt: now(),
 	...overrides,
@@ -126,7 +125,7 @@ export const makeGroupPrincipalRow = (
 ): PrincipalRow => ({
 	id: crypto.randomUUID(),
 	principalType: "group",
-	displayName: null,
+	displayName: "Test Group",
 	updatedAt: now(),
 	deletedAt: null,
 	slug: "test-group",

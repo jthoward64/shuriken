@@ -47,7 +47,6 @@ export interface UserRepositoryShape {
 	readonly softDelete: (id: UserId) => Effect.Effect<void, DatabaseError>;
 	readonly create: (input: {
 		readonly slug: Slug;
-		readonly name: string;
 		readonly email: Email;
 		readonly displayName?: string;
 		readonly credentials: ReadonlyArray<HashedCredential>;
@@ -55,7 +54,6 @@ export interface UserRepositoryShape {
 	readonly update: (
 		id: UserId,
 		input: {
-			readonly name?: string;
 			readonly email?: Email;
 			readonly displayName?: string;
 		},

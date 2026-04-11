@@ -95,7 +95,7 @@ describe("InstanceRepository.insert and findById (integration)", () => {
 
 				const { principal } = yield* userRepo.create({
 					slug: Slug("alice"),
-					name: "Alice",
+					displayName: "Alice",
 					email: Email("alice@example.com"),
 					credentials: [],
 				});
@@ -160,7 +160,7 @@ describe("InstanceRepository.findBySlug (integration)", () => {
 
 				const { principal } = yield* userRepo.create({
 					slug: Slug("bob"),
-					name: "Bob",
+					displayName: "Bob",
 					email: Email("bob@example.com"),
 					credentials: [],
 				});
@@ -200,13 +200,13 @@ describe("InstanceRepository.findBySlug (integration)", () => {
 
 				const { principal: p1 } = yield* userRepo.create({
 					slug: Slug("carol"),
-					name: "Carol",
+					displayName: "Carol",
 					email: Email("carol@example.com"),
 					credentials: [],
 				});
 				const { principal: p2 } = yield* userRepo.create({
 					slug: Slug("dave"),
-					name: "Dave",
+					displayName: "Dave",
 					email: Email("dave@example.com"),
 					credentials: [],
 				});
@@ -275,7 +275,7 @@ describe("InstanceRepository.listByCollection (integration)", () => {
 
 				const { principal } = yield* userRepo.create({
 					slug: Slug("eve"),
-					name: "Eve",
+					displayName: "Eve",
 					email: Email("eve@example.com"),
 					credentials: [],
 				});
@@ -320,7 +320,7 @@ describe("InstanceRepository.listByCollection (integration)", () => {
 
 				const { principal } = yield* userRepo.create({
 					slug: Slug("frank"),
-					name: "Frank",
+					displayName: "Frank",
 					email: Email("frank@example.com"),
 					credentials: [],
 				});
@@ -379,7 +379,7 @@ describe("InstanceRepository.updateEtag (integration)", () => {
 
 				const { principal } = yield* userRepo.create({
 					slug: Slug("grace"),
-					name: "Grace",
+					displayName: "Grace",
 					email: Email("grace@example.com"),
 					credentials: [],
 				});
@@ -431,7 +431,7 @@ describe("InstanceRepository.softDelete (integration)", () => {
 
 				const { principal } = yield* userRepo.create({
 					slug: Slug("heidi"),
-					name: "Heidi",
+					displayName: "Heidi",
 					email: Email("heidi@example.com"),
 					credentials: [],
 				});

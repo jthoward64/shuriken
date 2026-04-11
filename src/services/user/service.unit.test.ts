@@ -16,7 +16,6 @@ import { UserService } from "./service.ts";
 
 const newUser = (overrides: Partial<NewUser> = {}): NewUser => ({
 	slug: Slug("alice"),
-	name: "Alice",
 	email: Email("alice@example.com"),
 	...overrides,
 });
@@ -111,19 +110,18 @@ describe("UserService.update", () => {
 		const env = makeTestEnv().withUser({
 			id: userId,
 			email: "alice@example.com",
-			name: "Alice",
 			slug: "alice",
 		});
 		const result = await runSuccess(
 			UserService.pipe(
 				Effect.flatMap((s) =>
-					s.update(UserId(userId), { name: "Alice Smith" }),
+					s.update(UserId(userId), { displayName: "Alice Smith" }),
 				),
 				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
 		);
-		expect(result.user.name).toBe("Alice Smith");
+		expect(result.principal.displayName).toBe("Alice Smith");
 		// Email was not in the update payload — must be unchanged
 		expect(result.user.email).toBe("alice@example.com");
 	});
@@ -154,7 +152,7 @@ describe("UserService.update", () => {
 		const err = (await runFailure(
 			UserService.pipe(
 				Effect.flatMap((s) =>
-					s.update(UserId(crypto.randomUUID()), { name: "Ghost" }),
+					s.update(UserId(crypto.randomUUID()), { displayName: "Ghost" }),
 				),
 				Effect.provide(env.toLayer()),
 			),

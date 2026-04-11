@@ -68,7 +68,7 @@ const buildMemberProps = (
 			props: {
 				[cn(DAV_NS, "displayname") as ClarkName]:
 					row.principal.displayName ?? "",
-				[cn(SHURIKEN_NS, "name") as ClarkName]: row.user.name,
+				[cn(SHURIKEN_NS, "name") as ClarkName]: row.principal.displayName,
 				[cn(SHURIKEN_NS, "email") as ClarkName]: row.user.email,
 			},
 			status: 200,

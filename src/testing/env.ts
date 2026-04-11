@@ -143,7 +143,6 @@ export interface UserSeedData {
 	readonly id?: UuidString;
 	readonly principalId?: UuidString;
 	readonly slug?: string;
-	readonly name?: string;
 	readonly email?: string;
 	readonly displayName?: string;
 }
@@ -248,7 +247,6 @@ const makeUserRepo = (stores: TestStores): UserRepositoryShape => ({
 			};
 			const userRow: UserRow = {
 				id: userId,
-				name: input.name,
 				email: input.email,
 				updatedAt: now,
 				principalId,
@@ -288,7 +286,6 @@ const makeUserRepo = (stores: TestStores): UserRepositoryShape => ({
 			const now = Temporal.Now.instant();
 			const updatedUser: UserRow = {
 				...existingUser,
-				name: input.name ?? existingUser.name,
 				email: input.email ?? existingUser.email,
 				updatedAt: now,
 			};
@@ -475,7 +472,10 @@ const makePrincipalRepo = (stores: TestStores): PrincipalRepositoryShape => ({
 
 	listAll: () =>
 		Effect.sync(() => {
-			const results: Array<{ principal: PrincipalRow; user: typeof stores.users extends Map<string, infer U> ? U : never }> = [];
+			const results: Array<{
+				principal: PrincipalRow;
+				user: typeof stores.users extends Map<string, infer U> ? U : never;
+			}> = [];
 			for (const principalRow of stores.principals.values()) {
 				if (principalRow.deletedAt !== null) {
 					continue;
@@ -493,7 +493,10 @@ const makePrincipalRepo = (stores: TestStores): PrincipalRepositoryShape => ({
 	searchByDisplayName: (query) =>
 		Effect.sync(() => {
 			const lower = query.toLowerCase();
-			const results: Array<{ principal: PrincipalRow; user: typeof stores.users extends Map<string, infer U> ? U : never }> = [];
+			const results: Array<{
+				principal: PrincipalRow;
+				user: typeof stores.users extends Map<string, infer U> ? U : never;
+			}> = [];
 			for (const principalRow of stores.principals.values()) {
 				if (principalRow.deletedAt !== null) {
 					continue;
@@ -504,8 +507,13 @@ const makePrincipalRepo = (stores: TestStores): PrincipalRepositoryShape => ({
 				if (!userRow) {
 					continue;
 				}
-				const displayName = (principalRow.displayName ?? principalRow.slug).toLowerCase();
-				if (displayName.includes(lower) || userRow.email.toLowerCase().includes(lower)) {
+				const displayName = (
+					principalRow.displayName ?? principalRow.slug
+				).toLowerCase();
+				if (
+					displayName.includes(lower) ||
+					userRow.email.toLowerCase().includes(lower)
+				) {
 					results.push({ principal: principalRow, user: userRow });
 				}
 			}
@@ -966,8 +974,7 @@ const makeEntityRepo = (stores: TestStores): EntityRepositoryShape => ({
 			),
 		),
 
-	existsByUidForPrincipal: (_principalId, _logicalUid) =>
-		Effect.succeed(false),
+	existsByUidForPrincipal: (_principalId, _logicalUid) => Effect.succeed(false),
 });
 
 const makeComponentRepo = (stores: TestStores): ComponentRepositoryShape => ({
@@ -1272,7 +1279,6 @@ export const makeTestEnv = (): TestEnvBuilder => {
 			stores.users.set(userId, {
 				id: userId,
 				principalId,
-				name: seed.name ?? `Test User ${i}`,
 				email: (seed.email ?? `test${i}@example.com`) as Email,
 				updatedAt: now,
 			});

@@ -36,7 +36,7 @@ const TEST_INSTANCE_ID = InstanceId("00000000-0000-0000-0000-000000000020");
 const authenticatedPrincipal: AuthenticatedPrincipal = {
 	principalId: TEST_PRINCIPAL_ID,
 	userId: TEST_USER_ID,
-	displayName: "Test User",
+	displayName: Option.some("Test User"),
 };
 
 const makeCtx = (auth: HttpRequestContext["auth"]): HttpRequestContext => ({

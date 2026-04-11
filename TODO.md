@@ -1,0 +1,11 @@
+- Add support for associating email credentials with a user account (either by entering them into the web UI, or from proxy header)
+- Add support for iMIP allowing cross-server calendar events
+- Add support for syncing an external icalendar file hosted on a remote server (public ical links)
+- Add support for providing an iCalendar feed of a user's calendar that can be subscribed to by external calendar applications (e.g. Google Calendar, Apple Calendar)
+- Add a web UI built with with https://fullcalendar.io/docs
+- Allow setting templated links to auth settings from config if a user has proxy auth credentials
+- Add a birthday calendar based on a user's contacts' birthdays
+- Add APIs for creating users and groups, and for adding/removing users from groups
+- Add support for sharing calendars and events with other users and groups
+- Add a holiday calendar
+- Implement super-admin (can access all data), admin (can create and manage users, but cannot access their data), and normal users (only access their own data) roles

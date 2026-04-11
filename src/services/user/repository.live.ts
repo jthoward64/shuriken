@@ -74,7 +74,6 @@ const create = Effect.fn("UserRepository.create")(
 		db: DbClient,
 		input: {
 			readonly slug: Slug;
-			readonly name: string;
 			readonly email: Email;
 			readonly displayName?: string;
 			readonly credentials: ReadonlyArray<HashedCredential>;
@@ -103,7 +102,6 @@ const create = Effect.fn("UserRepository.create")(
 					const userRows = await tx
 						.insert(user)
 						.values({
-							name: input.name,
 							email: input.email,
 							principalId: principalRow.id,
 						})
@@ -144,7 +142,6 @@ const update = Effect.fn("UserRepository.update")(
 		db: DbClient,
 		id: UserId,
 		input: {
-			readonly name?: string;
 			readonly email?: Email;
 			readonly displayName?: string;
 		},
@@ -159,11 +156,8 @@ const update = Effect.fn("UserRepository.update")(
 						.from(user)
 						.where(and(eq(user.id, id), eq(principal.id, user.principalId)));
 				}
-				if (input.name !== undefined || input.email !== undefined) {
-					const userPatch: { name?: string; email?: Email } = {};
-					if (input.name !== undefined) {
-						userPatch.name = input.name;
-					}
+				if (input.email !== undefined) {
+					const userPatch: { email?: Email } = {};
 					if (input.email !== undefined) {
 						userPatch.email = input.email;
 					}

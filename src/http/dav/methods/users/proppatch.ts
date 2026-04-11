@@ -164,17 +164,12 @@ export const userProppatchHandler = (
 				),
 			);
 
-		const { displayName, name, email, credential } = yield* parseBody(req);
+		const { displayName, email, credential } = yield* parseBody(req);
 		const userSvc = yield* UserService;
 
-		if (
-			displayName !== undefined ||
-			name !== undefined ||
-			email !== undefined
-		) {
+		if (displayName !== undefined || email !== undefined) {
 			yield* userSvc.update(path.userId, {
 				displayName,
-				name,
 				email: email as Email | undefined,
 			});
 		}

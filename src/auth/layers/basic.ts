@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { Effect, Layer, Option, Redacted } from "effect";
 import { AuthService } from "#src/auth/service.ts";
 import { DatabaseClient } from "#src/db/client.ts";
-import { authUser, user } from "#src/db/drizzle/schema/index.ts";
+import { authUser, principal, user } from "#src/db/drizzle/schema/index.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
 import { PrincipalId, UserId } from "#src/domain/ids.ts";
 import {
@@ -77,10 +77,11 @@ export const BasicAuthLayer = Layer.effect(
 												authCredential: authUser.authCredential,
 												userId: user.id,
 												principalId: user.principalId,
-												name: user.name,
+												displayName: principal.displayName,
 											})
 											.from(authUser)
 											.innerJoin(user, eq(authUser.userId, user.id))
+											.innerJoin(principal, eq(user.principalId, principal.id))
 											.where(
 												and(
 													eq(authUser.authSource, "local"),
@@ -117,7 +118,7 @@ export const BasicAuthLayer = Layer.effect(
 									principal: {
 										principalId: PrincipalId(row.principalId),
 										userId: UserId(row.userId),
-										displayName: row.name,
+										displayName: Option.fromNullable(row.displayName),
 									},
 								}) as AuthResult;
 							}),

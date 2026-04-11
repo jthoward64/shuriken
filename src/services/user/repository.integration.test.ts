@@ -64,7 +64,6 @@ describe("UserRepository.create (integration)", () => {
 					Effect.gen(function* () {
 						const created = yield* r.create({
 							slug: Slug("alice"),
-							name: "Alice",
 							email: Email("alice@example.com"),
 							credentials: [],
 						});
@@ -81,7 +80,6 @@ describe("UserRepository.create (integration)", () => {
 		const found = Option.getOrThrow(result.found);
 		expect(found.user.id).toBe(result.created.user.id);
 		expect(found.user.email).toBe("alice@example.com");
-		expect(found.user.name).toBe("Alice");
 		expect(found.principal.slug).toBe("alice");
 		expect(found.principal.principalType).toBe("user");
 	});
@@ -93,7 +91,6 @@ describe("UserRepository.create (integration)", () => {
 					Effect.gen(function* () {
 						const created = yield* r.create({
 							slug: Slug("bob"),
-							name: "Bob",
 							email: Email("bob@example.com"),
 							credentials: [],
 						});
@@ -119,7 +116,6 @@ describe("UserRepository.create (integration)", () => {
 					Effect.gen(function* () {
 						yield* r.create({
 							slug: Slug("carol"),
-							name: "Carol",
 							email: Email("carol@example.com"),
 							credentials: [
 								{
@@ -165,12 +161,11 @@ describe("UserRepository.update (integration)", () => {
 					Effect.gen(function* () {
 						const created = yield* r.create({
 							slug: Slug("alice"),
-							name: "Alice",
 							email: Email("alice@example.com"),
 							credentials: [],
 						});
 						return yield* r.update(UserId(created.user.id), {
-							name: "Alice Smith",
+							displayName: "Alice Smith",
 						});
 					}),
 				),
@@ -179,7 +174,7 @@ describe("UserRepository.update (integration)", () => {
 			),
 		);
 
-		expect(result.user.name).toBe("Alice Smith");
+		expect(result.principal.displayName).toBe("Alice Smith");
 		// email was not in the update payload — must be unchanged
 		expect(result.user.email).toBe("alice@example.com");
 	});
@@ -191,7 +186,6 @@ describe("UserRepository.update (integration)", () => {
 					Effect.gen(function* () {
 						const created = yield* r.create({
 							slug: Slug("bob"),
-							name: "Bob",
 							email: Email("bob@example.com"),
 							credentials: [],
 						});
@@ -227,7 +221,6 @@ describe("UserRepository soft delete (integration)", () => {
 					Effect.gen(function* () {
 						const created = yield* r.create({
 							slug: Slug("ghost"),
-							name: "Ghost",
 							email: Email("ghost@example.com"),
 							credentials: [],
 						});
@@ -271,7 +264,6 @@ describe("UserRepository credential lifecycle (integration)", () => {
 					Effect.gen(function* () {
 						const created = yield* r.create({
 							slug: Slug("alice"),
-							name: "Alice",
 							email: Email("alice@example.com"),
 							credentials: [],
 						});
@@ -302,7 +294,6 @@ describe("UserRepository credential lifecycle (integration)", () => {
 					Effect.gen(function* () {
 						const created = yield* r.create({
 							slug: Slug("bob"),
-							name: "Bob",
 							email: Email("bob@example.com"),
 							credentials: [],
 						});
@@ -373,7 +364,7 @@ describe("UserRepository.update — email branch (integration)", () => {
 					Effect.gen(function* () {
 						const created = yield* r.create({
 							slug: Slug("email-user"),
-							name: "Email User",
+							displayName: "Email User",
 							email: Email("old@example.com"),
 							credentials: [],
 						});
@@ -388,7 +379,7 @@ describe("UserRepository.update — email branch (integration)", () => {
 		);
 
 		expect(result.user.email).toBe("new@example.com");
-		expect(result.user.name).toBe("Email User");
+		expect(result.principal.displayName).toBe("Email User");
 	});
 });
 
@@ -410,13 +401,11 @@ describe("UserRepository unique constraint violations (integration)", () => {
 					Effect.gen(function* () {
 						yield* r.create({
 							slug: Slug("dup-email-a"),
-							name: "Dup A",
 							email: Email("dup@example.com"),
 							credentials: [],
 						});
 						yield* r.create({
 							slug: Slug("dup-email-b"),
-							name: "Dup B",
 							email: Email("dup@example.com"),
 							credentials: [],
 						});
@@ -436,13 +425,11 @@ describe("UserRepository unique constraint violations (integration)", () => {
 					Effect.gen(function* () {
 						yield* r.create({
 							slug: Slug("dup-slug"),
-							name: "Dup Slug A",
 							email: Email("dup-slug-a@example.com"),
 							credentials: [],
 						});
 						yield* r.create({
 							slug: Slug("dup-slug"),
-							name: "Dup Slug B",
 							email: Email("dup-slug-b@example.com"),
 							credentials: [],
 						});

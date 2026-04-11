@@ -17,7 +17,12 @@ describe("PrincipalService.findById", () => {
 	it("returns the principal+user when found", async () => {
 		const env = makeTestEnv();
 		const principalId = crypto.randomUUID();
-		env.withUser({ principalId, slug: "alice", name: "Alice" });
+		env.withUser({
+			principalId,
+			slug: "alice",
+			displayName: "Alice",
+			email: "alice@example.com",
+		});
 
 		const result = await runSuccess(
 			PrincipalService.pipe(
@@ -28,7 +33,8 @@ describe("PrincipalService.findById", () => {
 		);
 
 		expect(result.principal.id).toBe(principalId);
-		expect(result.user.name).toBe("Alice");
+		expect(result.principal.displayName).toBe("Alice");
+		expect(result.user.email).toBe("alice@example.com");
 	});
 
 	it("fails with 404 for an unknown id", async () => {
@@ -53,7 +59,7 @@ describe("PrincipalService.findById", () => {
 describe("PrincipalService.findBySlug", () => {
 	it("returns the principal+user when found", async () => {
 		const env = makeTestEnv();
-		env.withUser({ slug: "bob", name: "Bob" });
+		env.withUser({ slug: "bob", displayName: "Bob", email: "bob@example.com" });
 
 		const result = await runSuccess(
 			PrincipalService.pipe(
@@ -64,7 +70,7 @@ describe("PrincipalService.findBySlug", () => {
 		);
 
 		expect(result.principal.slug).toBe("bob");
-		expect(result.user.name).toBe("Bob");
+		expect(result.user.email).toBe("bob@example.com");
 	});
 
 	it("fails with 404 for an unknown slug", async () => {
@@ -89,7 +95,7 @@ describe("PrincipalService.findBySlug", () => {
 describe("PrincipalService.findByEmail", () => {
 	it("returns the principal+user when found", async () => {
 		const env = makeTestEnv();
-		env.withUser({ email: "carol@example.com", name: "Carol" });
+		env.withUser({ email: "carol@example.com", displayName: "Carol" });
 
 		const result = await runSuccess(
 			PrincipalService.pipe(
@@ -100,7 +106,7 @@ describe("PrincipalService.findByEmail", () => {
 		);
 
 		expect(result.user.email).toBe("carol@example.com");
-		expect(result.user.name).toBe("Carol");
+		expect(result.principal.displayName).toBe("Carol");
 	});
 
 	it("fails with 404 for an unknown email", async () => {

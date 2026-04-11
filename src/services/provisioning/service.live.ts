@@ -26,8 +26,8 @@ export const ProvisioningServiceLive = Layer.effect(
 
 				const user = yield* users.create({
 					slug: input.slug,
-					name: input.name,
 					email: input.email,
+					displayName: input.name,
 				});
 
 				// Drizzle infers the uuid column as string; cast to branded type

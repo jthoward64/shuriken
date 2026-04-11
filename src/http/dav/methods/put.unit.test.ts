@@ -30,8 +30,8 @@ import type { CollectionService } from "#src/services/collection/index.ts";
 import type { ComponentRepository } from "#src/services/component/index.ts";
 import type { EntityRepository } from "#src/services/entity/index.ts";
 import type { InstanceService } from "#src/services/instance/index.ts";
-import type { CalTimezoneRepository } from "#src/services/timezone/index.ts";
 import type { SchedulingService } from "#src/services/scheduling/service.ts";
+import type { CalTimezoneRepository } from "#src/services/timezone/index.ts";
 import { runFailure, runSuccess } from "#src/testing/effect.ts";
 import { makeTestEnv } from "#src/testing/env.ts";
 import { putHandler } from "./put.ts";
@@ -48,7 +48,7 @@ const TEST_INSTANCE_ID = InstanceId("00000000-0000-0000-0000-000000000004");
 const authenticatedPrincipal: AuthenticatedPrincipal = {
 	principalId: TEST_PRINCIPAL_ID,
 	userId: TEST_USER_ID,
-	displayName: "Test User",
+	displayName: Option.some("Test User"),
 };
 
 const makeCtx = (

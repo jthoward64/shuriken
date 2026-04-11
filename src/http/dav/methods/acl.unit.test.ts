@@ -56,7 +56,7 @@ const TARGET_PRINCIPAL_ID = PrincipalId("00000000-0000-0000-0000-000000000010");
 const authenticatedPrincipal: AuthenticatedPrincipal = {
 	principalId: TEST_PRINCIPAL_ID,
 	userId: TEST_USER_ID,
-	displayName: "Test User",
+	displayName: Option.some("Test User"),
 };
 
 const authenticatedCtx: HttpRequestContext = {

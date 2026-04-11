@@ -40,14 +40,15 @@ const buildUserProps = (
 	propstats: [
 		{
 			props: {
-				[cn(DAV_NS, "displayname") as ClarkName]:
-					row.principal.displayName ?? "",
-				[cn(SHURIKEN_NS, "name") as ClarkName]: row.user.name,
-				[cn(SHURIKEN_NS, "email") as ClarkName]: row.user.email,
-				[cn(DAV_NS, "group-membership") as ClarkName]:
+				[cn(DAV_NS, "displayname")]: row.principal.displayName ?? "",
+				...(row.principal.displayName
+					? { [cn(SHURIKEN_NS, "name")]: row.principal.displayName }
+					: {}),
+				[cn(SHURIKEN_NS, "email")]: row.user.email,
+				[cn(DAV_NS, "group-membership")]:
 					groupHrefs.length > 0
 						? {
-								[cn(DAV_NS, "href") as ClarkName]:
+								[cn(DAV_NS, "href")]:
 									groupHrefs.length === 1 ? groupHrefs[0] : groupHrefs,
 							}
 						: "",

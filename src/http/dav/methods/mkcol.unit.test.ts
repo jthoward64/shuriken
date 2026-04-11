@@ -35,7 +35,7 @@ const TEST_USER_ID = UserId("00000000-0000-0000-0000-000000000002");
 const authenticatedPrincipal: AuthenticatedPrincipal = {
 	principalId: TEST_PRINCIPAL_ID,
 	userId: TEST_USER_ID,
-	displayName: "Test User",
+	displayName: Option.some("Test User"),
 };
 
 const makeCtx = (

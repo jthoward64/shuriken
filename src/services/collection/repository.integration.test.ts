@@ -65,7 +65,7 @@ describe("CollectionRepository.findBySlug (integration)", () => {
 
 				const { principal } = yield* user.create({
 					slug: Slug("alice"),
-					name: "Alice",
+					displayName: "Alice",
 					email: Email("alice@example.com"),
 					credentials: [],
 				});
@@ -100,13 +100,13 @@ describe("CollectionRepository.findBySlug (integration)", () => {
 
 				const { principal: p1 } = yield* user.create({
 					slug: Slug("bob"),
-					name: "Bob",
+					displayName: "Bob",
 					email: Email("bob@example.com"),
 					credentials: [],
 				});
 				const { principal: p2 } = yield* user.create({
 					slug: Slug("carol"),
-					name: "Carol",
+					displayName: "Carol",
 					email: Email("carol@example.com"),
 					credentials: [],
 				});
@@ -146,7 +146,7 @@ describe("CollectionRepository.listByOwner (integration)", () => {
 				const col = yield* CollectionRepository;
 				const { principal } = yield* user.create({
 					slug: Slug("empty-owner"),
-					name: "Empty",
+					displayName: "Empty",
 					email: Email("empty@example.com"),
 					credentials: [],
 				});
@@ -163,7 +163,7 @@ describe("CollectionRepository.listByOwner (integration)", () => {
 				const col = yield* CollectionRepository;
 				const { principal } = yield* user.create({
 					slug: Slug("multi-owner"),
-					name: "Multi",
+					displayName: "Multi",
 					email: Email("multi@example.com"),
 					credentials: [],
 				});
@@ -193,13 +193,13 @@ describe("CollectionRepository.listByOwner (integration)", () => {
 				const col = yield* CollectionRepository;
 				const { principal: p1 } = yield* user.create({
 					slug: Slug("owner-a"),
-					name: "Owner A",
+					displayName: "Owner A",
 					email: Email("owner-a@example.com"),
 					credentials: [],
 				});
 				const { principal: p2 } = yield* user.create({
 					slug: Slug("owner-b"),
-					name: "Owner B",
+					displayName: "Owner B",
 					email: Email("owner-b@example.com"),
 					credentials: [],
 				});
@@ -227,7 +227,7 @@ describe("CollectionRepository.listByOwner (integration)", () => {
 				const col = yield* CollectionRepository;
 				const { principal } = yield* user.create({
 					slug: Slug("del-owner"),
-					name: "Del",
+					displayName: "Del",
 					email: Email("del@example.com"),
 					credentials: [],
 				});
@@ -270,7 +270,7 @@ describe("CollectionRepository unique slug constraint (integration)", () => {
 				const col = yield* CollectionRepository;
 				const { principal } = yield* user.create({
 					slug: Slug("dup-owner"),
-					name: "Dup",
+					displayName: "Dup",
 					email: Email("dup@example.com"),
 					credentials: [],
 				});
@@ -310,7 +310,7 @@ describe("CollectionRepository.softDelete (integration)", () => {
 				const col = yield* CollectionRepository;
 				const { principal } = yield* user.create({
 					slug: Slug("pre-del"),
-					name: "PreDel",
+					displayName: "PreDel",
 					email: Email("predel@example.com"),
 					credentials: [],
 				});
@@ -332,7 +332,7 @@ describe("CollectionRepository.softDelete (integration)", () => {
 				const col = yield* CollectionRepository;
 				const { principal } = yield* user.create({
 					slug: Slug("post-del"),
-					name: "PostDel",
+					displayName: "PostDel",
 					email: Email("postdel@example.com"),
 					credentials: [],
 				});
@@ -367,7 +367,7 @@ describe("CollectionRepository.softDelete (integration)", () => {
 				const col = yield* CollectionRepository;
 				const { principal } = yield* user.create({
 					slug: Slug("gone-owner"),
-					name: "Gone",
+					displayName: "Gone",
 					email: Email("gone@example.com"),
 					credentials: [],
 				});

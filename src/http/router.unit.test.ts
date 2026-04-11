@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Option } from "effect";
 import { AuthService } from "#src/auth/service.ts";
 import { AuthError, DatabaseError } from "#src/domain/errors.ts";
 import type { PrincipalId, UserId } from "#src/domain/ids.ts";
@@ -53,7 +53,7 @@ const authenticated = new Authenticated({
 	principal: {
 		principalId: "00000000-0000-4000-8000-000000000001" as PrincipalId,
 		userId: "00000000-0000-4000-8000-000000000002" as UserId,
-		displayName: "Test User",
+		displayName: Option.some("Test User"),
 	},
 });
 

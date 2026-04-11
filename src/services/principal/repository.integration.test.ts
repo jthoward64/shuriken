@@ -56,7 +56,6 @@ describe("PrincipalRepository.findById (integration)", () => {
 				const principalRepo = yield* PrincipalRepository;
 				const { principal, user } = yield* userRepo.create({
 					slug: Slug("alice"),
-					name: "Alice",
 					email: Email("alice@example.com"),
 					credentials: [],
 				});
@@ -103,7 +102,6 @@ describe("PrincipalRepository.findBySlug (integration)", () => {
 				const principalRepo = yield* PrincipalRepository;
 				yield* userRepo.create({
 					slug: Slug("bob"),
-					name: "Bob",
 					email: Email("bob@example.com"),
 					credentials: [],
 				});
@@ -147,7 +145,6 @@ describe("PrincipalRepository.findByEmail (integration)", () => {
 				const principalRepo = yield* PrincipalRepository;
 				yield* userRepo.create({
 					slug: Slug("carol"),
-					name: "Carol",
 					email: Email("carol@example.com"),
 					credentials: [],
 				});
@@ -191,7 +188,6 @@ describe("PrincipalRepository.findUserByUserId (integration)", () => {
 				const principalRepo = yield* PrincipalRepository;
 				const { user } = yield* userRepo.create({
 					slug: Slug("dave"),
-					name: "Dave",
 					email: Email("dave@example.com"),
 					credentials: [],
 				});
@@ -202,6 +198,5 @@ describe("PrincipalRepository.findUserByUserId (integration)", () => {
 		expect(Option.isSome(result)).toBe(true);
 		const found = Option.getOrThrow(result);
 		expect(found.email).toBe("dave@example.com");
-		expect(found.name).toBe("Dave");
 	});
 });

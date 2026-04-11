@@ -140,7 +140,7 @@ describe("GroupRepository membership (integration)", () => {
 				const groupRepo = yield* GroupRepository;
 				const { user } = yield* userRepo.create({
 					slug: Slug("alice"),
-					name: "Alice",
+					displayName: "Alice",
 					email: Email("alice@example.com"),
 					credentials: [],
 				});
@@ -158,7 +158,7 @@ describe("GroupRepository membership (integration)", () => {
 				const groupRepo = yield* GroupRepository;
 				const { user } = yield* userRepo.create({
 					slug: Slug("bob"),
-					name: "Bob",
+					displayName: "Bob",
 					email: Email("bob@example.com"),
 					credentials: [],
 				});
@@ -179,7 +179,7 @@ describe("GroupRepository membership (integration)", () => {
 				const groupRepo = yield* GroupRepository;
 				const { user } = yield* userRepo.create({
 					slug: Slug("carol"),
-					name: "Carol",
+					displayName: "Carol",
 					email: Email("carol@example.com"),
 					credentials: [],
 				});
@@ -201,7 +201,7 @@ describe("GroupRepository membership (integration)", () => {
 				const groupRepo = yield* GroupRepository;
 				const { user } = yield* userRepo.create({
 					slug: Slug("dave"),
-					name: "Dave",
+					displayName: "Dave",
 					email: Email("dave@example.com"),
 					credentials: [],
 				});

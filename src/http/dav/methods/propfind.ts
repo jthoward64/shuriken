@@ -553,8 +553,7 @@ export const propfindHandler = (
 			);
 			const principalSvc = yield* PrincipalService;
 			const principalRow = yield* principalSvc.findById(path.principalId);
-			const displayName =
-				principalRow.principal.displayName ?? principalRow.user.name;
+			const displayName = principalRow.principal.displayName;
 			const principalHref = `${origin}/dav/principals/${path.principalSeg}/`;
 			// RFC 6638 §2.2: scheduling inbox/outbox URLs for this principal.
 			const inboxHref = `${origin}/dav/principals/${path.principalSeg}/cal/inbox/`;
@@ -566,7 +565,7 @@ export const propfindHandler = (
 			);
 			const allProps: Record<ClarkName, unknown> = {
 				[RESOURCETYPE]: { "{DAV:}principal": "" },
-				[DISPLAYNAME]: displayName,
+				...(displayName ? { [DISPLAYNAME]: displayName } : {}),
 				// RFC 5397 §3: the acting user's principal URL
 				[CURRENT_USER_PRINCIPAL]: { [cn(DAV_NS, "href")]: actingPrincipalHref },
 				// RFC 3744 §4.2: canonical URL for this principal resource
