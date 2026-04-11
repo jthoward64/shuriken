@@ -9,19 +9,5 @@
 		"source.organizeImports.biome": "explicit",
 		"source.fixAll.biome": "explicit"
 	},
-	"js/ts.tsdk.path": "node_modules/typescript/lib",
-	"claudeCode.environmentVariables": [
-		{
-			"name": "PATH",
-			"value": "/home/tagho/.local/share/nvm/v24.12.0/bin:/home/tagho/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin"
-		},
-		{
-			"name": "nvm_current_version",
-			"value": "24.12.0"
-		},
-		{
-			"name": "CLAUDECODE",
-			"value": "1"
-		}
-	]
+	"js/ts.tsdk.path": "node_modules/typescript/lib"
 }
