@@ -17,7 +17,7 @@ A CalDAV/CardDAV server implementation in TypeScript.
 - **Package manager**: Bun. Never use npm, yarn, or pnpm.
 - **Scripts**: bun run `check`, `lint`, `format`, and `test` scripts are defined
 - **TypeScript**: Strict mode. No `any` ever. Use `unknown` and then narrow with runtime checks as needed. The only time `any` is allowed is internal to very small functions in order to satisfy *extremely* complex generics.
-- **Biome**: Use Biome for linting and formatting. Warnings, errors, and infos should alls be fixed
+- **Biome**: Use Biome for linting and formatting. Warnings, errors, and infos should alls be fixed. Prefer using Biome's autofix features where possible, but feel free to make manual adjustments as needed. Disabling or ignoring lint rules requires express approval from the user
 
 ## Effect
 
@@ -42,7 +42,7 @@ All application logic must use [Effect](https://effect.website) (`effect` packag
   - Extract as nullable: `Option.getOrUndefined(opt)` / `Option.getOrNull(opt)` instead of `isSome(opt) ? opt.value : undefined`
   - Branch on Some/None: `Option.match(opt, { onSome: f, onNone: g })` instead of ternary with `.value`
   - The only acceptable use of `isSome`/`isNone` is when no other options apply (for example mapping the option to a failure case)
-- Reference: index of docs available at https://effect.website/llms.txt and a complete API reference at https://effect-ts.github.io/effect/docs/effect
+- Reference: index of docs available at https://effect.website/llms.txt and a complete API reference at https://effect-ts.github.io/effect/docs/effect or node_modules/effect/dist/dts/...
 
 ## HTTP Server
 
