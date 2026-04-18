@@ -27,13 +27,11 @@ const DAV_NS = "DAV:";
 
 interface UserMkcolProps {
 	readonly displayName: string | undefined;
-	readonly name: string | undefined;
 	readonly email: string | undefined;
 }
 
 const EMPTY_PROPS: UserMkcolProps = {
 	displayName: undefined,
-	name: undefined,
 	email: undefined,
 };
 
@@ -61,16 +59,12 @@ const extractProps = (tree: unknown): UserMkcolProps => {
 		typeof prop[`{${DAV_NS}}displayname`] === "string"
 			? (prop[`{${DAV_NS}}displayname`] as string)
 			: undefined;
-	const name =
-		typeof prop[`{${SHURIKEN_NS}}name`] === "string"
-			? (prop[`{${SHURIKEN_NS}}name`] as string)
-			: undefined;
 	const email =
 		typeof prop[`{${SHURIKEN_NS}}email`] === "string"
 			? (prop[`{${SHURIKEN_NS}}email`] as string)
 			: undefined;
 
-	return { displayName, name, email };
+	return { displayName, email };
 };
 
 const parseBody = (req: Request): Effect.Effect<UserMkcolProps, DavError> =>

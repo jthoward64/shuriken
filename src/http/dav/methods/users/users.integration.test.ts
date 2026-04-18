@@ -18,7 +18,7 @@ import { runScript } from "#src/testing/script-runner/runner.ts";
 // and userProppatchHandler.
 //
 // The SHURIKEN_NS is "https://shuriken.jthoward.dev/dav/ns" — used for
-// the shuriken:name, shuriken:email, and shuriken:credential properties.
+// the shuriken:email and shuriken:credential properties.
 // ---------------------------------------------------------------------------
 
 const SHURIKEN_NS = "https://shuriken.jthoward.dev/dav/ns";
@@ -37,22 +37,21 @@ const mkuser = (
 	path: string;
 	as: string;
 	headers: Record<string, string>;
-	body: string | undefined;
+	body: string;
 	expect: { status: number };
 } => ({
 	name: `MKCOL /dav/users/${slug}/`,
 	method: "MKCOL" as const,
 	path: `/dav/users/${slug}/`,
 	as,
-	headers: body ? { "Content-Type": "application/xml; charset=utf-8" } : {},
-	body,
+	headers: { "Content-Type": "application/xml; charset=utf-8" },
+	body: body ?? mkuserWithProps(slug, undefined, `${slug}@example.com`),
 	expect: { status: 201 },
 });
 
 const mkuserWithProps = (
 	_slug: string,
 	displayName?: string,
-	name?: string,
 	email?: string,
 ) =>
 	`<?xml version="1.0" encoding="utf-8"?>
@@ -60,7 +59,6 @@ const mkuserWithProps = (
   <D:set>
     <D:prop>
       ${displayName !== undefined ? `<D:displayname>${displayName}</D:displayname>` : ""}
-      ${name !== undefined ? `<S:name>${name}</S:name>` : ""}
       ${email !== undefined ? `<S:email>${email}</S:email>` : ""}
     </D:prop>
   </D:set>
@@ -72,16 +70,6 @@ const setDisplayname = (name: string) =>
   <D:set>
     <D:prop>
       <D:displayname>${name}</D:displayname>
-    </D:prop>
-  </D:set>
-</D:propertyupdate>`;
-
-const setShurikenName = (name: string) =>
-	`<?xml version="1.0" encoding="utf-8"?>
-<D:propertyupdate xmlns:D="DAV:" xmlns:S="${SHURIKEN_NS}">
-  <D:set>
-    <D:prop>
-      <S:name>${name}</S:name>
     </D:prop>
   </D:set>
 </D:propertyupdate>`;
@@ -318,12 +306,7 @@ describe("MKCOL /dav/users/:slug", () => {
 				mkuser(
 					"named-user",
 					"admin",
-					mkuserWithProps(
-						"named-user",
-						"Named User",
-						"Named User",
-						"named@example.com",
-					),
+					mkuserWithProps("named-user", "Named User", "named@example.com"),
 				),
 				propfind("/dav/users/named-user/", PROPFIND_ALLPROP, {
 					as: "admin",
@@ -523,26 +506,6 @@ describe("PROPPATCH /dav/users/:slug", () => {
 					as: "admin",
 					headers: { Depth: "0" },
 					expect: { status: 207, bodyContains: "Fancy Name" },
-				}),
-			],
-			singleAdminUser(),
-		);
-		for (const result of results) {
-			expect(result.failures, result.step.name).toEqual([]);
-		}
-	});
-
-	it("updates shuriken:name and returns 204", async () => {
-		const results = await runScript(
-			[
-				proppatch("/dav/users/admin/", setShurikenName("New Full Name"), {
-					as: "admin",
-					expect: { status: 204 },
-				}),
-				propfind("/dav/users/admin/", PROPFIND_ALLPROP, {
-					as: "admin",
-					headers: { Depth: "0" },
-					expect: { status: 207, bodyContains: "New Full Name" },
 				}),
 			],
 			singleAdminUser(),

@@ -72,6 +72,7 @@ export const AppConfig = Config.all({
 	database: DatabaseConfig,
 	auth: AuthConfig,
 	log: LogConfig,
+	nodeEnv: Config.string("nodeEnv").pipe(Config.withDefault("production")),
 });
 
 export type AppConfigType = Config.Config.Success<typeof AppConfig>;

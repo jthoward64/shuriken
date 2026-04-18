@@ -39,6 +39,7 @@ const testConfig: AppConfigType = {
 		singleUserEmail: Option.none<string>(),
 	},
 	log: { level: undefined },
+	nodeEnv: "test",
 };
 
 const AppConfigTestLayer = Layer.succeed(

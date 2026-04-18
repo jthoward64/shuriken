@@ -41,9 +41,6 @@ const buildUserProps = (
 		{
 			props: {
 				[cn(DAV_NS, "displayname")]: row.principal.displayName ?? "",
-				...(row.principal.displayName
-					? { [cn(SHURIKEN_NS, "name")]: row.principal.displayName }
-					: {}),
 				[cn(SHURIKEN_NS, "email")]: row.user.email,
 				[cn(DAV_NS, "group-membership")]:
 					groupHrefs.length > 0

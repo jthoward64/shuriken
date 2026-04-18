@@ -1,6 +1,7 @@
-import { Layer, Logger } from "effect";
+import { DevTools } from "@effect/experimental";
 import { selectAuthLayer } from "#src/auth/index.ts";
-import { AppConfigLive } from "#src/config.ts";
+import { AppConfigLive, AppConfigService } from "#src/config.ts";
+import { Effect, Layer, Logger } from "effect";
 import { type DatabaseClient, DatabaseClientLive } from "#src/db/client.ts";
 import { type CryptoService, CryptoServiceLive } from "#src/platform/crypto.ts";
 import { AclDomainLayer } from "#src/services/acl/index.ts";
@@ -34,6 +35,17 @@ export const InfraLayer = Layer.mergeAll(
 );
 
 // ---------------------------------------------------------------------------
+// DevTools layer — only active when NODE_ENV=development
+// ---------------------------------------------------------------------------
+
+const DevToolsLayer = Layer.unwrapEffect(
+	Effect.gen(function* () {
+		const { nodeEnv } = yield* AppConfigService;
+		return nodeEnv === "development" ? DevTools.layer() : Layer.empty;
+	}),
+).pipe(Layer.provide(InfraLayer));
+
+// ---------------------------------------------------------------------------
 // Auth layer — concrete implementation selected at startup from AUTH_MODE
 // ---------------------------------------------------------------------------
 
@@ -62,6 +74,7 @@ const BaseAppLayer = Layer.mergeAll(
 	Logger.pretty,
 	InfraLayer,
 	AuthLayer,
+	DevToolsLayer,
 	withInfra(PrincipalDomainLayer),
 	withInfra(CollectionDomainLayer),
 	withInfra(InstanceDomainLayer),

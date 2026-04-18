@@ -27,7 +27,6 @@ const DAV_NS = "DAV:";
 
 interface ProppatchUpdates {
 	readonly displayName: string | undefined;
-	readonly name: string | undefined;
 	readonly email: string | undefined;
 	readonly credential: NewCredential | undefined;
 }
@@ -35,7 +34,6 @@ interface ProppatchUpdates {
 const extractUpdates = (tree: unknown): ProppatchUpdates => {
 	const empty: ProppatchUpdates = {
 		displayName: undefined,
-		name: undefined,
 		email: undefined,
 		credential: undefined,
 	};
@@ -61,10 +59,6 @@ const extractUpdates = (tree: unknown): ProppatchUpdates => {
 	const displayName =
 		typeof prop[`{${DAV_NS}}displayname`] === "string"
 			? (prop[`{${DAV_NS}}displayname`] as string)
-			: undefined;
-	const name =
-		typeof prop[`{${SHURIKEN_NS}}name`] === "string"
-			? (prop[`{${SHURIKEN_NS}}name`] as string)
 			: undefined;
 	const email =
 		typeof prop[`{${SHURIKEN_NS}}email`] === "string"
@@ -93,7 +87,7 @@ const extractUpdates = (tree: unknown): ProppatchUpdates => {
 		}
 	}
 
-	return { displayName, name, email, credential };
+	return { displayName, email, credential };
 };
 
 const parseBody = (req: Request): Effect.Effect<ProppatchUpdates, DavError> =>
@@ -102,7 +96,6 @@ const parseBody = (req: Request): Effect.Effect<ProppatchUpdates, DavError> =>
 			if (body.trim() === "") {
 				return Effect.succeed({
 					displayName: undefined,
-					name: undefined,
 					email: undefined,
 					credential: undefined,
 				} satisfies ProppatchUpdates);
