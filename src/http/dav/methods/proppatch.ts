@@ -401,8 +401,8 @@ export const proppatchHandler = (
 						typeof rawVal === "string"
 							? rawVal.trim()
 							: typeof rawVal === "object" &&
-								  rawVal !== null &&
-								  "#text" in (rawVal as Record<string, unknown>)
+									rawVal !== null &&
+									"#text" in (rawVal as Record<string, unknown>)
 								? String((rawVal as Record<string, unknown>)["#text"]).trim()
 								: null;
 					if (tzid) {
@@ -462,9 +462,7 @@ export const proppatchHandler = (
 					typeof rawVal === "object" && rawVal !== null
 						? (rawVal as Record<string, unknown>)
 						: null;
-				const hrefStr = hrefObj
-					? String(hrefObj[`{${DAV_NS}}href`] ?? "")
-					: "";
+				const hrefStr = hrefObj ? String(hrefObj[`{${DAV_NS}}href`] ?? "") : "";
 				// Extract the last non-empty path segment as the collection UUID/slug.
 				const segments = hrefStr.replace(/\/$/, "").split("/");
 				const lastSeg = segments.at(-1) ?? "";

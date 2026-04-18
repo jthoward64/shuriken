@@ -172,8 +172,7 @@ export const stripKnownVtimezones = (
 			// Malformed VTIMEZONE without TZID — keep it to avoid data loss.
 			return true;
 		}
-		const tzid =
-			tzidProp.value.type === "TEXT" ? tzidProp.value.value : null;
+		const tzid = tzidProp.value.type === "TEXT" ? tzidProp.value.value : null;
 		if (tzid === null) {
 			return true;
 		}

@@ -75,8 +75,7 @@ const isDavPath = (pathname: string): boolean =>
 	pathname.startsWith("/.well-known/cal") ||
 	pathname.startsWith("/.well-known/card");
 
-const isTimezonePath = (pathname: string): boolean =>
-	pathname === "/timezones";
+const isTimezonePath = (pathname: string): boolean => pathname === "/timezones";
 
 const isUiPath = (pathname: string): boolean =>
 	pathname === "/" ||

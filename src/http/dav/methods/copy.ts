@@ -12,7 +12,12 @@ import {
 	someOrNotFound,
 	unauthorized,
 } from "#src/domain/errors.ts";
-import { CollectionId, EntityId, InstanceId, type PrincipalId } from "#src/domain/ids.ts";
+import {
+	CollectionId,
+	EntityId,
+	InstanceId,
+	type PrincipalId,
+} from "#src/domain/ids.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
 import { type ResolvedDavPath, Slug } from "#src/domain/types/path.ts";
 import { ETag } from "#src/domain/types/strings.ts";
@@ -290,10 +295,9 @@ const copyCollection = (
 		const srcCollectionProps =
 			sourceCollection.clientProperties as IrDeadProperties;
 		if (Object.keys(srcCollectionProps).length > 0) {
-			yield* collectionSvc.updateProperties(
-				CollectionId(newCollection.id),
-				{ clientProperties: srcCollectionProps },
-			);
+			yield* collectionSvc.updateProperties(CollectionId(newCollection.id), {
+				clientProperties: srcCollectionProps,
+			});
 		}
 
 		// RFC 4918 §9.8.2: copy non-protected ACEs from source collection.
@@ -368,8 +372,7 @@ const copyCollection = (
 							contentType: inst.contentType,
 							etag,
 							slug: Slug(inst.slug),
-							clientProperties:
-								inst.clientProperties as IrDeadProperties,
+							clientProperties: inst.clientProperties as IrDeadProperties,
 							contentLength: new TextEncoder().encode(canonical).byteLength,
 						});
 

@@ -3,9 +3,11 @@
 // ---------------------------------------------------------------------------
 
 import type { InferSelectModel } from "drizzle-orm";
-import type { davScheduleMessage } from "#src/db/drizzle/schema/index.ts";
+import type {
+	davScheduleMessage,
+	ScheduleMethod,
+} from "#src/db/drizzle/schema/index.ts";
 import type { CollectionId, EntityId, PrincipalId } from "#src/domain/ids.ts";
-import type { ScheduleMethod } from "#src/db/drizzle/schema/index.ts";
 
 export type ScheduleMessageRow = InferSelectModel<typeof davScheduleMessage>;
 

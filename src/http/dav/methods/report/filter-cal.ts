@@ -351,7 +351,9 @@ const evalVtodoTimeRange = (
 	const hasDuration = comp.properties.some((p) => p.name === "DURATION");
 
 	const completedProp = comp.properties.find((p) => p.name === "COMPLETED");
-	const completed = completedProp ? instantFromIrValue(completedProp) : undefined;
+	const completed = completedProp
+		? instantFromIrValue(completedProp)
+		: undefined;
 
 	const createdProp = comp.properties.find((p) => p.name === "CREATED");
 	const created = createdProp ? instantFromIrValue(createdProp) : undefined;
@@ -422,14 +424,15 @@ const evalVtodoTimeRange = (
 			start === undefined ||
 			start.epochMilliseconds <= completed.epochMilliseconds;
 		const endOk =
-			end === undefined ||
-			end.epochMilliseconds >= completed.epochMilliseconds;
+			end === undefined || end.epochMilliseconds >= completed.epochMilliseconds;
 		return startOk && endOk;
 	}
 
 	if (created !== undefined) {
 		// (end > CREATED)
-		return end === undefined || end.epochMilliseconds > created.epochMilliseconds;
+		return (
+			end === undefined || end.epochMilliseconds > created.epochMilliseconds
+		);
 	}
 
 	// N, N, N, N, N → TRUE
@@ -468,7 +471,8 @@ const evalVjournalTimeRange = (
 	if (isDateTime) {
 		// (start <= DTSTART) AND (end > DTSTART)
 		const startOk =
-			start === undefined || start.epochMilliseconds <= dtstart.epochMilliseconds;
+			start === undefined ||
+			start.epochMilliseconds <= dtstart.epochMilliseconds;
 		const endOk =
 			end === undefined || end.epochMilliseconds > dtstart.epochMilliseconds;
 		return startOk && endOk;
@@ -502,8 +506,10 @@ const evalVfreebusyTimeRange = (
 
 	if (dtstart && dtend) {
 		// Y | *: (range.start <= DTEND) AND (range.end > DTSTART)
-		const startOk = !range.start || range.start.epochMilliseconds <= dtend.epochMilliseconds;
-		const endOk = !range.end || range.end.epochMilliseconds > dtstart.epochMilliseconds;
+		const startOk =
+			!range.start || range.start.epochMilliseconds <= dtend.epochMilliseconds;
+		const endOk =
+			!range.end || range.end.epochMilliseconds > dtstart.epochMilliseconds;
 		return startOk && endOk;
 	}
 
@@ -526,11 +532,15 @@ const evalVfreebusyTimeRange = (
 			try {
 				const pStart = Temporal.Instant.from(ps.slice(0, slash));
 				const endPart = ps.slice(slash + 1);
-				const pEnd = endPart.startsWith("P") || endPart.startsWith("-P")
-					? pStart.add(Temporal.Duration.from(endPart))
-					: Temporal.Instant.from(endPart);
-				const startOk = !range.start || range.start.epochMilliseconds < pEnd.epochMilliseconds;
-				const endOk = !range.end || range.end.epochMilliseconds > pStart.epochMilliseconds;
+				const pEnd =
+					endPart.startsWith("P") || endPart.startsWith("-P")
+						? pStart.add(Temporal.Duration.from(endPart))
+						: Temporal.Instant.from(endPart);
+				const startOk =
+					!range.start ||
+					range.start.epochMilliseconds < pEnd.epochMilliseconds;
+				const endOk =
+					!range.end || range.end.epochMilliseconds > pStart.epochMilliseconds;
 				if (startOk && endOk) {
 					return true;
 				}

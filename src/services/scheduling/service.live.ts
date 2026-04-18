@@ -14,6 +14,8 @@
 
 import { Effect, Layer, Option } from "effect";
 import { Temporal } from "temporal-polyfill";
+import { makeEtag } from "#src/data/etag.ts";
+import { encodeICalendar } from "#src/data/icalendar/codec.ts";
 import {
 	buildVfreebusyText,
 	coalescePeriods,
@@ -25,12 +27,10 @@ import {
 	getDtstartInstant,
 } from "#src/data/icalendar/ir-helpers.ts";
 import { getOccurrenceInstantsInRange } from "#src/data/icalendar/recurrence/recurrence-check.ts";
-import { makeEtag } from "#src/data/etag.ts";
-import { encodeICalendar } from "#src/data/icalendar/codec.ts";
 import type { IrComponent, IrDocument, IrProperty } from "#src/data/ir.ts";
 import { forbidden } from "#src/domain/errors.ts";
-import { CollectionId, EntityId } from "#src/domain/ids.ts";
 import type { PrincipalId } from "#src/domain/ids.ts";
+import { CollectionId, EntityId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import { ETag } from "#src/domain/types/strings.ts";
 import { AclService } from "#src/services/acl/index.ts";

@@ -8,8 +8,8 @@
 
 import { Effect, Option } from "effect";
 import type { ClarkName, IrDocument } from "#src/data/ir.ts";
-import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import type { EntityType } from "#src/db/drizzle/schema/index.ts";
+import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import type { CollectionId, EntityId, PrincipalId } from "#src/domain/ids.ts";
 import { InstanceId, isUuid } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";

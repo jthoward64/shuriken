@@ -111,8 +111,10 @@ export const principalMatchHandler = (
 								missing[name] = "";
 							}
 						}
-						const stats: Array<{ props: Record<ClarkName, unknown>; status: number }> =
-							[{ props: found, status: 200 }];
+						const stats: Array<{
+							props: Record<ClarkName, unknown>;
+							status: number;
+						}> = [{ props: found, status: 200 }];
 						if (Object.keys(missing).length > 0) {
 							stats.push({ props: missing, status: 404 });
 						}

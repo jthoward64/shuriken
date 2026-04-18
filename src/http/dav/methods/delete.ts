@@ -95,8 +95,7 @@ export const deleteHandler = (
 						schedulingSvc.processAfterDelete({
 							actingPrincipalId: principal.principalId,
 							doc: { kind: "icalendar", root: treeOpt.value },
-							suppressReply:
-								ctx.headers.get("Schedule-Reply") === "no",
+							suppressReply: ctx.headers.get("Schedule-Reply") === "no",
 						}),
 					);
 				}

@@ -134,8 +134,7 @@ export const principalPropertySearchHandler = (
 			const principalHref = `${origin}/dav/principals/${row.principal.id}/`;
 
 			const allProps: Record<ClarkName, unknown> = {
-				[DISPLAYNAME]:
-					row.principal.displayName ?? row.principal.slug,
+				[DISPLAYNAME]: row.principal.displayName ?? row.principal.slug,
 				[cn(DAV_NS, "resourcetype")]: { [cn(DAV_NS, "principal")]: "" },
 				[cn(DAV_NS, "principal-URL")]: {
 					[cn(DAV_NS, "href")]: principalHref,

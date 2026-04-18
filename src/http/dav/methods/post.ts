@@ -74,13 +74,9 @@ export const postHandler = (
 		}
 
 		// Must contain a VFREEBUSY component.
-		const hasFreebusy = doc.root.components.some(
-			(c) => c.name === "VFREEBUSY",
-		);
+		const hasFreebusy = doc.root.components.some((c) => c.name === "VFREEBUSY");
 		if (!hasFreebusy) {
-			return yield* badRequest(
-				"Outbox POST requires a VFREEBUSY component",
-			);
+			return yield* badRequest("Outbox POST requires a VFREEBUSY component");
 		}
 
 		// Delegate to SchedulingService.

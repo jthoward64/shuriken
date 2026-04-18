@@ -1,8 +1,8 @@
+import { Effect, Option } from "effect";
 import {
 	tzlib_get_ical_block,
 	tzlib_get_timezones,
 } from "timezones-ical-library";
-import { Effect, Option } from "effect";
 
 // ---------------------------------------------------------------------------
 // IanaTimezoneService — wraps timezones-ical-library to provide VTIMEZONE
@@ -40,7 +40,7 @@ export class IanaTimezoneService extends Effect.Service<IanaTimezoneService>()(
 			// Pre-build a Set for O(1) lookups — tzlib_get_timezones() is stable data.
 			const rawList = tzlib_get_timezones();
 			const tzids: ReadonlyArray<string> = Array.isArray(rawList)
-				? (rawList as string[])
+				? (rawList as Array<string>)
 				: [];
 			const knownSet = new Set<string>(tzids);
 

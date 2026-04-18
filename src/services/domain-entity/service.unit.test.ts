@@ -52,7 +52,8 @@ const makeTestEntityRepository = () => {
 			return Effect.void;
 		},
 		existsByUid: (_collectionId, _logicalUid) => Effect.succeed(false),
-		existsByUidForPrincipal: (_principalId, _logicalUid) => Effect.succeed(false),
+		existsByUidForPrincipal: (_principalId, _logicalUid) =>
+			Effect.succeed(false),
 	};
 
 	return { repo, store };

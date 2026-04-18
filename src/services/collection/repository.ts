@@ -6,7 +6,9 @@ import type {
 	CollectionType,
 	davCollection,
 } from "#src/db/drizzle/schema/index.ts";
+
 export type { CollectionType } from "#src/db/drizzle/schema/index.ts";
+
 import type { DatabaseError } from "#src/domain/errors.ts";
 import type { CollectionId, PrincipalId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";

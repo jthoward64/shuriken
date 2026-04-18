@@ -41,9 +41,9 @@ import {
 	PrincipalService,
 	type PrincipalServiceShape,
 } from "#src/services/principal/service.ts";
-import { CalTimezoneRepository } from "#src/services/timezone/repository.ts";
 import { SchedulingService } from "#src/services/scheduling/service.ts";
 import { IanaTimezoneService } from "#src/services/timezone/iana.ts";
+import { CalTimezoneRepository } from "#src/services/timezone/repository.ts";
 import { TombstoneRepository } from "#src/services/tombstone/index.ts";
 import { UserRepository, UserService } from "#src/services/user/index.ts";
 import type { UserRepositoryShape } from "#src/services/user/repository.ts";

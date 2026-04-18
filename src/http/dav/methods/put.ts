@@ -5,6 +5,7 @@ import { extractVtimezones } from "#src/data/icalendar/timezone.ts";
 import { extractUid as extractICalUid } from "#src/data/icalendar/uid.ts";
 import { decodeVCard, encodeVCard } from "#src/data/vcard/codec.ts";
 import { extractUid as extractVCardUid } from "#src/data/vcard/uid.ts";
+import type { EntityType } from "#src/db/drizzle/schema/index.ts";
 import {
 	conflict,
 	type DatabaseError,
@@ -15,8 +16,6 @@ import {
 	unauthorized,
 	unsupportedMediaType,
 } from "#src/domain/errors.ts";
-import { SchedulingService } from "#src/services/scheduling/index.ts";
-import type { EntityType } from "#src/db/drizzle/schema/index.ts";
 import { CollectionId, EntityId, InstanceId } from "#src/domain/ids.ts";
 import type { ResolvedDavPath, Slug } from "#src/domain/types/path.ts";
 import { ETag } from "#src/domain/types/strings.ts";
@@ -28,6 +27,7 @@ import { CollectionService } from "#src/services/collection/index.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
 import { EntityRepository } from "#src/services/entity/index.ts";
 import { InstanceService } from "#src/services/instance/index.ts";
+import { SchedulingService } from "#src/services/scheduling/index.ts";
 import { CalTimezoneRepository } from "#src/services/timezone/index.ts";
 
 // ---------------------------------------------------------------------------
@@ -220,13 +220,12 @@ export const putHandler = (
 			// RFC 6638 §3.2.4.1: SOR UID must also be unique across ALL calendar
 			// collections owned by the principal (not just the target collection).
 			if (entityType === "icalendar" && logicalUid !== null) {
-				const isSorCandidate =
-					doc.root.components.some(
-						(c) =>
-							(c.name === "VEVENT" || c.name === "VTODO") &&
-							c.properties.some((p) => p.name === "ORGANIZER") &&
-							c.properties.some((p) => p.name === "ATTENDEE"),
-					);
+				const isSorCandidate = doc.root.components.some(
+					(c) =>
+						(c.name === "VEVENT" || c.name === "VTODO") &&
+						c.properties.some((p) => p.name === "ORGANIZER") &&
+						c.properties.some((p) => p.name === "ATTENDEE"),
+				);
 				if (isSorCandidate) {
 					const entityRepo2 = yield* EntityRepository;
 					const crossConflict = yield* entityRepo2.existsByUidForPrincipal(

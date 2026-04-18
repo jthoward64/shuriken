@@ -73,9 +73,7 @@ export const coalescePeriods = (
 		intervals.sort(
 			(a, b) => a.start.epochMilliseconds - b.start.epochMilliseconds,
 		);
-		let current:
-			| { start: Temporal.Instant; end: Temporal.Instant }
-			| undefined;
+		let current: { start: Temporal.Instant; end: Temporal.Instant } | undefined;
 		for (const iv of intervals) {
 			if (!current) {
 				current = { start: iv.start, end: iv.end };

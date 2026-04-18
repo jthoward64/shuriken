@@ -10,7 +10,11 @@ import { Effect, Option } from "effect";
 import { encodeICalendar } from "#src/data/icalendar/codec.ts";
 import type { ClarkName, IrDocument } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
-import { forbidden, methodNotAllowed, unauthorized } from "#src/domain/errors.ts";
+import {
+	forbidden,
+	methodNotAllowed,
+	unauthorized,
+} from "#src/domain/errors.ts";
 import type { EntityId, UuidString } from "#src/domain/ids.ts";
 import { InstanceId } from "#src/domain/ids.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
@@ -152,13 +156,15 @@ export const calendarQueryHandler = (
 			typeof timezoneIdEl === "string"
 				? timezoneIdEl.trim()
 				: typeof timezoneIdEl === "object" &&
-					  timezoneIdEl !== null &&
-					  "#text" in (timezoneIdEl as Record<string, unknown>)
-					? String(
-							(timezoneIdEl as Record<string, unknown>)["#text"],
-						).trim()
+						timezoneIdEl !== null &&
+						"#text" in (timezoneIdEl as Record<string, unknown>)
+					? String((timezoneIdEl as Record<string, unknown>)["#text"]).trim()
 					: null;
-		if (timezoneIdStr !== null && timezoneIdStr !== "" && !ianaSvc.isKnownTzid(timezoneIdStr)) {
+		if (
+			timezoneIdStr !== null &&
+			timezoneIdStr !== "" &&
+			!ianaSvc.isKnownTzid(timezoneIdStr)
+		) {
 			return yield* forbidden("CALDAV:valid-timezone");
 		}
 

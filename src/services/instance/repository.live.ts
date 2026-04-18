@@ -176,12 +176,7 @@ const insertInstance = Effect.fn("InstanceRepository.insert")(
 );
 
 const updateEtag = Effect.fn("InstanceRepository.updateEtag")(
-	function* (
-		db: DbClient,
-		id: InstanceId,
-		etag: ETag,
-		contentLength?: number,
-	) {
+	function* (db: DbClient, id: InstanceId, etag: ETag, contentLength?: number) {
 		yield* Effect.logTrace("repo.instance.updateEtag", { id });
 		return yield* Effect.tryPromise({
 			try: () =>

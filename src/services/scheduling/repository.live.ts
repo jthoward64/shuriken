@@ -132,7 +132,7 @@ const findDefaultCalendar = Effect.fn(
 				.where(
 					and(
 						// biome-ignore lint/style/noNonNullAssertion: guarded by null check above
-					eq(davCollection.id, inbox.scheduleDefaultCalendarId!),
+						eq(davCollection.id, inbox.scheduleDefaultCalendarId!),
 						isNull(davCollection.deletedAt),
 					),
 				)

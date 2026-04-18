@@ -6,10 +6,7 @@ import { shareLink, shareLinkCalendars } from "#src/db/drizzle/schema/index.ts";
 import type { ShareLinkVisibility } from "#src/db/drizzle/schema/share-link.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
 import type { UserId, UuidString } from "#src/domain/ids.ts";
-import {
-	ShareLinkRepository,
-	type ShareLinkRepositoryShape,
-} from "./repository.ts";
+import { ShareLinkRepository } from "./repository.ts";
 
 // ---------------------------------------------------------------------------
 // ShareLinkRepository — Drizzle implementation
@@ -39,12 +36,7 @@ const findByUser = Effect.fn("ShareLinkRepository.findByUser")(
 		yield* Effect.logTrace("repo.shareLink.findByUser", { userId });
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
-					.select()
-					.from(shareLink)
-					.where(
-						eq(shareLink.userId, userId),
-					),
+				db.select().from(shareLink).where(eq(shareLink.userId, userId)),
 			catch: (e) => new DatabaseError({ cause: e }),
 		});
 	},
@@ -88,7 +80,9 @@ const insert = Effect.fn("ShareLinkRepository.insert")(
 					.returning()
 					.then((r) => {
 						const row = r[0];
-						if (!row) throw new Error("Insert returned no rows");
+						if (!row) {
+							throw new Error("Insert returned no rows");
+						}
 						return row;
 					}),
 			catch: (e) => new DatabaseError({ cause: e }),
@@ -119,7 +113,9 @@ const update = Effect.fn("ShareLinkRepository.update")(
 					.returning()
 					.then((r) => {
 						const row = r[0];
-						if (!row) throw new Error("Update returned no rows");
+						if (!row) {
+							throw new Error("Update returned no rows");
+						}
 						return row;
 					}),
 			catch: (e) => new DatabaseError({ cause: e }),
@@ -170,7 +166,9 @@ const addCalendar = Effect.fn("ShareLinkRepository.addCalendar")(
 					.returning()
 					.then((r) => {
 						const row = r[0];
-						if (!row) throw new Error("Insert returned no rows");
+						if (!row) {
+							throw new Error("Insert returned no rows");
+						}
 						return row;
 					}),
 			catch: (e) => new DatabaseError({ cause: e }),

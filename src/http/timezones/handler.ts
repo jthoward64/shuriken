@@ -15,8 +15,11 @@
 
 import { Effect, Option } from "effect";
 import type { DatabaseError } from "#src/domain/errors.ts";
-import { CalTimezoneRepository } from "#src/services/timezone/index.ts";
-import { IanaTimezoneService } from "#src/services/timezone/index.ts";
+import {
+	CalTimezoneRepository,
+	IanaTimezoneService,
+} from "#src/services/timezone/index.ts";
+import { HTTP_BAD_REQUEST, HTTP_NOT_FOUND } from "../status";
 
 // ---------------------------------------------------------------------------
 // Response helpers
@@ -34,18 +37,16 @@ const jsonResponse = (
 	);
 
 const badRequest = (message: string): Effect.Effect<Response, never> =>
-	jsonResponse({ error: message }, 400);
+	jsonResponse({ error: message }, HTTP_BAD_REQUEST);
 
 const notFound = (): Effect.Effect<Response, never> =>
-	jsonResponse({ error: "Timezone not found" }, 404);
+	jsonResponse({ error: "Timezone not found" }, HTTP_NOT_FOUND);
 
 // ---------------------------------------------------------------------------
 // Action: capabilities
 // ---------------------------------------------------------------------------
 
-const handleCapabilities = (
-	origin: string,
-): Effect.Effect<Response, never> =>
+const handleCapabilities = (origin: string): Effect.Effect<Response, never> =>
 	jsonResponse({
 		info: { "primary-source": `${origin}/timezones` },
 		actions: ["capabilities", "list", "get"],
@@ -64,11 +65,7 @@ const extractLastModified = (vtimezone: string): string | null => {
 	return match?.[1] ?? null;
 };
 
-const handleList = (): Effect.Effect<
-	Response,
-	never,
-	IanaTimezoneService
-> =>
+const handleList = (): Effect.Effect<Response, never, IanaTimezoneService> =>
 	Effect.gen(function* () {
 		const svc = yield* IanaTimezoneService;
 		const tzids = svc.listTzids();
@@ -102,7 +99,11 @@ const wrapInVcalendar = (vtimezone: string): string =>
 
 const handleGet = (
 	tzid: string,
-): Effect.Effect<Response, DatabaseError, IanaTimezoneService | CalTimezoneRepository> =>
+): Effect.Effect<
+	Response,
+	DatabaseError,
+	IanaTimezoneService | CalTimezoneRepository
+> =>
 	Effect.gen(function* () {
 		const svc = yield* IanaTimezoneService;
 
