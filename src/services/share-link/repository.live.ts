@@ -4,6 +4,7 @@ import type { Temporal } from "temporal-polyfill";
 import { DatabaseClient, type DbClient } from "#src/db/client.ts";
 import { shareLink, shareLinkCalendars } from "#src/db/drizzle/schema/index.ts";
 import type { ShareLinkVisibility } from "#src/db/drizzle/schema/share-link.ts";
+import { getActiveDb } from "#src/db/transaction.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
 import type { UserId, UuidString } from "#src/domain/ids.ts";
 import { ShareLinkRepository } from "./repository.ts";
@@ -16,9 +17,10 @@ const findById = Effect.fn("ShareLinkRepository.findById")(
 	function* (db: DbClient, id: UuidString) {
 		yield* Effect.annotateCurrentSpan({ "share_link.id": id });
 		yield* Effect.logTrace("repo.shareLink.findById", { id });
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.select()
 					.from(shareLink)
 					.where(eq(shareLink.id, id))
@@ -36,9 +38,10 @@ const findByUser = Effect.fn("ShareLinkRepository.findByUser")(
 	function* (db: DbClient, userId: UserId) {
 		yield* Effect.annotateCurrentSpan({ "user.id": userId });
 		yield* Effect.logTrace("repo.shareLink.findByUser", { userId });
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db.select().from(shareLink).where(eq(shareLink.userId, userId)),
+				activeDb.select().from(shareLink).where(eq(shareLink.userId, userId)),
 			catch: (e) => new DatabaseError({ cause: e }),
 		});
 	},
@@ -51,9 +54,10 @@ const listCalendars = Effect.fn("ShareLinkRepository.listCalendars")(
 	function* (db: DbClient, linkId: UuidString) {
 		yield* Effect.annotateCurrentSpan({ "share_link.id": linkId });
 		yield* Effect.logTrace("repo.shareLink.listCalendars", { linkId });
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.select()
 					.from(shareLinkCalendars)
 					.where(eq(shareLinkCalendars.shareLinkId, linkId)),
@@ -72,9 +76,10 @@ const insert = Effect.fn("ShareLinkRepository.insert")(
 	) {
 		yield* Effect.annotateCurrentSpan({ "user.id": input.userId });
 		yield* Effect.logTrace("repo.shareLink.insert", { userId: input.userId });
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.insert(shareLink)
 					.values({
 						userId: input.userId,
@@ -105,9 +110,10 @@ const update = Effect.fn("ShareLinkRepository.update")(
 	) {
 		yield* Effect.annotateCurrentSpan({ "share_link.id": id });
 		yield* Effect.logTrace("repo.shareLink.update", { id });
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.update(shareLink)
 					.set({
 						enabled: input.enabled,
@@ -135,9 +141,10 @@ const softDelete = Effect.fn("ShareLinkRepository.softDelete")(
 	function* (db: DbClient, id: UuidString) {
 		yield* Effect.annotateCurrentSpan({ "share_link.id": id });
 		yield* Effect.logTrace("repo.shareLink.softDelete", { id });
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.delete(shareLink)
 					.where(eq(shareLink.id, id))
 					.then(() => undefined),
@@ -164,9 +171,10 @@ const addCalendar = Effect.fn("ShareLinkRepository.addCalendar")(
 			linkId,
 			calendarId,
 		});
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.insert(shareLinkCalendars)
 					.values({
 						shareLinkId: linkId,
@@ -199,9 +207,10 @@ const removeCalendar = Effect.fn("ShareLinkRepository.removeCalendar")(
 			linkId,
 			calendarId,
 		});
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.delete(shareLinkCalendars)
 					.where(
 						and(

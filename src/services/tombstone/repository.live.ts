@@ -2,6 +2,7 @@ import { and, eq, gt } from "drizzle-orm";
 import { Effect, Layer } from "effect";
 import { DatabaseClient, type DbClient } from "#src/db/client.ts";
 import { davTombstone } from "#src/db/drizzle/schema/index.ts";
+import { getActiveDb } from "#src/db/transaction.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
 import type { CollectionId } from "#src/domain/ids.ts";
 import { TombstoneRepository } from "./repository.ts";
@@ -24,9 +25,10 @@ const findSinceRevision = Effect.fn("TombstoneRepository.findSinceRevision")(
 			collectionId,
 			sinceSyncRevision,
 		});
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.select()
 					.from(davTombstone)
 					.where(

@@ -3,6 +3,7 @@ import { Effect, Layer, Metric, Option } from "effect";
 import type { Temporal } from "temporal-polyfill";
 import { DatabaseClient, type DbClient } from "#src/db/client.ts";
 import { calTimezone } from "#src/db/drizzle/schema/index.ts";
+import { getActiveDb } from "#src/db/transaction.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
 import { repoQueryDurationMs } from "#src/observability/metrics.ts";
 import { CalTimezoneRepository } from "./repository.ts";
@@ -19,9 +20,10 @@ const findByTzid = Effect.fn("CalTimezoneRepository.findByTzid")(
 	function* (db: DbClient, tzid: string) {
 		yield* Effect.annotateCurrentSpan({ "tz.tzid": tzid });
 		yield* Effect.logTrace("repo.timezone.findByTzid", { tzid });
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.select()
 					.from(calTimezone)
 					.where(eq(calTimezone.tzid, tzid))
@@ -53,9 +55,10 @@ const upsert = Effect.fn("CalTimezoneRepository.upsert")(
 			hasIanaName: Option.isSome(ianaName),
 			hasLastModified: Option.isSome(lastModified),
 		});
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.insert(calTimezone)
 					.values({
 						tzid,

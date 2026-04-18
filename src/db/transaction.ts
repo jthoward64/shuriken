@@ -1,5 +1,5 @@
-import type { Cause, Exit } from "effect";
-import { Effect, FiberRef, Option, Runtime } from "effect";
+import type { Cause } from "effect";
+import { Effect, Exit, FiberRef, Option, Runtime } from "effect";
 import { DatabaseClient, type DbClient } from "#src/db/client.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
 
@@ -35,9 +35,9 @@ export const getActiveDb = (fallback: DbClient): Effect.Effect<DbClient> =>
 // ---------------------------------------------------------------------------
 
 class EffectExitWrapper extends Error {
-	// any is acceptable here: this is a small internal sentinel class whose
-	// sole purpose is to preserve an Exit value across the async boundary,
-	// and the exact type parameters are recovered via cast at the call site.
+	// Exit type parameters are recovered via cast at the call site; using
+	// unknown here is the minimum needed to satisfy the extremely complex
+	// Exit<A,E> generic while keeping the sentinel class parameter-free.
 	readonly exit: Exit.Exit<unknown, unknown>;
 
 	constructor(exit: Exit.Exit<unknown, unknown>) {
@@ -75,14 +75,14 @@ export const withTransaction = <A, E, R>(
 						Effect.exit(effect),
 					),
 				);
-				if (exit._tag === "Success") {
+				if (Exit.isSuccess(exit)) {
 					return exit.value;
 				}
 				throw new EffectExitWrapper(exit);
 			}).then(
 				(value) => resume(Effect.succeed(value as A)),
 				(e) => {
-					if (e instanceof EffectExitWrapper) {
+					if (e instanceof EffectExitWrapper && Exit.isFailure(e.exit)) {
 						resume(
 							Effect.failCause(e.exit.cause as Cause.Cause<E>),
 						);

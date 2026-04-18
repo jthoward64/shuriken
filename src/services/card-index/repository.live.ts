@@ -2,6 +2,7 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { Effect, Layer } from "effect";
 import { DatabaseClient, type DbClient } from "#src/db/client.ts";
 import { cardIndex, davInstance } from "#src/db/drizzle/schema/index.ts";
+import { getActiveDb } from "#src/db/transaction.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
 import type { CollectionId } from "#src/domain/ids.ts";
 import {
@@ -77,6 +78,7 @@ const findByText = Effect.fn("CardIndexRepository.findByText")(
 		const folded = foldText(text, collation);
 		const pattern = likePattern(folded, matchType);
 		const useUnicode = collation === "i;unicode-casemap";
+		const activeDb = yield* getActiveDb(db);
 
 		return yield* Effect.tryPromise({
 			try: () => {
@@ -118,7 +120,7 @@ const findByText = Effect.fn("CardIndexRepository.findByText")(
 					}
 				}
 
-				return db
+				return activeDb
 					.selectDistinct({ instanceId: davInstance.id })
 					.from(cardIndex)
 					.innerJoin(

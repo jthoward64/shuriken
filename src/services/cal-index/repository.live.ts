@@ -5,6 +5,7 @@ import { RRuleTemporal } from "rrule-temporal";
 import type { Temporal } from "temporal-polyfill";
 import { DatabaseClient, type DbClient } from "#src/db/client.ts";
 import { calIndex, davInstance } from "#src/db/drizzle/schema/index.ts";
+import { getActiveDb } from "#src/db/transaction.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
 import type { CollectionId, EntityId } from "#src/domain/ids.ts";
 import { type CalComponentType, CalIndexRepository } from "./repository.ts";
@@ -115,9 +116,10 @@ const findByTimeRange = Effect.fn("CalIndexRepository.findByTimeRange")(
 			collectionId,
 			componentType,
 		});
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.selectDistinct({ instanceId: davInstance.id })
 					.from(calIndex)
 					.innerJoin(
@@ -174,9 +176,10 @@ const findByComponentType = Effect.fn("CalIndexRepository.findByComponentType")(
 			collectionId,
 			componentType,
 		});
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.selectDistinct({ instanceId: davInstance.id })
 					.from(calIndex)
 					.innerJoin(
@@ -211,9 +214,11 @@ const indexRruleOccurrences = Effect.fn(
 			entityId,
 		});
 
+		const activeDb = yield* getActiveDb(db);
+
 		const rows = yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.select({
 						componentId: calIndex.componentId,
 						rruleText: calIndex.rruleText,
@@ -258,7 +263,7 @@ const indexRruleOccurrences = Effect.fn(
 
 			yield* Effect.tryPromise({
 				try: () =>
-					db
+					activeDb
 						.update(calIndex)
 						.set({
 							rruleOccurrenceMonths: months,

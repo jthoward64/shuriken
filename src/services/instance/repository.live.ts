@@ -3,6 +3,7 @@ import { Effect, Layer, Option } from "effect";
 import type { IrDeadProperties } from "#src/data/ir.ts";
 import { DatabaseClient, type DbClient } from "#src/db/client.ts";
 import { davInstance } from "#src/db/drizzle/schema/index.ts";
+import { getActiveDb } from "#src/db/transaction.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
 import type { CollectionId, EntityId, InstanceId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
@@ -17,9 +18,10 @@ const findById = Effect.fn("InstanceRepository.findById")(
 	function* (db: DbClient, id: InstanceId) {
 		yield* Effect.annotateCurrentSpan({ "instance.id": id });
 		yield* Effect.logTrace("repo.instance.findById", { id });
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.select()
 					.from(davInstance)
 					.where(and(eq(davInstance.id, id), isNull(davInstance.deletedAt)))
@@ -40,9 +42,10 @@ const findBySlug = Effect.fn("InstanceRepository.findBySlug")(
 			"instance.slug": slug,
 		});
 		yield* Effect.logTrace("repo.instance.findBySlug", { collectionId, slug });
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.select()
 					.from(davInstance)
 					.where(
@@ -66,9 +69,10 @@ const listByCollection = Effect.fn("InstanceRepository.listByCollection")(
 	function* (db: DbClient, collectionId: CollectionId) {
 		yield* Effect.annotateCurrentSpan({ "collection.id": collectionId });
 		yield* Effect.logTrace("repo.instance.listByCollection", { collectionId });
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.select()
 					.from(davInstance)
 					.where(
@@ -99,9 +103,10 @@ const findChangedSince = Effect.fn("InstanceRepository.findChangedSince")(
 			collectionId,
 			sinceSyncRevision,
 		});
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.select()
 					.from(davInstance)
 					.where(
@@ -127,9 +132,10 @@ const findByIds = Effect.fn("InstanceRepository.findByIds")(
 		if (ids.length === 0) {
 			return [];
 		}
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.select()
 					.from(davInstance)
 					.where(
@@ -156,9 +162,10 @@ const insertInstance = Effect.fn("InstanceRepository.insert")(
 			collectionId: input.collectionId,
 			slug: input.slug,
 		});
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.insert(davInstance)
 					.values({
 						collectionId: input.collectionId,
@@ -194,9 +201,10 @@ const updateEtag = Effect.fn("InstanceRepository.updateEtag")(
 	function* (db: DbClient, id: InstanceId, etag: ETag, contentLength?: number) {
 		yield* Effect.annotateCurrentSpan({ "instance.id": id });
 		yield* Effect.logTrace("repo.instance.updateEtag", { id });
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.update(davInstance)
 					.set({
 						etag,
@@ -217,9 +225,10 @@ const softDelete = Effect.fn("InstanceRepository.softDelete")(
 	function* (db: DbClient, id: InstanceId) {
 		yield* Effect.annotateCurrentSpan({ "instance.id": id });
 		yield* Effect.logTrace("repo.instance.softDelete", { id });
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.update(davInstance)
 					.set({ deletedAt: sql`now()` })
 					.where(eq(davInstance.id, id))
@@ -249,9 +258,10 @@ const relocate = Effect.fn("InstanceRepository.relocate")(
 			targetCollectionId,
 			targetSlug,
 		});
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.update(davInstance)
 					.set({
 						collectionId: targetCollectionId,
@@ -281,9 +291,10 @@ const updateClientProperties = Effect.fn(
 	function* (db: DbClient, id: InstanceId, clientProperties: IrDeadProperties) {
 		yield* Effect.annotateCurrentSpan({ "instance.id": id });
 		yield* Effect.logTrace("repo.instance.updateClientProperties", { id });
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.update(davInstance)
 					.set({ clientProperties, updatedAt: sql`now()` })
 					.where(and(eq(davInstance.id, id), isNull(davInstance.deletedAt)))

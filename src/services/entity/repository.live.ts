@@ -7,6 +7,7 @@ import {
 	davInstance,
 	type EntityType,
 } from "#src/db/drizzle/schema/index.ts";
+import { getActiveDb } from "#src/db/transaction.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
 import type { CollectionId, EntityId, PrincipalId } from "#src/domain/ids.ts";
 import { repoQueryDurationMs } from "#src/observability/metrics.ts";
@@ -30,9 +31,10 @@ const insertEntity = Effect.fn("EntityRepository.insert")(
 			entityType: input.entityType,
 			hasUid: input.logicalUid !== null,
 		});
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.insert(davEntity)
 					.values({
 						entityType: input.entityType,
@@ -62,9 +64,10 @@ const findById = Effect.fn("EntityRepository.findById")(
 	function* (db: DbClient, id: EntityId) {
 		yield* Effect.annotateCurrentSpan({ "entity.id": id });
 		yield* Effect.logTrace("repo.entity.findById", { id });
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.select()
 					.from(davEntity)
 					.where(and(eq(davEntity.id, id), isNull(davEntity.deletedAt)))
@@ -92,9 +95,10 @@ const updateLogicalUid = Effect.fn("EntityRepository.updateLogicalUid")(
 			id,
 			hasUid: logicalUid !== null,
 		});
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.update(davEntity)
 					.set({ logicalUid, updatedAt: sql`now()` })
 					.where(eq(davEntity.id, id))
@@ -117,9 +121,10 @@ const softDelete = Effect.fn("EntityRepository.softDelete")(
 	function* (db: DbClient, id: EntityId) {
 		yield* Effect.annotateCurrentSpan({ "entity.id": id });
 		yield* Effect.logTrace("repo.entity.softDelete", { id });
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.update(davEntity)
 					.set({ deletedAt: sql`now()` })
 					.where(eq(davEntity.id, id))
@@ -146,9 +151,10 @@ const existsByUid = Effect.fn("EntityRepository.existsByUid")(
 			collectionId,
 			logicalUid,
 		});
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.select({ id: davEntity.id })
 					.from(davEntity)
 					.innerJoin(davInstance, eq(davInstance.entityId, davEntity.id))
@@ -186,9 +192,10 @@ const existsByUidForPrincipal = Effect.fn(
 			principalId,
 			logicalUid,
 		});
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.select({ id: davEntity.id })
 					.from(davEntity)
 					.innerJoin(davInstance, eq(davInstance.entityId, davEntity.id))

@@ -5,6 +5,7 @@ import {
 	type CollectionType,
 	davCollection,
 } from "#src/db/drizzle/schema/index.ts";
+import { getActiveDb } from "#src/db/transaction.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
 import type { CollectionId, PrincipalId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
@@ -22,9 +23,10 @@ const findById = Effect.fn("CollectionRepository.findById")(
 	function* (db: DbClient, id: CollectionId) {
 		yield* Effect.annotateCurrentSpan({ "collection.id": id });
 		yield* Effect.logTrace("repo.collection.findById", { id });
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.select()
 					.from(davCollection)
 					.where(and(eq(davCollection.id, id), isNull(davCollection.deletedAt)))
@@ -55,9 +57,10 @@ const findBySlug = Effect.fn("CollectionRepository.findBySlug")(
 			collectionType,
 			slug,
 		});
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.select()
 					.from(davCollection)
 					.where(
@@ -82,9 +85,10 @@ const listByOwner = Effect.fn("CollectionRepository.listByOwner")(
 	function* (db: DbClient, ownerPrincipalId: PrincipalId) {
 		yield* Effect.annotateCurrentSpan({ "principal.id": ownerPrincipalId });
 		yield* Effect.logTrace("repo.collection.listByOwner", { ownerPrincipalId });
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.select()
 					.from(davCollection)
 					.where(
@@ -112,9 +116,10 @@ const insert = Effect.fn("CollectionRepository.insert")(
 			ownerPrincipalId: input.ownerPrincipalId,
 			slug: input.slug,
 		});
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.insert(davCollection)
 					.values({
 						ownerPrincipalId: input.ownerPrincipalId,
@@ -159,9 +164,10 @@ const relocate = Effect.fn("CollectionRepository.relocate")(
 			targetOwnerPrincipalId,
 			targetSlug,
 		});
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.update(davCollection)
 					.set({
 						ownerPrincipalId: targetOwnerPrincipalId,
@@ -189,9 +195,10 @@ const softDelete = Effect.fn("CollectionRepository.softDelete")(
 	function* (db: DbClient, id: CollectionId) {
 		yield* Effect.annotateCurrentSpan({ "collection.id": id });
 		yield* Effect.logTrace("repo.collection.softDelete", { id });
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.update(davCollection)
 					.set({ deletedAt: sql`now()` })
 					.where(eq(davCollection.id, id))
@@ -238,9 +245,10 @@ const updateProperties = Effect.fn("CollectionRepository.updateProperties")(
 		if (changes.scheduleDefaultCalendarId !== undefined) {
 			setValues.scheduleDefaultCalendarId = changes.scheduleDefaultCalendarId;
 		}
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.update(davCollection)
 					.set(setValues)
 					.where(and(eq(davCollection.id, id), isNull(davCollection.deletedAt)))

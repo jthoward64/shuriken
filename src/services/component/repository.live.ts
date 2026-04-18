@@ -17,6 +17,7 @@ import {
 	davProperty,
 	type EntityType,
 } from "#src/db/drizzle/schema/index.ts";
+import { getActiveDb } from "#src/db/transaction.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
 import {
 	ComponentId,
@@ -190,74 +191,86 @@ const dbColumnsToIrValue = (
 };
 
 // ---------------------------------------------------------------------------
-// insertTree — recursive tree walk inside a single Drizzle transaction
+// insertTree — recursive tree walk using the active DB connection
+//
+// activeDb is resolved once by insertTree and threaded through recursion so
+// all inserts share the same connection (and transaction, if one is active).
 // ---------------------------------------------------------------------------
 
-type DrizzleTx = Parameters<Parameters<DbClient["transaction"]>[0]>[0];
-
-const insertComponentInTx = async (
-	tx: DrizzleTx,
+const insertComponentEffect = (
+	activeDb: DbClient,
 	entityId: EntityId,
 	component: IrComponent,
 	parentComponentId: UuidString | null,
 	ordinal: number,
-): Promise<UuidString> => {
-	const compRows = await tx
-		.insert(davComponent)
-		.values({ entityId, parentComponentId, name: component.name, ordinal })
-		.returning();
-	const compRow = compRows[0];
-	if (!compRow) {
-		throw new Error("Component insert returned no rows");
-	}
-	const componentId = compRow.id;
-
-	for (let i = 0; i < component.properties.length; i++) {
-		const prop = component.properties[i];
-		if (!prop) {
-			continue;
+): Effect.Effect<UuidString, DatabaseError> =>
+	Effect.gen(function* () {
+		const compRows = yield* Effect.tryPromise({
+			try: () =>
+				activeDb
+					.insert(davComponent)
+					.values({ entityId, parentComponentId, name: component.name, ordinal })
+					.returning(),
+			catch: (e) => new DatabaseError({ cause: e }),
+		});
+		const compRow = compRows[0];
+		if (!compRow) {
+			return yield* Effect.fail(
+				new DatabaseError({ cause: new Error("Component insert returned no rows") }),
+			);
 		}
-		const valueColumns = irValueToDbColumns(prop.value);
-		const propRows = await tx
-			.insert(davProperty)
-			.values({
-				componentId,
-				name: prop.name,
-				valueType: prop.value.type,
-				ordinal: i,
-				...valueColumns,
-			})
-			.returning();
-		const propRow = propRows[0];
-		if (!propRow) {
-			throw new Error("Property insert returned no rows");
-		}
-		const propertyId = propRow.id;
+		const componentId = compRow.id as UuidString;
 
-		for (let j = 0; j < prop.parameters.length; j++) {
-			const param = prop.parameters[j];
-			if (!param) {
-				continue;
-			}
-			await tx.insert(davParameter).values({
-				propertyId,
-				name: param.name,
-				value: param.value,
-				ordinal: j,
+		for (let i = 0; i < component.properties.length; i++) {
+			const prop = component.properties[i];
+			if (!prop) { continue; }
+			const valueColumns = irValueToDbColumns(prop.value);
+			const propRows = yield* Effect.tryPromise({
+				try: () =>
+					activeDb
+						.insert(davProperty)
+						.values({
+							componentId,
+							name: prop.name,
+							valueType: prop.value.type,
+							ordinal: i,
+							...valueColumns,
+						})
+						.returning(),
+				catch: (e) => new DatabaseError({ cause: e }),
 			});
-		}
-	}
+			const propRow = propRows[0];
+			if (!propRow) {
+				return yield* Effect.fail(
+					new DatabaseError({ cause: new Error("Property insert returned no rows") }),
+				);
+			}
+			const propertyId = propRow.id;
 
-	for (let i = 0; i < component.components.length; i++) {
-		const child = component.components[i];
-		if (!child) {
-			continue;
+			for (let j = 0; j < prop.parameters.length; j++) {
+				const param = prop.parameters[j];
+				if (!param) { continue; }
+				yield* Effect.tryPromise({
+					try: () =>
+						activeDb.insert(davParameter).values({
+							propertyId,
+							name: param.name,
+							value: param.value,
+							ordinal: j,
+						}),
+					catch: (e) => new DatabaseError({ cause: e }),
+				});
+			}
 		}
-		await insertComponentInTx(tx, entityId, child, componentId, i);
-	}
 
-	return componentId;
-};
+		for (let i = 0; i < component.components.length; i++) {
+			const child = component.components[i];
+			if (!child) { continue; }
+			yield* insertComponentEffect(activeDb, entityId, child, componentId, i);
+		}
+
+		return componentId;
+	});
 
 const compDuration = repoQueryDurationMs.pipe(
 	Metric.tagged("repo.entity", "component"),
@@ -267,14 +280,9 @@ const insertTree = Effect.fn("ComponentRepository.insertTree")(
 	function* (db: DbClient, entityId: EntityId, root: IrComponent) {
 		yield* Effect.annotateCurrentSpan({ "entity.id": entityId });
 		yield* Effect.logTrace("repo.component.insertTree", { entityId });
-		return yield* Effect.tryPromise({
-			try: () =>
-				db.transaction(async (tx) => {
-					const rootId = await insertComponentInTx(tx, entityId, root, null, 0);
-					return ComponentId(rootId);
-				}),
-			catch: (e) => new DatabaseError({ cause: e }),
-		}).pipe(
+		const activeDb = yield* getActiveDb(db);
+		return yield* insertComponentEffect(activeDb, entityId, root, null, 0).pipe(
+			Effect.map(ComponentId),
 			Metric.trackDuration(
 				compDuration.pipe(Metric.tagged("repo.operation", "insertTree")),
 			),
@@ -308,6 +316,7 @@ const loadTree = Effect.fn("ComponentRepository.loadTree")(
 			"entity.type": entityType,
 		});
 		yield* Effect.logTrace("repo.component.loadTree", { entityId, entityType });
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: async (): Promise<Option.Option<IrComponent>> => {
 				const isKnown =
@@ -316,7 +325,7 @@ const loadTree = Effect.fn("ComponentRepository.loadTree")(
 						: isKnownVcardProperty;
 
 				// 1. Load all active component rows for the entity
-				const components = await db
+				const components = await activeDb
 					.select()
 					.from(davComponent)
 					.where(
@@ -334,7 +343,7 @@ const loadTree = Effect.fn("ComponentRepository.loadTree")(
 				const componentIds = components.map((c) => c.id);
 
 				// 2. Load all active property rows for those components
-				const properties = await db
+				const properties = await activeDb
 					.select()
 					.from(davProperty)
 					.where(
@@ -349,7 +358,7 @@ const loadTree = Effect.fn("ComponentRepository.loadTree")(
 				let parameters: Array<ParameterRow> = [];
 				if (properties.length > 0) {
 					const propertyIds = properties.map((p) => p.id);
-					parameters = await db
+					parameters = await activeDb
 						.select()
 						.from(davParameter)
 						.where(
@@ -425,9 +434,10 @@ const deleteByEntity = Effect.fn("ComponentRepository.deleteByEntity")(
 	function* (db: DbClient, entityId: EntityId) {
 		yield* Effect.annotateCurrentSpan({ "entity.id": entityId });
 		yield* Effect.logTrace("repo.component.deleteByEntity", { entityId });
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.update(davComponent)
 					.set({ deletedAt: sql`now()` })
 					.where(
