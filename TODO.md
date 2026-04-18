@@ -1,5 +1,3 @@
-- Add APIs for creating users and groups, and for adding/removing users from groups
-- Add a basic web ui for managing self, users, and groups (e.g. changing own email, slug, name, and password, creating new users, creating new groups, adding/removing users from groups, editing others). Use HTMX and TW elements
 - Add the ability to manage collections (calendars and addressbooks) from the web UI
 - Add a calendar viewer to web UI built with with https://fullcalendar.io/docs
 - Add support for creating, editing, and deleting calendar events from the web UI
