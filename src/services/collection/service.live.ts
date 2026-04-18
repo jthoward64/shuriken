@@ -1,8 +1,9 @@
 import { Effect, Layer } from "effect";
+import { DatabaseClient } from "#src/db/client.ts";
+import { withTransaction } from "#src/db/transaction.ts";
 import { noneOrConflict, someOrNotFound } from "#src/domain/errors.ts";
 import type { CollectionId, PrincipalId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
-import { withTransaction } from "#src/db/transaction.ts";
 import { AclRepository } from "#src/services/acl/repository.ts";
 import {
 	type CollectionPropertyChanges,
@@ -21,6 +22,7 @@ export const CollectionServiceLive = Layer.effect(
 	Effect.gen(function* () {
 		const repo = yield* CollectionRepository;
 		const aclRepo = yield* AclRepository;
+		const db = yield* DatabaseClient;
 
 		return CollectionService.of({
 			findById: Effect.fn("CollectionService.findById")(function* (
@@ -116,7 +118,7 @@ export const CollectionServiceLive = Layer.effect(
 						});
 						return c;
 					}),
-				);
+				).pipe(Effect.provideService(DatabaseClient, db));
 				yield* Effect.logDebug("collection.create: created", {
 					collectionId: collection.id,
 					type: collection.collectionType,

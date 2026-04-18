@@ -5,7 +5,9 @@ import { extractVtimezones } from "#src/data/icalendar/timezone.ts";
 import { extractUid as extractICalUid } from "#src/data/icalendar/uid.ts";
 import { decodeVCard, encodeVCard } from "#src/data/vcard/codec.ts";
 import { extractUid as extractVCardUid } from "#src/data/vcard/uid.ts";
+import { DatabaseClient } from "#src/db/client.ts";
 import type { EntityType } from "#src/db/drizzle/schema/index.ts";
+import { withTransaction } from "#src/db/transaction.ts";
 import {
 	conflict,
 	type DatabaseError,
@@ -50,8 +52,10 @@ export const putHandler = (
 	| CalIndexRepository
 	| CollectionService
 	| SchedulingService
+	| DatabaseClient
 > =>
 	Effect.gen(function* () {
+		const db = yield* DatabaseClient;
 		// 1. Only new-instance and instance paths accept PUT.
 		if (path.kind !== "new-instance" && path.kind !== "instance") {
 			return yield* methodNotAllowed();
@@ -238,23 +242,24 @@ export const putHandler = (
 				}
 			}
 
-			// Create entity row.
-			const entityRow = yield* entityRepo.insert({ entityType, logicalUid });
-
-			// Persist component tree.
+			// Create entity, component tree, and instance atomically.
 			const componentRepo = yield* ComponentRepository;
-			yield* componentRepo.insertTree(EntityId(entityRow.id), doc.root);
-
-			// Create instance row.
 			const instanceSvc = yield* InstanceService;
-			const newInstance = yield* instanceSvc.put({
-				collectionId: path.collectionId,
-				entityId: EntityId(entityRow.id),
-				contentType,
-				etag,
-				slug: path.slug,
-				contentLength,
-			});
+			const { entityRow, newInstance } = yield* withTransaction(
+				Effect.gen(function* () {
+					const row = yield* entityRepo.insert({ entityType, logicalUid });
+					yield* componentRepo.insertTree(EntityId(row.id), doc.root);
+					const inst = yield* instanceSvc.put({
+						collectionId: path.collectionId,
+						entityId: EntityId(row.id),
+						contentType,
+						etag,
+						slug: path.slug,
+						contentLength,
+					});
+					return { entityRow: row, newInstance: inst };
+				}),
+			).pipe(Effect.provideService(DatabaseClient, db));
 
 			// Populate precomputed RRULE shape columns used by the week-bucket SQL filter.
 			const calIdx = yield* CalIndexRepository;
@@ -365,32 +370,32 @@ export const putHandler = (
 			});
 		}
 
-		// Replace component tree.
-		yield* componentRepo.deleteByEntity(EntityId(existingInstance.entityId));
-
+		// Replace component tree and update instance atomically.
 		const entityRepo = yield* EntityRepository;
-		yield* entityRepo.updateLogicalUid(
-			EntityId(existingInstance.entityId),
-			logicalUid,
-		);
-
-		yield* componentRepo.insertTree(
-			EntityId(existingInstance.entityId),
-			doc.root,
-		);
-
-		// Update instance ETag and sync revision.
-		yield* instanceSvc.put(
-			{
-				collectionId: CollectionId(existingInstance.collectionId),
-				entityId: EntityId(existingInstance.entityId),
-				contentType,
-				etag,
-				slug: existingInstance.slug as Slug,
-				contentLength,
-			},
-			path.instanceId,
-		);
+		yield* withTransaction(
+			Effect.gen(function* () {
+				yield* componentRepo.deleteByEntity(EntityId(existingInstance.entityId));
+				yield* entityRepo.updateLogicalUid(
+					EntityId(existingInstance.entityId),
+					logicalUid,
+				);
+				yield* componentRepo.insertTree(
+					EntityId(existingInstance.entityId),
+					doc.root,
+				);
+				yield* instanceSvc.put(
+					{
+						collectionId: CollectionId(existingInstance.collectionId),
+						entityId: EntityId(existingInstance.entityId),
+						contentType,
+						etag,
+						slug: existingInstance.slug as Slug,
+						contentLength,
+					},
+					path.instanceId,
+				);
+			}),
+		).pipe(Effect.provideService(DatabaseClient, db));
 
 		// Populate precomputed RRULE shape columns used by the week-bucket SQL filter.
 		const calIdx = yield* CalIndexRepository;

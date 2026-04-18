@@ -1,4 +1,5 @@
 import { Effect, Layer } from "effect";
+import { DatabaseClient } from "#src/db/client.ts";
 import { withTransaction } from "#src/db/transaction.ts";
 import type { PrincipalId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
@@ -16,8 +17,8 @@ export const ProvisioningServiceLive = Layer.effect(
 	Effect.gen(function* () {
 		const users = yield* UserService;
 		const collections = yield* CollectionService;
-
 		const acl = yield* AclRepository;
+		const db = yield* DatabaseClient;
 
 		return ProvisioningService.of({
 			provisionUser: Effect.fn("ProvisioningService.provisionUser")(function* (
@@ -35,6 +36,7 @@ export const ProvisioningServiceLive = Layer.effect(
 							slug: input.slug,
 							email: input.email,
 							displayName: input.name,
+							credentials: input.credentials,
 						});
 
 						// Drizzle infers the uuid column as string; cast to branded type
@@ -87,7 +89,7 @@ export const ProvisioningServiceLive = Layer.effect(
 
 						return { user, calendar, addressBook, inbox, outbox };
 					}),
-				);
+				).pipe(Effect.provideService(DatabaseClient, db));
 
 				yield* Effect.logInfo("user provisioned", {
 					email: input.email,

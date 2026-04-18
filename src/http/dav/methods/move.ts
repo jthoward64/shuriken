@@ -1,4 +1,6 @@
 import { Effect } from "effect";
+import { DatabaseClient } from "#src/db/client.ts";
+import { withTransaction } from "#src/db/transaction.ts";
 import {
 	conflict,
 	davError,
@@ -147,23 +149,29 @@ const moveInstance = (
 		// Insert a new instance row at the destination (same entity, preserving ETag
 		// and content). RFC §9.9.1: DAV:creationdate SHOULD remain the same — we
 		// preserve entity identity by reusing the existing entityId.
+		// Both writes are atomic: RFC 4918 §9.9 requires source to be preserved if
+		// the destination insert fails.
+		const db = yield* DatabaseClient;
 		const instanceRepo = yield* InstanceRepository;
-		yield* instanceRepo.insert({
-			collectionId: destPath.collectionId,
-			entityId: EntityId(sourceInstance.entityId),
-			contentType: sourceInstance.contentType,
-			etag: ETag(sourceInstance.etag),
-			slug: destSlug,
-			...(sourceInstance.scheduleTag
-				? { scheduleTag: sourceInstance.scheduleTag }
-				: {}),
-		});
-
-		// Soft-delete the source instance. The DB trigger fires on the deletedAt
-		// change, increments the source collection's sync-token, and creates the
-		// tombstone entry that sync-collection clients need to learn the resource
-		// was removed (RFC 6578 §6.1).
-		yield* instanceRepo.softDelete(path.instanceId);
+		yield* withTransaction(
+			Effect.gen(function* () {
+				yield* instanceRepo.insert({
+					collectionId: destPath.collectionId,
+					entityId: EntityId(sourceInstance.entityId),
+					contentType: sourceInstance.contentType,
+					etag: ETag(sourceInstance.etag),
+					slug: destSlug,
+					...(sourceInstance.scheduleTag
+						? { scheduleTag: sourceInstance.scheduleTag }
+						: {}),
+				});
+				// Soft-delete the source instance. The DB trigger fires on the deletedAt
+				// change, increments the source collection's sync-token, and creates the
+				// tombstone entry that sync-collection clients need to learn the resource
+				// was removed (RFC 6578 §6.1).
+				yield* instanceRepo.softDelete(path.instanceId);
+			}),
+		).pipe(Effect.provideService(DatabaseClient, db));
 
 		return new Response(null, {
 			status: destExisted ? HTTP_NO_CONTENT : HTTP_CREATED,

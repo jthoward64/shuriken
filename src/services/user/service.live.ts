@@ -1,4 +1,5 @@
 import { Effect, Layer, Option, Redacted } from "effect";
+import { DatabaseClient } from "#src/db/client.ts";
 import { withTransaction } from "#src/db/transaction.ts";
 import {
 	conflict,
@@ -57,6 +58,7 @@ export const UserServiceLive = Layer.effect(
 		const repo = yield* UserRepository;
 		const crypto = yield* CryptoService;
 		const aclRepo = yield* AclRepository;
+		const db = yield* DatabaseClient;
 
 		return UserService.of({
 			list: Effect.fn("UserService.list")(function* () {
@@ -232,7 +234,7 @@ export const UserServiceLive = Layer.effect(
 						);
 						yield* repo.insertCredential({ userId, ...hashed });
 					}),
-				);
+				).pipe(Effect.provideService(DatabaseClient, db));
 				yield* Effect.logTrace("user.setCredential done", { userId });
 			}),
 		});

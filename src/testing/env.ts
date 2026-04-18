@@ -1,6 +1,7 @@
 import { Effect, Layer, Option, Redacted } from "effect";
 import { Temporal } from "temporal-polyfill";
 import type { IrComponent } from "#src/data/ir.ts";
+import { DatabaseClient } from "#src/db/client.ts";
 import type {
 	CollectionType,
 	ContentType,
@@ -1236,6 +1237,7 @@ export interface TestEnvBuilder {
 		| CalIndexRepository
 		| IanaTimezoneService
 		| SchedulingService
+		| DatabaseClient
 	>;
 	/** Direct store access for advanced assertions. Prefer reading via services. */
 	readonly stores: TestStores;
@@ -1434,16 +1436,22 @@ export const makeTestEnv = (): TestEnvBuilder => {
 					Effect.succeed("BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n"),
 			});
 
+			const noOpDb = {
+				transaction: async <T>(fn: (tx: DatabaseClient) => Promise<T>): Promise<T> =>
+					fn(noOpDb as unknown as DatabaseClient),
+			} as unknown as DatabaseClient;
+			const testDbClientLayer = Layer.succeed(DatabaseClient, noOpDb);
+
 			const userServiceLayer = UserServiceLive.pipe(
 				Layer.provide(
-					Layer.mergeAll(userRepoLayer, TestCryptoLayer, aclRepoLayer),
+					Layer.mergeAll(userRepoLayer, TestCryptoLayer, aclRepoLayer, testDbClientLayer),
 				),
 			);
 			const principalServiceLayer = PrincipalServiceLive.pipe(
 				Layer.provide(principalRepoLayer),
 			);
 			const collectionServiceLayer = CollectionServiceLive.pipe(
-				Layer.provide(Layer.mergeAll(collectionRepoLayer, aclRepoLayer)),
+				Layer.provide(Layer.mergeAll(collectionRepoLayer, aclRepoLayer, testDbClientLayer)),
 			);
 			const instanceServiceLayer = InstanceServiceLive.pipe(
 				Layer.provide(instanceRepoLayer),
@@ -1469,6 +1477,7 @@ export const makeTestEnv = (): TestEnvBuilder => {
 				calIndexRepoLayer,
 				IanaTimezoneService.Default,
 				schedulingServiceLayer,
+				testDbClientLayer,
 			);
 		},
 	};

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { Effect, Option } from "effect";
+import type { DatabaseClient } from "#src/db/client.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import {
 	CollectionId,
@@ -186,6 +187,7 @@ type PutEffect<A> = Effect.Effect<
 	| CalIndexRepository
 	| CollectionService
 	| SchedulingService
+	| DatabaseClient
 >;
 type PutFailEffect = Effect.Effect<
 	unknown,
@@ -198,6 +200,7 @@ type PutFailEffect = Effect.Effect<
 	| CalIndexRepository
 	| CollectionService
 	| SchedulingService
+	| DatabaseClient
 >;
 
 const run = <A>(env: ReturnType<typeof makeTestEnv>, effect: PutEffect<A>) =>

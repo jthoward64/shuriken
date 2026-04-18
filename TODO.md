@@ -1,6 +1,5 @@
-- Add a default admin email and password to the config, which can be used to log in and set up the server on first run (default to something like admin@example.com and a random password that is printed to the console on startup)
 - Add APIs for creating users and groups, and for adding/removing users from groups
-- Add a basic web ui for managing self, users, and groups (e.g. changing own email, slug, name, and password, creating new users, creating new groups, adding/removing users from groups, editing others)
+- Add a basic web ui for managing self, users, and groups (e.g. changing own email, slug, name, and password, creating new users, creating new groups, adding/removing users from groups, editing others). Use HTMX and TW elements
 - Add the ability to manage collections (calendars and addressbooks) from the web UI
 - Add a calendar viewer to web UI built with with https://fullcalendar.io/docs
 - Add support for creating, editing, and deleting calendar events from the web UI

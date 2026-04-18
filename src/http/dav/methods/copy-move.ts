@@ -1,4 +1,6 @@
 import { Effect } from "effect";
+import { DatabaseClient } from "#src/db/client.ts";
+import { withTransaction } from "#src/db/transaction.ts";
 import {
 	type DatabaseError,
 	type DavError,
@@ -89,18 +91,23 @@ export const deleteInstance = (
 ): Effect.Effect<
 	void,
 	DatabaseError,
-	InstanceRepository | EntityRepository | ComponentRepository
+	InstanceRepository | EntityRepository | ComponentRepository | DatabaseClient
 > =>
 	Effect.gen(function* () {
+		const db = yield* DatabaseClient;
 		const instanceRepo = yield* InstanceRepository;
 		const entityRepo = yield* EntityRepository;
 		const componentRepo = yield* ComponentRepository;
 
 		// Soft-delete instance first so the DB tombstone trigger fires while the
 		// entity is still logically present.
-		yield* instanceRepo.softDelete(InstanceId(instance.id));
-		yield* entityRepo.softDelete(EntityId(instance.entityId));
-		yield* componentRepo.deleteByEntity(EntityId(instance.entityId));
+		yield* withTransaction(
+			Effect.gen(function* () {
+				yield* instanceRepo.softDelete(InstanceId(instance.id));
+				yield* entityRepo.softDelete(EntityId(instance.entityId));
+				yield* componentRepo.deleteByEntity(EntityId(instance.entityId));
+			}),
+		).pipe(Effect.provideService(DatabaseClient, db));
 	});
 
 /**
@@ -116,12 +123,17 @@ export const deleteCollection = (
 	| CollectionRepository
 	| EntityRepository
 	| ComponentRepository
+	| DatabaseClient
 > =>
 	Effect.gen(function* () {
+		const db = yield* DatabaseClient;
 		const instanceRepo = yield* InstanceRepository;
 		const instances = yield* instanceRepo.listByCollection(collectionId);
-		yield* Effect.forEach(instances, deleteInstance, { discard: true });
-
 		const collectionRepo = yield* CollectionRepository;
-		yield* collectionRepo.softDelete(collectionId);
+		yield* withTransaction(
+			Effect.gen(function* () {
+				yield* Effect.forEach(instances, deleteInstance, { discard: true });
+				yield* collectionRepo.softDelete(collectionId);
+			}),
+		).pipe(Effect.provideService(DatabaseClient, db));
 	});

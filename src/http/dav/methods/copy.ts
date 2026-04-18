@@ -3,6 +3,8 @@ import { makeEtag } from "#src/data/etag.ts";
 import { encodeICalendar } from "#src/data/icalendar/codec.ts";
 import type { IrDeadProperties } from "#src/data/ir.ts";
 import { encodeVCard } from "#src/data/vcard/codec.ts";
+import { DatabaseClient } from "#src/db/client.ts";
+import { withTransaction } from "#src/db/transaction.ts";
 import {
 	conflict,
 	forbidden,
@@ -103,6 +105,7 @@ const copyInstance = (
 	_req: Request,
 ) =>
 	Effect.gen(function* () {
+		const db = yield* DatabaseClient;
 		const destPath = yield* parseDavPath(destUrl);
 
 		// RFC 4918 §9.8.5: source and destination must differ.
@@ -169,15 +172,6 @@ const copyInstance = (
 			destSlug = destPath.slug;
 		}
 
-		// Create new entity (independent copy).
-		const newEntity = yield* entityRepo.insert({
-			entityType,
-			logicalUid: sourceEntity.logicalUid,
-		});
-
-		// Clone component tree under new entity.
-		yield* componentRepo.insertTree(EntityId(newEntity.id), irRoot);
-
 		// Compute fresh ETag from canonical encoding.
 		const canonical =
 			entityType === "icalendar"
@@ -185,37 +179,45 @@ const copyInstance = (
 				: yield* encodeVCard({ kind: "vcard", root: irRoot });
 		const etag = ETag(yield* makeEtag(canonical));
 
-		// Insert new instance at destination, preserving dead properties.
+		// Create entity, clone component tree, insert instance, copy ACEs atomically.
 		const instanceRepo = yield* InstanceRepository;
-		const newInstance = yield* instanceRepo.insert({
-			collectionId: destPath.collectionId,
-			entityId: EntityId(newEntity.id),
-			contentType: sourceInstance.contentType,
-			etag,
-			slug: destSlug,
-			clientProperties: sourceInstance.clientProperties as IrDeadProperties,
-			contentLength: new TextEncoder().encode(canonical).byteLength,
-		});
-
-		// RFC 4918 §9.8.2: copy non-protected ACEs from source to destination.
 		const sourceAces = yield* acl.getAces(path.instanceId, "instance");
 		const nonProtectedAces = sourceAces.filter((a) => !a.protected);
-		if (nonProtectedAces.length > 0) {
-			yield* acl.setAces(
-				InstanceId(newInstance.id),
-				"instance",
-				nonProtectedAces.map((a, i) => ({
-					resourceType: "instance" as const,
-					resourceId: newInstance.id,
-					principalType: a.principalType,
-					principalId: a.principalId ?? undefined,
-					privilege: a.privilege as DavPrivilege,
-					grantDeny: a.grantDeny,
-					protected: false,
-					ordinal: i,
-				})),
-			);
-		}
+		yield* withTransaction(
+			Effect.gen(function* () {
+				const newEntity = yield* entityRepo.insert({
+					entityType,
+					logicalUid: sourceEntity.logicalUid,
+				});
+				yield* componentRepo.insertTree(EntityId(newEntity.id), irRoot);
+				const inst = yield* instanceRepo.insert({
+					collectionId: destPath.collectionId,
+					entityId: EntityId(newEntity.id),
+					contentType: sourceInstance.contentType,
+					etag,
+					slug: destSlug,
+					clientProperties: sourceInstance.clientProperties as IrDeadProperties,
+					contentLength: new TextEncoder().encode(canonical).byteLength,
+				});
+				if (nonProtectedAces.length > 0) {
+					yield* acl.setAces(
+						InstanceId(inst.id),
+						"instance",
+						nonProtectedAces.map((a, i) => ({
+							resourceType: "instance" as const,
+							resourceId: inst.id,
+							principalType: a.principalType,
+							principalId: a.principalId ?? undefined,
+							privilege: a.privilege as DavPrivilege,
+							grantDeny: a.grantDeny,
+							protected: false,
+							ordinal: i,
+						})),
+					);
+				}
+				return inst;
+			}),
+		).pipe(Effect.provideService(DatabaseClient, db));
 
 		return new Response(null, {
 			status: destExisted ? HTTP_NO_CONTENT : HTTP_CREATED,
@@ -235,6 +237,7 @@ const copyCollection = (
 	req: Request,
 ) =>
 	Effect.gen(function* () {
+		const db = yield* DatabaseClient;
 		const depth = yield* parseDepth(req, "infinity");
 		const destPath = yield* parseDavPath(destUrl);
 
@@ -354,50 +357,50 @@ const copyCollection = (
 							.findById(EntityId(inst.entityId))
 							.pipe(Effect.flatMap(someOrNotFound("Source entity not found")));
 
-						const newEntity = yield* entityRepo.insert({
-							entityType: srcEntityType,
-							logicalUid: srcEntity.logicalUid,
-						});
-						yield* componentRepo.insertTree(EntityId(newEntity.id), irRoot);
-
 						const canonical =
 							srcEntityType === "icalendar"
 								? yield* encodeICalendar({ kind: "icalendar", root: irRoot })
 								: yield* encodeVCard({ kind: "vcard", root: irRoot });
 						const etag = ETag(yield* makeEtag(canonical));
 
-						const newInst = yield* instanceRepo.insert({
-							collectionId: CollectionId(newCollection.id),
-							entityId: EntityId(newEntity.id),
-							contentType: inst.contentType,
-							etag,
-							slug: Slug(inst.slug),
-							clientProperties: inst.clientProperties as IrDeadProperties,
-							contentLength: new TextEncoder().encode(canonical).byteLength,
-						});
-
 						// Copy non-protected ACEs for each instance.
-						const instAces = yield* acl.getAces(
-							InstanceId(inst.id),
-							"instance",
-						);
+						const instAces = yield* acl.getAces(InstanceId(inst.id), "instance");
 						const instNonProtected = instAces.filter((a) => !a.protected);
-						if (instNonProtected.length > 0) {
-							yield* acl.setAces(
-								InstanceId(newInst.id),
-								"instance",
-								instNonProtected.map((a, i) => ({
-									resourceType: "instance" as const,
-									resourceId: newInst.id,
-									principalType: a.principalType,
-									principalId: a.principalId ?? undefined,
-									privilege: a.privilege as DavPrivilege,
-									grantDeny: a.grantDeny,
-									protected: false,
-									ordinal: i,
-								})),
-							);
-						}
+
+						yield* withTransaction(
+							Effect.gen(function* () {
+								const newEntity = yield* entityRepo.insert({
+									entityType: srcEntityType,
+									logicalUid: srcEntity.logicalUid,
+								});
+								yield* componentRepo.insertTree(EntityId(newEntity.id), irRoot);
+								const newInst = yield* instanceRepo.insert({
+									collectionId: CollectionId(newCollection.id),
+									entityId: EntityId(newEntity.id),
+									contentType: inst.contentType,
+									etag,
+									slug: Slug(inst.slug),
+									clientProperties: inst.clientProperties as IrDeadProperties,
+									contentLength: new TextEncoder().encode(canonical).byteLength,
+								});
+								if (instNonProtected.length > 0) {
+									yield* acl.setAces(
+										InstanceId(newInst.id),
+										"instance",
+										instNonProtected.map((a, i) => ({
+											resourceType: "instance" as const,
+											resourceId: newInst.id,
+											principalType: a.principalType,
+											principalId: a.principalId ?? undefined,
+											privilege: a.privilege as DavPrivilege,
+											grantDeny: a.grantDeny,
+											protected: false,
+											ordinal: i,
+										})),
+									);
+								}
+							}),
+						).pipe(Effect.provideService(DatabaseClient, db));
 					}),
 				{ discard: true },
 			);

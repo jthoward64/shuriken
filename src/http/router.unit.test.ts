@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { Effect, Layer, Option } from "effect";
 import { AuthService } from "#src/auth/service.ts";
+import { DatabaseClient } from "#src/db/client.ts";
 import { AuthError, DatabaseError } from "#src/domain/errors.ts";
 import type { PrincipalId, UserId } from "#src/domain/ids.ts";
 import { Authenticated, type Unauthenticated } from "#src/domain/types/dav.ts";
@@ -56,6 +57,11 @@ const authenticated = new Authenticated({
 		displayName: Option.some("Test User"),
 	},
 });
+
+const noOpRouterDb = {
+	transaction: async <T>(fn: (tx: DatabaseClient) => Promise<T>): Promise<T> =>
+		fn(noOpRouterDb as unknown as DatabaseClient),
+} as unknown as DatabaseClient;
 
 // All-die stub layers for services that must be provided but won't be called.
 // These stubs satisfy the type system; any actual call would crash the test fast.
@@ -203,6 +209,7 @@ const stubLayers = Layer.mergeAll(
 		processOutboxPost: die,
 	}),
 	IanaTimezoneService.Default,
+	Layer.succeed(DatabaseClient, noOpRouterDb),
 );
 
 const runWith = (

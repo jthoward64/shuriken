@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { Effect, Layer, Option } from "effect";
+import { DatabaseClient } from "#src/db/client.ts";
 import { RequestId } from "#src/domain/ids.ts";
 import { Unauthenticated } from "#src/domain/types/dav.ts";
 import {
@@ -123,6 +124,11 @@ const noopComponentRepo: ComponentRepositoryShape =
 /** No-op CalTimezoneRepository — router path resolution never touches timezone storage. */
 const noopCalTimezoneRepo = CalTimezoneRepository.of(stubService());
 
+const noOpDb = {
+	transaction: async <T>(fn: (tx: DatabaseClient) => Promise<T>): Promise<T> =>
+		fn(noOpDb as unknown as DatabaseClient),
+} as unknown as DatabaseClient;
+
 /** Build a Layer providing all DAV router requirements from simple slug→id maps. */
 const makeRouterLayer = (
 	seeds: RouterSeeds = {},
@@ -146,6 +152,7 @@ const makeRouterLayer = (
 	| GroupService
 	| SchedulingService
 	| IanaTimezoneService
+	| DatabaseClient
 > => {
 	const principals = seeds.principals ?? new Map<string, string>();
 	const collections = seeds.collections ?? new Map<string, string>();
@@ -361,6 +368,7 @@ const makeRouterLayer = (
 				Effect.succeed("BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n"),
 		}),
 		IanaTimezoneService.Default,
+		Layer.succeed(DatabaseClient, noOpDb),
 	);
 };
 

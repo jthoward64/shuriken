@@ -28,6 +28,7 @@ import {
 } from "#src/data/icalendar/ir-helpers.ts";
 import { getOccurrenceInstantsInRange } from "#src/data/icalendar/recurrence/recurrence-check.ts";
 import type { IrComponent, IrDocument, IrProperty } from "#src/data/ir.ts";
+import { DatabaseClient } from "#src/db/client.ts";
 import { withTransaction } from "#src/db/transaction.ts";
 import { forbidden } from "#src/domain/errors.ts";
 import type { PrincipalId } from "#src/domain/ids.ts";
@@ -378,6 +379,7 @@ export const SchedulingServiceLive = Layer.effect(
 		const entityRepo = yield* EntityRepository;
 		const instanceSvc = yield* InstanceService;
 		const aclSvc = yield* AclService;
+		const db = yield* DatabaseClient;
 
 		// -------------------------------------------------------------------------
 		// Helper: write updated SCHEDULE-STATUS params back to the stored tree
@@ -396,7 +398,7 @@ export const SchedulingServiceLive = Layer.effect(
 					yield* componentRepo.deleteByEntity(entityId);
 					yield* componentRepo.insertTree(entityId, updated);
 				}),
-			);
+			).pipe(Effect.provideService(DatabaseClient, db));
 		});
 
 		// -------------------------------------------------------------------------

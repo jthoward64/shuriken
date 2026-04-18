@@ -1,4 +1,5 @@
 import { Effect, Option } from "effect";
+import type { DatabaseClient } from "#src/db/client.ts";
 import {
 	type DatabaseError,
 	type DavError,
@@ -45,6 +46,7 @@ export const deleteHandler = (
 	| ComponentRepository
 	| AclService
 	| SchedulingService
+	| DatabaseClient
 > =>
 	Effect.gen(function* () {
 		// new-instance/new-collection → resource does not exist (404).

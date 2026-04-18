@@ -44,6 +44,17 @@ All application logic must use [Effect](https://effect.website) (`effect` packag
   - The only acceptable use of `isSome`/`isNone` is when no other options apply (for example mapping the option to a failure case)
 - Reference: index of docs available at https://effect.website/llms.txt and a complete API reference at https://effect-ts.github.io/effect/docs/effect or node_modules/effect/dist/dts/...
 
+## Web UI
+
+- The web UI is built with HTMX v4 beta and TW Elements
+- The web UI is rendered using handlebars templates on the server; no client-side frameworks or hydration. Interactivity is added progressively with HTMX.
+- HTMX docs are available at https://four.htmx.org/reference
+- TW Elements docs are available at https://tw-elements.com
+- The UI should be progressively enhanced and functional without JavaScript where possible, but can use HTMX for dynamic interactions and TW Elements for styling and components.
+- The UI should use the same DAV APIs as external clients, rather than having separate endpoints or logic for the web UI. This ensures consistency and reduces the amount of code we have to maintain.
+- The UI should be designed with accessibility in mind, using semantic HTML and ARIA attributes as needed to ensure it is usable by all users.
+- Components should be reusable and composable where possible, to avoid duplication and make it easier to maintain the UI codebase.
+
 ## HTTP Server
 
 - HTTP server is `Bun.serve`. Only the `fetch` handler is used; we do not use bun's builtin routing as it is not fit for DAV's architectural style.

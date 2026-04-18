@@ -10,6 +10,7 @@ import type { Slug } from "#src/domain/types/path.ts";
 import type { Email } from "#src/domain/types/strings.ts";
 import type { CollectionRow } from "#src/services/collection/repository.ts";
 import type { UserWithPrincipal } from "#src/services/user/repository.ts";
+import type { NewCredential } from "#src/services/user/service.ts";
 
 // ---------------------------------------------------------------------------
 // Input / output types
@@ -19,6 +20,7 @@ export interface ProvisionUserInput {
 	readonly email: Email;
 	readonly name: string;
 	readonly slug: Slug;
+	readonly credentials?: ReadonlyArray<NewCredential>;
 }
 
 export interface ProvisionedUser {

@@ -1,4 +1,5 @@
 import { Effect, Metric, Option } from "effect";
+import type { DatabaseClient } from "#src/db/client.ts";
 import {
 	type AppError,
 	conflict,
@@ -112,6 +113,7 @@ const buildDavErrorBody = (precondition: DavPrecondition): string => {
 // ---------------------------------------------------------------------------
 
 type DavServices =
+	| DatabaseClient
 	| PrincipalRepository
 	| CollectionRepository
 	| InstanceRepository

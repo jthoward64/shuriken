@@ -1,5 +1,6 @@
 import { Effect, Match, Metric, Option } from "effect";
 import { AuthService } from "#src/auth/service.ts";
+import type { DatabaseClient } from "#src/db/client.ts";
 import type { AppError } from "#src/domain/errors.ts";
 import {
 	type HttpRequestContext,
@@ -54,6 +55,7 @@ import type { UserRepository, UserService } from "#src/services/user/index.ts";
 
 type AppServices =
 	| AuthService
+	| DatabaseClient
 	| PrincipalRepository
 	| CollectionRepository
 	| InstanceRepository

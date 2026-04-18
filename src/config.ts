@@ -61,6 +61,15 @@ export const AuthConfig = Config.all({
 
 	/** Email of the single user in single-user mode. Optional; uses first user if absent. */
 	singleUserEmail: Config.string("singleUserEmail").pipe(Config.option),
+
+	/** Email address for the default admin user created on first run in basic auth mode. Required when AUTH_MODE=basic. */
+	adminEmail: Config.string("adminEmail").pipe(Config.option),
+
+	/** Password for the default admin user. If absent a random password is generated and printed to stdout on first run. */
+	adminPassword: Config.redacted("adminPassword").pipe(Config.option),
+
+	/** Slug for the default admin user. Defaults to the local part of ADMIN_EMAIL. */
+	adminSlug: Config.string("adminSlug").pipe(Config.option),
 });
 
 export const LogConfig = Config.all({
