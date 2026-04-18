@@ -122,7 +122,11 @@ export const BasicAuthLayer = Layer.effect(
 										username: creds.username,
 									});
 									yield* Metric.increment(
-										Metric.tagged(authCounter, "auth.outcome", "invalid_password"),
+										Metric.tagged(
+											authCounter,
+											"auth.outcome",
+											"invalid_password",
+										),
 									);
 									return new Unauthenticated() as AuthResult;
 								}

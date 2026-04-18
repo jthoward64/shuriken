@@ -16,8 +16,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
       - run: bun run check
-      - uses: biomejs/setup-biome@v2
-      - run: biome ci
+      - run: bun x biome ci --reporter=github
 
   test:
     name: Test

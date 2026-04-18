@@ -152,7 +152,10 @@ const update = Effect.fn("GroupRepository.update")(
 
 const addMember = Effect.fn("GroupRepository.addMember")(
 	function* (db: DbClient, groupId: GroupId, userId: UserId) {
-		yield* Effect.annotateCurrentSpan({ "group.id": groupId, "user.id": userId });
+		yield* Effect.annotateCurrentSpan({
+			"group.id": groupId,
+			"user.id": userId,
+		});
 		yield* Effect.logTrace("repo.group.addMember", { groupId, userId });
 		return yield* Effect.tryPromise({
 			try: () =>
@@ -171,7 +174,10 @@ const addMember = Effect.fn("GroupRepository.addMember")(
 
 const removeMember = Effect.fn("GroupRepository.removeMember")(
 	function* (db: DbClient, groupId: GroupId, userId: UserId) {
-		yield* Effect.annotateCurrentSpan({ "group.id": groupId, "user.id": userId });
+		yield* Effect.annotateCurrentSpan({
+			"group.id": groupId,
+			"user.id": userId,
+		});
 		yield* Effect.logTrace("repo.group.removeMember", { groupId, userId });
 		return yield* Effect.tryPromise({
 			try: () =>
@@ -191,7 +197,10 @@ const removeMember = Effect.fn("GroupRepository.removeMember")(
 
 const hasMember = Effect.fn("GroupRepository.hasMember")(
 	function* (db: DbClient, groupId: GroupId, userId: UserId) {
-		yield* Effect.annotateCurrentSpan({ "group.id": groupId, "user.id": userId });
+		yield* Effect.annotateCurrentSpan({
+			"group.id": groupId,
+			"user.id": userId,
+		});
 		yield* Effect.logTrace("repo.group.hasMember", { groupId, userId });
 		return yield* Effect.tryPromise({
 			try: () =>

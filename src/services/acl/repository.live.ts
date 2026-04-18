@@ -28,7 +28,10 @@ const getAces = Effect.fn("AclRepository.getAces")(
 		resourceId: UuidString,
 		resourceType: AclResourceType,
 	) {
-		yield* Effect.annotateCurrentSpan({ "resource.id": resourceId, "resource.type": resourceType });
+		yield* Effect.annotateCurrentSpan({
+			"resource.id": resourceId,
+			"resource.type": resourceType,
+		});
 		yield* Effect.logTrace("repo.acl.getAces", { resourceId, resourceType });
 		return yield* Effect.tryPromise({
 			try: () =>

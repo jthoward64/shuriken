@@ -35,7 +35,10 @@ const findById = Effect.fn("InstanceRepository.findById")(
 
 const findBySlug = Effect.fn("InstanceRepository.findBySlug")(
 	function* (db: DbClient, collectionId: CollectionId, slug: Slug) {
-		yield* Effect.annotateCurrentSpan({ "collection.id": collectionId, "instance.slug": slug });
+		yield* Effect.annotateCurrentSpan({
+			"collection.id": collectionId,
+			"instance.slug": slug,
+		});
 		yield* Effect.logTrace("repo.instance.findBySlug", { collectionId, slug });
 		return yield* Effect.tryPromise({
 			try: () =>

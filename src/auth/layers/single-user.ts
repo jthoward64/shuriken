@@ -22,7 +22,11 @@ import { authAttemptsTotal } from "#src/observability/metrics.ts";
 //   - Changes to the user row are reflected without restarting the server
 // ---------------------------------------------------------------------------
 
-const authCounter = Metric.tagged(authAttemptsTotal, "auth.mode", "single-user");
+const authCounter = Metric.tagged(
+	authAttemptsTotal,
+	"auth.mode",
+	"single-user",
+);
 
 const resolvePrincipal = (
 	db: DatabaseClient,
