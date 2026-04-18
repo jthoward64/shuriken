@@ -72,6 +72,7 @@ const findPrincipalByCalAddress = Effect.fn(
 
 const findInbox = Effect.fn("SchedulingRepository.findInbox")(
 	function* (db: DbClient, principalId: PrincipalId) {
+		yield* Effect.annotateCurrentSpan({ "principal.id": principalId });
 		yield* Effect.logTrace("repo.scheduling.findInbox", { principalId });
 		return yield* Effect.tryPromise({
 			try: () =>
@@ -98,6 +99,7 @@ const findInbox = Effect.fn("SchedulingRepository.findInbox")(
 const findDefaultCalendar = Effect.fn(
 	"SchedulingRepository.findDefaultCalendar",
 )(function* (db: DbClient, principalId: PrincipalId) {
+	yield* Effect.annotateCurrentSpan({ "principal.id": principalId });
 	yield* Effect.logTrace("repo.scheduling.findDefaultCalendar", {
 		principalId,
 	});
@@ -144,6 +146,10 @@ const findDefaultCalendar = Effect.fn(
 
 const findSorByUid = Effect.fn("SchedulingRepository.findSorByUid")(
 	function* (db: DbClient, principalId: PrincipalId, uid: string) {
+		yield* Effect.annotateCurrentSpan({
+			"principal.id": principalId,
+			"entity.logical_uid": uid,
+		});
 		yield* Effect.logTrace("repo.scheduling.findSorByUid", {
 			principalId,
 			uid,
@@ -189,6 +195,10 @@ const findSorByUid = Effect.fn("SchedulingRepository.findSorByUid")(
 
 const findInboxInstance = Effect.fn("SchedulingRepository.findInboxInstance")(
 	function* (db: DbClient, inboxCollectionId: CollectionId, uid: string) {
+		yield* Effect.annotateCurrentSpan({
+			"collection.id": inboxCollectionId,
+			"entity.logical_uid": uid,
+		});
 		yield* Effect.logTrace("repo.scheduling.findInboxInstance", {
 			inboxCollectionId,
 			uid,
@@ -231,6 +241,10 @@ const insertScheduleMessage = Effect.fn(
 	"SchedulingRepository.insertScheduleMessage",
 )(
 	function* (db: DbClient, msg: NewScheduleMessage) {
+		yield* Effect.annotateCurrentSpan({
+			"scheduling.recipient": msg.recipient,
+			"scheduling.method": msg.method,
+		});
 		yield* Effect.logTrace("repo.scheduling.insertScheduleMessage", {
 			recipient: msg.recipient,
 			method: msg.method,
@@ -267,6 +281,7 @@ const listOpaqueCalendarCollections = Effect.fn(
 	"SchedulingRepository.listOpaqueCalendarCollections",
 )(
 	function* (db: DbClient, principalId: PrincipalId) {
+		yield* Effect.annotateCurrentSpan({ "principal.id": principalId });
 		yield* Effect.logTrace("repo.scheduling.listOpaqueCalendarCollections", {
 			principalId,
 		});
@@ -296,6 +311,7 @@ const listOpaqueCalendarCollections = Effect.fn(
 
 const updateScheduleTag = Effect.fn("SchedulingRepository.updateScheduleTag")(
 	function* (db: DbClient, instanceId: InstanceId, scheduleTag: string) {
+		yield* Effect.annotateCurrentSpan({ "instance.id": instanceId });
 		yield* Effect.logTrace("repo.scheduling.updateScheduleTag", { instanceId });
 		return yield* Effect.tryPromise({
 			try: () =>

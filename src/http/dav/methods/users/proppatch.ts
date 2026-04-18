@@ -105,7 +105,6 @@ const parseBody = (req: Request): Effect.Effect<ProppatchUpdates, DavError> =>
 				Effect.catchTag("XmlParseError", () =>
 					Effect.succeed({
 						displayName: undefined,
-						name: undefined,
 						email: undefined,
 						credential: undefined,
 					} satisfies ProppatchUpdates),

@@ -63,6 +63,11 @@ const findByText = Effect.fn("CardIndexRepository.findByText")(
 		collation: CardCollation,
 		matchType: CardMatchType,
 	) {
+		yield* Effect.annotateCurrentSpan({
+			"collection.id": collectionId,
+			"card.field": field,
+			"card.match_type": matchType,
+		});
 		yield* Effect.logTrace("repo.card-index.findByText", {
 			collectionId,
 			field,

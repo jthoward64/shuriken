@@ -23,6 +23,7 @@ import {
 
 const findById = Effect.fn("UserRepository.findById")(
 	function* (db: DbClient, id: UserId) {
+		yield* Effect.annotateCurrentSpan({ "user.id": id });
 		yield* Effect.logTrace("repo.user.findById", { id });
 		return yield* Effect.tryPromise({
 			try: () =>
@@ -79,6 +80,7 @@ const create = Effect.fn("UserRepository.create")(
 			readonly credentials: ReadonlyArray<HashedCredential>;
 		},
 	) {
+		yield* Effect.annotateCurrentSpan({ "user.slug": input.slug });
 		yield* Effect.logTrace("repo.user.create", { slug: input.slug });
 		return yield* Effect.tryPromise<
 			UserWithPrincipal,
@@ -146,6 +148,7 @@ const update = Effect.fn("UserRepository.update")(
 			readonly displayName?: string;
 		},
 	) {
+		yield* Effect.annotateCurrentSpan({ "user.id": id });
 		yield* Effect.logTrace("repo.user.update", { id });
 		return yield* Effect.tryPromise({
 			try: async () => {
@@ -191,6 +194,7 @@ const update = Effect.fn("UserRepository.update")(
 
 const findCredential = Effect.fn("UserRepository.findCredential")(
 	function* (db: DbClient, authSource: string, authId: string) {
+		yield* Effect.annotateCurrentSpan({ "credential.source": authSource });
 		yield* Effect.logTrace("repo.user.findCredential", { authSource });
 		return yield* Effect.tryPromise({
 			try: () =>
@@ -218,6 +222,10 @@ const insertCredential = Effect.fn("UserRepository.insertCredential")(
 		db: DbClient,
 		input: HashedCredential & { readonly userId: UserId },
 	) {
+		yield* Effect.annotateCurrentSpan({
+			"user.id": input.userId,
+			"credential.source": input.authSource,
+		});
 		yield* Effect.logTrace("repo.user.insertCredential", {
 			authSource: input.authSource,
 		});
@@ -249,6 +257,7 @@ const insertCredential = Effect.fn("UserRepository.insertCredential")(
 
 const findBySlug = Effect.fn("UserRepository.findBySlug")(
 	function* (db: DbClient, slug: Slug) {
+		yield* Effect.annotateCurrentSpan({ "user.slug": slug });
 		yield* Effect.logTrace("repo.user.findBySlug", { slug });
 		return yield* Effect.tryPromise({
 			try: () =>
@@ -299,6 +308,7 @@ const list = Effect.fn("UserRepository.list")(
 
 const softDelete = Effect.fn("UserRepository.softDelete")(
 	function* (db: DbClient, id: UserId) {
+		yield* Effect.annotateCurrentSpan({ "user.id": id });
 		yield* Effect.logTrace("repo.user.softDelete", { id });
 		return yield* Effect.tryPromise({
 			try: () =>
@@ -318,6 +328,10 @@ const softDelete = Effect.fn("UserRepository.softDelete")(
 
 const deleteCredential = Effect.fn("UserRepository.deleteCredential")(
 	function* (db: DbClient, userId: UserId, authSource: string, authId: string) {
+		yield* Effect.annotateCurrentSpan({
+			"user.id": userId,
+			"credential.source": authSource,
+		});
 		yield* Effect.logTrace("repo.user.deleteCredential", {
 			userId,
 			authSource,

@@ -24,13 +24,13 @@ export const httpRequestsTotal = Metric.counter("shuriken.http.requests", {
 });
 
 /**
- * HTTP request end-to-end latency in milliseconds.
+ * HTTP request end-to-end latency.
  * Tagged with method and path_group (known before the handler runs).
+ * Uses timerWithBoundaries so it accepts Effect Duration values from Metric.trackDuration.
  */
-export const httpRequestDurationMs = Metric.histogram(
+export const httpRequestDurationMs = Metric.timerWithBoundaries(
 	"shuriken.http.request.duration_ms",
-	durBoundaries,
-	"HTTP request end-to-end latency in milliseconds",
+	durBoundaries.values,
 );
 
 // ---------------------------------------------------------------------------
@@ -82,11 +82,11 @@ export const repoQueriesTotal = Metric.counter("shuriken.repo.queries", {
 });
 
 /**
- * Repository query latency in milliseconds.
+ * Repository query latency.
  * Tagged with entity and operation before use.
+ * Uses timerWithBoundaries so it accepts Effect Duration values from Metric.trackDuration.
  */
-export const repoQueryDurationMs = Metric.histogram(
+export const repoQueryDurationMs = Metric.timerWithBoundaries(
 	"shuriken.repo.query.duration_ms",
-	durBoundaries,
-	"Repository query latency in milliseconds",
+	durBoundaries.values,
 );

@@ -22,9 +22,7 @@ import { authAttemptsTotal } from "#src/observability/metrics.ts";
 //   - Changes to the user row are reflected without restarting the server
 // ---------------------------------------------------------------------------
 
-const authCounter = authAttemptsTotal.pipe(
-	Metric.tagged("auth.mode", "single-user"),
-);
+const authCounter = Metric.tagged(authAttemptsTotal, "auth.mode", "single-user");
 
 const resolvePrincipal = (
 	db: DatabaseClient,
@@ -89,7 +87,7 @@ export const SingleUserAuthLayer = Layer.effect(
 					yield* Effect.logTrace("auth.single-user: authenticating");
 					const resolved = yield* resolvePrincipal(db, email);
 					yield* Metric.increment(
-						authCounter.pipe(Metric.tagged("auth.outcome", "success")),
+						Metric.tagged(authCounter, "auth.outcome", "success"),
 					);
 					return new Authenticated({ principal: resolved });
 				},
@@ -105,7 +103,7 @@ export const SingleUserAuthLayer = Layer.effect(
 										{ cause: e instanceof DatabaseError ? e.cause : e },
 									),
 							Metric.increment(
-								authCounter.pipe(Metric.tagged("auth.outcome", "error")),
+								Metric.tagged(authCounter, "auth.outcome", "error"),
 							),
 						],
 						{ discard: true },

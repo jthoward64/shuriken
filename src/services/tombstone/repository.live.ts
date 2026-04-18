@@ -16,6 +16,10 @@ const findSinceRevision = Effect.fn("TombstoneRepository.findSinceRevision")(
 		collectionId: CollectionId,
 		sinceSyncRevision: number,
 	) {
+		yield* Effect.annotateCurrentSpan({
+			"collection.id": collectionId,
+			"tombstone.since_revision": sinceSyncRevision,
+		});
 		yield* Effect.logTrace("repo.tombstone.findSinceRevision", {
 			collectionId,
 			sinceSyncRevision,

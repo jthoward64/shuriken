@@ -107,6 +107,10 @@ const findByTimeRange = Effect.fn("CalIndexRepository.findByTimeRange")(
 		weekStart: Temporal.Instant | null,
 		weekEnd: Temporal.Instant | null,
 	) {
+		yield* Effect.annotateCurrentSpan({
+			"collection.id": collectionId,
+			"cal.component_type": componentType,
+		});
 		yield* Effect.logTrace("repo.cal-index.findByTimeRange", {
 			collectionId,
 			componentType,
@@ -162,6 +166,10 @@ const findByComponentType = Effect.fn("CalIndexRepository.findByComponentType")(
 		collectionId: CollectionId,
 		componentType: CalComponentType,
 	) {
+		yield* Effect.annotateCurrentSpan({
+			"collection.id": collectionId,
+			"cal.component_type": componentType,
+		});
 		yield* Effect.logTrace("repo.cal-index.findByComponentType", {
 			collectionId,
 			componentType,
@@ -198,6 +206,7 @@ const indexRruleOccurrences = Effect.fn(
 	"CalIndexRepository.indexRruleOccurrences",
 )(
 	function* (db: DbClient, entityId: EntityId) {
+		yield* Effect.annotateCurrentSpan({ "entity.id": entityId });
 		yield* Effect.logTrace("repo.cal-index.indexRruleOccurrences", {
 			entityId,
 		});

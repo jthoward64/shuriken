@@ -501,9 +501,10 @@ export const davRouter = (
 
 		// Track the dispatched DAV request
 		yield* Metric.increment(
-			davRequestsTotal.pipe(
-				Metric.tagged("dav.method", method),
-				Metric.tagged("dav.path_kind", path.kind),
+			Metric.tagged(
+				Metric.tagged(davRequestsTotal, "dav.method", method),
+				"dav.path_kind",
+				path.kind,
 			),
 		);
 

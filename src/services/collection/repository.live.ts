@@ -20,6 +20,7 @@ import {
 
 const findById = Effect.fn("CollectionRepository.findById")(
 	function* (db: DbClient, id: CollectionId) {
+		yield* Effect.annotateCurrentSpan({ "collection.id": id });
 		yield* Effect.logTrace("repo.collection.findById", { id });
 		return yield* Effect.tryPromise({
 			try: () =>
@@ -44,6 +45,11 @@ const findBySlug = Effect.fn("CollectionRepository.findBySlug")(
 		collectionType: CollectionType,
 		slug: Slug,
 	) {
+		yield* Effect.annotateCurrentSpan({
+			"collection.owner": ownerPrincipalId,
+			"collection.type": collectionType,
+			"collection.slug": slug,
+		});
 		yield* Effect.logTrace("repo.collection.findBySlug", {
 			ownerPrincipalId,
 			collectionType,
@@ -74,6 +80,7 @@ const findBySlug = Effect.fn("CollectionRepository.findBySlug")(
 
 const listByOwner = Effect.fn("CollectionRepository.listByOwner")(
 	function* (db: DbClient, ownerPrincipalId: PrincipalId) {
+		yield* Effect.annotateCurrentSpan({ "principal.id": ownerPrincipalId });
 		yield* Effect.logTrace("repo.collection.listByOwner", { ownerPrincipalId });
 		return yield* Effect.tryPromise({
 			try: () =>
@@ -96,6 +103,11 @@ const listByOwner = Effect.fn("CollectionRepository.listByOwner")(
 
 const insert = Effect.fn("CollectionRepository.insert")(
 	function* (db: DbClient, input: NewCollection) {
+		yield* Effect.annotateCurrentSpan({
+			"collection.owner": input.ownerPrincipalId,
+			"collection.type": input.collectionType,
+			"collection.slug": input.slug,
+		});
 		yield* Effect.logTrace("repo.collection.insert", {
 			ownerPrincipalId: input.ownerPrincipalId,
 			slug: input.slug,
@@ -137,6 +149,11 @@ const relocate = Effect.fn("CollectionRepository.relocate")(
 		targetOwnerPrincipalId: PrincipalId,
 		targetSlug: Slug,
 	) {
+		yield* Effect.annotateCurrentSpan({
+			"collection.id": id,
+			"collection.target_owner": targetOwnerPrincipalId,
+			"collection.target_slug": targetSlug,
+		});
 		yield* Effect.logTrace("repo.collection.relocate", {
 			id,
 			targetOwnerPrincipalId,
@@ -170,6 +187,7 @@ const relocate = Effect.fn("CollectionRepository.relocate")(
 
 const softDelete = Effect.fn("CollectionRepository.softDelete")(
 	function* (db: DbClient, id: CollectionId) {
+		yield* Effect.annotateCurrentSpan({ "collection.id": id });
 		yield* Effect.logTrace("repo.collection.softDelete", { id });
 		return yield* Effect.tryPromise({
 			try: () =>
@@ -199,6 +217,7 @@ const updateProperties = Effect.fn("CollectionRepository.updateProperties")(
 		id: CollectionId,
 		changes: CollectionPropertyChanges,
 	) {
+		yield* Effect.annotateCurrentSpan({ "collection.id": id });
 		yield* Effect.logTrace("repo.collection.updateProperties", { id });
 		const setValues: Record<string, unknown> = {
 			clientProperties: changes.clientProperties,

@@ -122,7 +122,7 @@ export const isClientTrusted = (
 				.some((entry) => matchesEntry(ip, entry)),
 	});
 
-const authCounter = authAttemptsTotal.pipe(Metric.tagged("auth.mode", "proxy"));
+const authCounter = Metric.tagged(authAttemptsTotal, "auth.mode", "proxy");
 
 export const ProxyAuthLayer = Layer.effect(
 	AuthService,
@@ -143,9 +143,7 @@ export const ProxyAuthLayer = Layer.effect(
 							clientIp: Option.getOrUndefined(clientIp),
 						});
 						yield* Metric.increment(
-							authCounter.pipe(
-								Metric.tagged("auth.outcome", "untrusted_proxy"),
-							),
+							Metric.tagged(authCounter, "auth.outcome", "untrusted_proxy"),
 						);
 						return new Unauthenticated();
 					}
@@ -156,7 +154,7 @@ export const ProxyAuthLayer = Layer.effect(
 							proxyHeader,
 						});
 						yield* Metric.increment(
-							authCounter.pipe(Metric.tagged("auth.outcome", "header_absent")),
+							Metric.tagged(authCounter, "auth.outcome", "header_absent"),
 						);
 						return new Unauthenticated();
 					}
@@ -183,7 +181,7 @@ export const ProxyAuthLayer = Layer.effect(
 					if (!row) {
 						yield* Effect.logDebug("auth.proxy: user not found", { username });
 						yield* Metric.increment(
-							authCounter.pipe(Metric.tagged("auth.outcome", "not_found")),
+							Metric.tagged(authCounter, "auth.outcome", "not_found"),
 						);
 						return new Unauthenticated();
 					}
@@ -193,7 +191,7 @@ export const ProxyAuthLayer = Layer.effect(
 						username,
 					});
 					yield* Metric.increment(
-						authCounter.pipe(Metric.tagged("auth.outcome", "success")),
+						Metric.tagged(authCounter, "auth.outcome", "success"),
 					);
 					return new Authenticated({
 						principal: {
@@ -210,7 +208,7 @@ export const ProxyAuthLayer = Layer.effect(
 								cause: e instanceof DatabaseError ? e.cause : e,
 							}),
 							Metric.increment(
-								authCounter.pipe(Metric.tagged("auth.outcome", "error")),
+								Metric.tagged(authCounter, "auth.outcome", "error"),
 							),
 						],
 						{ discard: true },

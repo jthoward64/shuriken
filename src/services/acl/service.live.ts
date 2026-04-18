@@ -211,7 +211,7 @@ export const AclServiceLive = Layer.effect(
 					);
 					if (allowed) {
 						yield* Metric.increment(
-							aclChecksTotal.pipe(Metric.tagged("acl.outcome", "allowed")),
+							Metric.tagged(aclChecksTotal, "acl.outcome", "allowed"),
 						);
 						return;
 					}
@@ -229,12 +229,12 @@ export const AclServiceLive = Layer.effect(
 							privilege,
 						});
 						yield* Metric.increment(
-							aclChecksTotal.pipe(Metric.tagged("acl.outcome", "denied")),
+							Metric.tagged(aclChecksTotal, "acl.outcome", "denied"),
 						);
 						return yield* Effect.fail(needPrivileges());
 					}
 					yield* Metric.increment(
-						aclChecksTotal.pipe(Metric.tagged("acl.outcome", "allowed")),
+						Metric.tagged(aclChecksTotal, "acl.outcome", "allowed"),
 					);
 				},
 			),

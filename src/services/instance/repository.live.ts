@@ -15,6 +15,7 @@ import { InstanceRepository, type NewInstance } from "./repository.ts";
 
 const findById = Effect.fn("InstanceRepository.findById")(
 	function* (db: DbClient, id: InstanceId) {
+		yield* Effect.annotateCurrentSpan({ "instance.id": id });
 		yield* Effect.logTrace("repo.instance.findById", { id });
 		return yield* Effect.tryPromise({
 			try: () =>
@@ -34,6 +35,7 @@ const findById = Effect.fn("InstanceRepository.findById")(
 
 const findBySlug = Effect.fn("InstanceRepository.findBySlug")(
 	function* (db: DbClient, collectionId: CollectionId, slug: Slug) {
+		yield* Effect.annotateCurrentSpan({ "collection.id": collectionId, "instance.slug": slug });
 		yield* Effect.logTrace("repo.instance.findBySlug", { collectionId, slug });
 		return yield* Effect.tryPromise({
 			try: () =>
@@ -59,6 +61,7 @@ const findBySlug = Effect.fn("InstanceRepository.findBySlug")(
 
 const listByCollection = Effect.fn("InstanceRepository.listByCollection")(
 	function* (db: DbClient, collectionId: CollectionId) {
+		yield* Effect.annotateCurrentSpan({ "collection.id": collectionId });
 		yield* Effect.logTrace("repo.instance.listByCollection", { collectionId });
 		return yield* Effect.tryPromise({
 			try: () =>
@@ -85,6 +88,10 @@ const findChangedSince = Effect.fn("InstanceRepository.findChangedSince")(
 		collectionId: CollectionId,
 		sinceSyncRevision: number,
 	) {
+		yield* Effect.annotateCurrentSpan({
+			"collection.id": collectionId,
+			"instance.since_revision": sinceSyncRevision,
+		});
 		yield* Effect.logTrace("repo.instance.findChangedSince", {
 			collectionId,
 			sinceSyncRevision,
@@ -112,6 +119,7 @@ const findChangedSince = Effect.fn("InstanceRepository.findChangedSince")(
 
 const findByIds = Effect.fn("InstanceRepository.findByIds")(
 	function* (db: DbClient, ids: ReadonlyArray<InstanceId>) {
+		yield* Effect.annotateCurrentSpan({ "instance.count": ids.length });
 		yield* Effect.logTrace("repo.instance.findByIds", { count: ids.length });
 		if (ids.length === 0) {
 			return [];
@@ -137,6 +145,10 @@ const findByIds = Effect.fn("InstanceRepository.findByIds")(
 
 const insertInstance = Effect.fn("InstanceRepository.insert")(
 	function* (db: DbClient, input: NewInstance) {
+		yield* Effect.annotateCurrentSpan({
+			"collection.id": input.collectionId,
+			"instance.slug": input.slug,
+		});
 		yield* Effect.logTrace("repo.instance.insert", {
 			collectionId: input.collectionId,
 			slug: input.slug,
@@ -177,6 +189,7 @@ const insertInstance = Effect.fn("InstanceRepository.insert")(
 
 const updateEtag = Effect.fn("InstanceRepository.updateEtag")(
 	function* (db: DbClient, id: InstanceId, etag: ETag, contentLength?: number) {
+		yield* Effect.annotateCurrentSpan({ "instance.id": id });
 		yield* Effect.logTrace("repo.instance.updateEtag", { id });
 		return yield* Effect.tryPromise({
 			try: () =>
@@ -199,6 +212,7 @@ const updateEtag = Effect.fn("InstanceRepository.updateEtag")(
 
 const softDelete = Effect.fn("InstanceRepository.softDelete")(
 	function* (db: DbClient, id: InstanceId) {
+		yield* Effect.annotateCurrentSpan({ "instance.id": id });
 		yield* Effect.logTrace("repo.instance.softDelete", { id });
 		return yield* Effect.tryPromise({
 			try: () =>
@@ -222,6 +236,11 @@ const relocate = Effect.fn("InstanceRepository.relocate")(
 		targetCollectionId: CollectionId,
 		targetSlug: Slug,
 	) {
+		yield* Effect.annotateCurrentSpan({
+			"instance.id": id,
+			"collection.id": targetCollectionId,
+			"instance.target_slug": targetSlug,
+		});
 		yield* Effect.logTrace("repo.instance.relocate", {
 			id,
 			targetCollectionId,
@@ -257,6 +276,7 @@ const updateClientProperties = Effect.fn(
 	"InstanceRepository.updateClientProperties",
 )(
 	function* (db: DbClient, id: InstanceId, clientProperties: IrDeadProperties) {
+		yield* Effect.annotateCurrentSpan({ "instance.id": id });
 		yield* Effect.logTrace("repo.instance.updateClientProperties", { id });
 		return yield* Effect.tryPromise({
 			try: () =>

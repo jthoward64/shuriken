@@ -23,6 +23,7 @@ export const PrincipalRepositoryLive = Layer.effect(
 
 		const findById = Effect.fn("PrincipalRepository.findById")(
 			function* (id: PrincipalId) {
+				yield* Effect.annotateCurrentSpan({ "principal.id": id });
 				yield* Effect.logTrace("repo.principal.findById", { id });
 				return yield* Effect.tryPromise({
 					try: () =>
@@ -47,6 +48,7 @@ export const PrincipalRepositoryLive = Layer.effect(
 
 		const findBySlug = Effect.fn("PrincipalRepository.findBySlug")(
 			function* (slug: Slug) {
+				yield* Effect.annotateCurrentSpan({ "principal.slug": slug });
 				yield* Effect.logTrace("repo.principal.findBySlug", { slug });
 				return yield* Effect.tryPromise({
 					try: () =>
@@ -73,6 +75,7 @@ export const PrincipalRepositoryLive = Layer.effect(
 			"PrincipalRepository.findPrincipalBySlug",
 		)(
 			function* (slug: Slug) {
+				yield* Effect.annotateCurrentSpan({ "principal.slug": slug });
 				yield* Effect.logTrace("repo.principal.findPrincipalBySlug", { slug });
 				return yield* Effect.tryPromise({
 					try: () =>
@@ -116,6 +119,7 @@ export const PrincipalRepositoryLive = Layer.effect(
 
 		const findUserByUserId = Effect.fn("PrincipalRepository.findUserByUserId")(
 			function* (id: UserId) {
+				yield* Effect.annotateCurrentSpan({ "user.id": id });
 				yield* Effect.logTrace("repo.principal.findUserByUserId", { id });
 				return yield* Effect.tryPromise({
 					try: () =>
@@ -135,6 +139,7 @@ export const PrincipalRepositoryLive = Layer.effect(
 
 		const updateProperties = Effect.fn("PrincipalRepository.updateProperties")(
 			function* (id: PrincipalId, changes: PrincipalPropertyChanges) {
+				yield* Effect.annotateCurrentSpan({ "principal.id": id });
 				yield* Effect.logTrace("repo.principal.updateProperties", { id });
 				const setValues: Record<string, unknown> = {
 					clientProperties: changes.clientProperties,
@@ -192,6 +197,7 @@ export const PrincipalRepositoryLive = Layer.effect(
 			"PrincipalRepository.searchByDisplayName",
 		)(
 			function* (query: string) {
+				yield* Effect.annotateCurrentSpan({ "search.query_len": query.length });
 				yield* Effect.logTrace("repo.principal.searchByDisplayName", { query });
 				const pattern = `%${query}%`;
 				return yield* Effect.tryPromise({

@@ -23,6 +23,7 @@ import { GroupRepository, type GroupWithPrincipal } from "./repository.ts";
 
 const findById = Effect.fn("GroupRepository.findById")(
 	function* (db: DbClient, id: GroupId) {
+		yield* Effect.annotateCurrentSpan({ "group.id": id });
 		yield* Effect.logTrace("repo.group.findById", { id });
 		return yield* Effect.tryPromise({
 			try: () =>
@@ -58,6 +59,7 @@ const create = Effect.fn("GroupRepository.create")(
 			readonly displayName?: string;
 		},
 	) {
+		yield* Effect.annotateCurrentSpan({ "group.slug": input.slug });
 		yield* Effect.logTrace("repo.group.create", { slug: input.slug });
 		return yield* Effect.tryPromise<
 			GroupWithPrincipal,
@@ -112,6 +114,7 @@ const update = Effect.fn("GroupRepository.update")(
 		id: GroupId,
 		input: { readonly displayName?: string },
 	) {
+		yield* Effect.annotateCurrentSpan({ "group.id": id });
 		yield* Effect.logTrace("repo.group.update", { id });
 		return yield* Effect.tryPromise({
 			try: async () => {
@@ -149,6 +152,7 @@ const update = Effect.fn("GroupRepository.update")(
 
 const addMember = Effect.fn("GroupRepository.addMember")(
 	function* (db: DbClient, groupId: GroupId, userId: UserId) {
+		yield* Effect.annotateCurrentSpan({ "group.id": groupId, "user.id": userId });
 		yield* Effect.logTrace("repo.group.addMember", { groupId, userId });
 		return yield* Effect.tryPromise({
 			try: () =>
@@ -167,6 +171,7 @@ const addMember = Effect.fn("GroupRepository.addMember")(
 
 const removeMember = Effect.fn("GroupRepository.removeMember")(
 	function* (db: DbClient, groupId: GroupId, userId: UserId) {
+		yield* Effect.annotateCurrentSpan({ "group.id": groupId, "user.id": userId });
 		yield* Effect.logTrace("repo.group.removeMember", { groupId, userId });
 		return yield* Effect.tryPromise({
 			try: () =>
@@ -186,6 +191,7 @@ const removeMember = Effect.fn("GroupRepository.removeMember")(
 
 const hasMember = Effect.fn("GroupRepository.hasMember")(
 	function* (db: DbClient, groupId: GroupId, userId: UserId) {
+		yield* Effect.annotateCurrentSpan({ "group.id": groupId, "user.id": userId });
 		yield* Effect.logTrace("repo.group.hasMember", { groupId, userId });
 		return yield* Effect.tryPromise({
 			try: () =>
@@ -207,6 +213,7 @@ const hasMember = Effect.fn("GroupRepository.hasMember")(
 
 const findBySlug = Effect.fn("GroupRepository.findBySlug")(
 	function* (db: DbClient, slug: Slug) {
+		yield* Effect.annotateCurrentSpan({ "group.slug": slug });
 		yield* Effect.logTrace("repo.group.findBySlug", { slug });
 		return yield* Effect.tryPromise({
 			try: () =>
@@ -268,6 +275,7 @@ const list = Effect.fn("GroupRepository.list")(
 
 const listMembers = Effect.fn("GroupRepository.listMembers")(
 	function* (db: DbClient, groupId: GroupId) {
+		yield* Effect.annotateCurrentSpan({ "group.id": groupId });
 		yield* Effect.logTrace("repo.group.listMembers", { groupId });
 		return yield* Effect.tryPromise({
 			try: () =>
@@ -299,6 +307,7 @@ const listMembers = Effect.fn("GroupRepository.listMembers")(
 
 const listByMember = Effect.fn("GroupRepository.listByMember")(
 	function* (db: DbClient, userId: UserId) {
+		yield* Effect.annotateCurrentSpan({ "user.id": userId });
 		yield* Effect.logTrace("repo.group.listByMember", { userId });
 		return yield* Effect.tryPromise({
 			try: () =>
@@ -330,6 +339,7 @@ const listByMember = Effect.fn("GroupRepository.listByMember")(
 
 const softDelete = Effect.fn("GroupRepository.softDelete")(
 	function* (db: DbClient, id: GroupId) {
+		yield* Effect.annotateCurrentSpan({ "group.id": id });
 		yield* Effect.logTrace("repo.group.softDelete", { id });
 		return yield* Effect.tryPromise({
 			try: () =>
@@ -349,6 +359,10 @@ const softDelete = Effect.fn("GroupRepository.softDelete")(
 
 const setMembers = Effect.fn("GroupRepository.setMembers")(
 	function* (db: DbClient, groupId: GroupId, userIds: ReadonlyArray<UserId>) {
+		yield* Effect.annotateCurrentSpan({
+			"group.id": groupId,
+			"group.member_count": userIds.length,
+		});
 		yield* Effect.logTrace("repo.group.setMembers", {
 			groupId,
 			count: userIds.length,

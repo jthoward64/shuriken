@@ -22,7 +22,7 @@ import { CryptoService } from "#src/platform/crypto.ts";
 
 const BASIC_PREFIX = "Basic ";
 
-const authCounter = authAttemptsTotal.pipe(Metric.tagged("auth.mode", "basic"));
+const authCounter = Metric.tagged(authAttemptsTotal, "auth.mode", "basic");
 
 export const parseBasicAuth = (
 	headers: Headers,
@@ -66,9 +66,7 @@ export const BasicAuthLayer = Layer.effect(
 							Effect.gen(function* () {
 								yield* Effect.logTrace("auth.basic: no credentials present");
 								yield* Metric.increment(
-									authCounter.pipe(
-										Metric.tagged("auth.outcome", "no_credentials"),
-									),
+									Metric.tagged(authCounter, "auth.outcome", "no_credentials"),
 								);
 								return new Unauthenticated() as AuthResult;
 							}),
@@ -110,9 +108,7 @@ export const BasicAuthLayer = Layer.effect(
 										username: creds.username,
 									});
 									yield* Metric.increment(
-										authCounter.pipe(
-											Metric.tagged("auth.outcome", "not_found"),
-										),
+										Metric.tagged(authCounter, "auth.outcome", "not_found"),
 									);
 									return new Unauthenticated() as AuthResult;
 								}
@@ -126,9 +122,7 @@ export const BasicAuthLayer = Layer.effect(
 										username: creds.username,
 									});
 									yield* Metric.increment(
-										authCounter.pipe(
-											Metric.tagged("auth.outcome", "invalid_password"),
-										),
+										Metric.tagged(authCounter, "auth.outcome", "invalid_password"),
 									);
 									return new Unauthenticated() as AuthResult;
 								}
@@ -138,7 +132,7 @@ export const BasicAuthLayer = Layer.effect(
 									username: creds.username,
 								});
 								yield* Metric.increment(
-									authCounter.pipe(Metric.tagged("auth.outcome", "success")),
+									Metric.tagged(authCounter, "auth.outcome", "success"),
 								);
 								return new Authenticated({
 									principal: {
@@ -157,7 +151,7 @@ export const BasicAuthLayer = Layer.effect(
 								cause: e instanceof DatabaseError ? e.cause : e,
 							}),
 							Metric.increment(
-								authCounter.pipe(Metric.tagged("auth.outcome", "error")),
+								Metric.tagged(authCounter, "auth.outcome", "error"),
 							),
 						],
 						{ discard: true },

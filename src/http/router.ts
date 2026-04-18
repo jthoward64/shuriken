@@ -215,13 +215,15 @@ export const handleRequest = (
 	const group = pathGroup(url.pathname);
 
 	// Pre-tagged metric instances (method + path_group are stable for this request)
-	const requestCounter = httpRequestsTotal.pipe(
-		Metric.tagged("http.method", req.method),
-		Metric.tagged("http.path_group", group),
+	const requestCounter = Metric.tagged(
+		Metric.tagged(httpRequestsTotal, "http.method", req.method),
+		"http.path_group",
+		group,
 	);
-	const durationHistogram = httpRequestDurationMs.pipe(
-		Metric.tagged("http.method", req.method),
-		Metric.tagged("http.path_group", group),
+	const durationHistogram = Metric.tagged(
+		Metric.tagged(httpRequestDurationMs, "http.method", req.method),
+		"http.path_group",
+		group,
 	);
 
 	return Effect.gen(function* () {
@@ -281,9 +283,7 @@ export const handleRequest = (
 							? Effect.logDebug("request complete", { status })
 							: Effect.logTrace("request complete", { status }),
 					Metric.increment(
-						requestCounter.pipe(
-							Metric.tagged("http.status_code", String(status)),
-						),
+						Metric.tagged(requestCounter, "http.status_code", String(status)),
 					),
 				],
 				{ discard: true },

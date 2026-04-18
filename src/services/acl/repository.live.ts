@@ -28,6 +28,7 @@ const getAces = Effect.fn("AclRepository.getAces")(
 		resourceId: UuidString,
 		resourceType: AclResourceType,
 	) {
+		yield* Effect.annotateCurrentSpan({ "resource.id": resourceId, "resource.type": resourceType });
 		yield* Effect.logTrace("repo.acl.getAces", { resourceId, resourceType });
 		return yield* Effect.tryPromise({
 			try: () =>
@@ -54,6 +55,11 @@ const setAces = Effect.fn("AclRepository.setAces")(
 		resourceType: AclResourceType,
 		aces: ReadonlyArray<NewAce>,
 	) {
+		yield* Effect.annotateCurrentSpan({
+			"resource.id": resourceId,
+			"resource.type": resourceType,
+			"acl.count": aces.length,
+		});
 		yield* Effect.logTrace("repo.acl.setAces", {
 			resourceId,
 			resourceType,
@@ -96,6 +102,10 @@ const setAces = Effect.fn("AclRepository.setAces")(
 
 const grantAce = Effect.fn("AclRepository.grantAce")(
 	function* (db: DbClient, ace: NewAce) {
+		yield* Effect.annotateCurrentSpan({
+			"resource.id": ace.resourceId,
+			"acl.privilege": ace.privilege,
+		});
 		yield* Effect.logTrace("repo.acl.grantAce", {
 			resourceId: ace.resourceId,
 			privilege: ace.privilege,
@@ -165,6 +175,10 @@ const hasPrivilege = Effect.fn("AclRepository.hasPrivilege")(
 		privileges: ReadonlyArray<DavPrivilege>,
 		isAuthenticated: boolean,
 	) {
+		yield* Effect.annotateCurrentSpan({
+			"resource.id": resourceId,
+			"resource.type": resourceType,
+		});
 		yield* Effect.logTrace("repo.acl.hasPrivilege", {
 			resourceId,
 			resourceType,
@@ -201,6 +215,10 @@ const getGrantedPrivileges = Effect.fn("AclRepository.getGrantedPrivileges")(
 		resourceType: AclResourceType,
 		isAuthenticated: boolean,
 	) {
+		yield* Effect.annotateCurrentSpan({
+			"resource.id": resourceId,
+			"resource.type": resourceType,
+		});
 		yield* Effect.logTrace("repo.acl.getGrantedPrivileges", {
 			resourceId,
 			resourceType,
@@ -233,6 +251,10 @@ const getResourceParent = Effect.fn("AclRepository.getResourceParent")(
 		resourceId: UuidString,
 		resourceType: AclResourceType,
 	) {
+		yield* Effect.annotateCurrentSpan({
+			"resource.id": resourceId,
+			"resource.type": resourceType,
+		});
 		yield* Effect.logTrace("repo.acl.getResourceParent", {
 			resourceId,
 			resourceType,
@@ -302,6 +324,7 @@ const getResourceParent = Effect.fn("AclRepository.getResourceParent")(
 
 const getGroupPrincipalIds = Effect.fn("AclRepository.getGroupPrincipalIds")(
 	function* (db: DbClient, userPrincipalId: PrincipalId) {
+		yield* Effect.annotateCurrentSpan({ "principal.id": userPrincipalId });
 		yield* Effect.logTrace("repo.acl.getGroupPrincipalIds", {
 			userPrincipalId,
 		});
