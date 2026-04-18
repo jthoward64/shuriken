@@ -83,13 +83,18 @@ export const UserServiceLive = Layer.effect(
 				const result = yield* repo
 					.findById(id)
 					.pipe(Effect.flatMap(someOrNotFound(`User not found: ${id}`)));
-				yield* Effect.logTrace("user.findById result", { userId: result.user.id });
+				yield* Effect.logTrace("user.findById result", {
+					userId: result.user.id,
+				});
 				return result;
 			}),
 
 			create: Effect.fn("UserService.create")(function* (input: NewUser) {
 				yield* Effect.annotateCurrentSpan({ "user.slug": input.slug });
-				yield* Effect.logTrace("user.create", { slug: input.slug, email: input.email });
+				yield* Effect.logTrace("user.create", {
+					slug: input.slug,
+					email: input.email,
+				});
 				const credentials: Array<{
 					authSource: string;
 					authId: string;

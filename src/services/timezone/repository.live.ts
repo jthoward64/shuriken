@@ -28,7 +28,11 @@ const findByTzid = Effect.fn("CalTimezoneRepository.findByTzid")(
 					.limit(1)
 					.then((r) => Option.fromNullable(r[0])),
 			catch: (e) => new DatabaseError({ cause: e }),
-		}).pipe(Metric.trackDuration(tzDuration.pipe(Metric.tagged("repo.operation", "findByTzid"))));
+		}).pipe(
+			Metric.trackDuration(
+				tzDuration.pipe(Metric.tagged("repo.operation", "findByTzid")),
+			),
+		);
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.timezone.findByTzid failed", e.cause),
@@ -97,7 +101,11 @@ const upsert = Effect.fn("CalTimezoneRepository.upsert")(
 						return row;
 					}),
 			catch: (e) => new DatabaseError({ cause: e }),
-		}).pipe(Metric.trackDuration(tzDuration.pipe(Metric.tagged("repo.operation", "upsert"))));
+		}).pipe(
+			Metric.trackDuration(
+				tzDuration.pipe(Metric.tagged("repo.operation", "upsert")),
+			),
+		);
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.timezone.upsert failed", e.cause),

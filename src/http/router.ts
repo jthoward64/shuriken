@@ -181,7 +181,9 @@ const mapErrorToResponse = (err: AppError): Effect.Effect<Response, never> =>
 				new Response("Internal Server Error", { status: 500 }),
 			).pipe(
 				Effect.tap(() =>
-					Effect.logError("request failed with internal error", { cause: e.cause }),
+					Effect.logError("request failed with internal error", {
+						cause: e.cause,
+					}),
 				),
 			),
 		),

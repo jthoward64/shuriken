@@ -310,105 +310,107 @@ const loadTree = Effect.fn("ComponentRepository.loadTree")(
 		yield* Effect.logTrace("repo.component.loadTree", { entityId, entityType });
 		return yield* Effect.tryPromise({
 			try: async (): Promise<Option.Option<IrComponent>> => {
-			const isKnown =
-				entityType === "icalendar" ? isKnownIcalProperty : isKnownVcardProperty;
+				const isKnown =
+					entityType === "icalendar"
+						? isKnownIcalProperty
+						: isKnownVcardProperty;
 
-			// 1. Load all active component rows for the entity
-			const components = await db
-				.select()
-				.from(davComponent)
-				.where(
-					and(
-						eq(davComponent.entityId, entityId),
-						isNull(davComponent.deletedAt),
-					),
-				)
-				.orderBy(davComponent.ordinal);
-
-			if (components.length === 0) {
-				return Option.none();
-			}
-
-			const componentIds = components.map((c) => c.id);
-
-			// 2. Load all active property rows for those components
-			const properties = await db
-				.select()
-				.from(davProperty)
-				.where(
-					and(
-						inArray(davProperty.componentId, componentIds),
-						isNull(davProperty.deletedAt),
-					),
-				)
-				.orderBy(davProperty.ordinal);
-
-			// 3. Load all active parameter rows for those properties
-			let parameters: Array<ParameterRow> = [];
-			if (properties.length > 0) {
-				const propertyIds = properties.map((p) => p.id);
-				parameters = await db
+				// 1. Load all active component rows for the entity
+				const components = await db
 					.select()
-					.from(davParameter)
+					.from(davComponent)
 					.where(
 						and(
-							inArray(davParameter.propertyId, propertyIds),
-							isNull(davParameter.deletedAt),
+							eq(davComponent.entityId, entityId),
+							isNull(davComponent.deletedAt),
 						),
 					)
-					.orderBy(davParameter.ordinal);
-			}
+					.orderBy(davComponent.ordinal);
 
-			// 4. Group parameters by propertyId
-			const paramsByPropId = new Map<string, Array<IrParameter>>();
-			for (const param of parameters) {
-				const list = paramsByPropId.get(param.propertyId) ?? [];
-				list.push({ name: param.name, value: param.value });
-				paramsByPropId.set(param.propertyId, list);
-			}
-
-			// 5. Build IrProperty list per componentId
-			const propertiesByCompId = new Map<string, Array<IrProperty>>();
-			for (const propRow of properties) {
-				const irParams = paramsByPropId.get(propRow.id) ?? [];
-				const irProp: IrProperty = {
-					name: propRow.name,
-					parameters: irParams,
-					value: dbColumnsToIrValue(propRow, irParams),
-					isKnown: isKnown(propRow.name),
-				};
-				const list = propertiesByCompId.get(propRow.componentId) ?? [];
-				list.push(irProp);
-				propertiesByCompId.set(propRow.componentId, list);
-			}
-
-			// 6. Build parent→children map and find root
-			const childrenByParentId = new Map<string, Array<ComponentRow>>();
-			let rootComp: ComponentRow | undefined;
-			for (const comp of components) {
-				if (comp.parentComponentId === null) {
-					rootComp = comp;
-				} else {
-					const list = childrenByParentId.get(comp.parentComponentId) ?? [];
-					list.push(comp);
-					childrenByParentId.set(comp.parentComponentId, list);
+				if (components.length === 0) {
+					return Option.none();
 				}
-			}
 
-			if (!rootComp) {
-				return Option.none();
-			}
+				const componentIds = components.map((c) => c.id);
 
-			return Option.some(
-				buildIrComponent(rootComp, childrenByParentId, propertiesByCompId),
-			);
-		},
-		catch: (e) => new DatabaseError({ cause: e }),
-	}).pipe(
-		Metric.trackDuration(
-			compDuration.pipe(Metric.tagged("repo.operation", "loadTree")),
-		),
-	);
+				// 2. Load all active property rows for those components
+				const properties = await db
+					.select()
+					.from(davProperty)
+					.where(
+						and(
+							inArray(davProperty.componentId, componentIds),
+							isNull(davProperty.deletedAt),
+						),
+					)
+					.orderBy(davProperty.ordinal);
+
+				// 3. Load all active parameter rows for those properties
+				let parameters: Array<ParameterRow> = [];
+				if (properties.length > 0) {
+					const propertyIds = properties.map((p) => p.id);
+					parameters = await db
+						.select()
+						.from(davParameter)
+						.where(
+							and(
+								inArray(davParameter.propertyId, propertyIds),
+								isNull(davParameter.deletedAt),
+							),
+						)
+						.orderBy(davParameter.ordinal);
+				}
+
+				// 4. Group parameters by propertyId
+				const paramsByPropId = new Map<string, Array<IrParameter>>();
+				for (const param of parameters) {
+					const list = paramsByPropId.get(param.propertyId) ?? [];
+					list.push({ name: param.name, value: param.value });
+					paramsByPropId.set(param.propertyId, list);
+				}
+
+				// 5. Build IrProperty list per componentId
+				const propertiesByCompId = new Map<string, Array<IrProperty>>();
+				for (const propRow of properties) {
+					const irParams = paramsByPropId.get(propRow.id) ?? [];
+					const irProp: IrProperty = {
+						name: propRow.name,
+						parameters: irParams,
+						value: dbColumnsToIrValue(propRow, irParams),
+						isKnown: isKnown(propRow.name),
+					};
+					const list = propertiesByCompId.get(propRow.componentId) ?? [];
+					list.push(irProp);
+					propertiesByCompId.set(propRow.componentId, list);
+				}
+
+				// 6. Build parent→children map and find root
+				const childrenByParentId = new Map<string, Array<ComponentRow>>();
+				let rootComp: ComponentRow | undefined;
+				for (const comp of components) {
+					if (comp.parentComponentId === null) {
+						rootComp = comp;
+					} else {
+						const list = childrenByParentId.get(comp.parentComponentId) ?? [];
+						list.push(comp);
+						childrenByParentId.set(comp.parentComponentId, list);
+					}
+				}
+
+				if (!rootComp) {
+					return Option.none();
+				}
+
+				return Option.some(
+					buildIrComponent(rootComp, childrenByParentId, propertiesByCompId),
+				);
+			},
+			catch: (e) => new DatabaseError({ cause: e }),
+		}).pipe(
+			Metric.trackDuration(
+				compDuration.pipe(Metric.tagged("repo.operation", "loadTree")),
+			),
+		);
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.component.loadTree failed", e.cause),

@@ -159,7 +159,10 @@ export const AclServiceLive = Layer.effect(
 		return AclService.of({
 			getAces: Effect.fn("AclService.getAces")(
 				function* (resourceId, resourceType) {
-					yield* Effect.annotateCurrentSpan({ "acl.resource_id": resourceId, "acl.resource_type": resourceType });
+					yield* Effect.annotateCurrentSpan({
+						"acl.resource_id": resourceId,
+						"acl.resource_type": resourceType,
+					});
 					yield* Effect.logTrace("acl.getAces", { resourceId, resourceType });
 					const aces = yield* repo.getAces(resourceId, resourceType);
 					yield* Effect.logTrace("acl.getAces result", { count: aces.length });
@@ -169,8 +172,15 @@ export const AclServiceLive = Layer.effect(
 
 			setAces: Effect.fn("AclService.setAces")(
 				function* (resourceId, resourceType, aces) {
-					yield* Effect.annotateCurrentSpan({ "acl.resource_id": resourceId, "acl.resource_type": resourceType });
-					yield* Effect.logTrace("acl.setAces", { resourceId, resourceType, count: aces.length });
+					yield* Effect.annotateCurrentSpan({
+						"acl.resource_id": resourceId,
+						"acl.resource_type": resourceType,
+					});
+					yield* Effect.logTrace("acl.setAces", {
+						resourceId,
+						resourceType,
+						count: aces.length,
+					});
 					yield* repo.setAces(resourceId, resourceType, aces);
 					yield* Effect.logTrace("acl.setAces done");
 				},

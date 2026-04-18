@@ -93,10 +93,7 @@ export const BasicAuthLayer = Layer.effect(
 											})
 											.from(authUser)
 											.innerJoin(user, eq(authUser.userId, user.id))
-											.innerJoin(
-												principal,
-												eq(user.principalId, principal.id),
-											)
+											.innerJoin(principal, eq(user.principalId, principal.id))
 											.where(
 												and(
 													eq(authUser.authSource, "local"),
@@ -141,9 +138,7 @@ export const BasicAuthLayer = Layer.effect(
 									username: creds.username,
 								});
 								yield* Metric.increment(
-									authCounter.pipe(
-										Metric.tagged("auth.outcome", "success"),
-									),
+									authCounter.pipe(Metric.tagged("auth.outcome", "success")),
 								);
 								return new Authenticated({
 									principal: {

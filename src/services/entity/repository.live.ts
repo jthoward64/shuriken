@@ -47,7 +47,11 @@ const insertEntity = Effect.fn("EntityRepository.insert")(
 						return row;
 					}),
 			catch: (e) => new DatabaseError({ cause: e }),
-		}).pipe(Metric.trackDuration(entityDuration.pipe(Metric.tagged("repo.operation", "insert"))));
+		}).pipe(
+			Metric.trackDuration(
+				entityDuration.pipe(Metric.tagged("repo.operation", "insert")),
+			),
+		);
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.entity.insert failed", e.cause),
@@ -67,7 +71,11 @@ const findById = Effect.fn("EntityRepository.findById")(
 					.limit(1)
 					.then((r) => Option.fromNullable(r[0])),
 			catch: (e) => new DatabaseError({ cause: e }),
-		}).pipe(Metric.trackDuration(entityDuration.pipe(Metric.tagged("repo.operation", "findById"))));
+		}).pipe(
+			Metric.trackDuration(
+				entityDuration.pipe(Metric.tagged("repo.operation", "findById")),
+			),
+		);
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.entity.findById failed", e.cause),
@@ -94,7 +102,9 @@ const updateLogicalUid = Effect.fn("EntityRepository.updateLogicalUid")(
 			catch: (e) => new DatabaseError({ cause: e }),
 		}).pipe(
 			Metric.trackDuration(
-				entityDuration.pipe(Metric.tagged("repo.operation", "updateLogicalUid")),
+				entityDuration.pipe(
+					Metric.tagged("repo.operation", "updateLogicalUid"),
+				),
 			),
 		);
 	},

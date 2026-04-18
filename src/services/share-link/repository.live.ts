@@ -156,7 +156,10 @@ const addCalendar = Effect.fn("ShareLinkRepository.addCalendar")(
 		calendarId: UuidString,
 		visibility: ShareLinkVisibility,
 	) {
-		yield* Effect.annotateCurrentSpan({ "share_link.id": linkId, "collection.id": calendarId });
+		yield* Effect.annotateCurrentSpan({
+			"share_link.id": linkId,
+			"collection.id": calendarId,
+		});
 		yield* Effect.logTrace("repo.shareLink.addCalendar", {
 			linkId,
 			calendarId,
@@ -188,7 +191,10 @@ const addCalendar = Effect.fn("ShareLinkRepository.addCalendar")(
 
 const removeCalendar = Effect.fn("ShareLinkRepository.removeCalendar")(
 	function* (db: DbClient, linkId: UuidString, calendarId: UuidString) {
-		yield* Effect.annotateCurrentSpan({ "share_link.id": linkId, "collection.id": calendarId });
+		yield* Effect.annotateCurrentSpan({
+			"share_link.id": linkId,
+			"collection.id": calendarId,
+		});
 		yield* Effect.logTrace("repo.shareLink.removeCalendar", {
 			linkId,
 			calendarId,

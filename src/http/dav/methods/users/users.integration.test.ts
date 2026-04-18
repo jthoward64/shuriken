@@ -49,11 +49,7 @@ const mkuser = (
 	expect: { status: 201 },
 });
 
-const mkuserWithProps = (
-	_slug: string,
-	displayName?: string,
-	email?: string,
-) =>
+const mkuserWithProps = (_slug: string, displayName?: string, email?: string) =>
 	`<?xml version="1.0" encoding="utf-8"?>
 <D:mkcol xmlns:D="DAV:" xmlns:S="${SHURIKEN_NS}">
   <D:set>

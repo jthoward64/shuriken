@@ -197,9 +197,12 @@ export const parseDavPath = (
 				? userRepo.findById(UserId(userSeg))
 				: userRepo.findBySlug(Slug(userSeg));
 			if (Option.isNone(userOpt)) {
-				yield* Effect.logTrace("dav.parsePath: user not found, treating as new", {
-					segment: userSeg,
-				});
+				yield* Effect.logTrace(
+					"dav.parsePath: user not found, treating as new",
+					{
+						segment: userSeg,
+					},
+				);
 				return {
 					kind: "newUser",
 					slug: Slug(userSeg),
@@ -379,9 +382,12 @@ export const parseDavPath = (
 				)
 			: collRepo.findBySlug(principalId, collectionType, Slug(seg3));
 		if (Option.isNone(collRowOpt)) {
-			yield* Effect.logTrace("dav.parsePath: collection not found, treating as new", {
-				segment: seg3,
-			});
+			yield* Effect.logTrace(
+				"dav.parsePath: collection not found, treating as new",
+				{
+					segment: seg3,
+				},
+			);
 			return {
 				kind: "new-collection",
 				principalId,
@@ -426,9 +432,12 @@ export const parseDavPath = (
 				)
 			: instRepo.findBySlug(collectionId, Slug(seg4));
 		if (Option.isNone(instRowOpt)) {
-			yield* Effect.logTrace("dav.parsePath: instance not found, treating as new", {
-				segment: seg4,
-			});
+			yield* Effect.logTrace(
+				"dav.parsePath: instance not found, treating as new",
+				{
+					segment: seg4,
+				},
+			);
 			return {
 				kind: "new-instance",
 				principalId,
@@ -591,7 +600,8 @@ export const davRouter = (
 				return new Response(null, {
 					status: HTTP_METHOD_NOT_ALLOWED,
 					headers: {
-						Allow: "OPTIONS, GET, HEAD, PUT, DELETE, COPY, MOVE, PROPFIND, PROPPATCH, MKCOL, REPORT, MKCALENDAR, MKADDRESSBOOK, ACL",
+						Allow:
+							"OPTIONS, GET, HEAD, PUT, DELETE, COPY, MOVE, PROPFIND, PROPPATCH, MKCOL, REPORT, MKCALENDAR, MKADDRESSBOOK, ACL",
 					},
 				});
 		}

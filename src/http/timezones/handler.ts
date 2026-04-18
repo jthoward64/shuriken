@@ -46,9 +46,7 @@ const notFound = (): Effect.Effect<Response, never> =>
 // Action: capabilities
 // ---------------------------------------------------------------------------
 
-const handleCapabilities = (
-	origin: string,
-): Effect.Effect<Response, never> =>
+const handleCapabilities = (origin: string): Effect.Effect<Response, never> =>
 	Effect.gen(function* () {
 		yield* Effect.logTrace("timezones: capabilities");
 		return yield* jsonResponse({

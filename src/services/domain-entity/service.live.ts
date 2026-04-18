@@ -28,26 +28,27 @@ export const DomainEntityServiceLive = Layer.effect(
 		const compRepo = yield* ComponentRepository;
 
 		return DomainEntityService.of({
-			create: Effect.fn("DomainEntityService.create")(
-				function* ({ entityType, document }) {
-					yield* Effect.annotateCurrentSpan({ "entity.type": entityType });
-					yield* Effect.logTrace("entity.create", { entityType });
-					const entity = yield* entityRepo.insert({
-						entityType,
-						logicalUid: null,
-					});
-					const uid = extractUidFromDocument(document);
-					if (uid !== null) {
-						yield* entityRepo.updateLogicalUid(EntityId(entity.id), uid);
-					}
-					yield* compRepo.insertTree(EntityId(entity.id), document.root);
-					yield* Effect.logTrace("entity.create: created", {
-						entityId: entity.id,
-						hasUid: uid !== null,
-					});
-					return EntityId(entity.id);
-				},
-			),
+			create: Effect.fn("DomainEntityService.create")(function* ({
+				entityType,
+				document,
+			}) {
+				yield* Effect.annotateCurrentSpan({ "entity.type": entityType });
+				yield* Effect.logTrace("entity.create", { entityType });
+				const entity = yield* entityRepo.insert({
+					entityType,
+					logicalUid: null,
+				});
+				const uid = extractUidFromDocument(document);
+				if (uid !== null) {
+					yield* entityRepo.updateLogicalUid(EntityId(entity.id), uid);
+				}
+				yield* compRepo.insertTree(EntityId(entity.id), document.root);
+				yield* Effect.logTrace("entity.create: created", {
+					entityId: entity.id,
+					hasUid: uid !== null,
+				});
+				return EntityId(entity.id);
+			}),
 
 			load: Effect.fn("DomainEntityService.load")(function* (id) {
 				yield* Effect.annotateCurrentSpan({ "entity.id": id });
@@ -60,7 +61,9 @@ export const DomainEntityServiceLive = Layer.effect(
 				const kind = entity.value.entityType as EntityType;
 				const tree = yield* compRepo.loadTree(id, kind);
 				if (Option.isNone(tree)) {
-					yield* Effect.logTrace("entity.load: component tree not found", { id });
+					yield* Effect.logTrace("entity.load: component tree not found", {
+						id,
+					});
 					return Option.none<IrDocument>();
 				}
 				yield* Effect.logTrace("entity.load result", { id, kind });

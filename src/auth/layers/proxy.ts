@@ -156,9 +156,7 @@ export const ProxyAuthLayer = Layer.effect(
 							proxyHeader,
 						});
 						yield* Metric.increment(
-							authCounter.pipe(
-								Metric.tagged("auth.outcome", "header_absent"),
-							),
+							authCounter.pipe(Metric.tagged("auth.outcome", "header_absent")),
 						);
 						return new Unauthenticated();
 					}
