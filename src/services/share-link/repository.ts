@@ -1,6 +1,7 @@
 import type { InferSelectModel } from "drizzle-orm";
 import type { Effect, Option } from "effect";
 import { Context } from "effect";
+import type { Temporal } from "temporal-polyfill";
 import type {
 	ShareLinkVisibility,
 	shareLink,
@@ -28,14 +29,14 @@ export interface ShareLinkRepositoryShape {
 	) => Effect.Effect<ReadonlyArray<ShareLinkCalendarRow>, DatabaseError>;
 	readonly insert: (input: {
 		readonly userId: UserId;
-		readonly expiresAt?: Date;
+		readonly expiresAt?: Temporal.Instant;
 		readonly enabled?: boolean;
 	}) => Effect.Effect<ShareLinkRow, DatabaseError>;
 	readonly update: (
 		id: UuidString,
 		input: {
 			readonly enabled?: boolean;
-			readonly expiresAt?: Date;
+			readonly expiresAt?: Temporal.Instant;
 		},
 	) => Effect.Effect<ShareLinkRow, DatabaseError>;
 	readonly softDelete: (id: UuidString) => Effect.Effect<void, DatabaseError>;

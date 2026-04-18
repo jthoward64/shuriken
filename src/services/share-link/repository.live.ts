@@ -1,11 +1,15 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { Effect, Layer, Option } from "effect";
+import type { Temporal } from "temporal-polyfill";
 import { DatabaseClient, type DbClient } from "#src/db/client.ts";
 import { shareLink, shareLinkCalendars } from "#src/db/drizzle/schema/index.ts";
 import type { ShareLinkVisibility } from "#src/db/drizzle/schema/share-link.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
 import type { UserId, UuidString } from "#src/domain/ids.ts";
-import type { ShareLinkRepositoryShape } from "./repository.ts";
+import {
+	ShareLinkRepository,
+	type ShareLinkRepositoryShape,
+} from "./repository.ts";
 
 // ---------------------------------------------------------------------------
 // ShareLinkRepository — Drizzle implementation
@@ -19,7 +23,7 @@ const findById = Effect.fn("ShareLinkRepository.findById")(
 				db
 					.select()
 					.from(shareLink)
-					.where(and(eq(shareLink.id, id), isNull(shareLink.deletedAt)))
+					.where(eq(shareLink.id, id))
 					.limit(1)
 					.then((r) => Option.fromNullable(r[0])),
 			catch: (e) => new DatabaseError({ cause: e }),
@@ -39,7 +43,7 @@ const findByUser = Effect.fn("ShareLinkRepository.findByUser")(
 					.select()
 					.from(shareLink)
 					.where(
-						and(eq(shareLink.userId, userId), isNull(shareLink.deletedAt)),
+						eq(shareLink.userId, userId),
 					),
 			catch: (e) => new DatabaseError({ cause: e }),
 		});
@@ -69,7 +73,7 @@ const listCalendars = Effect.fn("ShareLinkRepository.listCalendars")(
 const insert = Effect.fn("ShareLinkRepository.insert")(
 	function* (
 		db: DbClient,
-		input: { userId: UserId; expiresAt?: Date; enabled?: boolean },
+		input: { userId: UserId; expiresAt?: Temporal.Instant; enabled?: boolean },
 	) {
 		yield* Effect.logTrace("repo.shareLink.insert", { userId: input.userId });
 		return yield* Effect.tryPromise({
@@ -99,7 +103,7 @@ const update = Effect.fn("ShareLinkRepository.update")(
 	function* (
 		db: DbClient,
 		id: UuidString,
-		input: { enabled?: boolean; expiresAt?: Date },
+		input: { enabled?: boolean; expiresAt?: Temporal.Instant },
 	) {
 		yield* Effect.logTrace("repo.shareLink.update", { id });
 		return yield* Effect.tryPromise({
@@ -132,8 +136,7 @@ const softDelete = Effect.fn("ShareLinkRepository.softDelete")(
 		return yield* Effect.tryPromise({
 			try: () =>
 				db
-					.update(shareLink)
-					.set({ deletedAt: sql`now()` })
+					.delete(shareLink)
 					.where(eq(shareLink.id, id))
 					.then(() => undefined),
 			catch: (e) => new DatabaseError({ cause: e }),
@@ -205,17 +208,18 @@ const removeCalendar = Effect.fn("ShareLinkRepository.removeCalendar")(
 
 export const ShareLinkRepositoryLive = Layer.effect(
 	ShareLinkRepository,
-	Effect.gen(function* () {
-		const db = yield* DatabaseClient;
-		return {
-			findById,
-			findByUser,
-			listCalendars,
-			insert,
-			update,
-			softDelete,
-			addCalendar,
-			removeCalendar,
-		} as ShareLinkRepositoryShape;
-	}),
+	Effect.map(DatabaseClient, (db) =>
+		ShareLinkRepository.of({
+			findById: (id) => findById(db, id),
+			findByUser: (userId) => findByUser(db, userId),
+			listCalendars: (linkId) => listCalendars(db, linkId),
+			insert: (input) => insert(db, input),
+			update: (id, input) => update(db, id, input),
+			softDelete: (id) => softDelete(db, id),
+			addCalendar: (linkId, calendarId, visibility) =>
+				addCalendar(db, linkId, calendarId, visibility),
+			removeCalendar: (linkId, calendarId) =>
+				removeCalendar(db, linkId, calendarId),
+		}),
+	),
 );
