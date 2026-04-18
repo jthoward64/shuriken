@@ -1,3 +1,5 @@
+- Dockerize the application for deployment
+- Github Actions for CI/CD (check, test, build, ghcr)
 - Add support for associating email credentials with a user account (either by entering them into the web UI, or from proxy header)
 - Add support for iMIP allowing cross-server calendar events
 - Add support for syncing an external icalendar file hosted on a remote server (public ical links)

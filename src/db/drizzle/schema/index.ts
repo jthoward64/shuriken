@@ -5,5 +5,6 @@ export * from "./card";
 export * from "./dav";
 export * from "./groups";
 export * from "./principal";
+export * from "./share-link";
 export * from "./types";
 export * from "./user";

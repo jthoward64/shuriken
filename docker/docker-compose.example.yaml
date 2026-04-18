@@ -1,0 +1,43 @@
+name: shuriken
+
+services:
+  database:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: shuriken
+      POSTGRES_PASSWORD: shuriken
+      POSTGRES_DB: shuriken
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shuriken"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    image: ghcr.io/your-org/shuriken-ts:latest
+    # To build from source instead:
+    # build:
+    #   context: ..
+    #   dockerfile: docker/Dockerfile
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://shuriken:shuriken@database:5432/shuriken
+      PORT: "3000"
+      AUTH_MODE: single-user
+      SINGLE_USER_EMAIL: admin@example.com
+      # For basic auth:
+      # AUTH_MODE: basic
+      # For proxy auth:
+      # AUTH_MODE: proxy
+      # PROXY_HEADER: X-Remote-User
+      # TRUSTED_PROXIES: "*"
+      # LOG_LEVEL: info
+    ports:
+      - "3000:3000"
+
+volumes:
+  db_data:
