@@ -105,7 +105,7 @@ describe("MKADDRESSBOOK", () => {
 	// Skipped: Bun's Request constructor normalizes MKADDRESSBOOK to GET (Fetch spec
 	// forbids non-standard method names), so this test cannot be exercised through
 	// the test harness until Bun fixes the issue.
-	it.skip("creates an addressbook with extended body (displayname + description)", async () => {
+	it("creates an addressbook with extended body (displayname + description)", async () => {
 		const results = await runScript(
 			[
 				{
