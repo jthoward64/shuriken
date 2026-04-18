@@ -1,4 +1,4 @@
-import { Effect, Match, Option } from "effect";
+import { Effect, Match, Metric, Option } from "effect";
 import { AuthService } from "#src/auth/service.ts";
 import type { AppError } from "#src/domain/errors.ts";
 import {
@@ -21,6 +21,10 @@ import type {
 	PrincipalRepository,
 	SchedulingService,
 } from "#src/layers.ts";
+import {
+	httpRequestDurationMs,
+	httpRequestsTotal,
+} from "#src/observability/metrics.ts";
 import type { AclService } from "#src/services/acl/index.ts";
 import type { CalIndexRepository } from "#src/services/cal-index/index.ts";
 import type { CardIndexRepository } from "#src/services/card-index/index.ts";
@@ -45,6 +49,7 @@ import type { UserRepository, UserService } from "#src/services/user/index.ts";
 //   2. Authenticate the request
 //   3. Route to DAV, timezone service, or UI based on path prefix
 //   4. Map all errors to HTTP responses
+//   5. Track HTTP request metrics and duration
 // ---------------------------------------------------------------------------
 
 type AppServices =
@@ -82,6 +87,20 @@ const isUiPath = (pathname: string): boolean =>
 	pathname === "/ui" ||
 	pathname.startsWith("/ui/") ||
 	pathname.startsWith("/static/");
+
+/** Coarse path group for metric tagging — stable cardinality. */
+const pathGroup = (pathname: string): string => {
+	if (isDavPath(pathname)) {
+		return "dav";
+	}
+	if (isTimezonePath(pathname)) {
+		return "timezones";
+	}
+	if (isUiPath(pathname)) {
+		return "ui";
+	}
+	return "unknown";
+};
 
 /**
  * Split a DavPrecondition string into an XML namespace prefix and local name.
@@ -160,13 +179,19 @@ const mapErrorToResponse = (err: AppError): Effect.Effect<Response, never> =>
 		Match.tag("DatabaseError", "InternalError", (e) =>
 			Effect.succeed(
 				new Response("Internal Server Error", { status: 500 }),
-			).pipe(Effect.tap(() => Effect.logWarning("server error", e.cause))),
+			).pipe(
+				Effect.tap(() =>
+					Effect.logError("request failed with internal error", { cause: e.cause }),
+				),
+			),
 		),
 		Match.tag("ConfigError", (e) =>
 			Effect.succeed(
 				new Response("Internal Server Error", { status: 500 }),
 			).pipe(
-				Effect.tap(() => Effect.logWarning("config error", { key: e.key })),
+				Effect.tap(() =>
+					Effect.logError("request failed with config error", { key: e.key }),
+				),
 			),
 		),
 		Match.exhaustive,
@@ -185,10 +210,25 @@ export const handleRequest = (
 	const requestId = newRequestId();
 	const clientIp = Option.fromNullable(server.requestIP(req)?.address);
 	const url = new URL(req.url);
+	const group = pathGroup(url.pathname);
+
+	// Pre-tagged metric instances (method + path_group are stable for this request)
+	const requestCounter = httpRequestsTotal.pipe(
+		Metric.tagged("http.method", req.method),
+		Metric.tagged("http.path_group", group),
+	);
+	const durationHistogram = httpRequestDurationMs.pipe(
+		Metric.tagged("http.method", req.method),
+		Metric.tagged("http.path_group", group),
+	);
 
 	return Effect.gen(function* () {
 		yield* setRequestId(requestId);
-		yield* Effect.logTrace("request received");
+		yield* Effect.logTrace("request received", {
+			method: req.method,
+			path: url.pathname,
+			clientIp: Option.getOrUndefined(clientIp),
+		});
 
 		const authService = yield* AuthService;
 		const auth = yield* authService.authenticate(req.headers, clientIp);
@@ -220,20 +260,42 @@ export const handleRequest = (
 			return yield* uiRouter(req);
 		}
 
-		yield* Effect.logDebug("no route matched");
+		yield* Effect.logDebug("no route matched", { path: url.pathname });
 		return new Response("Not Found", { status: 404 });
 	}).pipe(
-		Effect.annotateLogs({ requestId, method: req.method, path: url.pathname }),
+		Effect.annotateLogs({
+			requestId,
+			"http.method": req.method,
+			"http.path": url.pathname,
+		}),
 		Effect.catchAll(mapErrorToResponse),
-		Effect.tap((response) =>
-			response.status >= HTTP_INTERNAL_SERVER_ERROR
-				? Effect.logWarning("request failed", { status: response.status })
-				: response.status >= HTTP_BAD_REQUEST
-					? Effect.logDebug("request complete", { status: response.status })
-					: Effect.logTrace("request complete", { status: response.status }),
-		),
+		Effect.tap((response) => {
+			const status = response.status;
+			return Effect.all(
+				[
+					status >= HTTP_INTERNAL_SERVER_ERROR
+						? Effect.logWarning("request complete", { status })
+						: status >= HTTP_BAD_REQUEST
+							? Effect.logDebug("request complete", { status })
+							: Effect.logTrace("request complete", { status }),
+					Metric.increment(
+						requestCounter.pipe(
+							Metric.tagged("http.status_code", String(status)),
+						),
+					),
+				],
+				{ discard: true },
+			);
+		}),
+		Metric.trackDuration(durationHistogram),
 		Effect.withSpan("http.request", {
-			attributes: { "http.method": req.method, "http.path": url.pathname },
+			attributes: {
+				"http.method": req.method,
+				"http.path": url.pathname,
+				"http.path_group": group,
+				"http.client_ip": Option.getOrElse(clientIp, () => ""),
+				"request.id": requestId,
+			},
 		}),
 	);
 };

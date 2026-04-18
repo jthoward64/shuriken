@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { Effect, Layer, Option } from "effect";
+import { Effect, Layer, Metric, Option } from "effect";
 import { AuthService } from "#src/auth/service.ts";
 import { AppConfigService } from "#src/config.ts";
 import { DatabaseClient } from "#src/db/client.ts";
@@ -9,6 +9,7 @@ import { PrincipalId, UserId } from "#src/domain/ids.ts";
 import type { AuthenticatedPrincipal } from "#src/domain/types/dav.ts";
 import { Authenticated } from "#src/domain/types/dav.ts";
 import { Email } from "#src/domain/types/strings.ts";
+import { authAttemptsTotal } from "#src/observability/metrics.ts";
 
 // ---------------------------------------------------------------------------
 // Single-user auth layer
@@ -21,11 +22,18 @@ import { Email } from "#src/domain/types/strings.ts";
 //   - Changes to the user row are reflected without restarting the server
 // ---------------------------------------------------------------------------
 
+const authCounter = authAttemptsTotal.pipe(
+	Metric.tagged("auth.mode", "single-user"),
+);
+
 const resolvePrincipal = (
 	db: DatabaseClient,
 	email: Option.Option<Email>,
 ): Effect.Effect<AuthenticatedPrincipal, AuthError | DatabaseError> =>
 	Effect.gen(function* () {
+		yield* Effect.logTrace("auth.single-user: resolving principal", {
+			email: Option.getOrUndefined(email),
+		});
 		const rows = yield* Effect.tryPromise({
 			try: () =>
 				db
@@ -45,6 +53,9 @@ const resolvePrincipal = (
 
 		const row = rows[0];
 		if (row) {
+			yield* Effect.logTrace("auth.single-user: principal resolved", {
+				userId: row.userId,
+			});
 			return {
 				principalId: PrincipalId(row.principalId),
 				userId: UserId(row.userId),
@@ -72,16 +83,33 @@ export const SingleUserAuthLayer = Layer.effect(
 		return AuthService.of({
 			// Resolve per-request: layer build is infallible, user row changes
 			// are reflected immediately without restarting the server.
-			authenticate: Effect.fn("auth.authenticate")(
+			authenticate: Effect.fn("auth.single-user.authenticate")(
 				function* (_headers, _clientIp) {
-					yield* Effect.logTrace("single-user auth");
-					const principal = yield* resolvePrincipal(db, email);
-					return new Authenticated({ principal });
+					yield* Effect.annotateCurrentSpan({ "auth.mode": "single-user" });
+					yield* Effect.logTrace("auth.single-user: authenticating");
+					const resolved = yield* resolvePrincipal(db, email);
+					yield* Metric.increment(
+						authCounter.pipe(Metric.tagged("auth.outcome", "success")),
+					);
+					return new Authenticated({ principal: resolved });
 				},
 				Effect.tapError((e) =>
-					e instanceof AuthError
-						? Effect.logWarning("single-user auth failed", { reason: e.reason })
-						: Effect.void,
+					Effect.all(
+						[
+							e instanceof AuthError
+								? Effect.logWarning("auth.single-user: principal not found", {
+										reason: e.reason,
+									})
+								: Effect.logWarning(
+										"auth.single-user: error during authentication",
+										{ cause: e instanceof DatabaseError ? e.cause : e },
+									),
+							Metric.increment(
+								authCounter.pipe(Metric.tagged("auth.outcome", "error")),
+							),
+						],
+						{ discard: true },
+					),
 				),
 			),
 		});

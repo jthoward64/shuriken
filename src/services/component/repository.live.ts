@@ -1,6 +1,6 @@
 import type { InferSelectModel } from "drizzle-orm";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
-import { Effect, Layer, Option } from "effect";
+import { Effect, Layer, Metric, Option } from "effect";
 import type { Temporal } from "temporal-polyfill";
 import { isKnownIcalProperty } from "#src/data/icalendar/known.ts";
 import type {
@@ -23,6 +23,7 @@ import {
 	type EntityId,
 	type UuidString,
 } from "#src/domain/ids.ts";
+import { repoQueryDurationMs } from "#src/observability/metrics.ts";
 import { ComponentRepository } from "./repository.ts";
 
 // ---------------------------------------------------------------------------
@@ -258,15 +259,31 @@ const insertComponentInTx = async (
 	return componentId;
 };
 
-const insertTree = (db: DbClient, entityId: EntityId, root: IrComponent) =>
-	Effect.tryPromise({
-		try: () =>
-			db.transaction(async (tx) => {
-				const rootId = await insertComponentInTx(tx, entityId, root, null, 0);
-				return ComponentId(rootId);
-			}),
-		catch: (e) => new DatabaseError({ cause: e }),
-	});
+const compDuration = repoQueryDurationMs.pipe(
+	Metric.tagged("repo.entity", "component"),
+);
+
+const insertTree = Effect.fn("ComponentRepository.insertTree")(
+	function* (db: DbClient, entityId: EntityId, root: IrComponent) {
+		yield* Effect.annotateCurrentSpan({ "entity.id": entityId });
+		yield* Effect.logTrace("repo.component.insertTree", { entityId });
+		return yield* Effect.tryPromise({
+			try: () =>
+				db.transaction(async (tx) => {
+					const rootId = await insertComponentInTx(tx, entityId, root, null, 0);
+					return ComponentId(rootId);
+				}),
+			catch: (e) => new DatabaseError({ cause: e }),
+		}).pipe(
+			Metric.trackDuration(
+				compDuration.pipe(Metric.tagged("repo.operation", "insertTree")),
+			),
+		);
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.component.insertTree failed", e.cause),
+	),
+);
 
 // ---------------------------------------------------------------------------
 // loadTree — bulk load + tree reconstruction
@@ -284,9 +301,15 @@ const buildIrComponent = (
 	return { name: compRow.name, properties, components: children };
 };
 
-const loadTree = (db: DbClient, entityId: EntityId, entityType: EntityType) =>
-	Effect.tryPromise({
-		try: async (): Promise<Option.Option<IrComponent>> => {
+const loadTree = Effect.fn("ComponentRepository.loadTree")(
+	function* (db: DbClient, entityId: EntityId, entityType: EntityType) {
+		yield* Effect.annotateCurrentSpan({
+			"entity.id": entityId,
+			"entity.type": entityType,
+		});
+		yield* Effect.logTrace("repo.component.loadTree", { entityId, entityType });
+		return yield* Effect.tryPromise({
+			try: async (): Promise<Option.Option<IrComponent>> => {
 			const isKnown =
 				entityType === "icalendar" ? isKnownIcalProperty : isKnownVcardProperty;
 
@@ -381,27 +404,48 @@ const loadTree = (db: DbClient, entityId: EntityId, entityType: EntityType) =>
 			);
 		},
 		catch: (e) => new DatabaseError({ cause: e }),
-	});
+	}).pipe(
+		Metric.trackDuration(
+			compDuration.pipe(Metric.tagged("repo.operation", "loadTree")),
+		),
+	);
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.component.loadTree failed", e.cause),
+	),
+);
 
 // ---------------------------------------------------------------------------
 // deleteByEntity — soft-delete all component rows for an entity
 // ---------------------------------------------------------------------------
 
-const deleteByEntity = (db: DbClient, entityId: EntityId) =>
-	Effect.tryPromise({
-		try: () =>
-			db
-				.update(davComponent)
-				.set({ deletedAt: sql`now()` })
-				.where(
-					and(
-						eq(davComponent.entityId, entityId),
-						isNull(davComponent.deletedAt),
-					),
-				)
-				.then(() => undefined),
-		catch: (e) => new DatabaseError({ cause: e }),
-	});
+const deleteByEntity = Effect.fn("ComponentRepository.deleteByEntity")(
+	function* (db: DbClient, entityId: EntityId) {
+		yield* Effect.annotateCurrentSpan({ "entity.id": entityId });
+		yield* Effect.logTrace("repo.component.deleteByEntity", { entityId });
+		return yield* Effect.tryPromise({
+			try: () =>
+				db
+					.update(davComponent)
+					.set({ deletedAt: sql`now()` })
+					.where(
+						and(
+							eq(davComponent.entityId, entityId),
+							isNull(davComponent.deletedAt),
+						),
+					)
+					.then(() => undefined),
+			catch: (e) => new DatabaseError({ cause: e }),
+		}).pipe(
+			Metric.trackDuration(
+				compDuration.pipe(Metric.tagged("repo.operation", "deleteByEntity")),
+			),
+		);
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.component.deleteByEntity failed", e.cause),
+	),
+);
 
 // ---------------------------------------------------------------------------
 // ComponentRepositoryLive

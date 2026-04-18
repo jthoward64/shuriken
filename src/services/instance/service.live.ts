@@ -19,26 +19,47 @@ export const InstanceServiceLive = Layer.effect(
 			findById: Effect.fn("InstanceService.findById")(function* (
 				id: InstanceId,
 			) {
+				yield* Effect.annotateCurrentSpan({ "instance.id": id });
 				yield* Effect.logTrace("instance.findById", { id });
-				return yield* repo
+				const result = yield* repo
 					.findById(id)
 					.pipe(Effect.flatMap(someOrNotFound(`Instance not found: ${id}`)));
+				yield* Effect.logTrace("instance.findById result", {
+					instanceId: result.id,
+					slug: result.slug,
+				});
+				return result;
 			}),
 
 			findBySlug: Effect.fn("InstanceService.findBySlug")(function* (
 				collectionId: CollectionId,
 				slug: Slug,
 			) {
+				yield* Effect.annotateCurrentSpan({
+					"instance.collection_id": collectionId,
+					"instance.slug": slug,
+				});
 				yield* Effect.logTrace("instance.findBySlug", { collectionId, slug });
-				return yield* repo
+				const result = yield* repo
 					.findBySlug(collectionId, slug)
 					.pipe(Effect.flatMap(someOrNotFound(`Instance not found: ${slug}`)));
+				yield* Effect.logTrace("instance.findBySlug result", {
+					instanceId: result.id,
+				});
+				return result;
 			}),
 
 			listByCollection: Effect.fn("InstanceService.listByCollection")(
 				function* (collectionId: CollectionId) {
+					yield* Effect.annotateCurrentSpan({
+						"instance.collection_id": collectionId,
+					});
 					yield* Effect.logTrace("instance.listByCollection", { collectionId });
-					return yield* repo.listByCollection(collectionId);
+					const results = yield* repo.listByCollection(collectionId);
+					yield* Effect.logTrace("instance.listByCollection result", {
+						count: results.length,
+					});
+					return results;
 				},
 			),
 
@@ -46,14 +67,21 @@ export const InstanceServiceLive = Layer.effect(
 				input: NewInstance,
 				existingId?: InstanceId,
 			) {
+				yield* Effect.annotateCurrentSpan({
+					"instance.collection_id": input.collectionId,
+					"instance.slug": input.slug,
+					"instance.existing_id": existingId ?? "",
+				});
 				yield* Effect.logTrace("instance.put", {
 					collectionId: input.collectionId,
 					existingId,
+					slug: input.slug,
+					isUpdate: existingId !== undefined,
 				});
 				if (existingId) {
 					// Update existing instance etag (sync_revision is set by DB trigger)
 					yield* repo.updateEtag(existingId, input.etag, input.contentLength);
-					return yield* repo
+					const result = yield* repo
 						.findById(existingId)
 						.pipe(
 							Effect.flatMap(
@@ -62,21 +90,34 @@ export const InstanceServiceLive = Layer.effect(
 								),
 							),
 						);
+					yield* Effect.logTrace("instance.put: updated", {
+						instanceId: result.id,
+					});
+					return result;
 				}
-				return yield* repo.insert(input);
+				const result = yield* repo.insert(input);
+				yield* Effect.logDebug("instance.put: created", {
+					instanceId: result.id,
+					slug: result.slug,
+				});
+				return result;
 			}),
 
 			delete: Effect.fn("InstanceService.delete")(function* (id: InstanceId) {
+				yield* Effect.annotateCurrentSpan({ "instance.id": id });
 				yield* Effect.logTrace("instance.delete", { id });
-				return yield* repo.findById(id).pipe(
+				const result = yield* repo.findById(id).pipe(
 					Effect.flatMap(someOrNotFound(`Instance not found: ${id}`)),
 					Effect.flatMap(() => repo.softDelete(id)),
 				);
+				yield* Effect.logDebug("instance.delete: deleted", { id });
+				return result;
 			}),
 
 			updateClientProperties: Effect.fn(
 				"InstanceService.updateClientProperties",
 			)(function* (id: InstanceId, clientProperties: IrDeadProperties) {
+				yield* Effect.annotateCurrentSpan({ "instance.id": id });
 				yield* Effect.logTrace("instance.updateClientProperties", { id });
 				return yield* repo.updateClientProperties(id, clientProperties);
 			}),

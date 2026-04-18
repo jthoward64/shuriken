@@ -15,84 +15,113 @@ export const GroupServiceLive = Layer.effect(
 
 		return GroupService.of({
 			create: Effect.fn("GroupService.create")(function* (input: NewGroup) {
+				yield* Effect.annotateCurrentSpan({ "group.slug": input.slug });
 				yield* Effect.logTrace("group.create", { slug: input.slug });
-				return yield* repo.create(input);
+				const result = yield* repo.create(input);
+				yield* Effect.logDebug("group.create: created", { groupId: result.group.id });
+				return result;
 			}),
 
 			findById: Effect.fn("GroupService.findById")(function* (id: GroupId) {
+				yield* Effect.annotateCurrentSpan({ "group.id": id });
 				yield* Effect.logTrace("group.findById", { id });
-				return yield* repo
+				const result = yield* repo
 					.findById(id)
 					.pipe(Effect.flatMap(someOrNotFound(`Group not found: ${id}`)));
+				yield* Effect.logTrace("group.findById result", { groupId: result.group.id });
+				return result;
 			}),
 
 			list: Effect.fn("GroupService.list")(function* () {
 				yield* Effect.logTrace("group.list");
-				return yield* repo.list();
+				const results = yield* repo.list();
+				yield* Effect.logTrace("group.list result", { count: results.length });
+				return results;
 			}),
 
 			listMembers: Effect.fn("GroupService.listMembers")(function* (
 				groupId: GroupId,
 			) {
+				yield* Effect.annotateCurrentSpan({ "group.id": groupId });
 				yield* Effect.logTrace("group.listMembers", { groupId });
 				yield* repo
 					.findById(groupId)
 					.pipe(Effect.flatMap(someOrNotFound(`Group not found: ${groupId}`)));
-				return yield* repo.listMembers(groupId);
+				const results = yield* repo.listMembers(groupId);
+				yield* Effect.logTrace("group.listMembers result", { count: results.length });
+				return results;
 			}),
 
 			listByMember: Effect.fn("GroupService.listByMember")(function* (
 				userId: UserId,
 			) {
+				yield* Effect.annotateCurrentSpan({ "user.id": userId });
 				yield* Effect.logTrace("group.listByMember", { userId });
-				return yield* repo.listByMember(userId);
+				const results = yield* repo.listByMember(userId);
+				yield* Effect.logTrace("group.listByMember result", { count: results.length });
+				return results;
 			}),
 
 			update: Effect.fn("GroupService.update")(function* (
 				id: GroupId,
 				input: UpdateGroup,
 			) {
+				yield* Effect.annotateCurrentSpan({ "group.id": id });
 				yield* Effect.logTrace("group.update", { id });
 				yield* repo
 					.findById(id)
 					.pipe(Effect.flatMap(someOrNotFound(`Group not found: ${id}`)));
-				return yield* repo.update(id, input);
+				const result = yield* repo.update(id, input);
+				yield* Effect.logTrace("group.update done", { id });
+				return result;
 			}),
 
 			addMember: Effect.fn("GroupService.addMember")(function* (
 				groupId: GroupId,
 				userId: UserId,
 			) {
+				yield* Effect.annotateCurrentSpan({ "group.id": groupId, "user.id": userId });
 				yield* Effect.logTrace("group.addMember", { groupId, userId });
-				return yield* repo.findById(groupId).pipe(
+				const result = yield* repo.findById(groupId).pipe(
 					Effect.flatMap(someOrNotFound(`Group not found: ${groupId}`)),
 					Effect.flatMap(() => repo.addMember(groupId, userId)),
 				);
+				yield* Effect.logTrace("group.addMember done", { groupId, userId });
+				return result;
 			}),
 
 			removeMember: Effect.fn("GroupService.removeMember")(function* (
 				groupId: GroupId,
 				userId: UserId,
 			) {
+				yield* Effect.annotateCurrentSpan({ "group.id": groupId, "user.id": userId });
 				yield* Effect.logTrace("group.removeMember", { groupId, userId });
-				return yield* repo.findById(groupId).pipe(
+				const result = yield* repo.findById(groupId).pipe(
 					Effect.flatMap(someOrNotFound(`Group not found: ${groupId}`)),
 					Effect.flatMap(() => repo.removeMember(groupId, userId)),
 				);
+				yield* Effect.logTrace("group.removeMember done", { groupId, userId });
+				return result;
 			}),
 
 			delete: Effect.fn("GroupService.delete")(function* (id: GroupId) {
+				yield* Effect.annotateCurrentSpan({ "group.id": id });
 				yield* Effect.logTrace("group.delete", { id });
 				yield* repo
 					.findById(id)
 					.pipe(Effect.flatMap(someOrNotFound(`Group not found: ${id}`)));
 				yield* repo.softDelete(id);
+				yield* Effect.logDebug("group.delete: deleted", { id });
 			}),
 
 			setMembers: Effect.fn("GroupService.setMembers")(function* (
 				groupId: GroupId,
 				userIds: ReadonlyArray<UserId>,
 			) {
+				yield* Effect.annotateCurrentSpan({
+					"group.id": groupId,
+					"group.member_count": userIds.length,
+				});
 				yield* Effect.logTrace("group.setMembers", {
 					groupId,
 					count: userIds.length,
@@ -101,6 +130,7 @@ export const GroupServiceLive = Layer.effect(
 					.findById(groupId)
 					.pipe(Effect.flatMap(someOrNotFound(`Group not found: ${groupId}`)));
 				yield* repo.setMembers(groupId, userIds);
+				yield* Effect.logTrace("group.setMembers done", { groupId });
 			}),
 		});
 	}),

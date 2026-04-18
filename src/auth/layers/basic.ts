@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import { Effect, Layer, Option, Redacted } from "effect";
+import { Effect, Layer, Metric, Option, Redacted } from "effect";
 import { AuthService } from "#src/auth/service.ts";
 import { DatabaseClient } from "#src/db/client.ts";
 import { authUser, principal, user } from "#src/db/drizzle/schema/index.ts";
@@ -10,6 +10,7 @@ import {
 	type AuthResult,
 	Unauthenticated,
 } from "#src/domain/types/dav.ts";
+import { authAttemptsTotal } from "#src/observability/metrics.ts";
 import { CryptoService } from "#src/platform/crypto.ts";
 
 // ---------------------------------------------------------------------------
@@ -20,6 +21,8 @@ import { CryptoService } from "#src/platform/crypto.ts";
 // ---------------------------------------------------------------------------
 
 const BASIC_PREFIX = "Basic ";
+
+const authCounter = authAttemptsTotal.pipe(Metric.tagged("auth.mode", "basic"));
 
 export const parseBasicAuth = (
 	headers: Headers,
@@ -54,18 +57,27 @@ export const BasicAuthLayer = Layer.effect(
 		const crypto = yield* CryptoService;
 
 		return AuthService.of({
-			authenticate: Effect.fn("auth.authenticate")(
+			authenticate: Effect.fn("auth.basic.authenticate")(
 				function* (headers, _clientIp) {
+					yield* Effect.annotateCurrentSpan({ "auth.mode": "basic" });
+
 					return yield* Option.match(parseBasicAuth(headers), {
 						onNone: () =>
-							Effect.logTrace("basic auth: no credentials").pipe(
-								Effect.andThen(
-									Effect.succeed<AuthResult>(new Unauthenticated()),
-								),
-							),
+							Effect.gen(function* () {
+								yield* Effect.logTrace("auth.basic: no credentials present");
+								yield* Metric.increment(
+									authCounter.pipe(
+										Metric.tagged("auth.outcome", "no_credentials"),
+									),
+								);
+								return new Unauthenticated() as AuthResult;
+							}),
 						onSome: (creds) =>
 							Effect.gen(function* () {
-								yield* Effect.logTrace("basic auth attempt", {
+								yield* Effect.annotateCurrentSpan({
+									"auth.username": creds.username,
+								});
+								yield* Effect.logTrace("auth.basic: attempt", {
 									username: creds.username,
 								});
 
@@ -81,7 +93,10 @@ export const BasicAuthLayer = Layer.effect(
 											})
 											.from(authUser)
 											.innerJoin(user, eq(authUser.userId, user.id))
-											.innerJoin(principal, eq(user.principalId, principal.id))
+											.innerJoin(
+												principal,
+												eq(user.principalId, principal.id),
+											)
 											.where(
 												and(
 													eq(authUser.authSource, "local"),
@@ -94,9 +109,14 @@ export const BasicAuthLayer = Layer.effect(
 
 								const row = rows[0];
 								if (!row?.authCredential) {
-									yield* Effect.logDebug("basic auth: user not found", {
+									yield* Effect.logDebug("auth.basic: user not found", {
 										username: creds.username,
 									});
+									yield* Metric.increment(
+										authCounter.pipe(
+											Metric.tagged("auth.outcome", "not_found"),
+										),
+									);
 									return new Unauthenticated() as AuthResult;
 								}
 
@@ -105,15 +125,26 @@ export const BasicAuthLayer = Layer.effect(
 									.verifyPassword(creds.password, row.authCredential)
 									.pipe(Effect.orDie);
 								if (!valid) {
-									yield* Effect.logDebug("basic auth: invalid password", {
+									yield* Effect.logDebug("auth.basic: invalid password", {
 										username: creds.username,
 									});
+									yield* Metric.increment(
+										authCounter.pipe(
+											Metric.tagged("auth.outcome", "invalid_password"),
+										),
+									);
 									return new Unauthenticated() as AuthResult;
 								}
 
-								yield* Effect.logTrace("basic auth: succeeded", {
+								yield* Effect.logDebug("auth.basic: success", {
 									userId: row.userId,
+									username: creds.username,
 								});
+								yield* Metric.increment(
+									authCounter.pipe(
+										Metric.tagged("auth.outcome", "success"),
+									),
+								);
 								return new Authenticated({
 									principal: {
 										principalId: PrincipalId(row.principalId),
@@ -124,6 +155,19 @@ export const BasicAuthLayer = Layer.effect(
 							}),
 					});
 				},
+				Effect.tapError((e) =>
+					Effect.all(
+						[
+							Effect.logWarning("auth.basic: error during authentication", {
+								cause: e instanceof DatabaseError ? e.cause : e,
+							}),
+							Metric.increment(
+								authCounter.pipe(Metric.tagged("auth.outcome", "error")),
+							),
+						],
+						{ discard: true },
+					),
+				),
 			),
 		});
 	}),

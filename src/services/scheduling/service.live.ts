@@ -520,6 +520,20 @@ export const SchedulingServiceLive = Layer.effect(
 					suppressReply,
 				} = opts;
 
+				yield* Effect.annotateCurrentSpan({
+					"scheduling.principal_id": actingPrincipalId,
+					"scheduling.entity_id": entityId,
+					"scheduling.instance_id": instanceId,
+					"scheduling.is_sor": isSor(doc),
+				});
+				yield* Effect.logTrace("scheduling.processAfterPut", {
+					actingPrincipalId,
+					entityId,
+					instanceId,
+					suppressReply,
+					hasPreviousDoc: Option.isSome(previousDoc),
+				});
+
 				if (!isSor(doc)) {
 					return Option.none<string>();
 				}
@@ -690,6 +704,13 @@ export const SchedulingServiceLive = Layer.effect(
 		}) {
 			const { actingPrincipalId, oldDoc, newDoc } = opts;
 
+			yield* Effect.annotateCurrentSpan({
+				"scheduling.principal_id": actingPrincipalId,
+			});
+			yield* Effect.logTrace("scheduling.validateSchedulingChange", {
+				actingPrincipalId,
+			});
+
 			if (!isSor(oldDoc) && !isSor(newDoc)) {
 				return;
 			}
@@ -774,6 +795,15 @@ export const SchedulingServiceLive = Layer.effect(
 		}) {
 			const { actingPrincipalId, doc, suppressReply } = opts;
 
+			yield* Effect.annotateCurrentSpan({
+				"scheduling.principal_id": actingPrincipalId,
+				"scheduling.is_sor": isSor(doc),
+			});
+			yield* Effect.logTrace("scheduling.processAfterDelete", {
+				actingPrincipalId,
+				suppressReply,
+			});
+
 			if (!isSor(doc)) {
 				return;
 			}
@@ -842,7 +872,16 @@ export const SchedulingServiceLive = Layer.effect(
 
 		const processOutboxPost = Effect.fn("SchedulingService.processOutboxPost")(
 			function* (opts: { actingPrincipalId: PrincipalId; doc: IrDocument }) {
-				const { doc } = opts;
+				const { actingPrincipalId, doc } = opts;
+
+				yield* Effect.annotateCurrentSpan({
+					"scheduling.principal_id": actingPrincipalId,
+					"scheduling.doc_kind": doc.kind,
+				});
+				yield* Effect.logTrace("scheduling.processOutboxPost", {
+					actingPrincipalId,
+					docKind: doc.kind,
+				});
 
 				if (doc.kind !== "icalendar") {
 					return yield* Effect.fail(

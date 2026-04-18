@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { Effect, Layer, Option } from "effect";
+import { Effect, Layer, Metric, Option } from "effect";
 import { AuthService } from "#src/auth/service.ts";
 import { AppConfigService } from "#src/config.ts";
 import { DatabaseClient } from "#src/db/client.ts";
@@ -7,6 +7,7 @@ import { principal, user } from "#src/db/drizzle/schema/index.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
 import { PrincipalId, UserId } from "#src/domain/ids.ts";
 import { Authenticated, Unauthenticated } from "#src/domain/types/dav.ts";
+import { authAttemptsTotal } from "#src/observability/metrics.ts";
 
 // ---------------------------------------------------------------------------
 // Proxy auth layer
@@ -121,6 +122,8 @@ export const isClientTrusted = (
 				.some((entry) => matchesEntry(ip, entry)),
 	});
 
+const authCounter = authAttemptsTotal.pipe(Metric.tagged("auth.mode", "proxy"));
+
 export const ProxyAuthLayer = Layer.effect(
 	AuthService,
 	Effect.gen(function* () {
@@ -130,25 +133,38 @@ export const ProxyAuthLayer = Layer.effect(
 		} = yield* AppConfigService;
 
 		return AuthService.of({
-			authenticate: Effect.fn("auth.authenticate")(
+			authenticate: Effect.fn("auth.proxy.authenticate")(
 				function* (headers, clientIp) {
+					yield* Effect.annotateCurrentSpan({ "auth.mode": "proxy" });
+
 					// If the request doesn't come from a trusted proxy, ignore the header
 					if (!isClientTrusted(clientIp, trustedProxies)) {
-						yield* Effect.logDebug("proxy auth: untrusted client", {
+						yield* Effect.logDebug("auth.proxy: client not trusted", {
 							clientIp: Option.getOrUndefined(clientIp),
 						});
+						yield* Metric.increment(
+							authCounter.pipe(
+								Metric.tagged("auth.outcome", "untrusted_proxy"),
+							),
+						);
 						return new Unauthenticated();
 					}
 
 					const username = headers.get(proxyHeader);
 					if (!username) {
-						yield* Effect.logDebug("proxy auth: header absent", {
+						yield* Effect.logDebug("auth.proxy: header absent", {
 							proxyHeader,
 						});
+						yield* Metric.increment(
+							authCounter.pipe(
+								Metric.tagged("auth.outcome", "header_absent"),
+							),
+						);
 						return new Unauthenticated();
 					}
 
-					yield* Effect.logTrace("proxy auth attempt", { username });
+					yield* Effect.annotateCurrentSpan({ "auth.username": username });
+					yield* Effect.logTrace("auth.proxy: attempt", { username });
 
 					const rows = yield* Effect.tryPromise({
 						try: () =>
@@ -167,13 +183,20 @@ export const ProxyAuthLayer = Layer.effect(
 
 					const row = rows[0];
 					if (!row) {
-						yield* Effect.logDebug("proxy auth: user not found", { username });
+						yield* Effect.logDebug("auth.proxy: user not found", { username });
+						yield* Metric.increment(
+							authCounter.pipe(Metric.tagged("auth.outcome", "not_found")),
+						);
 						return new Unauthenticated();
 					}
 
-					yield* Effect.logTrace("proxy auth: succeeded", {
+					yield* Effect.logDebug("auth.proxy: success", {
 						userId: row.userId,
+						username,
 					});
+					yield* Metric.increment(
+						authCounter.pipe(Metric.tagged("auth.outcome", "success")),
+					);
 					return new Authenticated({
 						principal: {
 							principalId: PrincipalId(row.principalId),
@@ -182,6 +205,19 @@ export const ProxyAuthLayer = Layer.effect(
 						},
 					});
 				},
+				Effect.tapError((e) =>
+					Effect.all(
+						[
+							Effect.logWarning("auth.proxy: error during authentication", {
+								cause: e instanceof DatabaseError ? e.cause : e,
+							}),
+							Metric.increment(
+								authCounter.pipe(Metric.tagged("auth.outcome", "error")),
+							),
+						],
+						{ discard: true },
+					),
+				),
 			),
 		});
 	}),

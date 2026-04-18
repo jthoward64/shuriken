@@ -22,6 +22,10 @@ export const ProvisioningServiceLive = Layer.effect(
 			provisionUser: Effect.fn("ProvisioningService.provisionUser")(function* (
 				input: ProvisionUserInput,
 			) {
+				yield* Effect.annotateCurrentSpan({
+					"user.slug": input.slug,
+					"user.email": input.email,
+				});
 				yield* Effect.logInfo("provisioning user", { email: input.email });
 
 				const user = yield* users.create({

@@ -1,7 +1,8 @@
-import { Array as Arr, Effect, Layer, Option } from "effect";
+import { Array as Arr, Effect, Layer, Metric, Option } from "effect";
 import { type DatabaseError, needPrivileges } from "#src/domain/errors.ts";
 import type { PrincipalId, UuidString } from "#src/domain/ids.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
+import { aclChecksTotal } from "#src/observability/metrics.ts";
 import { AclRepository, type AclResourceType } from "./repository.ts";
 import { AclService } from "./service.ts";
 
@@ -109,10 +110,7 @@ export const AclServiceLive = Layer.effect(
 			);
 
 		// ---------------------------------------------------------------------------
-		// Ancestor-chain walking helpers (Fix 12)
-		//
-		// Both helpers close over `repo`; callers pass in the resolved principalIds
-		// (and privileges for checkAncestors) so the closures stay pure functions.
+		// Ancestor-chain walking helpers
 		// ---------------------------------------------------------------------------
 
 		const checkAncestors = (
@@ -161,20 +159,31 @@ export const AclServiceLive = Layer.effect(
 		return AclService.of({
 			getAces: Effect.fn("AclService.getAces")(
 				function* (resourceId, resourceType) {
+					yield* Effect.annotateCurrentSpan({ "acl.resource_id": resourceId, "acl.resource_type": resourceType });
 					yield* Effect.logTrace("acl.getAces", { resourceId, resourceType });
-					return yield* repo.getAces(resourceId, resourceType);
+					const aces = yield* repo.getAces(resourceId, resourceType);
+					yield* Effect.logTrace("acl.getAces result", { count: aces.length });
+					return aces;
 				},
 			),
 
 			setAces: Effect.fn("AclService.setAces")(
 				function* (resourceId, resourceType, aces) {
-					yield* Effect.logTrace("acl.setAces", { resourceId, resourceType });
+					yield* Effect.annotateCurrentSpan({ "acl.resource_id": resourceId, "acl.resource_type": resourceType });
+					yield* Effect.logTrace("acl.setAces", { resourceId, resourceType, count: aces.length });
 					yield* repo.setAces(resourceId, resourceType, aces);
+					yield* Effect.logTrace("acl.setAces done");
 				},
 			),
 
 			check: Effect.fn("AclService.check")(
 				function* (principalId, resourceId, resourceType, privilege) {
+					yield* Effect.annotateCurrentSpan({
+						"acl.principal_id": principalId,
+						"acl.resource_id": resourceId,
+						"acl.resource_type": resourceType,
+						"acl.privilege": privilege,
+					});
 					yield* Effect.logTrace("acl.check", {
 						principalId,
 						resourceId,
@@ -191,6 +200,9 @@ export const AclServiceLive = Layer.effect(
 						true,
 					);
 					if (allowed) {
+						yield* Metric.increment(
+							aclChecksTotal.pipe(Metric.tagged("acl.outcome", "allowed")),
+						);
 						return;
 					}
 					// Walk ancestor chain before giving up
@@ -206,13 +218,24 @@ export const AclServiceLive = Layer.effect(
 							resourceId,
 							privilege,
 						});
+						yield* Metric.increment(
+							aclChecksTotal.pipe(Metric.tagged("acl.outcome", "denied")),
+						);
 						return yield* Effect.fail(needPrivileges());
 					}
+					yield* Metric.increment(
+						aclChecksTotal.pipe(Metric.tagged("acl.outcome", "allowed")),
+					);
 				},
 			),
 
 			currentUserPrivileges: Effect.fn("AclService.currentUserPrivileges")(
 				function* (principalId, resourceId, resourceType) {
+					yield* Effect.annotateCurrentSpan({
+						"acl.principal_id": principalId,
+						"acl.resource_id": resourceId,
+						"acl.resource_type": resourceType,
+					});
 					yield* Effect.logTrace("acl.currentUserPrivileges", {
 						principalId,
 						resourceId,
@@ -237,7 +260,11 @@ export const AclServiceLive = Layer.effect(
 							expanded.add(contained);
 						}
 					}
-					return Arr.fromIterable(expanded);
+					const result = Arr.fromIterable(expanded);
+					yield* Effect.logTrace("acl.currentUserPrivileges result", {
+						count: result.length,
+					});
+					return result;
 				},
 			),
 		});

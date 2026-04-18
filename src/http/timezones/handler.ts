@@ -46,11 +46,16 @@ const notFound = (): Effect.Effect<Response, never> =>
 // Action: capabilities
 // ---------------------------------------------------------------------------
 
-const handleCapabilities = (origin: string): Effect.Effect<Response, never> =>
-	jsonResponse({
-		info: { "primary-source": `${origin}/timezones` },
-		actions: ["capabilities", "list", "get"],
-	});
+const handleCapabilities = (
+	origin: string,
+): Effect.Effect<Response, never> =>
+	Effect.gen(function* () {
+		yield* Effect.logTrace("timezones: capabilities");
+		return yield* jsonResponse({
+			info: { "primary-source": `${origin}/timezones` },
+			actions: ["capabilities", "list", "get"],
+		});
+	}).pipe(Effect.withSpan("timezones.capabilities"));
 
 // ---------------------------------------------------------------------------
 // Action: list
@@ -67,8 +72,11 @@ const extractLastModified = (vtimezone: string): string | null => {
 
 const handleList = (): Effect.Effect<Response, never, IanaTimezoneService> =>
 	Effect.gen(function* () {
+		yield* Effect.logTrace("timezones: list");
 		const svc = yield* IanaTimezoneService;
 		const tzids = svc.listTzids();
+
+		yield* Effect.logTrace("timezones: list result", { count: tzids.length });
 
 		const timezones = tzids.map((tzid) => {
 			const vtOpt = svc.getVtimezone(tzid);
@@ -84,7 +92,7 @@ const handleList = (): Effect.Effect<Response, never, IanaTimezoneService> =>
 		});
 
 		return yield* jsonResponse({ timezones });
-	});
+	}).pipe(Effect.withSpan("timezones.list"));
 
 // ---------------------------------------------------------------------------
 // Action: get
@@ -105,11 +113,15 @@ const handleGet = (
 	IanaTimezoneService | CalTimezoneRepository
 > =>
 	Effect.gen(function* () {
+		yield* Effect.logTrace("timezones: get", { tzid });
+		yield* Effect.annotateCurrentSpan({ "tz.tzid": tzid });
+
 		const svc = yield* IanaTimezoneService;
 
 		// Prefer the library's pre-compiled data for IANA timezones.
 		const ianaOpt = svc.getVtimezone(tzid);
 		if (Option.isSome(ianaOpt)) {
+			yield* Effect.logTrace("timezones: get from IANA library", { tzid });
 			const body = wrapInVcalendar(Option.getOrThrow(ianaOpt));
 			return new Response(body, {
 				status: 200,
@@ -118,6 +130,7 @@ const handleGet = (
 		}
 
 		// Fall back to cal_timezone table for custom / non-IANA timezones.
+		yield* Effect.logTrace("timezones: get from database", { tzid });
 		const repo = yield* CalTimezoneRepository;
 		const customOpt = yield* repo.findByTzid(tzid);
 		if (Option.isSome(customOpt)) {
@@ -129,8 +142,11 @@ const handleGet = (
 			});
 		}
 
+		yield* Effect.logDebug("timezones: timezone not found", { tzid });
 		return yield* notFound();
-	});
+	}).pipe(
+		Effect.withSpan("timezones.get", { attributes: { "tz.tzid": tzid } }),
+	);
 
 // ---------------------------------------------------------------------------
 // Main handler

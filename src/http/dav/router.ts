@@ -1,4 +1,4 @@
-import { Effect, Option } from "effect";
+import { Effect, Metric, Option } from "effect";
 import {
 	type AppError,
 	conflict,
@@ -24,6 +24,7 @@ import {
 	HTTP_METHOD_NOT_ALLOWED,
 	HTTP_UNAUTHORIZED,
 } from "#src/http/status.ts";
+import { davRequestsTotal } from "#src/observability/metrics.ts";
 import type { AclService } from "#src/services/acl/index.ts";
 import type { CalIndexRepository } from "#src/services/cal-index/index.ts";
 import type { CardIndexRepository } from "#src/services/card-index/index.ts";
@@ -188,17 +189,26 @@ export const parseDavPath = (
 		}
 		const userSeg = decodeURIComponent(segments[1] ?? "");
 		return Effect.gen(function* () {
+			yield* Effect.logTrace("dav.parsePath: resolving user segment", {
+				segment: userSeg,
+			});
 			const userRepo = yield* UserRepository;
 			const userOpt = yield* isUuid(userSeg)
 				? userRepo.findById(UserId(userSeg))
 				: userRepo.findBySlug(Slug(userSeg));
 			if (Option.isNone(userOpt)) {
+				yield* Effect.logTrace("dav.parsePath: user not found, treating as new", {
+					segment: userSeg,
+				});
 				return {
 					kind: "newUser",
 					slug: Slug(userSeg),
 				} satisfies ResolvedDavPath;
 			}
 			const row = userOpt.value;
+			yield* Effect.logTrace("dav.parsePath: user resolved", {
+				userId: row.user.id,
+			});
 			return {
 				kind: "user",
 				principalId: PrincipalId(row.principal.id),
@@ -217,11 +227,18 @@ export const parseDavPath = (
 		}
 		const groupSeg = decodeURIComponent(segments[1] ?? "");
 		return Effect.gen(function* () {
+			yield* Effect.logTrace("dav.parsePath: resolving group segment", {
+				segment: groupSeg,
+			});
 			const groupRepo = yield* GroupRepository;
 			const groupOpt = yield* isUuid(groupSeg)
 				? groupRepo.findById(GroupId(groupSeg))
 				: groupRepo.findBySlug(Slug(groupSeg));
 			if (Option.isNone(groupOpt)) {
+				yield* Effect.logTrace(
+					"dav.parsePath: group not found, treating as new",
+					{ segment: groupSeg },
+				);
 				return {
 					kind: "newGroup",
 					slug: Slug(groupSeg),
@@ -233,6 +250,9 @@ export const parseDavPath = (
 
 			// /dav/groups/:slug/members/
 			if (segments.length === SEGMENTS_GROUP) {
+				yield* Effect.logTrace("dav.parsePath: group resolved", {
+					groupId,
+				});
 				return {
 					kind: "group",
 					principalId,
@@ -294,11 +314,17 @@ export const parseDavPath = (
 	const seg1 = decodeURIComponent(segments[1] ?? "");
 
 	return Effect.gen(function* () {
+		yield* Effect.logTrace("dav.parsePath: resolving principal segment", {
+			segment: seg1,
+		});
 		const principalRepo = yield* PrincipalRepository;
 		const principalOpt = yield* isUuid(seg1)
 			? principalRepo.findById(PrincipalId(seg1))
 			: principalRepo.findBySlug(Slug(seg1));
 		if (Option.isNone(principalOpt)) {
+			yield* Effect.logDebug("dav.parsePath: unknown principal", {
+				segment: seg1,
+			});
 			return {
 				kind: "unknownPrincipal",
 				principalSeg: seg1,
@@ -308,6 +334,9 @@ export const parseDavPath = (
 		const principalId = PrincipalId(principalRow.principal.id);
 
 		if (segments.length === SEGMENTS_PRINCIPAL) {
+			yield* Effect.logTrace("dav.parsePath: principal resolved", {
+				principalId,
+			});
 			return {
 				kind: "principal",
 				principalId,
@@ -330,6 +359,11 @@ export const parseDavPath = (
 		}
 
 		const seg3 = decodeURIComponent(segments[3] ?? "");
+		yield* Effect.logTrace("dav.parsePath: resolving collection segment", {
+			principalId,
+			namespace,
+			segment: seg3,
+		});
 		const collRepo = yield* CollectionRepository;
 		const collRowOpt = yield* isUuid(seg3)
 			? collRepo.findById(CollectionId(seg3)).pipe(
@@ -345,6 +379,9 @@ export const parseDavPath = (
 				)
 			: collRepo.findBySlug(principalId, collectionType, Slug(seg3));
 		if (Option.isNone(collRowOpt)) {
+			yield* Effect.logTrace("dav.parsePath: collection not found, treating as new", {
+				segment: seg3,
+			});
 			return {
 				kind: "new-collection",
 				principalId,
@@ -356,6 +393,9 @@ export const parseDavPath = (
 		const collectionId = CollectionId(collRowOpt.value.id);
 
 		if (segments.length === SEGMENTS_COLLECTION) {
+			yield* Effect.logTrace("dav.parsePath: collection resolved", {
+				collectionId,
+			});
 			return {
 				kind: "collection",
 				principalId,
@@ -367,6 +407,10 @@ export const parseDavPath = (
 		}
 
 		const seg4 = decodeURIComponent(segments[4] ?? "");
+		yield* Effect.logTrace("dav.parsePath: resolving instance segment", {
+			collectionId,
+			segment: seg4,
+		});
 		const instRepo = yield* InstanceRepository;
 		const instRowOpt = yield* isUuid(seg4)
 			? instRepo.findById(InstanceId(seg4)).pipe(
@@ -382,6 +426,9 @@ export const parseDavPath = (
 				)
 			: instRepo.findBySlug(collectionId, Slug(seg4));
 		if (Option.isNone(instRowOpt)) {
+			yield* Effect.logTrace("dav.parsePath: instance not found, treating as new", {
+				segment: seg4,
+			});
 			return {
 				kind: "new-instance",
 				principalId,
@@ -393,6 +440,9 @@ export const parseDavPath = (
 			} satisfies ResolvedDavPath;
 		}
 
+		yield* Effect.logTrace("dav.parsePath: instance resolved", {
+			instanceId: instRowOpt.value.id,
+		});
 		return {
 			kind: "instance",
 			principalId,
@@ -412,28 +462,49 @@ export const davRouter = (
 	ctx: HttpRequestContext,
 ): Effect.Effect<Response, AppError, DavServices> =>
 	Effect.gen(function* () {
-		const path = yield* parseDavPath(ctx.url);
-		yield* Effect.logTrace("dav path resolved", { kind: path.kind });
+		const path = yield* parseDavPath(ctx.url).pipe(
+			Effect.withSpan("dav.parse_path", {
+				attributes: { "http.path": ctx.url.pathname },
+			}),
+		);
+		const method = req.method.toUpperCase();
+
+		yield* Effect.annotateCurrentSpan({
+			"dav.path_kind": path.kind,
+			"dav.method": method,
+		});
+		yield* Effect.logTrace("dav.route: dispatching", {
+			kind: path.kind,
+			method,
+		});
 
 		// RFC 6764 §5: /.well-known/caldav and /.well-known/carddav must redirect
 		// to the DAV context path so clients can perform service discovery.
 		if (path.kind === "wellknown") {
-			yield* Effect.logTrace("dav well-known redirect", { name: path.name });
+			yield* Effect.logTrace("dav.route: well-known redirect", {
+				name: path.name,
+			});
 			return new Response(null, {
 				status: 301,
 				headers: { Location: "/dav/" },
 			});
 		}
 
-		// /dav/ and /dav/principals/ are valid paths — fall through to method dispatch
-		// (handlers return 501 until implemented in Step 4)
-
-		const method = req.method.toUpperCase();
-		yield* Effect.logTrace("dav method dispatch", { method, kind: path.kind });
+		// Track the dispatched DAV request
+		yield* Metric.increment(
+			davRequestsTotal.pipe(
+				Metric.tagged("dav.method", method),
+				Metric.tagged("dav.path_kind", path.kind),
+			),
+		);
 
 		// Principal does not exist — MKCOL/MKCALENDAR/PUT → 409 (missing intermediate
 		// collection, RFC 4918 §9.3.1 / §9.7); everything else → 404.
 		if (path.kind === "unknownPrincipal") {
+			yield* Effect.logDebug("dav.route: unknown principal", {
+				method,
+				path: ctx.url.pathname,
+			});
 			if (method === "MKCOL" || method === "MKCALENDAR" || method === "PUT") {
 				return yield* conflict();
 			}
@@ -516,12 +587,11 @@ export const davRouter = (
 			case "ACL":
 				return yield* aclHandler(path, ctx, req);
 			default:
-				yield* Effect.logInfo("dav method not allowed", { method });
+				yield* Effect.logInfo("dav.route: method not allowed", { method });
 				return new Response(null, {
 					status: HTTP_METHOD_NOT_ALLOWED,
 					headers: {
-						Allow:
-							"OPTIONS, GET, HEAD, PUT, DELETE, COPY, MOVE, PROPFIND, PROPPATCH, MKCOL, REPORT, MKCALENDAR, MKADDRESSBOOK, ACL",
+						Allow: "OPTIONS, GET, HEAD, PUT, DELETE, COPY, MOVE, PROPFIND, PROPPATCH, MKCOL, REPORT, MKCALENDAR, MKADDRESSBOOK, ACL",
 					},
 				});
 		}
@@ -541,6 +611,6 @@ export const davRouter = (
 			);
 		}),
 		Effect.withSpan("dav.route", {
-			attributes: { "dav.path": ctx.url.pathname },
+			attributes: { "http.path": ctx.url.pathname },
 		}),
 	);

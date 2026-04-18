@@ -14,6 +14,7 @@ import { ShareLinkRepository } from "./repository.ts";
 
 const findById = Effect.fn("ShareLinkRepository.findById")(
 	function* (db: DbClient, id: UuidString) {
+		yield* Effect.annotateCurrentSpan({ "share_link.id": id });
 		yield* Effect.logTrace("repo.shareLink.findById", { id });
 		return yield* Effect.tryPromise({
 			try: () =>
@@ -33,6 +34,7 @@ const findById = Effect.fn("ShareLinkRepository.findById")(
 
 const findByUser = Effect.fn("ShareLinkRepository.findByUser")(
 	function* (db: DbClient, userId: UserId) {
+		yield* Effect.annotateCurrentSpan({ "user.id": userId });
 		yield* Effect.logTrace("repo.shareLink.findByUser", { userId });
 		return yield* Effect.tryPromise({
 			try: () =>
@@ -47,6 +49,7 @@ const findByUser = Effect.fn("ShareLinkRepository.findByUser")(
 
 const listCalendars = Effect.fn("ShareLinkRepository.listCalendars")(
 	function* (db: DbClient, linkId: UuidString) {
+		yield* Effect.annotateCurrentSpan({ "share_link.id": linkId });
 		yield* Effect.logTrace("repo.shareLink.listCalendars", { linkId });
 		return yield* Effect.tryPromise({
 			try: () =>
@@ -67,6 +70,7 @@ const insert = Effect.fn("ShareLinkRepository.insert")(
 		db: DbClient,
 		input: { userId: UserId; expiresAt?: Temporal.Instant; enabled?: boolean },
 	) {
+		yield* Effect.annotateCurrentSpan({ "user.id": input.userId });
 		yield* Effect.logTrace("repo.shareLink.insert", { userId: input.userId });
 		return yield* Effect.tryPromise({
 			try: () =>
@@ -99,6 +103,7 @@ const update = Effect.fn("ShareLinkRepository.update")(
 		id: UuidString,
 		input: { enabled?: boolean; expiresAt?: Temporal.Instant },
 	) {
+		yield* Effect.annotateCurrentSpan({ "share_link.id": id });
 		yield* Effect.logTrace("repo.shareLink.update", { id });
 		return yield* Effect.tryPromise({
 			try: () =>
@@ -128,6 +133,7 @@ const update = Effect.fn("ShareLinkRepository.update")(
 
 const softDelete = Effect.fn("ShareLinkRepository.softDelete")(
 	function* (db: DbClient, id: UuidString) {
+		yield* Effect.annotateCurrentSpan({ "share_link.id": id });
 		yield* Effect.logTrace("repo.shareLink.softDelete", { id });
 		return yield* Effect.tryPromise({
 			try: () =>
@@ -150,6 +156,7 @@ const addCalendar = Effect.fn("ShareLinkRepository.addCalendar")(
 		calendarId: UuidString,
 		visibility: ShareLinkVisibility,
 	) {
+		yield* Effect.annotateCurrentSpan({ "share_link.id": linkId, "collection.id": calendarId });
 		yield* Effect.logTrace("repo.shareLink.addCalendar", {
 			linkId,
 			calendarId,
@@ -181,6 +188,7 @@ const addCalendar = Effect.fn("ShareLinkRepository.addCalendar")(
 
 const removeCalendar = Effect.fn("ShareLinkRepository.removeCalendar")(
 	function* (db: DbClient, linkId: UuidString, calendarId: UuidString) {
+		yield* Effect.annotateCurrentSpan({ "share_link.id": linkId, "collection.id": calendarId });
 		yield* Effect.logTrace("repo.shareLink.removeCalendar", {
 			linkId,
 			calendarId,
