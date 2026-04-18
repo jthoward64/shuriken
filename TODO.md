@@ -1,13 +1,16 @@
-- Dockerize the application for deployment
-- Github Actions for CI/CD (check, test, build, ghcr)
+- Add a default admin email and password to the config, which can be used to log in and set up the server on first run (default to something like admin@example.com and a random password that is printed to the console on startup)
+- Add APIs for creating users and groups, and for adding/removing users from groups
+- Add a basic web ui for managing self, users, and groups (e.g. changing own email, slug, name, and password, creating new users, creating new groups, adding/removing users from groups, editing others)
+- Add the ability to manage collections (calendars and addressbooks) from the web UI
+- Add a calendar viewer to web UI built with with https://fullcalendar.io/docs
+- Add support for creating, editing, and deleting calendar events from the web UI
+- Add contacts to web UI
 - Add support for associating email credentials with a user account (either by entering them into the web UI, or from proxy header)
 - Add support for iMIP allowing cross-server calendar events
 - Add support for syncing an external icalendar file hosted on a remote server (public ical links)
 - Add support for providing an iCalendar feed of a user's calendar that can be subscribed to by external calendar applications (e.g. Google Calendar, Apple Calendar)
-- Add a web UI built with with https://fullcalendar.io/docs
 - Allow setting templated links to auth settings from config if a user has proxy auth credentials
 - Add a birthday calendar based on a user's contacts' birthdays
-- Add APIs for creating users and groups, and for adding/removing users from groups
 - Add support for sharing calendars and events with other users and groups
 - Add a holiday calendar
 - Implement super-admin (can access all data), admin (can create and manage users, but cannot access their data), and normal users (only access their own data) roles
