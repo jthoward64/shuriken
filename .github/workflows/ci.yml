@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
     branches: [main]
 
@@ -14,7 +15,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
-      - run: bun run verify
+      - run: bun run check
+      - uses: biomejs/setup-biome@v2
+      - run: biome ci
 
   test:
     name: Test
@@ -49,10 +52,35 @@ jobs:
         with:
           images: ghcr.io/${{ github.event.repository.full_name }}
           tags: |
-            type=sha
+            type=sha,format=long
             type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=tag
+
+      # If an image was already built for this commit, retag it rather than rebuild.
+      # This also handles git tags: the tag's commit was already built on main push.
+      - name: Check if image exists for this commit
+        id: exists
+        if: github.event_name != 'pull_request'
+        env:
+          SHA_IMAGE: ghcr.io/${{ github.event.repository.full_name }}:sha-${{ github.sha }}
+        run: |
+          if docker manifest inspect "$SHA_IMAGE" > /dev/null 2>&1; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Retag existing image
+        if: github.event_name != 'pull_request' && steps.exists.outputs.found == 'true'
+        env:
+          SHA_IMAGE: ghcr.io/${{ github.event.repository.full_name }}:sha-${{ github.sha }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          TAG_ARGS=$(printf '%s\n' "$TAGS" | sed 's/^/--tag /' | tr '\n' ' ')
+          docker buildx imagetools create $TAG_ARGS "$SHA_IMAGE"
 
       - uses: docker/build-push-action@v6
+        if: steps.exists.outputs.found != 'true'
         with:
           context: .
           file: docker/Dockerfile
