@@ -2,6 +2,7 @@ import { and, eq, ilike, isNull, or, sql } from "drizzle-orm";
 import { Effect, Layer, Option } from "effect";
 import { DatabaseClient } from "#src/db/client.ts";
 import { principal, user } from "#src/db/drizzle/schema/index.ts";
+import { getActiveDb } from "#src/db/transaction.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
 import type { PrincipalId, UserId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
@@ -25,9 +26,10 @@ export const PrincipalRepositoryLive = Layer.effect(
 			function* (id: PrincipalId) {
 				yield* Effect.annotateCurrentSpan({ "principal.id": id });
 				yield* Effect.logTrace("repo.principal.findById", { id });
+				const activeDb = yield* getActiveDb(db);
 				return yield* Effect.tryPromise({
 					try: () =>
-						db
+						activeDb
 							.select()
 							.from(principal)
 							.innerJoin(user, eq(user.principalId, principal.id))
@@ -50,9 +52,10 @@ export const PrincipalRepositoryLive = Layer.effect(
 			function* (slug: Slug) {
 				yield* Effect.annotateCurrentSpan({ "principal.slug": slug });
 				yield* Effect.logTrace("repo.principal.findBySlug", { slug });
+				const activeDb = yield* getActiveDb(db);
 				return yield* Effect.tryPromise({
 					try: () =>
-						db
+						activeDb
 							.select()
 							.from(principal)
 							.innerJoin(user, eq(user.principalId, principal.id))
@@ -77,9 +80,10 @@ export const PrincipalRepositoryLive = Layer.effect(
 			function* (slug: Slug) {
 				yield* Effect.annotateCurrentSpan({ "principal.slug": slug });
 				yield* Effect.logTrace("repo.principal.findPrincipalBySlug", { slug });
+				const activeDb = yield* getActiveDb(db);
 				return yield* Effect.tryPromise({
 					try: () =>
-						db
+						activeDb
 							.select()
 							.from(principal)
 							.where(and(eq(principal.slug, slug), isNull(principal.deletedAt)))
@@ -96,9 +100,10 @@ export const PrincipalRepositoryLive = Layer.effect(
 		const findByEmail = Effect.fn("PrincipalRepository.findByEmail")(
 			function* (email: Email) {
 				yield* Effect.logTrace("repo.principal.findByEmail");
+				const activeDb = yield* getActiveDb(db);
 				return yield* Effect.tryPromise({
 					try: () =>
-						db
+						activeDb
 							.select()
 							.from(user)
 							.innerJoin(principal, eq(principal.id, user.principalId))
@@ -121,9 +126,10 @@ export const PrincipalRepositoryLive = Layer.effect(
 			function* (id: UserId) {
 				yield* Effect.annotateCurrentSpan({ "user.id": id });
 				yield* Effect.logTrace("repo.principal.findUserByUserId", { id });
+				const activeDb = yield* getActiveDb(db);
 				return yield* Effect.tryPromise({
 					try: () =>
-						db
+						activeDb
 							.select()
 							.from(user)
 							.where(eq(user.id, id))
@@ -148,9 +154,10 @@ export const PrincipalRepositoryLive = Layer.effect(
 				if (changes.displayName !== undefined) {
 					setValues.displayName = changes.displayName;
 				}
+				const activeDb = yield* getActiveDb(db);
 				return yield* Effect.tryPromise({
 					try: () =>
-						db
+						activeDb
 							.update(principal)
 							.set(setValues)
 							.where(and(eq(principal.id, id), isNull(principal.deletedAt)))
@@ -175,9 +182,10 @@ export const PrincipalRepositoryLive = Layer.effect(
 		const listAll = Effect.fn("PrincipalRepository.listAll")(
 			function* () {
 				yield* Effect.logTrace("repo.principal.listAll");
+				const activeDb = yield* getActiveDb(db);
 				return yield* Effect.tryPromise({
 					try: () =>
-						db
+						activeDb
 							.select()
 							.from(principal)
 							.innerJoin(user, eq(user.principalId, principal.id))
@@ -200,9 +208,10 @@ export const PrincipalRepositoryLive = Layer.effect(
 				yield* Effect.annotateCurrentSpan({ "search.query_len": query.length });
 				yield* Effect.logTrace("repo.principal.searchByDisplayName", { query });
 				const pattern = `%${query}%`;
+				const activeDb = yield* getActiveDb(db);
 				return yield* Effect.tryPromise({
 					try: () =>
-						db
+						activeDb
 							.select()
 							.from(principal)
 							.innerJoin(user, eq(user.principalId, principal.id))

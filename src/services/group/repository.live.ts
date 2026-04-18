@@ -7,6 +7,7 @@ import {
 	principal,
 	user,
 } from "#src/db/drizzle/schema/index.ts";
+import { getActiveDb } from "#src/db/transaction.ts";
 import {
 	ConflictError,
 	DatabaseError,
@@ -25,9 +26,10 @@ const findById = Effect.fn("GroupRepository.findById")(
 	function* (db: DbClient, id: GroupId) {
 		yield* Effect.annotateCurrentSpan({ "group.id": id });
 		yield* Effect.logTrace("repo.group.findById", { id });
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.select()
 					.from(group)
 					.innerJoin(principal, eq(principal.id, group.principalId))
@@ -61,39 +63,21 @@ const create = Effect.fn("GroupRepository.create")(
 	) {
 		yield* Effect.annotateCurrentSpan({ "group.slug": input.slug });
 		yield* Effect.logTrace("repo.group.create", { slug: input.slug });
-		return yield* Effect.tryPromise<
-			GroupWithPrincipal,
+		const activeDb = yield* getActiveDb(db);
+
+		const principalRows = yield* Effect.tryPromise<
+			ReadonlyArray<typeof principal.$inferSelect>,
 			DatabaseError | ConflictError
 		>({
 			try: () =>
-				db.transaction(async (tx) => {
-					const principalRows = await tx
-						.insert(principal)
-						.values({
-							principalType: "group",
-							slug: input.slug,
-							displayName: input.displayName,
-						})
-						.returning();
-					const principalRow = principalRows[0];
-					if (!principalRow) {
-						throw new Error("principal insert returned no rows");
-					}
-
-					const groupRows = await tx
-						.insert(group)
-						.values({ principalId: principalRow.id })
-						.returning();
-					const groupRow = groupRows[0];
-					if (!groupRow) {
-						throw new Error("group insert returned no rows");
-					}
-
-					return {
-						principal: principalRow,
-						group: groupRow,
-					} satisfies GroupWithPrincipal;
-				}),
+				activeDb
+					.insert(principal)
+					.values({
+						principalType: "group",
+						slug: input.slug,
+						displayName: input.displayName,
+					})
+					.returning(),
 			catch: (e) =>
 				isPgUniqueViolation(e)
 					? new ConflictError({
@@ -102,6 +86,32 @@ const create = Effect.fn("GroupRepository.create")(
 						})
 					: new DatabaseError({ cause: e }),
 		});
+		const principalRow = principalRows[0];
+		if (!principalRow) {
+			return yield* Effect.fail(
+				new DatabaseError({ cause: new Error("principal insert returned no rows") }),
+			);
+		}
+
+		const groupRows = yield* Effect.tryPromise({
+			try: () =>
+				activeDb
+					.insert(group)
+					.values({ principalId: principalRow.id })
+					.returning(),
+			catch: (e) => new DatabaseError({ cause: e }),
+		});
+		const groupRow = groupRows[0];
+		if (!groupRow) {
+			return yield* Effect.fail(
+				new DatabaseError({ cause: new Error("group insert returned no rows") }),
+			);
+		}
+
+		return {
+			principal: principalRow,
+			group: groupRow,
+		} satisfies GroupWithPrincipal;
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.group.create failed", e.cause),
@@ -116,17 +126,18 @@ const update = Effect.fn("GroupRepository.update")(
 	) {
 		yield* Effect.annotateCurrentSpan({ "group.id": id });
 		yield* Effect.logTrace("repo.group.update", { id });
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: async () => {
 				if (input.displayName !== undefined) {
-					await db
+					await activeDb
 						.update(principal)
 						.set({ displayName: input.displayName, updatedAt: sql`now()` })
 						.from(group)
 						.where(and(eq(group.id, id), eq(principal.id, group.principalId)));
 				}
 
-				const rows = await db
+				const rows = await activeDb
 					.select()
 					.from(group)
 					.innerJoin(principal, eq(principal.id, group.principalId))
@@ -157,9 +168,10 @@ const addMember = Effect.fn("GroupRepository.addMember")(
 			"user.id": userId,
 		});
 		yield* Effect.logTrace("repo.group.addMember", { groupId, userId });
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.insert(membership)
 					.values({ groupId, userId })
 					.onConflictDoNothing()
@@ -179,9 +191,10 @@ const removeMember = Effect.fn("GroupRepository.removeMember")(
 			"user.id": userId,
 		});
 		yield* Effect.logTrace("repo.group.removeMember", { groupId, userId });
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.delete(membership)
 					.where(
 						and(eq(membership.groupId, groupId), eq(membership.userId, userId)),
@@ -202,9 +215,10 @@ const hasMember = Effect.fn("GroupRepository.hasMember")(
 			"user.id": userId,
 		});
 		yield* Effect.logTrace("repo.group.hasMember", { groupId, userId });
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.select()
 					.from(membership)
 					.where(
@@ -224,9 +238,10 @@ const findBySlug = Effect.fn("GroupRepository.findBySlug")(
 	function* (db: DbClient, slug: Slug) {
 		yield* Effect.annotateCurrentSpan({ "group.slug": slug });
 		yield* Effect.logTrace("repo.group.findBySlug", { slug });
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.select()
 					.from(group)
 					.innerJoin(principal, eq(principal.id, group.principalId))
@@ -259,9 +274,10 @@ const findBySlug = Effect.fn("GroupRepository.findBySlug")(
 const list = Effect.fn("GroupRepository.list")(
 	function* (db: DbClient) {
 		yield* Effect.logTrace("repo.group.list");
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.select()
 					.from(group)
 					.innerJoin(principal, eq(principal.id, group.principalId))
@@ -286,9 +302,10 @@ const listMembers = Effect.fn("GroupRepository.listMembers")(
 	function* (db: DbClient, groupId: GroupId) {
 		yield* Effect.annotateCurrentSpan({ "group.id": groupId });
 		yield* Effect.logTrace("repo.group.listMembers", { groupId });
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.select()
 					.from(user)
 					.innerJoin(principal, eq(principal.id, user.principalId))
@@ -318,9 +335,10 @@ const listByMember = Effect.fn("GroupRepository.listByMember")(
 	function* (db: DbClient, userId: UserId) {
 		yield* Effect.annotateCurrentSpan({ "user.id": userId });
 		yield* Effect.logTrace("repo.group.listByMember", { userId });
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.select()
 					.from(group)
 					.innerJoin(principal, eq(principal.id, group.principalId))
@@ -350,9 +368,10 @@ const softDelete = Effect.fn("GroupRepository.softDelete")(
 	function* (db: DbClient, id: GroupId) {
 		yield* Effect.annotateCurrentSpan({ "group.id": id });
 		yield* Effect.logTrace("repo.group.softDelete", { id });
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.update(principal)
 					.set({ deletedAt: sql`now()`, updatedAt: sql`now()` })
 					.from(group)
@@ -376,19 +395,22 @@ const setMembers = Effect.fn("GroupRepository.setMembers")(
 			groupId,
 			count: userIds.length,
 		});
-		return yield* Effect.tryPromise({
+		const activeDb = yield* getActiveDb(db);
+		yield* Effect.tryPromise({
 			try: () =>
-				db.transaction(async (tx) => {
-					await tx.delete(membership).where(eq(membership.groupId, groupId));
-					if (userIds.length > 0) {
-						await tx
-							.insert(membership)
-							.values(userIds.map((userId) => ({ groupId, userId })))
-							.onConflictDoNothing();
-					}
-				}),
+				activeDb.delete(membership).where(eq(membership.groupId, groupId)),
 			catch: (e) => new DatabaseError({ cause: e }),
 		});
+		if (userIds.length > 0) {
+			yield* Effect.tryPromise({
+				try: () =>
+					activeDb
+						.insert(membership)
+						.values(userIds.map((userId) => ({ groupId, userId })))
+						.onConflictDoNothing(),
+				catch: (e) => new DatabaseError({ cause: e }),
+			});
+		}
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.group.setMembers failed", e.cause),

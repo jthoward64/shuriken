@@ -9,6 +9,7 @@ import {
 	membership,
 	user,
 } from "#src/db/drizzle/schema/index.ts";
+import { getActiveDb } from "#src/db/transaction.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
 import type { PrincipalId, UuidString } from "#src/domain/ids.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
@@ -33,9 +34,10 @@ const getAces = Effect.fn("AclRepository.getAces")(
 			"resource.type": resourceType,
 		});
 		yield* Effect.logTrace("repo.acl.getAces", { resourceId, resourceType });
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.select()
 					.from(davAcl)
 					.where(
@@ -68,37 +70,38 @@ const setAces = Effect.fn("AclRepository.setAces")(
 			resourceType,
 			count: aces.length,
 		});
-		return yield* Effect.tryPromise({
+		const activeDb = yield* getActiveDb(db);
+		yield* Effect.tryPromise({
 			try: () =>
-				db.transaction(async (tx) => {
-					// Delete all non-protected ACEs for this resource
-					await tx
-						.delete(davAcl)
-						.where(
-							and(
-								eq(davAcl.resourceId, resourceId),
-								eq(davAcl.resourceType, resourceType),
-								eq(davAcl.protected, false),
-							),
-						);
-					// Insert the new ACEs (skip if empty)
-					if (aces.length > 0) {
-						await tx.insert(davAcl).values(
-							aces.map((ace) => ({
-								resourceType: ace.resourceType,
-								resourceId: ace.resourceId,
-								principalType: ace.principalType,
-								principalId: ace.principalId ?? null,
-								privilege: ace.privilege,
-								grantDeny: ace.grantDeny,
-								protected: ace.protected,
-								ordinal: ace.ordinal,
-							})),
-						);
-					}
-				}),
+				activeDb
+					.delete(davAcl)
+					.where(
+						and(
+							eq(davAcl.resourceId, resourceId),
+							eq(davAcl.resourceType, resourceType),
+							eq(davAcl.protected, false),
+						),
+					),
 			catch: (e) => new DatabaseError({ cause: e }),
 		});
+		if (aces.length > 0) {
+			yield* Effect.tryPromise({
+				try: () =>
+					activeDb.insert(davAcl).values(
+						aces.map((ace) => ({
+							resourceType: ace.resourceType,
+							resourceId: ace.resourceId,
+							principalType: ace.principalType,
+							principalId: ace.principalId ?? null,
+							privilege: ace.privilege,
+							grantDeny: ace.grantDeny,
+							protected: ace.protected,
+							ordinal: ace.ordinal,
+						})),
+					),
+				catch: (e) => new DatabaseError({ cause: e }),
+			});
+		}
 	},
 	Effect.tapError((e) => Effect.logWarning("repo.acl.setAces failed", e.cause)),
 );
@@ -113,9 +116,10 @@ const grantAce = Effect.fn("AclRepository.grantAce")(
 			resourceId: ace.resourceId,
 			privilege: ace.privilege,
 		});
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.insert(davAcl)
 					.values({
 						resourceType: ace.resourceType,
@@ -186,9 +190,10 @@ const hasPrivilege = Effect.fn("AclRepository.hasPrivilege")(
 			resourceId,
 			resourceType,
 		});
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.select({ id: davAcl.id })
 					.from(davAcl)
 					.where(
@@ -226,9 +231,10 @@ const getGrantedPrivileges = Effect.fn("AclRepository.getGrantedPrivileges")(
 			resourceId,
 			resourceType,
 		});
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.selectDistinct({ privilege: davAcl.privilege })
 					.from(davAcl)
 					.where(
@@ -268,10 +274,11 @@ const getResourceParent = Effect.fn("AclRepository.getResourceParent")(
 				readonly type: AclResourceType;
 			}>();
 		}
+		const activeDb = yield* getActiveDb(db);
 		if (resourceType === "instance") {
 			return yield* Effect.tryPromise({
 				try: () =>
-					db
+					activeDb
 						.select({ collectionId: davInstance.collectionId })
 						.from(davInstance)
 						.where(eq(davInstance.id, resourceId))
@@ -290,7 +297,7 @@ const getResourceParent = Effect.fn("AclRepository.getResourceParent")(
 		// collection
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.select({
 						parentCollectionId: davCollection.parentCollectionId,
 						ownerPrincipalId: davCollection.ownerPrincipalId,
@@ -331,9 +338,10 @@ const getGroupPrincipalIds = Effect.fn("AclRepository.getGroupPrincipalIds")(
 		yield* Effect.logTrace("repo.acl.getGroupPrincipalIds", {
 			userPrincipalId,
 		});
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.select({ principalId: group.principalId })
 					.from(group)
 					.innerJoin(membership, eq(membership.groupId, group.id))

@@ -14,6 +14,7 @@ import {
 	principal,
 	user,
 } from "#src/db/drizzle/schema/index.ts";
+import { getActiveDb } from "#src/db/transaction.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
 import type {
 	CollectionId,
@@ -41,9 +42,10 @@ const findPrincipalByCalAddress = Effect.fn(
 		const email = calAddress.toLowerCase().startsWith("mailto:")
 			? calAddress.slice("mailto:".length)
 			: calAddress;
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.select()
 					.from(principal)
 					.innerJoin(user, eq(user.principalId, principal.id))
@@ -74,9 +76,10 @@ const findInbox = Effect.fn("SchedulingRepository.findInbox")(
 	function* (db: DbClient, principalId: PrincipalId) {
 		yield* Effect.annotateCurrentSpan({ "principal.id": principalId });
 		yield* Effect.logTrace("repo.scheduling.findInbox", { principalId });
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.select()
 					.from(davCollection)
 					.where(
@@ -103,10 +106,11 @@ const findDefaultCalendar = Effect.fn(
 	yield* Effect.logTrace("repo.scheduling.findDefaultCalendar", {
 		principalId,
 	});
+	const activeDb = yield* getActiveDb(db);
 	// Step 1: get the inbox to read scheduleDefaultCalendarId
 	const inbox = yield* Effect.tryPromise({
 		try: () =>
-			db
+			activeDb
 				.select({
 					scheduleDefaultCalendarId: davCollection.scheduleDefaultCalendarId,
 				})
@@ -128,7 +132,7 @@ const findDefaultCalendar = Effect.fn(
 	// Step 2: load the target calendar
 	return yield* Effect.tryPromise({
 		try: () =>
-			db
+			activeDb
 				.select()
 				.from(davCollection)
 				.where(
@@ -154,9 +158,10 @@ const findSorByUid = Effect.fn("SchedulingRepository.findSorByUid")(
 			principalId,
 			uid,
 		});
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.select({ instance: davInstance, collection: davCollection })
 					.from(davInstance)
 					.innerJoin(
@@ -203,9 +208,10 @@ const findInboxInstance = Effect.fn("SchedulingRepository.findInboxInstance")(
 			inboxCollectionId,
 			uid,
 		});
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.select({ instance: davInstance, entityId: davEntity.id })
 					.from(davInstance)
 					.innerJoin(davEntity, eq(davEntity.id, davInstance.entityId))
@@ -249,9 +255,10 @@ const insertScheduleMessage = Effect.fn(
 			recipient: msg.recipient,
 			method: msg.method,
 		});
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.insert(davScheduleMessage)
 					.values({
 						collectionId: msg.collectionId,
@@ -285,9 +292,10 @@ const listOpaqueCalendarCollections = Effect.fn(
 		yield* Effect.logTrace("repo.scheduling.listOpaqueCalendarCollections", {
 			principalId,
 		});
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.select()
 					.from(davCollection)
 					.where(
@@ -313,9 +321,10 @@ const updateScheduleTag = Effect.fn("SchedulingRepository.updateScheduleTag")(
 	function* (db: DbClient, instanceId: InstanceId, scheduleTag: string) {
 		yield* Effect.annotateCurrentSpan({ "instance.id": instanceId });
 		yield* Effect.logTrace("repo.scheduling.updateScheduleTag", { instanceId });
+		const activeDb = yield* getActiveDb(db);
 		return yield* Effect.tryPromise({
 			try: () =>
-				db
+				activeDb
 					.update(davInstance)
 					.set({ scheduleTag, updatedAt: sql`now()` })
 					.where(

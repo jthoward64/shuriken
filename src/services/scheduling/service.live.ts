@@ -28,6 +28,7 @@ import {
 } from "#src/data/icalendar/ir-helpers.ts";
 import { getOccurrenceInstantsInRange } from "#src/data/icalendar/recurrence/recurrence-check.ts";
 import type { IrComponent, IrDocument, IrProperty } from "#src/data/ir.ts";
+import { withTransaction } from "#src/db/transaction.ts";
 import { forbidden } from "#src/domain/errors.ts";
 import type { PrincipalId } from "#src/domain/ids.ts";
 import { CollectionId, EntityId } from "#src/domain/ids.ts";
@@ -390,8 +391,12 @@ export const SchedulingServiceLive = Layer.effect(
 				return;
 			}
 			const updated = applyScheduleStatus(treeOpt.value, calAddress, status);
-			yield* componentRepo.deleteByEntity(entityId);
-			yield* componentRepo.insertTree(entityId, updated);
+			yield* withTransaction(
+				Effect.gen(function* () {
+					yield* componentRepo.deleteByEntity(entityId);
+					yield* componentRepo.insertTree(entityId, updated);
+				}),
+			);
 		});
 
 		// -------------------------------------------------------------------------

@@ -2,6 +2,7 @@ import { Effect, Layer } from "effect";
 import { noneOrConflict, someOrNotFound } from "#src/domain/errors.ts";
 import type { CollectionId, PrincipalId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
+import { withTransaction } from "#src/db/transaction.ts";
 import { AclRepository } from "#src/services/acl/repository.ts";
 import {
 	type CollectionPropertyChanges,
@@ -100,17 +101,22 @@ export const CollectionServiceLive = Layer.effect(
 							),
 						),
 					);
-				const collection = yield* repo.insert(input);
-				yield* aclRepo.grantAce({
-					resourceType: "collection",
-					resourceId: collection.id,
-					principalType: "principal",
-					principalId: input.ownerPrincipalId,
-					privilege: "DAV:all",
-					grantDeny: "grant",
-					protected: true,
-					ordinal: 0,
-				});
+				const collection = yield* withTransaction(
+					Effect.gen(function* () {
+						const c = yield* repo.insert(input);
+						yield* aclRepo.grantAce({
+							resourceType: "collection",
+							resourceId: c.id,
+							principalType: "principal",
+							principalId: input.ownerPrincipalId,
+							privilege: "DAV:all",
+							grantDeny: "grant",
+							protected: true,
+							ordinal: 0,
+						});
+						return c;
+					}),
+				);
 				yield* Effect.logDebug("collection.create: created", {
 					collectionId: collection.id,
 					type: collection.collectionType,

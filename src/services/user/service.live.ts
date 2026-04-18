@@ -1,4 +1,5 @@
 import { Effect, Layer, Option, Redacted } from "effect";
+import { withTransaction } from "#src/db/transaction.ts";
 import {
 	conflict,
 	noneOrConflict,
@@ -221,13 +222,17 @@ export const UserServiceLive = Layer.effect(
 					.findById(userId)
 					.pipe(Effect.flatMap(someOrNotFound(`User not found: ${userId}`)));
 				// Delete any existing credential for this source+authId, then insert fresh
-				yield* repo.deleteCredential(
-					userId,
-					credential.source,
-					credential.authId,
-				);
 				const hashed = yield* hashCredential(crypto, credential);
-				yield* repo.insertCredential({ userId, ...hashed });
+				yield* withTransaction(
+					Effect.gen(function* () {
+						yield* repo.deleteCredential(
+							userId,
+							credential.source,
+							credential.authId,
+						);
+						yield* repo.insertCredential({ userId, ...hashed });
+					}),
+				);
 				yield* Effect.logTrace("user.setCredential done", { userId });
 			}),
 		});
