@@ -1,5 +1,6 @@
 import { Effect, Match, Metric, Option } from "effect";
 import { AuthService } from "#src/auth/service.ts";
+import type { AppConfigService } from "#src/config.ts";
 import type { DatabaseClient } from "#src/db/client.ts";
 import type { AppError } from "#src/domain/errors.ts";
 import {
@@ -15,6 +16,7 @@ import {
 } from "#src/http/status.ts";
 import { timezonesHandler } from "#src/http/timezones/handler.ts";
 import { uiRouter } from "#src/http/ui/router.ts";
+import type { TemplateService } from "#src/http/ui/template/index.ts";
 import type {
 	CollectionRepository,
 	IanaTimezoneService,
@@ -26,6 +28,7 @@ import {
 	httpRequestDurationMs,
 	httpRequestsTotal,
 } from "#src/observability/metrics.ts";
+import type { BunFileService } from "#src/platform/file.ts";
 import type { AclService } from "#src/services/acl/index.ts";
 import type { CalIndexRepository } from "#src/services/cal-index/index.ts";
 import type { CardIndexRepository } from "#src/services/card-index/index.ts";
@@ -54,6 +57,7 @@ import type { UserRepository, UserService } from "#src/services/user/index.ts";
 // ---------------------------------------------------------------------------
 
 type AppServices =
+	| AppConfigService
 	| AuthService
 	| DatabaseClient
 	| PrincipalRepository
@@ -74,7 +78,9 @@ type AppServices =
 	| GroupRepository
 	| UserService
 	| GroupService
-	| SchedulingService;
+	| SchedulingService
+	| BunFileService
+	| TemplateService;
 
 const isDavPath = (pathname: string): boolean =>
 	pathname === "/dav" ||
@@ -263,7 +269,7 @@ export const handleRequest = (
 		}
 
 		if (isUiPath(url.pathname)) {
-			return yield* uiRouter(req);
+			return yield* uiRouter(req, ctx);
 		}
 
 		yield* Effect.logDebug("no route matched", { path: url.pathname });

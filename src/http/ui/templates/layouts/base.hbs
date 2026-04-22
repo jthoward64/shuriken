@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{pageTitle}} — Shuriken</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
+  <style>
+    [x-cloak] { display: none !important; }
+    .htmx-indicator { display: none; }
+    .htmx-request .htmx-indicator { display: inline; }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col">
+  <nav class="bg-gray-900 text-white shadow">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-14">
+        <div class="flex items-center gap-6">
+          <a href="/ui" class="font-semibold text-lg tracking-tight hover:text-gray-300">Shuriken</a>
+          {{> nav}}
+        </div>
+        <div class="flex items-center gap-4 text-sm">
+          {{#if displayName}}
+            <a href="/ui/profile" class="hover:text-gray-300">{{displayName}}</a>
+          {{/if}}
+          {{#if showLogout}}
+            <a href="/ui/logout" class="hover:text-gray-300">Sign out</a>
+          {{/if}}
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    {{{body}}}
+  </main>
+
+  <footer class="text-center text-xs text-gray-400 py-4">Shuriken CalDAV/CardDAV</footer>
+</body>
+</html>

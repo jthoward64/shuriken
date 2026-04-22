@@ -1,0 +1,12 @@
+{{#if showUsers}}
+  <a href="/ui/users"
+     class="text-sm {{#if (eq currentPath '/ui/users')}}text-white font-medium{{else}}text-gray-300 hover:text-white{{/if}}">
+    Users
+  </a>
+{{/if}}
+{{#if showGroups}}
+  <a href="/ui/groups"
+     class="text-sm {{#if (eq currentPath '/ui/groups')}}text-white font-medium{{else}}text-gray-300 hover:text-white{{/if}}">
+    Groups
+  </a>
+{{/if}}

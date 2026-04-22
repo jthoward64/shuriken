@@ -871,6 +871,27 @@ const makeAclRepo = (stores: TestStores): AclRepositoryShape => ({
 			),
 		]),
 
+	batchGetGrantedPrivileges: (callerPrincipalIds, resourceIds, resourceType) =>
+		Effect.succeed(
+			new Map(
+				resourceIds.map((resourceId) => [
+					resourceId,
+					[
+						...new Set(
+							(stores.acl.get(resourceId) ?? [])
+								.filter(
+									(ace) =>
+										ace.resourceType === resourceType &&
+										ace.grantDeny === "grant" &&
+										matchesPrincipal(ace, callerPrincipalIds, true),
+								)
+								.map((ace) => ace.privilege as DavPrivilege),
+						),
+					] as ReadonlyArray<DavPrivilege>,
+				]),
+			),
+		),
+
 	getGroupPrincipalIds: (userPrincipalId) =>
 		Effect.sync(() => {
 			const userRow = [...stores.users.values()].find(

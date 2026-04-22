@@ -1,0 +1,41 @@
+<div class="space-y-4">
+  <div class="flex items-center justify-between">
+    <h1 class="text-2xl font-bold text-gray-900">{{pageTitle}}</h1>
+    {{#if canCreateGroup}}
+      <a href="/ui/groups/new" class="inline-flex items-center px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded hover:bg-gray-700">
+        New group
+      </a>
+    {{/if}}
+  </div>
+
+  {{> flash}}
+
+  {{#if groups}}
+    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Slug</th>
+            <th class="px-4 py-3"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+          {{#each groups}}
+            <tr>
+              <td class="px-4 py-3 text-sm text-gray-900">{{principal.displayName}}</td>
+              <td class="px-4 py-3 text-sm text-gray-600 font-mono">{{principal.slug}}</td>
+              <td class="px-4 py-3 text-right text-sm">
+                {{#if canEdit}}
+                  <a href="/ui/groups/{{principal.slug}}" class="text-gray-600 hover:text-gray-900">Edit</a>
+                {{/if}}
+              </td>
+            </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </div>
+  {{else}}
+    <p class="text-gray-500 text-sm">No groups found.</p>
+  {{/if}}
+</div>

@@ -36,6 +36,18 @@ export const GroupServiceLive = Layer.effect(
 				return result;
 			}),
 
+			findBySlug: Effect.fn("GroupService.findBySlug")(function* (slug) {
+				yield* Effect.annotateCurrentSpan({ "group.slug": slug });
+				yield* Effect.logTrace("group.findBySlug", { slug });
+				const result = yield* repo
+					.findBySlug(slug)
+					.pipe(Effect.flatMap(someOrNotFound(`Group not found: ${slug}`)));
+				yield* Effect.logTrace("group.findBySlug result", {
+					groupId: result.group.id,
+				});
+				return result;
+			}),
+
 			list: Effect.fn("GroupService.list")(function* () {
 				yield* Effect.logTrace("group.list");
 				const results = yield* repo.list();

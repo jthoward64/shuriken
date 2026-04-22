@@ -154,6 +154,9 @@ export const PrincipalRepositoryLive = Layer.effect(
 				if (changes.displayName !== undefined) {
 					setValues.displayName = changes.displayName;
 				}
+				if (changes.slug !== undefined) {
+					setValues.slug = changes.slug;
+				}
 				const activeDb = yield* getActiveDb(db);
 				return yield* Effect.tryPromise({
 					try: () =>

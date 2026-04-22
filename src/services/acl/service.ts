@@ -10,6 +10,8 @@ import type {
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
 import type { AceRow, AclResourceType, NewAce } from "./repository.ts";
 
+export type { AclResourceType } from "./repository.ts";
+
 // ---------------------------------------------------------------------------
 // AclResourceId — the UUID of the resource being access-checked.
 //
@@ -78,6 +80,18 @@ export interface AclServiceShape {
 		resourceType: AclResourceType,
 		aces: ReadonlyArray<NewAce>,
 	) => Effect.Effect<void, DatabaseError>;
+
+	/**
+	 * Batch version of currentUserPrivileges. Returns a map from resource ID to
+	 * the expanded privilege set the caller holds on each resource. Resources
+	 * where the caller has no privileges are absent from the map. No ancestor
+	 * chain walking — direct ACEs only (suitable for virtual resource checks).
+	 */
+	readonly batchCurrentUserPrivileges: (
+		principalId: PrincipalId,
+		resourceIds: ReadonlyArray<AclResourceId>,
+		resourceType: AclResourceType,
+	) => Effect.Effect<ReadonlyMap<AclResourceId, ReadonlyArray<DavPrivilege>>, DatabaseError>;
 }
 
 export class AclService extends Context.Tag("AclService")<

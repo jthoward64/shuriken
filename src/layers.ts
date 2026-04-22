@@ -3,7 +3,9 @@ import { Effect, Layer, Logger } from "effect";
 import { selectAuthLayer } from "#src/auth/index.ts";
 import { AppConfigLive, AppConfigService } from "#src/config.ts";
 import { type DatabaseClient, DatabaseClientLive } from "#src/db/client.ts";
+import { TemplateServiceLive } from "#src/http/ui/template/index.ts";
 import { type CryptoService, CryptoServiceLive } from "#src/platform/crypto.ts";
+import { BunFileServiceLive } from "#src/platform/file.ts";
 import { AclDomainLayer } from "#src/services/acl/index.ts";
 import { CalIndexRepositoryLive } from "#src/services/cal-index/index.ts";
 import { CardIndexRepositoryLive } from "#src/services/card-index/index.ts";
@@ -88,6 +90,8 @@ const BaseAppLayer = Layer.mergeAll(
 	TombstoneRepositoryLive.pipe(Layer.provide(InfraLayer)),
 	CalIndexRepositoryLive.pipe(Layer.provide(InfraLayer)),
 	CardIndexRepositoryLive.pipe(Layer.provide(InfraLayer)),
+	BunFileServiceLive,
+	TemplateServiceLive.pipe(Layer.provide(BunFileServiceLive)),
 );
 
 // AppLayer — adds SchedulingDomainLayer, which depends on cross-domain services
@@ -106,7 +110,9 @@ export const AppLayer = Layer.merge(
 
 export { AuthService } from "#src/auth/service.ts";
 export { DatabaseClient } from "#src/db/client.ts";
+export { TemplateService } from "#src/http/ui/template/index.ts";
 export { CryptoService } from "#src/platform/crypto.ts";
+export { BunFileService } from "#src/platform/file.ts";
 export { AclService } from "#src/services/acl/index.ts";
 export {
 	type CalComponentType,

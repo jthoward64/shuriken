@@ -356,6 +356,54 @@ const getGroupPrincipalIds = Effect.fn("AclRepository.getGroupPrincipalIds")(
 	),
 );
 
+const batchGetGrantedPrivileges = Effect.fn(
+	"AclRepository.batchGetGrantedPrivileges",
+)(
+	function* (
+		db: DbClient,
+		callerPrincipalIds: ReadonlyArray<PrincipalId>,
+		resourceIds: ReadonlyArray<UuidString>,
+		resourceType: AclResourceType,
+	) {
+		if (resourceIds.length === 0) {
+			return new Map<UuidString, ReadonlyArray<DavPrivilege>>();
+		}
+		yield* Effect.logTrace("repo.acl.batchGetGrantedPrivileges", {
+			resourceCount: resourceIds.length,
+			resourceType,
+		});
+		const activeDb = yield* getActiveDb(db);
+		const rows = yield* Effect.tryPromise({
+			try: () =>
+				activeDb
+					.selectDistinct({
+						resourceId: davAcl.resourceId,
+						privilege: davAcl.privilege,
+					})
+					.from(davAcl)
+					.where(
+						and(
+							inArray(davAcl.resourceId, resourceIds),
+							eq(davAcl.resourceType, resourceType),
+							eq(davAcl.grantDeny, "grant"),
+							buildPrincipalFilter(callerPrincipalIds, true),
+						),
+					),
+			catch: (e) => new DatabaseError({ cause: e }),
+		});
+		const result = new Map<UuidString, ReadonlyArray<DavPrivilege>>();
+		for (const row of rows) {
+			const id = row.resourceId as UuidString;
+			const existing = result.get(id) ?? [];
+			result.set(id, [...existing, row.privilege as DavPrivilege]);
+		}
+		return result;
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.acl.batchGetGrantedPrivileges failed", e.cause),
+	),
+);
+
 export const AclRepositoryLive = Layer.effect(
 	AclRepository,
 	Effect.map(DatabaseClient, (db) =>
@@ -397,6 +445,8 @@ export const AclRepositoryLive = Layer.effect(
 				getGroupPrincipalIds(db, userPrincipalId),
 			getResourceParent: (resourceId, resourceType) =>
 				getResourceParent(db, resourceId, resourceType),
+			batchGetGrantedPrivileges: (callerPrincipalIds, resourceIds, resourceType) =>
+				batchGetGrantedPrivileges(db, callerPrincipalIds, resourceIds, resourceType),
 		}),
 	),
 );

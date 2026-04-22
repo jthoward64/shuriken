@@ -4,7 +4,7 @@ import type { PrincipalId, UuidString } from "#src/domain/ids.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
 import { aclChecksTotal } from "#src/observability/metrics.ts";
 import { AclRepository, type AclResourceType } from "./repository.ts";
-import { AclService } from "./service.ts";
+import { type AclResourceId, AclService } from "./service.ts";
 
 // ---------------------------------------------------------------------------
 // Privilege hierarchy (RFC 3744 §3 + CalDAV §6)
@@ -277,6 +277,33 @@ export const AclServiceLive = Layer.effect(
 					return result;
 				},
 			),
+
+			batchCurrentUserPrivileges: Effect.fn(
+				"AclService.batchCurrentUserPrivileges",
+			)(function* (principalId, resourceIds, resourceType) {
+				yield* Effect.logTrace("acl.batchCurrentUserPrivileges", {
+					principalId,
+					resourceCount: resourceIds.length,
+					resourceType,
+				});
+				const principalIds = yield* resolvePrincipalIds(principalId);
+				const raw = yield* repo.batchGetGrantedPrivileges(
+					principalIds,
+					resourceIds as ReadonlyArray<UuidString>,
+					resourceType,
+				);
+				const result = new Map<AclResourceId, ReadonlyArray<DavPrivilege>>();
+				for (const [id, privileges] of raw) {
+					const expanded = new Set<DavPrivilege>();
+					for (const p of privileges) {
+						for (const contained of expandContained(p)) {
+							expanded.add(contained);
+						}
+					}
+					result.set(id as AclResourceId, Arr.fromIterable(expanded));
+				}
+				return result;
+			}),
 		});
 	}),
 );

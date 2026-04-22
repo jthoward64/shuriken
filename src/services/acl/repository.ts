@@ -92,6 +92,19 @@ export interface AclRepositoryShape {
 	) => Effect.Effect<ReadonlyArray<PrincipalId>, DatabaseError>;
 
 	/**
+	 * Batch variant of getGrantedPrivileges. Returns a map from resource UUID
+	 * to the privileges granted to the caller on that resource. Resources with
+	 * no matching ACEs are absent from the map (not present with empty arrays).
+	 * The caller must supply the expanded principal ID set (own + group IDs).
+	 * No ancestor-chain walking — direct ACEs only.
+	 */
+	readonly batchGetGrantedPrivileges: (
+		callerPrincipalIds: ReadonlyArray<PrincipalId>,
+		resourceIds: ReadonlyArray<UuidString>,
+		resourceType: ResourceType,
+	) => Effect.Effect<ReadonlyMap<UuidString, ReadonlyArray<DavPrivilege>>, DatabaseError>;
+
+	/**
 	 * Return the immediate ACL-inheritance parent of a resource, used by the
 	 * service to walk the hierarchy when no direct ACE matches.
 	 *

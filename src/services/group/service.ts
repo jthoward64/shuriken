@@ -37,6 +37,9 @@ export interface GroupServiceShape {
 	readonly findById: (
 		id: GroupId,
 	) => Effect.Effect<GroupWithPrincipal, DavError | DatabaseError>;
+	readonly findBySlug: (
+		slug: Slug,
+	) => Effect.Effect<GroupWithPrincipal, DavError | DatabaseError>;
 	readonly list: () => Effect.Effect<
 		ReadonlyArray<GroupWithPrincipal>,
 		DatabaseError

@@ -1,15 +1,18 @@
 import { describe, expect, it } from "bun:test";
-import { Effect, Layer, Option } from "effect";
+import { Effect, Layer, Option, Redacted } from "effect";
 import { AuthService } from "#src/auth/service.ts";
+import { AppConfigService } from "#src/config.ts";
 import { DatabaseClient } from "#src/db/client.ts";
 import { AuthError, DatabaseError } from "#src/domain/errors.ts";
 import type { PrincipalId, UserId } from "#src/domain/ids.ts";
 import { Authenticated, type Unauthenticated } from "#src/domain/types/dav.ts";
+import { TemplateService } from "#src/http/ui/template/index.ts";
 import {
 	CollectionRepository as CollectionRepoTag,
 	InstanceRepository,
 	PrincipalRepository,
 } from "#src/layers.ts";
+import { BunFileService } from "#src/platform/file.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import { CalIndexRepository } from "#src/services/cal-index/index.ts";
 import { CardIndexRepository } from "#src/services/card-index/index.ts";
@@ -116,6 +119,7 @@ const stubLayers = Layer.mergeAll(
 	Layer.succeed(AclService, {
 		check: die,
 		currentUserPrivileges: die,
+		batchCurrentUserPrivileges: die,
 		getAces: die,
 		setAces: die,
 	}),
@@ -193,6 +197,7 @@ const stubLayers = Layer.mergeAll(
 	Layer.succeed(GroupService, {
 		create: die,
 		findById: die,
+		findBySlug: die,
 		list: die,
 		listMembers: die,
 		listByMember: die,
@@ -210,6 +215,34 @@ const stubLayers = Layer.mergeAll(
 	}),
 	IanaTimezoneService.Default,
 	Layer.succeed(DatabaseClient, noOpRouterDb),
+	Layer.succeed(AppConfigService, {
+		server: { port: 3000, host: "::" },
+		database: { url: Redacted.make("postgres://localhost/test") },
+		auth: {
+			mode: "single-user" as const,
+			proxyHeader: "X-Remote-User",
+			trustedProxies: "*",
+			singleUserEmail: Option.none(),
+			adminEmail: Option.none(),
+			adminPassword: Option.none(),
+			adminSlug: Option.none(),
+		},
+		log: { level: undefined },
+		nodeEnv: "test",
+	} as unknown as AppConfigService),
+	Layer.succeed(BunFileService, {
+		readText: die,
+		readBytes: die,
+		exists: () => Effect.succeed(false),
+		mimeType: () => undefined,
+		glob: () => Effect.succeed([]),
+	}),
+	Layer.succeed(TemplateService, {
+		render: (_name: string, _ctx: Record<string, unknown>, _isHtmx: boolean) =>
+			Effect.succeed("<!DOCTYPE html><body>test</body>"),
+		renderFragment: (_name: string, _ctx: Record<string, unknown>) =>
+			Effect.succeed("<div>test</div>"),
+	}),
 );
 
 const runWith = (

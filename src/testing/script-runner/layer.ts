@@ -1,8 +1,10 @@
-import { Layer, Logger, LogLevel, Option, Redacted } from "effect";
+import { Effect, Layer, Logger, LogLevel, Option, Redacted } from "effect";
 import { BasicAuthLayer } from "#src/auth/layers/basic.ts";
 import { AppConfigService, type AppConfigType } from "#src/config.ts";
 import type { DatabaseClient } from "#src/db/client.ts";
+import { TemplateService } from "#src/http/ui/template/index.ts";
 import type { CryptoService } from "#src/platform/crypto.ts";
+import { BunFileService } from "#src/platform/file.ts";
 import { AclDomainLayer, AclRepositoryLive } from "#src/services/acl/index.ts";
 import { CalIndexRepositoryLive } from "#src/services/cal-index/index.ts";
 import { CardIndexRepositoryLive } from "#src/services/card-index/index.ts";
@@ -94,8 +96,28 @@ export const makeScriptRunnerLayer = () => {
 		withTestInfra(CardIndexRepositoryLive),
 	);
 
-	return Layer.merge(
+	const testStubsLayer = Layer.mergeAll(
+		Layer.succeed(BunFileService, {
+			readText: () => Effect.die("stub"),
+			readBytes: () => Effect.die("stub"),
+			exists: () => Effect.succeed(false),
+			mimeType: () => undefined,
+			glob: () => Effect.succeed([]),
+		}),
+		Layer.succeed(TemplateService, {
+			render: (
+				_name: string,
+				_ctx: Record<string, unknown>,
+				_isHtmx: boolean,
+			) => Effect.succeed("<!DOCTYPE html><body>test</body>"),
+			renderFragment: (_name: string, _ctx: Record<string, unknown>) =>
+				Effect.succeed("<div>test</div>"),
+		}),
+	);
+
+	return Layer.mergeAll(
 		testBaseLayer,
 		SchedulingDomainLayer.pipe(Layer.provide(testBaseLayer)),
+		testStubsLayer,
 	);
 };

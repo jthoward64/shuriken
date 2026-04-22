@@ -24,6 +24,8 @@ export interface PrincipalPropertyChanges {
 	readonly clientProperties: IrDeadProperties;
 	/** undefined = leave unchanged; null = clear the value */
 	readonly displayName?: string | null;
+	/** undefined = leave unchanged */
+	readonly slug?: Slug;
 }
 
 export interface PrincipalRepositoryShape {

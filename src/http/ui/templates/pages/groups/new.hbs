@@ -1,0 +1,51 @@
+<div class="space-y-6 max-w-2xl">
+  <div class="flex items-center gap-2">
+    <a href="/ui/groups" class="text-sm text-gray-500 hover:text-gray-700">Groups</a>
+    <span class="text-gray-400">/</span>
+    <h1 class="text-2xl font-bold text-gray-900">{{pageTitle}}</h1>
+  </div>
+
+  {{> form-error}}
+
+  <section class="bg-white rounded-lg border border-gray-200 p-6">
+    <form
+      method="POST"
+      action="/ui/api/groups/create"
+      hx-post="/ui/api/groups/create"
+      hx-target="body"
+      hx-swap="outerHTML"
+      class="space-y-4"
+    >
+      <div>
+        <label for="slug" class="block text-sm font-medium text-gray-700 mb-1">Slug <span class="text-red-500">*</span></label>
+        <input
+          type="text"
+          id="slug"
+          name="slug"
+          required
+          pattern="[a-z0-9-]+"
+          class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-500"
+          placeholder="e.g. engineering"
+        >
+        <p class="mt-1 text-xs text-gray-500">Lowercase letters, digits, and hyphens only.</p>
+      </div>
+      <div>
+        <label for="displayName" class="block text-sm font-medium text-gray-700 mb-1">Display name</label>
+        <input
+          type="text"
+          id="displayName"
+          name="displayName"
+          class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-500"
+        >
+      </div>
+      <div class="flex gap-3 pt-2">
+        <button type="submit" class="px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded hover:bg-gray-700">
+          Create group
+        </button>
+        <a href="/ui/groups" class="px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded hover:bg-gray-50">
+          Cancel
+        </a>
+      </div>
+    </form>
+  </section>
+</div>

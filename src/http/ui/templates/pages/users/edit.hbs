@@ -1,0 +1,146 @@
+<div class="space-y-6 max-w-2xl">
+  <div class="flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <a href="/ui/users" class="text-sm text-gray-500 hover:text-gray-700">Users</a>
+      <span class="text-gray-400">/</span>
+      <h1 class="text-2xl font-bold text-gray-900">{{pageTitle}}</h1>
+    </div>
+    {{#if canDelete}}
+      <form
+        method="POST"
+        action="/ui/api/users/{{principal.slug}}/delete"
+        hx-post="/ui/api/users/{{principal.slug}}/delete"
+        hx-target="body"
+        hx-swap="outerHTML"
+        hx-confirm="Delete this user? This cannot be undone."
+        class="inline"
+      >
+        <button type="submit" class="px-3 py-1.5 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700">
+          Delete
+        </button>
+      </form>
+    {{/if}}
+  </div>
+
+  {{> flash}}
+  {{> form-error}}
+
+  <section class="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
+    <h2 class="text-base font-semibold text-gray-800">Profile</h2>
+    <form
+      method="POST"
+      action="/ui/api/users/{{principal.slug}}/update"
+      hx-post="/ui/api/users/{{principal.slug}}/update"
+      hx-target="body"
+      hx-swap="outerHTML"
+      class="space-y-4"
+    >
+      <div>
+        <label for="displayName" class="block text-sm font-medium text-gray-700 mb-1">Display name</label>
+        <input
+          type="text"
+          id="displayName"
+          name="displayName"
+          value="{{principal.displayName}}"
+          class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-500"
+        >
+      </div>
+      <div>
+        <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+        <input
+          type="email"
+          id="email"
+          name="email"
+          value="{{user.email}}"
+          class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-500"
+        >
+      </div>
+      {{#if canEditSlug}}
+        <div>
+          <label for="slug" class="block text-sm font-medium text-gray-700 mb-1">Username (slug)</label>
+          <input
+            type="text"
+            id="slug"
+            name="slug"
+            value="{{principal.slug}}"
+            class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-500"
+          >
+        </div>
+      {{/if}}
+      <button type="submit" class="px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded hover:bg-gray-700">
+        Save changes
+      </button>
+    </form>
+  </section>
+
+  {{#if showPasswordForm}}
+    <section class="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
+      <h2 class="text-base font-semibold text-gray-800">Change password</h2>
+      <form
+        method="POST"
+        action="/ui/api/users/{{principal.slug}}/set-password"
+        hx-post="/ui/api/users/{{principal.slug}}/set-password"
+        hx-target="body"
+        hx-swap="outerHTML"
+        class="space-y-4"
+      >
+        <div>
+          <label for="newPassword" class="block text-sm font-medium text-gray-700 mb-1">New password</label>
+          <input
+            type="password"
+            id="newPassword"
+            name="newPassword"
+            autocomplete="new-password"
+            class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-500"
+          >
+        </div>
+        <button type="submit" class="px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded hover:bg-gray-700">
+          Update password
+        </button>
+      </form>
+    </section>
+  {{/if}}
+
+  {{#if groups}}
+    <section class="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
+      <h2 class="text-base font-semibold text-gray-800">Group memberships</h2>
+      <p class="text-sm text-gray-600">Check the groups this user should belong to, then save each group individually.</p>
+      {{#each groups}}
+        {{#if canManageMembers}}
+          <div class="border-b border-gray-100 pb-3 last:border-0 last:pb-0">
+            <p class="text-sm font-medium text-gray-700 mb-2">{{principal.displayName}}{{#unless principal.displayName}}{{principal.slug}}{{/unless}}</p>
+            <form
+              method="POST"
+              action="/ui/api/groups/{{principal.slug}}/members"
+              hx-post="/ui/api/groups/{{principal.slug}}/members"
+              hx-target="body"
+              hx-swap="outerHTML"
+              class="inline-flex items-center gap-3"
+            >
+              <input type="hidden" name="userId" value="{{../user.id}}">
+              <label class="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="members"
+                  value="{{../user.id}}"
+                  {{#if isMember}}checked{{/if}}
+                  class="rounded border-gray-300 text-gray-800"
+                >
+                Member
+              </label>
+              <button type="submit" class="px-3 py-1 bg-white border border-gray-300 text-gray-700 text-xs font-medium rounded hover:bg-gray-50">
+                Save
+              </button>
+            </form>
+          </div>
+        {{else}}
+          <div class="flex items-center gap-2 text-sm text-gray-700">
+            <span class="inline-block w-3 h-3 rounded-full {{#if isMember}}bg-green-400{{else}}bg-gray-200{{/if}}"></span>
+            {{principal.displayName}}{{#unless principal.displayName}}{{principal.slug}}{{/unless}}
+            {{#if isMember}}<span class="text-xs text-gray-500">(member)</span>{{/if}}
+          </div>
+        {{/if}}
+      {{/each}}
+    </section>
+  {{/if}}
+</div>

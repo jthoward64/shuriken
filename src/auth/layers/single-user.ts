@@ -65,11 +65,18 @@ const resolvePrincipal = (
 			};
 		}
 
+		// If a specific email was configured but not found (e.g. the user changed
+		// their email), fall back to the first user rather than locking everyone out.
+		if (Option.isSome(email)) {
+			yield* Effect.logWarning(
+				"auth.single-user: SINGLE_USER_EMAIL not found, falling back to first user",
+				{ configuredEmail: Option.getOrUndefined(email) },
+			);
+			return yield* resolvePrincipal(db, Option.none());
+		}
+
 		return yield* new AuthError({
-			reason: Option.match(email, {
-				onSome: (e) => `Single-user principal not found for email: ${e}`,
-				onNone: () => "No users found in database for single-user mode",
-			}),
+			reason: "No users found in database for single-user mode",
 		});
 	});
 
