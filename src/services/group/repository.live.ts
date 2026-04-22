@@ -13,7 +13,7 @@ import {
 	DatabaseError,
 	isPgUniqueViolation,
 } from "#src/domain/errors.ts";
-import type { GroupId, UserId } from "#src/domain/ids.ts";
+import type { GroupId, PrincipalId, UserId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
 import type { UserWithPrincipal } from "#src/services/user/repository.ts";
 import { GroupRepository, type GroupWithPrincipal } from "./repository.ts";
@@ -234,6 +234,37 @@ const hasMember = Effect.fn("GroupRepository.hasMember")(
 	),
 );
 
+const findByPrincipalId = Effect.fn("GroupRepository.findByPrincipalId")(
+	function* (db: DbClient, principalId: PrincipalId) {
+		yield* Effect.annotateCurrentSpan({ "group.principalId": principalId });
+		yield* Effect.logTrace("repo.group.findByPrincipalId", { principalId });
+		const activeDb = yield* getActiveDb(db);
+		return yield* Effect.tryPromise({
+			try: () =>
+				activeDb
+					.select()
+					.from(group)
+					.innerJoin(principal, eq(principal.id, group.principalId))
+					.where(and(eq(group.principalId, principalId), isNull(principal.deletedAt)))
+					.limit(1)
+					.then((r) => {
+						if (!r[0]) {
+							return Option.none<GroupWithPrincipal>();
+						}
+						const row = r[0];
+						return Option.some({
+							principal: row.principal,
+							group: row.group,
+						} satisfies GroupWithPrincipal);
+					}),
+			catch: (e) => new DatabaseError({ cause: e }),
+		});
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.group.findByPrincipalId failed", e.cause),
+	),
+);
+
 const findBySlug = Effect.fn("GroupRepository.findBySlug")(
 	function* (db: DbClient, slug: Slug) {
 		yield* Effect.annotateCurrentSpan({ "group.slug": slug });
@@ -422,6 +453,7 @@ export const GroupRepositoryLive = Layer.effect(
 	Effect.map(DatabaseClient, (db) =>
 		GroupRepository.of({
 			findById: (id) => findById(db, id),
+			findByPrincipalId: (principalId) => findByPrincipalId(db, principalId),
 			findBySlug: (slug) => findBySlug(db, slug),
 			list: () => list(db),
 			listMembers: (groupId) => listMembers(db, groupId),

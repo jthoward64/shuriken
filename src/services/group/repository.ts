@@ -7,7 +7,7 @@ import type {
 	principal,
 } from "#src/db/drizzle/schema/index.ts";
 import type { ConflictError, DatabaseError } from "#src/domain/errors.ts";
-import type { GroupId, UserId } from "#src/domain/ids.ts";
+import type { GroupId, PrincipalId, UserId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
 import type { UserWithPrincipal } from "#src/services/user/repository.ts";
 
@@ -27,6 +27,9 @@ export interface GroupWithPrincipal {
 export interface GroupRepositoryShape {
 	readonly findById: (
 		id: GroupId,
+	) => Effect.Effect<Option.Option<GroupWithPrincipal>, DatabaseError>;
+	readonly findByPrincipalId: (
+		principalId: PrincipalId,
 	) => Effect.Effect<Option.Option<GroupWithPrincipal>, DatabaseError>;
 	readonly findBySlug: (
 		slug: Slug,

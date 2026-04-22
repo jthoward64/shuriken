@@ -6,10 +6,9 @@ import {
 	InternalError,
 } from "#src/domain/errors.ts";
 import type { PrincipalId } from "#src/domain/ids.ts";
-import type { CollectionType } from "#src/services/collection/repository.ts";
-import type { Slug } from "#src/domain/types/path.ts";
 import { GROUPS_VIRTUAL_RESOURCE_ID } from "#src/domain/virtual-resources.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
+import type { CollectionType } from "#src/services/collection/repository.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import {
 	type FormValidationError,
@@ -25,7 +24,7 @@ import { CollectionService } from "#src/services/collection/index.ts";
 import { GroupService } from "#src/services/group/index.ts";
 
 // ---------------------------------------------------------------------------
-// POST /ui/api/groups/:slug/collections/create
+// POST /ui/api/groups/:principalId/collections/create
 // ---------------------------------------------------------------------------
 
 const SUPPORTED_COMPONENTS: Record<string, Array<string>> = {
@@ -36,7 +35,7 @@ const SUPPORTED_COMPONENTS: Record<string, Array<string>> = {
 export const groupsCollectionsCreateHandler = (
 	req: Request,
 	ctx: HttpRequestContext,
-	slug: Slug,
+	principalId: PrincipalId,
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError | InternalError | ConflictError,
@@ -48,8 +47,7 @@ export const groupsCollectionsCreateHandler = (
 		const groupService = yield* GroupService;
 		const collectionService = yield* CollectionService;
 
-		const { principal: principalRow } = yield* groupService.findBySlug(slug);
-		const ownerPrincipalId = principalRow.id as PrincipalId;
+		yield* groupService.findByPrincipalId(principalId);
 
 		yield* acl.check(
 			principal.principalId,
@@ -84,7 +82,7 @@ export const groupsCollectionsCreateHandler = (
 		const parsed = parseResult.right;
 
 		const newCollection = yield* collectionService.create({
-			ownerPrincipalId,
+			ownerPrincipalId: principalId,
 			collectionType,
 			slug: parsed.slug,
 			displayName: parsed.displayName,

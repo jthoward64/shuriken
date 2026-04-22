@@ -24,13 +24,13 @@ import { PrincipalService } from "#src/services/principal/index.ts";
 import { UserService } from "#src/services/user/index.ts";
 
 // ---------------------------------------------------------------------------
-// POST /ui/api/users/:slug/update
+// POST /ui/api/users/:principalId/update
 // ---------------------------------------------------------------------------
 
 export const usersUpdateHandler = (
 	req: Request,
 	ctx: HttpRequestContext,
-	slug: Slug,
+	principalId: PrincipalId,
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError | InternalError,
@@ -43,7 +43,7 @@ export const usersUpdateHandler = (
 		const principalService = yield* PrincipalService;
 
 		const { user, principal: principalRow } =
-			yield* userService.findBySlug(slug);
+			yield* principalService.findById(principalId);
 		const isSelf = user.id === principal.userId;
 
 		if (!isSelf) {
@@ -67,8 +67,6 @@ export const usersUpdateHandler = (
 			catch: (e) => new InternalError({ cause: e }),
 		});
 
-		// Slug is optional in the form — only present when canEditSlug is true.
-		// If absent, fall back to the current slug so no change is attempted.
 		const slugRaw = form.get("slug")?.toString() ?? principalRow.slug;
 		const parseResult = yield* Effect.all({
 			displayName: parseOptionalDisplayName(
@@ -87,7 +85,6 @@ export const usersUpdateHandler = (
 		}
 		const parsed = parseResult.right;
 
-		// Apply each change if it differs from the current value
 		if (
 			parsed.displayName !== (principalRow.displayName ?? undefined) ||
 			parsed.email !== user.email
@@ -98,7 +95,6 @@ export const usersUpdateHandler = (
 			});
 		}
 
-		// Slug change: requires DAV:unbind on the users virtual resource
 		if (parsed.slug !== principalRow.slug) {
 			const usersPrivs = yield* acl.currentUserPrivileges(
 				principal.principalId,
@@ -110,13 +106,13 @@ export const usersUpdateHandler = (
 					principalRow.id as PrincipalId,
 					{
 						clientProperties: {},
-						slug: parsed.slug,
+						slug: parsed.slug as Slug,
 					},
 				);
 			}
 		}
 
-		const redirectTo = isSelf ? "/ui/profile" : `/ui/users/${parsed.slug}`;
+		const redirectTo = isSelf ? "/ui/profile" : `/ui/users/${principalId}`;
 		if (isHtmxRequest(ctx.headers)) {
 			return new Response(null, {
 				status: 200,

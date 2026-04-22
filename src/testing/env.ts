@@ -1161,6 +1161,25 @@ const makeGroupRepo = (stores: TestStores): GroupRepositoryShape => ({
 			),
 		),
 
+	findByPrincipalId: (principalId) =>
+		Effect.succeed(
+			Option.fromNullable(
+				(() => {
+					const principal = stores.groupPrincipals.get(principalId);
+					if (!principal || principal.deletedAt !== null) {
+						return null;
+					}
+					const groupRow = [...stores.groups.values()].find(
+						(g) => g.principalId === principalId,
+					);
+					if (!groupRow) {
+						return null;
+					}
+					return { principal, group: groupRow };
+				})(),
+			),
+		),
+
 	list: () =>
 		Effect.succeed(
 			[...stores.groups.values()].flatMap((groupRow) => {

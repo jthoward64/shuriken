@@ -8,8 +8,8 @@
     {{#if canDelete}}
       <form
         method="POST"
-        action="/ui/api/groups/{{principal.slug}}/delete"
-        hx-post="/ui/api/groups/{{principal.slug}}/delete"
+        action="/ui/api/groups/{{principal.id}}/delete"
+        hx-post="/ui/api/groups/{{principal.id}}/delete"
         hx-target="body"
         hx-swap="outerHTML"
         hx-confirm="Delete this group? This cannot be undone."
@@ -29,8 +29,8 @@
     <h2 class="text-base font-semibold text-gray-800">Details</h2>
     <form
       method="POST"
-      action="/ui/api/groups/{{principal.slug}}/update"
-      hx-post="/ui/api/groups/{{principal.slug}}/update"
+      action="/ui/api/groups/{{principal.id}}/update"
+      hx-post="/ui/api/groups/{{principal.id}}/update"
       hx-target="body"
       hx-swap="outerHTML"
       class="space-y-4"
@@ -58,7 +58,7 @@
   <section class="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
     <div class="flex items-center justify-between">
       <h2 class="text-base font-semibold text-gray-800">Collections</h2>
-      <a href="/ui/groups/{{principal.slug}}/collections/new" class="px-3 py-1.5 bg-white border border-gray-300 text-gray-700 text-xs font-medium rounded hover:bg-gray-50">
+      <a href="/ui/groups/{{principal.id}}/collections/new" class="px-3 py-1.5 bg-white border border-gray-300 text-gray-700 text-xs font-medium rounded hover:bg-gray-50">
         Add collection
       </a>
     </div>

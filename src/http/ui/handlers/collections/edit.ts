@@ -99,7 +99,7 @@ export const collectionsEditHandler = (
 				...nav,
 				pageTitle: collection.displayName ?? collection.slug,
 				collection,
-				ownerSlug: ownerResult.slug,
+				ownerPrincipalId,
 				ownerDisplayName: ownerResult.displayName,
 				ownerType: ownerResult.type,
 				isCalendar: collection.collectionType === "calendar",

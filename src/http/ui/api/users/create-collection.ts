@@ -6,9 +6,8 @@ import {
 	InternalError,
 } from "#src/domain/errors.ts";
 import type { PrincipalId } from "#src/domain/ids.ts";
-import type { CollectionType } from "#src/services/collection/repository.ts";
-import type { Slug } from "#src/domain/types/path.ts";
 import { USERS_VIRTUAL_RESOURCE_ID } from "#src/domain/virtual-resources.ts";
+import type { CollectionType } from "#src/services/collection/repository.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import {
@@ -22,10 +21,10 @@ import { renderFragment } from "#src/http/ui/helpers/render-page.ts";
 import type { TemplateService } from "#src/http/ui/template/index.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
-import { UserService } from "#src/services/user/index.ts";
+import { PrincipalService } from "#src/services/principal/index.ts";
 
 // ---------------------------------------------------------------------------
-// POST /ui/api/users/:slug/collections/create
+// POST /ui/api/users/:principalId/collections/create
 // ---------------------------------------------------------------------------
 
 const SUPPORTED_COMPONENTS: Record<string, Array<string>> = {
@@ -36,20 +35,19 @@ const SUPPORTED_COMPONENTS: Record<string, Array<string>> = {
 export const usersCollectionsCreateHandler = (
 	req: Request,
 	ctx: HttpRequestContext,
-	slug: Slug,
+	principalId: PrincipalId,
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError | InternalError | ConflictError,
-	AclService | CollectionService | TemplateService | UserService
+	AclService | CollectionService | PrincipalService | TemplateService
 > =>
 	Effect.gen(function* () {
 		const principal = yield* requireAuthenticated(ctx.auth);
 		const acl = yield* AclService;
-		const userService = yield* UserService;
+		const principalService = yield* PrincipalService;
 		const collectionService = yield* CollectionService;
 
-		const { user, principal: principalRow } = yield* userService.findBySlug(slug);
-		const ownerPrincipalId = principalRow.id as PrincipalId;
+		const { user } = yield* principalService.findById(principalId);
 
 		const isSelf = user.id === principal.userId;
 		if (!isSelf) {
@@ -87,7 +85,7 @@ export const usersCollectionsCreateHandler = (
 		const parsed = parseResult.right;
 
 		const newCollection = yield* collectionService.create({
-			ownerPrincipalId,
+			ownerPrincipalId: principalId,
 			collectionType,
 			slug: parsed.slug,
 			displayName: parsed.displayName,

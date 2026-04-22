@@ -6,7 +6,6 @@ import type {
 	InternalError,
 } from "#src/domain/errors.ts";
 import type { GroupId, PrincipalId, UserId } from "#src/domain/ids.ts";
-import type { Slug } from "#src/domain/types/path.ts";
 import { GROUPS_VIRTUAL_RESOURCE_ID } from "#src/domain/virtual-resources.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
@@ -18,13 +17,13 @@ import { CollectionService } from "#src/services/collection/index.ts";
 import { GroupService } from "#src/services/group/index.ts";
 
 // ---------------------------------------------------------------------------
-// GET /ui/groups/:slug
+// GET /ui/groups/:principalId
 // ---------------------------------------------------------------------------
 
 export const groupsEditHandler = (
 	_req: Request,
 	ctx: HttpRequestContext,
-	slug: Slug,
+	principalId: PrincipalId,
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError | InternalError,
@@ -38,7 +37,7 @@ export const groupsEditHandler = (
 		const collectionService = yield* CollectionService;
 
 		const { group, principal: principalRow } =
-			yield* groupService.findBySlug(slug);
+			yield* groupService.findByPrincipalId(principalId);
 
 		const groupsVirtualPrivs = yield* acl.currentUserPrivileges(
 			principal.principalId,
@@ -54,17 +53,12 @@ export const groupsEditHandler = (
 			);
 		}
 
-		const [members, groupsPrivs, allCollections] = yield* Effect.all([
+		const [members, allCollections] = yield* Effect.all([
 			groupService.listMembers(group.id as GroupId),
-			acl.currentUserPrivileges(
-				principal.principalId,
-				GROUPS_VIRTUAL_RESOURCE_ID,
-				"virtual",
-			),
 			collectionService.listByOwner(principalRow.id as PrincipalId),
 		]);
 
-		const canDelete = groupsPrivs.includes("DAV:unbind");
+		const canDelete = groupsVirtualPrivs.includes("DAV:unbind");
 
 		const collections = allCollections
 			.filter((c) => c.collectionType === "calendar" || c.collectionType === "addressbook")

@@ -5,7 +5,7 @@ import type {
 	DavError,
 	InternalError,
 } from "#src/domain/errors.ts";
-import type { Slug } from "#src/domain/types/path.ts";
+import type { PrincipalId } from "#src/domain/ids.ts";
 import { GROUPS_VIRTUAL_RESOURCE_ID } from "#src/domain/virtual-resources.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
@@ -16,13 +16,13 @@ import { AclService } from "#src/services/acl/index.ts";
 import { GroupService } from "#src/services/group/index.ts";
 
 // ---------------------------------------------------------------------------
-// GET /ui/groups/:slug/collections/new
+// GET /ui/groups/:principalId/collections/new
 // ---------------------------------------------------------------------------
 
 export const groupsCollectionsNewHandler = (
 	_req: Request,
 	ctx: HttpRequestContext,
-	slug: Slug,
+	principalId: PrincipalId,
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError | InternalError,
@@ -34,7 +34,8 @@ export const groupsCollectionsNewHandler = (
 		const acl = yield* AclService;
 		const groupService = yield* GroupService;
 
-		const { principal: principalRow } = yield* groupService.findBySlug(slug);
+		const { principal: principalRow } =
+			yield* groupService.findByPrincipalId(principalId);
 
 		yield* acl.check(
 			principal.principalId,
@@ -57,8 +58,8 @@ export const groupsCollectionsNewHandler = (
 				ownerSlug: principalRow.slug,
 				ownerDisplayName: principalRow.displayName ?? principalRow.slug,
 				ownerType: "group",
-				createUrl: `/ui/api/groups/${principalRow.slug}/collections/create`,
-				backUrl: `/ui/groups/${principalRow.slug}`,
+				createUrl: `/ui/api/groups/${principalRow.id}/collections/create`,
+				backUrl: `/ui/groups/${principalRow.id}`,
 			},
 			ctx.headers,
 		);

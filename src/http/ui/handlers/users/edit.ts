@@ -6,7 +6,6 @@ import type {
 	InternalError,
 } from "#src/domain/errors.ts";
 import type { GroupId, PrincipalId, UserId } from "#src/domain/ids.ts";
-import type { Slug } from "#src/domain/types/path.ts";
 import {
 	GROUPS_VIRTUAL_RESOURCE_ID,
 	USERS_VIRTUAL_RESOURCE_ID,
@@ -19,35 +18,34 @@ import type { TemplateService } from "#src/http/ui/template/index.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
 import { GroupService } from "#src/services/group/index.ts";
-import { UserService } from "#src/services/user/index.ts";
+import { PrincipalService } from "#src/services/principal/index.ts";
 
 // ---------------------------------------------------------------------------
-// GET /ui/users/:slug
+// GET /ui/users/:principalId
 // ---------------------------------------------------------------------------
 
 export const usersEditHandler = (
 	_req: Request,
 	ctx: HttpRequestContext,
-	slug: Slug,
+	principalId: PrincipalId,
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError | InternalError,
-	AclService | AppConfigService | CollectionService | GroupService | TemplateService | UserService
+	AclService | AppConfigService | CollectionService | GroupService | PrincipalService | TemplateService
 > =>
 	Effect.gen(function* () {
 		const principal = yield* requireAuthenticated(ctx.auth);
 		const config = yield* AppConfigService;
 		const acl = yield* AclService;
-		const userService = yield* UserService;
+		const principalService = yield* PrincipalService;
 		const groupService = yield* GroupService;
 		const collectionService = yield* CollectionService;
 
 		const { user, principal: principalRow } =
-			yield* userService.findBySlug(slug);
+			yield* principalService.findById(principalId);
 
 		const isSelf = user.id === principal.userId;
 		if (!isSelf) {
-			// Admin-level access on the users virtual resource grants write to all principals
 			const usersVirtualPrivs = yield* acl.currentUserPrivileges(
 				principal.principalId,
 				USERS_VIRTUAL_RESOURCE_ID,
@@ -71,7 +69,6 @@ export const usersEditHandler = (
 
 		const userGroupIds = new Set(userGroups.map((g) => g.group.id));
 
-		// Check which groups the caller can manage membership for
 		const groupPrincipalIds = allGroups.map(
 			(g) => g.principal.id as PrincipalId,
 		);

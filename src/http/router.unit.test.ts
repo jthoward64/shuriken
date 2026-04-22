@@ -174,6 +174,7 @@ const stubLayers = Layer.mergeAll(
 	Layer.succeed(GroupRepository, {
 		findById: die,
 		findBySlug: die,
+		findByPrincipalId: die,
 		list: die,
 		listMembers: die,
 		listByMember: die,
@@ -200,6 +201,7 @@ const stubLayers = Layer.mergeAll(
 		create: die,
 		findById: die,
 		findBySlug: die,
+		findByPrincipalId: die,
 		list: die,
 		listMembers: die,
 		listByMember: die,

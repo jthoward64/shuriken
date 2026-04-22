@@ -1,4 +1,3 @@
-- Add the ability to manage collections (calendars and addressbooks) from the web UI
 - Add a calendar viewer to web UI built with with https://fullcalendar.io/docs
 - Add support for creating, editing, and deleting calendar events from the web UI
 - Add contacts to web UI

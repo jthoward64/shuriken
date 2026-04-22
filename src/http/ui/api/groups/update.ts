@@ -5,7 +5,6 @@ import {
 	InternalError,
 } from "#src/domain/errors.ts";
 import type { GroupId, PrincipalId } from "#src/domain/ids.ts";
-import type { Slug } from "#src/domain/types/path.ts";
 import { GROUPS_VIRTUAL_RESOURCE_ID } from "#src/domain/virtual-resources.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
@@ -15,13 +14,13 @@ import { AclService } from "#src/services/acl/index.ts";
 import { GroupService } from "#src/services/group/index.ts";
 
 // ---------------------------------------------------------------------------
-// POST /ui/api/groups/:slug/update
+// POST /ui/api/groups/:principalId/update
 // ---------------------------------------------------------------------------
 
 export const groupsUpdateHandler = (
 	req: Request,
 	ctx: HttpRequestContext,
-	slug: Slug,
+	principalId: PrincipalId,
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError | InternalError,
@@ -33,7 +32,7 @@ export const groupsUpdateHandler = (
 		const groupService = yield* GroupService;
 
 		const { group, principal: principalRow } =
-			yield* groupService.findBySlug(slug);
+			yield* groupService.findByPrincipalId(principalId);
 
 		const groupsVirtualPrivs = yield* acl.currentUserPrivileges(
 			principal.principalId,
@@ -60,14 +59,15 @@ export const groupsUpdateHandler = (
 
 		yield* groupService.update(group.id as GroupId, { displayName });
 
+		const redirectTo = `/ui/groups/${principalId}`;
 		if (isHtmxRequest(ctx.headers)) {
 			return new Response(null, {
 				status: 200,
-				headers: { "HX-Redirect": `/ui/groups/${principalRow.slug}` },
+				headers: { "HX-Redirect": redirectTo },
 			});
 		}
 		return new Response(null, {
 			status: 303,
-			headers: { Location: `/ui/groups/${principalRow.slug}` },
+			headers: { Location: redirectTo },
 		});
 	});

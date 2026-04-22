@@ -6,8 +6,7 @@ import type {
 	DavError,
 	InternalError,
 } from "#src/domain/errors.ts";
-import { CollectionId, isUuid } from "#src/domain/ids.ts";
-import type { Slug } from "#src/domain/types/path.ts";
+import { CollectionId, PrincipalId, isUuid } from "#src/domain/ids.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import {
 	HTTP_CONFLICT,
@@ -230,11 +229,11 @@ export const uiRouter = (
 		if (seg1 === "new" && !seg2) {
 			return handle(usersNewHandler(req, ctx));
 		}
-		if (seg1 && seg2 === "collections" && seg3 === "new" && !seg4) {
-			return handle(usersCollectionsNewHandler(req, ctx, seg1 as Slug));
+		if (seg1 && isUuid(seg1) && seg2 === "collections" && seg3 === "new" && !seg4) {
+			return handle(usersCollectionsNewHandler(req, ctx, PrincipalId(seg1)));
 		}
-		if (seg1 && !seg2) {
-			return handle(usersEditHandler(req, ctx, seg1 as Slug));
+		if (seg1 && isUuid(seg1) && !seg2) {
+			return handle(usersEditHandler(req, ctx, PrincipalId(seg1)));
 		}
 	}
 
@@ -246,11 +245,11 @@ export const uiRouter = (
 		if (seg1 === "new" && !seg2) {
 			return handle(groupsNewHandler(req, ctx));
 		}
-		if (seg1 && seg2 === "collections" && seg3 === "new" && !seg4) {
-			return handle(groupsCollectionsNewHandler(req, ctx, seg1 as Slug));
+		if (seg1 && isUuid(seg1) && seg2 === "collections" && seg3 === "new" && !seg4) {
+			return handle(groupsCollectionsNewHandler(req, ctx, PrincipalId(seg1)));
 		}
-		if (seg1 && !seg2) {
-			return handle(groupsEditHandler(req, ctx, seg1 as Slug));
+		if (seg1 && isUuid(seg1) && !seg2) {
+			return handle(groupsEditHandler(req, ctx, PrincipalId(seg1)));
 		}
 	}
 
@@ -268,34 +267,34 @@ export const uiRouter = (
 			if (seg2 === "create" && !seg3) {
 				return handle(usersCreateHandler(req, ctx));
 			}
-			if (seg2 && seg3 === "update" && !seg4) {
-				return handle(usersUpdateHandler(req, ctx, seg2 as Slug));
+			if (seg2 && isUuid(seg2) && seg3 === "update" && !seg4) {
+				return handle(usersUpdateHandler(req, ctx, PrincipalId(seg2)));
 			}
-			if (seg2 && seg3 === "delete" && !seg4) {
-				return handle(usersDeleteHandler(req, ctx, seg2 as Slug));
+			if (seg2 && isUuid(seg2) && seg3 === "delete" && !seg4) {
+				return handle(usersDeleteHandler(req, ctx, PrincipalId(seg2)));
 			}
-			if (seg2 && seg3 === "set-password" && !seg4) {
-				return handle(usersSetPasswordHandler(req, ctx, seg2 as Slug));
+			if (seg2 && isUuid(seg2) && seg3 === "set-password" && !seg4) {
+				return handle(usersSetPasswordHandler(req, ctx, PrincipalId(seg2)));
 			}
-			if (seg2 && seg3 === "collections" && seg4 === "create") {
-				return handle(usersCollectionsCreateHandler(req, ctx, seg2 as Slug));
+			if (seg2 && isUuid(seg2) && seg3 === "collections" && seg4 === "create") {
+				return handle(usersCollectionsCreateHandler(req, ctx, PrincipalId(seg2)));
 			}
 		}
 		if (seg1 === "groups") {
 			if (seg2 === "create" && !seg3) {
 				return handle(groupsCreateHandler(req, ctx));
 			}
-			if (seg2 && seg3 === "update" && !seg4) {
-				return handle(groupsUpdateHandler(req, ctx, seg2 as Slug));
+			if (seg2 && isUuid(seg2) && seg3 === "update" && !seg4) {
+				return handle(groupsUpdateHandler(req, ctx, PrincipalId(seg2)));
 			}
-			if (seg2 && seg3 === "delete" && !seg4) {
-				return handle(groupsDeleteHandler(req, ctx, seg2 as Slug));
+			if (seg2 && isUuid(seg2) && seg3 === "delete" && !seg4) {
+				return handle(groupsDeleteHandler(req, ctx, PrincipalId(seg2)));
 			}
-			if (seg2 && seg3 === "members" && !seg4) {
-				return handle(groupsMembersHandler(req, ctx, seg2 as Slug));
+			if (seg2 && isUuid(seg2) && seg3 === "members" && !seg4) {
+				return handle(groupsMembersHandler(req, ctx, PrincipalId(seg2)));
 			}
-			if (seg2 && seg3 === "collections" && seg4 === "create") {
-				return handle(groupsCollectionsCreateHandler(req, ctx, seg2 as Slug));
+			if (seg2 && isUuid(seg2) && seg3 === "collections" && seg4 === "create") {
+				return handle(groupsCollectionsCreateHandler(req, ctx, PrincipalId(seg2)));
 			}
 		}
 	}

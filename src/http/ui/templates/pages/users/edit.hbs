@@ -8,8 +8,8 @@
     {{#if canDelete}}
       <form
         method="POST"
-        action="/ui/api/users/{{principal.slug}}/delete"
-        hx-post="/ui/api/users/{{principal.slug}}/delete"
+        action="/ui/api/users/{{principal.id}}/delete"
+        hx-post="/ui/api/users/{{principal.id}}/delete"
         hx-target="body"
         hx-swap="outerHTML"
         hx-confirm="Delete this user? This cannot be undone."
@@ -29,8 +29,8 @@
     <h2 class="text-base font-semibold text-gray-800">Profile</h2>
     <form
       method="POST"
-      action="/ui/api/users/{{principal.slug}}/update"
-      hx-post="/ui/api/users/{{principal.slug}}/update"
+      action="/ui/api/users/{{principal.id}}/update"
+      hx-post="/ui/api/users/{{principal.id}}/update"
       hx-target="body"
       hx-swap="outerHTML"
       class="space-y-4"
@@ -78,8 +78,8 @@
       <h2 class="text-base font-semibold text-gray-800">Change password</h2>
       <form
         method="POST"
-        action="/ui/api/users/{{principal.slug}}/set-password"
-        hx-post="/ui/api/users/{{principal.slug}}/set-password"
+        action="/ui/api/users/{{principal.id}}/set-password"
+        hx-post="/ui/api/users/{{principal.id}}/set-password"
         hx-target="body"
         hx-swap="outerHTML"
         class="space-y-4"
@@ -104,7 +104,7 @@
   <section class="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
     <div class="flex items-center justify-between">
       <h2 class="text-base font-semibold text-gray-800">Collections</h2>
-      <a href="/ui/users/{{principal.slug}}/collections/new" class="px-3 py-1.5 bg-white border border-gray-300 text-gray-700 text-xs font-medium rounded hover:bg-gray-50">
+      <a href="/ui/users/{{principal.id}}/collections/new" class="px-3 py-1.5 bg-white border border-gray-300 text-gray-700 text-xs font-medium rounded hover:bg-gray-50">
         Add collection
       </a>
     </div>
@@ -144,8 +144,8 @@
             <p class="text-sm font-medium text-gray-700 mb-2">{{principal.displayName}}{{#unless principal.displayName}}{{principal.slug}}{{/unless}}</p>
             <form
               method="POST"
-              action="/ui/api/groups/{{principal.slug}}/members"
-              hx-post="/ui/api/groups/{{principal.slug}}/members"
+              action="/ui/api/groups/{{principal.id}}/members"
+              hx-post="/ui/api/groups/{{principal.id}}/members"
               hx-target="body"
               hx-swap="outerHTML"
               class="inline-flex items-center gap-3"

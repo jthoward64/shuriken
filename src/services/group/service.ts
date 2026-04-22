@@ -5,7 +5,7 @@ import type {
 	DatabaseError,
 	DavError,
 } from "#src/domain/errors.ts";
-import type { GroupId, UserId } from "#src/domain/ids.ts";
+import type { GroupId, PrincipalId, UserId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
 import type { UserWithPrincipal } from "#src/services/user/repository.ts";
 import type { GroupWithPrincipal } from "./repository.ts";
@@ -36,6 +36,9 @@ export interface GroupServiceShape {
 	>;
 	readonly findById: (
 		id: GroupId,
+	) => Effect.Effect<GroupWithPrincipal, DavError | DatabaseError>;
+	readonly findByPrincipalId: (
+		principalId: PrincipalId,
 	) => Effect.Effect<GroupWithPrincipal, DavError | DatabaseError>;
 	readonly findBySlug: (
 		slug: Slug,

@@ -1,6 +1,6 @@
 import { Effect, Layer } from "effect";
 import { someOrNotFound } from "#src/domain/errors.ts";
-import type { GroupId, UserId } from "#src/domain/ids.ts";
+import type { GroupId, PrincipalId, UserId } from "#src/domain/ids.ts";
 import { GroupRepository } from "./repository.ts";
 import { GroupService, type NewGroup, type UpdateGroup } from "./service.ts";
 
@@ -31,6 +31,22 @@ export const GroupServiceLive = Layer.effect(
 					.findById(id)
 					.pipe(Effect.flatMap(someOrNotFound(`Group not found: ${id}`)));
 				yield* Effect.logTrace("group.findById result", {
+					groupId: result.group.id,
+				});
+				return result;
+			}),
+
+			findByPrincipalId: Effect.fn("GroupService.findByPrincipalId")(function* (
+				principalId: PrincipalId,
+			) {
+				yield* Effect.annotateCurrentSpan({ "group.principalId": principalId });
+				yield* Effect.logTrace("group.findByPrincipalId", { principalId });
+				const result = yield* repo
+					.findByPrincipalId(principalId)
+					.pipe(
+						Effect.flatMap(someOrNotFound(`Group not found: ${principalId}`)),
+					);
+				yield* Effect.logTrace("group.findByPrincipalId result", {
 					groupId: result.group.id,
 				});
 				return result;

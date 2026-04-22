@@ -4,11 +4,11 @@
       {{#if (eq ownerType "user")}}
         <a href="/ui/users" class="text-sm text-gray-500 hover:text-gray-700">Users</a>
         <span class="text-gray-400">/</span>
-        <a href="/ui/users/{{ownerSlug}}" class="text-sm text-gray-500 hover:text-gray-700">{{ownerDisplayName}}</a>
+        <a href="/ui/users/{{ownerPrincipalId}}" class="text-sm text-gray-500 hover:text-gray-700">{{ownerDisplayName}}</a>
       {{else}}
         <a href="/ui/groups" class="text-sm text-gray-500 hover:text-gray-700">Groups</a>
         <span class="text-gray-400">/</span>
-        <a href="/ui/groups/{{ownerSlug}}" class="text-sm text-gray-500 hover:text-gray-700">{{ownerDisplayName}}</a>
+        <a href="/ui/groups/{{ownerPrincipalId}}" class="text-sm text-gray-500 hover:text-gray-700">{{ownerDisplayName}}</a>
       {{/if}}
       <span class="text-gray-400">/</span>
       <h1 class="text-2xl font-bold text-gray-900">{{pageTitle}}</h1>

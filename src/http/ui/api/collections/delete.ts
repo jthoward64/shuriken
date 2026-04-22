@@ -56,38 +56,27 @@ export const collectionsDeleteHandler = (
 		}
 
 		// Resolve owner before deleting so we can redirect after
-		const ownerResult = yield* principalService.findById(ownerPrincipalId).pipe(
-			Effect.map((pwu) => ({
-				slug: pwu.principal.slug,
-				type: "user" as const,
-			})),
+		yield* collectionService.delete(collectionId);
+
+		const redirectTo = principalService.findById(ownerPrincipalId).pipe(
+			Effect.map(() => `/ui/users/${ownerPrincipalId}`),
 			Effect.catchTag("DavError", (e) =>
 				e.status === HTTP_NOT_FOUND
-					? principalService.findPrincipalById(ownerPrincipalId).pipe(
-							Effect.map((p) => ({
-								slug: p.slug,
-								type: "group" as const,
-							})),
-						)
+					? Effect.succeed(`/ui/groups/${ownerPrincipalId}`)
 					: Effect.fail(e),
 			),
 		);
 
-		yield* collectionService.delete(collectionId);
-
-		const redirectTo =
-			ownerResult.type === "user"
-				? `/ui/users/${ownerResult.slug}`
-				: `/ui/groups/${ownerResult.slug}`;
+		const destination = yield* redirectTo;
 
 		if (isHtmxRequest(ctx.headers)) {
 			return new Response(null, {
 				status: 200,
-				headers: { "HX-Redirect": redirectTo },
+				headers: { "HX-Redirect": destination },
 			});
 		}
 		return new Response(null, {
 			status: 303,
-			headers: { Location: redirectTo },
+			headers: { Location: destination },
 		});
 	});

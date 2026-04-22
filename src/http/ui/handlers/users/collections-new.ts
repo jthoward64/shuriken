@@ -5,8 +5,7 @@ import type {
 	DavError,
 	InternalError,
 } from "#src/domain/errors.ts";
-import type { UserId } from "#src/domain/ids.ts";
-import type { Slug } from "#src/domain/types/path.ts";
+import type { PrincipalId } from "#src/domain/ids.ts";
 import { USERS_VIRTUAL_RESOURCE_ID } from "#src/domain/virtual-resources.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
@@ -14,30 +13,31 @@ import { buildNavContext } from "#src/http/ui/helpers/nav-context.ts";
 import { renderPage } from "#src/http/ui/helpers/render-page.ts";
 import type { TemplateService } from "#src/http/ui/template/index.ts";
 import { AclService } from "#src/services/acl/index.ts";
-import { UserService } from "#src/services/user/index.ts";
+import { PrincipalService } from "#src/services/principal/index.ts";
 
 // ---------------------------------------------------------------------------
-// GET /ui/users/:slug/collections/new
+// GET /ui/users/:principalId/collections/new
 // ---------------------------------------------------------------------------
 
 export const usersCollectionsNewHandler = (
 	_req: Request,
 	ctx: HttpRequestContext,
-	slug: Slug,
+	principalId: PrincipalId,
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError | InternalError,
-	AclService | AppConfigService | TemplateService | UserService
+	AclService | AppConfigService | PrincipalService | TemplateService
 > =>
 	Effect.gen(function* () {
 		const principal = yield* requireAuthenticated(ctx.auth);
 		const config = yield* AppConfigService;
 		const acl = yield* AclService;
-		const userService = yield* UserService;
+		const principalService = yield* PrincipalService;
 
-		const { user, principal: principalRow } = yield* userService.findBySlug(slug);
+		const { user, principal: principalRow } =
+			yield* principalService.findById(principalId);
 
-		const isSelf = user.id === (principal.userId as UserId);
+		const isSelf = user.id === principal.userId;
 		if (!isSelf) {
 			yield* acl.check(
 				principal.principalId,
@@ -61,8 +61,8 @@ export const usersCollectionsNewHandler = (
 				ownerSlug: principalRow.slug,
 				ownerDisplayName: principalRow.displayName ?? principalRow.slug,
 				ownerType: "user",
-				createUrl: `/ui/api/users/${principalRow.slug}/collections/create`,
-				backUrl: `/ui/users/${principalRow.slug}`,
+				createUrl: `/ui/api/users/${principalRow.id}/collections/create`,
+				backUrl: `/ui/users/${principalRow.id}`,
 			},
 			ctx.headers,
 		);
