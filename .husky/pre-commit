@@ -1,2 +1,2 @@
 bun test --changed --parallel
-bun fix
+bun run verify
