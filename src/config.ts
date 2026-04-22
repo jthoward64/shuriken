@@ -59,10 +59,11 @@ export const AuthConfig = Config.all({
 	 */
 	trustedProxies: Config.string("trustedProxies").pipe(Config.withDefault("*")),
 
-	/** Email of the single user in single-user mode. Optional; uses first user if absent. */
-	singleUserEmail: Config.string("singleUserEmail").pipe(Config.option),
-
-	/** Email address for the default admin user created on first run in basic auth mode. Required when AUTH_MODE=basic. */
+	/**
+	 * Email of the admin user. In basic auth mode, this user is provisioned with credentials
+	 * on first run. In single-user mode, all sessions authenticate as this user automatically.
+	 * Required in both modes; fails at startup if absent.
+	 */
 	adminEmail: Config.string("adminEmail").pipe(Config.option),
 
 	/** Password for the default admin user. If absent a random password is generated and printed to stdout on first run. */

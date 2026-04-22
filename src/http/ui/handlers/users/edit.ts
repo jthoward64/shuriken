@@ -7,7 +7,10 @@ import type {
 } from "#src/domain/errors.ts";
 import type { GroupId, PrincipalId, UserId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
-import { USERS_VIRTUAL_RESOURCE_ID } from "#src/domain/virtual-resources.ts";
+import {
+	GROUPS_VIRTUAL_RESOURCE_ID,
+	USERS_VIRTUAL_RESOURCE_ID,
+} from "#src/domain/virtual-resources.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import { buildNavContext } from "#src/http/ui/helpers/nav-context.ts";
@@ -40,15 +43,22 @@ export const usersEditHandler = (
 		const { user, principal: principalRow } =
 			yield* userService.findBySlug(slug);
 
-		// Must have DAV:write-properties on this principal OR be viewing self
 		const isSelf = user.id === principal.userId;
 		if (!isSelf) {
-			yield* acl.check(
+			// Admin-level access on the users virtual resource grants write to all principals
+			const usersVirtualPrivs = yield* acl.currentUserPrivileges(
 				principal.principalId,
-				principalRow.id as PrincipalId,
-				"principal",
-				"DAV:write-properties",
+				USERS_VIRTUAL_RESOURCE_ID,
+				"virtual",
 			);
+			if (!usersVirtualPrivs.includes("DAV:write-properties")) {
+				yield* acl.check(
+					principal.principalId,
+					principalRow.id as PrincipalId,
+					"principal",
+					"DAV:write-properties",
+				);
+			}
 		}
 
 		const [allGroups, userGroups] = yield* Effect.all([
@@ -62,22 +72,27 @@ export const usersEditHandler = (
 		const groupPrincipalIds = allGroups.map(
 			(g) => g.principal.id as PrincipalId,
 		);
-		const groupPrivMap = yield* acl.batchCurrentUserPrivileges(
-			principal.principalId,
-			groupPrincipalIds,
-			"principal",
-		);
+		const [groupPrivMap, groupsVirtualPrivs, usersPrivs] = yield* Effect.all([
+			acl.batchCurrentUserPrivileges(
+				principal.principalId,
+				groupPrincipalIds,
+				"principal",
+			),
+			acl.currentUserPrivileges(
+				principal.principalId,
+				GROUPS_VIRTUAL_RESOURCE_ID,
+				"virtual",
+			),
+			acl.currentUserPrivileges(
+				principal.principalId,
+				USERS_VIRTUAL_RESOURCE_ID,
+				"virtual",
+			),
+		]);
 
-		// canEditSlug requires DAV:unbind on the users virtual resource
-		const usersPrivs = yield* acl.currentUserPrivileges(
-			principal.principalId,
-			USERS_VIRTUAL_RESOURCE_ID,
-			"virtual",
-		);
+		const hasGroupsVirtualWrite = groupsVirtualPrivs.includes("DAV:write-properties");
 		const canEditSlug = usersPrivs.includes("DAV:unbind");
-		const canDelete =
-			usersPrivs.includes("DAV:unbind") ||
-			(isSelf && usersPrivs.includes("DAV:unbind"));
+		const canDelete = usersPrivs.includes("DAV:unbind");
 
 		const nav = yield* buildNavContext(
 			principal,
@@ -91,7 +106,8 @@ export const usersEditHandler = (
 				group: g.group,
 				principal: g.principal,
 				isMember: userGroupIds.has(g.group.id as GroupId),
-				canManageMembers: privs.includes("DAV:write-properties"),
+				canManageMembers:
+					hasGroupsVirtualWrite || privs.includes("DAV:write-properties"),
 			};
 		});
 

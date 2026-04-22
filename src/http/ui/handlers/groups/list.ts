@@ -54,19 +54,23 @@ export const groupsListHandler = (
 			"principal",
 		);
 
-		const canCreateGroup = (yield* acl.currentUserPrivileges(
+		// Virtual resource grants apply to all groups in the collection
+		const groupsVirtualPrivs = yield* acl.currentUserPrivileges(
 			principal.principalId,
 			GROUPS_VIRTUAL_RESOURCE_ID,
 			"virtual",
-		)).includes("DAV:bind");
+		);
+		const canCreateGroup = groupsVirtualPrivs.includes("DAV:bind");
+		const hasVirtualWrite = groupsVirtualPrivs.includes("DAV:write-properties");
+		const hasVirtualUnbind = groupsVirtualPrivs.includes("DAV:unbind");
 
 		const enrichedGroups = groups.map((g) => {
 			const privs = privMap.get(g.principal.id as PrincipalId) ?? [];
 			return {
 				principal: g.principal,
 				group: g.group,
-				canEdit: privs.includes("DAV:write-properties"),
-				canDelete: privs.includes("DAV:unbind"),
+				canEdit: hasVirtualWrite || privs.includes("DAV:write-properties"),
+				canDelete: hasVirtualUnbind || privs.includes("DAV:unbind"),
 			};
 		});
 

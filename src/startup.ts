@@ -7,6 +7,7 @@ import {
 	type DavError,
 	type InternalError,
 } from "#src/domain/errors.ts";
+import type { PrincipalId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import { Email } from "#src/domain/types/strings.ts";
 import { HTTP_NOT_FOUND } from "#src/http/status.ts";
@@ -28,10 +29,11 @@ const generateRandomPassword = (): string => {
 // ---------------------------------------------------------------------------
 // singleUserStartup — runs at application boot when AUTH_MODE=single-user.
 //
-// Requires SINGLE_USER_EMAIL to be set; fails with ConfigError if absent.
+// Requires ADMIN_EMAIL to be set; fails with ConfigError if absent.
 // Derives the user's slug and name from the local part of the email address
 // (everything before the @). Idempotent: succeeds without action when the
-// user already exists.
+// user already exists. Always ensures the admin user has DAV:all on virtual
+// resources so that the web UI management functions work correctly.
 // ---------------------------------------------------------------------------
 
 export const singleUserStartup: Effect.Effect<
@@ -45,34 +47,40 @@ export const singleUserStartup: Effect.Effect<
 		return;
 	}
 
-	const emailOpt = config.auth.singleUserEmail;
-	if (Option.isNone(emailOpt)) {
-		return yield* Effect.fail(new ConfigError({ key: "singleUserEmail" }));
+	if (Option.isNone(config.auth.adminEmail)) {
+		return yield* Effect.fail(new ConfigError({ key: "adminEmail" }));
 	}
 
-	const email = Email(emailOpt.value);
-
+	const adminEmailStr = config.auth.adminEmail.value;
+	const email = Email(adminEmailStr);
 	const principalSvc = yield* PrincipalService;
-	const alreadyExists = yield* principalSvc.findByEmail(email).pipe(
-		Effect.as(true),
+	const provisioningSvc = yield* ProvisioningService;
+
+	const existing = yield* principalSvc.findByEmail(email).pipe(
+		Effect.map((p) => Option.some(p)),
 		Effect.catchTag("DavError", (e) =>
-			e.status === HTTP_NOT_FOUND ? Effect.succeed(false) : Effect.fail(e),
+			e.status === HTTP_NOT_FOUND
+				? Effect.succeed(Option.none())
+				: Effect.fail(e),
 		),
 	);
 
-	if (alreadyExists) {
+	let principalId: PrincipalId;
+
+	if (Option.isSome(existing)) {
 		yield* Effect.logDebug("single-user already provisioned", { email });
-		return;
+		principalId = existing.value.principal.id as PrincipalId;
+	} else {
+		const localPart = adminEmailStr.split("@")[0] ?? adminEmailStr;
+		const result = yield* provisioningSvc.provisionUser({
+			email,
+			name: localPart,
+			slug: Slug(localPart),
+		});
+		principalId = result.user.principal.id as PrincipalId;
 	}
 
-	const localPart = emailOpt.value.split("@")[0] ?? emailOpt.value;
-	const provisioningSvc = yield* ProvisioningService;
-
-	yield* provisioningSvc.provisionUser({
-		email,
-		name: localPart,
-		slug: Slug(localPart),
-	});
+	yield* provisioningSvc.ensureAdminAces(principalId);
 });
 
 // ---------------------------------------------------------------------------
@@ -82,7 +90,8 @@ export const singleUserStartup: Effect.Effect<
 // If ADMIN_PASSWORD is not set, generates a random password and prints it
 // to stdout — the operator must save it, as it will not be shown again.
 // ADMIN_SLUG defaults to the local part of ADMIN_EMAIL.
-// Idempotent: succeeds without action when the user already exists.
+// Idempotent: succeeds without action when the user already exists. Always
+// ensures the admin user has DAV:all on virtual resources.
 // ---------------------------------------------------------------------------
 
 export const basicAuthStartup: Effect.Effect<
@@ -102,48 +111,55 @@ export const basicAuthStartup: Effect.Effect<
 
 	const adminEmailStr = config.auth.adminEmail.value;
 	const email = Email(adminEmailStr);
-
 	const principalSvc = yield* PrincipalService;
-	const alreadyExists = yield* principalSvc.findByEmail(email).pipe(
-		Effect.as(true),
+	const provisioningSvc = yield* ProvisioningService;
+
+	const existing = yield* principalSvc.findByEmail(email).pipe(
+		Effect.map((p) => Option.some(p)),
 		Effect.catchTag("DavError", (e) =>
-			e.status === HTTP_NOT_FOUND ? Effect.succeed(false) : Effect.fail(e),
+			e.status === HTTP_NOT_FOUND
+				? Effect.succeed(Option.none())
+				: Effect.fail(e),
 		),
 	);
 
-	if (alreadyExists) {
+	let principalId: PrincipalId;
+
+	if (Option.isSome(existing)) {
 		yield* Effect.logDebug("basic-auth: admin user already exists", { email });
-		return;
+		principalId = existing.value.principal.id as PrincipalId;
+	} else {
+		const localPart = adminEmailStr.split("@")[0] ?? adminEmailStr;
+		const slug = Slug(Option.getOrElse(config.auth.adminSlug, () => localPart));
+
+		// Generate a random password if ADMIN_PASSWORD is not configured.
+		const plainPassword = Option.isNone(config.auth.adminPassword)
+			? Option.some(generateRandomPassword())
+			: Option.none<string>();
+		const password = Option.match(plainPassword, {
+			onSome: Redacted.make,
+			onNone: () => Option.getOrThrow(config.auth.adminPassword),
+		});
+
+		const result = yield* provisioningSvc.provisionUser({
+			email,
+			name: localPart,
+			slug,
+			credentials: [{ source: "local", authId: adminEmailStr, password }],
+		});
+		principalId = result.user.principal.id as PrincipalId;
+
+		yield* Effect.logInfo("basic-auth: admin user provisioned", { email });
+
+		Option.match(plainPassword, {
+			onSome: (p) => {
+				console.log(
+					`\n*** shuriken-ts: default admin credentials ***\n  Email:    ${email}\n  Password: ${p}\n  Save this password — it will not be shown again.\n`,
+				);
+			},
+			onNone: () => {},
+		});
 	}
 
-	const localPart = adminEmailStr.split("@")[0] ?? adminEmailStr;
-	const slug = Slug(Option.getOrElse(config.auth.adminSlug, () => localPart));
-
-	// Generate a random password if ADMIN_PASSWORD is not configured.
-	const plainPassword = Option.isNone(config.auth.adminPassword)
-		? Option.some(generateRandomPassword())
-		: Option.none<string>();
-	const password = Option.match(plainPassword, {
-		onSome: Redacted.make,
-		onNone: () => Option.getOrThrow(config.auth.adminPassword),
-	});
-
-	const provisioningSvc = yield* ProvisioningService;
-	yield* provisioningSvc.provisionUser({
-		email,
-		name: localPart,
-		slug,
-		credentials: [{ source: "local", authId: adminEmailStr, password }],
-	});
-
-	yield* Effect.logInfo("basic-auth: admin user provisioned", { email });
-
-	Option.match(plainPassword, {
-		onSome: (p) => {
-			console.log(
-				`\n*** shuriken-ts: default admin credentials ***\n  Email:    ${email}\n  Password: ${p}\n  Save this password — it will not be shown again.\n`,
-			);
-		},
-		onNone: () => {},
-	});
+	yield* provisioningSvc.ensureAdminAces(principalId);
 });

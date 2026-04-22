@@ -56,19 +56,23 @@ export const usersListHandler = (
 			"principal",
 		);
 
-		const canCreateUser = (yield* acl.currentUserPrivileges(
+		// Virtual resource grants apply to all users in the collection
+		const usersVirtualPrivs = yield* acl.currentUserPrivileges(
 			principal.principalId,
 			USERS_VIRTUAL_RESOURCE_ID,
 			"virtual",
-		)).includes("DAV:bind");
+		);
+		const canCreateUser = usersVirtualPrivs.includes("DAV:bind");
+		const hasVirtualWrite = usersVirtualPrivs.includes("DAV:write-properties");
+		const hasVirtualUnbind = usersVirtualPrivs.includes("DAV:unbind");
 
 		const enrichedUsers = users.map((u) => {
 			const privs = privMap.get(u.principal.id as PrincipalId) ?? [];
 			return {
 				principal: u.principal,
 				user: u.user,
-				canEdit: privs.includes("DAV:write-properties"),
-				canDelete: privs.includes("DAV:unbind"),
+				canEdit: hasVirtualWrite || privs.includes("DAV:write-properties"),
+				canDelete: hasVirtualUnbind || privs.includes("DAV:unbind"),
 			};
 		});
 

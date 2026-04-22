@@ -45,7 +45,6 @@ const stubLayers = Layer.mergeAll(
 			mode: "single-user" as const,
 			proxyHeader: "X-Remote-User",
 			trustedProxies: "*",
-			singleUserEmail: Option.none(),
 			adminEmail: Option.none(),
 			adminPassword: Option.none(),
 			adminSlug: Option.none(),

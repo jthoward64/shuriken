@@ -6,6 +6,7 @@ import {
 } from "#src/domain/errors.ts";
 import type { GroupId, PrincipalId, UserId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
+import { GROUPS_VIRTUAL_RESOURCE_ID } from "#src/domain/virtual-resources.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import { isHtmxRequest } from "#src/http/ui/helpers/htmx.ts";
@@ -33,24 +34,39 @@ export const groupsMembersHandler = (
 		const { group, principal: principalRow } =
 			yield* groupService.findBySlug(slug);
 
-		yield* acl.check(
+		const groupsVirtualPrivs = yield* acl.currentUserPrivileges(
 			principal.principalId,
-			principalRow.id as PrincipalId,
-			"principal",
-			"DAV:write-properties",
+			GROUPS_VIRTUAL_RESOURCE_ID,
+			"virtual",
 		);
+		if (!groupsVirtualPrivs.includes("DAV:write-properties")) {
+			yield* acl.check(
+				principal.principalId,
+				principalRow.id as PrincipalId,
+				"principal",
+				"DAV:write-properties",
+			);
+		}
 
 		const form = yield* Effect.tryPromise({
 			try: () => req.formData(),
 			catch: (e) => new InternalError({ cause: e }),
 		});
 
-		// Checkbox array: each checked user sends "members" with the userId value
-		const memberIds = form
-			.getAll("members")
-			.map((v) => v.toString() as UserId);
+		// The form submits a hidden "userId" field identifying the single user being
+		// toggled, and a "members" checkbox that is present only when checked.
+		// Use addMember/removeMember so other existing members are not affected.
+		const userId = form.get("userId")?.toString() as UserId | undefined;
+		if (!userId) {
+			return new Response("Missing userId", { status: 400 });
+		}
+		const isMember = form.getAll("members").some((v) => v.toString() === userId);
 
-		yield* groupService.setMembers(group.id as GroupId, memberIds);
+		if (isMember) {
+			yield* groupService.addMember(group.id as GroupId, userId);
+		} else {
+			yield* groupService.removeMember(group.id as GroupId, userId);
+		}
 
 		if (isHtmxRequest(ctx.headers)) {
 			return new Response(null, {

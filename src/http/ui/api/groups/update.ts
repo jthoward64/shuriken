@@ -6,6 +6,7 @@ import {
 } from "#src/domain/errors.ts";
 import type { GroupId, PrincipalId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
+import { GROUPS_VIRTUAL_RESOURCE_ID } from "#src/domain/virtual-resources.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import { parseOptionalDisplayName } from "#src/http/ui/helpers/form.ts";
@@ -34,12 +35,19 @@ export const groupsUpdateHandler = (
 		const { group, principal: principalRow } =
 			yield* groupService.findBySlug(slug);
 
-		yield* acl.check(
+		const groupsVirtualPrivs = yield* acl.currentUserPrivileges(
 			principal.principalId,
-			principalRow.id as PrincipalId,
-			"principal",
-			"DAV:write-properties",
+			GROUPS_VIRTUAL_RESOURCE_ID,
+			"virtual",
 		);
+		if (!groupsVirtualPrivs.includes("DAV:write-properties")) {
+			yield* acl.check(
+				principal.principalId,
+				principalRow.id as PrincipalId,
+				"principal",
+				"DAV:write-properties",
+			);
+		}
 
 		const form = yield* Effect.tryPromise({
 			try: () => req.formData(),

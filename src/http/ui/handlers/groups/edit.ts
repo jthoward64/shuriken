@@ -38,12 +38,19 @@ export const groupsEditHandler = (
 		const { group, principal: principalRow } =
 			yield* groupService.findBySlug(slug);
 
-		yield* acl.check(
+		const groupsVirtualPrivs = yield* acl.currentUserPrivileges(
 			principal.principalId,
-			principalRow.id as PrincipalId,
-			"principal",
-			"DAV:write-properties",
+			GROUPS_VIRTUAL_RESOURCE_ID,
+			"virtual",
 		);
+		if (!groupsVirtualPrivs.includes("DAV:write-properties")) {
+			yield* acl.check(
+				principal.principalId,
+				principalRow.id as PrincipalId,
+				"principal",
+				"DAV:write-properties",
+			);
+		}
 
 		const [members, groupsPrivs] = yield* Effect.all([
 			groupService.listMembers(group.id as GroupId),

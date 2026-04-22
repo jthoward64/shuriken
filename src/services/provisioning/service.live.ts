@@ -3,6 +3,10 @@ import { DatabaseClient } from "#src/db/client.ts";
 import { withTransaction } from "#src/db/transaction.ts";
 import type { PrincipalId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
+import {
+	GROUPS_VIRTUAL_RESOURCE_ID,
+	USERS_VIRTUAL_RESOURCE_ID,
+} from "#src/domain/virtual-resources.ts";
 import { AclRepository } from "#src/services/acl/repository.ts";
 import { CollectionService } from "#src/services/collection/service.ts";
 import { UserService } from "#src/services/user/service.ts";
@@ -98,6 +102,42 @@ export const ProvisioningServiceLive = Layer.effect(
 
 				return result;
 			}),
+
+			ensureAdminAces: Effect.fn("ProvisioningService.ensureAdminAces")(
+				function* (principalId: PrincipalId) {
+					yield* Effect.logDebug("ensuring admin virtual resource ACEs", {
+						principalId,
+					});
+					for (const resourceId of [
+						USERS_VIRTUAL_RESOURCE_ID,
+						GROUPS_VIRTUAL_RESOURCE_ID,
+					]) {
+						const has = yield* acl.hasPrivilege(
+							[principalId],
+							resourceId,
+							"virtual",
+							["DAV:all"],
+							true,
+						);
+						if (!has) {
+							yield* acl.grantAce({
+								resourceType: "virtual",
+								resourceId,
+								principalType: "principal",
+								principalId,
+								privilege: "DAV:all",
+								grantDeny: "grant",
+								protected: true,
+								ordinal: 0,
+							});
+							yield* Effect.logInfo("granted DAV:all on virtual resource", {
+								principalId,
+								resourceId,
+							});
+						}
+					}
+				},
+			),
 		});
 	}),
 );

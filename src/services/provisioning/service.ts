@@ -6,6 +6,7 @@ import type {
 	DavError,
 	InternalError,
 } from "#src/domain/errors.ts";
+import type { PrincipalId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
 import type { Email } from "#src/domain/types/strings.ts";
 import type { CollectionRow } from "#src/services/collection/repository.ts";
@@ -46,6 +47,15 @@ export interface ProvisioningServiceShape {
 		ProvisionedUser,
 		ConflictError | DatabaseError | DavError | InternalError
 	>;
+
+	/**
+	 * Idempotently ensure the given principal has DAV:all on the users and groups
+	 * virtual resources. Called at startup for the admin user in every auth mode
+	 * so that existing setups gain the ACEs without a DB migration.
+	 */
+	readonly ensureAdminAces: (
+		principalId: PrincipalId,
+	) => Effect.Effect<void, DatabaseError>;
 }
 
 export class ProvisioningService extends Context.Tag("ProvisioningService")<

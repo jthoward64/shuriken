@@ -85,7 +85,7 @@ export const SingleUserAuthLayer = Layer.effect(
 	Effect.gen(function* () {
 		const db = yield* DatabaseClient;
 		const {
-			auth: { singleUserEmail: emailOpt },
+			auth: { adminEmail: emailOpt },
 		} = yield* AppConfigService;
 		const email = Option.map(emailOpt, Email);
 

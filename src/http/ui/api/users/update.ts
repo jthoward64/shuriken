@@ -47,12 +47,19 @@ export const usersUpdateHandler = (
 		const isSelf = user.id === principal.userId;
 
 		if (!isSelf) {
-			yield* acl.check(
+			const usersVirtualPrivs = yield* acl.currentUserPrivileges(
 				principal.principalId,
-				principalRow.id as PrincipalId,
-				"principal",
-				"DAV:write-properties",
+				USERS_VIRTUAL_RESOURCE_ID,
+				"virtual",
 			);
+			if (!usersVirtualPrivs.includes("DAV:write-properties")) {
+				yield* acl.check(
+					principal.principalId,
+					principalRow.id as PrincipalId,
+					"principal",
+					"DAV:write-properties",
+				);
+			}
 		}
 
 		const form = yield* Effect.tryPromise({

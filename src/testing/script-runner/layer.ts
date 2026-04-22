@@ -38,7 +38,6 @@ const testConfig: AppConfigType = {
 		mode: "basic",
 		proxyHeader: "X-Remote-User",
 		trustedProxies: "*",
-		singleUserEmail: Option.none<string>(),
 		adminEmail: Option.none<string>(),
 		adminPassword: Option.none<Redacted.Redacted<string>>(),
 		adminSlug: Option.none<string>(),
