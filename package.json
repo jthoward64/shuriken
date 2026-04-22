@@ -4,7 +4,7 @@
 	"module": "src/index.ts",
 	"private": true,
 	"engines": {
-		"bun": "1.3.12-canary.20260418.1"
+		"bun": "^1.3.13"
 	},
 	"scripts": {
 		"lint": "biome lint",
@@ -19,15 +19,17 @@
 		"test:integration": "bun test $(find . -name '*.integration.test.ts' -print)",
 		"migrations:gen": "drizzle-kit generate && rm src/testing/test-db-cache.tar.gz || true",
 		"migrations:run": "drizzle-kit migrate",
-		"studio": "drizzle-kit studio"
+		"studio": "drizzle-kit studio",
+		"prepare": "husky"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.4.9",
 		"@effect/language-service": "^0.84.2",
 		"@electric-sql/pglite": "^0.4.2",
-		"@types/bun": "^1.3.11",
+		"@types/bun": "^1.3.13",
 		"@types/handlebars": "^4.1.0",
 		"drizzle-kit": "beta",
+		"husky": "^9.1.7",
 		"typescript": "^6"
 	},
 	"imports": {
