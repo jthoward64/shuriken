@@ -3,10 +3,9 @@ import { and, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { Effect, Layer } from "effect";
 import { RRuleTemporal } from "rrule-temporal";
 import type { Temporal } from "temporal-polyfill";
-import { DatabaseClient, type DbClient } from "#src/db/client.ts";
+import { DatabaseClient } from "#src/db/client.ts";
 import { calIndex, davInstance } from "#src/db/drizzle/schema/index.ts";
-import { getActiveDb } from "#src/db/transaction.ts";
-import { DatabaseError } from "#src/domain/errors.ts";
+import { runDbQuery } from "#src/db/query.ts";
 import type { CollectionId, EntityId } from "#src/domain/ids.ts";
 import { type CalComponentType, CalIndexRepository } from "./repository.ts";
 
@@ -100,7 +99,6 @@ const rruleWeekBucketClause = (
 
 const findByTimeRange = Effect.fn("CalIndexRepository.findByTimeRange")(
 	function* (
-		db: DbClient,
 		collectionId: CollectionId,
 		componentType: CalComponentType,
 		start: Temporal.Instant | null,
@@ -116,46 +114,42 @@ const findByTimeRange = Effect.fn("CalIndexRepository.findByTimeRange")(
 			collectionId,
 			componentType,
 		});
-		const activeDb = yield* getActiveDb(db);
-		return yield* Effect.tryPromise({
-			try: () =>
-				activeDb
-					.selectDistinct({ instanceId: davInstance.id })
-					.from(calIndex)
-					.innerJoin(
-						davInstance,
-						and(
-							eq(calIndex.entityId, davInstance.entityId),
-							eq(davInstance.collectionId, collectionId),
-							isNull(davInstance.deletedAt),
-						),
-					)
-					.where(
-						and(
-							eq(calIndex.componentType, componentType),
-							isNull(calIndex.deletedAt),
-							or(
-								// Non-RRULE: standard dtstart/dtend overlap
-								and(
-									isNull(calIndex.rruleText),
-									start !== null
-										? or(
-												isNull(calIndex.dtendUtc),
-												sql`${calIndex.dtendUtc} > ${start.toString()}::timestamptz`,
-											)
-										: undefined,
-									end !== null
-										? sql`${calIndex.dtstartUtc} < ${end.toString()}::timestamptz`
-										: undefined,
-								),
-								// RRULE: week-bucket pre-filter
-								rruleWeekBucketClause(weekStart, weekEnd),
+		return yield* runDbQuery((db) =>
+			db
+				.selectDistinct({ instanceId: davInstance.id })
+				.from(calIndex)
+				.innerJoin(
+					davInstance,
+					and(
+						eq(calIndex.entityId, davInstance.entityId),
+						eq(davInstance.collectionId, collectionId),
+						isNull(davInstance.deletedAt),
+					),
+				)
+				.where(
+					and(
+						eq(calIndex.componentType, componentType),
+						isNull(calIndex.deletedAt),
+						or(
+							// Non-RRULE: standard dtstart/dtend overlap
+							and(
+								isNull(calIndex.rruleText),
+								start !== null
+									? or(
+											isNull(calIndex.dtendUtc),
+											sql`${calIndex.dtendUtc} > ${start.toString()}::timestamptz`,
+										)
+									: undefined,
+								end !== null
+									? sql`${calIndex.dtstartUtc} < ${end.toString()}::timestamptz`
+									: undefined,
 							),
+							// RRULE: week-bucket pre-filter
+							rruleWeekBucketClause(weekStart, weekEnd),
 						),
-					)
-					.then((rows) => rows.map((r) => r.instanceId)),
-			catch: (e) => new DatabaseError({ cause: e }),
-		});
+					),
+				),
+		).pipe(Effect.map((rows) => rows.map((r) => r.instanceId)));
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.cal-index.findByTimeRange failed", e.cause),
@@ -163,11 +157,7 @@ const findByTimeRange = Effect.fn("CalIndexRepository.findByTimeRange")(
 );
 
 const findByComponentType = Effect.fn("CalIndexRepository.findByComponentType")(
-	function* (
-		db: DbClient,
-		collectionId: CollectionId,
-		componentType: CalComponentType,
-	) {
+	function* (collectionId: CollectionId, componentType: CalComponentType) {
 		yield* Effect.annotateCurrentSpan({
 			"collection.id": collectionId,
 			"cal.component_type": componentType,
@@ -176,29 +166,25 @@ const findByComponentType = Effect.fn("CalIndexRepository.findByComponentType")(
 			collectionId,
 			componentType,
 		});
-		const activeDb = yield* getActiveDb(db);
-		return yield* Effect.tryPromise({
-			try: () =>
-				activeDb
-					.selectDistinct({ instanceId: davInstance.id })
-					.from(calIndex)
-					.innerJoin(
-						davInstance,
-						and(
-							eq(calIndex.entityId, davInstance.entityId),
-							eq(davInstance.collectionId, collectionId),
-							isNull(davInstance.deletedAt),
-						),
-					)
-					.where(
-						and(
-							eq(calIndex.componentType, componentType),
-							isNull(calIndex.deletedAt),
-						),
-					)
-					.then((rows) => rows.map((r) => r.instanceId)),
-			catch: (e) => new DatabaseError({ cause: e }),
-		});
+		return yield* runDbQuery((db) =>
+			db
+				.selectDistinct({ instanceId: davInstance.id })
+				.from(calIndex)
+				.innerJoin(
+					davInstance,
+					and(
+						eq(calIndex.entityId, davInstance.entityId),
+						eq(davInstance.collectionId, collectionId),
+						isNull(davInstance.deletedAt),
+					),
+				)
+				.where(
+					and(
+						eq(calIndex.componentType, componentType),
+						isNull(calIndex.deletedAt),
+					),
+				),
+		).pipe(Effect.map((rows) => rows.map((r) => r.instanceId)));
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.cal-index.findByComponentType failed", e.cause),
@@ -208,32 +194,26 @@ const findByComponentType = Effect.fn("CalIndexRepository.findByComponentType")(
 const indexRruleOccurrences = Effect.fn(
 	"CalIndexRepository.indexRruleOccurrences",
 )(
-	function* (db: DbClient, entityId: EntityId) {
+	function* (entityId: EntityId) {
 		yield* Effect.annotateCurrentSpan({ "entity.id": entityId });
-		yield* Effect.logTrace("repo.cal-index.indexRruleOccurrences", {
-			entityId,
-		});
+		yield* Effect.logTrace("repo.cal-index.indexRruleOccurrences", { entityId });
 
-		const activeDb = yield* getActiveDb(db);
-
-		const rows = yield* Effect.tryPromise({
-			try: () =>
-				activeDb
-					.select({
-						componentId: calIndex.componentId,
-						rruleText: calIndex.rruleText,
-						dtstartUtc: calIndex.dtstartUtc,
-					})
-					.from(calIndex)
-					.where(
-						and(
-							eq(calIndex.entityId, entityId),
-							isNotNull(calIndex.rruleText),
-							isNull(calIndex.deletedAt),
-						),
+		const rows = yield* runDbQuery((db) =>
+			db
+				.select({
+					componentId: calIndex.componentId,
+					rruleText: calIndex.rruleText,
+					dtstartUtc: calIndex.dtstartUtc,
+				})
+				.from(calIndex)
+				.where(
+					and(
+						eq(calIndex.entityId, entityId),
+						isNotNull(calIndex.rruleText),
+						isNull(calIndex.deletedAt),
 					),
-			catch: (e) => new DatabaseError({ cause: e }),
-		});
+				),
+		);
 
 		for (const row of rows) {
 			if (row.rruleText === null || row.dtstartUtc === null) {
@@ -261,18 +241,16 @@ const indexRruleOccurrences = Effect.fn(
 			const dayMin = Math.min(...sample.map((d) => d.day));
 			const dayMax = Math.max(...sample.map((d) => d.day));
 
-			yield* Effect.tryPromise({
-				try: () =>
-					activeDb
-						.update(calIndex)
-						.set({
-							rruleOccurrenceMonths: months,
-							rruleOccurrenceDayMin: dayMin,
-							rruleOccurrenceDayMax: dayMax,
-						})
-						.where(eq(calIndex.componentId, row.componentId)),
-				catch: (e) => new DatabaseError({ cause: e }),
-			});
+			yield* runDbQuery((db) =>
+				db
+					.update(calIndex)
+					.set({
+						rruleOccurrenceMonths: months,
+						rruleOccurrenceDayMin: dayMin,
+						rruleOccurrenceDayMax: dayMax,
+					})
+					.where(eq(calIndex.componentId, row.componentId)),
+			).pipe(Effect.asVoid);
 		}
 	},
 	Effect.tapError((e) =>
@@ -282,28 +260,17 @@ const indexRruleOccurrences = Effect.fn(
 
 export const CalIndexRepositoryLive = Layer.effect(
 	CalIndexRepository,
-	Effect.map(DatabaseClient, (db) =>
-		CalIndexRepository.of({
-			findByTimeRange: (
-				collectionId,
-				componentType,
-				start,
-				end,
-				weekStart,
-				weekEnd,
-			) =>
-				findByTimeRange(
-					db,
-					collectionId,
-					componentType,
-					start,
-					end,
-					weekStart,
-					weekEnd,
-				),
-			findByComponentType: (collectionId, componentType) =>
-				findByComponentType(db, collectionId, componentType),
-			indexRruleOccurrences: (entityId) => indexRruleOccurrences(db, entityId),
-		}),
-	),
+	Effect.gen(function* () {
+		const dc = yield* DatabaseClient;
+		const run = <A, E>(e: Effect.Effect<A, E, DatabaseClient>): Effect.Effect<A, E> =>
+			Effect.provideService(e, DatabaseClient, dc);
+		return CalIndexRepository.of({
+			findByTimeRange: (...args: Parameters<typeof findByTimeRange>) =>
+				run(findByTimeRange(...args)),
+			findByComponentType: (...args: Parameters<typeof findByComponentType>) =>
+				run(findByComponentType(...args)),
+			indexRruleOccurrences: (...args: Parameters<typeof indexRruleOccurrences>) =>
+				run(indexRruleOccurrences(...args)),
+		});
+	}),
 );

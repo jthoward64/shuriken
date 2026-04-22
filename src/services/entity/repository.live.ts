@@ -1,13 +1,13 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { Effect, Layer, Metric, Option } from "effect";
-import { DatabaseClient, type DbClient } from "#src/db/client.ts";
+import { DatabaseClient } from "#src/db/client.ts";
 import {
 	davCollection,
 	davEntity,
 	davInstance,
 	type EntityType,
 } from "#src/db/drizzle/schema/index.ts";
-import { getActiveDb } from "#src/db/transaction.ts";
+import { runDbQuery } from "#src/db/query.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
 import type { CollectionId, EntityId, PrincipalId } from "#src/domain/ids.ts";
 import { repoQueryDurationMs } from "#src/observability/metrics.ts";
@@ -22,34 +22,30 @@ const entityDuration = repoQueryDurationMs.pipe(
 );
 
 const insertEntity = Effect.fn("EntityRepository.insert")(
-	function* (
-		db: DbClient,
-		input: { entityType: EntityType; logicalUid: string | null },
-	) {
+	function* (input: { entityType: EntityType; logicalUid: string | null }) {
 		yield* Effect.annotateCurrentSpan({ "entity.type": input.entityType });
 		yield* Effect.logTrace("repo.entity.insert", {
 			entityType: input.entityType,
 			hasUid: input.logicalUid !== null,
 		});
-		const activeDb = yield* getActiveDb(db);
-		return yield* Effect.tryPromise({
-			try: () =>
-				activeDb
-					.insert(davEntity)
-					.values({
-						entityType: input.entityType,
-						logicalUid: input.logicalUid,
-					})
-					.returning()
-					.then((r) => {
-						const row = r[0];
-						if (!row) {
-							throw new Error("Entity insert returned no rows");
-						}
-						return row;
-					}),
-			catch: (e) => new DatabaseError({ cause: e }),
-		}).pipe(
+		return yield* runDbQuery((db) =>
+			db
+				.insert(davEntity)
+				.values({
+					entityType: input.entityType,
+					logicalUid: input.logicalUid,
+				})
+				.returning(),
+		).pipe(
+			Effect.flatMap((r) => {
+				const row = r[0];
+				if (!row) {
+					return Effect.fail(
+						new DatabaseError({ cause: new Error("Entity insert returned no rows") }),
+					);
+				}
+				return Effect.succeed(row);
+			}),
 			Metric.trackDuration(
 				entityDuration.pipe(Metric.tagged("repo.operation", "insert")),
 			),
@@ -61,20 +57,17 @@ const insertEntity = Effect.fn("EntityRepository.insert")(
 );
 
 const findById = Effect.fn("EntityRepository.findById")(
-	function* (db: DbClient, id: EntityId) {
+	function* (id: EntityId) {
 		yield* Effect.annotateCurrentSpan({ "entity.id": id });
 		yield* Effect.logTrace("repo.entity.findById", { id });
-		const activeDb = yield* getActiveDb(db);
-		return yield* Effect.tryPromise({
-			try: () =>
-				activeDb
-					.select()
-					.from(davEntity)
-					.where(and(eq(davEntity.id, id), isNull(davEntity.deletedAt)))
-					.limit(1)
-					.then((r) => Option.fromNullable(r[0])),
-			catch: (e) => new DatabaseError({ cause: e }),
-		}).pipe(
+		return yield* runDbQuery((db) =>
+			db
+				.select()
+				.from(davEntity)
+				.where(and(eq(davEntity.id, id), isNull(davEntity.deletedAt)))
+				.limit(1),
+		).pipe(
+			Effect.map((r) => Option.fromNullable(r[0])),
 			Metric.trackDuration(
 				entityDuration.pipe(Metric.tagged("repo.operation", "findById")),
 			),
@@ -86,7 +79,7 @@ const findById = Effect.fn("EntityRepository.findById")(
 );
 
 const updateLogicalUid = Effect.fn("EntityRepository.updateLogicalUid")(
-	function* (db: DbClient, id: EntityId, logicalUid: string | null) {
+	function* (id: EntityId, logicalUid: string | null) {
 		yield* Effect.annotateCurrentSpan({
 			"entity.id": id,
 			"entity.has_uid": logicalUid !== null,
@@ -95,16 +88,13 @@ const updateLogicalUid = Effect.fn("EntityRepository.updateLogicalUid")(
 			id,
 			hasUid: logicalUid !== null,
 		});
-		const activeDb = yield* getActiveDb(db);
-		return yield* Effect.tryPromise({
-			try: () =>
-				activeDb
-					.update(davEntity)
-					.set({ logicalUid, updatedAt: sql`now()` })
-					.where(eq(davEntity.id, id))
-					.then(() => undefined),
-			catch: (e) => new DatabaseError({ cause: e }),
-		}).pipe(
+		return yield* runDbQuery((db) =>
+			db
+				.update(davEntity)
+				.set({ logicalUid, updatedAt: sql`now()` })
+				.where(eq(davEntity.id, id)),
+		).pipe(
+			Effect.asVoid,
 			Metric.trackDuration(
 				entityDuration.pipe(
 					Metric.tagged("repo.operation", "updateLogicalUid"),
@@ -118,19 +108,16 @@ const updateLogicalUid = Effect.fn("EntityRepository.updateLogicalUid")(
 );
 
 const softDelete = Effect.fn("EntityRepository.softDelete")(
-	function* (db: DbClient, id: EntityId) {
+	function* (id: EntityId) {
 		yield* Effect.annotateCurrentSpan({ "entity.id": id });
 		yield* Effect.logTrace("repo.entity.softDelete", { id });
-		const activeDb = yield* getActiveDb(db);
-		return yield* Effect.tryPromise({
-			try: () =>
-				activeDb
-					.update(davEntity)
-					.set({ deletedAt: sql`now()` })
-					.where(eq(davEntity.id, id))
-					.then(() => undefined),
-			catch: (e) => new DatabaseError({ cause: e }),
-		}).pipe(
+		return yield* runDbQuery((db) =>
+			db
+				.update(davEntity)
+				.set({ deletedAt: sql`now()` })
+				.where(eq(davEntity.id, id)),
+		).pipe(
+			Effect.asVoid,
 			Metric.trackDuration(
 				entityDuration.pipe(Metric.tagged("repo.operation", "softDelete")),
 			),
@@ -142,7 +129,7 @@ const softDelete = Effect.fn("EntityRepository.softDelete")(
 );
 
 const existsByUid = Effect.fn("EntityRepository.existsByUid")(
-	function* (db: DbClient, collectionId: CollectionId, logicalUid: string) {
+	function* (collectionId: CollectionId, logicalUid: string) {
 		yield* Effect.annotateCurrentSpan({
 			"collection.id": collectionId,
 			"entity.logical_uid": logicalUid,
@@ -151,25 +138,22 @@ const existsByUid = Effect.fn("EntityRepository.existsByUid")(
 			collectionId,
 			logicalUid,
 		});
-		const activeDb = yield* getActiveDb(db);
-		return yield* Effect.tryPromise({
-			try: () =>
-				activeDb
-					.select({ id: davEntity.id })
-					.from(davEntity)
-					.innerJoin(davInstance, eq(davInstance.entityId, davEntity.id))
-					.where(
-						and(
-							eq(davInstance.collectionId, collectionId),
-							eq(davEntity.logicalUid, logicalUid),
-							isNull(davInstance.deletedAt),
-							isNull(davEntity.deletedAt),
-						),
-					)
-					.limit(1)
-					.then((r) => r.length > 0),
-			catch: (e) => new DatabaseError({ cause: e }),
-		}).pipe(
+		return yield* runDbQuery((db) =>
+			db
+				.select({ id: davEntity.id })
+				.from(davEntity)
+				.innerJoin(davInstance, eq(davInstance.entityId, davEntity.id))
+				.where(
+					and(
+						eq(davInstance.collectionId, collectionId),
+						eq(davEntity.logicalUid, logicalUid),
+						isNull(davInstance.deletedAt),
+						isNull(davEntity.deletedAt),
+					),
+				)
+				.limit(1),
+		).pipe(
+			Effect.map((r) => r.length > 0),
 			Metric.trackDuration(
 				entityDuration.pipe(Metric.tagged("repo.operation", "existsByUid")),
 			),
@@ -183,7 +167,7 @@ const existsByUid = Effect.fn("EntityRepository.existsByUid")(
 const existsByUidForPrincipal = Effect.fn(
 	"EntityRepository.existsByUidForPrincipal",
 )(
-	function* (db: DbClient, principalId: PrincipalId, logicalUid: string) {
+	function* (principalId: PrincipalId, logicalUid: string) {
 		yield* Effect.annotateCurrentSpan({
 			"principal.id": principalId,
 			"entity.logical_uid": logicalUid,
@@ -192,31 +176,28 @@ const existsByUidForPrincipal = Effect.fn(
 			principalId,
 			logicalUid,
 		});
-		const activeDb = yield* getActiveDb(db);
-		return yield* Effect.tryPromise({
-			try: () =>
-				activeDb
-					.select({ id: davEntity.id })
-					.from(davEntity)
-					.innerJoin(davInstance, eq(davInstance.entityId, davEntity.id))
-					.innerJoin(
-						davCollection,
-						eq(davCollection.id, davInstance.collectionId),
-					)
-					.where(
-						and(
-							eq(davCollection.ownerPrincipalId, principalId),
-							eq(davCollection.collectionType, "calendar"),
-							eq(davEntity.logicalUid, logicalUid),
-							isNull(davInstance.deletedAt),
-							isNull(davEntity.deletedAt),
-							isNull(davCollection.deletedAt),
-						),
-					)
-					.limit(1)
-					.then((r) => r.length > 0),
-			catch: (e) => new DatabaseError({ cause: e }),
-		}).pipe(
+		return yield* runDbQuery((db) =>
+			db
+				.select({ id: davEntity.id })
+				.from(davEntity)
+				.innerJoin(davInstance, eq(davInstance.entityId, davEntity.id))
+				.innerJoin(
+					davCollection,
+					eq(davCollection.id, davInstance.collectionId),
+				)
+				.where(
+					and(
+						eq(davCollection.ownerPrincipalId, principalId),
+						eq(davCollection.collectionType, "calendar"),
+						eq(davEntity.logicalUid, logicalUid),
+						isNull(davInstance.deletedAt),
+						isNull(davEntity.deletedAt),
+						isNull(davCollection.deletedAt),
+					),
+				)
+				.limit(1),
+		).pipe(
+			Effect.map((r) => r.length > 0),
 			Metric.trackDuration(
 				entityDuration.pipe(
 					Metric.tagged("repo.operation", "existsByUidForPrincipal"),
@@ -231,15 +212,19 @@ const existsByUidForPrincipal = Effect.fn(
 
 export const EntityRepositoryLive = Layer.effect(
 	EntityRepository,
-	Effect.map(DatabaseClient, (db) =>
-		EntityRepository.of({
-			insert: (input) => insertEntity(db, input),
-			findById: (id) => findById(db, id),
-			updateLogicalUid: (id, uid) => updateLogicalUid(db, id, uid),
-			softDelete: (id) => softDelete(db, id),
-			existsByUid: (collectionId, uid) => existsByUid(db, collectionId, uid),
-			existsByUidForPrincipal: (principalId, uid) =>
-				existsByUidForPrincipal(db, principalId, uid),
-		}),
-	),
+	Effect.gen(function* () {
+		const dc = yield* DatabaseClient;
+		const run = <A, E>(e: Effect.Effect<A, E, DatabaseClient>): Effect.Effect<A, E> =>
+			Effect.provideService(e, DatabaseClient, dc);
+		return EntityRepository.of({
+			insert: (...args: Parameters<typeof insertEntity>) => run(insertEntity(...args)),
+			findById: (...args: Parameters<typeof findById>) => run(findById(...args)),
+			updateLogicalUid: (...args: Parameters<typeof updateLogicalUid>) =>
+				run(updateLogicalUid(...args)),
+			softDelete: (...args: Parameters<typeof softDelete>) => run(softDelete(...args)),
+			existsByUid: (...args: Parameters<typeof existsByUid>) => run(existsByUid(...args)),
+			existsByUidForPrincipal: (...args: Parameters<typeof existsByUidForPrincipal>) =>
+				run(existsByUidForPrincipal(...args)),
+		});
+	}),
 );

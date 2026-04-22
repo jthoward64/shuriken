@@ -1,9 +1,9 @@
 import { eq, sql } from "drizzle-orm";
 import { Effect, Layer, Metric, Option } from "effect";
 import type { Temporal } from "temporal-polyfill";
-import { DatabaseClient, type DbClient } from "#src/db/client.ts";
+import { DatabaseClient } from "#src/db/client.ts";
 import { calTimezone } from "#src/db/drizzle/schema/index.ts";
-import { getActiveDb } from "#src/db/transaction.ts";
+import { runDbQuery } from "#src/db/query.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
 import { repoQueryDurationMs } from "#src/observability/metrics.ts";
 import { CalTimezoneRepository } from "./repository.ts";
@@ -17,20 +17,17 @@ const tzDuration = repoQueryDurationMs.pipe(
 );
 
 const findByTzid = Effect.fn("CalTimezoneRepository.findByTzid")(
-	function* (db: DbClient, tzid: string) {
+	function* (tzid: string) {
 		yield* Effect.annotateCurrentSpan({ "tz.tzid": tzid });
 		yield* Effect.logTrace("repo.timezone.findByTzid", { tzid });
-		const activeDb = yield* getActiveDb(db);
-		return yield* Effect.tryPromise({
-			try: () =>
-				activeDb
-					.select()
-					.from(calTimezone)
-					.where(eq(calTimezone.tzid, tzid))
-					.limit(1)
-					.then((r) => Option.fromNullable(r[0])),
-			catch: (e) => new DatabaseError({ cause: e }),
-		}).pipe(
+		return yield* runDbQuery((db) =>
+			db
+				.select()
+				.from(calTimezone)
+				.where(eq(calTimezone.tzid, tzid))
+				.limit(1),
+		).pipe(
+			Effect.map((r) => Option.fromNullable(r[0])),
 			Metric.trackDuration(
 				tzDuration.pipe(Metric.tagged("repo.operation", "findByTzid")),
 			),
@@ -43,7 +40,6 @@ const findByTzid = Effect.fn("CalTimezoneRepository.findByTzid")(
 
 const upsert = Effect.fn("CalTimezoneRepository.upsert")(
 	function* (
-		db: DbClient,
 		tzid: string,
 		vtimezoneData: string,
 		ianaName: Option.Option<string>,
@@ -55,56 +51,57 @@ const upsert = Effect.fn("CalTimezoneRepository.upsert")(
 			hasIanaName: Option.isSome(ianaName),
 			hasLastModified: Option.isSome(lastModified),
 		});
-		const activeDb = yield* getActiveDb(db);
-		return yield* Effect.tryPromise({
-			try: () =>
-				activeDb
-					.insert(calTimezone)
-					.values({
-						tzid,
-						vtimezoneData,
-						ianaName: Option.getOrNull(ianaName),
-						// Use sql cast to avoid temporal-polyfill vs temporal-spec type conflict.
-						// The custom type's toDriver (Instant → ISO string) is bypassed here;
-						// we perform the same conversion manually and let PG parse it.
-						lastModifiedAt: Option.match(lastModified, {
-							onNone: () => null,
-							onSome: (inst) => sql`${inst.toString()}::timestamptz`,
-						}),
-					})
-					.onConflictDoUpdate({
-						target: calTimezone.tzid,
-						// RFC 5545 §3.6.5: only overwrite vtimezoneData when the incoming
-						// LAST-MODIFIED is absent (recency unknown) or ≥ the stored value.
-						// This prevents a stale client-sent VTIMEZONE from clobbering a
-						// more recent definition that another client already stored.
-						set: {
-							vtimezoneData: sql`CASE
-								WHEN excluded.last_modified_at IS NULL
-								  OR cal_timezone.last_modified_at IS NULL
-								  OR excluded.last_modified_at >= cal_timezone.last_modified_at
-								THEN excluded.vtimezone_data
-								ELSE cal_timezone.vtimezone_data
-							END`,
-							// GREATEST ignores NULLs, so whichever side has a timestamp wins;
-							// if both are NULL the column stays NULL.
-							lastModifiedAt: sql`GREATEST(excluded.last_modified_at, cal_timezone.last_modified_at)`,
-							// Only overwrite ianaName when a value is explicitly provided;
-							// Option.none() preserves whatever was previously resolved.
-							...(Option.isSome(ianaName) ? { ianaName: ianaName.value } : {}),
-							updatedAt: sql`now()`,
-						},
-					})
-					.returning()
-					.then((rows) => {
-						const row = rows[0];
-						if (!row) {
-							throw new Error("cal_timezone upsert returned no rows");
-						}
-						return row;
+		return yield* runDbQuery((db) =>
+			db
+				.insert(calTimezone)
+				.values({
+					tzid,
+					vtimezoneData,
+					ianaName: Option.getOrNull(ianaName),
+					// Use sql cast to avoid temporal-polyfill vs temporal-spec type conflict.
+					// The custom type's toDriver (Instant → ISO string) is bypassed here;
+					// we perform the same conversion manually and let PG parse it.
+					lastModifiedAt: Option.match(lastModified, {
+						onNone: () => null,
+						onSome: (inst) => sql`${inst.toString()}::timestamptz`,
 					}),
-			catch: (e) => new DatabaseError({ cause: e }),
-		}).pipe(
+				})
+				.onConflictDoUpdate({
+					target: calTimezone.tzid,
+					// RFC 5545 §3.6.5: only overwrite vtimezoneData when the incoming
+					// LAST-MODIFIED is absent (recency unknown) or ≥ the stored value.
+					// This prevents a stale client-sent VTIMEZONE from clobbering a
+					// more recent definition that another client already stored.
+					set: {
+						vtimezoneData: sql`CASE
+							WHEN excluded.last_modified_at IS NULL
+							  OR cal_timezone.last_modified_at IS NULL
+							  OR excluded.last_modified_at >= cal_timezone.last_modified_at
+							THEN excluded.vtimezone_data
+							ELSE cal_timezone.vtimezone_data
+						END`,
+						// GREATEST ignores NULLs, so whichever side has a timestamp wins;
+						// if both are NULL the column stays NULL.
+						lastModifiedAt: sql`GREATEST(excluded.last_modified_at, cal_timezone.last_modified_at)`,
+						// Only overwrite ianaName when a value is explicitly provided;
+						// Option.none() preserves whatever was previously resolved.
+						...(Option.isSome(ianaName) ? { ianaName: ianaName.value } : {}),
+						updatedAt: sql`now()`,
+					},
+				})
+				.returning(),
+		).pipe(
+			Effect.flatMap((rows) => {
+				const row = rows[0];
+				if (!row) {
+					return Effect.fail(
+						new DatabaseError({
+							cause: new Error("cal_timezone upsert returned no rows"),
+						}),
+					);
+				}
+				return Effect.succeed(row);
+			}),
 			Metric.trackDuration(
 				tzDuration.pipe(Metric.tagged("repo.operation", "upsert")),
 			),
@@ -117,11 +114,13 @@ const upsert = Effect.fn("CalTimezoneRepository.upsert")(
 
 export const CalTimezoneRepositoryLive = Layer.effect(
 	CalTimezoneRepository,
-	Effect.map(DatabaseClient, (db) =>
-		CalTimezoneRepository.of({
-			findByTzid: (tzid) => findByTzid(db, tzid),
-			upsert: (tzid, vtimezoneData, ianaName, lastModified) =>
-				upsert(db, tzid, vtimezoneData, ianaName, lastModified),
-		}),
-	),
+	Effect.gen(function* () {
+		const dc = yield* DatabaseClient;
+		const run = <A, E>(e: Effect.Effect<A, E, DatabaseClient>): Effect.Effect<A, E> =>
+			Effect.provideService(e, DatabaseClient, dc);
+		return CalTimezoneRepository.of({
+			findByTzid: (...args: Parameters<typeof findByTzid>) => run(findByTzid(...args)),
+			upsert: (...args: Parameters<typeof upsert>) => run(upsert(...args)),
+		});
+	}),
 );

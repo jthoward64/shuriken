@@ -10,14 +10,14 @@ import type {
 	IrValue,
 } from "#src/data/ir.ts";
 import { isKnownVcardProperty } from "#src/data/vcard/known.ts";
-import { DatabaseClient, type DbClient } from "#src/db/client.ts";
+import { DatabaseClient } from "#src/db/client.ts";
 import {
 	davComponent,
 	davParameter,
 	davProperty,
 	type EntityType,
 } from "#src/db/drizzle/schema/index.ts";
-import { getActiveDb } from "#src/db/transaction.ts";
+import { runDbQuery } from "#src/db/query.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
 import {
 	ComponentId,
@@ -191,28 +191,25 @@ const dbColumnsToIrValue = (
 };
 
 // ---------------------------------------------------------------------------
-// insertTree — recursive tree walk using the active DB connection
+// insertComponentEffect — recursive tree walk, one runDbQuery per insert.
 //
-// activeDb is resolved once by insertTree and threaded through recursion so
-// all inserts share the same connection (and transaction, if one is active).
+// Each insert gets its own db.insert span. getActiveDb is cheap (a FiberRef
+// read) so calling it per-insert via runDbQuery is fine.
 // ---------------------------------------------------------------------------
 
 const insertComponentEffect = (
-	activeDb: DbClient,
 	entityId: EntityId,
 	component: IrComponent,
 	parentComponentId: UuidString | null,
 	ordinal: number,
-): Effect.Effect<UuidString, DatabaseError> =>
+): Effect.Effect<UuidString, DatabaseError, DatabaseClient> =>
 	Effect.gen(function* () {
-		const compRows = yield* Effect.tryPromise({
-			try: () =>
-				activeDb
-					.insert(davComponent)
-					.values({ entityId, parentComponentId, name: component.name, ordinal })
-					.returning(),
-			catch: (e) => new DatabaseError({ cause: e }),
-		});
+		const compRows = yield* runDbQuery((db) =>
+			db
+				.insert(davComponent)
+				.values({ entityId, parentComponentId, name: component.name, ordinal })
+				.returning(),
+		);
 		const compRow = compRows[0];
 		if (!compRow) {
 			return yield* Effect.fail(
@@ -223,22 +220,22 @@ const insertComponentEffect = (
 
 		for (let i = 0; i < component.properties.length; i++) {
 			const prop = component.properties[i];
-			if (!prop) { continue; }
+			if (!prop) {
+				continue;
+			}
 			const valueColumns = irValueToDbColumns(prop.value);
-			const propRows = yield* Effect.tryPromise({
-				try: () =>
-					activeDb
-						.insert(davProperty)
-						.values({
-							componentId,
-							name: prop.name,
-							valueType: prop.value.type,
-							ordinal: i,
-							...valueColumns,
-						})
-						.returning(),
-				catch: (e) => new DatabaseError({ cause: e }),
-			});
+			const propRows = yield* runDbQuery((db) =>
+				db
+					.insert(davProperty)
+					.values({
+						componentId,
+						name: prop.name,
+						valueType: prop.value.type,
+						ordinal: i,
+						...valueColumns,
+					})
+					.returning(),
+			);
 			const propRow = propRows[0];
 			if (!propRow) {
 				return yield* Effect.fail(
@@ -249,24 +246,26 @@ const insertComponentEffect = (
 
 			for (let j = 0; j < prop.parameters.length; j++) {
 				const param = prop.parameters[j];
-				if (!param) { continue; }
-				yield* Effect.tryPromise({
-					try: () =>
-						activeDb.insert(davParameter).values({
-							propertyId,
-							name: param.name,
-							value: param.value,
-							ordinal: j,
-						}),
-					catch: (e) => new DatabaseError({ cause: e }),
-				});
+				if (!param) {
+					continue;
+				}
+				yield* runDbQuery((db) =>
+					db.insert(davParameter).values({
+						propertyId,
+						name: param.name,
+						value: param.value,
+						ordinal: j,
+					}),
+				).pipe(Effect.asVoid);
 			}
 		}
 
 		for (let i = 0; i < component.components.length; i++) {
 			const child = component.components[i];
-			if (!child) { continue; }
-			yield* insertComponentEffect(activeDb, entityId, child, componentId, i);
+			if (!child) {
+				continue;
+			}
+			yield* insertComponentEffect(entityId, child, componentId, i);
 		}
 
 		return componentId;
@@ -277,11 +276,10 @@ const compDuration = repoQueryDurationMs.pipe(
 );
 
 const insertTree = Effect.fn("ComponentRepository.insertTree")(
-	function* (db: DbClient, entityId: EntityId, root: IrComponent) {
+	function* (entityId: EntityId, root: IrComponent) {
 		yield* Effect.annotateCurrentSpan({ "entity.id": entityId });
 		yield* Effect.logTrace("repo.component.insertTree", { entityId });
-		const activeDb = yield* getActiveDb(db);
-		return yield* insertComponentEffect(activeDb, entityId, root, null, 0).pipe(
+		return yield* insertComponentEffect(entityId, root, null, 0).pipe(
 			Effect.map(ComponentId),
 			Metric.trackDuration(
 				compDuration.pipe(Metric.tagged("repo.operation", "insertTree")),
@@ -294,7 +292,7 @@ const insertTree = Effect.fn("ComponentRepository.insertTree")(
 );
 
 // ---------------------------------------------------------------------------
-// loadTree — bulk load + tree reconstruction
+// loadTree — three separate queries then in-memory tree reconstruction
 // ---------------------------------------------------------------------------
 
 const buildIrComponent = (
@@ -310,115 +308,109 @@ const buildIrComponent = (
 };
 
 const loadTree = Effect.fn("ComponentRepository.loadTree")(
-	function* (db: DbClient, entityId: EntityId, entityType: EntityType) {
+	function* (entityId: EntityId, entityType: EntityType) {
 		yield* Effect.annotateCurrentSpan({
 			"entity.id": entityId,
 			"entity.type": entityType,
 		});
 		yield* Effect.logTrace("repo.component.loadTree", { entityId, entityType });
-		const activeDb = yield* getActiveDb(db);
-		return yield* Effect.tryPromise({
-			try: async (): Promise<Option.Option<IrComponent>> => {
-				const isKnown =
-					entityType === "icalendar"
-						? isKnownIcalProperty
-						: isKnownVcardProperty;
+		const isKnown =
+			entityType === "icalendar" ? isKnownIcalProperty : isKnownVcardProperty;
 
-				// 1. Load all active component rows for the entity
-				const components = await activeDb
+		// 1. Load all active component rows for the entity
+		const components = yield* runDbQuery((db) =>
+			db
+				.select()
+				.from(davComponent)
+				.where(
+					and(
+						eq(davComponent.entityId, entityId),
+						isNull(davComponent.deletedAt),
+					),
+				)
+				.orderBy(davComponent.ordinal),
+		);
+
+		if (components.length === 0) {
+			return Option.none<IrComponent>();
+		}
+
+		const componentIds = components.map((c) => c.id);
+
+		// 2. Load all active property rows for those components
+		const properties = yield* runDbQuery((db) =>
+			db
+				.select()
+				.from(davProperty)
+				.where(
+					and(
+						inArray(davProperty.componentId, componentIds),
+						isNull(davProperty.deletedAt),
+					),
+				)
+				.orderBy(davProperty.ordinal),
+		);
+
+		// 3. Load all active parameter rows for those properties
+		let parameters: Array<ParameterRow> = [];
+		if (properties.length > 0) {
+			const propertyIds = properties.map((p) => p.id);
+			parameters = yield* runDbQuery((db) =>
+				db
 					.select()
-					.from(davComponent)
+					.from(davParameter)
 					.where(
 						and(
-							eq(davComponent.entityId, entityId),
-							isNull(davComponent.deletedAt),
+							inArray(davParameter.propertyId, propertyIds),
+							isNull(davParameter.deletedAt),
 						),
 					)
-					.orderBy(davComponent.ordinal);
+					.orderBy(davParameter.ordinal),
+			);
+		}
 
-				if (components.length === 0) {
-					return Option.none();
-				}
+		// 4. Group parameters by propertyId
+		const paramsByPropId = new Map<string, Array<IrParameter>>();
+		for (const param of parameters) {
+			const list = paramsByPropId.get(param.propertyId) ?? [];
+			list.push({ name: param.name, value: param.value });
+			paramsByPropId.set(param.propertyId, list);
+		}
 
-				const componentIds = components.map((c) => c.id);
+		// 5. Build IrProperty list per componentId
+		const propertiesByCompId = new Map<string, Array<IrProperty>>();
+		for (const propRow of properties) {
+			const irParams = paramsByPropId.get(propRow.id) ?? [];
+			const irProp: IrProperty = {
+				name: propRow.name,
+				parameters: irParams,
+				value: dbColumnsToIrValue(propRow, irParams),
+				isKnown: isKnown(propRow.name),
+			};
+			const list = propertiesByCompId.get(propRow.componentId) ?? [];
+			list.push(irProp);
+			propertiesByCompId.set(propRow.componentId, list);
+		}
 
-				// 2. Load all active property rows for those components
-				const properties = await activeDb
-					.select()
-					.from(davProperty)
-					.where(
-						and(
-							inArray(davProperty.componentId, componentIds),
-							isNull(davProperty.deletedAt),
-						),
-					)
-					.orderBy(davProperty.ordinal);
+		// 6. Build parent→children map and find root
+		const childrenByParentId = new Map<string, Array<ComponentRow>>();
+		let rootComp: ComponentRow | undefined;
+		for (const comp of components) {
+			if (comp.parentComponentId === null) {
+				rootComp = comp;
+			} else {
+				const list = childrenByParentId.get(comp.parentComponentId) ?? [];
+				list.push(comp);
+				childrenByParentId.set(comp.parentComponentId, list);
+			}
+		}
 
-				// 3. Load all active parameter rows for those properties
-				let parameters: Array<ParameterRow> = [];
-				if (properties.length > 0) {
-					const propertyIds = properties.map((p) => p.id);
-					parameters = await activeDb
-						.select()
-						.from(davParameter)
-						.where(
-							and(
-								inArray(davParameter.propertyId, propertyIds),
-								isNull(davParameter.deletedAt),
-							),
-						)
-						.orderBy(davParameter.ordinal);
-				}
+		if (!rootComp) {
+			return Option.none<IrComponent>();
+		}
 
-				// 4. Group parameters by propertyId
-				const paramsByPropId = new Map<string, Array<IrParameter>>();
-				for (const param of parameters) {
-					const list = paramsByPropId.get(param.propertyId) ?? [];
-					list.push({ name: param.name, value: param.value });
-					paramsByPropId.set(param.propertyId, list);
-				}
-
-				// 5. Build IrProperty list per componentId
-				const propertiesByCompId = new Map<string, Array<IrProperty>>();
-				for (const propRow of properties) {
-					const irParams = paramsByPropId.get(propRow.id) ?? [];
-					const irProp: IrProperty = {
-						name: propRow.name,
-						parameters: irParams,
-						value: dbColumnsToIrValue(propRow, irParams),
-						isKnown: isKnown(propRow.name),
-					};
-					const list = propertiesByCompId.get(propRow.componentId) ?? [];
-					list.push(irProp);
-					propertiesByCompId.set(propRow.componentId, list);
-				}
-
-				// 6. Build parent→children map and find root
-				const childrenByParentId = new Map<string, Array<ComponentRow>>();
-				let rootComp: ComponentRow | undefined;
-				for (const comp of components) {
-					if (comp.parentComponentId === null) {
-						rootComp = comp;
-					} else {
-						const list = childrenByParentId.get(comp.parentComponentId) ?? [];
-						list.push(comp);
-						childrenByParentId.set(comp.parentComponentId, list);
-					}
-				}
-
-				if (!rootComp) {
-					return Option.none();
-				}
-
-				return Option.some(
-					buildIrComponent(rootComp, childrenByParentId, propertiesByCompId),
-				);
-			},
-			catch: (e) => new DatabaseError({ cause: e }),
-		}).pipe(
-			Metric.trackDuration(
-				compDuration.pipe(Metric.tagged("repo.operation", "loadTree")),
-			),
+		return Option.some(
+			buildIrComponent(rootComp, childrenByParentId, propertiesByCompId),
 		);
 	},
 	Effect.tapError((e) =>
@@ -431,24 +423,21 @@ const loadTree = Effect.fn("ComponentRepository.loadTree")(
 // ---------------------------------------------------------------------------
 
 const deleteByEntity = Effect.fn("ComponentRepository.deleteByEntity")(
-	function* (db: DbClient, entityId: EntityId) {
+	function* (entityId: EntityId) {
 		yield* Effect.annotateCurrentSpan({ "entity.id": entityId });
 		yield* Effect.logTrace("repo.component.deleteByEntity", { entityId });
-		const activeDb = yield* getActiveDb(db);
-		return yield* Effect.tryPromise({
-			try: () =>
-				activeDb
-					.update(davComponent)
-					.set({ deletedAt: sql`now()` })
-					.where(
-						and(
-							eq(davComponent.entityId, entityId),
-							isNull(davComponent.deletedAt),
-						),
-					)
-					.then(() => undefined),
-			catch: (e) => new DatabaseError({ cause: e }),
-		}).pipe(
+		return yield* runDbQuery((db) =>
+			db
+				.update(davComponent)
+				.set({ deletedAt: sql`now()` })
+				.where(
+					and(
+						eq(davComponent.entityId, entityId),
+						isNull(davComponent.deletedAt),
+					),
+				),
+		).pipe(
+			Effect.asVoid,
 			Metric.trackDuration(
 				compDuration.pipe(Metric.tagged("repo.operation", "deleteByEntity")),
 			),
@@ -465,11 +454,15 @@ const deleteByEntity = Effect.fn("ComponentRepository.deleteByEntity")(
 
 export const ComponentRepositoryLive = Layer.effect(
 	ComponentRepository,
-	Effect.map(DatabaseClient, (db) =>
-		ComponentRepository.of({
-			insertTree: (entityId, root) => insertTree(db, entityId, root),
-			loadTree: (entityId, entityType) => loadTree(db, entityId, entityType),
-			deleteByEntity: (entityId) => deleteByEntity(db, entityId),
-		}),
-	),
+	Effect.gen(function* () {
+		const dc = yield* DatabaseClient;
+		const run = <A, E>(e: Effect.Effect<A, E, DatabaseClient>): Effect.Effect<A, E> =>
+			Effect.provideService(e, DatabaseClient, dc);
+		return ComponentRepository.of({
+			insertTree: (...args: Parameters<typeof insertTree>) => run(insertTree(...args)),
+			loadTree: (...args: Parameters<typeof loadTree>) => run(loadTree(...args)),
+			deleteByEntity: (...args: Parameters<typeof deleteByEntity>) =>
+				run(deleteByEntity(...args)),
+		});
+	}),
 );

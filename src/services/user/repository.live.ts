@@ -1,8 +1,8 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { Effect, Layer, Option } from "effect";
-import { DatabaseClient, type DbClient } from "#src/db/client.ts";
+import { DatabaseClient } from "#src/db/client.ts";
 import { authUser, principal, user } from "#src/db/drizzle/schema/index.ts";
-import { getActiveDb } from "#src/db/transaction.ts";
+import { runDbQuery } from "#src/db/query.ts";
 import {
 	ConflictError,
 	DatabaseError,
@@ -23,25 +23,23 @@ import {
 // ---------------------------------------------------------------------------
 
 const findById = Effect.fn("UserRepository.findById")(
-	function* (db: DbClient, id: UserId) {
+	function* (id: UserId) {
 		yield* Effect.annotateCurrentSpan({ "user.id": id });
 		yield* Effect.logTrace("repo.user.findById", { id });
-		const activeDb = yield* getActiveDb(db);
-		return yield* Effect.tryPromise({
-			try: () =>
-				activeDb
-					.select()
-					.from(user)
-					.innerJoin(principal, eq(principal.id, user.principalId))
-					.where(and(eq(user.id, id), isNull(principal.deletedAt)))
-					.limit(1)
-					.then((r) =>
-						Option.fromNullable(
-							r[0] ? { principal: r[0].principal, user: r[0].user } : null,
-						),
-					),
-			catch: (e) => new DatabaseError({ cause: e }),
-		});
+		return yield* runDbQuery((db) =>
+			db
+				.select()
+				.from(user)
+				.innerJoin(principal, eq(principal.id, user.principalId))
+				.where(and(eq(user.id, id), isNull(principal.deletedAt)))
+				.limit(1),
+		).pipe(
+			Effect.map((r) =>
+				Option.fromNullable(
+					r[0] ? { principal: r[0].principal, user: r[0].user } : null,
+				),
+			),
+		);
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.user.findById failed", e.cause),
@@ -49,24 +47,22 @@ const findById = Effect.fn("UserRepository.findById")(
 );
 
 const findByEmail = Effect.fn("UserRepository.findByEmail")(
-	function* (db: DbClient, email: Email) {
+	function* (email: Email) {
 		yield* Effect.logTrace("repo.user.findByEmail");
-		const activeDb = yield* getActiveDb(db);
-		return yield* Effect.tryPromise({
-			try: () =>
-				activeDb
-					.select()
-					.from(user)
-					.innerJoin(principal, eq(principal.id, user.principalId))
-					.where(and(eq(user.email, email), isNull(principal.deletedAt)))
-					.limit(1)
-					.then((r) =>
-						Option.fromNullable(
-							r[0] ? { principal: r[0].principal, user: r[0].user } : null,
-						),
-					),
-			catch: (e) => new DatabaseError({ cause: e }),
-		});
+		return yield* runDbQuery((db) =>
+			db
+				.select()
+				.from(user)
+				.innerJoin(principal, eq(principal.id, user.principalId))
+				.where(and(eq(user.email, email), isNull(principal.deletedAt)))
+				.limit(1),
+		).pipe(
+			Effect.map((r) =>
+				Option.fromNullable(
+					r[0] ? { principal: r[0].principal, user: r[0].user } : null,
+				),
+			),
+		);
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.user.findByEmail failed", e.cause),
@@ -74,67 +70,58 @@ const findByEmail = Effect.fn("UserRepository.findByEmail")(
 );
 
 const create = Effect.fn("UserRepository.create")(
-	function* (
-		db: DbClient,
-		input: {
-			readonly slug: Slug;
-			readonly email: Email;
-			readonly displayName?: string;
-			readonly credentials: ReadonlyArray<HashedCredential>;
-		},
-	) {
+	function* (input: {
+		readonly slug: Slug;
+		readonly email: Email;
+		readonly displayName?: string;
+		readonly credentials: ReadonlyArray<HashedCredential>;
+	}) {
 		yield* Effect.annotateCurrentSpan({ "user.slug": input.slug });
 		yield* Effect.logTrace("repo.user.create", { slug: input.slug });
-		const activeDb = yield* getActiveDb(db);
 
-		const principalRows = yield* Effect.tryPromise<
-			ReadonlyArray<typeof principal.$inferSelect>,
-			DatabaseError | ConflictError
-		>({
-			try: () =>
-				activeDb
-					.insert(principal)
-					.values({
-						principalType: "user",
-						slug: input.slug,
-						displayName: input.displayName,
-					})
-					.returning(),
-			catch: (e) =>
-				isPgUniqueViolation(e)
+		const principalRows = yield* runDbQuery((db) =>
+			db
+				.insert(principal)
+				.values({
+					principalType: "user",
+					slug: input.slug,
+					displayName: input.displayName,
+				})
+				.returning(),
+		).pipe(
+			Effect.mapError((e) =>
+				isPgUniqueViolation(e.cause)
 					? new ConflictError({
 							field: "slug_or_email",
 							message: "User with this slug or email already exists",
 						})
-					: new DatabaseError({ cause: e }),
-		});
+					: e,
+			),
+		);
 		const principalRow = principalRows[0];
 		if (!principalRow) {
 			return yield* Effect.fail(
-				new DatabaseError({ cause: new Error("principal insert returned no rows") }),
+				new DatabaseError({
+					cause: new Error("principal insert returned no rows"),
+				}),
 			);
 		}
 
-		const userRows = yield* Effect.tryPromise<
-			ReadonlyArray<typeof user.$inferSelect>,
-			DatabaseError | ConflictError
-		>({
-			try: () =>
-				activeDb
-					.insert(user)
-					.values({
-						email: input.email,
-						principalId: principalRow.id,
-					})
-					.returning(),
-			catch: (e) =>
-				isPgUniqueViolation(e)
+		const userRows = yield* runDbQuery((db) =>
+			db
+				.insert(user)
+				.values({ email: input.email, principalId: principalRow.id })
+				.returning(),
+		).pipe(
+			Effect.mapError((e) =>
+				isPgUniqueViolation(e.cause)
 					? new ConflictError({
 							field: "slug_or_email",
 							message: "User with this slug or email already exists",
 						})
-					: new DatabaseError({ cause: e }),
-		});
+					: e,
+			),
+		);
 		const userRow = userRows[0];
 		if (!userRow) {
 			return yield* Effect.fail(
@@ -143,16 +130,14 @@ const create = Effect.fn("UserRepository.create")(
 		}
 
 		for (const cred of input.credentials) {
-			yield* Effect.tryPromise({
-				try: () =>
-					activeDb.insert(authUser).values({
-						userId: userRow.id,
-						authSource: cred.authSource,
-						authId: cred.authId,
-						authCredential: Option.getOrNull(cred.authCredential),
-					}),
-				catch: (e) => new DatabaseError({ cause: e }),
-			});
+			yield* runDbQuery((db) =>
+				db.insert(authUser).values({
+					userId: userRow.id,
+					authSource: cred.authSource,
+					authId: cred.authId,
+					authCredential: Option.getOrNull(cred.authCredential),
+				}),
+			).pipe(Effect.asVoid);
 		}
 
 		return {
@@ -165,7 +150,6 @@ const create = Effect.fn("UserRepository.create")(
 
 const update = Effect.fn("UserRepository.update")(
 	function* (
-		db: DbClient,
 		id: UserId,
 		input: {
 			readonly email?: Email;
@@ -174,69 +158,66 @@ const update = Effect.fn("UserRepository.update")(
 	) {
 		yield* Effect.annotateCurrentSpan({ "user.id": id });
 		yield* Effect.logTrace("repo.user.update", { id });
-		const activeDb = yield* getActiveDb(db);
-		return yield* Effect.tryPromise({
-			try: async () => {
-				if (input.displayName !== undefined) {
-					await activeDb
-						.update(principal)
-						.set({ displayName: input.displayName, updatedAt: sql`now()` })
-						.from(user)
-						.where(and(eq(user.id, id), eq(principal.id, user.principalId)));
-				}
-				if (input.email !== undefined) {
-					const userPatch: { email?: Email } = {};
-					if (input.email !== undefined) {
-						userPatch.email = input.email;
-					}
-					await activeDb
-						.update(user)
-						.set({ ...userPatch, updatedAt: sql`now()` })
-						.where(eq(user.id, id));
-				}
 
-				const rows = await activeDb
-					.select()
+		if (input.displayName !== undefined) {
+			const displayName = input.displayName;
+			yield* runDbQuery((db) =>
+				db
+					.update(principal)
+					.set({ displayName, updatedAt: sql`now()` })
 					.from(user)
-					.innerJoin(principal, eq(principal.id, user.principalId))
-					.where(and(eq(user.id, id), isNull(principal.deletedAt)))
-					.limit(1);
+					.where(and(eq(user.id, id), eq(principal.id, user.principalId))),
+			).pipe(Effect.asVoid);
+		}
+		if (input.email !== undefined) {
+			const email = input.email;
+			yield* runDbQuery((db) =>
+				db
+					.update(user)
+					.set({ email, updatedAt: sql`now()` })
+					.where(eq(user.id, id)),
+			).pipe(Effect.asVoid);
+		}
 
-				const row = rows[0];
-				if (!row) {
-					throw new Error(`User not found after update: ${id}`);
-				}
-				return {
-					principal: row.principal,
-					user: row.user,
-				} satisfies UserWithPrincipal;
-			},
-			catch: (e) => new DatabaseError({ cause: e }),
-		});
+		const rows = yield* runDbQuery((db) =>
+			db
+				.select()
+				.from(user)
+				.innerJoin(principal, eq(principal.id, user.principalId))
+				.where(and(eq(user.id, id), isNull(principal.deletedAt)))
+				.limit(1),
+		);
+		const row = rows[0];
+		if (!row) {
+			return yield* Effect.fail(
+				new DatabaseError({
+					cause: new Error(`User not found after update: ${id}`),
+				}),
+			);
+		}
+		return { principal: row.principal, user: row.user } satisfies UserWithPrincipal;
 	},
 	Effect.tapError((e) => Effect.logWarning("repo.user.update failed", e.cause)),
 );
 
 const findCredential = Effect.fn("UserRepository.findCredential")(
-	function* (db: DbClient, authSource: string, authId: string) {
+	function* (authSource: string, authId: string) {
 		yield* Effect.annotateCurrentSpan({ "credential.source": authSource });
 		yield* Effect.logTrace("repo.user.findCredential", { authSource });
-		const activeDb = yield* getActiveDb(db);
-		return yield* Effect.tryPromise({
-			try: () =>
-				activeDb
-					.select()
-					.from(authUser)
-					.where(
-						and(
-							eq(authUser.authSource, authSource),
-							eq(authUser.authId, authId),
-						),
-					)
-					.limit(1)
-					.then((r) => Option.fromNullable(r[0] as AuthUserRow | undefined)),
-			catch: (e) => new DatabaseError({ cause: e }),
-		});
+		return yield* runDbQuery((db) =>
+			db
+				.select()
+				.from(authUser)
+				.where(
+					and(
+						eq(authUser.authSource, authSource),
+						eq(authUser.authId, authId),
+					),
+				)
+				.limit(1),
+		).pipe(
+			Effect.map((r) => Option.fromNullable(r[0] as AuthUserRow | undefined)),
+		);
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.user.findCredential failed", e.cause),
@@ -244,10 +225,7 @@ const findCredential = Effect.fn("UserRepository.findCredential")(
 );
 
 const insertCredential = Effect.fn("UserRepository.insertCredential")(
-	function* (
-		db: DbClient,
-		input: HashedCredential & { readonly userId: UserId },
-	) {
+	function* (input: HashedCredential & { readonly userId: UserId }) {
 		yield* Effect.annotateCurrentSpan({
 			"user.id": input.userId,
 			"credential.source": input.authSource,
@@ -255,27 +233,29 @@ const insertCredential = Effect.fn("UserRepository.insertCredential")(
 		yield* Effect.logTrace("repo.user.insertCredential", {
 			authSource: input.authSource,
 		});
-		const activeDb = yield* getActiveDb(db);
-		return yield* Effect.tryPromise({
-			try: () =>
-				activeDb
-					.insert(authUser)
-					.values({
-						userId: input.userId,
-						authSource: input.authSource,
-						authId: input.authId,
-						authCredential: Option.getOrNull(input.authCredential),
-					})
-					.returning()
-					.then((r) => {
-						const row = r[0];
-						if (!row) {
-							throw new Error("auth_user insert returned no rows");
-						}
-						return row;
-					}),
-			catch: (e) => new DatabaseError({ cause: e }),
-		});
+		return yield* runDbQuery((db) =>
+			db
+				.insert(authUser)
+				.values({
+					userId: input.userId,
+					authSource: input.authSource,
+					authId: input.authId,
+					authCredential: Option.getOrNull(input.authCredential),
+				})
+				.returning(),
+		).pipe(
+			Effect.flatMap((r) => {
+				const row = r[0];
+				if (!row) {
+					return Effect.fail(
+						new DatabaseError({
+							cause: new Error("auth_user insert returned no rows"),
+						}),
+					);
+				}
+				return Effect.succeed(row);
+			}),
+		);
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.user.insertCredential failed", e.cause),
@@ -283,31 +263,29 @@ const insertCredential = Effect.fn("UserRepository.insertCredential")(
 );
 
 const findBySlug = Effect.fn("UserRepository.findBySlug")(
-	function* (db: DbClient, slug: Slug) {
+	function* (slug: Slug) {
 		yield* Effect.annotateCurrentSpan({ "user.slug": slug });
 		yield* Effect.logTrace("repo.user.findBySlug", { slug });
-		const activeDb = yield* getActiveDb(db);
-		return yield* Effect.tryPromise({
-			try: () =>
-				activeDb
-					.select()
-					.from(user)
-					.innerJoin(principal, eq(principal.id, user.principalId))
-					.where(
-						and(
-							eq(principal.slug, slug),
-							eq(principal.principalType, "user"),
-							isNull(principal.deletedAt),
-						),
-					)
-					.limit(1)
-					.then((r) =>
-						Option.fromNullable(
-							r[0] ? { principal: r[0].principal, user: r[0].user } : null,
-						),
+		return yield* runDbQuery((db) =>
+			db
+				.select()
+				.from(user)
+				.innerJoin(principal, eq(principal.id, user.principalId))
+				.where(
+					and(
+						eq(principal.slug, slug),
+						eq(principal.principalType, "user"),
+						isNull(principal.deletedAt),
 					),
-			catch: (e) => new DatabaseError({ cause: e }),
-		});
+				)
+				.limit(1),
+		).pipe(
+			Effect.map((r) =>
+				Option.fromNullable(
+					r[0] ? { principal: r[0].principal, user: r[0].user } : null,
+				),
+			),
+		);
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.user.findBySlug failed", e.cause),
@@ -315,41 +293,35 @@ const findBySlug = Effect.fn("UserRepository.findBySlug")(
 );
 
 const list = Effect.fn("UserRepository.list")(
-	function* (db: DbClient) {
+	function* () {
 		yield* Effect.logTrace("repo.user.list");
-		const activeDb = yield* getActiveDb(db);
-		return yield* Effect.tryPromise({
-			try: () =>
-				activeDb
-					.select()
-					.from(user)
-					.innerJoin(principal, eq(principal.id, user.principalId))
-					.where(isNull(principal.deletedAt))
-					.orderBy(principal.slug)
-					.then((rows) =>
-						rows.map((r) => ({ principal: r.principal, user: r.user })),
-					),
-			catch: (e) => new DatabaseError({ cause: e }),
-		});
+		return yield* runDbQuery((db) =>
+			db
+				.select()
+				.from(user)
+				.innerJoin(principal, eq(principal.id, user.principalId))
+				.where(isNull(principal.deletedAt))
+				.orderBy(principal.slug),
+		).pipe(
+			Effect.map((rows) =>
+				rows.map((r) => ({ principal: r.principal, user: r.user })),
+			),
+		);
 	},
 	Effect.tapError((e) => Effect.logWarning("repo.user.list failed", e.cause)),
 );
 
 const softDelete = Effect.fn("UserRepository.softDelete")(
-	function* (db: DbClient, id: UserId) {
+	function* (id: UserId) {
 		yield* Effect.annotateCurrentSpan({ "user.id": id });
 		yield* Effect.logTrace("repo.user.softDelete", { id });
-		const activeDb = yield* getActiveDb(db);
-		return yield* Effect.tryPromise({
-			try: () =>
-				activeDb
-					.update(principal)
-					.set({ deletedAt: sql`now()`, updatedAt: sql`now()` })
-					.from(user)
-					.where(and(eq(user.id, id), eq(principal.id, user.principalId)))
-					.then(() => undefined),
-			catch: (e) => new DatabaseError({ cause: e }),
-		});
+		return yield* runDbQuery((db) =>
+			db
+				.update(principal)
+				.set({ deletedAt: sql`now()`, updatedAt: sql`now()` })
+				.from(user)
+				.where(and(eq(user.id, id), eq(principal.id, user.principalId))),
+		).pipe(Effect.asVoid);
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.user.softDelete failed", e.cause),
@@ -357,7 +329,7 @@ const softDelete = Effect.fn("UserRepository.softDelete")(
 );
 
 const deleteCredential = Effect.fn("UserRepository.deleteCredential")(
-	function* (db: DbClient, userId: UserId, authSource: string, authId: string) {
+	function* (userId: UserId, authSource: string, authId: string) {
 		yield* Effect.annotateCurrentSpan({
 			"user.id": userId,
 			"credential.source": authSource,
@@ -366,21 +338,17 @@ const deleteCredential = Effect.fn("UserRepository.deleteCredential")(
 			userId,
 			authSource,
 		});
-		const activeDb = yield* getActiveDb(db);
-		return yield* Effect.tryPromise({
-			try: () =>
-				activeDb
-					.delete(authUser)
-					.where(
-						and(
-							eq(authUser.userId, userId),
-							eq(authUser.authSource, authSource),
-							eq(authUser.authId, authId),
-						),
-					)
-					.then(() => undefined),
-			catch: (e) => new DatabaseError({ cause: e }),
-		});
+		return yield* runDbQuery((db) =>
+			db
+				.delete(authUser)
+				.where(
+					and(
+						eq(authUser.userId, userId),
+						eq(authUser.authSource, authSource),
+						eq(authUser.authId, authId),
+					),
+				),
+		).pipe(Effect.asVoid);
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.user.deleteCredential failed", e.cause),
@@ -389,19 +357,25 @@ const deleteCredential = Effect.fn("UserRepository.deleteCredential")(
 
 export const UserRepositoryLive = Layer.effect(
 	UserRepository,
-	Effect.map(DatabaseClient, (db) =>
-		UserRepository.of({
-			findById: (id) => findById(db, id),
-			findBySlug: (slug) => findBySlug(db, slug),
-			findByEmail: (email) => findByEmail(db, email),
-			list: () => list(db),
-			softDelete: (id) => softDelete(db, id),
-			create: (input) => create(db, input),
-			update: (id, input) => update(db, id, input),
-			findCredential: (source, authId) => findCredential(db, source, authId),
-			insertCredential: (input) => insertCredential(db, input),
-			deleteCredential: (userId, source, authId) =>
-				deleteCredential(db, userId, source, authId),
-		}),
-	),
+	Effect.gen(function* () {
+		const dc = yield* DatabaseClient;
+		const run = <A, E>(e: Effect.Effect<A, E, DatabaseClient>): Effect.Effect<A, E> =>
+			Effect.provideService(e, DatabaseClient, dc);
+		return UserRepository.of({
+			findById: (...args: Parameters<typeof findById>) => run(findById(...args)),
+			findBySlug: (...args: Parameters<typeof findBySlug>) => run(findBySlug(...args)),
+			findByEmail: (...args: Parameters<typeof findByEmail>) =>
+				run(findByEmail(...args)),
+			list: (...args: Parameters<typeof list>) => run(list(...args)),
+			softDelete: (...args: Parameters<typeof softDelete>) => run(softDelete(...args)),
+			create: (...args: Parameters<typeof create>) => run(create(...args)),
+			update: (...args: Parameters<typeof update>) => run(update(...args)),
+			findCredential: (...args: Parameters<typeof findCredential>) =>
+				run(findCredential(...args)),
+			insertCredential: (...args: Parameters<typeof insertCredential>) =>
+				run(insertCredential(...args)),
+			deleteCredential: (...args: Parameters<typeof deleteCredential>) =>
+				run(deleteCredential(...args)),
+		});
+	}),
 );

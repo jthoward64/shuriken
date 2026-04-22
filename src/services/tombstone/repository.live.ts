@@ -1,9 +1,8 @@
 import { and, eq, gt } from "drizzle-orm";
 import { Effect, Layer } from "effect";
-import { DatabaseClient, type DbClient } from "#src/db/client.ts";
+import { DatabaseClient } from "#src/db/client.ts";
 import { davTombstone } from "#src/db/drizzle/schema/index.ts";
-import { getActiveDb } from "#src/db/transaction.ts";
-import { DatabaseError } from "#src/domain/errors.ts";
+import { runDbQuery } from "#src/db/query.ts";
 import type { CollectionId } from "#src/domain/ids.ts";
 import { TombstoneRepository } from "./repository.ts";
 
@@ -13,7 +12,6 @@ import { TombstoneRepository } from "./repository.ts";
 
 const findSinceRevision = Effect.fn("TombstoneRepository.findSinceRevision")(
 	function* (
-		db: DbClient,
 		collectionId: CollectionId,
 		sinceSyncRevision: number,
 	) {
@@ -25,21 +23,18 @@ const findSinceRevision = Effect.fn("TombstoneRepository.findSinceRevision")(
 			collectionId,
 			sinceSyncRevision,
 		});
-		const activeDb = yield* getActiveDb(db);
-		return yield* Effect.tryPromise({
-			try: () =>
-				activeDb
-					.select()
-					.from(davTombstone)
-					.where(
-						and(
-							eq(davTombstone.collectionId, collectionId),
-							gt(davTombstone.syncRevision, sinceSyncRevision),
-						),
-					)
-					.orderBy(davTombstone.syncRevision),
-			catch: (e) => new DatabaseError({ cause: e }),
-		});
+		return yield* runDbQuery((db) =>
+			db
+				.select()
+				.from(davTombstone)
+				.where(
+					and(
+						eq(davTombstone.collectionId, collectionId),
+						gt(davTombstone.syncRevision, sinceSyncRevision),
+					),
+				)
+				.orderBy(davTombstone.syncRevision),
+		);
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.tombstone.findSinceRevision failed", e.cause),
@@ -48,10 +43,13 @@ const findSinceRevision = Effect.fn("TombstoneRepository.findSinceRevision")(
 
 export const TombstoneRepositoryLive = Layer.effect(
 	TombstoneRepository,
-	Effect.map(DatabaseClient, (db) =>
-		TombstoneRepository.of({
-			findSinceRevision: (collectionId, since) =>
-				findSinceRevision(db, collectionId, since),
-		}),
-	),
+	Effect.gen(function* () {
+		const dc = yield* DatabaseClient;
+		const run = <A, E>(e: Effect.Effect<A, E, DatabaseClient>): Effect.Effect<A, E> =>
+			Effect.provideService(e, DatabaseClient, dc);
+		return TombstoneRepository.of({
+			findSinceRevision: (...args: Parameters<typeof findSinceRevision>) =>
+				run(findSinceRevision(...args)),
+		});
+	}),
 );
