@@ -8,6 +8,7 @@ import { HTTP_NOT_FOUND } from "#src/http/status.ts";
 import { TemplateService } from "#src/http/ui/template/index.ts";
 import { BunFileService } from "#src/platform/file.ts";
 import { AclService } from "#src/services/acl/index.ts";
+import { CollectionService } from "#src/services/collection/index.ts";
 import { GroupService } from "#src/services/group/index.ts";
 import { PrincipalService } from "#src/services/principal/index.ts";
 import { UserService } from "#src/services/user/index.ts";
@@ -72,9 +73,18 @@ const stubLayers = Layer.mergeAll(
 		getAces: die,
 		setAces: die,
 	}),
+	Layer.succeed(CollectionService, {
+		findById: die,
+		findBySlug: die,
+		listByOwner: die,
+		create: die,
+		delete: die,
+		updateProperties: die,
+	}),
 	Layer.succeed(PrincipalService, {
 		findById: die,
 		findBySlug: die,
+		findPrincipalById: die,
 		findByEmail: die,
 		updateProperties: die,
 	}),

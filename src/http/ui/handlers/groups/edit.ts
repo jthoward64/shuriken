@@ -14,6 +14,7 @@ import { buildNavContext } from "#src/http/ui/helpers/nav-context.ts";
 import { renderPage } from "#src/http/ui/helpers/render-page.ts";
 import type { TemplateService } from "#src/http/ui/template/index.ts";
 import { AclService } from "#src/services/acl/index.ts";
+import { CollectionService } from "#src/services/collection/index.ts";
 import { GroupService } from "#src/services/group/index.ts";
 
 // ---------------------------------------------------------------------------
@@ -27,13 +28,14 @@ export const groupsEditHandler = (
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError | InternalError,
-	AclService | AppConfigService | GroupService | TemplateService
+	AclService | AppConfigService | CollectionService | GroupService | TemplateService
 > =>
 	Effect.gen(function* () {
 		const principal = yield* requireAuthenticated(ctx.auth);
 		const config = yield* AppConfigService;
 		const acl = yield* AclService;
 		const groupService = yield* GroupService;
+		const collectionService = yield* CollectionService;
 
 		const { group, principal: principalRow } =
 			yield* groupService.findBySlug(slug);
@@ -52,16 +54,26 @@ export const groupsEditHandler = (
 			);
 		}
 
-		const [members, groupsPrivs] = yield* Effect.all([
+		const [members, groupsPrivs, allCollections] = yield* Effect.all([
 			groupService.listMembers(group.id as GroupId),
 			acl.currentUserPrivileges(
 				principal.principalId,
 				GROUPS_VIRTUAL_RESOURCE_ID,
 				"virtual",
 			),
+			collectionService.listByOwner(principalRow.id as PrincipalId),
 		]);
 
 		const canDelete = groupsPrivs.includes("DAV:unbind");
+
+		const collections = allCollections
+			.filter((c) => c.collectionType === "calendar" || c.collectionType === "addressbook")
+			.map((c) => ({
+				id: c.id,
+				slug: c.slug,
+				displayName: c.displayName ?? c.slug,
+				collectionType: c.collectionType,
+			}));
 
 		const nav = yield* buildNavContext(
 			principal,
@@ -82,6 +94,7 @@ export const groupsEditHandler = (
 					id: m.user.id as UserId,
 				})),
 				canDelete,
+				collections,
 			},
 			ctx.headers,
 		);

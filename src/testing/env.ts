@@ -441,6 +441,9 @@ const makePrincipalRepo = (stores: TestStores): PrincipalRepositoryShape => ({
 			),
 		),
 
+	findPrincipalById: (id) =>
+		Effect.succeed(Option.fromNullable(stores.principals.get(id) ?? null)),
+
 	findPrincipalBySlug: (slug) =>
 		Effect.succeed(
 			Option.fromNullable(

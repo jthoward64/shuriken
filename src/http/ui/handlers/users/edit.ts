@@ -17,6 +17,7 @@ import { buildNavContext } from "#src/http/ui/helpers/nav-context.ts";
 import { renderPage } from "#src/http/ui/helpers/render-page.ts";
 import type { TemplateService } from "#src/http/ui/template/index.ts";
 import { AclService } from "#src/services/acl/index.ts";
+import { CollectionService } from "#src/services/collection/index.ts";
 import { GroupService } from "#src/services/group/index.ts";
 import { UserService } from "#src/services/user/index.ts";
 
@@ -31,7 +32,7 @@ export const usersEditHandler = (
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError | InternalError,
-	AclService | AppConfigService | GroupService | TemplateService | UserService
+	AclService | AppConfigService | CollectionService | GroupService | TemplateService | UserService
 > =>
 	Effect.gen(function* () {
 		const principal = yield* requireAuthenticated(ctx.auth);
@@ -39,6 +40,7 @@ export const usersEditHandler = (
 		const acl = yield* AclService;
 		const userService = yield* UserService;
 		const groupService = yield* GroupService;
+		const collectionService = yield* CollectionService;
 
 		const { user, principal: principalRow } =
 			yield* userService.findBySlug(slug);
@@ -61,9 +63,10 @@ export const usersEditHandler = (
 			}
 		}
 
-		const [allGroups, userGroups] = yield* Effect.all([
+		const [allGroups, userGroups, allCollections] = yield* Effect.all([
 			groupService.list(),
 			groupService.listByMember(user.id as UserId),
+			collectionService.listByOwner(principalRow.id as PrincipalId),
 		]);
 
 		const userGroupIds = new Set(userGroups.map((g) => g.group.id));
@@ -94,6 +97,15 @@ export const usersEditHandler = (
 		const canEditSlug = usersPrivs.includes("DAV:unbind");
 		const canDelete = usersPrivs.includes("DAV:unbind");
 
+		const collections = allCollections
+			.filter((c) => c.collectionType === "calendar" || c.collectionType === "addressbook")
+			.map((c) => ({
+				id: c.id,
+				slug: c.slug,
+				displayName: c.displayName ?? c.slug,
+				collectionType: c.collectionType,
+			}));
+
 		const nav = yield* buildNavContext(
 			principal,
 			ctx.url.pathname,
@@ -123,6 +135,7 @@ export const usersEditHandler = (
 				canDelete,
 				showPasswordForm: config.auth.mode === "basic",
 				isSelf,
+				collections,
 			},
 			ctx.headers,
 		);

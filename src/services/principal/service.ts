@@ -15,6 +15,10 @@ import type {
 // ---------------------------------------------------------------------------
 
 export interface PrincipalServiceShape {
+	/** Find any principal (user OR group) by ID — no user join. */
+	readonly findPrincipalById: (
+		id: PrincipalId,
+	) => Effect.Effect<PrincipalRow, DavError | DatabaseError>;
 	readonly findById: (
 		id: PrincipalId,
 	) => Effect.Effect<PrincipalWithUser, DavError | DatabaseError>;

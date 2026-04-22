@@ -101,6 +101,39 @@
     </section>
   {{/if}}
 
+  <section class="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
+    <div class="flex items-center justify-between">
+      <h2 class="text-base font-semibold text-gray-800">Collections</h2>
+      <a href="/ui/users/{{principal.slug}}/collections/new" class="px-3 py-1.5 bg-white border border-gray-300 text-gray-700 text-xs font-medium rounded hover:bg-gray-50">
+        Add collection
+      </a>
+    </div>
+    {{#if collections}}
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-gray-200">
+            <th class="text-left font-medium text-gray-700 pb-2">Name</th>
+            <th class="text-left font-medium text-gray-700 pb-2">Type</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {{#each collections}}
+            <tr>
+              <td class="py-2">
+                <a href="/ui/collections/{{id}}" class="text-gray-900 hover:text-gray-600">
+                  {{displayName}}
+                </a>
+              </td>
+              <td class="py-2 text-gray-500">{{collectionType}}</td>
+            </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    {{else}}
+      <p class="text-gray-500 text-sm">No collections yet.</p>
+    {{/if}}
+  </section>
+
   {{#if groups}}
     <section class="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
       <h2 class="text-base font-semibold text-gray-800">Group memberships</h2>

@@ -72,6 +72,7 @@ const stubLayers = Layer.mergeAll(
 	Layer.succeed(PrincipalRepository, {
 		findById: die,
 		findBySlug: die,
+		findPrincipalById: die,
 		findPrincipalBySlug: die,
 		findByEmail: die,
 		findUserByUserId: die,
@@ -126,6 +127,7 @@ const stubLayers = Layer.mergeAll(
 	Layer.succeed(PrincipalService, {
 		findById: die,
 		findBySlug: die,
+		findPrincipalById: die,
 		findByEmail: die,
 		updateProperties: die,
 	}),

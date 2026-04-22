@@ -19,6 +19,16 @@ export const PrincipalServiceLive = Layer.effect(
 		const repo = yield* PrincipalRepository;
 
 		return PrincipalService.of({
+			findPrincipalById: Effect.fn("PrincipalService.findPrincipalById")(
+				function* (id: PrincipalId) {
+					yield* Effect.annotateCurrentSpan({ "principal.id": id });
+					yield* Effect.logTrace("principal.findPrincipalById", { id });
+					return yield* repo
+						.findPrincipalById(id)
+						.pipe(Effect.flatMap(someOrNotFound(`Principal not found: ${id}`)));
+				},
+			),
+
 			findById: Effect.fn("PrincipalService.findById")(function* (
 				id: PrincipalId,
 			) {
