@@ -6,14 +6,14 @@ import type { Email } from "#src/domain/types/strings.ts";
 // FormValidationError — carries field-keyed validation messages
 // ---------------------------------------------------------------------------
 
-export class FormValidationError extends Data.TaggedError("FormValidationError")<{
+export class FormValidationError extends Data.TaggedError(
+	"FormValidationError",
+)<{
 	readonly fields: ReadonlyMap<string, string>;
 }> {}
 
 const fail = (field: string, message: string) =>
-	Effect.fail(
-		new FormValidationError({ fields: new Map([[field, message]]) }),
-	);
+	Effect.fail(new FormValidationError({ fields: new Map([[field, message]]) }));
 
 // ---------------------------------------------------------------------------
 // Field parsers
@@ -28,7 +28,10 @@ export const parseSlug = (
 		return fail(field, "Slug is required");
 	}
 	if (!/^[a-z0-9-]+$/.test(v)) {
-		return fail(field, "Slug may only contain lowercase letters, digits, and hyphens");
+		return fail(
+			field,
+			"Slug may only contain lowercase letters, digits, and hyphens",
+		);
 	}
 	return Effect.succeed(v as Slug);
 };
@@ -79,5 +82,4 @@ export const parsePassword = (
 /** Convert a FormValidationError to a field-keyed plain object for templates. */
 export const validationErrorToContext = (
 	err: FormValidationError,
-): Record<string, string> =>
-	Object.fromEntries(err.fields);
+): Record<string, string> => Object.fromEntries(err.fields);

@@ -16,7 +16,11 @@ export const groupsDeleteHandler = (
 	_req: Request,
 	ctx: HttpRequestContext,
 	principalId: PrincipalId,
-): Effect.Effect<Response, DavError | DatabaseError, AclService | GroupService> =>
+): Effect.Effect<
+	Response,
+	DavError | DatabaseError,
+	AclService | GroupService
+> =>
 	Effect.gen(function* () {
 		const principal = yield* requireAuthenticated(ctx.auth);
 		const acl = yield* AclService;

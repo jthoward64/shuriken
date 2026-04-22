@@ -91,7 +91,10 @@ export interface AclServiceShape {
 		principalId: PrincipalId,
 		resourceIds: ReadonlyArray<AclResourceId>,
 		resourceType: AclResourceType,
-	) => Effect.Effect<ReadonlyMap<AclResourceId, ReadonlyArray<DavPrivilege>>, DatabaseError>;
+	) => Effect.Effect<
+		ReadonlyMap<AclResourceId, ReadonlyArray<DavPrivilege>>,
+		DatabaseError
+	>;
 }
 
 export class AclService extends Context.Tag("AclService")<

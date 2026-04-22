@@ -1480,21 +1480,29 @@ export const makeTestEnv = (): TestEnvBuilder => {
 			});
 
 			const noOpDb = {
-				transaction: async <T>(fn: (tx: DatabaseClient) => Promise<T>): Promise<T> =>
-					fn(noOpDb as unknown as DatabaseClient),
+				transaction: async <T>(
+					fn: (tx: DatabaseClient) => Promise<T>,
+				): Promise<T> => fn(noOpDb as unknown as DatabaseClient),
 			} as unknown as DatabaseClient;
 			const testDbClientLayer = Layer.succeed(DatabaseClient, noOpDb);
 
 			const userServiceLayer = UserServiceLive.pipe(
 				Layer.provide(
-					Layer.mergeAll(userRepoLayer, TestCryptoLayer, aclRepoLayer, testDbClientLayer),
+					Layer.mergeAll(
+						userRepoLayer,
+						TestCryptoLayer,
+						aclRepoLayer,
+						testDbClientLayer,
+					),
 				),
 			);
 			const principalServiceLayer = PrincipalServiceLive.pipe(
 				Layer.provide(principalRepoLayer),
 			);
 			const collectionServiceLayer = CollectionServiceLive.pipe(
-				Layer.provide(Layer.mergeAll(collectionRepoLayer, aclRepoLayer, testDbClientLayer)),
+				Layer.provide(
+					Layer.mergeAll(collectionRepoLayer, aclRepoLayer, testDbClientLayer),
+				),
 			);
 			const instanceServiceLayer = InstanceServiceLive.pipe(
 				Layer.provide(instanceRepoLayer),

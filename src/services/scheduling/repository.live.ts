@@ -99,7 +99,9 @@ const findDefaultCalendar = Effect.fn(
 	"SchedulingRepository.findDefaultCalendar",
 )(function* (principalId: PrincipalId) {
 	yield* Effect.annotateCurrentSpan({ "principal.id": principalId });
-	yield* Effect.logTrace("repo.scheduling.findDefaultCalendar", { principalId });
+	yield* Effect.logTrace("repo.scheduling.findDefaultCalendar", {
+		principalId,
+	});
 	// Step 1: get the inbox to read scheduleDefaultCalendarId
 	const inbox = yield* runDbQuery((db) =>
 		db
@@ -143,12 +145,18 @@ const findSorByUid = Effect.fn("SchedulingRepository.findSorByUid")(
 			"principal.id": principalId,
 			"entity.logical_uid": uid,
 		});
-		yield* Effect.logTrace("repo.scheduling.findSorByUid", { principalId, uid });
+		yield* Effect.logTrace("repo.scheduling.findSorByUid", {
+			principalId,
+			uid,
+		});
 		return yield* runDbQuery((db) =>
 			db
 				.select({ instance: davInstance, collection: davCollection })
 				.from(davInstance)
-				.innerJoin(davCollection, eq(davCollection.id, davInstance.collectionId))
+				.innerJoin(
+					davCollection,
+					eq(davCollection.id, davInstance.collectionId),
+				)
 				.innerJoin(davEntity, eq(davEntity.id, davInstance.entityId))
 				.where(
 					and(
@@ -321,20 +329,24 @@ export const SchedulingRepositoryLive = Layer.effect(
 	SchedulingRepository,
 	Effect.gen(function* () {
 		const dc = yield* DatabaseClient;
-		const run = <A, E>(e: Effect.Effect<A, E, DatabaseClient>): Effect.Effect<A, E> =>
-			Effect.provideService(e, DatabaseClient, dc);
+		const run = <A, E>(
+			e: Effect.Effect<A, E, DatabaseClient>,
+		): Effect.Effect<A, E> => Effect.provideService(e, DatabaseClient, dc);
 		return SchedulingRepository.of({
-			findPrincipalByCalAddress: (...args: Parameters<typeof findPrincipalByCalAddress>) =>
-				run(findPrincipalByCalAddress(...args)),
-			findInbox: (...args: Parameters<typeof findInbox>) => run(findInbox(...args)),
+			findPrincipalByCalAddress: (
+				...args: Parameters<typeof findPrincipalByCalAddress>
+			) => run(findPrincipalByCalAddress(...args)),
+			findInbox: (...args: Parameters<typeof findInbox>) =>
+				run(findInbox(...args)),
 			findDefaultCalendar: (...args: Parameters<typeof findDefaultCalendar>) =>
 				run(findDefaultCalendar(...args)),
 			findSorByUid: (...args: Parameters<typeof findSorByUid>) =>
 				run(findSorByUid(...args)),
 			findInboxInstance: (...args: Parameters<typeof findInboxInstance>) =>
 				run(findInboxInstance(...args)),
-			insertScheduleMessage: (...args: Parameters<typeof insertScheduleMessage>) =>
-				run(insertScheduleMessage(...args)),
+			insertScheduleMessage: (
+				...args: Parameters<typeof insertScheduleMessage>
+			) => run(insertScheduleMessage(...args)),
 			updateScheduleTag: (...args: Parameters<typeof updateScheduleTag>) =>
 				run(updateScheduleTag(...args)),
 			listOpaqueCalendarCollections: (

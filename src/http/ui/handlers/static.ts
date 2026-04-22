@@ -26,11 +26,13 @@ export const staticHandler = (
 		if (!exists) {
 			return new Response(null, { status: 404 });
 		}
-		const bytes = yield* files.readBytes(absPath).pipe(
-			Effect.catchAll((_e: InternalError) =>
-				Effect.succeed(null as unknown as Uint8Array),
-			),
-		);
+		const bytes = yield* files
+			.readBytes(absPath)
+			.pipe(
+				Effect.catchAll((_e: InternalError) =>
+					Effect.succeed(null as unknown as Uint8Array),
+				),
+			);
 		if (!bytes) {
 			return new Response(null, { status: 404 });
 		}

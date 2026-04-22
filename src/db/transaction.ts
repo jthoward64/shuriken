@@ -72,9 +72,10 @@ export const withTransaction = <A, E, R>(
 			Effect.async<A, E | DatabaseError>((resume) => {
 				db.transaction(async (tx) => {
 					const exit = await Runtime.runPromise(runtime)(
-						Effect.locally(TransactionRef, Option.some(tx as DbClient))(
-							Effect.exit(effect),
-						),
+						Effect.locally(
+							TransactionRef,
+							Option.some(tx as DbClient),
+						)(Effect.exit(effect)),
 					);
 					if (Exit.isSuccess(exit)) {
 						return exit.value;
@@ -84,9 +85,7 @@ export const withTransaction = <A, E, R>(
 					(value) => resume(Effect.succeed(value as A)),
 					(e) => {
 						if (e instanceof EffectExitWrapper && Exit.isFailure(e.exit)) {
-							resume(
-								Effect.failCause(e.exit.cause as Cause.Cause<E>),
-							);
+							resume(Effect.failCause(e.exit.cause as Cause.Cause<E>));
 						} else {
 							resume(Effect.fail(new DatabaseError({ cause: e })));
 						}

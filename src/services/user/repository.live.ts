@@ -195,7 +195,10 @@ const update = Effect.fn("UserRepository.update")(
 				}),
 			);
 		}
-		return { principal: row.principal, user: row.user } satisfies UserWithPrincipal;
+		return {
+			principal: row.principal,
+			user: row.user,
+		} satisfies UserWithPrincipal;
 	},
 	Effect.tapError((e) => Effect.logWarning("repo.user.update failed", e.cause)),
 );
@@ -209,10 +212,7 @@ const findCredential = Effect.fn("UserRepository.findCredential")(
 				.select()
 				.from(authUser)
 				.where(
-					and(
-						eq(authUser.authSource, authSource),
-						eq(authUser.authId, authId),
-					),
+					and(eq(authUser.authSource, authSource), eq(authUser.authId, authId)),
 				)
 				.limit(1),
 		).pipe(
@@ -359,15 +359,19 @@ export const UserRepositoryLive = Layer.effect(
 	UserRepository,
 	Effect.gen(function* () {
 		const dc = yield* DatabaseClient;
-		const run = <A, E>(e: Effect.Effect<A, E, DatabaseClient>): Effect.Effect<A, E> =>
-			Effect.provideService(e, DatabaseClient, dc);
+		const run = <A, E>(
+			e: Effect.Effect<A, E, DatabaseClient>,
+		): Effect.Effect<A, E> => Effect.provideService(e, DatabaseClient, dc);
 		return UserRepository.of({
-			findById: (...args: Parameters<typeof findById>) => run(findById(...args)),
-			findBySlug: (...args: Parameters<typeof findBySlug>) => run(findBySlug(...args)),
+			findById: (...args: Parameters<typeof findById>) =>
+				run(findById(...args)),
+			findBySlug: (...args: Parameters<typeof findBySlug>) =>
+				run(findBySlug(...args)),
 			findByEmail: (...args: Parameters<typeof findByEmail>) =>
 				run(findByEmail(...args)),
 			list: (...args: Parameters<typeof list>) => run(list(...args)),
-			softDelete: (...args: Parameters<typeof softDelete>) => run(softDelete(...args)),
+			softDelete: (...args: Parameters<typeof softDelete>) =>
+				run(softDelete(...args)),
 			create: (...args: Parameters<typeof create>) => run(create(...args)),
 			update: (...args: Parameters<typeof update>) => run(update(...args)),
 			findCredential: (...args: Parameters<typeof findCredential>) =>

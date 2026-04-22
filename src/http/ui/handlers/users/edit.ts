@@ -31,7 +31,12 @@ export const usersEditHandler = (
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError | InternalError,
-	AclService | AppConfigService | CollectionService | GroupService | PrincipalService | TemplateService
+	| AclService
+	| AppConfigService
+	| CollectionService
+	| GroupService
+	| PrincipalService
+	| TemplateService
 > =>
 	Effect.gen(function* () {
 		const principal = yield* requireAuthenticated(ctx.auth);
@@ -90,12 +95,17 @@ export const usersEditHandler = (
 			),
 		]);
 
-		const hasGroupsVirtualWrite = groupsVirtualPrivs.includes("DAV:write-properties");
+		const hasGroupsVirtualWrite = groupsVirtualPrivs.includes(
+			"DAV:write-properties",
+		);
 		const canEditSlug = usersPrivs.includes("DAV:unbind");
 		const canDelete = usersPrivs.includes("DAV:unbind");
 
 		const collections = allCollections
-			.filter((c) => c.collectionType === "calendar" || c.collectionType === "addressbook")
+			.filter(
+				(c) =>
+					c.collectionType === "calendar" || c.collectionType === "addressbook",
+			)
 			.map((c) => ({
 				id: c.id,
 				slug: c.slug,

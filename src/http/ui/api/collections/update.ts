@@ -36,9 +36,21 @@ export const collectionsUpdateHandler = (
 		const collection = yield* collectionService.findById(collectionId);
 
 		const [collPrivs, usersPrivs, groupsPrivs] = yield* Effect.all([
-			acl.currentUserPrivileges(principal.principalId, collection.id as CollectionId, "collection"),
-			acl.currentUserPrivileges(principal.principalId, USERS_VIRTUAL_RESOURCE_ID, "virtual"),
-			acl.currentUserPrivileges(principal.principalId, GROUPS_VIRTUAL_RESOURCE_ID, "virtual"),
+			acl.currentUserPrivileges(
+				principal.principalId,
+				collection.id as CollectionId,
+				"collection",
+			),
+			acl.currentUserPrivileges(
+				principal.principalId,
+				USERS_VIRTUAL_RESOURCE_ID,
+				"virtual",
+			),
+			acl.currentUserPrivileges(
+				principal.principalId,
+				GROUPS_VIRTUAL_RESOURCE_ID,
+				"virtual",
+			),
 		]);
 
 		const isAdmin =
@@ -61,7 +73,8 @@ export const collectionsUpdateHandler = (
 
 		const displayName = form.get("displayName")?.toString().trim() || undefined;
 		const description = form.get("description")?.toString().trim() || undefined;
-		const timezoneTzid = form.get("timezoneTzid")?.toString().trim() || undefined;
+		const timezoneTzid =
+			form.get("timezoneTzid")?.toString().trim() || undefined;
 
 		yield* collectionService.updateProperties(collectionId, {
 			clientProperties: {},

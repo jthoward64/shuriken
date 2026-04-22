@@ -8,11 +8,16 @@ import { InternalError } from "#src/domain/errors.ts";
 
 export interface BunFileServiceShape {
 	readonly readText: (path: string) => Effect.Effect<string, InternalError>;
-	readonly readBytes: (path: string) => Effect.Effect<Uint8Array, InternalError>;
+	readonly readBytes: (
+		path: string,
+	) => Effect.Effect<Uint8Array, InternalError>;
 	readonly exists: (path: string) => Effect.Effect<boolean, never>;
 	readonly mimeType: (path: string) => string | undefined;
 	/** Enumerate files matching a glob pattern relative to cwd. */
-	readonly glob: (pattern: string, cwd?: string) => Effect.Effect<ReadonlyArray<string>, InternalError>;
+	readonly glob: (
+		pattern: string,
+		cwd?: string,
+	) => Effect.Effect<ReadonlyArray<string>, InternalError>;
 }
 
 export class BunFileService extends Context.Tag("BunFileService")<
@@ -37,8 +42,7 @@ export const BunFileServiceLive = Layer.succeed(BunFileService, {
 			catch: (e) => new InternalError({ cause: e }),
 		}),
 
-	exists: (path) =>
-		Effect.promise(() => Bun.file(path).exists()),
+	exists: (path) => Effect.promise(() => Bun.file(path).exists()),
 
 	mimeType: (path) => Bun.file(path).type || undefined,
 

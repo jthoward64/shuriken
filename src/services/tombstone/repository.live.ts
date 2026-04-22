@@ -11,10 +11,7 @@ import { TombstoneRepository } from "./repository.ts";
 // ---------------------------------------------------------------------------
 
 const findSinceRevision = Effect.fn("TombstoneRepository.findSinceRevision")(
-	function* (
-		collectionId: CollectionId,
-		sinceSyncRevision: number,
-	) {
+	function* (collectionId: CollectionId, sinceSyncRevision: number) {
 		yield* Effect.annotateCurrentSpan({
 			"collection.id": collectionId,
 			"tombstone.since_revision": sinceSyncRevision,
@@ -45,8 +42,9 @@ export const TombstoneRepositoryLive = Layer.effect(
 	TombstoneRepository,
 	Effect.gen(function* () {
 		const dc = yield* DatabaseClient;
-		const run = <A, E>(e: Effect.Effect<A, E, DatabaseClient>): Effect.Effect<A, E> =>
-			Effect.provideService(e, DatabaseClient, dc);
+		const run = <A, E>(
+			e: Effect.Effect<A, E, DatabaseClient>,
+		): Effect.Effect<A, E> => Effect.provideService(e, DatabaseClient, dc);
 		return TombstoneRepository.of({
 			findSinceRevision: (...args: Parameters<typeof findSinceRevision>) =>
 				run(findSinceRevision(...args)),

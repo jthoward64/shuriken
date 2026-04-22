@@ -41,7 +41,9 @@ const insertEntity = Effect.fn("EntityRepository.insert")(
 				const row = r[0];
 				if (!row) {
 					return Effect.fail(
-						new DatabaseError({ cause: new Error("Entity insert returned no rows") }),
+						new DatabaseError({
+							cause: new Error("Entity insert returned no rows"),
+						}),
 					);
 				}
 				return Effect.succeed(row);
@@ -214,17 +216,23 @@ export const EntityRepositoryLive = Layer.effect(
 	EntityRepository,
 	Effect.gen(function* () {
 		const dc = yield* DatabaseClient;
-		const run = <A, E>(e: Effect.Effect<A, E, DatabaseClient>): Effect.Effect<A, E> =>
-			Effect.provideService(e, DatabaseClient, dc);
+		const run = <A, E>(
+			e: Effect.Effect<A, E, DatabaseClient>,
+		): Effect.Effect<A, E> => Effect.provideService(e, DatabaseClient, dc);
 		return EntityRepository.of({
-			insert: (...args: Parameters<typeof insertEntity>) => run(insertEntity(...args)),
-			findById: (...args: Parameters<typeof findById>) => run(findById(...args)),
+			insert: (...args: Parameters<typeof insertEntity>) =>
+				run(insertEntity(...args)),
+			findById: (...args: Parameters<typeof findById>) =>
+				run(findById(...args)),
 			updateLogicalUid: (...args: Parameters<typeof updateLogicalUid>) =>
 				run(updateLogicalUid(...args)),
-			softDelete: (...args: Parameters<typeof softDelete>) => run(softDelete(...args)),
-			existsByUid: (...args: Parameters<typeof existsByUid>) => run(existsByUid(...args)),
-			existsByUidForPrincipal: (...args: Parameters<typeof existsByUidForPrincipal>) =>
-				run(existsByUidForPrincipal(...args)),
+			softDelete: (...args: Parameters<typeof softDelete>) =>
+				run(softDelete(...args)),
+			existsByUid: (...args: Parameters<typeof existsByUid>) =>
+				run(existsByUid(...args)),
+			existsByUidForPrincipal: (
+				...args: Parameters<typeof existsByUidForPrincipal>
+			) => run(existsByUidForPrincipal(...args)),
 		});
 	}),
 );

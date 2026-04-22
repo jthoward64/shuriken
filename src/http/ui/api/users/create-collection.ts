@@ -7,7 +7,6 @@ import {
 } from "#src/domain/errors.ts";
 import type { PrincipalId } from "#src/domain/ids.ts";
 import { USERS_VIRTUAL_RESOURCE_ID } from "#src/domain/virtual-resources.ts";
-import type { CollectionType } from "#src/services/collection/repository.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import {
@@ -21,6 +20,7 @@ import { renderFragment } from "#src/http/ui/helpers/render-page.ts";
 import type { TemplateService } from "#src/http/ui/template/index.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
+import type { CollectionType } from "#src/services/collection/repository.ts";
 import { PrincipalService } from "#src/services/principal/index.ts";
 
 // ---------------------------------------------------------------------------
@@ -65,21 +65,30 @@ export const usersCollectionsCreateHandler = (
 		});
 
 		const collectionTypeRaw = form.get("collectionType")?.toString();
-		if (collectionTypeRaw !== "calendar" && collectionTypeRaw !== "addressbook") {
+		if (
+			collectionTypeRaw !== "calendar" &&
+			collectionTypeRaw !== "addressbook"
+		) {
 			return yield* renderFragment("partials/form-error", {
-				errors: { collectionType: "Collection type must be calendar or addressbook" },
+				errors: {
+					collectionType: "Collection type must be calendar or addressbook",
+				},
 			});
 		}
 		const collectionType = collectionTypeRaw as CollectionType;
 
 		const parseResult = yield* Effect.all({
 			slug: parseSlug(form.get("slug")?.toString()),
-			displayName: parseOptionalDisplayName(form.get("displayName")?.toString()),
+			displayName: parseOptionalDisplayName(
+				form.get("displayName")?.toString(),
+			),
 		}).pipe(Effect.either);
 
 		if (Either.isLeft(parseResult)) {
 			return yield* renderFragment("partials/form-error", {
-				errors: validationErrorToContext(parseResult.left as FormValidationError),
+				errors: validationErrorToContext(
+					parseResult.left as FormValidationError,
+				),
 			});
 		}
 		const parsed = parseResult.right;

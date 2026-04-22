@@ -6,7 +6,7 @@ import type {
 	DavError,
 	InternalError,
 } from "#src/domain/errors.ts";
-import { CollectionId, PrincipalId, isUuid } from "#src/domain/ids.ts";
+import { CollectionId, isUuid, PrincipalId } from "#src/domain/ids.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import {
 	HTTP_CONFLICT,
@@ -19,13 +19,13 @@ import {
 } from "#src/http/status.ts";
 import { collectionsDeleteHandler } from "#src/http/ui/api/collections/delete.ts";
 import { collectionsUpdateHandler } from "#src/http/ui/api/collections/update.ts";
-import { groupsCollectionsCreateHandler } from "#src/http/ui/api/groups/create-collection.ts";
 import { groupsCreateHandler } from "#src/http/ui/api/groups/create.ts";
+import { groupsCollectionsCreateHandler } from "#src/http/ui/api/groups/create-collection.ts";
 import { groupsDeleteHandler } from "#src/http/ui/api/groups/delete.ts";
 import { groupsMembersHandler } from "#src/http/ui/api/groups/members.ts";
 import { groupsUpdateHandler } from "#src/http/ui/api/groups/update.ts";
-import { usersCollectionsCreateHandler } from "#src/http/ui/api/users/create-collection.ts";
 import { usersCreateHandler } from "#src/http/ui/api/users/create.ts";
+import { usersCollectionsCreateHandler } from "#src/http/ui/api/users/create-collection.ts";
 import { usersDeleteHandler } from "#src/http/ui/api/users/delete.ts";
 import { usersSetPasswordHandler } from "#src/http/ui/api/users/set-password.ts";
 import { usersUpdateHandler } from "#src/http/ui/api/users/update.ts";
@@ -231,7 +231,13 @@ export const uiRouter = (
 	}
 
 	// Collections (GET pages)
-	if (seg0 === "collections" && method === "GET" && seg1 && isUuid(seg1) && !seg2) {
+	if (
+		seg0 === "collections" &&
+		method === "GET" &&
+		seg1 &&
+		isUuid(seg1) &&
+		!seg2
+	) {
 		return handle(collectionsEditHandler(req, ctx, CollectionId(seg1)));
 	}
 
@@ -243,7 +249,13 @@ export const uiRouter = (
 		if (seg1 === "new" && !seg2) {
 			return handle(usersNewHandler(req, ctx));
 		}
-		if (seg1 && isUuid(seg1) && seg2 === "collections" && seg3 === "new" && !seg4) {
+		if (
+			seg1 &&
+			isUuid(seg1) &&
+			seg2 === "collections" &&
+			seg3 === "new" &&
+			!seg4
+		) {
 			return handle(usersCollectionsNewHandler(req, ctx, PrincipalId(seg1)));
 		}
 		if (seg1 && isUuid(seg1) && !seg2) {
@@ -259,7 +271,13 @@ export const uiRouter = (
 		if (seg1 === "new" && !seg2) {
 			return handle(groupsNewHandler(req, ctx));
 		}
-		if (seg1 && isUuid(seg1) && seg2 === "collections" && seg3 === "new" && !seg4) {
+		if (
+			seg1 &&
+			isUuid(seg1) &&
+			seg2 === "collections" &&
+			seg3 === "new" &&
+			!seg4
+		) {
 			return handle(groupsCollectionsNewHandler(req, ctx, PrincipalId(seg1)));
 		}
 		if (seg1 && isUuid(seg1) && !seg2) {
@@ -291,7 +309,9 @@ export const uiRouter = (
 				return handle(usersSetPasswordHandler(req, ctx, PrincipalId(seg2)));
 			}
 			if (seg2 && isUuid(seg2) && seg3 === "collections" && seg4 === "create") {
-				return handle(usersCollectionsCreateHandler(req, ctx, PrincipalId(seg2)));
+				return handle(
+					usersCollectionsCreateHandler(req, ctx, PrincipalId(seg2)),
+				);
 			}
 		}
 		if (seg1 === "groups") {
@@ -308,7 +328,9 @@ export const uiRouter = (
 				return handle(groupsMembersHandler(req, ctx, PrincipalId(seg2)));
 			}
 			if (seg2 && isUuid(seg2) && seg3 === "collections" && seg4 === "create") {
-				return handle(groupsCollectionsCreateHandler(req, ctx, PrincipalId(seg2)));
+				return handle(
+					groupsCollectionsCreateHandler(req, ctx, PrincipalId(seg2)),
+				);
 			}
 		}
 	}

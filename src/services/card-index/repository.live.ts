@@ -137,10 +137,12 @@ export const CardIndexRepositoryLive = Layer.effect(
 	CardIndexRepository,
 	Effect.gen(function* () {
 		const dc = yield* DatabaseClient;
-		const run = <A, E>(e: Effect.Effect<A, E, DatabaseClient>): Effect.Effect<A, E> =>
-			Effect.provideService(e, DatabaseClient, dc);
+		const run = <A, E>(
+			e: Effect.Effect<A, E, DatabaseClient>,
+		): Effect.Effect<A, E> => Effect.provideService(e, DatabaseClient, dc);
 		return CardIndexRepository.of({
-			findByText: (...args: Parameters<typeof findByText>) => run(findByText(...args)),
+			findByText: (...args: Parameters<typeof findByText>) =>
+				run(findByText(...args)),
 		});
 	}),
 );

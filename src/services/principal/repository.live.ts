@@ -82,7 +82,9 @@ const findPrincipalById = Effect.fn("PrincipalRepository.findPrincipalById")(
 	),
 );
 
-const findPrincipalBySlug = Effect.fn("PrincipalRepository.findPrincipalBySlug")(
+const findPrincipalBySlug = Effect.fn(
+	"PrincipalRepository.findPrincipalBySlug",
+)(
 	function* (slug: Slug) {
 		yield* Effect.annotateCurrentSpan({ "principal.slug": slug });
 		yield* Effect.logTrace("repo.principal.findPrincipalBySlug", { slug });
@@ -161,7 +163,9 @@ const updateProperties = Effect.fn("PrincipalRepository.updateProperties")(
 				if (!row) {
 					return Effect.fail(
 						new DatabaseError({
-							cause: new Error(`Principal not found for property update: ${id}`),
+							cause: new Error(
+								`Principal not found for property update: ${id}`,
+							),
 						}),
 					);
 				}
@@ -230,13 +234,16 @@ export const PrincipalRepositoryLive = Layer.effect(
 	PrincipalRepository,
 	Effect.gen(function* () {
 		const dc = yield* DatabaseClient;
-		const run = <A, E>(e: Effect.Effect<A, E, DatabaseClient>): Effect.Effect<A, E> =>
-			Effect.provideService(e, DatabaseClient, dc);
+		const run = <A, E>(
+			e: Effect.Effect<A, E, DatabaseClient>,
+		): Effect.Effect<A, E> => Effect.provideService(e, DatabaseClient, dc);
 		return PrincipalRepository.of({
-			findById: (...args: Parameters<typeof findById>) => run(findById(...args)),
+			findById: (...args: Parameters<typeof findById>) =>
+				run(findById(...args)),
 			findPrincipalById: (...args: Parameters<typeof findPrincipalById>) =>
 				run(findPrincipalById(...args)),
-			findBySlug: (...args: Parameters<typeof findBySlug>) => run(findBySlug(...args)),
+			findBySlug: (...args: Parameters<typeof findBySlug>) =>
+				run(findBySlug(...args)),
 			findPrincipalBySlug: (...args: Parameters<typeof findPrincipalBySlug>) =>
 				run(findPrincipalBySlug(...args)),
 			findByEmail: (...args: Parameters<typeof findByEmail>) =>

@@ -27,7 +27,11 @@ export const groupsEditHandler = (
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError | InternalError,
-	AclService | AppConfigService | CollectionService | GroupService | TemplateService
+	| AclService
+	| AppConfigService
+	| CollectionService
+	| GroupService
+	| TemplateService
 > =>
 	Effect.gen(function* () {
 		const principal = yield* requireAuthenticated(ctx.auth);
@@ -61,7 +65,10 @@ export const groupsEditHandler = (
 		const canDelete = groupsVirtualPrivs.includes("DAV:unbind");
 
 		const collections = allCollections
-			.filter((c) => c.collectionType === "calendar" || c.collectionType === "addressbook")
+			.filter(
+				(c) =>
+					c.collectionType === "calendar" || c.collectionType === "addressbook",
+			)
 			.map((c) => ({
 				id: c.id,
 				slug: c.slug,

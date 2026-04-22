@@ -15,7 +15,10 @@ const noFilesLayer = Layer.succeed(BunFileService, {
 
 const run = (path: string): Promise<Response> =>
 	Effect.runPromise(
-		Effect.provide(staticHandler(new Request(`http://localhost${path}`)), noFilesLayer),
+		Effect.provide(
+			staticHandler(new Request(`http://localhost${path}`)),
+			noFilesLayer,
+		),
 	);
 
 describe("staticHandler", () => {

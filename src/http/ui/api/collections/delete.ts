@@ -36,9 +36,21 @@ export const collectionsDeleteHandler = (
 		const ownerPrincipalId = collection.ownerPrincipalId as PrincipalId;
 
 		const [collPrivs, usersPrivs, groupsPrivs] = yield* Effect.all([
-			acl.currentUserPrivileges(principal.principalId, collection.id as CollectionId, "collection"),
-			acl.currentUserPrivileges(principal.principalId, USERS_VIRTUAL_RESOURCE_ID, "virtual"),
-			acl.currentUserPrivileges(principal.principalId, GROUPS_VIRTUAL_RESOURCE_ID, "virtual"),
+			acl.currentUserPrivileges(
+				principal.principalId,
+				collection.id as CollectionId,
+				"collection",
+			),
+			acl.currentUserPrivileges(
+				principal.principalId,
+				USERS_VIRTUAL_RESOURCE_ID,
+				"virtual",
+			),
+			acl.currentUserPrivileges(
+				principal.principalId,
+				GROUPS_VIRTUAL_RESOURCE_ID,
+				"virtual",
+			),
 		]);
 
 		const canDelete =

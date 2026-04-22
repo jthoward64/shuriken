@@ -35,7 +35,9 @@ const findById = Effect.fn("GroupRepository.findById")(
 				.limit(1),
 		).pipe(
 			Effect.map((r) => {
-				if (!r[0]) { return Option.none<GroupWithPrincipal>(); }
+				if (!r[0]) {
+					return Option.none<GroupWithPrincipal>();
+				}
 				const row = r[0];
 				return Option.some({
 					principal: row.principal,
@@ -88,7 +90,9 @@ const create = Effect.fn("GroupRepository.create")(
 		const groupRow = groupRows[0];
 		if (!groupRow) {
 			return yield* Effect.fail(
-				new DatabaseError({ cause: new Error("group insert returned no rows") }),
+				new DatabaseError({
+					cause: new Error("group insert returned no rows"),
+				}),
 			);
 		}
 
@@ -146,13 +150,13 @@ const update = Effect.fn("GroupRepository.update")(
 
 const addMember = Effect.fn("GroupRepository.addMember")(
 	function* (groupId: GroupId, userId: UserId) {
-		yield* Effect.annotateCurrentSpan({ "group.id": groupId, "user.id": userId });
+		yield* Effect.annotateCurrentSpan({
+			"group.id": groupId,
+			"user.id": userId,
+		});
 		yield* Effect.logTrace("repo.group.addMember", { groupId, userId });
 		return yield* runDbQuery((db) =>
-			db
-				.insert(membership)
-				.values({ groupId, userId })
-				.onConflictDoNothing(),
+			db.insert(membership).values({ groupId, userId }).onConflictDoNothing(),
 		).pipe(Effect.asVoid);
 	},
 	Effect.tapError((e) =>
@@ -162,7 +166,10 @@ const addMember = Effect.fn("GroupRepository.addMember")(
 
 const removeMember = Effect.fn("GroupRepository.removeMember")(
 	function* (groupId: GroupId, userId: UserId) {
-		yield* Effect.annotateCurrentSpan({ "group.id": groupId, "user.id": userId });
+		yield* Effect.annotateCurrentSpan({
+			"group.id": groupId,
+			"user.id": userId,
+		});
 		yield* Effect.logTrace("repo.group.removeMember", { groupId, userId });
 		return yield* runDbQuery((db) =>
 			db
@@ -179,7 +186,10 @@ const removeMember = Effect.fn("GroupRepository.removeMember")(
 
 const hasMember = Effect.fn("GroupRepository.hasMember")(
 	function* (groupId: GroupId, userId: UserId) {
-		yield* Effect.annotateCurrentSpan({ "group.id": groupId, "user.id": userId });
+		yield* Effect.annotateCurrentSpan({
+			"group.id": groupId,
+			"user.id": userId,
+		});
 		yield* Effect.logTrace("repo.group.hasMember", { groupId, userId });
 		return yield* runDbQuery((db) =>
 			db
@@ -206,15 +216,14 @@ const findByPrincipalId = Effect.fn("GroupRepository.findByPrincipalId")(
 				.from(group)
 				.innerJoin(principal, eq(principal.id, group.principalId))
 				.where(
-					and(
-						eq(group.principalId, principalId),
-						isNull(principal.deletedAt),
-					),
+					and(eq(group.principalId, principalId), isNull(principal.deletedAt)),
 				)
 				.limit(1),
 		).pipe(
 			Effect.map((r) => {
-				if (!r[0]) { return Option.none<GroupWithPrincipal>(); }
+				if (!r[0]) {
+					return Option.none<GroupWithPrincipal>();
+				}
 				const row = r[0];
 				return Option.some({
 					principal: row.principal,
@@ -247,7 +256,9 @@ const findBySlug = Effect.fn("GroupRepository.findBySlug")(
 				.limit(1),
 		).pipe(
 			Effect.map((r) => {
-				if (!r[0]) { return Option.none<GroupWithPrincipal>(); }
+				if (!r[0]) {
+					return Option.none<GroupWithPrincipal>();
+				}
 				const row = r[0];
 				return Option.some({
 					principal: row.principal,
@@ -327,9 +338,7 @@ const listByMember = Effect.fn("GroupRepository.listByMember")(
 				.from(group)
 				.innerJoin(principal, eq(principal.id, group.principalId))
 				.innerJoin(membership, eq(membership.groupId, group.id))
-				.where(
-					and(eq(membership.userId, userId), isNull(principal.deletedAt)),
-				)
+				.where(and(eq(membership.userId, userId), isNull(principal.deletedAt)))
 				.orderBy(principal.slug),
 		).pipe(
 			Effect.map((rows) =>
@@ -396,26 +405,33 @@ export const GroupRepositoryLive = Layer.effect(
 	GroupRepository,
 	Effect.gen(function* () {
 		const dc = yield* DatabaseClient;
-		const run = <A, E>(e: Effect.Effect<A, E, DatabaseClient>): Effect.Effect<A, E> =>
-			Effect.provideService(e, DatabaseClient, dc);
+		const run = <A, E>(
+			e: Effect.Effect<A, E, DatabaseClient>,
+		): Effect.Effect<A, E> => Effect.provideService(e, DatabaseClient, dc);
 		return GroupRepository.of({
-			findById: (...args: Parameters<typeof findById>) => run(findById(...args)),
+			findById: (...args: Parameters<typeof findById>) =>
+				run(findById(...args)),
 			findByPrincipalId: (...args: Parameters<typeof findByPrincipalId>) =>
 				run(findByPrincipalId(...args)),
-			findBySlug: (...args: Parameters<typeof findBySlug>) => run(findBySlug(...args)),
+			findBySlug: (...args: Parameters<typeof findBySlug>) =>
+				run(findBySlug(...args)),
 			list: (...args: Parameters<typeof list>) => run(list(...args)),
 			listMembers: (...args: Parameters<typeof listMembers>) =>
 				run(listMembers(...args)),
 			listByMember: (...args: Parameters<typeof listByMember>) =>
 				run(listByMember(...args)),
-			softDelete: (...args: Parameters<typeof softDelete>) => run(softDelete(...args)),
-			setMembers: (...args: Parameters<typeof setMembers>) => run(setMembers(...args)),
+			softDelete: (...args: Parameters<typeof softDelete>) =>
+				run(softDelete(...args)),
+			setMembers: (...args: Parameters<typeof setMembers>) =>
+				run(setMembers(...args)),
 			create: (...args: Parameters<typeof create>) => run(create(...args)),
 			update: (...args: Parameters<typeof update>) => run(update(...args)),
-			addMember: (...args: Parameters<typeof addMember>) => run(addMember(...args)),
+			addMember: (...args: Parameters<typeof addMember>) =>
+				run(addMember(...args)),
 			removeMember: (...args: Parameters<typeof removeMember>) =>
 				run(removeMember(...args)),
-			hasMember: (...args: Parameters<typeof hasMember>) => run(hasMember(...args)),
+			hasMember: (...args: Parameters<typeof hasMember>) =>
+				run(hasMember(...args)),
 		});
 	}),
 );

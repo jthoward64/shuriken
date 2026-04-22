@@ -17,7 +17,11 @@ export const usersDeleteHandler = (
 	_req: Request,
 	ctx: HttpRequestContext,
 	principalId: PrincipalId,
-): Effect.Effect<Response, DavError | DatabaseError, AclService | PrincipalService | UserService> =>
+): Effect.Effect<
+	Response,
+	DavError | DatabaseError,
+	AclService | PrincipalService | UserService
+> =>
 	Effect.gen(function* () {
 		const principal = yield* requireAuthenticated(ctx.auth);
 		const acl = yield* AclService;

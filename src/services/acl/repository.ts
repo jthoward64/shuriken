@@ -102,7 +102,10 @@ export interface AclRepositoryShape {
 		callerPrincipalIds: ReadonlyArray<PrincipalId>,
 		resourceIds: ReadonlyArray<UuidString>,
 		resourceType: ResourceType,
-	) => Effect.Effect<ReadonlyMap<UuidString, ReadonlyArray<DavPrivilege>>, DatabaseError>;
+	) => Effect.Effect<
+		ReadonlyMap<UuidString, ReadonlyArray<DavPrivilege>>,
+		DatabaseError
+	>;
 
 	/**
 	 * Return the immediate ACL-inheritance parent of a resource, used by the

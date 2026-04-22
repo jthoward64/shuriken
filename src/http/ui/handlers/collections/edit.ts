@@ -31,7 +31,11 @@ export const collectionsEditHandler = (
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError | InternalError,
-	AclService | AppConfigService | CollectionService | PrincipalService | TemplateService
+	| AclService
+	| AppConfigService
+	| CollectionService
+	| PrincipalService
+	| TemplateService
 > =>
 	Effect.gen(function* () {
 		const principal = yield* requireAuthenticated(ctx.auth);
@@ -44,9 +48,21 @@ export const collectionsEditHandler = (
 		const ownerPrincipalId = collection.ownerPrincipalId as PrincipalId;
 
 		const [collPrivs, usersPrivs, groupsPrivs] = yield* Effect.all([
-			acl.currentUserPrivileges(principal.principalId, collection.id as CollectionId, "collection"),
-			acl.currentUserPrivileges(principal.principalId, USERS_VIRTUAL_RESOURCE_ID, "virtual"),
-			acl.currentUserPrivileges(principal.principalId, GROUPS_VIRTUAL_RESOURCE_ID, "virtual"),
+			acl.currentUserPrivileges(
+				principal.principalId,
+				collection.id as CollectionId,
+				"collection",
+			),
+			acl.currentUserPrivileges(
+				principal.principalId,
+				USERS_VIRTUAL_RESOURCE_ID,
+				"virtual",
+			),
+			acl.currentUserPrivileges(
+				principal.principalId,
+				GROUPS_VIRTUAL_RESOURCE_ID,
+				"virtual",
+			),
 		]);
 
 		const isAdmin =

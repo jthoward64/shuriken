@@ -1,5 +1,5 @@
-import { Context } from "effect";
 import type { Effect } from "effect";
+import { Context } from "effect";
 import type { InternalError } from "#src/domain/errors.ts";
 
 // ---------------------------------------------------------------------------

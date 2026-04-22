@@ -196,7 +196,9 @@ const indexRruleOccurrences = Effect.fn(
 )(
 	function* (entityId: EntityId) {
 		yield* Effect.annotateCurrentSpan({ "entity.id": entityId });
-		yield* Effect.logTrace("repo.cal-index.indexRruleOccurrences", { entityId });
+		yield* Effect.logTrace("repo.cal-index.indexRruleOccurrences", {
+			entityId,
+		});
 
 		const rows = yield* runDbQuery((db) =>
 			db
@@ -262,15 +264,17 @@ export const CalIndexRepositoryLive = Layer.effect(
 	CalIndexRepository,
 	Effect.gen(function* () {
 		const dc = yield* DatabaseClient;
-		const run = <A, E>(e: Effect.Effect<A, E, DatabaseClient>): Effect.Effect<A, E> =>
-			Effect.provideService(e, DatabaseClient, dc);
+		const run = <A, E>(
+			e: Effect.Effect<A, E, DatabaseClient>,
+		): Effect.Effect<A, E> => Effect.provideService(e, DatabaseClient, dc);
 		return CalIndexRepository.of({
 			findByTimeRange: (...args: Parameters<typeof findByTimeRange>) =>
 				run(findByTimeRange(...args)),
 			findByComponentType: (...args: Parameters<typeof findByComponentType>) =>
 				run(findByComponentType(...args)),
-			indexRruleOccurrences: (...args: Parameters<typeof indexRruleOccurrences>) =>
-				run(indexRruleOccurrences(...args)),
+			indexRruleOccurrences: (
+				...args: Parameters<typeof indexRruleOccurrences>
+			) => run(indexRruleOccurrences(...args)),
 		});
 	}),
 );

@@ -21,11 +21,7 @@ const findByTzid = Effect.fn("CalTimezoneRepository.findByTzid")(
 		yield* Effect.annotateCurrentSpan({ "tz.tzid": tzid });
 		yield* Effect.logTrace("repo.timezone.findByTzid", { tzid });
 		return yield* runDbQuery((db) =>
-			db
-				.select()
-				.from(calTimezone)
-				.where(eq(calTimezone.tzid, tzid))
-				.limit(1),
+			db.select().from(calTimezone).where(eq(calTimezone.tzid, tzid)).limit(1),
 		).pipe(
 			Effect.map((r) => Option.fromNullable(r[0])),
 			Metric.trackDuration(
@@ -116,10 +112,12 @@ export const CalTimezoneRepositoryLive = Layer.effect(
 	CalTimezoneRepository,
 	Effect.gen(function* () {
 		const dc = yield* DatabaseClient;
-		const run = <A, E>(e: Effect.Effect<A, E, DatabaseClient>): Effect.Effect<A, E> =>
-			Effect.provideService(e, DatabaseClient, dc);
+		const run = <A, E>(
+			e: Effect.Effect<A, E, DatabaseClient>,
+		): Effect.Effect<A, E> => Effect.provideService(e, DatabaseClient, dc);
 		return CalTimezoneRepository.of({
-			findByTzid: (...args: Parameters<typeof findByTzid>) => run(findByTzid(...args)),
+			findByTzid: (...args: Parameters<typeof findByTzid>) =>
+				run(findByTzid(...args)),
 			upsert: (...args: Parameters<typeof upsert>) => run(upsert(...args)),
 		});
 	}),

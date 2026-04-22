@@ -213,7 +213,9 @@ const insertComponentEffect = (
 		const compRow = compRows[0];
 		if (!compRow) {
 			return yield* Effect.fail(
-				new DatabaseError({ cause: new Error("Component insert returned no rows") }),
+				new DatabaseError({
+					cause: new Error("Component insert returned no rows"),
+				}),
 			);
 		}
 		const componentId = compRow.id as UuidString;
@@ -239,7 +241,9 @@ const insertComponentEffect = (
 			const propRow = propRows[0];
 			if (!propRow) {
 				return yield* Effect.fail(
-					new DatabaseError({ cause: new Error("Property insert returned no rows") }),
+					new DatabaseError({
+						cause: new Error("Property insert returned no rows"),
+					}),
 				);
 			}
 			const propertyId = propRow.id;
@@ -456,11 +460,14 @@ export const ComponentRepositoryLive = Layer.effect(
 	ComponentRepository,
 	Effect.gen(function* () {
 		const dc = yield* DatabaseClient;
-		const run = <A, E>(e: Effect.Effect<A, E, DatabaseClient>): Effect.Effect<A, E> =>
-			Effect.provideService(e, DatabaseClient, dc);
+		const run = <A, E>(
+			e: Effect.Effect<A, E, DatabaseClient>,
+		): Effect.Effect<A, E> => Effect.provideService(e, DatabaseClient, dc);
 		return ComponentRepository.of({
-			insertTree: (...args: Parameters<typeof insertTree>) => run(insertTree(...args)),
-			loadTree: (...args: Parameters<typeof loadTree>) => run(loadTree(...args)),
+			insertTree: (...args: Parameters<typeof insertTree>) =>
+				run(insertTree(...args)),
+			loadTree: (...args: Parameters<typeof loadTree>) =>
+				run(loadTree(...args)),
 			deleteByEntity: (...args: Parameters<typeof deleteByEntity>) =>
 				run(deleteByEntity(...args)),
 		});

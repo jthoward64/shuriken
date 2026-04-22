@@ -374,7 +374,9 @@ export const putHandler = (
 		const entityRepo = yield* EntityRepository;
 		yield* withTransaction(
 			Effect.gen(function* () {
-				yield* componentRepo.deleteByEntity(EntityId(existingInstance.entityId));
+				yield* componentRepo.deleteByEntity(
+					EntityId(existingInstance.entityId),
+				);
 				yield* entityRepo.updateLogicalUid(
 					EntityId(existingInstance.entityId),
 					logicalUid,

@@ -56,7 +56,9 @@ export const groupsMembersHandler = (
 		if (!userId) {
 			return new Response("Missing userId", { status: 400 });
 		}
-		const isMember = form.getAll("members").some((v) => v.toString() === userId);
+		const isMember = form
+			.getAll("members")
+			.some((v) => v.toString() === userId);
 
 		if (isMember) {
 			yield* groupService.addMember(group.id as GroupId, userId);

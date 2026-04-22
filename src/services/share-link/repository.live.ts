@@ -202,17 +202,22 @@ export const ShareLinkRepositoryLive = Layer.effect(
 	ShareLinkRepository,
 	Effect.gen(function* () {
 		const dc = yield* DatabaseClient;
-		const run = <A, E>(e: Effect.Effect<A, E, DatabaseClient>): Effect.Effect<A, E> =>
-			Effect.provideService(e, DatabaseClient, dc);
+		const run = <A, E>(
+			e: Effect.Effect<A, E, DatabaseClient>,
+		): Effect.Effect<A, E> => Effect.provideService(e, DatabaseClient, dc);
 		return ShareLinkRepository.of({
-			findById: (...args: Parameters<typeof findById>) => run(findById(...args)),
-			findByUser: (...args: Parameters<typeof findByUser>) => run(findByUser(...args)),
+			findById: (...args: Parameters<typeof findById>) =>
+				run(findById(...args)),
+			findByUser: (...args: Parameters<typeof findByUser>) =>
+				run(findByUser(...args)),
 			listCalendars: (...args: Parameters<typeof listCalendars>) =>
 				run(listCalendars(...args)),
 			insert: (...args: Parameters<typeof insert>) => run(insert(...args)),
 			update: (...args: Parameters<typeof update>) => run(update(...args)),
-			softDelete: (...args: Parameters<typeof softDelete>) => run(softDelete(...args)),
-			addCalendar: (...args: Parameters<typeof addCalendar>) => run(addCalendar(...args)),
+			softDelete: (...args: Parameters<typeof softDelete>) =>
+				run(softDelete(...args)),
+			addCalendar: (...args: Parameters<typeof addCalendar>) =>
+				run(addCalendar(...args)),
 			removeCalendar: (...args: Parameters<typeof removeCalendar>) =>
 				run(removeCalendar(...args)),
 		});

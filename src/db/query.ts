@@ -1,6 +1,6 @@
 import { Effect } from "effect";
-import { DatabaseClient, type DbClient } from "./client.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
+import { DatabaseClient, type DbClient } from "./client.ts";
 import { getActiveDb } from "./transaction.ts";
 
 // ---------------------------------------------------------------------------

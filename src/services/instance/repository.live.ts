@@ -292,22 +292,31 @@ export const InstanceRepositoryLive = Layer.effect(
 	InstanceRepository,
 	Effect.gen(function* () {
 		const dc = yield* DatabaseClient;
-		const run = <A, E>(e: Effect.Effect<A, E, DatabaseClient>): Effect.Effect<A, E> =>
-			Effect.provideService(e, DatabaseClient, dc);
+		const run = <A, E>(
+			e: Effect.Effect<A, E, DatabaseClient>,
+		): Effect.Effect<A, E> => Effect.provideService(e, DatabaseClient, dc);
 		return InstanceRepository.of({
-			findById: (...args: Parameters<typeof findById>) => run(findById(...args)),
-			findBySlug: (...args: Parameters<typeof findBySlug>) => run(findBySlug(...args)),
+			findById: (...args: Parameters<typeof findById>) =>
+				run(findById(...args)),
+			findBySlug: (...args: Parameters<typeof findBySlug>) =>
+				run(findBySlug(...args)),
 			listByCollection: (...args: Parameters<typeof listByCollection>) =>
 				run(listByCollection(...args)),
 			findChangedSince: (...args: Parameters<typeof findChangedSince>) =>
 				run(findChangedSince(...args)),
-			findByIds: (...args: Parameters<typeof findByIds>) => run(findByIds(...args)),
-			insert: (...args: Parameters<typeof insertInstance>) => run(insertInstance(...args)),
-			updateEtag: (...args: Parameters<typeof updateEtag>) => run(updateEtag(...args)),
-			softDelete: (...args: Parameters<typeof softDelete>) => run(softDelete(...args)),
-			relocate: (...args: Parameters<typeof relocate>) => run(relocate(...args)),
-			updateClientProperties: (...args: Parameters<typeof updateClientProperties>) =>
-				run(updateClientProperties(...args)),
+			findByIds: (...args: Parameters<typeof findByIds>) =>
+				run(findByIds(...args)),
+			insert: (...args: Parameters<typeof insertInstance>) =>
+				run(insertInstance(...args)),
+			updateEtag: (...args: Parameters<typeof updateEtag>) =>
+				run(updateEtag(...args)),
+			softDelete: (...args: Parameters<typeof softDelete>) =>
+				run(softDelete(...args)),
+			relocate: (...args: Parameters<typeof relocate>) =>
+				run(relocate(...args)),
+			updateClientProperties: (
+				...args: Parameters<typeof updateClientProperties>
+			) => run(updateClientProperties(...args)),
 		});
 	}),
 );

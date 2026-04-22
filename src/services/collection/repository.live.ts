@@ -1,7 +1,10 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { Effect, Layer, Option } from "effect";
 import { DatabaseClient } from "#src/db/client.ts";
-import { type CollectionType, davCollection } from "#src/db/drizzle/schema/index.ts";
+import {
+	type CollectionType,
+	davCollection,
+} from "#src/db/drizzle/schema/index.ts";
 import { runDbQuery } from "#src/db/query.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
 import type { CollectionId, PrincipalId } from "#src/domain/ids.ts";
@@ -241,7 +244,9 @@ const updateProperties = Effect.fn("CollectionRepository.updateProperties")(
 				if (!row) {
 					return Effect.fail(
 						new DatabaseError({
-							cause: new Error(`Collection not found for property update: ${id}`),
+							cause: new Error(
+								`Collection not found for property update: ${id}`,
+							),
 						}),
 					);
 				}
@@ -258,15 +263,21 @@ export const CollectionRepositoryLive = Layer.effect(
 	CollectionRepository,
 	Effect.gen(function* () {
 		const dc = yield* DatabaseClient;
-		const run = <A, E>(e: Effect.Effect<A, E, DatabaseClient>): Effect.Effect<A, E> =>
-			Effect.provideService(e, DatabaseClient, dc);
+		const run = <A, E>(
+			e: Effect.Effect<A, E, DatabaseClient>,
+		): Effect.Effect<A, E> => Effect.provideService(e, DatabaseClient, dc);
 		return CollectionRepository.of({
-			findById: (...args: Parameters<typeof findById>) => run(findById(...args)),
-			findBySlug: (...args: Parameters<typeof findBySlug>) => run(findBySlug(...args)),
-			listByOwner: (...args: Parameters<typeof listByOwner>) => run(listByOwner(...args)),
+			findById: (...args: Parameters<typeof findById>) =>
+				run(findById(...args)),
+			findBySlug: (...args: Parameters<typeof findBySlug>) =>
+				run(findBySlug(...args)),
+			listByOwner: (...args: Parameters<typeof listByOwner>) =>
+				run(listByOwner(...args)),
 			insert: (...args: Parameters<typeof insert>) => run(insert(...args)),
-			softDelete: (...args: Parameters<typeof softDelete>) => run(softDelete(...args)),
-			relocate: (...args: Parameters<typeof relocate>) => run(relocate(...args)),
+			softDelete: (...args: Parameters<typeof softDelete>) =>
+				run(softDelete(...args)),
+			relocate: (...args: Parameters<typeof relocate>) =>
+				run(relocate(...args)),
 			updateProperties: (...args: Parameters<typeof updateProperties>) =>
 				run(updateProperties(...args)),
 		});

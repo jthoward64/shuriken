@@ -364,7 +364,10 @@ const copyCollection = (
 						const etag = ETag(yield* makeEtag(canonical));
 
 						// Copy non-protected ACEs for each instance.
-						const instAces = yield* acl.getAces(InstanceId(inst.id), "instance");
+						const instAces = yield* acl.getAces(
+							InstanceId(inst.id),
+							"instance",
+						);
 						const instNonProtected = instAces.filter((a) => !a.protected);
 
 						yield* withTransaction(
