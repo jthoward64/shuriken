@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import { AppConfigService } from "#src/config.ts";
 import type {
 	DatabaseError,
@@ -11,6 +11,7 @@ import {
 	USERS_VIRTUAL_RESOURCE_ID,
 } from "#src/domain/virtual-resources.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
+import { buildAclPanelData } from "#src/http/ui/helpers/acl-panel.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import { buildNavContext } from "#src/http/ui/helpers/nav-context.ts";
 import { renderPage } from "#src/http/ui/helpers/render-page.ts";
@@ -133,6 +134,12 @@ export const usersEditHandler = (
 		const origin = ctx.url.origin;
 		const davBase = `${origin}/dav/principals/${principalRow.id}`;
 
+		const aclPanel = yield* buildAclPanelData(
+			principal.principalId,
+			principalRow.id as PrincipalId,
+			"principal",
+		).pipe(Effect.map(Option.getOrUndefined));
+
 		return yield* renderPage(
 			"pages/users/edit",
 			{
@@ -149,6 +156,7 @@ export const usersEditHandler = (
 				principalUrl: `${davBase}/`,
 				caldavUrl: `${davBase}/cal/`,
 				carddavUrl: `${davBase}/card/`,
+				aclPanel,
 			},
 			ctx.headers,
 		);

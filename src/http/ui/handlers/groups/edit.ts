@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import { AppConfigService } from "#src/config.ts";
 import type {
 	DatabaseError,
@@ -8,6 +8,7 @@ import type {
 import type { GroupId, PrincipalId, UserId } from "#src/domain/ids.ts";
 import { GROUPS_VIRTUAL_RESOURCE_ID } from "#src/domain/virtual-resources.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
+import { buildAclPanelData } from "#src/http/ui/helpers/acl-panel.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import { buildNavContext } from "#src/http/ui/helpers/nav-context.ts";
 import { renderPage } from "#src/http/ui/helpers/render-page.ts";
@@ -15,6 +16,7 @@ import type { TemplateService } from "#src/http/ui/template/index.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
 import { GroupService } from "#src/services/group/index.ts";
+import type { PrincipalService } from "#src/services/principal/index.ts";
 
 // ---------------------------------------------------------------------------
 // GET /ui/groups/:principalId
@@ -31,6 +33,7 @@ export const groupsEditHandler = (
 	| AppConfigService
 	| CollectionService
 	| GroupService
+	| PrincipalService
 	| TemplateService
 > =>
 	Effect.gen(function* () {
@@ -82,6 +85,12 @@ export const groupsEditHandler = (
 			config.auth.mode,
 		);
 
+		const aclPanel = yield* buildAclPanelData(
+			principal.principalId,
+			principalRow.id as PrincipalId,
+			"principal",
+		).pipe(Effect.map(Option.getOrUndefined));
+
 		return yield* renderPage(
 			"pages/groups/edit",
 			{
@@ -96,6 +105,7 @@ export const groupsEditHandler = (
 				})),
 				canDelete,
 				collections,
+				aclPanel,
 			},
 			ctx.headers,
 		);

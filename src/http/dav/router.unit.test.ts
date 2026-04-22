@@ -33,10 +33,11 @@ import {
 } from "#src/services/instance/repository.ts";
 import type { InstanceServiceShape } from "#src/services/instance/service.ts";
 import { InstanceService } from "#src/services/instance/service.ts";
-import type { PrincipalWithUser } from "#src/services/principal/repository.ts";
 import {
 	PrincipalRepository,
 	type PrincipalRepositoryShape,
+	type PrincipalRow,
+	type PrincipalWithUser,
 } from "#src/services/principal/repository.ts";
 import {
 	PrincipalService,
@@ -236,6 +237,38 @@ const makeRouterLayer = (
 					},
 				} as unknown as PrincipalWithUser;
 				return Effect.succeed(Option.some(row));
+			},
+			findPrincipalBySlug: (slug) => {
+				const id = principals.get(slug);
+				if (!id) {
+					return Effect.succeed(Option.none());
+				}
+				return Effect.succeed(
+					Option.some({
+						id,
+						slug,
+						principalType: "user",
+						displayName: null,
+						updatedAt: null,
+						deletedAt: null,
+					} as unknown as PrincipalRow),
+				);
+			},
+			findPrincipalById: (id) => {
+				const slug = principalById.get(id);
+				if (!slug) {
+					return Effect.succeed(Option.none());
+				}
+				return Effect.succeed(
+					Option.some({
+						id,
+						slug,
+						principalType: "user",
+						displayName: null,
+						updatedAt: null,
+						deletedAt: null,
+					} as unknown as PrincipalRow),
+				);
 			},
 			findByEmail: () => Effect.succeed(Option.none()),
 			findUserByUserId: () => Effect.succeed(Option.none()),

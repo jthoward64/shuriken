@@ -6,7 +6,12 @@ import type {
 	DavError,
 	InternalError,
 } from "#src/domain/errors.ts";
-import { CollectionId, isUuid, PrincipalId } from "#src/domain/ids.ts";
+import {
+	CollectionId,
+	isUuid,
+	PrincipalId,
+	VirtualResourceId,
+} from "#src/domain/ids.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import {
 	HTTP_CONFLICT,
@@ -17,6 +22,8 @@ import {
 	HTTP_SEE_OTHER,
 	HTTP_UNAUTHORIZED,
 } from "#src/http/status.ts";
+import { aclGrantHandler } from "#src/http/ui/api/acl/grant.ts";
+import { aclRevokeHandler } from "#src/http/ui/api/acl/revoke.ts";
 import { collectionsDeleteHandler } from "#src/http/ui/api/collections/delete.ts";
 import { collectionsUpdateHandler } from "#src/http/ui/api/collections/update.ts";
 import { groupsCreateHandler } from "#src/http/ui/api/groups/create.ts";
@@ -44,6 +51,7 @@ import type { AclService } from "#src/services/acl/index.ts";
 import type { CollectionService } from "#src/services/collection/index.ts";
 import type { GroupService } from "#src/services/group/index.ts";
 import type { PrincipalService } from "#src/services/principal/index.ts";
+import type { PrincipalRepository } from "#src/services/principal/repository.ts";
 import type { UserService } from "#src/services/user/index.ts";
 import { profileHandler } from "./handlers/profile.ts";
 import { renderError } from "./helpers/render-page.ts";
@@ -59,6 +67,7 @@ export type UiServices =
 	| BunFileService
 	| CollectionService
 	| GroupService
+	| PrincipalRepository
 	| PrincipalService
 	| TemplateService
 	| UserService;
@@ -287,6 +296,24 @@ export const uiRouter = (
 
 	// API endpoints (POST)
 	if (seg0 === "api" && method === "POST") {
+		if (
+			seg1 === "acl" &&
+			(seg2 === "principal" || seg2 === "collection" || seg2 === "virtual") &&
+			seg3 &&
+			isUuid(seg3) &&
+			(seg4 === "grant" || seg4 === "revoke")
+		) {
+			const resourceId =
+				seg2 === "principal"
+					? PrincipalId(seg3)
+					: seg2 === "collection"
+						? CollectionId(seg3)
+						: VirtualResourceId(seg3);
+			if (seg4 === "grant") {
+				return handle(aclGrantHandler(req, ctx, seg2, resourceId));
+			}
+			return handle(aclRevokeHandler(req, ctx, seg2, resourceId));
+		}
 		if (seg1 === "collections") {
 			if (seg2 && isUuid(seg2) && seg3 === "update" && !seg4) {
 				return handle(collectionsUpdateHandler(req, ctx, CollectionId(seg2)));

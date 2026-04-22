@@ -2,9 +2,11 @@
 // ACL handler — RFC 3744 §8.1
 //
 // Supported path kinds:
-//   collection  → collection ACL
-//   instance    → instance ACL
-//   principal   → principal ACL
+//   collection      → collection ACL
+//   instance        → instance ACL
+//   principal       → principal ACL
+//   userCollection  → virtual resource ACL (USERS_VIRTUAL_RESOURCE_ID)
+//   groupCollection → virtual resource ACL (GROUPS_VIRTUAL_RESOURCE_ID)
 //   new-collection / new-instance → 404 (resource does not exist)
 //   root / principalCollection / wellknown → 405
 //
@@ -26,6 +28,10 @@ import {
 import { isUuid, PrincipalId, type UuidString } from "#src/domain/ids.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
 import type { ResolvedDavPath, Slug } from "#src/domain/types/path.ts";
+import {
+	GROUPS_VIRTUAL_RESOURCE_ID,
+	USERS_VIRTUAL_RESOURCE_ID,
+} from "#src/domain/virtual-resources.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { normalizeClarkNames } from "#src/http/dav/xml/clark.ts";
 import { parseXml, readXmlBody } from "#src/http/dav/xml/parser.ts";
@@ -269,8 +275,6 @@ export const aclHandler = (
 			path.kind === "wellknown" ||
 			path.kind === "root" ||
 			path.kind === "principalCollection" ||
-			path.kind === "userCollection" ||
-			path.kind === "groupCollection" ||
 			path.kind === "groupMembers"
 		) {
 			return yield* Effect.fail(methodNotAllowed());
@@ -298,6 +302,12 @@ export const aclHandler = (
 		} else if (path.kind === "collection") {
 			resourceId = path.collectionId;
 			resourceType = "collection";
+		} else if (path.kind === "userCollection") {
+			resourceId = USERS_VIRTUAL_RESOURCE_ID as AclResourceId;
+			resourceType = "virtual";
+		} else if (path.kind === "groupCollection") {
+			resourceId = GROUPS_VIRTUAL_RESOURCE_ID as AclResourceId;
+			resourceType = "virtual";
 		} else {
 			// instance
 			resourceId = path.instanceId;

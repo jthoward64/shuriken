@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import { AppConfigService } from "#src/config.ts";
 import type {
 	DatabaseError,
@@ -12,6 +12,7 @@ import {
 } from "#src/domain/virtual-resources.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { HTTP_NOT_FOUND } from "#src/http/status.ts";
+import { buildAclPanelData } from "#src/http/ui/helpers/acl-panel.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import { buildNavContext } from "#src/http/ui/helpers/nav-context.ts";
 import { renderPage } from "#src/http/ui/helpers/render-page.ts";
@@ -109,6 +110,12 @@ export const collectionsEditHandler = (
 			config.auth.mode,
 		);
 
+		const aclPanel = yield* buildAclPanelData(
+			principal.principalId,
+			collection.id as CollectionId,
+			"collection",
+		).pipe(Effect.map(Option.getOrUndefined));
+
 		return yield* renderPage(
 			"pages/collections/edit",
 			{
@@ -120,6 +127,7 @@ export const collectionsEditHandler = (
 				ownerType: ownerResult.type,
 				isCalendar: collection.collectionType === "calendar",
 				canDelete,
+				aclPanel,
 			},
 			ctx.headers,
 		);

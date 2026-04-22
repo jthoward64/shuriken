@@ -1,0 +1,25 @@
+<script type="importmap">
+    {
+    "imports": {
+        "fullcalendar": "https://cdn.jsdelivr.net/npm/fullcalendar@7.0.0-rc.1/+esm",
+        "temporal-polyfill": "https://cdn.jsdelivr.net/npm/temporal-polyfill@0.3.2/+esm"
+    }
+    }
+</script>
+<script type="module">
+    import { Calendar } from "fullcalendar";
+    import dayGridPlugin from "fullcalendar/daygrid";
+
+    document.addEventListener("DOMContentLoaded", function () {
+    const calendarEl = document.getElementById("calendar");
+    const calendar = new Calendar(calendarEl, {
+        plugins: [dayGridPlugin],
+        headerToolbar: {
+        left: "prev,next today",
+        center: "title",
+        right: "dayGridMonth,timeGridWeek,timeGridDay,listWeek",
+        },
+    });
+    calendar.render();
+    });
+</script>

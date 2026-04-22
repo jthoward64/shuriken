@@ -11,6 +11,7 @@ import { AclService } from "#src/services/acl/index.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
 import { GroupService } from "#src/services/group/index.ts";
 import { PrincipalService } from "#src/services/principal/index.ts";
+import { PrincipalRepository } from "#src/services/principal/repository.ts";
 import { UserService } from "#src/services/user/index.ts";
 import { uiRouter } from "./router.ts";
 
@@ -112,6 +113,17 @@ const stubLayers = Layer.mergeAll(
 		setMembers: die,
 		addMember: die,
 		removeMember: die,
+	}),
+	Layer.succeed(PrincipalRepository, {
+		findById: die,
+		findBySlug: die,
+		findPrincipalById: die,
+		findPrincipalBySlug: die,
+		findByEmail: die,
+		findUserByUserId: die,
+		updateProperties: die,
+		listAll: die,
+		searchByDisplayName: die,
 	}),
 );
 

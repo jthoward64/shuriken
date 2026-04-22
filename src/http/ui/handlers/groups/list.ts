@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import { AppConfigService } from "#src/config.ts";
 import type {
 	DatabaseError,
@@ -8,12 +8,14 @@ import type {
 import type { PrincipalId } from "#src/domain/ids.ts";
 import { GROUPS_VIRTUAL_RESOURCE_ID } from "#src/domain/virtual-resources.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
+import { buildAclPanelData } from "#src/http/ui/helpers/acl-panel.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import { buildNavContext } from "#src/http/ui/helpers/nav-context.ts";
 import { renderPage } from "#src/http/ui/helpers/render-page.ts";
 import type { TemplateService } from "#src/http/ui/template/index.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import { GroupService } from "#src/services/group/index.ts";
+import type { PrincipalService } from "#src/services/principal/index.ts";
 
 // ---------------------------------------------------------------------------
 // GET /ui/groups
@@ -25,7 +27,11 @@ export const groupsListHandler = (
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError | InternalError,
-	AclService | AppConfigService | GroupService | TemplateService
+	| AclService
+	| AppConfigService
+	| GroupService
+	| PrincipalService
+	| TemplateService
 > =>
 	Effect.gen(function* () {
 		const principal = yield* requireAuthenticated(ctx.auth);
@@ -74,6 +80,12 @@ export const groupsListHandler = (
 			};
 		});
 
+		const aclPanel = yield* buildAclPanelData(
+			principal.principalId,
+			GROUPS_VIRTUAL_RESOURCE_ID,
+			"virtual",
+		).pipe(Effect.map(Option.getOrUndefined));
+
 		return yield* renderPage(
 			"pages/groups/list",
 			{
@@ -81,6 +93,7 @@ export const groupsListHandler = (
 				pageTitle: "Groups",
 				groups: enrichedGroups,
 				canCreateGroup,
+				aclPanel,
 			},
 			ctx.headers,
 		);
