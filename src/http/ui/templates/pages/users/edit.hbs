@@ -73,6 +73,25 @@
     </form>
   </section>
 
+  <section class="bg-white rounded-lg border border-gray-200 p-6 space-y-3">
+    <h2 class="text-base font-semibold text-gray-800">DAV client setup</h2>
+    <p class="text-xs text-gray-500">Use these URLs when configuring a CalDAV or CardDAV client.</p>
+    <div class="space-y-2">
+      <div>
+        <p class="text-xs font-medium text-gray-600 mb-0.5">Principal URL</p>
+        <code class="block text-xs text-gray-800 bg-gray-50 rounded px-2 py-1.5 break-all select-all">{{principalUrl}}</code>
+      </div>
+      <div>
+        <p class="text-xs font-medium text-gray-600 mb-0.5">CalDAV</p>
+        <code class="block text-xs text-gray-800 bg-gray-50 rounded px-2 py-1.5 break-all select-all">{{caldavUrl}}</code>
+      </div>
+      <div>
+        <p class="text-xs font-medium text-gray-600 mb-0.5">CardDAV</p>
+        <code class="block text-xs text-gray-800 bg-gray-50 rounded px-2 py-1.5 break-all select-all">{{carddavUrl}}</code>
+      </div>
+    </div>
+  </section>
+
   {{#if showPasswordForm}}
     <section class="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
       <h2 class="text-base font-semibold text-gray-800">Change password</h2>

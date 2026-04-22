@@ -324,8 +324,8 @@ export const parseDavPath = (
 		});
 		const principalRepo = yield* PrincipalRepository;
 		const principalOpt = yield* isUuid(seg1)
-			? principalRepo.findById(PrincipalId(seg1))
-			: principalRepo.findBySlug(Slug(seg1));
+			? principalRepo.findPrincipalById(PrincipalId(seg1))
+			: principalRepo.findPrincipalBySlug(Slug(seg1));
 		if (Option.isNone(principalOpt)) {
 			yield* Effect.logDebug("dav.parsePath: unknown principal", {
 				segment: seg1,
@@ -336,7 +336,7 @@ export const parseDavPath = (
 			} satisfies ResolvedDavPath;
 		}
 		const principalRow = principalOpt.value;
-		const principalId = PrincipalId(principalRow.principal.id);
+		const principalId = PrincipalId(principalRow.id);
 
 		if (segments.length === SEGMENTS_PRINCIPAL) {
 			yield* Effect.logTrace("dav.parsePath: principal resolved", {

@@ -1,5 +1,5 @@
 import { Effect, Match } from "effect";
-import type { AppConfigService } from "#src/config.ts";
+import { AppConfigService } from "#src/config.ts";
 import type {
 	ConflictError,
 	DatabaseError,
@@ -72,10 +72,19 @@ type UiError = DavError | DatabaseError | InternalError | ConflictError;
 const mapUiError = (
 	err: UiError,
 	ctx: HttpRequestContext,
+	authMode: string,
 ): Effect.Effect<Response, never, TemplateService> =>
 	Match.value(err).pipe(
 		Match.tag("DavError", (e) => {
 			if (e.status === HTTP_UNAUTHORIZED) {
+				if (authMode === "basic") {
+					return Effect.succeed(
+						new Response(null, {
+							status: HTTP_UNAUTHORIZED,
+							headers: { "WWW-Authenticate": 'Basic realm="shuriken"' },
+						}),
+					);
+				}
 				return Effect.succeed(
 					new Response(null, {
 						status: HTTP_SEE_OTHER,
@@ -190,7 +199,12 @@ export const uiRouter = (
 	const handle = (
 		eff: Effect.Effect<Response, UiError, UiServices>,
 	): Effect.Effect<Response, never, UiServices> =>
-		eff.pipe(Effect.catchAll((err) => mapUiError(err, ctx)));
+		Effect.gen(function* () {
+			const config = yield* AppConfigService;
+			return yield* eff.pipe(
+				Effect.catchAll((err) => mapUiError(err, ctx, config.auth.mode)),
+			);
+		});
 
 	const notFound = (): Effect.Effect<Response, never, UiServices> =>
 		renderError(

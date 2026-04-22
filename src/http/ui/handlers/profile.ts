@@ -40,6 +40,9 @@ export const profileHandler = (
 			config.auth.mode,
 		);
 
+		const origin = ctx.url.origin;
+		const davBase = `${origin}/dav/principals/${principalRow.id}`;
+
 		return yield* renderPage(
 			"pages/profile",
 			{
@@ -49,6 +52,9 @@ export const profileHandler = (
 				principal: principalRow,
 				canEditSlug: false,
 				showPasswordForm: config.auth.mode === "basic",
+				principalUrl: `${davBase}/`,
+				caldavUrl: `${davBase}/cal/`,
+				carddavUrl: `${davBase}/card/`,
 			},
 			ctx.headers,
 		);

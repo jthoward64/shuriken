@@ -17,7 +17,7 @@ import { Temporal } from "temporal-polyfill";
 import { type ClarkName, cn, type IrDeadProperties } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import { forbidden, notFound, unauthorized } from "#src/domain/errors.ts";
-import { GroupId, InstanceId, UserId } from "#src/domain/ids.ts";
+import { GroupId, InstanceId, PrincipalId, UserId } from "#src/domain/ids.ts";
 import { COLLECTION_TYPE_TO_NAMESPACE } from "#src/domain/types/collection-namespace.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
@@ -625,14 +625,34 @@ export const propfindHandler = (
 			});
 
 			if (depth === 1) {
-				const collections = yield* collSvc.listByOwner(path.principalId);
-				for (const coll of collections) {
+				const [ownCollections, groupCollectionSets] = yield* Effect.all([
+					collSvc.listByOwner(path.principalId),
+					Effect.all(
+						memberOfGroups.map((g) =>
+							collSvc.listByOwner(PrincipalId(g.principal.id)),
+						),
+					),
+				]);
+				for (const coll of ownCollections) {
 					const ns =
 						(COLLECTION_TYPE_TO_NAMESPACE as Record<string, string>)[
 							coll.collectionType
 						] ?? "col";
-					const href = collectionHref(origin, path.principalSeg, ns, coll.slug);
+					const href = collectionHref(origin, path.principalSeg, ns, coll.id);
 					responses.push(collectionResponse(href, coll, propfind, origin));
+				}
+				for (const [group, groupColls] of memberOfGroups.map(
+					(g, i) => [g, groupCollectionSets[i] ?? []] as const,
+				)) {
+					const groupPrincipalSeg = group.principal.id;
+					for (const coll of groupColls) {
+						const ns =
+							(COLLECTION_TYPE_TO_NAMESPACE as Record<string, string>)[
+								coll.collectionType
+							] ?? "col";
+						const href = collectionHref(origin, groupPrincipalSeg, ns, coll.id);
+						responses.push(collectionResponse(href, coll, propfind, origin));
+					}
 				}
 			}
 		} else if (path.kind === "collection") {

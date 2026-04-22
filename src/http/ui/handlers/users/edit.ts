@@ -120,6 +120,9 @@ export const usersEditHandler = (
 			};
 		});
 
+		const origin = ctx.url.origin;
+		const davBase = `${origin}/dav/principals/${principalRow.id}`;
+
 		return yield* renderPage(
 			"pages/users/edit",
 			{
@@ -133,6 +136,9 @@ export const usersEditHandler = (
 				showPasswordForm: config.auth.mode === "basic",
 				isSelf,
 				collections,
+				principalUrl: `${davBase}/`,
+				caldavUrl: `${davBase}/cal/`,
+				carddavUrl: `${davBase}/card/`,
 			},
 			ctx.headers,
 		);
