@@ -450,7 +450,7 @@ describe("PROPFIND principal", () => {
 					headers: { Depth: "1" },
 					expect: {
 						status: 207,
-						bodyContains: ["primary"],
+						bodyContains: ["Primary Calendar"],
 					},
 				}),
 			],
