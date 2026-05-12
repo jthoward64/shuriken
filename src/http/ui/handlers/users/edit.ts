@@ -117,7 +117,7 @@ export const usersEditHandler = (
 		const nav = yield* buildNavContext(
 			principal,
 			ctx.url.pathname,
-			config.auth.mode,
+			config.auth.basicAuthEnabled,
 		);
 
 		const enrichedGroups = allGroups.map((g) => {
@@ -150,7 +150,7 @@ export const usersEditHandler = (
 				groups: enrichedGroups,
 				canEditSlug,
 				canDelete,
-				showPasswordForm: config.auth.mode === "basic",
+				showPasswordForm: config.auth.basicAuthEnabled,
 				isSelf,
 				collections,
 				principalUrl: `${davBase}/`,

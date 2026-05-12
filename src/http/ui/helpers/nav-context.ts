@@ -22,7 +22,7 @@ export interface NavContext {
 export const buildNavContext = (
 	principal: AuthenticatedPrincipal,
 	currentPath: string,
-	authMode: "single-user" | "basic" | "proxy",
+	basicAuthEnabled: boolean,
 ): Effect.Effect<NavContext, DatabaseError, AclService> =>
 	Effect.gen(function* () {
 		const acl = yield* AclService;
@@ -43,7 +43,7 @@ export const buildNavContext = (
 		return {
 			showUsers: usersPrivs.includes("DAV:read"),
 			showGroups: groupsPrivs.includes("DAV:read"),
-			showLogout: authMode === "basic",
+			showLogout: basicAuthEnabled,
 			currentPath,
 			displayName: Option.getOrUndefined(principal.displayName),
 		};

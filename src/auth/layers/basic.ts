@@ -14,7 +14,7 @@ import { authAttemptsTotal } from "#src/observability/metrics.ts";
 import { CryptoService } from "#src/platform/crypto.ts";
 
 // ---------------------------------------------------------------------------
-// Basic auth layer
+// Basic auth
 //
 // Parses HTTP Basic Authentication credentials, looks up the user in the
 // auth_user table (authSource = "local"), and verifies the password.
@@ -50,117 +50,129 @@ export const parseBasicAuth = (
 	});
 };
 
+/**
+ * Core basic-auth logic. Parses the Authorization header, looks up the user,
+ * verifies the password, and emits per-outcome metrics. Returns Unauthenticated
+ * when no credentials are present, the user is unknown, or the password is wrong.
+ *
+ * Shared between BasicAuthLayer and CompositeAuthLayer.
+ */
+export const authenticateBasic = (
+	headers: Headers,
+): Effect.Effect<AuthResult, DatabaseError, DatabaseClient | CryptoService> =>
+	Effect.gen(function* () {
+		const db = yield* DatabaseClient;
+		const crypto = yield* CryptoService;
+
+		return yield* Option.match(parseBasicAuth(headers), {
+			onNone: () =>
+				Effect.gen(function* () {
+					yield* Effect.logTrace("auth.basic: no credentials present");
+					yield* Metric.increment(
+						Metric.tagged(authCounter, "auth.outcome", "no_credentials"),
+					);
+					return new Unauthenticated() as AuthResult;
+				}),
+			onSome: (creds) =>
+				Effect.gen(function* () {
+					yield* Effect.annotateCurrentSpan({
+						"auth.username": creds.username,
+					});
+					yield* Effect.logTrace("auth.basic: attempt", {
+						username: creds.username,
+					});
+
+					const rows = yield* Effect.tryPromise({
+						try: () =>
+							db
+								.select({
+									authCredential: authUser.authCredential,
+									userId: user.id,
+									principalId: user.principalId,
+									displayName: principal.displayName,
+								})
+								.from(authUser)
+								.innerJoin(user, eq(authUser.userId, user.id))
+								.innerJoin(principal, eq(user.principalId, principal.id))
+								.where(
+									and(
+										eq(authUser.authSource, "local"),
+										eq(authUser.authId, creds.username),
+									),
+								)
+								.limit(1),
+						catch: (e) => new DatabaseError({ cause: e }),
+					});
+
+					const row = rows[0];
+					if (!row?.authCredential) {
+						yield* Effect.logDebug("auth.basic: user not found", {
+							username: creds.username,
+						});
+						yield* Metric.increment(
+							Metric.tagged(authCounter, "auth.outcome", "not_found"),
+						);
+						return new Unauthenticated() as AuthResult;
+					}
+
+					// InternalError from Bun.password is a defect (unexpected), not a domain error
+					const valid = yield* crypto
+						.verifyPassword(creds.password, row.authCredential)
+						.pipe(Effect.orDie);
+					if (!valid) {
+						yield* Effect.logDebug("auth.basic: invalid password", {
+							username: creds.username,
+						});
+						yield* Metric.increment(
+							Metric.tagged(authCounter, "auth.outcome", "invalid_password"),
+						);
+						return new Unauthenticated() as AuthResult;
+					}
+
+					yield* Effect.logDebug("auth.basic: success", {
+						userId: row.userId,
+						username: creds.username,
+					});
+					yield* Metric.increment(
+						Metric.tagged(authCounter, "auth.outcome", "success"),
+					);
+					return new Authenticated({
+						principal: {
+							principalId: PrincipalId(row.principalId),
+							userId: UserId(row.userId),
+							displayName: Option.fromNullable(row.displayName),
+						},
+					}) as AuthResult;
+				}),
+		});
+	}).pipe(
+		Effect.tapError((e) =>
+			Effect.all(
+				[
+					Effect.logWarning("auth.basic: error during authentication", {
+						cause: e instanceof DatabaseError ? e.cause : e,
+					}),
+					Metric.increment(Metric.tagged(authCounter, "auth.outcome", "error")),
+				],
+				{ discard: true },
+			),
+		),
+	);
+
 export const BasicAuthLayer = Layer.effect(
 	AuthService,
 	Effect.gen(function* () {
 		const db = yield* DatabaseClient;
 		const crypto = yield* CryptoService;
-
 		return AuthService.of({
 			authenticate: Effect.fn("auth.basic.authenticate")(
 				function* (headers, _clientIp) {
 					yield* Effect.annotateCurrentSpan({ "auth.mode": "basic" });
-
-					return yield* Option.match(parseBasicAuth(headers), {
-						onNone: () =>
-							Effect.gen(function* () {
-								yield* Effect.logTrace("auth.basic: no credentials present");
-								yield* Metric.increment(
-									Metric.tagged(authCounter, "auth.outcome", "no_credentials"),
-								);
-								return new Unauthenticated() as AuthResult;
-							}),
-						onSome: (creds) =>
-							Effect.gen(function* () {
-								yield* Effect.annotateCurrentSpan({
-									"auth.username": creds.username,
-								});
-								yield* Effect.logTrace("auth.basic: attempt", {
-									username: creds.username,
-								});
-
-								// Look up auth_user row for this username
-								const rows = yield* Effect.tryPromise({
-									try: () =>
-										db
-											.select({
-												authCredential: authUser.authCredential,
-												userId: user.id,
-												principalId: user.principalId,
-												displayName: principal.displayName,
-											})
-											.from(authUser)
-											.innerJoin(user, eq(authUser.userId, user.id))
-											.innerJoin(principal, eq(user.principalId, principal.id))
-											.where(
-												and(
-													eq(authUser.authSource, "local"),
-													eq(authUser.authId, creds.username),
-												),
-											)
-											.limit(1),
-									catch: (e) => new DatabaseError({ cause: e }),
-								});
-
-								const row = rows[0];
-								if (!row?.authCredential) {
-									yield* Effect.logDebug("auth.basic: user not found", {
-										username: creds.username,
-									});
-									yield* Metric.increment(
-										Metric.tagged(authCounter, "auth.outcome", "not_found"),
-									);
-									return new Unauthenticated() as AuthResult;
-								}
-
-								// InternalError from Bun.password is a defect (unexpected), not a domain error
-								const valid = yield* crypto
-									.verifyPassword(creds.password, row.authCredential)
-									.pipe(Effect.orDie);
-								if (!valid) {
-									yield* Effect.logDebug("auth.basic: invalid password", {
-										username: creds.username,
-									});
-									yield* Metric.increment(
-										Metric.tagged(
-											authCounter,
-											"auth.outcome",
-											"invalid_password",
-										),
-									);
-									return new Unauthenticated() as AuthResult;
-								}
-
-								yield* Effect.logDebug("auth.basic: success", {
-									userId: row.userId,
-									username: creds.username,
-								});
-								yield* Metric.increment(
-									Metric.tagged(authCounter, "auth.outcome", "success"),
-								);
-								return new Authenticated({
-									principal: {
-										principalId: PrincipalId(row.principalId),
-										userId: UserId(row.userId),
-										displayName: Option.fromNullable(row.displayName),
-									},
-								}) as AuthResult;
-							}),
-					});
+					return yield* authenticateBasic(headers).pipe(
+						Effect.provideService(DatabaseClient, db),
+						Effect.provideService(CryptoService, crypto),
+					);
 				},
-				Effect.tapError((e) =>
-					Effect.all(
-						[
-							Effect.logWarning("auth.basic: error during authentication", {
-								cause: e instanceof DatabaseError ? e.cause : e,
-							}),
-							Metric.increment(
-								Metric.tagged(authCounter, "auth.outcome", "error"),
-							),
-						],
-						{ discard: true },
-					),
-				),
 			),
 		});
 	}),

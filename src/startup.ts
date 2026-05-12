@@ -1,11 +1,10 @@
 import { Effect, Option, Redacted } from "effect";
 import { AppConfigService } from "#src/config.ts";
-import {
-	ConfigError,
-	type ConflictError,
-	type DatabaseError,
-	type DavError,
-	type InternalError,
+import type {
+	ConflictError,
+	DatabaseError,
+	DavError,
+	InternalError,
 } from "#src/domain/errors.ts";
 import type { PrincipalId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
@@ -27,31 +26,26 @@ const generateRandomPassword = (): string => {
 };
 
 // ---------------------------------------------------------------------------
-// singleUserStartup — runs at application boot when AUTH_MODE=single-user.
+// autoLoginStartup — runs at application boot when AUTO_LOGIN is set.
 //
-// Requires ADMIN_EMAIL to be set; fails with ConfigError if absent.
-// Derives the user's slug and name from the local part of the email address
-// (everything before the @). Idempotent: succeeds without action when the
-// user already exists. Always ensures the admin user has DAV:all on virtual
-// resources so that the web UI management functions work correctly.
+// Provisions the configured user if they do not already exist, derives the
+// user's slug and name from the local part of the email address (everything
+// before the @), and ensures they have DAV:all on virtual resources so the
+// web UI management functions work correctly. Idempotent.
 // ---------------------------------------------------------------------------
 
-export const singleUserStartup: Effect.Effect<
+export const autoLoginStartup: Effect.Effect<
 	void,
-	ConfigError | DavError | DatabaseError | ConflictError | InternalError,
+	DavError | DatabaseError | ConflictError | InternalError,
 	AppConfigService | PrincipalService | ProvisioningService
 > = Effect.gen(function* () {
 	const config = yield* AppConfigService;
 
-	if (config.auth.mode !== "single-user") {
+	if (Option.isNone(config.auth.autoLogin)) {
 		return;
 	}
 
-	if (Option.isNone(config.auth.adminEmail)) {
-		return yield* Effect.fail(new ConfigError({ key: "adminEmail" }));
-	}
-
-	const adminEmailStr = config.auth.adminEmail.value;
+	const adminEmailStr = config.auth.autoLogin.value;
 	const email = Email(adminEmailStr);
 	const principalSvc = yield* PrincipalService;
 	const provisioningSvc = yield* ProvisioningService;
@@ -68,7 +62,7 @@ export const singleUserStartup: Effect.Effect<
 	let principalId: PrincipalId;
 
 	if (Option.isSome(existing)) {
-		yield* Effect.logDebug("single-user already provisioned", { email });
+		yield* Effect.logDebug("auto-login user already provisioned", { email });
 		principalId = existing.value.principal.id as PrincipalId;
 	} else {
 		const localPart = adminEmailStr.split("@")[0] ?? adminEmailStr;
@@ -84,9 +78,8 @@ export const singleUserStartup: Effect.Effect<
 });
 
 // ---------------------------------------------------------------------------
-// basicAuthStartup — runs at application boot when AUTH_MODE=basic.
+// basicAuthStartup — runs when basic auth is enabled and ADMIN_EMAIL is set.
 //
-// Requires ADMIN_EMAIL to be set; fails with ConfigError if absent.
 // If ADMIN_PASSWORD is not set, generates a random password and prints it
 // to stdout — the operator must save it, as it will not be shown again.
 // ADMIN_SLUG defaults to the local part of ADMIN_EMAIL.
@@ -96,17 +89,13 @@ export const singleUserStartup: Effect.Effect<
 
 export const basicAuthStartup: Effect.Effect<
 	void,
-	ConfigError | DavError | DatabaseError | ConflictError | InternalError,
+	DavError | DatabaseError | ConflictError | InternalError,
 	AppConfigService | PrincipalService | ProvisioningService
 > = Effect.gen(function* () {
 	const config = yield* AppConfigService;
 
-	if (config.auth.mode !== "basic") {
+	if (!config.auth.basicAuthEnabled || Option.isNone(config.auth.adminEmail)) {
 		return;
-	}
-
-	if (Option.isNone(config.auth.adminEmail)) {
-		return yield* Effect.fail(new ConfigError({ key: "adminEmail" }));
 	}
 
 	const adminEmailStr = config.auth.adminEmail.value;

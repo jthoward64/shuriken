@@ -1,3 +1,4 @@
+- Implement super-admin (can access all data), admin (can create and manage users, but cannot access their data), and normal users (only access their own data) role provisioning in proxy auth mode and a way to create users in this manner when in basic auth mode
 - Add a calendar viewer to web UI built with with https://fullcalendar.io/docs
 - Add support for creating, editing, and deleting calendar events from the web UI
 - Add contacts to web UI
@@ -9,4 +10,3 @@
 - Add a birthday calendar based on a user's contacts' birthdays
 - Add support for sharing calendars and events with other users and groups
 - Add a holiday calendar
-- Implement super-admin (can access all data), admin (can create and manage users, but cannot access their data), and normal users (only access their own data) roles

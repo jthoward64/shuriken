@@ -26,43 +26,41 @@ export const DatabaseConfig = Config.all({
 	url: Config.redacted("databaseUrl"),
 });
 
-export type AuthMode = "single-user" | "basic" | "proxy";
-
 export const AuthConfig = Config.all({
 	/**
-	 * Auth mode selection.
-	 * - single-user: no credentials checked; all requests are one configured user
-	 * - basic:       HTTP Basic Authentication against auth_user table
-	 * - proxy:       trust a reverse-proxy header (e.g. X-Remote-User)
+	 * Auto-login email. When set, all requests are authenticated as this user
+	 * without credential checks. Use for development or single-user self-hosted
+	 * setups. Takes precedence over both proxy and basic auth.
 	 */
-	mode: Config.string("authMode").pipe(
-		Config.withDefault("single-user"),
-		Config.map((s): AuthMode => {
-			if (s === "single-user" || s === "basic" || s === "proxy") {
-				return s;
-			} else {
-				throw new Error(
-					`Invalid AUTH_MODE "${s}". Must be single-user, basic, or proxy.`,
-				);
-			}
-		}),
-	),
+	autoLogin: Config.string("autoLogin").pipe(Config.option),
 
-	/** Header the reverse proxy injects with the authenticated username. */
-	proxyHeader: Config.string("proxyHeader").pipe(
-		Config.withDefault("X-Remote-User"),
-	),
+	/**
+	 * Header the reverse proxy injects with the authenticated username.
+	 * When set, proxy auth is enabled and requests from trusted IPs (see
+	 * TRUSTED_PROXIES) are authenticated via this header. Leave unset to
+	 * disable proxy auth.
+	 */
+	proxyHeader: Config.string("proxyHeader").pipe(Config.option),
 
 	/**
 	 * Comma-separated list of trusted proxy IPs, or "*" to trust all.
-	 * When AUTH_MODE=proxy, requests from untrusted IPs have the proxy header ignored.
+	 * Only meaningful when PROXY_HEADER is set; requests from untrusted IPs
+	 * have the proxy header ignored.
 	 */
 	trustedProxies: Config.string("trustedProxies").pipe(Config.withDefault("*")),
 
 	/**
-	 * Email of the admin user. In basic auth mode, this user is provisioned with credentials
-	 * on first run. In single-user mode, all sessions authenticate as this user automatically.
-	 * Required in both modes; fails at startup if absent.
+	 * HTTP Basic Authentication toggle. Defaults to true; set BASIC_AUTH_ENABLED=false
+	 * to disable. When enabled, the server validates Authorization: Basic headers
+	 * against the auth_user table and emits WWW-Authenticate on 401.
+	 */
+	basicAuthEnabled: Config.boolean("basicAuthEnabled").pipe(
+		Config.withDefault(true),
+	),
+
+	/**
+	 * Email of the admin user provisioned for basic auth on first boot.
+	 * Optional; only used when basic auth is enabled.
 	 */
 	adminEmail: Config.string("adminEmail").pipe(Config.option),
 

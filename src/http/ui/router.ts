@@ -81,12 +81,12 @@ type UiError = DavError | DatabaseError | InternalError | ConflictError;
 const mapUiError = (
 	err: UiError,
 	ctx: HttpRequestContext,
-	authMode: string,
+	basicAuthEnabled: boolean,
 ): Effect.Effect<Response, never, TemplateService> =>
 	Match.value(err).pipe(
 		Match.tag("DavError", (e) => {
 			if (e.status === HTTP_UNAUTHORIZED) {
-				if (authMode === "basic") {
+				if (basicAuthEnabled) {
 					return Effect.succeed(
 						new Response(null, {
 							status: HTTP_UNAUTHORIZED,
@@ -211,7 +211,9 @@ export const uiRouter = (
 		Effect.gen(function* () {
 			const config = yield* AppConfigService;
 			return yield* eff.pipe(
-				Effect.catchAll((err) => mapUiError(err, ctx, config.auth.mode)),
+				Effect.catchAll((err) =>
+					mapUiError(err, ctx, config.auth.basicAuthEnabled),
+				),
 			);
 		});
 

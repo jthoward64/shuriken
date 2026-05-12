@@ -5,7 +5,7 @@ import { Effect, Layer, Logger, ManagedRuntime } from "effect";
 import { AppConfigLive, AppConfigService } from "#src/config.ts";
 import { handleRequest } from "#src/http/router.ts";
 import { AppLayer } from "#src/layers.ts";
-import { basicAuthStartup, singleUserStartup } from "#src/startup.ts";
+import { autoLoginStartup, basicAuthStartup } from "#src/startup.ts";
 import { HTTP_INTERNAL_SERVER_ERROR } from "./http/status";
 
 const program = Effect.gen(function* () {
@@ -18,7 +18,7 @@ const program = Effect.gen(function* () {
 	yield* Effect.promise(() =>
 		runtime.runPromise(
 			Effect.gen(function* () {
-				yield* singleUserStartup;
+				yield* autoLoginStartup;
 				yield* basicAuthStartup;
 			}).pipe(Effect.tapError((err) => Effect.logError("startup failed", err))),
 		),

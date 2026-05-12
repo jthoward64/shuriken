@@ -223,9 +223,10 @@ const stubLayers = Layer.mergeAll(
 		server: { port: 3000, host: "::" },
 		database: { url: Redacted.make("postgres://localhost/test") },
 		auth: {
-			mode: "single-user" as const,
-			proxyHeader: "X-Remote-User",
+			autoLogin: Option.none(),
+			proxyHeader: Option.none(),
 			trustedProxies: "*",
+			basicAuthEnabled: true,
 			adminEmail: Option.none(),
 			adminPassword: Option.none(),
 			adminSlug: Option.none(),

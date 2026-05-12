@@ -50,7 +50,7 @@ export const usersCollectionsNewHandler = (
 		const nav = yield* buildNavContext(
 			principal,
 			ctx.url.pathname,
-			config.auth.mode,
+			config.auth.basicAuthEnabled,
 		);
 
 		return yield* renderPage(

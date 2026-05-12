@@ -50,7 +50,7 @@ export const groupsListHandler = (
 		const nav = yield* buildNavContext(
 			principal,
 			ctx.url.pathname,
-			config.auth.mode,
+			config.auth.basicAuthEnabled,
 		);
 
 		const groupPrincipalIds = groups.map((g) => g.principal.id as PrincipalId);

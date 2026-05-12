@@ -1,6 +1,6 @@
 import { Effect, Match, Metric, Option } from "effect";
 import { AuthService } from "#src/auth/service.ts";
-import type { AppConfigService } from "#src/config.ts";
+import { AppConfigService } from "#src/config.ts";
 import type { DatabaseClient } from "#src/db/client.ts";
 import type { AppError } from "#src/domain/errors.ts";
 import {
@@ -156,7 +156,10 @@ const davErrorBody = (precondition: string): Effect.Effect<string, never> => {
 };
 
 /** Map any AppError to a Response. */
-const mapErrorToResponse = (err: AppError): Effect.Effect<Response, never> =>
+const mapErrorToResponse = (
+	err: AppError,
+	basicAuthEnabled: boolean,
+): Effect.Effect<Response, never> =>
 	Match.value(err).pipe(
 		Match.tag("DavError", (e) =>
 			e.precondition
@@ -174,7 +177,9 @@ const mapErrorToResponse = (err: AppError): Effect.Effect<Response, never> =>
 			Effect.succeed(
 				new Response("Unauthorized", {
 					status: 401,
-					headers: { "WWW-Authenticate": 'Basic realm="shuriken"' },
+					headers: basicAuthEnabled
+						? { "WWW-Authenticate": 'Basic realm="shuriken"' }
+						: {},
 				}),
 			),
 		),
@@ -280,7 +285,11 @@ export const handleRequest = (
 			"http.method": req.method,
 			"http.path": url.pathname,
 		}),
-		Effect.catchAll(mapErrorToResponse),
+		Effect.catchAll((err) =>
+			Effect.flatMap(AppConfigService, (cfg) =>
+				mapErrorToResponse(err, cfg.auth.basicAuthEnabled),
+			),
+		),
 		Effect.tap((response) => {
 			const status = response.status;
 			return Effect.all(

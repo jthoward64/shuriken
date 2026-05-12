@@ -124,6 +124,101 @@ export const isClientTrusted = (
 
 const authCounter = Metric.tagged(authAttemptsTotal, "auth.mode", "proxy");
 
+/**
+ * Core proxy-auth logic. Checks that the client IP is trusted, reads the
+ * configured proxy header, looks up the user by email, and emits per-outcome
+ * metrics. Returns Unauthenticated when the proxy isn't trusted, the header
+ * is absent, or the user is unknown.
+ *
+ * Shared between ProxyAuthLayer and CompositeAuthLayer.
+ */
+export const authenticateProxy = (
+	headers: Headers,
+	clientIp: Option.Option<string>,
+	proxyHeader: string,
+	trustedProxies: string,
+): Effect.Effect<
+	Authenticated | Unauthenticated,
+	DatabaseError,
+	DatabaseClient
+> =>
+	Effect.gen(function* () {
+		const db = yield* DatabaseClient;
+
+		if (!isClientTrusted(clientIp, trustedProxies)) {
+			yield* Effect.logDebug("auth.proxy: client not trusted", {
+				clientIp: Option.getOrUndefined(clientIp),
+			});
+			yield* Metric.increment(
+				Metric.tagged(authCounter, "auth.outcome", "untrusted_proxy"),
+			);
+			return new Unauthenticated();
+		}
+
+		const username = headers.get(proxyHeader);
+		if (!username) {
+			yield* Effect.logDebug("auth.proxy: header absent", { proxyHeader });
+			yield* Metric.increment(
+				Metric.tagged(authCounter, "auth.outcome", "header_absent"),
+			);
+			return new Unauthenticated();
+		}
+
+		yield* Effect.annotateCurrentSpan({ "auth.username": username });
+		yield* Effect.logTrace("auth.proxy: attempt", { username });
+
+		const rows = yield* Effect.tryPromise({
+			try: () =>
+				db
+					.select({
+						userId: user.id,
+						principalId: user.principalId,
+						displayName: principal.displayName,
+					})
+					.from(user)
+					.innerJoin(principal, eq(user.principalId, principal.id))
+					.where(eq(user.email, username))
+					.limit(1),
+			catch: (e) => new DatabaseError({ cause: e }),
+		});
+
+		const row = rows[0];
+		if (!row) {
+			yield* Effect.logDebug("auth.proxy: user not found", { username });
+			yield* Metric.increment(
+				Metric.tagged(authCounter, "auth.outcome", "not_found"),
+			);
+			return new Unauthenticated();
+		}
+
+		yield* Effect.logDebug("auth.proxy: success", {
+			userId: row.userId,
+			username,
+		});
+		yield* Metric.increment(
+			Metric.tagged(authCounter, "auth.outcome", "success"),
+		);
+		return new Authenticated({
+			principal: {
+				principalId: PrincipalId(row.principalId),
+				userId: UserId(row.userId),
+				displayName: Option.fromNullable(row.displayName),
+			},
+		});
+	}).pipe(
+		Effect.tapError((e) =>
+			Effect.all(
+				[
+					Effect.logWarning("auth.proxy: error during authentication", {
+						cause: e instanceof DatabaseError ? e.cause : e,
+					}),
+					Metric.increment(Metric.tagged(authCounter, "auth.outcome", "error")),
+				],
+				{ discard: true },
+			),
+		),
+	);
+
 export const ProxyAuthLayer = Layer.effect(
 	AuthService,
 	Effect.gen(function* () {
@@ -131,89 +226,19 @@ export const ProxyAuthLayer = Layer.effect(
 		const {
 			auth: { proxyHeader, trustedProxies },
 		} = yield* AppConfigService;
+		const header = Option.getOrElse(proxyHeader, () => "X-Remote-User");
 
 		return AuthService.of({
 			authenticate: Effect.fn("auth.proxy.authenticate")(
 				function* (headers, clientIp) {
 					yield* Effect.annotateCurrentSpan({ "auth.mode": "proxy" });
-
-					// If the request doesn't come from a trusted proxy, ignore the header
-					if (!isClientTrusted(clientIp, trustedProxies)) {
-						yield* Effect.logDebug("auth.proxy: client not trusted", {
-							clientIp: Option.getOrUndefined(clientIp),
-						});
-						yield* Metric.increment(
-							Metric.tagged(authCounter, "auth.outcome", "untrusted_proxy"),
-						);
-						return new Unauthenticated();
-					}
-
-					const username = headers.get(proxyHeader);
-					if (!username) {
-						yield* Effect.logDebug("auth.proxy: header absent", {
-							proxyHeader,
-						});
-						yield* Metric.increment(
-							Metric.tagged(authCounter, "auth.outcome", "header_absent"),
-						);
-						return new Unauthenticated();
-					}
-
-					yield* Effect.annotateCurrentSpan({ "auth.username": username });
-					yield* Effect.logTrace("auth.proxy: attempt", { username });
-
-					const rows = yield* Effect.tryPromise({
-						try: () =>
-							db
-								.select({
-									userId: user.id,
-									principalId: user.principalId,
-									displayName: principal.displayName,
-								})
-								.from(user)
-								.innerJoin(principal, eq(user.principalId, principal.id))
-								.where(eq(user.email, username))
-								.limit(1),
-						catch: (e) => new DatabaseError({ cause: e }),
-					});
-
-					const row = rows[0];
-					if (!row) {
-						yield* Effect.logDebug("auth.proxy: user not found", { username });
-						yield* Metric.increment(
-							Metric.tagged(authCounter, "auth.outcome", "not_found"),
-						);
-						return new Unauthenticated();
-					}
-
-					yield* Effect.logDebug("auth.proxy: success", {
-						userId: row.userId,
-						username,
-					});
-					yield* Metric.increment(
-						Metric.tagged(authCounter, "auth.outcome", "success"),
-					);
-					return new Authenticated({
-						principal: {
-							principalId: PrincipalId(row.principalId),
-							userId: UserId(row.userId),
-							displayName: Option.fromNullable(row.displayName),
-						},
-					});
+					return yield* authenticateProxy(
+						headers,
+						clientIp,
+						header,
+						trustedProxies,
+					).pipe(Effect.provideService(DatabaseClient, db));
 				},
-				Effect.tapError((e) =>
-					Effect.all(
-						[
-							Effect.logWarning("auth.proxy: error during authentication", {
-								cause: e instanceof DatabaseError ? e.cause : e,
-							}),
-							Metric.increment(
-								Metric.tagged(authCounter, "auth.outcome", "error"),
-							),
-						],
-						{ discard: true },
-					),
-				),
 			),
 		});
 	}),

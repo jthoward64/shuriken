@@ -28,7 +28,15 @@ const authCounter = Metric.tagged(
 	"single-user",
 );
 
-const resolvePrincipal = (
+/**
+ * Resolve a principal for auto-login / single-user mode. Looks up the user by
+ * email (if provided), falling back to the first user in the database when the
+ * configured email is not found or no email is configured. Fails with AuthError
+ * when no users exist.
+ *
+ * Shared between SingleUserAuthLayer and CompositeAuthLayer.
+ */
+export const resolveAutoLoginPrincipal = (
 	db: DatabaseClient,
 	email: Option.Option<Email>,
 ): Effect.Effect<AuthenticatedPrincipal, AuthError | DatabaseError> =>
@@ -69,10 +77,10 @@ const resolvePrincipal = (
 		// their email), fall back to the first user rather than locking everyone out.
 		if (Option.isSome(email)) {
 			yield* Effect.logWarning(
-				"auth.single-user: SINGLE_USER_EMAIL not found, falling back to first user",
+				"auth.single-user: AUTO_LOGIN email not found, falling back to first user",
 				{ configuredEmail: Option.getOrUndefined(email) },
 			);
-			return yield* resolvePrincipal(db, Option.none());
+			return yield* resolveAutoLoginPrincipal(db, Option.none());
 		}
 
 		return yield* new AuthError({
@@ -85,9 +93,9 @@ export const SingleUserAuthLayer = Layer.effect(
 	Effect.gen(function* () {
 		const db = yield* DatabaseClient;
 		const {
-			auth: { adminEmail: emailOpt },
+			auth: { autoLogin },
 		} = yield* AppConfigService;
-		const email = Option.map(emailOpt, Email);
+		const email = Option.map(autoLogin, Email);
 
 		return AuthService.of({
 			// Resolve per-request: layer build is infallible, user row changes
@@ -96,7 +104,7 @@ export const SingleUserAuthLayer = Layer.effect(
 				function* (_headers, _clientIp) {
 					yield* Effect.annotateCurrentSpan({ "auth.mode": "single-user" });
 					yield* Effect.logTrace("auth.single-user: authenticating");
-					const resolved = yield* resolvePrincipal(db, email);
+					const resolved = yield* resolveAutoLoginPrincipal(db, email);
 					yield* Metric.increment(
 						Metric.tagged(authCounter, "auth.outcome", "success"),
 					);

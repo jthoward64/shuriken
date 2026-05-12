@@ -1,6 +1,6 @@
 import { DevTools } from "@effect/experimental";
 import { Effect, Layer, Logger } from "effect";
-import { selectAuthLayer } from "#src/auth/index.ts";
+import { CompositeAuthLayer } from "#src/auth/index.ts";
 import { AppConfigLive, AppConfigService } from "#src/config.ts";
 import { type DatabaseClient, DatabaseClientLive } from "#src/db/client.ts";
 import { TemplateServiceLive } from "#src/http/ui/template/index.ts";
@@ -48,12 +48,11 @@ const DevToolsLayer = Layer.unwrapEffect(
 ).pipe(Layer.provide(InfraLayer));
 
 // ---------------------------------------------------------------------------
-// Auth layer — concrete implementation selected at startup from AUTH_MODE
+// Auth layer — composite implementation; tries auto-login → proxy → basic on
+// every request and returns the first authenticated result.
 // ---------------------------------------------------------------------------
 
-export const AuthLayer = Layer.unwrapEffect(selectAuthLayer).pipe(
-	Layer.provide(InfraLayer),
-);
+export const AuthLayer = CompositeAuthLayer.pipe(Layer.provide(InfraLayer));
 
 // ---------------------------------------------------------------------------
 // Domain layer helper — each domain layer needs DatabaseClient from InfraLayer

@@ -107,7 +107,7 @@ export const collectionsEditHandler = (
 		const nav = yield* buildNavContext(
 			principal,
 			ctx.url.pathname,
-			config.auth.mode,
+			config.auth.basicAuthEnabled,
 		);
 
 		const aclPanel = yield* buildAclPanelData(

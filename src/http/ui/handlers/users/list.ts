@@ -51,7 +51,7 @@ export const usersListHandler = (
 		const nav = yield* buildNavContext(
 			principal,
 			ctx.url.pathname,
-			config.auth.mode,
+			config.auth.basicAuthEnabled,
 		);
 
 		// Batch-check per-user permissions for the current caller

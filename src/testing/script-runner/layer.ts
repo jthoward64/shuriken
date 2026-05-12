@@ -35,9 +35,10 @@ const testConfig: AppConfigType = {
 	server: { port: 3000, host: "localhost" },
 	database: { url: Redacted.make("postgres://unused") },
 	auth: {
-		mode: "basic",
-		proxyHeader: "X-Remote-User",
+		autoLogin: Option.none<string>(),
+		proxyHeader: Option.none<string>(),
 		trustedProxies: "*",
+		basicAuthEnabled: true,
 		adminEmail: Option.none<string>(),
 		adminPassword: Option.none<Redacted.Redacted<string>>(),
 		adminSlug: Option.none<string>(),

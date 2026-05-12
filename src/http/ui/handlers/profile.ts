@@ -37,7 +37,7 @@ export const profileHandler = (
 		const nav = yield* buildNavContext(
 			principal,
 			ctx.url.pathname,
-			config.auth.mode,
+			config.auth.basicAuthEnabled,
 		);
 
 		const origin = ctx.url.origin;
@@ -51,7 +51,7 @@ export const profileHandler = (
 				user,
 				principal: principalRow,
 				canEditSlug: false,
-				showPasswordForm: config.auth.mode === "basic",
+				showPasswordForm: config.auth.basicAuthEnabled,
 				principalUrl: `${davBase}/`,
 				caldavUrl: `${davBase}/cal/`,
 				carddavUrl: `${davBase}/card/`,

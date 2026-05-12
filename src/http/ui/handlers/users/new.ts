@@ -40,7 +40,7 @@ export const usersNewHandler = (
 		const nav = yield* buildNavContext(
 			principal,
 			ctx.url.pathname,
-			config.auth.mode,
+			config.auth.basicAuthEnabled,
 		);
 
 		return yield* renderPage(
@@ -48,7 +48,7 @@ export const usersNewHandler = (
 			{
 				...nav,
 				pageTitle: "New User",
-				showPasswordForm: config.auth.mode === "basic",
+				showPasswordForm: config.auth.basicAuthEnabled,
 			},
 			ctx.headers,
 		);
