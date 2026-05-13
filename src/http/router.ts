@@ -13,10 +13,14 @@ import { buildXml } from "#src/http/dav/xml/builder.ts";
 import {
 	HTTP_BAD_REQUEST,
 	HTTP_INTERNAL_SERVER_ERROR,
+	HTTP_UNAUTHORIZED,
 } from "#src/http/status.ts";
 import { timezonesHandler } from "#src/http/timezones/handler.ts";
 import { uiRouter } from "#src/http/ui/router.ts";
 import type { TemplateService } from "#src/http/ui/template/index.ts";
+import type { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
+import type { ProvisioningService } from "#src/services/provisioning/service.ts";
+import type { SubscriptionService } from "#src/services/external-calendar/subscription.ts";
 import type {
 	CollectionRepository,
 	IanaTimezoneService,
@@ -80,7 +84,10 @@ type AppServices =
 	| GroupService
 	| SchedulingService
 	| BunFileService
-	| TemplateService;
+	| TemplateService
+	| ProvisioningService
+	| ExternalCalendarRepository
+	| SubscriptionService;
 
 const isDavPath = (pathname: string): boolean =>
 	pathname === "/dav" ||
@@ -161,8 +168,23 @@ const mapErrorToResponse = (
 	basicAuthEnabled: boolean,
 ): Effect.Effect<Response, never> =>
 	Match.value(err).pipe(
-		Match.tag("DavError", (e) =>
-			e.precondition
+		Match.tag("DavError", (e) => {
+			// 401s — from davRouter's central auth gate or per-handler
+			// `unauthorized()` — surface as DavError today. Honour the
+			// `basicAuthEnabled` toggle the same way we do for AuthError so
+			// proxy-only / AUTO_LOGIN-only deployments don't falsely advertise
+			// Basic in their challenge.
+			if (e.status === HTTP_UNAUTHORIZED) {
+				return Effect.succeed(
+					new Response(e.message ?? null, {
+						status: HTTP_UNAUTHORIZED,
+						headers: basicAuthEnabled
+							? { "WWW-Authenticate": 'Basic realm="shuriken"' }
+							: {},
+					}),
+				);
+			}
+			return e.precondition
 				? Effect.flatMap(davErrorBody(e.precondition), (body) =>
 						Effect.succeed(
 							new Response(body, {
@@ -171,12 +193,12 @@ const mapErrorToResponse = (
 							}),
 						),
 					)
-				: Effect.succeed(new Response(e.message ?? null, { status: e.status })),
-		),
+				: Effect.succeed(new Response(e.message ?? null, { status: e.status }));
+		}),
 		Match.tag("AuthError", () =>
 			Effect.succeed(
 				new Response("Unauthorized", {
-					status: 401,
+					status: HTTP_UNAUTHORIZED,
 					headers: basicAuthEnabled
 						? { "WWW-Authenticate": 'Basic realm="shuriken"' }
 						: {},

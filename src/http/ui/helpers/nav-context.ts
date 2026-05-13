@@ -14,6 +14,7 @@ import { AclService } from "#src/services/acl/index.ts";
 export interface NavContext {
 	readonly showUsers: boolean;
 	readonly showGroups: boolean;
+	readonly showSubscriptions: boolean;
 	readonly showLogout: boolean;
 	readonly currentPath: string;
 	readonly displayName: string | undefined;
@@ -43,6 +44,7 @@ export const buildNavContext = (
 		return {
 			showUsers: usersPrivs.includes("DAV:read"),
 			showGroups: groupsPrivs.includes("DAV:read"),
+			showSubscriptions: true,
 			showLogout: basicAuthEnabled,
 			currentPath,
 			displayName: Option.getOrUndefined(principal.displayName),

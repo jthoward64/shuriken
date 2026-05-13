@@ -3,6 +3,7 @@ export * from "./auth";
 export * from "./cal";
 export * from "./card";
 export * from "./dav";
+export * from "./external-calendar";
 export * from "./groups";
 export * from "./principal";
 export * from "./share-link";

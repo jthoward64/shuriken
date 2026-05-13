@@ -9,21 +9,40 @@
 //   principalCollection / wellknown → 404 (router handles well-known redirect before PROPFIND)
 //
 // Depth: infinity is rejected with 403 DAV:propfind-finite-depth (RFC 4918 §9.1).
-// Missing Depth header defaults to 0 per RFC 4918 §9.1.
+// Missing Depth header is treated as "infinity" per RFC 4918 §9.1 → also 403.
+// (Clients that want a single-level response must send Depth: 0 or Depth: 1.)
 // ---------------------------------------------------------------------------
 
 import { Effect, Option } from "effect";
 import { Temporal } from "temporal-polyfill";
-import { type ClarkName, cn, type IrDeadProperties } from "#src/data/ir.ts";
-import type { DatabaseError, DavError } from "#src/domain/errors.ts";
-import { forbidden, notFound, unauthorized } from "#src/domain/errors.ts";
-import { GroupId, InstanceId, PrincipalId, UserId } from "#src/domain/ids.ts";
+import { encodeICalendar } from "#src/data/icalendar/codec.ts";
+import {
+	type ClarkName,
+	cn,
+	type IrDeadProperties,
+	type IrDocument,
+} from "#src/data/ir.ts";
+import { encodeVCard } from "#src/data/vcard/codec.ts";
+import type {
+	DatabaseError,
+	DavError,
+	XmlParseError,
+} from "#src/domain/errors.ts";
+import { badRequest, forbidden, notFound, unauthorized } from "#src/domain/errors.ts";
+import {
+	type EntityId,
+	GroupId,
+	InstanceId,
+	PrincipalId,
+	UserId,
+} from "#src/domain/ids.ts";
 import { COLLECTION_TYPE_TO_NAMESPACE } from "#src/domain/types/collection-namespace.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import {
 	buildInstanceProps,
+	creationDateFromId,
 	type PropfindKind,
 	splitPropstats,
 	toRfc1123,
@@ -35,10 +54,12 @@ import { parseXml, readXmlBody } from "#src/http/dav/xml/parser.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import type { AceRow } from "#src/services/acl/repository.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
+import { ComponentRepository } from "#src/services/component/index.ts";
 import type { CollectionRow } from "#src/services/collection/repository.ts";
 import { GroupService } from "#src/services/group/index.ts";
 import { InstanceService } from "#src/services/instance/index.ts";
 import type { InstanceRow } from "#src/services/instance/repository.ts";
+import { PrincipalRepository } from "#src/services/principal/index.ts";
 import { PrincipalService } from "#src/services/principal/service.ts";
 import { CalTimezoneRepository } from "#src/services/timezone/index.ts";
 
@@ -54,7 +75,55 @@ const CARDDAV_NS = "urn:ietf:params:xml:ns:carddav";
 const RESOURCETYPE = cn(DAV_NS, "resourcetype");
 const DISPLAYNAME = cn(DAV_NS, "displayname");
 const GETLASTMODIFIED = cn(DAV_NS, "getlastmodified");
+const GETETAG = cn(DAV_NS, "getetag");
+const CREATIONDATE = cn(DAV_NS, "creationdate");
 const SYNC_TOKEN = cn(DAV_NS, "sync-token");
+// calendarserver-org `getctag` — older change-detection token, equivalent to
+// sync-token but widely required by Apple/Thunderbird/DAVx5 clients.
+const CALENDARSERVER_NS = "http://calendarserver.org/ns/";
+const GETCTAG = cn(CALENDARSERVER_NS, "getctag");
+// Apple's `{http://apple.com/ns/ical/}calendar-color` — widely used dead prop
+// for picking the calendar's tile colour in client UIs.
+const APPLE_ICAL_NS = "http://apple.com/ns/ical/";
+const CALENDAR_COLOR = cn(APPLE_ICAL_NS, "calendar-color");
+
+// Default-color palette (12 entries). When a calendar collection has no
+// client-supplied calendar-color dead property, we emit a deterministic pick
+// from this palette so client UIs render distinct tiles instead of "no
+// colour" placeholders. Values are RGB with full alpha (#RRGGBBAA per Apple's
+// convention).
+const DEFAULT_CALENDAR_COLORS: ReadonlyArray<string> = [
+	"#F44336FF",
+	"#FF9800FF",
+	"#FFC107FF",
+	"#4CAF50FF",
+	"#009688FF",
+	"#03A9F4FF",
+	"#3F51B5FF",
+	"#9C27B0FF",
+	"#E91E63FF",
+	"#795548FF",
+	"#607D8BFF",
+	"#FF5722FF",
+];
+
+/**
+ * Pick a deterministic default colour for a calendar collection. Hashes the
+ * collection UUID's hex digits into the palette index so the same calendar
+ * always renders with the same colour, but different calendars get spread
+ * across the palette.
+ */
+const defaultCalendarColor = (id: string): string => {
+	let sum = 0;
+	const hexRadix = 16;
+	for (const ch of id.replaceAll("-", "")) {
+		const n = Number.parseInt(ch, hexRadix);
+		if (Number.isFinite(n)) {
+			sum += n;
+		}
+	}
+	return DEFAULT_CALENDAR_COLORS[sum % DEFAULT_CALENDAR_COLORS.length] as string;
+};
 const CURRENT_USER_PRINCIPAL = cn(DAV_NS, "current-user-principal");
 const CAL_DESCRIPTION = cn(CALDAV_NS, "calendar-description");
 const CAL_HOME_SET = cn(CALDAV_NS, "calendar-home-set");
@@ -82,6 +151,9 @@ const SCHEDULE_INBOX_URL = cn(CALDAV_NS, "schedule-inbox-URL");
 const SCHEDULE_OUTBOX_URL = cn(CALDAV_NS, "schedule-outbox-URL");
 const CAL_SUPPORTED_COLLATION_SET = cn(CALDAV_NS, "supported-collation-set");
 const CARD_SUPPORTED_COLLATION_SET = cn(CARDDAV_NS, "supported-collation-set");
+// RFC 4791 §9.6 / RFC 6352 §10.4 — body-data live properties on instances
+const CALENDAR_DATA = cn(CALDAV_NS, "calendar-data");
+const ADDRESS_DATA = cn(CARDDAV_NS, "address-data");
 const DAV_GROUP_MEMBER_SET = cn(DAV_NS, "group-member-set");
 const DAV_GROUP_MEMBERSHIP = cn(DAV_NS, "group-membership");
 const DAV_ALTERNATE_URI_SET = cn(DAV_NS, "alternate-URI-set");
@@ -93,17 +165,20 @@ const SCHEDULE_DEFAULT_CAL_URL = cn(CALDAV_NS, "schedule-default-calendar-URL");
 const CAL_USER_TYPE = cn(CALDAV_NS, "calendar-user-type");
 
 // The two collation URIs the server supports for <text-match> filters.
-// RFC 4791 §5.2.10 / RFC 6352 §6.2.3.
-const SUPPORTED_COLLATIONS: ReadonlyArray<Record<ClarkName, unknown>> = [
-	{ [cn(CALDAV_NS, "collation")]: "i;ascii-casemap" } as Record<
-		ClarkName,
-		unknown
-	>,
-	{ [cn(CALDAV_NS, "collation")]: "i;unicode-casemap" } as Record<
-		ClarkName,
-		unknown
-	>,
+// RFC 4791 §5.2.10 / RFC 6352 §6.2.3 — the property is a single element with
+// one <collation> child per supported collation; on calendar collections the
+// child is in the CalDAV namespace, on address-books it is in the CardDAV
+// namespace (each spec defines its own child element).
+const COLLATION_NAMES: ReadonlyArray<string> = [
+	"i;ascii-casemap",
+	"i;unicode-casemap",
 ];
+const CAL_SUPPORTED_COLLATIONS: Record<ClarkName, unknown> = {
+	[cn(CALDAV_NS, "collation")]: COLLATION_NAMES,
+};
+const CARD_SUPPORTED_COLLATIONS: Record<ClarkName, unknown> = {
+	[cn(CARDDAV_NS, "collation")]: COLLATION_NAMES,
+};
 
 // ---------------------------------------------------------------------------
 // ACL helpers
@@ -130,51 +205,61 @@ const privilegeToClark = (p: DavPrivilege): ClarkName => {
 	return cn(DAV_NS, p);
 };
 
-/** Build the DAV:current-user-privilege-set value from a privilege list. */
+/**
+ * Build the DAV:current-user-privilege-set value from a privilege list.
+ * RFC 3744 §5.4: a single property with one <D:privilege> child per privilege.
+ * Returning an array of `{ "{DAV:}privilege": ... }` objects would cause
+ * fast-xml-builder to emit one wrapper per element, so we return a single
+ * object whose `"{DAV:}privilege"` value is an array — that lets the builder
+ * render a single wrapper containing repeated <D:privilege> children.
+ */
 const buildPrivilegeSet = (
 	privileges: ReadonlyArray<DavPrivilege>,
-): Array<Record<ClarkName, unknown>> =>
-	privileges.map(
-		(p) =>
-			({
-				[cn(DAV_NS, "privilege")]: { [privilegeToClark(p)]: "" },
-			}) as Record<ClarkName, unknown>,
-	);
+): Record<ClarkName, unknown> => ({
+	[cn(DAV_NS, "privilege")]: privileges.map((p) => ({
+		[privilegeToClark(p)]: "",
+	})),
+});
 
-/** Build the DAV:supported-report-set value for a given collection type. */
+/**
+ * Build the DAV:supported-report-set value for a given collection type.
+ * RFC 3253 §3.1.5: single property with one <D:supported-report> child per
+ * supported report. Returns an object whose `"{DAV:}supported-report"` value
+ * is an array so fast-xml-builder emits a single wrapper containing repeated
+ * <D:supported-report> children.
+ */
 const buildSupportedReportSet = (
 	collectionType: string,
-): ReadonlyArray<Record<ClarkName, unknown>> => {
-	const makeEntry = (name: ClarkName): Record<ClarkName, unknown> =>
-		({
-			[cn(DAV_NS, "supported-report")]: {
-				[cn(DAV_NS, "report")]: { [name]: "" },
-			},
-		}) as Record<ClarkName, unknown>;
+): Record<ClarkName, unknown> => {
+	const makeEntry = (name: ClarkName): Record<ClarkName, unknown> => ({
+		[cn(DAV_NS, "report")]: { [name]: "" },
+	});
 
-	if (collectionType === "calendar") {
-		return [
-			makeEntry(cn(CALDAV_NS, "calendar-query")),
-			makeEntry(cn(CALDAV_NS, "calendar-multiget")),
-			makeEntry(cn(DAV_NS, "sync-collection")),
-		];
-	}
-	if (collectionType === "addressbook") {
-		return [
-			makeEntry(cn(CARDDAV_NS, "addressbook-query")),
-			makeEntry(cn(CARDDAV_NS, "addressbook-multiget")),
-			makeEntry(cn(DAV_NS, "sync-collection")),
-		];
-	}
-	// RFC 6638 §2.3: inbox and outbox MUST support calendar-query and calendar-multiget
-	if (collectionType === "inbox" || collectionType === "outbox") {
-		return [
-			makeEntry(cn(CALDAV_NS, "calendar-query")),
-			makeEntry(cn(CALDAV_NS, "calendar-multiget")),
-			makeEntry(cn(DAV_NS, "sync-collection")),
-		];
-	}
-	return [makeEntry(cn(DAV_NS, "sync-collection"))];
+	const names: ReadonlyArray<ClarkName> =
+		collectionType === "calendar"
+			? [
+					cn(CALDAV_NS, "calendar-query"),
+					cn(CALDAV_NS, "calendar-multiget"),
+					cn(DAV_NS, "sync-collection"),
+				]
+			: collectionType === "addressbook"
+				? [
+						cn(CARDDAV_NS, "addressbook-query"),
+						cn(CARDDAV_NS, "addressbook-multiget"),
+						cn(DAV_NS, "sync-collection"),
+					]
+				: collectionType === "inbox" || collectionType === "outbox"
+					? [
+							// RFC 6638 §2.3: inbox/outbox MUST support calendar-query and calendar-multiget
+							cn(CALDAV_NS, "calendar-query"),
+							cn(CALDAV_NS, "calendar-multiget"),
+							cn(DAV_NS, "sync-collection"),
+						]
+					: [cn(DAV_NS, "sync-collection")];
+
+	return {
+		[cn(DAV_NS, "supported-report")]: names.map(makeEntry),
+	};
 };
 
 /** Shared ACL restrictions value (grant-only, no-invert per RFC 3744 §5.6). */
@@ -193,8 +278,8 @@ const ACL_RESTRICTIONS_VALUE: Readonly<Record<ClarkName, unknown>> = {
 const buildAclValue = (
 	aces: ReadonlyArray<AceRow>,
 	origin: string,
-): ReadonlyArray<Record<ClarkName, unknown>> =>
-	aces.map((ace) => {
+): Record<ClarkName, unknown> => ({
+	[cn(DAV_NS, "ace")]: aces.map((ace) => {
 		const principal: Record<ClarkName, unknown> =
 			ace.principalType === "all"
 				? { [cn(DAV_NS, "all")]: "" }
@@ -228,8 +313,9 @@ const buildAclValue = (
 		if (ace.protected) {
 			aceObj[cn(DAV_NS, "protected")] = "";
 		}
-		return { [cn(DAV_NS, "ace")]: aceObj } as Record<ClarkName, unknown>;
-	});
+		return aceObj;
+	}),
+});
 
 // ---------------------------------------------------------------------------
 // PROPFIND body parsing
@@ -237,7 +323,7 @@ const buildAclValue = (
 
 const parsePropfindBody = (
 	req: Request,
-): Effect.Effect<PropfindKind, DavError> =>
+): Effect.Effect<PropfindKind, DavError | XmlParseError> =>
 	readXmlBody(req).pipe(
 		Effect.flatMap((body) => {
 			if (body.trim() === "") {
@@ -280,12 +366,69 @@ const parsePropfindBody = (
 					}
 					return { type: "allprop" } satisfies PropfindKind;
 				}),
-				Effect.catchTag("XmlParseError", () =>
-					Effect.succeed({ type: "allprop" } satisfies PropfindKind),
-				),
+				// RFC 4918 §9.1: PROPFIND body MUST be well-formed XML.
+				// XmlParseError propagates → HTTP edge maps it to 400.
 			);
 		}),
 	);
+
+/**
+ * Returns the data property's Clark name for an instance under the given
+ * namespace, or `null` when the namespace doesn't carry body-data.
+ *
+ * RFC 4791 §9.6 — calendar collections (and inbox/outbox per RFC 6638 §2.3)
+ * expose `{caldav}calendar-data`; RFC 6352 §10.4 — address-books expose
+ * `{carddav}address-data`.
+ */
+const dataClarkForNamespace = (namespace: string): ClarkName | null => {
+	if (namespace === "cal" || namespace === "inbox" || namespace === "outbox") {
+		return CALENDAR_DATA;
+	}
+	if (namespace === "card") {
+		return ADDRESS_DATA;
+	}
+	return null;
+};
+
+/**
+ * If the PROPFIND request explicitly asks for the body-data property
+ * (`<C:calendar-data/>` or `<CR:address-data/>`), load the instance's
+ * component tree and emit the serialized body. RFC 4791 §9.6 / RFC 6352 §10.4
+ * state these properties are NOT included in `allprop` responses — clients
+ * must request them explicitly — so we skip the load entirely for `allprop`
+ * to avoid a per-instance fetch on a collection-wide enumeration.
+ */
+const loadInstanceData = (
+	row: InstanceRow,
+	namespace: string,
+	propfind: PropfindKind,
+): Effect.Effect<Option.Option<string>, DatabaseError, ComponentRepository> =>
+	Effect.gen(function* () {
+		const dataClark = dataClarkForNamespace(namespace);
+		if (dataClark === null) {
+			return Option.none<string>();
+		}
+		if (propfind.type !== "prop" || !propfind.names.has(dataClark)) {
+			return Option.none<string>();
+		}
+		const compRepo = yield* ComponentRepository;
+		const entityType = dataClark === ADDRESS_DATA ? "vcard" : "icalendar";
+		const treeOpt = yield* compRepo.loadTree(
+			row.entityId as unknown as EntityId,
+			entityType,
+		);
+		if (Option.isNone(treeOpt)) {
+			return Option.none<string>();
+		}
+		const doc: IrDocument =
+			entityType === "icalendar"
+				? { kind: "icalendar", root: treeOpt.value }
+				: { kind: "vcard", root: treeOpt.value };
+		const body = yield* entityType === "icalendar"
+			? encodeICalendar(doc)
+			: encodeVCard(doc);
+		return Option.some(body);
+	});
 
 // ---------------------------------------------------------------------------
 // Resource URL builders
@@ -373,11 +516,25 @@ const buildCollectionProps = (
 		[RESOURCETYPE]: resourcetype,
 		[GETLASTMODIFIED]: toRfc1123(row.updatedAt),
 		[SYNC_TOKEN]: `urn:ietf:params:xml:ns:sync:${row.synctoken}`,
+		// CalendarServer `getctag` — alias for sync-token, kept for compatibility
+		// with clients that pre-date RFC 6578 (Apple/Thunderbird/DAVx5).
+		[GETCTAG]: String(row.synctoken),
+		// RFC 4918 §15.7 DAV:getetag on a collection — represents the collection
+		// resource itself. We surface the sync_token as a weak etag: it changes
+		// whenever any member is added/modified/removed, which is the practical
+		// "has this collection changed?" signal clients care about.
+		[GETETAG]: `W/"${row.synctoken}"`,
 		[LOCK_DISCOVERY]: "",
 		[SUPPORTED_LOCK]: "",
 		[ACL_RESTRICTIONS]: ACL_RESTRICTIONS_VALUE,
 		[SUPPORTED_REPORT_SET]: buildSupportedReportSet(row.collectionType),
 	};
+
+	// RFC 4918 §15.1 DAV:creationdate — derive from the UUIDv7 row id.
+	const createdAt = creationDateFromId(row.id);
+	if (createdAt !== undefined) {
+		props[CREATIONDATE] = createdAt;
+	}
 
 	if (row.displayName !== null) {
 		props[DISPLAYNAME] = row.displayName;
@@ -395,6 +552,18 @@ const buildCollectionProps = (
 	) {
 		props[CAL_SUPPORTED_COMPONENTS] = {
 			[`{${CALDAV_NS}}comp`]: row.supportedComponents.map((c) => ({
+				"@_name": c,
+			})),
+		};
+	}
+
+	// RFC 6638 §2.3 — scheduling inbox/outbox MUST advertise the set of
+	// scheduling components they accept. Inbox/Outbox carry VEVENT/VTODO
+	// requests and VFREEBUSY for free-busy lookups; expose those so clients
+	// know to route invitations and free-busy POSTs here.
+	if (row.collectionType === "inbox" || row.collectionType === "outbox") {
+		props[CAL_SUPPORTED_COMPONENTS] = {
+			[`{${CALDAV_NS}}comp`]: ["VEVENT", "VTODO", "VFREEBUSY"].map((c) => ({
 				"@_name": c,
 			})),
 		};
@@ -451,6 +620,14 @@ const buildCollectionProps = (
 		};
 	}
 
+	// Default calendar-color (Apple ns) for calendar collections — picked
+	// deterministically from the row id so the same calendar always renders
+	// with the same colour. Set BEFORE the dead-props loop so a value the
+	// client persisted via PROPPATCH/MKCALENDAR overrides the default.
+	if (row.collectionType === "calendar") {
+		props[CALENDAR_COLOR] = defaultCalendarColor(row.id);
+	}
+
 	// Dead properties
 	const dead = row.clientProperties as IrDeadProperties | null;
 	if (dead) {
@@ -486,19 +663,35 @@ export const propfindHandler = (
 	req: Request,
 ): Effect.Effect<
 	Response,
-	DavError | DatabaseError,
+	DavError | DatabaseError | XmlParseError,
 	| CollectionService
 	| InstanceService
 	| AclService
 	| PrincipalService
+	| PrincipalRepository
 	| CalTimezoneRepository
 	| GroupService
+	| ComponentRepository
 > =>
 	Effect.gen(function* () {
-		// Reject Depth: infinity (RFC 4918 §9.1 + DAV:propfind-finite-depth)
+		// RFC 4918 §9.1 says missing Depth ≡ infinity; we reject infinity with
+		// DAV:propfind-finite-depth, but historically every CalDAV client and
+		// every other DAV server (Apple CalendarServer, DAViCal, Radicale,
+		// Baikal, …) treats missing Depth as 0. Following the convention so
+		// clients that omit Depth see the resource-only response they expect.
+		//
+		// The spec requires "0", "1", and "infinity"; anything else is an
+		// invalid request and per RFC 4918 §10.2 should be rejected with 400
+		// rather than silently coerced to 0 — silent coercion masks client
+		// bugs (Apache Tomcat made this same fix recently).
 		const depthHeader = req.headers.get("Depth") ?? "0";
 		if (depthHeader === "infinity") {
 			return yield* forbidden("DAV:propfind-finite-depth");
+		}
+		if (depthHeader !== "0" && depthHeader !== "1") {
+			return yield* badRequest(
+				`Invalid Depth header "${depthHeader}" — must be 0, 1, or infinity`,
+			);
 		}
 		const depth = depthHeader === "1" ? 1 : 0;
 
@@ -506,7 +699,6 @@ export const propfindHandler = (
 		if (
 			path.kind === "new-collection" ||
 			path.kind === "new-instance" ||
-			path.kind === "principalCollection" ||
 			path.kind === "wellknown" ||
 			path.kind === "userCollection" ||
 			path.kind === "user" ||
@@ -555,17 +747,35 @@ export const propfindHandler = (
 			const principalRow = yield* principalSvc.findById(path.principalId);
 			const displayName = principalRow.principal.displayName;
 			const principalHref = `${origin}/dav/principals/${path.principalSeg}/`;
+
+			// Resolve the principal's collections up front so we can build the
+			// correct schedule-inbox/outbox URLs (they live at /inbox/<uuid>/ and
+			// /outbox/<uuid>/, not under /cal/). The list is reused at depth:1.
+			const ownCollections = yield* collSvc.listByOwner(path.principalId);
+			const inbox = ownCollections.find((c) => c.collectionType === "inbox");
+			const outbox = ownCollections.find((c) => c.collectionType === "outbox");
 			// RFC 6638 §2.2: scheduling inbox/outbox URLs for this principal.
-			const inboxHref = `${origin}/dav/principals/${path.principalSeg}/cal/inbox/`;
-			const outboxHref = `${origin}/dav/principals/${path.principalSeg}/cal/outbox/`;
+			// Use UUIDs because these are indirect references (the client did not
+			// directly address them), matching the project's href policy.
+			const inboxHref = inbox
+				? collectionHref(origin, path.principalSeg, "inbox", inbox.id)
+				: undefined;
+			const outboxHref = outbox
+				? collectionHref(origin, path.principalSeg, "outbox", outbox.id)
+				: undefined;
 			// RFC 3744 §4.4: list the groups this principal belongs to.
 			const groupSvc = yield* GroupService;
 			const memberOfGroups = yield* groupSvc.listByMember(
 				UserId(principalRow.user.id),
 			);
+			// RFC 4918 §15.1 DAV:creationdate — derived from the principal's UUIDv7.
+			const principalCreated = creationDateFromId(principalRow.principal.id);
 			const allProps: Record<ClarkName, unknown> = {
 				[RESOURCETYPE]: { "{DAV:}principal": "" },
 				...(displayName ? { [DISPLAYNAME]: displayName } : {}),
+				...(principalCreated
+					? { [CREATIONDATE]: principalCreated }
+					: {}),
 				// RFC 5397 §3: the acting user's principal URL
 				[CURRENT_USER_PRINCIPAL]: { [cn(DAV_NS, "href")]: actingPrincipalHref },
 				// RFC 3744 §4.2: canonical URL for this principal resource
@@ -582,18 +792,26 @@ export const propfindHandler = (
 				[DAV_ALTERNATE_URI_SET]: {
 					[cn(DAV_NS, "href")]: `mailto:${principalRow.user.email}`,
 				},
-				// RFC 6638 §2.2: scheduling collection URLs
-				[SCHEDULE_INBOX_URL]: { [cn(DAV_NS, "href")]: inboxHref },
-				[SCHEDULE_OUTBOX_URL]: { [cn(DAV_NS, "href")]: outboxHref },
+				// RFC 6638 §2.2: scheduling collection URLs. Omitted when the
+				// principal has no provisioned inbox/outbox (e.g. a group principal).
+				...(inboxHref
+					? { [SCHEDULE_INBOX_URL]: { [cn(DAV_NS, "href")]: inboxHref } }
+					: {}),
+				...(outboxHref
+					? { [SCHEDULE_OUTBOX_URL]: { [cn(DAV_NS, "href")]: outboxHref } }
+					: {}),
 				// RFC 7809 §5.1: timezone distribution service used by this server.
 				// SHOULD NOT be returned in allprop per spec, but included here for
 				// consistency with other live properties. Clients that request it
 				// explicitly will always receive it.
 				[TIMEZONE_SERVICE_SET]: { [cn(DAV_NS, "href")]: `${origin}/timezones` },
-				// RFC 3744 §4.4: groups this user belongs to
-				[DAV_GROUP_MEMBERSHIP]: memberOfGroups.map((g) => ({
-					[cn(DAV_NS, "href")]: `${origin}/dav/groups/${g.principal.id}/`,
-				})),
+				// RFC 3744 §4.4: groups this user belongs to. Single <D:group-membership>
+				// element with one <D:href> child per group (not one wrapper per href).
+				[DAV_GROUP_MEMBERSHIP]: {
+					[cn(DAV_NS, "href")]: memberOfGroups.map(
+						(g) => `${origin}/dav/groups/${g.principal.id}/`,
+					),
+				},
 				// RFC 3744 §5.6: server operates grant-only, no-invert
 				[ACL_RESTRICTIONS]: ACL_RESTRICTIONS_VALUE,
 				// RFC 3744 §5.4: privileges the acting principal has on this resource
@@ -625,14 +843,11 @@ export const propfindHandler = (
 			});
 
 			if (depth === 1) {
-				const [ownCollections, groupCollectionSets] = yield* Effect.all([
-					collSvc.listByOwner(path.principalId),
-					Effect.all(
-						memberOfGroups.map((g) =>
-							collSvc.listByOwner(PrincipalId(g.principal.id)),
-						),
+				const groupCollectionSets = yield* Effect.all(
+					memberOfGroups.map((g) =>
+						collSvc.listByOwner(PrincipalId(g.principal.id)),
 					),
-				]);
+				);
 				for (const coll of ownCollections) {
 					const ns =
 						(COLLECTION_TYPE_TO_NAMESPACE as Record<string, string>)[
@@ -696,9 +911,9 @@ export const propfindHandler = (
 			}
 			// Collation sets — RFC 4791 §5.2.10 / RFC 6352 §6.2.3
 			if (collRow.collectionType === "calendar") {
-				collProps[CAL_SUPPORTED_COLLATION_SET] = SUPPORTED_COLLATIONS;
+				collProps[CAL_SUPPORTED_COLLATION_SET] = CAL_SUPPORTED_COLLATIONS;
 			} else if (collRow.collectionType === "addressbook") {
-				collProps[CARD_SUPPORTED_COLLATION_SET] = SUPPORTED_COLLATIONS;
+				collProps[CARD_SUPPORTED_COLLATION_SET] = CARD_SUPPORTED_COLLATIONS;
 			}
 			// DAV:acl — RFC 3744 §5.5: only when the caller holds read-acl.
 			if (
@@ -736,6 +951,18 @@ export const propfindHandler = (
 						// RFC 3744 §5.1: owner inherited from the parent collection
 						[DAV_OWNER]: { [cn(DAV_NS, "href")]: ownerHref },
 					};
+					// RFC 4791 §9.6 / RFC 6352 §10.4 — body-data when explicitly requested.
+					const dataOpt = yield* loadInstanceData(
+						inst,
+						path.namespace,
+						propfind,
+					);
+					if (Option.isSome(dataOpt)) {
+						const dataKey = dataClarkForNamespace(path.namespace);
+						if (dataKey !== null) {
+							instProps[dataKey] = dataOpt.value;
+						}
+					}
 					// DAV:acl — RFC 3744 §5.5: only when the caller holds read-acl.
 					if (
 						(instPrivileges as ReadonlyArray<string>).includes("DAV:read-acl")
@@ -760,6 +987,7 @@ export const propfindHandler = (
 				propstats: splitPropstats(
 					{
 						[RESOURCETYPE]: { [cn(DAV_NS, "collection")]: "" },
+						[DISPLAYNAME]: "DAV",
 						[CURRENT_USER_PRINCIPAL]: {
 							[cn(DAV_NS, "href")]: actingPrincipalHref,
 						},
@@ -767,6 +995,42 @@ export const propfindHandler = (
 					propfind,
 				),
 			});
+		} else if (path.kind === "principalCollection") {
+			// RFC 3744 §4.5 — the principal-collection resource. Depth:0 returns
+			// just this resource; Depth:1 enumerates every (non-deleted) user
+			// principal so client UIs can populate principal pickers.
+			responses.push({
+				href: `${origin}/dav/principals/`,
+				propstats: splitPropstats(
+					{
+						[RESOURCETYPE]: { [cn(DAV_NS, "collection")]: "" },
+						[DISPLAYNAME]: "Principals",
+						[CURRENT_USER_PRINCIPAL]: {
+							[cn(DAV_NS, "href")]: actingPrincipalHref,
+						},
+					},
+					propfind,
+				),
+			});
+			if (depth === 1) {
+				const principalRepo = yield* PrincipalRepository;
+				const allPrincipals = yield* principalRepo.listAll();
+				for (const p of allPrincipals) {
+					const pHref = `${origin}/dav/principals/${p.principal.id}/`;
+					responses.push({
+						href: pHref,
+						propstats: splitPropstats(
+							{
+								[RESOURCETYPE]: { [cn(DAV_NS, "principal")]: "" },
+								[DISPLAYNAME]:
+									p.principal.displayName ?? p.principal.slug,
+								[PRINCIPAL_URL]: { [cn(DAV_NS, "href")]: pHref },
+							},
+							propfind,
+						),
+					});
+				}
+			}
 		} else if (path.kind === "group") {
 			// RFC 3744 §4.3: group principals expose DAV:group-member-set.
 			yield* acl.check(
@@ -828,6 +1092,18 @@ export const propfindHandler = (
 				// RFC 3744 §5.1: owner inherited from the parent collection
 				[DAV_OWNER]: { [cn(DAV_NS, "href")]: ownerHref },
 			};
+			// RFC 4791 §9.6 / RFC 6352 §10.4 — body-data when explicitly requested.
+			const dataOpt = yield* loadInstanceData(
+				instRow,
+				path.namespace,
+				propfind,
+			);
+			if (Option.isSome(dataOpt)) {
+				const dataKey = dataClarkForNamespace(path.namespace);
+				if (dataKey !== null) {
+					instProps[dataKey] = dataOpt.value;
+				}
+			}
 			// DAV:acl — RFC 3744 §5.5: only when the caller holds read-acl.
 			if (
 				(instancePrivileges as ReadonlyArray<string>).includes("DAV:read-acl")

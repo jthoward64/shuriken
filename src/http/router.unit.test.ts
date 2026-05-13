@@ -22,6 +22,9 @@ import { EntityRepository } from "#src/services/entity/index.ts";
 import { GroupRepository, GroupService } from "#src/services/group/index.ts";
 import { InstanceService } from "#src/services/instance/index.ts";
 import { PrincipalService } from "#src/services/principal/service.ts";
+import { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
+import { SubscriptionService } from "#src/services/external-calendar/subscription.ts";
+import { ProvisioningService } from "#src/services/provisioning/service.ts";
 import { SchedulingService } from "#src/services/scheduling/service.ts";
 import { IanaTimezoneService } from "#src/services/timezone/iana.ts";
 import { CalTimezoneRepository } from "#src/services/timezone/index.ts";
@@ -138,6 +141,7 @@ const stubLayers = Layer.mergeAll(
 		softDelete: die,
 		existsByUid: die,
 		existsByUidForPrincipal: die,
+		listActiveInstancesWithUid: die,
 	}),
 	Layer.succeed(ComponentRepository, {
 		insertTree: die,
@@ -230,8 +234,11 @@ const stubLayers = Layer.mergeAll(
 			adminEmail: Option.none(),
 			adminPassword: Option.none(),
 			adminSlug: Option.none(),
+			authSettingsUrl: Option.none(),
+			authSettingsLabel: Option.none(),
 		},
 		log: { level: undefined },
+		externalCalendar: { schedulerTickS: 60, fetchConcurrency: 4, claimCap: 100 },
 		nodeEnv: "test",
 	} as unknown as AppConfigService),
 	Layer.succeed(BunFileService, {
@@ -246,6 +253,32 @@ const stubLayers = Layer.mergeAll(
 			Effect.succeed("<!DOCTYPE html><body>test</body>"),
 		renderFragment: (_name: string, _ctx: Record<string, unknown>) =>
 			Effect.succeed("<div>test</div>"),
+	}),
+	Layer.succeed(ProvisioningService, {
+		provisionUser: die,
+		ensureAdminAces: die,
+	}),
+	Layer.succeed(ExternalCalendarRepository, {
+		findById: die,
+		findByUrl: die,
+		upsertByUrl: die,
+		softDelete: die,
+		recordSyncResult: die,
+		recomputeSyncInterval: die,
+		findDue: die,
+		findClaimById: die,
+		findClaimByCollection: () => Effect.succeed(Option.none()),
+		listClaimsForExternal: die,
+		listClaimsWithExternalForPrincipal: die,
+		countClaimsForExternal: die,
+		insertClaim: die,
+		updateClaim: die,
+		deleteClaim: die,
+		clearHttpCache: die,
+	}),
+	Layer.succeed(SubscriptionService, {
+		subscribe: die,
+		unsubscribe: die,
 	}),
 );
 

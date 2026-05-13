@@ -969,13 +969,38 @@ export const SchedulingServiceLive = Layer.effect(
 								const isOverride = comp.properties.some(
 									(p) => p.name === "RECURRENCE-ID",
 								);
-								if (isOverride) {
-									continue;
-								}
-
 								const hasRrule = comp.properties.some(
 									(p) => p.name === "RRULE",
 								);
+
+								// Overrides (RFC 5545 §3.8.4.4) carry their own DTSTART/
+								// DTEND and replace the regular master occurrence at the
+								// given RECURRENCE-ID. The recurrence loop below excludes
+								// that slot from the master so we don't double-count.
+								// Emit the override's actual time as a one-shot period.
+								if (isOverride && !hasRrule) {
+									const dtstart = getDtstartInstant(comp);
+									if (!dtstart) {
+										continue;
+									}
+									const dtend = effectiveDtend(comp, dtstart);
+									if (
+										dtstart.epochMilliseconds >= queryEnd.epochMilliseconds ||
+										dtend.epochMilliseconds <= queryStart.epochMilliseconds
+									) {
+										continue;
+									}
+									const ps =
+										dtstart.epochMilliseconds < queryStart.epochMilliseconds
+											? queryStart
+											: dtstart;
+									const pe =
+										dtend.epochMilliseconds > queryEnd.epochMilliseconds
+											? queryEnd
+											: dtend;
+									periods.push({ start: ps, end: pe, fbType });
+									continue;
+								}
 
 								if (hasRrule) {
 									const masterStart = getDtstartInstant(comp);

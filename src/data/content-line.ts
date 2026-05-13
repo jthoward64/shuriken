@@ -245,7 +245,19 @@ const parseLogicalLine = (line: string): ContentLine => {
 
 	// Split name+params at unquoted `;`
 	const segments = splitUnquoted(nameAndParams, ";");
-	const name = (segments[0] ?? "").toUpperCase();
+	// vCard (RFC 6350 §3.3) allows a property-group prefix like `item1.EMAIL`
+	// where the property name part is case-insensitive but the group
+	// identifier IS case-sensitive. iCalendar (RFC 5545) doesn't use group
+	// prefixes, so this only matters in practice for vCard. Detect the prefix
+	// here and preserve its case while still upper-casing the property name
+	// itself — otherwise serializing `item1.EMAIL` round-trips as `ITEM1.EMAIL`
+	// and breaks Apple's `_$!<HomePage>!$_` style label lookups.
+	const rawName = segments[0] ?? "";
+	const dotIdx = rawName.lastIndexOf(".");
+	const name =
+		dotIdx === -1
+			? rawName.toUpperCase()
+			: `${rawName.slice(0, dotIdx)}.${rawName.slice(dotIdx + 1).toUpperCase()}`;
 	if (!name) {
 		throw new Error(`Content line has empty name: "${line}"`);
 	}

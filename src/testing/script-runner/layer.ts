@@ -10,6 +10,8 @@ import { CalIndexRepositoryLive } from "#src/services/cal-index/index.ts";
 import { CardIndexRepositoryLive } from "#src/services/card-index/index.ts";
 import { CollectionDomainLayer } from "#src/services/collection/index.ts";
 import { DomainEntityDomainLayer } from "#src/services/domain-entity/index.ts";
+import { ExternalCalendarRepositoryLive } from "#src/services/external-calendar/repository.live.ts";
+import { SubscriptionServiceLive } from "#src/services/external-calendar/subscription.live.ts";
 import { GroupDomainLayer } from "#src/services/group/index.ts";
 import { InstanceDomainLayer } from "#src/services/instance/index.ts";
 import { PrincipalDomainLayer } from "#src/services/principal/index.ts";
@@ -42,8 +44,15 @@ const testConfig: AppConfigType = {
 		adminEmail: Option.none<string>(),
 		adminPassword: Option.none<Redacted.Redacted<string>>(),
 		adminSlug: Option.none<string>(),
+		authSettingsUrl: Option.none<string>(),
+		authSettingsLabel: Option.none<string>(),
 	},
 	log: { level: undefined },
+	externalCalendar: {
+		schedulerTickS: 60,
+		fetchConcurrency: 4,
+		claimCap: 100,
+	},
 	nodeEnv: "test",
 };
 
@@ -94,7 +103,9 @@ export const makeScriptRunnerLayer = () => {
 		withTestInfra(TombstoneRepositoryLive),
 		withTestInfra(CalIndexRepositoryLive),
 		withTestInfra(CardIndexRepositoryLive),
+		withTestInfra(ExternalCalendarRepositoryLive),
 	);
+
 
 	const testStubsLayer = Layer.mergeAll(
 		Layer.succeed(BunFileService, {
@@ -118,6 +129,7 @@ export const makeScriptRunnerLayer = () => {
 	return Layer.mergeAll(
 		testBaseLayer,
 		SchedulingDomainLayer.pipe(Layer.provide(testBaseLayer)),
+		SubscriptionServiceLive.pipe(Layer.provide(testBaseLayer)),
 		testStubsLayer,
 	);
 };

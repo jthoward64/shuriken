@@ -8,7 +8,12 @@ import type {
 	GrantDeny,
 	PrincipalType,
 } from "#src/db/drizzle/schema/index.ts";
-import { ComponentId, type UuidString } from "#src/domain/ids.ts";
+import {
+	ComponentId,
+	EntityId,
+	InstanceId,
+	type UuidString,
+} from "#src/domain/ids.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
 import type { Slug } from "#src/domain/types/path.ts";
 import type { Email } from "#src/domain/types/strings.ts";
@@ -35,6 +40,7 @@ import type { CollectionService } from "#src/services/collection/service.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
 import type { ComponentRepositoryShape } from "#src/services/component/repository.ts";
 import { EntityRepository } from "#src/services/entity/index.ts";
+import { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
 import type {
 	EntityRepositoryShape,
 	EntityRow,
@@ -1000,6 +1006,22 @@ const makeEntityRepo = (stores: TestStores): EntityRepositoryShape => ({
 		),
 
 	existsByUidForPrincipal: (_principalId, _logicalUid) => Effect.succeed(false),
+
+	listActiveInstancesWithUid: (collectionId) =>
+		Effect.succeed(
+			[...stores.instances.values()]
+				.filter(
+					(inst) => inst.collectionId === collectionId && inst.deletedAt === null,
+				)
+				.map((inst) => ({
+					instanceId: InstanceId(inst.id),
+					entityId: EntityId(inst.entityId),
+					logicalUid:
+						stores.entities.get(inst.entityId)?.logicalUid ?? null,
+					etag: inst.etag,
+					slug: inst.slug,
+				})),
+		),
 });
 
 const makeComponentRepo = (stores: TestStores): ComponentRepositoryShape => ({
@@ -1275,6 +1297,7 @@ export interface TestEnvBuilder {
 		| PrincipalRepository
 		| CryptoService
 		| EntityRepository
+		| ExternalCalendarRepository
 		| ComponentRepository
 		| CalTimezoneRepository
 		| CalIndexRepository
@@ -1459,6 +1482,32 @@ export const makeTestEnv = (): TestEnvBuilder => {
 				EntityRepository,
 				makeEntityRepo(stores),
 			);
+			// The test environment doesn't model external subscriptions; all
+			// queries return "not a subscription" so the read-only guard never
+			// false-positives. Tests that exercise the subscription code path
+			// should compose a more specific layer on top.
+			const externalCalendarRepoLayer = Layer.succeed(
+				ExternalCalendarRepository,
+				{
+					findById: () => Effect.succeed(Option.none()),
+					findByUrl: () => Effect.succeed(Option.none()),
+					upsertByUrl: () => Effect.die("no external_calendar in test env"),
+					softDelete: () => Effect.void,
+					recordSyncResult: () => Effect.void,
+					recomputeSyncInterval: () => Effect.void,
+					findDue: () => Effect.succeed([]),
+					findClaimById: () => Effect.succeed(Option.none()),
+					findClaimByCollection: () => Effect.succeed(Option.none()),
+					listClaimsForExternal: () => Effect.succeed([]),
+					listClaimsWithExternalForPrincipal: () => Effect.succeed([]),
+					countClaimsForExternal: () => Effect.succeed(0),
+					insertClaim: () =>
+						Effect.die("no external_calendar_claim in test env"),
+					updateClaim: () => Effect.die("no external_calendar_claim in test env"),
+					deleteClaim: () => Effect.void,
+					clearHttpCache: () => Effect.void,
+				},
+			);
 			const componentRepoLayer = Layer.succeed(
 				ComponentRepository,
 				makeComponentRepo(stores),
@@ -1523,6 +1572,7 @@ export const makeTestEnv = (): TestEnvBuilder => {
 				aclRepoLayer,
 				principalRepoLayer,
 				entityRepoLayer,
+				externalCalendarRepoLayer,
 				componentRepoLayer,
 				calTimezoneRepoLayer,
 				calIndexRepoLayer,

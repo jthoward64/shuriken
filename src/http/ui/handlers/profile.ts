@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import { AppConfigService } from "#src/config.ts";
 import type {
 	DatabaseError,
@@ -43,6 +43,23 @@ export const profileHandler = (
 		const origin = ctx.url.origin;
 		const davBase = `${origin}/dav/principals/${principalRow.id}`;
 
+		// External auth-settings link (e.g. SSO portal). Substitute `{email}`,
+		// `{slug}`, and `{userId}` placeholders so the same template URL works
+		// for every user. Encoded so a literal `{}` segment can't break the
+		// surrounding URL via injection of `?` or `#`.
+		const authSettingsUrl = Option.match(config.auth.authSettingsUrl, {
+			onNone: () => undefined,
+			onSome: (raw) =>
+				raw
+					.replace(/\{email\}/g, encodeURIComponent(user.email))
+					.replace(/\{slug\}/g, encodeURIComponent(principalRow.slug))
+					.replace(/\{userId\}/g, encodeURIComponent(user.id)),
+		});
+		const authSettingsLabel = Option.getOrElse(
+			config.auth.authSettingsLabel,
+			() => "Manage account",
+		);
+
 		return yield* renderPage(
 			"pages/profile",
 			{
@@ -52,6 +69,8 @@ export const profileHandler = (
 				principal: principalRow,
 				canEditSlug: false,
 				showPasswordForm: config.auth.basicAuthEnabled,
+				authSettingsUrl,
+				authSettingsLabel,
 				principalUrl: `${davBase}/`,
 				caldavUrl: `${davBase}/cal/`,
 				carddavUrl: `${davBase}/card/`,

@@ -30,6 +30,7 @@ import { multistatusResponse } from "#src/http/dav/xml/multistatus.ts";
 import { parseXml, readXmlBody } from "#src/http/dav/xml/parser.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
+import { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
 import { InstanceService } from "#src/services/instance/index.ts";
 import { PrincipalService } from "#src/services/principal/service.ts";
 import { IanaTimezoneService } from "#src/services/timezone/iana.ts";
@@ -238,6 +239,7 @@ export const proppatchHandler = (
 	| InstanceService
 	| AclService
 	| PrincipalService
+	| ExternalCalendarRepository
 	| IanaTimezoneService
 	| CalTimezoneRepository
 > =>
@@ -482,6 +484,36 @@ export const proppatchHandler = (
 				}
 			} else if (remove.has(SCHEDULE_DEFAULT_CAL_URL_PROP)) {
 				newScheduleDefaultCalendarId = null;
+			}
+
+			// Policy B for #7+#12: if this collection is a subscription claim,
+			// PROPPATCH on displayname / calendar-color writes the new value
+			// into the claim's override columns. Otherwise the next sync pass
+			// would re-apply `external_calendar.default_displayname` and clobber
+			// the user's edit. The collection row's own column is still updated
+			// below for immediate read consistency — the next sync sees the
+			// override and keeps the same value.
+			const extRepo = yield* ExternalCalendarRepository;
+			const claimOpt = yield* extRepo.findClaimByCollection(path.collectionId);
+			if (Option.isSome(claimOpt)) {
+				const claim = claimOpt.value;
+				const appleColorKey =
+					"{http://apple.com/ns/ical/}calendar-color" as ClarkName;
+				const colorPatch = set.has(appleColorKey)
+					? { colorOverride: String(set.get(appleColorKey)) }
+					: remove.has(appleColorKey)
+						? { colorOverride: null }
+						: {};
+				const namePatch =
+					newDisplayName !== undefined
+						? { displaynameOverride: newDisplayName }
+						: {};
+				if (
+					Object.keys(colorPatch).length > 0 ||
+					Object.keys(namePatch).length > 0
+				) {
+					yield* extRepo.updateClaim(claim.id, { ...colorPatch, ...namePatch });
+				}
 			}
 
 			yield* collSvc.updateProperties(path.collectionId, {

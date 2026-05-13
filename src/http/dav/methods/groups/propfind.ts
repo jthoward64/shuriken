@@ -42,15 +42,20 @@ const buildGroupProps = (
 			props: {
 				[cn(DAV_NS, "displayname") as ClarkName]:
 					row.principal.displayName ?? "",
+				// RFC 3744 §5.3: group principals MUST carry the `principal`
+				// resourcetype so ACL clients recognise them as principals.
+				// Keeping `collection` because /dav/groups/:slug/members/ is a
+				// real sub-collection that PROPFIND Depth:1 enumerates.
 				[cn(DAV_NS, "resourcetype") as ClarkName]: {
+					[cn(DAV_NS, "principal") as ClarkName]: "",
 					[cn(DAV_NS, "collection") as ClarkName]: "",
 				},
+				// RFC 3744 §4.3 — single property whose `<D:href>` value carries
+				// all members. Use an array so the XML builder emits one wrapper
+				// with N child `<D:href>` elements (vs N wrappers).
 				[cn(DAV_NS, "group-member-set") as ClarkName]:
 					memberHrefs.length > 0
-						? {
-								[cn(DAV_NS, "href") as ClarkName]:
-									memberHrefs.length === 1 ? memberHrefs[0] : memberHrefs,
-							}
+						? { [cn(DAV_NS, "href") as ClarkName]: memberHrefs }
 						: "",
 			},
 			status: 200,

@@ -270,6 +270,12 @@ export const aclHandler = (
 	AclService | PrincipalRepository
 > =>
 	Effect.gen(function* () {
+		// Auth gate first — defense in depth alongside the central davRouter gate.
+		if (ctx.auth._tag !== "Authenticated") {
+			return yield* unauthorized();
+		}
+		const actingPrincipalId = ctx.auth.principal.principalId;
+
 		// Reject unsupported path kinds
 		if (
 			path.kind === "wellknown" ||
@@ -313,11 +319,6 @@ export const aclHandler = (
 			resourceId = path.instanceId;
 			resourceType = "instance";
 		}
-
-		if (ctx.auth._tag !== "Authenticated") {
-			return yield* unauthorized();
-		}
-		const actingPrincipalId = ctx.auth.principal.principalId;
 
 		// Must have DAV:write-acl on the resource
 		const acl = yield* AclService;

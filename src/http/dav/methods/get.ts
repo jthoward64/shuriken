@@ -65,7 +65,16 @@ export const getHandler = (
 	InstanceService | ComponentRepository | AclService | IanaTimezoneService
 > =>
 	Effect.gen(function* () {
-		// 1. Only instance paths accept GET/HEAD.
+		// 1. Require an authenticated principal. Auth check must precede any
+		// path-shape check so that anonymous probes cannot distinguish resource
+		// kinds via 405 vs 404. The central davRouter gate already enforces this,
+		// but check here as defense-in-depth.
+		if (ctx.auth._tag !== "Authenticated") {
+			return yield* unauthorized();
+		}
+		const principal = ctx.auth.principal;
+
+		// 2. Only instance paths accept GET/HEAD.
 		// new-instance/new-collection means the path is structurally valid but
 		// the resource does not exist → 404. Any other kind → 405.
 		if (path.kind === "new-instance" || path.kind === "new-collection") {
@@ -74,12 +83,6 @@ export const getHandler = (
 		if (path.kind !== "instance") {
 			return yield* methodNotAllowed();
 		}
-
-		// 2. Require an authenticated principal.
-		if (ctx.auth._tag !== "Authenticated") {
-			return yield* unauthorized();
-		}
-		const principal = ctx.auth.principal;
 
 		// 3. ACL check: read on the instance.
 		const acl = yield* AclService;

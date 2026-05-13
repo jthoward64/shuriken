@@ -20,6 +20,8 @@ import {
 } from "#src/services/collection/index.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
 import type { EntityRepository } from "#src/services/entity/index.ts";
+import { isSubscribedCollection } from "#src/services/external-calendar/guards.ts";
+import { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
 import {
 	type InstanceRepository,
 	InstanceService,
@@ -45,10 +47,18 @@ export const deleteHandler = (
 	| EntityRepository
 	| ComponentRepository
 	| AclService
+	| ExternalCalendarRepository
 	| SchedulingService
 	| DatabaseClient
 > =>
 	Effect.gen(function* () {
+		// Auth gate first — anonymous probes must not learn resource shapes
+		// from 404/405 responses.
+		if (ctx.auth._tag !== "Authenticated") {
+			return yield* unauthorized();
+		}
+		const principal = ctx.auth.principal;
+
 		// new-instance/new-collection → resource does not exist (404).
 		// Principal/root/well-known kinds do not support DELETE → 405.
 		if (path.kind === "new-instance" || path.kind === "new-collection") {
@@ -58,10 +68,15 @@ export const deleteHandler = (
 			return yield* methodNotAllowed();
 		}
 
-		if (ctx.auth._tag !== "Authenticated") {
-			return yield* unauthorized();
+		// External-subscription members are read-only. DELETE on the
+		// subscribed collection itself IS allowed (it's how a user
+		// unsubscribes) — only block instance-level deletes.
+		if (
+			path.kind === "instance" &&
+			(yield* isSubscribedCollection(path.collectionId))
+		) {
+			return yield* forbidden("DAV:need-privileges");
 		}
-		const principal = ctx.auth.principal;
 
 		const acl = yield* AclService;
 
@@ -127,6 +142,27 @@ export const deleteHandler = (
 			collRow.collectionType === "outbox"
 		) {
 			return yield* forbidden();
+		}
+
+		// External-subscription cleanup: when the user DELETEs a subscribed
+		// collection, also drop the claim. If that was the last claim on the
+		// shared external_calendar row, soft-delete it so the scheduler stops
+		// polling. Done before deleting the collection itself because the FK
+		// (claim.collection_id) is ON DELETE CASCADE — but we still want to
+		// recompute the external_calendar's sync interval / GC the parent row.
+		const extRepo = yield* ExternalCalendarRepository;
+		const claimOpt = yield* extRepo.findClaimByCollection(path.collectionId);
+		if (Option.isSome(claimOpt)) {
+			const claim = claimOpt.value;
+			yield* extRepo.deleteClaim(claim.id);
+			const remaining = yield* extRepo.countClaimsForExternal(
+				claim.externalCalendarId,
+			);
+			if (remaining === 0) {
+				yield* extRepo.softDelete(claim.externalCalendarId);
+			} else {
+				yield* extRepo.recomputeSyncInterval(claim.externalCalendarId);
+			}
 		}
 
 		// Delete all active instances then the collection (RFC 4918 §9.6.1).

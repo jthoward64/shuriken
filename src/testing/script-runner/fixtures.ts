@@ -80,10 +80,19 @@ export interface StepOptions {
 // etc.) that can be overridden via StepOptions.expect or StepOptions.headers.
 // ---------------------------------------------------------------------------
 
-/** MKCOL — create a new DAV collection. Expects 201 by default. */
-export const mkcol = (path: string, options?: StepOptions): ScriptStep => ({
-	name: options?.name ?? `MKCOL ${path}`,
-	method: "MKCOL",
+/**
+ * MKCOL — create a new DAV collection. Expects 201 by default. Pass
+ * `method: "MKCALENDAR"` / `"MKADDRESSBOOK"` to drive the typed variants
+ * (RFC 4791 §5.3.1 / RFC 6352 §6.3.2).
+ */
+export const mkcol = (
+	path: string,
+	options?: StepOptions & {
+		readonly method?: "MKCOL" | "MKCALENDAR" | "MKADDRESSBOOK";
+	},
+): ScriptStep => ({
+	name: options?.name ?? `${options?.method ?? "MKCOL"} ${path}`,
+	method: options?.method ?? "MKCOL",
 	path,
 	as: options?.as,
 	headers: options?.headers,

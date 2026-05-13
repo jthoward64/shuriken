@@ -6,6 +6,7 @@ import {
 	type DavError,
 	type DavPrecondition,
 	notFound,
+	unauthorized,
 } from "#src/domain/errors.ts";
 import {
 	CollectionId,
@@ -33,6 +34,7 @@ import type { CollectionService } from "#src/services/collection/index.ts";
 import { CollectionRepository } from "#src/services/collection/index.ts";
 import type { ComponentRepository } from "#src/services/component/index.ts";
 import type { EntityRepository } from "#src/services/entity/index.ts";
+import type { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
 import type { GroupService } from "#src/services/group/index.ts";
 import { GroupRepository } from "#src/services/group/index.ts";
 import type { InstanceService } from "#src/services/instance/index.ts";
@@ -132,6 +134,7 @@ type DavServices =
 	| GroupRepository
 	| UserService
 	| GroupService
+	| ExternalCalendarRepository
 	| SchedulingService;
 
 // Segment counts after stripping /dav (index 0 = "principals")
@@ -159,7 +162,14 @@ export const parseDavPath = (
 ): Effect.Effect<
 	ResolvedDavPath,
 	DavError | import("#src/domain/errors.ts").DatabaseError,
-	DavServices
+	// Narrow R to exactly the repos parseDavPath actually queries. Avoids
+	// dragging DavServices' transitive requirements (e.g. mutation-only
+	// services) into callers that just want path resolution.
+	| PrincipalRepository
+	| UserRepository
+	| GroupRepository
+	| CollectionRepository
+	| InstanceRepository
 > => {
 	const path = url.pathname.replace(/\/$/, ""); // strip trailing slash
 
@@ -468,17 +478,63 @@ export const parseDavPath = (
 };
 
 /** Dispatch a DAV request to the appropriate method handler. */
+/**
+ * Path kinds that resolve to a collection-shaped resource. Used by the
+ * Content-Location post-processor (RFC 4918 §5.2) to add a canonical
+ * with-slash hint when the client addressed a collection without a slash.
+ */
+const COLLECTION_KINDS: ReadonlySet<string> = new Set([
+	"root",
+	"principalCollection",
+	"principal",
+	"collection",
+	"userCollection",
+	"user",
+	"groupCollection",
+	"group",
+	"groupMembers",
+]);
+
 export const davRouter = (
 	req: Request,
 	ctx: HttpRequestContext,
-): Effect.Effect<Response, AppError, DavServices> =>
-	Effect.gen(function* () {
+): Effect.Effect<Response, AppError, DavServices> => {
+	// RFC 4918 §5.2: when a collection is addressed without a trailing slash
+	// the server MAY handle the request anyway, and in that case SHOULD return
+	// a Content-Location header pointing to the canonical (with-slash) URL.
+	// Captured here so the post-processor below can see what parseDavPath
+	// resolved without complicating every per-method return.
+	let resolvedCollectionKind = false;
+	return Effect.gen(function* () {
+		const method = req.method.toUpperCase();
+
+		// RFC 6764 §5: /.well-known/{cal,card}dav redirects are public — no auth.
+		// They are pure service-discovery and never expose principal-level data.
+		const pathname = ctx.url.pathname.replace(/\/$/, "");
+		const isWellKnown =
+			pathname === "/.well-known/caldav" || pathname === "/.well-known/carddav";
+
+		// Central auth gate: every DAV request must be authenticated, except
+		// service-discovery endpoints (well-known) and OPTIONS (RFC 4918 §10.1 —
+		// clients use OPTIONS pre-auth to discover server capabilities). Without
+		// this gate, parseDavPath and per-method handlers can leak resource
+		// topology to anonymous probes via 404 / 405 responses. Failing with
+		// AuthError lets the outer HTTP edge attach the right WWW-Authenticate
+		// header (only when basic auth is enabled).
+		if (
+			!isWellKnown &&
+			method !== "OPTIONS" &&
+			ctx.auth._tag !== "Authenticated"
+		) {
+			return yield* unauthorized();
+		}
+
 		const path = yield* parseDavPath(ctx.url).pipe(
 			Effect.withSpan("dav.parse_path", {
 				attributes: { "http.path": ctx.url.pathname },
 			}),
 		);
-		const method = req.method.toUpperCase();
+		resolvedCollectionKind = COLLECTION_KINDS.has(path.kind);
 
 		yield* Effect.annotateCurrentSpan({
 			"dav.path_kind": path.kind,
@@ -610,20 +666,43 @@ export const davRouter = (
 		}
 	}).pipe(
 		Effect.catchTag("DavError", (err) => {
+			// 401s propagate to the outer HTTP edge so it can attach the right
+			// WWW-Authenticate header — basic auth only emits one when
+			// basicAuthEnabled is true; proxy-only / AUTO_LOGIN-only deployments
+			// must not advertise Basic to clients.
+			if (err.status === HTTP_UNAUTHORIZED) {
+				return Effect.fail(err);
+			}
 			const body = err.precondition
 				? buildDavErrorBody(err.precondition)
 				: null;
 			const headers: Record<string, string> = body
 				? { "Content-Type": "application/xml; charset=utf-8" }
 				: {};
-			if (err.status === HTTP_UNAUTHORIZED) {
-				headers["WWW-Authenticate"] = 'Basic realm="shuriken"';
-			}
 			return Effect.succeed(
 				new Response(body, { status: err.status, headers }),
 			);
+		}),
+		// RFC 4918 §5.2: if the client addressed a collection without a trailing
+		// slash, point them at the canonical URL via Content-Location so caches
+		// and follow-up clients converge on the with-slash form. Only applied
+		// when parseDavPath resolved a collection kind; per-instance URLs are
+		// excluded because they're not collections.
+		Effect.map((response) => {
+			if (
+				!resolvedCollectionKind ||
+				ctx.url.pathname.endsWith("/") ||
+				response.headers.has("Content-Location")
+			) {
+				return response;
+			}
+			const canonical = `${ctx.url.origin}${ctx.url.pathname}/${ctx.url.search}`;
+			const next = new Response(response.body, response);
+			next.headers.set("Content-Location", canonical);
+			return next;
 		}),
 		Effect.withSpan("dav.route", {
 			attributes: { "http.path": ctx.url.pathname },
 		}),
 	);
+};

@@ -1,8 +1,14 @@
 import { Effect } from "effect";
+import type { ClarkName, IrDeadProperties } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
-import { methodNotAllowed, unauthorized } from "#src/domain/errors.ts";
+import {
+	forbidden,
+	methodNotAllowed,
+	unauthorized,
+} from "#src/domain/errors.ts";
+import { CollectionId } from "#src/domain/ids.ts";
 import { NAMESPACE_TO_COLLECTION_TYPE } from "#src/domain/types/collection-namespace.ts";
-import type { ResolvedDavPath } from "#src/domain/types/path.ts";
+import { isValidSlug, type ResolvedDavPath } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { normalizeClarkNames } from "#src/http/dav/xml/clark.ts";
 import { parseXml, readXmlBody } from "#src/http/dav/xml/parser.ts";
@@ -26,13 +32,29 @@ interface MkcolProps {
 	readonly displayName: string | undefined;
 	readonly description: string | undefined;
 	readonly supportedComponents: ReadonlyArray<string> | undefined;
+	/** Dead properties from <D:set><D:prop> not consumed by the live-prop fields above. */
+	readonly deadProps: IrDeadProperties;
 }
 
 const EMPTY_PROPS: MkcolProps = {
 	displayName: undefined,
 	description: undefined,
 	supportedComponents: undefined,
+	deadProps: {} as IrDeadProperties,
 };
+
+/**
+ * Clark-formatted keys of properties that MKCOL/MKCALENDAR/MKADDRESSBOOK
+ * consume as live fields — these must NOT be stored as dead properties.
+ * (resourcetype is protected; the others map to typed columns.)
+ */
+const LIVE_PROP_KEYS: ReadonlySet<string> = new Set([
+	`{${DAV_NS}}displayname`,
+	`{${DAV_NS}}resourcetype`,
+	`{${CALDAV_NS}}calendar-description`,
+	`{${CARDDAV_NS}}addressbook-description`,
+	`{${CALDAV_NS}}supported-calendar-component-set`,
+]);
 
 /**
  * Extract displayName, description, and supportedComponents from a
@@ -109,7 +131,28 @@ const extractMkcolProps = (tree: unknown): MkcolProps => {
 		}
 	}
 
-	return { displayName, description, supportedComponents };
+	// Anything in <D:set><D:prop> that we didn't recognise above is treated as
+	// a dead property — RFC 5689 §3 lets MKCOL bodies carry any property at
+	// all, and clients (Apple Calendar, DAVx5, …) routinely include
+	// {http://apple.com/ns/ical/}calendar-color here. Discarding them silently
+	// forces clients to follow MKCOL with a PROPPATCH for every common case.
+	const deadProps: Record<ClarkName, unknown> = {};
+	for (const [key, value] of Object.entries(prop)) {
+		if (key.startsWith("@_")) {
+			continue;
+		}
+		if (LIVE_PROP_KEYS.has(key)) {
+			continue;
+		}
+		deadProps[key as ClarkName] = value;
+	}
+
+	return {
+		displayName,
+		description,
+		supportedComponents,
+		deadProps: deadProps as IrDeadProperties,
+	};
 };
 
 /**
@@ -145,14 +188,23 @@ export const mkcolHandler = (
 	CollectionService | AclService
 > =>
 	Effect.gen(function* () {
-		if (path.kind !== "new-collection") {
-			return yield* methodNotAllowed();
-		}
-
+		// Auth gate first — defense in depth alongside the central davRouter gate.
 		if (ctx.auth._tag !== "Authenticated") {
 			return yield* unauthorized();
 		}
 		const principal = ctx.auth.principal;
+
+		if (path.kind !== "new-collection") {
+			return yield* methodNotAllowed();
+		}
+
+		// Slug validation — reject collection names containing whitespace,
+		// path traversal sequences, or characters that would require encoding
+		// in subsequent responses. Done at creation time so the existing-row
+		// fast-paths in parseDavPath can stay simple.
+		if (!isValidSlug(path.slug)) {
+			return yield* forbidden();
+		}
 
 		const collectionType = NAMESPACE_TO_COLLECTION_TYPE[path.namespace];
 
@@ -164,11 +216,11 @@ export const mkcolHandler = (
 			"DAV:bind",
 		);
 
-		const { displayName, description, supportedComponents } =
+		const { displayName, description, supportedComponents, deadProps } =
 			yield* parseMkcolBody(req);
 
 		const collectionSvc = yield* CollectionService;
-		yield* collectionSvc.create({
+		const newCollection = yield* collectionSvc.create({
 			ownerPrincipalId: path.principalId,
 			collectionType,
 			slug: path.slug,
@@ -176,6 +228,16 @@ export const mkcolHandler = (
 			description,
 			supportedComponents: supportedComponents as Array<string> | undefined,
 		});
+
+		// RFC 5689 §3: the MKCOL body's `<D:set>` is a single atomic operation.
+		// Persist any unrecognised properties as dead props so e.g. Apple's
+		// {ical}calendar-color set at MKCALENDAR time survives subsequent
+		// PROPFIND requests.
+		if (Object.keys(deadProps).length > 0) {
+			yield* collectionSvc.updateProperties(CollectionId(newCollection.id), {
+				clientProperties: deadProps,
+			});
+		}
 
 		const location = `${ctx.url.origin}/dav/principals/${path.principalSeg}/${path.namespace}/${path.slug}/`;
 

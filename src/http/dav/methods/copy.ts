@@ -31,6 +31,7 @@ import {
 } from "#src/http/status.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
+import { isSubscribedCollection } from "#src/services/external-calendar/guards.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
 import { EntityRepository } from "#src/services/entity/index.ts";
 import {
@@ -57,17 +58,18 @@ export const copyHandler = (
 	req: Request,
 ) =>
 	Effect.gen(function* () {
+		// Auth gate first — defense in depth alongside the central davRouter gate.
+		if (ctx.auth._tag !== "Authenticated") {
+			return yield* unauthorized();
+		}
+		const principal = ctx.auth.principal;
+
 		if (path.kind === "new-instance" || path.kind === "new-collection") {
 			return yield* notFound("Source resource not found");
 		}
 		if (path.kind !== "instance" && path.kind !== "collection") {
 			return yield* methodNotAllowed();
 		}
-
-		if (ctx.auth._tag !== "Authenticated") {
-			return yield* unauthorized();
-		}
-		const principal = ctx.auth.principal;
 
 		const destUrl = yield* parseDestination(req);
 		if (destUrl.origin !== ctx.url.origin) {
@@ -121,6 +123,12 @@ const copyInstance = (
 			return yield* conflict();
 		}
 
+		// Subscribed collections are read-only — block COPY-into. COPY-from
+		// is fine: it produces a new resource elsewhere, leaves the source feed alone.
+		if (yield* isSubscribedCollection(destPath.collectionId)) {
+			return yield* forbidden("DAV:need-privileges");
+		}
+
 		const acl = yield* AclService;
 
 		// ACL: read on source instance.
@@ -170,6 +178,25 @@ const copyInstance = (
 				"DAV:bind",
 			);
 			destSlug = destPath.slug;
+		}
+
+		// UID uniqueness — RFC 4791 §5.3.2 / RFC 6352 §5.1. The destination
+		// collection must not already contain another resource with the source's
+		// UID (the overwrite path above already deleted the destination if it
+		// existed; what we're guarding against is *another* instance in the same
+		// destination collection that happens to share this UID).
+		if (sourceEntity.logicalUid !== null) {
+			const conflictExists = yield* entityRepo.existsByUid(
+				destPath.collectionId,
+				sourceEntity.logicalUid,
+			);
+			if (conflictExists) {
+				return yield* conflict(
+					entityType === "icalendar"
+						? "CALDAV:no-uid-conflict"
+						: "CARDDAV:no-uid-conflict",
+				);
+			}
 		}
 
 		// Compute fresh ETag from canonical encoding.

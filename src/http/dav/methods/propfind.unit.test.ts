@@ -420,8 +420,10 @@ describe("propfindHandler — named prop", () => {
 			principalSeg: String(TEST_PRINCIPAL_ID),
 			collectionSeg: String(TEST_COLLECTION_ID),
 		};
-		// Request a property that doesn't exist on a collection
-		const body = `<D:propfind xmlns:D="DAV:"><D:prop><D:getetag/></D:prop></D:propfind>`;
+		// Request a property that the server doesn't serve on this kind of
+		// resource. (We can't use {DAV:}getetag any more — collections now carry
+		// a weak ETag derived from the sync-token per RFC 4918 §15.7.)
+		const body = `<D:propfind xmlns:D="DAV:" xmlns:X="https://example.com/missing/"><D:prop><X:not-a-real-prop/></D:prop></D:propfind>`;
 
 		const res = await runSuccess(
 			propfindHandler(path, authenticatedCtx, makeRequest("0", body)).pipe(

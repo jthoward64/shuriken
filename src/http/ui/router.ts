@@ -10,6 +10,7 @@ import {
 	CollectionId,
 	isUuid,
 	PrincipalId,
+	type UuidString,
 	VirtualResourceId,
 } from "#src/domain/ids.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
@@ -36,7 +37,11 @@ import { usersCollectionsCreateHandler } from "#src/http/ui/api/users/create-col
 import { usersDeleteHandler } from "#src/http/ui/api/users/delete.ts";
 import { usersSetPasswordHandler } from "#src/http/ui/api/users/set-password.ts";
 import { usersUpdateHandler } from "#src/http/ui/api/users/update.ts";
+import { subscriptionsCreateHandler } from "#src/http/ui/api/subscriptions/create.ts";
+import { subscriptionsDeleteHandler } from "#src/http/ui/api/subscriptions/delete.ts";
 import { collectionsEditHandler } from "#src/http/ui/handlers/collections/edit.ts";
+import { subscriptionsListHandler } from "#src/http/ui/handlers/subscriptions/list.ts";
+import { subscriptionsNewHandler } from "#src/http/ui/handlers/subscriptions/new.ts";
 import { groupsCollectionsNewHandler } from "#src/http/ui/handlers/groups/collections-new.ts";
 import { groupsEditHandler } from "#src/http/ui/handlers/groups/edit.ts";
 import { groupsListHandler } from "#src/http/ui/handlers/groups/list.ts";
@@ -49,9 +54,12 @@ import { usersNewHandler } from "#src/http/ui/handlers/users/new.ts";
 import type { BunFileService } from "#src/platform/file.ts";
 import type { AclService } from "#src/services/acl/index.ts";
 import type { CollectionService } from "#src/services/collection/index.ts";
+import type { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
+import type { SubscriptionService } from "#src/services/external-calendar/subscription.ts";
 import type { GroupService } from "#src/services/group/index.ts";
 import type { PrincipalService } from "#src/services/principal/index.ts";
 import type { PrincipalRepository } from "#src/services/principal/repository.ts";
+import type { ProvisioningService } from "#src/services/provisioning/service.ts";
 import type { UserService } from "#src/services/user/index.ts";
 import { profileHandler } from "./handlers/profile.ts";
 import { renderError } from "./helpers/render-page.ts";
@@ -66,9 +74,12 @@ export type UiServices =
 	| AclService
 	| BunFileService
 	| CollectionService
+	| ExternalCalendarRepository
 	| GroupService
+	| SubscriptionService
 	| PrincipalRepository
 	| PrincipalService
+	| ProvisioningService
 	| TemplateService
 	| UserService;
 
@@ -296,6 +307,16 @@ export const uiRouter = (
 		}
 	}
 
+	// Subscriptions (GET pages)
+	if (seg0 === "subscriptions" && method === "GET") {
+		if (!seg1) {
+			return handle(subscriptionsListHandler(req, ctx));
+		}
+		if (seg1 === "new" && !seg2) {
+			return handle(subscriptionsNewHandler(req, ctx));
+		}
+	}
+
 	// API endpoints (POST)
 	if (seg0 === "api" && method === "POST") {
 		if (
@@ -341,6 +362,14 @@ export const uiRouter = (
 				return handle(
 					usersCollectionsCreateHandler(req, ctx, PrincipalId(seg2)),
 				);
+			}
+		}
+		if (seg1 === "subscriptions") {
+			if (seg2 === "create" && !seg3) {
+				return handle(subscriptionsCreateHandler(req, ctx));
+			}
+			if (seg2 && isUuid(seg2) && seg3 === "delete" && !seg4) {
+				return handle(subscriptionsDeleteHandler(req, ctx, seg2 as UuidString));
 			}
 		}
 		if (seg1 === "groups") {

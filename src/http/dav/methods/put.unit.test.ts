@@ -30,6 +30,7 @@ import type { CalIndexRepository } from "#src/services/cal-index/index.ts";
 import type { CollectionService } from "#src/services/collection/index.ts";
 import type { ComponentRepository } from "#src/services/component/index.ts";
 import type { EntityRepository } from "#src/services/entity/index.ts";
+import type { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
 import type { InstanceService } from "#src/services/instance/index.ts";
 import type { SchedulingService } from "#src/services/scheduling/service.ts";
 import type { CalTimezoneRepository } from "#src/services/timezone/index.ts";
@@ -186,6 +187,7 @@ type PutEffect<A> = Effect.Effect<
 	| CalTimezoneRepository
 	| CalIndexRepository
 	| CollectionService
+	| ExternalCalendarRepository
 	| SchedulingService
 	| DatabaseClient
 >;
@@ -199,6 +201,7 @@ type PutFailEffect = Effect.Effect<
 	| CalTimezoneRepository
 	| CalIndexRepository
 	| CollectionService
+	| ExternalCalendarRepository
 	| SchedulingService
 	| DatabaseClient
 >;
@@ -474,7 +477,7 @@ describe("putHandler — method not allowed", () => {
 		};
 		const err = (await runErr(
 			env,
-			putHandler(path, unauthenticatedCtx, makeICalRequest()),
+			putHandler(path, authenticatedCtx, makeICalRequest()),
 		)) as DavError;
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_METHOD_NOT_ALLOWED);

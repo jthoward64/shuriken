@@ -5,10 +5,14 @@
 // can build instance propstat responses without duplicating logic.
 // ---------------------------------------------------------------------------
 
-import type { Temporal } from "temporal-polyfill";
+import { Temporal } from "temporal-polyfill";
 import { type ClarkName, cn, type IrDeadProperties } from "#src/data/ir.ts";
 import type { Propstat } from "#src/http/dav/xml/multistatus.ts";
 import type { InstanceRow } from "#src/services/instance/repository.ts";
+
+// UUIDv7's first 48 bits (12 hex chars) encode Unix milliseconds.
+const UUIDV7_TIMESTAMP_HEX_LENGTH = 12;
+const HEX_RADIX = 16;
 
 // ---------------------------------------------------------------------------
 // RFC 1123 date formatter  (required by DAV:getlastmodified)
@@ -57,7 +61,49 @@ const GETCONTENTLENGTH = cn(DAV_NS, "getcontentlength");
 const LOCK_DISCOVERY = cn(DAV_NS, "lockdiscovery");
 const SUPPORTED_LOCK = cn(DAV_NS, "supportedlock");
 const ACL_RESTRICTIONS = cn(DAV_NS, "acl-restrictions");
+const CREATIONDATE = cn(DAV_NS, "creationdate");
 const SCHEDULE_TAG = cn(CALDAV_NS, "schedule-tag");
+
+// ---------------------------------------------------------------------------
+// ISO 8601 formatter for DAV:creationdate (RFC 4918 §15.1)
+// ---------------------------------------------------------------------------
+
+const ISO_YEAR_DIGITS = 4;
+const ISO_FIELD_DIGITS = 2;
+
+/** Format an Instant as the ISO 8601 datetime DAV:creationdate requires. */
+export const toIso8601Utc = (instant: Temporal.Instant): string => {
+	const zdt = instant.toZonedDateTimeISO("UTC");
+	const p2 = (n: number): string => String(n).padStart(ISO_FIELD_DIGITS, "0");
+	const p4 = (n: number): string => String(n).padStart(ISO_YEAR_DIGITS, "0");
+	return `${p4(zdt.year)}-${p2(zdt.month)}-${p2(zdt.day)}T${p2(zdt.hour)}:${p2(zdt.minute)}:${p2(zdt.second)}Z`;
+};
+
+/**
+ * Derive DAV:creationdate from a UUIDv7 row id. UUIDv7's leading 48 bits
+ * encode Unix milliseconds (RFC 9562 §5.7), so we don't need a separate
+ * `created_at` column. Inlined here (rather than calling
+ * `extractInstantFromUuidV7` from `#src/domain/ids.ts`) because that helper
+ * leans on the global Temporal namespace and we want the bundled
+ * temporal-polyfill type the rest of this file uses. Returns undefined on
+ * anything that doesn't look like a UUID (defensive — existing rows are
+ * always UUIDv7).
+ */
+export const creationDateFromId = (id: string): string | undefined => {
+	const hex = id.replaceAll("-", "").slice(0, UUIDV7_TIMESTAMP_HEX_LENGTH);
+	if (hex.length !== UUIDV7_TIMESTAMP_HEX_LENGTH) {
+		return undefined;
+	}
+	const ms = Number.parseInt(hex, HEX_RADIX);
+	if (!Number.isFinite(ms)) {
+		return undefined;
+	}
+	try {
+		return toIso8601Utc(Temporal.Instant.fromEpochMilliseconds(ms));
+	} catch {
+		return undefined;
+	}
+};
 
 // ---------------------------------------------------------------------------
 // PropfindKind — shared type for prop request parsing results
@@ -144,6 +190,14 @@ export const buildInstanceProps = (
 			[cn(DAV_NS, "no-invert")]: "",
 		},
 	};
+
+	// RFC 4918 §15.1 DAV:creationdate. UUIDv7 row ids encode the creation
+	// instant in their leading 48 bits, so we derive it from the id rather
+	// than carrying a separate column.
+	const created = creationDateFromId(row.id);
+	if (created !== undefined) {
+		props[CREATIONDATE] = created;
+	}
 
 	if (row.contentLength !== null && row.contentLength !== undefined) {
 		props[GETCONTENTLENGTH] = String(row.contentLength);

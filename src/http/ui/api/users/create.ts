@@ -19,7 +19,7 @@ import { isHtmxRequest } from "#src/http/ui/helpers/htmx.ts";
 import { renderFragment } from "#src/http/ui/helpers/render-page.ts";
 import type { TemplateService } from "#src/http/ui/template/index.ts";
 import { AclService } from "#src/services/acl/index.ts";
-import { UserService } from "#src/services/user/index.ts";
+import { ProvisioningService } from "#src/services/provisioning/service.ts";
 
 // ---------------------------------------------------------------------------
 // POST /ui/api/users/create
@@ -31,7 +31,7 @@ export const usersCreateHandler = (
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError | InternalError | ConflictError,
-	AclService | TemplateService | UserService
+	AclService | TemplateService | ProvisioningService
 > =>
 	Effect.gen(function* () {
 		const principal = yield* requireAuthenticated(ctx.auth);
@@ -65,11 +65,16 @@ export const usersCreateHandler = (
 		const parsed = parseResult.right;
 
 		const password = form.get("password")?.toString();
-		const userService = yield* UserService;
-		yield* userService.create({
+		// Use ProvisioningService rather than UserService.create directly so
+		// new users get the same default collections (primary calendar,
+		// primary address book, scheduling inbox/outbox) and owner-ACL grant
+		// that the admin user gets at startup. Without this, alice has no
+		// inbox so admin's invite has nowhere to land.
+		const provisioning = yield* ProvisioningService;
+		yield* provisioning.provisionUser({
 			slug: parsed.slug,
 			email: parsed.email,
-			displayName: parsed.displayName,
+			name: parsed.displayName ?? parsed.slug,
 			credentials: password
 				? [
 						{
@@ -78,7 +83,7 @@ export const usersCreateHandler = (
 							password: Redacted.make(password),
 						},
 					]
-				: [],
+				: undefined,
 		});
 
 		if (isHtmxRequest(ctx.headers)) {

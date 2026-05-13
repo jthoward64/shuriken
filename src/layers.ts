@@ -20,6 +20,10 @@ import {
 	IanaTimezoneService,
 	TimezoneDomainLayer,
 } from "#src/services/timezone/index.ts";
+import { ExternalCalendarRepositoryLive } from "#src/services/external-calendar/repository.live.ts";
+import { ExternalCalendarSchedulerLayer } from "#src/services/external-calendar/scheduler.live.ts";
+import { SubscriptionServiceLive } from "#src/services/external-calendar/subscription.live.ts";
+import { ExternalCalendarSyncLayer } from "#src/services/external-calendar/sync.live.ts";
 import { TombstoneRepositoryLive } from "#src/services/tombstone/index.ts";
 import { UserDomainLayer } from "#src/services/user/index.ts";
 
@@ -87,6 +91,7 @@ const BaseAppLayer = Layer.mergeAll(
 	IanaTimezoneService.Default,
 	ProvisioningDomainLayer.pipe(Layer.provide(InfraLayer)),
 	TombstoneRepositoryLive.pipe(Layer.provide(InfraLayer)),
+	ExternalCalendarRepositoryLive.pipe(Layer.provide(InfraLayer)),
 	CalIndexRepositoryLive.pipe(Layer.provide(InfraLayer)),
 	CardIndexRepositoryLive.pipe(Layer.provide(InfraLayer)),
 	BunFileServiceLive,
@@ -98,9 +103,24 @@ const BaseAppLayer = Layer.mergeAll(
 // EntityRepository, InstanceService, PrincipalRepository, CryptoService).
 // Merge both: BaseAppLayer is used to satisfy SchedulingDomainLayer's requirements
 // and Effect's Layer sharing ensures services are only initialized once.
-export const AppLayer = Layer.merge(
+// SyncLayer materializes the sync service (with its bundled HttpClient).
+// We hold a named reference so the scheduler can consume it AND it gets
+// merged into the final AppLayer once.
+const ExternalCalendarSyncFull = ExternalCalendarSyncLayer.pipe(
+	Layer.provide(BaseAppLayer),
+);
+
+export const AppLayer = Layer.mergeAll(
 	BaseAppLayer,
 	SchedulingDomainLayer.pipe(Layer.provide(BaseAppLayer)),
+	ExternalCalendarSyncFull,
+	SubscriptionServiceLive.pipe(Layer.provide(BaseAppLayer)),
+	// Background scheduler fiber — polls findDue + syncOne on its own schedule.
+	// Needs ExternalCalendarRepository (BaseAppLayer), ExternalCalendarSyncService
+	// (ExternalCalendarSyncFull), and AppConfigService (InfraLayer in BaseAppLayer).
+	ExternalCalendarSchedulerLayer.pipe(
+		Layer.provide(Layer.mergeAll(BaseAppLayer, ExternalCalendarSyncFull)),
+	),
 );
 
 // ---------------------------------------------------------------------------
@@ -149,6 +169,13 @@ export {
 	TombstoneRepository,
 	type TombstoneRow,
 } from "#src/services/tombstone/index.ts";
+export {
+	type ExternalCalendarClaimRow,
+	ExternalCalendarRepository,
+	type ExternalCalendarRow,
+} from "#src/services/external-calendar/repository.ts";
+export { SubscriptionService } from "#src/services/external-calendar/subscription.ts";
+export { ExternalCalendarSyncService } from "#src/services/external-calendar/sync.ts";
 export {
 	UserRepository,
 	UserService,

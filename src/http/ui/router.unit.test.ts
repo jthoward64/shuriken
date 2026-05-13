@@ -9,9 +9,12 @@ import { TemplateService } from "#src/http/ui/template/index.ts";
 import { BunFileService } from "#src/platform/file.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
+import { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
+import { SubscriptionService } from "#src/services/external-calendar/subscription.ts";
 import { GroupService } from "#src/services/group/index.ts";
 import { PrincipalService } from "#src/services/principal/index.ts";
 import { PrincipalRepository } from "#src/services/principal/repository.ts";
+import { ProvisioningService } from "#src/services/provisioning/service.ts";
 import { UserService } from "#src/services/user/index.ts";
 import { uiRouter } from "./router.ts";
 
@@ -124,6 +127,32 @@ const stubLayers = Layer.mergeAll(
 		updateProperties: die,
 		listAll: die,
 		searchByDisplayName: die,
+	}),
+	Layer.succeed(ProvisioningService, {
+		provisionUser: die,
+		ensureAdminAces: die,
+	}),
+	Layer.succeed(ExternalCalendarRepository, {
+		findById: die,
+		findByUrl: die,
+		upsertByUrl: die,
+		softDelete: die,
+		recordSyncResult: die,
+		recomputeSyncInterval: die,
+		findDue: die,
+		findClaimById: die,
+		findClaimByCollection: die,
+		listClaimsForExternal: die,
+		listClaimsWithExternalForPrincipal: () => Effect.succeed([]),
+		countClaimsForExternal: die,
+		insertClaim: die,
+		clearHttpCache: die,
+		updateClaim: die,
+		deleteClaim: die,
+	}),
+	Layer.succeed(SubscriptionService, {
+		subscribe: die,
+		unsubscribe: die,
 	}),
 );
 

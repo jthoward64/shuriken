@@ -1,0 +1,100 @@
+<div class="space-y-6 max-w-2xl">
+  <div class="flex items-center gap-2">
+    <a href="/ui/subscriptions" class="text-sm text-gray-500 hover:text-gray-700">Subscriptions</a>
+    <span class="text-gray-400">/</span>
+    <h1 class="text-2xl font-bold text-gray-900">{{pageTitle}}</h1>
+  </div>
+
+  {{#unless preset}}
+  <section class="bg-white rounded-lg border border-gray-200 p-6">
+    <h2 class="text-sm font-medium text-gray-700 mb-3">Holiday presets</h2>
+    <ul class="space-y-2">
+      {{#each presets}}
+        <li>
+          <a href="/ui/subscriptions/new?preset={{id}}" class="text-sm text-blue-600 hover:text-blue-800 underline">{{displayName}}</a>
+        </li>
+      {{/each}}
+    </ul>
+  </section>
+  {{/unless}}
+
+  {{> form-error}}
+
+  <section class="bg-white rounded-lg border border-gray-200 p-6">
+    <form
+      method="POST"
+      action="/ui/api/subscriptions/create"
+      hx-post="/ui/api/subscriptions/create"
+      hx-target="body"
+      hx-swap="outerHTML"
+      class="space-y-4"
+    >
+      <div>
+        <label for="url" class="block text-sm font-medium text-gray-700 mb-1">iCalendar URL <span class="text-red-500">*</span></label>
+        <input
+          type="url"
+          id="url"
+          name="url"
+          required
+          value="{{#if preset}}{{preset.url}}{{/if}}"
+          class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-500"
+          placeholder="https://example.com/calendar.ics"
+        >
+      </div>
+      <div>
+        <label for="slug" class="block text-sm font-medium text-gray-700 mb-1">Slug <span class="text-red-500">*</span></label>
+        <input
+          type="text"
+          id="slug"
+          name="slug"
+          required
+          pattern="[a-z0-9-]+"
+          value="{{#if preset}}holidays-{{preset.id}}{{/if}}"
+          class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-500"
+          placeholder="e.g. holidays-us"
+        >
+        <p class="mt-1 text-xs text-gray-500">URL segment for this subscription's collection.</p>
+      </div>
+      <div>
+        <label for="displayName" class="block text-sm font-medium text-gray-700 mb-1">Display name override</label>
+        <input
+          type="text"
+          id="displayName"
+          name="displayName"
+          value="{{#if preset}}{{preset.displayName}}{{/if}}"
+          class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-500"
+        >
+        <p class="mt-1 text-xs text-gray-500">Leave blank to use the feed's own name.</p>
+      </div>
+      <div>
+        <label for="color" class="block text-sm font-medium text-gray-700 mb-1">Color override</label>
+        <input
+          type="color"
+          id="color"
+          name="color"
+          class="h-10 w-20 rounded border border-gray-300"
+        >
+      </div>
+      <div>
+        <label for="syncIntervalS" class="block text-sm font-medium text-gray-700 mb-1">Sync frequency</label>
+        <select
+          id="syncIntervalS"
+          name="syncIntervalS"
+          class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-500"
+        >
+          {{#each intervals}}
+            <option value="{{seconds}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+          {{/each}}
+        </select>
+      </div>
+      <div class="flex gap-3 pt-2">
+        <button type="submit" class="px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded hover:bg-gray-700">
+          Subscribe
+        </button>
+        <a href="/ui/subscriptions" class="px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded hover:bg-gray-50">
+          Cancel
+        </a>
+      </div>
+    </form>
+  </section>
+</div>

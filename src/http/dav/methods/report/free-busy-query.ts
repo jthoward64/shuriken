@@ -128,24 +128,35 @@ export const freeBusyQueryHandler = (
 					}
 
 					const hasRrule = comp.properties.some((p) => p.name === "RRULE");
-
-					// Recurrence-ID overrides are handled by their master's RRULE expansion;
-					// skip them here unless they are themselves the master (no RECURRENCE-ID).
 					const isOverride = comp.properties.some(
 						(p) => p.name === "RECURRENCE-ID",
 					);
-					if (isOverride) {
-						continue;
-					}
 
-					// Collect (dtstart, dtend) pairs — one per occurrence for recurring events,
-					// or just the single instance for non-recurring events.
+					// RFC 5545 §3.8.4.4: an override component replaces the master's
+					// regular occurrence at its RECURRENCE-ID. The recurrence expansion
+					// for the master excludes that slot, so the override must emit its
+					// rescheduled DTSTART/DTEND here. Previously this branch skipped
+					// overrides entirely, dropping the rescheduled occurrence from
+					// free-busy output.
 					const occurrencePairs: Array<{
 						start: Temporal.Instant;
 						end: Temporal.Instant;
 					}> = [];
 
-					if (hasRrule) {
+					if (isOverride && !hasRrule) {
+						const dtstart = getDtstartInstant(comp);
+						if (!dtstart) {
+							continue;
+						}
+						const dtend = effectiveDtend(comp, dtstart);
+						if (
+							dtstart.epochMilliseconds >= queryEnd.epochMilliseconds ||
+							dtend.epochMilliseconds <= queryStart.epochMilliseconds
+						) {
+							continue;
+						}
+						occurrencePairs.push({ start: dtstart, end: dtend });
+					} else if (hasRrule) {
 						const masterDtstart = getDtstartInstant(comp);
 						if (!masterDtstart) {
 							continue; // Floating — no timezone context, skip

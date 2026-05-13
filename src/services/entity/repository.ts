@@ -3,7 +3,12 @@ import type { Effect, Option } from "effect";
 import { Context } from "effect";
 import type { davEntity, EntityType } from "#src/db/drizzle/schema/index.ts";
 import type { DatabaseError } from "#src/domain/errors.ts";
-import type { CollectionId, EntityId, PrincipalId } from "#src/domain/ids.ts";
+import type {
+	CollectionId,
+	EntityId,
+	InstanceId,
+	PrincipalId,
+} from "#src/domain/ids.ts";
 
 // ---------------------------------------------------------------------------
 // EntityRepository — data access for dav_entity rows
@@ -42,6 +47,27 @@ export interface EntityRepositoryShape {
 		principalId: PrincipalId,
 		logicalUid: string,
 	) => Effect.Effect<boolean, DatabaseError>;
+
+	/**
+	 * Snapshot of every active instance in a collection paired with its
+	 * entity's logical UID. Used by the external-calendar sync engine to
+	 * reconcile a parsed feed against the existing rows (uids in feed but
+	 * not here → insert; uids here but not in feed → delete; intersection →
+	 * replace contents). One join query per collection — cheaper than
+	 * looping `findById` over every InstanceRow.
+	 */
+	readonly listActiveInstancesWithUid: (
+		collectionId: CollectionId,
+	) => Effect.Effect<
+		ReadonlyArray<{
+			readonly instanceId: InstanceId;
+			readonly entityId: EntityId;
+			readonly logicalUid: string | null;
+			readonly etag: string;
+			readonly slug: string;
+		}>,
+		DatabaseError
+	>;
 }
 
 export class EntityRepository extends Context.Tag("EntityRepository")<

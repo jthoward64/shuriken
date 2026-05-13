@@ -16,7 +16,9 @@ import {
 	paramsToIr,
 	parseDateAndOrTime,
 	parseDateTimeString,
+	parseStructuredText,
 	parseTextList,
+	serializeStructuredText,
 	serializeTextList,
 	unescapeText,
 } from "../format-utils.ts";
@@ -39,6 +41,23 @@ import { isVCard21, normalizeVCard21 } from "./vcard21.ts";
 // ---------------------------------------------------------------------------
 
 type VcardValueOverride = IrValueType | "DATE_TIME_DYNAMIC";
+
+/**
+ * vCard properties whose TEXT value is a structured value (RFC 6350 §3.4):
+ * semicolons are field separators, not literal text. We keep these in the IR
+ * as a TEXT value whose string preserves the unescaped `;` separators between
+ * fields, and route through `parseStructuredText` / `serializeStructuredText`
+ * so encode no longer mangles separators into `\;`.
+ *
+ * Names per RFC 6350 §6.2 (N, ADR), §6.6 (ORG), §6.2.7 (GENDER), §7.3 (CLIENTPIDMAP).
+ */
+const VCARD_STRUCTURED_PROPS: ReadonlySet<string> = new Set([
+	"N",
+	"ADR",
+	"ORG",
+	"GENDER",
+	"CLIENTPIDMAP",
+]);
 
 const VCARD_VALUE_OVERRIDES = new Map<string, VcardValueOverride>([
 	["text", "TEXT"],
@@ -149,7 +168,16 @@ const decodeVCardProperty = (line: ContentLine): IrProperty => {
 				}
 				break;
 			case "TEXT":
-				value = { type: "TEXT", value: unescapeText(raw) };
+				if (VCARD_STRUCTURED_PROPS.has(line.name)) {
+					// RFC 6350 §3.4: split on unescaped `;`, unescape each field,
+					// then rejoin with literal `;` so the IR retains the structure.
+					value = {
+						type: "TEXT",
+						value: parseStructuredText(raw).join(";"),
+					};
+				} else {
+					value = { type: "TEXT", value: unescapeText(raw) };
+				}
 				break;
 			case "TEXT_LIST":
 				value = { type: "TEXT_LIST", value: parseTextList(raw) };
@@ -211,9 +239,16 @@ const encodeVCardProperty = (prop: IrProperty): ContentLine => {
 		}
 	}
 
-	const rawValue = prop.isKnown
-		? encodeIrValue(prop.value)
-		: (prop.value as { value: string }).value;
+	const rawValue =
+		prop.isKnown && prop.value.type === "TEXT"
+			? VCARD_STRUCTURED_PROPS.has(prop.name)
+				? // RFC 6350 §3.4: split on literal `;` and escape each field so
+					// separators stay structural and content is properly escaped.
+					serializeStructuredText(prop.value.value.split(";"))
+				: escapeText(prop.value.value)
+			: prop.isKnown
+				? encodeIrValue(prop.value)
+				: (prop.value as { value: string }).value;
 	return {
 		name: prop.name,
 		params: paramsFromIr(prop.parameters),

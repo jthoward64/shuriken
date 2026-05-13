@@ -25,6 +25,54 @@ export const escapeText = (value: string): string =>
 		.replace(/\n/g, "\\n");
 
 /**
+ * Escape a vCard structured-value FIELD (RFC 6350 §3.4). Field separators
+ * (`;`) and inter-field commas are part of the surrounding structure, so we
+ * only escape characters that would otherwise corrupt a single field's
+ * content (backslash, newline).
+ *
+ * Note that this is intentionally NOT used for COMMA-separated text-lists
+ * (CATEGORIES, NICKNAME, …) — those keep `escapeText` so each list item is
+ * fully escaped before being joined with literal commas.
+ */
+export const escapeStructuredField = (value: string): string =>
+	value.replace(/\\/g, "\\\\").replace(/\n/g, "\\n");
+
+/**
+ * Split a structured vCard value on unescaped `;` separators (RFC 6350 §3.4),
+ * unescaping `\\`, `\;`, `\,`, and `\n` within each field. Symmetric with
+ * `serializeStructuredText`.
+ */
+export const parseStructuredText = (raw: string): ReadonlyArray<string> => {
+	const parts: Array<string> = [];
+	let current = "";
+	let escaped = false;
+	for (const ch of raw) {
+		if (escaped) {
+			if (ch === "n" || ch === "N") {
+				current += "\n";
+			} else {
+				current += ch;
+			}
+			escaped = false;
+		} else if (ch === "\\") {
+			escaped = true;
+		} else if (ch === ";") {
+			parts.push(current);
+			current = "";
+		} else {
+			current += ch;
+		}
+	}
+	parts.push(current);
+	return parts;
+};
+
+/** Serialize a structured value: escape each field (RFC 6350 §3.4) and join with `;`. */
+export const serializeStructuredText = (
+	fields: ReadonlyArray<string>,
+): string => fields.map(escapeStructuredField).join(";");
+
+/**
  * Split a TEXT value at unescaped commas and unescape each segment.
  * Used for TEXT_LIST properties (CATEGORIES, RESOURCES, NICKNAME, etc.).
  */

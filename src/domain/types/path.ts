@@ -22,6 +22,23 @@ export const ResourceUrl = Brand.nominal<ResourceUrl>();
 export type Slug = string & Brand.Brand<"Slug">;
 export const Slug = Brand.nominal<Slug>();
 
+/**
+ * Validate the shape of a client-supplied URL path segment that will be stored
+ * as a collection / instance / user / group slug.
+ *
+ * Constraints (deliberately tighter than RFC 3986 unreserved so we don't have
+ * to think about URL-encoding in storage or response hrefs):
+ *   - 1..128 ASCII chars
+ *   - Letters, digits, `_`, `-`, `.`
+ *   - May not start or end with `.` (avoids `..` traversal-shaped slugs)
+ *
+ * Returns `true` if the segment is a safe slug. Used at the HTTP edge to gate
+ * new-resource creation; existing rows are not re-validated.
+ */
+const SLUG_RE = /^[A-Za-z0-9_-][A-Za-z0-9._-]{0,126}[A-Za-z0-9_-]$|^[A-Za-z0-9_-]$/;
+
+export const isValidSlug = (s: string): boolean => SLUG_RE.test(s);
+
 // ---------------------------------------------------------------------------
 // ResolvedDavPath — after slug→UUID resolution at the HTTP edge
 // All internal code receives one of these; never a raw slug.

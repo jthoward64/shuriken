@@ -19,6 +19,7 @@
 		"test:integration": "bun test $(find . -name '*.integration.test.ts' -print)",
 		"migrations:gen": "drizzle-kit generate && rm src/testing/test-db-cache.tar.gz || true",
 		"migrations:run": "drizzle-kit migrate",
+		"db:reset": "bun run scripts/db-reset.ts && bun run migrations:run",
 		"studio": "drizzle-kit studio",
 		"prepare": "husky"
 	},

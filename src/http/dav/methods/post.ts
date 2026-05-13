@@ -57,6 +57,24 @@ export const postHandler = (
 			"CALDAV:schedule-send-freebusy",
 		);
 
+		// RFC 6638 §6.2 — Originator and Recipient(s) MUST be present on the
+		// outbox POST. Originator identifies the calendar user submitting the
+		// request and Recipient lists every CU the server should query. Without
+		// these the server cannot honour the §6.2.2 response-by-attendee rules
+		// or §6.1.4 ACL checks that scope the free-busy query.
+		const originator = req.headers.get("Originator");
+		if (originator === null || originator.trim() === "") {
+			return yield* badRequest(
+				"Outbox POST requires an Originator header (RFC 6638 §6.2)",
+			);
+		}
+		const recipients = req.headers.get("Recipient");
+		if (recipients === null || recipients.trim() === "") {
+			return yield* badRequest(
+				"Outbox POST requires at least one Recipient header (RFC 6638 §6.2)",
+			);
+		}
+
 		// Parse body as iCalendar.
 		const body = yield* Effect.promise(() => req.text());
 		const doc = yield* decodeICalendar(body);

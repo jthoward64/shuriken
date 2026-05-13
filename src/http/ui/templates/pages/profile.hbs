@@ -97,4 +97,19 @@
       </form>
     </section>
   {{/if}}
+
+  {{#if authSettingsUrl}}
+    <section class="bg-white rounded-lg border border-gray-200 p-6 space-y-3">
+      <h2 class="text-base font-semibold text-gray-800">Account settings</h2>
+      <p class="text-sm text-gray-600">
+        Account-level settings (password, recovery email, MFA) are managed externally.
+      </p>
+      <a
+        href="{{authSettingsUrl}}"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="inline-block px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded hover:bg-gray-700"
+      >{{authSettingsLabel}}</a>
+    </section>
+  {{/if}}
 </div>

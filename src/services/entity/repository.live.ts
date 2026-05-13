@@ -9,7 +9,12 @@ import {
 } from "#src/db/drizzle/schema/index.ts";
 import { runDbQuery } from "#src/db/query.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
-import type { CollectionId, EntityId, PrincipalId } from "#src/domain/ids.ts";
+import type {
+	CollectionId,
+	EntityId,
+	InstanceId,
+	PrincipalId,
+} from "#src/domain/ids.ts";
 import { repoQueryDurationMs } from "#src/observability/metrics.ts";
 import { EntityRepository } from "./repository.ts";
 
@@ -212,6 +217,57 @@ const existsByUidForPrincipal = Effect.fn(
 	),
 );
 
+const listActiveInstancesWithUid = Effect.fn(
+	"EntityRepository.listActiveInstancesWithUid",
+)(
+	function* (collectionId: CollectionId) {
+		yield* Effect.annotateCurrentSpan({ "collection.id": collectionId });
+		yield* Effect.logTrace("repo.entity.listActiveInstancesWithUid", {
+			collectionId,
+		});
+		return yield* runDbQuery((db) =>
+			db
+				.select({
+					instanceId: davInstance.id,
+					entityId: davEntity.id,
+					logicalUid: davEntity.logicalUid,
+					etag: davInstance.etag,
+					slug: davInstance.slug,
+				})
+				.from(davInstance)
+				.innerJoin(davEntity, eq(davInstance.entityId, davEntity.id))
+				.where(
+					and(
+						eq(davInstance.collectionId, collectionId),
+						isNull(davInstance.deletedAt),
+						isNull(davEntity.deletedAt),
+					),
+				),
+		).pipe(
+			Effect.map((rows) =>
+				rows.map((r) => ({
+					instanceId: r.instanceId as InstanceId,
+					entityId: r.entityId as EntityId,
+					logicalUid: r.logicalUid,
+					etag: r.etag,
+					slug: r.slug,
+				})),
+			),
+			Metric.trackDuration(
+				entityDuration.pipe(
+					Metric.tagged("repo.operation", "listActiveInstancesWithUid"),
+				),
+			),
+		);
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning(
+			"repo.entity.listActiveInstancesWithUid failed",
+			e.cause,
+		),
+	),
+);
+
 export const EntityRepositoryLive = Layer.effect(
 	EntityRepository,
 	Effect.gen(function* () {
@@ -233,6 +289,9 @@ export const EntityRepositoryLive = Layer.effect(
 			existsByUidForPrincipal: (
 				...args: Parameters<typeof existsByUidForPrincipal>
 			) => run(existsByUidForPrincipal(...args)),
+			listActiveInstancesWithUid: (
+				...args: Parameters<typeof listActiveInstancesWithUid>
+			) => run(listActiveInstancesWithUid(...args)),
 		});
 	}),
 );

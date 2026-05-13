@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import { DatabaseClient } from "#src/db/client.ts";
 import { withTransaction } from "#src/db/transaction.ts";
 import {
@@ -21,6 +21,8 @@ import {
 	HTTP_NO_CONTENT,
 } from "#src/http/status.ts";
 import { AclService } from "#src/services/acl/index.ts";
+import { EntityRepository } from "#src/services/entity/index.ts";
+import { isSubscribedCollection } from "#src/services/external-calendar/guards.ts";
 import {
 	CollectionRepository,
 	CollectionService,
@@ -48,17 +50,18 @@ export const moveHandler = (
 	req: Request,
 ) =>
 	Effect.gen(function* () {
+		// Auth gate first — defense in depth alongside the central davRouter gate.
+		if (ctx.auth._tag !== "Authenticated") {
+			return yield* unauthorized();
+		}
+		const principal = ctx.auth.principal;
+
 		if (path.kind === "new-instance" || path.kind === "new-collection") {
 			return yield* notFound("Source resource not found");
 		}
 		if (path.kind !== "instance" && path.kind !== "collection") {
 			return yield* methodNotAllowed();
 		}
-
-		if (ctx.auth._tag !== "Authenticated") {
-			return yield* unauthorized();
-		}
-		const principal = ctx.auth.principal;
 
 		const destUrl = yield* parseDestination(req);
 		if (destUrl.origin !== ctx.url.origin) {
@@ -109,6 +112,16 @@ const moveInstance = (
 			return yield* conflict();
 		}
 
+		// Read-only: subscribed collections own their event set. Block both
+		// MOVE-from (we'd be deleting a synced event) and MOVE-into (we'd be
+		// adding a foreign event that the next sync would remove).
+		if (yield* isSubscribedCollection(path.collectionId)) {
+			return yield* forbidden("DAV:need-privileges");
+		}
+		if (yield* isSubscribedCollection(destPath.collectionId)) {
+			return yield* forbidden("DAV:need-privileges");
+		}
+
 		const acl = yield* AclService;
 
 		// ACL: unbind from source collection, bind to destination collection.
@@ -144,6 +157,34 @@ const moveInstance = (
 		} else {
 			// destPath.kind === "new-instance"
 			destSlug = destPath.slug;
+		}
+
+		// UID uniqueness — RFC 4791 §5.3.2 / RFC 6352 §5.1. Moving into a
+		// destination collection that already contains another resource with
+		// the same UID must be rejected. Only check when crossing collections
+		// (within the same collection the source is the one we're moving).
+		if (destPath.collectionId !== path.collectionId) {
+			const entityRepoMove = yield* EntityRepository;
+			const sourceEntityOpt = yield* entityRepoMove.findById(
+				EntityId(sourceInstance.entityId),
+			);
+			const sourceUid = Option.match(sourceEntityOpt, {
+				onNone: () => null,
+				onSome: (e) => e.logicalUid,
+			});
+			if (sourceUid !== null) {
+				const conflictExists = yield* entityRepoMove.existsByUid(
+					destPath.collectionId,
+					sourceUid,
+				);
+				if (conflictExists) {
+					return yield* conflict(
+						sourceInstance.contentType === "text/calendar"
+							? "CALDAV:no-uid-conflict"
+							: "CARDDAV:no-uid-conflict",
+					);
+				}
+			}
 		}
 
 		// Insert a new instance row at the destination (same entity, preserving ETag

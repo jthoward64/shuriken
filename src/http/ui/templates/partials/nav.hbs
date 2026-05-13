@@ -10,3 +10,9 @@
     Groups
   </a>
 {{/if}}
+{{#if showSubscriptions}}
+  <a href="/ui/subscriptions"
+     class="text-sm {{#if (eq currentPath '/ui/subscriptions')}}text-white font-medium{{else}}text-gray-300 hover:text-white{{/if}}">
+    Subscriptions
+  </a>
+{{/if}}

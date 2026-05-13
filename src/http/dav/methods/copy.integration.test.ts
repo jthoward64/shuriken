@@ -45,8 +45,16 @@ const expectAllPass = (
 
 describe("COPY instance", () => {
 	it("copies an iCalendar instance to a new location (201)", async () => {
+		// Cross-collection copy: RFC 4791 §4.1 forbids two resources with the
+		// same UID in a single calendar collection, so a COPY of a stored event
+		// must target a different calendar.
 		const results = await runScript(
 			[
+				mkcol("/dav/principals/test/cal/dest-cal/", {
+					as: "test",
+					method: "MKCALENDAR",
+					expect: { status: 201 },
+				}),
 				put(
 					"/dav/principals/test/cal/primary/source.ics",
 					EVENT,
@@ -55,7 +63,7 @@ describe("COPY instance", () => {
 				),
 				copy(
 					"/dav/principals/test/cal/primary/source.ics",
-					"/dav/principals/test/cal/primary/dest.ics",
+					"/dav/principals/test/cal/dest-cal/dest.ics",
 					{ as: "test", expect: { status: 201 } },
 				),
 			],
@@ -65,8 +73,14 @@ describe("COPY instance", () => {
 	});
 
 	it("copies a vCard instance to a new location (201)", async () => {
+		// Cross-collection: RFC 6352 §3.1 forbids same UID in a single address-book.
 		const results = await runScript(
 			[
+				mkcol("/dav/principals/test/card/dest-card/", {
+					as: "test",
+					method: "MKADDRESSBOOK",
+					expect: { status: 201 },
+				}),
 				put(
 					"/dav/principals/test/card/primary/source.vcf",
 					VCARD,
@@ -75,7 +89,7 @@ describe("COPY instance", () => {
 				),
 				copy(
 					"/dav/principals/test/card/primary/source.vcf",
-					"/dav/principals/test/card/primary/dest.vcf",
+					"/dav/principals/test/card/dest-card/dest.vcf",
 					{ as: "test", expect: { status: 201 } },
 				),
 			],
@@ -87,6 +101,11 @@ describe("COPY instance", () => {
 	it("source is still accessible after copy", async () => {
 		const results = await runScript(
 			[
+				mkcol("/dav/principals/test/cal/dst/", {
+					as: "test",
+					method: "MKCALENDAR",
+					expect: { status: 201 },
+				}),
 				put(
 					"/dav/principals/test/cal/primary/original.ics",
 					EVENT,
@@ -95,7 +114,7 @@ describe("COPY instance", () => {
 				),
 				copy(
 					"/dav/principals/test/cal/primary/original.ics",
-					"/dav/principals/test/cal/primary/clone.ics",
+					"/dav/principals/test/cal/dst/clone.ics",
 					{ as: "test", expect: { status: 201 } },
 				),
 				get("/dav/principals/test/cal/primary/original.ics", {
@@ -111,16 +130,21 @@ describe("COPY instance", () => {
 	it("destination is accessible after copy", async () => {
 		const results = await runScript(
 			[
+				mkcol("/dav/principals/test/cal/dst-acc/", {
+					as: "test",
+					method: "MKCALENDAR",
+					expect: { status: 201 },
+				}),
 				put("/dav/principals/test/cal/primary/ev.ics", EVENT, "text/calendar", {
 					as: "test",
 					expect: { status: 201 },
 				}),
 				copy(
 					"/dav/principals/test/cal/primary/ev.ics",
-					"/dav/principals/test/cal/primary/ev-copy.ics",
+					"/dav/principals/test/cal/dst-acc/ev-copy.ics",
 					{ as: "test", expect: { status: 201 } },
 				),
-				get("/dav/principals/test/cal/primary/ev-copy.ics", {
+				get("/dav/principals/test/cal/dst-acc/ev-copy.ics", {
 					as: "test",
 					expect: {
 						status: 200,
@@ -136,6 +160,11 @@ describe("COPY instance", () => {
 	it("copy produces an independent ETag from the source", async () => {
 		const results = await runScript(
 			[
+				mkcol("/dav/principals/test/cal/dst-etag-cal/", {
+					as: "test",
+					method: "MKCALENDAR",
+					expect: { status: 201 },
+				}),
 				put(
 					"/dav/principals/test/cal/primary/src-etag.ics",
 					EVENT,
@@ -144,7 +173,7 @@ describe("COPY instance", () => {
 				),
 				copy(
 					"/dav/principals/test/cal/primary/src-etag.ics",
-					"/dav/principals/test/cal/primary/dst-etag.ics",
+					"/dav/principals/test/cal/dst-etag-cal/dst-etag.ics",
 					{ as: "test", expect: { status: 201 } },
 				),
 			],
@@ -152,19 +181,24 @@ describe("COPY instance", () => {
 		);
 		expectAllPass(results);
 		// The COPY response itself contains the new ETag
-		const copyResult = results[1];
+		const copyResult = results[2];
 		expect(copyResult?.headers.etag).toBeTruthy();
 	});
 
 	it("Overwrite:T replaces existing destination (204)", async () => {
 		const results = await runScript(
 			[
+				mkcol("/dav/principals/test/cal/ow-dst/", {
+					as: "test",
+					method: "MKCALENDAR",
+					expect: { status: 201 },
+				}),
 				put("/dav/principals/test/cal/primary/a.ics", EVENT, "text/calendar", {
 					as: "test",
 					expect: { status: 201 },
 				}),
 				put(
-					"/dav/principals/test/cal/primary/b.ics",
+					"/dav/principals/test/cal/ow-dst/b.ics",
 					makeCalEvent({
 						uid: "copy-overwrite-dest@example.com",
 						summary: "Old Destination",
@@ -176,11 +210,11 @@ describe("COPY instance", () => {
 				),
 				copy(
 					"/dav/principals/test/cal/primary/a.ics",
-					"/dav/principals/test/cal/primary/b.ics",
+					"/dav/principals/test/cal/ow-dst/b.ics",
 					{ as: "test", overwrite: "T", expect: { status: 204 } },
 				),
 				// Verify destination now has source content
-				get("/dav/principals/test/cal/primary/b.ics", {
+				get("/dav/principals/test/cal/ow-dst/b.ics", {
 					as: "test",
 					expect: { status: 200, bodyContains: "Copy Test Event" },
 				}),

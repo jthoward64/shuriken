@@ -1,6 +1,11 @@
 import { Effect, Option } from "effect";
+import { Temporal } from "temporal-polyfill";
 import { makeEtag } from "#src/data/etag.ts";
 import { decodeICalendar, encodeICalendar } from "#src/data/icalendar/codec.ts";
+import {
+	getDtendInstant,
+	getDtstartInstant,
+} from "#src/data/icalendar/ir-helpers.ts";
 import { extractVtimezones } from "#src/data/icalendar/timezone.ts";
 import { extractUid as extractICalUid } from "#src/data/icalendar/uid.ts";
 import { decodeVCard, encodeVCard } from "#src/data/vcard/codec.ts";
@@ -19,7 +24,7 @@ import {
 	unsupportedMediaType,
 } from "#src/domain/errors.ts";
 import { CollectionId, EntityId, InstanceId } from "#src/domain/ids.ts";
-import type { ResolvedDavPath, Slug } from "#src/domain/types/path.ts";
+import { isValidSlug, type ResolvedDavPath, type Slug } from "#src/domain/types/path.ts";
 import { ETag } from "#src/domain/types/strings.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { HTTP_CREATED, HTTP_NO_CONTENT } from "#src/http/status.ts";
@@ -29,6 +34,8 @@ import { CollectionService } from "#src/services/collection/index.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
 import { EntityRepository } from "#src/services/entity/index.ts";
 import { InstanceService } from "#src/services/instance/index.ts";
+import { isSubscribedCollection } from "#src/services/external-calendar/guards.ts";
+import type { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
 import { SchedulingService } from "#src/services/scheduling/index.ts";
 import { CalTimezoneRepository } from "#src/services/timezone/index.ts";
 
@@ -51,14 +58,29 @@ export const putHandler = (
 	| AclService
 	| CalIndexRepository
 	| CollectionService
+	| ExternalCalendarRepository
 	| SchedulingService
 	| DatabaseClient
 > =>
 	Effect.gen(function* () {
+		// 1. Require an authenticated principal — must precede any path-shape
+		// branching so anonymous probes cannot leak resource topology.
+		if (ctx.auth._tag !== "Authenticated") {
+			return yield* unauthorized();
+		}
+		const principal = ctx.auth.principal;
+
 		const db = yield* DatabaseClient;
-		// 1. Only new-instance and instance paths accept PUT.
+		// 2. Only new-instance and instance paths accept PUT.
 		if (path.kind !== "new-instance" && path.kind !== "instance") {
 			return yield* methodNotAllowed();
+		}
+
+		// 2a. Slug shape — only enforced on new-instance creation; updates
+		// preserve the existing slug regardless of whether it matches today's
+		// stricter rules. Same constraints as MKCOL.
+		if (path.kind === "new-instance" && !isValidSlug(path.slug)) {
+			return yield* forbidden();
 		}
 
 		// RFC 6638 §3.2.3.1: PUT to scheduling inbox or outbox is not allowed.
@@ -66,11 +88,15 @@ export const putHandler = (
 			return yield* forbidden("CALDAV:valid-calendar-object-resource");
 		}
 
-		// 2. Require an authenticated principal.
-		if (ctx.auth._tag !== "Authenticated") {
-			return yield* unauthorized();
+		// External-calendar subscriptions are read-only for their members:
+		// the sync engine owns the event set and the next sync would overwrite
+		// a user-side PUT anyway. RFC 4918 §15 doesn't define a specific
+		// precondition for this, but `<DAV:need-privileges>` is the conventional
+		// signal that the principal lacks `DAV:write-content` on the resource —
+		// which is effectively what's happening here.
+		if (yield* isSubscribedCollection(path.collectionId)) {
+			return yield* forbidden("DAV:need-privileges");
 		}
-		const principal = ctx.auth.principal;
 
 		// 3. Validate Content-Type.
 		const rawContentType = req.headers.get("Content-Type") ?? "";
@@ -102,8 +128,62 @@ export const putHandler = (
 			return yield* unsupportedMediaType("CARDDAV:supported-address-data");
 		}
 
-		// 4. Read body.
-		const body = yield* Effect.promise(() => req.text());
+		// 4. RFC 7232 §6 — preconditions are evaluated BEFORE we touch the body.
+		//    Otherwise a client retrying after a 304 with stale credentials etc.
+		//    can be told "your body is invalid" when the real failure is the
+		//    precondition. Also avoids reading + parsing a potentially large
+		//    body just to reject it for an ETag mismatch.
+		const ifMatch = req.headers.get("If-Match");
+		const ifNoneMatch = req.headers.get("If-None-Match");
+		const ifScheduleTagMatch = req.headers.get("If-Schedule-Tag-Match");
+		const existingInstance =
+			path.kind === "instance"
+				? yield* (yield* InstanceService).findById(path.instanceId)
+				: null;
+		if (existingInstance === null) {
+			// new-instance: any If-Match value is a precondition failure since
+			// no current ETag exists; If-Schedule-Tag-Match likewise (no current tag).
+			if (ifMatch !== null || ifScheduleTagMatch !== null) {
+				return yield* preconditionFailed();
+			}
+		} else {
+			if (
+				ifMatch !== null &&
+				ifMatch !== "*" &&
+				ifMatch !== existingInstance.etag
+			) {
+				return yield* preconditionFailed();
+			}
+			if (ifNoneMatch === "*") {
+				return yield* preconditionFailed();
+			}
+			if (
+				ifScheduleTagMatch !== null &&
+				ifScheduleTagMatch !== existingInstance.scheduleTag
+			) {
+				return yield* preconditionFailed();
+			}
+		}
+
+		// 5. Read body. RFC 5545 §6 / RFC 6350 §3.1 require iCalendar and vCard
+		// to be UTF-8. Decode strictly so invalid byte sequences fail-fast with
+		// a precondition error rather than silently producing U+FFFD replacements
+		// that would later corrupt XML responses.
+		const bodyBytes = new Uint8Array(
+			yield* Effect.promise(() => req.arrayBuffer()),
+		);
+		const body = yield* Effect.try({
+			try: () => new TextDecoder("utf-8", { fatal: true }).decode(bodyBytes),
+			catch: () => undefined,
+		}).pipe(
+			Effect.catchAll(() =>
+				forbidden(
+					entityType === "icalendar"
+						? "CALDAV:valid-calendar-data"
+						: "CARDDAV:valid-address-data",
+				),
+			),
+		);
 
 		// 5. Parse into IrDocument.
 		const doc =
@@ -135,6 +215,19 @@ export const putHandler = (
 			entityType === "icalendar" ? extractICalUid(doc) : extractVCardUid(doc),
 		);
 
+		// 6a. UID REQUIRED. RFC 5545 §3.6.1 (iCalendar) / RFC 6350 §6.7.6 (vCard).
+		//     CalDAV §4.1 / CardDAV §3.1 both require every stored resource to
+		//     have a UID so the server can enforce uniqueness; absence means we
+		//     could never detect conflicts. Reject with the corresponding
+		//     "valid-*-data" precondition so clients see a meaningful error.
+		if (logicalUid === null) {
+			return yield* forbidden(
+				entityType === "icalendar"
+					? "CALDAV:valid-calendar-object-resource"
+					: "CARDDAV:valid-address-data",
+			);
+		}
+
 		// 6b. CalDAV semantic validation — RFC 4791 §4.1, §5.3.2.
 		//     Applies to every iCalendar PUT (both new and update).
 		if (entityType === "icalendar") {
@@ -157,6 +250,22 @@ export const putHandler = (
 			);
 			if (componentUids.size > 1) {
 				return yield* forbidden("CALDAV:valid-calendar-object-resource");
+			}
+			// Rule 3: DTEND/DUE MUST be later than DTSTART (RFC 5545 §3.8.2.2,
+			// §3.8.2.3). Servers that don't enforce this push the burden onto
+			// every querying client, so e.g. a calendar-query time-range would
+			// silently miss inverted events. Only checked when both endpoints
+			// resolve to comparable instants — floating or partial dates skip.
+			for (const c of nonTzComponents) {
+				const dtstart = getDtstartInstant(c);
+				const dtend = getDtendInstant(c);
+				if (
+					dtstart !== undefined &&
+					dtend !== undefined &&
+					Temporal.Instant.compare(dtend, dtstart) < 0
+				) {
+					return yield* forbidden("CALDAV:valid-calendar-object-resource");
+				}
 			}
 		}
 
@@ -181,11 +290,8 @@ export const putHandler = (
 				"DAV:bind",
 			);
 
-			// If-Match on a non-existent resource is always a precondition failure.
-			const ifMatch = req.headers.get("If-Match");
-			if (ifMatch !== null) {
-				return yield* preconditionFailed();
-			}
+			// (Preconditions already enforced in step 4 — If-Match on a
+			// non-existent resource returned 412 there.)
 
 			// RFC 4791 §5.2.3: reject if the component type is not in the collection's
 			// supported-calendar-component-set.
@@ -301,33 +407,38 @@ export const putHandler = (
 			"DAV:write-content",
 		);
 
-		// Fetch existing instance to validate conditional headers and get entityId.
+		// existingInstance + preconditions were resolved in step 4 above.
+		// Narrow the type for the remainder of this branch.
+		if (existingInstance === null) {
+			return yield* preconditionFailed();
+		}
 		const instanceSvc = yield* InstanceService;
-		const existingInstance = yield* instanceSvc.findById(path.instanceId);
 
-		// If-Match: must match the current ETag (or be "*").
-		const ifMatch = req.headers.get("If-Match");
-		if (
-			ifMatch !== null &&
-			ifMatch !== "*" &&
-			ifMatch !== existingInstance.etag
-		) {
-			return yield* preconditionFailed();
-		}
-
-		// If-None-Match: "*" fails when the resource already exists.
-		const ifNoneMatch = req.headers.get("If-None-Match");
-		if (ifNoneMatch === "*") {
-			return yield* preconditionFailed();
-		}
-
-		// If-Schedule-Tag-Match: RFC 6638 §3.2.1 — must match the current schedule-tag.
-		const ifScheduleTagMatch = req.headers.get("If-Schedule-Tag-Match");
-		if (
-			ifScheduleTagMatch !== null &&
-			ifScheduleTagMatch !== existingInstance.scheduleTag
-		) {
-			return yield* preconditionFailed();
+		// UID uniqueness on UPDATE — RFC 4791 §5.3.2 / RFC 6352 §5.1. Changing
+		// the UID to one that already belongs to another resource in this
+		// collection must be rejected; same-UID overwrite is fine.
+		if (logicalUid !== null) {
+			const entityRepoUid = yield* EntityRepository;
+			const currentEntityOpt = yield* entityRepoUid.findById(
+				EntityId(existingInstance.entityId),
+			);
+			const currentUid = Option.match(currentEntityOpt, {
+				onNone: () => null,
+				onSome: (e) => e.logicalUid,
+			});
+			if (currentUid !== logicalUid) {
+				const conflictExists = yield* entityRepoUid.existsByUid(
+					CollectionId(existingInstance.collectionId),
+					logicalUid,
+				);
+				if (conflictExists) {
+					return yield* conflict(
+						entityType === "icalendar"
+							? "CALDAV:no-uid-conflict"
+							: "CARDDAV:no-uid-conflict",
+					);
+				}
+			}
 		}
 
 		// RFC 4791 §5.2.3: reject if the component type is not in the collection's

@@ -69,10 +69,61 @@ export const AuthConfig = Config.all({
 
 	/** Slug for the default admin user. Defaults to the local part of ADMIN_EMAIL. */
 	adminSlug: Config.string("adminSlug").pipe(Config.option),
+
+	/**
+	 * External account-management URL shown on the user's profile page.
+	 *
+	 * Typical use: when the server runs behind an SSO portal (Authelia,
+	 * Authentik, Keycloak, ...), password changes and profile edits happen
+	 * over there rather than in this app. Set this to a URL with optional
+	 * `{email}`, `{slug}`, or `{userId}` placeholders and the profile page
+	 * surfaces a link with the substitutions filled in.
+	 *
+	 * Example: `https://sso.example.com/account?username={email}`.
+	 */
+	authSettingsUrl: Config.string("authSettingsUrl").pipe(Config.option),
+
+	/** Link text for the external auth-settings link. Defaults to "Manage account". */
+	authSettingsLabel: Config.string("authSettingsLabel").pipe(Config.option),
 });
 
 export const LogConfig = Config.all({
 	level: Config.logLevel("logLevel").pipe(Config.withDefault(undefined)),
+});
+
+const DEFAULT_EXTERNAL_TICK_S = 60;
+const DEFAULT_EXTERNAL_CONCURRENCY = 4;
+const DEFAULT_EXTERNAL_CLAIM_CAP = 100;
+
+export const ExternalCalendarConfig = Config.all({
+	/**
+	 * How often the background scheduler wakes up to look for due external
+	 * calendars. The actual sync cadence per URL is governed by each row's
+	 * `sync_interval_s`; this just bounds how *quickly* a newly-due row gets
+	 * picked up. 60s is a good default — small enough that adding a new
+	 * subscription shows events within a minute, large enough not to thrash
+	 * the DB when no work is pending.
+	 */
+	schedulerTickS: Config.integer("externalCalendarSchedulerTickS").pipe(
+		Config.withDefault(DEFAULT_EXTERNAL_TICK_S),
+	),
+	/**
+	 * Maximum number of URLs the scheduler will fetch in parallel per tick.
+	 * Each one is an outbound HTTP call + DB transaction per claim, so 4
+	 * gives reasonable throughput without overloading slow upstreams.
+	 */
+	fetchConcurrency: Config.integer("externalCalendarFetchConcurrency").pipe(
+		Config.withDefault(DEFAULT_EXTERNAL_CONCURRENCY),
+	),
+	/**
+	 * Soft DoS guard on claims-per-URL. New claim requests beyond this cap
+	 * are rejected by the create endpoint. Per-tenant deployments can leave
+	 * this generous; public-facing multi-tenant deployments may want it
+	 * lower.
+	 */
+	claimCap: Config.integer("externalCalendarClaimCap").pipe(
+		Config.withDefault(DEFAULT_EXTERNAL_CLAIM_CAP),
+	),
 });
 
 export const AppConfig = Config.all({
@@ -80,6 +131,7 @@ export const AppConfig = Config.all({
 	database: DatabaseConfig,
 	auth: AuthConfig,
 	log: LogConfig,
+	externalCalendar: ExternalCalendarConfig,
 	nodeEnv: Config.string("nodeEnv").pipe(Config.withDefault("production")),
 });
 

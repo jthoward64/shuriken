@@ -1,8 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import { Effect, Layer, Option } from "effect";
 import { DatabaseClient } from "#src/db/client.ts";
+import type { PrincipalId, UserId } from "#src/domain/ids.ts";
 import { RequestId } from "#src/domain/ids.ts";
-import { Unauthenticated } from "#src/domain/types/dav.ts";
+import { Authenticated } from "#src/domain/types/dav.ts";
 import {
 	HTTP_METHOD_NOT_ALLOWED,
 	HTTP_MOVED_PERMANENTLY,
@@ -23,6 +24,10 @@ import { ComponentRepository } from "#src/services/component/index.ts";
 import type { ComponentRepositoryShape } from "#src/services/component/repository.ts";
 import { EntityRepository } from "#src/services/entity/index.ts";
 import type { EntityRepositoryShape } from "#src/services/entity/repository.ts";
+import {
+	ExternalCalendarRepository,
+	type ExternalCalendarRepositoryShape,
+} from "#src/services/external-calendar/repository.ts";
 import { GroupRepository, GroupService } from "#src/services/group/index.ts";
 import type { GroupRepositoryShape } from "#src/services/group/repository.ts";
 import type { GroupServiceShape } from "#src/services/group/service.ts";
@@ -77,7 +82,16 @@ const makeCtx = (method: string, pathname: string) => ({
 	method,
 	url: new URL(`http://localhost${pathname}`),
 	headers: new Headers(),
-	auth: new Unauthenticated(),
+	// Default to authenticated so router-dispatch tests can verify routing logic.
+	// The central auth gate in davRouter would otherwise convert every non-OPTIONS
+	// request to 401, masking the actual dispatch behavior we're trying to test.
+	auth: new Authenticated({
+		principal: {
+			principalId: "00000000-0000-4000-8000-00000000fffe" as PrincipalId,
+			userId: "00000000-0000-4000-8000-00000000ffff" as UserId,
+			displayName: Option.some("Test"),
+		},
+	}),
 	clientIp: Option.none(),
 	caldavTimezones: null,
 });
@@ -340,7 +354,28 @@ const makeRouterLayer = (
 			listByCollection: () => Effect.succeed([]),
 		});
 
-	return Layer.mergeAll(
+	const base: Layer.Layer<
+		| PrincipalRepository
+		| CollectionRepository
+		| InstanceRepository
+		| CollectionService
+		| InstanceService
+		| PrincipalService
+		| EntityRepository
+		| ComponentRepository
+		| CalTimezoneRepository
+		| TombstoneRepository
+		| CalIndexRepository
+		| CardIndexRepository
+		| UserRepository
+		| GroupRepository
+		| UserService
+		| GroupService
+		| import("#src/services/acl/index.ts").AclService
+		| SchedulingService
+		| IanaTimezoneService
+		| DatabaseClient
+	> = Layer.mergeAll(
 		Layer.succeed(PrincipalRepository, principalRepo),
 		Layer.succeed(CollectionRepository, collectionRepo),
 		Layer.succeed(InstanceRepository, instanceRepo),
@@ -403,14 +438,36 @@ const makeRouterLayer = (
 		IanaTimezoneService.Default,
 		Layer.succeed(DatabaseClient, noOpDb),
 	);
+
+	// `Layer.mergeAll` widens output types but its tuple-overload arity caps
+	// around 18 layers — beyond that TS quietly drops the tail. Merge the
+	// subscription stub in a second step so the inferred output stays correct.
+	return Layer.merge(
+		base,
+		// Mutation handlers ask "is this collection a subscription?" via
+		// findClaimByCollection. Default to "no" so existing tests keep
+		// their semantics; specific subscription tests can override.
+		Layer.succeed(
+			ExternalCalendarRepository,
+			ExternalCalendarRepository.of(
+				stubService<ExternalCalendarRepositoryShape>({
+					findClaimByCollection: () => Effect.succeed(Option.none()),
+				}),
+			),
+		),
+	);
 };
 
 const run = (method: string, pathname: string, seeds?: RouterSeeds) => {
 	const req = new Request(`http://localhost${pathname}`, { method });
 	const ctx = makeCtx(method, pathname);
-	return Effect.runPromise(
-		davRouter(req, ctx).pipe(Effect.provide(makeRouterLayer(seeds))),
-	);
+	// `Layer.merge`'s output-type inference loses precision when the merged
+	// layers exceed the tuple-overload arity of `Layer.mergeAll` (around 18
+	// entries). The runtime is correct; we just need to tell TS what we know.
+	const provided = davRouter(req, ctx).pipe(
+		Effect.provide(makeRouterLayer(seeds)),
+	) as unknown as Effect.Effect<Response, unknown, never>;
+	return Effect.runPromise(provided);
 };
 
 const runPath = (pathname: string, seeds?: RouterSeeds) =>
