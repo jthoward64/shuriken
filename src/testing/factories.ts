@@ -97,6 +97,7 @@ export const makeCollectionRow = (
 	maxAttendeesPerInstance: null,
 	scheduleTransp: "opaque",
 	scheduleDefaultCalendarId: null,
+	autoManagedKind: null,
 	...overrides,
 });
 

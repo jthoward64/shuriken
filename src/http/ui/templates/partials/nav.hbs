@@ -16,3 +16,9 @@
     Subscriptions
   </a>
 {{/if}}
+{{#if showShared}}
+  <a href="/ui/shared"
+     class="text-sm {{#if (eq currentPath '/ui/shared')}}text-white font-medium{{else}}text-gray-300 hover:text-white{{/if}}">
+    Shared with me
+  </a>
+{{/if}}

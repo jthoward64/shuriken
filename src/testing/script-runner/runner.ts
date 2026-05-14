@@ -37,7 +37,7 @@ const DEFAULT_USER: ScriptUser = {
 // which is valid (trusted-proxy checks are skipped for basic auth anyway).
 // ---------------------------------------------------------------------------
 
-const mockServer = {
+export const mockServer = {
 	requestIP: (_req: Request) => null,
 } as unknown as import("bun").Server<unknown>;
 

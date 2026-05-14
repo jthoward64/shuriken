@@ -1,11 +1,16 @@
-import { and, eq, gt, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, notInArray, sql } from "drizzle-orm";
 import { Effect, Layer, Option } from "effect";
 import type { IrDeadProperties } from "#src/data/ir.ts";
 import { DatabaseClient } from "#src/db/client.ts";
-import { davInstance } from "#src/db/drizzle/schema/index.ts";
+import { davCollection, davInstance } from "#src/db/drizzle/schema/index.ts";
 import { runDbQuery } from "#src/db/query.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
-import type { CollectionId, EntityId, InstanceId } from "#src/domain/ids.ts";
+import type {
+	CollectionId,
+	EntityId,
+	InstanceId,
+	PrincipalId,
+} from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
 import type { ETag } from "#src/domain/types/strings.ts";
 import { InstanceRepository, type NewInstance } from "./repository.ts";
@@ -54,6 +59,52 @@ const findBySlug = Effect.fn("InstanceRepository.findBySlug")(
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.instance.findBySlug failed", e.cause),
+	),
+);
+
+const listSharedWithPrincipals = Effect.fn(
+	"InstanceRepository.listSharedWithPrincipals",
+)(
+	function* (
+		principalIds: ReadonlyArray<PrincipalId>,
+		privileges: ReadonlyArray<string>,
+	) {
+		yield* Effect.annotateCurrentSpan({
+			"caller.principals": principalIds.length,
+		});
+		if (principalIds.length === 0 || privileges.length === 0) {
+			return [];
+		}
+		return yield* runDbQuery((db) =>
+			db
+				.selectDistinct({ instance: davInstance })
+				.from(davInstance)
+				.innerJoin(
+					davCollection,
+					eq(davCollection.id, davInstance.collectionId),
+				)
+				.innerJoin(
+					sql`dav_acl`,
+					sql`dav_acl.resource_id = ${davInstance.id} AND dav_acl.resource_type = 'instance'`,
+				)
+				.where(
+					and(
+						isNull(davInstance.deletedAt),
+						isNull(davCollection.deletedAt),
+						notInArray(davCollection.ownerPrincipalId, [...principalIds]),
+						sql`dav_acl.principal_type = 'principal'`,
+						sql`dav_acl.grant_deny = 'grant'`,
+						inArray(sql`dav_acl.principal_id`, [...principalIds]),
+						inArray(sql`dav_acl.privilege`, [...privileges]),
+					),
+				),
+		).pipe(Effect.map((rows) => rows.map((r) => r.instance)));
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning(
+			"repo.instance.listSharedWithPrincipals failed",
+			e.cause,
+		),
 	),
 );
 
@@ -300,6 +351,9 @@ export const InstanceRepositoryLive = Layer.effect(
 				run(findById(...args)),
 			findBySlug: (...args: Parameters<typeof findBySlug>) =>
 				run(findBySlug(...args)),
+			listSharedWithPrincipals: (
+				...args: Parameters<typeof listSharedWithPrincipals>
+			) => run(listSharedWithPrincipals(...args)),
 			listByCollection: (...args: Parameters<typeof listByCollection>) =>
 				run(listByCollection(...args)),
 			findChangedSince: (...args: Parameters<typeof findChangedSince>) =>

@@ -109,6 +109,11 @@ export const davCollection = pgTable(
 		scheduleDefaultCalendarId: uuid(
 			"schedule_default_calendar_id",
 		).$type<UuidString>(),
+		// Marks server-managed derived calendars (e.g. "birthdays"). When set,
+		// handlers reject client-initiated mutations to the collection or its
+		// instances; the only writer is the corresponding generator service.
+		// Null on user-created collections.
+		autoManagedKind: text("auto_managed_kind"),
 	},
 	(table) => [
 		foreignKey({

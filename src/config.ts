@@ -94,6 +94,8 @@ export const LogConfig = Config.all({
 const DEFAULT_EXTERNAL_TICK_S = 60;
 const DEFAULT_EXTERNAL_CONCURRENCY = 4;
 const DEFAULT_EXTERNAL_CLAIM_CAP = 100;
+const DEFAULT_BIRTHDAY_TICK_S = 600;
+const DEFAULT_BIRTHDAY_CONCURRENCY = 4;
 
 export const ExternalCalendarConfig = Config.all({
 	/**
@@ -126,12 +128,29 @@ export const ExternalCalendarConfig = Config.all({
 	),
 });
 
+const BirthdayConfig = Config.all({
+	/**
+	 * Periodic-sweep cadence for BirthdayService. Idempotent + cheap (one
+	 * addressbook scan + diff per principal); default 10 min catches edits
+	 * even if write-side hooks miss them, without putting noticeable load on
+	 * the DB.
+	 */
+	schedulerTickS: Config.integer("birthdaySchedulerTickS").pipe(
+		Config.withDefault(DEFAULT_BIRTHDAY_TICK_S),
+	),
+	/** Max principals reconciled in parallel per tick. */
+	concurrency: Config.integer("birthdayConcurrency").pipe(
+		Config.withDefault(DEFAULT_BIRTHDAY_CONCURRENCY),
+	),
+});
+
 export const AppConfig = Config.all({
 	server: ServerConfig,
 	database: DatabaseConfig,
 	auth: AuthConfig,
 	log: LogConfig,
 	externalCalendar: ExternalCalendarConfig,
+	birthday: BirthdayConfig,
 	nodeEnv: Config.string("nodeEnv").pipe(Config.withDefault("production")),
 });
 

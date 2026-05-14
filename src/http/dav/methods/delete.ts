@@ -20,7 +20,10 @@ import {
 } from "#src/services/collection/index.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
 import type { EntityRepository } from "#src/services/entity/index.ts";
-import { isSubscribedCollection } from "#src/services/external-calendar/guards.ts";
+import {
+	isAutoManagedCollection,
+	isReadOnlyCollection,
+} from "#src/services/collection/read-only-guard.ts";
 import { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
 import {
 	type InstanceRepository,
@@ -73,7 +76,15 @@ export const deleteHandler = (
 		// unsubscribes) — only block instance-level deletes.
 		if (
 			path.kind === "instance" &&
-			(yield* isSubscribedCollection(path.collectionId))
+			(yield* isReadOnlyCollection(path.collectionId))
+		) {
+			return yield* forbidden("DAV:need-privileges");
+		}
+		// Auto-managed collections (e.g. birthdays) reject collection-level
+		// DELETE too — there's no "unsubscribe" semantics, the server owns it.
+		if (
+			path.kind === "collection" &&
+			(yield* isAutoManagedCollection(path.collectionId))
 		) {
 			return yield* forbidden("DAV:need-privileges");
 		}

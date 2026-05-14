@@ -20,6 +20,8 @@ import {
 	IanaTimezoneService,
 	TimezoneDomainLayer,
 } from "#src/services/timezone/index.ts";
+import { BirthdaySchedulerLayer } from "#src/services/birthday/scheduler.live.ts";
+import { BirthdayServiceLive } from "#src/services/birthday/service.live.ts";
 import { ExternalCalendarRepositoryLive } from "#src/services/external-calendar/repository.live.ts";
 import { ExternalCalendarSchedulerLayer } from "#src/services/external-calendar/scheduler.live.ts";
 import { SubscriptionServiceLive } from "#src/services/external-calendar/subscription.live.ts";
@@ -109,17 +111,23 @@ const BaseAppLayer = Layer.mergeAll(
 const ExternalCalendarSyncFull = ExternalCalendarSyncLayer.pipe(
 	Layer.provide(BaseAppLayer),
 );
+const BirthdayServiceFull = BirthdayServiceLive.pipe(
+	Layer.provide(BaseAppLayer),
+);
 
 export const AppLayer = Layer.mergeAll(
 	BaseAppLayer,
 	SchedulingDomainLayer.pipe(Layer.provide(BaseAppLayer)),
 	ExternalCalendarSyncFull,
 	SubscriptionServiceLive.pipe(Layer.provide(BaseAppLayer)),
-	// Background scheduler fiber — polls findDue + syncOne on its own schedule.
-	// Needs ExternalCalendarRepository (BaseAppLayer), ExternalCalendarSyncService
-	// (ExternalCalendarSyncFull), and AppConfigService (InfraLayer in BaseAppLayer).
+	BirthdayServiceFull,
 	ExternalCalendarSchedulerLayer.pipe(
 		Layer.provide(Layer.mergeAll(BaseAppLayer, ExternalCalendarSyncFull)),
+	),
+	// Birthday sweep fiber — periodic full reconcile of every auto-managed
+	// "birthdays" collection from the principal's vCards.
+	BirthdaySchedulerLayer.pipe(
+		Layer.provide(Layer.mergeAll(BaseAppLayer, BirthdayServiceFull)),
 	),
 );
 
@@ -174,6 +182,7 @@ export {
 	ExternalCalendarRepository,
 	type ExternalCalendarRow,
 } from "#src/services/external-calendar/repository.ts";
+export { BirthdayService } from "#src/services/birthday/service.ts";
 export { SubscriptionService } from "#src/services/external-calendar/subscription.ts";
 export { ExternalCalendarSyncService } from "#src/services/external-calendar/sync.ts";
 export {

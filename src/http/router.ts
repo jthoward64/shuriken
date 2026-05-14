@@ -34,6 +34,7 @@ import {
 } from "#src/observability/metrics.ts";
 import type { BunFileService } from "#src/platform/file.ts";
 import type { AclService } from "#src/services/acl/index.ts";
+import type { AclRepository } from "#src/services/acl/repository.ts";
 import type { CalIndexRepository } from "#src/services/cal-index/index.ts";
 import type { CardIndexRepository } from "#src/services/card-index/index.ts";
 import type { CollectionService } from "#src/services/collection/index.ts";
@@ -87,6 +88,7 @@ type AppServices =
 	| TemplateService
 	| ProvisioningService
 	| ExternalCalendarRepository
+	| AclRepository
 	| SubscriptionService;
 
 const isDavPath = (pathname: string): boolean =>

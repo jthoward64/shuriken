@@ -22,7 +22,7 @@ import {
 } from "#src/http/status.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import { EntityRepository } from "#src/services/entity/index.ts";
-import { isSubscribedCollection } from "#src/services/external-calendar/guards.ts";
+import { isReadOnlyCollection } from "#src/services/collection/read-only-guard.ts";
 import {
 	CollectionRepository,
 	CollectionService,
@@ -115,10 +115,10 @@ const moveInstance = (
 		// Read-only: subscribed collections own their event set. Block both
 		// MOVE-from (we'd be deleting a synced event) and MOVE-into (we'd be
 		// adding a foreign event that the next sync would remove).
-		if (yield* isSubscribedCollection(path.collectionId)) {
+		if (yield* isReadOnlyCollection(path.collectionId)) {
 			return yield* forbidden("DAV:need-privileges");
 		}
-		if (yield* isSubscribedCollection(destPath.collectionId)) {
+		if (yield* isReadOnlyCollection(destPath.collectionId)) {
 			return yield* forbidden("DAV:need-privileges");
 		}
 

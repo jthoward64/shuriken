@@ -14,6 +14,7 @@ import {
 } from "#src/layers.ts";
 import { BunFileService } from "#src/platform/file.ts";
 import { AclService } from "#src/services/acl/index.ts";
+import { AclRepository as AclRepoTag } from "#src/services/acl/repository.ts";
 import { CalIndexRepository } from "#src/services/cal-index/index.ts";
 import { CardIndexRepository } from "#src/services/card-index/index.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
@@ -87,6 +88,8 @@ const stubLayers = Layer.mergeAll(
 		findById: die,
 		findBySlug: die,
 		listByOwner: die,
+		listByAutoManagedKind: die,
+		listSharedWithPrincipals: die,
 		insert: die,
 		softDelete: die,
 		relocate: die,
@@ -96,6 +99,7 @@ const stubLayers = Layer.mergeAll(
 		findById: die,
 		findBySlug: die,
 		listByCollection: die,
+		listSharedWithPrincipals: die,
 		findChangedSince: die,
 		findByIds: die,
 		insert: die,
@@ -162,6 +166,7 @@ const stubLayers = Layer.mergeAll(
 	}),
 	Layer.succeed(CardIndexRepository, {
 		findByText: die,
+		listWithBday: die,
 	}),
 	Layer.succeed(UserRepository, {
 		findById: die,
@@ -239,6 +244,7 @@ const stubLayers = Layer.mergeAll(
 		},
 		log: { level: undefined },
 		externalCalendar: { schedulerTickS: 60, fetchConcurrency: 4, claimCap: 100 },
+		birthday: { schedulerTickS: 600, concurrency: 4 },
 		nodeEnv: "test",
 	} as unknown as AppConfigService),
 	Layer.succeed(BunFileService, {
@@ -279,6 +285,16 @@ const stubLayers = Layer.mergeAll(
 	Layer.succeed(SubscriptionService, {
 		subscribe: die,
 		unsubscribe: die,
+	}),
+	Layer.succeed(AclRepoTag, {
+		getAces: die,
+		setAces: die,
+		grantAce: die,
+		hasPrivilege: die,
+		getGrantedPrivileges: die,
+		getGroupPrincipalIds: () => Effect.succeed([]),
+		batchGetGrantedPrivileges: die,
+		getResourceParent: die,
 	}),
 );
 

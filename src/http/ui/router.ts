@@ -8,6 +8,7 @@ import type {
 } from "#src/domain/errors.ts";
 import {
 	CollectionId,
+	InstanceId,
 	isUuid,
 	PrincipalId,
 	type UuidString,
@@ -40,6 +41,8 @@ import { usersUpdateHandler } from "#src/http/ui/api/users/update.ts";
 import { subscriptionsCreateHandler } from "#src/http/ui/api/subscriptions/create.ts";
 import { subscriptionsDeleteHandler } from "#src/http/ui/api/subscriptions/delete.ts";
 import { collectionsEditHandler } from "#src/http/ui/handlers/collections/edit.ts";
+import { instanceAclHandler } from "#src/http/ui/handlers/instances/acl.ts";
+import { sharedWithMeHandler } from "#src/http/ui/handlers/shared/index.ts";
 import { subscriptionsListHandler } from "#src/http/ui/handlers/subscriptions/list.ts";
 import { subscriptionsNewHandler } from "#src/http/ui/handlers/subscriptions/new.ts";
 import { groupsCollectionsNewHandler } from "#src/http/ui/handlers/groups/collections-new.ts";
@@ -53,8 +56,12 @@ import { usersListHandler } from "#src/http/ui/handlers/users/list.ts";
 import { usersNewHandler } from "#src/http/ui/handlers/users/new.ts";
 import type { BunFileService } from "#src/platform/file.ts";
 import type { AclService } from "#src/services/acl/index.ts";
+import type { AclRepository } from "#src/services/acl/repository.ts";
 import type { CollectionService } from "#src/services/collection/index.ts";
+import type { CollectionRepository } from "#src/services/collection/repository.ts";
 import type { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
+import type { InstanceService } from "#src/services/instance/index.ts";
+import type { InstanceRepository } from "#src/services/instance/repository.ts";
 import type { SubscriptionService } from "#src/services/external-calendar/subscription.ts";
 import type { GroupService } from "#src/services/group/index.ts";
 import type { PrincipalService } from "#src/services/principal/index.ts";
@@ -71,11 +78,15 @@ import type { TemplateService } from "./template/index.ts";
 
 export type UiServices =
 	| AppConfigService
+	| AclRepository
 	| AclService
 	| BunFileService
+	| CollectionRepository
 	| CollectionService
 	| ExternalCalendarRepository
 	| GroupService
+	| InstanceRepository
+	| InstanceService
 	| SubscriptionService
 	| PrincipalRepository
 	| PrincipalService
@@ -307,6 +318,23 @@ export const uiRouter = (
 		}
 	}
 
+	// Shared-with-me landing
+	if (seg0 === "shared" && method === "GET" && !seg1) {
+		return handle(sharedWithMeHandler(req, ctx));
+	}
+
+	// Per-instance ACL editor
+	if (
+		seg0 === "instances" &&
+		seg1 &&
+		isUuid(seg1) &&
+		seg2 === "acl" &&
+		!seg3 &&
+		method === "GET"
+	) {
+		return handle(instanceAclHandler(req, ctx, InstanceId(seg1)));
+	}
+
 	// Subscriptions (GET pages)
 	if (seg0 === "subscriptions" && method === "GET") {
 		if (!seg1) {
@@ -321,7 +349,10 @@ export const uiRouter = (
 	if (seg0 === "api" && method === "POST") {
 		if (
 			seg1 === "acl" &&
-			(seg2 === "principal" || seg2 === "collection" || seg2 === "virtual") &&
+			(seg2 === "principal" ||
+				seg2 === "collection" ||
+				seg2 === "instance" ||
+				seg2 === "virtual") &&
 			seg3 &&
 			isUuid(seg3) &&
 			(seg4 === "grant" || seg4 === "revoke")
@@ -331,7 +362,9 @@ export const uiRouter = (
 					? PrincipalId(seg3)
 					: seg2 === "collection"
 						? CollectionId(seg3)
-						: VirtualResourceId(seg3);
+						: seg2 === "instance"
+							? InstanceId(seg3)
+							: VirtualResourceId(seg3);
 			if (seg4 === "grant") {
 				return handle(aclGrantHandler(req, ctx, seg2, resourceId));
 			}

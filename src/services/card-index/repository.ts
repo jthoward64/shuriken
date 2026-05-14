@@ -1,7 +1,7 @@
 import type { Effect } from "effect";
 import { Context } from "effect";
 import type { DatabaseError } from "#src/domain/errors.ts";
-import type { CollectionId } from "#src/domain/ids.ts";
+import type { CollectionId, EntityId } from "#src/domain/ids.ts";
 
 // ---------------------------------------------------------------------------
 // CardIndexRepository — data access for card_index rows
@@ -39,6 +39,24 @@ export interface CardIndexRepositoryShape {
 		collation: CardCollation,
 		matchType: CardMatchType,
 	) => Effect.Effect<ReadonlyArray<string>, DatabaseError>;
+
+	/**
+	 * Return every card in `collectionId` that has a non-empty BDAY value, joined
+	 * via the live dav_instance row so the caller gets stable identity (entityId
+	 * + uid + fn + normalized bday). Used by BirthdayService to regenerate the
+	 * derived "Birthdays" calendar.
+	 */
+	readonly listWithBday: (
+		collectionId: CollectionId,
+	) => Effect.Effect<
+		ReadonlyArray<{
+			readonly entityId: EntityId;
+			readonly uid: string;
+			readonly fn: string;
+			readonly bday: string;
+		}>,
+		DatabaseError
+	>;
 }
 
 export class CardIndexRepository extends Context.Tag("CardIndexRepository")<

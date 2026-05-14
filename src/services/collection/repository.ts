@@ -28,6 +28,8 @@ export interface NewCollection {
 	readonly timezoneTzid?: string;
 	readonly supportedComponents?: Array<string>;
 	readonly parentCollectionId?: CollectionId;
+	/** Marks the collection as server-managed (e.g. "birthdays"); see schema. */
+	readonly autoManagedKind?: string;
 }
 
 export interface CollectionPropertyChanges {
@@ -55,6 +57,26 @@ export interface CollectionRepositoryShape {
 	) => Effect.Effect<Option.Option<CollectionRow>, DatabaseError>;
 	readonly listByOwner: (
 		ownerPrincipalId: PrincipalId,
+	) => Effect.Effect<ReadonlyArray<CollectionRow>, DatabaseError>;
+	/**
+	 * List every active collection whose `auto_managed_kind` matches. Used by
+	 * the corresponding generator's scheduler tick — e.g. BirthdayService asks
+	 * for `kind = "birthdays"` to know which collections to reconcile.
+	 */
+	readonly listByAutoManagedKind: (
+		kind: string,
+	) => Effect.Effect<ReadonlyArray<CollectionRow>, DatabaseError>;
+	/**
+	 * Collections the given principal-set has a direct grant on but does NOT
+	 * own. Used by the "Shared with me" UI section. `principalIds` should be
+	 * the caller's own principal id plus the principal ids of every group
+	 * they belong to so group-granted shares are also returned. `privileges`
+	 * is the set of acceptable DAV privileges — any matching ACE qualifies
+	 * the collection.
+	 */
+	readonly listSharedWithPrincipals: (
+		principalIds: ReadonlyArray<PrincipalId>,
+		privileges: ReadonlyArray<string>,
 	) => Effect.Effect<ReadonlyArray<CollectionRow>, DatabaseError>;
 	readonly insert: (
 		input: NewCollection,

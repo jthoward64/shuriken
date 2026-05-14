@@ -10,6 +10,7 @@ import { CalIndexRepositoryLive } from "#src/services/cal-index/index.ts";
 import { CardIndexRepositoryLive } from "#src/services/card-index/index.ts";
 import { CollectionDomainLayer } from "#src/services/collection/index.ts";
 import { DomainEntityDomainLayer } from "#src/services/domain-entity/index.ts";
+import { BirthdayServiceLive } from "#src/services/birthday/service.live.ts";
 import { ExternalCalendarRepositoryLive } from "#src/services/external-calendar/repository.live.ts";
 import { SubscriptionServiceLive } from "#src/services/external-calendar/subscription.live.ts";
 import { GroupDomainLayer } from "#src/services/group/index.ts";
@@ -52,6 +53,10 @@ const testConfig: AppConfigType = {
 		schedulerTickS: 60,
 		fetchConcurrency: 4,
 		claimCap: 100,
+	},
+	birthday: {
+		schedulerTickS: 600,
+		concurrency: 4,
 	},
 	nodeEnv: "test",
 };
@@ -130,6 +135,7 @@ export const makeScriptRunnerLayer = () => {
 		testBaseLayer,
 		SchedulingDomainLayer.pipe(Layer.provide(testBaseLayer)),
 		SubscriptionServiceLive.pipe(Layer.provide(testBaseLayer)),
+		BirthdayServiceLive.pipe(Layer.provide(testBaseLayer)),
 		testStubsLayer,
 	);
 };

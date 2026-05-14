@@ -28,6 +28,7 @@ import {
 import type { AclService } from "#src/services/acl/index.ts";
 import type { CalIndexRepository } from "#src/services/cal-index/index.ts";
 import type { CollectionService } from "#src/services/collection/index.ts";
+import type { CollectionRepository } from "#src/services/collection/repository.ts";
 import type { ComponentRepository } from "#src/services/component/index.ts";
 import type { EntityRepository } from "#src/services/entity/index.ts";
 import type { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
@@ -186,6 +187,7 @@ type PutEffect<A> = Effect.Effect<
 	| EntityRepository
 	| CalTimezoneRepository
 	| CalIndexRepository
+	| CollectionRepository
 	| CollectionService
 	| ExternalCalendarRepository
 	| SchedulingService
@@ -200,6 +202,7 @@ type PutFailEffect = Effect.Effect<
 	| EntityRepository
 	| CalTimezoneRepository
 	| CalIndexRepository
+	| CollectionRepository
 	| CollectionService
 	| ExternalCalendarRepository
 	| SchedulingService

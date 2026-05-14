@@ -8,10 +8,14 @@ import { HTTP_NOT_FOUND } from "#src/http/status.ts";
 import { TemplateService } from "#src/http/ui/template/index.ts";
 import { BunFileService } from "#src/platform/file.ts";
 import { AclService } from "#src/services/acl/index.ts";
+import { AclRepository } from "#src/services/acl/repository.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
+import { CollectionRepository as CollectionRepoTag } from "#src/services/collection/repository.ts";
 import { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
 import { SubscriptionService } from "#src/services/external-calendar/subscription.ts";
 import { GroupService } from "#src/services/group/index.ts";
+import { InstanceService } from "#src/services/instance/index.ts";
+import { InstanceRepository as InstanceRepoTag } from "#src/services/instance/repository.ts";
 import { PrincipalService } from "#src/services/principal/index.ts";
 import { PrincipalRepository } from "#src/services/principal/repository.ts";
 import { ProvisioningService } from "#src/services/provisioning/service.ts";
@@ -153,6 +157,48 @@ const stubLayers = Layer.mergeAll(
 	Layer.succeed(SubscriptionService, {
 		subscribe: die,
 		unsubscribe: die,
+	}),
+	Layer.succeed(AclRepository, {
+		getAces: die,
+		setAces: die,
+		grantAce: die,
+		hasPrivilege: die,
+		getGrantedPrivileges: die,
+		getGroupPrincipalIds: () => Effect.succeed([]),
+		batchGetGrantedPrivileges: die,
+		getResourceParent: die,
+	}),
+	Layer.succeed(CollectionRepoTag, {
+		findById: die,
+		findBySlug: die,
+		listByOwner: die,
+		listByAutoManagedKind: die,
+		listSharedWithPrincipals: () => Effect.succeed([]),
+		insert: die,
+		softDelete: die,
+		relocate: die,
+		updateProperties: die,
+	}),
+	Layer.succeed(InstanceRepoTag, {
+		findById: die,
+		findBySlug: die,
+		listByCollection: die,
+		listSharedWithPrincipals: () => Effect.succeed([]),
+		findChangedSince: die,
+		findByIds: die,
+		insert: die,
+		updateEtag: die,
+		softDelete: die,
+		relocate: die,
+		updateClientProperties: die,
+	}),
+	Layer.succeed(InstanceService, {
+		findById: die,
+		findBySlug: die,
+		listByCollection: die,
+		put: die,
+		delete: die,
+		updateClientProperties: die,
 	}),
 );
 

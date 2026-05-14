@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, notInArray, sql } from "drizzle-orm";
 import { Effect, Layer, Option } from "effect";
 import { DatabaseClient } from "#src/db/client.ts";
 import {
@@ -93,6 +93,76 @@ const listByOwner = Effect.fn("CollectionRepository.listByOwner")(
 	),
 );
 
+const listByAutoManagedKind = Effect.fn(
+	"CollectionRepository.listByAutoManagedKind",
+)(
+	function* (kind: string) {
+		yield* Effect.annotateCurrentSpan({ "collection.auto_managed_kind": kind });
+		return yield* runDbQuery((db) =>
+			db
+				.select()
+				.from(davCollection)
+				.where(
+					and(
+						eq(davCollection.autoManagedKind, kind),
+						isNull(davCollection.deletedAt),
+					),
+				),
+		);
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning(
+			"repo.collection.listByAutoManagedKind failed",
+			e.cause,
+		),
+	),
+);
+
+const listSharedWithPrincipals = Effect.fn(
+	"CollectionRepository.listSharedWithPrincipals",
+)(
+	function* (
+		principalIds: ReadonlyArray<PrincipalId>,
+		privileges: ReadonlyArray<string>,
+	) {
+		yield* Effect.annotateCurrentSpan({
+			"caller.principals": principalIds.length,
+		});
+		if (principalIds.length === 0 || privileges.length === 0) {
+			return [];
+		}
+		// dav_acl is polymorphic on (resource_type, resource_id); inline-join to
+		// dav_collection keeps the query single-pass. The `notInArray(owner...)`
+		// excludes the caller's own collections — sharing-discovery only shows
+		// other people's resources.
+		return yield* runDbQuery((db) =>
+			db
+				.selectDistinct({ collection: davCollection })
+				.from(davCollection)
+				.innerJoin(
+					sql`dav_acl`,
+					sql`dav_acl.resource_id = ${davCollection.id} AND dav_acl.resource_type = 'collection'`,
+				)
+				.where(
+					and(
+						isNull(davCollection.deletedAt),
+						notInArray(davCollection.ownerPrincipalId, [...principalIds]),
+						sql`dav_acl.principal_type = 'principal'`,
+						sql`dav_acl.grant_deny = 'grant'`,
+						inArray(sql`dav_acl.principal_id`, [...principalIds]),
+						inArray(sql`dav_acl.privilege`, [...privileges]),
+					),
+				),
+		).pipe(Effect.map((rows) => rows.map((r) => r.collection)));
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning(
+			"repo.collection.listSharedWithPrincipals failed",
+			e.cause,
+		),
+	),
+);
+
 const insert = Effect.fn("CollectionRepository.insert")(
 	function* (input: NewCollection) {
 		yield* Effect.annotateCurrentSpan({
@@ -116,6 +186,7 @@ const insert = Effect.fn("CollectionRepository.insert")(
 					timezoneTzid: input.timezoneTzid,
 					supportedComponents: input.supportedComponents,
 					parentCollectionId: input.parentCollectionId,
+					autoManagedKind: input.autoManagedKind,
 				})
 				.returning(),
 		).pipe(
@@ -273,6 +344,12 @@ export const CollectionRepositoryLive = Layer.effect(
 				run(findBySlug(...args)),
 			listByOwner: (...args: Parameters<typeof listByOwner>) =>
 				run(listByOwner(...args)),
+			listByAutoManagedKind: (
+				...args: Parameters<typeof listByAutoManagedKind>
+			) => run(listByAutoManagedKind(...args)),
+			listSharedWithPrincipals: (
+				...args: Parameters<typeof listSharedWithPrincipals>
+			) => run(listSharedWithPrincipals(...args)),
 			insert: (...args: Parameters<typeof insert>) => run(insert(...args)),
 			softDelete: (...args: Parameters<typeof softDelete>) =>
 				run(softDelete(...args)),

@@ -31,10 +31,11 @@ import { HTTP_CREATED, HTTP_NO_CONTENT } from "#src/http/status.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import { CalIndexRepository } from "#src/services/cal-index/index.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
+import type { CollectionRepository } from "#src/services/collection/repository.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
 import { EntityRepository } from "#src/services/entity/index.ts";
 import { InstanceService } from "#src/services/instance/index.ts";
-import { isSubscribedCollection } from "#src/services/external-calendar/guards.ts";
+import { isReadOnlyCollection } from "#src/services/collection/read-only-guard.ts";
 import type { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
 import { SchedulingService } from "#src/services/scheduling/index.ts";
 import { CalTimezoneRepository } from "#src/services/timezone/index.ts";
@@ -57,6 +58,7 @@ export const putHandler = (
 	| CalTimezoneRepository
 	| AclService
 	| CalIndexRepository
+	| CollectionRepository
 	| CollectionService
 	| ExternalCalendarRepository
 	| SchedulingService
@@ -94,7 +96,7 @@ export const putHandler = (
 		// precondition for this, but `<DAV:need-privileges>` is the conventional
 		// signal that the principal lacks `DAV:write-content` on the resource —
 		// which is effectively what's happening here.
-		if (yield* isSubscribedCollection(path.collectionId)) {
+		if (yield* isReadOnlyCollection(path.collectionId)) {
 			return yield* forbidden("DAV:need-privileges");
 		}
 

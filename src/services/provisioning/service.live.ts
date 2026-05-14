@@ -77,6 +77,19 @@ export const ProvisioningServiceLive = Layer.effect(
 							displayName: "Scheduling Outbox",
 						});
 
+						// Server-managed Birthdays calendar. Marked auto-managed
+						// so DAV mutations are rejected; the BirthdayService
+						// scheduler regenerates its contents from BDAY props on
+						// the user's vCards.
+						yield* collections.create({
+							ownerPrincipalId: principalId,
+							collectionType: "calendar",
+							slug: Slug("birthdays"),
+							displayName: "Birthdays",
+							supportedComponents: ["VEVENT"],
+							autoManagedKind: "birthdays",
+						});
+
 						// Grant the owner full access to their own principal resource.
 						// This is the root of the ACL inheritance hierarchy; all collection
 						// and instance ACEs inherit from the owner principal's ACL.

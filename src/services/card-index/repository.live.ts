@@ -3,7 +3,7 @@ import { Effect, Layer } from "effect";
 import { DatabaseClient } from "#src/db/client.ts";
 import { cardIndex, davInstance } from "#src/db/drizzle/schema/index.ts";
 import { runDbQuery } from "#src/db/query.ts";
-import type { CollectionId } from "#src/domain/ids.ts";
+import type { CollectionId, EntityId } from "#src/domain/ids.ts";
 import {
 	type CardCollation,
 	type CardIndexField,
@@ -133,6 +133,47 @@ const findByText = Effect.fn("CardIndexRepository.findByText")(
 	),
 );
 
+const listWithBday = Effect.fn("CardIndexRepository.listWithBday")(
+	function* (collectionId: CollectionId) {
+		yield* Effect.annotateCurrentSpan({ "collection.id": collectionId });
+		const rows = yield* runDbQuery((db) =>
+			db
+				.selectDistinctOn([cardIndex.entityId], {
+					entityId: cardIndex.entityId,
+					uid: cardIndex.uid,
+					fn: cardIndex.fn,
+					bday: sql<string>`${cardIndex.data}->>'bday'`,
+				})
+				.from(cardIndex)
+				.innerJoin(
+					davInstance,
+					and(
+						eq(davInstance.entityId, cardIndex.entityId),
+						eq(davInstance.collectionId, collectionId),
+						isNull(davInstance.deletedAt),
+					),
+				)
+				.where(
+					and(
+						isNull(cardIndex.deletedAt),
+						sql`${cardIndex.data}->>'bday' IS NOT NULL`,
+					),
+				),
+		);
+		return rows
+			.filter((r) => r.uid !== null && r.fn !== null && r.bday !== null)
+			.map((r) => ({
+				entityId: r.entityId as EntityId,
+				uid: r.uid as string,
+				fn: r.fn as string,
+				bday: r.bday,
+			}));
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.card-index.listWithBday failed", e.cause),
+	),
+);
+
 export const CardIndexRepositoryLive = Layer.effect(
 	CardIndexRepository,
 	Effect.gen(function* () {
@@ -143,6 +184,8 @@ export const CardIndexRepositoryLive = Layer.effect(
 		return CardIndexRepository.of({
 			findByText: (...args: Parameters<typeof findByText>) =>
 				run(findByText(...args)),
+			listWithBday: (...args: Parameters<typeof listWithBday>) =>
+				run(listWithBday(...args)),
 		});
 	}),
 );

@@ -562,6 +562,33 @@ const makeCollectionRepo = (stores: TestStores): CollectionRepositoryShape => ({
 			),
 		),
 
+	listByAutoManagedKind: (kind) =>
+		Effect.succeed(
+			[...stores.collections.values()].filter(
+				(c) => c.autoManagedKind === kind && c.deletedAt === null,
+			),
+		),
+
+	listSharedWithPrincipals: (principalIds, privileges) => {
+		const idSet = new Set<string>(principalIds);
+		const privSet = new Set<string>(privileges);
+		const collections = [...stores.collections.values()].filter(
+			(c) => c.deletedAt === null && !idSet.has(c.ownerPrincipalId),
+		);
+		const matching = collections.filter((c) =>
+			(stores.acl.get(c.id) ?? []).some(
+				(a) =>
+					a.resourceType === "collection" &&
+					a.principalType === "principal" &&
+					a.grantDeny === "grant" &&
+					a.principalId !== null &&
+					idSet.has(a.principalId) &&
+					privSet.has(a.privilege),
+			),
+		);
+		return Effect.succeed(matching);
+	},
+
 	insert: (input: NewCollection) =>
 		Effect.sync(() => {
 			const now = Temporal.Now.instant();
@@ -586,6 +613,7 @@ const makeCollectionRepo = (stores: TestStores): CollectionRepositoryShape => ({
 				maxAttendeesPerInstance: null,
 				scheduleTransp: "opaque",
 				scheduleDefaultCalendarId: null,
+				autoManagedKind: input.autoManagedKind ?? null,
 			};
 			stores.collections.set(row.id, row);
 			return row;
@@ -669,6 +697,33 @@ const makeInstanceRepo = (stores: TestStores): InstanceRepositoryShape => ({
 				(i) => i.collectionId === collectionId && i.deletedAt === null,
 			),
 		),
+
+	listSharedWithPrincipals: (principalIds, privileges) => {
+		const idSet = new Set<string>(principalIds);
+		const privSet = new Set<string>(privileges);
+		const matching = [...stores.instances.values()].filter((i) => {
+			if (i.deletedAt !== null) {
+				return false;
+			}
+			const coll = stores.collections.get(i.collectionId);
+			if (!coll || coll.deletedAt !== null) {
+				return false;
+			}
+			if (idSet.has(coll.ownerPrincipalId)) {
+				return false;
+			}
+			return (stores.acl.get(i.id) ?? []).some(
+				(a) =>
+					a.resourceType === "instance" &&
+					a.principalType === "principal" &&
+					a.grantDeny === "grant" &&
+					a.principalId !== null &&
+					idSet.has(a.principalId) &&
+					privSet.has(a.privilege),
+			);
+		});
+		return Effect.succeed(matching);
+	},
 
 	findChangedSince: (collectionId, sinceSyncRevision) =>
 		Effect.succeed(
@@ -1294,6 +1349,7 @@ export interface TestEnvBuilder {
 		| PrincipalService
 		| AclService
 		| AclRepository
+		| CollectionRepository
 		| PrincipalRepository
 		| CryptoService
 		| EntityRepository
@@ -1377,6 +1433,7 @@ export const makeTestEnv = (): TestEnvBuilder => {
 				maxAttendeesPerInstance: null,
 				scheduleTransp: "opaque",
 				scheduleDefaultCalendarId: null,
+				autoManagedKind: null,
 			});
 			return self;
 		},
@@ -1570,6 +1627,7 @@ export const makeTestEnv = (): TestEnvBuilder => {
 				groupServiceLayer,
 				aclServiceLayer,
 				aclRepoLayer,
+				collectionRepoLayer,
 				principalRepoLayer,
 				entityRepoLayer,
 				externalCalendarRepoLayer,

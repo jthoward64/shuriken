@@ -4,7 +4,12 @@ import { Context } from "effect";
 import type { IrDeadProperties } from "#src/data/ir.ts";
 import type { ContentType, davInstance } from "#src/db/drizzle/schema/index.ts";
 import type { DatabaseError } from "#src/domain/errors.ts";
-import type { CollectionId, EntityId, InstanceId } from "#src/domain/ids.ts";
+import type {
+	CollectionId,
+	EntityId,
+	InstanceId,
+	PrincipalId,
+} from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
 import type { ETag } from "#src/domain/types/strings.ts";
 
@@ -66,6 +71,17 @@ export interface InstanceRepositoryShape {
 		id: InstanceId,
 		clientProperties: IrDeadProperties,
 	) => Effect.Effect<InstanceRow, DatabaseError>;
+	/**
+	 * Instances the principal-set has a direct grant on but whose parent
+	 * collection they do NOT own. The companion of
+	 * `CollectionRepository.listSharedWithPrincipals` for individual events
+	 * shared without sharing the whole calendar — see
+	 * `services/sharing/...` for the higher-level use site.
+	 */
+	readonly listSharedWithPrincipals: (
+		principalIds: ReadonlyArray<PrincipalId>,
+		privileges: ReadonlyArray<string>,
+	) => Effect.Effect<ReadonlyArray<InstanceRow>, DatabaseError>;
 }
 
 export class InstanceRepository extends Context.Tag("InstanceRepository")<

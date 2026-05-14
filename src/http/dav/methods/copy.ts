@@ -31,7 +31,7 @@ import {
 } from "#src/http/status.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
-import { isSubscribedCollection } from "#src/services/external-calendar/guards.ts";
+import { isReadOnlyCollection } from "#src/services/collection/read-only-guard.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
 import { EntityRepository } from "#src/services/entity/index.ts";
 import {
@@ -125,7 +125,7 @@ const copyInstance = (
 
 		// Subscribed collections are read-only — block COPY-into. COPY-from
 		// is fine: it produces a new resource elsewhere, leaves the source feed alone.
-		if (yield* isSubscribedCollection(destPath.collectionId)) {
+		if (yield* isReadOnlyCollection(destPath.collectionId)) {
 			return yield* forbidden("DAV:need-privileges");
 		}
 

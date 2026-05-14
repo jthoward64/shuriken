@@ -14,6 +14,10 @@ export { AclService } from "./service.ts";
 // Requires: DatabaseClient (provided by InfraLayer in layers.ts)
 // ---------------------------------------------------------------------------
 
-export const AclDomainLayer = AclServiceLive.pipe(
-	Layer.provide(AclRepositoryLive),
+// Merging the repo lets handlers (e.g. the "shared with me" page) reach
+// AclRepository directly for cheap lookups like getGroupPrincipalIds without
+// going through the service tag.
+export const AclDomainLayer = Layer.mergeAll(
+	AclServiceLive.pipe(Layer.provide(AclRepositoryLive)),
+	AclRepositoryLive,
 );
