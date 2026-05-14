@@ -9,6 +9,9 @@ import { TemplateService } from "#src/http/ui/template/index.ts";
 import { BunFileService } from "#src/platform/file.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import { AclRepository } from "#src/services/acl/repository.ts";
+import { CardEditService } from "#src/services/card-edit/service.ts";
+import { CardIndexRepository } from "#src/services/card-index/repository.ts";
+import { ComponentRepository } from "#src/services/component/index.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
 import { CollectionRepository as CollectionRepoTag } from "#src/services/collection/repository.ts";
 import { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
@@ -199,6 +202,20 @@ const stubLayers = Layer.mergeAll(
 		put: die,
 		delete: die,
 		updateClientProperties: die,
+	}),
+	Layer.succeed(CardIndexRepository, {
+		findByText: () => Effect.succeed([]),
+		listWithBday: () => Effect.succeed([]),
+	}),
+	Layer.succeed(ComponentRepository, {
+		insertTree: die,
+		loadTree: () => Effect.succeed(Option.none()),
+		deleteByEntity: die,
+	}),
+	Layer.succeed(CardEditService, {
+		create: die,
+		update: die,
+		delete: die,
 	}),
 );
 

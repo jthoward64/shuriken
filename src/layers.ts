@@ -22,6 +22,7 @@ import {
 } from "#src/services/timezone/index.ts";
 import { BirthdaySchedulerLayer } from "#src/services/birthday/scheduler.live.ts";
 import { BirthdayServiceLive } from "#src/services/birthday/service.live.ts";
+import { CardEditServiceLive } from "#src/services/card-edit/service.live.ts";
 import { ExternalCalendarRepositoryLive } from "#src/services/external-calendar/repository.live.ts";
 import { ExternalCalendarSchedulerLayer } from "#src/services/external-calendar/scheduler.live.ts";
 import { SubscriptionServiceLive } from "#src/services/external-calendar/subscription.live.ts";
@@ -120,6 +121,7 @@ export const AppLayer = Layer.mergeAll(
 	SchedulingDomainLayer.pipe(Layer.provide(BaseAppLayer)),
 	ExternalCalendarSyncFull,
 	SubscriptionServiceLive.pipe(Layer.provide(BaseAppLayer)),
+	CardEditServiceLive.pipe(Layer.provide(BaseAppLayer)),
 	BirthdayServiceFull,
 	ExternalCalendarSchedulerLayer.pipe(
 		Layer.provide(Layer.mergeAll(BaseAppLayer, ExternalCalendarSyncFull)),
@@ -183,6 +185,7 @@ export {
 	type ExternalCalendarRow,
 } from "#src/services/external-calendar/repository.ts";
 export { BirthdayService } from "#src/services/birthday/service.ts";
+export { CardEditService } from "#src/services/card-edit/service.ts";
 export { SubscriptionService } from "#src/services/external-calendar/subscription.ts";
 export { ExternalCalendarSyncService } from "#src/services/external-calendar/sync.ts";
 export {

@@ -15,6 +15,7 @@ import {
 import { BunFileService } from "#src/platform/file.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import { AclRepository as AclRepoTag } from "#src/services/acl/repository.ts";
+import { CardEditService } from "#src/services/card-edit/service.ts";
 import { CalIndexRepository } from "#src/services/cal-index/index.ts";
 import { CardIndexRepository } from "#src/services/card-index/index.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
@@ -295,6 +296,11 @@ const stubLayers = Layer.mergeAll(
 		getGroupPrincipalIds: () => Effect.succeed([]),
 		batchGetGrantedPrivileges: die,
 		getResourceParent: die,
+	}),
+	Layer.succeed(CardEditService, {
+		create: die,
+		update: die,
+		delete: die,
 	}),
 );
 

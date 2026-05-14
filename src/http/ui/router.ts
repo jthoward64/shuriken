@@ -38,6 +38,12 @@ import { usersCollectionsCreateHandler } from "#src/http/ui/api/users/create-col
 import { usersDeleteHandler } from "#src/http/ui/api/users/delete.ts";
 import { usersSetPasswordHandler } from "#src/http/ui/api/users/set-password.ts";
 import { usersUpdateHandler } from "#src/http/ui/api/users/update.ts";
+import { contactsCreateHandler } from "#src/http/ui/api/contacts/create.ts";
+import { contactsDeleteHandler } from "#src/http/ui/api/contacts/delete.ts";
+import { contactsUpdateHandler } from "#src/http/ui/api/contacts/update.ts";
+import { contactsEditHandler } from "#src/http/ui/handlers/contacts/edit.ts";
+import { contactsListHandler } from "#src/http/ui/handlers/contacts/list.ts";
+import { contactsNewHandler } from "#src/http/ui/handlers/contacts/new.ts";
 import { subscriptionsCreateHandler } from "#src/http/ui/api/subscriptions/create.ts";
 import { subscriptionsDeleteHandler } from "#src/http/ui/api/subscriptions/delete.ts";
 import { collectionsEditHandler } from "#src/http/ui/handlers/collections/edit.ts";
@@ -57,6 +63,9 @@ import { usersNewHandler } from "#src/http/ui/handlers/users/new.ts";
 import type { BunFileService } from "#src/platform/file.ts";
 import type { AclService } from "#src/services/acl/index.ts";
 import type { AclRepository } from "#src/services/acl/repository.ts";
+import type { CardEditService } from "#src/services/card-edit/service.ts";
+import type { CardIndexRepository } from "#src/services/card-index/repository.ts";
+import type { ComponentRepository } from "#src/services/component/index.ts";
 import type { CollectionService } from "#src/services/collection/index.ts";
 import type { CollectionRepository } from "#src/services/collection/repository.ts";
 import type { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
@@ -81,8 +90,11 @@ export type UiServices =
 	| AclRepository
 	| AclService
 	| BunFileService
+	| CardEditService
+	| CardIndexRepository
 	| CollectionRepository
 	| CollectionService
+	| ComponentRepository
 	| ExternalCalendarRepository
 	| GroupService
 	| InstanceRepository
@@ -323,6 +335,19 @@ export const uiRouter = (
 		return handle(sharedWithMeHandler(req, ctx));
 	}
 
+	// Contacts (GET pages)
+	if (seg0 === "contacts" && method === "GET") {
+		if (!seg1) {
+			return handle(contactsListHandler(req, ctx));
+		}
+		if (seg1 === "new" && !seg2) {
+			return handle(contactsNewHandler(req, ctx));
+		}
+		if (seg1 && isUuid(seg1) && !seg2) {
+			return handle(contactsEditHandler(req, ctx, InstanceId(seg1)));
+		}
+	}
+
 	// Per-instance ACL editor
 	if (
 		seg0 === "instances" &&
@@ -395,6 +420,17 @@ export const uiRouter = (
 				return handle(
 					usersCollectionsCreateHandler(req, ctx, PrincipalId(seg2)),
 				);
+			}
+		}
+		if (seg1 === "contacts") {
+			if (seg2 === "create" && !seg3) {
+				return handle(contactsCreateHandler(req, ctx));
+			}
+			if (seg2 && isUuid(seg2) && seg3 === "update" && !seg4) {
+				return handle(contactsUpdateHandler(req, ctx, InstanceId(seg2)));
+			}
+			if (seg2 && isUuid(seg2) && seg3 === "delete" && !seg4) {
+				return handle(contactsDeleteHandler(req, ctx, InstanceId(seg2)));
 			}
 		}
 		if (seg1 === "subscriptions") {

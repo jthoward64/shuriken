@@ -16,6 +16,7 @@ export interface NavContext {
 	readonly showGroups: boolean;
 	readonly showSubscriptions: boolean;
 	readonly showShared: boolean;
+	readonly showContacts: boolean;
 	readonly showLogout: boolean;
 	readonly currentPath: string;
 	readonly displayName: string | undefined;
@@ -47,6 +48,7 @@ export const buildNavContext = (
 			showGroups: groupsPrivs.includes("DAV:read"),
 			showSubscriptions: true,
 			showShared: true,
+			showContacts: true,
 			showLogout: basicAuthEnabled,
 			currentPath,
 			displayName: Option.getOrUndefined(principal.displayName),

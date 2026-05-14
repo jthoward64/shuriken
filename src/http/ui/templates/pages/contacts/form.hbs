@@ -1,0 +1,187 @@
+<div class="space-y-6 max-w-3xl">
+  <div class="flex items-center gap-2">
+    <a href="/ui/contacts?addressbook={{addressbookId}}" class="text-sm text-gray-500 hover:text-gray-700">Contacts</a>
+    <span class="text-gray-400">/</span>
+    <h1 class="text-2xl font-bold text-gray-900">{{pageTitle}}</h1>
+  </div>
+
+  {{> form-error}}
+
+  <form method="POST" action="{{action}}" enctype="multipart/form-data" class="space-y-6 bg-white border border-gray-200 rounded-lg p-6">
+    <input type="hidden" name="addressbookId" value="{{addressbookId}}" />
+
+    <section class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <label class="block">
+        <span class="block text-sm font-medium text-gray-700">Display name <span class="text-red-500">*</span></span>
+        <input required type="text" name="fn" value="{{form.fn}}"
+               class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+      </label>
+      <label class="block">
+        <span class="block text-sm font-medium text-gray-700">Family name</span>
+        <input type="text" name="familyName" value="{{form.familyName}}"
+               class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+      </label>
+      <label class="block">
+        <span class="block text-sm font-medium text-gray-700">Given name</span>
+        <input type="text" name="givenName" value="{{form.givenName}}"
+               class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+      </label>
+      <label class="block">
+        <span class="block text-sm font-medium text-gray-700">Birthday</span>
+        <input type="date" name="bday" value="{{form.bday}}"
+               class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+      </label>
+    </section>
+
+    <section>
+      <h2 class="text-sm font-semibold text-gray-700 mb-2">Email</h2>
+      {{#each form.emails}}
+        <div class="flex gap-2 mb-2">
+          <input type="email" name="emails[].value" value="{{value}}" placeholder="address@example.com"
+                 class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm" />
+          <input type="text" name="emails[].types" value="{{types}}" placeholder="home, work"
+                 class="w-40 rounded border border-gray-300 px-3 py-2 text-sm" />
+        </div>
+      {{/each}}
+      <div class="flex gap-2 mb-2">
+        <input type="email" name="emails[].value" value="" placeholder="address@example.com"
+               class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm" />
+        <input type="text" name="emails[].types" value="" placeholder="home, work"
+               class="w-40 rounded border border-gray-300 px-3 py-2 text-sm" />
+      </div>
+      <p class="text-xs text-gray-500">Add another by submitting; blank rows are dropped server-side.</p>
+    </section>
+
+    <section>
+      <h2 class="text-sm font-semibold text-gray-700 mb-2">Phone</h2>
+      {{#each form.tels}}
+        <div class="flex gap-2 mb-2">
+          <input type="tel" name="tels[].value" value="{{value}}"
+                 class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm" />
+          <input type="text" name="tels[].types" value="{{types}}" placeholder="cell, voice"
+                 class="w-40 rounded border border-gray-300 px-3 py-2 text-sm" />
+        </div>
+      {{/each}}
+      <div class="flex gap-2 mb-2">
+        <input type="tel" name="tels[].value" value=""
+               class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm" />
+        <input type="text" name="tels[].types" value="" placeholder="cell, voice"
+               class="w-40 rounded border border-gray-300 px-3 py-2 text-sm" />
+      </div>
+    </section>
+
+    <section>
+      <h2 class="text-sm font-semibold text-gray-700 mb-2">URLs</h2>
+      {{#each form.urls}}
+        <input type="url" name="urls[]" value="{{this}}"
+               class="block w-full rounded border border-gray-300 px-3 py-2 text-sm mb-2" />
+      {{/each}}
+      <input type="url" name="urls[]" value="" placeholder="https://example.com"
+             class="block w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+    </section>
+
+    <section>
+      <h2 class="text-sm font-semibold text-gray-700 mb-2">Addresses</h2>
+      {{#each form.addresses}}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3 p-3 border border-gray-200 rounded">
+          <input type="text" name="addresses[].street" value="{{street}}" placeholder="Street"
+                 class="md:col-span-2 rounded border border-gray-300 px-3 py-2 text-sm" />
+          <input type="text" name="addresses[].extended" value="{{extended}}" placeholder="Suite / unit"
+                 class="rounded border border-gray-300 px-3 py-2 text-sm" />
+          <input type="text" name="addresses[].poBox" value="{{poBox}}" placeholder="PO Box"
+                 class="rounded border border-gray-300 px-3 py-2 text-sm" />
+          <input type="text" name="addresses[].locality" value="{{locality}}" placeholder="City"
+                 class="rounded border border-gray-300 px-3 py-2 text-sm" />
+          <input type="text" name="addresses[].region" value="{{region}}" placeholder="State / region"
+                 class="rounded border border-gray-300 px-3 py-2 text-sm" />
+          <input type="text" name="addresses[].postalCode" value="{{postalCode}}" placeholder="Postal code"
+                 class="rounded border border-gray-300 px-3 py-2 text-sm" />
+          <input type="text" name="addresses[].country" value="{{country}}" placeholder="Country"
+                 class="rounded border border-gray-300 px-3 py-2 text-sm" />
+          <input type="text" name="addresses[].types" value="{{types}}" placeholder="home, work"
+                 class="md:col-span-2 rounded border border-gray-300 px-3 py-2 text-sm" />
+        </div>
+      {{/each}}
+      <details class="text-sm">
+        <summary class="cursor-pointer text-gray-700">Add address</summary>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3 p-3 border border-gray-200 rounded">
+          <input type="text" name="addresses[].street" value="" placeholder="Street"
+                 class="md:col-span-2 rounded border border-gray-300 px-3 py-2 text-sm" />
+          <input type="text" name="addresses[].extended" value="" placeholder="Suite / unit"
+                 class="rounded border border-gray-300 px-3 py-2 text-sm" />
+          <input type="text" name="addresses[].poBox" value="" placeholder="PO Box"
+                 class="rounded border border-gray-300 px-3 py-2 text-sm" />
+          <input type="text" name="addresses[].locality" value="" placeholder="City"
+                 class="rounded border border-gray-300 px-3 py-2 text-sm" />
+          <input type="text" name="addresses[].region" value="" placeholder="State / region"
+                 class="rounded border border-gray-300 px-3 py-2 text-sm" />
+          <input type="text" name="addresses[].postalCode" value="" placeholder="Postal code"
+                 class="rounded border border-gray-300 px-3 py-2 text-sm" />
+          <input type="text" name="addresses[].country" value="" placeholder="Country"
+                 class="rounded border border-gray-300 px-3 py-2 text-sm" />
+          <input type="text" name="addresses[].types" value="" placeholder="home, work"
+                 class="md:col-span-2 rounded border border-gray-300 px-3 py-2 text-sm" />
+        </div>
+      </details>
+    </section>
+
+    <section class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <label class="block">
+        <span class="block text-sm font-medium text-gray-700">Organisation</span>
+        <input type="text" name="org" value="{{form.org}}"
+               class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+      </label>
+      <label class="block">
+        <span class="block text-sm font-medium text-gray-700">Title</span>
+        <input type="text" name="title" value="{{form.title}}"
+               class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+      </label>
+      <label class="block md:col-span-2">
+        <span class="block text-sm font-medium text-gray-700">Categories (comma-separated)</span>
+        <input type="text" name="categoriesCsv" value="{{form.categoriesCsv}}"
+               class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+      </label>
+      <label class="block md:col-span-2">
+        <span class="block text-sm font-medium text-gray-700">Note</span>
+        <textarea name="note" rows="3"
+                  class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm">{{form.note}}</textarea>
+      </label>
+    </section>
+
+    <section>
+      <h2 class="text-sm font-semibold text-gray-700 mb-2">Photo</h2>
+      {{#if form.photo}}
+        <img src="{{form.photo}}" alt="Contact photo" class="w-24 h-24 object-cover rounded mb-2" />
+      {{/if}}
+      <label class="block text-sm">
+        <span class="text-gray-700">Upload (max 512 KB):</span>
+        <input type="file" name="photoFile" accept="image/*" class="ml-2" />
+      </label>
+      <label class="block text-sm mt-2">
+        <span class="text-gray-700">…or paste a URL:</span>
+        <input type="url" name="photo" value="{{form.photo}}"
+               class="ml-2 rounded border border-gray-300 px-3 py-2 text-sm w-2/3" />
+      </label>
+    </section>
+
+    <div class="flex flex-wrap gap-3 pt-2">
+      <button type="submit" class="px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded hover:bg-gray-700">
+        {{#if (eq mode 'edit')}}Save changes{{else}}Create contact{{/if}}
+      </button>
+      <a href="/ui/contacts?addressbook={{addressbookId}}" class="px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded hover:bg-gray-50">
+        Cancel
+      </a>
+    </div>
+  </form>
+
+  {{#if (eq mode 'edit')}}
+    <form method="POST" action="{{deleteAction}}"
+          onsubmit="return confirm('Delete this contact?')"
+          class="bg-white border border-red-200 rounded-lg p-6">
+      <h2 class="text-sm font-semibold text-red-700 mb-2">Danger zone</h2>
+      <button type="submit" class="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700">
+        Delete contact
+      </button>
+    </form>
+  {{/if}}
+</div>
