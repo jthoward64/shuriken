@@ -1,0 +1,86 @@
+<div class="space-y-4">
+  <div class="flex items-center justify-between gap-4 flex-wrap">
+    <h1 class="text-2xl font-bold text-gray-900">{{pageTitle}}</h1>
+    {{#if hasCalendar}}
+      <a href="/ui/calendar/{{selectedId}}/events/new"
+         class="inline-flex items-center px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded hover:bg-gray-700">
+        New event
+      </a>
+    {{/if}}
+  </div>
+
+  <form method="GET" action="/ui/calendar" class="flex flex-wrap items-center gap-3 bg-white border border-gray-200 rounded-lg p-3">
+    <label class="text-sm text-gray-700">
+      Calendar:
+      <select name="collection" onchange="this.form.submit()"
+              class="ml-1 rounded border border-gray-300 px-2 py-1 text-sm">
+        {{#each calendars}}
+          <option value="{{id}}" {{#if selected}}selected{{/if}}>{{displayName}}</option>
+        {{/each}}
+      </select>
+    </label>
+  </form>
+
+  {{#if hasCalendar}}
+    <div id="fullcalendar" class="bg-white border border-gray-200 rounded-lg p-4"></div>
+
+    <!--
+      FullCalendar via CDN. Swap these URLs (or vendor them into /static/)
+      to change distribution. The rrule plugin enables RRULE expansion on
+      the client without a server-side iteration step.
+    -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/rrule@2.8.1/dist/es5/rrule.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/rrule@6.1.15/index.global.min.js"></script>
+
+    <script>
+      (function () {
+        const collectionId = {{{json selectedId}}};
+        const eventsUrl = `/ui/api/calendar/${collectionId}/events`;
+        const el = document.getElementById("fullcalendar");
+        const calendar = new FullCalendar.Calendar(el, {
+          plugins: window.FullCalendarRRule ? [window.FullCalendarRRule.default] : [],
+          initialView: "dayGridMonth",
+          headerToolbar: {
+            left: "prev,next today",
+            center: "title",
+            right: "dayGridMonth,timeGridWeek,timeGridDay,listWeek",
+          },
+          selectable: true,
+          editable: false,
+          events: async function (info, successCallback, failureCallback) {
+            try {
+              const res = await fetch(
+                `${eventsUrl}?start=${encodeURIComponent(info.startStr)}&end=${encodeURIComponent(info.endStr)}`,
+                { credentials: "same-origin" },
+              );
+              if (!res.ok) {
+                failureCallback(new Error("HTTP " + res.status));
+                return;
+              }
+              const data = await res.json();
+              successCallback(data);
+            } catch (e) {
+              failureCallback(e);
+            }
+          },
+          select: function (info) {
+            const params = new URLSearchParams({
+              start: info.startStr,
+              end: info.endStr,
+              allDay: String(info.allDay),
+            });
+            window.location.href = `/ui/calendar/${collectionId}/events/new?${params}`;
+          },
+          eventClick: function (info) {
+            window.location.href = `/ui/calendar/${collectionId}/events/${info.event.id}`;
+          },
+        });
+        calendar.render();
+      })();
+    </script>
+  {{else}}
+    <p class="text-gray-500 text-sm">No calendars available.</p>
+  {{/if}}
+</div>

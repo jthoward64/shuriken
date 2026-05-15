@@ -38,6 +38,18 @@ import { usersCollectionsCreateHandler } from "#src/http/ui/api/users/create-col
 import { usersDeleteHandler } from "#src/http/ui/api/users/delete.ts";
 import { usersSetPasswordHandler } from "#src/http/ui/api/users/set-password.ts";
 import { usersUpdateHandler } from "#src/http/ui/api/users/update.ts";
+import { emailCredentialsClearHandler } from "#src/http/ui/api/profile/email-credentials-clear.ts";
+import { emailCredentialsSaveHandler } from "#src/http/ui/api/profile/email-credentials-save.ts";
+import { emailCredentialsPageHandler } from "#src/http/ui/handlers/profile/email-credentials.ts";
+import { calendarEventsHandler } from "#src/http/ui/api/calendar/events.ts";
+import {
+	eventCreateHandler,
+	eventDeleteHandler,
+	eventUpdateHandler,
+} from "#src/http/ui/api/calendar/event-write.ts";
+import { eventEditHandler } from "#src/http/ui/handlers/calendar/event-edit.ts";
+import { eventNewHandler } from "#src/http/ui/handlers/calendar/event-new.ts";
+import { calendarViewHandler } from "#src/http/ui/handlers/calendar/view.ts";
 import { contactsCreateHandler } from "#src/http/ui/api/contacts/create.ts";
 import { contactsDeleteHandler } from "#src/http/ui/api/contacts/delete.ts";
 import { contactsUpdateHandler } from "#src/http/ui/api/contacts/update.ts";
@@ -63,7 +75,10 @@ import { usersNewHandler } from "#src/http/ui/handlers/users/new.ts";
 import type { BunFileService } from "#src/platform/file.ts";
 import type { AclService } from "#src/services/acl/index.ts";
 import type { AclRepository } from "#src/services/acl/repository.ts";
+import type { CalEditService } from "#src/services/cal-edit/service.ts";
 import type { CardEditService } from "#src/services/card-edit/service.ts";
+import type { UserEmailCredentialRepository } from "#src/services/email-credential/repository.ts";
+import type { EmailCredentialService } from "#src/services/email-credential/service.ts";
 import type { CardIndexRepository } from "#src/services/card-index/repository.ts";
 import type { ComponentRepository } from "#src/services/component/index.ts";
 import type { CollectionService } from "#src/services/collection/index.ts";
@@ -90,7 +105,10 @@ export type UiServices =
 	| AclRepository
 	| AclService
 	| BunFileService
+	| CalEditService
 	| CardEditService
+	| EmailCredentialService
+	| UserEmailCredentialRepository
 	| CardIndexRepository
 	| CollectionRepository
 	| CollectionService
@@ -274,6 +292,14 @@ export const uiRouter = (
 	if (seg0 === "profile" && !seg1 && method === "GET") {
 		return handle(profileHandler(req, ctx));
 	}
+	if (
+		seg0 === "profile" &&
+		seg1 === "email-credentials" &&
+		!seg2 &&
+		method === "GET"
+	) {
+		return handle(emailCredentialsPageHandler(req, ctx));
+	}
 
 	// Collections (GET pages)
 	if (
@@ -333,6 +359,45 @@ export const uiRouter = (
 	// Shared-with-me landing
 	if (seg0 === "shared" && method === "GET" && !seg1) {
 		return handle(sharedWithMeHandler(req, ctx));
+	}
+
+	// Calendar viewer + event pages
+	if (seg0 === "calendar" && method === "GET") {
+		if (!seg1) {
+			return handle(calendarViewHandler(req, ctx));
+		}
+		if (
+			seg1 &&
+			isUuid(seg1) &&
+			seg2 === "events" &&
+			seg3 === "new" &&
+			!seg4
+		) {
+			return handle(eventNewHandler(req, ctx, CollectionId(seg1)));
+		}
+		if (
+			seg1 &&
+			isUuid(seg1) &&
+			seg2 === "events" &&
+			seg3 &&
+			isUuid(seg3) &&
+			!seg4
+		) {
+			return handle(eventEditHandler(req, ctx, InstanceId(seg3)));
+		}
+	}
+
+	// Calendar events JSON feed
+	if (
+		seg0 === "api" &&
+		seg1 === "calendar" &&
+		seg2 &&
+		isUuid(seg2) &&
+		seg3 === "events" &&
+		!seg4 &&
+		method === "GET"
+	) {
+		return handle(calendarEventsHandler(req, ctx, CollectionId(seg2)));
 	}
 
 	// Contacts (GET pages)
@@ -420,6 +485,34 @@ export const uiRouter = (
 				return handle(
 					usersCollectionsCreateHandler(req, ctx, PrincipalId(seg2)),
 				);
+			}
+		}
+		// Calendar event mutations
+		if (
+			seg1 === "calendar" &&
+			seg2 &&
+			isUuid(seg2) &&
+			seg3 === "events"
+		) {
+			if (seg4 === "create") {
+				return handle(eventCreateHandler(req, ctx, CollectionId(seg2)));
+			}
+			if (seg4 && isUuid(seg4)) {
+				const seg5 = segments[5];
+				if (seg5 === "update") {
+					return handle(eventUpdateHandler(req, ctx, InstanceId(seg4)));
+				}
+				if (seg5 === "delete") {
+					return handle(eventDeleteHandler(req, ctx, InstanceId(seg4)));
+				}
+			}
+		}
+		if (seg1 === "profile" && seg2 === "email-credentials") {
+			if (seg3 === "save" && !seg4) {
+				return handle(emailCredentialsSaveHandler(req, ctx));
+			}
+			if (seg3 === "clear" && !seg4) {
+				return handle(emailCredentialsClearHandler(req, ctx));
 			}
 		}
 		if (seg1 === "contacts") {

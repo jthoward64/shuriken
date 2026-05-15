@@ -123,6 +123,17 @@ export interface AclRepositoryShape {
 		Option.Option<{ readonly id: UuidString; readonly type: ResourceType }>,
 		DatabaseError
 	>;
+
+	/**
+	 * Look up the role tag stored on the user row whose `principal_id` matches.
+	 * Returns "normal" when no user row exists (e.g. group principals) so the
+	 * caller can pass it straight to `bypassesAclCheck`. Used by AclService to
+	 * short-circuit privilege checks for super-admins without taking a
+	 * UserRepository dependency.
+	 */
+	readonly getRoleForPrincipal: (
+		principalId: PrincipalId,
+	) => Effect.Effect<string, DatabaseError>;
 }
 
 export class AclRepository extends Context.Tag("AclRepository")<

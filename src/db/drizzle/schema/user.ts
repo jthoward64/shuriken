@@ -16,6 +16,13 @@ export const user = pgTable(
 	{
 		id: uuid().default(sql`uuidv7()`).primaryKey().$type<UuidString>(),
 		email: text().notNull(),
+		/**
+		 * Free-form role identifier. The set of recognised roles lives in
+		 * `src/services/role/policy.ts`; storing as text means future roles
+		 * (billing-admin, support, …) don't require a schema migration. Any
+		 * unknown value behaves as `normal`.
+		 */
+		role: text().notNull().default("normal"),
 		updatedAt: timestampTz("updated_at").default(sql`now()`).notNull(),
 		principalId: uuid("principal_id")
 			.notNull()

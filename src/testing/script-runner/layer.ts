@@ -11,6 +11,9 @@ import { CardIndexRepositoryLive } from "#src/services/card-index/index.ts";
 import { CollectionDomainLayer } from "#src/services/collection/index.ts";
 import { DomainEntityDomainLayer } from "#src/services/domain-entity/index.ts";
 import { BirthdayServiceLive } from "#src/services/birthday/service.live.ts";
+import { CalEditServiceLive } from "#src/services/cal-edit/service.live.ts";
+import { UserEmailCredentialRepositoryLive } from "#src/services/email-credential/repository.live.ts";
+import { EmailCredentialServiceLive } from "#src/services/email-credential/service.live.ts";
 import { CardEditServiceLive } from "#src/services/card-edit/service.live.ts";
 import { ExternalCalendarRepositoryLive } from "#src/services/external-calendar/repository.live.ts";
 import { SubscriptionServiceLive } from "#src/services/external-calendar/subscription.live.ts";
@@ -41,6 +44,7 @@ const testConfig: AppConfigType = {
 	auth: {
 		autoLogin: Option.none<string>(),
 		proxyHeader: Option.none<string>(),
+		proxyRoleHeader: Option.none<string>(),
 		trustedProxies: "*",
 		basicAuthEnabled: true,
 		adminEmail: Option.none<string>(),
@@ -58,6 +62,25 @@ const testConfig: AppConfigType = {
 	birthday: {
 		schedulerTickS: 600,
 		concurrency: 4,
+	},
+	mail: {
+		enabled: false,
+		defaultFromAddress: "",
+		defaultFromName: "",
+		defaultHost: "",
+		defaultPort: 587,
+		defaultUsername: "",
+		defaultPassword: "",
+		defaultSecurity: "starttls" as const,
+		credsKey: "",
+		profiles: [] as ReadonlyArray<{
+			pattern: string;
+			host: string;
+			port: number;
+			username: string;
+			password: string;
+			security?: "none" | "starttls" | "tls";
+		}>,
 	},
 	nodeEnv: "test",
 };
@@ -80,9 +103,21 @@ const AppConfigTestLayer = Layer.succeed(
 //   - BasicAuthLayer         always (multi-user support via Basic auth)
 // ---------------------------------------------------------------------------
 
-export const makeScriptRunnerLayer = () => {
+export const makeScriptRunnerLayer = (
+	overrides?: Partial<AppConfigType>,
+) => {
+	const merged: AppConfigType = overrides
+		? { ...testConfig, ...overrides }
+		: testConfig;
+	const configLayer =
+		overrides === undefined
+			? AppConfigTestLayer
+			: Layer.succeed(
+					AppConfigService,
+					merged as unknown as AppConfigService,
+				);
 	const testInfraLayer = Layer.mergeAll(
-		AppConfigTestLayer,
+		configLayer,
 		makePgliteDatabaseLayer(),
 		TestCryptoLayer,
 	);
@@ -109,6 +144,7 @@ export const makeScriptRunnerLayer = () => {
 		withTestInfra(TombstoneRepositoryLive),
 		withTestInfra(CalIndexRepositoryLive),
 		withTestInfra(CardIndexRepositoryLive),
+		withTestInfra(UserEmailCredentialRepositoryLive),
 		withTestInfra(ExternalCalendarRepositoryLive),
 	);
 
@@ -138,6 +174,8 @@ export const makeScriptRunnerLayer = () => {
 		SubscriptionServiceLive.pipe(Layer.provide(testBaseLayer)),
 		BirthdayServiceLive.pipe(Layer.provide(testBaseLayer)),
 		CardEditServiceLive.pipe(Layer.provide(testBaseLayer)),
+		CalEditServiceLive.pipe(Layer.provide(testBaseLayer)),
+		EmailCredentialServiceLive.pipe(Layer.provide(testBaseLayer)),
 		testStubsLayer,
 	);
 };

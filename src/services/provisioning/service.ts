@@ -22,6 +22,8 @@ export interface ProvisionUserInput {
 	readonly name: string;
 	readonly slug: Slug;
 	readonly credentials?: ReadonlyArray<NewCredential>;
+	/** Free-form role tag — see services/role/policy.ts. Defaults to "normal". */
+	readonly role?: string;
 }
 
 export interface ProvisionedUser {

@@ -41,6 +41,13 @@ export const AuthConfig = Config.all({
 	 * disable proxy auth.
 	 */
 	proxyHeader: Config.string("proxyHeader").pipe(Config.option),
+	/**
+	 * Optional header carrying the new user's role tag when proxy auth
+	 * auto-creates them. Header value should match a role from
+	 * `services/role/policy.ts` (e.g. "admin", "super_admin"); unknown
+	 * values fall back to "normal".
+	 */
+	proxyRoleHeader: Config.string("proxyRoleHeader").pipe(Config.option),
 
 	/**
 	 * Comma-separated list of trusted proxy IPs, or "*" to trust all.
@@ -128,6 +135,110 @@ export const ExternalCalendarConfig = Config.all({
 	),
 });
 
+// ---------------------------------------------------------------------------
+// MailConfig — outbound SMTP credentials.
+//
+// Three layers, evaluated in priority order by EmailCredentialService:
+//   1. Per-user credentials in the DB (encrypted at rest with EMAIL_CREDS_KEY)
+//   2. Server-wide regex-scoped profiles (e.g. one SMTP relay for
+//      `^.*@example\.com$`) — admins host email for their users and want
+//      mail to be sent AS the user with no per-user setup.
+//   3. Default fallback — single relay, mail goes out as `defaultFromAddress`
+//      with `Reply-To: <user.email>` so replies still reach them.
+//
+// Profiles are configured via a JSON env var (`SMTP_PROFILES_JSON`) that
+// decodes to an array of `MailProfile`. JSON keeps the schema flexible and
+// avoids invented numbered-env-var conventions. Empty array = no profiles.
+// ---------------------------------------------------------------------------
+
+const SMTP_DEFAULT_PORT = 587;
+
+interface RawMailProfileShape {
+	readonly pattern: string;
+	readonly host: string;
+	readonly port: number;
+	readonly username: string;
+	readonly password: string;
+	readonly security?: "none" | "starttls" | "tls";
+}
+
+const decodeMailProfiles = (raw: string): ReadonlyArray<RawMailProfileShape> => {
+	if (raw.trim() === "") {
+		return [];
+	}
+	try {
+		const parsed = JSON.parse(raw);
+		if (!Array.isArray(parsed)) {
+			return [];
+		}
+		// Best-effort shape filter; ConfigValidationError is preferable but
+		// SMTP_PROFILES_JSON is admin-controlled, so we just drop malformed
+		// entries rather than failing boot.
+		return parsed.filter(
+			(p): p is RawMailProfileShape =>
+				typeof p === "object" &&
+				p !== null &&
+				typeof (p as { pattern?: unknown }).pattern === "string" &&
+				typeof (p as { host?: unknown }).host === "string",
+		);
+	} catch {
+		return [];
+	}
+};
+
+export const MailConfig = Config.all({
+	/**
+	 * Enables outbound mail. When false (the default), every send is a no-op;
+	 * EmailCredentialService still resolves so callers can preview but the
+	 * mailer transport will short-circuit. Useful for personal / single-user
+	 * deployments that don't need scheduling invitations.
+	 */
+	enabled: Config.boolean("mailEnabled").pipe(Config.withDefault(false)),
+	/**
+	 * Default sender address used when no per-user creds and no matching
+	 * profile exist. Required when `mailEnabled` is true.
+	 */
+	defaultFromAddress: Config.string("smtpFromAddress").pipe(
+		Config.withDefault(""),
+	),
+	defaultFromName: Config.string("smtpFromName").pipe(Config.withDefault("")),
+	defaultHost: Config.string("smtpHost").pipe(Config.withDefault("")),
+	defaultPort: Config.integer("smtpPort").pipe(
+		Config.withDefault(SMTP_DEFAULT_PORT),
+	),
+	defaultUsername: Config.string("smtpUsername").pipe(Config.withDefault("")),
+	defaultPassword: Config.string("smtpPassword").pipe(Config.withDefault("")),
+	defaultSecurity: Config.literal(
+		"none",
+		"starttls",
+		"tls",
+	)("smtpSecurity").pipe(Config.withDefault("starttls")),
+	/**
+	 * Symmetric key used to encrypt per-user SMTP passwords stored in the DB.
+	 * Required to write or read user-level creds; if unset, that source is
+	 * disabled and the resolver falls through to profiles + default.
+	 */
+	credsKey: Config.string("emailCredsKey").pipe(Config.withDefault("")),
+	/**
+	 * Server-wide regex-scoped SMTP profiles. JSON-encoded array; each entry:
+	 *   {
+	 *     "pattern": "^.*@example\\.com$",
+	 *     "host": "smtp.example.com",
+	 *     "port": 587,
+	 *     "username": "relay@example.com",
+	 *     "password": "…",
+	 *     "security": "starttls"   // optional, defaults to starttls
+	 *   }
+	 * The first profile whose `pattern` matches the user's email is used; the
+	 * resolver still sets From: to the user's address (the relay is expected
+	 * to permit it).
+	 */
+	profiles: Config.string("smtpProfilesJson").pipe(
+		Config.withDefault(""),
+		Config.map(decodeMailProfiles),
+	),
+});
+
 const BirthdayConfig = Config.all({
 	/**
 	 * Periodic-sweep cadence for BirthdayService. Idempotent + cheap (one
@@ -151,6 +262,7 @@ export const AppConfig = Config.all({
 	log: LogConfig,
 	externalCalendar: ExternalCalendarConfig,
 	birthday: BirthdayConfig,
+	mail: MailConfig,
 	nodeEnv: Config.string("nodeEnv").pipe(Config.withDefault("production")),
 });
 

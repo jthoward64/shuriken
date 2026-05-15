@@ -8,6 +8,7 @@ import {
 	USERS_VIRTUAL_RESOURCE_ID,
 } from "#src/domain/virtual-resources.ts";
 import { AclRepository } from "#src/services/acl/repository.ts";
+import { virtualGrants } from "#src/services/role/policy.ts";
 import { CollectionService } from "#src/services/collection/service.ts";
 import { UserService } from "#src/services/user/service.ts";
 import { ProvisioningService, type ProvisionUserInput } from "./service.ts";
@@ -41,6 +42,7 @@ export const ProvisioningServiceLive = Layer.effect(
 							email: input.email,
 							displayName: input.name,
 							credentials: input.credentials,
+							role: input.role,
 						});
 
 						// Drizzle infers the uuid column as string; cast to branded type
@@ -103,6 +105,24 @@ export const ProvisioningServiceLive = Layer.effect(
 							protected: true,
 							ordinal: 0,
 						});
+
+						// Apply role-driven virtual-resource grants. Same set is
+						// re-applied by `ensureAdminAces` if the role is later
+						// changed, so we only need it here for the initial create.
+						let ordinal = 10;
+						for (const grant of virtualGrants(input.role ?? "normal")) {
+							yield* acl.grantAce({
+								resourceType: grant.resourceType,
+								resourceId: grant.resourceId,
+								principalType: "principal",
+								principalId,
+								privilege: grant.privilege,
+								grantDeny: "grant",
+								protected: true,
+								ordinal,
+							});
+							ordinal += 10;
+						}
 
 						return { user, calendar, addressBook, inbox, outbox };
 					}),

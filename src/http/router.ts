@@ -20,7 +20,10 @@ import { uiRouter } from "#src/http/ui/router.ts";
 import type { TemplateService } from "#src/http/ui/template/index.ts";
 import type { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
 import type { ProvisioningService } from "#src/services/provisioning/service.ts";
+import type { CalEditService } from "#src/services/cal-edit/service.ts";
 import type { CardEditService } from "#src/services/card-edit/service.ts";
+import type { UserEmailCredentialRepository } from "#src/services/email-credential/repository.ts";
+import type { EmailCredentialService } from "#src/services/email-credential/service.ts";
 import type { SubscriptionService } from "#src/services/external-calendar/subscription.ts";
 import type {
 	CollectionRepository,
@@ -90,7 +93,10 @@ type AppServices =
 	| ProvisioningService
 	| ExternalCalendarRepository
 	| AclRepository
+	| CalEditService
 	| CardEditService
+	| EmailCredentialService
+	| UserEmailCredentialRepository
 	| SubscriptionService;
 
 const isDavPath = (pathname: string): boolean =>

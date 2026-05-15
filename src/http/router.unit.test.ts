@@ -15,7 +15,10 @@ import {
 import { BunFileService } from "#src/platform/file.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import { AclRepository as AclRepoTag } from "#src/services/acl/repository.ts";
+import { CalEditService } from "#src/services/cal-edit/service.ts";
 import { CardEditService } from "#src/services/card-edit/service.ts";
+import { UserEmailCredentialRepository } from "#src/services/email-credential/repository.ts";
+import { EmailCredentialService } from "#src/services/email-credential/service.ts";
 import { CalIndexRepository } from "#src/services/cal-index/index.ts";
 import { CardIndexRepository } from "#src/services/card-index/index.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
@@ -235,6 +238,7 @@ const stubLayers = Layer.mergeAll(
 		auth: {
 			autoLogin: Option.none(),
 			proxyHeader: Option.none(),
+			proxyRoleHeader: Option.none(),
 			trustedProxies: "*",
 			basicAuthEnabled: true,
 			adminEmail: Option.none(),
@@ -246,6 +250,18 @@ const stubLayers = Layer.mergeAll(
 		log: { level: undefined },
 		externalCalendar: { schedulerTickS: 60, fetchConcurrency: 4, claimCap: 100 },
 		birthday: { schedulerTickS: 600, concurrency: 4 },
+		mail: {
+			enabled: false,
+			defaultFromAddress: "",
+			defaultFromName: "",
+			defaultHost: "",
+			defaultPort: 587,
+			defaultUsername: "",
+			defaultPassword: "",
+			defaultSecurity: "starttls",
+			credsKey: "",
+			profiles: [],
+		},
 		nodeEnv: "test",
 	} as unknown as AppConfigService),
 	Layer.succeed(BunFileService, {
@@ -296,10 +312,26 @@ const stubLayers = Layer.mergeAll(
 		getGroupPrincipalIds: () => Effect.succeed([]),
 		batchGetGrantedPrivileges: die,
 		getResourceParent: die,
+		getRoleForPrincipal: () => Effect.succeed("normal"),
 	}),
 	Layer.succeed(CardEditService, {
 		create: die,
 		update: die,
+		delete: die,
+	}),
+	Layer.succeed(CalEditService, {
+		create: die,
+		update: die,
+		delete: die,
+	}),
+	Layer.succeed(EmailCredentialService, {
+		resolveForUser: die,
+		storeForUser: die,
+		clearForUser: die,
+	}),
+	Layer.succeed(UserEmailCredentialRepository, {
+		findByUserId: () => Effect.succeed(Option.none()),
+		upsert: die,
 		delete: die,
 	}),
 );

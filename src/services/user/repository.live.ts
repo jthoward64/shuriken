@@ -75,6 +75,7 @@ const create = Effect.fn("UserRepository.create")(
 		readonly email: Email;
 		readonly displayName?: string;
 		readonly credentials: ReadonlyArray<HashedCredential>;
+		readonly role?: string;
 	}) {
 		yield* Effect.annotateCurrentSpan({ "user.slug": input.slug });
 		yield* Effect.logTrace("repo.user.create", { slug: input.slug });
@@ -110,7 +111,11 @@ const create = Effect.fn("UserRepository.create")(
 		const userRows = yield* runDbQuery((db) =>
 			db
 				.insert(user)
-				.values({ email: input.email, principalId: principalRow.id })
+				.values({
+					email: input.email,
+					principalId: principalRow.id,
+					role: input.role ?? "normal",
+				})
 				.returning(),
 		).pipe(
 			Effect.mapError((e) =>
@@ -154,6 +159,7 @@ const update = Effect.fn("UserRepository.update")(
 		input: {
 			readonly email?: Email;
 			readonly displayName?: string;
+			readonly role?: string;
 		},
 	) {
 		yield* Effect.annotateCurrentSpan({ "user.id": id });
@@ -175,6 +181,15 @@ const update = Effect.fn("UserRepository.update")(
 				db
 					.update(user)
 					.set({ email, updatedAt: sql`now()` })
+					.where(eq(user.id, id)),
+			).pipe(Effect.asVoid);
+		}
+		if (input.role !== undefined) {
+			const role = input.role;
+			yield* runDbQuery((db) =>
+				db
+					.update(user)
+					.set({ role, updatedAt: sql`now()` })
 					.where(eq(user.id, id)),
 			).pipe(Effect.asVoid);
 		}

@@ -255,6 +255,7 @@ const makeUserRepo = (stores: TestStores): UserRepositoryShape => ({
 			const userRow: UserRow = {
 				id: userId,
 				email: input.email,
+				role: input.role ?? "normal",
 				updatedAt: now,
 				principalId,
 			};
@@ -1017,6 +1018,14 @@ const makeAclRepo = (stores: TestStores): AclRepositoryShape => ({
 				readonly type: AclResourceType;
 			}>();
 		}),
+
+	getRoleForPrincipal: (principalId) =>
+		Effect.sync(() => {
+			const userRow = [...stores.users.values()].find(
+				(u) => u.principalId === principalId,
+			);
+			return userRow?.role ?? "normal";
+		}),
 });
 
 const makeEntityRepo = (stores: TestStores): EntityRepositoryShape => ({
@@ -1404,6 +1413,7 @@ export const makeTestEnv = (): TestEnvBuilder => {
 				id: userId,
 				principalId,
 				email: (seed.email ?? `test${i}@example.com`) as Email,
+				role: "normal",
 				updatedAt: now,
 			});
 			return self;

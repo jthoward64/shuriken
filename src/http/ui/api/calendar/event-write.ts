@@ -1,0 +1,158 @@
+import { Effect } from "effect";
+import {
+	type DatabaseError,
+	type DavError,
+	InternalError,
+} from "#src/domain/errors.ts";
+import { CollectionId, type InstanceId } from "#src/domain/ids.ts";
+import type { HttpRequestContext } from "#src/http/context.ts";
+import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
+import { isHtmxRequest } from "#src/http/ui/helpers/htmx.ts";
+import { AclService } from "#src/services/acl/service.ts";
+import { CalEditService } from "#src/services/cal-edit/service.ts";
+import type { EventFormData } from "#src/services/cal-edit/types.ts";
+import { emptyEventForm } from "#src/services/cal-edit/types.ts";
+import { InstanceService } from "#src/services/instance/index.ts";
+
+// ---------------------------------------------------------------------------
+// Shared form parser for both create and update — event payload is small
+// enough to inline here rather than a separate helper module.
+// ---------------------------------------------------------------------------
+
+interface FormLike {
+	get(key: string): unknown;
+}
+
+const single = (form: FormLike, key: string) =>
+	(form.get(key)?.toString() ?? "").trim();
+
+const parseEventForm = (form: FormLike): EventFormData => ({
+	...emptyEventForm,
+	summary: single(form, "summary"),
+	description: single(form, "description"),
+	location: single(form, "location"),
+	categoriesCsv: single(form, "categoriesCsv"),
+	allDay: form.get("allDay") === "on" || form.get("allDay") === "true",
+	start: single(form, "start"),
+	end: single(form, "end"),
+	recurrenceFreq: single(
+		form,
+		"recurrenceFreq",
+	) as EventFormData["recurrenceFreq"],
+	recurrenceCount: single(form, "recurrenceCount"),
+	recurrenceUntil: single(form, "recurrenceUntil"),
+});
+
+const redirectAfter = (
+	ctx: HttpRequestContext,
+	collectionId: string,
+): Response => {
+	const redirect = `/ui/calendar?collection=${collectionId}`;
+	if (isHtmxRequest(ctx.headers)) {
+		return new Response(null, {
+			status: 200,
+			headers: { "HX-Redirect": redirect },
+		});
+	}
+	return new Response(null, { status: 303, headers: { Location: redirect } });
+};
+
+// ---------------------------------------------------------------------------
+// POST /ui/api/calendar/:collectionId/events/create
+// ---------------------------------------------------------------------------
+
+export const eventCreateHandler = (
+	req: Request,
+	ctx: HttpRequestContext,
+	collectionId: CollectionId,
+): Effect.Effect<
+	Response,
+	DavError | DatabaseError | InternalError,
+	AclService | CalEditService
+> =>
+	Effect.gen(function* () {
+		const principal = yield* requireAuthenticated(ctx.auth);
+		const acl = yield* AclService;
+		const calEdit = yield* CalEditService;
+
+		yield* acl.check(
+			principal.principalId,
+			collectionId,
+			"collection",
+			"DAV:bind",
+		);
+
+		const form = yield* Effect.tryPromise({
+			try: () => req.formData(),
+			catch: (e) => new InternalError({ cause: e }),
+		});
+		yield* calEdit.create(collectionId, parseEventForm(form));
+
+		return redirectAfter(ctx, collectionId);
+	});
+
+// ---------------------------------------------------------------------------
+// POST /ui/api/calendar/:collectionId/events/:instanceId/update
+// ---------------------------------------------------------------------------
+
+export const eventUpdateHandler = (
+	req: Request,
+	ctx: HttpRequestContext,
+	instanceId: InstanceId,
+): Effect.Effect<
+	Response,
+	DavError | DatabaseError | InternalError,
+	AclService | CalEditService | InstanceService
+> =>
+	Effect.gen(function* () {
+		const principal = yield* requireAuthenticated(ctx.auth);
+		const acl = yield* AclService;
+		const calEdit = yield* CalEditService;
+		const instanceSvc = yield* InstanceService;
+
+		const existing = yield* instanceSvc.findById(instanceId);
+		yield* acl.check(
+			principal.principalId,
+			CollectionId(existing.collectionId),
+			"collection",
+			"DAV:write-content",
+		);
+
+		const form = yield* Effect.tryPromise({
+			try: () => req.formData(),
+			catch: (e) => new InternalError({ cause: e }),
+		});
+		yield* calEdit.update(instanceId, parseEventForm(form));
+
+		return redirectAfter(ctx, existing.collectionId);
+	});
+
+// ---------------------------------------------------------------------------
+// POST /ui/api/calendar/:collectionId/events/:instanceId/delete
+// ---------------------------------------------------------------------------
+
+export const eventDeleteHandler = (
+	_req: Request,
+	ctx: HttpRequestContext,
+	instanceId: InstanceId,
+): Effect.Effect<
+	Response,
+	DavError | DatabaseError | InternalError,
+	AclService | CalEditService | InstanceService
+> =>
+	Effect.gen(function* () {
+		const principal = yield* requireAuthenticated(ctx.auth);
+		const acl = yield* AclService;
+		const calEdit = yield* CalEditService;
+		const instanceSvc = yield* InstanceService;
+
+		const existing = yield* instanceSvc.findById(instanceId);
+		yield* acl.check(
+			principal.principalId,
+			CollectionId(existing.collectionId),
+			"collection",
+			"DAV:unbind",
+		);
+		yield* calEdit.delete(instanceId);
+		return redirectAfter(ctx, existing.collectionId);
+	});

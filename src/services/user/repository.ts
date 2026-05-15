@@ -50,12 +50,14 @@ export interface UserRepositoryShape {
 		readonly email: Email;
 		readonly displayName?: string;
 		readonly credentials: ReadonlyArray<HashedCredential>;
+		readonly role?: string;
 	}) => Effect.Effect<UserWithPrincipal, DatabaseError | ConflictError>;
 	readonly update: (
 		id: UserId,
 		input: {
 			readonly email?: Email;
 			readonly displayName?: string;
+			readonly role?: string;
 		},
 	) => Effect.Effect<UserWithPrincipal, DatabaseError>;
 	readonly findCredential: (

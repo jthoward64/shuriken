@@ -17,6 +17,7 @@ export interface NavContext {
 	readonly showSubscriptions: boolean;
 	readonly showShared: boolean;
 	readonly showContacts: boolean;
+	readonly showCalendar: boolean;
 	readonly showLogout: boolean;
 	readonly currentPath: string;
 	readonly displayName: string | undefined;
@@ -49,6 +50,7 @@ export const buildNavContext = (
 			showSubscriptions: true,
 			showShared: true,
 			showContacts: true,
+			showCalendar: true,
 			showLogout: basicAuthEnabled,
 			currentPath,
 			displayName: Option.getOrUndefined(principal.displayName),

@@ -20,6 +20,7 @@ import { isHtmxRequest } from "#src/http/ui/helpers/htmx.ts";
 import { renderFragment } from "#src/http/ui/helpers/render-page.ts";
 import type { TemplateService } from "#src/http/ui/template/index.ts";
 import { AclService } from "#src/services/acl/index.ts";
+import { AclRepository } from "#src/services/acl/repository.ts";
 import { PrincipalService } from "#src/services/principal/index.ts";
 import { UserService } from "#src/services/user/index.ts";
 
@@ -34,7 +35,7 @@ export const usersUpdateHandler = (
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError | InternalError,
-	AclService | PrincipalService | TemplateService | UserService
+	AclRepository | AclService | PrincipalService | TemplateService | UserService
 > =>
 	Effect.gen(function* () {
 		const principal = yield* requireAuthenticated(ctx.auth);
@@ -85,13 +86,30 @@ export const usersUpdateHandler = (
 		}
 		const parsed = parseResult.right;
 
+		// Role edits are only honoured when the caller is super_admin.
+		// Anyone else's submission of `role` is silently ignored to keep
+		// the form failure mode quiet for non-priv users.
+		const submittedRole = form.get("role")?.toString();
+		const aclRepo = yield* AclRepository;
+		const callerRole = yield* aclRepo.getRoleForPrincipal(
+			principal.principalId,
+		);
+		const roleChange =
+			submittedRole !== undefined &&
+			submittedRole !== user.role &&
+			callerRole === "super_admin"
+				? submittedRole
+				: undefined;
+
 		if (
 			parsed.displayName !== (principalRow.displayName ?? undefined) ||
-			parsed.email !== user.email
+			parsed.email !== user.email ||
+			roleChange !== undefined
 		) {
 			yield* userService.update(user.id as UserId, {
 				displayName: parsed.displayName,
 				email: parsed.email,
+				...(roleChange !== undefined ? { role: roleChange } : {}),
 			});
 		}
 

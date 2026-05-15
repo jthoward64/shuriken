@@ -45,6 +45,7 @@ export const makeUserRow = (
 	id: crypto.randomUUID(),
 	principalId,
 	email: "test@example.com",
+	role: "normal",
 	updatedAt: now(),
 	...overrides,
 });

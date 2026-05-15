@@ -28,11 +28,15 @@ export interface NewUser {
 	readonly email: Email;
 	readonly displayName?: string;
 	readonly credentials?: ReadonlyArray<NewCredential>;
+	/** Free-form role tag; see services/role/policy.ts. Defaults to "normal". */
+	readonly role?: string;
 }
 
 export interface UpdateUser {
 	readonly displayName?: string;
 	readonly email?: Email;
+	/** When provided, replaces the user's role tag; see services/role/policy.ts. */
+	readonly role?: string;
 }
 
 // ---------------------------------------------------------------------------

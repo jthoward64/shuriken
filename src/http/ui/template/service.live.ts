@@ -29,6 +29,11 @@ function registerHelpers(hbs: typeof Handlebars): void {
 		"includes",
 		(arr: unknown, val: unknown) => Array.isArray(arr) && arr.includes(val),
 	);
+	// `json` — serialise any value for safe embedding inside an inline
+	// <script> tag. Wraps `</` to prevent premature </script> termination.
+	hbs.registerHelper("json", (value: unknown) =>
+		JSON.stringify(value ?? null).replace(/</g, "\\u003c"),
+	);
 	hbs.registerHelper("formatDate", (value: unknown) => {
 		if (typeof value === "string") {
 			return value;

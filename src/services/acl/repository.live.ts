@@ -296,6 +296,23 @@ const getResourceParent = Effect.fn("AclRepository.getResourceParent")(
 	),
 );
 
+const getRoleForPrincipal = Effect.fn("AclRepository.getRoleForPrincipal")(
+	function* (principalId: PrincipalId) {
+		yield* Effect.annotateCurrentSpan({ "principal.id": principalId });
+		const rows = yield* runDbQuery((db) =>
+			db
+				.select({ role: user.role })
+				.from(user)
+				.where(eq(user.principalId, principalId))
+				.limit(1),
+		);
+		return rows[0]?.role ?? "normal";
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.acl.getRoleForPrincipal failed", e.cause),
+	),
+);
+
 const getGroupPrincipalIds = Effect.fn("AclRepository.getGroupPrincipalIds")(
 	function* (userPrincipalId: PrincipalId) {
 		yield* Effect.annotateCurrentSpan({ "principal.id": userPrincipalId });
@@ -382,6 +399,9 @@ export const AclRepositoryLive = Layer.effect(
 			) => run(getGroupPrincipalIds(...args)),
 			getResourceParent: (...args: Parameters<typeof getResourceParent>) =>
 				run(getResourceParent(...args)),
+			getRoleForPrincipal: (
+				...args: Parameters<typeof getRoleForPrincipal>
+			) => run(getRoleForPrincipal(...args)),
 			batchGetGrantedPrivileges: (
 				...args: Parameters<typeof batchGetGrantedPrivileges>
 			) => run(batchGetGrantedPrivileges(...args)),

@@ -3,6 +3,7 @@ import { type DatabaseError, needPrivileges } from "#src/domain/errors.ts";
 import type { PrincipalId, UuidString } from "#src/domain/ids.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
 import { aclChecksTotal } from "#src/observability/metrics.ts";
+import { bypassesAclCheck } from "#src/services/role/policy.ts";
 import { AclRepository, type AclResourceType } from "./repository.ts";
 import { type AclResourceId, AclService } from "./service.ts";
 
@@ -200,6 +201,15 @@ export const AclServiceLive = Layer.effect(
 						resourceType,
 						privilege,
 					});
+					// Role-based short-circuit (super_admin et al). Skips the
+					// ACE evaluation entirely.
+					const role = yield* repo.getRoleForPrincipal(principalId);
+					if (bypassesAclCheck(role)) {
+						yield* Metric.increment(
+							Metric.tagged(aclChecksTotal, "acl.outcome", "allowed"),
+						);
+						return;
+					}
 					const principalIds = yield* resolvePrincipalIds(principalId);
 					const privileges = expandContainers(privilege);
 					const allowed = yield* repo.hasPrivilege(

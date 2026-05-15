@@ -22,6 +22,9 @@ import {
 } from "#src/services/timezone/index.ts";
 import { BirthdaySchedulerLayer } from "#src/services/birthday/scheduler.live.ts";
 import { BirthdayServiceLive } from "#src/services/birthday/service.live.ts";
+import { CalEditServiceLive } from "#src/services/cal-edit/service.live.ts";
+import { EmailCredentialServiceLive } from "#src/services/email-credential/service.live.ts";
+import { UserEmailCredentialRepositoryLive } from "#src/services/email-credential/repository.live.ts";
 import { CardEditServiceLive } from "#src/services/card-edit/service.live.ts";
 import { ExternalCalendarRepositoryLive } from "#src/services/external-calendar/repository.live.ts";
 import { ExternalCalendarSchedulerLayer } from "#src/services/external-calendar/scheduler.live.ts";
@@ -97,6 +100,7 @@ const BaseAppLayer = Layer.mergeAll(
 	ExternalCalendarRepositoryLive.pipe(Layer.provide(InfraLayer)),
 	CalIndexRepositoryLive.pipe(Layer.provide(InfraLayer)),
 	CardIndexRepositoryLive.pipe(Layer.provide(InfraLayer)),
+	UserEmailCredentialRepositoryLive.pipe(Layer.provide(InfraLayer)),
 	BunFileServiceLive,
 	TemplateServiceLive.pipe(Layer.provide(BunFileServiceLive)),
 );
@@ -122,6 +126,8 @@ export const AppLayer = Layer.mergeAll(
 	ExternalCalendarSyncFull,
 	SubscriptionServiceLive.pipe(Layer.provide(BaseAppLayer)),
 	CardEditServiceLive.pipe(Layer.provide(BaseAppLayer)),
+	CalEditServiceLive.pipe(Layer.provide(BaseAppLayer)),
+	EmailCredentialServiceLive.pipe(Layer.provide(BaseAppLayer)),
 	BirthdayServiceFull,
 	ExternalCalendarSchedulerLayer.pipe(
 		Layer.provide(Layer.mergeAll(BaseAppLayer, ExternalCalendarSyncFull)),
@@ -185,6 +191,9 @@ export {
 	type ExternalCalendarRow,
 } from "#src/services/external-calendar/repository.ts";
 export { BirthdayService } from "#src/services/birthday/service.ts";
+export { CalEditService } from "#src/services/cal-edit/service.ts";
+export { EmailCredentialService } from "#src/services/email-credential/service.ts";
+export { UserEmailCredentialRepository } from "#src/services/email-credential/repository.ts";
 export { CardEditService } from "#src/services/card-edit/service.ts";
 export { SubscriptionService } from "#src/services/external-calendar/subscription.ts";
 export { ExternalCalendarSyncService } from "#src/services/external-calendar/sync.ts";

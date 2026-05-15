@@ -9,7 +9,10 @@ import { TemplateService } from "#src/http/ui/template/index.ts";
 import { BunFileService } from "#src/platform/file.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import { AclRepository } from "#src/services/acl/repository.ts";
+import { CalEditService } from "#src/services/cal-edit/service.ts";
 import { CardEditService } from "#src/services/card-edit/service.ts";
+import { UserEmailCredentialRepository } from "#src/services/email-credential/repository.ts";
+import { EmailCredentialService } from "#src/services/email-credential/service.ts";
 import { CardIndexRepository } from "#src/services/card-index/repository.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
@@ -170,6 +173,7 @@ const stubLayers = Layer.mergeAll(
 		getGroupPrincipalIds: () => Effect.succeed([]),
 		batchGetGrantedPrivileges: die,
 		getResourceParent: die,
+		getRoleForPrincipal: () => Effect.succeed("normal"),
 	}),
 	Layer.succeed(CollectionRepoTag, {
 		findById: die,
@@ -215,6 +219,21 @@ const stubLayers = Layer.mergeAll(
 	Layer.succeed(CardEditService, {
 		create: die,
 		update: die,
+		delete: die,
+	}),
+	Layer.succeed(CalEditService, {
+		create: die,
+		update: die,
+		delete: die,
+	}),
+	Layer.succeed(EmailCredentialService, {
+		resolveForUser: die,
+		storeForUser: die,
+		clearForUser: die,
+	}),
+	Layer.succeed(UserEmailCredentialRepository, {
+		findByUserId: () => Effect.succeed(Option.none()),
+		upsert: die,
 		delete: die,
 	}),
 );

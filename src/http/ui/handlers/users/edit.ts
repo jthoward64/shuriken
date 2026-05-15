@@ -17,7 +17,9 @@ import { buildNavContext } from "#src/http/ui/helpers/nav-context.ts";
 import { renderPage } from "#src/http/ui/helpers/render-page.ts";
 import type { TemplateService } from "#src/http/ui/template/index.ts";
 import { AclService } from "#src/services/acl/index.ts";
+import { AclRepository } from "#src/services/acl/repository.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
+import { KNOWN_ROLES } from "#src/services/role/policy.ts";
 import { GroupService } from "#src/services/group/index.ts";
 import { PrincipalService } from "#src/services/principal/index.ts";
 
@@ -32,6 +34,7 @@ export const usersEditHandler = (
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError | InternalError,
+	| AclRepository
 	| AclService
 	| AppConfigService
 	| CollectionService
@@ -43,6 +46,7 @@ export const usersEditHandler = (
 		const principal = yield* requireAuthenticated(ctx.auth);
 		const config = yield* AppConfigService;
 		const acl = yield* AclService;
+		const aclRepo = yield* AclRepository;
 		const principalService = yield* PrincipalService;
 		const groupService = yield* GroupService;
 		const collectionService = yield* CollectionService;
@@ -140,6 +144,18 @@ export const usersEditHandler = (
 			"principal",
 		).pipe(Effect.map(Option.getOrUndefined));
 
+		// Role dropdown is only shown to super-admins; everyone else gets a
+		// read-only badge of the current value (so they can see whose data
+		// they're looking at, but can't escalate themselves).
+		const callerRole = yield* aclRepo.getRoleForPrincipal(
+			principal.principalId,
+		);
+		const canEditRole = callerRole === "super_admin";
+		const roleOptions = KNOWN_ROLES.map((r) => ({
+			value: r,
+			selected: r === user.role,
+		}));
+
 		return yield* renderPage(
 			"pages/users/edit",
 			{
@@ -157,6 +173,9 @@ export const usersEditHandler = (
 				caldavUrl: `${davBase}/cal/`,
 				carddavUrl: `${davBase}/card/`,
 				aclPanel,
+				canEditRole,
+				roleOptions,
+				userRole: user.role,
 			},
 			ctx.headers,
 		);
