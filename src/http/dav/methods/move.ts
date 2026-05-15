@@ -21,12 +21,12 @@ import {
 	HTTP_NO_CONTENT,
 } from "#src/http/status.ts";
 import { AclService } from "#src/services/acl/index.ts";
-import { EntityRepository } from "#src/services/entity/index.ts";
-import { isReadOnlyCollection } from "#src/services/collection/read-only-guard.ts";
 import {
 	CollectionRepository,
 	CollectionService,
 } from "#src/services/collection/index.ts";
+import { isReadOnlyCollection } from "#src/services/collection/read-only-guard.ts";
+import { EntityRepository } from "#src/services/entity/index.ts";
 import {
 	InstanceRepository,
 	InstanceService,

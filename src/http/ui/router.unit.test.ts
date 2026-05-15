@@ -11,15 +11,16 @@ import { AclService } from "#src/services/acl/index.ts";
 import { AclRepository } from "#src/services/acl/repository.ts";
 import { CalEditService } from "#src/services/cal-edit/service.ts";
 import { CardEditService } from "#src/services/card-edit/service.ts";
-import { UserEmailCredentialRepository } from "#src/services/email-credential/repository.ts";
-import { EmailCredentialService } from "#src/services/email-credential/service.ts";
 import { CardIndexRepository } from "#src/services/card-index/repository.ts";
-import { ComponentRepository } from "#src/services/component/index.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
 import { CollectionRepository as CollectionRepoTag } from "#src/services/collection/repository.ts";
+import { ComponentRepository } from "#src/services/component/index.ts";
+import { UserEmailCredentialRepository } from "#src/services/email-credential/repository.ts";
+import { EmailCredentialService } from "#src/services/email-credential/service.ts";
 import { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
 import { SubscriptionService } from "#src/services/external-calendar/subscription.ts";
 import { GroupService } from "#src/services/group/index.ts";
+import { ImipDispatchService } from "#src/services/imip/dispatch.ts";
 import { InstanceService } from "#src/services/instance/index.ts";
 import { InstanceRepository as InstanceRepoTag } from "#src/services/instance/repository.ts";
 import { PrincipalService } from "#src/services/principal/index.ts";
@@ -235,6 +236,15 @@ const stubLayers = Layer.mergeAll(
 		findByUserId: () => Effect.succeed(Option.none()),
 		upsert: die,
 		delete: die,
+	}),
+	Layer.succeed(ImipDispatchService, {
+		dispatch: () =>
+			Effect.succeed({
+				sent: 0,
+				skippedLocal: 0,
+				skippedDisabled: 0,
+				failed: 0,
+			}),
 	}),
 );
 

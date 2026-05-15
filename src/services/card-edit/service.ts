@@ -5,11 +5,7 @@ import type {
 	DavError,
 	InternalError,
 } from "#src/domain/errors.ts";
-import type {
-	CollectionId,
-	EntityId,
-	InstanceId,
-} from "#src/domain/ids.ts";
+import type { CollectionId, EntityId, InstanceId } from "#src/domain/ids.ts";
 import type { ContactFormData } from "./types.ts";
 
 // ---------------------------------------------------------------------------

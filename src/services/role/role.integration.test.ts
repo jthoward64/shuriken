@@ -1,6 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import { Effect, ManagedRuntime, Redacted } from "effect";
-import { type CollectionId, type PrincipalId, UserId } from "#src/domain/ids.ts";
+import {
+	type CollectionId,
+	type PrincipalId,
+	UserId,
+} from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import { Email } from "#src/domain/types/strings.ts";
 import { handleRequest } from "#src/http/router.ts";

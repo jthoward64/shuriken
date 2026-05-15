@@ -18,13 +18,6 @@ import {
 import { timezonesHandler } from "#src/http/timezones/handler.ts";
 import { uiRouter } from "#src/http/ui/router.ts";
 import type { TemplateService } from "#src/http/ui/template/index.ts";
-import type { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
-import type { ProvisioningService } from "#src/services/provisioning/service.ts";
-import type { CalEditService } from "#src/services/cal-edit/service.ts";
-import type { CardEditService } from "#src/services/card-edit/service.ts";
-import type { UserEmailCredentialRepository } from "#src/services/email-credential/repository.ts";
-import type { EmailCredentialService } from "#src/services/email-credential/service.ts";
-import type { SubscriptionService } from "#src/services/external-calendar/subscription.ts";
 import type {
 	CollectionRepository,
 	IanaTimezoneService,
@@ -39,17 +32,25 @@ import {
 import type { BunFileService } from "#src/platform/file.ts";
 import type { AclService } from "#src/services/acl/index.ts";
 import type { AclRepository } from "#src/services/acl/repository.ts";
+import type { CalEditService } from "#src/services/cal-edit/service.ts";
 import type { CalIndexRepository } from "#src/services/cal-index/index.ts";
+import type { CardEditService } from "#src/services/card-edit/service.ts";
 import type { CardIndexRepository } from "#src/services/card-index/index.ts";
 import type { CollectionService } from "#src/services/collection/index.ts";
 import type { ComponentRepository } from "#src/services/component/index.ts";
+import type { UserEmailCredentialRepository } from "#src/services/email-credential/repository.ts";
+import type { EmailCredentialService } from "#src/services/email-credential/service.ts";
 import type { EntityRepository } from "#src/services/entity/index.ts";
+import type { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
+import type { SubscriptionService } from "#src/services/external-calendar/subscription.ts";
 import type {
 	GroupRepository,
 	GroupService,
 } from "#src/services/group/index.ts";
+import type { ImipDispatchService } from "#src/services/imip/dispatch.ts";
 import type { InstanceService } from "#src/services/instance/index.ts";
 import type { PrincipalService } from "#src/services/principal/service.ts";
+import type { ProvisioningService } from "#src/services/provisioning/service.ts";
 import type { CalTimezoneRepository } from "#src/services/timezone/index.ts";
 import type { TombstoneRepository } from "#src/services/tombstone/index.ts";
 import type { UserRepository, UserService } from "#src/services/user/index.ts";
@@ -96,6 +97,7 @@ type AppServices =
 	| CalEditService
 	| CardEditService
 	| EmailCredentialService
+	| ImipDispatchService
 	| UserEmailCredentialRepository
 	| SubscriptionService;
 

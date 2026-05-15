@@ -24,19 +24,23 @@ import {
 	unsupportedMediaType,
 } from "#src/domain/errors.ts";
 import { CollectionId, EntityId, InstanceId } from "#src/domain/ids.ts";
-import { isValidSlug, type ResolvedDavPath, type Slug } from "#src/domain/types/path.ts";
+import {
+	isValidSlug,
+	type ResolvedDavPath,
+	type Slug,
+} from "#src/domain/types/path.ts";
 import { ETag } from "#src/domain/types/strings.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { HTTP_CREATED, HTTP_NO_CONTENT } from "#src/http/status.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import { CalIndexRepository } from "#src/services/cal-index/index.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
+import { isReadOnlyCollection } from "#src/services/collection/read-only-guard.ts";
 import type { CollectionRepository } from "#src/services/collection/repository.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
 import { EntityRepository } from "#src/services/entity/index.ts";
-import { InstanceService } from "#src/services/instance/index.ts";
-import { isReadOnlyCollection } from "#src/services/collection/read-only-guard.ts";
 import type { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
+import { InstanceService } from "#src/services/instance/index.ts";
 import { SchedulingService } from "#src/services/scheduling/index.ts";
 import { CalTimezoneRepository } from "#src/services/timezone/index.ts";
 

@@ -1,4 +1,8 @@
-import { FetchHttpClient, HttpClient, HttpClientRequest } from "@effect/platform";
+import {
+	FetchHttpClient,
+	HttpClient,
+	HttpClientRequest,
+} from "@effect/platform";
 import { Effect, Layer, Option } from "effect";
 import { Temporal } from "temporal-polyfill";
 import { makeEtag } from "#src/data/etag.ts";
@@ -91,7 +95,10 @@ const buildSubVcalendar = (
 });
 
 /** Extract a non-empty TEXT property value from VCALENDAR (e.g. X-WR-CALNAME). */
-const extractCalProp = (root: IrComponent, name: string): string | undefined => {
+const extractCalProp = (
+	root: IrComponent,
+	name: string,
+): string | undefined => {
 	const prop = root.properties.find((p) => p.name === name);
 	if (!prop || prop.value.type !== "TEXT") {
 		return undefined;
@@ -190,9 +197,8 @@ const reconcileClaim = (
 	events: ReadonlyArray<ParsedEvent>,
 ): Effect.Effect<void, DatabaseError | DavError> =>
 	Effect.gen(function* () {
-		const existing = yield* deps.entityRepo.listActiveInstancesWithUid(
-			collectionId,
-		);
+		const existing =
+			yield* deps.entityRepo.listActiveInstancesWithUid(collectionId);
 		const existingByUid = new Map(
 			existing
 				.filter((r) => r.logicalUid !== null)
@@ -378,7 +384,12 @@ const syncOne = (
 			Effect.either,
 		);
 		if (docResult._tag === "Left") {
-			yield* stampError(repo, id, now, `parse failed: ${String(docResult.left)}`);
+			yield* stampError(
+				repo,
+				id,
+				now,
+				`parse failed: ${String(docResult.left)}`,
+			);
 			return;
 		}
 		const doc = docResult.right;

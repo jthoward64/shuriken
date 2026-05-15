@@ -28,7 +28,12 @@ import type {
 	DavError,
 	XmlParseError,
 } from "#src/domain/errors.ts";
-import { badRequest, forbidden, notFound, unauthorized } from "#src/domain/errors.ts";
+import {
+	badRequest,
+	forbidden,
+	notFound,
+	unauthorized,
+} from "#src/domain/errors.ts";
 import {
 	type EntityId,
 	GroupId,
@@ -54,8 +59,8 @@ import { parseXml, readXmlBody } from "#src/http/dav/xml/parser.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import type { AceRow } from "#src/services/acl/repository.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
-import { ComponentRepository } from "#src/services/component/index.ts";
 import type { CollectionRow } from "#src/services/collection/repository.ts";
+import { ComponentRepository } from "#src/services/component/index.ts";
 import { GroupService } from "#src/services/group/index.ts";
 import { InstanceService } from "#src/services/instance/index.ts";
 import type { InstanceRow } from "#src/services/instance/repository.ts";
@@ -122,7 +127,9 @@ const defaultCalendarColor = (id: string): string => {
 			sum += n;
 		}
 	}
-	return DEFAULT_CALENDAR_COLORS[sum % DEFAULT_CALENDAR_COLORS.length] as string;
+	return DEFAULT_CALENDAR_COLORS[
+		sum % DEFAULT_CALENDAR_COLORS.length
+	] as string;
 };
 const CURRENT_USER_PRINCIPAL = cn(DAV_NS, "current-user-principal");
 const CAL_DESCRIPTION = cn(CALDAV_NS, "calendar-description");
@@ -773,9 +780,7 @@ export const propfindHandler = (
 			const allProps: Record<ClarkName, unknown> = {
 				[RESOURCETYPE]: { "{DAV:}principal": "" },
 				...(displayName ? { [DISPLAYNAME]: displayName } : {}),
-				...(principalCreated
-					? { [CREATIONDATE]: principalCreated }
-					: {}),
+				...(principalCreated ? { [CREATIONDATE]: principalCreated } : {}),
 				// RFC 5397 §3: the acting user's principal URL
 				[CURRENT_USER_PRINCIPAL]: { [cn(DAV_NS, "href")]: actingPrincipalHref },
 				// RFC 3744 §4.2: canonical URL for this principal resource
@@ -1022,8 +1027,7 @@ export const propfindHandler = (
 						propstats: splitPropstats(
 							{
 								[RESOURCETYPE]: { [cn(DAV_NS, "principal")]: "" },
-								[DISPLAYNAME]:
-									p.principal.displayName ?? p.principal.slug,
+								[DISPLAYNAME]: p.principal.displayName ?? p.principal.slug,
 								[PRINCIPAL_URL]: { [cn(DAV_NS, "href")]: pHref },
 							},
 							propfind,

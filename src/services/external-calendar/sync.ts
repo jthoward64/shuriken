@@ -1,6 +1,10 @@
 import type { Effect } from "effect";
 import { Context } from "effect";
-import type { DatabaseError, DavError, InternalError } from "#src/domain/errors.ts";
+import type {
+	DatabaseError,
+	DavError,
+	InternalError,
+} from "#src/domain/errors.ts";
 import type { UuidString } from "#src/domain/ids.ts";
 
 // ---------------------------------------------------------------------------

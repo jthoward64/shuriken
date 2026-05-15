@@ -8,8 +8,8 @@ import {
 	USERS_VIRTUAL_RESOURCE_ID,
 } from "#src/domain/virtual-resources.ts";
 import { AclRepository } from "#src/services/acl/repository.ts";
-import { virtualGrants } from "#src/services/role/policy.ts";
 import { CollectionService } from "#src/services/collection/service.ts";
+import { virtualGrants } from "#src/services/role/policy.ts";
 import { UserService } from "#src/services/user/service.ts";
 import { ProvisioningService, type ProvisionUserInput } from "./service.ts";
 

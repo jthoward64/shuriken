@@ -39,7 +39,9 @@ const fromBase64 = (b64: string): Uint8Array<ArrayBuffer> => {
 	return out;
 };
 
-const deriveKey = (passphrase: string): Effect.Effect<CryptoKey, InternalError> =>
+const deriveKey = (
+	passphrase: string,
+): Effect.Effect<CryptoKey, InternalError> =>
 	Effect.tryPromise({
 		try: async () => {
 			const digest = await crypto.subtle.digest(

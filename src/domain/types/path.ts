@@ -35,7 +35,8 @@ export const Slug = Brand.nominal<Slug>();
  * Returns `true` if the segment is a safe slug. Used at the HTTP edge to gate
  * new-resource creation; existing rows are not re-validated.
  */
-const SLUG_RE = /^[A-Za-z0-9_-][A-Za-z0-9._-]{0,126}[A-Za-z0-9_-]$|^[A-Za-z0-9_-]$/;
+const SLUG_RE =
+	/^[A-Za-z0-9_-][A-Za-z0-9._-]{0,126}[A-Za-z0-9_-]$|^[A-Za-z0-9_-]$/;
 
 export const isValidSlug = (s: string): boolean => SLUG_RE.test(s);
 

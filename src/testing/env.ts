@@ -40,11 +40,11 @@ import type { CollectionService } from "#src/services/collection/service.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
 import type { ComponentRepositoryShape } from "#src/services/component/repository.ts";
 import { EntityRepository } from "#src/services/entity/index.ts";
-import { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
 import type {
 	EntityRepositoryShape,
 	EntityRow,
 } from "#src/services/entity/repository.ts";
+import { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
 import {
 	GroupRepository,
 	type GroupRepositoryShape,
@@ -1075,13 +1075,13 @@ const makeEntityRepo = (stores: TestStores): EntityRepositoryShape => ({
 		Effect.succeed(
 			[...stores.instances.values()]
 				.filter(
-					(inst) => inst.collectionId === collectionId && inst.deletedAt === null,
+					(inst) =>
+						inst.collectionId === collectionId && inst.deletedAt === null,
 				)
 				.map((inst) => ({
 					instanceId: InstanceId(inst.id),
 					entityId: EntityId(inst.entityId),
-					logicalUid:
-						stores.entities.get(inst.entityId)?.logicalUid ?? null,
+					logicalUid: stores.entities.get(inst.entityId)?.logicalUid ?? null,
 					etag: inst.etag,
 					slug: inst.slug,
 				})),
@@ -1570,7 +1570,8 @@ export const makeTestEnv = (): TestEnvBuilder => {
 					countClaimsForExternal: () => Effect.succeed(0),
 					insertClaim: () =>
 						Effect.die("no external_calendar_claim in test env"),
-					updateClaim: () => Effect.die("no external_calendar_claim in test env"),
+					updateClaim: () =>
+						Effect.die("no external_calendar_claim in test env"),
 					deleteClaim: () => Effect.void,
 					clearHttpCache: () => Effect.void,
 				},

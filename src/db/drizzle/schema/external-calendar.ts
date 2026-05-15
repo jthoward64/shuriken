@@ -77,10 +77,7 @@ export const externalCalendar = pgTable(
 			)
 			.where(sql`(deleted_at IS NULL)`),
 		check("external_calendar_last_sync_status_check", syncStatusEnum.sql),
-		check(
-			"external_calendar_sync_interval_positive",
-			sql`sync_interval_s > 0`,
-		),
+		check("external_calendar_sync_interval_positive", sql`sync_interval_s > 0`),
 	],
 );
 

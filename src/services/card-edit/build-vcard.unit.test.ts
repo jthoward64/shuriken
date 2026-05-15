@@ -54,7 +54,10 @@ describe("buildVcardComponent / parseVcardToForm round-trip", () => {
 	});
 
 	it("emits a minimal VCARD when only FN is provided", () => {
-		const vcard = buildVcardComponent("only-fn", { ...emptyContactForm, fn: "X" });
+		const vcard = buildVcardComponent("only-fn", {
+			...emptyContactForm,
+			fn: "X",
+		});
 		const names = vcard.properties.map((p) => p.name).sort();
 		expect(names).toEqual(["FN", "UID", "VERSION"]);
 	});

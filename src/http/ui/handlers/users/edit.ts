@@ -19,9 +19,9 @@ import type { TemplateService } from "#src/http/ui/template/index.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import { AclRepository } from "#src/services/acl/repository.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
-import { KNOWN_ROLES } from "#src/services/role/policy.ts";
 import { GroupService } from "#src/services/group/index.ts";
 import { PrincipalService } from "#src/services/principal/index.ts";
+import { KNOWN_ROLES } from "#src/services/role/policy.ts";
 
 // ---------------------------------------------------------------------------
 // GET /ui/users/:principalId

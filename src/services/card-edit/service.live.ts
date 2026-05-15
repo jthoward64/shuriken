@@ -1,7 +1,7 @@
 import { Effect, Layer } from "effect";
 import { makeEtag } from "#src/data/etag.ts";
-import { encodeVCard } from "#src/data/vcard/codec.ts";
 import type { IrDocument } from "#src/data/ir.ts";
+import { encodeVCard } from "#src/data/vcard/codec.ts";
 import { DatabaseClient } from "#src/db/client.ts";
 import { withTransaction } from "#src/db/transaction.ts";
 import type {
@@ -9,11 +9,7 @@ import type {
 	DavError,
 	InternalError,
 } from "#src/domain/errors.ts";
-import {
-	CollectionId,
-	EntityId,
-	type InstanceId,
-} from "#src/domain/ids.ts";
+import { CollectionId, EntityId, type InstanceId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import { ETag } from "#src/domain/types/strings.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
@@ -37,7 +33,9 @@ const slugFromUid = (uid: string): Slug => {
 	return Slug(`${safe || "contact"}.vcf`);
 };
 
-const wrapInDoc = (vcard: ReturnType<typeof buildVcardComponent>): IrDocument => ({
+const wrapInDoc = (
+	vcard: ReturnType<typeof buildVcardComponent>,
+): IrDocument => ({
 	kind: "vcard",
 	root: vcard,
 });
@@ -194,7 +192,9 @@ export const CardEditServiceLive = Layer.effect(
 					Effect.provideService(InstanceService, instanceSvc),
 				),
 			delete: (instanceId) =>
-				del(instanceId).pipe(Effect.provideService(InstanceService, instanceSvc)),
+				del(instanceId).pipe(
+					Effect.provideService(InstanceService, instanceSvc),
+				),
 		});
 	}),
 );

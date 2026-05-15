@@ -101,10 +101,7 @@ const listSharedWithPrincipals = Effect.fn(
 		).pipe(Effect.map((rows) => rows.map((r) => r.instance)));
 	},
 	Effect.tapError((e) =>
-		Effect.logWarning(
-			"repo.instance.listSharedWithPrincipals failed",
-			e.cause,
-		),
+		Effect.logWarning("repo.instance.listSharedWithPrincipals failed", e.cause),
 	),
 );
 

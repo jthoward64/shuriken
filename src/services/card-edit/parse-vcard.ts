@@ -23,7 +23,10 @@ const typesParam = (p: IrProperty): ReadonlyArray<string> => {
 	if (!t || t.value === "") {
 		return [];
 	}
-	return t.value.split(",").map((s) => s.trim()).filter((s) => s !== "");
+	return t.value
+		.split(",")
+		.map((s) => s.trim())
+		.filter((s) => s !== "");
 };
 
 const splitAddress = (raw: string): Omit<ContactAddress, "types"> => {

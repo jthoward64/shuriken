@@ -105,4 +105,3 @@ export const calendarEventsHandler = (
 			headers: { "Content-Type": "application/json; charset=utf-8" },
 		});
 	});
-

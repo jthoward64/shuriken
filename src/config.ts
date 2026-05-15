@@ -152,6 +152,7 @@ export const ExternalCalendarConfig = Config.all({
 // ---------------------------------------------------------------------------
 
 const SMTP_DEFAULT_PORT = 587;
+const LMTP_DEFAULT_PORT = 2400;
 
 interface RawMailProfileShape {
 	readonly pattern: string;
@@ -162,7 +163,9 @@ interface RawMailProfileShape {
 	readonly security?: "none" | "starttls" | "tls";
 }
 
-const decodeMailProfiles = (raw: string): ReadonlyArray<RawMailProfileShape> => {
+const decodeMailProfiles = (
+	raw: string,
+): ReadonlyArray<RawMailProfileShape> => {
 	if (raw.trim() === "") {
 		return [];
 	}
@@ -219,6 +222,17 @@ export const MailConfig = Config.all({
 	 * disabled and the resolver falls through to profiles + default.
 	 */
 	credsKey: Config.string("emailCredsKey").pipe(Config.withDefault("")),
+	/**
+	 * iMIP LMTP listener. When `lmtpEnabled` is true a Bun TCP listener is
+	 * spawned on `lmtpPort` (default 2400) accepting LMTP delivery from a
+	 * front-end MTA (postfix `lmtp:` transport, dovecot, etc). Disabled by
+	 * default — incoming iMIP isn't useful without a configured upstream.
+	 */
+	lmtpEnabled: Config.boolean("lmtpEnabled").pipe(Config.withDefault(false)),
+	lmtpPort: Config.integer("lmtpPort").pipe(
+		Config.withDefault(LMTP_DEFAULT_PORT),
+	),
+	lmtpHost: Config.string("lmtpHost").pipe(Config.withDefault("127.0.0.1")),
 	/**
 	 * Server-wide regex-scoped SMTP profiles. JSON-encoded array; each entry:
 	 *   {

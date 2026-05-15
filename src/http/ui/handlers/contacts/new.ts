@@ -11,8 +11,8 @@ import { buildNavContext } from "#src/http/ui/helpers/nav-context.ts";
 import { renderPage } from "#src/http/ui/helpers/render-page.ts";
 import type { TemplateService } from "#src/http/ui/template/index.ts";
 import type { AclService } from "#src/services/acl/service.ts";
-import { CollectionRepository } from "#src/services/collection/repository.ts";
 import { emptyContactForm } from "#src/services/card-edit/types.ts";
+import { CollectionRepository } from "#src/services/collection/repository.ts";
 
 // ---------------------------------------------------------------------------
 // GET /ui/contacts/new?addressbook=<id>
@@ -36,7 +36,8 @@ export const contactsNewHandler = (
 			(c) => c.collectionType === "addressbook" && c.deletedAt === null,
 		);
 		const requestedId = ctx.url.searchParams.get("addressbook") ?? "";
-		const selected = addressbooks.find((c) => c.id === requestedId) ?? addressbooks[0];
+		const selected =
+			addressbooks.find((c) => c.id === requestedId) ?? addressbooks[0];
 		if (!selected) {
 			return new Response("No addressbook available", { status: 400 });
 		}

@@ -9,11 +9,7 @@ import {
 	type DavError,
 	InternalError,
 } from "#src/domain/errors.ts";
-import {
-	CollectionId,
-	EntityId,
-	type InstanceId,
-} from "#src/domain/ids.ts";
+import { CollectionId, EntityId, type InstanceId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import { ETag } from "#src/domain/types/strings.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
@@ -78,6 +74,7 @@ const newUid = (): string => `${crypto.randomUUID()}@shuriken`;
 const create = (
 	calendarId: CollectionId,
 	form: EventFormData,
+	uidOverride?: string,
 ): Effect.Effect<
 	{
 		readonly entityId: EntityId;
@@ -94,7 +91,7 @@ const create = (
 		const instanceSvc = yield* InstanceService;
 		const db = yield* DatabaseClient;
 
-		const uid = newUid();
+		const uid = uidOverride ?? newUid();
 		const vevent = buildVeventComponent(uid, form);
 		if (!vevent) {
 			return yield* Effect.fail(
@@ -130,7 +127,12 @@ const create = (
 			}),
 		).pipe(Effect.provideService(DatabaseClient, db));
 
-		return { entityId: result.entityId, instanceId: result.instanceId, slug, uid };
+		return {
+			entityId: result.entityId,
+			instanceId: result.instanceId,
+			slug,
+			uid,
+		};
 	});
 
 const mergePreservedProps = (
@@ -174,11 +176,14 @@ const update = (
 		const existingDocOpt = yield* componentRepo.loadTree(entityId, "icalendar");
 		const existingVevent =
 			existingDocOpt._tag === "Some"
-				? (existingDocOpt.value.components.find((c) => c.name === "VEVENT") ?? null)
+				? (existingDocOpt.value.components.find((c) => c.name === "VEVENT") ??
+					null)
 				: null;
 		// Carry UID through — vCard-style logical-UID stability.
 		const uidFromTree =
-			existingVevent?.properties.find((p) => p.name === "UID")?.value.value?.toString() ?? null;
+			existingVevent?.properties
+				.find((p) => p.name === "UID")
+				?.value.value?.toString() ?? null;
 		const finalUid = uidFromTree ?? `${existing.entityId}@shuriken`;
 
 		const rebuilt = buildVeventComponent(finalUid, form);
@@ -239,8 +244,8 @@ export const CalEditServiceLive = Layer.effect(
 		const entityRepo = yield* EntityRepository;
 		const instanceSvc = yield* InstanceService;
 		return CalEditService.of({
-			create: (calendarId, form) =>
-				create(calendarId, form).pipe(
+			create: (calendarId, form, uidOverride) =>
+				create(calendarId, form, uidOverride).pipe(
 					Effect.provideService(ComponentRepository, componentRepo),
 					Effect.provideService(DatabaseClient, db),
 					Effect.provideService(EntityRepository, entityRepo),
@@ -254,7 +259,9 @@ export const CalEditServiceLive = Layer.effect(
 					Effect.provideService(InstanceService, instanceSvc),
 				),
 			delete: (instanceId) =>
-				del(instanceId).pipe(Effect.provideService(InstanceService, instanceSvc)),
+				del(instanceId).pipe(
+					Effect.provideService(InstanceService, instanceSvc),
+				),
 		});
 	}),
 );

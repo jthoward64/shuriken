@@ -8,7 +8,9 @@ import type {
 import type { DatabaseError } from "#src/domain/errors.ts";
 import type { UserId } from "#src/domain/ids.ts";
 
-export type UserEmailCredentialRow = InferSelectModel<typeof userEmailCredential>;
+export type UserEmailCredentialRow = InferSelectModel<
+	typeof userEmailCredential
+>;
 
 export interface NewUserEmailCredential {
 	readonly userId: UserId;

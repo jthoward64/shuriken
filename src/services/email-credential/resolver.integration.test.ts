@@ -42,6 +42,9 @@ const buildMail = (mail: MailOverride) => ({
 	defaultPassword: "",
 	defaultSecurity: "starttls" as const,
 	credsKey: mail.credsKey ?? "",
+	lmtpEnabled: false,
+	lmtpPort: 2400,
+	lmtpHost: "127.0.0.1",
 	profiles: mail.profiles ?? [],
 });
 

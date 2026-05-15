@@ -16,19 +16,20 @@ import { BunFileService } from "#src/platform/file.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import { AclRepository as AclRepoTag } from "#src/services/acl/repository.ts";
 import { CalEditService } from "#src/services/cal-edit/service.ts";
-import { CardEditService } from "#src/services/card-edit/service.ts";
-import { UserEmailCredentialRepository } from "#src/services/email-credential/repository.ts";
-import { EmailCredentialService } from "#src/services/email-credential/service.ts";
 import { CalIndexRepository } from "#src/services/cal-index/index.ts";
+import { CardEditService } from "#src/services/card-edit/service.ts";
 import { CardIndexRepository } from "#src/services/card-index/index.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
+import { UserEmailCredentialRepository } from "#src/services/email-credential/repository.ts";
+import { EmailCredentialService } from "#src/services/email-credential/service.ts";
 import { EntityRepository } from "#src/services/entity/index.ts";
-import { GroupRepository, GroupService } from "#src/services/group/index.ts";
-import { InstanceService } from "#src/services/instance/index.ts";
-import { PrincipalService } from "#src/services/principal/service.ts";
 import { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
 import { SubscriptionService } from "#src/services/external-calendar/subscription.ts";
+import { GroupRepository, GroupService } from "#src/services/group/index.ts";
+import { ImipDispatchService } from "#src/services/imip/dispatch.ts";
+import { InstanceService } from "#src/services/instance/index.ts";
+import { PrincipalService } from "#src/services/principal/service.ts";
 import { ProvisioningService } from "#src/services/provisioning/service.ts";
 import { SchedulingService } from "#src/services/scheduling/service.ts";
 import { IanaTimezoneService } from "#src/services/timezone/iana.ts";
@@ -248,7 +249,11 @@ const stubLayers = Layer.mergeAll(
 			authSettingsLabel: Option.none(),
 		},
 		log: { level: undefined },
-		externalCalendar: { schedulerTickS: 60, fetchConcurrency: 4, claimCap: 100 },
+		externalCalendar: {
+			schedulerTickS: 60,
+			fetchConcurrency: 4,
+			claimCap: 100,
+		},
 		birthday: { schedulerTickS: 600, concurrency: 4 },
 		mail: {
 			enabled: false,
@@ -260,6 +265,9 @@ const stubLayers = Layer.mergeAll(
 			defaultPassword: "",
 			defaultSecurity: "starttls",
 			credsKey: "",
+			lmtpEnabled: false,
+			lmtpPort: 2400,
+			lmtpHost: "127.0.0.1",
 			profiles: [],
 		},
 		nodeEnv: "test",
@@ -333,6 +341,15 @@ const stubLayers = Layer.mergeAll(
 		findByUserId: () => Effect.succeed(Option.none()),
 		upsert: die,
 		delete: die,
+	}),
+	Layer.succeed(ImipDispatchService, {
+		dispatch: () =>
+			Effect.succeed({
+				sent: 0,
+				skippedLocal: 0,
+				skippedDisabled: 0,
+				failed: 0,
+			}),
 	}),
 );
 

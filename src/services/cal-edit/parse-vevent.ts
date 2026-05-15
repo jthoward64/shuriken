@@ -76,6 +76,8 @@ export const parseVeventToForm = (vevent: IrComponent): EventFormData => {
 	let recurrenceFreq: RecurrenceFreq = "";
 	let recurrenceCount = "";
 	let recurrenceUntil = "";
+	const attendees: Array<string> = [];
+	let organizer = "";
 
 	for (const p of vevent.properties) {
 		switch (p.name) {
@@ -110,6 +112,24 @@ export const parseVeventToForm = (vevent: IrComponent): EventFormData => {
 				recurrenceUntil = parsed.until;
 				break;
 			}
+			case "ATTENDEE": {
+				const raw = textOf(p);
+				if (raw !== "") {
+					attendees.push(
+						raw.toLowerCase().startsWith("mailto:")
+							? raw.slice("mailto:".length)
+							: raw,
+					);
+				}
+				break;
+			}
+			case "ORGANIZER": {
+				const raw = textOf(p);
+				organizer = raw.toLowerCase().startsWith("mailto:")
+					? raw.slice("mailto:".length)
+					: raw;
+				break;
+			}
 			default:
 				break;
 		}
@@ -127,5 +147,7 @@ export const parseVeventToForm = (vevent: IrComponent): EventFormData => {
 		recurrenceFreq,
 		recurrenceCount,
 		recurrenceUntil,
+		attendees,
+		organizer,
 	};
 };

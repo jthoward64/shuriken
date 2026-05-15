@@ -6,19 +6,22 @@ import { TemplateService } from "#src/http/ui/template/index.ts";
 import type { CryptoService } from "#src/platform/crypto.ts";
 import { BunFileService } from "#src/platform/file.ts";
 import { AclDomainLayer, AclRepositoryLive } from "#src/services/acl/index.ts";
+import { BirthdayServiceLive } from "#src/services/birthday/service.live.ts";
+import { CalEditServiceLive } from "#src/services/cal-edit/service.live.ts";
 import { CalIndexRepositoryLive } from "#src/services/cal-index/index.ts";
+import { CardEditServiceLive } from "#src/services/card-edit/service.live.ts";
 import { CardIndexRepositoryLive } from "#src/services/card-index/index.ts";
 import { CollectionDomainLayer } from "#src/services/collection/index.ts";
 import { DomainEntityDomainLayer } from "#src/services/domain-entity/index.ts";
-import { BirthdayServiceLive } from "#src/services/birthday/service.live.ts";
-import { CalEditServiceLive } from "#src/services/cal-edit/service.live.ts";
 import { UserEmailCredentialRepositoryLive } from "#src/services/email-credential/repository.live.ts";
 import { EmailCredentialServiceLive } from "#src/services/email-credential/service.live.ts";
-import { CardEditServiceLive } from "#src/services/card-edit/service.live.ts";
 import { ExternalCalendarRepositoryLive } from "#src/services/external-calendar/repository.live.ts";
 import { SubscriptionServiceLive } from "#src/services/external-calendar/subscription.live.ts";
 import { GroupDomainLayer } from "#src/services/group/index.ts";
+import { ImipDispatchServiceLive } from "#src/services/imip/dispatch.live.ts";
+import { ImipInboundServiceLive } from "#src/services/imip/inbound.live.ts";
 import { InstanceDomainLayer } from "#src/services/instance/index.ts";
+import { MailerServiceLive } from "#src/services/mailer/service.live.ts";
 import { PrincipalDomainLayer } from "#src/services/principal/index.ts";
 import { ProvisioningDomainLayer } from "#src/services/provisioning/index.ts";
 import { SchedulingDomainLayer } from "#src/services/scheduling/index.ts";
@@ -73,6 +76,9 @@ const testConfig: AppConfigType = {
 		defaultPassword: "",
 		defaultSecurity: "starttls" as const,
 		credsKey: "",
+		lmtpEnabled: false,
+		lmtpPort: 2400,
+		lmtpHost: "127.0.0.1",
 		profiles: [] as ReadonlyArray<{
 			pattern: string;
 			host: string;
@@ -103,19 +109,14 @@ const AppConfigTestLayer = Layer.succeed(
 //   - BasicAuthLayer         always (multi-user support via Basic auth)
 // ---------------------------------------------------------------------------
 
-export const makeScriptRunnerLayer = (
-	overrides?: Partial<AppConfigType>,
-) => {
+export const makeScriptRunnerLayer = (overrides?: Partial<AppConfigType>) => {
 	const merged: AppConfigType = overrides
 		? { ...testConfig, ...overrides }
 		: testConfig;
 	const configLayer =
 		overrides === undefined
 			? AppConfigTestLayer
-			: Layer.succeed(
-					AppConfigService,
-					merged as unknown as AppConfigService,
-				);
+			: Layer.succeed(AppConfigService, merged as unknown as AppConfigService);
 	const testInfraLayer = Layer.mergeAll(
 		configLayer,
 		makePgliteDatabaseLayer(),
@@ -148,7 +149,6 @@ export const makeScriptRunnerLayer = (
 		withTestInfra(ExternalCalendarRepositoryLive),
 	);
 
-
 	const testStubsLayer = Layer.mergeAll(
 		Layer.succeed(BunFileService, {
 			readText: () => Effect.die("stub"),
@@ -176,6 +176,38 @@ export const makeScriptRunnerLayer = (
 		CardEditServiceLive.pipe(Layer.provide(testBaseLayer)),
 		CalEditServiceLive.pipe(Layer.provide(testBaseLayer)),
 		EmailCredentialServiceLive.pipe(Layer.provide(testBaseLayer)),
+		MailerServiceLive.pipe(
+			Layer.provide(
+				Layer.mergeAll(
+					testBaseLayer,
+					EmailCredentialServiceLive.pipe(Layer.provide(testBaseLayer)),
+				),
+			),
+		),
+		ImipInboundServiceLive.pipe(
+			Layer.provide(
+				Layer.mergeAll(
+					testBaseLayer,
+					CalEditServiceLive.pipe(Layer.provide(testBaseLayer)),
+				),
+			),
+		),
+		ImipDispatchServiceLive.pipe(
+			Layer.provide(
+				Layer.mergeAll(
+					testBaseLayer,
+					EmailCredentialServiceLive.pipe(Layer.provide(testBaseLayer)),
+					MailerServiceLive.pipe(
+						Layer.provide(
+							Layer.mergeAll(
+								testBaseLayer,
+								EmailCredentialServiceLive.pipe(Layer.provide(testBaseLayer)),
+							),
+						),
+					),
+				),
+			),
+		),
 		testStubsLayer,
 	);
 };

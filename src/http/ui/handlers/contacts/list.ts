@@ -12,12 +12,12 @@ import { buildNavContext } from "#src/http/ui/helpers/nav-context.ts";
 import { renderPage } from "#src/http/ui/helpers/render-page.ts";
 import type { TemplateService } from "#src/http/ui/template/index.ts";
 import type { AclService } from "#src/services/acl/service.ts";
+import { parseVcardToForm } from "#src/services/card-edit/parse-vcard.ts";
 import { CardIndexRepository } from "#src/services/card-index/repository.ts";
 import type { CollectionRow } from "#src/services/collection/repository.ts";
 import { CollectionRepository } from "#src/services/collection/repository.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
 import { InstanceRepository } from "#src/services/instance/repository.ts";
-import { parseVcardToForm } from "#src/services/card-edit/parse-vcard.ts";
 
 // ---------------------------------------------------------------------------
 // GET /ui/contacts?addressbook=<id>&q=<search>

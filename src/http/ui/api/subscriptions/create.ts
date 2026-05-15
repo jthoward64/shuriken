@@ -68,9 +68,9 @@ export const subscriptionsCreateHandler = (
 		const displayName = form.get("displayName")?.toString().trim() || undefined;
 		const color = form.get("color")?.toString().trim() || undefined;
 
-		const parseResult = yield* parseSlug(
-			form.get("slug")?.toString(),
-		).pipe(Effect.either);
+		const parseResult = yield* parseSlug(form.get("slug")?.toString()).pipe(
+			Effect.either,
+		);
 		if (Either.isLeft(parseResult)) {
 			return yield* renderFragment("partials/form-error", {
 				errors: validationErrorToContext(
@@ -99,7 +99,9 @@ export const subscriptionsCreateHandler = (
 			url,
 			slug,
 			syncIntervalS,
-			...(displayName !== undefined ? { displaynameOverride: displayName } : {}),
+			...(displayName !== undefined
+				? { displaynameOverride: displayName }
+				: {}),
 			...(color !== undefined ? { colorOverride: color } : {}),
 		});
 

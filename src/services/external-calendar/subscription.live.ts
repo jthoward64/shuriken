@@ -1,8 +1,8 @@
 import { Effect, Layer, Option } from "effect";
 import { AppConfigService } from "#src/config.ts";
 import {
-	conflict,
 	type ConflictError,
+	conflict,
 	type DatabaseError,
 	DavError,
 	forbidden,
@@ -91,9 +91,7 @@ const subscribe = (
 			collectionType: "calendar",
 			slug: Slug(input.slug),
 			displayName:
-				input.displaynameOverride ??
-				external.defaultDisplayname ??
-				undefined,
+				input.displaynameOverride ?? external.defaultDisplayname ?? undefined,
 			supportedComponents: ["VEVENT", "VTODO", "VJOURNAL"],
 		});
 
@@ -152,7 +150,9 @@ const unsubscribe = (
 		yield* repo.deleteClaim(claimId);
 		yield* collSvc.delete(CollectionId(claim.collectionId));
 
-		const remaining = yield* repo.countClaimsForExternal(claim.externalCalendarId);
+		const remaining = yield* repo.countClaimsForExternal(
+			claim.externalCalendarId,
+		);
 		if (remaining === 0) {
 			yield* repo.softDelete(claim.externalCalendarId);
 		} else {

@@ -69,7 +69,9 @@ const del = Effect.fn("UserEmailCredentialRepository.delete")(
 	function* (userId: UserId) {
 		yield* Effect.annotateCurrentSpan({ "user.id": userId });
 		yield* runDbQuery((db) =>
-			db.delete(userEmailCredential).where(eq(userEmailCredential.userId, userId)),
+			db
+				.delete(userEmailCredential)
+				.where(eq(userEmailCredential.userId, userId)),
 		);
 	},
 	Effect.tapError((e) =>

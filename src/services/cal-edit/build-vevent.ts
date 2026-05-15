@@ -132,6 +132,31 @@ export const buildVeventComponent = (
 			isKnown: true,
 		});
 	}
+	if (form.organizer !== "") {
+		props.push({
+			name: "ORGANIZER",
+			parameters: [],
+			value: { type: "CAL_ADDRESS", value: `mailto:${form.organizer}` },
+			isKnown: true,
+		});
+	}
+	for (const a of form.attendees) {
+		const trimmed = a.trim();
+		if (trimmed === "") {
+			continue;
+		}
+		props.push({
+			name: "ATTENDEE",
+			parameters: [
+				{ name: "ROLE", value: "REQ-PARTICIPANT" },
+				{ name: "PARTSTAT", value: "NEEDS-ACTION" },
+				{ name: "RSVP", value: "TRUE" },
+			],
+			value: { type: "CAL_ADDRESS", value: `mailto:${trimmed}` },
+			isKnown: true,
+		});
+	}
+
 	if (form.recurrenceFreq !== "") {
 		const parts: Array<string> = [`FREQ=${form.recurrenceFreq}`];
 		const count = Number.parseInt(form.recurrenceCount, 10);

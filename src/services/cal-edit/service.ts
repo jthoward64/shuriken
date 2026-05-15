@@ -5,11 +5,7 @@ import type {
 	DavError,
 	InternalError,
 } from "#src/domain/errors.ts";
-import type {
-	CollectionId,
-	EntityId,
-	InstanceId,
-} from "#src/domain/ids.ts";
+import type { CollectionId, EntityId, InstanceId } from "#src/domain/ids.ts";
 import type { EventFormData } from "./types.ts";
 
 // ---------------------------------------------------------------------------
@@ -31,17 +27,18 @@ export interface CalEditServiceShape {
 	readonly create: (
 		calendarId: CollectionId,
 		form: EventFormData,
-	) => Effect.Effect<
-		CalEditResult,
-		DatabaseError | DavError | InternalError
-	>;
+		/**
+		 * Optional pre-supplied UID — when set, that value is used as the
+		 * VEVENT UID + entity logical_uid so the caller can correlate later
+		 * (inbound iMIP REQUEST passes the sender's UID through). Defaults
+		 * to a freshly minted UID.
+		 */
+		uid?: string,
+	) => Effect.Effect<CalEditResult, DatabaseError | DavError | InternalError>;
 	readonly update: (
 		instanceId: InstanceId,
 		form: EventFormData,
-	) => Effect.Effect<
-		CalEditResult,
-		DatabaseError | DavError | InternalError
-	>;
+	) => Effect.Effect<CalEditResult, DatabaseError | DavError | InternalError>;
 	readonly delete: (
 		instanceId: InstanceId,
 	) => Effect.Effect<void, DatabaseError | DavError | InternalError>;

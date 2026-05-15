@@ -18,12 +18,12 @@ import {
 	type CollectionRepository,
 	CollectionService,
 } from "#src/services/collection/index.ts";
-import { ComponentRepository } from "#src/services/component/index.ts";
-import type { EntityRepository } from "#src/services/entity/index.ts";
 import {
 	isAutoManagedCollection,
 	isReadOnlyCollection,
 } from "#src/services/collection/read-only-guard.ts";
+import { ComponentRepository } from "#src/services/component/index.ts";
+import type { EntityRepository } from "#src/services/entity/index.ts";
 import { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
 import {
 	type InstanceRepository,

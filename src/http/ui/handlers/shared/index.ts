@@ -26,7 +26,11 @@ import { PrincipalRepository } from "#src/services/principal/repository.ts";
 
 // Any of these privileges on a resource qualifies it as "shared".
 // DAV:read is the common case; DAV:all and DAV:write imply read.
-const READ_PRIVILEGES: ReadonlyArray<string> = ["DAV:read", "DAV:all", "DAV:write"];
+const READ_PRIVILEGES: ReadonlyArray<string> = [
+	"DAV:read",
+	"DAV:all",
+	"DAV:write",
+];
 
 export const sharedWithMeHandler = (
 	_req: Request,
@@ -50,9 +54,7 @@ export const sharedWithMeHandler = (
 		const instRepo = yield* InstanceRepository;
 		const principalRepo = yield* PrincipalRepository;
 
-		const groupIds = yield* aclRepo.getGroupPrincipalIds(
-			principal.principalId,
-		);
+		const groupIds = yield* aclRepo.getGroupPrincipalIds(principal.principalId);
 		const principalSet: ReadonlyArray<PrincipalId> = [
 			principal.principalId,
 			...groupIds,

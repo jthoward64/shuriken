@@ -81,10 +81,8 @@ const buildAddresses = (form: FormLike): ReadonlyArray<ContactAddress> => {
 };
 
 export const parseContactForm = (form: FormLike): ContactFormData => {
-	const single = (key: string) =>
-		(form.get(key)?.toString() ?? "").trim();
-	const urls = stringsFor(form, "urls[]")
-		.map((u) => u.trim());
+	const single = (key: string) => (form.get(key)?.toString() ?? "").trim();
+	const urls = stringsFor(form, "urls[]").map((u) => u.trim());
 	return {
 		...emptyContactForm,
 		fn: single("fn"),

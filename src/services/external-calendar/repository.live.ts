@@ -9,11 +9,7 @@ import {
 } from "#src/db/drizzle/schema/index.ts";
 import { runDbQuery } from "#src/db/query.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
-import type {
-	CollectionId,
-	PrincipalId,
-	UuidString,
-} from "#src/domain/ids.ts";
+import type { CollectionId, PrincipalId, UuidString } from "#src/domain/ids.ts";
 import {
 	ExternalCalendarRepository,
 	type SyncResultPatch,
@@ -168,10 +164,7 @@ const recordSyncResult = Effect.fn(
 		);
 	},
 	Effect.tapError((e) =>
-		Effect.logWarning(
-			"repo.externalCalendar.recordSyncResult failed",
-			e.cause,
-		),
+		Effect.logWarning("repo.externalCalendar.recordSyncResult failed", e.cause),
 	),
 );
 
@@ -205,7 +198,7 @@ const recomputeSyncInterval = Effect.fn(
 
 const findDue = Effect.fn("ExternalCalendarRepository.findDue")(
 	function* (now: Temporal.Instant) {
-		yield* Effect.annotateCurrentSpan({ "now": now.toString() });
+		yield* Effect.annotateCurrentSpan({ now: now.toString() });
 		// `last_sync_at IS NULL OR last_sync_at + sync_interval_s * interval '1 sec' < now`
 		// PG `make_interval(secs => x)` is the idiomatic way; we use a literal.
 		return yield* runDbQuery((db) =>
@@ -231,9 +224,7 @@ const findDue = Effect.fn("ExternalCalendarRepository.findDue")(
 	),
 );
 
-const findClaimById = Effect.fn(
-	"ExternalCalendarRepository.findClaimById",
-)(
+const findClaimById = Effect.fn("ExternalCalendarRepository.findClaimById")(
 	function* (id: UuidString) {
 		yield* Effect.annotateCurrentSpan({ "claim.id": id });
 		return yield* runDbQuery((db) =>
@@ -281,7 +272,9 @@ const listClaimsForExternal = Effect.fn(
 			db
 				.select()
 				.from(externalCalendarClaim)
-				.where(eq(externalCalendarClaim.externalCalendarId, externalCalendarId)),
+				.where(
+					eq(externalCalendarClaim.externalCalendarId, externalCalendarId),
+				),
 		);
 	},
 	Effect.tapError((e) =>
@@ -341,7 +334,9 @@ const countClaimsForExternal = Effect.fn(
 			db
 				.select({ n: sql<number>`count(*)::int` })
 				.from(externalCalendarClaim)
-				.where(eq(externalCalendarClaim.externalCalendarId, externalCalendarId)),
+				.where(
+					eq(externalCalendarClaim.externalCalendarId, externalCalendarId),
+				),
 		);
 		return r[0]?.n ?? 0;
 	},
@@ -475,7 +470,8 @@ export const ExternalCalendarRepositoryLive = Layer.effect(
 			e: Effect.Effect<A, E, DatabaseClient>,
 		): Effect.Effect<A, E> => Effect.provideService(e, DatabaseClient, dc);
 		return ExternalCalendarRepository.of({
-			findById: (...args: Parameters<typeof findById>) => run(findById(...args)),
+			findById: (...args: Parameters<typeof findById>) =>
+				run(findById(...args)),
 			findByUrl: (...args: Parameters<typeof findByUrl>) =>
 				run(findByUrl(...args)),
 			upsertByUrl: (...args: Parameters<typeof upsertByUrl>) =>

@@ -46,12 +46,7 @@ export const instanceAclHandler = (
 		// quietly return an empty set for a non-existent UUID, which would
 		// confuse the UI. findById raises 404 here for missing instances.
 		const instance = yield* instanceSvc.findById(instanceId);
-		yield* acl.check(
-			principal.principalId,
-			instanceId,
-			"instance",
-			"DAV:read",
-		);
+		yield* acl.check(principal.principalId, instanceId, "instance", "DAV:read");
 
 		const panel = yield* buildAclPanelData(
 			principal.principalId,

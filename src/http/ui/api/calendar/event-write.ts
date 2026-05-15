@@ -12,7 +12,11 @@ import { AclService } from "#src/services/acl/service.ts";
 import { CalEditService } from "#src/services/cal-edit/service.ts";
 import type { EventFormData } from "#src/services/cal-edit/types.ts";
 import { emptyEventForm } from "#src/services/cal-edit/types.ts";
+import type { ComponentRepository } from "#src/services/component/index.ts";
+import type { ImipDispatchService } from "#src/services/imip/dispatch.ts";
+import { fireAndForgetDispatch } from "#src/services/imip/event-hook.ts";
 import { InstanceService } from "#src/services/instance/index.ts";
+import type { UserService } from "#src/services/user/index.ts";
 
 // ---------------------------------------------------------------------------
 // Shared form parser for both create and update — event payload is small
@@ -41,6 +45,11 @@ const parseEventForm = (form: FormLike): EventFormData => ({
 	) as EventFormData["recurrenceFreq"],
 	recurrenceCount: single(form, "recurrenceCount"),
 	recurrenceUntil: single(form, "recurrenceUntil"),
+	attendees: single(form, "attendeesCsv")
+		.split(/[\n,]/)
+		.map((s) => s.trim())
+		.filter((s) => s !== ""),
+	organizer: single(form, "organizer"),
 });
 
 const redirectAfter = (
@@ -68,7 +77,12 @@ export const eventCreateHandler = (
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError | InternalError,
-	AclService | CalEditService
+	| AclService
+	| CalEditService
+	| ComponentRepository
+	| ImipDispatchService
+	| InstanceService
+	| UserService
 > =>
 	Effect.gen(function* () {
 		const principal = yield* requireAuthenticated(ctx.auth);
@@ -86,7 +100,12 @@ export const eventCreateHandler = (
 			try: () => req.formData(),
 			catch: (e) => new InternalError({ cause: e }),
 		});
-		yield* calEdit.create(collectionId, parseEventForm(form));
+		const created = yield* calEdit.create(collectionId, parseEventForm(form));
+		yield* fireAndForgetDispatch(
+			"REQUEST",
+			created.instanceId,
+			principal.userId,
+		);
 
 		return redirectAfter(ctx, collectionId);
 	});
@@ -102,7 +121,12 @@ export const eventUpdateHandler = (
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError | InternalError,
-	AclService | CalEditService | InstanceService
+	| AclService
+	| CalEditService
+	| ComponentRepository
+	| ImipDispatchService
+	| InstanceService
+	| UserService
 > =>
 	Effect.gen(function* () {
 		const principal = yield* requireAuthenticated(ctx.auth);
@@ -123,6 +147,7 @@ export const eventUpdateHandler = (
 			catch: (e) => new InternalError({ cause: e }),
 		});
 		yield* calEdit.update(instanceId, parseEventForm(form));
+		yield* fireAndForgetDispatch("REQUEST", instanceId, principal.userId);
 
 		return redirectAfter(ctx, existing.collectionId);
 	});
@@ -138,7 +163,12 @@ export const eventDeleteHandler = (
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError | InternalError,
-	AclService | CalEditService | InstanceService
+	| AclService
+	| CalEditService
+	| ComponentRepository
+	| ImipDispatchService
+	| InstanceService
+	| UserService
 > =>
 	Effect.gen(function* () {
 		const principal = yield* requireAuthenticated(ctx.auth);
@@ -153,6 +183,9 @@ export const eventDeleteHandler = (
 			"collection",
 			"DAV:unbind",
 		);
+		// Fire CANCEL *before* the delete so the IR tree is still readable
+		// when the dispatcher loads it on its forked fiber.
+		yield* fireAndForgetDispatch("CANCEL", instanceId, principal.userId);
 		yield* calEdit.delete(instanceId);
 		return redirectAfter(ctx, existing.collectionId);
 	});

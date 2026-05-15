@@ -96,10 +96,9 @@ describe("Calendar CRUD + events feed (integration)", () => {
 			// Hit the JSON feed.
 			const feedRes = await runtime.runPromise(
 				handleRequest(
-					new Request(
-						`http://localhost/ui/api/calendar/${calendarId}/events`,
-						{ headers: { Authorization: ALICE_AUTH } },
-					),
+					new Request(`http://localhost/ui/api/calendar/${calendarId}/events`, {
+						headers: { Authorization: ALICE_AUTH },
+					}),
 					mockServer,
 				),
 			);
@@ -153,10 +152,9 @@ describe("Calendar CRUD + events feed (integration)", () => {
 			);
 			const feedAfter = await runtime.runPromise(
 				handleRequest(
-					new Request(
-						`http://localhost/ui/api/calendar/${calendarId}/events`,
-						{ headers: { Authorization: ALICE_AUTH } },
-					),
+					new Request(`http://localhost/ui/api/calendar/${calendarId}/events`, {
+						headers: { Authorization: ALICE_AUTH },
+					}),
 					mockServer,
 				),
 			);

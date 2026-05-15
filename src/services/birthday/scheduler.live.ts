@@ -31,10 +31,7 @@ const tickAll = Effect.gen(function* () {
 		targets,
 		(c) =>
 			birthdays
-				.regenerate(
-					c.ownerPrincipalId as PrincipalId,
-					CollectionId(c.id),
-				)
+				.regenerate(c.ownerPrincipalId as PrincipalId, CollectionId(c.id))
 				.pipe(
 					Effect.catchAllCause((cause) =>
 						Effect.logWarning("scheduler.birthday: regenerate failed", {

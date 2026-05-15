@@ -7,12 +7,26 @@ import { TemplateServiceLive } from "#src/http/ui/template/index.ts";
 import { type CryptoService, CryptoServiceLive } from "#src/platform/crypto.ts";
 import { BunFileServiceLive } from "#src/platform/file.ts";
 import { AclDomainLayer } from "#src/services/acl/index.ts";
+import { BirthdaySchedulerLayer } from "#src/services/birthday/scheduler.live.ts";
+import { BirthdayServiceLive } from "#src/services/birthday/service.live.ts";
+import { CalEditServiceLive } from "#src/services/cal-edit/service.live.ts";
 import { CalIndexRepositoryLive } from "#src/services/cal-index/index.ts";
+import { CardEditServiceLive } from "#src/services/card-edit/service.live.ts";
 import { CardIndexRepositoryLive } from "#src/services/card-index/index.ts";
 import { CollectionDomainLayer } from "#src/services/collection/index.ts";
 import { DomainEntityDomainLayer } from "#src/services/domain-entity/index.ts";
+import { UserEmailCredentialRepositoryLive } from "#src/services/email-credential/repository.live.ts";
+import { EmailCredentialServiceLive } from "#src/services/email-credential/service.live.ts";
+import { ExternalCalendarRepositoryLive } from "#src/services/external-calendar/repository.live.ts";
+import { ExternalCalendarSchedulerLayer } from "#src/services/external-calendar/scheduler.live.ts";
+import { SubscriptionServiceLive } from "#src/services/external-calendar/subscription.live.ts";
+import { ExternalCalendarSyncLayer } from "#src/services/external-calendar/sync.live.ts";
 import { GroupDomainLayer } from "#src/services/group/index.ts";
+import { ImipDispatchServiceLive } from "#src/services/imip/dispatch.live.ts";
+import { ImipInboundServiceLive } from "#src/services/imip/inbound.live.ts";
+import { LmtpServerLayer } from "#src/services/imip/lmtp-server.ts";
 import { InstanceDomainLayer } from "#src/services/instance/index.ts";
+import { MailerServiceLive } from "#src/services/mailer/service.live.ts";
 import { PrincipalDomainLayer } from "#src/services/principal/index.ts";
 import { ProvisioningDomainLayer } from "#src/services/provisioning/index.ts";
 import { SchedulingDomainLayer } from "#src/services/scheduling/index.ts";
@@ -20,16 +34,6 @@ import {
 	IanaTimezoneService,
 	TimezoneDomainLayer,
 } from "#src/services/timezone/index.ts";
-import { BirthdaySchedulerLayer } from "#src/services/birthday/scheduler.live.ts";
-import { BirthdayServiceLive } from "#src/services/birthday/service.live.ts";
-import { CalEditServiceLive } from "#src/services/cal-edit/service.live.ts";
-import { EmailCredentialServiceLive } from "#src/services/email-credential/service.live.ts";
-import { UserEmailCredentialRepositoryLive } from "#src/services/email-credential/repository.live.ts";
-import { CardEditServiceLive } from "#src/services/card-edit/service.live.ts";
-import { ExternalCalendarRepositoryLive } from "#src/services/external-calendar/repository.live.ts";
-import { ExternalCalendarSchedulerLayer } from "#src/services/external-calendar/scheduler.live.ts";
-import { SubscriptionServiceLive } from "#src/services/external-calendar/subscription.live.ts";
-import { ExternalCalendarSyncLayer } from "#src/services/external-calendar/sync.live.ts";
 import { TombstoneRepositoryLive } from "#src/services/tombstone/index.ts";
 import { UserDomainLayer } from "#src/services/user/index.ts";
 
@@ -119,6 +123,12 @@ const ExternalCalendarSyncFull = ExternalCalendarSyncLayer.pipe(
 const BirthdayServiceFull = BirthdayServiceLive.pipe(
 	Layer.provide(BaseAppLayer),
 );
+const EmailCredentialFull = EmailCredentialServiceLive.pipe(
+	Layer.provide(BaseAppLayer),
+);
+const MailerFull = MailerServiceLive.pipe(
+	Layer.provide(Layer.mergeAll(BaseAppLayer, EmailCredentialFull)),
+);
 
 export const AppLayer = Layer.mergeAll(
 	BaseAppLayer,
@@ -127,7 +137,34 @@ export const AppLayer = Layer.mergeAll(
 	SubscriptionServiceLive.pipe(Layer.provide(BaseAppLayer)),
 	CardEditServiceLive.pipe(Layer.provide(BaseAppLayer)),
 	CalEditServiceLive.pipe(Layer.provide(BaseAppLayer)),
-	EmailCredentialServiceLive.pipe(Layer.provide(BaseAppLayer)),
+	EmailCredentialFull,
+	MailerFull,
+	ImipDispatchServiceLive.pipe(
+		Layer.provide(Layer.mergeAll(BaseAppLayer, MailerFull)),
+	),
+	ImipInboundServiceLive.pipe(
+		Layer.provide(
+			Layer.mergeAll(
+				BaseAppLayer,
+				CalEditServiceLive.pipe(Layer.provide(BaseAppLayer)),
+			),
+		),
+	),
+	LmtpServerLayer.pipe(
+		Layer.provide(
+			Layer.mergeAll(
+				BaseAppLayer,
+				ImipInboundServiceLive.pipe(
+					Layer.provide(
+						Layer.mergeAll(
+							BaseAppLayer,
+							CalEditServiceLive.pipe(Layer.provide(BaseAppLayer)),
+						),
+					),
+				),
+			),
+		),
+	),
 	BirthdayServiceFull,
 	ExternalCalendarSchedulerLayer.pipe(
 		Layer.provide(Layer.mergeAll(BaseAppLayer, ExternalCalendarSyncFull)),
@@ -149,10 +186,13 @@ export { TemplateService } from "#src/http/ui/template/index.ts";
 export { CryptoService } from "#src/platform/crypto.ts";
 export { BunFileService } from "#src/platform/file.ts";
 export { AclService } from "#src/services/acl/index.ts";
+export { BirthdayService } from "#src/services/birthday/service.ts";
+export { CalEditService } from "#src/services/cal-edit/service.ts";
 export {
 	type CalComponentType,
 	CalIndexRepository,
 } from "#src/services/cal-index/index.ts";
+export { CardEditService } from "#src/services/card-edit/service.ts";
 export {
 	type CardCollation,
 	type CardIndexField,
@@ -164,14 +204,26 @@ export {
 	CollectionService,
 } from "#src/services/collection/index.ts";
 export { DomainEntityService } from "#src/services/domain-entity/index.ts";
+export { UserEmailCredentialRepository } from "#src/services/email-credential/repository.ts";
+export { EmailCredentialService } from "#src/services/email-credential/service.ts";
+export {
+	type ExternalCalendarClaimRow,
+	ExternalCalendarRepository,
+	type ExternalCalendarRow,
+} from "#src/services/external-calendar/repository.ts";
+export { SubscriptionService } from "#src/services/external-calendar/subscription.ts";
+export { ExternalCalendarSyncService } from "#src/services/external-calendar/sync.ts";
 export {
 	GroupRepository,
 	GroupService,
 } from "#src/services/group/index.ts";
+export { ImipDispatchService } from "#src/services/imip/dispatch.ts";
+export { ImipInboundService } from "#src/services/imip/inbound.ts";
 export {
 	InstanceRepository,
 	InstanceService,
 } from "#src/services/instance/index.ts";
+export { MailerService } from "#src/services/mailer/service.ts";
 export {
 	PrincipalRepository,
 	PrincipalService,
@@ -185,18 +237,6 @@ export {
 	TombstoneRepository,
 	type TombstoneRow,
 } from "#src/services/tombstone/index.ts";
-export {
-	type ExternalCalendarClaimRow,
-	ExternalCalendarRepository,
-	type ExternalCalendarRow,
-} from "#src/services/external-calendar/repository.ts";
-export { BirthdayService } from "#src/services/birthday/service.ts";
-export { CalEditService } from "#src/services/cal-edit/service.ts";
-export { EmailCredentialService } from "#src/services/email-credential/service.ts";
-export { UserEmailCredentialRepository } from "#src/services/email-credential/repository.ts";
-export { CardEditService } from "#src/services/card-edit/service.ts";
-export { SubscriptionService } from "#src/services/external-calendar/subscription.ts";
-export { ExternalCalendarSyncService } from "#src/services/external-calendar/sync.ts";
 export {
 	UserRepository,
 	UserService,

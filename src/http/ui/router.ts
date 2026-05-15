@@ -26,48 +26,48 @@ import {
 } from "#src/http/status.ts";
 import { aclGrantHandler } from "#src/http/ui/api/acl/grant.ts";
 import { aclRevokeHandler } from "#src/http/ui/api/acl/revoke.ts";
-import { collectionsDeleteHandler } from "#src/http/ui/api/collections/delete.ts";
-import { collectionsUpdateHandler } from "#src/http/ui/api/collections/update.ts";
-import { groupsCreateHandler } from "#src/http/ui/api/groups/create.ts";
-import { groupsCollectionsCreateHandler } from "#src/http/ui/api/groups/create-collection.ts";
-import { groupsDeleteHandler } from "#src/http/ui/api/groups/delete.ts";
-import { groupsMembersHandler } from "#src/http/ui/api/groups/members.ts";
-import { groupsUpdateHandler } from "#src/http/ui/api/groups/update.ts";
-import { usersCreateHandler } from "#src/http/ui/api/users/create.ts";
-import { usersCollectionsCreateHandler } from "#src/http/ui/api/users/create-collection.ts";
-import { usersDeleteHandler } from "#src/http/ui/api/users/delete.ts";
-import { usersSetPasswordHandler } from "#src/http/ui/api/users/set-password.ts";
-import { usersUpdateHandler } from "#src/http/ui/api/users/update.ts";
-import { emailCredentialsClearHandler } from "#src/http/ui/api/profile/email-credentials-clear.ts";
-import { emailCredentialsSaveHandler } from "#src/http/ui/api/profile/email-credentials-save.ts";
-import { emailCredentialsPageHandler } from "#src/http/ui/handlers/profile/email-credentials.ts";
-import { calendarEventsHandler } from "#src/http/ui/api/calendar/events.ts";
 import {
 	eventCreateHandler,
 	eventDeleteHandler,
 	eventUpdateHandler,
 } from "#src/http/ui/api/calendar/event-write.ts";
-import { eventEditHandler } from "#src/http/ui/handlers/calendar/event-edit.ts";
-import { eventNewHandler } from "#src/http/ui/handlers/calendar/event-new.ts";
-import { calendarViewHandler } from "#src/http/ui/handlers/calendar/view.ts";
+import { calendarEventsHandler } from "#src/http/ui/api/calendar/events.ts";
+import { collectionsDeleteHandler } from "#src/http/ui/api/collections/delete.ts";
+import { collectionsUpdateHandler } from "#src/http/ui/api/collections/update.ts";
 import { contactsCreateHandler } from "#src/http/ui/api/contacts/create.ts";
 import { contactsDeleteHandler } from "#src/http/ui/api/contacts/delete.ts";
 import { contactsUpdateHandler } from "#src/http/ui/api/contacts/update.ts";
+import { groupsCreateHandler } from "#src/http/ui/api/groups/create.ts";
+import { groupsCollectionsCreateHandler } from "#src/http/ui/api/groups/create-collection.ts";
+import { groupsDeleteHandler } from "#src/http/ui/api/groups/delete.ts";
+import { groupsMembersHandler } from "#src/http/ui/api/groups/members.ts";
+import { groupsUpdateHandler } from "#src/http/ui/api/groups/update.ts";
+import { emailCredentialsClearHandler } from "#src/http/ui/api/profile/email-credentials-clear.ts";
+import { emailCredentialsSaveHandler } from "#src/http/ui/api/profile/email-credentials-save.ts";
+import { subscriptionsCreateHandler } from "#src/http/ui/api/subscriptions/create.ts";
+import { subscriptionsDeleteHandler } from "#src/http/ui/api/subscriptions/delete.ts";
+import { usersCreateHandler } from "#src/http/ui/api/users/create.ts";
+import { usersCollectionsCreateHandler } from "#src/http/ui/api/users/create-collection.ts";
+import { usersDeleteHandler } from "#src/http/ui/api/users/delete.ts";
+import { usersSetPasswordHandler } from "#src/http/ui/api/users/set-password.ts";
+import { usersUpdateHandler } from "#src/http/ui/api/users/update.ts";
+import { eventEditHandler } from "#src/http/ui/handlers/calendar/event-edit.ts";
+import { eventNewHandler } from "#src/http/ui/handlers/calendar/event-new.ts";
+import { calendarViewHandler } from "#src/http/ui/handlers/calendar/view.ts";
+import { collectionsEditHandler } from "#src/http/ui/handlers/collections/edit.ts";
 import { contactsEditHandler } from "#src/http/ui/handlers/contacts/edit.ts";
 import { contactsListHandler } from "#src/http/ui/handlers/contacts/list.ts";
 import { contactsNewHandler } from "#src/http/ui/handlers/contacts/new.ts";
-import { subscriptionsCreateHandler } from "#src/http/ui/api/subscriptions/create.ts";
-import { subscriptionsDeleteHandler } from "#src/http/ui/api/subscriptions/delete.ts";
-import { collectionsEditHandler } from "#src/http/ui/handlers/collections/edit.ts";
-import { instanceAclHandler } from "#src/http/ui/handlers/instances/acl.ts";
-import { sharedWithMeHandler } from "#src/http/ui/handlers/shared/index.ts";
-import { subscriptionsListHandler } from "#src/http/ui/handlers/subscriptions/list.ts";
-import { subscriptionsNewHandler } from "#src/http/ui/handlers/subscriptions/new.ts";
 import { groupsCollectionsNewHandler } from "#src/http/ui/handlers/groups/collections-new.ts";
 import { groupsEditHandler } from "#src/http/ui/handlers/groups/edit.ts";
 import { groupsListHandler } from "#src/http/ui/handlers/groups/list.ts";
 import { groupsNewHandler } from "#src/http/ui/handlers/groups/new.ts";
+import { instanceAclHandler } from "#src/http/ui/handlers/instances/acl.ts";
+import { emailCredentialsPageHandler } from "#src/http/ui/handlers/profile/email-credentials.ts";
+import { sharedWithMeHandler } from "#src/http/ui/handlers/shared/index.ts";
 import { staticHandler } from "#src/http/ui/handlers/static.ts";
+import { subscriptionsListHandler } from "#src/http/ui/handlers/subscriptions/list.ts";
+import { subscriptionsNewHandler } from "#src/http/ui/handlers/subscriptions/new.ts";
 import { usersCollectionsNewHandler } from "#src/http/ui/handlers/users/collections-new.ts";
 import { usersEditHandler } from "#src/http/ui/handlers/users/edit.ts";
 import { usersListHandler } from "#src/http/ui/handlers/users/list.ts";
@@ -77,17 +77,18 @@ import type { AclService } from "#src/services/acl/index.ts";
 import type { AclRepository } from "#src/services/acl/repository.ts";
 import type { CalEditService } from "#src/services/cal-edit/service.ts";
 import type { CardEditService } from "#src/services/card-edit/service.ts";
-import type { UserEmailCredentialRepository } from "#src/services/email-credential/repository.ts";
-import type { EmailCredentialService } from "#src/services/email-credential/service.ts";
 import type { CardIndexRepository } from "#src/services/card-index/repository.ts";
-import type { ComponentRepository } from "#src/services/component/index.ts";
 import type { CollectionService } from "#src/services/collection/index.ts";
 import type { CollectionRepository } from "#src/services/collection/repository.ts";
+import type { ComponentRepository } from "#src/services/component/index.ts";
+import type { UserEmailCredentialRepository } from "#src/services/email-credential/repository.ts";
+import type { EmailCredentialService } from "#src/services/email-credential/service.ts";
 import type { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
-import type { InstanceService } from "#src/services/instance/index.ts";
-import type { InstanceRepository } from "#src/services/instance/repository.ts";
 import type { SubscriptionService } from "#src/services/external-calendar/subscription.ts";
 import type { GroupService } from "#src/services/group/index.ts";
+import type { ImipDispatchService } from "#src/services/imip/dispatch.ts";
+import type { InstanceService } from "#src/services/instance/index.ts";
+import type { InstanceRepository } from "#src/services/instance/repository.ts";
 import type { PrincipalService } from "#src/services/principal/index.ts";
 import type { PrincipalRepository } from "#src/services/principal/repository.ts";
 import type { ProvisioningService } from "#src/services/provisioning/service.ts";
@@ -108,6 +109,7 @@ export type UiServices =
 	| CalEditService
 	| CardEditService
 	| EmailCredentialService
+	| ImipDispatchService
 	| UserEmailCredentialRepository
 	| CardIndexRepository
 	| CollectionRepository
@@ -366,13 +368,7 @@ export const uiRouter = (
 		if (!seg1) {
 			return handle(calendarViewHandler(req, ctx));
 		}
-		if (
-			seg1 &&
-			isUuid(seg1) &&
-			seg2 === "events" &&
-			seg3 === "new" &&
-			!seg4
-		) {
+		if (seg1 && isUuid(seg1) && seg2 === "events" && seg3 === "new" && !seg4) {
 			return handle(eventNewHandler(req, ctx, CollectionId(seg1)));
 		}
 		if (
@@ -488,12 +484,7 @@ export const uiRouter = (
 			}
 		}
 		// Calendar event mutations
-		if (
-			seg1 === "calendar" &&
-			seg2 &&
-			isUuid(seg2) &&
-			seg3 === "events"
-		) {
+		if (seg1 === "calendar" && seg2 && isUuid(seg2) && seg3 === "events") {
 			if (seg4 === "create") {
 				return handle(eventCreateHandler(req, ctx, CollectionId(seg2)));
 			}

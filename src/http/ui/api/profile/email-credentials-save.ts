@@ -1,4 +1,5 @@
 import { Effect, Redacted } from "effect";
+import type { SmtpSecurity } from "#src/db/drizzle/schema/index.ts";
 import {
 	type DatabaseError,
 	type DavError,
@@ -7,7 +8,6 @@ import {
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import { isHtmxRequest } from "#src/http/ui/helpers/htmx.ts";
-import type { SmtpSecurity } from "#src/db/drizzle/schema/index.ts";
 import { EmailCredentialService } from "#src/services/email-credential/service.ts";
 
 // ---------------------------------------------------------------------------
@@ -42,8 +42,7 @@ export const emailCredentialsSaveHandler = (
 			catch: (e) => new InternalError({ cause: e }),
 		});
 
-		const single = (key: string) =>
-			(form.get(key)?.toString() ?? "").trim();
+		const single = (key: string) => (form.get(key)?.toString() ?? "").trim();
 		const fromAddress = single("fromAddress");
 		const fromName = single("fromName");
 		const host = single("host");

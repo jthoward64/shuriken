@@ -399,9 +399,8 @@ export const AclRepositoryLive = Layer.effect(
 			) => run(getGroupPrincipalIds(...args)),
 			getResourceParent: (...args: Parameters<typeof getResourceParent>) =>
 				run(getResourceParent(...args)),
-			getRoleForPrincipal: (
-				...args: Parameters<typeof getRoleForPrincipal>
-			) => run(getRoleForPrincipal(...args)),
+			getRoleForPrincipal: (...args: Parameters<typeof getRoleForPrincipal>) =>
+				run(getRoleForPrincipal(...args)),
 			batchGetGrantedPrivileges: (
 				...args: Parameters<typeof batchGetGrantedPrivileges>
 			) => run(batchGetGrantedPrivileges(...args)),

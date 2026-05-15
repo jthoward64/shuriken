@@ -1,10 +1,10 @@
+import type { ResourceType } from "#src/db/drizzle/schema/index.ts";
+import type { UuidString } from "#src/domain/ids.ts";
+import type { DavPrivilege } from "#src/domain/types/dav.ts";
 import {
 	GROUPS_VIRTUAL_RESOURCE_ID,
 	USERS_VIRTUAL_RESOURCE_ID,
 } from "#src/domain/virtual-resources.ts";
-import type { ResourceType } from "#src/db/drizzle/schema/index.ts";
-import type { UuidString } from "#src/domain/ids.ts";
-import type { DavPrivilege } from "#src/domain/types/dav.ts";
 
 // ---------------------------------------------------------------------------
 // RolePolicy — single source of truth for what each role grants.
@@ -87,4 +87,5 @@ const VIRTUAL_GRANTS: Readonly<
 	],
 };
 
-export const virtualGrants = (role: string) => VIRTUAL_GRANTS[normaliseRole(role)];
+export const virtualGrants = (role: string) =>
+	VIRTUAL_GRANTS[normaliseRole(role)];

@@ -6,8 +6,8 @@
 // ---------------------------------------------------------------------------
 
 import { Temporal } from "temporal-polyfill";
-import type { IrComponent, IrDocument, IrProperty } from "#src/data/ir.ts";
 import { getOccurrenceInstantsInRange } from "#src/data/icalendar/recurrence/recurrence-check.ts";
+import type { IrComponent, IrDocument, IrProperty } from "#src/data/ir.ts";
 
 const CALDAV_NS = "urn:ietf:params:xml:ns:caldav";
 const cn = (local: string): string => `{${CALDAV_NS}}${local}`;
@@ -307,17 +307,18 @@ const valueToInstant = (
 		return value.value.toInstant();
 	}
 	if (value.type === "DATE") {
-		return value.value.toZonedDateTime({
-			timeZone: "UTC",
-			plainTime: "00:00:00",
-		}).toInstant();
+		return value.value
+			.toZonedDateTime({
+				timeZone: "UTC",
+				plainTime: "00:00:00",
+			})
+			.toInstant();
 	}
 	if (value.type === "PLAIN_DATE_TIME") {
 		return value.value.toZonedDateTime("UTC").toInstant();
 	}
 	return undefined;
 };
-
 
 /** Build a new scheduling component for an occurrence at `start`. */
 const buildExpandedInstance = (
@@ -407,7 +408,6 @@ const stripTzidParam = (prop: IrProperty): IrProperty =>
 				),
 			}
 		: prop;
-
 
 const subsetComponent = (comp: IrComponent, spec: CompSpec): IrComponent => {
 	// Properties: keep all if allProps, or filter to spec.props + always-required ones

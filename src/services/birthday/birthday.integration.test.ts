@@ -124,9 +124,7 @@ describe("Birthday calendar (integration)", () => {
 			);
 			expect(propfindRes.status).toBe(207);
 			const propfindBody = await propfindRes.text();
-			const responseCount = (
-				propfindBody.match(/<D:response>/g) ?? []
-			).length;
+			const responseCount = (propfindBody.match(/<D:response>/g) ?? []).length;
 			expect(responseCount).toBe(2);
 			expect(propfindBody).toContain("text/calendar");
 

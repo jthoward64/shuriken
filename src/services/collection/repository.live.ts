@@ -111,10 +111,7 @@ const listByAutoManagedKind = Effect.fn(
 		);
 	},
 	Effect.tapError((e) =>
-		Effect.logWarning(
-			"repo.collection.listByAutoManagedKind failed",
-			e.cause,
-		),
+		Effect.logWarning("repo.collection.listByAutoManagedKind failed", e.cause),
 	),
 );
 

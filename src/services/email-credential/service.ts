@@ -1,11 +1,8 @@
 import type { Effect, Redacted } from "effect";
 import { Context } from "effect";
-import type {
-	DatabaseError,
-	InternalError,
-} from "#src/domain/errors.ts";
-import type { UserId } from "#src/domain/ids.ts";
 import type { SmtpSecurity } from "#src/db/drizzle/schema/index.ts";
+import type { DatabaseError, InternalError } from "#src/domain/errors.ts";
+import type { UserId } from "#src/domain/ids.ts";
 
 // ---------------------------------------------------------------------------
 // EmailCredentialService — resolves "which SMTP creds should I use to send
@@ -50,10 +47,7 @@ export interface EmailCredentialServiceShape {
 		userId: UserId,
 		userEmail: string,
 		userDisplayName: string | null,
-	) => Effect.Effect<
-		ResolvedSmtpCreds | null,
-		DatabaseError | InternalError
-	>;
+	) => Effect.Effect<ResolvedSmtpCreds | null, DatabaseError | InternalError>;
 	/**
 	 * Persist per-user creds, encrypting the password with EMAIL_CREDS_KEY.
 	 * Returns InternalError if the env key is unset.
@@ -68,9 +62,7 @@ export interface EmailCredentialServiceShape {
 		readonly password: Redacted.Redacted<string>;
 		readonly security: SmtpSecurity;
 	}) => Effect.Effect<void, DatabaseError | InternalError>;
-	readonly clearForUser: (
-		userId: UserId,
-	) => Effect.Effect<void, DatabaseError>;
+	readonly clearForUser: (userId: UserId) => Effect.Effect<void, DatabaseError>;
 }
 
 export class EmailCredentialService extends Context.Tag(

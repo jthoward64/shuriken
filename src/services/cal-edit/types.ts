@@ -27,6 +27,14 @@ export interface EventFormData {
 	readonly recurrenceCount: string;
 	/** Optional ISO date; empty string = unbounded. */
 	readonly recurrenceUntil: string;
+	/**
+	 * Attendee email addresses (one per array entry). Non-local addresses
+	 * trigger an iMIP REQUEST/CANCEL message via MailerService when the
+	 * event is created or modified. Empty array = no scheduling.
+	 */
+	readonly attendees: ReadonlyArray<string>;
+	/** Optional ORGANIZER address override; defaults to the calendar owner. */
+	readonly organizer: string;
 }
 
 export const emptyEventForm: EventFormData = {
@@ -40,4 +48,6 @@ export const emptyEventForm: EventFormData = {
 	recurrenceFreq: "",
 	recurrenceCount: "",
 	recurrenceUntil: "",
+	attendees: [],
+	organizer: "",
 };

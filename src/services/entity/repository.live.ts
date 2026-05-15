@@ -261,10 +261,7 @@ const listActiveInstancesWithUid = Effect.fn(
 		);
 	},
 	Effect.tapError((e) =>
-		Effect.logWarning(
-			"repo.entity.listActiveInstancesWithUid failed",
-			e.cause,
-		),
+		Effect.logWarning("repo.entity.listActiveInstancesWithUid failed", e.cause),
 	),
 );
 

@@ -46,9 +46,7 @@ export interface CardIndexRepositoryShape {
 	 * + uid + fn + normalized bday). Used by BirthdayService to regenerate the
 	 * derived "Birthdays" calendar.
 	 */
-	readonly listWithBday: (
-		collectionId: CollectionId,
-	) => Effect.Effect<
+	readonly listWithBday: (collectionId: CollectionId) => Effect.Effect<
 		ReadonlyArray<{
 			readonly entityId: EntityId;
 			readonly uid: string;

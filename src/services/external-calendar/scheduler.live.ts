@@ -41,10 +41,9 @@ export const ExternalCalendarSchedulerLayer = Layer.scopedDiscard(
 	Effect.gen(function* () {
 		const config = yield* AppConfigService;
 		const tick = config.externalCalendar.schedulerTickS;
-		yield* Effect.logInfo(
-			"scheduler.external: starting polling fiber",
-			{ tickS: tick },
-		);
+		yield* Effect.logInfo("scheduler.external: starting polling fiber", {
+			tickS: tick,
+		});
 		yield* tickAll.pipe(
 			// `catchAllCause` keeps the fiber alive across defects too — a
 			// rogue exception in one tick mustn't kill the whole scheduler.

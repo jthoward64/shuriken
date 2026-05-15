@@ -3,9 +3,9 @@ import type { Context, Effect, Option } from "effect";
 import { Context as Ctx } from "effect";
 import type { Temporal } from "temporal-polyfill";
 import type {
+	ExternalCalendarSyncStatus,
 	externalCalendar,
 	externalCalendarClaim,
-	ExternalCalendarSyncStatus,
 } from "#src/db/drizzle/schema/index.ts";
 import type { DatabaseError } from "#src/domain/errors.ts";
 import type { CollectionId, PrincipalId, UuidString } from "#src/domain/ids.ts";
@@ -136,9 +136,7 @@ export interface ExternalCalendarRepositoryShape {
 		},
 	) => Effect.Effect<ExternalCalendarClaimRow, DatabaseError>;
 
-	readonly deleteClaim: (
-		id: UuidString,
-	) => Effect.Effect<void, DatabaseError>;
+	readonly deleteClaim: (id: UuidString) => Effect.Effect<void, DatabaseError>;
 }
 
 export class ExternalCalendarRepository extends Ctx.Tag(
@@ -146,5 +144,6 @@ export class ExternalCalendarRepository extends Ctx.Tag(
 )<ExternalCalendarRepository, ExternalCalendarRepositoryShape>() {}
 
 // re-export for callers that prefer the Context.Tag name
-export type ExternalCalendarRepositoryContext =
-	Context.Tag.Identifier<typeof ExternalCalendarRepository>;
+export type ExternalCalendarRepositoryContext = Context.Tag.Identifier<
+	typeof ExternalCalendarRepository
+>;

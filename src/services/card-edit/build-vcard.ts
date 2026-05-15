@@ -35,9 +35,7 @@ const uriProp = (name: string, value: string): IrProperty => ({
 const typedTextProp = (name: string, tv: ContactTypedValue): IrProperty => ({
 	name,
 	parameters:
-		tv.types.length === 0
-			? []
-			: [{ name: "TYPE", value: tv.types.join(",") }],
+		tv.types.length === 0 ? [] : [{ name: "TYPE", value: tv.types.join(",") }],
 	value: { type: "TEXT", value: tv.value },
 	isKnown: true,
 });
