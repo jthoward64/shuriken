@@ -38,6 +38,11 @@ const FORM_OWNED_PROPS = new Set([
 	"DTEND",
 	"CATEGORIES",
 	"RRULE",
+	// ATTENDEE / ORGANIZER are form-managed: the new payload is the
+	// authoritative set. Without this, edits that remove an attendee leave
+	// a stale ATTENDEE in the IR and resend REQUESTs to ghosts.
+	"ATTENDEE",
+	"ORGANIZER",
 ]);
 
 const SLUG_MAX_BODY = 120;

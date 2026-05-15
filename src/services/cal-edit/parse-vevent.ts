@@ -11,7 +11,11 @@ import { emptyEventForm } from "./types.ts";
 // ---------------------------------------------------------------------------
 
 const textOf = (p: IrProperty): string =>
-	p.value.type === "TEXT" || p.value.type === "URI" ? p.value.value : "";
+	p.value.type === "TEXT" ||
+	p.value.type === "URI" ||
+	p.value.type === "CAL_ADDRESS"
+		? p.value.value
+		: "";
 
 const isAllDayProp = (p: IrProperty): boolean =>
 	p.parameters.some((pp) => pp.name === "VALUE" && pp.value === "DATE") ||

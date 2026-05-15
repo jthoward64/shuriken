@@ -27,6 +27,7 @@ export const dispatchForInstance = (
 	method: ImipMethod,
 	instanceId: InstanceId,
 	organizerUserId: UserId,
+	onlyRecipients?: ReadonlyArray<string>,
 ): Effect.Effect<
 	void,
 	DavError | DatabaseError | InternalError,
@@ -52,6 +53,12 @@ export const dispatchForInstance = (
 		if (!vevent) {
 			return;
 		}
+		// onlyRecipients=[] means "no targeted recipients" — skip entirely.
+		// (Distinguished from undefined, which means "use the VEVENT's
+		// ATTENDEE list".)
+		if (onlyRecipients !== undefined && onlyRecipients.length === 0) {
+			return;
+		}
 
 		const { user, principal } = yield* userSvc.findById(organizerUserId);
 		const outcome = yield* dispatch.dispatch({
@@ -60,6 +67,7 @@ export const dispatchForInstance = (
 			organizerUserId,
 			organizerEmail: user.email,
 			organizerDisplayName: principal.displayName,
+			...(onlyRecipients !== undefined ? { onlyRecipients } : {}),
 		});
 		yield* Effect.logDebug("imip.dispatch result", { outcome, instanceId });
 	});
@@ -72,8 +80,9 @@ export const fireAndForgetDispatch = (
 	method: ImipMethod,
 	instanceId: InstanceId,
 	organizerUserId: UserId,
+	onlyRecipients?: ReadonlyArray<string>,
 ) =>
-	dispatchForInstance(method, instanceId, organizerUserId).pipe(
+	dispatchForInstance(method, instanceId, organizerUserId, onlyRecipients).pipe(
 		Effect.catchAllCause((cause) =>
 			Effect.logWarning("imip.fireAndForgetDispatch failed", { cause }),
 		),

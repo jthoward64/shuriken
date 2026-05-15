@@ -201,3 +201,48 @@ export const apply = (
 
 export const formatReply = (reply: LmtpReply): string =>
 	`${reply.code} ${reply.text}\r\n`;
+
+// ---------------------------------------------------------------------------
+// Per-recipient delivery outcome → LMTP reply.
+//
+// Extracted so the LMTP server's ordering guarantee (RFC 2033 §4.2 — one
+// reply per RCPT TO, in issuance order) can be unit-tested without standing
+// up a real socket. The server awaits all delivery tasks then maps outcomes
+// to replies via this function in RCPT order.
+// ---------------------------------------------------------------------------
+
+export type DeliveryOutcome =
+	| { readonly tag: "Applied" }
+	| { readonly tag: "UnknownRecipient" }
+	| { readonly tag: "MissingCalendar" }
+	| { readonly tag: "NotImip" }
+	| { readonly tag: "MalformedIcs"; readonly cause: string }
+	| { readonly tag: "Rejected" };
+
+export const deliveryReply = (
+	recipient: string,
+	outcome: DeliveryOutcome,
+): LmtpReply => {
+	switch (outcome.tag) {
+		case "Applied":
+			return { code: 250, text: `Delivered ${recipient}` };
+		case "UnknownRecipient":
+			return { code: 550, text: `No such user: ${recipient}` };
+		case "MissingCalendar":
+			return { code: 550, text: `No primary calendar for ${recipient}` };
+		case "NotImip":
+			return { code: 550, text: "Not an iMIP message" };
+		case "MalformedIcs":
+			return { code: 550, text: `Malformed iCalendar: ${outcome.cause}` };
+		case "Rejected":
+			return { code: 451, text: "Temporary failure" };
+	}
+};
+
+export const renderDeliveryReplies = (
+	recipients: ReadonlyArray<string>,
+	outcomes: ReadonlyArray<DeliveryOutcome>,
+): ReadonlyArray<LmtpReply> =>
+	recipients.map((r, i) =>
+		deliveryReply(r, outcomes[i] ?? { tag: "Rejected" }),
+	);

@@ -51,6 +51,11 @@ export const contactsCreateHandler = (
 		);
 
 		const base = parseContactForm(formData);
+		// RFC 6350 §3.3 — FN is mandatory and non-empty. The UI form marks it
+		// `required` but a script POST can bypass; reject here too.
+		if (base.fn.trim() === "") {
+			return new Response("Display name is required", { status: 400 });
+		}
 		const withPhoto = yield* Effect.tryPromise({
 			try: () => applyPhotoUpload(formData, base),
 			catch: (e) => new InternalError({ cause: e }),

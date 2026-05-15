@@ -71,6 +71,22 @@ describe("buildVcardComponent / parseVcardToForm round-trip", () => {
 		expect(vcard.properties.find((p) => p.name === "BDAY")).toBeUndefined();
 	});
 
+	it("emits yearless BDAY (--MMDD) as TEXT, normalised to --MMDD", () => {
+		const cases: ReadonlyArray<readonly [string, string]> = [
+			["--1224", "--1224"],
+			["--12-24", "--1224"],
+		];
+		for (const [input, expected] of cases) {
+			const vcard = buildVcardComponent("yearless", {
+				...emptyContactForm,
+				fn: "X",
+				bday: input,
+			});
+			const bday = vcard.properties.find((p) => p.name === "BDAY");
+			expect(bday?.value).toEqual({ type: "TEXT", value: expected });
+		}
+	});
+
 	it("drops empty array entries silently", () => {
 		const vcard = buildVcardComponent("empties", {
 			...emptyContactForm,

@@ -29,7 +29,8 @@ const dispatch = (
 		const mailer = yield* MailerService;
 		const userRepo = yield* UserRepository;
 
-		const attendees = extractAttendeeAddresses(input.vevent);
+		const attendees =
+			input.onlyRecipients ?? extractAttendeeAddresses(input.vevent);
 		let sent = 0;
 		let skippedLocal = 0;
 		let skippedDisabled = 0;

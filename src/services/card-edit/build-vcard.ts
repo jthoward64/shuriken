@@ -51,12 +51,32 @@ const addressJoined = (addr: ContactAddress): string =>
 		addr.country,
 	].join(";");
 
-const tryParseBday = (raw: string): Temporal.PlainDate | null => {
+/**
+ * BDAY input handler.
+ *
+ * vCard 4 BDAY accepts full dates and yearless forms (RFC 6350 §4.3.4):
+ *   * YYYY-MM-DD       → emit as DATE
+ *   * --MMDD / --MM-DD → emit as TEXT (DATE has no representation for
+ *                       yearless months/days)
+ * Anything else returns null so the BDAY property is omitted.
+ */
+const tryParseBday = (
+	raw: string,
+):
+	| { readonly date: Temporal.PlainDate; readonly raw?: never }
+	| { readonly date?: never; readonly raw: string }
+	| null => {
 	if (!raw) {
 		return null;
 	}
+	const yearlessMatch = raw.match(/^--(\d{2})-?(\d{2})$/);
+	if (yearlessMatch) {
+		// Re-emit canonical `--MMDD` so the on-the-wire form is stable
+		// regardless of whether the user typed --1224 or --12-24.
+		return { raw: `--${yearlessMatch[1]}${yearlessMatch[2]}` };
+	}
 	try {
-		return Temporal.PlainDate.from(raw);
+		return { date: Temporal.PlainDate.from(raw) };
 	} catch {
 		return null;
 	}
@@ -117,7 +137,10 @@ export const buildVcardComponent = (
 		props.push({
 			name: "BDAY",
 			parameters: [],
-			value: { type: "DATE", value: bday },
+			value:
+				bday.date !== undefined
+					? { type: "DATE", value: bday.date }
+					: { type: "TEXT", value: bday.raw },
 			isKnown: true,
 		});
 	}

@@ -41,7 +41,10 @@ export const autoLoginStartup: Effect.Effect<
 > = Effect.gen(function* () {
 	const config = yield* AppConfigService;
 
-	if (Option.isNone(config.auth.autoLogin)) {
+	if (
+		Option.isNone(config.auth.autoLogin) ||
+		config.auth.autoLogin.value === ""
+	) {
 		return;
 	}
 
@@ -135,6 +138,9 @@ export const basicAuthStartup: Effect.Effect<
 			name: localPart,
 			slug,
 			credentials: [{ source: "local", authId: adminEmailStr, password }],
+			// Preserve the pre-roles "admin = full power" expectation.
+			// Operators who want a less-privileged admin can demote later via UI.
+			role: "super_admin",
 		});
 		principalId = result.user.principal.id as PrincipalId;
 

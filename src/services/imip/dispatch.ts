@@ -24,6 +24,14 @@ export interface ImipDispatchInput {
 	readonly organizerUserId: UserId;
 	readonly organizerEmail: string;
 	readonly organizerDisplayName: string | null;
+	/**
+	 * When set, dispatch ONLY to these addresses instead of pulling the
+	 * recipient list from the VEVENT's ATTENDEE properties. Used by the
+	 * "attendee removed" CANCEL path: we send a METHOD:CANCEL of the
+	 * current event to each removed address so their client matches by UID
+	 * and drops the meeting.
+	 */
+	readonly onlyRecipients?: ReadonlyArray<string>;
 }
 
 export interface ImipDispatchOutcome {

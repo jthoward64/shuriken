@@ -4,7 +4,7 @@ import {
 	type DavError,
 	InternalError,
 } from "#src/domain/errors.ts";
-import { CollectionId, type InstanceId } from "#src/domain/ids.ts";
+import { CollectionId, EntityId, type InstanceId } from "#src/domain/ids.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import { isHtmxRequest } from "#src/http/ui/helpers/htmx.ts";
@@ -12,7 +12,8 @@ import { AclService } from "#src/services/acl/service.ts";
 import { CalEditService } from "#src/services/cal-edit/service.ts";
 import type { EventFormData } from "#src/services/cal-edit/types.ts";
 import { emptyEventForm } from "#src/services/cal-edit/types.ts";
-import type { ComponentRepository } from "#src/services/component/index.ts";
+import { ComponentRepository } from "#src/services/component/index.ts";
+import { extractAttendeeAddresses } from "#src/services/imip/build-message.ts";
 import type { ImipDispatchService } from "#src/services/imip/dispatch.ts";
 import { fireAndForgetDispatch } from "#src/services/imip/event-hook.ts";
 import { InstanceService } from "#src/services/instance/index.ts";
@@ -146,8 +147,43 @@ export const eventUpdateHandler = (
 			try: () => req.formData(),
 			catch: (e) => new InternalError({ cause: e }),
 		});
-		yield* calEdit.update(instanceId, parseEventForm(form));
+
+		// Capture the pre-edit attendee set so we can fire CANCEL to any
+		// addresses dropped by the new form. Without this, removed
+		// attendees would keep the meeting on their calendar.
+		const componentRepo = yield* ComponentRepository;
+		const preTree = yield* componentRepo.loadTree(
+			EntityId(existing.entityId),
+			"icalendar",
+		);
+		const preAttendees: ReadonlyArray<string> =
+			preTree._tag === "Some"
+				? extractAttendeeAddresses(
+						preTree.value.components.find((c) => c.name === "VEVENT") ?? {
+							name: "VEVENT",
+							properties: [],
+							components: [],
+						},
+					)
+				: [];
+
+		const parsed = parseEventForm(form);
+		yield* calEdit.update(instanceId, parsed);
+
+		const lowerSet = new Set(
+			parsed.attendees.map((a) => a.toLowerCase().trim()),
+		);
+		const removed = preAttendees.filter((a) => !lowerSet.has(a.toLowerCase()));
+
 		yield* fireAndForgetDispatch("REQUEST", instanceId, principal.userId);
+		if (removed.length > 0) {
+			yield* fireAndForgetDispatch(
+				"CANCEL",
+				instanceId,
+				principal.userId,
+				removed,
+			);
+		}
 
 		return redirectAfter(ctx, existing.collectionId);
 	});

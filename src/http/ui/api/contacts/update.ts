@@ -51,6 +51,9 @@ export const contactsUpdateHandler = (
 		});
 
 		const base = parseContactForm(formData);
+		if (base.fn.trim() === "") {
+			return new Response("Display name is required", { status: 400 });
+		}
 		const withPhoto = yield* Effect.tryPromise({
 			try: () => applyPhotoUpload(formData, base),
 			catch: (e) => new InternalError({ cause: e }),

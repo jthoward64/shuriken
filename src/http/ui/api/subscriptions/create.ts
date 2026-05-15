@@ -31,16 +31,14 @@ import { SubscriptionService } from "#src/services/external-calendar/subscriptio
 //   syncIntervalS     required, parsed as int
 // ---------------------------------------------------------------------------
 
-const parsePositiveInt = (
-	value: string | undefined,
-): Effect.Effect<number, InternalError> => {
+// Returns null on rejected values; the caller surfaces a 400 form-error
+// response so the operator sees the validation message instead of a 500.
+const parsePositiveInt = (value: string | undefined): number | null => {
 	const n = value ? Number.parseInt(value, 10) : Number.NaN;
 	if (!Number.isFinite(n) || n <= 0) {
-		return Effect.fail(
-			new InternalError({ cause: new Error(`invalid integer: ${value}`) }),
-		);
+		return null;
 	}
-	return Effect.succeed(n);
+	return n;
 };
 
 export const subscriptionsCreateHandler = (
@@ -80,7 +78,7 @@ export const subscriptionsCreateHandler = (
 		}
 		const slug = parseResult.right;
 
-		const syncIntervalS = yield* parsePositiveInt(
+		const syncIntervalS = parsePositiveInt(
 			form.get("syncIntervalS")?.toString(),
 		);
 
@@ -89,6 +87,18 @@ export const subscriptionsCreateHandler = (
 				errors: validationErrorToContext(
 					new FormValidationError({
 						fields: new Map([["url", "URL is required"]]),
+					}),
+				),
+			});
+		}
+
+		if (syncIntervalS === null) {
+			return yield* renderFragment("partials/form-error", {
+				errors: validationErrorToContext(
+					new FormValidationError({
+						fields: new Map([
+							["syncIntervalS", "Sync interval must be a positive integer."],
+						]),
 					}),
 				),
 			});

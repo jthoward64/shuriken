@@ -1,10 +1,12 @@
 import { describe, expect, it } from "bun:test";
 import {
 	apply,
+	deliveryReply,
 	formatReply,
 	greeting,
 	initialState,
 	parseCommand,
+	renderDeliveryReplies,
 } from "./lmtp-protocol.ts";
 
 describe("LMTP protocol", () => {
@@ -52,5 +54,60 @@ describe("LMTP protocol", () => {
 
 	it("formatReply ends with CRLF", () => {
 		expect(formatReply({ code: 250, text: "OK" })).toBe("250 OK\r\n");
+	});
+
+	it("deliveryReply maps every outcome variant", () => {
+		expect(deliveryReply("a@x", { tag: "Applied" })).toEqual({
+			code: 250,
+			text: "Delivered a@x",
+		});
+		expect(deliveryReply("a@x", { tag: "UnknownRecipient" })).toEqual({
+			code: 550,
+			text: "No such user: a@x",
+		});
+		expect(deliveryReply("a@x", { tag: "MissingCalendar" })).toEqual({
+			code: 550,
+			text: "No primary calendar for a@x",
+		});
+		expect(deliveryReply("a@x", { tag: "NotImip" })).toEqual({
+			code: 550,
+			text: "Not an iMIP message",
+		});
+		expect(
+			deliveryReply("a@x", { tag: "MalformedIcs", cause: "no METHOD" }),
+		).toEqual({
+			code: 550,
+			text: "Malformed iCalendar: no METHOD",
+		});
+		expect(deliveryReply("a@x", { tag: "Rejected" })).toEqual({
+			code: 451,
+			text: "Temporary failure",
+		});
+	});
+
+	it("renderDeliveryReplies preserves RCPT order (RFC 2033 §4.2)", () => {
+		// Outcomes intentionally not in RCPT order — caller may resolve them
+		// out of completion order via Promise.allSettled; the renderer must
+		// re-align with the RCPT list.
+		const rcpts = ["alice@x", "bob@x", "carol@x"];
+		const outcomes = [
+			{ tag: "Applied" } as const,
+			{ tag: "UnknownRecipient" } as const,
+			{ tag: "Applied" } as const,
+		];
+		const replies = renderDeliveryReplies(rcpts, outcomes);
+		expect(replies.map((r) => r.text)).toEqual([
+			"Delivered alice@x",
+			"No such user: bob@x",
+			"Delivered carol@x",
+		]);
+	});
+
+	it("renderDeliveryReplies fills missing outcomes with Rejected", () => {
+		// Defensive — if a Promise didn't settle for some reason the recipient
+		// still gets a deterministic reply (451) rather than no reply at all,
+		// which would hang the upstream MTA.
+		const replies = renderDeliveryReplies(["a@x", "b@x"], [{ tag: "Applied" }]);
+		expect(replies[1]).toEqual({ code: 451, text: "Temporary failure" });
 	});
 });
