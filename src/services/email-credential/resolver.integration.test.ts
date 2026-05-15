@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { Effect, ManagedRuntime, Redacted } from "effect";
+import { Effect, ManagedRuntime, Option, Redacted } from "effect";
 import { UserId as makeUserId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import { Email } from "#src/domain/types/strings.ts";
@@ -46,6 +46,11 @@ const buildMail = (mail: MailOverride) => ({
 	lmtpPort: 2400,
 	lmtpHost: "127.0.0.1",
 	profiles: mail.profiles ?? [],
+	proxyUsernameHeader: Option.none<string>(),
+	proxyPasswordHeader: Option.none<string>(),
+	proxyHostHeader: Option.none<string>(),
+	proxyPortHeader: Option.none<string>(),
+	proxySecurityHeader: Option.none<string>(),
 });
 
 const provisionAlice = Effect.gen(function* () {

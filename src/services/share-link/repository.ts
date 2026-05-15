@@ -21,6 +21,9 @@ export interface ShareLinkRepositoryShape {
 	readonly findById: (
 		id: UuidString,
 	) => Effect.Effect<Option.Option<ShareLinkRow>, DatabaseError>;
+	readonly findByToken: (
+		token: string,
+	) => Effect.Effect<Option.Option<ShareLinkRow>, DatabaseError>;
 	readonly findByUser: (
 		userId: UserId,
 	) => Effect.Effect<ReadonlyArray<ShareLinkRow>, DatabaseError>;
@@ -29,14 +32,18 @@ export interface ShareLinkRepositoryShape {
 	) => Effect.Effect<ReadonlyArray<ShareLinkCalendarRow>, DatabaseError>;
 	readonly insert: (input: {
 		readonly userId: UserId;
-		readonly expiresAt?: Temporal.Instant;
+		readonly token: string;
+		readonly displayName?: string | null;
+		readonly expiresAt?: Temporal.Instant | null;
 		readonly enabled?: boolean;
 	}) => Effect.Effect<ShareLinkRow, DatabaseError>;
 	readonly update: (
 		id: UuidString,
 		input: {
 			readonly enabled?: boolean;
-			readonly expiresAt?: Temporal.Instant;
+			readonly token?: string;
+			readonly displayName?: string | null;
+			readonly expiresAt?: Temporal.Instant | null;
 		},
 	) => Effect.Effect<ShareLinkRow, DatabaseError>;
 	readonly softDelete: (id: UuidString) => Effect.Effect<void, DatabaseError>;
@@ -45,6 +52,11 @@ export interface ShareLinkRepositoryShape {
 		calendarId: UuidString,
 		visibility: ShareLinkVisibility,
 	) => Effect.Effect<ShareLinkCalendarRow, DatabaseError>;
+	readonly setCalendarVisibility: (
+		linkId: UuidString,
+		calendarId: UuidString,
+		visibility: ShareLinkVisibility,
+	) => Effect.Effect<void, DatabaseError>;
 	readonly removeCalendar: (
 		linkId: UuidString,
 		calendarId: UuidString,

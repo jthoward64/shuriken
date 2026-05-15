@@ -1,6 +1,9 @@
 import { Effect, Layer, Option } from "effect";
 import { authenticateBasic } from "#src/auth/layers/basic.ts";
-import { authenticateProxy } from "#src/auth/layers/proxy.ts";
+import {
+	authenticateProxy,
+	type ProxyAutoProvisionOpts,
+} from "#src/auth/layers/proxy.ts";
 import { resolveAutoLoginPrincipal } from "#src/auth/layers/single-user.ts";
 import { AuthService } from "#src/auth/service.ts";
 import { AppConfigService } from "#src/config.ts";
@@ -8,6 +11,7 @@ import { DatabaseClient } from "#src/db/client.ts";
 import { Authenticated, Unauthenticated } from "#src/domain/types/dav.ts";
 import { Email } from "#src/domain/types/strings.ts";
 import { CryptoService } from "#src/platform/crypto.ts";
+import { ProvisioningService } from "#src/services/provisioning/service.ts";
 
 // ---------------------------------------------------------------------------
 // Composite auth layer
@@ -29,11 +33,26 @@ export const CompositeAuthLayer = Layer.effect(
 	Effect.gen(function* () {
 		const db = yield* DatabaseClient;
 		const crypto = yield* CryptoService;
+		const provisioning = yield* ProvisioningService;
 		const {
-			auth: { autoLogin, proxyHeader, trustedProxies, basicAuthEnabled },
+			auth: {
+				autoLogin,
+				proxyHeader,
+				proxyRoleHeader,
+				trustedProxies,
+				basicAuthEnabled,
+				proxyAutoProvision,
+			},
 		} = yield* AppConfigService;
 
 		const autoLoginEmail = Option.map(autoLogin, Email);
+		const provisionOpts: Option.Option<ProxyAutoProvisionOpts> =
+			proxyAutoProvision
+				? Option.some({
+						autoProvision: true,
+						roleHeader: proxyRoleHeader,
+					})
+				: Option.none();
 
 		return AuthService.of({
 			authenticate: Effect.fn("auth.composite.authenticate")(
@@ -57,7 +76,11 @@ export const CompositeAuthLayer = Layer.effect(
 							clientIp,
 							proxyHeader.value,
 							trustedProxies,
-						).pipe(Effect.provideService(DatabaseClient, db));
+							provisionOpts,
+						).pipe(
+							Effect.provideService(DatabaseClient, db),
+							Effect.provideService(ProvisioningService, provisioning),
+						);
 						if (result._tag === "Authenticated") {
 							return result;
 						}

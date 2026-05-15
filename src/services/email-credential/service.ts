@@ -21,7 +21,7 @@ import type { UserId } from "#src/domain/ids.ts";
 // it and so #6 (iMIP) can pick the right Reply-To behavior.
 // ---------------------------------------------------------------------------
 
-export type ResolvedKind = "user" | "profile" | "default";
+export type ResolvedKind = "user" | "user-proxy" | "profile" | "default";
 
 export interface ResolvedSmtpCreds {
 	readonly kind: ResolvedKind;

@@ -3,6 +3,10 @@ import { AppConfigService } from "#src/config.ts";
 import type { SmtpSecurity } from "#src/db/drizzle/schema/index.ts";
 import type { DatabaseError, InternalError } from "#src/domain/errors.ts";
 import type { UserId } from "#src/domain/ids.ts";
+import {
+	getSmtpProxyOverride,
+	type SmtpProxyOverride,
+} from "#src/http/smtp-headers-ref.ts";
 import { UserEmailCredentialRepository } from "./repository.ts";
 import { decryptSecret, encryptSecret } from "./secret-cipher.ts";
 import { EmailCredentialService, type ResolvedSmtpCreds } from "./service.ts";
@@ -46,6 +50,27 @@ const matchProfile = (
 	}
 	return null;
 };
+
+const fromProxyOverride = (
+	override: SmtpProxyOverride,
+	defaults: {
+		readonly defaultHost: string;
+		readonly defaultPort: number;
+		readonly defaultSecurity: SmtpSecurity;
+	},
+	userEmail: string,
+	userDisplayName: string | null,
+): ResolvedSmtpCreds => ({
+	kind: "user-proxy",
+	host: Option.getOrElse(override.host, () => defaults.defaultHost),
+	port: Option.getOrElse(override.port, () => defaults.defaultPort),
+	username: override.username,
+	password: Redacted.make(override.password),
+	security: Option.getOrElse(override.security, () => defaults.defaultSecurity),
+	fromAddress: userEmail,
+	fromName: userDisplayName,
+	replyTo: null,
+});
 
 const fromUserCreds = (
 	row: {
@@ -130,6 +155,17 @@ const resolveForUser = (
 
 		if (!config.mail.enabled) {
 			return null;
+		}
+
+		// 0. Per-request proxy override.
+		const overrideOpt = yield* getSmtpProxyOverride;
+		if (Option.isSome(overrideOpt)) {
+			return fromProxyOverride(
+				overrideOpt.value,
+				config.mail,
+				userEmail,
+				userDisplayName,
+			);
 		}
 
 		// 1. Per-user creds.

@@ -30,6 +30,8 @@ import { MailerServiceLive } from "#src/services/mailer/service.live.ts";
 import { PrincipalDomainLayer } from "#src/services/principal/index.ts";
 import { ProvisioningDomainLayer } from "#src/services/provisioning/index.ts";
 import { SchedulingDomainLayer } from "#src/services/scheduling/index.ts";
+import { ShareLinkRepositoryLive } from "#src/services/share-link/repository.live.ts";
+import { ShareLinkServiceLive } from "#src/services/share-link/service.live.ts";
 import {
 	IanaTimezoneService,
 	TimezoneDomainLayer,
@@ -66,7 +68,14 @@ const DevToolsLayer = Layer.unwrapEffect(
 // every request and returns the first authenticated result.
 // ---------------------------------------------------------------------------
 
-export const AuthLayer = CompositeAuthLayer.pipe(Layer.provide(InfraLayer));
+export const AuthLayer = CompositeAuthLayer.pipe(
+	Layer.provide(
+		Layer.mergeAll(
+			InfraLayer,
+			ProvisioningDomainLayer.pipe(Layer.provide(InfraLayer)),
+		),
+	),
+);
 
 // ---------------------------------------------------------------------------
 // Domain layer helper — each domain layer needs DatabaseClient from InfraLayer
@@ -105,6 +114,7 @@ const BaseAppLayer = Layer.mergeAll(
 	CalIndexRepositoryLive.pipe(Layer.provide(InfraLayer)),
 	CardIndexRepositoryLive.pipe(Layer.provide(InfraLayer)),
 	UserEmailCredentialRepositoryLive.pipe(Layer.provide(InfraLayer)),
+	ShareLinkRepositoryLive.pipe(Layer.provide(InfraLayer)),
 	BunFileServiceLive,
 	TemplateServiceLive.pipe(Layer.provide(BunFileServiceLive)),
 );
@@ -137,6 +147,7 @@ export const AppLayer = Layer.mergeAll(
 	SubscriptionServiceLive.pipe(Layer.provide(BaseAppLayer)),
 	CardEditServiceLive.pipe(Layer.provide(BaseAppLayer)),
 	CalEditServiceLive.pipe(Layer.provide(BaseAppLayer)),
+	ShareLinkServiceLive.pipe(Layer.provide(BaseAppLayer)),
 	EmailCredentialFull,
 	MailerFull,
 	ImipDispatchServiceLive.pipe(
@@ -229,6 +240,8 @@ export {
 	PrincipalService,
 } from "#src/services/principal/index.ts";
 export { SchedulingService } from "#src/services/scheduling/index.ts";
+export { ShareLinkRepository } from "#src/services/share-link/repository.ts";
+export { ShareLinkService } from "#src/services/share-link/service.ts";
 export {
 	CalTimezoneRepository,
 	IanaTimezoneService,

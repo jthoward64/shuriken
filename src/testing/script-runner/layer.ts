@@ -25,6 +25,8 @@ import { MailerServiceLive } from "#src/services/mailer/service.live.ts";
 import { PrincipalDomainLayer } from "#src/services/principal/index.ts";
 import { ProvisioningDomainLayer } from "#src/services/provisioning/index.ts";
 import { SchedulingDomainLayer } from "#src/services/scheduling/index.ts";
+import { ShareLinkRepositoryLive } from "#src/services/share-link/repository.live.ts";
+import { ShareLinkServiceLive } from "#src/services/share-link/service.live.ts";
 import {
 	IanaTimezoneService,
 	TimezoneDomainLayer,
@@ -55,6 +57,7 @@ const testConfig: AppConfigType = {
 		adminSlug: Option.none<string>(),
 		authSettingsUrl: Option.none<string>(),
 		authSettingsLabel: Option.none<string>(),
+		proxyAutoProvision: false,
 	},
 	log: { level: undefined },
 	externalCalendar: {
@@ -87,6 +90,11 @@ const testConfig: AppConfigType = {
 			password: string;
 			security?: "none" | "starttls" | "tls";
 		}>,
+		proxyUsernameHeader: Option.none<string>(),
+		proxyPasswordHeader: Option.none<string>(),
+		proxyHostHeader: Option.none<string>(),
+		proxyPortHeader: Option.none<string>(),
+		proxySecurityHeader: Option.none<string>(),
 	},
 	nodeEnv: "test",
 };
@@ -147,6 +155,7 @@ export const makeScriptRunnerLayer = (overrides?: Partial<AppConfigType>) => {
 		withTestInfra(CardIndexRepositoryLive),
 		withTestInfra(UserEmailCredentialRepositoryLive),
 		withTestInfra(ExternalCalendarRepositoryLive),
+		withTestInfra(ShareLinkRepositoryLive),
 	);
 
 	const testStubsLayer = Layer.mergeAll(
@@ -175,6 +184,7 @@ export const makeScriptRunnerLayer = (overrides?: Partial<AppConfigType>) => {
 		BirthdayServiceLive.pipe(Layer.provide(testBaseLayer)),
 		CardEditServiceLive.pipe(Layer.provide(testBaseLayer)),
 		CalEditServiceLive.pipe(Layer.provide(testBaseLayer)),
+		ShareLinkServiceLive.pipe(Layer.provide(testBaseLayer)),
 		EmailCredentialServiceLive.pipe(Layer.provide(testBaseLayer)),
 		MailerServiceLive.pipe(
 			Layer.provide(

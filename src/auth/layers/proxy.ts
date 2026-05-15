@@ -7,7 +7,10 @@ import { principal, user } from "#src/db/drizzle/schema/index.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
 import { PrincipalId, UserId } from "#src/domain/ids.ts";
 import { Authenticated, Unauthenticated } from "#src/domain/types/dav.ts";
+import { Slug } from "#src/domain/types/path.ts";
+import { Email } from "#src/domain/types/strings.ts";
 import { authAttemptsTotal } from "#src/observability/metrics.ts";
+import { ProvisioningService } from "#src/services/provisioning/service.ts";
 
 // ---------------------------------------------------------------------------
 // Proxy auth layer
@@ -124,6 +127,27 @@ export const isClientTrusted = (
 
 const authCounter = Metric.tagged(authAttemptsTotal, "auth.mode", "proxy");
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const SLUG_RE_LIKE =
+	/^[A-Za-z0-9_-][A-Za-z0-9._-]{0,126}[A-Za-z0-9_-]$|^[A-Za-z0-9_-]$/;
+
+const slugFromEmail = (email: string): Option.Option<Slug> => {
+	const local = email.split("@")[0]?.toLowerCase() ?? "";
+	const sanitized = local
+		.replace(/[^A-Za-z0-9._-]/g, "-")
+		.replace(/^-+|-+$/g, "");
+	if (sanitized === "" || !SLUG_RE_LIKE.test(sanitized)) {
+		return Option.none();
+	}
+	return Option.some(Slug(sanitized));
+};
+
+export interface ProxyAutoProvisionOpts {
+	readonly autoProvision: boolean;
+	readonly roleHeader: Option.Option<string>;
+}
+
 /**
  * Core proxy-auth logic. Checks that the client IP is trusted, reads the
  * configured proxy header, looks up the user by email, and emits per-outcome
@@ -137,10 +161,11 @@ export const authenticateProxy = (
 	clientIp: Option.Option<string>,
 	proxyHeader: string,
 	trustedProxies: string,
+	provisionOpts: Option.Option<ProxyAutoProvisionOpts> = Option.none(),
 ): Effect.Effect<
 	Authenticated | Unauthenticated,
 	DatabaseError,
-	DatabaseClient
+	DatabaseClient | ProvisioningService
 > =>
 	Effect.gen(function* () {
 		const db = yield* DatabaseClient;
@@ -184,6 +209,59 @@ export const authenticateProxy = (
 
 		const row = rows[0];
 		if (!row) {
+			if (
+				Option.isSome(provisionOpts) &&
+				provisionOpts.value.autoProvision &&
+				EMAIL_RE.test(username)
+			) {
+				const slugOpt = slugFromEmail(username);
+				if (Option.isNone(slugOpt)) {
+					yield* Effect.logDebug("auth.proxy: cannot derive slug from email", {
+						username,
+					});
+					yield* Metric.increment(
+						Metric.tagged(authCounter, "auth.outcome", "not_found"),
+					);
+					return new Unauthenticated();
+				}
+				const roleHeader = provisionOpts.value.roleHeader;
+				const role = Option.isSome(roleHeader)
+					? (headers.get(roleHeader.value) ?? undefined)
+					: undefined;
+				yield* Effect.logDebug("auth.proxy: auto-provisioning user", {
+					username,
+					role,
+				});
+				const provisioning = yield* ProvisioningService;
+				const provisioned = yield* provisioning
+					.provisionUser({
+						email: Email(username),
+						name: username,
+						slug: slugOpt.value,
+						role,
+					})
+					.pipe(
+						Effect.catchTags({
+							ConflictError: (e) =>
+								Effect.fail(new DatabaseError({ cause: e })),
+							DavError: (e) => Effect.fail(new DatabaseError({ cause: e })),
+							InternalError: (e) =>
+								Effect.fail(new DatabaseError({ cause: e })),
+						}),
+					);
+				yield* Metric.increment(
+					Metric.tagged(authCounter, "auth.outcome", "auto_provisioned"),
+				);
+				return new Authenticated({
+					principal: {
+						principalId: PrincipalId(provisioned.user.principal.id),
+						userId: UserId(provisioned.user.user.id),
+						displayName: Option.fromNullable(
+							provisioned.user.principal.displayName,
+						),
+					},
+				});
+			}
 			yield* Effect.logDebug("auth.proxy: user not found", { username });
 			yield* Metric.increment(
 				Metric.tagged(authCounter, "auth.outcome", "not_found"),
@@ -223,10 +301,23 @@ export const ProxyAuthLayer = Layer.effect(
 	AuthService,
 	Effect.gen(function* () {
 		const db = yield* DatabaseClient;
+		const provisioning = yield* ProvisioningService;
 		const {
-			auth: { proxyHeader, trustedProxies },
+			auth: {
+				proxyHeader,
+				proxyRoleHeader,
+				trustedProxies,
+				proxyAutoProvision,
+			},
 		} = yield* AppConfigService;
 		const header = Option.getOrElse(proxyHeader, () => "X-Remote-User");
+		const provisionOpts: Option.Option<ProxyAutoProvisionOpts> =
+			proxyAutoProvision
+				? Option.some({
+						autoProvision: true,
+						roleHeader: proxyRoleHeader,
+					})
+				: Option.none();
 
 		return AuthService.of({
 			authenticate: Effect.fn("auth.proxy.authenticate")(
@@ -237,7 +328,11 @@ export const ProxyAuthLayer = Layer.effect(
 						clientIp,
 						header,
 						trustedProxies,
-					).pipe(Effect.provideService(DatabaseClient, db));
+						provisionOpts,
+					).pipe(
+						Effect.provideService(DatabaseClient, db),
+						Effect.provideService(ProvisioningService, provisioning),
+					);
 				},
 			),
 		});

@@ -32,6 +32,7 @@ import { InstanceService } from "#src/services/instance/index.ts";
 import { PrincipalService } from "#src/services/principal/service.ts";
 import { ProvisioningService } from "#src/services/provisioning/service.ts";
 import { SchedulingService } from "#src/services/scheduling/service.ts";
+import { ShareLinkService } from "#src/services/share-link/service.ts";
 import { IanaTimezoneService } from "#src/services/timezone/iana.ts";
 import { CalTimezoneRepository } from "#src/services/timezone/index.ts";
 import { TombstoneRepository } from "#src/services/tombstone/index.ts";
@@ -269,6 +270,11 @@ const stubLayers = Layer.mergeAll(
 			lmtpPort: 2400,
 			lmtpHost: "127.0.0.1",
 			profiles: [],
+			proxyUsernameHeader: Option.none(),
+			proxyPasswordHeader: Option.none(),
+			proxyHostHeader: Option.none(),
+			proxyPortHeader: Option.none(),
+			proxySecurityHeader: Option.none(),
 		},
 		nodeEnv: "test",
 	} as unknown as AppConfigService),
@@ -350,6 +356,18 @@ const stubLayers = Layer.mergeAll(
 				skippedDisabled: 0,
 				failed: 0,
 			}),
+	}),
+	Layer.succeed(ShareLinkService, {
+		listForUser: () => Effect.succeed([]),
+		getById: () => Effect.succeed(Option.none()),
+		getActiveByToken: () => Effect.succeed(Option.none()),
+		create: die,
+		update: die,
+		regenerateToken: die,
+		setVisibility: die,
+		addCalendar: die,
+		removeCalendar: die,
+		delete: die,
 	}),
 );
 

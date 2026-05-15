@@ -26,6 +26,18 @@ const findById = Effect.fn("ShareLinkRepository.findById")(
 	),
 );
 
+const findByToken = Effect.fn("ShareLinkRepository.findByToken")(
+	function* (token: string) {
+		yield* Effect.logTrace("repo.shareLink.findByToken");
+		return yield* runDbQuery((db) =>
+			db.select().from(shareLink).where(eq(shareLink.token, token)).limit(1),
+		).pipe(Effect.map((r) => Option.fromNullable(r[0])));
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.shareLink.findByToken failed", e.cause),
+	),
+);
+
 const findByUser = Effect.fn("ShareLinkRepository.findByUser")(
 	function* (userId: UserId) {
 		yield* Effect.annotateCurrentSpan({ "user.id": userId });
@@ -58,7 +70,9 @@ const listCalendars = Effect.fn("ShareLinkRepository.listCalendars")(
 const insert = Effect.fn("ShareLinkRepository.insert")(
 	function* (input: {
 		userId: UserId;
-		expiresAt?: Temporal.Instant;
+		token: string;
+		displayName?: string | null;
+		expiresAt?: Temporal.Instant | null;
 		enabled?: boolean;
 	}) {
 		yield* Effect.annotateCurrentSpan({ "user.id": input.userId });
@@ -68,7 +82,9 @@ const insert = Effect.fn("ShareLinkRepository.insert")(
 				.insert(shareLink)
 				.values({
 					userId: input.userId,
-					expiresAt: input.expiresAt,
+					token: input.token,
+					displayName: input.displayName ?? null,
+					expiresAt: input.expiresAt ?? null,
 					enabled: input.enabled,
 				})
 				.returning(),
@@ -92,15 +108,24 @@ const insert = Effect.fn("ShareLinkRepository.insert")(
 const update = Effect.fn("ShareLinkRepository.update")(
 	function* (
 		id: UuidString,
-		input: { enabled?: boolean; expiresAt?: Temporal.Instant },
+		input: {
+			enabled?: boolean;
+			token?: string;
+			displayName?: string | null;
+			expiresAt?: Temporal.Instant | null;
+		},
 	) {
 		yield* Effect.annotateCurrentSpan({ "share_link.id": id });
 		yield* Effect.logTrace("repo.shareLink.update", { id });
+		// Drizzle treats `undefined` as "do not set", so we can pass the partial
+		// directly; explicit `null` clears nullable columns (displayName, expiresAt).
 		return yield* runDbQuery((db) =>
 			db
 				.update(shareLink)
 				.set({
 					enabled: input.enabled,
+					token: input.token,
+					displayName: input.displayName,
 					expiresAt: input.expiresAt,
 					updatedAt: sql`now()`,
 				})
@@ -172,6 +197,40 @@ const addCalendar = Effect.fn("ShareLinkRepository.addCalendar")(
 	),
 );
 
+const setCalendarVisibility = Effect.fn(
+	"ShareLinkRepository.setCalendarVisibility",
+)(
+	function* (
+		linkId: UuidString,
+		calendarId: UuidString,
+		visibility: ShareLinkVisibility,
+	) {
+		yield* Effect.annotateCurrentSpan({
+			"share_link.id": linkId,
+			"collection.id": calendarId,
+		});
+		yield* Effect.logTrace("repo.shareLink.setCalendarVisibility", {
+			linkId,
+			calendarId,
+			visibility,
+		});
+		return yield* runDbQuery((db) =>
+			db
+				.update(shareLinkCalendars)
+				.set({ visibility })
+				.where(
+					and(
+						eq(shareLinkCalendars.shareLinkId, linkId),
+						eq(shareLinkCalendars.calendarId, calendarId),
+					),
+				),
+		).pipe(Effect.asVoid);
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.shareLink.setCalendarVisibility failed", e.cause),
+	),
+);
+
 const removeCalendar = Effect.fn("ShareLinkRepository.removeCalendar")(
 	function* (linkId: UuidString, calendarId: UuidString) {
 		yield* Effect.annotateCurrentSpan({
@@ -208,6 +267,8 @@ export const ShareLinkRepositoryLive = Layer.effect(
 		return ShareLinkRepository.of({
 			findById: (...args: Parameters<typeof findById>) =>
 				run(findById(...args)),
+			findByToken: (...args: Parameters<typeof findByToken>) =>
+				run(findByToken(...args)),
 			findByUser: (...args: Parameters<typeof findByUser>) =>
 				run(findByUser(...args)),
 			listCalendars: (...args: Parameters<typeof listCalendars>) =>
@@ -218,6 +279,9 @@ export const ShareLinkRepositoryLive = Layer.effect(
 				run(softDelete(...args)),
 			addCalendar: (...args: Parameters<typeof addCalendar>) =>
 				run(addCalendar(...args)),
+			setCalendarVisibility: (
+				...args: Parameters<typeof setCalendarVisibility>
+			) => run(setCalendarVisibility(...args)),
 			removeCalendar: (...args: Parameters<typeof removeCalendar>) =>
 				run(removeCalendar(...args)),
 		});

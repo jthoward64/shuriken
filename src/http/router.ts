@@ -10,6 +10,8 @@ import {
 } from "#src/http/context.ts";
 import { davRouter } from "#src/http/dav/router.ts";
 import { buildXml } from "#src/http/dav/xml/builder.ts";
+import { feedHandler, isFeedPath } from "#src/http/feed/handler.ts";
+import { applySmtpProxyHeaders } from "#src/http/smtp-headers-apply.ts";
 import {
 	HTTP_BAD_REQUEST,
 	HTTP_INTERNAL_SERVER_ERROR,
@@ -51,6 +53,7 @@ import type { ImipDispatchService } from "#src/services/imip/dispatch.ts";
 import type { InstanceService } from "#src/services/instance/index.ts";
 import type { PrincipalService } from "#src/services/principal/service.ts";
 import type { ProvisioningService } from "#src/services/provisioning/service.ts";
+import type { ShareLinkService } from "#src/services/share-link/service.ts";
 import type { CalTimezoneRepository } from "#src/services/timezone/index.ts";
 import type { TombstoneRepository } from "#src/services/tombstone/index.ts";
 import type { UserRepository, UserService } from "#src/services/user/index.ts";
@@ -99,7 +102,8 @@ type AppServices =
 	| EmailCredentialService
 	| ImipDispatchService
 	| UserEmailCredentialRepository
-	| SubscriptionService;
+	| SubscriptionService
+	| ShareLinkService;
 
 const isDavPath = (pathname: string): boolean =>
 	pathname === "/dav" ||
@@ -125,6 +129,9 @@ const pathGroup = (pathname: string): string => {
 	}
 	if (isUiPath(pathname)) {
 		return "ui";
+	}
+	if (isFeedPath(pathname)) {
+		return "feed";
 	}
 	return "unknown";
 };
@@ -281,8 +288,19 @@ export const handleRequest = (
 			clientIp: Option.getOrUndefined(clientIp),
 		});
 
+		// Public unauthenticated feed endpoint — must be handled before auth so
+		// the share-link token (not basic/proxy credentials) authorizes the read.
+		if (isFeedPath(url.pathname)) {
+			return yield* feedHandler(req, url);
+		}
+
 		const authService = yield* AuthService;
 		const auth = yield* authService.authenticate(req.headers, clientIp);
+
+		// Transient SMTP creds — only honoured from a trusted proxy. Picked up
+		// by EmailCredentialService.resolveForUser via a FiberRef.
+		const cfg = yield* AppConfigService;
+		yield* applySmtpProxyHeaders(req.headers, clientIp, cfg);
 
 		const caldavTimezones = req.headers.get("CalDAV-Timezones") as
 			| "T"

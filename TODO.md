@@ -1,12 +1,10 @@
 - Implement super-admin (can access all data), admin (can create and manage users/groups, but cannot access their data), and normal users (only access their own user data) role provisioning in proxy auth mode and a way to create users in this manner when in basic auth mode. Also need a concept of group admin?
-- Add a calendar viewer to web UI built with with https://fullcalendar.io/docs
-- Add support for creating, editing, and deleting calendar events from the web UI
-- Add contacts to web UI
+  - DONE: role column, super_admin bypass in AclService, role-driven virtual-resource grants, basic-auth admin auto-promotes to super_admin, UI role dropdown for super-admins, `PROXY_ROLE_HEADER` config
+  - TODO: proxy auth currently only authenticates existing users; auto-provisioning of new users from proxy headers (and reading their role tag) is not wired
+  - TODO: dedicated "group admin" affordance — today this works via existing ACL grant on the group's principal but there's no UI button labelled "make group admin"
 - Add support for associating email credentials with a user account (either by entering them into the web UI, or from proxy header)
-- Add support for iMIP allowing cross-server calendar events
-- Add support for syncing an external icalendar file hosted on a remote server (public ical links)
+  - DONE: per-user UI form, AES-GCM encryption, server-wide regex profiles, default fallback with Reply-To
+  - TODO: proxy-header ingestion of SMTP credentials (transient, per-request) — config field exists but no transport reads it yet
 - Add support for providing an iCalendar feed of a user's calendar that can be subscribed to by external calendar applications (e.g. Google Calendar, Apple Calendar)
-- Allow setting templated links to auth settings from config if a user has proxy auth credentials
-- Add a birthday calendar based on a user's contacts' birthdays
-- Add support for sharing calendars and events with other users and groups
-- Add a holiday calendar
+- Add support for importing ics files and vcard files into a user's calendar and contacts, respectively
+- Add support for exporting a user's calendar and contacts as ics and vcard files, respectively

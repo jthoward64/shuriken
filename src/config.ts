@@ -92,6 +92,16 @@ export const AuthConfig = Config.all({
 
 	/** Link text for the external auth-settings link. Defaults to "Manage account". */
 	authSettingsLabel: Config.string("authSettingsLabel").pipe(Config.option),
+
+	/**
+	 * When true and proxy auth identifies an unknown email, the user is
+	 * auto-provisioned with the role from `proxyRoleHeader` (default
+	 * "normal"). Off by default — opt in only when the proxy is the
+	 * authoritative source of truth for user identity.
+	 */
+	proxyAutoProvision: Config.boolean("proxyAutoProvision").pipe(
+		Config.withDefault(false),
+	),
 });
 
 export const LogConfig = Config.all({
@@ -250,6 +260,31 @@ export const MailConfig = Config.all({
 	profiles: Config.string("smtpProfilesJson").pipe(
 		Config.withDefault(""),
 		Config.map(decodeMailProfiles),
+	),
+	/**
+	 * Per-request SMTP creds passed by a trusted reverse proxy.
+	 *
+	 * When `proxyUsernameHeader` AND `proxyPasswordHeader` are both set, and
+	 * the request comes from a trusted proxy IP (see `auth.trustedProxies`),
+	 * the values from these headers override stored / profile / default SMTP
+	 * creds for the duration of the request. Useful for SSO portals that
+	 * already hold the user's mail credentials.
+	 *
+	 * Host/port/security headers are optional — fall back to the default
+	 * profile values when absent. All headers must be configured in pairs
+	 * with the proxy (no per-deploy split between username here and password
+	 * there).
+	 */
+	proxyUsernameHeader: Config.string("smtpProxyUsernameHeader").pipe(
+		Config.option,
+	),
+	proxyPasswordHeader: Config.string("smtpProxyPasswordHeader").pipe(
+		Config.option,
+	),
+	proxyHostHeader: Config.string("smtpProxyHostHeader").pipe(Config.option),
+	proxyPortHeader: Config.string("smtpProxyPortHeader").pipe(Config.option),
+	proxySecurityHeader: Config.string("smtpProxySecurityHeader").pipe(
+		Config.option,
 	),
 });
 

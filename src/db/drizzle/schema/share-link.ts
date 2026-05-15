@@ -27,6 +27,10 @@ export const shareLink = pgTable("share_link", {
 		.notNull()
 		.references(() => user.id, { onDelete: "cascade" })
 		.$type<UuidString>(),
+	// URL-safe random token used by /feed/<token>.ics — unique across rows.
+	token: text("token").notNull().unique(),
+	// Human label shown in the management UI and used for the .ics filename.
+	displayName: text("display_name"),
 	updatedAt: timestampTz("updated_at").default(sql`now()`).notNull(),
 	expiresAt: timestampTz("expires_at"),
 });
