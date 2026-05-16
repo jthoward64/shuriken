@@ -3,6 +3,7 @@ import { Effect, ManagedRuntime, Option, Redacted } from "effect";
 import { UserId as makeUserId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import { Email } from "#src/domain/types/strings.ts";
+import { setSmtpProxyOverride } from "#src/http/smtp-headers-ref.ts";
 import { EmailCredentialService } from "#src/services/email-credential/service.ts";
 import { ProvisioningService } from "#src/services/provisioning/index.ts";
 import { makeScriptRunnerLayer } from "#src/testing/script-runner/layer.ts";
@@ -186,6 +187,69 @@ describe("EmailCredentialService resolver (integration)", () => {
 			expect(result?.password ? Redacted.value(result.password) : null).toBe(
 				"isp-password",
 			);
+		} finally {
+			await runtime.dispose();
+		}
+	});
+
+	it("prefers proxy-header creds over stored per-user creds", async () => {
+		const runtime = ManagedRuntime.make(
+			makeScriptRunnerLayer({
+				mail: buildMail({
+					enabled: true,
+					defaultHost: "fallback",
+					defaultFromAddress: "noreply@shuriken",
+					credsKey: MAIL_KEY,
+				}),
+			}),
+		);
+		try {
+			const userId = await runtime.runPromise(provisionAlice);
+
+			// Stored per-user creds — without the proxy override these would win.
+			await runtime.runPromise(
+				Effect.flatMap(EmailCredentialService, (s) =>
+					s.storeForUser({
+						userId,
+						fromAddress: "alice@my-isp.example",
+						fromName: "Alice from ISP",
+						host: "smtp.my-isp.example",
+						port: 465,
+						username: "alice@my-isp.example",
+						password: Redacted.make("isp-password"),
+						security: "tls",
+					}),
+				),
+			);
+
+			// Set the SMTP proxy override on the current fiber, then resolve.
+			const resolved = await runtime.runPromise(
+				Effect.gen(function* () {
+					yield* setSmtpProxyOverride({
+						username: "proxy-user@example.com",
+						password: "proxy-password",
+						host: Option.some("smtp.proxy.example"),
+						port: Option.some(2525),
+						security: Option.some("starttls"),
+					});
+					const svc = yield* EmailCredentialService;
+					return yield* svc.resolveForUser(
+						userId,
+						"alice@example.com",
+						"Alice",
+					);
+				}),
+			);
+
+			expect(resolved?.kind).toBe("user-proxy");
+			expect(resolved?.host).toBe("smtp.proxy.example");
+			expect(resolved?.port).toBe(2525);
+			expect(resolved?.security).toBe("starttls");
+			expect(resolved?.username).toBe("proxy-user@example.com");
+			expect(resolved?.fromAddress).toBe("alice@example.com");
+			expect(
+				resolved?.password ? Redacted.value(resolved.password) : null,
+			).toBe("proxy-password");
 		} finally {
 			await runtime.dispose();
 		}

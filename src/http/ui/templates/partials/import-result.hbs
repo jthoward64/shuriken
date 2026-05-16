@@ -1,0 +1,16 @@
+{{#if conflict}}
+  <div class="rounded border border-yellow-300 bg-yellow-50 p-3 text-sm space-y-2">
+    <p class="font-medium text-yellow-900">{{conflicts.length}} item(s) already exist with these UIDs:</p>
+    <ul class="list-disc list-inside text-xs max-h-32 overflow-auto font-mono text-yellow-800">
+      {{#each conflicts}}<li>{{this}}</li>{{/each}}
+    </ul>
+    <p class="text-xs text-yellow-800">
+      Re-select the file with <strong>Skip duplicates</strong> or <strong>Replace duplicates</strong> to proceed.
+    </p>
+  </div>
+{{else}}
+  <div class="rounded border border-green-300 bg-green-50 p-3 text-sm text-green-900">
+    Imported {{inserted}} new, replaced {{merged}}, skipped {{skipped}}.
+    {{#if total}}<span class="text-xs text-green-700">({{total}} total)</span>{{/if}}
+  </div>
+{{/if}}

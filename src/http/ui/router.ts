@@ -1,5 +1,6 @@
 import { Effect, Match } from "effect";
 import { AppConfigService } from "#src/config.ts";
+import type { DatabaseClient } from "#src/db/client.ts";
 import type {
 	ConflictError,
 	DatabaseError,
@@ -32,11 +33,17 @@ import {
 	eventUpdateHandler,
 } from "#src/http/ui/api/calendar/event-write.ts";
 import { calendarEventsHandler } from "#src/http/ui/api/calendar/events.ts";
+import { calendarImportHandler } from "#src/http/ui/api/calendar/import.ts";
 import { collectionsDeleteHandler } from "#src/http/ui/api/collections/delete.ts";
 import { collectionsUpdateHandler } from "#src/http/ui/api/collections/update.ts";
 import { contactsCreateHandler } from "#src/http/ui/api/contacts/create.ts";
 import { contactsDeleteHandler } from "#src/http/ui/api/contacts/delete.ts";
+import { contactsImportHandler } from "#src/http/ui/api/contacts/import.ts";
 import { contactsUpdateHandler } from "#src/http/ui/api/contacts/update.ts";
+import { feedsCreateHandler } from "#src/http/ui/api/feeds/create.ts";
+import { feedsDeleteHandler } from "#src/http/ui/api/feeds/delete.ts";
+import { feedsRegenerateHandler } from "#src/http/ui/api/feeds/regenerate.ts";
+import { feedsUpdateHandler } from "#src/http/ui/api/feeds/update.ts";
 import { groupsCreateHandler } from "#src/http/ui/api/groups/create.ts";
 import { groupsCollectionsCreateHandler } from "#src/http/ui/api/groups/create-collection.ts";
 import { groupsDeleteHandler } from "#src/http/ui/api/groups/delete.ts";
@@ -53,11 +60,16 @@ import { usersSetPasswordHandler } from "#src/http/ui/api/users/set-password.ts"
 import { usersUpdateHandler } from "#src/http/ui/api/users/update.ts";
 import { eventEditHandler } from "#src/http/ui/handlers/calendar/event-edit.ts";
 import { eventNewHandler } from "#src/http/ui/handlers/calendar/event-new.ts";
+import { calendarExportHandler } from "#src/http/ui/handlers/calendar/export.ts";
 import { calendarViewHandler } from "#src/http/ui/handlers/calendar/view.ts";
 import { collectionsEditHandler } from "#src/http/ui/handlers/collections/edit.ts";
 import { contactsEditHandler } from "#src/http/ui/handlers/contacts/edit.ts";
+import { contactsExportHandler } from "#src/http/ui/handlers/contacts/export.ts";
 import { contactsListHandler } from "#src/http/ui/handlers/contacts/list.ts";
 import { contactsNewHandler } from "#src/http/ui/handlers/contacts/new.ts";
+import { feedsEditHandler } from "#src/http/ui/handlers/feeds/edit.ts";
+import { feedsListHandler } from "#src/http/ui/handlers/feeds/list.ts";
+import { feedsNewHandler } from "#src/http/ui/handlers/feeds/new.ts";
 import { groupsCollectionsNewHandler } from "#src/http/ui/handlers/groups/collections-new.ts";
 import { groupsEditHandler } from "#src/http/ui/handlers/groups/edit.ts";
 import { groupsListHandler } from "#src/http/ui/handlers/groups/list.ts";
@@ -83,6 +95,7 @@ import type { CollectionRepository } from "#src/services/collection/repository.t
 import type { ComponentRepository } from "#src/services/component/index.ts";
 import type { UserEmailCredentialRepository } from "#src/services/email-credential/repository.ts";
 import type { EmailCredentialService } from "#src/services/email-credential/service.ts";
+import type { EntityRepository } from "#src/services/entity/index.ts";
 import type { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
 import type { SubscriptionService } from "#src/services/external-calendar/subscription.ts";
 import type { GroupService } from "#src/services/group/index.ts";
@@ -92,6 +105,7 @@ import type { InstanceRepository } from "#src/services/instance/repository.ts";
 import type { PrincipalService } from "#src/services/principal/index.ts";
 import type { PrincipalRepository } from "#src/services/principal/repository.ts";
 import type { ProvisioningService } from "#src/services/provisioning/service.ts";
+import type { ShareLinkService } from "#src/services/share-link/service.ts";
 import type { UserService } from "#src/services/user/index.ts";
 import { profileHandler } from "./handlers/profile.ts";
 import { renderError } from "./helpers/render-page.ts";
@@ -108,7 +122,9 @@ export type UiServices =
 	| BunFileService
 	| CalEditService
 	| CardEditService
+	| DatabaseClient
 	| EmailCredentialService
+	| EntityRepository
 	| ImipDispatchService
 	| UserEmailCredentialRepository
 	| CardIndexRepository
@@ -123,6 +139,7 @@ export type UiServices =
 	| PrincipalRepository
 	| PrincipalService
 	| ProvisioningService
+	| ShareLinkService
 	| TemplateService
 	| UserService;
 
@@ -363,10 +380,33 @@ export const uiRouter = (
 		return handle(sharedWithMeHandler(req, ctx));
 	}
 
+	// Feeds (share-link management)
+	if (seg0 === "feeds" && method === "GET") {
+		if (!seg1) {
+			return handle(feedsListHandler(req, ctx));
+		}
+		if (seg1 === "new" && !seg2) {
+			return handle(feedsNewHandler(req, ctx));
+		}
+		if (seg1 && isUuid(seg1) && !seg2) {
+			return handle(feedsEditHandler(req, ctx, seg1 as UuidString));
+		}
+	}
+
 	// Calendar viewer + event pages
 	if (seg0 === "calendar" && method === "GET") {
 		if (!seg1) {
 			return handle(calendarViewHandler(req, ctx));
+		}
+		if (seg1 && isUuid(seg1) && seg2 === "export.ics" && !seg3) {
+			return handle(
+				calendarExportHandler(
+					req,
+					ctx,
+					CollectionId(seg1),
+					ctx.url.searchParams.get("name") ?? "calendar",
+				),
+			);
 		}
 		if (seg1 && isUuid(seg1) && seg2 === "events" && seg3 === "new" && !seg4) {
 			return handle(eventNewHandler(req, ctx, CollectionId(seg1)));
@@ -403,6 +443,19 @@ export const uiRouter = (
 		}
 		if (seg1 === "new" && !seg2) {
 			return handle(contactsNewHandler(req, ctx));
+		}
+		if (seg1 === "export.vcf" && !seg2) {
+			const bookId = ctx.url.searchParams.get("addressbook");
+			if (bookId !== null && isUuid(bookId)) {
+				return handle(
+					contactsExportHandler(
+						req,
+						ctx,
+						CollectionId(bookId),
+						ctx.url.searchParams.get("name") ?? "contacts",
+					),
+				);
+			}
 		}
 		if (seg1 && isUuid(seg1) && !seg2) {
 			return handle(contactsEditHandler(req, ctx, InstanceId(seg1)));
@@ -483,6 +536,16 @@ export const uiRouter = (
 				);
 			}
 		}
+		// Calendar bulk import
+		if (
+			seg1 === "calendar" &&
+			seg2 &&
+			isUuid(seg2) &&
+			seg3 === "import" &&
+			!seg4
+		) {
+			return handle(calendarImportHandler(req, ctx, CollectionId(seg2)));
+		}
 		// Calendar event mutations
 		if (seg1 === "calendar" && seg2 && isUuid(seg2) && seg3 === "events") {
 			if (seg4 === "create") {
@@ -510,6 +573,9 @@ export const uiRouter = (
 			if (seg2 === "create" && !seg3) {
 				return handle(contactsCreateHandler(req, ctx));
 			}
+			if (seg2 && isUuid(seg2) && seg3 === "import" && !seg4) {
+				return handle(contactsImportHandler(req, ctx, CollectionId(seg2)));
+			}
 			if (seg2 && isUuid(seg2) && seg3 === "update" && !seg4) {
 				return handle(contactsUpdateHandler(req, ctx, InstanceId(seg2)));
 			}
@@ -523,6 +589,20 @@ export const uiRouter = (
 			}
 			if (seg2 && isUuid(seg2) && seg3 === "delete" && !seg4) {
 				return handle(subscriptionsDeleteHandler(req, ctx, seg2 as UuidString));
+			}
+		}
+		if (seg1 === "feeds") {
+			if (seg2 === "create" && !seg3) {
+				return handle(feedsCreateHandler(req, ctx));
+			}
+			if (seg2 && isUuid(seg2) && seg3 === "update" && !seg4) {
+				return handle(feedsUpdateHandler(req, ctx, seg2 as UuidString));
+			}
+			if (seg2 && isUuid(seg2) && seg3 === "delete" && !seg4) {
+				return handle(feedsDeleteHandler(req, ctx, seg2 as UuidString));
+			}
+			if (seg2 && isUuid(seg2) && seg3 === "regenerate" && !seg4) {
+				return handle(feedsRegenerateHandler(req, ctx, seg2 as UuidString));
 			}
 		}
 		if (seg1 === "groups") {

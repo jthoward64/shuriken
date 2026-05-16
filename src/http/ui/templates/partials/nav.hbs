@@ -34,3 +34,9 @@
     Shared with me
   </a>
 {{/if}}
+{{#if showFeeds}}
+  <a href="/ui/feeds"
+     class="text-sm {{#if (eq currentPath '/ui/feeds')}}text-white font-medium{{else}}text-gray-300 hover:text-white{{/if}}">
+    Feeds
+  </a>
+{{/if}}

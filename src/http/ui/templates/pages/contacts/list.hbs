@@ -2,14 +2,41 @@
   <div class="flex items-center justify-between gap-4 flex-wrap">
     <h1 class="text-2xl font-bold text-gray-900">{{pageTitle}}</h1>
     {{#if hasAddressbook}}
-      <a href="/ui/contacts/new?addressbook={{selectedId}}"
-         class="inline-flex items-center px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded hover:bg-gray-700">
-        New contact
-      </a>
+      <div class="flex items-center gap-2 flex-wrap">
+        <a href="/ui/contacts/export.vcf?addressbook={{selectedId}}"
+           class="inline-flex items-center px-3 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded hover:bg-gray-50">
+          Export .vcf
+        </a>
+        <form
+          method="POST"
+          action="/ui/api/contacts/{{selectedId}}/import"
+          enctype="multipart/form-data"
+          hx-post="/ui/api/contacts/{{selectedId}}/import"
+          hx-encoding="multipart/form-data"
+          hx-target="#import-result"
+          hx-swap="innerHTML"
+          class="inline-flex items-center gap-1"
+        >
+          <label class="inline-flex items-center px-3 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded hover:bg-gray-50 cursor-pointer">
+            Import .vcf
+            <input type="file" name="file" accept=".vcf,text/vcard" class="hidden" onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()">
+          </label>
+          <select name="mode" class="rounded border border-gray-300 px-2 py-1.5 text-xs">
+            <option value="error">Error on conflict</option>
+            <option value="skip">Skip duplicates</option>
+            <option value="merge">Replace duplicates</option>
+          </select>
+        </form>
+        <a href="/ui/contacts/new?addressbook={{selectedId}}"
+           class="inline-flex items-center px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded hover:bg-gray-700">
+          New contact
+        </a>
+      </div>
     {{/if}}
   </div>
 
   {{> flash}}
+  <div id="import-result"></div>
 
   <form method="GET" action="/ui/contacts" class="flex flex-wrap items-center gap-3 bg-white border border-gray-200 rounded-lg p-3">
     <label class="text-sm text-gray-700">

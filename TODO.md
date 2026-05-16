@@ -1,10 +1,13 @@
 - Implement super-admin (can access all data), admin (can create and manage users/groups, but cannot access their data), and normal users (only access their own user data) role provisioning in proxy auth mode and a way to create users in this manner when in basic auth mode. Also need a concept of group admin?
   - DONE: role column, super_admin bypass in AclService, role-driven virtual-resource grants, basic-auth admin auto-promotes to super_admin, UI role dropdown for super-admins, `PROXY_ROLE_HEADER` config
-  - TODO: proxy auth currently only authenticates existing users; auto-provisioning of new users from proxy headers (and reading their role tag) is not wired
-  - TODO: dedicated "group admin" affordance — today this works via existing ACL grant on the group's principal but there's no UI button labelled "make group admin"
+  - DONE: proxy auth auto-provisions unknown users when `PROXY_AUTO_PROVISION=true`, reading role from `PROXY_ROLE_HEADER`
+  - DONE: "Group admins" section on the group-edit page — list, add (user slug), remove; backed by existing ACL grant on the group's principal
 - Add support for associating email credentials with a user account (either by entering them into the web UI, or from proxy header)
   - DONE: per-user UI form, AES-GCM encryption, server-wide regex profiles, default fallback with Reply-To
-  - TODO: proxy-header ingestion of SMTP credentials (transient, per-request) — config field exists but no transport reads it yet
+  - DONE: per-request SMTP creds from trusted-proxy headers (`SMTP_PROXY_USERNAME_HEADER` / `SMTP_PROXY_PASSWORD_HEADER`, with optional host/port/security overrides); resolver picks them ahead of stored creds, surfaced as `kind: "user-proxy"`
 - Add support for providing an iCalendar feed of a user's calendar that can be subscribed to by external calendar applications (e.g. Google Calendar, Apple Calendar)
+  - DONE: `/feed/<token>.ics` public endpoint, per-calendar visibility (`all` / `limited` / `free_busy`), VTIMEZONE dedup, expires_at + enabled gating, `/ui/feeds` management UI
 - Add support for importing ics files and vcard files into a user's calendar and contacts, respectively
+  - DONE: ics + vcf bulk import with three modes (`error` / `skip` / `merge`), inline buttons on calendar viewer and contacts list
 - Add support for exporting a user's calendar and contacts as ics and vcard files, respectively
+  - DONE: ics + vcf exports with `Content-Disposition: attachment`, ACL-guarded, button on each list page

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { Effect, Layer, Option, Redacted } from "effect";
 import { AppConfigService } from "#src/config.ts";
+import { DatabaseClient } from "#src/db/client.ts";
 import type { PrincipalId, RequestId, UserId } from "#src/domain/ids.ts";
 import { Authenticated } from "#src/domain/types/dav.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
@@ -17,6 +18,7 @@ import { CollectionRepository as CollectionRepoTag } from "#src/services/collect
 import { ComponentRepository } from "#src/services/component/index.ts";
 import { UserEmailCredentialRepository } from "#src/services/email-credential/repository.ts";
 import { EmailCredentialService } from "#src/services/email-credential/service.ts";
+import { EntityRepository } from "#src/services/entity/index.ts";
 import { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
 import { SubscriptionService } from "#src/services/external-calendar/subscription.ts";
 import { GroupService } from "#src/services/group/index.ts";
@@ -26,6 +28,7 @@ import { InstanceRepository as InstanceRepoTag } from "#src/services/instance/re
 import { PrincipalService } from "#src/services/principal/index.ts";
 import { PrincipalRepository } from "#src/services/principal/repository.ts";
 import { ProvisioningService } from "#src/services/provisioning/service.ts";
+import { ShareLinkService } from "#src/services/share-link/service.ts";
 import { UserService } from "#src/services/user/index.ts";
 import { uiRouter } from "./router.ts";
 
@@ -245,6 +248,28 @@ const stubLayers = Layer.mergeAll(
 				skippedDisabled: 0,
 				failed: 0,
 			}),
+	}),
+	Layer.succeed(DatabaseClient, {} as unknown as DatabaseClient),
+	Layer.succeed(ShareLinkService, {
+		listForUser: () => Effect.succeed([]),
+		getById: () => Effect.succeed(Option.none()),
+		getActiveByToken: () => Effect.succeed(Option.none()),
+		create: die,
+		update: die,
+		regenerateToken: die,
+		setVisibility: die,
+		addCalendar: die,
+		removeCalendar: die,
+		delete: die,
+	}),
+	Layer.succeed(EntityRepository, {
+		insert: die,
+		findById: () => Effect.succeed(Option.none()),
+		updateLogicalUid: () => Effect.void,
+		softDelete: () => Effect.void,
+		existsByUid: () => Effect.succeed(false),
+		existsByUidForPrincipal: () => Effect.succeed(false),
+		listActiveInstancesWithUid: () => Effect.succeed([]),
 	}),
 );
 

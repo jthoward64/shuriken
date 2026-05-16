@@ -10,6 +10,7 @@ import { GROUPS_VIRTUAL_RESOURCE_ID } from "#src/domain/virtual-resources.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { buildAclPanelData } from "#src/http/ui/helpers/acl-panel.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
+import { buildGroupAdminsData } from "#src/http/ui/helpers/group-admins.ts";
 import { buildNavContext } from "#src/http/ui/helpers/nav-context.ts";
 import { renderPage } from "#src/http/ui/helpers/render-page.ts";
 import type { TemplateService } from "#src/http/ui/template/index.ts";
@@ -91,6 +92,10 @@ export const groupsEditHandler = (
 			"principal",
 		).pipe(Effect.map(Option.getOrUndefined));
 
+		const groupAdmins = yield* buildGroupAdminsData(
+			principalRow.id as PrincipalId,
+		);
+
 		return yield* renderPage(
 			"pages/groups/edit",
 			{
@@ -106,6 +111,8 @@ export const groupsEditHandler = (
 				canDelete,
 				collections,
 				aclPanel,
+				groupAdmins,
+				groupPrincipalId: principalRow.id,
 			},
 			ctx.headers,
 		);

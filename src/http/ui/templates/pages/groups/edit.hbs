@@ -90,6 +90,58 @@
 
   {{> acl-panel}}
 
+  <section id="group-admins" class="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
+    <h2 class="text-base font-semibold text-gray-800">Group admins</h2>
+    <p class="text-xs text-gray-500">Users granted DAV:all on this group's principal can manage its membership and act on its behalf.</p>
+    {{#if groupAdmins.length}}
+      <ul class="divide-y divide-gray-100">
+        {{#each groupAdmins}}
+          <li class="py-2 flex items-center justify-between text-sm">
+            <span class="text-gray-900">{{label}}</span>
+            <form
+              method="POST"
+              action="/ui/api/acl/principal/{{../groupPrincipalId}}/revoke"
+              hx-post="/ui/api/acl/principal/{{../groupPrincipalId}}/revoke"
+              hx-target="body"
+              hx-swap="outerHTML"
+              class="inline"
+            >
+              <input type="hidden" name="aceId" value="{{aceId}}">
+              <button type="submit" class="text-xs text-red-600 hover:text-red-800">Remove</button>
+            </form>
+          </li>
+        {{/each}}
+      </ul>
+    {{else}}
+      <p class="text-gray-500 text-sm">No group admins yet.</p>
+    {{/if}}
+
+    <form
+      method="POST"
+      action="/ui/api/acl/principal/{{groupPrincipalId}}/grant"
+      hx-post="/ui/api/acl/principal/{{groupPrincipalId}}/grant"
+      hx-target="body"
+      hx-swap="outerHTML"
+      class="flex items-end gap-2 flex-wrap border-t border-gray-100 pt-4"
+    >
+      <div>
+        <label for="adminSlug" class="block text-xs text-gray-600 mb-1">Add admin (user slug)</label>
+        <input
+          type="text"
+          id="adminSlug"
+          name="principalSlug"
+          placeholder="e.g. alice"
+          class="rounded border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-500"
+          required
+        >
+      </div>
+      <input type="hidden" name="privilege" value="DAV:all">
+      <button type="submit" class="px-3 py-1.5 bg-gray-800 text-white text-sm font-medium rounded hover:bg-gray-700">
+        Add admin
+      </button>
+    </form>
+  </section>
+
   <section class="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
     <h2 class="text-base font-semibold text-gray-800">Members</h2>
     {{#if members}}
