@@ -1,0 +1,36 @@
+{{- if .Values.httpRoute.enabled -}}
+{{- if and .Values.ingress.enabled .Values.httpRoute.enabled -}}
+{{- fail "Enable either ingress OR httpRoute, not both — they would publish the same backend under two different routing surfaces." -}}
+{{- end -}}
+{{- if not .Values.httpRoute.parentRefs -}}
+{{- fail "httpRoute.parentRefs must list at least one Gateway when httpRoute.enabled is true." -}}
+{{- end -}}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "shuriken.fullname" . }}
+  labels: {{- include "shuriken.labels" . | nindent 4 }}
+  {{- with .Values.httpRoute.annotations }}
+  annotations: {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  parentRefs: {{- toYaml .Values.httpRoute.parentRefs | nindent 4 }}
+  {{- with .Values.httpRoute.hostnames }}
+  hostnames: {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- range .Values.httpRoute.rules }}
+    - backendRefs:
+        - name: {{ include "shuriken.fullname" $ }}
+          port: {{ $.Values.service.port }}
+      {{- with .matches }}
+      matches: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .filters }}
+      filters: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .timeouts }}
+      timeouts: {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- end }}
+{{- end }}

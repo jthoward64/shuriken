@@ -1,0 +1,83 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "shuriken.fullname" . }}-config
+  labels: {{- include "shuriken.labels" . | nindent 4 }}
+data:
+  # ---- server ------------------------------------------------------------
+  PORT: {{ .Values.config.server.port | quote }}
+  HOST: {{ .Values.config.server.host | quote }}
+  NODE_ENV: {{ .Values.config.nodeEnv | quote }}
+  {{- with .Values.config.logLevel }}
+  LOG_LEVEL: {{ . | quote }}
+  {{- end }}
+
+  # ---- auth --------------------------------------------------------------
+  {{- with .Values.config.auth.autoLogin }}
+  AUTO_LOGIN: {{ . | quote }}
+  {{- end }}
+  BASIC_AUTH_ENABLED: {{ .Values.config.auth.basicAuthEnabled | quote }}
+  {{- with .Values.config.auth.proxyHeader }}
+  PROXY_HEADER: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.config.auth.proxyRoleHeader }}
+  PROXY_ROLE_HEADER: {{ . | quote }}
+  {{- end }}
+  TRUSTED_PROXIES: {{ .Values.config.auth.trustedProxies | quote }}
+  PROXY_AUTO_PROVISION: {{ .Values.config.auth.proxyAutoProvision | quote }}
+  {{- with .Values.config.auth.adminEmail }}
+  ADMIN_EMAIL: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.config.auth.adminSlug }}
+  ADMIN_SLUG: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.config.auth.authSettingsUrl }}
+  AUTH_SETTINGS_URL: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.config.auth.authSettingsLabel }}
+  AUTH_SETTINGS_LABEL: {{ . | quote }}
+  {{- end }}
+
+  # ---- external calendar scheduler --------------------------------------
+  EXTERNAL_CALENDAR_SCHEDULER_TICK_S: {{ .Values.config.externalCalendar.schedulerTickS | quote }}
+  EXTERNAL_CALENDAR_FETCH_CONCURRENCY: {{ .Values.config.externalCalendar.fetchConcurrency | quote }}
+  EXTERNAL_CALENDAR_CLAIM_CAP: {{ .Values.config.externalCalendar.claimCap | quote }}
+
+  # ---- birthday scheduler ----------------------------------------------
+  BIRTHDAY_SCHEDULER_TICK_S: {{ .Values.config.birthday.schedulerTickS | quote }}
+  BIRTHDAY_CONCURRENCY: {{ .Values.config.birthday.concurrency | quote }}
+
+  # ---- mail (non-sensitive parts) --------------------------------------
+  MAIL_ENABLED: {{ .Values.config.mail.enabled | quote }}
+  {{- with .Values.config.mail.defaultFromAddress }}
+  SMTP_FROM_ADDRESS: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.config.mail.defaultFromName }}
+  SMTP_FROM_NAME: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.config.mail.defaultHost }}
+  SMTP_HOST: {{ . | quote }}
+  {{- end }}
+  SMTP_PORT: {{ .Values.config.mail.defaultPort | quote }}
+  {{- with .Values.config.mail.defaultUsername }}
+  SMTP_USERNAME: {{ . | quote }}
+  {{- end }}
+  SMTP_SECURITY: {{ .Values.config.mail.defaultSecurity | quote }}
+  LMTP_ENABLED: {{ .Values.config.mail.lmtpEnabled | quote }}
+  LMTP_PORT: {{ .Values.config.mail.lmtpPort | quote }}
+  LMTP_HOST: {{ .Values.config.mail.lmtpHost | quote }}
+  {{- with .Values.config.mail.proxyUsernameHeader }}
+  SMTP_PROXY_USERNAME_HEADER: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.config.mail.proxyPasswordHeader }}
+  SMTP_PROXY_PASSWORD_HEADER: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.config.mail.proxyHostHeader }}
+  SMTP_PROXY_HOST_HEADER: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.config.mail.proxyPortHeader }}
+  SMTP_PROXY_PORT_HEADER: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.config.mail.proxySecurityHeader }}
+  SMTP_PROXY_SECURITY_HEADER: {{ . | quote }}
+  {{- end }}

@@ -1,0 +1,41 @@
+shuriken-ts is now installed in namespace {{ .Release.Namespace }}.
+
+{{- if .Values.ingress.enabled }}
+
+Reach the server at:
+{{- range .Values.ingress.hosts }}
+{{- range .paths }}
+  https://{{ .host }}{{ .path }}
+{{- end }}
+{{- end }}
+{{- else if eq .Values.service.type "LoadBalancer" }}
+
+Get the load-balancer address:
+  kubectl get svc -n {{ .Release.Namespace }} {{ include "shuriken.fullname" . }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+{{- else }}
+
+Port-forward to try it locally:
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "shuriken.fullname" . }} 3000:{{ .Values.service.port }}
+  open http://localhost:3000/ui/
+{{- end }}
+
+Useful next steps:
+
+  # Tail logs from every replica
+  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }} -f
+
+  # Re-run migrations on demand
+  kubectl create job --from=cronjob/{{ include "shuriken.fullname" . }} {{ include "shuriken.fullname" . }}-migrate-manual \
+    -n {{ .Release.Namespace }}
+
+{{- if not .Values.existingSecret.name }}
+
+NOTE: secrets are managed by the chart from values.yaml — for production
+deployments prefer setting `existingSecret.name` to a Secret created via
+ExternalSecrets / Sealed Secrets / your CI/CD pipeline.
+{{- end }}
+
+CalDAV / CardDAV discovery URLs (point your client at these):
+
+  https://<your-host>/.well-known/caldav
+  https://<your-host>/.well-known/carddav

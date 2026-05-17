@@ -1,0 +1,351 @@
+# ---------------------------------------------------------------------------
+# shuriken values.yaml
+#
+# Configures a production deployment of shuriken-ts. Every key is documented
+# inline; the JSON schema in values.schema.json validates types and required
+# fields at `helm install --install` time.
+# ---------------------------------------------------------------------------
+
+image:
+  repository: ghcr.io/jthowardio/shuriken-ts
+  tag: ""           # defaults to .Chart.AppVersion when empty
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+replicaCount: 1
+
+# Run database migrations as a Helm pre-install/pre-upgrade Job so multi-
+# replica rollouts don't race on schema. Disable when you migrate
+# out-of-band.
+migrations:
+  enabled: true
+  # Extra labels/annotations on the migration Job pod.
+  podAnnotations: {}
+  # Resource requests for the one-shot migration pod.
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  # Job backoff before giving up.
+  backoffLimit: 1
+  # Timeout for the migration step in seconds; the Job is failed if it runs longer.
+  activeDeadlineSeconds: 600
+
+# ---------------------------------------------------------------------------
+# App runtime configuration. Every key here maps to an env var read by the
+# app via Effect's Config API. The chart auto-derives the SCREAMING_SNAKE
+# name (e.g. config.server.port → PORT, config.auth.proxyHeader → PROXY_HEADER).
+#
+# Values are split into two cohorts:
+#   * non-sensitive — rendered into a ConfigMap
+#   * sensitive (anything with credentials/keys/tokens) — rendered into a
+#     Secret. To supply them from an existing secret instead, set
+#     `existingSecret.name` (see below).
+# ---------------------------------------------------------------------------
+
+config:
+  server:
+    port: 3000
+    host: "::"
+
+  # NODE_ENV — leave as "production" unless you specifically need dev-mode
+  # tooling (DevTools, more verbose logs).
+  nodeEnv: production
+
+  # LOG_LEVEL — one of trace|debug|info|warn|error|fatal. Empty falls back
+  # to the app default (info in production).
+  logLevel: info
+
+  database:
+    # Set `existingSecret.name` to read DATABASE_URL from a pre-existing
+    # Secret. Otherwise, populate `url` here and the chart renders a Secret.
+    url: ""
+    # Optionally point at a different key on the existing secret (default
+    # is `DATABASE_URL`).
+    existingSecretKey: DATABASE_URL
+
+  auth:
+    # When set, every request is auto-authenticated as this email.
+    # Useful for single-user self-hosted setups. Leave blank to disable.
+    autoLogin: ""
+    # Enable HTTP Basic auth. Disable if you only want proxy auth.
+    basicAuthEnabled: true
+    # Proxy auth toggle: when proxyHeader is set, the server trusts the
+    # header on requests from trusted IPs.
+    proxyHeader: ""
+    proxyRoleHeader: ""
+    # Comma-separated trusted-proxy IPs / CIDRs. "*" trusts every source.
+    trustedProxies: "*"
+    # Auto-create unknown users from proxy headers + role header.
+    proxyAutoProvision: false
+    # First-boot admin user (basic auth). Password goes into the Secret.
+    adminEmail: ""
+    adminPassword: ""
+    adminSlug: ""
+    # External account-management link shown on the profile page.
+    authSettingsUrl: ""
+    authSettingsLabel: ""
+
+  externalCalendar:
+    schedulerTickS: 60
+    fetchConcurrency: 4
+    claimCap: 100
+
+  birthday:
+    schedulerTickS: 600
+    concurrency: 4
+
+  mail:
+    enabled: false
+    defaultFromAddress: ""
+    defaultFromName: ""
+    defaultHost: ""
+    defaultPort: 587
+    defaultUsername: ""
+    defaultPassword: ""
+    defaultSecurity: starttls    # none | starttls | tls
+    # AES-GCM key used to encrypt per-user SMTP creds at rest. Required
+    # when you want users to save their own credentials in the UI.
+    credsKey: ""
+    # iMIP LMTP listener (postfix transport / dovecot). Disabled by default.
+    lmtpEnabled: false
+    lmtpPort: 2400
+    lmtpHost: "0.0.0.0"
+    # JSON-encoded regex-scoped relay profiles. See README of the app
+    # for the schema.
+    profilesJson: ""
+    # Trusted-proxy SMTP override headers (Feature 4). Empty = disabled.
+    proxyUsernameHeader: ""
+    proxyPasswordHeader: ""
+    proxyHostHeader: ""
+    proxyPortHeader: ""
+    proxySecurityHeader: ""
+
+# ---------------------------------------------------------------------------
+# Secret handling. Sensitive values above (database.url, adminPassword,
+# mail.defaultPassword, mail.credsKey, mail.profilesJson) are rendered into
+# a chart-managed Secret named `<release>-shuriken-secret` by default.
+#
+# To use an externally-managed Secret (e.g. created by ExternalSecrets,
+# Sealed Secrets, or your own pipeline), set `existingSecret.name`. The
+# chart will then mount that Secret instead. Keys on that secret are
+# expected to be SCREAMING_SNAKE_CASE (e.g. DATABASE_URL, SMTP_PASSWORD).
+# ---------------------------------------------------------------------------
+
+existingSecret:
+  name: ""
+
+# ---------------------------------------------------------------------------
+# Service definition. By default exposes only HTTP. Enable lmtp to also
+# expose the iMIP LMTP listener (requires config.mail.lmtpEnabled).
+# ---------------------------------------------------------------------------
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+  annotations: {}
+  lmtp:
+    enabled: false
+    port: 2400
+    targetPort: 2400
+
+# ---------------------------------------------------------------------------
+# Ingress for the HTTP service. CalDAV clients are sensitive to .well-known
+# redirects; the default rewrites keep them under /.well-known/{cal,card}dav.
+# ---------------------------------------------------------------------------
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: dav.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  # tls:
+  #   - secretName: dav-tls
+  #     hosts:
+  #       - dav.example.com
+
+# ---------------------------------------------------------------------------
+# Gateway API HTTPRoute — the modern alternative to Ingress. Attaches to
+# one or more Gateways managed elsewhere in the cluster (Contour, Istio,
+# Cilium, GKE Gateway, etc.). Enable EITHER ingress OR httpRoute, not both.
+# ---------------------------------------------------------------------------
+
+httpRoute:
+  enabled: false
+  # Gateway parents this route attaches to. At least one entry required
+  # when enabled. `name` is mandatory; `namespace`, `sectionName`, `kind`
+  # are optional and follow Gateway API semantics.
+  parentRefs:
+    - name: gateway
+      # namespace: gateway-system
+      # sectionName: https
+      # kind: Gateway
+  # Hostnames the route matches. Empty list = all hostnames the Gateway listens on.
+  hostnames:
+    - dav.example.com
+  # Path matches. Defaults to `/` PathPrefix; extend for sub-path mounts.
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      # Optional per-rule timeouts (Gateway API v1.2+).
+      # timeouts:
+      #   request: 30s
+      #   backendRequest: 25s
+      # Optional filters (URL rewrites, header mutation, redirects).
+      filters: []
+  annotations: {}
+
+# ---------------------------------------------------------------------------
+# Resource requests / limits + scaling.
+# ---------------------------------------------------------------------------
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 75
+  targetMemoryUtilizationPercentage: 80
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+  # maxUnavailable: ""
+
+# ---------------------------------------------------------------------------
+# Probes — the app responds to HEAD /.well-known/caldav unauthenticated
+# (it's part of the DAV discovery path and is cheap). Tune to your SLOs.
+# ---------------------------------------------------------------------------
+
+livenessProbe:
+  httpGet:
+    path: /.well-known/caldav
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 15
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /.well-known/caldav
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+startupProbe:
+  httpGet:
+    path: /.well-known/caldav
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  failureThreshold: 30
+
+# ---------------------------------------------------------------------------
+# Pod-level security context. Image runs as the bun user (UID 1000); these
+# defaults make it strictly non-root with a read-only rootfs.
+# ---------------------------------------------------------------------------
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# Volume mounts for the writable scratch + cache the app needs even with
+# read-only rootfs (Bun writes to /tmp; the timezone polyfill loads zone
+# data at startup).
+extraVolumes:
+  - name: tmp
+    emptyDir: {}
+
+extraVolumeMounts:
+  - name: tmp
+    mountPath: /tmp
+
+# ---------------------------------------------------------------------------
+# Deployment-level knobs.
+# ---------------------------------------------------------------------------
+
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 25%
+    maxUnavailable: 0
+
+podAnnotations: {}
+podLabels: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints: []
+priorityClassName: ""
+terminationGracePeriodSeconds: 30
+
+# ---------------------------------------------------------------------------
+# ServiceAccount — kept minimal because the app doesn't talk to the
+# Kubernetes API. Disable to use the namespace default.
+# ---------------------------------------------------------------------------
+
+serviceAccount:
+  create: true
+  automount: false
+  annotations: {}
+  name: ""
+
+# ---------------------------------------------------------------------------
+# NetworkPolicy — deny-all-by-default style; opens HTTP to the cluster
+# ingress and the database egress port. Leave disabled if you manage
+# network policy elsewhere (Cilium, Calico tiers, service mesh).
+# ---------------------------------------------------------------------------
+
+networkPolicy:
+  enabled: false
+  # Allow ingress from these namespaces (pod selector match labels).
+  ingressNamespaces: []
+  # Egress port for Postgres (override if you use a non-standard port).
+  databasePort: 5432
+  # Allow egress to these CIDRs for outbound SMTP / external calendar sync.
+  egressCidrs:
+    - 0.0.0.0/0
+
+# ---------------------------------------------------------------------------
+# Extra env vars — appended verbatim after the rendered config. Useful
+# for one-off knobs you don't want to model in values.yaml.
+# ---------------------------------------------------------------------------
+
+extraEnv: []
+# - name: DEBUG
+#   value: "true"

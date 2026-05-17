@@ -1,0 +1,21 @@
+apiVersion: v2
+name: shuriken
+description: |
+  A CalDAV/CardDAV server (RFC 4791 + RFC 6352) with an HTMX-based
+  management UI, public iCal feeds, bulk import/export, and
+  RFC 6638 scheduling (iMIP).
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/jthowardio/shuriken-ts
+sources:
+  - https://github.com/jthowardio/shuriken-ts
+keywords:
+  - caldav
+  - carddav
+  - calendar
+  - contacts
+  - dav
+maintainers:
+  - name: Joshua Tag Howard
+    email: tag@jthoward.dev

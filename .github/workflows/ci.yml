@@ -27,7 +27,89 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun test
 
-  build:
+  helm:
+    name: Helm chart lint & template
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.18.4
+
+      - name: Install kubeconform
+        run: |
+          curl -sSL -o /tmp/kubeconform.tar.gz \
+            https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
+          tar -xzf /tmp/kubeconform.tar.gz -C /usr/local/bin kubeconform
+
+      - name: helm lint --strict
+        run: helm lint --strict helm/shuriken
+
+      - name: helm template (defaults)
+        run: helm template ci helm/shuriken --debug > /tmp/render-defaults.yaml
+
+      - name: helm template (all optional features on)
+        run: |
+          helm template ci helm/shuriken \
+            --set config.database.url='postgresql://x:y@db:5432/z' \
+            --set config.auth.adminPassword='dummy' \
+            --set ingress.enabled=true \
+            --set autoscaling.enabled=true \
+            --set podDisruptionBudget.enabled=true \
+            --set networkPolicy.enabled=true \
+            --set config.mail.enabled=true \
+            --set config.mail.lmtpEnabled=true \
+            --set service.lmtp.enabled=true \
+            > /tmp/render-full.yaml
+
+      - name: helm template (HTTPRoute variant)
+        run: |
+          helm template ci helm/shuriken \
+            --set config.database.url='postgresql://x:y@db:5432/z' \
+            --set httpRoute.enabled=true \
+            > /tmp/render-httproute.yaml
+
+      - name: Reject combos that should fail schema or template
+        run: |
+          set +e
+          # Schema: invalid pullPolicy must fail
+          helm template ci helm/shuriken --set image.pullPolicy=Bogus 2>/dev/null
+          if [ $? -eq 0 ]; then echo "schema regression: bad pullPolicy accepted"; exit 1; fi
+          # Mutex: ingress + httpRoute must fail
+          helm template ci helm/shuriken --set ingress.enabled=true --set httpRoute.enabled=true 2>/dev/null
+          if [ $? -eq 0 ]; then echo "mutex regression: ingress + httpRoute both rendered"; exit 1; fi
+          echo "negative cases rejected as expected"
+
+      - name: kubeconform (validate rendered manifests against k8s 1.31 schemas)
+        run: |
+          for f in /tmp/render-defaults.yaml /tmp/render-full.yaml /tmp/render-httproute.yaml; do
+            echo "==> $f"
+            kubeconform -strict -ignore-missing-schemas \
+              -schema-location default \
+              -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+              -kubernetes-version 1.31.0 \
+              -summary "$f"
+          done
+
+      - name: helm package
+        run: helm package helm/shuriken --destination /tmp/charts
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: helm-chart
+          path: /tmp/charts/*.tgz
+          retention-days: 14
+
+      - name: Push chart to GHCR (tagged releases only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GH_TOKEN" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+          helm push /tmp/charts/*.tgz "oci://ghcr.io/${{ github.repository_owner }}/charts"
+
+  docker:
     name: Build & push image
     runs-on: ubuntu-latest
     needs: [check, test]
