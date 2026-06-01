@@ -1,4 +1,4 @@
-name: shuriken
+name: shuriken-dev-db
 
 services:
   database:
