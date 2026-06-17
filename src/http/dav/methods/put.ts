@@ -2,6 +2,7 @@ import { Effect, Option } from "effect";
 import { Temporal } from "temporal-polyfill";
 import { makeEtag } from "#src/data/etag.ts";
 import { decodeICalendar, encodeICalendar } from "#src/data/icalendar/codec.ts";
+import { ensureDtstamp } from "#src/data/icalendar/ensure-dtstamp.ts";
 import {
 	getDtendInstant,
 	getDtstartInstant,
@@ -25,7 +26,7 @@ import {
 } from "#src/domain/errors.ts";
 import { CollectionId, EntityId, InstanceId } from "#src/domain/ids.ts";
 import {
-	isValidSlug,
+	isValidInstanceSlug,
 	type ResolvedDavPath,
 	type Slug,
 } from "#src/domain/types/path.ts";
@@ -85,7 +86,7 @@ export const putHandler = (
 		// 2a. Slug shape — only enforced on new-instance creation; updates
 		// preserve the existing slug regardless of whether it matches today's
 		// stricter rules. Same constraints as MKCOL.
-		if (path.kind === "new-instance" && !isValidSlug(path.slug)) {
+		if (path.kind === "new-instance" && !isValidInstanceSlug(path.slug)) {
 			return yield* forbidden();
 		}
 
@@ -191,11 +192,14 @@ export const putHandler = (
 			),
 		);
 
-		// 5. Parse into IrDocument.
-		const doc =
+		// 5. Parse into IrDocument. Fill a missing DTSTAMP (required by RFC 5545
+		// §3.6 on VEVENT/VTODO/VJOURNAL/VFREEBUSY) with the store time so we never
+		// persist or serve invalid iCalendar; a client-supplied DTSTAMP is kept.
+		const doc = ensureDtstamp(
 			entityType === "icalendar"
 				? yield* decodeICalendar(body)
-				: yield* decodeVCard(body);
+				: yield* decodeVCard(body),
+		);
 
 		// 5a. Cache VTIMEZONE definitions in cal_timezone (iCalendar only).
 		//     Each VTIMEZONE is upserted with RFC 5545 §3.6.5 LAST-MODIFIED conflict

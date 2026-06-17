@@ -24,6 +24,7 @@ import {
 import { CollectionId, isUuid } from "#src/domain/ids.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
+import { encodeSegment } from "#src/http/dav/encode-segment.ts";
 import { normalizeClarkNames } from "#src/http/dav/xml/clark.ts";
 import type { DavResponse, Propstat } from "#src/http/dav/xml/multistatus.ts";
 import { multistatusResponse } from "#src/http/dav/xml/multistatus.ts";
@@ -564,7 +565,7 @@ export const proppatchHandler = (
 				}
 			}
 
-			const href = `${origin}/dav/principals/${path.principalSeg}/${path.namespace}/${path.collectionSeg}/${path.instanceSeg}`;
+			const href = `${origin}/dav/principals/${path.principalSeg}/${path.namespace}/${path.collectionSeg}/${encodeSegment(path.instanceSeg)}`;
 
 			if (failedNames.size > 0) {
 				return yield* multistatusResponse([

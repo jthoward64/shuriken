@@ -18,7 +18,7 @@ const cn = (local: string): string => `{${CARDDAV_NS}}${local}`;
 
 export interface TextMatch {
 	readonly value: string;
-	readonly collation: "i;ascii-casemap" | "i;unicode-casemap";
+	readonly collation: "i;ascii-casemap" | "i;unicode-casemap" | "i;octet";
 	readonly matchType: "equals" | "contains" | "starts-with" | "ends-with";
 	readonly negate: boolean;
 }
@@ -93,6 +93,19 @@ const parseParamFilter = (el: unknown): ParamFilter => {
 };
 
 const parseTextMatch = (el: unknown): TextMatch => {
+	// fast-xml-parser collapses a text-only `<C:text-match>foo</C:text-match>`
+	// (no attributes — what most clients send) to a bare string/number; only an
+	// element with attributes becomes an object with `#text`. Treat the bare
+	// form as the match value, otherwise the filter degrades to matching every
+	// record (value "" → contains "" → always true).
+	if (typeof el === "string" || typeof el === "number") {
+		return {
+			value: String(el),
+			collation: "i;ascii-casemap",
+			matchType: "contains",
+			negate: false,
+		};
+	}
 	if (typeof el !== "object" || el === null) {
 		return {
 			value: "",
@@ -102,11 +115,20 @@ const parseTextMatch = (el: unknown): TextMatch => {
 		};
 	}
 	const obj = el as Record<string, unknown>;
-	const value = typeof obj["#text"] === "string" ? obj["#text"] : "";
-	const collation =
-		obj["@_collation"] === "i;unicode-casemap"
+	const rawText = obj["#text"];
+	const value =
+		typeof rawText === "string"
+			? rawText
+			: typeof rawText === "number"
+				? String(rawText)
+				: "";
+	const rawCollation = obj["@_collation"];
+	const collation: TextMatch["collation"] =
+		rawCollation === "i;unicode-casemap"
 			? "i;unicode-casemap"
-			: "i;ascii-casemap";
+			: rawCollation === "i;octet"
+				? "i;octet"
+				: "i;ascii-casemap";
 	const matchType = (
 		["equals", "contains", "starts-with", "ends-with"].includes(
 			obj["@_match-type"] as string,
@@ -219,10 +241,18 @@ const evalParamFilter = (prop: IrProperty, f: ParamFilter): boolean => {
 };
 
 const evalTextMatch = (text: string, tm: TextMatch): boolean => {
-	const fold = (s: string) =>
-		tm.collation === "i;unicode-casemap"
-			? s.normalize("NFC").toLowerCase()
-			: s.toLowerCase();
+	// i;octet is an exact, case-sensitive comparison; the casemap collations
+	// fold case (RFC 6352 §8.6.2 / RFC 4790).
+	const fold = (s: string) => {
+		switch (tm.collation) {
+			case "i;octet":
+				return s;
+			case "i;unicode-casemap":
+				return s.normalize("NFC").toLowerCase();
+			default:
+				return s.toLowerCase();
+		}
+	};
 	const haystack = fold(text);
 	const needle = fold(tm.value);
 
@@ -248,6 +278,14 @@ const propValueText = (prop: IrProperty): string => {
 	const v = prop.value;
 	if (v.type === "TEXT") {
 		return v.value;
+	}
+	// Multi-valued vCard properties (CATEGORIES, NICKNAME, …). Render the
+	// comma-joined form so a text-match sees every member, not an empty string.
+	if (v.type === "TEXT_LIST") {
+		return v.value.join(",");
+	}
+	if (v.type === "DATE_LIST" || v.type === "DATE_TIME_LIST") {
+		return v.value.map((item) => item.toString()).join(",");
 	}
 	if ("value" in v && typeof v.value === "string") {
 		return v.value;

@@ -20,7 +20,11 @@ import type { AclService } from "#src/services/acl/index.ts";
 import { PrincipalRepository } from "#src/services/principal/index.ts";
 
 const DAV_NS = "DAV:";
+const CALDAV_NS = "urn:ietf:params:xml:ns:caldav";
+const CARDDAV_NS = "urn:ietf:params:xml:ns:carddav";
 const DISPLAYNAME = cn(DAV_NS, "displayname");
+const CAL_HOME_SET = cn(CALDAV_NS, "calendar-home-set");
+const CARD_HOME_SET = cn(CARDDAV_NS, "addressbook-home-set");
 
 // ---------------------------------------------------------------------------
 // Body parsing helpers
@@ -139,6 +143,12 @@ export const principalPropertySearchHandler = (
 				[cn(DAV_NS, "principal-URL")]: {
 					[cn(DAV_NS, "href")]: principalHref,
 				},
+				// RFC 4791 §6.2.1 / RFC 6352 §7.1.1: principal discovery clients
+				// (e.g. python-caldav) request the home-sets here to locate a user's
+				// calendars/address books. Mirror the PROPFIND values — the per-type
+				// home collections, not the principal root.
+				[CAL_HOME_SET]: { [cn(DAV_NS, "href")]: `${principalHref}cal/` },
+				[CARD_HOME_SET]: { [cn(DAV_NS, "href")]: `${principalHref}card/` },
 			};
 
 			const propstats = requestedProps

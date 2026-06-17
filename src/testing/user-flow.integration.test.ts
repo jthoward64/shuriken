@@ -133,15 +133,17 @@ describe("User flow: calendar discovery + CRUD", () => {
 				),
 
 				// 5. PROPFIND depth:1 — should list the collection + 1 instance.
-				//    Per shuriken's DAV policy depth:1 hrefs use stable UUIDs,
-				//    so we count <D:response> elements rather than search for the
-				//    slug.
+				//    Member hrefs use the resource's slug, so the instance appears
+				//    at the URL the client created it at.
 				propfind("/dav/principals/alice/cal/work/", PROPFIND_ALLPROP, {
 					as: "alice",
 					headers: { Depth: "1" },
 					expect: {
 						status: 207,
-						bodyContains: ["<D:response>", "/dav/principals/alice/cal/work/"],
+						bodyContains: [
+							"<D:response>",
+							"/dav/principals/alice/cal/work/lunch.ics",
+						],
 					},
 				}),
 

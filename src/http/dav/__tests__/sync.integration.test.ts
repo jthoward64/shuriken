@@ -464,9 +464,8 @@ describe("sync-collection REPORT — addressbook", () => {
 		const deltaBody = results[3]?.body ?? "";
 		const hrefCount = (deltaBody.match(/<D:href>/g) ?? []).length;
 		expect(hrefCount).toBe(1);
-		// sync-collection uses stable UUID hrefs for member resources
-		expect(deltaBody).toMatch(
-			/\/dav\/principals\/test\/card\/primary\/[0-9a-f-]{36}/,
-		);
+		// sync-collection member hrefs use the resource's slug so the href matches
+		// the URL the client created the object at (the c2 PUT above).
+		expect(deltaBody).toContain("/dav/principals/test/card/primary/c2.vcf");
 	});
 });

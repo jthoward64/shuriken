@@ -19,6 +19,7 @@ import type { EntityId, UuidString } from "#src/domain/ids.ts";
 import { InstanceId } from "#src/domain/ids.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
+import { encodeSegment } from "#src/http/dav/encode-segment.ts";
 import {
 	buildInstanceProps,
 	type PropfindKind,
@@ -305,7 +306,7 @@ export const calendarQueryHandler = (
 				stripTimezones(subsetIrDocument(irDoc, spec)),
 			);
 
-			const href = `${origin}/dav/principals/${path.principalSeg}/${path.namespace}/${path.collectionSeg}/${inst.id}`;
+			const href = `${origin}/dav/principals/${path.principalSeg}/${path.namespace}/${path.collectionSeg}/${encodeSegment(inst.slug || inst.id)}`;
 			const allProps: Record<ClarkName, unknown> = {
 				...buildInstanceProps(inst),
 				[CALENDAR_DATA]: dataStr,

@@ -2,9 +2,10 @@
 // PROPFIND handler — RFC 4918 §9.1
 //
 // Supported path kinds:
-//   collection  → collection properties + (Depth:1) instance members
-//   instance    → instance properties only
-//   principal   → minimal home-set properties
+//   collection      → collection properties + (Depth:1) instance members
+//   collectionHome  → per-type home (e.g. /cal/) + (Depth:1) typed collections
+//   instance        → instance properties only
+//   principal       → minimal home-set properties
 //   new-collection / new-instance → 404
 //   principalCollection / wellknown → 404 (router handles well-known redirect before PROPFIND)
 //
@@ -41,10 +42,14 @@ import {
 	PrincipalId,
 	UserId,
 } from "#src/domain/ids.ts";
-import { COLLECTION_TYPE_TO_NAMESPACE } from "#src/domain/types/collection-namespace.ts";
+import {
+	COLLECTION_TYPE_TO_NAMESPACE,
+	type CollectionNamespace,
+} from "#src/domain/types/collection-namespace.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
+import { encodeSegment } from "#src/http/dav/encode-segment.ts";
 import {
 	buildInstanceProps,
 	creationDateFromId,
@@ -178,6 +183,7 @@ const CAL_USER_TYPE = cn(CALDAV_NS, "calendar-user-type");
 // namespace (each spec defines its own child element).
 const COLLATION_NAMES: ReadonlyArray<string> = [
 	"i;ascii-casemap",
+	"i;octet",
 	"i;unicode-casemap",
 ];
 const CAL_SUPPORTED_COLLATIONS: Record<ClarkName, unknown> = {
@@ -452,8 +458,20 @@ const collectionHref = (
 	collectionSeg: string,
 ): string => `${origin}/dav/principals/${principalSeg}/${ns}/${collectionSeg}/`;
 
+/** Human-readable DAV:displayname for each per-type home collection. */
+const COLLECTION_HOME_DISPLAYNAME: Record<CollectionNamespace, string> = {
+	cal: "Calendars",
+	card: "Address Books",
+	inbox: "Scheduling Inbox",
+	outbox: "Scheduling Outbox",
+	col: "Collections",
+};
+
 /**
- * Href for a directly-accessed instance: mirrors the URL segments the client used.
+ * Href for a directly-accessed instance: mirrors the URL segments the client
+ * used. The instance segment is percent-encoded because object names may now
+ * contain `@` and other UID characters (see isValidInstanceSlug); the parent
+ * segments use the tighter collection-slug charset and need no encoding.
  */
 const instanceHref = (
 	origin: string,
@@ -462,11 +480,14 @@ const instanceHref = (
 	collectionSeg: string,
 	instanceSeg: string,
 ): string =>
-	`${origin}/dav/principals/${principalSeg}/${ns}/${collectionSeg}/${instanceSeg}`;
+	`${origin}/dav/principals/${principalSeg}/${ns}/${collectionSeg}/${encodeSegment(instanceSeg)}`;
 
 /**
- * Href for a depth:1 member instance that the client did not directly address.
- * Uses UUIDs, which are stable identifiers the client can use for subsequent requests.
+ * Href for a depth:1 member instance. Uses the instance's stored slug so the
+ * href matches the URL the client created the object at (clients such as
+ * python-caldav match list/search/sync results against that URL). The slug is
+ * percent-encoded because object names may contain `@` etc.; it falls back to
+ * the UUID only if the slug is somehow empty. Both forms resolve on input.
  */
 const memberInstanceHref = (
 	origin: string,
@@ -475,7 +496,7 @@ const memberInstanceHref = (
 	collectionSeg: string,
 	instanceRow: InstanceRow,
 ): string =>
-	`${origin}/dav/principals/${principalSeg}/${ns}/${collectionSeg}/${instanceRow.id}`;
+	`${origin}/dav/principals/${principalSeg}/${ns}/${collectionSeg}/${encodeSegment(instanceRow.slug || instanceRow.id)}`;
 
 // ---------------------------------------------------------------------------
 // Property builders
@@ -785,10 +806,17 @@ export const propfindHandler = (
 				[CURRENT_USER_PRINCIPAL]: { [cn(DAV_NS, "href")]: actingPrincipalHref },
 				// RFC 3744 §4.2: canonical URL for this principal resource
 				[PRINCIPAL_URL]: { [cn(DAV_NS, "href")]: principalHref },
-				// RFC 4791 §6.2.1: home URL for calendar discovery
-				[CAL_HOME_SET]: { [cn(DAV_NS, "href")]: principalHref },
-				// RFC 6352 §6.2.1: home URL for addressbook discovery
-				[CARD_HOME_SET]: { [cn(DAV_NS, "href")]: principalHref },
+				// RFC 4791 §6.2.1: calendar home — the collection whose members are
+				// the principal's calendars. Points at the `/cal/` namespace level so
+				// MKCALENDAR <home>/<name>/ (the universal client convention) lands on
+				// a real, addressable collection (RFC 4918 §5.2).
+				[CAL_HOME_SET]: {
+					[cn(DAV_NS, "href")]: `${principalHref}cal/`,
+				},
+				// RFC 6352 §7.1.1: addressbook home — analogous, at `/card/`.
+				[CARD_HOME_SET]: {
+					[cn(DAV_NS, "href")]: `${principalHref}card/`,
+				},
 				// RFC 6638 §2.4.1: email addresses for attendee lookup
 				[CAL_USER_ADDRESS_SET]: {
 					[cn(DAV_NS, "href")]: `mailto:${principalRow.user.email}`,
@@ -858,7 +886,12 @@ export const propfindHandler = (
 						(COLLECTION_TYPE_TO_NAMESPACE as Record<string, string>)[
 							coll.collectionType
 						] ?? "col";
-					const href = collectionHref(origin, path.principalSeg, ns, coll.id);
+					const href = collectionHref(
+						origin,
+						path.principalSeg,
+						ns,
+						coll.slug || coll.id,
+					);
 					responses.push(collectionResponse(href, coll, propfind, origin));
 				}
 				for (const [group, groupColls] of memberOfGroups.map(
@@ -870,7 +903,12 @@ export const propfindHandler = (
 							(COLLECTION_TYPE_TO_NAMESPACE as Record<string, string>)[
 								coll.collectionType
 							] ?? "col";
-						const href = collectionHref(origin, groupPrincipalSeg, ns, coll.id);
+						const href = collectionHref(
+							origin,
+							groupPrincipalSeg,
+							ns,
+							coll.slug || coll.id,
+						);
 						responses.push(collectionResponse(href, coll, propfind, origin));
 					}
 				}
@@ -982,6 +1020,61 @@ export const propfindHandler = (
 						href: iHref,
 						propstats: splitPropstats(instProps, propfind),
 					});
+				}
+			}
+		} else if (path.kind === "collectionHome") {
+			// RFC 4918 §5.2: the per-type namespace level (e.g. /…/cal/) is a real
+			// collection — the calendar/addressbook *home* whose members are the
+			// principal's typed collections. Authorized via the owning principal's
+			// ACL (the home has no ACL row of its own).
+			yield* acl.check(
+				actingPrincipalId,
+				path.principalId,
+				"principal",
+				"DAV:read",
+			);
+			const homePrivileges = yield* acl.currentUserPrivileges(
+				actingPrincipalId,
+				path.principalId,
+				"principal",
+			);
+			const homeHref = `${origin}/dav/principals/${path.principalSeg}/${path.namespace}/`;
+			const ownerHref = `${origin}/dav/principals/${path.principalId}/`;
+			responses.push({
+				href: homeHref,
+				propstats: splitPropstats(
+					{
+						// An ordinary WebDAV collection, NOT a calendar/addressbook —
+						// those resourcetypes belong on the members beneath it.
+						[RESOURCETYPE]: { [cn(DAV_NS, "collection")]: "" },
+						[DISPLAYNAME]: COLLECTION_HOME_DISPLAYNAME[path.namespace],
+						[DAV_OWNER]: { [cn(DAV_NS, "href")]: ownerHref },
+						[CURRENT_USER_PRINCIPAL]: {
+							[cn(DAV_NS, "href")]: actingPrincipalHref,
+						},
+						[CURRENT_USER_PRIVILEGE_SET]: buildPrivilegeSet(homePrivileges),
+					},
+					propfind,
+				),
+			});
+
+			if (depth === 1) {
+				const homeCollections = yield* collSvc.listByOwner(path.principalId);
+				for (const coll of homeCollections) {
+					const ns =
+						(COLLECTION_TYPE_TO_NAMESPACE as Record<string, string>)[
+							coll.collectionType
+						] ?? "col";
+					if (ns !== path.namespace) {
+						continue;
+					}
+					const href = collectionHref(
+						origin,
+						path.principalSeg,
+						ns,
+						coll.slug || coll.id,
+					);
+					responses.push(collectionResponse(href, coll, propfind, origin));
 				}
 			}
 		} else if (path.kind === "root") {

@@ -140,8 +140,13 @@ const findByTimeRange = Effect.fn("CalIndexRepository.findByTimeRange")(
 											sql`${calIndex.dtendUtc} > ${start.toString()}::timestamptz`,
 										)
 									: undefined,
+								// A NULL dtstart_utc must still be a candidate: a VTODO with
+								// only DUE, or with no DTSTART/DUE/DURATION at all (RFC 4791
+								// §9.9 — matches every range), has no indexed start. The
+								// in-memory §9.9 evaluation does the exact check. VEVENTs
+								// always carry DTSTART, so this never loosens event queries.
 								end !== null
-									? sql`${calIndex.dtstartUtc} < ${end.toString()}::timestamptz`
+									? sql`(${calIndex.dtstartUtc} IS NULL OR ${calIndex.dtstartUtc} < ${end.toString()}::timestamptz)`
 									: undefined,
 							),
 							// RRULE: week-bucket pre-filter

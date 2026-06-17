@@ -1,6 +1,13 @@
 import { describe, expect, it } from "bun:test";
 import { makeCalEvent, makeVCard } from "#src/testing/data.ts";
-import { put, singleUser } from "#src/testing/script-runner/fixtures.ts";
+import {
+	del,
+	get,
+	PROPFIND_RESOURCETYPE,
+	propfind,
+	put,
+	singleUser,
+} from "#src/testing/script-runner/fixtures.ts";
 import { runScript } from "#src/testing/script-runner/runner.ts";
 
 const EVENT = makeCalEvent({
@@ -249,6 +256,164 @@ describe("PUT conditional headers on existing resource", () => {
 						expect: { status: 412 },
 					},
 				),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+	});
+});
+
+// Real clients name calendar/contact objects after the UID, which is almost
+// always `local@domain` — so the resource name contains `@`. The instance slug
+// charset must accept it, and response hrefs must percent-encode it.
+// See documentation/planning/finding-instance-slug-charset.md.
+describe("PUT object name with @ (UID-derived resource names)", () => {
+	const atName = "20010712T182145Z-123401@example.com.ics";
+
+	it("round-trips a calendar object whose name contains @", async () => {
+		const results = await runScript(
+			[
+				put(
+					`/dav/principals/test/cal/primary/${atName}`,
+					EVENT,
+					"text/calendar",
+					{ as: "test", expect: { status: 201 } },
+				),
+				get(`/dav/principals/test/cal/primary/${atName}`, {
+					as: "test",
+					expect: { status: 200 },
+				}),
+				del(`/dav/principals/test/cal/primary/${atName}`, {
+					as: "test",
+					expect: { status: 204 },
+				}),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+	});
+
+	it("percent-encodes @ in the depth:0 PROPFIND href", async () => {
+		const results = await runScript(
+			[
+				put(
+					`/dav/principals/test/cal/primary/${atName}`,
+					EVENT,
+					"text/calendar",
+					{ as: "test", expect: { status: 201 } },
+				),
+				propfind(
+					`/dav/principals/test/cal/primary/${atName}`,
+					PROPFIND_RESOURCETYPE,
+					{ as: "test", headers: { Depth: "0" }, expect: { status: 207 } },
+				),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+		// The href must carry the encoded `%40`, never a bare `@`.
+		expect(results[1]?.body).toContain(
+			"20010712T182145Z-123401%40example.com.ics",
+		);
+		expect(results[1]?.body).not.toContain("123401@example.com.ics");
+	});
+
+	it("rejects an object name with a disallowed character (space)", async () => {
+		// The relaxed instance charset still excludes spaces (and `.`/`..`/`/`,
+		// which URL normalization handles). A `%20` survives URL parsing and
+		// decodes to a space at the edge, so this exercises the validator's
+		// rejection path over real HTTP → 403.
+		const results = await runScript(
+			[
+				put(
+					"/dav/principals/test/cal/primary/has%20space.ics",
+					EVENT,
+					"text/calendar",
+					{ as: "test", expect: { status: 403 } },
+				),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+	});
+});
+
+// RFC 5545 §3.6: DTSTAMP is REQUIRED. Clients sometimes omit it; the server
+// fills a missing DTSTAMP with the store time so it never persists/serves
+// invalid iCalendar (a supplied DTSTAMP is preserved). See
+// src/data/icalendar/ensure-dtstamp.ts.
+describe("PUT fills a missing DTSTAMP", () => {
+	const eventNoDtstamp = [
+		"BEGIN:VCALENDAR",
+		"VERSION:2.0",
+		"PRODID:-//Test//Test//EN",
+		"BEGIN:VEVENT",
+		"UID:no-dtstamp@example.com",
+		"DTSTART:20260115T100000Z",
+		"DTEND:20260115T110000Z",
+		"SUMMARY:No DTSTAMP",
+		"END:VEVENT",
+		"END:VCALENDAR",
+		"",
+	].join("\r\n");
+
+	const eventWithDtstamp = [
+		"BEGIN:VCALENDAR",
+		"VERSION:2.0",
+		"PRODID:-//Test//Test//EN",
+		"BEGIN:VEVENT",
+		"UID:has-dtstamp@example.com",
+		"DTSTAMP:20200101T000000Z",
+		"DTSTART:20260115T100000Z",
+		"DTEND:20260115T110000Z",
+		"SUMMARY:Has DTSTAMP",
+		"END:VEVENT",
+		"END:VCALENDAR",
+		"",
+	].join("\r\n");
+
+	it("adds DTSTAMP when the client omits it", async () => {
+		const results = await runScript(
+			[
+				put(
+					"/dav/principals/test/cal/primary/no-dtstamp.ics",
+					eventNoDtstamp,
+					"text/calendar",
+					{ as: "test", expect: { status: 201 } },
+				),
+				get("/dav/principals/test/cal/primary/no-dtstamp.ics", {
+					as: "test",
+					expect: { status: 200, bodyContains: ["DTSTAMP"] },
+				}),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+	});
+
+	it("preserves a client-supplied DTSTAMP", async () => {
+		const results = await runScript(
+			[
+				put(
+					"/dav/principals/test/cal/primary/has-dtstamp.ics",
+					eventWithDtstamp,
+					"text/calendar",
+					{ as: "test", expect: { status: 201 } },
+				),
+				get("/dav/principals/test/cal/primary/has-dtstamp.ics", {
+					as: "test",
+					expect: { status: 200, bodyContains: ["DTSTAMP:20200101T000000Z"] },
+				}),
 			],
 			singleUser(),
 		);

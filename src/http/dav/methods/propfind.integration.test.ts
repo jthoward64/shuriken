@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { makeCalEvent, makeVCard } from "#src/testing/data.ts";
 import {
+	del,
 	PROPFIND_ALLPROP,
 	PROPFIND_DISPLAYNAME,
 	PROPFIND_RESOURCETYPE,
@@ -371,6 +372,10 @@ describe("PROPFIND CalDAV/CardDAV discovery properties", () => {
 		expect(results[0]?.body).not.toContain(
 			`<D:status>HTTP/1.1 404 Not Found</D:status>`,
 		);
+		// RFC 4918 §5.2: the home must be a real, addressable collection so that
+		// the universal `MKCALENDAR <home>/<name>/` convention works. It points at
+		// the `/cal/` namespace level, not the principal root.
+		expect(results[0]?.body).toContain("/dav/principals/test/cal/");
 	});
 
 	// RFC 6352 §6.2.1: CARDDAV:addressbook-home-set MUST be supported on
@@ -393,6 +398,8 @@ describe("PROPFIND CalDAV/CardDAV discovery properties", () => {
 		expect(results[0]?.body).not.toContain(
 			`<D:status>HTTP/1.1 404 Not Found</D:status>`,
 		);
+		// Points at the `/card/` namespace level (see calendar-home-set above).
+		expect(results[0]?.body).toContain("/dav/principals/test/card/");
 	});
 
 	// RFC 5397 §3: DAV:current-user-principal allows a client to discover its
@@ -452,6 +459,100 @@ describe("PROPFIND principal", () => {
 						status: 207,
 						bodyContains: ["Primary Calendar"],
 					},
+				}),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+	});
+});
+
+// RFC 4918 §5.2: the per-type namespace level (/dav/principals/:slug/cal/, …) is
+// a real, addressable home collection whose members are the typed collections.
+describe("PROPFIND collection home", () => {
+	it("Depth:0 on the calendar home is an ordinary collection (not a calendar)", async () => {
+		const results = await runScript(
+			[
+				propfind("/dav/principals/test/cal/", PROPFIND_RESOURCETYPE, {
+					as: "test",
+					headers: { Depth: "0" },
+					expect: { status: 207, bodyContains: ["collection"] },
+				}),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+		// The home is a plain collection; the calendar resourcetype belongs on its
+		// members, not on the home itself.
+		expect(results[0]?.body).not.toContain("calendar");
+	});
+
+	it("Depth:0 on the calendar home reports a displayname", async () => {
+		const results = await runScript(
+			[
+				propfind("/dav/principals/test/cal/", PROPFIND_DISPLAYNAME, {
+					as: "test",
+					headers: { Depth: "0" },
+					expect: { status: 207, bodyContains: ["Calendars"] },
+				}),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+	});
+
+	it("Depth:1 on the calendar home lists the principal's calendars as members", async () => {
+		const results = await runScript(
+			[
+				propfind("/dav/principals/test/cal/", PROPFIND_DISPLAYNAME, {
+					as: "test",
+					headers: { Depth: "1" },
+					expect: {
+						status: 207,
+						bodyContains: ["Primary Calendar", "/dav/principals/test/cal/"],
+					},
+				}),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+		// Address books live under /card/, not the calendar home.
+		expect(results[0]?.body).not.toContain("Primary Address Book");
+	});
+
+	it("Depth:1 on the addressbook home lists the principal's address books", async () => {
+		const results = await runScript(
+			[
+				propfind("/dav/principals/test/card/", PROPFIND_DISPLAYNAME, {
+					as: "test",
+					headers: { Depth: "1" },
+					expect: {
+						status: 207,
+						bodyContains: ["Primary Address Book"],
+					},
+				}),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+	});
+
+	it("rejects mutating methods on the home with 405", async () => {
+		const results = await runScript(
+			[
+				del("/dav/principals/test/cal/", {
+					as: "test",
+					expect: { status: 405 },
 				}),
 			],
 			singleUser(),

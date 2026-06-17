@@ -95,10 +95,13 @@ All Bun-specific APIs (file I/O, `Bun.serve`, `Bun.file`, `Bun.password`, etc.) 
 
 - Both slug-based and UUID-based paths are accepted for every DAV resource; slugs are resolved to UUIDs inside `parseDavPath` before any handler sees them.
 - `ResolvedDavPath` carries `principalSeg`, `collectionSeg`, and `instanceSeg` — the URL-decoded path segments exactly as the client sent them — alongside the resolved UUID fields. Handlers use the seg fields when constructing hrefs so that response URLs mirror what the client used.
-- **PROPFIND `<href>` construction**:
+- **Response `<href>` construction** (priority: satisfy the client; prefer UUIDs only where they don't):
   - For a resource the client directly addressed (depth:0), the href uses the seg values from the path (slug or UUID, whatever the client sent).
-  - For depth:1 member instances that the client did not directly address, UUIDs are used — they are stable identifiers and clients will use them for subsequent per-resource requests.
-  - MKCOL/MKCALENDAR/MKADDRESSBOOK `Location` headers follow the same rule: the principal seg is mirrored from the request, and the new collection's slug is used (since that is what the client named it).
+  - For **member-enumeration** responses — depth:1 PROPFIND members, and the `calendar-query` / `addressbook-query` / `sync-collection` REPORTs — each member href uses the resource's **stored slug** (falling back to its UUID only if the slug is empty). Clients (e.g. python-caldav) match list/search/sync results against the URL they created the resource at, so the href must mirror that slug. Both slug and UUID still resolve on input, so this never breaks subsequent per-resource requests.
+  - `calendar-multiget` / `addressbook-multiget` mirror the request href verbatim.
+  - Member-href slugs are percent-encoded via `encodeSegment` (`src/http/dav/encode-segment.ts`) because object names may contain `@` etc. (see `isValidInstanceSlug`).
+  - **Link-reference** properties that clients merely follow rather than match — `calendar-home-set`, `addressbook-home-set`, `principal-URL`, `current-user-principal`, `owner`, `schedule-inbox-URL`/`schedule-outbox-URL`, `schedule-default-calendar-URL`, `group-membership` — keep UUID-based hrefs (stable, and the client never compares them to a creation URL).
+  - MKCOL/MKCALENDAR/MKADDRESSBOOK `Location` headers: the principal seg is mirrored from the request, and the new collection's slug is used (since that is what the client named it).
 
 ## Coding Principles
 

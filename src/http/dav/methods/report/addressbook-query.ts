@@ -15,6 +15,7 @@ import type { EntityId, UuidString } from "#src/domain/ids.ts";
 import { InstanceId } from "#src/domain/ids.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
+import { encodeSegment } from "#src/http/dav/encode-segment.ts";
 import {
 	buildInstanceProps,
 	type PropfindKind,
@@ -71,6 +72,11 @@ const extractFnPreFilter = (
 	// Only use the first text-match as a pre-filter hint (in-memory eval handles the rest)
 	const tm = fnFilter.textMatches[0];
 	if (!tm || tm.negate) {
+		return null;
+	}
+	// The card index folds case, so it can't serve a case-sensitive i;octet
+	// match — fall back to a full scan (the in-memory eval handles i;octet).
+	if (tm.collation === "i;octet") {
 		return null;
 	}
 	return { text: tm.value, collation: tm.collation, matchType: tm.matchType };
@@ -188,7 +194,7 @@ export const addressbookQueryHandler = (
 
 			const dataStr = yield* encodeVCard(subsetVCardDocument(irDoc, spec));
 
-			const href = `${origin}/dav/principals/${path.principalSeg}/${path.namespace}/${path.collectionSeg}/${inst.id}`;
+			const href = `${origin}/dav/principals/${path.principalSeg}/${path.namespace}/${path.collectionSeg}/${encodeSegment(inst.slug || inst.id)}`;
 			const allProps: Record<ClarkName, unknown> = {
 				...buildInstanceProps(inst),
 				[ADDRESS_DATA]: dataStr,

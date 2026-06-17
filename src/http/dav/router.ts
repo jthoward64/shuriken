@@ -368,9 +368,20 @@ export const parseDavPath = (
 		const namespace = namespaceOpt.value;
 		const collectionType = NAMESPACE_TO_COLLECTION_TYPE[namespace];
 
-		// Paths that stop at the namespace level (/dav/principals/:slug/:ns) are not valid
+		// /dav/principals/:slug/:ns — the per-type home collection (calendar home,
+		// addressbook home, …). RFC 4918 §5.2: this ancestor of the typed
+		// collections beneath it MUST be an addressable collection.
 		if (segments.length === SEGMENTS_NAMESPACE) {
-			return yield* notFound(`Invalid DAV path: ${path}`);
+			yield* Effect.logTrace("dav.parsePath: collection home resolved", {
+				principalId,
+				namespace,
+			});
+			return {
+				kind: "collectionHome",
+				principalId,
+				namespace,
+				principalSeg: seg1,
+			} satisfies ResolvedDavPath;
 		}
 
 		const seg3 = decodeURIComponent(segments[3] ?? "");
@@ -487,6 +498,7 @@ const COLLECTION_KINDS: ReadonlySet<string> = new Set([
 	"root",
 	"principalCollection",
 	"principal",
+	"collectionHome",
 	"collection",
 	"userCollection",
 	"user",
@@ -623,6 +635,23 @@ export const davRouter = (
 					return yield* groupMemberPutHandler(path, ctx);
 				default:
 					break;
+			}
+		}
+
+		// Per-type home collection (/dav/principals/:slug/:ns). It is a virtual
+		// container — enumerable via PROPFIND, but not itself created, deleted, or
+		// written. Everything except OPTIONS/PROPFIND is 405.
+		if (path.kind === "collectionHome") {
+			switch (method) {
+				case "OPTIONS":
+					return yield* optionsHandler(path, ctx);
+				case "PROPFIND":
+					return yield* propfindHandler(path, ctx, req);
+				default:
+					return new Response(null, {
+						status: HTTP_METHOD_NOT_ALLOWED,
+						headers: { Allow: "OPTIONS, PROPFIND" },
+					});
 			}
 		}
 

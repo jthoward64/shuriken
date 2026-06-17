@@ -1062,4 +1062,102 @@ describe("evaluateCalFilter — propValueText covers multiple IrValue types", ()
 		]);
 		expect(evaluateCalFilter(doc, makeFilterForProp("URL"))).toBe(true);
 	});
+
+	// CATEGORIES is multi-valued (TEXT_LIST). A text-match must see *every*
+	// member, not just the first — `category=PERSONAL` against
+	// CATEGORIES:ANNIVERSARY,PERSONAL,SPECIAL OCCASION must match.
+	const makeCategoriesFilter = (needle: string): CalFilter => ({
+		compFilter: {
+			name: "VCALENDAR",
+			propFilters: [],
+			compFilters: [
+				{
+					name: "VEVENT",
+					propFilters: [
+						{
+							name: "CATEGORIES",
+							paramFilters: [],
+							textMatch: {
+								value: needle,
+								collation: "i;ascii-casemap",
+								matchType: "contains",
+								negate: false,
+							},
+						},
+					],
+					compFilters: [],
+				},
+			],
+		},
+	});
+
+	const categoriesDoc = makeDoc([
+		makeComponent("VEVENT", [
+			{
+				name: "CATEGORIES",
+				parameters: [],
+				value: {
+					type: "TEXT_LIST",
+					value: ["ANNIVERSARY", "PERSONAL", "SPECIAL OCCASION"],
+				},
+				isKnown: true,
+			},
+		]),
+	]);
+
+	it("TEXT_LIST text-match matches a non-first member", () => {
+		expect(
+			evaluateCalFilter(categoriesDoc, makeCategoriesFilter("PERSONAL")),
+		).toBe(true);
+	});
+
+	it("TEXT_LIST text-match matches the first member", () => {
+		expect(
+			evaluateCalFilter(categoriesDoc, makeCategoriesFilter("ANNIVERSARY")),
+		).toBe(true);
+	});
+
+	it("TEXT_LIST text-match does not match an absent value", () => {
+		expect(
+			evaluateCalFilter(categoriesDoc, makeCategoriesFilter("FINANCE")),
+		).toBe(false);
+	});
+
+	// RFC 4791 §7.5.1: i;octet is a mandatory, case-sensitive collation.
+	const makeOctetFilter = (needle: string): CalFilter => ({
+		compFilter: {
+			name: "VCALENDAR",
+			propFilters: [],
+			compFilters: [
+				{
+					name: "VEVENT",
+					propFilters: [
+						{
+							name: "CATEGORIES",
+							paramFilters: [],
+							textMatch: {
+								value: needle,
+								collation: "i;octet",
+								matchType: "contains",
+								negate: false,
+							},
+						},
+					],
+					compFilters: [],
+				},
+			],
+		},
+	});
+
+	it("i;octet collation matches case-exactly", () => {
+		expect(evaluateCalFilter(categoriesDoc, makeOctetFilter("PERSONAL"))).toBe(
+			true,
+		);
+	});
+
+	it("i;octet collation is case-sensitive (lowercase does not match)", () => {
+		expect(evaluateCalFilter(categoriesDoc, makeOctetFilter("personal"))).toBe(
+			false,
+		);
+	});
 });

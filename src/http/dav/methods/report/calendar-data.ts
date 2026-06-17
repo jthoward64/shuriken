@@ -331,11 +331,26 @@ const buildExpandedInstance = (
 	);
 	const newProps: Array<IrProperty> = preserved.map((p) => stripTzidParam(p));
 
+	// An all-day (DTSTART;VALUE=DATE) master expands to DATE occurrences — the
+	// expanded DTSTART/DTEND/RECURRENCE-ID must keep the DATE value type, not be
+	// promoted to DATE-TIME (RFC 5545: RECURRENCE-ID's type must match DTSTART).
+	const masterDtstart = master.properties.find((p) => p.name === "DTSTART");
+	const isAllDay = masterDtstart?.value.type === "DATE";
+	// DATE-valued properties whose default type is DATE-TIME (DTSTART, DTEND,
+	// DUE, RECURRENCE-ID) must carry the VALUE=DATE parameter so they encode as
+	// `DTSTART;VALUE=DATE:20081102`, not `DTSTART:20081102`.
+	const dateParams: ReadonlyArray<{ name: string; value: string }> = isAllDay
+		? [{ name: "VALUE", value: "DATE" }]
+		: [];
+
 	const startZdt = start.toZonedDateTimeISO("UTC");
+	const dtstartValue: IrProperty["value"] = isAllDay
+		? { type: "DATE", value: startZdt.toPlainDate() }
+		: { type: "DATE_TIME", value: startZdt };
 	newProps.push({
 		name: "DTSTART",
-		parameters: [],
-		value: { type: "DATE_TIME", value: startZdt },
+		parameters: [...dateParams],
+		value: dtstartValue,
 		isKnown: true,
 	});
 	if (duration !== undefined) {
@@ -344,17 +359,19 @@ const buildExpandedInstance = (
 		// VEVENT uses DTEND, VTODO uses DUE. Default to DTEND for everything else.
 		newProps.push({
 			name: master.name === "VTODO" ? "DUE" : "DTEND",
-			parameters: [],
-			value: { type: "DATE_TIME", value: endZdt },
+			parameters: [...dateParams],
+			value: isAllDay
+				? { type: "DATE", value: endZdt.toPlainDate() }
+				: { type: "DATE_TIME", value: endZdt },
 			isKnown: true,
 		});
 	}
 	// RFC 4791 §9.6.5 ¶3.5: each expanded instance carries RECURRENCE-ID set to
-	// its occurrence's original DTSTART (in UTC).
+	// its occurrence's original DTSTART (in UTC), with the same value type.
 	newProps.push({
 		name: "RECURRENCE-ID",
-		parameters: [],
-		value: { type: "DATE_TIME", value: startZdt },
+		parameters: [...dateParams],
+		value: dtstartValue,
 		isKnown: true,
 	});
 

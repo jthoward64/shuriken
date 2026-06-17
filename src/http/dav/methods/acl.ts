@@ -281,6 +281,7 @@ export const aclHandler = (
 			path.kind === "wellknown" ||
 			path.kind === "root" ||
 			path.kind === "principalCollection" ||
+			path.kind === "collectionHome" ||
 			path.kind === "groupMembers"
 		) {
 			return yield* Effect.fail(methodNotAllowed());

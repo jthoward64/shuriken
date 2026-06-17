@@ -1,0 +1,6 @@
+# Per-run output (raw logs, normalized snapshots, junit xml). Baselines live
+# next to each suite (caldav-server-tester/baseline.txt, etc.) and ARE tracked.
+results/
+
+# litmus writes these debug artifacts into its suite dir at runtime
+litmus/*.log

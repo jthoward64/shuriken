@@ -40,6 +40,27 @@ const SLUG_RE =
 
 export const isValidSlug = (s: string): boolean => SLUG_RE.test(s);
 
+/**
+ * Validate a calendar/contact *object* (instance) resource name.
+ *
+ * Deliberately looser than {@link isValidSlug}: real clients name objects after
+ * their UID, which is overwhelmingly `local@domain` (e.g.
+ * `20010712T182145Z-123401@example.com.ics`). The tight collection-slug charset
+ * rejects `@` and would 403 those PUTs — a serious interoperability bug (see
+ * documentation/planning/finding-instance-slug-charset.md).
+ *
+ * We accept the RFC 3986 `pchar` set minus `/` — unreserved + sub-delims +
+ * `:`/`@` — which is everything legal in a single path segment. Anything stored
+ * is re-encoded with `encodeSegment` when emitted in an href, so a permissive
+ * input charset never produces an unsafe URL. `.`/`..` are rejected (they carry
+ * special meaning in a URL path); `/` and control characters are excluded by
+ * the character class.
+ */
+const INSTANCE_SLUG_RE = /^[A-Za-z0-9._~!$&'()*+,;=:@-]{1,128}$/;
+
+export const isValidInstanceSlug = (s: string): boolean =>
+	s !== "." && s !== ".." && INSTANCE_SLUG_RE.test(s);
+
 // ---------------------------------------------------------------------------
 // ResolvedDavPath — after slug→UUID resolution at the HTTP edge
 // All internal code receives one of these; never a raw slug.
@@ -63,6 +84,21 @@ export type ResolvedDavPath =
 			/** /dav/principals/:seg — a single principal home */
 			readonly kind: "principal";
 			readonly principalId: PrincipalId;
+			/** URL-decoded path segment as the client sent it (slug or UUID string). */
+			readonly principalSeg: string;
+	  }
+	| {
+			/**
+			 * /dav/principals/:seg/:ns — the per-type *home* collection (e.g. the
+			 * calendar home at `/cal/`, addressbook home at `/card/`). RFC 4918 §5.2
+			 * requires every ancestor of an addressable resource to be a collection,
+			 * so the namespace level is a real, enumerable collection whose members
+			 * are the typed collections beneath it. Advertised to clients via
+			 * {CALDAV}calendar-home-set / {CARDDAV}addressbook-home-set.
+			 */
+			readonly kind: "collectionHome";
+			readonly principalId: PrincipalId;
+			readonly namespace: CollectionNamespace;
 			/** URL-decoded path segment as the client sent it (slug or UUID string). */
 			readonly principalSeg: string;
 	  }

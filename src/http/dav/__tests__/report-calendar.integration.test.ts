@@ -187,6 +187,27 @@ const querySummaryContainsJanuary = `<?xml version="1.0" encoding="utf-8"?>
   </C:filter>
 </C:calendar-query>`;
 
+// Bare <text-match> with NO attributes — the form python-caldav and most
+// clients send. fast-xml-parser collapses it to a string, which previously made
+// parseTextMatch drop it (the prop-filter degraded to an existence check and
+// matched every event). Regression guard for that bug.
+const querySummaryBareTextMatch = `<?xml version="1.0" encoding="utf-8"?>
+<C:calendar-query xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:D="DAV:">
+  <D:prop>
+    <D:getetag/>
+    <C:calendar-data/>
+  </D:prop>
+  <C:filter>
+    <C:comp-filter name="VCALENDAR">
+      <C:comp-filter name="VEVENT">
+        <C:prop-filter name="SUMMARY">
+          <C:text-match>January</C:text-match>
+        </C:prop-filter>
+      </C:comp-filter>
+    </C:comp-filter>
+  </C:filter>
+</C:calendar-query>`;
+
 const querySummaryNotJanuary = `<?xml version="1.0" encoding="utf-8"?>
 <C:calendar-query xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:D="DAV:">
   <D:prop>
@@ -484,6 +505,31 @@ describe("calendar-query REPORT", () => {
 		}
 	});
 
+	it("bare text-match (no attributes) filters correctly", async () => {
+		const results = await runScript(
+			[
+				...SETUP,
+				report(
+					"/dav/principals/test/cal/report-cal/",
+					querySummaryBareTextMatch,
+					{
+						as: "test",
+						expect: {
+							status: 207,
+							bodyContains: JAN_UID,
+							// Before the parseTextMatch fix this also returned FEB_UID.
+							bodyNotContains: FEB_UID,
+						},
+					},
+				),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+	});
+
 	it("text-match with negate-condition excludes matched event", async () => {
 		const results = await runScript(
 			[
@@ -705,6 +751,214 @@ describe("calendar-multiget REPORT — edge cases", () => {
 						status: 207,
 						bodyNotContains: [JAN_UID, FEB_UID],
 					},
+				}),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+	});
+});
+
+// ---------------------------------------------------------------------------
+// VTODO time-range edge cases (RFC 4791 §9.9), VALARM time-range (§9.10), and
+// DATE-valued recurrence expansion (§9.6.5).
+// ---------------------------------------------------------------------------
+
+const vtodo = (uid: string, lines: string): string =>
+	`BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//t//EN\r\nBEGIN:VTODO\r\nUID:${uid}\r\nDTSTAMP:20070101T000000Z\r\n${lines}END:VTODO\r\nEND:VCALENDAR\r\n`;
+
+const vtodoQuery = (start: string, end: string): string =>
+	`<?xml version="1.0" encoding="utf-8"?>
+<C:calendar-query xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:D="DAV:">
+  <D:prop><D:getetag/></D:prop>
+  <C:filter><C:comp-filter name="VCALENDAR"><C:comp-filter name="VTODO">
+    <C:time-range start="${start}" end="${end}"/>
+  </C:comp-filter></C:comp-filter></C:filter>
+</C:calendar-query>`;
+
+describe("calendar-query REPORT — VTODO time-range §9.9", () => {
+	it("matches a DUE-only todo and a todo with no time properties", async () => {
+		const results = await runScript(
+			[
+				// DUE only, in window
+				put(
+					"/dav/principals/test/cal/primary/td-due.ics",
+					vtodo("td-due@x", "DUE;VALUE=DATE:20070501\r\nSUMMARY:due-only\r\n"),
+					"text/calendar",
+					{ as: "test", expect: { status: 201 } },
+				),
+				// No DTSTART/DUE/DURATION — matches every range
+				put(
+					"/dav/principals/test/cal/primary/td-none.ics",
+					vtodo("td-none@x", "SUMMARY:no-time\r\n"),
+					"text/calendar",
+					{ as: "test", expect: { status: 201 } },
+				),
+				// DTSTART+DUE entirely before the window — must NOT match
+				put(
+					"/dav/principals/test/cal/primary/td-old.ics",
+					vtodo(
+						"td-old@x",
+						"DTSTART:19920415T133000Z\r\nDUE:19920516T045959Z\r\nSUMMARY:old\r\n",
+					),
+					"text/calendar",
+					{ as: "test", expect: { status: 201 } },
+				),
+				report(
+					"/dav/principals/test/cal/primary/",
+					vtodoQuery("19970414T000000Z", "20150514T000000Z"),
+					{
+						as: "test",
+						expect: {
+							status: 207,
+							bodyContains: ["td-due.ics", "td-none.ics"],
+							bodyNotContains: ["td-old.ics"],
+						},
+					},
+				),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+	});
+});
+
+describe("calendar-query REPORT — VALARM time-range §9.10", () => {
+	const alarmEvent = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//t//EN\r\nBEGIN:VEVENT\r\nUID:alm@x\r\nDTSTAMP:20151001T000000Z\r\nDTSTART:20151010T080000Z\r\nDTEND:20151010T090000Z\r\nSUMMARY:alarm\r\nBEGIN:VALARM\r\nACTION:AUDIO\r\nTRIGGER:-PT15M\r\nEND:VALARM\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`;
+	const alarmQuery = (start: string, end: string): string =>
+		`<?xml version="1.0" encoding="utf-8"?>
+<C:calendar-query xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:D="DAV:">
+  <D:prop><D:getetag/></D:prop>
+  <C:filter><C:comp-filter name="VCALENDAR"><C:comp-filter name="VEVENT"><C:comp-filter name="VALARM">
+    <C:time-range start="${start}" end="${end}"/>
+  </C:comp-filter></C:comp-filter></C:comp-filter></C:filter>
+</C:calendar-query>`;
+
+	it("matches when the alarm trigger falls in range (07:45)", async () => {
+		const results = await runScript(
+			[
+				put(
+					"/dav/principals/test/cal/primary/alm.ics",
+					alarmEvent,
+					"text/calendar",
+					{
+						as: "test",
+						expect: { status: 201 },
+					},
+				),
+				report(
+					"/dav/principals/test/cal/primary/",
+					alarmQuery("20151010T074000Z", "20151010T075500Z"),
+					{
+						as: "test",
+						expect: { status: 207, bodyContains: ["alm.ics"] },
+					},
+				),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+	});
+
+	it("does not match when the alarm trigger is outside the range (08:01-08:07)", async () => {
+		const results = await runScript(
+			[
+				put(
+					"/dav/principals/test/cal/primary/alm.ics",
+					alarmEvent,
+					"text/calendar",
+					{
+						as: "test",
+						expect: { status: 201 },
+					},
+				),
+				report(
+					"/dav/principals/test/cal/primary/",
+					alarmQuery("20151010T080100Z", "20151010T080700Z"),
+					{
+						as: "test",
+						expect: { status: 207, bodyNotContains: ["alm.ics"] },
+					},
+				),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+	});
+});
+
+describe("calendar-query REPORT — expand DATE-valued recurrence §9.6.5", () => {
+	it("keeps VALUE=DATE on expanded all-day occurrences", async () => {
+		const yearly = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//t//EN\r\nBEGIN:VEVENT\r\nUID:anniv@x\r\nDTSTAMP:19970901T130000Z\r\nDTSTART;VALUE=DATE:19971102\r\nSUMMARY:Anniversary\r\nRRULE:FREQ=YEARLY\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`;
+		const expandQuery = `<?xml version="1.0" encoding="utf-8"?>
+<C:calendar-query xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:D="DAV:">
+  <D:prop><C:calendar-data><C:expand start="20081101T000000Z" end="20081103T000000Z"/></C:calendar-data></D:prop>
+  <C:filter><C:comp-filter name="VCALENDAR"><C:comp-filter name="VEVENT">
+    <C:time-range start="20081101T000000Z" end="20081103T000000Z"/>
+  </C:comp-filter></C:comp-filter></C:filter>
+</C:calendar-query>`;
+		const results = await runScript(
+			[
+				put(
+					"/dav/principals/test/cal/primary/anniv.ics",
+					yearly,
+					"text/calendar",
+					{
+						as: "test",
+						expect: { status: 201 },
+					},
+				),
+				report("/dav/principals/test/cal/primary/", expandQuery, {
+					as: "test",
+					expect: {
+						status: 207,
+						bodyContains: ["DTSTART;VALUE=DATE:20081102"],
+					},
+				}),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+	});
+});
+
+// Regression: an open-ended <time-range> (start, no end) over a recurring
+// component must not crash. The open-end bound was Number.MAX_SAFE_INTEGER ms,
+// which is out of Temporal's range and threw "Out-of-bounds date" → 500.
+describe("calendar-query REPORT — open-ended time-range over a recurrence", () => {
+	it("matches a yearly event with a start-only time-range (no 500)", async () => {
+		const yearly = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//t//EN\r\nBEGIN:VEVENT\r\nUID:rec@x\r\nDTSTAMP:19970901T130000Z\r\nDTSTART:19971102T120000Z\r\nDTEND:19971102T130000Z\r\nSUMMARY:Yearly\r\nRRULE:FREQ=YEARLY\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`;
+		const openEndedQuery = `<?xml version="1.0" encoding="utf-8"?>
+<C:calendar-query xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:D="DAV:">
+  <D:prop><D:getetag/></D:prop>
+  <C:filter><C:comp-filter name="VCALENDAR"><C:comp-filter name="VEVENT">
+    <C:time-range start="20081101T000000Z"/>
+  </C:comp-filter></C:comp-filter></C:filter>
+</C:calendar-query>`;
+		const results = await runScript(
+			[
+				put(
+					"/dav/principals/test/cal/primary/rec.ics",
+					yearly,
+					"text/calendar",
+					{
+						as: "test",
+						expect: { status: 201 },
+					},
+				),
+				report("/dav/principals/test/cal/primary/", openEndedQuery, {
+					as: "test",
+					expect: { status: 207, bodyContains: ["rec.ics"] },
 				}),
 			],
 			singleUser(),

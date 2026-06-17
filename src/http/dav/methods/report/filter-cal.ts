@@ -21,13 +21,22 @@ import { forbidden } from "#src/domain/errors.ts";
 const CALDAV_NS = "urn:ietf:params:xml:ns:caldav";
 const cn = (local: string): string => `{${CALDAV_NS}}${local}`;
 
+// Bounds for an open-ended <time-range> (a missing start or end). Temporal
+// cannot represent Number.MAX_SAFE_INTEGER milliseconds — it exceeds the maximum
+// instant (~year 275760) and throws "Out-of-bounds date" — and expanding a
+// no-UNTIL recurrence all the way to that limit would generate hundreds of
+// thousands of occurrences. Year 1..9999 is a safe, practical infinity: no real
+// calendar object recurs outside it.
+const OPEN_RANGE_START = Temporal.Instant.from("0001-01-01T00:00:00Z");
+const OPEN_RANGE_END = Temporal.Instant.from("9999-12-31T23:59:59Z");
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 export interface TextMatch {
 	readonly value: string;
-	readonly collation: "i;ascii-casemap" | "i;unicode-casemap";
+	readonly collation: "i;ascii-casemap" | "i;unicode-casemap" | "i;octet";
 	readonly matchType: "equals" | "contains" | "starts-with" | "ends-with";
 	readonly negate: boolean;
 }
@@ -120,20 +129,41 @@ const parseParamFilter = (el: unknown): ParamFilter => {
 };
 
 const parseTextMatch = (el: unknown): TextMatch | undefined => {
-	if (typeof el !== "object" || el === null) {
+	if (el === undefined || el === null) {
+		return undefined;
+	}
+	// fast-xml-parser collapses a text-only element with no attributes —
+	// `<C:text-match>foo</C:text-match>`, the form most clients (python-caldav,
+	// iOS, …) send — to a bare string or number, and only produces an object
+	// (with `#text`) when the element carries attributes like collation or
+	// match-type. Handle every shape, otherwise the text-match is silently
+	// dropped and the prop-filter degrades to a mere property-existence check.
+	if (typeof el === "string" || typeof el === "number") {
+		return {
+			value: String(el),
+			collation: "i;ascii-casemap",
+			matchType: "contains",
+			negate: false,
+		};
+	}
+	if (typeof el !== "object") {
 		return undefined;
 	}
 	const obj = el as Record<string, unknown>;
+	const rawText = obj["#text"];
 	const value =
-		typeof obj["#text"] === "string"
-			? obj["#text"]
-			: typeof obj === "string"
-				? obj
+		typeof rawText === "string"
+			? rawText
+			: typeof rawText === "number"
+				? String(rawText)
 				: "";
-	const collation =
-		obj["@_collation"] === "i;unicode-casemap"
+	const rawCollation = obj["@_collation"];
+	const collation: TextMatch["collation"] =
+		rawCollation === "i;unicode-casemap"
 			? "i;unicode-casemap"
-			: "i;ascii-casemap";
+			: rawCollation === "i;octet"
+				? "i;octet"
+				: "i;ascii-casemap";
 	const matchType = (
 		["equals", "contains", "starts-with", "ends-with"].includes(
 			obj["@_match-type"] as string,
@@ -198,10 +228,15 @@ const evalCompFilter = (
 	comp: IrComponent,
 	f: CompFilter,
 	vcalRoot: IrComponent,
+	// The component enclosing `comp`, when there is one. Needed to evaluate a
+	// VALARM time-range, whose TRIGGER is relative to its parent component.
+	parent?: IrComponent,
 ): boolean => {
 	if (f.name !== comp.name) {
 		// comp-filter applies to a different component name — look in children
-		return comp.components.some((child) => evalCompFilter(child, f, vcalRoot));
+		return comp.components.some((child) =>
+			evalCompFilter(child, f, vcalRoot, comp),
+		);
 	}
 
 	if (f.isNotDefined) {
@@ -210,7 +245,10 @@ const evalCompFilter = (
 	}
 
 	// Time-range filter on the component
-	if (f.timeRange && !evalComponentTimeRange(comp, f.timeRange, vcalRoot)) {
+	if (
+		f.timeRange &&
+		!evalComponentTimeRange(comp, f.timeRange, vcalRoot, parent)
+	) {
 		return false;
 	}
 
@@ -228,7 +266,9 @@ const evalCompFilter = (
 			if (matchingChildren.length > 0) {
 				return false;
 			}
-		} else if (!matchingChildren.some((c) => evalCompFilter(c, cf, vcalRoot))) {
+		} else if (
+			!matchingChildren.some((c) => evalCompFilter(c, cf, vcalRoot, comp))
+		) {
 			return false;
 		}
 	}
@@ -290,10 +330,19 @@ const evalParamFilter = (prop: IrProperty, f: ParamFilter): boolean => {
 };
 
 const evalTextMatch = (text: string, tm: TextMatch): boolean => {
-	const fold = (s: string) =>
-		tm.collation === "i;unicode-casemap"
-			? s.normalize("NFC").toLowerCase()
-			: s.toLowerCase();
+	// RFC 4791 §7.5.1: i;ascii-casemap and i;octet are mandatory. The casemap
+	// collations fold case; i;octet is an exact byte/codepoint comparison
+	// (case-sensitive), which clients rely on for e.g. an exact CATEGORIES match.
+	const fold = (s: string) => {
+		switch (tm.collation) {
+			case "i;octet":
+				return s;
+			case "i;unicode-casemap":
+				return s.normalize("NFC").toLowerCase();
+			default:
+				return s.toLowerCase();
+		}
+	};
 	const haystack = fold(text);
 	const needle = fold(tm.value);
 
@@ -554,19 +603,99 @@ const evalVfreebusyTimeRange = (
 	return false;
 };
 
+/**
+ * Compute the alarm trigger instant(s) for a VALARM. RFC 4791 §9.10: a relative
+ * DURATION trigger is anchored to the parent component's DTSTART (default) or
+ * its DTEND/effective end (RELATED=END); an absolute trigger is a DATE-TIME.
+ * DURATION+REPEAT defines a repeating alarm, so multiple triggers.
+ */
+const valarmTriggerInstants = (
+	alarm: IrComponent,
+	parent: IrComponent | undefined,
+): ReadonlyArray<Temporal.Instant> => {
+	const trigger = alarm.properties.find((p) => p.name === "TRIGGER");
+	if (!trigger) {
+		return [];
+	}
+	if (trigger.value.type === "DATE_TIME") {
+		const abs = instantFromIrValue(trigger);
+		return abs ? [abs] : [];
+	}
+	if (trigger.value.type !== "DURATION" || parent === undefined) {
+		return [];
+	}
+	const dtstart = getDtstartInstant(parent);
+	if (dtstart === undefined) {
+		return [];
+	}
+	const relatedEnd =
+		trigger.parameters
+			.find((p) => p.name.toUpperCase() === "RELATED")
+			?.value.toUpperCase() === "END";
+	const anchor = relatedEnd ? effectiveDtend(parent, dtstart) : dtstart;
+	const addDuration = (
+		base: Temporal.Instant,
+		iso: string,
+	): Temporal.Instant | undefined => {
+		try {
+			return base
+				.toZonedDateTimeISO("UTC")
+				.add(Temporal.Duration.from(iso))
+				.toInstant();
+		} catch {
+			return undefined;
+		}
+	};
+	const first = addDuration(anchor, trigger.value.value);
+	if (first === undefined) {
+		return [];
+	}
+	const triggers: Array<Temporal.Instant> = [first];
+	// RFC 5545 §3.8.6.{2,3}: DURATION (the repeat interval) + REPEAT (count).
+	const repeatProp = alarm.properties.find((p) => p.name === "REPEAT");
+	const intervalProp = alarm.properties.find((p) => p.name === "DURATION");
+	const repeat =
+		repeatProp?.value.type === "INTEGER" ? repeatProp.value.value : 0;
+	if (repeat > 0 && intervalProp?.value.type === "DURATION") {
+		let prev = first;
+		for (let i = 0; i < repeat; i++) {
+			const next = addDuration(prev, intervalProp.value.value);
+			if (next === undefined) {
+				break;
+			}
+			triggers.push(next);
+			prev = next;
+		}
+	}
+	return triggers;
+};
+
 const evalComponentTimeRange = (
 	comp: IrComponent,
 	range: { start?: Temporal.Instant; end?: Temporal.Instant },
 	vcalRoot: IrComponent,
+	parent?: IrComponent,
 ): boolean => {
+	// RFC 4791 §9.10: VALARM matches if a computed trigger falls in the range.
+	if (comp.name === "VALARM") {
+		return valarmTriggerInstants(comp, parent).some((t) => {
+			if (range.start && t.epochMilliseconds < range.start.epochMilliseconds) {
+				return false;
+			}
+			if (range.end && t.epochMilliseconds >= range.end.epochMilliseconds) {
+				return false;
+			}
+			return true;
+		});
+	}
+
 	const rruleProp = comp.properties.find((p) => p.name === "RRULE");
 	if (rruleProp) {
 		return hasOccurrenceInRange(
 			vcalRoot,
 			comp,
-			range.start ?? Temporal.Instant.fromEpochMilliseconds(0),
-			range.end ??
-				Temporal.Instant.fromEpochMilliseconds(Number.MAX_SAFE_INTEGER),
+			range.start ?? OPEN_RANGE_START,
+			range.end ?? OPEN_RANGE_END,
 		);
 	}
 
@@ -618,6 +747,17 @@ const propValueText = (prop: IrProperty): string => {
 	}
 	if (v.type === "BOOLEAN") {
 		return String(v.value);
+	}
+	// Multi-valued properties (CATEGORIES, RESOURCES, EXDATE, …). A text-match
+	// must see every value, not just the first / an empty string — otherwise a
+	// search like `category=PERSONAL` against `CATEGORIES:ANNIVERSARY,PERSONAL`
+	// never matches. Render the comma-joined iCalendar form so `contains`
+	// matches any member.
+	if (v.type === "TEXT_LIST") {
+		return v.value.join(",");
+	}
+	if (v.type === "DATE_LIST" || v.type === "DATE_TIME_LIST") {
+		return v.value.map((item) => item.toString()).join(",");
 	}
 	if ("value" in v && typeof v.value === "string") {
 		return v.value;
