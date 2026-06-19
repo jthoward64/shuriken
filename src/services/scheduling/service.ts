@@ -55,14 +55,29 @@ export interface SchedulingServiceShape {
 	}) => Effect.Effect<void, DavError | DatabaseError>;
 
 	/**
-	 * Handles an outbox POST free-busy request (RFC 6638 §5).
-	 * Aggregates free-busy information for the requested ATTENDEE list
-	 * and returns the VCALENDAR text.
+	 * Handles an outbox POST free-busy request (RFC 6638 §5 / §6.2). Computes
+	 * free-busy for each requested ATTENDEE and returns one result per recipient
+	 * so the edge can build a CALDAV:schedule-response (RFC 6638 §6.2.2, §10.2).
 	 */
 	readonly processOutboxPost: (opts: {
 		actingPrincipalId: PrincipalId;
 		doc: IrDocument;
-	}) => Effect.Effect<string, DavError | DatabaseError>;
+	}) => Effect.Effect<
+		ReadonlyArray<OutboxFreeBusyResult>,
+		DavError | DatabaseError
+	>;
+}
+
+/**
+ * One per-recipient result of an outbox free-busy POST (RFC 6638 §6.2.2). When
+ * `found` is false the recipient is not a calendar user the server can resolve
+ * — the edge emits request-status `3.7` and no calendar data; otherwise `2.0`
+ * with `calendarData` carrying that recipient's VFREEBUSY.
+ */
+export interface OutboxFreeBusyResult {
+	readonly recipient: string;
+	readonly found: boolean;
+	readonly calendarData: string;
 }
 
 export class SchedulingService extends Context.Tag("SchedulingService")<

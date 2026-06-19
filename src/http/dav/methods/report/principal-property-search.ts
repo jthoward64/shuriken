@@ -113,24 +113,28 @@ export const principalPropertySearchHandler = (
 					)
 				: null;
 
-		if (searches.length === 0) {
-			return yield* multistatusResponse([]);
-		}
-
-		// Only support DAV:displayname searches — collect match strings for it
-		const displayNameMatches = searches
-			.filter((s) => s.propNames.includes(DISPLAYNAME))
-			.map((s) => s.matchString);
-
-		if (displayNameMatches.length === 0) {
-			return yield* multistatusResponse([]);
-		}
-
-		// Use the first match string (clients typically send one search)
+		// RFC 3744 §9.4 expects at least one <property-search>, but the widespread
+		// "list all principals" idiom — python-caldav's search_principals() with no
+		// name filter — sends a criteria-less query to enumerate every principal.
+		// Treat that as a match-all (an empty substring matches every principal).
+		// A query that *does* carry criteria but only for properties we can't
+		// search (anything other than DAV:displayname) still yields no matches.
 		const principalRepo = yield* PrincipalRepository;
-		const matched = yield* principalRepo.searchByDisplayName(
-			displayNameMatches[0] ?? "",
-		);
+		const matched = yield* Effect.gen(function* () {
+			if (searches.length === 0) {
+				return yield* principalRepo.searchByDisplayName("");
+			}
+			const displayNameMatches = searches
+				.filter((s) => s.propNames.includes(DISPLAYNAME))
+				.map((s) => s.matchString);
+			if (displayNameMatches.length === 0) {
+				return [];
+			}
+			// Use the first match string (clients typically send one search).
+			return yield* principalRepo.searchByDisplayName(
+				displayNameMatches[0] ?? "",
+			);
+		});
 
 		const responses: Array<DavResponse> = [];
 

@@ -1,7 +1,7 @@
 import { Effect, Layer } from "effect";
 import { DatabaseClient } from "#src/db/client.ts";
 import { withTransaction } from "#src/db/transaction.ts";
-import type { PrincipalId } from "#src/domain/ids.ts";
+import { CollectionId, type PrincipalId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import {
 	GROUPS_VIRTUAL_RESOURCE_ID,
@@ -65,11 +65,16 @@ export const ProvisioningServiceLive = Layer.effect(
 						});
 
 						// RFC 6638 §2.2: each CalDAV principal must have a scheduling inbox and outbox.
+						// Point the inbox's schedule-default-calendar (RFC 6638 §9.2) at the
+						// primary calendar so incoming iTIP REQUESTs are auto-placed there
+						// (§3.4.2). Without this the inbox has no default calendar and
+						// auto-scheduling silently no-ops for every user.
 						const inbox = yield* collections.create({
 							ownerPrincipalId: principalId,
 							collectionType: "inbox",
 							slug: Slug("inbox"),
 							displayName: "Scheduling Inbox",
+							scheduleDefaultCalendarId: CollectionId(calendar.id),
 						});
 
 						const outbox = yield* collections.create({

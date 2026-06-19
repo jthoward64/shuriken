@@ -18,9 +18,34 @@ import {
 } from "#src/domain/errors.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
+import { buildXml } from "#src/http/dav/xml/builder.ts";
 import { HTTP_OK } from "#src/http/status.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import { SchedulingService } from "#src/services/scheduling/index.ts";
+import type { OutboxFreeBusyResult } from "#src/services/scheduling/service.ts";
+
+const CALDAV_NS = "urn:ietf:params:xml:ns:caldav";
+
+// RFC 6638 §6.2.2 / §10.2: an outbox POST response is a CALDAV:schedule-response
+// with one CALDAV:response per recipient. Each carries the recipient href and an
+// iTIP REQUEST-STATUS (RFC 5546 §3.6): "2.0;Success" with the recipient's
+// free-busy calendar-data, or "3.7;Invalid Calendar User" when unresolvable.
+const buildScheduleResponse = (
+	results: ReadonlyArray<OutboxFreeBusyResult>,
+): Effect.Effect<string> => {
+	const responses = results.map((r) => ({
+		"C:recipient": { "D:href": r.recipient },
+		"C:request-status": r.found ? "2.0;Success" : "3.7;Invalid Calendar User",
+		...(r.found ? { "C:calendar-data": r.calendarData } : {}),
+	}));
+	return buildXml({
+		"C:schedule-response": {
+			"@_xmlns:D": "DAV:",
+			"@_xmlns:C": CALDAV_NS,
+			"C:response": responses.length === 1 ? responses[0] : responses,
+		},
+	});
+};
 
 // ---------------------------------------------------------------------------
 // Handler
@@ -57,23 +82,13 @@ export const postHandler = (
 			"CALDAV:schedule-send-freebusy",
 		);
 
-		// RFC 6638 §6.2 — Originator and Recipient(s) MUST be present on the
-		// outbox POST. Originator identifies the calendar user submitting the
-		// request and Recipient lists every CU the server should query. Without
-		// these the server cannot honour the §6.2.2 response-by-attendee rules
-		// or §6.1.4 ACL checks that scope the free-busy query.
-		const originator = req.headers.get("Originator");
-		if (originator === null || originator.trim() === "") {
-			return yield* badRequest(
-				"Outbox POST requires an Originator header (RFC 6638 §6.2)",
-			);
-		}
-		const recipients = req.headers.get("Recipient");
-		if (recipients === null || recipients.trim() === "") {
-			return yield* badRequest(
-				"Outbox POST requires at least one Recipient header (RFC 6638 §6.2)",
-			);
-		}
+		// NB: the `Originator`/`Recipient` HTTP headers from the pre-standard
+		// caldav-sched draft (Apple Calendar Server) are intentionally NOT
+		// required. RFC 6638 derives the originator from the iCalendar ORGANIZER
+		// (here, the authenticated principal) and the recipients from the
+		// VFREEBUSY ATTENDEE properties — which is exactly what processOutboxPost
+		// reads below. Requiring the legacy headers rejected conformant clients
+		// (e.g. python-caldav) that never send them.
 
 		// Parse body as iCalendar.
 		const body = yield* Effect.promise(() => req.text());
@@ -97,18 +112,20 @@ export const postHandler = (
 			return yield* badRequest("Outbox POST requires a VFREEBUSY component");
 		}
 
-		// Delegate to SchedulingService.
+		// Delegate to SchedulingService, then render the per-recipient results
+		// into a CALDAV:schedule-response (RFC 6638 §6.2.2).
 		const schedulingSvc = yield* SchedulingService;
-		const calendarText = yield* schedulingSvc.processOutboxPost({
+		const fbResults = yield* schedulingSvc.processOutboxPost({
 			actingPrincipalId: principal.principalId,
 			doc,
 		});
 
-		const bodyBytes = new TextEncoder().encode(calendarText);
+		const xml = yield* buildScheduleResponse(fbResults);
+		const bodyBytes = new TextEncoder().encode(xml);
 		return new Response(bodyBytes, {
 			status: HTTP_OK,
 			headers: {
-				"Content-Type": "text/calendar; charset=utf-8",
+				"Content-Type": "application/xml; charset=utf-8",
 				"Content-Length": String(bodyBytes.byteLength),
 			},
 		});

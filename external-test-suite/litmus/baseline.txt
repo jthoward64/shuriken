@@ -1,12 +1,12 @@
 basic/begin: pass
+basic/delete: SKIPPED
 basic/delete_coll: SKIPPED
 basic/delete_fragment: FAIL (could not create collection)
 basic/delete_null: pass
-basic/delete: SKIPPED
 basic/finish: pass
 basic/init: pass
-basic/mkcol_again: SKIPPED
 basic/mkcol: FAIL (MKCOL /dav/principals/test/col/litmus/coll/: <NUM> Method Not Allowed)
+basic/mkcol_again: SKIPPED
 basic/mkcol_no_parent: WARNING: MKCOL with missing intermediate gave <NUM>, should be <NUM> (RFC2518:<NUM>.<NUM>.<NUM>)
 basic/mkcol_over_plain: SKIPPED
 basic/mkcol_with_body: FAIL (MKCOL with weird body must fail with <NUM> (RFC2518:<NUM>.<NUM>.<NUM>))

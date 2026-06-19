@@ -184,6 +184,7 @@ const insert = Effect.fn("CollectionRepository.insert")(
 					supportedComponents: input.supportedComponents,
 					parentCollectionId: input.parentCollectionId,
 					autoManagedKind: input.autoManagedKind,
+					scheduleDefaultCalendarId: input.scheduleDefaultCalendarId,
 				})
 				.returning(),
 		).pipe(

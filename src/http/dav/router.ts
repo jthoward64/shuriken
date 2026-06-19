@@ -333,9 +333,20 @@ export const parseDavPath = (
 			segment: seg1,
 		});
 		const principalRepo = yield* PrincipalRepository;
+		// Both UUID- and slug-addressed paths are accepted; a slug may be
+		// UUID-shaped, so a UUID-shaped segment that matches no principal *id*
+		// falls back to a slug lookup (mirrors collection/instance resolution).
+		const principalBySlug = principalRepo.findPrincipalBySlug(Slug(seg1));
 		const principalOpt = yield* isUuid(seg1)
-			? principalRepo.findPrincipalById(PrincipalId(seg1))
-			: principalRepo.findPrincipalBySlug(Slug(seg1));
+			? principalRepo.findPrincipalById(PrincipalId(seg1)).pipe(
+					Effect.flatMap(
+						Option.match({
+							onNone: () => principalBySlug,
+							onSome: (row) => Effect.succeed(Option.some(row)),
+						}),
+					),
+				)
+			: principalBySlug;
 		if (Option.isNone(principalOpt)) {
 			yield* Effect.logDebug("dav.parsePath: unknown principal", {
 				segment: seg1,
@@ -391,19 +402,32 @@ export const parseDavPath = (
 			segment: seg3,
 		});
 		const collRepo = yield* CollectionRepository;
+		// Both UUID- and slug-addressed paths are accepted (see CLAUDE.md "DAV URL
+		// and href policy"). A slug may itself be UUID-shaped — e.g. python-caldav's
+		// make_calendar() names a new calendar after a random uuid4() — so a
+		// UUID-shaped segment that matches no collection *id* must still fall back
+		// to a slug lookup, otherwise such a collection becomes unaddressable
+		// (PROPFIND → 404, PUT into it → 405). findBySlug is scoped to this
+		// principal, so the fallback can never resolve to another principal's
+		// collection.
+		const collBySlug = collRepo.findBySlug(
+			principalId,
+			collectionType,
+			Slug(seg3),
+		);
 		const collRowOpt = yield* isUuid(seg3)
 			? collRepo.findById(CollectionId(seg3)).pipe(
 					Effect.flatMap(
 						Option.match({
-							onNone: () => Effect.succeed(Option.none()),
+							onNone: () => collBySlug,
 							onSome: (row) =>
 								row.ownerPrincipalId === principalId
 									? Effect.succeed(Option.some(row))
-									: Effect.fail(notFound(`Collection not found: ${seg3}`)),
+									: collBySlug,
 						}),
 					),
 				)
-			: collRepo.findBySlug(principalId, collectionType, Slug(seg3));
+			: collBySlug;
 		if (Option.isNone(collRowOpt)) {
 			yield* Effect.logTrace(
 				"dav.parsePath: collection not found, treating as new",
@@ -441,19 +465,23 @@ export const parseDavPath = (
 			segment: seg4,
 		});
 		const instRepo = yield* InstanceRepository;
+		// Same slug/UUID duality as collections above: an instance slug may be
+		// UUID-shaped, so a UUID-shaped segment that matches no instance *id* must
+		// fall back to a slug lookup. findBySlug is scoped to this collection.
+		const instBySlug = instRepo.findBySlug(collectionId, Slug(seg4));
 		const instRowOpt = yield* isUuid(seg4)
 			? instRepo.findById(InstanceId(seg4)).pipe(
 					Effect.flatMap(
 						Option.match({
-							onNone: () => Effect.succeed(Option.none()),
+							onNone: () => instBySlug,
 							onSome: (row) =>
 								row.collectionId === collectionId
 									? Effect.succeed(Option.some(row))
-									: Effect.fail(notFound(`Instance not found: ${seg4}`)),
+									: instBySlug,
 						}),
 					),
 				)
-			: instRepo.findBySlug(collectionId, Slug(seg4));
+			: instBySlug;
 		if (Option.isNone(instRowOpt)) {
 			yield* Effect.logTrace(
 				"dav.parsePath: instance not found, treating as new",

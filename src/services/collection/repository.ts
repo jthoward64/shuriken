@@ -30,6 +30,12 @@ export interface NewCollection {
 	readonly parentCollectionId?: CollectionId;
 	/** Marks the collection as server-managed (e.g. "birthdays"); see schema. */
 	readonly autoManagedKind?: string;
+	/**
+	 * RFC 6638 §9.2: schedule-default-calendar-URL (inbox only). Set at creation
+	 * so a freshly provisioned principal can receive auto-placed scheduling
+	 * objects without the client first having to PROPPATCH the inbox.
+	 */
+	readonly scheduleDefaultCalendarId?: CollectionId;
 }
 
 export interface CollectionPropertyChanges {

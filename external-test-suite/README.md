@@ -101,6 +101,14 @@ external-test-suite/
 - **caldav-server-tester** and **python-caldav** create and delete their own
   calendars/events. They generally clean up after themselves; if a run leaves
   cruft and the next run behaves oddly, re-run with `--fresh`.
+- **caldav-server-tester** runs RFC 6638 scheduling checks (auto-schedule,
+  free-busy, inbox delivery), which are multi-user. Its `run.sh` provisions a
+  second account (`SECOND_*` env in `docker-compose.yml`) via the admin UI API
+  and drives the tool through a two-section caldav config file
+  (`--config-section primary --config-section second`). The harness env vars
+  avoid the `CALDAV_*` prefix on purpose — the caldav library treats any
+  `CALDAV_*` var as a connection override, which would collapse both clients
+  onto one account.
 - The server is pinned to **basic auth**; tools authenticate as the seeded
   admin above. To probe single-user mode instead, swap the server env in
   `docker-compose.yml` (`AUTO_LOGIN=test@example.com`, drop `BASIC_AUTH_*`).

@@ -41,7 +41,7 @@ import { EntityRepository } from "#src/services/entity/index.ts";
 import { InstanceService } from "#src/services/instance/index.ts";
 import { PrincipalRepository } from "#src/services/principal/index.ts";
 import { SchedulingRepository } from "./repository.ts";
-import { SchedulingService } from "./service.ts";
+import { type OutboxFreeBusyResult, SchedulingService } from "./service.ts";
 import type { AttendeeInfo } from "./types.ts";
 
 // ---------------------------------------------------------------------------
@@ -931,14 +931,25 @@ export const SchedulingServiceLive = Layer.effect(
 					)
 					.map((p) => p.value.value as string);
 
-				const periods: Array<Period> = [];
+				const results: Array<OutboxFreeBusyResult> = [];
 
 				for (const calAddress of attendeeAddresses) {
 					const pwuOpt = yield* repo.findPrincipalByCalAddress(calAddress);
 					if (Option.isNone(pwuOpt)) {
+						// RFC 6638 §6.2.2: an unresolvable recipient yields a
+						// per-recipient request-status (3.7) rather than failing the
+						// whole POST. The edge renders this into the schedule-response.
+						results.push({
+							recipient: calAddress,
+							found: false,
+							calendarData: "",
+						});
 						continue;
 					}
 
+					// Free-busy is aggregated per recipient so each gets its own
+					// CALDAV:response entry (RFC 6638 §10.2).
+					const periods: Array<Period> = [];
 					const recipientId = pwuOpt.value.principal.id as PrincipalId;
 					const collections =
 						yield* repo.listOpaqueCalendarCollections(recipientId);
@@ -1055,13 +1066,19 @@ export const SchedulingServiceLive = Layer.effect(
 							}
 						}
 					}
+
+					results.push({
+						recipient: calAddress,
+						found: true,
+						calendarData: buildVfreebusyText(
+							queryStart,
+							queryEnd,
+							coalescePeriods(periods),
+						),
+					});
 				}
 
-				return buildVfreebusyText(
-					queryStart,
-					queryEnd,
-					coalescePeriods(periods),
-				);
+				return results;
 			},
 		);
 

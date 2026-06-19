@@ -2,24 +2,72 @@
 # Runs caldav-server-tester against the shuriken server and compares the
 # normalized result against the checked-in baseline.
 #
-# Env (from docker-compose.yml): DAV_URL, CALDAV_USERNAME, CALDAV_PASSWORD.
-# UPDATE_BASELINE=1 refreshes the baseline instead of comparing.
+# Env (from docker-compose.yml): DAV_URL, ADMIN_API_URL, PRIMARY_USERNAME/PASSWORD,
+# SECOND_USERNAME/PASSWORD/SLUG/DISPLAYNAME. UPDATE_BASELINE=1 refreshes the
+# baseline instead of comparing.
+#
+# Two accounts are used: the tool talks to the server through a caldav config
+# file with a `primary` and a `second` section, passed via repeated
+# --config-section flags. This is the ONLY way the tool runs its multi-user
+# RFC 6638 scheduling checks (the --caldav-url path skips them). The second
+# account is created on demand via the admin UI API.
 set -eu
 
 SUITE=caldav-server-tester
 OUT=/results/$SUITE
 mkdir -p "$OUT"
 
-echo "[$SUITE] probing $DAV_URL as $CALDAV_USERNAME"
+# Point the caldav library at our generated config file. (Anything matching
+# CALDAV_CONFIG* is ignored by its env-var connection override logic.)
+export CALDAV_CONFIG_FILE=/tmp/calendar.conf
+
+# Provision the second account (idempotent) and write the two-section config.
+# read_config() parses JSON before YAML, so emitting JSON needs no pyyaml dep.
+python3 - <<'PY'
+import base64, json, os, sys, urllib.error, urllib.parse, urllib.request
+
+api = os.environ["ADMIN_API_URL"].rstrip("/")
+dav = os.environ["DAV_URL"]
+pu, pp = os.environ["PRIMARY_USERNAME"], os.environ["PRIMARY_PASSWORD"]
+su, sp = os.environ["SECOND_USERNAME"], os.environ["SECOND_PASSWORD"]
+slug = os.environ.get("SECOND_SLUG", "scheduling2")
+dn = os.environ.get("SECOND_DISPLAYNAME", slug)
+
+# Create the second user as the admin. Non-2xx (e.g. already exists) is fine.
+body = urllib.parse.urlencode(
+    {"slug": slug, "email": su, "displayName": dn, "password": sp}
+).encode()
+req = urllib.request.Request(f"{api}/ui/api/users/create", data=body, method="POST")
+req.add_header(
+    "Authorization", "Basic " + base64.b64encode(f"{pu}:{pp}".encode()).decode()
+)
+try:
+    with urllib.request.urlopen(req) as r:
+        print(f"[csc] second-user create: HTTP {r.status}", file=sys.stderr)
+except urllib.error.HTTPError as e:
+    print(f"[csc] second-user create: HTTP {e.code} (already exists?)", file=sys.stderr)
+except Exception as e:  # noqa: BLE001 — best-effort; tester still runs single-user
+    print(f"[csc] second-user create failed: {e}", file=sys.stderr)
+
+# Section keys use the caldav library's config-file prefix (`caldav_*`), which is
+# distinct from its CALDAV_* environment-variable names.
+cfg = {
+    "primary": {"caldav_url": dav, "caldav_username": pu, "caldav_password": pp},
+    "second": {"caldav_url": dav, "caldav_username": su, "caldav_password": sp},
+}
+with open(os.environ["CALDAV_CONFIG_FILE"], "w") as f:
+    json.dump(cfg, f)
+PY
+
+echo "[$SUITE] probing $DAV_URL (primary=$PRIMARY_USERNAME, second=$SECOND_USERNAME)"
 
 # Capture machine-readable + human-readable runs. The tool exits non-zero when
 # it finds deviations, which is normal here — the baseline diff is the real
 # gate, so don't let `set -e` abort on it.
 set +e
 caldav-server-tester \
-	--caldav-url "$DAV_URL" \
-	--caldav-username "$CALDAV_USERNAME" \
-	--caldav-password "$CALDAV_PASSWORD" \
+	--config-section primary \
+	--config-section second \
 	--verbose \
 	--format json > "$OUT/raw.json" 2> "$OUT/raw.log"
 TOOL_RC=$?

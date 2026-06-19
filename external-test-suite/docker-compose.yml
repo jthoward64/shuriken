@@ -45,7 +45,10 @@ services:
       LMTP_ENABLED: "false"
       LOG_LEVEL: Info
     depends_on:
-      - database
+      # Wait for Postgres to pass its healthcheck before booting — the server
+      # entrypoint runs migrations immediately, which races a not-yet-ready DB.
+      database:
+        condition: service_healthy
     healthcheck:
       # `fetch` resolves even on a 401, so this just proves the HTTP server is
       # accepting connections and routing. bun is already in the image.
@@ -66,9 +69,22 @@ services:
     depends_on:
       - server
     environment:
+      # DAV endpoint + the server's admin/UI API base (same host, without /dav).
       DAV_URL: http://server:3000/dav/
-      CALDAV_USERNAME: test@example.com
-      CALDAV_PASSWORD: testpassword123
+      ADMIN_API_URL: http://server:3000
+      # Primary (seeded admin) account — the account under test.
+      PRIMARY_USERNAME: test@example.com
+      PRIMARY_PASSWORD: testpassword123
+      # Second account, created on demand by run.sh via the admin UI API. RFC 6638
+      # scheduling (auto-schedule / freebusy-query / inbox-delivery) is inherently
+      # multi-user, so the tester only exercises it when a second account exists.
+      # NB: these vars deliberately avoid the CALDAV_* prefix — the caldav library
+      # treats ANY CALDAV_* env var as a connection override, which would collapse
+      # both config sections onto a single account.
+      SECOND_USERNAME: scheduling2@example.com
+      SECOND_PASSWORD: schedulingpass123
+      SECOND_SLUG: scheduling2
+      SECOND_DISPLAYNAME: Scheduling Two
     volumes:
       - ./caldav-server-tester:/suite
       - ./results:/results

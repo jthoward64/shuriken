@@ -156,11 +156,12 @@ are **not** addressed here — they are distinct from the home-set issue:
   MKCALENDAR/extended-MKCOL body (or a follow-up PROPPATCH) isn't applied.
 - `search.text.case-sensitive / search.text.category / search.time-range.alarm:
   unsupported` — calendar-query text + alarm time-range filters.
-- `save.duplicate-uid.cross-calendar: ungraceful (PutError)` — storing a second
-  object with a UID already used in another calendar errors instead of being
-  handled gracefully.
-- `principal-search.list-all: unsupported` — principal-property-search with an
-  empty/match-all filter.
+- ~~`save.duplicate-uid.cross-calendar: ungraceful (PutError)`~~ — RESOLVED.
+  Root cause was UUID-shaped calendar slugs being unaddressable, not duplicate-UID
+  handling; see [finding-uuid-shaped-slug.md](./finding-uuid-shaped-slug.md).
+- ~~`principal-search.list-all: unsupported`~~ — RESOLVED; criteria-less
+  principal-property-search now enumerates all principals. See
+  [finding-uuid-shaped-slug.md](./finding-uuid-shaped-slug.md).
 
 ### Secondary, not yet changed
 

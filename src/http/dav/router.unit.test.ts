@@ -432,8 +432,7 @@ const makeRouterLayer = (
 			processAfterPut: (_opts) => Effect.succeed(Option.none()),
 			validateSchedulingChange: (_opts) => Effect.void,
 			processAfterDelete: (_opts) => Effect.void,
-			processOutboxPost: (_opts) =>
-				Effect.succeed("BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n"),
+			processOutboxPost: (_opts) => Effect.succeed([]),
 		}),
 		IanaTimezoneService.Default,
 		Layer.succeed(DatabaseClient, noOpDb),
@@ -718,5 +717,74 @@ describe("davRouter — new-resource path resolution", () => {
 			).pipe(Effect.provide(makeRouterLayer())),
 		);
 		expect(path.kind).toBe("unknownPrincipal");
+	});
+});
+
+// ---------------------------------------------------------------------------
+// UUID-shaped slugs (regression)
+//
+// A slug may itself be UUID-shaped — python-caldav's make_calendar() names a
+// new calendar after a random uuid4(), and clients name objects after UUID-ish
+// UIDs. A UUID-shaped segment that matches no resource *id* must fall back to a
+// slug lookup; otherwise such resources become unaddressable (PROPFIND → 404,
+// PUT → 405). See documentation/planning/finding-uuid-shaped-slug.md.
+// ---------------------------------------------------------------------------
+
+describe("davRouter — UUID-shaped slug resolution (regression)", () => {
+	// A real uuid4 string used as a *slug*, distinct from the resource's own id.
+	const uuidSlug = "2623f643-c7d8-4687-a07a-e78438a2b8f4";
+
+	it("resolves a collection whose slug is UUID-shaped (not new-collection)", async () => {
+		const aliceId = crypto.randomUUID();
+		const calId = crypto.randomUUID(); // the collection's real id ≠ its slug
+		const path = await runPath(`/dav/principals/alice/cal/${uuidSlug}/`, {
+			principals: new Map([["alice", aliceId]]),
+			collections: new Map([[`${aliceId}:calendar:${uuidSlug}`, calId]]),
+		});
+		expect(path.kind).toBe("collection");
+		if (path.kind === "collection") {
+			expect(String(path.collectionId)).toBe(calId);
+		}
+	});
+
+	it("resolves an instance whose slug is UUID-shaped (not new-instance)", async () => {
+		const aliceId = crypto.randomUUID();
+		const calId = crypto.randomUUID();
+		const instId = crypto.randomUUID(); // the instance's real id ≠ its slug
+		const path = await runPath(`/dav/principals/alice/cal/my-cal/${uuidSlug}`, {
+			principals: new Map([["alice", aliceId]]),
+			collections: new Map([[`${aliceId}:calendar:my-cal`, calId]]),
+			instances: new Map([[`${calId}:${uuidSlug}`, instId]]),
+		});
+		expect(path.kind).toBe("instance");
+		if (path.kind === "instance") {
+			expect(String(path.instanceId)).toBe(instId);
+		}
+	});
+
+	it("resolves a principal whose slug is UUID-shaped (not unknownPrincipal)", async () => {
+		const aliceId = crypto.randomUUID(); // real id ≠ the UUID-shaped slug
+		const path = await runPath(`/dav/principals/${uuidSlug}/`, {
+			principals: new Map([[uuidSlug, aliceId]]),
+		});
+		expect(path.kind).toBe("principal");
+		if (path.kind === "principal") {
+			expect(String(path.principalId)).toBe(aliceId);
+		}
+	});
+
+	it("a canonical collection id still wins over a same-shaped slug fallback", async () => {
+		// When the UUID segment IS a real collection id, it resolves directly via
+		// findById without needing the slug fallback.
+		const aliceId = crypto.randomUUID();
+		const calId = crypto.randomUUID();
+		const path = await runPath(`/dav/principals/alice/cal/${calId}/`, {
+			principals: new Map([["alice", aliceId]]),
+			collections: new Map([[`${aliceId}:calendar:my-cal`, calId]]),
+		});
+		expect(path.kind).toBe("collection");
+		if (path.kind === "collection") {
+			expect(String(path.collectionId)).toBe(calId);
+		}
 	});
 });

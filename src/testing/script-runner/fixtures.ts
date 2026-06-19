@@ -228,6 +228,27 @@ export const options = (path: string, opts?: StepOptions): ScriptStep => ({
 	expect: opts?.expect ?? { status: 200 },
 });
 
+/**
+ * POST — used for the scheduling outbox free-busy request (RFC 6638 §6.2).
+ * Sends an iCalendar body and expects 200 by default.
+ */
+export const post = (
+	path: string,
+	body: string,
+	opts?: StepOptions,
+): ScriptStep => ({
+	name: opts?.name ?? `POST ${path}`,
+	method: "POST",
+	path,
+	as: opts?.as,
+	headers: {
+		"Content-Type": "text/calendar; charset=utf-8",
+		...opts?.headers,
+	},
+	body,
+	expect: opts?.expect ?? { status: 200 },
+});
+
 /** REPORT — DAV report query. Expects 207 by default. */
 export const report = (
 	path: string,

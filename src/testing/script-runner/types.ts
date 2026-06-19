@@ -14,6 +14,7 @@ export type HttpMethod =
 	| "MKCOL"
 	| "MOVE"
 	| "OPTIONS"
+	| "POST"
 	| "PROPFIND"
 	| "PROPPATCH"
 	| "PUT"

@@ -1592,8 +1592,7 @@ export const makeTestEnv = (): TestEnvBuilder => {
 				processAfterPut: (_opts) => Effect.succeed(Option.none()),
 				validateSchedulingChange: (_opts) => Effect.void,
 				processAfterDelete: (_opts) => Effect.void,
-				processOutboxPost: (_opts) =>
-					Effect.succeed("BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n"),
+				processOutboxPost: (_opts) => Effect.succeed([]),
 			});
 
 			const noOpDb = {

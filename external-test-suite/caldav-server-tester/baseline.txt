@@ -1,9 +1,1 @@
-features.principal-search.list-all.support: unsupported
-features.save.support: ungraceful
-features.scheduling.auto-schedule.behaviour: not tested: only one user configured; server claims scheduling support
-features.scheduling.auto-schedule.support: unknown
-features.scheduling.freebusy-query.behaviour: not tested: only one user configured; server claims scheduling support
-features.scheduling.freebusy-query.support: unknown
-features.scheduling.mailbox.inbox-delivery.behaviour: not tested: only one user configured; server claims scheduling support
-features.scheduling.mailbox.inbox-delivery.support: unknown
 features.scheduling.schedule-tag.stable-partstat.support: unknown
