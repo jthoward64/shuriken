@@ -114,15 +114,18 @@ describe("MKADDRESSBOOK", () => {
 					path: "/dav/principals/test/card/named-book/",
 					as: "test",
 					headers: { "Content-Type": "application/xml; charset=utf-8" },
+					// RFC 6352 §6.3.1: address books are created with the extended
+					// MKCOL body whose root is DAV:mkcol (the `mkcol` element lives in
+					// the DAV: namespace, not CARDDAV:).
 					body: `<?xml version="1.0" encoding="utf-8"?>
-<C:mkcol xmlns:C="urn:ietf:params:xml:ns:carddav" xmlns:D="DAV:">
+<D:mkcol xmlns:C="urn:ietf:params:xml:ns:carddav" xmlns:D="DAV:">
   <D:set>
     <D:prop>
       <D:displayname>My Contacts</D:displayname>
       <C:addressbook-description>A test addressbook</C:addressbook-description>
     </D:prop>
   </D:set>
-</C:mkcol>`,
+</D:mkcol>`,
 					expect: { status: 201 },
 				},
 			],

@@ -148,6 +148,15 @@ export const getHandler = (
 			"Content-Length": String(bodyBytes.byteLength),
 		});
 
+		// RFC 6638 §8.2: scheduling object resources carry a Schedule-Tag. caldav
+		// clients read it from the GET response header (alongside the
+		// CALDAV:schedule-tag PROPFIND property) to drive If-Schedule-Tag-Match
+		// conditional requests. Only SORs have a stored tag, so gate on its
+		// presence.
+		if (instance.scheduleTag) {
+			headers.set("Schedule-Tag", instance.scheduleTag);
+		}
+
 		// RFC 7232 §3 — conditional GET: check If-None-Match and If-Modified-Since.
 		const ifNoneMatch = ctx.headers.get("If-None-Match");
 		if (ifNoneMatch !== null) {

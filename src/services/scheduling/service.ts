@@ -31,6 +31,12 @@ export interface SchedulingServiceShape {
 		collectionId: CollectionId;
 		doc: IrDocument;
 		previousDoc: Option.Option<IrDocument>;
+		/**
+		 * The Schedule-Tag currently stored on the resource (RFC 6638 §3.2.10).
+		 * `Option.none()` for a create. Used to keep the tag stable across an
+		 * attendee's PARTSTAT-only update.
+		 */
+		previousScheduleTag: Option.Option<string>;
 		suppressReply: boolean;
 	}) => Effect.Effect<Option.Option<string>, DavError | DatabaseError>;
 

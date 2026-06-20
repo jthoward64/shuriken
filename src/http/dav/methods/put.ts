@@ -392,6 +392,7 @@ export const putHandler = (
 							collectionId: path.collectionId,
 							doc,
 							previousDoc: Option.none(),
+							previousScheduleTag: Option.none(),
 							suppressReply: req.headers.get("Schedule-Reply") === "no",
 						})
 					: Option.none<string>();
@@ -535,6 +536,9 @@ export const putHandler = (
 						collectionId: CollectionId(existingInstance.collectionId),
 						doc,
 						previousDoc: prevDoc,
+						previousScheduleTag: Option.fromNullable(
+							existingInstance.scheduleTag,
+						),
 						suppressReply: req.headers.get("Schedule-Reply") === "no",
 					})
 				: Option.none<string>();

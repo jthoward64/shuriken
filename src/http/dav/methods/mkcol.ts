@@ -5,6 +5,7 @@ import {
 	forbidden,
 	methodNotAllowed,
 	unauthorized,
+	unsupportedMediaType,
 } from "#src/domain/errors.ts";
 import { CollectionId } from "#src/domain/ids.ts";
 import { NAMESPACE_TO_COLLECTION_TYPE } from "#src/domain/types/collection-namespace.ts";
@@ -57,30 +58,36 @@ const LIVE_PROP_KEYS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Extract displayName, description, and supportedComponents from a
- * Clark-normalized fast-xml-parser tree.
+ * Locate the MKCOL request document element in a Clark-normalized tree.
  *
- * All fields default to `undefined` when the body is absent or malformed —
- * the extended-MKCOL body is optional per RFC 5689 §5.
+ * The root element is one of DAV:mkcol (plain extended MKCOL, RFC 5689 §3),
+ * CALDAV:mkcalendar (MKCALENDAR, RFC 4791 §5.3.1), or CARDDAV:mkaddressbook
+ * (MKADDRESSBOOK, RFC 6352 §5.3.1). Returns `undefined` for any other root —
+ * RFC 5689 §3 reserves such bodies for future use, so the caller must reject
+ * them with 415 (RFC 4918 §9.3) rather than silently creating a collection.
  */
-const extractMkcolProps = (tree: unknown): MkcolProps => {
+const findMkcolRoot = (tree: unknown): Record<string, unknown> | undefined => {
 	if (typeof tree !== "object" || tree === null) {
-		return EMPTY_PROPS;
+		return undefined;
 	}
-
 	const root = tree as Record<string, unknown>;
-
-	// The root element may be any of these depending on the HTTP method
-	const rootEl = (root[`{${DAV_NS}}mkcol`] ??
+	const rootEl =
+		root[`{${DAV_NS}}mkcol`] ??
 		root[`{${CALDAV_NS}}mkcalendar`] ??
-		root[`{${CARDDAV_NS}}mkaddressbook`]) as
-		| Record<string, unknown>
-		| undefined;
+		root[`{${CARDDAV_NS}}mkaddressbook`];
+	return typeof rootEl === "object" && rootEl !== null
+		? (rootEl as Record<string, unknown>)
+		: undefined;
+};
 
-	if (typeof rootEl !== "object" || rootEl === null) {
-		return EMPTY_PROPS;
-	}
-
+/**
+ * Extract displayName, description, and supportedComponents from the (already
+ * located) MKCOL request document element.
+ *
+ * Each field defaults to `undefined` when absent — the individual extended-MKCOL
+ * properties are optional per RFC 5689 §3.
+ */
+const extractMkcolProps = (rootEl: Record<string, unknown>): MkcolProps => {
 	const set = rootEl[`{${DAV_NS}}set`] as Record<string, unknown> | undefined;
 	if (typeof set !== "object" || set === null) {
 		return EMPTY_PROPS;
@@ -157,8 +164,17 @@ const extractMkcolProps = (tree: unknown): MkcolProps => {
 
 /**
  * Read and parse the optional extended-MKCOL request body.
- * Returns all-undefined props for empty or malformed bodies (RFC 5689 §5).
- * Only propagates DavError from readXmlBody (e.g. 413 Too Large).
+ *
+ * - Empty body → all-undefined props (the standard MKCOL form, RFC 4918 §9.3).
+ * - Non-empty body with a recognized root (DAV:mkcol / CALDAV:mkcalendar /
+ *   CARDDAV:mkaddressbook) → extracted props.
+ * - Non-empty body that is not well-formed XML, or whose root element is not a
+ *   recognized MKCOL request document → fails with 415 Unsupported Media Type.
+ *   RFC 4918 §9.3: a MKCOL entity the server "does not support or understand…
+ *   MUST respond with 415". RFC 5689 §3 reserves non-DAV:mkcol XML roots, so we
+ *   reject them rather than silently creating an empty collection.
+ *
+ * Also propagates DavError from readXmlBody (e.g. 413 Too Large).
  */
 const parseMkcolBody = (req: Request): Effect.Effect<MkcolProps, DavError> =>
 	readXmlBody(req).pipe(
@@ -167,8 +183,13 @@ const parseMkcolBody = (req: Request): Effect.Effect<MkcolProps, DavError> =>
 				return Effect.succeed(EMPTY_PROPS);
 			}
 			return parseXml(body).pipe(
-				Effect.map((parsed) => extractMkcolProps(normalizeClarkNames(parsed))),
-				Effect.catchTag("XmlParseError", () => Effect.succeed(EMPTY_PROPS)),
+				Effect.flatMap((parsed) => {
+					const rootEl = findMkcolRoot(normalizeClarkNames(parsed));
+					return rootEl === undefined
+						? unsupportedMediaType()
+						: Effect.succeed(extractMkcolProps(rootEl));
+				}),
+				Effect.catchTag("XmlParseError", () => unsupportedMediaType()),
 			);
 		}),
 	);
@@ -194,6 +215,16 @@ export const mkcolHandler = (
 		}
 		const principal = ctx.auth.principal;
 
+		// Validate the request entity body before any resource-routing decision.
+		// RFC 4918 §9.3: a MKCOL body the server cannot understand MUST yield 415,
+		// and that is a property of the request entity independent of the target.
+		// litmus basic/mkcol_with_body sends a junk body to a sub-collection path
+		// (which shuriken cannot host) and requires 415 — so the body check must
+		// run before the `path.kind` 405 below. An empty/valid body parses to
+		// all-undefined props and falls through to the routing checks unchanged.
+		const { displayName, description, supportedComponents, deadProps } =
+			yield* parseMkcolBody(req);
+
 		if (path.kind !== "new-collection") {
 			return yield* methodNotAllowed();
 		}
@@ -215,9 +246,6 @@ export const mkcolHandler = (
 			"principal",
 			"DAV:bind",
 		);
-
-		const { displayName, description, supportedComponents, deadProps } =
-			yield* parseMkcolBody(req);
 
 		const collectionSvc = yield* CollectionService;
 		const newCollection = yield* collectionSvc.create({

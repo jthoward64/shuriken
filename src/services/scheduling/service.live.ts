@@ -32,13 +32,14 @@ import { DatabaseClient } from "#src/db/client.ts";
 import { withTransaction } from "#src/db/transaction.ts";
 import { forbidden } from "#src/domain/errors.ts";
 import type { PrincipalId } from "#src/domain/ids.ts";
-import { CollectionId, EntityId } from "#src/domain/ids.ts";
+import { CollectionId, EntityId, InstanceId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import { ETag } from "#src/domain/types/strings.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
 import { EntityRepository } from "#src/services/entity/index.ts";
 import { InstanceService } from "#src/services/instance/index.ts";
+import type { InstanceRow } from "#src/services/instance/repository.ts";
 import { PrincipalRepository } from "#src/services/principal/index.ts";
 import { SchedulingRepository } from "./repository.ts";
 import { type OutboxFreeBusyResult, SchedulingService } from "./service.ts";
@@ -334,6 +335,146 @@ const patchPartstat = (doc: IrDocument, partstat: string): IrDocument => {
 	};
 };
 
+/** Read the VCALENDAR METHOD value (e.g. "REQUEST"/"REPLY"/"CANCEL"), if any. */
+const getMethod = (doc: IrDocument): string | undefined => {
+	if (doc.kind !== "icalendar") {
+		return undefined;
+	}
+	const prop = doc.root.properties.find((p) => p.name === "METHOD");
+	return prop?.value.type === "TEXT" ? prop.value.value : undefined;
+};
+
+/**
+ * Strip the VCALENDAR METHOD property. iTIP messages carry METHOD; a calendar
+ * object resource stored in a calendar collection MUST NOT (RFC 5545 §3.6 /
+ * RFC 6638 §3.1), so auto-placed copies drop it.
+ */
+const stripMethod = (doc: IrDocument): IrDocument => {
+	if (doc.kind !== "icalendar") {
+		return doc;
+	}
+	return {
+		...doc,
+		root: {
+			...doc.root,
+			properties: doc.root.properties.filter((p) => p.name !== "METHOD"),
+		},
+	};
+};
+
+/**
+ * Apply an iTIP REPLY to a scheduling object resource (RFC 6638 §4.2): for each
+ * ATTENDEE whose cal-address appears in `replies`, set its PARTSTAT to the
+ * replied value and its SCHEDULE-STATUS to "2.0" (delivered). Other properties —
+ * and the resource's Schedule-Tag — are untouched.
+ */
+const applyReplyToSor = (
+	root: IrComponent,
+	replies: ReadonlyMap<string, string>,
+): IrComponent => ({
+	...root,
+	components: root.components.map((comp) => {
+		if (comp.name !== "VEVENT" && comp.name !== "VTODO") {
+			return comp;
+		}
+		return {
+			...comp,
+			properties: comp.properties.map((p) => {
+				if (p.name !== "ATTENDEE" || p.value.type !== "CAL_ADDRESS") {
+					return p;
+				}
+				const partstat = replies.get(p.value.value.toLowerCase());
+				if (partstat === undefined) {
+					return p;
+				}
+				return {
+					...p,
+					parameters: [
+						...p.parameters.filter(
+							(pa) => pa.name !== "PARTSTAT" && pa.name !== "SCHEDULE-STATUS",
+						),
+						{ name: "PARTSTAT", value: partstat },
+						{ name: "SCHEDULE-STATUS", value: SCHED_STATUS_DELIVERED },
+					],
+				};
+			}),
+		};
+	}),
+});
+
+/** Set STATUS:CANCELLED on every VEVENT/VTODO (RFC 6638 §4.1 cancellation). */
+const setStatusCancelled = (root: IrComponent): IrComponent => ({
+	...root,
+	components: root.components.map((comp) => {
+		if (comp.name !== "VEVENT" && comp.name !== "VTODO") {
+			return comp;
+		}
+		return {
+			...comp,
+			properties: [
+				...comp.properties.filter((p) => p.name !== "STATUS"),
+				{
+					name: "STATUS",
+					parameters: [],
+					value: { type: "TEXT" as const, value: "CANCELLED" },
+					isKnown: true,
+				},
+			],
+		};
+	}),
+});
+
+/**
+ * Canonicalize an iCalendar tree for Schedule-Tag change detection: drop the
+ * volatile/per-user bits that don't constitute a "consequential" scheduling
+ * change — ATTENDEE PARTSTAT and SCHEDULE-STATUS parameters (participation
+ * status) and the DTSTAMP property (re-stamped on every iTIP message). Two
+ * trees with the same canonical form differ only in participation status.
+ */
+const canonicalizeForTag = (root: IrComponent): string => {
+	const normComp = (comp: IrComponent): unknown => {
+		if (comp.name !== "VEVENT" && comp.name !== "VTODO") {
+			return {
+				name: comp.name,
+				properties: comp.properties,
+				components: comp.components.map(normComp),
+			};
+		}
+		const properties = comp.properties
+			.filter((p) => p.name !== "DTSTAMP")
+			.map((p) =>
+				p.name === "ATTENDEE"
+					? {
+							...p,
+							parameters: p.parameters.filter(
+								(pa) => pa.name !== "PARTSTAT" && pa.name !== "SCHEDULE-STATUS",
+							),
+						}
+					: p,
+			);
+		return {
+			name: comp.name,
+			properties,
+			components: comp.components.map(normComp),
+		};
+	};
+	return JSON.stringify({
+		properties: root.properties,
+		components: root.components.map(normComp),
+	});
+};
+
+/**
+ * RFC 6638 §3.2.10 Attendee rule 2: an Organizer update that "only specifies
+ * changes in the participation status of Attendees" MUST NOT change the
+ * Attendee's Schedule-Tag. True when the two trees are identical apart from
+ * ATTENDEE PARTSTAT/SCHEDULE-STATUS (and DTSTAMP).
+ */
+const isPartstatOnlyChange = (
+	prevRoot: IrComponent,
+	nextRoot: IrComponent,
+): boolean => canonicalizeForTag(prevRoot) === canonicalizeForTag(nextRoot);
+
 /** Mutate SCHEDULE-STATUS param on the ATTENDEE for a given cal-address. */
 const applyScheduleStatus = (
 	root: IrComponent,
@@ -407,7 +548,12 @@ export const SchedulingServiceLive = Layer.effect(
 
 		const persistItipToCollection = Effect.fn(
 			"SchedulingService.persistItipToCollection",
-		)(function* (collectionId: CollectionId, itipDoc: IrDocument, uid: string) {
+		)(function* (
+			collectionId: CollectionId,
+			itipDoc: IrDocument,
+			uid: string,
+			scheduleTag?: string,
+		) {
 			const canonical = yield* encodeICalendar(itipDoc);
 			const etag = ETag(yield* makeEtag(canonical));
 			const contentLength = new TextEncoder().encode(canonical).byteLength;
@@ -423,12 +569,172 @@ export const SchedulingServiceLive = Layer.effect(
 				contentType: "text/calendar",
 				etag,
 				slug,
+				scheduleTag,
 				contentLength,
 			});
 		});
 
 		// -------------------------------------------------------------------------
-		// Helper: deliver an iTIP doc to a principal's inbox (+ auto-placement copy)
+		// Helper: replace an existing SOR's component tree in place. Recomputes the
+		// ETag (content changed) and, when `scheduleTag` is given, updates the
+		// Schedule-Tag; omit it to keep the tag stable (RFC 6638 §3.2.10).
+		// -------------------------------------------------------------------------
+
+		const updateExistingSor = Effect.fn("SchedulingService.updateExistingSor")(
+			function* (
+				instance: InstanceRow,
+				newRoot: IrComponent,
+				scheduleTag?: string,
+			) {
+				const entityId = EntityId(instance.entityId);
+				const canonical = yield* encodeICalendar({
+					kind: "icalendar",
+					root: newRoot,
+				});
+				const etag = ETag(yield* makeEtag(canonical));
+				const contentLength = new TextEncoder().encode(canonical).byteLength;
+				yield* withTransaction(
+					Effect.gen(function* () {
+						yield* componentRepo.deleteByEntity(entityId);
+						yield* componentRepo.insertTree(entityId, newRoot);
+					}),
+				).pipe(Effect.provideService(DatabaseClient, db));
+				yield* instanceSvc.put(
+					{
+						collectionId: CollectionId(instance.collectionId),
+						entityId,
+						contentType: "text/calendar",
+						etag,
+						slug: instance.slug as Slug,
+						contentLength,
+					},
+					InstanceId(instance.id),
+				);
+				if (scheduleTag !== undefined) {
+					yield* repo.updateScheduleTag(InstanceId(instance.id), scheduleTag);
+				}
+			},
+		);
+
+		// -------------------------------------------------------------------------
+		// Auto-processing of incoming iTIP messages (RFC 6638 §4). Each updates or
+		// creates the matching scheduling object resource on the recipient's
+		// calendars, in addition to the Inbox indicator copy.
+		// -------------------------------------------------------------------------
+
+		// REQUEST (RFC 6638 §4.1): create the SOR, or update an existing copy with
+		// the same UID rather than duplicating it.
+		const autoApplyRequest = Effect.fn("SchedulingService.autoApplyRequest")(
+			function* (
+				recipientPrincipalId: PrincipalId,
+				requestDoc: IrDocument,
+				uid: string,
+			) {
+				const calendarDoc = stripMethod(requestDoc);
+				const sorOpt = yield* repo.findSorByUid(recipientPrincipalId, uid);
+				if (Option.isSome(sorOpt)) {
+					// Update case: the Organizer's view is authoritative. The
+					// Schedule-Tag changes for a consequential change, but RFC 6638
+					// §3.2.10 Attendee rule 2 requires it to stay stable when the update
+					// only changes Attendees' participation status — otherwise a
+					// concurrent RSVP would spuriously fail another client's
+					// If-Schedule-Tag-Match conditional PUT. Diff the incoming REQUEST
+					// against the stored copy to decide.
+					const prevTreeOpt = yield* componentRepo.loadTree(
+						EntityId(sorOpt.value.instance.entityId),
+						"icalendar",
+					);
+					const partstatOnly =
+						Option.isSome(prevTreeOpt) &&
+						isPartstatOnlyChange(prevTreeOpt.value, calendarDoc.root);
+					yield* updateExistingSor(
+						sorOpt.value.instance,
+						calendarDoc.root,
+						partstatOnly ? undefined : crypto.randomUUID(),
+					);
+					return;
+				}
+				// New message: auto-place into the schedule-default-calendar with the
+				// recipient's participation reset to NEEDS-ACTION (RFC 6638 §3.4.2).
+				const defaultCalOpt =
+					yield* repo.findDefaultCalendar(recipientPrincipalId);
+				if (Option.isSome(defaultCalOpt)) {
+					yield* persistItipToCollection(
+						CollectionId(defaultCalOpt.value.id),
+						patchPartstat(calendarDoc, "NEEDS-ACTION"),
+						uid,
+						crypto.randomUUID(),
+					);
+				}
+			},
+		);
+
+		// REPLY (RFC 6638 §4.2): update the Organizer's SOR with the Attendee's new
+		// PARTSTAT. The Schedule-Tag MUST stay stable (§3.2.10 organizer rule 1).
+		const autoApplyReply = Effect.fn("SchedulingService.autoApplyReply")(
+			function* (
+				organizerPrincipalId: PrincipalId,
+				replyDoc: IrDocument,
+				uid: string,
+			) {
+				const sorOpt = yield* repo.findSorByUid(organizerPrincipalId, uid);
+				if (Option.isNone(sorOpt)) {
+					// RFC 6638 §4.2: no matching SOR — ignore the reply (inbox copy kept).
+					yield* Effect.logDebug(
+						"scheduling.autoApplyReply: no organizer SOR",
+						{
+							uid,
+						},
+					);
+					return;
+				}
+				const replyAttendees = extractAttendees(replyDoc);
+				if (replyAttendees.length === 0) {
+					return;
+				}
+				const replies = new Map(
+					replyAttendees.map((a) => [a.calAddress.toLowerCase(), a.partstat]),
+				);
+				const treeOpt = yield* componentRepo.loadTree(
+					EntityId(sorOpt.value.instance.entityId),
+					"icalendar",
+				);
+				if (Option.isNone(treeOpt)) {
+					return;
+				}
+				// No scheduleTag argument → the Schedule-Tag is preserved.
+				yield* updateExistingSor(
+					sorOpt.value.instance,
+					applyReplyToSor(treeOpt.value, replies),
+				);
+			},
+		);
+
+		// CANCEL (RFC 6638 §4.1): mark the recipient's SOR cancelled. A cancellation
+		// is consequential, so the Schedule-Tag changes.
+		const autoApplyCancel = Effect.fn("SchedulingService.autoApplyCancel")(
+			function* (recipientPrincipalId: PrincipalId, uid: string) {
+				const sorOpt = yield* repo.findSorByUid(recipientPrincipalId, uid);
+				if (Option.isNone(sorOpt)) {
+					return;
+				}
+				const treeOpt = yield* componentRepo.loadTree(
+					EntityId(sorOpt.value.instance.entityId),
+					"icalendar",
+				);
+				if (Option.isNone(treeOpt)) {
+					return;
+				}
+				yield* updateExistingSor(
+					sorOpt.value.instance,
+					setStatusCancelled(treeOpt.value),
+					crypto.randomUUID(),
+				);
+			},
+		);
+
+		// -------------------------------------------------------------------------
+		// Helper: deliver an iTIP doc to a principal's inbox (+ auto-processing)
 		// -------------------------------------------------------------------------
 
 		const deliverToInbox = Effect.fn("SchedulingService.deliverToInbox")(
@@ -457,19 +763,27 @@ export const SchedulingServiceLive = Layer.effect(
 					),
 				);
 
+				// The Inbox copy is the iTIP message itself — it keeps its METHOD as
+				// the indicator that a scheduling operation occurred (RFC 6638 §4).
 				yield* persistItipToCollection(inboxId, itipDoc, uid);
 
-				// Auto-placement copy into schedule-default-calendar (RFC 6638 §3.4.2)
-				const defaultCalOpt =
-					yield* repo.findDefaultCalendar(recipientPrincipalId);
-				if (Option.isSome(defaultCalOpt)) {
+				// Automatically process the message onto the recipient's calendars
+				// (RFC 6638 §4). Auto-processing is best-effort: a failure here must
+				// not undo the Inbox delivery, so each path is wrapped in
+				// Effect.ignore. The placed/updated copies are real scheduling object
+				// resources (METHOD stripped, Schedule-Tag assigned), so clients can
+				// read the tag back (RFC 6638 §3.2.10, §8.2).
+				const method = getMethod(itipDoc);
+				if (method === "REQUEST") {
 					yield* Effect.ignore(
-						persistItipToCollection(
-							CollectionId(defaultCalOpt.value.id),
-							patchPartstat(itipDoc, "NEEDS-ACTION"),
-							uid,
-						),
+						autoApplyRequest(recipientPrincipalId, itipDoc, uid),
 					);
+				} else if (method === "REPLY") {
+					yield* Effect.ignore(
+						autoApplyReply(recipientPrincipalId, itipDoc, uid),
+					);
+				} else if (method === "CANCEL") {
+					yield* Effect.ignore(autoApplyCancel(recipientPrincipalId, uid));
 				}
 				return true;
 			},
@@ -516,6 +830,7 @@ export const SchedulingServiceLive = Layer.effect(
 				collectionId: CollectionId;
 				doc: IrDocument;
 				previousDoc: Option.Option<IrDocument>;
+				previousScheduleTag: Option.Option<string>;
 				suppressReply: boolean;
 			}) {
 				const {
@@ -524,6 +839,7 @@ export const SchedulingServiceLive = Layer.effect(
 					instanceId,
 					doc,
 					previousDoc,
+					previousScheduleTag,
 					suppressReply,
 				} = opts;
 
@@ -558,7 +874,29 @@ export const SchedulingServiceLive = Layer.effect(
 					actingPrincipalId,
 					organizerCalAddress,
 				);
-				const scheduleTag = crypto.randomUUID();
+
+				// Schedule-Tag stability on an Attendee's own update.
+				//
+				// NOTE — intentional deviation. A *strict* reading of RFC 6638
+				// §3.2.10 (Attendee rule 3) and the reference implementation (Apple
+				// CalendarServer) both say a direct/explicit PUT — even one that only
+				// changes the Attendee's PARTSTAT — MUST mint a fresh Schedule-Tag;
+				// the tag is only held stable for server-internal iTIP processing.
+				// We deliberately keep it stable for an Attendee's PARTSTAT-style
+				// update instead, matching the de-facto caldav ecosystem convention
+				// probed by caldav-server-tester (`scheduling.schedule-tag
+				// .stable-partstat`): holding the tag avoids breaking other clients'
+				// If-Schedule-Tag-Match conditional PUTs across concurrent RSVPs.
+				// validateSchedulingChange has already restricted an Attendee's edit
+				// to attendee-mutable properties (PARTSTAT, VALARM, TRANSP, …), so
+				// every Attendee-role update reaching here is treated as tag-stable.
+				// Organizer changes, and brand-new resources, always get a fresh tag.
+				const existingTag = Option.getOrUndefined(previousScheduleTag);
+				const preserveTag =
+					role === "attendee" &&
+					Option.isSome(previousDoc) &&
+					existingTag !== undefined;
+				const scheduleTag = preserveTag ? existingTag : crypto.randomUUID();
 
 				const serverAttendees = extractAttendees(doc).filter(
 					(a) => a.scheduleAgent === "SERVER",
@@ -580,6 +918,16 @@ export const SchedulingServiceLive = Layer.effect(
 					const requestDoc = buildItipRequest(doc);
 
 					for (const attendee of serverAttendees) {
+						// The Organizer holds the master copy and is not sent an iTIP
+						// REQUEST for their own event (RFC 5546 §3.2; RFC 6638 §3.2.2).
+						// Skipping self-delivery also avoids redundantly auto-applying the
+						// REQUEST back onto the Organizer's own scheduling object resource.
+						if (
+							attendee.calAddress.toLowerCase() ===
+							organizerCalAddress.toLowerCase()
+						) {
+							continue;
+						}
 						const recipientOpt = yield* repo.findPrincipalByCalAddress(
 							attendee.calAddress,
 						);
@@ -693,7 +1041,11 @@ export const SchedulingServiceLive = Layer.effect(
 					}
 				}
 
-				yield* Effect.ignore(repo.updateScheduleTag(instanceId, scheduleTag));
+				// When preserving the tag (attendee RSVP), the stored value already
+				// equals `scheduleTag`; skip the write so we don't churn updated_at.
+				if (!preserveTag) {
+					yield* Effect.ignore(repo.updateScheduleTag(instanceId, scheduleTag));
+				}
 				return Option.some(scheduleTag);
 			},
 		);

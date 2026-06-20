@@ -20,6 +20,7 @@ import {
 	HTTP_CREATED,
 	HTTP_METHOD_NOT_ALLOWED,
 	HTTP_UNAUTHORIZED,
+	HTTP_UNSUPPORTED_MEDIA_TYPE,
 } from "#src/http/status.ts";
 import { runFailure, runSuccess } from "#src/testing/effect.ts";
 import { makeTestEnv } from "#src/testing/env.ts";
@@ -311,18 +312,43 @@ describe("mkcolHandler — extended-MKCOL body", () => {
 		expect(rows[0]?.displayName).toBeNull();
 	});
 
-	it("tolerates malformed XML body — returns 201 with default props", async () => {
+	it("rejects a non-well-formed XML body with 415 (RFC 4918 §9.3)", async () => {
 		const env = makeEnv();
 		const path = makeNewCollectionPath("cal");
 
-		const res = await runSuccess(
+		const err = (await runFailure(
 			mkcolHandler(path, authenticatedCtx, makeRequest("<not-closed-tag")).pipe(
 				Effect.provide(env.toLayer()),
-				Effect.orDie,
 			),
+		)) as DavError;
+
+		expect(err._tag).toBe("DavError");
+		expect(err.status).toBe(HTTP_UNSUPPORTED_MEDIA_TYPE);
+		// The collection must not have been created.
+		expect([...env.stores.collections.values()]).toHaveLength(0);
+	});
+
+	it("rejects a well-formed body whose root is not a MKCOL document with 415", async () => {
+		// litmus basic/mkcol_with_body: a syntactically valid XML body whose root
+		// is not DAV:mkcol / CALDAV:mkcalendar / CARDDAV:mkaddressbook is reserved
+		// (RFC 5689 §3) and must be rejected, not silently treated as an empty body.
+		const env = makeEnv();
+		const path = makeNewCollectionPath("col");
+		const ctx = makeCtx(
+			new Authenticated({ principal: authenticatedPrincipal }),
+			"MKCOL",
+			"col",
 		);
 
-		expect(res.status).toBe(HTTP_CREATED);
+		const err = (await runFailure(
+			mkcolHandler(path, ctx, makeRequest("<dummy>foo</dummy>")).pipe(
+				Effect.provide(env.toLayer()),
+			),
+		)) as DavError;
+
+		expect(err._tag).toBe("DavError");
+		expect(err.status).toBe(HTTP_UNSUPPORTED_MEDIA_TYPE);
+		expect([...env.stores.collections.values()]).toHaveLength(0);
 	});
 });
 
