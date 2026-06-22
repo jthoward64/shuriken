@@ -31,7 +31,7 @@ spec:
           image: {{ include "shuriken.image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext: {{- toYaml .Values.containerSecurityContext | nindent 12 }}
-          command: ["bun", "run", "migrations:run"]
+          command: ["deno", "task", "migrations:run"]
           envFrom:
             - configMapRef:
                 name: {{ include "shuriken.fullname" . }}-config

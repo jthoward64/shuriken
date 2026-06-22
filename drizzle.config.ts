@@ -1,4 +1,3 @@
-import process from "node:process";
 import { defineConfig } from "drizzle-kit";
 
 export default defineConfig({
@@ -6,8 +5,8 @@ export default defineConfig({
 	schema: "src/db/drizzle/schema/index.ts",
 	dialect: "postgresql",
 	dbCredentials: {
-		// biome-ignore lint/style/noNonNullAssertion: drizzle will handle missing value
-		url: process.env.DATABASE_URL!,
+		// drizzle will handle a missing value
+		url: Deno.env.get("DATABASE_URL") ?? "",
 	},
 	verbose: true,
 });

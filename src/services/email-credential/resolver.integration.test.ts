@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { expect } from "@std/expect";
+import { describe, it } from "@std/testing/bdd";
 import { Effect, ManagedRuntime, Option, Redacted } from "effect";
 import { UserId as makeUserId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";

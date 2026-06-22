@@ -1,4 +1,5 @@
-import { beforeAll, describe, expect, it } from "bun:test";
+import { expect } from "@std/expect";
+import { beforeAll, describe, it } from "@std/testing/bdd";
 import { Effect, Layer, Option } from "effect";
 import { CollectionId, EntityId, PrincipalId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
@@ -244,7 +245,7 @@ describe("AclRepository.hasPrivilege (integration)", () => {
 	// tested here because PGlite does not accept a parameterised array via
 	// Drizzle's sql template (it expects a literal "{uuid,...}" array syntax).
 	// That path is exercised by the service-layer unit tests against a mock
-	// repository, and will be verified in production against the Bun SQL driver.
+	// repository, and will be verified in production against the node-postgres driver.
 });
 
 // ---------------------------------------------------------------------------

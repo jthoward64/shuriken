@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { expect } from "@std/expect";
+import { describe, it } from "@std/testing/bdd";
 import { Effect, ManagedRuntime, Option, Redacted } from "effect";
 import {
 	type CollectionId,
@@ -16,7 +17,7 @@ import { InstanceRepository } from "#src/services/instance/repository.ts";
 import { ProvisioningService } from "#src/services/provisioning/index.ts";
 import { UserService } from "#src/services/user/index.ts";
 import { makeScriptRunnerLayer } from "#src/testing/script-runner/layer.ts";
-import { mockServer } from "#src/testing/script-runner/runner.ts";
+import { mockClientAddress } from "#src/testing/script-runner/runner.ts";
 import type { ContactFormData } from "./types.ts";
 import { emptyContactForm } from "./types.ts";
 
@@ -91,7 +92,7 @@ describe("Contacts CRUD (integration)", () => {
 						method: "PROPFIND",
 						headers: { Authorization: ALICE_AUTH, Depth: "1" },
 					}),
-					mockServer,
+					mockClientAddress,
 				),
 			);
 			expect(propfindRes.status).toBe(207);
@@ -140,7 +141,7 @@ describe("Contacts CRUD (integration)", () => {
 						method: "PROPFIND",
 						headers: { Authorization: ALICE_AUTH, Depth: "1" },
 					}),
-					mockServer,
+					mockClientAddress,
 				),
 			);
 			const body2 = await propfindAfter.text();

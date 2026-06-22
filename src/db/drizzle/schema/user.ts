@@ -8,8 +8,8 @@ import {
 	uuid,
 } from "drizzle-orm/pg-core";
 import type { UuidString } from "#src/domain/ids.ts";
-import { principal } from "./principal";
-import { timestampTz } from "./types";
+import { principal } from "./principal.ts";
+import { timestampTz } from "./types.ts";
 
 export const user = pgTable(
 	"user",

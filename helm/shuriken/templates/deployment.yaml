@@ -45,7 +45,7 @@ spec:
           # Skip the entrypoint's migration step — migrations run in the
           # Helm pre-install/pre-upgrade Job instead so multi-replica
           # rollouts don't race.
-          command: ["bun", "."]
+          command: ["deno", "task", "start"]
           envFrom:
             - configMapRef:
                 name: {{ include "shuriken.fullname" . }}-config

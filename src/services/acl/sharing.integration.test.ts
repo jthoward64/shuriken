@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { expect } from "@std/expect";
+import { describe, it } from "@std/testing/bdd";
 import { Effect, ManagedRuntime, Redacted } from "effect";
 import { Temporal } from "temporal-polyfill";
 import {
@@ -16,7 +17,7 @@ import { InstanceRepository } from "#src/services/instance/repository.ts";
 import { ProvisioningService } from "#src/services/provisioning/index.ts";
 import { UserService } from "#src/services/user/index.ts";
 import { makeScriptRunnerLayer } from "#src/testing/script-runner/layer.ts";
-import { mockServer } from "#src/testing/script-runner/runner.ts";
+import { mockClientAddress } from "#src/testing/script-runner/runner.ts";
 
 // ---------------------------------------------------------------------------
 // Verifies the calendar-sharing primitives end-to-end:
@@ -106,7 +107,7 @@ describe("Calendar / event sharing (integration)", () => {
 							body: EVENT_ICS,
 						},
 					),
-					mockServer,
+					mockClientAddress,
 				),
 			);
 			expect(eventPutRes.status).toBe(201);
@@ -161,7 +162,7 @@ describe("Calendar / event sharing (integration)", () => {
 						method: "PROPFIND",
 						headers: { Authorization: bobAuth, Depth: "1" },
 					}),
-					mockServer,
+					mockClientAddress,
 				),
 			);
 			expect(bobReadRes.status).toBe(207);
@@ -180,7 +181,7 @@ describe("Calendar / event sharing (integration)", () => {
 							body: "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n",
 						},
 					),
-					mockServer,
+					mockClientAddress,
 				),
 			);
 			expect(bobWriteRes.status).toBe(403);

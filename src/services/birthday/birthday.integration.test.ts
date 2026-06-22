@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { expect } from "@std/expect";
+import { describe, it } from "@std/testing/bdd";
 import { Effect, ManagedRuntime, Redacted } from "effect";
 import { CollectionId, type PrincipalId, UserId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
@@ -8,7 +9,7 @@ import { CollectionRepository } from "#src/services/collection/repository.ts";
 import { ProvisioningService } from "#src/services/provisioning/index.ts";
 import { UserService } from "#src/services/user/index.ts";
 import { makeScriptRunnerLayer } from "#src/testing/script-runner/layer.ts";
-import { mockServer } from "#src/testing/script-runner/runner.ts";
+import { mockClientAddress } from "#src/testing/script-runner/runner.ts";
 import { BirthdayService } from "./service.ts";
 
 // ---------------------------------------------------------------------------
@@ -83,7 +84,7 @@ describe("Birthday calendar (integration)", () => {
 				},
 			);
 			const putRes = await runtime.runPromise(
-				handleRequest(putReq, mockServer),
+				handleRequest(putReq, mockClientAddress),
 			);
 			expect(putRes.status).toBe(201);
 
@@ -120,7 +121,7 @@ describe("Birthday calendar (integration)", () => {
 				},
 			);
 			const propfindRes = await runtime.runPromise(
-				handleRequest(propfindReq, mockServer),
+				handleRequest(propfindReq, mockClientAddress),
 			);
 			expect(propfindRes.status).toBe(207);
 			const propfindBody = await propfindRes.text();
@@ -139,7 +140,7 @@ describe("Birthday calendar (integration)", () => {
 				},
 			);
 			const writeRes = await runtime.runPromise(
-				handleRequest(writeAttempt, mockServer),
+				handleRequest(writeAttempt, mockClientAddress),
 			);
 			expect(writeRes.status).toBe(403);
 
@@ -165,7 +166,7 @@ describe("Birthday calendar (integration)", () => {
 				},
 			);
 			const replaceRes = await runtime.runPromise(
-				handleRequest(replaceReq, mockServer),
+				handleRequest(replaceReq, mockClientAddress),
 			);
 			expect([200, 204]).toContain(replaceRes.status);
 

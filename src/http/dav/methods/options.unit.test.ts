@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { expect } from "@std/expect";
+import { describe, it } from "@std/testing/bdd";
 import { Effect, Option } from "effect";
 import { PrincipalId, RequestId } from "#src/domain/ids.ts";
 import { Unauthenticated } from "#src/domain/types/dav.ts";

@@ -7,7 +7,7 @@
 # ---------------------------------------------------------------------------
 
 image:
-  repository: ghcr.io/jthowardio/shuriken-ts
+  repository: ghcr.io/jthoward64/shuriken
   tag: ""           # defaults to .Chart.AppVersion when empty
   pullPolicy: IfNotPresent
 
@@ -265,7 +265,7 @@ startupProbe:
   failureThreshold: 30
 
 # ---------------------------------------------------------------------------
-# Pod-level security context. Image runs as the bun user (UID 1000); these
+# Pod-level security context. Image runs as the deno user (UID 1000); these
 # defaults make it strictly non-root with a read-only rootfs.
 # ---------------------------------------------------------------------------
 
@@ -285,7 +285,7 @@ containerSecurityContext:
       - ALL
 
 # Volume mounts for the writable scratch + cache the app needs even with
-# read-only rootfs (Bun writes to /tmp; the timezone polyfill loads zone
+# read-only rootfs (Deno writes to /tmp; the timezone polyfill loads zone
 # data at startup).
 extraVolumes:
   - name: tmp

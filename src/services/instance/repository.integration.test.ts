@@ -1,4 +1,5 @@
-import { beforeAll, describe, expect, it } from "bun:test";
+import { expect } from "@std/expect";
+import { beforeAll, describe, it } from "@std/testing/bdd";
 import { Effect, Layer, Option } from "effect";
 import { DatabaseClient } from "#src/db/client.ts";
 import { davEntity, type EntityType } from "#src/db/drizzle/schema/index.ts";

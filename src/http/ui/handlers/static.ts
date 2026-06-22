@@ -1,17 +1,19 @@
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { Effect } from "effect";
 import type { InternalError } from "#src/domain/errors.ts";
-import { BunFileService } from "#src/platform/file.ts";
+import { FileService } from "#src/platform/file.ts";
 
 // ---------------------------------------------------------------------------
 // Static asset handler — serves files from src/http/ui/static/
 // ---------------------------------------------------------------------------
 
-const STATIC_DIR = path.resolve(import.meta.dir, "../static");
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const STATIC_DIR = path.resolve(HERE, "../static");
 
 export const staticHandler = (
 	req: Request,
-): Effect.Effect<Response, never, BunFileService> => {
+): Effect.Effect<Response, never, FileService> => {
 	const url = new URL(req.url);
 	// Strip the /static/ prefix to get the relative path
 	const relPath = url.pathname.replace(/^\/static\//, "");
@@ -21,7 +23,7 @@ export const staticHandler = (
 	const absPath = path.join(STATIC_DIR, relPath);
 
 	return Effect.gen(function* () {
-		const files = yield* BunFileService;
+		const files = yield* FileService;
 		const exists = yield* files.exists(absPath);
 		if (!exists) {
 			return new Response(null, { status: 404 });
@@ -37,7 +39,9 @@ export const staticHandler = (
 			return new Response(null, { status: 404 });
 		}
 		const mime = files.mimeType(absPath) ?? "application/octet-stream";
-		return new Response(bytes, {
+		// Uint8Array is a valid body at runtime; the cast bridges the
+		// ArrayBufferLike/ArrayBuffer generic mismatch in lib typings.
+		return new Response(bytes as BodyInit, {
 			status: 200,
 			headers: { "Content-Type": mime },
 		});

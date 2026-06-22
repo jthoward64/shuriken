@@ -15,7 +15,7 @@ import {
 	uuid,
 } from "drizzle-orm/pg-core";
 import type { UuidString } from "#src/domain/ids.ts";
-import { principal } from "./principal";
+import { principal } from "./principal.ts";
 import {
 	bytea,
 	dateStr,
@@ -23,7 +23,7 @@ import {
 	type GetDrizzleEnumType,
 	timestampStr,
 	timestampTz,
-} from "./types";
+} from "./types.ts";
 
 const entityTypeEnum = drizzleEnum(
 	"entity_type",

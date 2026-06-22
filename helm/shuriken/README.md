@@ -1,6 +1,6 @@
 # shuriken Helm chart
 
-Production deployment of [shuriken-ts](https://github.com/jthowardio/shuriken-ts) —
+Production deployment of [shuriken](https://github.com/jthoward64/shuriken) —
 a CalDAV / CardDAV server with HTMX management UI, public iCal feeds, bulk
 import/export, and RFC 6638 scheduling.
 
@@ -16,9 +16,9 @@ helm install shuriken ./helm/shuriken \
 
 ## What's in the chart
 
-- **Deployment** — single container running `bun .`, with checksum
+- **Deployment** — single container running `deno task start`, with checksum
   annotations so config-map / secret changes trigger rollouts.
-- **Pre-install/pre-upgrade Job** — runs `bun run migrations:run` before
+- **Pre-install/pre-upgrade Job** — runs `deno task migrations:run` before
   any pod from the new revision starts. Disable via `migrations.enabled=false`.
 - **Service** — ClusterIP by default; exposes HTTP and optionally the LMTP
   port for inbound iMIP.

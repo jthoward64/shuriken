@@ -9,8 +9,8 @@ import {
 	uuid,
 } from "drizzle-orm/pg-core";
 import type { UuidString } from "#src/domain/ids.ts";
-import { davCollection } from "./dav";
-import { drizzleEnum, type GetDrizzleEnumType, timestampTz } from "./types";
+import { davCollection } from "./dav.ts";
+import { drizzleEnum, type GetDrizzleEnumType, timestampTz } from "./types.ts";
 
 // ---------------------------------------------------------------------------
 // External calendar subscriptions — shared fetch + per-user claims.

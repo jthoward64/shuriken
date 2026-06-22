@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { expect } from "@std/expect";
+import { describe, it } from "@std/testing/bdd";
 import { Cause, Effect, Exit, Option } from "effect";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import {
@@ -539,7 +540,7 @@ describe("aclHandler — successful writes", () => {
 		expect(aces).toHaveLength(2);
 		expect(aces[0]?.ordinal).toBe(aces[1]?.ordinal);
 		expect(aces[0]?.ordinal).toBe(0);
-		const privileges = new Set(aces.map((a) => a.privilege));
+		const privileges = aces.map((a) => a.privilege);
 		expect(privileges).toContain("DAV:read");
 		expect(privileges).toContain("DAV:read-acl");
 	});

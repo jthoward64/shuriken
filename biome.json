@@ -92,7 +92,7 @@
 			"quoteStyle": "double",
 			"semicolons": "always"
 		},
-		"globals": ["Bun"]
+		"globals": ["Deno"]
 	},
 	"overrides": [
 		{

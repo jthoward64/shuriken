@@ -87,8 +87,8 @@ import type { UserService } from "#src/services/user/service.ts";
 // ---------------------------------------------------------------------------
 // TestCryptoLayer
 //
-// Identity-based crypto — no Bun.password dependency.
-// hashPassword prepends "test:" so verifyPassword can validate without bcrypt.
+// Identity-based crypto — no real password hashing.
+// hashPassword prepends "test:" so verifyPassword can validate without argon2.
 // ---------------------------------------------------------------------------
 
 const TEST_HASH_PREFIX = "test:";

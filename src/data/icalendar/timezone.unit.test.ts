@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { expect } from "@std/expect";
+import { describe, it } from "@std/testing/bdd";
 import { Effect, Option } from "effect";
 import { Temporal } from "temporal-polyfill";
 import type { IrComponent, IrDocument } from "../ir.ts";
@@ -156,8 +157,8 @@ describe("extractVtimezones", () => {
 	it("vtimezoneData starts with BEGIN:VTIMEZONE and ends with END:VTIMEZONE", async () => {
 		const doc = makeVcalendar([makeVtimezone("America/New_York")]);
 		const [result] = await run(extractVtimezones(doc));
-		expect(result?.vtimezoneData).toStartWith("BEGIN:VTIMEZONE\r\n");
-		expect(result?.vtimezoneData).toEndWith("END:VTIMEZONE\r\n");
+		expect(result?.vtimezoneData?.startsWith("BEGIN:VTIMEZONE\r\n")).toBe(true);
+		expect(result?.vtimezoneData?.endsWith("END:VTIMEZONE\r\n")).toBe(true);
 	});
 
 	it("vtimezoneData includes the TZID line and STANDARD sub-component", async () => {

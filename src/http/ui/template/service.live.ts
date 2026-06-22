@@ -1,15 +1,17 @@
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { Effect, Layer } from "effect";
 import Handlebars from "handlebars";
 import { InternalError } from "#src/domain/errors.ts";
-import { BunFileService } from "#src/platform/file.ts";
+import { FileService } from "#src/platform/file.ts";
 import { TemplateService } from "./service.ts";
 
 // ---------------------------------------------------------------------------
 // Template directory — resolved relative to this file at build time
 // ---------------------------------------------------------------------------
 
-const TEMPLATES_DIR = path.resolve(import.meta.dir, "../templates");
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const TEMPLATES_DIR = path.resolve(HERE, "../templates");
 
 // ---------------------------------------------------------------------------
 // Helpers registration
@@ -49,7 +51,7 @@ function registerHelpers(hbs: typeof Handlebars): void {
 export const TemplateServiceLive = Layer.effect(
 	TemplateService,
 	Effect.gen(function* () {
-		const files = yield* BunFileService;
+		const files = yield* FileService;
 
 		// Enumerate all .hbs files under the templates directory
 		const hbsPaths = yield* files.glob("**/*.hbs", TEMPLATES_DIR);

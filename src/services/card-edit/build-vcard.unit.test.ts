@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { expect } from "@std/expect";
+import { describe, it } from "@std/testing/bdd";
 import { buildVcardComponent } from "./build-vcard.ts";
 import { parseVcardToForm } from "./parse-vcard.ts";
 import { emptyContactForm } from "./types.ts";

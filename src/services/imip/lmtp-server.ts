@@ -8,6 +8,7 @@ import {
 	formatReply,
 	greeting,
 	initialState,
+	type LmtpReply,
 	type LmtpState,
 	parseCommand,
 	renderDeliveryReplies,
@@ -29,14 +30,13 @@ const outcomeToDelivery = (o: ImipInboundOutcome): DeliveryOutcome => {
 };
 
 // ---------------------------------------------------------------------------
-// LmtpServerLayer — boots a Bun TCP listener that speaks LMTP and forwards
+// LmtpServerLayer — boots a Deno TCP listener that speaks LMTP and forwards
 // successfully-decoded messages to ImipInboundService. Per-connection state
-// lives in a closure on `data` so concurrent clients can't bleed into each
-// other.
+// lives in a closure so concurrent clients can't bleed into each other.
 //
-// Bun.listen's socket API is callback-shaped, not Effect-shaped, so we hop
-// out of Effect into the runtime it's running on (passed in via Layer.scoped
-// + Runtime.runtime). Each per-recipient delivery is wrapped in
+// Deno's socket API is stream-shaped, not Effect-shaped, so we hop out of
+// Effect into the runtime it's running on (passed in via Layer.scoped +
+// Runtime.runtime). Each per-recipient delivery is wrapped in
 // `runtime.runPromise` so failures are logged but don't tear down the
 // listener.
 //
@@ -57,7 +57,7 @@ interface ConnectionState {
 	closeRequested: boolean;
 	/** 221 reply (and any others returned alongside close) held until the
 	 * mid-flight deliveries finish, so replies stay in protocol order. */
-	heldCloseReplies?: ReadonlyArray<import("./lmtp-protocol.ts").LmtpReply>;
+	heldCloseReplies?: ReadonlyArray<LmtpReply>;
 }
 
 // Drain a buffer of "lines terminated by CRLF" — leftover (no trailing CRLF
@@ -98,113 +98,156 @@ export const LmtpServerLayer = Layer.scopedDiscard(
 		const port = config.mail.lmtpPort;
 		const host = config.mail.lmtpHost;
 
+		// ---------------------------------------------------------------------
+		// Per-connection handler. Deno's socket API is stream-shaped (async
+		// read loop + Promise-returning writes), unlike Bun's callback socket,
+		// so connection state lives in a closure and all writes are serialized
+		// through `writeChain` to keep protocol replies in byte order even when
+		// async delivery replies race with synchronous command replies.
+		// ---------------------------------------------------------------------
+		const encoder = new TextEncoder();
+		const handleConn = (conn: Deno.Conn): void => {
+			const data: ConnectionState = {
+				state: initialState,
+				pending: "",
+				pendingDeliveries: 0,
+				closeRequested: false,
+			};
+			let closed = false;
+			let writeChain: Promise<unknown> = Promise.resolve();
+
+			const write = (reply: LmtpReply): void => {
+				const bytes = encoder.encode(formatReply(reply));
+				writeChain = writeChain
+					.then(() => (closed ? undefined : conn.write(bytes)))
+					.catch(() => {
+						closed = true;
+					});
+			};
+			const closeConn = (): void => {
+				closed = true;
+				void writeChain.finally(() => {
+					try {
+						conn.close();
+					} catch {
+						// already closed
+					}
+				});
+			};
+
+			write(greeting(hostname));
+
+			const processText = (text: string): void => {
+				const inDataBefore = data.state.tag === "Data";
+				const { lines, tail } = splitLines(text, data.pending);
+				data.pending = tail;
+				let inData = inDataBefore;
+				for (const line of lines) {
+					const cmd = parseCommand(line, inData);
+					const step = apply(data.state, cmd, hostname);
+					data.state = step.state;
+					// QUIT's 221 reply is held back while a delivery is in flight
+					// so the per-RCPT 250/5xx replies aren't sent AFTER the close
+					// acknowledgement (which would make the upstream MTA distrust
+					// them).
+					const holdReplies = step.close === true && data.pendingDeliveries > 0;
+					if (!holdReplies) {
+						for (const reply of step.replies) {
+							write(reply);
+						}
+					}
+					inData = step.state.tag === "Data";
+					if (step.delivery !== undefined) {
+						const { recipients, body } = step.delivery;
+						data.pendingDeliveries += 1;
+						// RFC 2033 §4.2: one reply per RCPT TO, in the order they
+						// were issued. Dispatch in parallel, then render replies in
+						// RCPT order from the collected outcomes.
+						const tasks = recipients.map((recipient) =>
+							runFork(
+								Effect.gen(function* () {
+									const outcome = yield* inbound.process({
+										recipientEmail: recipient,
+										rawMessage: body,
+									});
+									return outcome;
+								}),
+							),
+						);
+						void Promise.allSettled(tasks).then((results) => {
+							const outcomes: ReadonlyArray<DeliveryOutcome> = results.map(
+								(r) =>
+									r.status === "rejected"
+										? ({ tag: "Rejected" } as const)
+										: outcomeToDelivery(r.value),
+							);
+							for (const reply of renderDeliveryReplies(recipients, outcomes)) {
+								write(reply);
+							}
+							data.pendingDeliveries -= 1;
+							if (data.closeRequested && data.pendingDeliveries === 0) {
+								// Emit the held 221 (and any companion replies) in
+								// protocol order, then close.
+								for (const r of data.heldCloseReplies ?? []) {
+									write(r);
+								}
+								closeConn();
+							}
+						});
+					}
+					if (step.close === true) {
+						// QUIT received. If a delivery is mid-flight, defer the 221 +
+						// close until per-RCPT replies are flushed.
+						if (data.pendingDeliveries > 0) {
+							data.closeRequested = true;
+							data.heldCloseReplies = step.replies;
+						} else {
+							closeConn();
+						}
+					}
+				}
+			};
+
+			void (async () => {
+				const decoder = new TextDecoder();
+				try {
+					for await (const chunk of conn.readable) {
+						processText(decoder.decode(chunk, { stream: true }));
+						if (closed) {
+							break;
+						}
+					}
+				} catch (error) {
+					void runPromise(
+						Effect.logWarning("imip.lmtp: socket error", {
+							error: String(error),
+						}),
+					);
+				}
+			})();
+		};
+
 		yield* Effect.acquireRelease(
 			Effect.sync(() => {
-				const server = Bun.listen<ConnectionState>({
-					hostname: host,
-					port,
-					socket: {
-						open(socket) {
-							socket.data = {
-								state: initialState,
-								pending: "",
-								pendingDeliveries: 0,
-								closeRequested: false,
-							};
-							socket.write(formatReply(greeting(hostname)));
-						},
-						data(socket, chunk) {
-							const text = chunk.toString("utf8");
-							const inDataBefore = socket.data.state.tag === "Data";
-							const { lines, tail } = splitLines(text, socket.data.pending);
-							socket.data.pending = tail;
-							let inData = inDataBefore;
-							for (const line of lines) {
-								const cmd = parseCommand(line, inData);
-								const step = apply(socket.data.state, cmd, hostname);
-								socket.data.state = step.state;
-								// QUIT's 221 reply is held back while a delivery is in
-								// flight so the per-RCPT 250/5xx replies aren't sent
-								// AFTER the close acknowledgement (which would make the
-								// upstream MTA distrust them).
-								const holdReplies =
-									step.close === true && socket.data.pendingDeliveries > 0;
-								if (!holdReplies) {
-									for (const reply of step.replies) {
-										socket.write(formatReply(reply));
-									}
-								}
-								inData = step.state.tag === "Data";
-								if (step.delivery !== undefined) {
-									const { recipients, body } = step.delivery;
-									socket.data.pendingDeliveries += 1;
-									// RFC 2033 §4.2: one reply per RCPT TO, in the order
-									// they were issued. Dispatch in parallel, then render
-									// replies in RCPT order from the collected outcomes.
-									const tasks = recipients.map((recipient) =>
-										runFork(
-											Effect.gen(function* () {
-												const outcome = yield* inbound.process({
-													recipientEmail: recipient,
-													rawMessage: body,
-												});
-												return outcome;
-											}),
-										),
-									);
-									void Promise.allSettled(tasks).then((results) => {
-										const outcomes: ReadonlyArray<DeliveryOutcome> =
-											results.map((r) =>
-												r.status === "rejected"
-													? ({ tag: "Rejected" } as const)
-													: outcomeToDelivery(r.value),
-											);
-										for (const reply of renderDeliveryReplies(
-											recipients,
-											outcomes,
-										)) {
-											socket.write(formatReply(reply));
-										}
-										socket.data.pendingDeliveries -= 1;
-										if (
-											socket.data.closeRequested &&
-											socket.data.pendingDeliveries === 0
-										) {
-											// Emit the held 221 (and any companion replies)
-											// in protocol order, then close.
-											for (const r of socket.data.heldCloseReplies ?? []) {
-												socket.write(formatReply(r));
-											}
-											socket.end();
-										}
-									});
-								}
-								if (step.close === true) {
-									// QUIT received. If a delivery is mid-flight, defer
-									// the 221 + close until per-RCPT replies are flushed.
-									if (socket.data.pendingDeliveries > 0) {
-										socket.data.closeRequested = true;
-										socket.data.heldCloseReplies = step.replies;
-									} else {
-										socket.end();
-									}
-								}
-							}
-						},
-						error(_socket, error) {
-							void runPromise(
-								Effect.logWarning("imip.lmtp: socket error", {
-									error: String(error),
-								}),
-							);
-						},
-					},
-				});
-				return server;
+				const listener = Deno.listen({ hostname: host, port });
+				void (async () => {
+					try {
+						for await (const conn of listener) {
+							handleConn(conn);
+						}
+					} catch {
+						// Listener closed during shutdown — accept loop ends.
+					}
+				})();
+				return listener;
 			}),
-			(server) =>
+			(listener) =>
 				Effect.sync(() => {
-					server.stop(true);
+					try {
+						listener.close();
+					} catch {
+						// already closed
+					}
 				}),
 		);
 

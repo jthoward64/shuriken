@@ -5,8 +5,8 @@ import type {
 } from "#src/services/card-edit/types.ts";
 import { emptyContactForm } from "#src/services/card-edit/types.ts";
 
-// Bun's Request.formData() returns its own FormData-shaped object that
-// doesn't structurally equal the DOM lib's FormData. The helpers below only
+// Request.formData() return types can vary by runtime / lib config, so we
+// depend only on a structural subset (`get`/`getAll`). The helpers below only
 // rely on the subset we actually use.
 interface FormLike {
 	get(key: string): unknown;

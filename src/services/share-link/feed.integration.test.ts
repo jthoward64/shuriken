@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { expect } from "@std/expect";
+import { describe, it } from "@std/testing/bdd";
 import { Effect, ManagedRuntime } from "effect";
 import { Temporal } from "temporal-polyfill";
 import {
@@ -13,7 +14,7 @@ import { importIcs } from "#src/services/cal-edit/import-ics.ts";
 import { ProvisioningService } from "#src/services/provisioning/index.ts";
 import { ShareLinkService } from "#src/services/share-link/service.ts";
 import { makeScriptRunnerLayer } from "#src/testing/script-runner/layer.ts";
-import { mockServer } from "#src/testing/script-runner/runner.ts";
+import { mockClientAddress } from "#src/testing/script-runner/runner.ts";
 
 const ICS = `BEGIN:VCALENDAR
 VERSION:2.0
@@ -73,7 +74,10 @@ const setup = (
 	});
 
 const fetchFeed = (token: string) =>
-	handleRequest(new Request(`http://localhost/feed/${token}.ics`), mockServer);
+	handleRequest(
+		new Request(`http://localhost/feed/${token}.ics`),
+		mockClientAddress,
+	);
 
 describe("share-link feed end-to-end (integration)", () => {
 	it("returns 200 with VEVENT for an active link (visibility=all)", async () => {

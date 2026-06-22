@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { expect } from "@std/expect";
+import { describe, it } from "@std/testing/bdd";
 import { Effect, ManagedRuntime, Redacted } from "effect";
 import {
 	type CollectionId,
@@ -11,7 +12,7 @@ import { handleRequest } from "#src/http/router.ts";
 import { ProvisioningService } from "#src/services/provisioning/index.ts";
 import { UserService } from "#src/services/user/index.ts";
 import { makeScriptRunnerLayer } from "#src/testing/script-runner/layer.ts";
-import { mockServer } from "#src/testing/script-runner/runner.ts";
+import { mockClientAddress } from "#src/testing/script-runner/runner.ts";
 
 // ---------------------------------------------------------------------------
 // Three-tier roles end-to-end:
@@ -80,7 +81,7 @@ describe("Three-tier roles (integration)", () => {
 						method: "PROPFIND",
 						headers: { Authorization: auth("alice@example.com", "alice") },
 					}),
-					mockServer,
+					mockClientAddress,
 				),
 			);
 			// 403 is the canonical denied response under the existing ACL.
@@ -96,7 +97,7 @@ describe("Three-tier roles (integration)", () => {
 							Depth: "0",
 						},
 					}),
-					mockServer,
+					mockClientAddress,
 				),
 			);
 			expect(sRes.status).toBe(207);
@@ -119,7 +120,7 @@ describe("Three-tier roles (integration)", () => {
 							Depth: "0",
 						},
 					}),
-					mockServer,
+					mockClientAddress,
 				),
 			);
 			expect(sRes2.status).toBe(403);

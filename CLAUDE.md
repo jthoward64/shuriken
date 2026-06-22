@@ -13,9 +13,10 @@ A CalDAV/CardDAV server implementation in TypeScript.
 
 ## Runtime & Tooling
 
-- **Runtime**: Bun. Use `bun` for all scripts, package management, and test execution.
-- **Package manager**: Bun. Never use npm, yarn, or pnpm.
-- **Scripts**: bun run `check`, `lint`, `format`, and `test` scripts are defined
+- **Runtime**: Deno. Use `deno` for all scripts, dependency management, and test execution.
+- **Dependencies**: declared in `deno.json` as an imports map using `npm:` / `jsr:` specifiers; resolved into `node_modules` via `deno install` (`nodeModulesDir: "auto"`). Never use npm, yarn, pnpm, or bun. There is no `package.json`.
+- **Module specifiers**: relative and `#src/*` imports must carry explicit `.ts` extensions — Deno requires them.
+- **Tasks**: `deno task check`, `lint`, `format`, `test`, `start`, `dev`, `migrations:run` are defined in `deno.json`. Run scripts via `deno task <name>`.
 - **TypeScript**: Strict mode. No `any` ever. Use `unknown` and then narrow with runtime checks as needed. The only time `any` is allowed is internal to very small functions in order to satisfy *extremely* complex generics.
 - **Biome**: Use Biome for linting and formatting. Warnings, errors, and infos should alls be fixed. Prefer using Biome's autofix features where possible, but feel free to make manual adjustments as needed. Disabling or ignoring lint rules requires express approval from the user
 
@@ -57,19 +58,19 @@ All application logic must use [Effect](https://effect.website) (`effect` packag
 
 ## HTTP Server
 
-- HTTP server is `Bun.serve`. Only the `fetch` handler is used; we do not use bun's builtin routing as it is not fit for DAV's architectural style.
+- HTTP server is `Deno.serve`. Only the `fetch` handler is used; we do not use any builtin routing as it is not fit for DAV's architectural style. The handler resolves the client IP from the connection info and passes it (not any transport object) into `handleRequest`.
 - Routing is implemented manually in application code.
 - Request handlers must return an `Effect` that resolves to a `Response`.
 - The actual request data should not be accessed in any code outside the http edge (e.g. services, repositories). Parse and validate all request data at the edge and convert to well-defined types before passing into business logic (this includes the url path, query parameters, headers, body, etc.).
 - Response construction should also happen at the edge; service and repository functions should return well-defined types or tagged unions, not raw `Response` objects. We should be able to up and switch to literally any transport without touching business logic.
 
-## Bun Isolation
+## Runtime Isolation
 
-All Bun-specific APIs (file I/O, `Bun.serve`, `Bun.file`, `Bun.password`, etc.) must be wrapped behind interfaces defined in a dedicated platform adapter layer (e.g. `src/platform/`). Business logic and domain code must only depend on these interfaces, not on `Bun.*` globals directly. This makes the codebase portable to Node.js or Deno if needed. Web standard APIs can be use directly in application code as they are universally available.
+All runtime-specific APIs (`Deno.*` for sockets/serve, `node:*` for file I/O, password hashing, etc.) must be wrapped behind interfaces defined in a dedicated platform adapter layer (e.g. `src/platform/`). Business logic and domain code must only depend on these interfaces, not on `Deno.*`/`node:*` directly. This keeps the codebase portable to Node.js or Bun if needed. Web standard APIs (`fetch`, `Request`, `Response`, `URL`, `crypto`, `TextEncoder`, etc.) can be used directly in application code as they are universally available. Password hashing uses argon2id via `hash-wasm` (portable WASM) behind `CryptoService`.
 
 ## Database
 
-- ORM: **Drizzle** with a PostgreSQL driver.
+- ORM: **Drizzle** (`drizzle-orm/node-postgres`) over node-postgres (`pg`). pg-native (libpq) is preferred when available and falls back to the pure-JS client. Construct the client with `drizzle({ client: pool, schema })` — never `drizzle(pool, …)`, which makes drizzle spin up its own default pool and ignore yours.
 - All queries go through Drizzle; no raw SQL strings outside of Drizzle's `sql` template tag.
 - Schema is defined in `src/db/drizzle/schema/`; keep one concern per file.
 - Wrap Drizzle operations in `Effect` (map results, map errors to typed variants).
@@ -78,7 +79,7 @@ All Bun-specific APIs (file I/O, `Bun.serve`, `Bun.file`, `Bun.password`, etc.) 
 
 - Use the **Temporal API** for all date/time logic (`Temporal.PlainDate`, `Temporal.ZonedDateTime`, etc.).
 - A polyfill is present; do not use `Date`, `Date.now()`, or `new Date()` in application code.
-- Store timestamps as timestamptz in the database; parse them back to Temporal objects at the DB boundary (drizzle is configured to return timestamps as strings).
+- Store timestamps as timestamptz in the database; parse them back to Temporal objects at the DB boundary. The pg driver is configured with identity type-parsers for the date/time OIDs so timestamps arrive as raw strings (going string → Temporal directly, not string → Date → Temporal).
 
 ## XML
 
@@ -118,7 +119,7 @@ All Bun-specific APIs (file I/O, `Bun.serve`, `Bun.file`, `Bun.password`, etc.) 
 
 - Layers: **HTTP edge** → **routing** → **service/use-case** → **repository** → **DB**.
 - No layer reaches across more than one level.
-- Platform-specific code stays in `src/platform/`; domain code has zero Bun/Node/Deno imports.
+- Platform-specific code stays in `src/platform/`; domain code has zero `Deno.*`/`node:*` runtime imports.
 
 ### DRY
 
@@ -148,7 +149,7 @@ All Bun-specific APIs (file I/O, `Bun.serve`, `Bun.file`, `Bun.password`, etc.) 
 
 ## Testing
 
-- **Test runner**: Bun's built-in test runner (`bun test`). Never use Jest, Vitest, or any other runner.
+- **Test runner**: Deno's built-in test runner (`deno test`, via `deno task test`). Tests use `describe`/`it`/`beforeAll` from `@std/testing/bdd` and `expect` from `@std/expect`. Never use Jest, Vitest, Bun's runner, or any other runner.
 - Test files live alongside the code they test as `*.test.ts`, or in a `__tests__/` folder next to the module.
 
 ### Testability via Effect's Requirements System

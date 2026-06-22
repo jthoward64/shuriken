@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { expect } from "@std/expect";
+import { describe, it } from "@std/testing/bdd";
 import { Effect, ManagedRuntime, Option } from "effect";
 import { authenticateProxy } from "#src/auth/layers/proxy.ts";
 import { makeScriptRunnerLayer } from "#src/testing/script-runner/layer.ts";

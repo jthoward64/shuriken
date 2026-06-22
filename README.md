@@ -1,15 +1,24 @@
 # shuriken-ts
 
+A CalDAV/CardDAV server implementation in TypeScript, running on [Deno](https://deno.com).
+
 To install dependencies:
 
 ```bash
-bun install
+deno install
 ```
 
-To run:
+To run the server (loads `.env`, runs against the configured database):
 
 ```bash
-bun run index.ts
+deno task start
 ```
 
-This project was created using `bun init` in bun v1.3.11. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+Other useful tasks:
+
+```bash
+deno task dev          # start with --watch
+deno task test         # run the test suite
+deno task check        # type-check
+deno task migrations:run
+```

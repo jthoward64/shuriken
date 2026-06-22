@@ -1,4 +1,5 @@
-import { beforeAll, describe, expect, it } from "bun:test";
+import { expect } from "@std/expect";
+import { beforeAll, describe, it } from "@std/testing/bdd";
 import { Effect, Layer, Option } from "effect";
 import type { ConflictError } from "#src/domain/errors.ts";
 import { GroupId, UserId } from "#src/domain/ids.ts";

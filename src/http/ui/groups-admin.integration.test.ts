@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { expect } from "@std/expect";
+import { describe, it } from "@std/testing/bdd";
 import { Effect, ManagedRuntime, Redacted } from "effect";
 import { type PrincipalId, UserId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
@@ -9,7 +10,7 @@ import { GroupService } from "#src/services/group/service.ts";
 import { ProvisioningService } from "#src/services/provisioning/index.ts";
 import { UserService } from "#src/services/user/service.ts";
 import { makeScriptRunnerLayer } from "#src/testing/script-runner/layer.ts";
-import { mockServer } from "#src/testing/script-runner/runner.ts";
+import { mockClientAddress } from "#src/testing/script-runner/runner.ts";
 
 // ---------------------------------------------------------------------------
 // Group-admin integration:
@@ -85,7 +86,7 @@ describe("Group admin grant (integration)", () => {
 						body: `<?xml version="1.0" encoding="utf-8"?>
 <D:propfind xmlns:D="DAV:"><D:prop><D:displayname/></D:prop></D:propfind>`,
 					}),
-					mockServer,
+					mockClientAddress,
 				),
 			);
 			expect(res.status).toBe(207);

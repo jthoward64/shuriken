@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { expect } from "@std/expect";
+import { describe, it } from "@std/testing/bdd";
 import { Effect, Schema } from "effect";
 import { runFailure } from "#src/testing/effect.ts";
 import { type ContentLine, ContentLinesCodec } from "./content-line.ts";

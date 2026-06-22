@@ -1,13 +1,17 @@
-FROM oven/bun:1-alpine AS deps
+FROM denoland/deno:alpine AS deps
 WORKDIR /app
-COPY package.json bun.lock* ./
-RUN bun install --frozen-lockfile
+# Cache dependencies first for better layer reuse.
+COPY deno.json deno.lock* ./
+RUN deno install
 
-FROM oven/bun:1-alpine
+FROM denoland/deno:alpine
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
+# Pre-compile/cache the entrypoint module graph.
+RUN deno cache src/index.ts
 
 RUN chmod +x /app/docker/entrypoint.sh
 

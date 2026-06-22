@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { expect } from "@std/expect";
+import { describe, it } from "@std/testing/bdd";
 import { Effect, ManagedRuntime, Redacted } from "effect";
 import {
 	type CollectionId,
@@ -16,7 +17,7 @@ import { InstanceRepository } from "#src/services/instance/repository.ts";
 import { ProvisioningService } from "#src/services/provisioning/index.ts";
 import { UserService } from "#src/services/user/index.ts";
 import { makeScriptRunnerLayer } from "#src/testing/script-runner/layer.ts";
-import { mockServer } from "#src/testing/script-runner/runner.ts";
+import { mockClientAddress } from "#src/testing/script-runner/runner.ts";
 
 // ---------------------------------------------------------------------------
 // End-to-end exercise for CalEditService + the events JSON endpoint:
@@ -99,7 +100,7 @@ describe("Calendar CRUD + events feed (integration)", () => {
 					new Request(`http://localhost/ui/api/calendar/${calendarId}/events`, {
 						headers: { Authorization: ALICE_AUTH },
 					}),
-					mockServer,
+					mockClientAddress,
 				),
 			);
 			expect(feedRes.status).toBe(200);
@@ -155,7 +156,7 @@ describe("Calendar CRUD + events feed (integration)", () => {
 					new Request(`http://localhost/ui/api/calendar/${calendarId}/events`, {
 						headers: { Authorization: ALICE_AUTH },
 					}),
-					mockServer,
+					mockClientAddress,
 				),
 			);
 			const feed2 = (await feedAfter.json()) as ReadonlyArray<unknown>;
