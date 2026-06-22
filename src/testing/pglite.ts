@@ -21,7 +21,7 @@ let needGenerateDump = false;
 async function makePgLiteInstance(): Promise<PGlite> {
 	const memoryFs = new MemoryFS();
 	const dumpData = await readFile(DUMP_PATH)
-		.then((buf) => new Blob([buf]))
+		.then((buf) => new Blob([new Uint8Array(buf)]))
 		.catch(() => {
 			needGenerateDump = true;
 			return undefined;
