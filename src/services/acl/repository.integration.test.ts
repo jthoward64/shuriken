@@ -245,7 +245,7 @@ describe("AclRepository.hasPrivilege (integration)", () => {
 	// tested here because PGlite does not accept a parameterised array via
 	// Drizzle's sql template (it expects a literal "{uuid,...}" array syntax).
 	// That path is exercised by the service-layer unit tests against a mock
-	// repository, and will be verified in production against the node-postgres driver.
+	// repository, and will be verified in production against the postgres.js driver.
 });
 
 // ---------------------------------------------------------------------------

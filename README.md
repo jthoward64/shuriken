@@ -22,3 +22,9 @@ deno task test         # run the test suite
 deno task check        # type-check
 deno task migrations:run
 ```
+
+Git hooks (once per clone) — wires the pre-commit hook via `core.hooksPath`:
+
+```bash
+deno task hooks
+```

@@ -12,7 +12,7 @@
 // `deno task db:reset`. Pair with `deno task migrations:run` for a fresh DB.
 // ---------------------------------------------------------------------------
 
-import pg from "pg";
+import postgres from "postgres";
 
 const url = Deno.env.get("DATABASE_URL");
 if (!url) {
@@ -20,20 +20,19 @@ if (!url) {
 	Deno.exit(1);
 }
 
-const client = new pg.Client({ connectionString: url });
-await client.connect();
+const sql = postgres(url, { max: 1 });
 
 try {
 	// Both drops are idempotent (`if exists`). The order doesn't matter — we
 	// recreate `public` last so it's there for the migration runner.
-	await client.query("drop schema if exists drizzle cascade");
-	await client.query("drop schema if exists public cascade");
-	await client.query("create schema public");
+	await sql`drop schema if exists drizzle cascade`;
+	await sql`drop schema if exists public cascade`;
+	await sql`create schema public`;
 	console.log("db:reset: dropped drizzle + public schemas, recreated public");
 } catch (err) {
 	console.error("db:reset failed:", err);
-	await client.end().catch(() => undefined);
+	await sql.end();
 	Deno.exit(1);
 }
 
-await client.end().catch(() => undefined);
+await sql.end();

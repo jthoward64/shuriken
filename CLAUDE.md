@@ -70,7 +70,7 @@ All runtime-specific APIs (`Deno.*` for sockets/serve, `node:*` for file I/O, pa
 
 ## Database
 
-- ORM: **Drizzle** (`drizzle-orm/node-postgres`) over node-postgres (`pg`). pg-native (libpq) is preferred when available and falls back to the pure-JS client. Construct the client with `drizzle({ client: pool, schema })` — never `drizzle(pool, …)`, which makes drizzle spin up its own default pool and ignore yours.
+- ORM: **Drizzle** (`drizzle-orm/postgres-js`) over **postgres.js** (the `postgres` package — a pure-JS driver with a built-in pool). We use postgres.js because Deno only supports Node-API native addons, not the NAN-based `pg-native`/libpq bindings. Construct the client with `drizzle({ client, schema })` — never `drizzle(client, …)`, which makes drizzle spin up its own default connection and ignore yours.
 - All queries go through Drizzle; no raw SQL strings outside of Drizzle's `sql` template tag.
 - Schema is defined in `src/db/drizzle/schema/`; keep one concern per file.
 - Wrap Drizzle operations in `Effect` (map results, map errors to typed variants).
@@ -79,7 +79,7 @@ All runtime-specific APIs (`Deno.*` for sockets/serve, `node:*` for file I/O, pa
 
 - Use the **Temporal API** for all date/time logic (`Temporal.PlainDate`, `Temporal.ZonedDateTime`, etc.).
 - A polyfill is present; do not use `Date`, `Date.now()`, or `new Date()` in application code.
-- Store timestamps as timestamptz in the database; parse them back to Temporal objects at the DB boundary. The pg driver is configured with identity type-parsers for the date/time OIDs so timestamps arrive as raw strings (going string → Temporal directly, not string → Date → Temporal).
+- Store timestamps as timestamptz in the database; parse them back to Temporal objects at the DB boundary. `drizzle-orm/postgres-js` installs identity ("transparent") parsers for the date/time OIDs, so timestamps arrive as raw strings (going string → Temporal directly, not string → Date → Temporal).
 
 ## XML
 

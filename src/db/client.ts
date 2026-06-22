@@ -1,49 +1,27 @@
-import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
+import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { Effect, Redacted } from "effect";
-import pg from "pg";
+import postgres from "postgres";
 import { AppConfigService } from "#src/config.ts";
 import * as schema from "./drizzle/schema/index.ts";
 
 // ---------------------------------------------------------------------------
 // DatabaseClient — Drizzle ORM client as an Effect.Service
 //
-// Uses node-postgres (pg). pg-native (libpq) is preferred when available and
-// falls back to the pure-JS client otherwise. The connection pool is created
-// once when the Layer is built and shared across all requests through the
-// ManagedRuntime.
+// Uses postgres.js (the `postgres` package) via drizzle-orm/postgres-js. It is
+// a pure-JS driver with a built-in connection pool, created once when the Layer
+// is built and shared across all requests through the ManagedRuntime.
 //
-// Date/time OIDs are parsed as raw strings (identity parsers) rather than the
-// pg default of JS `Date`. Our custom Temporal column types in schema/types.ts
-// then go string → Temporal directly, avoiding a wasteful string → Date →
-// Temporal double conversion.
+// drizzle-orm/postgres-js installs identity ("transparent") parsers for the
+// date/time OIDs, so timestamps arrive as raw strings; our custom Temporal
+// column types in schema/types.ts then go string → Temporal directly, avoiding
+// a wasteful string → Date → Temporal double conversion.
+//
+// Pass `client` explicitly in the config object — `drizzle(client, …)` would
+// make drizzle spin up its own default connection and silently ignore both
+// this client and the schema.
 // ---------------------------------------------------------------------------
 
-const PG_OID_DATE = 1082;
-const PG_OID_TIMESTAMP = 1114;
-const PG_OID_TIMESTAMPTZ = 1184;
-
-const identity = (value: string): string => value;
-pg.types.setTypeParser(PG_OID_DATE, identity);
-pg.types.setTypeParser(PG_OID_TIMESTAMP, identity);
-pg.types.setTypeParser(PG_OID_TIMESTAMPTZ, identity);
-
-export type DbClient = NodePgDatabase<typeof schema>;
-
-// Prefer the native (libpq) pool; fall back to pure JS if pg-native is not
-// installed/loadable (accessing pg.native triggers a require of pg-native).
-const makePool = (
-	connectionString: string,
-): { readonly pool: pg.Pool; readonly native: boolean } => {
-	try {
-		const NativePool = pg.native?.Pool;
-		if (NativePool) {
-			return { pool: new NativePool({ connectionString }), native: true };
-		}
-	} catch {
-		// pg-native unavailable — fall through to the JS client.
-	}
-	return { pool: new pg.Pool({ connectionString }), native: false };
-};
+export type DbClient = PostgresJsDatabase<typeof schema>;
 
 export class DatabaseClient extends Effect.Service<DatabaseClient>()(
 	"DatabaseClient",
@@ -52,14 +30,9 @@ export class DatabaseClient extends Effect.Service<DatabaseClient>()(
 			const {
 				database: { url },
 			} = yield* AppConfigService;
-			const { pool, native } = makePool(Redacted.value(url));
-			// drizzle-orm v1 takes a config object; `client` must be passed
-			// explicitly — `drizzle(pool, …)` would make drizzle spin up its own
-			// default-config pool and silently ignore both this pool and schema.
-			const db = drizzle({ client: pool, schema });
-			yield* Effect.logInfo("database client initialized", {
-				driver: native ? "pg-native" : "pg-js",
-			});
+			const client = postgres(Redacted.value(url));
+			const db = drizzle({ client, schema });
+			yield* Effect.logInfo("database client initialized");
 			return db;
 		}),
 	},
