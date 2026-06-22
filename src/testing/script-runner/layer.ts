@@ -4,7 +4,7 @@ import { AppConfigService, type AppConfigType } from "#src/config.ts";
 import type { DatabaseClient } from "#src/db/client.ts";
 import { TemplateService } from "#src/http/ui/template/index.ts";
 import type { CryptoService } from "#src/platform/crypto.ts";
-import { BunFileService } from "#src/platform/file.ts";
+import { FileService } from "#src/platform/file.ts";
 import { AclDomainLayer, AclRepositoryLive } from "#src/services/acl/index.ts";
 import { BirthdayServiceLive } from "#src/services/birthday/service.live.ts";
 import { CalEditServiceLive } from "#src/services/cal-edit/service.live.ts";
@@ -113,7 +113,7 @@ const AppConfigTestLayer = Layer.succeed(
 // The layer mirrors AppLayer from src/layers.ts but substitutes:
 //   - AppConfigTestLayer     instead of AppConfigLive   (no env-var reads)
 //   - makePgliteDatabaseLayer() instead of DatabaseClientLive (in-memory DB)
-//   - TestCryptoLayer        instead of CryptoServiceLive (no Bun.password)
+//   - TestCryptoLayer        instead of CryptoServiceLive (no real hashing)
 //   - BasicAuthLayer         always (multi-user support via Basic auth)
 // ---------------------------------------------------------------------------
 
@@ -159,7 +159,7 @@ export const makeScriptRunnerLayer = (overrides?: Partial<AppConfigType>) => {
 	);
 
 	const testStubsLayer = Layer.mergeAll(
-		Layer.succeed(BunFileService, {
+		Layer.succeed(FileService, {
 			readText: () => Effect.die("stub"),
 			readBytes: () => Effect.die("stub"),
 			exists: () => Effect.succeed(false),

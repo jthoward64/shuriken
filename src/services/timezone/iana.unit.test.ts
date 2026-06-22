@@ -1,4 +1,5 @@
-import { describe, expect, test } from "bun:test";
+import { expect } from "@std/expect";
+import { describe, it as test } from "@std/testing/bdd";
 import { Effect, Option } from "effect";
 import { IanaTimezoneService } from "./iana.ts";
 

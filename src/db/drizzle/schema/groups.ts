@@ -7,9 +7,9 @@ import {
 	uuid,
 } from "drizzle-orm/pg-core";
 import type { UuidString } from "#src/domain/ids.ts";
-import { principal } from "./principal";
-import { timestampTz } from "./types";
-import { user } from "./user";
+import { principal } from "./principal.ts";
+import { timestampTz } from "./types.ts";
+import { user } from "./user.ts";
 
 export const group = pgTable(
 	"group",

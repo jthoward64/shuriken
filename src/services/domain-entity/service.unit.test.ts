@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { expect } from "@std/expect";
+import { describe, it } from "@std/testing/bdd";
 import { Effect, Layer, Option } from "effect";
 import type { IrComponent, IrDocument } from "#src/data/ir.ts";
 import { ComponentId, EntityId } from "#src/domain/ids.ts";
@@ -175,7 +176,7 @@ describe("DomainEntityService.create", () => {
 			),
 		);
 
-		expect(entityId).toBeString();
+		expect(typeof entityId).toBe("string");
 		expect(entityStore.size).toBe(1);
 		expect(compStore.size).toBe(1);
 	});

@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { expect } from "@std/expect";
+import { describe, it } from "@std/testing/bdd";
 import { report, twoUsers } from "#src/testing/script-runner/fixtures.ts";
 import { runScript } from "#src/testing/script-runner/runner.ts";
 

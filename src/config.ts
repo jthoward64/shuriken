@@ -2,7 +2,8 @@ import { Config, ConfigProvider, Effect } from "effect";
 
 // ---------------------------------------------------------------------------
 // Application configuration — all env vars read through Effect's Config API.
-// Bun takes care of loading .env files automatically
+// The `deno task` definitions pass `--env-file=.env`, so Deno loads .env into
+// the environment before the program starts.
 //
 // AppConfigService is the single source of truth for runtime configuration.
 // All services that need configuration must depend on this service rather
@@ -233,7 +234,7 @@ export const MailConfig = Config.all({
 	 */
 	credsKey: Config.string("emailCredsKey").pipe(Config.withDefault("")),
 	/**
-	 * iMIP LMTP listener. When `lmtpEnabled` is true a Bun TCP listener is
+	 * iMIP LMTP listener. When `lmtpEnabled` is true a Deno TCP listener is
 	 * spawned on `lmtpPort` (default 2400) accepting LMTP delivery from a
 	 * front-end MTA (postfix `lmtp:` transport, dovecot, etc). Disabled by
 	 * default — incoming iMIP isn't useful without a configured upstream.

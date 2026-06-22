@@ -1,9 +1,10 @@
-import { describe, expect, it } from "bun:test";
+import { expect } from "@std/expect";
+import { describe, it } from "@std/testing/bdd";
 import { Effect, Redacted } from "effect";
 import { CryptoService, CryptoServiceLive } from "./crypto.ts";
 
 // ---------------------------------------------------------------------------
-// CryptoServiceLive — smoke tests for the real Bun.password delegation
+// CryptoServiceLive — smoke tests for the real argon2id delegation
 // ---------------------------------------------------------------------------
 
 describe("CryptoServiceLive", () => {

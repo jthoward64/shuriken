@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { expect } from "@std/expect";
+import { describe, it } from "@std/testing/bdd";
 import { mkcol, singleUser } from "#src/testing/script-runner/fixtures.ts";
 import { runScript } from "#src/testing/script-runner/runner.ts";
 
@@ -101,10 +102,9 @@ describe("MKADDRESSBOOK", () => {
 	});
 
 	// RFC 5689 §5.1 and RFC 6352 §6.3.2: MKADDRESSBOOK may carry a body to set
-	// initial properties, analogous to MKCALENDAR with a body.
-	// Skipped: Bun's Request constructor normalizes MKADDRESSBOOK to GET (Fetch spec
-	// forbids non-standard method names), so this test cannot be exercised through
-	// the test harness until Bun fixes the issue.
+	// initial properties, analogous to MKCALENDAR with a body. (Deno's Request
+	// preserves the custom MKADDRESSBOOK method, so this runs end-to-end; Bun used
+	// to normalize it to GET, which forced this test to be skipped.)
 	it("creates an addressbook with extended body (displayname + description)", async () => {
 		const results = await runScript(
 			[

@@ -12,13 +12,13 @@ import {
 	uuid,
 } from "drizzle-orm/pg-core";
 import type { UuidString } from "#src/domain/ids.ts";
-import { davComponent, davEntity } from "./dav";
+import { davComponent, davEntity } from "./dav.ts";
 import {
 	drizzleEnum,
 	type GetDrizzleEnumType,
 	timestampTz,
 	tsvector,
-} from "./types";
+} from "./types.ts";
 
 const componentTypeEnum = drizzleEnum(
 	"component_type",

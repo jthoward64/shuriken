@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { expect } from "@std/expect";
+import { describe, it } from "@std/testing/bdd";
 import { Option, Redacted } from "effect";
 import { parseBasicAuth } from "./basic.ts";
 

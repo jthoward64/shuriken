@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { expect } from "@std/expect";
+import { describe, it } from "@std/testing/bdd";
 import { ensureDtstamp } from "#src/data/icalendar/ensure-dtstamp.ts";
 import type { IrComponent, IrDocument, IrProperty } from "#src/data/ir.ts";
 

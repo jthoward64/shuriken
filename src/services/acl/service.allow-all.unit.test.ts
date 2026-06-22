@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { expect } from "@std/expect";
+import { describe, it } from "@std/testing/bdd";
 import { Effect } from "effect";
 import { CollectionId, PrincipalId } from "#src/domain/ids.ts";
 import { AclServiceAllowAll } from "./service.allow-all.ts";

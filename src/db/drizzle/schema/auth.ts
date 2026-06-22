@@ -1,8 +1,8 @@
 import { sql } from "drizzle-orm";
 import { index, pgTable, text, unique, uuid } from "drizzle-orm/pg-core";
 import type { UuidString } from "#src/domain/ids.ts";
-import { redactedText, timestampTz } from "./types";
-import { user } from "./user";
+import { redactedText, timestampTz } from "./types.ts";
+import { user } from "./user.ts";
 
 export const authUser = pgTable(
 	"auth_user",

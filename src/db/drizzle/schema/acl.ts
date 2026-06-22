@@ -9,8 +9,8 @@ import {
 	uuid,
 } from "drizzle-orm/pg-core";
 import type { UuidString } from "#src/domain/ids.ts";
-import { principal } from "./principal";
-import { drizzleEnum, type GetDrizzleEnumType, timestampTz } from "./types";
+import { principal } from "./principal.ts";
+import { drizzleEnum, type GetDrizzleEnumType, timestampTz } from "./types.ts";
 
 // ---------------------------------------------------------------------------
 // dav_acl — RFC 3744 Access Control List

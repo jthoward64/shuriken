@@ -1,8 +1,8 @@
 import { sql } from "drizzle-orm";
 import { index, jsonb, pgTable, text, uuid } from "drizzle-orm/pg-core";
 import type { UuidString } from "#src/domain/ids.ts";
-import { davEntity } from "./dav";
-import { timestampTz, tsvector } from "./types";
+import { davEntity } from "./dav.ts";
+import { timestampTz, tsvector } from "./types.ts";
 
 export const cardIndex = pgTable(
 	"card_index",

@@ -9,7 +9,7 @@ import {
 	uuid,
 } from "drizzle-orm/pg-core";
 import type { UuidString } from "#src/domain/ids.ts";
-import { drizzleEnum, type GetDrizzleEnumType, timestampTz } from "./types";
+import { drizzleEnum, type GetDrizzleEnumType, timestampTz } from "./types.ts";
 
 const principalTypeEnum = drizzleEnum(
 	"principal_type",

@@ -1,5 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { MemoryFS, PGlite } from "@electric-sql/pglite";
 import { readMigrationFiles } from "drizzle-orm/migrator";
 import { migrate } from "drizzle-orm/pg-core";
@@ -8,9 +9,13 @@ import { Effect, Layer } from "effect";
 import { DatabaseClient } from "#src/db/client.ts";
 import * as schema from "#src/db/drizzle/schema/index.ts";
 
-const MIGRATIONS_FOLDER = resolve(import.meta.dir, "../db/drizzle/migrations");
-const INITIAL_MEMORY = 67108864; // 64 MiB
-const DUMP_PATH = resolve(import.meta.dir, "test-db-cache.tar.gz");
+const HERE = dirname(fileURLToPath(import.meta.url));
+const MIGRATIONS_FOLDER = resolve(HERE, "../db/drizzle/migrations");
+// PGlite's WASM declares an initial memory of 2048 pages (128 MiB); the
+// imported memory must be at least that large or V8 rejects instantiation
+// with a LinkError.
+const INITIAL_MEMORY = 134217728; // 128 MiB
+const DUMP_PATH = resolve(HERE, "test-db-cache.tar.gz");
 
 let needGenerateDump = false;
 async function makePgLiteInstance(): Promise<PGlite> {

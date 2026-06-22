@@ -1,2 +1,18 @@
-bun test --changed --parallel
-bun run verify
+#!/bin/sh
+# Deno-native pre-commit hook (no husky). Wired via `git config core.hooksPath
+# .husky`, which `deno task hooks` sets up. Type-check + lint/format + the fast
+# unit-test pass; the full integration suite runs in CI.
+set -e
+
+# Git runs hooks with a minimal PATH (and via /bin/sh, so fish/zsh PATH config
+# does not apply). Add Deno's default install dir so `deno` resolves; if it is
+# already on PATH (system-wide install) this is harmless.
+[ -d "$HOME/.deno/bin" ] && PATH="$HOME/.deno/bin:$PATH"
+
+if ! command -v deno >/dev/null 2>&1; then
+	echo "pre-commit: 'deno' not found on PATH. Install Deno (https://deno.com) or add it to PATH." >&2
+	exit 1
+fi
+
+deno task verify
+deno task test:unit

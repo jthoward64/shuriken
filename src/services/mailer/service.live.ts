@@ -83,11 +83,13 @@ const make = (
 					headers: headersFor(creds, message),
 				});
 				return {
-					accepted: (info.accepted ?? []).map((a) =>
-						typeof a === "string" ? a : a.address,
+					accepted: (info.accepted ?? []).map(
+						(a: string | { address: string }) =>
+							typeof a === "string" ? a : a.address,
 					),
-					rejected: (info.rejected ?? []).map((a) =>
-						typeof a === "string" ? a : a.address,
+					rejected: (info.rejected ?? []).map(
+						(a: string | { address: string }) =>
+							typeof a === "string" ? a : a.address,
 					),
 					messageId: info.messageId ?? null,
 				};

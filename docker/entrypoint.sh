@@ -2,7 +2,7 @@
 set -e
 
 echo "Running database migrations..."
-bun run migrations:run
+deno task migrations:run
 
 echo "Starting server..."
-exec bun .
+exec deno task start

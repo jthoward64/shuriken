@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { expect } from "@std/expect";
+import { describe, it } from "@std/testing/bdd";
 import "temporal-polyfill/global";
 import { extractInstantFromUuidV7 } from "./ids.ts";
 

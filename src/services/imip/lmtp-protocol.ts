@@ -1,6 +1,6 @@
 /** biome-ignore-all lint/style/noMagicNumbers: SMTP/LMTP reply codes are protocol-defined */
 // ---------------------------------------------------------------------------
-// LMTP protocol state machine (RFC 2033). Pure — no I/O. The Bun.listen
+// LMTP protocol state machine (RFC 2033). Pure — no I/O. The Deno listener
 // glue in `lmtp-server.ts` feeds bytes in, gets back command results +
 // reply lines, and ships them to the socket / inbound processor.
 //

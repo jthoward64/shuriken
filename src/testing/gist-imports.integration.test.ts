@@ -1,6 +1,8 @@
-import { describe, expect, it } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { expect } from "@std/expect";
+import { describe, it } from "@std/testing/bdd";
 import { Effect, ManagedRuntime } from "effect";
 import type { CollectionId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
@@ -24,7 +26,8 @@ import { makeScriptRunnerLayer } from "#src/testing/script-runner/layer.ts";
 //   * merge  on third import → every event is replaced, count == merged
 // ---------------------------------------------------------------------------
 
-const FIXTURES_DIR = resolve(import.meta.dir, "__fixtures__/dav-gists");
+const HERE = dirname(fileURLToPath(import.meta.url));
+const FIXTURES_DIR = resolve(HERE, "__fixtures__/dav-gists");
 
 const setupAlice = Effect.gen(function* () {
 	const prov = yield* ProvisioningService;
@@ -104,7 +107,7 @@ describe("Real-world gist .ics import (all 3 modes)", () => {
 			} finally {
 				await runtime.dispose();
 			}
-		}, 60_000);
+		});
 	}
 });
 
@@ -161,6 +164,6 @@ describe("Real-world gist .vcf import (all 3 modes)", () => {
 			} finally {
 				await runtime.dispose();
 			}
-		}, 60_000);
+		});
 	}
 });

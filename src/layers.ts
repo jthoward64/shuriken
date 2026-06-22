@@ -5,7 +5,7 @@ import { AppConfigLive, AppConfigService } from "#src/config.ts";
 import { type DatabaseClient, DatabaseClientLive } from "#src/db/client.ts";
 import { TemplateServiceLive } from "#src/http/ui/template/index.ts";
 import { type CryptoService, CryptoServiceLive } from "#src/platform/crypto.ts";
-import { BunFileServiceLive } from "#src/platform/file.ts";
+import { FileServiceLive } from "#src/platform/file.ts";
 import { AclDomainLayer } from "#src/services/acl/index.ts";
 import { BirthdaySchedulerLayer } from "#src/services/birthday/scheduler.live.ts";
 import { BirthdayServiceLive } from "#src/services/birthday/service.live.ts";
@@ -115,8 +115,8 @@ const BaseAppLayer = Layer.mergeAll(
 	CardIndexRepositoryLive.pipe(Layer.provide(InfraLayer)),
 	UserEmailCredentialRepositoryLive.pipe(Layer.provide(InfraLayer)),
 	ShareLinkRepositoryLive.pipe(Layer.provide(InfraLayer)),
-	BunFileServiceLive,
-	TemplateServiceLive.pipe(Layer.provide(BunFileServiceLive)),
+	FileServiceLive,
+	TemplateServiceLive.pipe(Layer.provide(FileServiceLive)),
 );
 
 // AppLayer — adds SchedulingDomainLayer, which depends on cross-domain services
@@ -195,7 +195,7 @@ export { AuthService } from "#src/auth/service.ts";
 export { DatabaseClient } from "#src/db/client.ts";
 export { TemplateService } from "#src/http/ui/template/index.ts";
 export { CryptoService } from "#src/platform/crypto.ts";
-export { BunFileService } from "#src/platform/file.ts";
+export { FileService } from "#src/platform/file.ts";
 export { AclService } from "#src/services/acl/index.ts";
 export { BirthdayService } from "#src/services/birthday/service.ts";
 export { CalEditService } from "#src/services/cal-edit/service.ts";

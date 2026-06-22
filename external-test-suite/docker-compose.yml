@@ -51,8 +51,8 @@ services:
         condition: service_healthy
     healthcheck:
       # `fetch` resolves even on a 401, so this just proves the HTTP server is
-      # accepting connections and routing. bun is already in the image.
-      test: ["CMD", "bun", "-e", "fetch('http://localhost:3000/dav/').then(()=>process.exit(0)).catch(()=>process.exit(1))"]
+      # accepting connections and routing. deno is already in the image.
+      test: ["CMD", "deno", "eval", "--allow-net", "fetch('http://localhost:3000/dav/').then(()=>Deno.exit(0)).catch(()=>Deno.exit(1))"]
       interval: 2s
       timeout: 5s
       retries: 60

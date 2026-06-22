@@ -2,7 +2,8 @@
 // Unit tests for hasOccurrenceInRange
 // ---------------------------------------------------------------------------
 
-import { describe, expect, it } from "bun:test";
+import { expect } from "@std/expect";
+import { describe, it } from "@std/testing/bdd";
 import { Temporal } from "temporal-polyfill";
 import type { IrComponent } from "#src/data/ir.ts";
 import { hasOccurrenceInRange } from "./recurrence-check.ts";

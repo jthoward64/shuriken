@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { expect } from "@std/expect";
+import { describe, it } from "@std/testing/bdd";
 import { Effect, Layer, Option, Redacted } from "effect";
 import { AppConfigService } from "#src/config.ts";
 import { DatabaseClient } from "#src/db/client.ts";
@@ -7,7 +8,7 @@ import { Authenticated } from "#src/domain/types/dav.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { HTTP_NOT_FOUND } from "#src/http/status.ts";
 import { TemplateService } from "#src/http/ui/template/index.ts";
-import { BunFileService } from "#src/platform/file.ts";
+import { FileService } from "#src/platform/file.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import { AclRepository } from "#src/services/acl/repository.ts";
 import { CalEditService } from "#src/services/cal-edit/service.ts";
@@ -71,7 +72,7 @@ const stubLayers = Layer.mergeAll(
 		log: { level: undefined },
 		nodeEnv: "test",
 	} as unknown as AppConfigService),
-	Layer.succeed(BunFileService, {
+	Layer.succeed(FileService, {
 		readText: die,
 		readBytes: die,
 		exists: () => Effect.succeed(false),

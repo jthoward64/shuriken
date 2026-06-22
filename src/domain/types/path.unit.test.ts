@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { expect } from "@std/expect";
+import { describe, it } from "@std/testing/bdd";
 import { isValidInstanceSlug, isValidSlug } from "#src/domain/types/path.ts";
 
 describe("isValidSlug (collection/principal slugs — tight)", () => {

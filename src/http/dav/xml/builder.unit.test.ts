@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { expect } from "@std/expect";
+import { describe, it } from "@std/testing/bdd";
 import { Effect } from "effect";
 import { buildXml } from "./builder.ts";
 import { parseXml } from "./parser.ts";

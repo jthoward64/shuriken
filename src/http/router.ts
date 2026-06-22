@@ -31,7 +31,7 @@ import {
 	httpRequestDurationMs,
 	httpRequestsTotal,
 } from "#src/observability/metrics.ts";
-import type { BunFileService } from "#src/platform/file.ts";
+import type { FileService } from "#src/platform/file.ts";
 import type { AclService } from "#src/services/acl/index.ts";
 import type { AclRepository } from "#src/services/acl/repository.ts";
 import type { CalEditService } from "#src/services/cal-edit/service.ts";
@@ -92,7 +92,7 @@ type AppServices =
 	| UserService
 	| GroupService
 	| SchedulingService
-	| BunFileService
+	| FileService
 	| TemplateService
 	| ProvisioningService
 	| ExternalCalendarRepository
@@ -256,15 +256,16 @@ const mapErrorToResponse = (
 /**
  * Main request handler — entry point for every HTTP request.
  *
- * @param req    The incoming Bun Request
- * @param server The Bun Server instance (used to get client IP)
+ * @param req           The incoming Request
+ * @param clientAddress The client IP, resolved from the transport at the edge,
+ *                      or undefined when unavailable.
  */
 export const handleRequest = (
 	req: Request,
-	server: import("bun").Server<unknown>,
+	clientAddress: string | undefined,
 ): Effect.Effect<Response, never, AppServices> => {
 	const requestId = newRequestId();
-	const clientIp = Option.fromNullable(server.requestIP(req)?.address);
+	const clientIp = Option.fromNullable(clientAddress);
 	const url = new URL(req.url);
 	const group = pathGroup(url.pathname);
 

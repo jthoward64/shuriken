@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { expect } from "@std/expect";
+import { describe, it } from "@std/testing/bdd";
 import { buildVeventComponent } from "./build-vevent.ts";
 import { parseVeventToForm } from "./parse-vevent.ts";
 import { emptyEventForm } from "./types.ts";

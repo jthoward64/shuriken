@@ -84,7 +84,7 @@ import { usersCollectionsNewHandler } from "#src/http/ui/handlers/users/collecti
 import { usersEditHandler } from "#src/http/ui/handlers/users/edit.ts";
 import { usersListHandler } from "#src/http/ui/handlers/users/list.ts";
 import { usersNewHandler } from "#src/http/ui/handlers/users/new.ts";
-import type { BunFileService } from "#src/platform/file.ts";
+import type { FileService } from "#src/platform/file.ts";
 import type { AclService } from "#src/services/acl/index.ts";
 import type { AclRepository } from "#src/services/acl/repository.ts";
 import type { CalEditService } from "#src/services/cal-edit/service.ts";
@@ -119,7 +119,7 @@ export type UiServices =
 	| AppConfigService
 	| AclRepository
 	| AclService
-	| BunFileService
+	| FileService
 	| CalEditService
 	| CardEditService
 	| DatabaseClient

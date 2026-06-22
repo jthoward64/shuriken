@@ -19,7 +19,7 @@ import {
 	CalTimezoneRepository,
 	IanaTimezoneService,
 } from "#src/services/timezone/index.ts";
-import { HTTP_BAD_REQUEST, HTTP_NOT_FOUND } from "../status";
+import { HTTP_BAD_REQUEST, HTTP_NOT_FOUND } from "../status.ts";
 
 // ---------------------------------------------------------------------------
 // Response helpers

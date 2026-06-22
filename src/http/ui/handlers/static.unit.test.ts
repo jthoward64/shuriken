@@ -1,11 +1,12 @@
-import { describe, expect, it } from "bun:test";
+import { expect } from "@std/expect";
+import { describe, it } from "@std/testing/bdd";
 import { Effect, Layer } from "effect";
-import { BunFileService } from "#src/platform/file.ts";
+import { FileService } from "#src/platform/file.ts";
 import { staticHandler } from "./static.ts";
 
 const die = () => Effect.die("stub");
 
-const noFilesLayer = Layer.succeed(BunFileService, {
+const noFilesLayer = Layer.succeed(FileService, {
 	readText: die,
 	readBytes: die,
 	exists: () => Effect.succeed(false),

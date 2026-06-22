@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { expect } from "@std/expect";
+import { describe, it } from "@std/testing/bdd";
 import { Effect, Layer, Option, Redacted } from "effect";
 import { AuthService } from "#src/auth/service.ts";
 import { AppConfigService } from "#src/config.ts";
@@ -12,7 +13,7 @@ import {
 	InstanceRepository,
 	PrincipalRepository,
 } from "#src/layers.ts";
-import { BunFileService } from "#src/platform/file.ts";
+import { FileService } from "#src/platform/file.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import { AclRepository as AclRepoTag } from "#src/services/acl/repository.ts";
 import { CalEditService } from "#src/services/cal-edit/service.ts";
@@ -40,12 +41,10 @@ import { UserRepository, UserService } from "#src/services/user/index.ts";
 import { handleRequest } from "./router.ts";
 
 // ---------------------------------------------------------------------------
-// Mock Bun.Server
+// Mock client address
 // ---------------------------------------------------------------------------
 
-const mockServer = {
-	requestIP: (_req: Request) => ({ address: "127.0.0.1" }),
-} as unknown as import("bun").Server<unknown>;
+const mockClientAddress: string | undefined = "127.0.0.1";
 
 // ---------------------------------------------------------------------------
 // Stub factories
@@ -278,7 +277,7 @@ const stubLayers = Layer.mergeAll(
 		},
 		nodeEnv: "test",
 	} as unknown as AppConfigService),
-	Layer.succeed(BunFileService, {
+	Layer.succeed(FileService, {
 		readText: die,
 		readBytes: die,
 		exists: () => Effect.succeed(false),
@@ -380,7 +379,7 @@ const runWith = (
 ): Promise<Response> => {
 	const layer = Layer.merge(authLayer(auth), stubLayers);
 	return Effect.runPromise(
-		Effect.provide(handleRequest(req, mockServer), layer),
+		Effect.provide(handleRequest(req, mockClientAddress), layer),
 	);
 };
 

@@ -30,16 +30,14 @@ const DEFAULT_USER: ScriptUser = {
 };
 
 // ---------------------------------------------------------------------------
-// Mock Bun.Server
+// Mock client address
 //
-// handleRequest calls server.requestIP(req)?.address to get the client IP.
-// Returning null here makes the auth layer receive Option.none() for clientIp,
-// which is valid (trusted-proxy checks are skipped for basic auth anyway).
+// handleRequest takes the resolved client IP. undefined makes the auth layer
+// receive Option.none() for clientIp, which is valid (trusted-proxy checks are
+// skipped for basic auth anyway).
 // ---------------------------------------------------------------------------
 
-export const mockServer = {
-	requestIP: (_req: Request) => null,
-} as unknown as import("bun").Server<unknown>;
+export const mockClientAddress: string | undefined = undefined;
 
 // ---------------------------------------------------------------------------
 // provisionUsers — set up users in a fresh DB before running steps
@@ -233,7 +231,9 @@ export const runScript = async (
 					: stepOrFactory;
 
 			const req = buildRequest(step, userMap);
-			const response = await runtime.runPromise(handleRequest(req, mockServer));
+			const response = await runtime.runPromise(
+				handleRequest(req, mockClientAddress),
+			);
 			const body = await response.text();
 			const failures = checkExpectations(step, response.status, body);
 

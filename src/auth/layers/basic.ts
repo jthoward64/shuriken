@@ -115,7 +115,7 @@ export const authenticateBasic = (
 						return new Unauthenticated() as AuthResult;
 					}
 
-					// InternalError from Bun.password is a defect (unexpected), not a domain error
+					// InternalError from the crypto service is a defect (unexpected), not a domain error
 					const valid = yield* crypto
 						.verifyPassword(creds.password, row.authCredential)
 						.pipe(Effect.orDie);

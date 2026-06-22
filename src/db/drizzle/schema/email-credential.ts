@@ -8,8 +8,8 @@ import {
 	uuid,
 } from "drizzle-orm/pg-core";
 import type { UuidString } from "#src/domain/ids.ts";
-import { drizzleEnum, type GetDrizzleEnumType, timestampTz } from "./types";
-import { user } from "./user";
+import { drizzleEnum, type GetDrizzleEnumType, timestampTz } from "./types.ts";
+import { user } from "./user.ts";
 
 // ---------------------------------------------------------------------------
 // user_email_credential — per-user outbound SMTP credentials.

@@ -1,4 +1,5 @@
-import { beforeAll, describe, expect, it } from "bun:test";
+import { expect } from "@std/expect";
+import { beforeAll, describe, it } from "@std/testing/bdd";
 import { Effect, Layer, Option } from "effect";
 import { EntityId } from "#src/domain/ids.ts";
 import { runSuccess } from "#src/testing/effect.ts";
@@ -44,7 +45,7 @@ describe("EntityRepository.insert (integration)", () => {
 
 		expect(result.entityType).toBe("icalendar");
 		expect(result.logicalUid).toBeNull();
-		expect(result.id).toBeString();
+		expect(typeof result.id).toBe("string");
 		expect(result.deletedAt).toBeNull();
 	});
 
