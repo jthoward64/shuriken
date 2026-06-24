@@ -1,4 +1,4 @@
-import { Effect, Either, Redacted } from "effect";
+import { Effect, Redacted, Result } from "effect";
 import {
 	type DatabaseError,
 	type DavError,
@@ -65,16 +65,16 @@ export const usersSetPasswordHandler = (
 
 		const passwordResult = yield* parsePassword(
 			form.get("newPassword")?.toString(),
-		).pipe(Effect.either);
+		).pipe(Effect.result);
 
-		if (Either.isLeft(passwordResult)) {
+		if (Result.isFailure(passwordResult)) {
 			return yield* renderFragment("partials/form-error", {
 				errors: validationErrorToContext(
-					passwordResult.left as FormValidationError,
+					passwordResult.failure as FormValidationError,
 				),
 			});
 		}
-		const newPassword = passwordResult.right;
+		const newPassword = passwordResult.success;
 
 		yield* userService.setCredential(user.id as UserId, {
 			source: "local",

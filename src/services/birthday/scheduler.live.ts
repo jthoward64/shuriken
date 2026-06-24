@@ -33,7 +33,7 @@ const tickAll = Effect.gen(function* () {
 			birthdays
 				.regenerate(c.ownerPrincipalId as PrincipalId, CollectionId(c.id))
 				.pipe(
-					Effect.catchAllCause((cause) =>
+					Effect.catchCause((cause) =>
 						Effect.logWarning("scheduler.birthday: regenerate failed", {
 							collectionId: c.id,
 							cause,
@@ -44,7 +44,7 @@ const tickAll = Effect.gen(function* () {
 	);
 });
 
-export const BirthdaySchedulerLayer = Layer.scopedDiscard(
+export const BirthdaySchedulerLayer = Layer.effectDiscard(
 	Effect.gen(function* () {
 		const config = yield* AppConfigService;
 		const tick = config.birthday.schedulerTickS;
@@ -52,7 +52,7 @@ export const BirthdaySchedulerLayer = Layer.scopedDiscard(
 			tickS: tick,
 		});
 		yield* tickAll.pipe(
-			Effect.catchAllCause((cause) =>
+			Effect.catchCause((cause) =>
 				Effect.logError("scheduler.birthday: tick crashed", { cause }),
 			),
 			Effect.repeat(Schedule.spaced(Duration.seconds(tick))),

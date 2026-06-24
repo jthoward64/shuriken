@@ -1,4 +1,4 @@
-import { Effect, Either } from "effect";
+import { Effect, Result } from "effect";
 import type { AppConfigService } from "#src/config.ts";
 import {
 	type ConflictError,
@@ -67,16 +67,16 @@ export const subscriptionsCreateHandler = (
 		const color = form.get("color")?.toString().trim() || undefined;
 
 		const parseResult = yield* parseSlug(form.get("slug")?.toString()).pipe(
-			Effect.either,
+			Effect.result,
 		);
-		if (Either.isLeft(parseResult)) {
+		if (Result.isFailure(parseResult)) {
 			return yield* renderFragment("partials/form-error", {
 				errors: validationErrorToContext(
-					parseResult.left as FormValidationError,
+					parseResult.failure as FormValidationError,
 				),
 			});
 		}
-		const slug = parseResult.right;
+		const slug = parseResult.success;
 
 		const syncIntervalS = parsePositiveInt(
 			form.get("syncIntervalS")?.toString(),

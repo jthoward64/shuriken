@@ -157,7 +157,7 @@ export const AclServiceLive = Layer.effect(
 				),
 			);
 
-		return AclService.of({
+		return {
 			getAces: Effect.fn("AclService.getAces")(
 				function* (resourceId, resourceType) {
 					yield* Effect.annotateCurrentSpan({
@@ -205,8 +205,11 @@ export const AclServiceLive = Layer.effect(
 					// ACE evaluation entirely.
 					const role = yield* repo.getRoleForPrincipal(principalId);
 					if (bypassesAclCheck(role)) {
-						yield* Metric.increment(
-							Metric.tagged(aclChecksTotal, "acl.outcome", "allowed"),
+						yield* Metric.update(
+							Metric.withAttributes(aclChecksTotal, {
+								"acl.outcome": "allowed",
+							}),
+							1,
 						);
 						return;
 					}
@@ -220,8 +223,11 @@ export const AclServiceLive = Layer.effect(
 						true,
 					);
 					if (allowed) {
-						yield* Metric.increment(
-							Metric.tagged(aclChecksTotal, "acl.outcome", "allowed"),
+						yield* Metric.update(
+							Metric.withAttributes(aclChecksTotal, {
+								"acl.outcome": "allowed",
+							}),
+							1,
 						);
 						return;
 					}
@@ -238,13 +244,17 @@ export const AclServiceLive = Layer.effect(
 							resourceId,
 							privilege,
 						});
-						yield* Metric.increment(
-							Metric.tagged(aclChecksTotal, "acl.outcome", "denied"),
+						yield* Metric.update(
+							Metric.withAttributes(aclChecksTotal, {
+								"acl.outcome": "denied",
+							}),
+							1,
 						);
 						return yield* Effect.fail(needPrivileges());
 					}
-					yield* Metric.increment(
-						Metric.tagged(aclChecksTotal, "acl.outcome", "allowed"),
+					yield* Metric.update(
+						Metric.withAttributes(aclChecksTotal, { "acl.outcome": "allowed" }),
+						1,
 					);
 				},
 			),
@@ -314,6 +324,6 @@ export const AclServiceLive = Layer.effect(
 				}
 				return result;
 			}),
-		});
+		};
 	}),
 );

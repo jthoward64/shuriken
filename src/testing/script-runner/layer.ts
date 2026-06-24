@@ -1,4 +1,4 @@
-import { Effect, Layer, Logger, LogLevel, Option, Redacted } from "effect";
+import { Effect, Layer, Option, Redacted, References } from "effect";
 import { BasicAuthLayer } from "#src/auth/layers/basic.ts";
 import { AppConfigService, type AppConfigType } from "#src/config.ts";
 import type { DatabaseClient } from "#src/db/client.ts";
@@ -28,7 +28,7 @@ import { SchedulingDomainLayer } from "#src/services/scheduling/index.ts";
 import { ShareLinkRepositoryLive } from "#src/services/share-link/repository.live.ts";
 import { ShareLinkServiceLive } from "#src/services/share-link/service.live.ts";
 import {
-	IanaTimezoneService,
+	IanaTimezoneServiceLive,
 	TimezoneDomainLayer,
 } from "#src/services/timezone/index.ts";
 import { TombstoneRepositoryLive } from "#src/services/tombstone/index.ts";
@@ -99,10 +99,7 @@ const testConfig: AppConfigType = {
 	nodeEnv: "test",
 };
 
-const AppConfigTestLayer = Layer.succeed(
-	AppConfigService,
-	testConfig as unknown as AppConfigService,
-);
+const AppConfigTestLayer = Layer.succeed(AppConfigService, testConfig);
 
 // ---------------------------------------------------------------------------
 // makeScriptRunnerLayer
@@ -124,7 +121,7 @@ export const makeScriptRunnerLayer = (overrides?: Partial<AppConfigType>) => {
 	const configLayer =
 		overrides === undefined
 			? AppConfigTestLayer
-			: Layer.succeed(AppConfigService, merged as unknown as AppConfigService);
+			: Layer.succeed(AppConfigService, merged);
 	const testInfraLayer = Layer.mergeAll(
 		configLayer,
 		makePgliteDatabaseLayer(),
@@ -137,7 +134,7 @@ export const makeScriptRunnerLayer = (overrides?: Partial<AppConfigType>) => {
 
 	const testBaseLayer = Layer.mergeAll(
 		testInfraLayer,
-		Logger.minimumLogLevel(LogLevel.None),
+		Layer.succeed(References.MinimumLogLevel, "None"),
 		BasicAuthLayer.pipe(Layer.provide(testInfraLayer)),
 		withTestInfra(PrincipalDomainLayer),
 		withTestInfra(CollectionDomainLayer),
@@ -148,7 +145,7 @@ export const makeScriptRunnerLayer = (overrides?: Partial<AppConfigType>) => {
 		withTestInfra(GroupDomainLayer),
 		withTestInfra(DomainEntityDomainLayer),
 		withTestInfra(TimezoneDomainLayer),
-		IanaTimezoneService.Default,
+		IanaTimezoneServiceLive,
 		withTestInfra(ProvisioningDomainLayer),
 		withTestInfra(TombstoneRepositoryLive),
 		withTestInfra(CalIndexRepositoryLive),

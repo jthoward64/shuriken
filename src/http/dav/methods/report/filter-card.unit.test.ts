@@ -53,42 +53,42 @@ const makeDoc = (properties: Array<IrProperty>): IrDocument => ({
 describe("parseCardFilter — invalid inputs", () => {
 	it("fails when input is null", async () => {
 		const result = await Effect.runPromise(
-			Effect.either(parseCardFilter(null)),
+			Effect.result(parseCardFilter(null)),
 		);
-		expect(result._tag).toBe("Left");
+		expect(result._tag).toBe("Failure");
 	});
 
 	it("fails when input is a string", async () => {
 		const result = await Effect.runPromise(
-			Effect.either(parseCardFilter("hello")),
+			Effect.result(parseCardFilter("hello")),
 		);
-		expect(result._tag).toBe("Left");
+		expect(result._tag).toBe("Failure");
 	});
 
 	it("fails when input is a number", async () => {
-		const result = await Effect.runPromise(Effect.either(parseCardFilter(42)));
-		expect(result._tag).toBe("Left");
+		const result = await Effect.runPromise(Effect.result(parseCardFilter(42)));
+		expect(result._tag).toBe("Failure");
 	});
 
 	it("fails when filter element is missing from the object", async () => {
 		const result = await Effect.runPromise(
-			Effect.either(parseCardFilter({ unrelated: {} })),
+			Effect.result(parseCardFilter({ unrelated: {} })),
 		);
-		expect(result._tag).toBe("Left");
+		expect(result._tag).toBe("Failure");
 	});
 
 	it("fails when filter element is null", async () => {
 		const result = await Effect.runPromise(
-			Effect.either(parseCardFilter({ [cn("filter")]: null })),
+			Effect.result(parseCardFilter({ [cn("filter")]: null })),
 		);
-		expect(result._tag).toBe("Left");
+		expect(result._tag).toBe("Failure");
 	});
 
 	it("fails when filter element is a string", async () => {
 		const result = await Effect.runPromise(
-			Effect.either(parseCardFilter({ [cn("filter")]: "bad" })),
+			Effect.result(parseCardFilter({ [cn("filter")]: "bad" })),
 		);
-		expect(result._tag).toBe("Left");
+		expect(result._tag).toBe("Failure");
 	});
 });
 

@@ -179,7 +179,7 @@ const mapUiError = (
 					{ pageTitle: "Forbidden" },
 					ctx.headers,
 				).pipe(
-					Effect.orElse(() =>
+					Effect.catch(() =>
 						Effect.succeed(
 							new Response("Forbidden", { status: HTTP_FORBIDDEN }),
 						),
@@ -193,7 +193,7 @@ const mapUiError = (
 					{ pageTitle: "Not Found" },
 					ctx.headers,
 				).pipe(
-					Effect.orElse(() =>
+					Effect.catch(() =>
 						Effect.succeed(
 							new Response("Not Found", { status: HTTP_NOT_FOUND }),
 						),
@@ -215,7 +215,7 @@ const mapUiError = (
 						{ pageTitle: "Server Error" },
 						ctx.headers,
 					).pipe(
-						Effect.orElse(() =>
+						Effect.catch(() =>
 							Effect.succeed(
 								new Response("Internal Server Error", {
 									status: HTTP_INTERNAL_SERVER_ERROR,
@@ -262,7 +262,7 @@ export const uiRouter = (
 
 	if (pathname.startsWith("/static/")) {
 		return staticHandler(req).pipe(
-			Effect.catchAll(() =>
+			Effect.catch(() =>
 				Effect.succeed(new Response(null, { status: HTTP_NOT_FOUND })),
 			),
 		);
@@ -282,7 +282,7 @@ export const uiRouter = (
 		Effect.gen(function* () {
 			const config = yield* AppConfigService;
 			return yield* eff.pipe(
-				Effect.catchAll((err) =>
+				Effect.catch((err) =>
 					mapUiError(err, ctx, config.auth.basicAuthEnabled),
 				),
 			);
@@ -295,7 +295,7 @@ export const uiRouter = (
 			{ pageTitle: "Not Found" },
 			ctx.headers,
 		).pipe(
-			Effect.catchAll(() =>
+			Effect.catch(() =>
 				Effect.succeed(new Response("Not Found", { status: HTTP_NOT_FOUND })),
 			),
 		);

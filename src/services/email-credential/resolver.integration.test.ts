@@ -4,7 +4,7 @@ import { Effect, ManagedRuntime, Option, Redacted } from "effect";
 import { UserId as makeUserId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import { Email } from "#src/domain/types/strings.ts";
-import { setSmtpProxyOverride } from "#src/http/smtp-headers-ref.ts";
+import { SmtpProxyOverrideRef } from "#src/http/smtp-headers-ref.ts";
 import { EmailCredentialService } from "#src/services/email-credential/service.ts";
 import { ProvisioningService } from "#src/services/provisioning/index.ts";
 import { makeScriptRunnerLayer } from "#src/testing/script-runner/layer.ts";
@@ -226,20 +226,24 @@ describe("EmailCredentialService resolver (integration)", () => {
 			// Set the SMTP proxy override on the current fiber, then resolve.
 			const resolved = await runtime.runPromise(
 				Effect.gen(function* () {
-					yield* setSmtpProxyOverride({
-						username: "proxy-user@example.com",
-						password: "proxy-password",
-						host: Option.some("smtp.proxy.example"),
-						port: Option.some(2525),
-						security: Option.some("starttls"),
-					});
 					const svc = yield* EmailCredentialService;
 					return yield* svc.resolveForUser(
 						userId,
 						"alice@example.com",
 						"Alice",
 					);
-				}),
+				}).pipe(
+					Effect.provideService(
+						SmtpProxyOverrideRef,
+						Option.some({
+							username: "proxy-user@example.com",
+							password: "proxy-password",
+							host: Option.some("smtp.proxy.example"),
+							port: Option.some(2525),
+							security: Option.some("starttls" as const),
+						}),
+					),
+				),
 			);
 
 			expect(resolved?.kind).toBe("user-proxy");

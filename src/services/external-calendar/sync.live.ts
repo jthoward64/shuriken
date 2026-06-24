@@ -1,14 +1,14 @@
+import { Effect, Layer, Option } from "effect";
 import {
 	FetchHttpClient,
 	HttpClient,
 	HttpClientRequest,
-} from "@effect/platform";
-import { Effect, Layer, Option } from "effect";
+} from "effect/unstable/http";
 import { Temporal } from "temporal-polyfill";
 import { makeEtag } from "#src/data/etag.ts";
 import { decodeICalendar, encodeICalendar } from "#src/data/icalendar/codec.ts";
 import type { IrComponent, IrDocument } from "#src/data/ir.ts";
-import { DatabaseClient } from "#src/db/client.ts";
+import { DatabaseClient, type DbClient } from "#src/db/client.ts";
 import { withTransaction } from "#src/db/transaction.ts";
 import type {
 	DatabaseError,
@@ -182,7 +182,7 @@ interface SyncDependencies {
 	readonly entityRepo: ReturnType<typeof EntityRepository.of>;
 	readonly componentRepo: ReturnType<typeof ComponentRepository.of>;
 	readonly instanceSvc: ReturnType<typeof InstanceService.of>;
-	readonly db: DatabaseClient;
+	readonly db: DbClient;
 }
 
 /**
@@ -338,22 +338,22 @@ const syncOne = (
 			HttpClientRequest.setHeader("User-Agent", "shuriken-ts/sync"),
 		);
 
-		const responseResult = yield* http.execute(req).pipe(Effect.either);
-		if (responseResult._tag === "Left") {
+		const responseResult = yield* http.execute(req).pipe(Effect.result);
+		if (responseResult._tag === "Failure") {
 			yield* stampError(
 				repo,
 				id,
 				now,
-				`fetch failed: ${String(responseResult.left)}`,
+				`fetch failed: ${String(responseResult.failure)}`,
 			);
 			yield* Effect.logWarning("sync.external: fetch failed", {
 				id,
 				url: external.url,
-				cause: responseResult.left,
+				cause: responseResult.failure,
 			});
 			return;
 		}
-		const response = responseResult.right;
+		const response = responseResult.success;
 
 		if (response.status === HTTP_NOT_MODIFIED) {
 			yield* repo.recordSyncResult(id, {
@@ -370,29 +370,29 @@ const syncOne = (
 			return;
 		}
 
-		const bodyResult = yield* response.text.pipe(Effect.either);
-		if (bodyResult._tag === "Left") {
+		const bodyResult = yield* response.text.pipe(Effect.result);
+		if (bodyResult._tag === "Failure") {
 			yield* stampError(
 				repo,
 				id,
 				now,
-				`body read failed: ${String(bodyResult.left)}`,
+				`body read failed: ${String(bodyResult.failure)}`,
 			);
 			return;
 		}
-		const docResult = yield* decodeICalendar(bodyResult.right).pipe(
-			Effect.either,
+		const docResult = yield* decodeICalendar(bodyResult.success).pipe(
+			Effect.result,
 		);
-		if (docResult._tag === "Left") {
+		if (docResult._tag === "Failure") {
 			yield* stampError(
 				repo,
 				id,
 				now,
-				`parse failed: ${String(docResult.left)}`,
+				`parse failed: ${String(docResult.failure)}`,
 			);
 			return;
 		}
-		const doc = docResult.right;
+		const doc = docResult.success;
 		const events = groupByUid(doc);
 
 		// Apply feed-level defaults so future claims can read them. Live claims
@@ -420,12 +420,12 @@ const syncOne = (
 				claim.collectionId as CollectionId,
 				effectiveDisplayname,
 				effectiveColor,
-			).pipe(Effect.either);
-			if (metadataPatch._tag === "Left") {
+			).pipe(Effect.result);
+			if (metadataPatch._tag === "Failure") {
 				yield* Effect.logWarning("sync.external: metadata update failed", {
 					id,
 					claimId: claim.id,
-					cause: metadataPatch.left,
+					cause: metadataPatch.failure,
 				});
 			}
 
@@ -434,14 +434,14 @@ const syncOne = (
 				claim.collectionId as CollectionId,
 				doc.root,
 				events,
-			).pipe(Effect.either);
-			if (claimResult._tag === "Left") {
+			).pipe(Effect.result);
+			if (claimResult._tag === "Failure") {
 				// Per-claim failures don't abort the rest of the sync; log and
 				// continue so one user's broken collection doesn't starve others.
 				yield* Effect.logWarning("sync.external: claim reconcile failed", {
 					id,
 					claimId: claim.id,
-					cause: claimResult.left,
+					cause: claimResult.failure,
 				});
 			}
 		}
@@ -460,7 +460,7 @@ const syncOne = (
 		// `syncOne` is intentionally not allowed to fail upward — sync errors are
 		// surfaced via `last_sync_status`/`last_sync_error` on the row and via
 		// logs. Background scheduler treats all returns as "tried; move on."
-		Effect.catchAll((err) =>
+		Effect.catch((err) =>
 			Effect.logError("sync.external: unexpected error", {
 				id,
 				cause: err,
@@ -478,7 +478,7 @@ export const ExternalCalendarSyncServiceLive = Layer.effect(
 		const collSvc = yield* CollectionService;
 		const db = yield* DatabaseClient;
 		const http = yield* HttpClient.HttpClient;
-		return ExternalCalendarSyncService.of({
+		return {
 			syncOne: (id) =>
 				syncOne(id).pipe(
 					Effect.provideService(ExternalCalendarRepository, repo),
@@ -489,7 +489,7 @@ export const ExternalCalendarSyncServiceLive = Layer.effect(
 					Effect.provideService(DatabaseClient, db),
 					Effect.provideService(HttpClient.HttpClient, http),
 				),
-		});
+		};
 	}),
 );
 

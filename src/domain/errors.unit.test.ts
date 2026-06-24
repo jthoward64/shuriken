@@ -1,6 +1,6 @@
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
-import { Effect, Option } from "effect";
+import { Cause, Effect, Option } from "effect";
 import {
 	HTTP_BAD_REQUEST,
 	HTTP_CONFLICT,
@@ -134,7 +134,7 @@ describe("someOrNotFound", () => {
 		);
 		expect(exit._tag).toBe("Failure");
 		if (exit._tag === "Failure") {
-			const err = (exit.cause as { _tag: string; error: DavError }).error;
+			const err = Option.getOrThrow(Cause.findErrorOption(exit.cause));
 			expect(err._tag).toBe("DavError");
 			expect(err.status).toBe(HTTP_NOT_FOUND);
 			expect(err.message).toBe("resource not found");
@@ -165,7 +165,7 @@ describe("noneOrConflict", () => {
 		);
 		expect(exit._tag).toBe("Failure");
 		if (exit._tag === "Failure") {
-			const err = (exit.cause as { _tag: string; error: DavError }).error;
+			const err = Option.getOrThrow(Cause.findErrorOption(exit.cause));
 			expect(err._tag).toBe("DavError");
 			expect(err.status).toBe(HTTP_CONFLICT);
 			expect(err.message).toBe("already exists");
@@ -178,7 +178,7 @@ describe("noneOrConflict", () => {
 		);
 		expect(exit._tag).toBe("Failure");
 		if (exit._tag === "Failure") {
-			const err = (exit.cause as { _tag: string; error: DavError }).error;
+			const err = Option.getOrThrow(Cause.findErrorOption(exit.cause));
 			expect(err.precondition).toBe("CALDAV:no-uid-conflict");
 		}
 	});

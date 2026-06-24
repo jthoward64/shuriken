@@ -24,7 +24,10 @@ import {
 	type EntityId,
 	type UuidString,
 } from "#src/domain/ids.ts";
-import { repoQueryDurationMs } from "#src/observability/metrics.ts";
+import {
+	repoQueryDurationMs,
+	trackDuration,
+} from "#src/observability/metrics.ts";
 import { ComponentRepository } from "./repository.ts";
 
 // ---------------------------------------------------------------------------
@@ -276,7 +279,7 @@ const insertComponentEffect = (
 	});
 
 const compDuration = repoQueryDurationMs.pipe(
-	Metric.tagged("repo.entity", "component"),
+	Metric.withAttributes({ "repo.entity": "component" }),
 );
 
 const insertTree = Effect.fn("ComponentRepository.insertTree")(
@@ -285,8 +288,10 @@ const insertTree = Effect.fn("ComponentRepository.insertTree")(
 		yield* Effect.logTrace("repo.component.insertTree", { entityId });
 		return yield* insertComponentEffect(entityId, root, null, 0).pipe(
 			Effect.map(ComponentId),
-			Metric.trackDuration(
-				compDuration.pipe(Metric.tagged("repo.operation", "insertTree")),
+			trackDuration(
+				compDuration.pipe(
+					Metric.withAttributes({ "repo.operation": "insertTree" }),
+				),
 			),
 		);
 	},
@@ -442,8 +447,10 @@ const deleteByEntity = Effect.fn("ComponentRepository.deleteByEntity")(
 				),
 		).pipe(
 			Effect.asVoid,
-			Metric.trackDuration(
-				compDuration.pipe(Metric.tagged("repo.operation", "deleteByEntity")),
+			trackDuration(
+				compDuration.pipe(
+					Metric.withAttributes({ "repo.operation": "deleteByEntity" }),
+				),
 			),
 		);
 	},
@@ -463,13 +470,13 @@ export const ComponentRepositoryLive = Layer.effect(
 		const run = <A, E>(
 			e: Effect.Effect<A, E, DatabaseClient>,
 		): Effect.Effect<A, E> => Effect.provideService(e, DatabaseClient, dc);
-		return ComponentRepository.of({
+		return {
 			insertTree: (...args: Parameters<typeof insertTree>) =>
 				run(insertTree(...args)),
 			loadTree: (...args: Parameters<typeof loadTree>) =>
 				run(loadTree(...args)),
 			deleteByEntity: (...args: Parameters<typeof deleteByEntity>) =>
 				run(deleteByEntity(...args)),
-		});
+		};
 	}),
 );

@@ -248,7 +248,7 @@ export const CalEditServiceLive = Layer.effect(
 		const db = yield* DatabaseClient;
 		const entityRepo = yield* EntityRepository;
 		const instanceSvc = yield* InstanceService;
-		return CalEditService.of({
+		return {
 			create: (calendarId, form, uidOverride) =>
 				create(calendarId, form, uidOverride).pipe(
 					Effect.provideService(ComponentRepository, componentRepo),
@@ -267,6 +267,6 @@ export const CalEditServiceLive = Layer.effect(
 				del(instanceId).pipe(
 					Effect.provideService(InstanceService, instanceSvc),
 				),
-		});
+		};
 	}),
 );

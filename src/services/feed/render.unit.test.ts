@@ -102,7 +102,7 @@ const stubComponentRepo = (
 ): ComponentRepositoryShape => ({
 	insertTree: () => Effect.succeed(ComponentId(crypto.randomUUID())),
 	loadTree: (entityId) =>
-		Effect.succeed(Option.fromNullable(trees.get(entityId as string))),
+		Effect.succeed(Option.fromNullishOr(trees.get(entityId as string))),
 	deleteByEntity: () => Effect.void,
 });
 

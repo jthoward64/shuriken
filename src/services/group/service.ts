@@ -77,7 +77,7 @@ export interface GroupServiceShape {
 	) => Effect.Effect<void, DavError | DatabaseError>;
 }
 
-export class GroupService extends Context.Tag("GroupService")<
+export class GroupService extends Context.Service<
 	GroupService,
 	GroupServiceShape
->() {}
+>()("GroupService") {}

@@ -7,8 +7,8 @@ import { readMigrationFiles } from "drizzle-orm/migrator";
 import { migrate } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/pglite";
 import { Effect, Layer } from "effect";
-import { DatabaseClient } from "#src/db/client.ts";
-import * as schema from "#src/db/drizzle/schema/index.ts";
+import { DatabaseClient, type DbClient } from "#src/db/client.ts";
+import { relations } from "#src/db/drizzle/relations.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS_FOLDER = resolve(HERE, "../db/drizzle/migrations");
@@ -42,7 +42,7 @@ let cachedPgLiteInstance: PGlite | undefined;
 
 // @effect-diagnostics-next-line globalErrorInEffectCatch:off
 export const makePgliteDatabaseLayer = (): Layer.Layer<DatabaseClient, Error> =>
-	Layer.scoped(
+	Layer.effect(
 		DatabaseClient,
 		Effect.acquireRelease(
 			Effect.tryPromise({
@@ -51,7 +51,7 @@ export const makePgliteDatabaseLayer = (): Layer.Layer<DatabaseClient, Error> =>
 						cachedPgLiteInstance = await makePgLiteInstance();
 					}
 					const pg = await cachedPgLiteInstance.clone();
-					const db = drizzle({ client: pg as PGlite, schema });
+					const db = drizzle({ client: pg as PGlite, relations });
 					if (needGenerateDump) {
 						await migrate(
 							readMigrationFiles({ migrationsFolder: MIGRATIONS_FOLDER }),
@@ -68,7 +68,7 @@ export const makePgliteDatabaseLayer = (): Layer.Layer<DatabaseClient, Error> =>
 					// PGlite is structurally compatible for all Drizzle operations we use;
 					// the QueryResultHKT difference is only a compile-time type parameter.
 					return {
-						client: DatabaseClient.make(db as unknown as DatabaseClient),
+						client: db as unknown as DbClient,
 						pg,
 					};
 				},

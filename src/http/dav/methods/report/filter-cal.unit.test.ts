@@ -77,38 +77,38 @@ const T_JAN15_12 = Temporal.Instant.from(
 
 describe("parseCalFilter — invalid inputs", () => {
 	it("fails with CALDAV:valid-filter when tree is null", async () => {
-		const result = await Effect.runPromise(Effect.either(parseCalFilter(null)));
-		expect(result._tag).toBe("Left");
+		const result = await Effect.runPromise(Effect.result(parseCalFilter(null)));
+		expect(result._tag).toBe("Failure");
 	});
 
 	it("fails when tree is not an object", async () => {
 		const result = await Effect.runPromise(
-			Effect.either(parseCalFilter("bad")),
+			Effect.result(parseCalFilter("bad")),
 		);
-		expect(result._tag).toBe("Left");
+		expect(result._tag).toBe("Failure");
 	});
 
 	it("fails when filter element is missing", async () => {
-		const result = await Effect.runPromise(Effect.either(parseCalFilter({})));
-		expect(result._tag).toBe("Left");
+		const result = await Effect.runPromise(Effect.result(parseCalFilter({})));
+		expect(result._tag).toBe("Failure");
 	});
 
 	it("fails when comp-filter is missing inside filter", async () => {
 		const CaldavNs = "urn:ietf:params:xml:ns:caldav";
 		const cn = (l: string) => `{${CaldavNs}}${l}`;
 		const result = await Effect.runPromise(
-			Effect.either(parseCalFilter({ [cn("filter")]: {} })),
+			Effect.result(parseCalFilter({ [cn("filter")]: {} })),
 		);
-		expect(result._tag).toBe("Left");
+		expect(result._tag).toBe("Failure");
 	});
 
 	it("fails when filter element is a string (not object)", async () => {
 		const CaldavNs = "urn:ietf:params:xml:ns:caldav";
 		const cn = (l: string) => `{${CaldavNs}}${l}`;
 		const result = await Effect.runPromise(
-			Effect.either(parseCalFilter({ [cn("filter")]: "bad" })),
+			Effect.result(parseCalFilter({ [cn("filter")]: "bad" })),
 		);
-		expect(result._tag).toBe("Left");
+		expect(result._tag).toBe("Failure");
 	});
 });
 

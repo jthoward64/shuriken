@@ -86,7 +86,7 @@ export interface OutboxFreeBusyResult {
 	readonly calendarData: string;
 }
 
-export class SchedulingService extends Context.Tag("SchedulingService")<
+export class SchedulingService extends Context.Service<
 	SchedulingService,
 	SchedulingServiceShape
->() {}
+>()("SchedulingService") {}

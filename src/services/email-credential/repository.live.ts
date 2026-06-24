@@ -20,7 +20,7 @@ const findByUserId = Effect.fn("UserEmailCredentialRepository.findByUserId")(
 				.where(eq(userEmailCredential.userId, userId))
 				.limit(1),
 		);
-		return Option.fromNullable(rows[0]);
+		return Option.fromNullishOr(rows[0]);
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.userEmailCredential.findByUserId failed", e.cause),
@@ -86,11 +86,11 @@ export const UserEmailCredentialRepositoryLive = Layer.effect(
 		const run = <A, E>(
 			e: Effect.Effect<A, E, DatabaseClient>,
 		): Effect.Effect<A, E> => Effect.provideService(e, DatabaseClient, dc);
-		return UserEmailCredentialRepository.of({
+		return {
 			findByUserId: (...args: Parameters<typeof findByUserId>) =>
 				run(findByUserId(...args)),
 			upsert: (...args: Parameters<typeof upsert>) => run(upsert(...args)),
 			delete: (...args: Parameters<typeof del>) => run(del(...args)),
-		});
+		};
 	}),
 );

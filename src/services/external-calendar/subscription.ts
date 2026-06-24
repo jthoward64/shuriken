@@ -53,7 +53,7 @@ export interface SubscriptionServiceShape {
 	) => Effect.Effect<void, DatabaseError | DavError | InternalError>;
 }
 
-export class SubscriptionService extends Context.Tag("SubscriptionService")<
+export class SubscriptionService extends Context.Service<
 	SubscriptionService,
 	SubscriptionServiceShape
->() {}
+>()("SubscriptionService") {}

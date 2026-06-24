@@ -24,7 +24,7 @@ export interface TemplateServiceShape {
 	) => Effect.Effect<string, InternalError>;
 }
 
-export class TemplateService extends Context.Tag("TemplateService")<
+export class TemplateService extends Context.Service<
 	TemplateService,
 	TemplateServiceShape
->() {}
+>()("TemplateService") {}

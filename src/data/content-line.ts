@@ -1,4 +1,4 @@
-import { Effect, ParseResult, Schema } from "effect";
+import { Effect, Option, Schema, SchemaGetter, SchemaIssue } from "effect";
 
 // ---------------------------------------------------------------------------
 // UTF-8 encoding thresholds and byte-widths (RFC 3629)
@@ -275,23 +275,32 @@ const parseLogicalLine = (line: string): ContentLine => {
 //   encode: ReadonlyArray<ContentLine> → string
 // ---------------------------------------------------------------------------
 
-export const ContentLinesCodec: Schema.Schema<
+export const ContentLinesCodec: Schema.Codec<
 	ReadonlyArray<ContentLine>,
 	string
-> = Schema.transformOrFail(Schema.String, Schema.Array(ContentLineSchema), {
-	strict: true,
-	decode: (text, _options, ast) =>
-		Effect.try({
-			try: () => splitAndUnfold(text).map(parseLogicalLine),
-			catch: (e) => new ParseResult.Type(ast, text, String(e)),
-		}),
-	encode: (lines, _options, ast) =>
-		Effect.try({
-			try: () =>
-				lines
-					.map((l) => foldLogicalLine(serializeLogicalLine(l)))
-					.join("\r\n")
-					.concat("\r\n"),
-			catch: (e) => new ParseResult.Type(ast, lines, String(e)),
-		}),
-});
+> = Schema.String.pipe(
+	Schema.decodeTo(Schema.Array(ContentLineSchema), {
+		decode: SchemaGetter.transformOrFail((text: string) =>
+			Effect.try({
+				try: () => splitAndUnfold(text).map(parseLogicalLine),
+				catch: (e) =>
+					new SchemaIssue.InvalidValue(Option.some(text), {
+						message: String(e),
+					}),
+			}),
+		),
+		encode: SchemaGetter.transformOrFail((lines: ReadonlyArray<ContentLine>) =>
+			Effect.try({
+				try: () =>
+					lines
+						.map((l) => foldLogicalLine(serializeLogicalLine(l)))
+						.join("\r\n")
+						.concat("\r\n"),
+				catch: (e) =>
+					new SchemaIssue.InvalidValue(Option.some(lines), {
+						message: String(e),
+					}),
+			}),
+		),
+	}),
+);

@@ -54,7 +54,7 @@ export const CompositeAuthLayer = Layer.effect(
 					})
 				: Option.none();
 
-		return AuthService.of({
+		return {
 			authenticate: Effect.fn("auth.composite.authenticate")(
 				function* (headers, clientIp) {
 					yield* Effect.annotateCurrentSpan({ "auth.mode": "composite" });
@@ -100,6 +100,6 @@ export const CompositeAuthLayer = Layer.effect(
 					return new Unauthenticated();
 				},
 			),
-		});
+		};
 	}),
 );

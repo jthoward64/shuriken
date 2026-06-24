@@ -25,7 +25,7 @@ export const ProvisioningServiceLive = Layer.effect(
 		const acl = yield* AclRepository;
 		const db = yield* DatabaseClient;
 
-		return ProvisioningService.of({
+		return {
 			provisionUser: Effect.fn("ProvisioningService.provisionUser")(function* (
 				input: ProvisionUserInput,
 			) {
@@ -176,6 +176,6 @@ export const ProvisioningServiceLive = Layer.effect(
 					}
 				},
 			),
-		});
+		};
 	}),
 );

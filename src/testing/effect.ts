@@ -1,4 +1,4 @@
-import { Cause, Effect, Exit, Logger, LogLevel, Option } from "effect";
+import { Cause, Effect, Exit, Option, References } from "effect";
 
 // ---------------------------------------------------------------------------
 // Effect test helpers
@@ -14,7 +14,9 @@ import { Cause, Effect, Exit, Logger, LogLevel, Option } from "effect";
 export const runSuccess = <A>(
 	effect: Effect.Effect<A, never, never>,
 ): Promise<A> =>
-	Effect.runPromise(effect.pipe(Logger.withMinimumLogLevel(LogLevel.None)));
+	Effect.runPromise(
+		effect.pipe(Effect.provideService(References.MinimumLogLevel, "None")),
+	);
 
 /**
  * Run an effect and return the typed failure value.
@@ -24,14 +26,14 @@ export const runFailure = async <E>(
 	effect: Effect.Effect<unknown, E, never>,
 ): Promise<E> => {
 	const exit = await Effect.runPromiseExit(
-		effect.pipe(Logger.withMinimumLogLevel(LogLevel.None)),
+		effect.pipe(Effect.provideService(References.MinimumLogLevel, "None")),
 	);
 	if (Exit.isSuccess(exit)) {
 		throw new Error(
 			`Expected effect to fail but it succeeded with: ${String(exit.value)}`,
 		);
 	}
-	return Option.getOrElse(Cause.failureOption(exit.cause), () => {
+	return Option.getOrElse(Cause.findErrorOption(exit.cause), () => {
 		throw new Error(
 			`Expected a Fail cause but got defect:\n${Cause.pretty(exit.cause)}`,
 		);

@@ -48,5 +48,9 @@ const program = Effect.gen(function* () {
 });
 
 NodeRuntime.runMain(
-	program.pipe(Effect.provide(Layer.mergeAll(Logger.pretty, AppConfigLive))),
+	program.pipe(
+		Effect.provide(
+			Layer.mergeAll(Logger.layer([Logger.consolePretty()]), AppConfigLive),
+		),
+	),
 );

@@ -24,7 +24,7 @@ export interface AuthServiceShape {
 	) => import("effect").Effect.Effect<AuthResult, AuthError | DatabaseError>;
 }
 
-export class AuthService extends Context.Tag("AuthService")<
+export class AuthService extends Context.Service<
 	AuthService,
 	AuthServiceShape
->() {}
+>()("AuthService") {}

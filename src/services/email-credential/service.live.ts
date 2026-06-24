@@ -230,7 +230,7 @@ export const EmailCredentialServiceLive = Layer.effect(
 	Effect.gen(function* () {
 		const config = yield* AppConfigService;
 		const repo = yield* UserEmailCredentialRepository;
-		return EmailCredentialService.of({
+		return {
 			resolveForUser: (...args) =>
 				resolveForUser(...args).pipe(
 					Effect.provideService(AppConfigService, config),
@@ -242,6 +242,6 @@ export const EmailCredentialServiceLive = Layer.effect(
 					Effect.provideService(UserEmailCredentialRepository, repo),
 				),
 			clearForUser: (userId) => repo.delete(userId),
-		});
+		};
 	}),
 );

@@ -89,7 +89,7 @@ export const extractVtimezones = (
 				(vtimezoneData): VtimezoneExtract => ({
 					tzid,
 					vtimezoneData,
-					ianaName: Option.fromNullable(
+					ianaName: Option.fromNullishOr(
 						getTextProp(component, "X-LIC-LOCATION") ?? null,
 					),
 					lastModified: getLastModified(component),

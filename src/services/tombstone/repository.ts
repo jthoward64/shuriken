@@ -29,7 +29,7 @@ export interface TombstoneRepositoryShape {
 	) => Effect.Effect<ReadonlyArray<TombstoneRow>, DatabaseError>;
 }
 
-export class TombstoneRepository extends Context.Tag("TombstoneRepository")<
+export class TombstoneRepository extends Context.Service<
 	TombstoneRepository,
 	TombstoneRepositoryShape
->() {}
+>()("TombstoneRepository") {}

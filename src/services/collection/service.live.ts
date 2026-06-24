@@ -24,7 +24,7 @@ export const CollectionServiceLive = Layer.effect(
 		const aclRepo = yield* AclRepository;
 		const db = yield* DatabaseClient;
 
-		return CollectionService.of({
+		return {
 			findById: Effect.fn("CollectionService.findById")(function* (
 				id: CollectionId,
 			) {
@@ -146,6 +146,6 @@ export const CollectionServiceLive = Layer.effect(
 					return yield* repo.updateProperties(id, changes);
 				},
 			),
-		});
+		};
 	}),
 );

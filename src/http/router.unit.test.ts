@@ -2,8 +2,8 @@ import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
 import { Effect, Layer, Option, Redacted } from "effect";
 import { AuthService } from "#src/auth/service.ts";
-import { AppConfigService } from "#src/config.ts";
-import { DatabaseClient } from "#src/db/client.ts";
+import { AppConfigService, type AppConfigType } from "#src/config.ts";
+import { DatabaseClient, type DbClient } from "#src/db/client.ts";
 import { AuthError, DatabaseError } from "#src/domain/errors.ts";
 import type { PrincipalId, UserId } from "#src/domain/ids.ts";
 import { Authenticated, type Unauthenticated } from "#src/domain/types/dav.ts";
@@ -34,7 +34,7 @@ import { PrincipalService } from "#src/services/principal/service.ts";
 import { ProvisioningService } from "#src/services/provisioning/service.ts";
 import { SchedulingService } from "#src/services/scheduling/service.ts";
 import { ShareLinkService } from "#src/services/share-link/service.ts";
-import { IanaTimezoneService } from "#src/services/timezone/iana.ts";
+import { IanaTimezoneServiceLive } from "#src/services/timezone/iana.ts";
 import { CalTimezoneRepository } from "#src/services/timezone/index.ts";
 import { TombstoneRepository } from "#src/services/tombstone/index.ts";
 import { UserRepository, UserService } from "#src/services/user/index.ts";
@@ -71,9 +71,9 @@ const authenticated = new Authenticated({
 });
 
 const noOpRouterDb = {
-	transaction: async <T>(fn: (tx: DatabaseClient) => Promise<T>): Promise<T> =>
-		fn(noOpRouterDb as unknown as DatabaseClient),
-} as unknown as DatabaseClient;
+	transaction: async <T>(fn: (tx: DbClient) => Promise<T>): Promise<T> =>
+		fn(noOpRouterDb as unknown as DbClient),
+} as unknown as DbClient;
 
 // All-die stub layers for services that must be provided but won't be called.
 // These stubs satisfy the type system; any actual call would crash the test fast.
@@ -231,7 +231,7 @@ const stubLayers = Layer.mergeAll(
 		processAfterDelete: die,
 		processOutboxPost: die,
 	}),
-	IanaTimezoneService.Default,
+	IanaTimezoneServiceLive,
 	Layer.succeed(DatabaseClient, noOpRouterDb),
 	Layer.succeed(AppConfigService, {
 		server: { port: 3000, host: "::" },
@@ -247,6 +247,7 @@ const stubLayers = Layer.mergeAll(
 			adminSlug: Option.none(),
 			authSettingsUrl: Option.none(),
 			authSettingsLabel: Option.none(),
+			proxyAutoProvision: false,
 		},
 		log: { level: undefined },
 		externalCalendar: {
@@ -276,7 +277,7 @@ const stubLayers = Layer.mergeAll(
 			proxySecurityHeader: Option.none(),
 		},
 		nodeEnv: "test",
-	} as unknown as AppConfigService),
+	} as unknown as AppConfigType),
 	Layer.succeed(FileService, {
 		readText: die,
 		readBytes: die,

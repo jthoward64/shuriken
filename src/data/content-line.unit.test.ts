@@ -8,8 +8,8 @@ import { type ContentLine, ContentLinesCodec } from "./content-line.ts";
 // Helpers
 // ---------------------------------------------------------------------------
 
-const decodeEffect = Schema.decode(ContentLinesCodec);
-const encodeEffect = Schema.encode(ContentLinesCodec);
+const decodeEffect = Schema.decodeEffect(ContentLinesCodec);
+const encodeEffect = Schema.encodeEffect(ContentLinesCodec);
 
 const dec = (text: string) => Effect.runPromise(decodeEffect(text));
 const enc = (lines: ReadonlyArray<ContentLine>) =>
@@ -129,7 +129,7 @@ describe("ContentLinesCodec decode", () => {
 
 	it("fails on a line with no colon separator", async () => {
 		const err = await runFailure(decodeEffect("BADLINE\r\n"));
-		expect(err._tag).toBe("ParseError");
+		expect(err._tag).toBe("SchemaError");
 	});
 });
 

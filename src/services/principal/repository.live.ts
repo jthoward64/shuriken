@@ -30,7 +30,7 @@ const findById = Effect.fn("PrincipalRepository.findById")(
 				.limit(1),
 		).pipe(
 			Effect.map((r) =>
-				Option.fromNullable(
+				Option.fromNullishOr(
 					r[0] ? { principal: r[0].principal, user: r[0].user } : null,
 				),
 			),
@@ -54,7 +54,7 @@ const findBySlug = Effect.fn("PrincipalRepository.findBySlug")(
 				.limit(1),
 		).pipe(
 			Effect.map((r) =>
-				Option.fromNullable(
+				Option.fromNullishOr(
 					r[0] ? { principal: r[0].principal, user: r[0].user } : null,
 				),
 			),
@@ -75,7 +75,7 @@ const findPrincipalById = Effect.fn("PrincipalRepository.findPrincipalById")(
 				.from(principal)
 				.where(and(eq(principal.id, id), isNull(principal.deletedAt)))
 				.limit(1),
-		).pipe(Effect.map((r) => Option.fromNullable(r[0] ?? null)));
+		).pipe(Effect.map((r) => Option.fromNullishOr(r[0] ?? null)));
 	},
 	Effect.tapError((e: DatabaseError) =>
 		Effect.logWarning("repo.principal.findPrincipalById failed", e.cause),
@@ -94,7 +94,7 @@ const findPrincipalBySlug = Effect.fn(
 				.from(principal)
 				.where(and(eq(principal.slug, slug), isNull(principal.deletedAt)))
 				.limit(1),
-		).pipe(Effect.map((r) => Option.fromNullable(r[0] ?? null)));
+		).pipe(Effect.map((r) => Option.fromNullishOr(r[0] ?? null)));
 	},
 	Effect.tapError((e: DatabaseError) =>
 		Effect.logWarning("repo.principal.findPrincipalBySlug failed", e.cause),
@@ -113,7 +113,7 @@ const findByEmail = Effect.fn("PrincipalRepository.findByEmail")(
 				.limit(1),
 		).pipe(
 			Effect.map((r) =>
-				Option.fromNullable(
+				Option.fromNullishOr(
 					r[0] ? { principal: r[0].principal, user: r[0].user } : null,
 				),
 			),
@@ -130,7 +130,9 @@ const findUserByUserId = Effect.fn("PrincipalRepository.findUserByUserId")(
 		yield* Effect.logTrace("repo.principal.findUserByUserId", { id });
 		return yield* runDbQuery((db) =>
 			db.select().from(user).where(eq(user.id, id)).limit(1),
-		).pipe(Effect.map((r) => Option.fromNullable(r[0] as UserRow | undefined)));
+		).pipe(
+			Effect.map((r) => Option.fromNullishOr(r[0] as UserRow | undefined)),
+		);
 	},
 	Effect.tapError((e: DatabaseError) =>
 		Effect.logWarning("repo.principal.findUserByUserId failed", e.cause),
@@ -237,7 +239,7 @@ export const PrincipalRepositoryLive = Layer.effect(
 		const run = <A, E>(
 			e: Effect.Effect<A, E, DatabaseClient>,
 		): Effect.Effect<A, E> => Effect.provideService(e, DatabaseClient, dc);
-		return PrincipalRepository.of({
+		return {
 			findById: (...args: Parameters<typeof findById>) =>
 				run(findById(...args)),
 			findPrincipalById: (...args: Parameters<typeof findPrincipalById>) =>
@@ -255,6 +257,6 @@ export const PrincipalRepositoryLive = Layer.effect(
 			listAll: (...args: Parameters<typeof listAll>) => run(listAll(...args)),
 			searchByDisplayName: (...args: Parameters<typeof searchByDisplayName>) =>
 				run(searchByDisplayName(...args)),
-		});
+		};
 	}),
 );

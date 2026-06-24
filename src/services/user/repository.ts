@@ -77,7 +77,7 @@ export interface UserRepositoryShape {
 	) => Effect.Effect<void, DatabaseError>;
 }
 
-export class UserRepository extends Context.Tag("UserRepository")<
+export class UserRepository extends Context.Service<
 	UserRepository,
 	UserRepositoryShape
->() {}
+>()("UserRepository") {}

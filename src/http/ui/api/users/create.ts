@@ -1,4 +1,4 @@
-import { Effect, Either, Redacted } from "effect";
+import { Effect, Redacted, Result } from "effect";
 import {
 	type ConflictError,
 	type DatabaseError,
@@ -53,16 +53,16 @@ export const usersCreateHandler = (
 			slug: parseSlug(form.get("slug")?.toString()),
 			email: parseEmail(form.get("email")?.toString()),
 			displayName: parseDisplayName(form.get("displayName")?.toString()),
-		}).pipe(Effect.either);
+		}).pipe(Effect.result);
 
-		if (Either.isLeft(parseResult)) {
+		if (Result.isFailure(parseResult)) {
 			return yield* renderFragment("partials/form-error", {
 				errors: validationErrorToContext(
-					parseResult.left as FormValidationError,
+					parseResult.failure as FormValidationError,
 				),
 			});
 		}
-		const parsed = parseResult.right;
+		const parsed = parseResult.success;
 
 		const password = form.get("password")?.toString();
 		// Use ProvisioningService rather than UserService.create directly so

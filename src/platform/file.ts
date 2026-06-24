@@ -24,10 +24,10 @@ export interface FileServiceShape {
 	) => Effect.Effect<ReadonlyArray<string>, InternalError>;
 }
 
-export class FileService extends Context.Tag("FileService")<
+export class FileService extends Context.Service<
 	FileService,
 	FileServiceShape
->() {}
+>()("FileService") {}
 
 // ---------------------------------------------------------------------------
 // Minimal extension → MIME map for the file types this server serves

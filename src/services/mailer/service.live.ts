@@ -122,6 +122,6 @@ export const MailerServiceLive = Layer.effect(
 	MailerService,
 	Effect.gen(function* () {
 		const emailCreds = yield* EmailCredentialService;
-		return MailerService.of(make(emailCreds));
+		return make(emailCreds);
 	}),
 );

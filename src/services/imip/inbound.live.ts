@@ -217,7 +217,7 @@ export const ImipInboundServiceLive = Layer.effect(
 		const instRepo = yield* InstanceRepository;
 		const instSvc = yield* InstanceService;
 		const userRepo = yield* UserRepository;
-		return ImipInboundService.of({
+		return {
 			process: (input) =>
 				process_(input).pipe(
 					Effect.provideService(CalEditService, calEdit),
@@ -228,7 +228,7 @@ export const ImipInboundServiceLive = Layer.effect(
 					Effect.provideService(InstanceService, instSvc),
 					Effect.provideService(UserRepository, userRepo),
 				),
-		});
+		};
 	}),
 );
 

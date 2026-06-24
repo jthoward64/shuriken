@@ -408,7 +408,7 @@ export const GroupRepositoryLive = Layer.effect(
 		const run = <A, E>(
 			e: Effect.Effect<A, E, DatabaseClient>,
 		): Effect.Effect<A, E> => Effect.provideService(e, DatabaseClient, dc);
-		return GroupRepository.of({
+		return {
 			findById: (...args: Parameters<typeof findById>) =>
 				run(findById(...args)),
 			findByPrincipalId: (...args: Parameters<typeof findByPrincipalId>) =>
@@ -432,6 +432,6 @@ export const GroupRepositoryLive = Layer.effect(
 				run(removeMember(...args)),
 			hasMember: (...args: Parameters<typeof hasMember>) =>
 				run(hasMember(...args)),
-		});
+		};
 	}),
 );

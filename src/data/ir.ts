@@ -155,7 +155,7 @@ const IrValueCalAddressSchema = Schema.Struct({
 	value: Schema.String,
 });
 
-export const IrValueSchema = Schema.Union(
+export const IrValueSchema = Schema.Union([
 	IrValueTextSchema,
 	IrValueIntegerSchema,
 	IrValueFloatSchema,
@@ -179,7 +179,7 @@ export const IrValueSchema = Schema.Union(
 	IrValueDateAndOrTimeSchema,
 	IrValueRecurSchema,
 	IrValueCalAddressSchema,
-);
+]);
 
 export type IrValue = Schema.Schema.Type<typeof IrValueSchema>;
 
@@ -221,7 +221,7 @@ export const IrComponentSchema: Schema.Schema<IrComponent> = Schema.Struct({
 // IrDocument — top-level (VCALENDAR or VCARD)
 // ---------------------------------------------------------------------------
 
-export const IrDocumentSchema = Schema.Union(
+export const IrDocumentSchema = Schema.Union([
 	Schema.Struct({
 		kind: Schema.Literal("icalendar"),
 		root: IrComponentSchema, // root.name === "VCALENDAR"
@@ -230,7 +230,7 @@ export const IrDocumentSchema = Schema.Union(
 		kind: Schema.Literal("vcard"),
 		root: IrComponentSchema, // root.name === "VCARD"
 	}),
-);
+]);
 
 export type IrDocument = Schema.Schema.Type<typeof IrDocumentSchema>;
 

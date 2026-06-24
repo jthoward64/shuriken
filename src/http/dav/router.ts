@@ -598,12 +598,12 @@ export const davRouter = (
 		}
 
 		// Track the dispatched DAV request
-		yield* Metric.increment(
-			Metric.tagged(
-				Metric.tagged(davRequestsTotal, "dav.method", method),
-				"dav.path_kind",
-				path.kind,
-			),
+		yield* Metric.update(
+			Metric.withAttributes(davRequestsTotal, {
+				"dav.method": method,
+				"dav.path_kind": path.kind,
+			}),
+			1,
 		);
 
 		// Principal does not exist — MKCOL/MKCALENDAR/PUT → 409 (missing intermediate

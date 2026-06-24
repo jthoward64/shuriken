@@ -45,9 +45,9 @@ export const TombstoneRepositoryLive = Layer.effect(
 		const run = <A, E>(
 			e: Effect.Effect<A, E, DatabaseClient>,
 		): Effect.Effect<A, E> => Effect.provideService(e, DatabaseClient, dc);
-		return TombstoneRepository.of({
+		return {
 			findSinceRevision: (...args: Parameters<typeof findSinceRevision>) =>
 				run(findSinceRevision(...args)),
-		});
+		};
 	}),
 );

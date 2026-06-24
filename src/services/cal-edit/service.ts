@@ -44,7 +44,7 @@ export interface CalEditServiceShape {
 	) => Effect.Effect<void, DatabaseError | DavError | InternalError>;
 }
 
-export class CalEditService extends Context.Tag("CalEditService")<
+export class CalEditService extends Context.Service<
 	CalEditService,
 	CalEditServiceShape
->() {}
+>()("CalEditService") {}

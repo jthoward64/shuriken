@@ -1,4 +1,4 @@
-import { Effect, ParseResult, Schema } from "effect";
+import { Effect, Option, Schema, SchemaGetter, SchemaIssue } from "effect";
 import {
 	type ContentLine,
 	ContentLineSchema,
@@ -19,7 +19,7 @@ export interface RawComponent {
 	readonly children: ReadonlyArray<RawComponent>;
 }
 
-export const RawComponentSchema: Schema.Schema<RawComponent> = Schema.Struct({
+export const RawComponentSchema: Schema.Codec<RawComponent> = Schema.Struct({
 	name: Schema.String,
 	contentLines: Schema.Array(ContentLineSchema),
 	children: Schema.Array(Schema.suspend(() => RawComponentSchema)),
@@ -111,25 +111,30 @@ const flattenTree = (component: RawComponent): Array<ContentLine> => [
 //   encode: RawComponent → ReadonlyArray<ContentLine>
 // ---------------------------------------------------------------------------
 
-export const RawComponentCodec: Schema.Schema<
+export const RawComponentCodec: Schema.Codec<
 	RawComponent,
 	ReadonlyArray<ContentLine>
-> = Schema.transformOrFail(
-	Schema.Array(ContentLineSchema),
-	RawComponentSchema,
-	{
-		strict: true,
-		decode: (lines, _options, ast) =>
+> = Schema.Array(ContentLineSchema).pipe(
+	Schema.decodeTo(RawComponentSchema, {
+		decode: SchemaGetter.transformOrFail((lines: ReadonlyArray<ContentLine>) =>
 			Effect.try({
 				try: () => buildTree(lines),
-				catch: (e) => new ParseResult.Type(ast, lines, String(e)),
+				catch: (e) =>
+					new SchemaIssue.InvalidValue(Option.some(lines), {
+						message: String(e),
+					}),
 			}),
-		encode: (component, _options, ast) =>
+		),
+		encode: SchemaGetter.transformOrFail((component: RawComponent) =>
 			Effect.try({
 				try: () => flattenTree(component),
-				catch: (e) => new ParseResult.Type(ast, component, String(e)),
+				catch: (e) =>
+					new SchemaIssue.InvalidValue(Option.some(component), {
+						message: String(e),
+					}),
 			}),
-	},
+		),
+	}),
 );
 
 // ---------------------------------------------------------------------------
@@ -140,5 +145,5 @@ export const RawComponentCodec: Schema.Schema<
 // on top of a single string-to-tree stage.
 // ---------------------------------------------------------------------------
 
-export const TextToRawComponentCodec: Schema.Schema<RawComponent, string> =
-	ContentLinesCodec.pipe(Schema.compose(RawComponentCodec));
+export const TextToRawComponentCodec: Schema.Codec<RawComponent, string> =
+	ContentLinesCodec.pipe(Schema.decodeTo(RawComponentCodec));

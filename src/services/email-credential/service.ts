@@ -65,6 +65,7 @@ export interface EmailCredentialServiceShape {
 	readonly clearForUser: (userId: UserId) => Effect.Effect<void, DatabaseError>;
 }
 
-export class EmailCredentialService extends Context.Tag(
-	"EmailCredentialService",
-)<EmailCredentialService, EmailCredentialServiceShape>() {}
+export class EmailCredentialService extends Context.Service<
+	EmailCredentialService,
+	EmailCredentialServiceShape
+>()("EmailCredentialService") {}

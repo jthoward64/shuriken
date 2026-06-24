@@ -83,9 +83,9 @@ export const fireAndForgetDispatch = (
 	onlyRecipients?: ReadonlyArray<string>,
 ) =>
 	dispatchForInstance(method, instanceId, organizerUserId, onlyRecipients).pipe(
-		Effect.catchAllCause((cause) =>
+		Effect.catchCause((cause) =>
 			Effect.logWarning("imip.fireAndForgetDispatch failed", { cause }),
 		),
-		Effect.forkDaemon,
+		Effect.forkDetach,
 		Effect.asVoid,
 	);

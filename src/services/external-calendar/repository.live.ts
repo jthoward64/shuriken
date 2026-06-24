@@ -26,7 +26,7 @@ const findById = Effect.fn("ExternalCalendarRepository.findById")(
 					and(eq(externalCalendar.id, id), isNull(externalCalendar.deletedAt)),
 				)
 				.limit(1),
-		).pipe(Effect.map((r) => Option.fromNullable(r[0])));
+		).pipe(Effect.map((r) => Option.fromNullishOr(r[0])));
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.externalCalendar.findById failed", e.cause),
@@ -47,7 +47,7 @@ const findByUrl = Effect.fn("ExternalCalendarRepository.findByUrl")(
 					),
 				)
 				.limit(1),
-		).pipe(Effect.map((r) => Option.fromNullable(r[0])));
+		).pipe(Effect.map((r) => Option.fromNullishOr(r[0])));
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.externalCalendar.findByUrl failed", e.cause),
@@ -233,7 +233,7 @@ const findClaimById = Effect.fn("ExternalCalendarRepository.findClaimById")(
 				.from(externalCalendarClaim)
 				.where(eq(externalCalendarClaim.id, id))
 				.limit(1),
-		).pipe(Effect.map((r) => Option.fromNullable(r[0])));
+		).pipe(Effect.map((r) => Option.fromNullishOr(r[0])));
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.externalCalendar.findClaimById failed", e.cause),
@@ -251,7 +251,7 @@ const findClaimByCollection = Effect.fn(
 				.from(externalCalendarClaim)
 				.where(eq(externalCalendarClaim.collectionId, collectionId))
 				.limit(1),
-		).pipe(Effect.map((r) => Option.fromNullable(r[0])));
+		).pipe(Effect.map((r) => Option.fromNullishOr(r[0])));
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning(
@@ -469,7 +469,7 @@ export const ExternalCalendarRepositoryLive = Layer.effect(
 		const run = <A, E>(
 			e: Effect.Effect<A, E, DatabaseClient>,
 		): Effect.Effect<A, E> => Effect.provideService(e, DatabaseClient, dc);
-		return ExternalCalendarRepository.of({
+		return {
 			findById: (...args: Parameters<typeof findById>) =>
 				run(findById(...args)),
 			findByUrl: (...args: Parameters<typeof findByUrl>) =>
@@ -506,6 +506,6 @@ export const ExternalCalendarRepositoryLive = Layer.effect(
 				run(updateClaim(...args)),
 			deleteClaim: (...args: Parameters<typeof deleteClaim>) =>
 				run(deleteClaim(...args)),
-		});
+		};
 	}),
 );

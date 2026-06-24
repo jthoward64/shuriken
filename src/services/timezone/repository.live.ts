@@ -5,7 +5,10 @@ import { DatabaseClient } from "#src/db/client.ts";
 import { calTimezone } from "#src/db/drizzle/schema/index.ts";
 import { runDbQuery } from "#src/db/query.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
-import { repoQueryDurationMs } from "#src/observability/metrics.ts";
+import {
+	repoQueryDurationMs,
+	trackDuration,
+} from "#src/observability/metrics.ts";
 import { CalTimezoneRepository } from "./repository.ts";
 
 // ---------------------------------------------------------------------------
@@ -13,7 +16,7 @@ import { CalTimezoneRepository } from "./repository.ts";
 // ---------------------------------------------------------------------------
 
 const tzDuration = repoQueryDurationMs.pipe(
-	Metric.tagged("repo.entity", "timezone"),
+	Metric.withAttributes({ "repo.entity": "timezone" }),
 );
 
 const findByTzid = Effect.fn("CalTimezoneRepository.findByTzid")(
@@ -23,9 +26,11 @@ const findByTzid = Effect.fn("CalTimezoneRepository.findByTzid")(
 		return yield* runDbQuery((db) =>
 			db.select().from(calTimezone).where(eq(calTimezone.tzid, tzid)).limit(1),
 		).pipe(
-			Effect.map((r) => Option.fromNullable(r[0])),
-			Metric.trackDuration(
-				tzDuration.pipe(Metric.tagged("repo.operation", "findByTzid")),
+			Effect.map((r) => Option.fromNullishOr(r[0])),
+			trackDuration(
+				tzDuration.pipe(
+					Metric.withAttributes({ "repo.operation": "findByTzid" }),
+				),
 			),
 		);
 	},
@@ -98,8 +103,8 @@ const upsert = Effect.fn("CalTimezoneRepository.upsert")(
 				}
 				return Effect.succeed(row);
 			}),
-			Metric.trackDuration(
-				tzDuration.pipe(Metric.tagged("repo.operation", "upsert")),
+			trackDuration(
+				tzDuration.pipe(Metric.withAttributes({ "repo.operation": "upsert" })),
 			),
 		);
 	},
@@ -115,10 +120,10 @@ export const CalTimezoneRepositoryLive = Layer.effect(
 		const run = <A, E>(
 			e: Effect.Effect<A, E, DatabaseClient>,
 		): Effect.Effect<A, E> => Effect.provideService(e, DatabaseClient, dc);
-		return CalTimezoneRepository.of({
+		return {
 			findByTzid: (...args: Parameters<typeof findByTzid>) =>
 				run(findByTzid(...args)),
 			upsert: (...args: Parameters<typeof upsert>) => run(upsert(...args)),
-		});
+		};
 	}),
 );

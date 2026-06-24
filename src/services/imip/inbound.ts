@@ -54,7 +54,7 @@ export interface ImipInboundServiceShape {
 	>;
 }
 
-export class ImipInboundService extends Context.Tag("ImipInboundService")<
+export class ImipInboundService extends Context.Service<
 	ImipInboundService,
 	ImipInboundServiceShape
->() {}
+>()("ImipInboundService") {}

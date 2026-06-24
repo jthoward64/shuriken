@@ -49,7 +49,7 @@ export interface CardEditServiceShape {
 	) => Effect.Effect<void, DatabaseError | DavError | InternalError>;
 }
 
-export class CardEditService extends Context.Tag("CardEditService")<
+export class CardEditService extends Context.Service<
 	CardEditService,
 	CardEditServiceShape
->() {}
+>()("CardEditService") {}

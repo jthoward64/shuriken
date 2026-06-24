@@ -84,7 +84,7 @@ export interface InstanceRepositoryShape {
 	) => Effect.Effect<ReadonlyArray<InstanceRow>, DatabaseError>;
 }
 
-export class InstanceRepository extends Context.Tag("InstanceRepository")<
+export class InstanceRepository extends Context.Service<
 	InstanceRepository,
 	InstanceRepositoryShape
->() {}
+>()("InstanceRepository") {}

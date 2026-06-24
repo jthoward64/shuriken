@@ -15,7 +15,10 @@ import type {
 	InstanceId,
 	PrincipalId,
 } from "#src/domain/ids.ts";
-import { repoQueryDurationMs } from "#src/observability/metrics.ts";
+import {
+	repoQueryDurationMs,
+	trackDuration,
+} from "#src/observability/metrics.ts";
 import { EntityRepository } from "./repository.ts";
 
 // ---------------------------------------------------------------------------
@@ -23,7 +26,7 @@ import { EntityRepository } from "./repository.ts";
 // ---------------------------------------------------------------------------
 
 const entityDuration = repoQueryDurationMs.pipe(
-	Metric.tagged("repo.entity", "entity"),
+	Metric.withAttributes({ "repo.entity": "entity" }),
 );
 
 const insertEntity = Effect.fn("EntityRepository.insert")(
@@ -53,8 +56,10 @@ const insertEntity = Effect.fn("EntityRepository.insert")(
 				}
 				return Effect.succeed(row);
 			}),
-			Metric.trackDuration(
-				entityDuration.pipe(Metric.tagged("repo.operation", "insert")),
+			trackDuration(
+				entityDuration.pipe(
+					Metric.withAttributes({ "repo.operation": "insert" }),
+				),
 			),
 		);
 	},
@@ -74,9 +79,11 @@ const findById = Effect.fn("EntityRepository.findById")(
 				.where(and(eq(davEntity.id, id), isNull(davEntity.deletedAt)))
 				.limit(1),
 		).pipe(
-			Effect.map((r) => Option.fromNullable(r[0])),
-			Metric.trackDuration(
-				entityDuration.pipe(Metric.tagged("repo.operation", "findById")),
+			Effect.map((r) => Option.fromNullishOr(r[0])),
+			trackDuration(
+				entityDuration.pipe(
+					Metric.withAttributes({ "repo.operation": "findById" }),
+				),
 			),
 		);
 	},
@@ -102,9 +109,9 @@ const updateLogicalUid = Effect.fn("EntityRepository.updateLogicalUid")(
 				.where(eq(davEntity.id, id)),
 		).pipe(
 			Effect.asVoid,
-			Metric.trackDuration(
+			trackDuration(
 				entityDuration.pipe(
-					Metric.tagged("repo.operation", "updateLogicalUid"),
+					Metric.withAttributes({ "repo.operation": "updateLogicalUid" }),
 				),
 			),
 		);
@@ -125,8 +132,10 @@ const softDelete = Effect.fn("EntityRepository.softDelete")(
 				.where(eq(davEntity.id, id)),
 		).pipe(
 			Effect.asVoid,
-			Metric.trackDuration(
-				entityDuration.pipe(Metric.tagged("repo.operation", "softDelete")),
+			trackDuration(
+				entityDuration.pipe(
+					Metric.withAttributes({ "repo.operation": "softDelete" }),
+				),
 			),
 		);
 	},
@@ -161,8 +170,10 @@ const existsByUid = Effect.fn("EntityRepository.existsByUid")(
 				.limit(1),
 		).pipe(
 			Effect.map((r) => r.length > 0),
-			Metric.trackDuration(
-				entityDuration.pipe(Metric.tagged("repo.operation", "existsByUid")),
+			trackDuration(
+				entityDuration.pipe(
+					Metric.withAttributes({ "repo.operation": "existsByUid" }),
+				),
 			),
 		);
 	},
@@ -205,9 +216,11 @@ const existsByUidForPrincipal = Effect.fn(
 				.limit(1),
 		).pipe(
 			Effect.map((r) => r.length > 0),
-			Metric.trackDuration(
+			trackDuration(
 				entityDuration.pipe(
-					Metric.tagged("repo.operation", "existsByUidForPrincipal"),
+					Metric.withAttributes({
+						"repo.operation": "existsByUidForPrincipal",
+					}),
 				),
 			),
 		);
@@ -253,9 +266,11 @@ const listActiveInstancesWithUid = Effect.fn(
 					slug: r.slug,
 				})),
 			),
-			Metric.trackDuration(
+			trackDuration(
 				entityDuration.pipe(
-					Metric.tagged("repo.operation", "listActiveInstancesWithUid"),
+					Metric.withAttributes({
+						"repo.operation": "listActiveInstancesWithUid",
+					}),
 				),
 			),
 		);
@@ -272,7 +287,7 @@ export const EntityRepositoryLive = Layer.effect(
 		const run = <A, E>(
 			e: Effect.Effect<A, E, DatabaseClient>,
 		): Effect.Effect<A, E> => Effect.provideService(e, DatabaseClient, dc);
-		return EntityRepository.of({
+		return {
 			insert: (...args: Parameters<typeof insertEntity>) =>
 				run(insertEntity(...args)),
 			findById: (...args: Parameters<typeof findById>) =>
@@ -289,6 +304,6 @@ export const EntityRepositoryLive = Layer.effect(
 			listActiveInstancesWithUid: (
 				...args: Parameters<typeof listActiveInstancesWithUid>
 			) => run(listActiveInstancesWithUid(...args)),
-		});
+		};
 	}),
 );

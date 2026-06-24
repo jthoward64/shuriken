@@ -110,7 +110,7 @@ export const ShareLinkServiceLive = Layer.effect(
 				return opt.value;
 			});
 
-		return ShareLinkService.of({
+		return {
 			listForUser: (userId: UserId) =>
 				Effect.gen(function* () {
 					const rows = yield* repo.findByUser(userId);
@@ -216,6 +216,6 @@ export const ShareLinkServiceLive = Layer.effect(
 					yield* loadOwned(id, caller);
 					yield* repo.softDelete(id);
 				}),
-		});
+		};
 	}),
 );

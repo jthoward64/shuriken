@@ -62,7 +62,7 @@ const dispatch = (
 					message,
 				)
 				.pipe(
-					Effect.catchAll((cause) =>
+					Effect.catch((cause) =>
 						Effect.logWarning("imip.dispatch: send failed", {
 							to: raw,
 							cause,
@@ -94,12 +94,12 @@ export const ImipDispatchServiceLive = Layer.effect(
 	Effect.gen(function* () {
 		const mailer = yield* MailerService;
 		const userRepo = yield* UserRepository;
-		return ImipDispatchService.of({
+		return {
 			dispatch: (input) =>
 				dispatch(input).pipe(
 					Effect.provideService(MailerService, mailer),
 					Effect.provideService(UserRepository, userRepo),
 				),
-		});
+		};
 	}),
 );

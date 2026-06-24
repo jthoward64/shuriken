@@ -11,13 +11,13 @@ import { type Option, Schema } from "effect";
 // same principal (e.g. a "primary" calendar and a "primary" address book).
 // ---------------------------------------------------------------------------
 
-export const CollectionNamespaceSchema = Schema.Literal(
+export const CollectionNamespaceSchema = Schema.Literals([
 	"cal",
 	"card",
 	"inbox",
 	"outbox",
 	"col",
-);
+]);
 
 export type CollectionNamespace = Schema.Schema.Type<
 	typeof CollectionNamespaceSchema

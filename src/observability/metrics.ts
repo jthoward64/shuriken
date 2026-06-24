@@ -1,15 +1,29 @@
-import { Metric, MetricBoundaries } from "effect";
+import { type Duration, Effect, Metric } from "effect";
 
 // ---------------------------------------------------------------------------
 // Shared boundary definitions
 // ---------------------------------------------------------------------------
 
 // Exponential bucket boundaries: ~0.5 ms → ~16 s (16 buckets)
-const durBoundaries = MetricBoundaries.exponential({
+const durBoundaries = Metric.exponentialBoundaries({
 	start: 0.5,
 	factor: 2,
 	count: 16,
 });
+
+// ---------------------------------------------------------------------------
+// trackDuration — times an effect and records its elapsed Duration into a
+// duration metric. Effect v4 removed `Metric.trackDuration`; this helper
+// preserves the call-site ergonomics. The duration is recorded on success;
+// failures are tracked separately via the *Total counters.
+// ---------------------------------------------------------------------------
+
+export const trackDuration =
+	(metric: Metric.Metric<Duration.Duration, unknown>) =>
+	<A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+		Effect.flatMap(Effect.timed(effect), ([duration, value]) =>
+			Effect.as(Metric.update(metric, duration), value),
+		);
 
 // ---------------------------------------------------------------------------
 // HTTP layer
@@ -28,9 +42,9 @@ export const httpRequestsTotal = Metric.counter("shuriken.http.requests", {
  * Tagged with method and path_group (known before the handler runs).
  * Uses timerWithBoundaries so it accepts Effect Duration values from Metric.trackDuration.
  */
-export const httpRequestDurationMs = Metric.timerWithBoundaries(
+export const httpRequestDurationMs = Metric.timer(
 	"shuriken.http.request.duration_ms",
-	durBoundaries.values,
+	{ boundaries: durBoundaries },
 );
 
 // ---------------------------------------------------------------------------
@@ -86,7 +100,7 @@ export const repoQueriesTotal = Metric.counter("shuriken.repo.queries", {
  * Tagged with entity and operation before use.
  * Uses timerWithBoundaries so it accepts Effect Duration values from Metric.trackDuration.
  */
-export const repoQueryDurationMs = Metric.timerWithBoundaries(
+export const repoQueryDurationMs = Metric.timer(
 	"shuriken.repo.query.duration_ms",
-	durBoundaries.values,
+	{ boundaries: durBoundaries },
 );

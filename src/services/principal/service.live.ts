@@ -18,7 +18,7 @@ export const PrincipalServiceLive = Layer.effect(
 	Effect.gen(function* () {
 		const repo = yield* PrincipalRepository;
 
-		return PrincipalService.of({
+		return {
 			findPrincipalById: Effect.fn("PrincipalService.findPrincipalById")(
 				function* (id: PrincipalId) {
 					yield* Effect.annotateCurrentSpan({ "principal.id": id });
@@ -85,6 +85,6 @@ export const PrincipalServiceLive = Layer.effect(
 					return result;
 				},
 			),
-		});
+		};
 	}),
 );

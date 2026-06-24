@@ -1,8 +1,8 @@
-import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
-import { Effect, Redacted } from "effect";
+import { drizzle } from "drizzle-orm/postgres-js";
+import { Context, Effect, Layer, Redacted } from "effect";
 import postgres from "postgres";
 import { AppConfigService } from "#src/config.ts";
-import * as schema from "./drizzle/schema/index.ts";
+import { relations } from "./drizzle/relations.ts";
 
 // ---------------------------------------------------------------------------
 // DatabaseClient — Drizzle ORM client as an Effect.Service
@@ -17,25 +17,34 @@ import * as schema from "./drizzle/schema/index.ts";
 // a wasteful string → Date → Temporal double conversion.
 //
 // Pass `client` explicitly in the config object — `drizzle(client, …)` would
-// make drizzle spin up its own default connection and silently ignore both
-// this client and the schema.
+// make drizzle spin up its own default connection and silently ignore this
+// client.
+//
+// `relations` (see ./drizzle/relations.ts) powers the `db.query.*` relational
+// API; it carries no runtime FKs of its own, it only describes the join graph.
 // ---------------------------------------------------------------------------
 
-export type DbClient = PostgresJsDatabase<typeof schema>;
-
-export class DatabaseClient extends Effect.Service<DatabaseClient>()(
+export class DatabaseClient extends Context.Service<DatabaseClient>()(
 	"DatabaseClient",
 	{
-		effect: Effect.gen(function* () {
+		make: Effect.gen(function* () {
 			const {
 				database: { url },
 			} = yield* AppConfigService;
 			const client = postgres(Redacted.value(url));
-			const db = drizzle({ client, schema });
+			const db = drizzle({ client, relations });
 			yield* Effect.logInfo("database client initialized");
 			return db;
 		}),
 	},
 ) {}
 
-export const DatabaseClientLive = DatabaseClient.Default;
+export const DatabaseClientLive = Layer.effect(
+	DatabaseClient,
+	DatabaseClient.make,
+);
+
+// The concrete Drizzle DB type, derived from the service's resolved shape so it
+// always matches what `yield* DatabaseClient` produces (avoids drift between a
+// hand-written type and Drizzle's inferred relations-aware database type).
+export type DbClient = Context.Service.Shape<typeof DatabaseClient>;

@@ -34,16 +34,12 @@ const ALL_PRIVILEGES: ReadonlyArray<DavPrivilege> = [
 	"CALDAV:schedule-send-freebusy",
 ];
 
-export const AclServiceAllowAll = Layer.succeed(
-	AclService,
-	AclService.of({
-		check: (_principalId, _resourceId, _resourceType, _privilege) =>
-			Effect.void,
-		currentUserPrivileges: (_principalId, _resourceId, _resourceType) =>
-			Effect.succeed(ALL_PRIVILEGES),
-		getAces: (_resourceId, _resourceType) => Effect.succeed([]),
-		setAces: (_resourceId, _resourceType, _aces) => Effect.void,
-		batchCurrentUserPrivileges: (_principalId, resourceIds, _resourceType) =>
-			Effect.succeed(new Map(resourceIds.map((id) => [id, ALL_PRIVILEGES]))),
-	}),
-);
+export const AclServiceAllowAll = Layer.succeed(AclService, {
+	check: (_principalId, _resourceId, _resourceType, _privilege) => Effect.void,
+	currentUserPrivileges: (_principalId, _resourceId, _resourceType) =>
+		Effect.succeed(ALL_PRIVILEGES),
+	getAces: (_resourceId, _resourceType) => Effect.succeed([]),
+	setAces: (_resourceId, _resourceType, _aces) => Effect.void,
+	batchCurrentUserPrivileges: (_principalId, resourceIds, _resourceType) =>
+		Effect.succeed(new Map(resourceIds.map((id) => [id, ALL_PRIVILEGES]))),
+});

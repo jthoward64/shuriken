@@ -1,7 +1,7 @@
 import { Effect, Layer, Option, Redacted } from "effect";
 import { Temporal } from "temporal-polyfill";
 import type { IrComponent } from "#src/data/ir.ts";
-import { DatabaseClient } from "#src/db/client.ts";
+import { DatabaseClient, type DbClient } from "#src/db/client.ts";
 import type {
 	CollectionType,
 	ContentType,
@@ -70,7 +70,10 @@ import {
 import { PrincipalServiceLive } from "#src/services/principal/service.live.ts";
 import type { PrincipalService } from "#src/services/principal/service.ts";
 import { SchedulingService } from "#src/services/scheduling/service.ts";
-import { IanaTimezoneService } from "#src/services/timezone/iana.ts";
+import {
+	type IanaTimezoneService,
+	IanaTimezoneServiceLive,
+} from "#src/services/timezone/iana.ts";
 import {
 	CalTimezoneRepository,
 	type CalTimezoneRow,
@@ -203,7 +206,7 @@ export interface AceSeedData {
 const makeUserRepo = (stores: TestStores): UserRepositoryShape => ({
 	findById: (id) =>
 		Effect.succeed(
-			Option.fromNullable(
+			Option.fromNullishOr(
 				(() => {
 					const userRow = stores.users.get(id);
 					if (!userRow) {
@@ -220,7 +223,7 @@ const makeUserRepo = (stores: TestStores): UserRepositoryShape => ({
 
 	findByEmail: (email) =>
 		Effect.succeed(
-			Option.fromNullable(
+			Option.fromNullishOr(
 				(() => {
 					const userRow = [...stores.users.values()].find(
 						(u) => u.email === email,
@@ -314,7 +317,7 @@ const makeUserRepo = (stores: TestStores): UserRepositoryShape => ({
 
 	findCredential: (authSource, authId) =>
 		Effect.succeed(
-			Option.fromNullable(
+			Option.fromNullishOr(
 				stores.credentials.get(`${authSource}:${authId}`) ?? null,
 			),
 		),
@@ -341,7 +344,7 @@ const makeUserRepo = (stores: TestStores): UserRepositoryShape => ({
 
 	findBySlug: (slug) =>
 		Effect.succeed(
-			Option.fromNullable(
+			Option.fromNullishOr(
 				(() => {
 					const principal = [...stores.principals.values()].find(
 						(p) => p.slug === slug && p.deletedAt === null,
@@ -391,7 +394,7 @@ const makeUserRepo = (stores: TestStores): UserRepositoryShape => ({
 const makePrincipalRepo = (stores: TestStores): PrincipalRepositoryShape => ({
 	findById: (id) =>
 		Effect.succeed(
-			Option.fromNullable(
+			Option.fromNullishOr(
 				(() => {
 					const principalRow = stores.principals.get(id);
 					if (!principalRow) {
@@ -410,7 +413,7 @@ const makePrincipalRepo = (stores: TestStores): PrincipalRepositoryShape => ({
 
 	findBySlug: (slug) =>
 		Effect.succeed(
-			Option.fromNullable(
+			Option.fromNullishOr(
 				(() => {
 					const principalRow = [...stores.principals.values()].find(
 						(p) => p.slug === slug && p.deletedAt === null,
@@ -431,7 +434,7 @@ const makePrincipalRepo = (stores: TestStores): PrincipalRepositoryShape => ({
 
 	findByEmail: (email) =>
 		Effect.succeed(
-			Option.fromNullable(
+			Option.fromNullishOr(
 				(() => {
 					const userRow = [...stores.users.values()].find(
 						(u) => u.email === email,
@@ -449,11 +452,11 @@ const makePrincipalRepo = (stores: TestStores): PrincipalRepositoryShape => ({
 		),
 
 	findPrincipalById: (id) =>
-		Effect.succeed(Option.fromNullable(stores.principals.get(id) ?? null)),
+		Effect.succeed(Option.fromNullishOr(stores.principals.get(id) ?? null)),
 
 	findPrincipalBySlug: (slug) =>
 		Effect.succeed(
-			Option.fromNullable(
+			Option.fromNullishOr(
 				[...stores.principals.values()].find(
 					(p) => p.slug === slug && p.deletedAt === null,
 				) ?? null,
@@ -461,7 +464,7 @@ const makePrincipalRepo = (stores: TestStores): PrincipalRepositoryShape => ({
 		),
 
 	findUserByUserId: (id) =>
-		Effect.succeed(Option.fromNullable(stores.users.get(id) ?? null)),
+		Effect.succeed(Option.fromNullishOr(stores.users.get(id) ?? null)),
 
 	updateProperties: (id, changes: PrincipalPropertyChanges) =>
 		Effect.sync(() => {
@@ -535,7 +538,7 @@ const makePrincipalRepo = (stores: TestStores): PrincipalRepositoryShape => ({
 const makeCollectionRepo = (stores: TestStores): CollectionRepositoryShape => ({
 	findById: (id) =>
 		Effect.succeed(
-			Option.fromNullable(
+			Option.fromNullishOr(
 				(() => {
 					const row = stores.collections.get(id);
 					return row && row.deletedAt === null ? row : null;
@@ -545,7 +548,7 @@ const makeCollectionRepo = (stores: TestStores): CollectionRepositoryShape => ({
 
 	findBySlug: (ownerPrincipalId, collectionType, slug) =>
 		Effect.succeed(
-			Option.fromNullable(
+			Option.fromNullishOr(
 				[...stores.collections.values()].find(
 					(c) =>
 						c.ownerPrincipalId === ownerPrincipalId &&
@@ -672,7 +675,7 @@ const makeCollectionRepo = (stores: TestStores): CollectionRepositoryShape => ({
 const makeInstanceRepo = (stores: TestStores): InstanceRepositoryShape => ({
 	findById: (id) =>
 		Effect.succeed(
-			Option.fromNullable(
+			Option.fromNullishOr(
 				(() => {
 					const row = stores.instances.get(id);
 					return row && row.deletedAt === null ? row : null;
@@ -682,7 +685,7 @@ const makeInstanceRepo = (stores: TestStores): InstanceRepositoryShape => ({
 
 	findBySlug: (collectionId, slug) =>
 		Effect.succeed(
-			Option.fromNullable(
+			Option.fromNullishOr(
 				[...stores.instances.values()].find(
 					(i) =>
 						i.collectionId === collectionId &&
@@ -1044,7 +1047,7 @@ const makeEntityRepo = (stores: TestStores): EntityRepositoryShape => ({
 		}),
 
 	findById: (id) =>
-		Effect.succeed(Option.fromNullable(stores.entities.get(id) ?? null)),
+		Effect.succeed(Option.fromNullishOr(stores.entities.get(id) ?? null)),
 
 	updateLogicalUid: (id, uid) =>
 		Effect.sync(() => {
@@ -1097,7 +1100,7 @@ const makeComponentRepo = (stores: TestStores): ComponentRepositoryShape => ({
 
 	loadTree: (entityId, _entityType) =>
 		Effect.succeed(
-			Option.fromNullable(stores.components.get(entityId) ?? null),
+			Option.fromNullishOr(stores.components.get(entityId) ?? null),
 		),
 
 	deleteByEntity: (entityId) =>
@@ -1117,7 +1120,7 @@ const makeCalTimezoneRepo = (
 	stores: TestStores,
 ): CalTimezoneRepositoryShape => ({
 	findByTzid: (tzid) =>
-		Effect.succeed(Option.fromNullable(stores.calTimezones.get(tzid) ?? null)),
+		Effect.succeed(Option.fromNullishOr(stores.calTimezones.get(tzid) ?? null)),
 
 	upsert: (tzid, vtimezoneData, ianaName, lastModified) =>
 		Effect.sync(() => {
@@ -1140,7 +1143,7 @@ const makeCalTimezoneRepo = (
 const makeGroupRepo = (stores: TestStores): GroupRepositoryShape => ({
 	findById: (id) =>
 		Effect.succeed(
-			Option.fromNullable(
+			Option.fromNullishOr(
 				(() => {
 					const groupRow = stores.groups.get(id);
 					if (!groupRow) {
@@ -1228,7 +1231,7 @@ const makeGroupRepo = (stores: TestStores): GroupRepositoryShape => ({
 
 	findBySlug: (slug) =>
 		Effect.succeed(
-			Option.fromNullable(
+			Option.fromNullishOr(
 				(() => {
 					const principal = [...stores.groupPrincipals.values()].find(
 						(p) => p.slug === slug && p.deletedAt === null,
@@ -1249,7 +1252,7 @@ const makeGroupRepo = (stores: TestStores): GroupRepositoryShape => ({
 
 	findByPrincipalId: (principalId) =>
 		Effect.succeed(
-			Option.fromNullable(
+			Option.fromNullishOr(
 				(() => {
 					const principal = stores.groupPrincipals.get(principalId);
 					if (!principal || principal.deletedAt !== null) {
@@ -1596,10 +1599,9 @@ export const makeTestEnv = (): TestEnvBuilder => {
 			});
 
 			const noOpDb = {
-				transaction: async <T>(
-					fn: (tx: DatabaseClient) => Promise<T>,
-				): Promise<T> => fn(noOpDb as unknown as DatabaseClient),
-			} as unknown as DatabaseClient;
+				transaction: async <T>(fn: (tx: DbClient) => Promise<T>): Promise<T> =>
+					fn(noOpDb as unknown as DbClient),
+			} as unknown as DbClient;
 			const testDbClientLayer = Layer.succeed(DatabaseClient, noOpDb);
 
 			const userServiceLayer = UserServiceLive.pipe(
@@ -1644,7 +1646,7 @@ export const makeTestEnv = (): TestEnvBuilder => {
 				componentRepoLayer,
 				calTimezoneRepoLayer,
 				calIndexRepoLayer,
-				IanaTimezoneService.Default,
+				IanaTimezoneServiceLive,
 				schedulingServiceLayer,
 				testDbClientLayer,
 			);

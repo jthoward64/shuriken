@@ -69,7 +69,7 @@ export interface PrincipalRepositoryShape {
 	) => Effect.Effect<ReadonlyArray<PrincipalWithUser>, DatabaseError>;
 }
 
-export class PrincipalRepository extends Context.Tag("PrincipalRepository")<
+export class PrincipalRepository extends Context.Service<
 	PrincipalRepository,
 	PrincipalRepositoryShape
->() {}
+>()("PrincipalRepository") {}

@@ -28,15 +28,15 @@ describe("secret-cipher", () => {
 			encryptSecret(right, Redacted.make("secret")),
 		);
 		const result = await Effect.runPromise(
-			decryptSecret(wrong, enc).pipe(Effect.either),
+			decryptSecret(wrong, enc).pipe(Effect.result),
 		);
-		expect(result._tag).toBe("Left");
+		expect(result._tag).toBe("Failure");
 	});
 
 	it("rejects empty key material", async () => {
 		const result = await Effect.runPromise(
-			encryptSecret(Redacted.make(""), Redacted.make("x")).pipe(Effect.either),
+			encryptSecret(Redacted.make(""), Redacted.make("x")).pipe(Effect.result),
 		);
-		expect(result._tag).toBe("Left");
+		expect(result._tag).toBe("Failure");
 	});
 });

@@ -937,7 +937,7 @@ export const SchedulingServiceLive = Layer.effect(
 								requestDoc,
 								uid,
 							).pipe(
-								Effect.catchAll((e) =>
+								Effect.catch((e) =>
 									Effect.logWarning(
 										"scheduling.processAfterPut: delivery failed",
 										{ attendee: attendee.calAddress, cause: e },
@@ -1434,11 +1434,11 @@ export const SchedulingServiceLive = Layer.effect(
 			},
 		);
 
-		return SchedulingService.of({
+		return {
 			processAfterPut: (opts) => processAfterPut(opts),
 			validateSchedulingChange: (opts) => validateSchedulingChange(opts),
 			processAfterDelete: (opts) => processAfterDelete(opts),
 			processOutboxPost: (opts) => processOutboxPost(opts),
-		});
+		};
 	}),
 );

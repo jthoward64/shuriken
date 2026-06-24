@@ -1,4 +1,4 @@
-import { Effect, Either } from "effect";
+import { Effect, Result } from "effect";
 import {
 	type ConflictError,
 	type DatabaseError,
@@ -79,16 +79,16 @@ export const groupsCollectionsCreateHandler = (
 			displayName: parseOptionalDisplayName(
 				form.get("displayName")?.toString(),
 			),
-		}).pipe(Effect.either);
+		}).pipe(Effect.result);
 
-		if (Either.isLeft(parseResult)) {
+		if (Result.isFailure(parseResult)) {
 			return yield* renderFragment("partials/form-error", {
 				errors: validationErrorToContext(
-					parseResult.left as FormValidationError,
+					parseResult.failure as FormValidationError,
 				),
 			});
 		}
-		const parsed = parseResult.right;
+		const parsed = parseResult.success;
 
 		const newCollection = yield* collectionService.create({
 			ownerPrincipalId: principalId,

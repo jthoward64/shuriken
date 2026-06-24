@@ -1,7 +1,7 @@
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
 import { Effect, Layer, Option } from "effect";
-import { DatabaseClient } from "#src/db/client.ts";
+import { DatabaseClient, type DbClient } from "#src/db/client.ts";
 import type { PrincipalId, UserId } from "#src/domain/ids.ts";
 import { RequestId } from "#src/domain/ids.ts";
 import { Authenticated } from "#src/domain/types/dav.ts";
@@ -50,8 +50,14 @@ import {
 	type PrincipalServiceShape,
 } from "#src/services/principal/service.ts";
 import { SchedulingService } from "#src/services/scheduling/service.ts";
-import { IanaTimezoneService } from "#src/services/timezone/iana.ts";
-import { CalTimezoneRepository } from "#src/services/timezone/repository.ts";
+import {
+	type IanaTimezoneService,
+	IanaTimezoneServiceLive,
+} from "#src/services/timezone/iana.ts";
+import {
+	CalTimezoneRepository,
+	type CalTimezoneRepositoryShape,
+} from "#src/services/timezone/repository.ts";
 import { TombstoneRepository } from "#src/services/tombstone/index.ts";
 import { UserRepository, UserService } from "#src/services/user/index.ts";
 import type { UserRepositoryShape } from "#src/services/user/repository.ts";
@@ -138,12 +144,12 @@ const noopComponentRepo: ComponentRepositoryShape =
 	});
 
 /** No-op CalTimezoneRepository — router path resolution never touches timezone storage. */
-const noopCalTimezoneRepo = CalTimezoneRepository.of(stubService());
+const noopCalTimezoneRepo = stubService<CalTimezoneRepositoryShape>();
 
 const noOpDb = {
-	transaction: async <T>(fn: (tx: DatabaseClient) => Promise<T>): Promise<T> =>
-		fn(noOpDb as unknown as DatabaseClient),
-} as unknown as DatabaseClient;
+	transaction: async <T>(fn: (tx: DbClient) => Promise<T>): Promise<T> =>
+		fn(noOpDb as unknown as DbClient),
+} as unknown as DbClient;
 
 /** Build a Layer providing all DAV router requirements from simple slug→id maps. */
 const makeRouterLayer = (
@@ -435,7 +441,7 @@ const makeRouterLayer = (
 			processAfterDelete: (_opts) => Effect.void,
 			processOutboxPost: (_opts) => Effect.succeed([]),
 		}),
-		IanaTimezoneService.Default,
+		IanaTimezoneServiceLive,
 		Layer.succeed(DatabaseClient, noOpDb),
 	);
 
@@ -449,11 +455,9 @@ const makeRouterLayer = (
 		// their semantics; specific subscription tests can override.
 		Layer.succeed(
 			ExternalCalendarRepository,
-			ExternalCalendarRepository.of(
-				stubService<ExternalCalendarRepositoryShape>({
-					findClaimByCollection: () => Effect.succeed(Option.none()),
-				}),
-			),
+			stubService<ExternalCalendarRepositoryShape>({
+				findClaimByCollection: () => Effect.succeed(Option.none()),
+			}),
 		),
 	);
 };

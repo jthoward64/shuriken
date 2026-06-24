@@ -57,7 +57,7 @@ export interface CardIndexRepositoryShape {
 	>;
 }
 
-export class CardIndexRepository extends Context.Tag("CardIndexRepository")<
+export class CardIndexRepository extends Context.Service<
 	CardIndexRepository,
 	CardIndexRepositoryShape
->() {}
+>()("CardIndexRepository") {}

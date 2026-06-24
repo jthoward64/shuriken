@@ -176,7 +176,7 @@ export const CardEditServiceLive = Layer.effect(
 		const db = yield* DatabaseClient;
 		const entityRepo = yield* EntityRepository;
 		const instanceSvc = yield* InstanceService;
-		return CardEditService.of({
+		return {
 			create: (addressbookId, form) =>
 				create(addressbookId, form).pipe(
 					Effect.provideService(ComponentRepository, componentRepo),
@@ -195,6 +195,6 @@ export const CardEditServiceLive = Layer.effect(
 				del(instanceId).pipe(
 					Effect.provideService(InstanceService, instanceSvc),
 				),
-		});
+		};
 	}),
 );

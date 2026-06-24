@@ -49,7 +49,7 @@ export interface DomainEntityServiceShape {
 	readonly remove: (id: EntityId) => Effect.Effect<void, DatabaseError>;
 }
 
-export class DomainEntityService extends Context.Tag("DomainEntityService")<
+export class DomainEntityService extends Context.Service<
 	DomainEntityService,
 	DomainEntityServiceShape
->() {}
+>()("DomainEntityService") {}

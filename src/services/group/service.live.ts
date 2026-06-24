@@ -13,7 +13,7 @@ export const GroupServiceLive = Layer.effect(
 	Effect.gen(function* () {
 		const repo = yield* GroupRepository;
 
-		return GroupService.of({
+		return {
 			create: Effect.fn("GroupService.create")(function* (input: NewGroup) {
 				yield* Effect.annotateCurrentSpan({ "group.slug": input.slug });
 				yield* Effect.logTrace("group.create", { slug: input.slug });
@@ -174,6 +174,6 @@ export const GroupServiceLive = Layer.effect(
 				yield* repo.setMembers(groupId, userIds);
 				yield* Effect.logTrace("group.setMembers done", { groupId });
 			}),
-		});
+		};
 	}),
 );

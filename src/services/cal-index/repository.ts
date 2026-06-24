@@ -65,7 +65,7 @@ export interface CalIndexRepositoryShape {
 	) => Effect.Effect<void, DatabaseError>;
 }
 
-export class CalIndexRepository extends Context.Tag("CalIndexRepository")<
+export class CalIndexRepository extends Context.Service<
 	CalIndexRepository,
 	CalIndexRepositoryShape
->() {}
+>()("CalIndexRepository") {}

@@ -60,7 +60,7 @@ export interface ProvisioningServiceShape {
 	) => Effect.Effect<void, DatabaseError>;
 }
 
-export class ProvisioningService extends Context.Tag("ProvisioningService")<
+export class ProvisioningService extends Context.Service<
 	ProvisioningService,
 	ProvisioningServiceShape
->() {}
+>()("ProvisioningService") {}

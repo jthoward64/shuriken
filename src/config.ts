@@ -1,4 +1,4 @@
-import { Config, ConfigProvider, Effect } from "effect";
+import { Config, ConfigProvider, Context, Effect, Layer } from "effect";
 
 // ---------------------------------------------------------------------------
 // Application configuration — all env vars read through Effect's Config API.
@@ -19,7 +19,7 @@ import { Config, ConfigProvider, Effect } from "effect";
 const DEFAULT_PORT = 3000;
 
 export const ServerConfig = Config.all({
-	port: Config.integer("port").pipe(Config.withDefault(DEFAULT_PORT)),
+	port: Config.int("port").pipe(Config.withDefault(DEFAULT_PORT)),
 	host: Config.string("host").pipe(Config.withDefault("::")),
 });
 
@@ -124,7 +124,7 @@ export const ExternalCalendarConfig = Config.all({
 	 * subscription shows events within a minute, large enough not to thrash
 	 * the DB when no work is pending.
 	 */
-	schedulerTickS: Config.integer("externalCalendarSchedulerTickS").pipe(
+	schedulerTickS: Config.int("externalCalendarSchedulerTickS").pipe(
 		Config.withDefault(DEFAULT_EXTERNAL_TICK_S),
 	),
 	/**
@@ -132,7 +132,7 @@ export const ExternalCalendarConfig = Config.all({
 	 * Each one is an outbound HTTP call + DB transaction per claim, so 4
 	 * gives reasonable throughput without overloading slow upstreams.
 	 */
-	fetchConcurrency: Config.integer("externalCalendarFetchConcurrency").pipe(
+	fetchConcurrency: Config.int("externalCalendarFetchConcurrency").pipe(
 		Config.withDefault(DEFAULT_EXTERNAL_CONCURRENCY),
 	),
 	/**
@@ -141,7 +141,7 @@ export const ExternalCalendarConfig = Config.all({
 	 * this generous; public-facing multi-tenant deployments may want it
 	 * lower.
 	 */
-	claimCap: Config.integer("externalCalendarClaimCap").pipe(
+	claimCap: Config.int("externalCalendarClaimCap").pipe(
 		Config.withDefault(DEFAULT_EXTERNAL_CLAIM_CAP),
 	),
 });
@@ -217,16 +217,15 @@ export const MailConfig = Config.all({
 	),
 	defaultFromName: Config.string("smtpFromName").pipe(Config.withDefault("")),
 	defaultHost: Config.string("smtpHost").pipe(Config.withDefault("")),
-	defaultPort: Config.integer("smtpPort").pipe(
+	defaultPort: Config.int("smtpPort").pipe(
 		Config.withDefault(SMTP_DEFAULT_PORT),
 	),
 	defaultUsername: Config.string("smtpUsername").pipe(Config.withDefault("")),
 	defaultPassword: Config.string("smtpPassword").pipe(Config.withDefault("")),
-	defaultSecurity: Config.literal(
-		"none",
-		"starttls",
-		"tls",
-	)("smtpSecurity").pipe(Config.withDefault("starttls")),
+	defaultSecurity: Config.literals(
+		["none", "starttls", "tls"],
+		"smtpSecurity",
+	).pipe(Config.withDefault("starttls")),
 	/**
 	 * Symmetric key used to encrypt per-user SMTP passwords stored in the DB.
 	 * Required to write or read user-level creds; if unset, that source is
@@ -240,9 +239,7 @@ export const MailConfig = Config.all({
 	 * default — incoming iMIP isn't useful without a configured upstream.
 	 */
 	lmtpEnabled: Config.boolean("lmtpEnabled").pipe(Config.withDefault(false)),
-	lmtpPort: Config.integer("lmtpPort").pipe(
-		Config.withDefault(LMTP_DEFAULT_PORT),
-	),
+	lmtpPort: Config.int("lmtpPort").pipe(Config.withDefault(LMTP_DEFAULT_PORT)),
 	lmtpHost: Config.string("lmtpHost").pipe(Config.withDefault("127.0.0.1")),
 	/**
 	 * Server-wide regex-scoped SMTP profiles. JSON-encoded array; each entry:
@@ -296,11 +293,11 @@ const BirthdayConfig = Config.all({
 	 * even if write-side hooks miss them, without putting noticeable load on
 	 * the DB.
 	 */
-	schedulerTickS: Config.integer("birthdaySchedulerTickS").pipe(
+	schedulerTickS: Config.int("birthdaySchedulerTickS").pipe(
 		Config.withDefault(DEFAULT_BIRTHDAY_TICK_S),
 	),
 	/** Max principals reconciled in parallel per tick. */
-	concurrency: Config.integer("birthdayConcurrency").pipe(
+	concurrency: Config.int("birthdayConcurrency").pipe(
 		Config.withDefault(DEFAULT_BIRTHDAY_CONCURRENCY),
 	),
 });
@@ -316,7 +313,7 @@ export const AppConfig = Config.all({
 	nodeEnv: Config.string("nodeEnv").pipe(Config.withDefault("production")),
 });
 
-export type AppConfigType = Config.Config.Success<typeof AppConfig>;
+export type AppConfigType = Config.Success<typeof AppConfig>;
 
 // ---------------------------------------------------------------------------
 // AppConfigService — Effect service wrapping the full application config.
@@ -330,15 +327,21 @@ export type AppConfigType = Config.Config.Success<typeof AppConfig>;
 // remember to set it up.
 // ---------------------------------------------------------------------------
 
-export class AppConfigService extends Effect.Service<AppConfigService>()(
+export class AppConfigService extends Context.Service<AppConfigService>()(
 	"AppConfigService",
 	{
-		effect: AppConfig.pipe(
-			Effect.withConfigProvider(
-				ConfigProvider.fromEnv().pipe(ConfigProvider.constantCase),
+		make: AppConfig.pipe(
+			// Apply constantCase to the ambient (env-backed) ConfigProvider so
+			// camelCase keys here map to SCREAMING_SNAKE_CASE env vars.
+			Effect.updateService(
+				ConfigProvider.ConfigProvider,
+				ConfigProvider.constantCase,
 			),
 		),
 	},
 ) {}
 
-export const AppConfigLive = AppConfigService.Default;
+export const AppConfigLive = Layer.effect(
+	AppConfigService,
+	AppConfigService.make,
+);

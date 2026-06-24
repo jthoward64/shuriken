@@ -12,20 +12,16 @@
     "jsr:@std/testing@^1.0.19": "1.0.19",
     "npm:@biomejs/biome@*": "2.4.9",
     "npm:@biomejs/biome@2.4.9": "2.4.9",
-    "npm:@effect/experimental@0.60": "0.60.0_@effect+platform@0.96.2__effect@3.21.4_effect@3.21.4",
-    "npm:@effect/opentelemetry@0.63": "0.63.0_@effect+platform@0.96.2__effect@3.21.4_@opentelemetry+api@1.9.1_@opentelemetry+resources@2.8.0__@opentelemetry+api@1.9.1_@opentelemetry+sdk-logs@0.219.0__@opentelemetry+api@1.9.1_@opentelemetry+sdk-metrics@2.8.0__@opentelemetry+api@1.9.1_@opentelemetry+sdk-trace-base@2.8.0__@opentelemetry+api@1.9.1_@opentelemetry+sdk-trace-node@2.8.0__@opentelemetry+api@1.9.1_@opentelemetry+sdk-trace-web@2.8.0__@opentelemetry+api@1.9.1_@opentelemetry+semantic-conventions@1.41.1_effect@3.21.4",
-    "npm:@effect/platform-node@0.107": "0.107.0_@effect+cluster@0.59.0__@effect+platform@0.96.2___effect@3.21.4__@effect+rpc@0.75.1___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+sql@0.51.1___@effect+experimental@0.60.0____@effect+platform@0.96.2_____effect@3.21.4____effect@3.21.4___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+workflow@0.18.2___@effect+experimental@0.60.0____@effect+platform@0.96.2_____effect@3.21.4____effect@3.21.4___@effect+platform@0.96.2____effect@3.21.4___@effect+rpc@0.75.1____@effect+platform@0.96.2_____effect@3.21.4____effect@3.21.4___effect@3.21.4__effect@3.21.4__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4_@effect+platform@0.96.2__effect@3.21.4_@effect+rpc@0.75.1__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+sql@0.51.1__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_effect@3.21.4_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+workflow@0.18.2__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+platform@0.96.2___effect@3.21.4__@effect+rpc@0.75.1___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__effect@3.21.4",
-    "npm:@effect/platform@~0.96.2": "0.96.2_effect@3.21.4",
+    "npm:@effect/platform-node@4.0.0-beta.88": "4.0.0-beta.88_effect@4.0.0-beta.88_ioredis@5.11.1",
     "npm:@electric-sql/pglite-icu-full@0.1": "0.1.0",
     "npm:@electric-sql/pglite@~0.5.3": "0.5.3",
     "npm:@js-temporal/polyfill@~0.5.1": "0.5.1",
-    "npm:@opentelemetry/sdk-trace-base@^2.8.0": "2.8.0_@opentelemetry+api@1.9.1",
     "npm:casbin@^5.51.0": "5.51.0",
-    "npm:drizzle-adapter@^1.4.0": "1.4.0_casbin@5.51.0_drizzle-orm@1.0.0-beta.22__@effect+sql@0.49.0___@effect+experimental@0.60.0____@effect+platform@0.96.2_____effect@3.21.4____effect@3.21.4___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@electric-sql+pglite@0.5.3__@opentelemetry+api@1.9.1__postgres@3.4.9__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+platform@0.96.2__effect@3.21.4_effect@3.21.4",
+    "npm:drizzle-adapter@^1.4.0": "1.4.0_casbin@5.51.0_drizzle-orm@1.0.0-beta.22__@electric-sql+pglite@0.5.3__postgres@3.4.9__ioredis@5.11.1_ioredis@5.11.1",
     "npm:drizzle-kit@*": "0.31.10",
-    "npm:drizzle-kit@^1.0.0-beta.22": "1.0.0-rc.4-ca0f029",
-    "npm:drizzle-orm@^1.0.0-beta.22": "1.0.0-beta.22_@effect+sql@0.49.0__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@electric-sql+pglite@0.5.3_@opentelemetry+api@1.9.1_postgres@3.4.9_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+platform@0.96.2__effect@3.21.4_effect@3.21.4",
-    "npm:effect@^3.21.4": "3.21.4",
+    "npm:drizzle-kit@1.0.0-rc.3": "1.0.0-rc.3",
+    "npm:drizzle-orm@1.0.0-rc.3": "1.0.0-rc.3_@electric-sql+pglite@0.5.3_effect@4.0.0-beta.88_postgres@3.4.9",
+    "npm:effect@4.0.0-beta.88": "4.0.0-beta.88",
     "npm:fast-xml-builder@^1.2.0": "1.2.0",
     "npm:fast-xml-parser@^5.9.3": "5.9.3",
     "npm:handlebars@^4.7.9": "4.7.9",
@@ -143,109 +139,52 @@
     "@drizzle-team/brocli@0.11.0": {
       "integrity": "sha512-hD3pekGiPg0WPCCGAZmusBBJsDqGUR66Y452YgQsZOnkdQ7ViEPKuyP4huUGEZQefp8g34RRodXYmJ2TbCH+tg=="
     },
-    "@effect/cluster@0.59.0_@effect+platform@0.96.2__effect@3.21.4_@effect+rpc@0.75.1__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+sql@0.51.1__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+workflow@0.18.2__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+platform@0.96.2___effect@3.21.4__@effect+rpc@0.75.1___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__effect@3.21.4_effect@3.21.4_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4": {
-      "integrity": "sha512-rxtJ0zlcdDDtn9wau0z/PFfwPP2FsYPB2/tSK4tT8DkTYQmACJ5AwRwZm3Ea83iL/gv3df63lRe94oMiS8bFfg==",
-      "dependencies": [
-        "@effect/platform",
-        "@effect/rpc",
-        "@effect/sql@0.51.1_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+platform@0.96.2__effect@3.21.4_effect@3.21.4",
-        "@effect/workflow",
-        "effect",
-        "kubernetes-types"
-      ]
-    },
-    "@effect/experimental@0.60.0_@effect+platform@0.96.2__effect@3.21.4_effect@3.21.4": {
+    "@effect/experimental@0.60.0_@effect+platform@0.96.2__effect@3.21.4_effect@3.21.4_ioredis@5.11.1": {
       "integrity": "sha512-i5zIg7Xup2KgHyqHlYtkgqSE1bNzCL0GbbTQxrpIzKF0q/ebknOk/ox8B/gIq2vImjoEE81h/oxU+6i1NH210g==",
       "dependencies": [
         "@effect/platform",
-        "effect",
-        "uuid"
+        "effect@3.21.4",
+        "ioredis",
+        "uuid@11.1.1"
+      ],
+      "optionalPeers": [
+        "ioredis"
       ]
     },
-    "@effect/opentelemetry@0.63.0_@effect+platform@0.96.2__effect@3.21.4_@opentelemetry+api@1.9.1_@opentelemetry+resources@2.8.0__@opentelemetry+api@1.9.1_@opentelemetry+sdk-logs@0.219.0__@opentelemetry+api@1.9.1_@opentelemetry+sdk-metrics@2.8.0__@opentelemetry+api@1.9.1_@opentelemetry+sdk-trace-base@2.8.0__@opentelemetry+api@1.9.1_@opentelemetry+sdk-trace-node@2.8.0__@opentelemetry+api@1.9.1_@opentelemetry+sdk-trace-web@2.8.0__@opentelemetry+api@1.9.1_@opentelemetry+semantic-conventions@1.41.1_effect@3.21.4": {
-      "integrity": "sha512-2yUG2QWNATi1uKP0kwhaP5eLp+c5NDzAL3EOpIcGLBAC0cbXZrx4n9Qw/QwUKxpuV+pbhrBUPCiByyWAFKfuCw==",
+    "@effect/platform-node-shared@4.0.0-beta.88_effect@4.0.0-beta.88": {
+      "integrity": "sha512-kkYDsnYCFFXCT9uaZQ/3hdc4fjzt0E68MImXrcHCmneX0xWCRo26m5F+iX6ryQ/lDMuhqu5lIUxIKhqhookTOw==",
       "dependencies": [
-        "@effect/platform",
-        "@opentelemetry/api",
-        "@opentelemetry/resources",
-        "@opentelemetry/sdk-logs",
-        "@opentelemetry/sdk-metrics",
-        "@opentelemetry/sdk-trace-base",
-        "@opentelemetry/sdk-trace-node",
-        "@opentelemetry/sdk-trace-web",
-        "@opentelemetry/semantic-conventions",
-        "effect"
-      ]
-    },
-    "@effect/platform-node-shared@0.60.0_@effect+cluster@0.59.0__@effect+platform@0.96.2___effect@3.21.4__@effect+rpc@0.75.1___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+sql@0.51.1___@effect+experimental@0.60.0____@effect+platform@0.96.2_____effect@3.21.4____effect@3.21.4___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+workflow@0.18.2___@effect+experimental@0.60.0____@effect+platform@0.96.2_____effect@3.21.4____effect@3.21.4___@effect+platform@0.96.2____effect@3.21.4___@effect+rpc@0.75.1____@effect+platform@0.96.2_____effect@3.21.4____effect@3.21.4___effect@3.21.4__effect@3.21.4__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4_@effect+platform@0.96.2__effect@3.21.4_@effect+rpc@0.75.1__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+sql@0.51.1__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_effect@3.21.4_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+workflow@0.18.2__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+platform@0.96.2___effect@3.21.4__@effect+rpc@0.75.1___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__effect@3.21.4": {
-      "integrity": "sha512-obT8Mau/guSYjehF9pg09FHM/ERXAAVBl/FXRXEyvTc7ZiDGTYnPBihytGNccsfNsgqBdvCE24sflwK6j5nFXA==",
-      "dependencies": [
-        "@effect/cluster",
-        "@effect/platform",
-        "@effect/rpc",
-        "@effect/sql@0.51.1_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+platform@0.96.2__effect@3.21.4_effect@3.21.4",
-        "@parcel/watcher",
-        "effect",
-        "multipasta",
+        "@types/ws",
+        "effect@4.0.0-beta.88",
         "ws"
       ]
     },
-    "@effect/platform-node@0.107.0_@effect+cluster@0.59.0__@effect+platform@0.96.2___effect@3.21.4__@effect+rpc@0.75.1___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+sql@0.51.1___@effect+experimental@0.60.0____@effect+platform@0.96.2_____effect@3.21.4____effect@3.21.4___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+workflow@0.18.2___@effect+experimental@0.60.0____@effect+platform@0.96.2_____effect@3.21.4____effect@3.21.4___@effect+platform@0.96.2____effect@3.21.4___@effect+rpc@0.75.1____@effect+platform@0.96.2_____effect@3.21.4____effect@3.21.4___effect@3.21.4__effect@3.21.4__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4_@effect+platform@0.96.2__effect@3.21.4_@effect+rpc@0.75.1__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+sql@0.51.1__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_effect@3.21.4_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+workflow@0.18.2__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+platform@0.96.2___effect@3.21.4__@effect+rpc@0.75.1___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__effect@3.21.4": {
-      "integrity": "sha512-VWUD9SCcnsrXYqED2jIwDHHDGb3QePNsHlX7HfqQGD2/AgnfX9jNnecaFrJj7Rf2gK5VbRE+i/2oNFoC/DkhcA==",
+    "@effect/platform-node@4.0.0-beta.88_effect@4.0.0-beta.88_ioredis@5.11.1": {
+      "integrity": "sha512-k05jVJ8uYFm5VNfFFndM0kePKz9+RNW1r4ofiTMRadWzH6YqlJcuAU7Gj6RXCg2cKV+Ad/CsDqBD6QTi44ZKow==",
       "dependencies": [
-        "@effect/cluster",
-        "@effect/platform",
         "@effect/platform-node-shared",
-        "@effect/rpc",
-        "@effect/sql@0.51.1_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+platform@0.96.2__effect@3.21.4_effect@3.21.4",
-        "effect",
+        "effect@4.0.0-beta.88",
+        "ioredis",
         "mime",
-        "undici",
-        "ws"
+        "undici"
       ]
     },
     "@effect/platform@0.96.2_effect@3.21.4": {
       "integrity": "sha512-oJm3UztdzZvK7BXkFSV3IdyGuqQrhLmViG/hMDZh99ski7aADesNuv19z4R0heH3bAXnSt/Nb8O9KJQ886C0Tg==",
       "dependencies": [
-        "effect",
+        "effect@3.21.4",
         "find-my-way-ts",
-        "msgpackr",
+        "msgpackr@1.12.1",
         "multipasta"
       ]
     },
-    "@effect/rpc@0.75.1_@effect+platform@0.96.2__effect@3.21.4_effect@3.21.4": {
-      "integrity": "sha512-8yxF8+mMGGEbF8BUCp34HjdJj7CvTpGeZxBcpsDF6v7zPiGbJL1UDLzA8ZqYjmcngBHhPecbmeONTk/LiLAaEg==",
-      "dependencies": [
-        "@effect/platform",
-        "effect",
-        "msgpackr"
-      ]
-    },
-    "@effect/sql@0.49.0_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+platform@0.96.2__effect@3.21.4_effect@3.21.4": {
+    "@effect/sql@0.49.0_effect@3.21.4_ioredis@5.11.1": {
       "integrity": "sha512-9UEKR+z+MrI/qMAmSvb/RiD9KlgIazjZUCDSpwNgm0lEK9/Q6ExEyfziiYFVCPiptp52cBw8uBHRic8hHnwqXA==",
       "dependencies": [
         "@effect/experimental",
         "@effect/platform",
-        "effect",
-        "uuid"
-      ]
-    },
-    "@effect/sql@0.51.1_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+platform@0.96.2__effect@3.21.4_effect@3.21.4": {
-      "integrity": "sha512-iPDAefrJcI0HcTk9keP9Gq8Pg08K1HmpnmZZt85AqyTcvorhoNsXDFiKBbPldfV2CortwVkacX8KjO9GPpSYCA==",
-      "dependencies": [
-        "@effect/experimental",
-        "@effect/platform",
-        "effect",
-        "uuid"
-      ]
-    },
-    "@effect/workflow@0.18.2_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+platform@0.96.2__effect@3.21.4_@effect+rpc@0.75.1__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_effect@3.21.4": {
-      "integrity": "sha512-2av0TexhxHnapQa3eLn6TkniokUFRZKf8dlWlLqbODMpXAJ3mm+DOHWM0ozMGkg9K/+zGCtiL3dMqJyJ8r7G8g==",
-      "dependencies": [
-        "@effect/experimental",
-        "@effect/platform",
-        "@effect/rpc",
-        "effect"
+        "effect@3.21.4",
+        "uuid@11.1.1"
       ]
     },
     "@electric-sql/pglite-icu-full@0.1.0": {
@@ -640,6 +579,9 @@
       "os": ["win32"],
       "cpu": ["x64"]
     },
+    "@ioredis/commands@1.10.0": {
+      "integrity": "sha512-UmeW7z4LfctwoQ5wkhVzgq8tXkreED2xZGpX+Bg+zA+WJFZCT6c062AfCK/Dfk81xZnnwdhJCUMkitihRaoC2Q=="
+    },
     "@js-temporal/polyfill@0.5.1": {
       "integrity": "sha512-hloP58zRVCRSpgDxmqCWJNlizAlUgJFqG2ypq79DCvyv9tHjRYMDOcPFjzfl/A1/YxDvRCZz8wvZvmapQnKwFQ==",
       "dependencies": [
@@ -679,172 +621,8 @@
     "@nodable/entities@2.2.0": {
       "integrity": "sha512-9uGyhaQavEUMC8AIddIjau4NsnsXhou+j5sBAGojCM1oxmQpVKTWR/9JxABD6UAv12vpIms55fPZKFQEhG6uBg=="
     },
-    "@opentelemetry/api-logs@0.219.0": {
-      "integrity": "sha512-FFx7YnaYJlIjqWW/AG/yAZ0L/NEY724PipXXXQLdtZPbLwBGbUMTGL1i/esI56TWfTUXxhLfpgrnWJCG8aUJyg==",
-      "dependencies": [
-        "@opentelemetry/api"
-      ]
-    },
     "@opentelemetry/api@1.9.1": {
       "integrity": "sha512-gLyJlPHPZYdAk1JENA9LeHejZe1Ti77/pTeFm/nMXmQH/HFZlcS/O2XJB+L8fkbrNSqhdtlvjBVjxwUYanNH5Q=="
-    },
-    "@opentelemetry/context-async-hooks@2.8.0_@opentelemetry+api@1.9.1": {
-      "integrity": "sha512-/3FIraneMcng67SUJCxvyInk/oxzwsxyadufk0wwfOBLf5wqtAGX4MoQASwSbndBPeARzBryUM9Azr5kHIdWLw==",
-      "dependencies": [
-        "@opentelemetry/api"
-      ]
-    },
-    "@opentelemetry/core@2.8.0_@opentelemetry+api@1.9.1": {
-      "integrity": "sha512-hd1Lfh8p545nNz+jq1Ejfz+Mn1hyLuxYn1YzTfFNrxr8urEWMNQLPf1Th8kjOH+HxwawCrtgBp8JpBUR4ZSgww==",
-      "dependencies": [
-        "@opentelemetry/api",
-        "@opentelemetry/semantic-conventions"
-      ]
-    },
-    "@opentelemetry/resources@2.8.0_@opentelemetry+api@1.9.1": {
-      "integrity": "sha512-qmXQ27ilDbUK/vGMqwL8D4/rhn76C+sherM4wTbjlfknR8Nvfc/hCxjRJPhkzZzUsPiNg16SA31NxMabwttRjg==",
-      "dependencies": [
-        "@opentelemetry/api",
-        "@opentelemetry/core",
-        "@opentelemetry/semantic-conventions"
-      ]
-    },
-    "@opentelemetry/sdk-logs@0.219.0_@opentelemetry+api@1.9.1": {
-      "integrity": "sha512-s6lTKRakaPClvKoWHRChxnXjDMkM/TQ30ff78jN6EBGf7MI7VzANE5PU3f4z9qDUudWjvZjOLHG0rBnBKYvoXA==",
-      "dependencies": [
-        "@opentelemetry/api",
-        "@opentelemetry/api-logs",
-        "@opentelemetry/core",
-        "@opentelemetry/resources",
-        "@opentelemetry/semantic-conventions"
-      ]
-    },
-    "@opentelemetry/sdk-metrics@2.8.0_@opentelemetry+api@1.9.1": {
-      "integrity": "sha512-UDBGaj6W0Rgy5rTTaoxs8gVGF/aGkAKyjurJv7se6wjRxJu7FoquTLT/vt54DZfo4crbprYfhX/SOK9+BPw1qg==",
-      "dependencies": [
-        "@opentelemetry/api",
-        "@opentelemetry/core",
-        "@opentelemetry/resources"
-      ]
-    },
-    "@opentelemetry/sdk-trace-base@2.8.0_@opentelemetry+api@1.9.1": {
-      "integrity": "sha512-mhU4jp+vW0mGbFRd+GeXHvmfA4aDqWjBjLC3pE5XMpLs0IE2ryYb019Ts2AQrOq67gaTF25D91+fgvEHDZEnuQ==",
-      "dependencies": [
-        "@opentelemetry/api",
-        "@opentelemetry/core",
-        "@opentelemetry/resources",
-        "@opentelemetry/semantic-conventions"
-      ]
-    },
-    "@opentelemetry/sdk-trace-node@2.8.0_@opentelemetry+api@1.9.1": {
-      "integrity": "sha512-nZt9OGufioAc3AfoLTqA9bsAeaMJAictYDdI2VcNQ+PmT+3rfKjAZDZvgPfd8VPX0O5Bw1hdQF6kDK8VSpZiWg==",
-      "dependencies": [
-        "@opentelemetry/api",
-        "@opentelemetry/context-async-hooks",
-        "@opentelemetry/core",
-        "@opentelemetry/sdk-trace-base"
-      ]
-    },
-    "@opentelemetry/sdk-trace-web@2.8.0_@opentelemetry+api@1.9.1": {
-      "integrity": "sha512-P3ZM8BGJ5mwjtyfAxRyxsCyWHvaj+xahdhLoS3YiPsEyTHcWTVzx2691C8SrGkpvro3tNFCsWuNNrvM+spKODg==",
-      "dependencies": [
-        "@opentelemetry/api",
-        "@opentelemetry/core",
-        "@opentelemetry/sdk-trace-base"
-      ]
-    },
-    "@opentelemetry/semantic-conventions@1.41.1": {
-      "integrity": "sha512-/UhIkaZgPutTFmQ7RnIJGgDXZmtEJ7Dvi86xNTFWcnRxVRNk/aotsqDJYeEvDP+FSMB2SdW+pQzNMcWP0rwuNA=="
-    },
-    "@parcel/watcher-android-arm64@2.5.6": {
-      "integrity": "sha512-YQxSS34tPF/6ZG7r/Ih9xy+kP/WwediEUsqmtf0cuCV5TPPKw/PQHRhueUo6JdeFJaqV3pyjm0GdYjZotbRt/A==",
-      "os": ["android"],
-      "cpu": ["arm64"]
-    },
-    "@parcel/watcher-darwin-arm64@2.5.6": {
-      "integrity": "sha512-Z2ZdrnwyXvvvdtRHLmM4knydIdU9adO3D4n/0cVipF3rRiwP+3/sfzpAwA/qKFL6i1ModaabkU7IbpeMBgiVEA==",
-      "os": ["darwin"],
-      "cpu": ["arm64"]
-    },
-    "@parcel/watcher-darwin-x64@2.5.6": {
-      "integrity": "sha512-HgvOf3W9dhithcwOWX9uDZyn1lW9R+7tPZ4sug+NGrGIo4Rk1hAXLEbcH1TQSqxts0NYXXlOWqVpvS1SFS4fRg==",
-      "os": ["darwin"],
-      "cpu": ["x64"]
-    },
-    "@parcel/watcher-freebsd-x64@2.5.6": {
-      "integrity": "sha512-vJVi8yd/qzJxEKHkeemh7w3YAn6RJCtYlE4HPMoVnCpIXEzSrxErBW5SJBgKLbXU3WdIpkjBTeUNtyBVn8TRng==",
-      "os": ["freebsd"],
-      "cpu": ["x64"]
-    },
-    "@parcel/watcher-linux-arm-glibc@2.5.6": {
-      "integrity": "sha512-9JiYfB6h6BgV50CCfasfLf/uvOcJskMSwcdH1PHH9rvS1IrNy8zad6IUVPVUfmXr+u+Km9IxcfMLzgdOudz9EQ==",
-      "os": ["linux"],
-      "cpu": ["arm"]
-    },
-    "@parcel/watcher-linux-arm-musl@2.5.6": {
-      "integrity": "sha512-Ve3gUCG57nuUUSyjBq/MAM0CzArtuIOxsBdQ+ftz6ho8n7s1i9E1Nmk/xmP323r2YL0SONs1EuwqBp2u1k5fxg==",
-      "os": ["linux"],
-      "cpu": ["arm"]
-    },
-    "@parcel/watcher-linux-arm64-glibc@2.5.6": {
-      "integrity": "sha512-f2g/DT3NhGPdBmMWYoxixqYr3v/UXcmLOYy16Bx0TM20Tchduwr4EaCbmxh1321TABqPGDpS8D/ggOTaljijOA==",
-      "os": ["linux"],
-      "cpu": ["arm64"]
-    },
-    "@parcel/watcher-linux-arm64-musl@2.5.6": {
-      "integrity": "sha512-qb6naMDGlbCwdhLj6hgoVKJl2odL34z2sqkC7Z6kzir8b5W65WYDpLB6R06KabvZdgoHI/zxke4b3zR0wAbDTA==",
-      "os": ["linux"],
-      "cpu": ["arm64"]
-    },
-    "@parcel/watcher-linux-x64-glibc@2.5.6": {
-      "integrity": "sha512-kbT5wvNQlx7NaGjzPFu8nVIW1rWqV780O7ZtkjuWaPUgpv2NMFpjYERVi0UYj1msZNyCzGlaCWEtzc+exjMGbQ==",
-      "os": ["linux"],
-      "cpu": ["x64"]
-    },
-    "@parcel/watcher-linux-x64-musl@2.5.6": {
-      "integrity": "sha512-1JRFeC+h7RdXwldHzTsmdtYR/Ku8SylLgTU/reMuqdVD7CtLwf0VR1FqeprZ0eHQkO0vqsbvFLXUmYm/uNKJBg==",
-      "os": ["linux"],
-      "cpu": ["x64"]
-    },
-    "@parcel/watcher-win32-arm64@2.5.6": {
-      "integrity": "sha512-3ukyebjc6eGlw9yRt678DxVF7rjXatWiHvTXqphZLvo7aC5NdEgFufVwjFfY51ijYEWpXbqF5jtrK275z52D4Q==",
-      "os": ["win32"],
-      "cpu": ["arm64"]
-    },
-    "@parcel/watcher-win32-ia32@2.5.6": {
-      "integrity": "sha512-k35yLp1ZMwwee3Ez/pxBi5cf4AoBKYXj00CZ80jUz5h8prpiaQsiRPKQMxoLstNuqe2vR4RNPEAEcjEFzhEz/g==",
-      "os": ["win32"],
-      "cpu": ["ia32"]
-    },
-    "@parcel/watcher-win32-x64@2.5.6": {
-      "integrity": "sha512-hbQlYcCq5dlAX9Qx+kFb0FHue6vbjlf0FrNzSKdYK2APUf7tGfGxQCk2ihEREmbR6ZMc0MVAD5RIX/41gpUzTw==",
-      "os": ["win32"],
-      "cpu": ["x64"]
-    },
-    "@parcel/watcher@2.5.6": {
-      "integrity": "sha512-tmmZ3lQxAe/k/+rNnXQRawJ4NjxO2hqiOLTHvWchtGZULp4RyFeh6aU4XdOYBFe2KE1oShQTv4AblOs2iOrNnQ==",
-      "dependencies": [
-        "detect-libc",
-        "is-glob",
-        "node-addon-api",
-        "picomatch"
-      ],
-      "optionalDependencies": [
-        "@parcel/watcher-android-arm64",
-        "@parcel/watcher-darwin-arm64",
-        "@parcel/watcher-darwin-x64",
-        "@parcel/watcher-freebsd-x64",
-        "@parcel/watcher-linux-arm-glibc",
-        "@parcel/watcher-linux-arm-musl",
-        "@parcel/watcher-linux-arm64-glibc",
-        "@parcel/watcher-linux-arm64-musl",
-        "@parcel/watcher-linux-x64-glibc",
-        "@parcel/watcher-linux-x64-musl",
-        "@parcel/watcher-win32-arm64",
-        "@parcel/watcher-win32-ia32",
-        "@parcel/watcher-win32-x64"
-      ],
-      "scripts": true
     },
     "@selderee/plugin-htmlparser2@0.12.0_selderee@0.12.0": {
       "integrity": "sha512-oELmoyA6ML9jDRMV3kgcMQFKxUfBU0yFVn6yTctVaLT5ygXnxH52I3TZEgV9EhXJC68/uFvE5Daj1/25c0Xa/A==",
@@ -856,6 +634,18 @@
     },
     "@standard-schema/spec@1.1.0": {
       "integrity": "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w=="
+    },
+    "@types/node@26.0.0": {
+      "integrity": "sha512-vf2YFi1iY9lHGwNJMs01biZFbKJkrZR1T6/MlzjhJLPdntOHLhTrDSnSVcdtvjihi4VQNlrFRIxLsDBlQpAipA==",
+      "dependencies": [
+        "undici-types"
+      ]
+    },
+    "@types/ws@8.18.1": {
+      "integrity": "sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==",
+      "dependencies": [
+        "@types/node"
+      ]
     },
     "@zone-eu/mailsplit@5.4.12": {
       "integrity": "sha512-w7Gy+NvjZ0MiXm8F6zfjImAqcTONKDImgWVBjDKQVFUXWuz3VFM5levNArkL2M877ajql5+bkS2pDV56injlmg==",
@@ -903,11 +693,23 @@
         "minimatch"
       ]
     },
+    "cluster-key-slot@1.1.1": {
+      "integrity": "sha512-rwHwUfXL40Chm1r08yrhU3qpUvdVlgkKNeyeGPOxnW8/SyVDvgRaed/Uz54AqWNaTCAThlj6QAs3TZcKI0xDEw=="
+    },
     "csv-parse@5.6.0": {
       "integrity": "sha512-l3nz3euub2QMg5ouu5U09Ew9Wf6/wQ8I++ch1loQ0ljmzhmfZYrH9fflS22i/PQEvsPvxCwxgz5q7UB8K1JO4Q=="
     },
+    "debug@4.4.3": {
+      "integrity": "sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA==",
+      "dependencies": [
+        "ms"
+      ]
+    },
     "deepmerge-ts@7.1.5": {
       "integrity": "sha512-HOJkrhaYsweh+W+e74Yn7YStZOilkoPb6fycpwNLKzSPtruFs48nYis0zy5yJz1+ktUhHxoRDJ27RQAWLIJVJw=="
+    },
+    "denque@2.1.0": {
+      "integrity": "sha512-HVQE3AAb/pxF8fQAoiqpvg9i3evqug3hoiwakOyZAwJm+6vZehbkYXZ0l4JxS+I3QxM97v5aaRNhj8v5oBhekw=="
     },
     "detect-libc@2.1.2": {
       "integrity": "sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ=="
@@ -937,11 +739,11 @@
         "domhandler"
       ]
     },
-    "drizzle-adapter@1.4.0_casbin@5.51.0_drizzle-orm@1.0.0-beta.22__@effect+sql@0.49.0___@effect+experimental@0.60.0____@effect+platform@0.96.2_____effect@3.21.4____effect@3.21.4___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@electric-sql+pglite@0.5.3__@opentelemetry+api@1.9.1__postgres@3.4.9__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+platform@0.96.2__effect@3.21.4_effect@3.21.4": {
+    "drizzle-adapter@1.4.0_casbin@5.51.0_drizzle-orm@1.0.0-beta.22__@electric-sql+pglite@0.5.3__postgres@3.4.9__ioredis@5.11.1_ioredis@5.11.1": {
       "integrity": "sha512-UU4ZcGYIZeSSdfZaTlZBUNjQ+Aj1T64QsB/ayBsskHo6bRQiw5fbX3CSyc7yllTCZ+jE5207EKvwAJpHgT2nNw==",
       "dependencies": [
         "casbin",
-        "drizzle-orm"
+        "drizzle-orm@1.0.0-beta.22_@electric-sql+pglite@0.5.3_postgres@3.4.9_ioredis@5.11.1"
       ]
     },
     "drizzle-kit@0.31.10": {
@@ -954,8 +756,8 @@
       ],
       "bin": true
     },
-    "drizzle-kit@1.0.0-rc.4-ca0f029": {
-      "integrity": "sha512-hM1K72ptIPOpJDScHo7cAF+K8A8Tr3q2yHvBJvOZWvLn2lN+G4RDUvG3rT3ohlSE2O3BN/s7g3e3JiQLStt8iQ==",
+    "drizzle-kit@1.0.0-rc.3": {
+      "integrity": "sha512-lwGIi6GTlEYzrtac1Szecns+zrAxjaOoNysfBCKRQOXQE7nMJ8IU2I2S6ek3FHEm1N30dQb5YrTdqV7zNH6n7A==",
       "dependencies": [
         "@drizzle-team/brocli@0.11.0",
         "@js-temporal/polyfill",
@@ -965,20 +767,33 @@
       ],
       "bin": true
     },
-    "drizzle-orm@1.0.0-beta.22_@effect+sql@0.49.0__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@electric-sql+pglite@0.5.3_@opentelemetry+api@1.9.1_postgres@3.4.9_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+platform@0.96.2__effect@3.21.4_effect@3.21.4": {
+    "drizzle-orm@1.0.0-beta.22_@electric-sql+pglite@0.5.3_postgres@3.4.9_ioredis@5.11.1": {
       "integrity": "sha512-F+DZyVIvH0oVKa/w08Cle1xfoH+pc+htIXHG/frnMLG72aby9NYYr9oc+9XvghnoO4umxFItduz0OMmQJMnenw==",
       "dependencies": [
-        "@effect/sql@0.49.0_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+platform@0.96.2__effect@3.21.4_effect@3.21.4",
+        "@effect/sql",
         "@electric-sql/pglite",
         "@opentelemetry/api",
         "pg",
         "postgres"
       ],
       "optionalPeers": [
-        "@effect/sql@0.49.0_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+platform@0.96.2__effect@3.21.4_effect@3.21.4",
+        "@effect/sql",
         "@electric-sql/pglite",
         "@opentelemetry/api",
         "pg",
+        "postgres"
+      ]
+    },
+    "drizzle-orm@1.0.0-rc.3_@electric-sql+pglite@0.5.3_effect@4.0.0-beta.88_postgres@3.4.9": {
+      "integrity": "sha512-akZOa5UxapFbdBG8IDkfBRpSZJpMHaOJtGgp7oi1oHaiU8S3KN92waHo2l5aRuv1D9tMGYpv3BQFOsiGcNjLTQ==",
+      "dependencies": [
+        "@electric-sql/pglite",
+        "effect@4.0.0-beta.88",
+        "postgres"
+      ],
+      "optionalPeers": [
+        "@electric-sql/pglite",
+        "effect@4.0.0-beta.88",
         "postgres"
       ]
     },
@@ -986,7 +801,22 @@
       "integrity": "sha512-B89v/xSgPbl1J2Ai2u18jxq3odpFauU1rC6/eSs4FeNHi72kwKdJp12VGigvRV2lK+kRnx+OOz41XV8guZd4gQ==",
       "dependencies": [
         "@standard-schema/spec",
-        "fast-check"
+        "fast-check@3.23.2"
+      ]
+    },
+    "effect@4.0.0-beta.88": {
+      "integrity": "sha512-ml7Xr2BhU12RnNk5xX0lPqHv5pIXg7E161ooGlYncFd17Z5NKXL26DnfvwZsNBxYLS0ToGVMhb4Em7Z0A4dTDA==",
+      "dependencies": [
+        "@standard-schema/spec",
+        "fast-check@4.8.0",
+        "find-my-way-ts",
+        "ini",
+        "kubernetes-types",
+        "msgpackr@2.0.4",
+        "multipasta",
+        "toml",
+        "uuid@14.0.1",
+        "yaml"
       ]
     },
     "encoding-japanese@2.2.0": {
@@ -1096,7 +926,13 @@
     "fast-check@3.23.2": {
       "integrity": "sha512-h5+1OzzfCC3Ef7VbtKdcv7zsstUQwUDlYpUTvjeUsJAssPgLn7QzbboPtL5ro04Mq0rPOsMzl7q5hIbRs2wD1A==",
       "dependencies": [
-        "pure-rand"
+        "pure-rand@6.1.0"
+      ]
+    },
+    "fast-check@4.8.0": {
+      "integrity": "sha512-GOJ158CUMnN6cSahsv4+ExARvIDuzzinFjkp0E9WtiBa5zcVeLozVkWaE4IzFcc+Y48Wp1EDlUZsXRyAztQcSg==",
+      "dependencies": [
+        "pure-rand@8.4.0"
       ]
     },
     "fast-xml-builder@1.2.0": {
@@ -1180,13 +1016,19 @@
     "ieee754@1.2.1": {
       "integrity": "sha512-dcyqhDvX1C46lXZcVqCpK+FtMRQVdIMN6/Df5js2zouUsqG7I6sFxitIC+7KYK29KdXOLHdu9zL4sFnoVQnqaA=="
     },
-    "is-extglob@2.1.1": {
-      "integrity": "sha512-SbKbANkN603Vi4jEZv49LeVJMn4yGwsbzZworEoyEiutsN3nJYdbO36zfhGJ6QEDpOZIFkDtnq5JRxmvl3jsoQ=="
+    "ini@7.0.0": {
+      "integrity": "sha512-ifK0CgjALofS5bkrcTy4RaQ9Vx2Knf/eLeIO+NaswQEpH1UblrtTSCIvN71qQDMq0PeQ/SSPojvEJp9vvvfr+w=="
     },
-    "is-glob@4.0.3": {
-      "integrity": "sha512-xelSayHH36ZgE7ZWhli7pW34hNbNl8Ojv5KVmkJD4hBdD3th8Tfk9vYasLM+mXWOZhFkgZfxhLSnrwRr4elSSg==",
+    "ioredis@5.11.1": {
+      "integrity": "sha512-ehuGcf94bQXhfagULNXrJdfnWO38v070jxSx/qE87Kjzmu2fU7ro5EFAb+OPituLqgfyuQaym5DlrNydW2sJ9A==",
       "dependencies": [
-        "is-extglob"
+        "@ioredis/commands",
+        "cluster-key-slot",
+        "debug",
+        "denque",
+        "redis-errors",
+        "redis-parser",
+        "standard-as-callback"
       ]
     },
     "is-unsafe@1.0.1": {
@@ -1244,8 +1086,8 @@
         "tlds"
       ]
     },
-    "mime@3.0.0": {
-      "integrity": "sha512-jSCU7/VB1loIWBZe14aEYHU/+1UMEHoaO7qxCOVJOw9GgH72VAWppxNcjU+x9a2k3GSIBXNKxXQFqRvvZ7vr3A==",
+    "mime@4.1.0": {
+      "integrity": "sha512-X5ju04+cAzsojXKes0B/S4tcYtFAJ6tTMuSPBEn9CPGlrWr8Fiw7qYeLT0XyH80HSoAoqWCaz+MWKh22P7G1cw==",
       "bin": true
     },
     "minimatch@10.2.5": {
@@ -1256,6 +1098,9 @@
     },
     "minimist@1.2.8": {
       "integrity": "sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA=="
+    },
+    "ms@2.1.3": {
+      "integrity": "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA=="
     },
     "msgpackr-extract@3.0.4": {
       "integrity": "sha512-4kmO/MdyUIkLIvTPr8VHLil4AtoKIoniWPIEk5+CDy0xnWC84azhSFmuJ7PxZdsYtiP5kEeQsORAVIeMgxT+Hw==",
@@ -1279,14 +1124,17 @@
         "msgpackr-extract"
       ]
     },
+    "msgpackr@2.0.4": {
+      "integrity": "sha512-o1C5KRmuRt+apqMr1HuGSqWStZoRBUpEsCsl15uM9VdAF1qHLtvMOU2En747EnTyEl6c4pzPewRMFF31s1CNbA==",
+      "optionalDependencies": [
+        "msgpackr-extract"
+      ]
+    },
     "multipasta@0.2.7": {
       "integrity": "sha512-KPA58d68KgGil15oDqXjkUBEBYc00XvbPj5/X+dyzeo/lWm9Nc25pQRlf1D+gv4OpK7NM0J1odrbu9JNNGvynA=="
     },
     "neo-async@2.6.2": {
       "integrity": "sha512-Yd3UES5mWCSqR+qNT93S3UoYUkqAZ9lLg8a7g9rimsWmYGK8cVToA4/sF3RrshdyV3sAGMXVUmpMYOw+dLpOuw=="
-    },
-    "node-addon-api@7.1.1": {
-      "integrity": "sha512-5m3bsyrjFWE1xf7nz7YXdN4udnVtXK6/Yfgn5qnahL6bCkf2yKt4k3nuTKAtT4r3IG8JNR2ncsIMdZuAzJjHQQ=="
     },
     "node-gyp-build-optional-packages@5.2.2": {
       "integrity": "sha512-s+w+rBWnpTMwSFbaE0UXsRlg7hU4FjekKU4eyAih5T8nJuNZT1nNsskXpxmeqSK9UzkBl6UgRlnKc8hz8IEqOw==",
@@ -1358,9 +1206,6 @@
         "split2"
       ]
     },
-    "picomatch@4.0.4": {
-      "integrity": "sha512-QP88BAKvMam/3NxH6vj2o21R6MjxZUAd6nlwAS/pnGvN9IVLocLHxGYIzFhg6fUQ+5th6P4dv4eW9jX3DSIj7A=="
-    },
     "postgres-array@2.0.0": {
       "integrity": "sha512-VpZrUqU5A69eQyW2c5CA1jtLecCsN2U/bD6VilrFDWq5+5UIEVO7nazS3TEcHf1zuPYO/sqGvUvW62g86RXZuA=="
     },
@@ -1384,6 +1229,18 @@
     },
     "pure-rand@6.1.0": {
       "integrity": "sha512-bVWawvoZoBYpp6yIoQtQXHZjmz35RSVHnUOTefl8Vcjr8snTPY1wnpSPMWekcFwbxI6gtmT7rSYPFvz71ldiOA=="
+    },
+    "pure-rand@8.4.0": {
+      "integrity": "sha512-IoM8YF/jY0hiugFo/wOWqfmarlE6J0wc6fDK1PhftMk7MGhVZl88sZimmqBBFomLOCSmcCCpsfj7wXASCpvK9A=="
+    },
+    "redis-errors@1.2.0": {
+      "integrity": "sha512-1qny3OExCf0UvUV/5wpYKf2YwPcOqXzkwKKSmKHiE6ZMQs5heeE/c8eXK+PNllPvmjgAbfnsbpkGZWy8cBpn9w=="
+    },
+    "redis-parser@3.0.0": {
+      "integrity": "sha512-DJnGAeenTdpMEH6uAJRK/uiyEIH9WVsUmoLwzudwGJUwZPp80PDBWPHXSAGNPwNvIXAbe7MSUB1zQFugFml66A==",
+      "dependencies": [
+        "redis-errors"
+      ]
     },
     "resolve-pkg-maps@1.0.0": {
       "integrity": "sha512-seS2Tj26TBVOC2NIc2rOe2y2ZO7efxITtLZcGSOnHHNOQ7CkiUBfw0Iw2ck6xkIhPwLhKNLS8BO+hEpngQlqzw=="
@@ -1416,6 +1273,9 @@
     "split2@4.2.0": {
       "integrity": "sha512-UcjcJOWknrNkF6PLX83qcHM6KHgVKNkV62Y8a5uYDVv9ydGQVwAHMKqHdJje1VTWpljG0WYpCDhrCdAOYH4TWg=="
     },
+    "standard-as-callback@2.1.0": {
+      "integrity": "sha512-qoRRSyROncaz1z0mvYqIE4lCd9p2R90i6GxW3uZv5ucSu8tU7B5HXUP1gG8pVZsYNVaXjk8ClXHPttLyxAL48A=="
+    },
     "strnum@2.4.1": {
       "integrity": "sha512-M9eUSMT2dCB2cTNPG7UYj6KuK7RJR2SN2+yCV/fTW3xzTCS6EaGZ5pSMgDIjB7r8zSfTGk+dvvn9rTjpVS9Mwg==",
       "dependencies": [
@@ -1442,6 +1302,9 @@
       "integrity": "sha512-QXqwfEl9ddlGBaRFXIvNKK6OhipSiLXuRuLJX5DErz0o0Q0rYxulWLdFryTkV5PkdZct5iMInwYEGe/eR++1AA==",
       "bin": true
     },
+    "toml@4.1.1": {
+      "integrity": "sha512-EBJnVBr3dTXdA89WVFoAIPUqkBjxPMwRqsfuo1r240tKFHXv3zgca4+NJib/h6TyvGF7vOawz0jGuryJCdNHrw=="
+    },
     "tsx@4.22.4": {
       "integrity": "sha512-X8EX+XV4QR5xCsrgxaED954zTDfY8KqlDtskKEL0cHhyS/P8b4IFOvGDQpsC9Q1XnLq915wEfwwY/zzskCtmhg==",
       "dependencies": [
@@ -1459,11 +1322,18 @@
       "integrity": "sha512-v3Xu+yuwBXisp6QYTcH4UbH+xYJXqnq2m/LtQVWKWzYc1iehYnLixoQDN9FH6/j9/oybfd6W9Ghwkl8+UMKTKQ==",
       "bin": true
     },
-    "undici@7.28.0": {
-      "integrity": "sha512-cRZYrTDwWznlnRiPjggAGxZXanty6M8RV1ff8Wm4LWXBp7/IG8v5DnOm74DtUBp9OONpK75YlPnIjQqX0dBDtA=="
+    "undici-types@8.3.0": {
+      "integrity": "sha512-j375ScV60dom+YkPFIfTLcOiPxkN/buHz5GobjLhixFuANaNs3C9l4GmrWqejgXWJ7BbJcFYpTEUkS1Ge8bpZQ=="
+    },
+    "undici@8.5.0": {
+      "integrity": "sha512-xamtWoB1EshgjpmlXd7GGm2VfdDtw1+rD8uhry8pSNW3If6S8E0m2T2+orSKeZXEn/aPJMviCpDBA65WJt8zhg=="
     },
     "uuid@11.1.1": {
       "integrity": "sha512-vIYxrBCC/N/K+Js3qSN88go7kIfNPssr/hHCesKCQNAjmgvYS2oqr69kIufEG+O4+PfezOH4EbIeHCfFov8ZgQ==",
+      "bin": true
+    },
+    "uuid@14.0.1": {
+      "integrity": "sha512-6ZxzVpzDXDa3bJWaHilVayA+BH/1zmxCJoVgvmqJnid/gPoKHxUrS/aC/T6LGQtNHT+XHG9fXPJB4d+IrU30Ew==",
       "bin": true
     },
     "wordwrap@1.0.0": {
@@ -1477,6 +1347,10 @@
     },
     "xtend@4.0.2": {
       "integrity": "sha512-LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ=="
+    },
+    "yaml@2.9.0": {
+      "integrity": "sha512-2AvhNX3mb8zd6Zy7INTtSpl1F15HW6Wnqj0srWlkKLcpYl/gMIMJiyuGq2KeI2YFxUPjdlB+3Lc10seMLtL4cA==",
+      "bin": true
     }
   },
   "workspace": {
@@ -1484,19 +1358,15 @@
       "jsr:@std/expect@^1.0.19",
       "jsr:@std/fs@^1.0.24",
       "jsr:@std/testing@^1.0.19",
-      "npm:@effect/experimental@0.60",
-      "npm:@effect/opentelemetry@0.63",
-      "npm:@effect/platform-node@0.107",
-      "npm:@effect/platform@~0.96.2",
+      "npm:@effect/platform-node@4.0.0-beta.88",
       "npm:@electric-sql/pglite-icu-full@0.1",
       "npm:@electric-sql/pglite@~0.5.3",
       "npm:@js-temporal/polyfill@~0.5.1",
-      "npm:@opentelemetry/sdk-trace-base@^2.8.0",
       "npm:casbin@^5.51.0",
       "npm:drizzle-adapter@^1.4.0",
-      "npm:drizzle-kit@^1.0.0-beta.22",
-      "npm:drizzle-orm@^1.0.0-beta.22",
-      "npm:effect@^3.21.4",
+      "npm:drizzle-kit@1.0.0-rc.3",
+      "npm:drizzle-orm@1.0.0-rc.3",
+      "npm:effect@4.0.0-beta.88",
       "npm:fast-xml-builder@^1.2.0",
       "npm:fast-xml-parser@^5.9.3",
       "npm:handlebars@^4.7.9",

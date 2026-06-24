@@ -60,7 +60,7 @@ export const UserServiceLive = Layer.effect(
 		const aclRepo = yield* AclRepository;
 		const db = yield* DatabaseClient;
 
-		return UserService.of({
+		return {
 			list: Effect.fn("UserService.list")(function* () {
 				yield* Effect.logTrace("user.list");
 				const results = yield* repo.list();
@@ -237,6 +237,6 @@ export const UserServiceLive = Layer.effect(
 				).pipe(Effect.provideService(DatabaseClient, db));
 				yield* Effect.logTrace("user.setCredential done", { userId });
 			}),
-		});
+		};
 	}),
 );

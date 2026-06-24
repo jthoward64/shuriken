@@ -1,4 +1,4 @@
-import { type Effect, FiberRef, Option } from "effect";
+import { Context, type Effect, Option } from "effect";
 import type { SmtpSecurity } from "#src/db/drizzle/schema/index.ts";
 
 // ---------------------------------------------------------------------------
@@ -23,15 +23,11 @@ export interface SmtpProxyOverride {
 	readonly security: Option.Option<SmtpSecurity>;
 }
 
-export const SmtpProxyOverrideRef = FiberRef.unsafeMake<
+export const SmtpProxyOverrideRef = Context.Reference<
 	Option.Option<SmtpProxyOverride>
->(Option.none());
+>("SmtpProxyOverride", { defaultValue: () => Option.none() });
 
+// The reference is itself an Effect that yields the current value.
 export const getSmtpProxyOverride: Effect.Effect<
 	Option.Option<SmtpProxyOverride>
-> = FiberRef.get(SmtpProxyOverrideRef);
-
-export const setSmtpProxyOverride = (
-	override: SmtpProxyOverride,
-): Effect.Effect<void> =>
-	FiberRef.set(SmtpProxyOverrideRef, Option.some(override));
+> = SmtpProxyOverrideRef;

@@ -1,5 +1,5 @@
 import type { Cause } from "effect";
-import { Effect, Exit, FiberRef, Option, Runtime } from "effect";
+import { Context, Effect, Exit, Option } from "effect";
 import { DatabaseClient, type DbClient } from "#src/db/client.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
 
@@ -10,8 +10,10 @@ import { DatabaseError } from "#src/domain/errors.ts";
 // Some(tx) = use this transaction client for all queries in the fiber tree.
 // ---------------------------------------------------------------------------
 
-export const TransactionRef: FiberRef.FiberRef<Option.Option<DbClient>> =
-	FiberRef.unsafeMake(Option.none());
+export const TransactionRef: Context.Reference<Option.Option<DbClient>> =
+	Context.Reference<Option.Option<DbClient>>("TransactionRef", {
+		defaultValue: () => Option.none(),
+	});
 
 // ---------------------------------------------------------------------------
 // getActiveDb — called at query time to pick up an active transaction
@@ -21,9 +23,7 @@ export const TransactionRef: FiberRef.FiberRef<Option.Option<DbClient>> =
 // ---------------------------------------------------------------------------
 
 export const getActiveDb = (fallback: DbClient): Effect.Effect<DbClient> =>
-	FiberRef.get(TransactionRef).pipe(
-		Effect.map(Option.getOrElse(() => fallback)),
-	);
+	TransactionRef.pipe(Effect.map(Option.getOrElse(() => fallback)));
 
 // ---------------------------------------------------------------------------
 // EffectExitWrapper — sentinel for bridging typed failures across the async
@@ -60,22 +60,23 @@ export const withTransaction = <A, E, R>(
 	effect: Effect.Effect<A, E, R>,
 ): Effect.Effect<A, E | DatabaseError, R | DatabaseClient> =>
 	Effect.gen(function* () {
-		const existing = yield* FiberRef.get(TransactionRef);
+		const existing = yield* TransactionRef;
 		if (Option.isSome(existing)) {
 			return yield* effect;
 		}
 
 		const db = yield* DatabaseClient;
-		const runtime = yield* Effect.runtime<R>();
+		const context = yield* Effect.context<R>();
 
 		return yield* Effect.withSpan("db.transaction")(
-			Effect.async<A, E | DatabaseError>((resume) => {
+			Effect.callback<A, E | DatabaseError>((resume) => {
 				db.transaction(async (tx) => {
-					const exit = await Runtime.runPromise(runtime)(
-						Effect.locally(
+					const exit = await Effect.runPromiseWith(context)(
+						Effect.provideService(
+							Effect.exit(effect),
 							TransactionRef,
-							Option.some(tx as DbClient),
-						)(Effect.exit(effect)),
+							Option.some(tx as unknown as DbClient),
+						),
 					);
 					if (Exit.isSuccess(exit)) {
 						return exit.value;

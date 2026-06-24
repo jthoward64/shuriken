@@ -183,7 +183,7 @@ export const putHandler = (
 			try: () => new TextDecoder("utf-8", { fatal: true }).decode(bodyBytes),
 			catch: () => undefined,
 		}).pipe(
-			Effect.catchAll(() =>
+			Effect.catch(() =>
 				forbidden(
 					entityType === "icalendar"
 						? "CALDAV:valid-calendar-data"
@@ -536,7 +536,7 @@ export const putHandler = (
 						collectionId: CollectionId(existingInstance.collectionId),
 						doc,
 						previousDoc: prevDoc,
-						previousScheduleTag: Option.fromNullable(
+						previousScheduleTag: Option.fromNullishOr(
 							existingInstance.scheduleTag,
 						),
 						suppressReply: req.headers.get("Schedule-Reply") === "no",

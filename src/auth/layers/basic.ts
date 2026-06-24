@@ -22,7 +22,9 @@ import { CryptoService } from "#src/platform/crypto.ts";
 
 const BASIC_PREFIX = "Basic ";
 
-const authCounter = Metric.tagged(authAttemptsTotal, "auth.mode", "basic");
+const authCounter = Metric.withAttributes(authAttemptsTotal, {
+	"auth.mode": "basic",
+});
 
 export const parseBasicAuth = (
 	headers: Headers,
@@ -68,8 +70,11 @@ export const authenticateBasic = (
 			onNone: () =>
 				Effect.gen(function* () {
 					yield* Effect.logTrace("auth.basic: no credentials present");
-					yield* Metric.increment(
-						Metric.tagged(authCounter, "auth.outcome", "no_credentials"),
+					yield* Metric.update(
+						Metric.withAttributes(authCounter, {
+							"auth.outcome": "no_credentials",
+						}),
+						1,
 					);
 					return new Unauthenticated() as AuthResult;
 				}),
@@ -109,8 +114,11 @@ export const authenticateBasic = (
 						yield* Effect.logDebug("auth.basic: user not found", {
 							username: creds.username,
 						});
-						yield* Metric.increment(
-							Metric.tagged(authCounter, "auth.outcome", "not_found"),
+						yield* Metric.update(
+							Metric.withAttributes(authCounter, {
+								"auth.outcome": "not_found",
+							}),
+							1,
 						);
 						return new Unauthenticated() as AuthResult;
 					}
@@ -123,8 +131,11 @@ export const authenticateBasic = (
 						yield* Effect.logDebug("auth.basic: invalid password", {
 							username: creds.username,
 						});
-						yield* Metric.increment(
-							Metric.tagged(authCounter, "auth.outcome", "invalid_password"),
+						yield* Metric.update(
+							Metric.withAttributes(authCounter, {
+								"auth.outcome": "invalid_password",
+							}),
+							1,
 						);
 						return new Unauthenticated() as AuthResult;
 					}
@@ -133,14 +144,15 @@ export const authenticateBasic = (
 						userId: row.userId,
 						username: creds.username,
 					});
-					yield* Metric.increment(
-						Metric.tagged(authCounter, "auth.outcome", "success"),
+					yield* Metric.update(
+						Metric.withAttributes(authCounter, { "auth.outcome": "success" }),
+						1,
 					);
 					return new Authenticated({
 						principal: {
 							principalId: PrincipalId(row.principalId),
 							userId: UserId(row.userId),
-							displayName: Option.fromNullable(row.displayName),
+							displayName: Option.fromNullishOr(row.displayName),
 						},
 					}) as AuthResult;
 				}),
@@ -152,7 +164,10 @@ export const authenticateBasic = (
 					Effect.logWarning("auth.basic: error during authentication", {
 						cause: e instanceof DatabaseError ? e.cause : e,
 					}),
-					Metric.increment(Metric.tagged(authCounter, "auth.outcome", "error")),
+					Metric.update(
+						Metric.withAttributes(authCounter, { "auth.outcome": "error" }),
+						1,
+					),
 				],
 				{ discard: true },
 			),
@@ -164,7 +179,7 @@ export const BasicAuthLayer = Layer.effect(
 	Effect.gen(function* () {
 		const db = yield* DatabaseClient;
 		const crypto = yield* CryptoService;
-		return AuthService.of({
+		return {
 			authenticate: Effect.fn("auth.basic.authenticate")(
 				function* (headers, _clientIp) {
 					yield* Effect.annotateCurrentSpan({ "auth.mode": "basic" });
@@ -174,6 +189,6 @@ export const BasicAuthLayer = Layer.effect(
 					);
 				},
 			),
-		});
+		};
 	}),
 );

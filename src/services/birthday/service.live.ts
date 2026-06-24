@@ -221,7 +221,7 @@ export const BirthdayServiceLive = Layer.effect(
 		const db = yield* DatabaseClient;
 		const entityRepo = yield* EntityRepository;
 		const instanceSvc = yield* InstanceService;
-		return BirthdayService.of({
+		return {
 			regenerate: (principalId, targetCollectionId) =>
 				regenerate(principalId, targetCollectionId).pipe(
 					Effect.provideService(CardIndexRepository, cardRepo),
@@ -231,6 +231,6 @@ export const BirthdayServiceLive = Layer.effect(
 					Effect.provideService(EntityRepository, entityRepo),
 					Effect.provideService(InstanceService, instanceSvc),
 				),
-		});
+		};
 	}),
 );

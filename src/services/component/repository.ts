@@ -41,7 +41,7 @@ export interface ComponentRepositoryShape {
 	) => Effect.Effect<void, DatabaseError>;
 }
 
-export class ComponentRepository extends Context.Tag("ComponentRepository")<
+export class ComponentRepository extends Context.Service<
 	ComponentRepository,
 	ComponentRepositoryShape
->() {}
+>()("ComponentRepository") {}

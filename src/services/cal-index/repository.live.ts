@@ -272,7 +272,7 @@ export const CalIndexRepositoryLive = Layer.effect(
 		const run = <A, E>(
 			e: Effect.Effect<A, E, DatabaseClient>,
 		): Effect.Effect<A, E> => Effect.provideService(e, DatabaseClient, dc);
-		return CalIndexRepository.of({
+		return {
 			findByTimeRange: (...args: Parameters<typeof findByTimeRange>) =>
 				run(findByTimeRange(...args)),
 			findByComponentType: (...args: Parameters<typeof findByComponentType>) =>
@@ -280,6 +280,6 @@ export const CalIndexRepositoryLive = Layer.effect(
 			indexRruleOccurrences: (
 				...args: Parameters<typeof indexRruleOccurrences>
 			) => run(indexRruleOccurrences(...args)),
-		});
+		};
 	}),
 );

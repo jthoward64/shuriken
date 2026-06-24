@@ -70,7 +70,7 @@ export interface EntityRepositoryShape {
 	>;
 }
 
-export class EntityRepository extends Context.Tag("EntityRepository")<
+export class EntityRepository extends Context.Service<
 	EntityRepository,
 	EntityRepositoryShape
->() {}
+>()("EntityRepository") {}

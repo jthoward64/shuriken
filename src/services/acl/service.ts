@@ -97,7 +97,6 @@ export interface AclServiceShape {
 	>;
 }
 
-export class AclService extends Context.Tag("AclService")<
-	AclService,
-	AclServiceShape
->() {}
+export class AclService extends Context.Service<AclService, AclServiceShape>()(
+	"AclService",
+) {}

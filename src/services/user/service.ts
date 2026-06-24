@@ -82,7 +82,7 @@ export interface UserServiceShape {
 	) => Effect.Effect<void, DavError | DatabaseError | InternalError>;
 }
 
-export class UserService extends Context.Tag("UserService")<
+export class UserService extends Context.Service<
 	UserService,
 	UserServiceShape
->() {}
+>()("UserService") {}

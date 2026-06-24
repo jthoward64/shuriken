@@ -1,4 +1,4 @@
-import { Effect, ParseResult, Schema } from "effect";
+import { Effect, Option, Schema, SchemaGetter, SchemaIssue } from "effect";
 import { type DavError, validAddressData } from "../../domain/errors.ts";
 import {
 	type RawComponent,
@@ -276,53 +276,67 @@ const convertIrToRawComponent = (ir: IrComponent): RawComponent => ({
 // VCardPropertyInferrer: Schema<IrComponent, RawComponent>
 // ---------------------------------------------------------------------------
 
-const VCardPropertyInferrer: Schema.Schema<IrComponent, RawComponent> =
-	Schema.transformOrFail(RawComponentSchema, IrComponentSchema, {
-		strict: true,
-		decode: (raw, _options, ast) =>
+// IrComponentSchema / IrDocumentSchema are exported from ir.ts annotated as
+// `Schema.Schema<T>`, which hides their `Encoded` type. `decodeTo` needs a
+// codec whose `Encoded` is known; `Schema.toType` produces one with
+// `Encoded === Type`, which is correct here (both are plain structs).
+const IrComponentCodec = Schema.toType(IrComponentSchema);
+const IrDocumentCodec = Schema.toType(IrDocumentSchema);
+
+const VCardPropertyInferrer = RawComponentSchema.pipe(
+	Schema.decodeTo(IrComponentCodec, {
+		decode: SchemaGetter.transformOrFail((raw: RawComponent) =>
 			Effect.try({
 				try: () => convertRawToIrComponent(raw),
-				catch: (e) => new ParseResult.Type(ast, raw, String(e)),
+				catch: (e) =>
+					new SchemaIssue.InvalidValue(Option.some(raw), {
+						message: String(e),
+					}),
 			}),
-		encode: (ir, _options, ast) =>
+		),
+		encode: SchemaGetter.transformOrFail((ir: IrComponent) =>
 			Effect.try({
 				try: () => convertIrToRawComponent(ir),
-				catch: (e) => new ParseResult.Type(ast, ir, String(e)),
+				catch: (e) =>
+					new SchemaIssue.InvalidValue(Option.some(ir), {
+						message: String(e),
+					}),
 			}),
-	});
+		),
+	}),
+);
 
 // ---------------------------------------------------------------------------
 // VCardDocumentCodec: Schema<IrDocument, IrComponent>
 // ---------------------------------------------------------------------------
 
-const VCardDocumentCodec: Schema.Schema<IrDocument, IrComponent> =
-	Schema.transformOrFail(IrComponentSchema, IrDocumentSchema, {
-		strict: true,
-		decode: (component, _options, ast) => {
+const VCardDocumentCodec = IrComponentCodec.pipe(
+	Schema.decodeTo(IrDocumentCodec, {
+		decode: SchemaGetter.transformOrFail((component: IrComponent) => {
 			if (component.name !== "VCARD") {
-				return ParseResult.fail(
-					new ParseResult.Type(
-						ast,
-						component,
-						`Expected VCARD root component, got "${component.name}"`,
-					),
+				return Effect.fail(
+					new SchemaIssue.InvalidValue(Option.some(component), {
+						message: `Expected VCARD root component, got "${component.name}"`,
+					}),
 				);
 			}
-			return ParseResult.succeed({ kind: "vcard" as const, root: component });
-		},
-		encode: (doc, _options, ast) => {
+			return Effect.succeed({
+				kind: "vcard" as const,
+				root: component,
+			});
+		}),
+		encode: SchemaGetter.transformOrFail((doc: IrDocument) => {
 			if (doc.kind !== "vcard") {
-				return ParseResult.fail(
-					new ParseResult.Type(
-						ast,
-						doc,
-						`Expected vcard document, got kind "${doc.kind}"`,
-					),
+				return Effect.fail(
+					new SchemaIssue.InvalidValue(Option.some(doc), {
+						message: `Expected vcard document, got kind "${doc.kind}"`,
+					}),
 				);
 			}
-			return ParseResult.succeed(doc.root);
-		},
-	});
+			return Effect.succeed(doc.root);
+		}),
+	}),
+);
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -339,10 +353,10 @@ const VCardDocumentCodec: Schema.Schema<IrDocument, IrComponent> =
  *          →[VCardPropertyInferrer]    IrComponent
  *          →[VCardDocumentCodec]       IrDocument
  */
-export const VCardCodec: Schema.Schema<IrDocument, string> =
+export const VCardCodec: Schema.Codec<IrDocument, string> =
 	TextToRawComponentCodec.pipe(
-		Schema.compose(VCardPropertyInferrer),
-		Schema.compose(VCardDocumentCodec),
+		Schema.decodeTo(VCardPropertyInferrer),
+		Schema.decodeTo(VCardDocumentCodec),
 	);
 
 /**
@@ -353,7 +367,7 @@ export const decodeVCard = (
 	text: string,
 ): Effect.Effect<IrDocument, DavError> => {
 	const normalized = isVCard21(text) ? normalizeVCard21(text) : text;
-	return Schema.decodeUnknown(VCardCodec)(normalized).pipe(
+	return Schema.decodeUnknownEffect(VCardCodec)(normalized).pipe(
 		Effect.mapError((e) => validAddressData(e.message)),
 	);
 };
@@ -363,4 +377,4 @@ export const decodeVCard = (
  * Encoding a structurally valid IrDocument cannot fail; panics on internal error.
  */
 export const encodeVCard = (doc: IrDocument): Effect.Effect<string, never> =>
-	Schema.encode(VCardCodec)(doc).pipe(Effect.orDie);
+	Schema.encodeEffect(VCardCodec)(doc).pipe(Effect.orDie);

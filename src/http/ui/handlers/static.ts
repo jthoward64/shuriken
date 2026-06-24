@@ -31,7 +31,7 @@ export const staticHandler = (
 		const bytes = yield* files
 			.readBytes(absPath)
 			.pipe(
-				Effect.catchAll((_e: InternalError) =>
+				Effect.catch((_e: InternalError) =>
 					Effect.succeed(null as unknown as Uint8Array),
 				),
 			);

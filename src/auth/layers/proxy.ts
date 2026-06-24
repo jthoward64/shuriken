@@ -125,7 +125,9 @@ export const isClientTrusted = (
 				.some((entry) => matchesEntry(ip, entry)),
 	});
 
-const authCounter = Metric.tagged(authAttemptsTotal, "auth.mode", "proxy");
+const authCounter = Metric.withAttributes(authAttemptsTotal, {
+	"auth.mode": "proxy",
+});
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -174,8 +176,11 @@ export const authenticateProxy = (
 			yield* Effect.logDebug("auth.proxy: client not trusted", {
 				clientIp: Option.getOrUndefined(clientIp),
 			});
-			yield* Metric.increment(
-				Metric.tagged(authCounter, "auth.outcome", "untrusted_proxy"),
+			yield* Metric.update(
+				Metric.withAttributes(authCounter, {
+					"auth.outcome": "untrusted_proxy",
+				}),
+				1,
 			);
 			return new Unauthenticated();
 		}
@@ -183,8 +188,9 @@ export const authenticateProxy = (
 		const username = headers.get(proxyHeader);
 		if (!username) {
 			yield* Effect.logDebug("auth.proxy: header absent", { proxyHeader });
-			yield* Metric.increment(
-				Metric.tagged(authCounter, "auth.outcome", "header_absent"),
+			yield* Metric.update(
+				Metric.withAttributes(authCounter, { "auth.outcome": "header_absent" }),
+				1,
 			);
 			return new Unauthenticated();
 		}
@@ -219,8 +225,9 @@ export const authenticateProxy = (
 					yield* Effect.logDebug("auth.proxy: cannot derive slug from email", {
 						username,
 					});
-					yield* Metric.increment(
-						Metric.tagged(authCounter, "auth.outcome", "not_found"),
+					yield* Metric.update(
+						Metric.withAttributes(authCounter, { "auth.outcome": "not_found" }),
+						1,
 					);
 					return new Unauthenticated();
 				}
@@ -249,22 +256,26 @@ export const authenticateProxy = (
 								Effect.fail(new DatabaseError({ cause: e })),
 						}),
 					);
-				yield* Metric.increment(
-					Metric.tagged(authCounter, "auth.outcome", "auto_provisioned"),
+				yield* Metric.update(
+					Metric.withAttributes(authCounter, {
+						"auth.outcome": "auto_provisioned",
+					}),
+					1,
 				);
 				return new Authenticated({
 					principal: {
 						principalId: PrincipalId(provisioned.user.principal.id),
 						userId: UserId(provisioned.user.user.id),
-						displayName: Option.fromNullable(
+						displayName: Option.fromNullishOr(
 							provisioned.user.principal.displayName,
 						),
 					},
 				});
 			}
 			yield* Effect.logDebug("auth.proxy: user not found", { username });
-			yield* Metric.increment(
-				Metric.tagged(authCounter, "auth.outcome", "not_found"),
+			yield* Metric.update(
+				Metric.withAttributes(authCounter, { "auth.outcome": "not_found" }),
+				1,
 			);
 			return new Unauthenticated();
 		}
@@ -273,14 +284,15 @@ export const authenticateProxy = (
 			userId: row.userId,
 			username,
 		});
-		yield* Metric.increment(
-			Metric.tagged(authCounter, "auth.outcome", "success"),
+		yield* Metric.update(
+			Metric.withAttributes(authCounter, { "auth.outcome": "success" }),
+			1,
 		);
 		return new Authenticated({
 			principal: {
 				principalId: PrincipalId(row.principalId),
 				userId: UserId(row.userId),
-				displayName: Option.fromNullable(row.displayName),
+				displayName: Option.fromNullishOr(row.displayName),
 			},
 		});
 	}).pipe(
@@ -290,7 +302,10 @@ export const authenticateProxy = (
 					Effect.logWarning("auth.proxy: error during authentication", {
 						cause: e instanceof DatabaseError ? e.cause : e,
 					}),
-					Metric.increment(Metric.tagged(authCounter, "auth.outcome", "error")),
+					Metric.update(
+						Metric.withAttributes(authCounter, { "auth.outcome": "error" }),
+						1,
+					),
 				],
 				{ discard: true },
 			),
@@ -319,7 +334,7 @@ export const ProxyAuthLayer = Layer.effect(
 					})
 				: Option.none();
 
-		return AuthService.of({
+		return {
 			authenticate: Effect.fn("auth.proxy.authenticate")(
 				function* (headers, clientIp) {
 					yield* Effect.annotateCurrentSpan({ "auth.mode": "proxy" });
@@ -335,6 +350,6 @@ export const ProxyAuthLayer = Layer.effect(
 					);
 				},
 			),
-		});
+		};
 	}),
 );

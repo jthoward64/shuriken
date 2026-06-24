@@ -1,5 +1,5 @@
-import { DevTools } from "@effect/experimental";
 import { Effect, Layer, Logger } from "effect";
+import { DevTools } from "effect/unstable/devtools";
 import { CompositeAuthLayer } from "#src/auth/index.ts";
 import { AppConfigLive, AppConfigService } from "#src/config.ts";
 import { type DatabaseClient, DatabaseClientLive } from "#src/db/client.ts";
@@ -33,7 +33,7 @@ import { SchedulingDomainLayer } from "#src/services/scheduling/index.ts";
 import { ShareLinkRepositoryLive } from "#src/services/share-link/repository.live.ts";
 import { ShareLinkServiceLive } from "#src/services/share-link/service.live.ts";
 import {
-	IanaTimezoneService,
+	IanaTimezoneServiceLive,
 	TimezoneDomainLayer,
 } from "#src/services/timezone/index.ts";
 import { TombstoneRepositoryLive } from "#src/services/tombstone/index.ts";
@@ -56,7 +56,7 @@ export const InfraLayer = Layer.mergeAll(
 // DevTools layer — only active when NODE_ENV=development
 // ---------------------------------------------------------------------------
 
-const DevToolsLayer = Layer.unwrapEffect(
+const DevToolsLayer = Layer.unwrap(
 	Effect.gen(function* () {
 		const { nodeEnv } = yield* AppConfigService;
 		return nodeEnv === "development" ? DevTools.layer() : Layer.empty;
@@ -95,7 +95,7 @@ const withInfra = <A, E>(
 
 // BaseAppLayer — all services except those with cross-domain dependencies.
 const BaseAppLayer = Layer.mergeAll(
-	Logger.pretty,
+	Logger.layer([Logger.consolePretty()]),
 	InfraLayer,
 	AuthLayer,
 	DevToolsLayer,
@@ -107,7 +107,7 @@ const BaseAppLayer = Layer.mergeAll(
 	withInfra(GroupDomainLayer),
 	withInfra(DomainEntityDomainLayer),
 	withInfra(TimezoneDomainLayer),
-	IanaTimezoneService.Default,
+	IanaTimezoneServiceLive,
 	ProvisioningDomainLayer.pipe(Layer.provide(InfraLayer)),
 	TombstoneRepositoryLive.pipe(Layer.provide(InfraLayer)),
 	ExternalCalendarRepositoryLive.pipe(Layer.provide(InfraLayer)),

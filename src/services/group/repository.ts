@@ -71,7 +71,7 @@ export interface GroupRepositoryShape {
 	) => Effect.Effect<boolean, DatabaseError>;
 }
 
-export class GroupRepository extends Context.Tag("GroupRepository")<
+export class GroupRepository extends Context.Service<
 	GroupRepository,
 	GroupRepositoryShape
->() {}
+>()("GroupRepository") {}

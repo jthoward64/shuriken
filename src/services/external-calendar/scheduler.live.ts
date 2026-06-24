@@ -37,7 +37,7 @@ const tickAll = Effect.gen(function* () {
 	});
 });
 
-export const ExternalCalendarSchedulerLayer = Layer.scopedDiscard(
+export const ExternalCalendarSchedulerLayer = Layer.effectDiscard(
 	Effect.gen(function* () {
 		const config = yield* AppConfigService;
 		const tick = config.externalCalendar.schedulerTickS;
@@ -47,7 +47,7 @@ export const ExternalCalendarSchedulerLayer = Layer.scopedDiscard(
 		yield* tickAll.pipe(
 			// `catchAllCause` keeps the fiber alive across defects too — a
 			// rogue exception in one tick mustn't kill the whole scheduler.
-			Effect.catchAllCause((cause) =>
+			Effect.catchCause((cause) =>
 				Effect.logError("scheduler.external: tick failed", { cause }),
 			),
 			Effect.repeat(Schedule.spaced(Duration.seconds(tick))),

@@ -1,4 +1,4 @@
-import { Effect, Layer, Runtime } from "effect";
+import { Effect, Layer } from "effect";
 import { AppConfigService } from "#src/config.ts";
 import type { ImipInboundOutcome } from "./inbound.ts";
 import { ImipInboundService } from "./inbound.ts";
@@ -35,7 +35,7 @@ const outcomeToDelivery = (o: ImipInboundOutcome): DeliveryOutcome => {
 // lives in a closure so concurrent clients can't bleed into each other.
 //
 // Deno's socket API is stream-shaped, not Effect-shaped, so we hop out of
-// Effect into the runtime it's running on (passed in via Layer.scoped +
+// Effect into the runtime it's running on (passed in via Layer.effect +
 // Runtime.runtime). Each per-recipient delivery is wrapped in
 // `runtime.runPromise` so failures are logged but don't tear down the
 // listener.
@@ -72,7 +72,7 @@ const splitLines = (
 	return { lines: parts, tail };
 };
 
-export const LmtpServerLayer = Layer.scopedDiscard(
+export const LmtpServerLayer = Layer.effectDiscard(
 	Effect.gen(function* () {
 		const config = yield* AppConfigService;
 		if (!config.mail.lmtpEnabled) {
@@ -81,12 +81,12 @@ export const LmtpServerLayer = Layer.scopedDiscard(
 		}
 		const inbound = yield* ImipInboundService;
 
-		const runtime = yield* Effect.runtime<never>();
-		const runPromise = Runtime.runPromise(runtime);
+		const context = yield* Effect.context<never>();
+		const runPromise = Effect.runPromiseWith(context);
 		const runFork = <A>(eff: Effect.Effect<A, unknown, never>): Promise<A> =>
 			runPromise(
 				eff.pipe(
-					Effect.catchAllCause((cause) =>
+					Effect.catchCause((cause) =>
 						Effect.logError("imip.lmtp: handler failed", { cause }).pipe(
 							Effect.flatMap(() => Effect.die(cause)),
 						),

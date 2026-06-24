@@ -52,7 +52,7 @@ export interface MailerServiceShape {
 	) => Effect.Effect<SendOutcome | null, InternalError>;
 }
 
-export class MailerService extends Context.Tag("MailerService")<
+export class MailerService extends Context.Service<
 	MailerService,
 	MailerServiceShape
->() {}
+>()("MailerService") {}

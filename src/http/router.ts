@@ -6,12 +6,13 @@ import type { AppError } from "#src/domain/errors.ts";
 import {
 	type HttpRequestContext,
 	newRequestId,
-	setRequestId,
+	RequestIdRef,
 } from "#src/http/context.ts";
 import { davRouter } from "#src/http/dav/router.ts";
 import { buildXml } from "#src/http/dav/xml/builder.ts";
 import { feedHandler, isFeedPath } from "#src/http/feed/handler.ts";
-import { applySmtpProxyHeaders } from "#src/http/smtp-headers-apply.ts";
+import { computeSmtpProxyOverride } from "#src/http/smtp-headers-apply.ts";
+import { SmtpProxyOverrideRef } from "#src/http/smtp-headers-ref.ts";
 import {
 	HTTP_BAD_REQUEST,
 	HTTP_INTERNAL_SERVER_ERROR,
@@ -30,6 +31,7 @@ import type {
 import {
 	httpRequestDurationMs,
 	httpRequestsTotal,
+	trackDuration,
 } from "#src/observability/metrics.ts";
 import type { FileService } from "#src/platform/file.ts";
 import type { AclService } from "#src/services/acl/index.ts";
@@ -265,24 +267,21 @@ export const handleRequest = (
 	clientAddress: string | undefined,
 ): Effect.Effect<Response, never, AppServices> => {
 	const requestId = newRequestId();
-	const clientIp = Option.fromNullable(clientAddress);
+	const clientIp = Option.fromNullishOr(clientAddress);
 	const url = new URL(req.url);
 	const group = pathGroup(url.pathname);
 
 	// Pre-tagged metric instances (method + path_group are stable for this request)
-	const requestCounter = Metric.tagged(
-		Metric.tagged(httpRequestsTotal, "http.method", req.method),
-		"http.path_group",
-		group,
-	);
-	const durationHistogram = Metric.tagged(
-		Metric.tagged(httpRequestDurationMs, "http.method", req.method),
-		"http.path_group",
-		group,
-	);
+	const requestCounter = Metric.withAttributes(httpRequestsTotal, {
+		"http.method": req.method,
+		"http.path_group": group,
+	});
+	const durationHistogram = Metric.withAttributes(httpRequestDurationMs, {
+		"http.method": req.method,
+		"http.path_group": group,
+	});
 
 	return Effect.gen(function* () {
-		yield* setRequestId(requestId);
 		yield* Effect.logTrace("request received", {
 			method: req.method,
 			path: url.pathname,
@@ -298,10 +297,11 @@ export const handleRequest = (
 		const authService = yield* AuthService;
 		const auth = yield* authService.authenticate(req.headers, clientIp);
 
-		// Transient SMTP creds — only honoured from a trusted proxy. Picked up
-		// by EmailCredentialService.resolveForUser via a FiberRef.
+		// Transient SMTP creds — only honoured from a trusted proxy. Provided via
+		// SmtpProxyOverrideRef for the duration of dispatch and picked up by
+		// EmailCredentialService.resolveForUser.
 		const cfg = yield* AppConfigService;
-		yield* applySmtpProxyHeaders(req.headers, clientIp, cfg);
+		const smtpOverride = computeSmtpProxyOverride(req.headers, clientIp, cfg);
 
 		const caldavTimezones = req.headers.get("CalDAV-Timezones") as
 			| "T"
@@ -318,27 +318,34 @@ export const handleRequest = (
 			caldavTimezones,
 		};
 
-		if (isDavPath(url.pathname)) {
-			return yield* davRouter(req, ctx);
-		}
+		const dispatch = Effect.gen(function* () {
+			if (isDavPath(url.pathname)) {
+				return yield* davRouter(req, ctx);
+			}
 
-		if (isTimezonePath(url.pathname)) {
-			return yield* timezonesHandler(req, url);
-		}
+			if (isTimezonePath(url.pathname)) {
+				return yield* timezonesHandler(req, url);
+			}
 
-		if (isUiPath(url.pathname)) {
-			return yield* uiRouter(req, ctx);
-		}
+			if (isUiPath(url.pathname)) {
+				return yield* uiRouter(req, ctx);
+			}
 
-		yield* Effect.logDebug("no route matched", { path: url.pathname });
-		return new Response("Not Found", { status: 404 });
+			yield* Effect.logDebug("no route matched", { path: url.pathname });
+			return new Response("Not Found", { status: 404 });
+		});
+
+		return yield* dispatch.pipe(
+			Effect.provideService(SmtpProxyOverrideRef, smtpOverride),
+		);
 	}).pipe(
+		Effect.provideService(RequestIdRef, Option.some(requestId)),
 		Effect.annotateLogs({
 			requestId,
 			"http.method": req.method,
 			"http.path": url.pathname,
 		}),
-		Effect.catchAll((err) =>
+		Effect.catch((err) =>
 			Effect.flatMap(AppConfigService, (cfg) =>
 				mapErrorToResponse(err, cfg.auth.basicAuthEnabled),
 			),
@@ -352,14 +359,17 @@ export const handleRequest = (
 						: status >= HTTP_BAD_REQUEST
 							? Effect.logDebug("request complete", { status })
 							: Effect.logTrace("request complete", { status }),
-					Metric.increment(
-						Metric.tagged(requestCounter, "http.status_code", String(status)),
+					Metric.update(
+						Metric.withAttributes(requestCounter, {
+							"http.status_code": String(status),
+						}),
+						1,
 					),
 				],
 				{ discard: true },
 			);
 		}),
-		Metric.trackDuration(durationHistogram),
+		trackDuration(durationHistogram),
 		Effect.withSpan("http.request", {
 			attributes: {
 				"http.method": req.method,

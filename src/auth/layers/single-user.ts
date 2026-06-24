@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { Effect, Layer, Metric, Option } from "effect";
 import { AuthService } from "#src/auth/service.ts";
 import { AppConfigService } from "#src/config.ts";
-import { DatabaseClient } from "#src/db/client.ts";
+import { DatabaseClient, type DbClient } from "#src/db/client.ts";
 import { principal, user } from "#src/db/drizzle/schema/index.ts";
 import { AuthError, DatabaseError } from "#src/domain/errors.ts";
 import { PrincipalId, UserId } from "#src/domain/ids.ts";
@@ -22,11 +22,9 @@ import { authAttemptsTotal } from "#src/observability/metrics.ts";
 //   - Changes to the user row are reflected without restarting the server
 // ---------------------------------------------------------------------------
 
-const authCounter = Metric.tagged(
-	authAttemptsTotal,
-	"auth.mode",
-	"single-user",
-);
+const authCounter = Metric.withAttributes(authAttemptsTotal, {
+	"auth.mode": "single-user",
+});
 
 /**
  * Resolve a principal for auto-login / single-user mode. Looks up the user by
@@ -37,7 +35,7 @@ const authCounter = Metric.tagged(
  * Shared between SingleUserAuthLayer and CompositeAuthLayer.
  */
 export const resolveAutoLoginPrincipal = (
-	db: DatabaseClient,
+	db: DbClient,
 	email: Option.Option<Email>,
 ): Effect.Effect<AuthenticatedPrincipal, AuthError | DatabaseError> =>
 	Effect.gen(function* () {
@@ -69,7 +67,7 @@ export const resolveAutoLoginPrincipal = (
 			return {
 				principalId: PrincipalId(row.principalId),
 				userId: UserId(row.userId),
-				displayName: Option.fromNullable(row.displayName),
+				displayName: Option.fromNullishOr(row.displayName),
 			};
 		}
 
@@ -97,7 +95,7 @@ export const SingleUserAuthLayer = Layer.effect(
 		} = yield* AppConfigService;
 		const email = Option.map(autoLogin, Email);
 
-		return AuthService.of({
+		return {
 			// Resolve per-request: layer build is infallible, user row changes
 			// are reflected immediately without restarting the server.
 			authenticate: Effect.fn("auth.single-user.authenticate")(
@@ -105,8 +103,9 @@ export const SingleUserAuthLayer = Layer.effect(
 					yield* Effect.annotateCurrentSpan({ "auth.mode": "single-user" });
 					yield* Effect.logTrace("auth.single-user: authenticating");
 					const resolved = yield* resolveAutoLoginPrincipal(db, email);
-					yield* Metric.increment(
-						Metric.tagged(authCounter, "auth.outcome", "success"),
+					yield* Metric.update(
+						Metric.withAttributes(authCounter, { "auth.outcome": "success" }),
+						1,
 					);
 					return new Authenticated({ principal: resolved });
 				},
@@ -121,14 +120,15 @@ export const SingleUserAuthLayer = Layer.effect(
 										"auth.single-user: error during authentication",
 										{ cause: e instanceof DatabaseError ? e.cause : e },
 									),
-							Metric.increment(
-								Metric.tagged(authCounter, "auth.outcome", "error"),
+							Metric.update(
+								Metric.withAttributes(authCounter, { "auth.outcome": "error" }),
+								1,
 							),
 						],
 						{ discard: true },
 					),
 				),
 			),
-		});
+		};
 	}),
 );

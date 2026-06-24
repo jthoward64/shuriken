@@ -23,10 +23,10 @@ export interface CryptoServiceShape {
 	) => Effect.Effect<boolean, InternalError>;
 }
 
-export class CryptoService extends Context.Tag("CryptoService")<
+export class CryptoService extends Context.Service<
 	CryptoService,
 	CryptoServiceShape
->() {}
+>()("CryptoService") {}
 
 // ---------------------------------------------------------------------------
 // argon2id parameters — OWASP-recommended defaults (64 MiB, t=3, p=1).

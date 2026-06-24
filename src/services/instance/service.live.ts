@@ -15,7 +15,7 @@ export const InstanceServiceLive = Layer.effect(
 	Effect.gen(function* () {
 		const repo = yield* InstanceRepository;
 
-		return InstanceService.of({
+		return {
 			findById: Effect.fn("InstanceService.findById")(function* (
 				id: InstanceId,
 			) {
@@ -121,6 +121,6 @@ export const InstanceServiceLive = Layer.effect(
 				yield* Effect.logTrace("instance.updateClientProperties", { id });
 				return yield* repo.updateClientProperties(id, clientProperties);
 			}),
-		});
+		};
 	}),
 );

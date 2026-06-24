@@ -51,7 +51,7 @@ const findPrincipalByCalAddress = Effect.fn(
 				.limit(1),
 		).pipe(
 			Effect.map((r) =>
-				Option.fromNullable(
+				Option.fromNullishOr(
 					r[0]
 						? ({
 								principal: r[0].principal,
@@ -87,7 +87,9 @@ const findInbox = Effect.fn("SchedulingRepository.findInbox")(
 				)
 				.limit(1),
 		).pipe(
-			Effect.map((r) => Option.fromNullable(r[0] as CollectionRow | undefined)),
+			Effect.map((r) =>
+				Option.fromNullishOr(r[0] as CollectionRow | undefined),
+			),
 		);
 	},
 	Effect.tapError((e: DatabaseError) =>
@@ -135,7 +137,7 @@ const findDefaultCalendar = Effect.fn(
 			)
 			.limit(1),
 	).pipe(
-		Effect.map((r) => Option.fromNullable(r[0] as CollectionRow | undefined)),
+		Effect.map((r) => Option.fromNullishOr(r[0] as CollectionRow | undefined)),
 	);
 });
 
@@ -171,7 +173,7 @@ const findSorByUid = Effect.fn("SchedulingRepository.findSorByUid")(
 				.limit(1),
 		).pipe(
 			Effect.map((r) =>
-				Option.fromNullable(
+				Option.fromNullishOr(
 					r[0]
 						? {
 								instance: r[0].instance as InstanceRow,
@@ -213,7 +215,7 @@ const findInboxInstance = Effect.fn("SchedulingRepository.findInboxInstance")(
 				.limit(1),
 		).pipe(
 			Effect.map((r) =>
-				Option.fromNullable(
+				Option.fromNullishOr(
 					r[0]
 						? {
 								instance: r[0].instance as InstanceRow,
@@ -332,7 +334,7 @@ export const SchedulingRepositoryLive = Layer.effect(
 		const run = <A, E>(
 			e: Effect.Effect<A, E, DatabaseClient>,
 		): Effect.Effect<A, E> => Effect.provideService(e, DatabaseClient, dc);
-		return SchedulingRepository.of({
+		return {
 			findPrincipalByCalAddress: (
 				...args: Parameters<typeof findPrincipalByCalAddress>
 			) => run(findPrincipalByCalAddress(...args)),
@@ -352,6 +354,6 @@ export const SchedulingRepositoryLive = Layer.effect(
 			listOpaqueCalendarCollections: (
 				...args: Parameters<typeof listOpaqueCalendarCollections>
 			) => run(listOpaqueCalendarCollections(...args)),
-		});
+		};
 	}),
 );

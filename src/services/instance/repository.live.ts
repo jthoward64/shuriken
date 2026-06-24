@@ -29,7 +29,7 @@ const findById = Effect.fn("InstanceRepository.findById")(
 				.from(davInstance)
 				.where(and(eq(davInstance.id, id), isNull(davInstance.deletedAt)))
 				.limit(1),
-		).pipe(Effect.map((r) => Option.fromNullable(r[0])));
+		).pipe(Effect.map((r) => Option.fromNullishOr(r[0])));
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.instance.findById failed", e.cause),
@@ -55,7 +55,7 @@ const findBySlug = Effect.fn("InstanceRepository.findBySlug")(
 					),
 				)
 				.limit(1),
-		).pipe(Effect.map((r) => Option.fromNullable(r[0])));
+		).pipe(Effect.map((r) => Option.fromNullishOr(r[0])));
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.instance.findBySlug failed", e.cause),
@@ -343,7 +343,7 @@ export const InstanceRepositoryLive = Layer.effect(
 		const run = <A, E>(
 			e: Effect.Effect<A, E, DatabaseClient>,
 		): Effect.Effect<A, E> => Effect.provideService(e, DatabaseClient, dc);
-		return InstanceRepository.of({
+		return {
 			findById: (...args: Parameters<typeof findById>) =>
 				run(findById(...args)),
 			findBySlug: (...args: Parameters<typeof findBySlug>) =>
@@ -368,6 +368,6 @@ export const InstanceRepositoryLive = Layer.effect(
 			updateClientProperties: (
 				...args: Parameters<typeof updateClientProperties>
 			) => run(updateClientProperties(...args)),
-		});
+		};
 	}),
 );

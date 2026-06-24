@@ -39,7 +39,7 @@ const runDavFailure = async (
 	if (Exit.isSuccess(exit)) {
 		throw new Error("Expected effect to fail but it succeeded");
 	}
-	return Option.getOrElse(Cause.failureOption(exit.cause), () => {
+	return Option.getOrElse(Cause.findErrorOption(exit.cause), () => {
 		throw new Error(`Expected a Fail cause: ${Cause.pretty(exit.cause)}`);
 	}) as DavError;
 };

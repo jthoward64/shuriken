@@ -40,7 +40,7 @@ export interface CalTimezoneRepositoryShape {
 	) => Effect.Effect<CalTimezoneRow, DatabaseError>;
 }
 
-export class CalTimezoneRepository extends Context.Tag("CalTimezoneRepository")<
+export class CalTimezoneRepository extends Context.Service<
 	CalTimezoneRepository,
 	CalTimezoneRepositoryShape
->() {}
+>()("CalTimezoneRepository") {}

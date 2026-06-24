@@ -27,7 +27,7 @@ export const DomainEntityServiceLive = Layer.effect(
 		const entityRepo = yield* EntityRepository;
 		const compRepo = yield* ComponentRepository;
 
-		return DomainEntityService.of({
+		return {
 			create: Effect.fn("DomainEntityService.create")(function* ({
 				entityType,
 				document,
@@ -95,6 +95,6 @@ export const DomainEntityServiceLive = Layer.effect(
 				yield* entityRepo.softDelete(id);
 				yield* Effect.logTrace("entity.remove done", { id });
 			}),
-		});
+		};
 	}),
 );

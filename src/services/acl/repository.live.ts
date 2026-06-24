@@ -384,7 +384,7 @@ export const AclRepositoryLive = Layer.effect(
 		const run = <A, E>(
 			e: Effect.Effect<A, E, DatabaseClient>,
 		): Effect.Effect<A, E> => Effect.provideService(e, DatabaseClient, dc);
-		return AclRepository.of({
+		return {
 			getAces: (...args: Parameters<typeof getAces>) => run(getAces(...args)),
 			setAces: (...args: Parameters<typeof setAces>) => run(setAces(...args)),
 			grantAce: (...args: Parameters<typeof grantAce>) =>
@@ -404,6 +404,6 @@ export const AclRepositoryLive = Layer.effect(
 			batchGetGrantedPrivileges: (
 				...args: Parameters<typeof batchGetGrantedPrivileges>
 			) => run(batchGetGrantedPrivileges(...args)),
-		});
+		};
 	}),
 );

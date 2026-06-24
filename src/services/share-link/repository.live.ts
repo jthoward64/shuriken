@@ -19,7 +19,7 @@ const findById = Effect.fn("ShareLinkRepository.findById")(
 		yield* Effect.logTrace("repo.shareLink.findById", { id });
 		return yield* runDbQuery((db) =>
 			db.select().from(shareLink).where(eq(shareLink.id, id)).limit(1),
-		).pipe(Effect.map((r) => Option.fromNullable(r[0])));
+		).pipe(Effect.map((r) => Option.fromNullishOr(r[0])));
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.shareLink.findById failed", e.cause),
@@ -31,7 +31,7 @@ const findByToken = Effect.fn("ShareLinkRepository.findByToken")(
 		yield* Effect.logTrace("repo.shareLink.findByToken");
 		return yield* runDbQuery((db) =>
 			db.select().from(shareLink).where(eq(shareLink.token, token)).limit(1),
-		).pipe(Effect.map((r) => Option.fromNullable(r[0])));
+		).pipe(Effect.map((r) => Option.fromNullishOr(r[0])));
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.shareLink.findByToken failed", e.cause),
@@ -264,7 +264,7 @@ export const ShareLinkRepositoryLive = Layer.effect(
 		const run = <A, E>(
 			e: Effect.Effect<A, E, DatabaseClient>,
 		): Effect.Effect<A, E> => Effect.provideService(e, DatabaseClient, dc);
-		return ShareLinkRepository.of({
+		return {
 			findById: (...args: Parameters<typeof findById>) =>
 				run(findById(...args)),
 			findByToken: (...args: Parameters<typeof findByToken>) =>
@@ -284,6 +284,6 @@ export const ShareLinkRepositoryLive = Layer.effect(
 			) => run(setCalendarVisibility(...args)),
 			removeCalendar: (...args: Parameters<typeof removeCalendar>) =>
 				run(removeCalendar(...args)),
-		});
+		};
 	}),
 );

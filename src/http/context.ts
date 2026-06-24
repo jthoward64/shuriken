@@ -1,23 +1,23 @@
-import { FiberRef, Option } from "effect";
+import { Context, Option } from "effect";
 import type { RequestId } from "#src/domain/ids.ts";
 import { RequestId as mkRequestId } from "#src/domain/ids.ts";
 import type { AuthResult } from "#src/domain/types/dav.ts";
 
 // ---------------------------------------------------------------------------
-// Request-scoped context propagated via FiberRef
+// Request-scoped context propagated via a Context.Reference (fiber-local).
 //
-// Set once by the top-level router at the start of each request.
-// Any deeply nested effect (service, repository, logger) can read it
-// without needing it passed as a parameter.
+// Provided once by the top-level router at the start of each request via
+// Effect.provideService. Any deeply nested effect (service, repository,
+// logger) can read it without needing it passed as a parameter.
 // ---------------------------------------------------------------------------
 
-export const RequestIdRef = FiberRef.unsafeMake<Option.Option<RequestId>>(
-	Option.none(),
+export const RequestIdRef = Context.Reference<Option.Option<RequestId>>(
+	"RequestId",
+	{ defaultValue: () => Option.none() },
 );
 
-export const getRequestId = FiberRef.get(RequestIdRef);
-export const setRequestId = (id: RequestId) =>
-	FiberRef.set(RequestIdRef, Option.some(id));
+// The reference is itself an Effect that yields the current value.
+export const getRequestId = RequestIdRef;
 
 export const newRequestId = (): RequestId => mkRequestId(crypto.randomUUID());
 

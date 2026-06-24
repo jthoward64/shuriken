@@ -1,4 +1,4 @@
-import { Effect, Either } from "effect";
+import { Effect, Result } from "effect";
 import {
 	type DatabaseError,
 	type DavError,
@@ -75,16 +75,16 @@ export const usersUpdateHandler = (
 			),
 			email: parseEmail(form.get("email")?.toString()),
 			slug: parseSlug(slugRaw),
-		}).pipe(Effect.either);
+		}).pipe(Effect.result);
 
-		if (Either.isLeft(parseResult)) {
+		if (Result.isFailure(parseResult)) {
 			return yield* renderFragment("partials/form-error", {
 				errors: validationErrorToContext(
-					parseResult.left as FormValidationError,
+					parseResult.failure as FormValidationError,
 				),
 			});
 		}
-		const parsed = parseResult.right;
+		const parsed = parseResult.success;
 
 		// Role edits are only honoured when the caller is super_admin.
 		// Anyone else's submission of `role` is silently ignored to keep

@@ -47,7 +47,7 @@ export interface ImipDispatchServiceShape {
 	) => Effect.Effect<ImipDispatchOutcome, InternalError>;
 }
 
-export class ImipDispatchService extends Context.Tag("ImipDispatchService")<
+export class ImipDispatchService extends Context.Service<
 	ImipDispatchService,
 	ImipDispatchServiceShape
->() {}
+>()("ImipDispatchService") {}

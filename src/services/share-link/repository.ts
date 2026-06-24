@@ -63,7 +63,7 @@ export interface ShareLinkRepositoryShape {
 	) => Effect.Effect<void, DatabaseError>;
 }
 
-export class ShareLinkRepository extends Context.Tag("ShareLinkRepository")<
+export class ShareLinkRepository extends Context.Service<
 	ShareLinkRepository,
 	ShareLinkRepositoryShape
->() {}
+>()("ShareLinkRepository") {}

@@ -104,7 +104,7 @@ export interface CollectionRepositoryShape {
 	) => Effect.Effect<CollectionRow, DatabaseError>;
 }
 
-export class CollectionRepository extends Context.Tag("CollectionRepository")<
+export class CollectionRepository extends Context.Service<
 	CollectionRepository,
 	CollectionRepositoryShape
->() {}
+>()("CollectionRepository") {}

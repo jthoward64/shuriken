@@ -96,7 +96,7 @@ export const TemplateServiceLive = Layer.effect(
 
 		const layout = compiled.get("layouts/base");
 
-		return TemplateService.of({
+		return {
 			render: (name, ctx, isHtmx) =>
 				Effect.gen(function* () {
 					const template = yield* getTemplate(name);
@@ -121,6 +121,6 @@ export const TemplateServiceLive = Layer.effect(
 						catch: (e) => new InternalError({ cause: e }),
 					});
 				}),
-		});
+		};
 	}),
 );

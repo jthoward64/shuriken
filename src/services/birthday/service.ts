@@ -41,7 +41,7 @@ export interface BirthdayServiceShape {
 	>;
 }
 
-export class BirthdayService extends Context.Tag("BirthdayService")<
+export class BirthdayService extends Context.Service<
 	BirthdayService,
 	BirthdayServiceShape
->() {}
+>()("BirthdayService") {}

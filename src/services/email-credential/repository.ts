@@ -35,6 +35,7 @@ export interface UserEmailCredentialRepositoryShape {
 	readonly delete: (userId: UserId) => Effect.Effect<void, DatabaseError>;
 }
 
-export class UserEmailCredentialRepository extends Context.Tag(
-	"UserEmailCredentialRepository",
-)<UserEmailCredentialRepository, UserEmailCredentialRepositoryShape>() {}
+export class UserEmailCredentialRepository extends Context.Service<
+	UserEmailCredentialRepository,
+	UserEmailCredentialRepositoryShape
+>()("UserEmailCredentialRepository") {}

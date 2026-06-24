@@ -91,7 +91,7 @@ export interface SchedulingRepositoryShape {
 	) => Effect.Effect<ReadonlyArray<CollectionRow>, DatabaseError>;
 }
 
-export class SchedulingRepository extends Context.Tag("SchedulingRepository")<
+export class SchedulingRepository extends Context.Service<
 	SchedulingRepository,
 	SchedulingRepositoryShape
->() {}
+>()("SchedulingRepository") {}

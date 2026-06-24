@@ -34,7 +34,7 @@ export interface PrincipalServiceShape {
 	) => Effect.Effect<PrincipalRow, DatabaseError>;
 }
 
-export class PrincipalService extends Context.Tag("PrincipalService")<
+export class PrincipalService extends Context.Service<
 	PrincipalService,
 	PrincipalServiceShape
->() {}
+>()("PrincipalService") {}

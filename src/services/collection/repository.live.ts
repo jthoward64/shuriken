@@ -29,7 +29,7 @@ const findById = Effect.fn("CollectionRepository.findById")(
 				.from(davCollection)
 				.where(and(eq(davCollection.id, id), isNull(davCollection.deletedAt)))
 				.limit(1),
-		).pipe(Effect.map((r) => Option.fromNullable(r[0])));
+		).pipe(Effect.map((r) => Option.fromNullishOr(r[0])));
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.collection.findById failed", e.cause),
@@ -65,7 +65,7 @@ const findBySlug = Effect.fn("CollectionRepository.findBySlug")(
 					),
 				)
 				.limit(1),
-		).pipe(Effect.map((r) => Option.fromNullable(r[0])));
+		).pipe(Effect.map((r) => Option.fromNullishOr(r[0])));
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.collection.findBySlug failed", e.cause),
@@ -335,7 +335,7 @@ export const CollectionRepositoryLive = Layer.effect(
 		const run = <A, E>(
 			e: Effect.Effect<A, E, DatabaseClient>,
 		): Effect.Effect<A, E> => Effect.provideService(e, DatabaseClient, dc);
-		return CollectionRepository.of({
+		return {
 			findById: (...args: Parameters<typeof findById>) =>
 				run(findById(...args)),
 			findBySlug: (...args: Parameters<typeof findBySlug>) =>
@@ -355,6 +355,6 @@ export const CollectionRepositoryLive = Layer.effect(
 				run(relocate(...args)),
 			updateProperties: (...args: Parameters<typeof updateProperties>) =>
 				run(updateProperties(...args)),
-		});
+		};
 	}),
 );

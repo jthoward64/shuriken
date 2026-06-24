@@ -1,4 +1,4 @@
-import { Effect, Option } from "effect";
+import { Context, Effect, Layer, Option } from "effect";
 import {
 	tzlib_get_ical_block,
 	tzlib_get_timezones,
@@ -33,10 +33,10 @@ export interface IanaTimezoneServiceShape {
 	readonly isKnownTzid: (tzid: string) => boolean;
 }
 
-export class IanaTimezoneService extends Effect.Service<IanaTimezoneService>()(
+export class IanaTimezoneService extends Context.Service<IanaTimezoneService>()(
 	"IanaTimezoneService",
 	{
-		sync: () => {
+		make: Effect.sync(() => {
 			// Pre-build a Set for O(1) lookups — tzlib_get_timezones() is stable data.
 			const rawList = tzlib_get_timezones();
 			const tzids: ReadonlyArray<string> = Array.isArray(rawList)
@@ -63,6 +63,11 @@ export class IanaTimezoneService extends Effect.Service<IanaTimezoneService>()(
 			const isKnownTzid = (tzid: string): boolean => knownSet.has(tzid);
 
 			return { getVtimezone, listTzids, isKnownTzid };
-		},
+		}),
 	},
 ) {}
+
+export const IanaTimezoneServiceLive = Layer.effect(
+	IanaTimezoneService,
+	IanaTimezoneService.make,
+);

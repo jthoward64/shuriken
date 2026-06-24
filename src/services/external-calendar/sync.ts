@@ -23,6 +23,7 @@ export interface ExternalCalendarSyncServiceShape {
 	) => Effect.Effect<void, DatabaseError | DavError | InternalError>;
 }
 
-export class ExternalCalendarSyncService extends Context.Tag(
-	"ExternalCalendarSyncService",
-)<ExternalCalendarSyncService, ExternalCalendarSyncServiceShape>() {}
+export class ExternalCalendarSyncService extends Context.Service<
+	ExternalCalendarSyncService,
+	ExternalCalendarSyncServiceShape
+>()("ExternalCalendarSyncService") {}

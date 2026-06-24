@@ -35,7 +35,7 @@ const findById = Effect.fn("UserRepository.findById")(
 				.limit(1),
 		).pipe(
 			Effect.map((r) =>
-				Option.fromNullable(
+				Option.fromNullishOr(
 					r[0] ? { principal: r[0].principal, user: r[0].user } : null,
 				),
 			),
@@ -58,7 +58,7 @@ const findByEmail = Effect.fn("UserRepository.findByEmail")(
 				.limit(1),
 		).pipe(
 			Effect.map((r) =>
-				Option.fromNullable(
+				Option.fromNullishOr(
 					r[0] ? { principal: r[0].principal, user: r[0].user } : null,
 				),
 			),
@@ -231,7 +231,7 @@ const findCredential = Effect.fn("UserRepository.findCredential")(
 				)
 				.limit(1),
 		).pipe(
-			Effect.map((r) => Option.fromNullable(r[0] as AuthUserRow | undefined)),
+			Effect.map((r) => Option.fromNullishOr(r[0] as AuthUserRow | undefined)),
 		);
 	},
 	Effect.tapError((e) =>
@@ -296,7 +296,7 @@ const findBySlug = Effect.fn("UserRepository.findBySlug")(
 				.limit(1),
 		).pipe(
 			Effect.map((r) =>
-				Option.fromNullable(
+				Option.fromNullishOr(
 					r[0] ? { principal: r[0].principal, user: r[0].user } : null,
 				),
 			),
@@ -377,7 +377,7 @@ export const UserRepositoryLive = Layer.effect(
 		const run = <A, E>(
 			e: Effect.Effect<A, E, DatabaseClient>,
 		): Effect.Effect<A, E> => Effect.provideService(e, DatabaseClient, dc);
-		return UserRepository.of({
+		return {
 			findById: (...args: Parameters<typeof findById>) =>
 				run(findById(...args)),
 			findBySlug: (...args: Parameters<typeof findBySlug>) =>
@@ -395,6 +395,6 @@ export const UserRepositoryLive = Layer.effect(
 				run(insertCredential(...args)),
 			deleteCredential: (...args: Parameters<typeof deleteCredential>) =>
 				run(deleteCredential(...args)),
-		});
+		};
 	}),
 );

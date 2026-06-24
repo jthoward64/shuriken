@@ -1,4 +1,4 @@
-import { Effect, ParseResult, Schema } from "effect";
+import { Effect, Option, Schema, SchemaGetter, SchemaIssue } from "effect";
 import { type DavError, validCalendarData } from "../../domain/errors.ts";
 import {
 	type RawComponent,
@@ -282,56 +282,60 @@ const convertIrToRawComponent = (ir: IrComponent): RawComponent => ({
 // ICalPropertyInferrer: Schema<IrComponent, RawComponent>
 // ---------------------------------------------------------------------------
 
-const ICalPropertyInferrer: Schema.Schema<IrComponent, RawComponent> =
-	Schema.transformOrFail(RawComponentSchema, IrComponentSchema, {
-		strict: true,
-		decode: (raw, _options, ast) =>
+const ICalPropertyInferrer = RawComponentSchema.pipe(
+	Schema.decodeTo(Schema.toType(IrComponentSchema), {
+		decode: SchemaGetter.transformOrFail((raw: RawComponent) =>
 			Effect.try({
 				try: () => convertRawToIrComponent(raw),
-				catch: (e) => new ParseResult.Type(ast, raw, String(e)),
+				catch: (e) =>
+					new SchemaIssue.InvalidValue(Option.some(raw), {
+						message: String(e),
+					}),
 			}),
-		encode: (ir, _options, ast) =>
+		),
+		encode: SchemaGetter.transformOrFail((ir: IrComponent) =>
 			Effect.try({
 				try: () => convertIrToRawComponent(ir),
-				catch: (e) => new ParseResult.Type(ast, ir, String(e)),
+				catch: (e) =>
+					new SchemaIssue.InvalidValue(Option.some(ir), {
+						message: String(e),
+					}),
 			}),
-	});
+		),
+	}),
+);
 
 // ---------------------------------------------------------------------------
 // ICalDocumentCodec: Schema<IrDocument, IrComponent>
 // ---------------------------------------------------------------------------
 
-const ICalDocumentCodec: Schema.Schema<IrDocument, IrComponent> =
-	Schema.transformOrFail(IrComponentSchema, IrDocumentSchema, {
-		strict: true,
-		decode: (component, _options, ast) => {
+const ICalDocumentCodec = Schema.toType(IrComponentSchema).pipe(
+	Schema.decodeTo(Schema.toType(IrDocumentSchema), {
+		decode: SchemaGetter.transformOrFail((component: IrComponent) => {
 			if (component.name !== "VCALENDAR") {
-				return ParseResult.fail(
-					new ParseResult.Type(
-						ast,
-						component,
-						`Expected VCALENDAR root component, got "${component.name}"`,
-					),
+				return Effect.fail(
+					new SchemaIssue.InvalidValue(Option.some(component), {
+						message: `Expected VCALENDAR root component, got "${component.name}"`,
+					}),
 				);
 			}
-			return ParseResult.succeed({
+			return Effect.succeed({
 				kind: "icalendar" as const,
 				root: component,
 			});
-		},
-		encode: (doc, _options, ast) => {
+		}),
+		encode: SchemaGetter.transformOrFail((doc: IrDocument) => {
 			if (doc.kind !== "icalendar") {
-				return ParseResult.fail(
-					new ParseResult.Type(
-						ast,
-						doc,
-						`Expected icalendar document, got kind "${doc.kind}"`,
-					),
+				return Effect.fail(
+					new SchemaIssue.InvalidValue(Option.some(doc), {
+						message: `Expected icalendar document, got kind "${doc.kind}"`,
+					}),
 				);
 			}
-			return ParseResult.succeed(doc.root);
-		},
-	});
+			return Effect.succeed(doc.root);
+		}),
+	}),
+);
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -345,20 +349,20 @@ const ICalDocumentCodec: Schema.Schema<IrDocument, IrComponent> =
  *          →[ICalPropertyInferrer]    IrComponent
  *          →[ICalDocumentCodec]       IrDocument
  */
-export const ICalendarCodec: Schema.Schema<IrDocument, string> =
+export const ICalendarCodec: Schema.Codec<IrDocument, string> =
 	TextToRawComponentCodec.pipe(
-		Schema.compose(ICalPropertyInferrer),
-		Schema.compose(ICalDocumentCodec),
+		Schema.decodeTo(ICalPropertyInferrer),
+		Schema.decodeTo(ICalDocumentCodec),
 	);
 
 /**
  * Decode iCalendar text → IrDocument.
- * Maps Schema.ParseError → validCalendarData DavError.
+ * Maps Schema.SchemaError → validCalendarData DavError.
  */
 export const decodeICalendar = (
 	text: string,
 ): Effect.Effect<IrDocument, DavError> =>
-	Schema.decodeUnknown(ICalendarCodec)(text).pipe(
+	Schema.decodeUnknownEffect(ICalendarCodec)(text).pipe(
 		Effect.mapError((e) => validCalendarData(e.message)),
 	);
 
@@ -369,7 +373,7 @@ export const decodeICalendar = (
 export const encodeICalendar = (
 	doc: IrDocument,
 ): Effect.Effect<string, never> =>
-	Schema.encode(ICalendarCodec)(doc).pipe(Effect.orDie);
+	Schema.encodeEffect(ICalendarCodec)(doc).pipe(Effect.orDie);
 
 /**
  * Serialize a single IrComponent (e.g. VTIMEZONE) to iCalendar content-line text,
@@ -382,7 +386,7 @@ export const encodeICalendar = (
 export const encodeICalComponent = (
 	component: IrComponent,
 ): Effect.Effect<string, never> =>
-	Schema.encode(ICalPropertyInferrer)(component).pipe(
-		Effect.flatMap((raw) => Schema.encode(TextToRawComponentCodec)(raw)),
+	Schema.encodeEffect(ICalPropertyInferrer)(component).pipe(
+		Effect.flatMap((raw) => Schema.encodeEffect(TextToRawComponentCodec)(raw)),
 		Effect.orDie,
 	);

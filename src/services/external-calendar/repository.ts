@@ -139,11 +139,12 @@ export interface ExternalCalendarRepositoryShape {
 	readonly deleteClaim: (id: UuidString) => Effect.Effect<void, DatabaseError>;
 }
 
-export class ExternalCalendarRepository extends Ctx.Tag(
-	"ExternalCalendarRepository",
-)<ExternalCalendarRepository, ExternalCalendarRepositoryShape>() {}
+export class ExternalCalendarRepository extends Ctx.Service<
+	ExternalCalendarRepository,
+	ExternalCalendarRepositoryShape
+>()("ExternalCalendarRepository") {}
 
-// re-export for callers that prefer the Context.Tag name
-export type ExternalCalendarRepositoryContext = Context.Tag.Identifier<
+// re-export for callers that prefer the Context.Service name
+export type ExternalCalendarRepositoryContext = Context.Service.Identifier<
 	typeof ExternalCalendarRepository
 >;

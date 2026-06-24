@@ -12,9 +12,9 @@ import type { ContentLine } from "./content-line.ts";
 // Helpers
 // ---------------------------------------------------------------------------
 
-const decodeLines = Schema.decode(RawComponentCodec);
-const encodeLines = Schema.encode(RawComponentCodec);
-const decodeText = Schema.decode(TextToRawComponentCodec);
+const decodeLines = Schema.decodeEffect(RawComponentCodec);
+const encodeLines = Schema.encodeEffect(RawComponentCodec);
+const decodeText = Schema.decodeEffect(TextToRawComponentCodec);
 
 const dec = (lines: ReadonlyArray<ContentLine>) =>
 	Effect.runPromise(decodeLines(lines));
@@ -86,7 +86,7 @@ describe("RawComponentCodec decode", () => {
 			{ name: "END", params: [], rawValue: "VEVENT" },
 		];
 		const err = await runFailure(decodeLines(lines));
-		expect(err._tag).toBe("ParseError");
+		expect(err._tag).toBe("SchemaError");
 	});
 
 	it("fails when there are multiple root components", async () => {
@@ -97,7 +97,7 @@ describe("RawComponentCodec decode", () => {
 			{ name: "END", params: [], rawValue: "VCALENDAR" },
 		];
 		const err = await runFailure(decodeLines(lines));
-		expect(err._tag).toBe("ParseError");
+		expect(err._tag).toBe("SchemaError");
 	});
 
 	it("fails when there are unclosed components", async () => {
@@ -106,7 +106,7 @@ describe("RawComponentCodec decode", () => {
 			{ name: "VERSION", params: [], rawValue: "2.0" },
 		];
 		const err = await runFailure(decodeLines(lines));
-		expect(err._tag).toBe("ParseError");
+		expect(err._tag).toBe("SchemaError");
 	});
 
 	it("fails when a property line appears outside any component", async () => {
@@ -114,7 +114,7 @@ describe("RawComponentCodec decode", () => {
 			{ name: "VERSION", params: [], rawValue: "2.0" },
 		];
 		const err = await runFailure(decodeLines(lines));
-		expect(err._tag).toBe("ParseError");
+		expect(err._tag).toBe("SchemaError");
 	});
 });
 

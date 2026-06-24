@@ -107,7 +107,7 @@ export interface ShareLinkServiceShape {
 	) => Effect.Effect<void, DatabaseError | DavError>;
 }
 
-export class ShareLinkService extends Context.Tag("ShareLinkService")<
+export class ShareLinkService extends Context.Service<
 	ShareLinkService,
 	ShareLinkServiceShape
->() {}
+>()("ShareLinkService") {}

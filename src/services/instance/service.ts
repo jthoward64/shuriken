@@ -34,7 +34,7 @@ export interface InstanceServiceShape {
 	) => Effect.Effect<InstanceRow, DatabaseError>;
 }
 
-export class InstanceService extends Context.Tag("InstanceService")<
+export class InstanceService extends Context.Service<
 	InstanceService,
 	InstanceServiceShape
->() {}
+>()("InstanceService") {}

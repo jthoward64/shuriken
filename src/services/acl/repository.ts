@@ -136,7 +136,7 @@ export interface AclRepositoryShape {
 	) => Effect.Effect<string, DatabaseError>;
 }
 
-export class AclRepository extends Context.Tag("AclRepository")<
+export class AclRepository extends Context.Service<
 	AclRepository,
 	AclRepositoryShape
->() {}
+>()("AclRepository") {}

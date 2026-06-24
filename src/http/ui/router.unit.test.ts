@@ -1,8 +1,8 @@
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
 import { Effect, Layer, Option, Redacted } from "effect";
-import { AppConfigService } from "#src/config.ts";
-import { DatabaseClient } from "#src/db/client.ts";
+import { AppConfigService, type AppConfigType } from "#src/config.ts";
+import { DatabaseClient, type DbClient } from "#src/db/client.ts";
 import type { PrincipalId, RequestId, UserId } from "#src/domain/ids.ts";
 import { Authenticated } from "#src/domain/types/dav.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
@@ -71,7 +71,7 @@ const stubLayers = Layer.mergeAll(
 		},
 		log: { level: undefined },
 		nodeEnv: "test",
-	} as unknown as AppConfigService),
+	} as unknown as AppConfigType),
 	Layer.succeed(FileService, {
 		readText: die,
 		readBytes: die,
@@ -250,7 +250,7 @@ const stubLayers = Layer.mergeAll(
 				failed: 0,
 			}),
 	}),
-	Layer.succeed(DatabaseClient, {} as unknown as DatabaseClient),
+	Layer.succeed(DatabaseClient, {} as unknown as DbClient),
 	Layer.succeed(ShareLinkService, {
 		listForUser: () => Effect.succeed([]),
 		getById: () => Effect.succeed(Option.none()),

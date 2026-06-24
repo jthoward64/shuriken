@@ -166,7 +166,7 @@ export const SubscriptionServiceLive = Layer.effect(
 		const repo = yield* ExternalCalendarRepository;
 		const collSvc = yield* CollectionService;
 		const config = yield* AppConfigService;
-		return SubscriptionService.of({
+		return {
 			subscribe: (input) =>
 				subscribe(input).pipe(
 					Effect.provideService(ExternalCalendarRepository, repo),
@@ -178,6 +178,6 @@ export const SubscriptionServiceLive = Layer.effect(
 					Effect.provideService(ExternalCalendarRepository, repo),
 					Effect.provideService(CollectionService, collSvc),
 				),
-		});
+		};
 	}),
 );
