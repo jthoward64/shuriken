@@ -87,27 +87,24 @@ export const authenticateBasic = (
 						username: creds.username,
 					});
 
-					const rows = yield* Effect.tryPromise({
-						try: () =>
-							db
-								.select({
-									authCredential: authUser.authCredential,
-									userId: user.id,
-									principalId: user.principalId,
-									displayName: principal.displayName,
-								})
-								.from(authUser)
-								.innerJoin(user, eq(authUser.userId, user.id))
-								.innerJoin(principal, eq(user.principalId, principal.id))
-								.where(
-									and(
-										eq(authUser.authSource, "local"),
-										eq(authUser.authId, creds.username),
-									),
-								)
-								.limit(1),
-						catch: (e) => new DatabaseError({ cause: e }),
-					});
+					const rows = yield* db
+						.select({
+							authCredential: authUser.authCredential,
+							userId: user.id,
+							principalId: user.principalId,
+							displayName: principal.displayName,
+						})
+						.from(authUser)
+						.innerJoin(user, eq(authUser.userId, user.id))
+						.innerJoin(principal, eq(user.principalId, principal.id))
+						.where(
+							and(
+								eq(authUser.authSource, "local"),
+								eq(authUser.authId, creds.username),
+							),
+						)
+						.limit(1)
+						.pipe(Effect.mapError((e) => new DatabaseError({ cause: e })));
 
 					const row = rows[0];
 					if (!row?.authCredential) {

@@ -13,14 +13,16 @@
     "npm:@biomejs/biome@*": "2.4.9",
     "npm:@biomejs/biome@2.4.9": "2.4.9",
     "npm:@effect/platform-node@4.0.0-beta.88": "4.0.0-beta.88_effect@4.0.0-beta.88_ioredis@5.11.1",
+    "npm:@effect/sql-pg@4.0.0-beta.88": "4.0.0-beta.88_effect@4.0.0-beta.88",
+    "npm:@effect/sql-pglite@4.0.0-beta.88": "4.0.0-beta.88_effect@4.0.0-beta.88",
     "npm:@electric-sql/pglite-icu-full@0.1": "0.1.0",
     "npm:@electric-sql/pglite@~0.5.3": "0.5.3",
     "npm:@js-temporal/polyfill@~0.5.1": "0.5.1",
     "npm:casbin@^5.51.0": "5.51.0",
-    "npm:drizzle-adapter@^1.4.0": "1.4.0_casbin@5.51.0_drizzle-orm@1.0.0-beta.22__@electric-sql+pglite@0.5.3__postgres@3.4.9__ioredis@5.11.1_ioredis@5.11.1",
+    "npm:drizzle-adapter@^1.4.0": "1.4.0_casbin@5.51.0_drizzle-orm@1.0.0-beta.22__@effect+sql-pg@4.0.0-beta.88___effect@4.0.0-beta.88__@electric-sql+pglite@0.5.3__pg@8.22.0__postgres@3.4.9__effect@4.0.0-beta.88_@effect+sql-pg@4.0.0-beta.88__effect@4.0.0-beta.88_effect@4.0.0-beta.88",
     "npm:drizzle-kit@*": "0.31.10",
     "npm:drizzle-kit@1.0.0-rc.3": "1.0.0-rc.3",
-    "npm:drizzle-orm@1.0.0-rc.3": "1.0.0-rc.3_@electric-sql+pglite@0.5.3_effect@4.0.0-beta.88_postgres@3.4.9",
+    "npm:drizzle-orm@1.0.0-rc.3": "1.0.0-rc.3_@effect+sql-pg@4.0.0-beta.88__effect@4.0.0-beta.88_@electric-sql+pglite@0.5.3_effect@4.0.0-beta.88_pg@8.22.0_postgres@3.4.9",
     "npm:effect@4.0.0-beta.88": "4.0.0-beta.88",
     "npm:fast-xml-builder@^1.2.0": "1.2.0",
     "npm:fast-xml-parser@^5.9.3": "5.9.3",
@@ -178,6 +180,24 @@
         "multipasta"
       ]
     },
+    "@effect/sql-pg@4.0.0-beta.88_effect@4.0.0-beta.88": {
+      "integrity": "sha512-aZNElnvf/RUU7wavt21tOGcqlaSYHdltcam5B4tSIA2Indq0wTnIvTEaKcwoFocFcwE23CxR59a7o3zmUQ+u/Q==",
+      "dependencies": [
+        "effect@4.0.0-beta.88",
+        "pg",
+        "pg-connection-string@2.12.0",
+        "pg-cursor",
+        "pg-pool",
+        "pg-types@4.1.0"
+      ]
+    },
+    "@effect/sql-pglite@4.0.0-beta.88_effect@4.0.0-beta.88": {
+      "integrity": "sha512-oAX4GW+qP7WECUwKs8rEnEHC38FnXZN0st1Hf27oB08MzcrxQ2an99lBR9eGVlki2GGYUYNJpPosra93b5qJiQ==",
+      "dependencies": [
+        "@electric-sql/pglite@0.4.6",
+        "effect@4.0.0-beta.88"
+      ]
+    },
     "@effect/sql@0.49.0_effect@3.21.4_ioredis@5.11.1": {
       "integrity": "sha512-9UEKR+z+MrI/qMAmSvb/RiD9KlgIazjZUCDSpwNgm0lEK9/Q6ExEyfziiYFVCPiptp52cBw8uBHRic8hHnwqXA==",
       "dependencies": [
@@ -189,6 +209,9 @@
     },
     "@electric-sql/pglite-icu-full@0.1.0": {
       "integrity": "sha512-yZ0diEYEk2JKaQJ1UX27yMIeVL5J5TX4lWJ8LqLZOBD+BD8NcQt8XGeJfpvr+y+BcHIcsxc85Ud1cesHapOBJA=="
+    },
+    "@electric-sql/pglite@0.4.6": {
+      "integrity": "sha512-qmlmfN8UyKCee35qkV0r/MBp+Znl8FjBz7OpoglNvww3GJpw0/DLP0o1ZymvLNmcD5DTLOQdzKPtF8Hd3mdl1w=="
     },
     "@electric-sql/pglite@0.5.3": {
       "integrity": "sha512-iTTYbA5Uesrl+N7zss0J5LopT7KE4j9aymYo+EZZh+rZbARQCUQOs+n2pay64JRUpc3fCkpfrniTNJnvYzOE+g=="
@@ -739,11 +762,11 @@
         "domhandler"
       ]
     },
-    "drizzle-adapter@1.4.0_casbin@5.51.0_drizzle-orm@1.0.0-beta.22__@electric-sql+pglite@0.5.3__postgres@3.4.9__ioredis@5.11.1_ioredis@5.11.1": {
+    "drizzle-adapter@1.4.0_casbin@5.51.0_drizzle-orm@1.0.0-beta.22__@effect+sql-pg@4.0.0-beta.88___effect@4.0.0-beta.88__@electric-sql+pglite@0.5.3__pg@8.22.0__postgres@3.4.9__effect@4.0.0-beta.88_@effect+sql-pg@4.0.0-beta.88__effect@4.0.0-beta.88_effect@4.0.0-beta.88": {
       "integrity": "sha512-UU4ZcGYIZeSSdfZaTlZBUNjQ+Aj1T64QsB/ayBsskHo6bRQiw5fbX3CSyc7yllTCZ+jE5207EKvwAJpHgT2nNw==",
       "dependencies": [
         "casbin",
-        "drizzle-orm@1.0.0-beta.22_@electric-sql+pglite@0.5.3_postgres@3.4.9_ioredis@5.11.1"
+        "drizzle-orm@1.0.0-beta.22_@effect+sql-pg@4.0.0-beta.88__effect@4.0.0-beta.88_@electric-sql+pglite@0.5.3_pg@8.22.0_postgres@3.4.9_effect@4.0.0-beta.88"
       ]
     },
     "drizzle-kit@0.31.10": {
@@ -767,33 +790,39 @@
       ],
       "bin": true
     },
-    "drizzle-orm@1.0.0-beta.22_@electric-sql+pglite@0.5.3_postgres@3.4.9_ioredis@5.11.1": {
+    "drizzle-orm@1.0.0-beta.22_@effect+sql-pg@4.0.0-beta.88__effect@4.0.0-beta.88_@electric-sql+pglite@0.5.3_pg@8.22.0_postgres@3.4.9_effect@4.0.0-beta.88": {
       "integrity": "sha512-F+DZyVIvH0oVKa/w08Cle1xfoH+pc+htIXHG/frnMLG72aby9NYYr9oc+9XvghnoO4umxFItduz0OMmQJMnenw==",
       "dependencies": [
         "@effect/sql",
-        "@electric-sql/pglite",
+        "@effect/sql-pg",
+        "@electric-sql/pglite@0.5.3",
         "@opentelemetry/api",
         "pg",
         "postgres"
       ],
       "optionalPeers": [
         "@effect/sql",
-        "@electric-sql/pglite",
+        "@effect/sql-pg",
+        "@electric-sql/pglite@0.5.3",
         "@opentelemetry/api",
         "pg",
         "postgres"
       ]
     },
-    "drizzle-orm@1.0.0-rc.3_@electric-sql+pglite@0.5.3_effect@4.0.0-beta.88_postgres@3.4.9": {
+    "drizzle-orm@1.0.0-rc.3_@effect+sql-pg@4.0.0-beta.88__effect@4.0.0-beta.88_@electric-sql+pglite@0.5.3_effect@4.0.0-beta.88_pg@8.22.0_postgres@3.4.9": {
       "integrity": "sha512-akZOa5UxapFbdBG8IDkfBRpSZJpMHaOJtGgp7oi1oHaiU8S3KN92waHo2l5aRuv1D9tMGYpv3BQFOsiGcNjLTQ==",
       "dependencies": [
-        "@electric-sql/pglite",
+        "@effect/sql-pg",
+        "@electric-sql/pglite@0.5.3",
         "effect@4.0.0-beta.88",
+        "pg",
         "postgres"
       ],
       "optionalPeers": [
-        "@electric-sql/pglite",
+        "@effect/sql-pg",
+        "@electric-sql/pglite@0.5.3",
         "effect@4.0.0-beta.88",
+        "pg",
         "postgres"
       ]
     },
@@ -1146,6 +1175,9 @@
     "nodemailer@9.0.1": {
       "integrity": "sha512-Gwv8SQewT616ZM/URn0H54b8PWo/Wum7md3EW2aWy1lO27+WZCX+Xyak3J+NlmHUjDh5ME+uesJUDRbR3Ye8Bw=="
     },
+    "obuf@1.1.2": {
+      "integrity": "sha512-PX1wu0AmAdPqOL1mWhqmlOd8kOIZQwGZw6rh7uby9fTc5lhaOWFLX3I6R1hrF9k3zUY40e6igsLGkDXK92LJNg=="
+    },
     "parseley@0.13.1": {
       "integrity": "sha512-uNBJZzmb60l6p6VWLTmevizNAGnE0xoSf1n0B4q3ntegDNzcS68NRCcBDZTcyXHxt2XhBChsCuqj4M+nChvE/A==",
       "dependencies": [
@@ -1162,11 +1194,23 @@
     "pg-cloudflare@1.4.0": {
       "integrity": "sha512-Vo7z/6rrQYxpNRylp4Tlob2elzbh+N/MOQbxFVWCxS7oEx6jF53GTJFxK2WWpKuBRkmiin4Mt+xofFDjx09R0A=="
     },
+    "pg-connection-string@2.12.0": {
+      "integrity": "sha512-U7qg+bpswf3Cs5xLzRqbXbQl85ng0mfSV/J0nnA31MCLgvEaAo7CIhmeyrmJpOr7o+zm0rXK+hNnT5l9RHkCkQ=="
+    },
     "pg-connection-string@2.14.0": {
       "integrity": "sha512-XwWDGcLRGCXAR8F/AM5bG7Q+A3Wm2s6QeEjlOKZLlH3UYcguiqCWKyWXVag5TLTIjR7oOJUY8kcADaZgWPyLeg=="
     },
+    "pg-cursor@2.21.0_pg@8.22.0": {
+      "integrity": "sha512-IYvk/j+Suhtbo/C3uOf4JLsLK/gWxOTUOmYbDsbKnLaVJDq+KwhwK6ngpRfiCk8eDMS3AmGQABZCv0cREEzHQw==",
+      "dependencies": [
+        "pg"
+      ]
+    },
     "pg-int8@1.0.1": {
       "integrity": "sha512-WCtabS6t3c8SkpDBUlb1kjOs7l66xsGdKpIPZsg4wR+B3+u9UAum2odSsF9tnvxg80h4ZxLWMy4pRjOsFIqQpw=="
+    },
+    "pg-numeric@1.0.2": {
+      "integrity": "sha512-BM/Thnrw5jm2kKLE5uJkXqqExRUY/toLHda65XgFTBTFYZyopbKjBe29Ii3RbkvlsMoFwD+tHeGaCjjv0gHlyw=="
     },
     "pg-pool@3.14.0_pg@8.22.0": {
       "integrity": "sha512-gKtPkFdQPU3DksooVLi9LsjZxrsBUZIpa+7aVx+LV5pNh0KzP4Zleud2po+ConrxbuXGBJ6Hfer6hdgpIBpBaw==",
@@ -1181,19 +1225,31 @@
       "integrity": "sha512-qTAAlrEsl8s4OiEQY69wDvcMIdQN6wdz5ojQiOy6YRMuynxenON0O5oCpJI6lshc6scgAY8qvJ2On/p+CXY0GA==",
       "dependencies": [
         "pg-int8",
-        "postgres-array",
-        "postgres-bytea",
-        "postgres-date",
-        "postgres-interval"
+        "postgres-array@2.0.0",
+        "postgres-bytea@1.0.1",
+        "postgres-date@1.0.7",
+        "postgres-interval@1.2.0"
+      ]
+    },
+    "pg-types@4.1.0": {
+      "integrity": "sha512-o2XFanIMy/3+mThw69O8d4n1E5zsLhdO+OPqswezu7Z5ekP4hYDqlDjlmOpYMbzY2Br0ufCwJLdDIXeNVwcWFg==",
+      "dependencies": [
+        "pg-int8",
+        "pg-numeric",
+        "postgres-array@3.0.4",
+        "postgres-bytea@3.0.0",
+        "postgres-date@2.1.0",
+        "postgres-interval@3.0.0",
+        "postgres-range"
       ]
     },
     "pg@8.22.0": {
       "integrity": "sha512-8wih1vVIBMxoUM2oB4soJsD9tDnDpLv4OXBJ+EJzFsvycD+lfyIreC2gGHq78f8jbLLt+bvlPTFdFZfJkOuzAA==",
       "dependencies": [
-        "pg-connection-string",
+        "pg-connection-string@2.14.0",
         "pg-pool",
         "pg-protocol",
-        "pg-types",
+        "pg-types@2.2.0",
         "pgpass"
       ],
       "optionalDependencies": [
@@ -1209,17 +1265,35 @@
     "postgres-array@2.0.0": {
       "integrity": "sha512-VpZrUqU5A69eQyW2c5CA1jtLecCsN2U/bD6VilrFDWq5+5UIEVO7nazS3TEcHf1zuPYO/sqGvUvW62g86RXZuA=="
     },
+    "postgres-array@3.0.4": {
+      "integrity": "sha512-nAUSGfSDGOaOAEGwqsRY27GPOea7CNipJPOA7lPbdEpx5Kg3qzdP0AaWC5MlhTWV9s4hFX39nomVZ+C4tnGOJQ=="
+    },
     "postgres-bytea@1.0.1": {
       "integrity": "sha512-5+5HqXnsZPE65IJZSMkZtURARZelel2oXUEO8rH83VS/hxH5vv1uHquPg5wZs8yMAfdv971IU+kcPUczi7NVBQ=="
     },
+    "postgres-bytea@3.0.0": {
+      "integrity": "sha512-CNd4jim9RFPkObHSjVHlVrxoVQXz7quwNFpz7RY1okNNme49+sVyiTvTRobiLV548Hx/hb1BG+iE7h9493WzFw==",
+      "dependencies": [
+        "obuf"
+      ]
+    },
     "postgres-date@1.0.7": {
       "integrity": "sha512-suDmjLVQg78nMK2UZ454hAG+OAW+HQPZ6n++TNDUX+L0+uUlLywnoxJKDou51Zm+zTCjrCl0Nq6J9C5hP9vK/Q=="
+    },
+    "postgres-date@2.1.0": {
+      "integrity": "sha512-K7Juri8gtgXVcDfZttFKVmhglp7epKb1K4pgrkLxehjqkrgPhfG6OO8LHLkfaqkbpjNRnra018XwAr1yQFWGcA=="
     },
     "postgres-interval@1.2.0": {
       "integrity": "sha512-9ZhXKM/rw350N1ovuWHbGxnGh/SNJ4cnxHiM0rxE4VN41wsg8P8zWn9hv/buK00RP4WvlOyr/RBDiptyxVbkZQ==",
       "dependencies": [
         "xtend"
       ]
+    },
+    "postgres-interval@3.0.0": {
+      "integrity": "sha512-BSNDnbyZCXSxgA+1f5UU2GmwhoI0aU5yMxRGO8CdFEcY2BQF9xm/7MqKnYoM1nJDk8nONNWDk9WeSmePFhQdlw=="
+    },
+    "postgres-range@1.1.4": {
+      "integrity": "sha512-i/hbxIE9803Alj/6ytL7UHQxRvZkI9O4Sy+J3HGc4F4oo/2eQAjTSNJ0bfxyse3bH0nuVesCk+3IRLaMtG3H6w=="
     },
     "postgres@3.4.9": {
       "integrity": "sha512-GD3qdB0x1z9xgFI6cdRD6xu2Sp2WCOEoe3mtnyB5Ee0XrrL5Pe+e4CCnJrRMnL1zYtRDZmQQVbvOttLnKDLnaw=="
@@ -1359,6 +1433,8 @@
       "jsr:@std/fs@^1.0.24",
       "jsr:@std/testing@^1.0.19",
       "npm:@effect/platform-node@4.0.0-beta.88",
+      "npm:@effect/sql-pg@4.0.0-beta.88",
+      "npm:@effect/sql-pglite@4.0.0-beta.88",
       "npm:@electric-sql/pglite-icu-full@0.1",
       "npm:@electric-sql/pglite@~0.5.3",
       "npm:@js-temporal/polyfill@~0.5.1",

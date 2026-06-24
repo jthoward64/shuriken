@@ -51,17 +51,20 @@ const insertEntity = (
 ): Effect.Effect<EntityId, never, DatabaseClient> =>
 	DatabaseClient.pipe(
 		Effect.flatMap((db) =>
-			Effect.promise(async () => {
-				const rows = await db
-					.insert(davEntity)
-					.values({ entityType })
-					.returning();
-				const row = rows[0];
-				if (!row) {
-					throw new Error("dav_entity insert returned no rows");
-				}
-				return EntityId(row.id);
-			}),
+			db
+				.insert(davEntity)
+				.values({ entityType })
+				.returning()
+				.pipe(
+					Effect.orDie,
+					Effect.map((rows) => {
+						const row = rows[0];
+						if (!row) {
+							throw new Error("dav_entity insert returned no rows");
+						}
+						return EntityId(row.id);
+					}),
+				),
 		),
 	);
 

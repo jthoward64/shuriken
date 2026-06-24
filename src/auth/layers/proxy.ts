@@ -198,20 +198,17 @@ export const authenticateProxy = (
 		yield* Effect.annotateCurrentSpan({ "auth.username": username });
 		yield* Effect.logTrace("auth.proxy: attempt", { username });
 
-		const rows = yield* Effect.tryPromise({
-			try: () =>
-				db
-					.select({
-						userId: user.id,
-						principalId: user.principalId,
-						displayName: principal.displayName,
-					})
-					.from(user)
-					.innerJoin(principal, eq(user.principalId, principal.id))
-					.where(eq(user.email, username))
-					.limit(1),
-			catch: (e) => new DatabaseError({ cause: e }),
-		});
+		const rows = yield* db
+			.select({
+				userId: user.id,
+				principalId: user.principalId,
+				displayName: principal.displayName,
+			})
+			.from(user)
+			.innerJoin(principal, eq(user.principalId, principal.id))
+			.where(eq(user.email, username))
+			.limit(1)
+			.pipe(Effect.mapError((e) => new DatabaseError({ cause: e })));
 
 		const row = rows[0];
 		if (!row) {

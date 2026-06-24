@@ -147,8 +147,9 @@ const noopComponentRepo: ComponentRepositoryShape =
 const noopCalTimezoneRepo = stubService<CalTimezoneRepositoryShape>();
 
 const noOpDb = {
-	transaction: async <T>(fn: (tx: DbClient) => Promise<T>): Promise<T> =>
-		fn(noOpDb as unknown as DbClient),
+	transaction: <A, E, R>(
+		fn: (tx: DbClient) => Effect.Effect<A, E, R>,
+	): Effect.Effect<A, E, R> => fn(noOpDb as unknown as DbClient),
 } as unknown as DbClient;
 
 /** Build a Layer providing all DAV router requirements from simple slug→id maps. */

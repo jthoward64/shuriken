@@ -1,4 +1,4 @@
-import { Data, Effect, Option } from "effect";
+import { Cause, Data, Effect, Option } from "effect";
 import {
 	HTTP_BAD_REQUEST,
 	HTTP_CONFLICT,
@@ -46,26 +46,46 @@ export class ConflictError extends Data.TaggedError("ConflictError")<{
 }> {}
 
 /**
- * Returns true when an error (or any nested `cause`) has PostgreSQL error code
- * 23505 (unique-constraint violation).
+ * Returns true when an error (or any nested `cause`/`reason`) represents a
+ * PostgreSQL unique-constraint violation.
  *
- * Drizzle wraps driver errors in `DrizzleQueryError`, so the PG error code
- * lives at `e.cause.code`, not directly on `e`. We recurse one level to
- * handle both shapes:
- *   - Direct PG error:        { code: "23505", ... }
- *   - Drizzle-wrapped error:  { cause: { code: "23505", ... }, ... }
+ * Errors arrive wrapped at several layers, so we walk both the `cause` and
+ * `reason` chains and accept any of these shapes:
+ *   - Direct PG error:             { code: "23505", ... }
+ *   - Drizzle-wrapped error:       { cause: { code: "23505", ... }, ... }
+ *   - @effect/sql SqlError reason: { reason: { _tag: "UniqueViolation", ... } }
+ *     (effect-postgres classifies the driver error into a typed reason rather
+ *      than surfacing the raw 23505 code.)
  */
 export const isPgUniqueViolation = (cause: unknown): boolean => {
+	if (typeof cause !== "object" || cause === null) {
+		return false;
+	}
+	// effect-postgres wraps the driver failure as an Effect `Cause`; squash it
+	// to reach the underlying SqlError.
+	if (Cause.isCause(cause)) {
+		return isPgUniqueViolation(Cause.squash(cause));
+	}
+	if ("code" in cause && (cause as { code: unknown }).code === "23505") {
+		return true;
+	}
 	if (
-		typeof cause === "object" &&
-		cause !== null &&
-		"code" in cause &&
-		(cause as { code: unknown }).code === "23505"
+		"_tag" in cause &&
+		(cause as { _tag: unknown })._tag === "UniqueViolation"
 	) {
 		return true;
 	}
-	if (typeof cause === "object" && cause !== null && "cause" in cause) {
-		return isPgUniqueViolation((cause as { cause: unknown }).cause);
+	if (
+		"reason" in cause &&
+		isPgUniqueViolation((cause as { reason: unknown }).reason)
+	) {
+		return true;
+	}
+	if (
+		"cause" in cause &&
+		isPgUniqueViolation((cause as { cause: unknown }).cause)
+	) {
+		return true;
 	}
 	return false;
 };

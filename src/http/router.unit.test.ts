@@ -71,8 +71,9 @@ const authenticated = new Authenticated({
 });
 
 const noOpRouterDb = {
-	transaction: async <T>(fn: (tx: DbClient) => Promise<T>): Promise<T> =>
-		fn(noOpRouterDb as unknown as DbClient),
+	transaction: <A, E, R>(
+		fn: (tx: DbClient) => Effect.Effect<A, E, R>,
+	): Effect.Effect<A, E, R> => fn(noOpRouterDb as unknown as DbClient),
 } as unknown as DbClient;
 
 // All-die stub layers for services that must be provided but won't be called.

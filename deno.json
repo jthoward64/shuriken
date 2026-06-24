@@ -26,6 +26,8 @@
 		"effect": "npm:effect@4.0.0-beta.88",
 		"effect/": "npm:/effect@4.0.0-beta.88/",
 		"@effect/platform-node": "npm:@effect/platform-node@4.0.0-beta.88",
+		"@effect/sql-pg": "npm:@effect/sql-pg@4.0.0-beta.88",
+		"@effect/sql-pglite": "npm:@effect/sql-pglite@4.0.0-beta.88",
 		"casbin": "npm:casbin@^5.51.0",
 		"drizzle-adapter": "npm:drizzle-adapter@^1.4.0",
 		"drizzle-orm": "npm:drizzle-orm@1.0.0-rc.3",

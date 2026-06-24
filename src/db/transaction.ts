@@ -1,13 +1,15 @@
-import type { Cause } from "effect";
-import { Context, Effect, Exit, Option } from "effect";
+import { Context, Effect, Option } from "effect";
 import { DatabaseClient, type DbClient } from "#src/db/client.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
 
 // ---------------------------------------------------------------------------
-// TransactionRef — fiber-local active transaction client
+// TransactionRef — fiber-local active transaction client (Context.Reference)
 //
 // None = use the captured pool connection (default).
 // Some(tx) = use this transaction client for all queries in the fiber tree.
+//
+// Provided (scoped) by withTransaction; read by getActiveDb so repositories
+// transparently route their queries to the open transaction.
 // ---------------------------------------------------------------------------
 
 export const TransactionRef: Context.Reference<Option.Option<DbClient>> =
@@ -26,34 +28,16 @@ export const getActiveDb = (fallback: DbClient): Effect.Effect<DbClient> =>
 	TransactionRef.pipe(Effect.map(Option.getOrElse(() => fallback)));
 
 // ---------------------------------------------------------------------------
-// EffectExitWrapper — sentinel for bridging typed failures across the async
-// boundary of Drizzle's callback-based transaction API.
+// withTransaction — wraps an Effect in a Drizzle (effect-postgres) transaction.
 //
-// Drizzle commits on resolve, rolls back on reject. We must throw to trigger
-// rollback on Effect failure, but we need to distinguish an Effect typed
-// failure (which should be re-raised as Effect.fail) from a real DB error.
-// ---------------------------------------------------------------------------
-
-class EffectExitWrapper extends Error {
-	// Exit type parameters are recovered via cast at the call site; using
-	// unknown here is the minimum needed to satisfy the extremely complex
-	// Exit<A,E> generic while keeping the sentinel class parameter-free.
-	readonly exit: Exit.Exit<unknown, unknown>;
-
-	constructor(exit: Exit.Exit<unknown, unknown>) {
-		super("EffectExitWrapper");
-		this.exit = exit;
-	}
-}
-
-// ---------------------------------------------------------------------------
-// withTransaction — wraps an Effect in a Drizzle database transaction.
+// Uses the driver's native, Effect-returning `db.transaction(tx => Effect)`:
+// commits on success, rolls back on failure/defect — no manual Promise/exit
+// bridging required.
 //
-// - Commits on success, rolls back on typed failure or defect.
-// - "Join outer": if already inside a transaction (FiberRef is Some), the
-//   effect runs in the existing transaction without starting a new one.
-//   This allows nested callers (e.g. provisionUser → collectionService.create)
-//   to share one connection without being aware of each other.
+// "Join outer": if already inside a transaction (TransactionRef is Some), the
+// effect runs in the existing transaction without starting a nested one. This
+// allows nested callers (e.g. provisionUser → collectionService.create) to
+// share one connection without being aware of each other.
 // ---------------------------------------------------------------------------
 
 export const withTransaction = <A, E, R>(
@@ -66,32 +50,23 @@ export const withTransaction = <A, E, R>(
 		}
 
 		const db = yield* DatabaseClient;
-		const context = yield* Effect.context<R>();
 
 		return yield* Effect.withSpan("db.transaction")(
-			Effect.callback<A, E | DatabaseError>((resume) => {
-				db.transaction(async (tx) => {
-					const exit = await Effect.runPromiseWith(context)(
+			db
+				.transaction((tx) =>
+					effect.pipe(
 						Effect.provideService(
-							Effect.exit(effect),
 							TransactionRef,
 							Option.some(tx as unknown as DbClient),
 						),
-					);
-					if (Exit.isSuccess(exit)) {
-						return exit.value;
-					}
-					throw new EffectExitWrapper(exit);
-				}).then(
-					(value) => resume(Effect.succeed(value as A)),
-					(e) => {
-						if (e instanceof EffectExitWrapper && Exit.isFailure(e.exit)) {
-							resume(Effect.failCause(e.exit.cause as Cause.Cause<E>));
-						} else {
-							resume(Effect.fail(new DatabaseError({ cause: e })));
-						}
-					},
-				);
-			}),
+					),
+				)
+				.pipe(
+					// Map the driver's transaction-machinery SqlError to our DatabaseError,
+					// leaving the wrapped effect's own typed failures (E) intact.
+					Effect.catchTag("SqlError", (e) =>
+						Effect.fail(new DatabaseError({ cause: e })),
+					),
+				),
 		);
 	});
