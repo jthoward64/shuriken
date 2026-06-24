@@ -2,39 +2,40 @@
   "version": "5",
   "specifiers": {
     "jsr:@std/assert@^1.0.19": "1.0.19",
-    "jsr:@std/expect@1": "1.0.19",
-    "jsr:@std/fs@1": "1.0.24",
+    "jsr:@std/expect@^1.0.19": "1.0.19",
+    "jsr:@std/fs@^1.0.24": "1.0.24",
     "jsr:@std/internal@^1.0.12": "1.0.14",
     "jsr:@std/internal@^1.0.13": "1.0.14",
     "jsr:@std/internal@^1.0.14": "1.0.14",
     "jsr:@std/path@^1.1.4": "1.1.5",
     "jsr:@std/path@^1.1.5": "1.1.5",
-    "jsr:@std/testing@1": "1.0.19",
+    "jsr:@std/testing@^1.0.19": "1.0.19",
     "npm:@biomejs/biome@*": "2.4.9",
     "npm:@biomejs/biome@2.4.9": "2.4.9",
     "npm:@effect/experimental@0.60": "0.60.0_@effect+platform@0.96.2__effect@3.21.4_effect@3.21.4",
     "npm:@effect/opentelemetry@0.63": "0.63.0_@effect+platform@0.96.2__effect@3.21.4_@opentelemetry+api@1.9.1_@opentelemetry+resources@2.8.0__@opentelemetry+api@1.9.1_@opentelemetry+sdk-logs@0.219.0__@opentelemetry+api@1.9.1_@opentelemetry+sdk-metrics@2.8.0__@opentelemetry+api@1.9.1_@opentelemetry+sdk-trace-base@2.8.0__@opentelemetry+api@1.9.1_@opentelemetry+sdk-trace-node@2.8.0__@opentelemetry+api@1.9.1_@opentelemetry+sdk-trace-web@2.8.0__@opentelemetry+api@1.9.1_@opentelemetry+semantic-conventions@1.41.1_effect@3.21.4",
-    "npm:@effect/platform-node@0.104": "0.104.1_@effect+cluster@0.56.4__@effect+platform@0.96.2___effect@3.21.4__@effect+rpc@0.73.2___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+sql@0.49.0___@effect+experimental@0.60.0____@effect+platform@0.96.2_____effect@3.21.4____effect@3.21.4___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+workflow@0.16.0___@effect+experimental@0.60.0____@effect+platform@0.96.2_____effect@3.21.4____effect@3.21.4___@effect+platform@0.96.2____effect@3.21.4___@effect+rpc@0.73.2____@effect+platform@0.96.2_____effect@3.21.4____effect@3.21.4___effect@3.21.4__effect@3.21.4__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4_@effect+platform@0.96.2__effect@3.21.4_@effect+rpc@0.73.2__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+sql@0.49.0__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_effect@3.21.4_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+workflow@0.16.0__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+platform@0.96.2___effect@3.21.4__@effect+rpc@0.73.2___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__effect@3.21.4",
-    "npm:@effect/platform@0.96": "0.96.2_effect@3.21.4",
-    "npm:@electric-sql/pglite@~0.4.2": "0.4.6",
+    "npm:@effect/platform-node@0.107": "0.107.0_@effect+cluster@0.59.0__@effect+platform@0.96.2___effect@3.21.4__@effect+rpc@0.75.1___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+sql@0.51.1___@effect+experimental@0.60.0____@effect+platform@0.96.2_____effect@3.21.4____effect@3.21.4___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+workflow@0.18.2___@effect+experimental@0.60.0____@effect+platform@0.96.2_____effect@3.21.4____effect@3.21.4___@effect+platform@0.96.2____effect@3.21.4___@effect+rpc@0.75.1____@effect+platform@0.96.2_____effect@3.21.4____effect@3.21.4___effect@3.21.4__effect@3.21.4__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4_@effect+platform@0.96.2__effect@3.21.4_@effect+rpc@0.75.1__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+sql@0.51.1__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_effect@3.21.4_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+workflow@0.18.2__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+platform@0.96.2___effect@3.21.4__@effect+rpc@0.75.1___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__effect@3.21.4",
+    "npm:@effect/platform@~0.96.2": "0.96.2_effect@3.21.4",
+    "npm:@electric-sql/pglite-icu-full@0.1": "0.1.0",
+    "npm:@electric-sql/pglite@~0.5.3": "0.5.3",
     "npm:@js-temporal/polyfill@~0.5.1": "0.5.1",
-    "npm:@opentelemetry/sdk-trace-base@^2.6.1": "2.8.0_@opentelemetry+api@1.9.1",
-    "npm:casbin@^5.49.0": "5.50.0",
-    "npm:drizzle-adapter@^1.4.0": "1.4.0_casbin@5.50.0_drizzle-orm@1.0.0-beta.22__@electric-sql+pglite@0.4.6__postgres@3.4.9_postgres@3.4.9",
+    "npm:@opentelemetry/sdk-trace-base@^2.8.0": "2.8.0_@opentelemetry+api@1.9.1",
+    "npm:casbin@^5.51.0": "5.51.0",
+    "npm:drizzle-adapter@^1.4.0": "1.4.0_casbin@5.51.0_drizzle-orm@1.0.0-beta.22__@effect+sql@0.49.0___@effect+experimental@0.60.0____@effect+platform@0.96.2_____effect@3.21.4____effect@3.21.4___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@electric-sql+pglite@0.5.3__@opentelemetry+api@1.9.1__postgres@3.4.9__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+platform@0.96.2__effect@3.21.4_effect@3.21.4",
     "npm:drizzle-kit@*": "0.31.10",
-    "npm:drizzle-kit@beta": "1.0.0-beta.22",
-    "npm:drizzle-orm@beta": "1.0.0-beta.22_@electric-sql+pglite@0.4.6_postgres@3.4.9",
-    "npm:effect@^3.21.0": "3.21.4",
-    "npm:fast-xml-builder@^1.1.4": "1.2.0",
-    "npm:fast-xml-parser@^5.5.9": "5.9.3",
+    "npm:drizzle-kit@^1.0.0-beta.22": "1.0.0-rc.4-ca0f029",
+    "npm:drizzle-orm@^1.0.0-beta.22": "1.0.0-beta.22_@effect+sql@0.49.0__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@electric-sql+pglite@0.5.3_@opentelemetry+api@1.9.1_postgres@3.4.9_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+platform@0.96.2__effect@3.21.4_effect@3.21.4",
+    "npm:effect@^3.21.4": "3.21.4",
+    "npm:fast-xml-builder@^1.2.0": "1.2.0",
+    "npm:fast-xml-parser@^5.9.3": "5.9.3",
     "npm:handlebars@^4.7.9": "4.7.9",
     "npm:hash-wasm@^4.12.0": "4.12.0",
-    "npm:mailparser@^3.9.8": "3.9.11",
-    "npm:nodemailer@^8.0.7": "8.0.11",
+    "npm:mailparser@^3.9.11": "3.9.11",
+    "npm:nodemailer@^9.0.1": "9.0.1",
     "npm:postgres@^3.4.9": "3.4.9",
-    "npm:rrule-temporal@^1.5.2": "1.5.3",
-    "npm:temporal-polyfill@~0.3.2": "0.3.2",
-    "npm:timezones-ical-library@^2.1.3": "2.2.1"
+    "npm:rrule-temporal@^1.5.3": "1.5.3",
+    "npm:temporal-polyfill@^1.0.1": "1.0.1",
+    "npm:timezones-ical-library@^2.2.1": "2.2.1"
   },
   "jsr": {
     "@std/assert@1.0.19": {
@@ -142,12 +143,12 @@
     "@drizzle-team/brocli@0.11.0": {
       "integrity": "sha512-hD3pekGiPg0WPCCGAZmusBBJsDqGUR66Y452YgQsZOnkdQ7ViEPKuyP4huUGEZQefp8g34RRodXYmJ2TbCH+tg=="
     },
-    "@effect/cluster@0.56.4_@effect+platform@0.96.2__effect@3.21.4_@effect+rpc@0.73.2__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+sql@0.49.0__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+workflow@0.16.0__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+platform@0.96.2___effect@3.21.4__@effect+rpc@0.73.2___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__effect@3.21.4_effect@3.21.4_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4": {
-      "integrity": "sha512-7Je5/JlbZOlsSxsbKjr97dJed2cNGWsb+TLNgMcr5mRDbcWlFOTUGvsrisEJV6waosYLIg+2omPdvnvRoYKdhA==",
+    "@effect/cluster@0.59.0_@effect+platform@0.96.2__effect@3.21.4_@effect+rpc@0.75.1__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+sql@0.51.1__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+workflow@0.18.2__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+platform@0.96.2___effect@3.21.4__@effect+rpc@0.75.1___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__effect@3.21.4_effect@3.21.4_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4": {
+      "integrity": "sha512-rxtJ0zlcdDDtn9wau0z/PFfwPP2FsYPB2/tSK4tT8DkTYQmACJ5AwRwZm3Ea83iL/gv3df63lRe94oMiS8bFfg==",
       "dependencies": [
         "@effect/platform",
         "@effect/rpc",
-        "@effect/sql",
+        "@effect/sql@0.51.1_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+platform@0.96.2__effect@3.21.4_effect@3.21.4",
         "@effect/workflow",
         "effect",
         "kubernetes-types"
@@ -176,27 +177,27 @@
         "effect"
       ]
     },
-    "@effect/platform-node-shared@0.57.1_@effect+cluster@0.56.4__@effect+platform@0.96.2___effect@3.21.4__@effect+rpc@0.73.2___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+sql@0.49.0___@effect+experimental@0.60.0____@effect+platform@0.96.2_____effect@3.21.4____effect@3.21.4___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+workflow@0.16.0___@effect+experimental@0.60.0____@effect+platform@0.96.2_____effect@3.21.4____effect@3.21.4___@effect+platform@0.96.2____effect@3.21.4___@effect+rpc@0.73.2____@effect+platform@0.96.2_____effect@3.21.4____effect@3.21.4___effect@3.21.4__effect@3.21.4__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4_@effect+platform@0.96.2__effect@3.21.4_@effect+rpc@0.73.2__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+sql@0.49.0__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_effect@3.21.4_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+workflow@0.16.0__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+platform@0.96.2___effect@3.21.4__@effect+rpc@0.73.2___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__effect@3.21.4": {
-      "integrity": "sha512-oX/bApMdoKsyrDiNdJxo7U9Rz1RXsjRv+ecfAPp1qGlSdGIo32wVRvJ2XCHqYj0sqaYJS0pU0/GCulRfVGuJag==",
+    "@effect/platform-node-shared@0.60.0_@effect+cluster@0.59.0__@effect+platform@0.96.2___effect@3.21.4__@effect+rpc@0.75.1___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+sql@0.51.1___@effect+experimental@0.60.0____@effect+platform@0.96.2_____effect@3.21.4____effect@3.21.4___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+workflow@0.18.2___@effect+experimental@0.60.0____@effect+platform@0.96.2_____effect@3.21.4____effect@3.21.4___@effect+platform@0.96.2____effect@3.21.4___@effect+rpc@0.75.1____@effect+platform@0.96.2_____effect@3.21.4____effect@3.21.4___effect@3.21.4__effect@3.21.4__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4_@effect+platform@0.96.2__effect@3.21.4_@effect+rpc@0.75.1__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+sql@0.51.1__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_effect@3.21.4_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+workflow@0.18.2__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+platform@0.96.2___effect@3.21.4__@effect+rpc@0.75.1___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__effect@3.21.4": {
+      "integrity": "sha512-obT8Mau/guSYjehF9pg09FHM/ERXAAVBl/FXRXEyvTc7ZiDGTYnPBihytGNccsfNsgqBdvCE24sflwK6j5nFXA==",
       "dependencies": [
         "@effect/cluster",
         "@effect/platform",
         "@effect/rpc",
-        "@effect/sql",
+        "@effect/sql@0.51.1_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+platform@0.96.2__effect@3.21.4_effect@3.21.4",
         "@parcel/watcher",
         "effect",
         "multipasta",
         "ws"
       ]
     },
-    "@effect/platform-node@0.104.1_@effect+cluster@0.56.4__@effect+platform@0.96.2___effect@3.21.4__@effect+rpc@0.73.2___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+sql@0.49.0___@effect+experimental@0.60.0____@effect+platform@0.96.2_____effect@3.21.4____effect@3.21.4___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+workflow@0.16.0___@effect+experimental@0.60.0____@effect+platform@0.96.2_____effect@3.21.4____effect@3.21.4___@effect+platform@0.96.2____effect@3.21.4___@effect+rpc@0.73.2____@effect+platform@0.96.2_____effect@3.21.4____effect@3.21.4___effect@3.21.4__effect@3.21.4__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4_@effect+platform@0.96.2__effect@3.21.4_@effect+rpc@0.73.2__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+sql@0.49.0__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_effect@3.21.4_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+workflow@0.16.0__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+platform@0.96.2___effect@3.21.4__@effect+rpc@0.73.2___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__effect@3.21.4": {
-      "integrity": "sha512-jT1a/z98niK6fnEU8pWHPPCdJMVDRCIdB65lolcOjse5rsTwVbczMjvKkhVQpF63mNWoOnol7OTRNkw5L54llg==",
+    "@effect/platform-node@0.107.0_@effect+cluster@0.59.0__@effect+platform@0.96.2___effect@3.21.4__@effect+rpc@0.75.1___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+sql@0.51.1___@effect+experimental@0.60.0____@effect+platform@0.96.2_____effect@3.21.4____effect@3.21.4___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+workflow@0.18.2___@effect+experimental@0.60.0____@effect+platform@0.96.2_____effect@3.21.4____effect@3.21.4___@effect+platform@0.96.2____effect@3.21.4___@effect+rpc@0.75.1____@effect+platform@0.96.2_____effect@3.21.4____effect@3.21.4___effect@3.21.4__effect@3.21.4__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4_@effect+platform@0.96.2__effect@3.21.4_@effect+rpc@0.75.1__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+sql@0.51.1__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_effect@3.21.4_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+workflow@0.18.2__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+platform@0.96.2___effect@3.21.4__@effect+rpc@0.75.1___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__effect@3.21.4": {
+      "integrity": "sha512-VWUD9SCcnsrXYqED2jIwDHHDGb3QePNsHlX7HfqQGD2/AgnfX9jNnecaFrJj7Rf2gK5VbRE+i/2oNFoC/DkhcA==",
       "dependencies": [
         "@effect/cluster",
         "@effect/platform",
         "@effect/platform-node-shared",
         "@effect/rpc",
-        "@effect/sql",
+        "@effect/sql@0.51.1_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+platform@0.96.2__effect@3.21.4_effect@3.21.4",
         "effect",
         "mime",
         "undici",
@@ -212,8 +213,8 @@
         "multipasta"
       ]
     },
-    "@effect/rpc@0.73.2_@effect+platform@0.96.2__effect@3.21.4_effect@3.21.4": {
-      "integrity": "sha512-td7LHDgBOYKg+VgGWEelD8rSAmvjXz7am17vfxZROX5qIYuvH7drL/z4p5xQFadhHZ7DYdlFpqdO9ggc77OCIw==",
+    "@effect/rpc@0.75.1_@effect+platform@0.96.2__effect@3.21.4_effect@3.21.4": {
+      "integrity": "sha512-8yxF8+mMGGEbF8BUCp34HjdJj7CvTpGeZxBcpsDF6v7zPiGbJL1UDLzA8ZqYjmcngBHhPecbmeONTk/LiLAaEg==",
       "dependencies": [
         "@effect/platform",
         "effect",
@@ -229,8 +230,17 @@
         "uuid"
       ]
     },
-    "@effect/workflow@0.16.0_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+platform@0.96.2__effect@3.21.4_@effect+rpc@0.73.2__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_effect@3.21.4": {
-      "integrity": "sha512-MiAdlxx3TixkgHdbw+Yf1Z3tHAAE0rOQga12kIydJqj05Fnod+W/I+kQGRMY/XWRg+QUsVxhmh1qTr7Ype6lrw==",
+    "@effect/sql@0.51.1_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+platform@0.96.2__effect@3.21.4_effect@3.21.4": {
+      "integrity": "sha512-iPDAefrJcI0HcTk9keP9Gq8Pg08K1HmpnmZZt85AqyTcvorhoNsXDFiKBbPldfV2CortwVkacX8KjO9GPpSYCA==",
+      "dependencies": [
+        "@effect/experimental",
+        "@effect/platform",
+        "effect",
+        "uuid"
+      ]
+    },
+    "@effect/workflow@0.18.2_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+platform@0.96.2__effect@3.21.4_@effect+rpc@0.75.1__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_effect@3.21.4": {
+      "integrity": "sha512-2av0TexhxHnapQa3eLn6TkniokUFRZKf8dlWlLqbODMpXAJ3mm+DOHWM0ozMGkg9K/+zGCtiL3dMqJyJ8r7G8g==",
       "dependencies": [
         "@effect/experimental",
         "@effect/platform",
@@ -238,8 +248,11 @@
         "effect"
       ]
     },
-    "@electric-sql/pglite@0.4.6": {
-      "integrity": "sha512-qmlmfN8UyKCee35qkV0r/MBp+Znl8FjBz7OpoglNvww3GJpw0/DLP0o1ZymvLNmcD5DTLOQdzKPtF8Hd3mdl1w=="
+    "@electric-sql/pglite-icu-full@0.1.0": {
+      "integrity": "sha512-yZ0diEYEk2JKaQJ1UX27yMIeVL5J5TX4lWJ8LqLZOBD+BD8NcQt8XGeJfpvr+y+BcHIcsxc85Ud1cesHapOBJA=="
+    },
+    "@electric-sql/pglite@0.5.3": {
+      "integrity": "sha512-iTTYbA5Uesrl+N7zss0J5LopT7KE4j9aymYo+EZZh+rZbARQCUQOs+n2pay64JRUpc3fCkpfrniTNJnvYzOE+g=="
     },
     "@esbuild-kit/core-utils@3.3.2": {
       "integrity": "sha512-sPRAnw9CdSsRmEtnsl2WXWdyquogVpB3yZ3dgwJfe8zrOzTsV7cJvmwrKVa+0ma5BoiGJ+BoqkMvawbayKUsqQ==",
@@ -880,8 +893,8 @@
         "ieee754"
       ]
     },
-    "casbin@5.50.0": {
-      "integrity": "sha512-ikARwU4ln2/3SzyG8cxFwjXgHhjmieapt62LwaeKZ0VDsqZ2meq3BCaJuW2Ept0cVx3C4j+1C2G9Rh6e/Fl+mQ==",
+    "casbin@5.51.0": {
+      "integrity": "sha512-+4QjMLyZDz+Vw3gLTTGvpAbMe4wB3u78qoFasSP6BAiOzM3rFvzP3Tb308ZpZlZv8KhbB8kgH11GCskwZjYaIw==",
       "dependencies": [
         "@casbin/expression-eval",
         "await-lock",
@@ -924,7 +937,7 @@
         "domhandler"
       ]
     },
-    "drizzle-adapter@1.4.0_casbin@5.50.0_drizzle-orm@1.0.0-beta.22__@electric-sql+pglite@0.4.6__postgres@3.4.9_postgres@3.4.9": {
+    "drizzle-adapter@1.4.0_casbin@5.51.0_drizzle-orm@1.0.0-beta.22__@effect+sql@0.49.0___@effect+experimental@0.60.0____@effect+platform@0.96.2_____effect@3.21.4____effect@3.21.4___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@electric-sql+pglite@0.5.3__@opentelemetry+api@1.9.1__postgres@3.4.9__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+platform@0.96.2__effect@3.21.4_effect@3.21.4": {
       "integrity": "sha512-UU4ZcGYIZeSSdfZaTlZBUNjQ+Aj1T64QsB/ayBsskHo6bRQiw5fbX3CSyc7yllTCZ+jE5207EKvwAJpHgT2nNw==",
       "dependencies": [
         "casbin",
@@ -941,8 +954,8 @@
       ],
       "bin": true
     },
-    "drizzle-kit@1.0.0-beta.22": {
-      "integrity": "sha512-9HTZuQRljQKTgCx4UhiGn8KYYfHGk4+B/bRR1714W67kz0qgJvdrG527i8rQD8uUyET9UTGR1u8syySJD4znGw==",
+    "drizzle-kit@1.0.0-rc.4-ca0f029": {
+      "integrity": "sha512-hM1K72ptIPOpJDScHo7cAF+K8A8Tr3q2yHvBJvOZWvLn2lN+G4RDUvG3rT3ohlSE2O3BN/s7g3e3JiQLStt8iQ==",
       "dependencies": [
         "@drizzle-team/brocli@0.11.0",
         "@js-temporal/polyfill",
@@ -952,17 +965,17 @@
       ],
       "bin": true
     },
-    "drizzle-orm@1.0.0-beta.22_@electric-sql+pglite@0.4.6_postgres@3.4.9": {
+    "drizzle-orm@1.0.0-beta.22_@effect+sql@0.49.0__@effect+experimental@0.60.0___@effect+platform@0.96.2____effect@3.21.4___effect@3.21.4__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@electric-sql+pglite@0.5.3_@opentelemetry+api@1.9.1_postgres@3.4.9_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+platform@0.96.2__effect@3.21.4_effect@3.21.4": {
       "integrity": "sha512-F+DZyVIvH0oVKa/w08Cle1xfoH+pc+htIXHG/frnMLG72aby9NYYr9oc+9XvghnoO4umxFItduz0OMmQJMnenw==",
       "dependencies": [
-        "@effect/sql",
+        "@effect/sql@0.49.0_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+platform@0.96.2__effect@3.21.4_effect@3.21.4",
         "@electric-sql/pglite",
         "@opentelemetry/api",
         "pg",
         "postgres"
       ],
       "optionalPeers": [
-        "@effect/sql",
+        "@effect/sql@0.49.0_@effect+experimental@0.60.0__@effect+platform@0.96.2___effect@3.21.4__effect@3.21.4_@effect+platform@0.96.2__effect@3.21.4_effect@3.21.4",
         "@electric-sql/pglite",
         "@opentelemetry/api",
         "pg",
@@ -1226,7 +1239,7 @@
         "iconv-lite",
         "libmime",
         "linkify-it",
-        "nodemailer@9.0.1",
+        "nodemailer",
         "punycode.js",
         "tlds"
       ]
@@ -1282,9 +1295,6 @@
       ],
       "bin": true
     },
-    "nodemailer@8.0.11": {
-      "integrity": "sha512-nrO/pDAUKl+wXX+lx16tDLbnm0fW6sK/x8mgohaCpg+CdCEl482bD4tCuAZk2DyliruiNTIZxRCoWkDqJEnAiA=="
-    },
     "nodemailer@9.0.1": {
       "integrity": "sha512-Gwv8SQewT616ZM/URn0H54b8PWo/Wum7md3EW2aWy1lO27+WZCX+Xyak3J+NlmHUjDh5ME+uesJUDRbR3Ye8Bw=="
     },
@@ -1295,8 +1305,8 @@
         "peberminta"
       ]
     },
-    "path-expression-matcher@1.6.0": {
-      "integrity": "sha512-e5y7RCLHKjemsgQ4eqGJtPyr10ILz25HO7flzxhTV8bgvd5yHx98DGtCAtbVW9f2TqnYI/gEVZd+vz7snrdPTw=="
+    "path-expression-matcher@1.6.1": {
+      "integrity": "sha512-h7bxdzhHk8Knyc4Tj+jMaa7fEEoUJy7p1qtbVgkYg1Uhpe5Np5VuGXCRZnkZvU+Q42M1vStt0ifa3ueykRJPmQ=="
     },
     "peberminta@0.10.0": {
       "integrity": "sha512-80B2AsU+I4Qdb0ZAPSfe9UwvGzwkM37IKIFEvdS3D/3Ndgv2bsuJ0bfG1+iEYO+l7Gfd4EUJmuRyq7efLgRMzQ=="
@@ -1412,14 +1422,18 @@
         "anynum"
       ]
     },
-    "temporal-polyfill@0.3.2": {
-      "integrity": "sha512-TzHthD/heRK947GNiSu3Y5gSPpeUDH34+LESnfsq8bqpFhsB79HFBX8+Z834IVX68P3EUyRPZK5bL/1fh437Eg==",
+    "temporal-polyfill@1.0.1": {
+      "integrity": "sha512-N2SoI9olnW7BUsU8RosDphZQl9s+WJ8O7PoJMFCr/e5/1rFkVI4GNOWaSeySG+UoP04foPYsnLWbJmbXOiShZg==",
       "dependencies": [
-        "temporal-spec"
+        "temporal-spec",
+        "temporal-utils"
       ]
     },
-    "temporal-spec@0.3.1": {
-      "integrity": "sha512-B4TUhezh9knfSIMwt7RVggApDRJZo73uZdj8AacL2mZ8RP5KtLianh2MXxL06GN9ESYiIsiuoLQhgVfwe55Yhw=="
+    "temporal-spec@1.0.0": {
+      "integrity": "sha512-00Ahj1e1ifaERTMOIIGpOCdOo9IEk2m6GGSMedsn9a2SIsGLdOTbmME1Htv6IM82b6VHrzSUTIVc7YHy6hdhFQ=="
+    },
+    "temporal-utils@1.0.1": {
+      "integrity": "sha512-HAixuesxFQIUaQk3ptX2jhfO/FsOkgVkDDMawvp6n/fkB1q6BKfs3lURw9I+pK/2e2e/q/vrLrxmeqauBoyGMQ=="
     },
     "timezones-ical-library@2.2.1": {
       "integrity": "sha512-VfDloy50AHsckqwuqc2ea+uyqxY7RjKXOqFMBd4T1zLkq31aVQNKhASvIF4+hSE2tuqaUGzGi4UQk5VzVNn94A=="
@@ -1467,31 +1481,32 @@
   },
   "workspace": {
     "dependencies": [
-      "jsr:@std/expect@1",
-      "jsr:@std/fs@1",
-      "jsr:@std/testing@1",
+      "jsr:@std/expect@^1.0.19",
+      "jsr:@std/fs@^1.0.24",
+      "jsr:@std/testing@^1.0.19",
       "npm:@effect/experimental@0.60",
       "npm:@effect/opentelemetry@0.63",
-      "npm:@effect/platform-node@0.104",
-      "npm:@effect/platform@0.96",
-      "npm:@electric-sql/pglite@~0.4.2",
+      "npm:@effect/platform-node@0.107",
+      "npm:@effect/platform@~0.96.2",
+      "npm:@electric-sql/pglite-icu-full@0.1",
+      "npm:@electric-sql/pglite@~0.5.3",
       "npm:@js-temporal/polyfill@~0.5.1",
-      "npm:@opentelemetry/sdk-trace-base@^2.6.1",
-      "npm:casbin@^5.49.0",
+      "npm:@opentelemetry/sdk-trace-base@^2.8.0",
+      "npm:casbin@^5.51.0",
       "npm:drizzle-adapter@^1.4.0",
-      "npm:drizzle-kit@beta",
-      "npm:drizzle-orm@beta",
-      "npm:effect@^3.21.0",
-      "npm:fast-xml-builder@^1.1.4",
-      "npm:fast-xml-parser@^5.5.9",
+      "npm:drizzle-kit@^1.0.0-beta.22",
+      "npm:drizzle-orm@^1.0.0-beta.22",
+      "npm:effect@^3.21.4",
+      "npm:fast-xml-builder@^1.2.0",
+      "npm:fast-xml-parser@^5.9.3",
       "npm:handlebars@^4.7.9",
       "npm:hash-wasm@^4.12.0",
-      "npm:mailparser@^3.9.8",
-      "npm:nodemailer@^8.0.7",
+      "npm:mailparser@^3.9.11",
+      "npm:nodemailer@^9.0.1",
       "npm:postgres@^3.4.9",
-      "npm:rrule-temporal@^1.5.2",
-      "npm:temporal-polyfill@~0.3.2",
-      "npm:timezones-ical-library@^2.1.3"
+      "npm:rrule-temporal@^1.5.3",
+      "npm:temporal-polyfill@^1.0.1",
+      "npm:timezones-ical-library@^2.2.1"
     ]
   }
 }

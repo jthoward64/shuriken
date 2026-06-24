@@ -2,6 +2,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { MemoryFS, PGlite } from "@electric-sql/pglite";
+import { icuDataDir } from "@electric-sql/pglite-icu-full";
 import { readMigrationFiles } from "drizzle-orm/migrator";
 import { migrate } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/pglite";
@@ -31,6 +32,7 @@ async function makePgLiteInstance(): Promise<PGlite> {
 		loadDataDir: dumpData,
 		relaxedDurability: true,
 		initialMemory: INITIAL_MEMORY,
+		icuDataDir: await icuDataDir(),
 	});
 
 	return pg;
