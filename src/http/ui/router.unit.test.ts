@@ -60,6 +60,7 @@ const makeCtx = (path: string, method = "GET"): HttpRequestContext => ({
 const stubLayers = Layer.mergeAll(
 	Layer.succeed(AppConfigService, {
 		server: { port: 3000, host: "::" },
+		metrics: { enabled: false, port: 9464 },
 		database: { url: Redacted.make("postgres://localhost/test") },
 		auth: {
 			mode: "single-user" as const,

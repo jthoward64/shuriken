@@ -61,6 +61,11 @@ spec:
             - name: http
               containerPort: {{ .Values.config.server.port }}
               protocol: TCP
+            {{- if .Values.config.metrics.enabled }}
+            - name: metrics
+              containerPort: {{ .Values.config.metrics.port }}
+              protocol: TCP
+            {{- end }}
             {{- if .Values.config.mail.lmtpEnabled }}
             - name: lmtp
               containerPort: {{ .Values.config.mail.lmtpPort }}

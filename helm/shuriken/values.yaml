@@ -43,6 +43,13 @@ config:
     port: 3000
     host: "::"
 
+  # Prometheus metrics endpoint. Served on a dedicated port (kept off the
+  # public HTTP port / ingress) at /metrics. Scrape it in-cluster — see the
+  # `serviceMonitor` section below for Prometheus Operator integration.
+  metrics:
+    enabled: true
+    port: 9464
+
   # NODE_ENV — leave as "production" unless you specifically need dev-mode
   # tooling (DevTools, more verbose logs).
   nodeEnv: production
@@ -144,6 +151,28 @@ service:
     enabled: false
     port: 2400
     targetPort: 2400
+
+# ---------------------------------------------------------------------------
+# Prometheus Operator ServiceMonitor. Requires the CRD (kube-prometheus-stack
+# or the Prometheus Operator) and config.metrics.enabled. The scraper hits the
+# Service's `metrics` port at `path`.
+# ---------------------------------------------------------------------------
+
+serviceMonitor:
+  enabled: false
+  # Namespace for the ServiceMonitor; defaults to the release namespace.
+  namespace: ""
+  # Extra labels — set these to match your Prometheus `serviceMonitorSelector`
+  # (e.g. `release: kube-prometheus-stack`) so the operator picks it up.
+  labels: {}
+  path: /metrics
+  interval: 30s
+  scrapeTimeout: ""
+  honorLabels: false
+  # Service labels to copy onto scraped metrics.
+  targetLabels: []
+  relabelings: []
+  metricRelabelings: []
 
 # ---------------------------------------------------------------------------
 # Ingress for the HTTP service. CalDAV clients are sensitive to .well-known

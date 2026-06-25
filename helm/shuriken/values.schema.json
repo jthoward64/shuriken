@@ -75,6 +75,20 @@
 						}
 					}
 				},
+				"metrics": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"enabled": {
+							"type": "boolean"
+						},
+						"port": {
+							"type": "integer",
+							"minimum": 1,
+							"maximum": 65535
+						}
+					}
+				},
 				"nodeEnv": {
 					"type": "string",
 					"enum": ["production", "development", "test"]
@@ -281,6 +295,42 @@
 							"maximum": 65535
 						}
 					}
+				}
+			}
+		},
+		"serviceMonitor": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"enabled": {
+					"type": "boolean"
+				},
+				"namespace": {
+					"type": "string"
+				},
+				"labels": {
+					"type": "object"
+				},
+				"path": {
+					"type": "string"
+				},
+				"interval": {
+					"type": "string"
+				},
+				"scrapeTimeout": {
+					"type": "string"
+				},
+				"honorLabels": {
+					"type": "boolean"
+				},
+				"targetLabels": {
+					"type": "array"
+				},
+				"relabelings": {
+					"type": "array"
+				},
+				"metricRelabelings": {
+					"type": "array"
 				}
 			}
 		},

@@ -45,6 +45,7 @@ import { makePgliteDatabaseLayer } from "#src/testing/pglite.ts";
 
 const testConfig: AppConfigType = {
 	server: { port: 3000, host: "localhost" },
+	metrics: { enabled: false, port: 9464 },
 	database: { url: Redacted.make("postgres://unused") },
 	auth: {
 		autoLogin: Option.none<string>(),

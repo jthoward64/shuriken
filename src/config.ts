@@ -30,6 +30,25 @@ export const ServerConfig = Config.all({
 	host: Config.string("host").pipe(Config.withDefault("::")),
 });
 
+const DEFAULT_METRICS_PORT = 9464;
+
+export const MetricsConfig = Config.all({
+	/**
+	 * Exposes the Prometheus `/metrics` endpoint on a dedicated listener
+	 * (`metricsPort`). Kept off the main HTTP port so the endpoint is never
+	 * reachable through a public ingress; scrape it in-cluster instead.
+	 * Defaults to enabled.
+	 */
+	enabled: Config.boolean("metricsEnabled").pipe(Config.withDefault(true)),
+	/**
+	 * Port for the metrics listener. 9464 is the OpenTelemetry/Prometheus
+	 * exporter convention. Bound to the same host as the main server.
+	 */
+	port: Config.int("metricsPort").pipe(
+		Config.withDefault(DEFAULT_METRICS_PORT),
+	),
+});
+
 export const DatabaseConfig = Config.all({
 	url: Config.redacted("databaseUrl"),
 });
@@ -324,6 +343,7 @@ const BirthdayConfig = Config.all({
 
 export const AppConfig = Config.all({
 	server: ServerConfig,
+	metrics: MetricsConfig,
 	database: DatabaseConfig,
 	auth: AuthConfig,
 	log: LogConfig,

@@ -8,6 +8,10 @@ data:
   PORT: {{ .Values.config.server.port | quote }}
   HOST: {{ .Values.config.server.host | quote }}
   NODE_ENV: {{ .Values.config.nodeEnv | quote }}
+
+  # ---- metrics -----------------------------------------------------------
+  METRICS_ENABLED: {{ .Values.config.metrics.enabled | quote }}
+  METRICS_PORT: {{ .Values.config.metrics.port | quote }}
   {{- with .Values.config.logLevel }}
   LOG_LEVEL: {{ . | quote }}
   {{- end }}
