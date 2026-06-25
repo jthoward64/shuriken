@@ -19,10 +19,15 @@ test-servers:
     #     caldav-server-tester --caldav-url http://server:3000/dav/ \
     #     --caldav-username <u> --caldav-password <p> --format yaml
     features:
-      # Principal search works (search by display name), but listing ALL
-      # principals with an empty/match-all filter is intentionally not offered.
+      # The seeded principal is provisioned with a primary calendar and address
+      # book, so a freshly-connected principal already has a calendar.
+      get-current-user-principal.has-calendar:
+        support: full
+      # Principal search works by display name AND as a criteria-less match-all
+      # (list every principal) — principalPropertySearchHandler treats an empty
+      # query as match-all (src/http/dav/methods/report/principal-property-search.ts).
       principal-search.list-all:
-        support: unsupported
+        support: full
       # Storing a second object whose UID already exists in ANOTHER calendar of
       # the same principal errors (PutError) instead of being handled gracefully
       # — RFC 6638 §3.2.4.1 cross-calendar UID uniqueness. See

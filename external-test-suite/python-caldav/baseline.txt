@@ -19,7 +19,7 @@ tests.test_caldav.TestForServershuriken::testEditSingleRecurrence: PASSED
 tests.test_caldav.TestForServershuriken::testFindCalendarOwner: PASSED
 tests.test_caldav.TestForServershuriken::testGetCalendar: PASSED
 tests.test_caldav.TestForServershuriken::testGetCalendarHomeSet: PASSED
-tests.test_caldav.TestForServershuriken::testGetDefaultCalendar: SKIPPED
+tests.test_caldav.TestForServershuriken::testGetDefaultCalendar: PASSED
 tests.test_caldav.TestForServershuriken::testGetSupportedComponents: PASSED
 tests.test_caldav.TestForServershuriken::testIssue397: PASSED
 tests.test_caldav.TestForServershuriken::testIssue399ChangeAttendeeStatusUsernameEmailFallback: PASSED
@@ -31,7 +31,7 @@ tests.test_caldav.TestForServershuriken::testObjectByUID: PASSED
 tests.test_caldav.TestForServershuriken::testObjects: PASSED
 tests.test_caldav.TestForServershuriken::testOffsetURL: PASSED
 tests.test_caldav.TestForServershuriken::testPrincipal: PASSED
-tests.test_caldav.TestForServershuriken::testPrincipals: SKIPPED
+tests.test_caldav.TestForServershuriken::testPrincipals: PASSED
 tests.test_caldav.TestForServershuriken::testPropfind: PASSED
 tests.test_caldav.TestForServershuriken::testRecurringDateSearch: PASSED
 tests.test_caldav.TestForServershuriken::testRecurringDateWithExceptionSearch: PASSED
