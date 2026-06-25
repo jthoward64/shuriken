@@ -52,20 +52,6 @@
 			"properties": {
 				"enabled": {
 					"type": "boolean"
-				},
-				"podAnnotations": {
-					"type": "object"
-				},
-				"resources": {
-					"$ref": "#/$defs/resources"
-				},
-				"backoffLimit": {
-					"type": "integer",
-					"minimum": 0
-				},
-				"activeDeadlineSeconds": {
-					"type": "integer",
-					"minimum": 1
 				}
 			}
 		},

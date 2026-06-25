@@ -42,10 +42,13 @@ spec:
           image: {{ include "shuriken.image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext: {{- toYaml .Values.containerSecurityContext | nindent 12 }}
-          # Skip the entrypoint's migration step — migrations run in the
-          # Helm pre-install/pre-upgrade Job instead so multi-replica
-          # rollouts don't race.
-          command: ["deno", "task", "start"]
+          # The image's default CMD is `task docker:start`, which runs database
+          # migrations and then starts the server (see the app Dockerfile). When
+          # migrations are disabled, override the args to start the server only.
+          # Uses args, not command, so the base image's tini entrypoint is kept.
+          {{- if not .Values.migrations.enabled }}
+          args: ["task", "start"]
+          {{- end }}
           envFrom:
             - configMapRef:
                 name: {{ include "shuriken.fullname" . }}-config

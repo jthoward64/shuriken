@@ -24,9 +24,8 @@ Useful next steps:
   # Tail logs from every replica
   kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }} -f
 
-  # Re-run migrations on demand
-  kubectl create job --from=cronjob/{{ include "shuriken.fullname" . }} {{ include "shuriken.fullname" . }}-migrate-manual \
-    -n {{ .Release.Namespace }}
+  # Re-run migrations on demand (the entrypoint migrates on every pod start)
+  kubectl rollout restart -n {{ .Release.Namespace }} deployment/{{ include "shuriken.fullname" . }}
 
 {{- if not .Values.existingSecret.name }}
 

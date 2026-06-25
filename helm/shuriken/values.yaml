@@ -17,25 +17,14 @@ fullnameOverride: ""
 
 replicaCount: 1
 
-# Run database migrations as a Helm pre-install/pre-upgrade Job so multi-
-# replica rollouts don't race on schema. Disable when you migrate
-# out-of-band.
+# Database migrations. When enabled (default) the container runs migrations and
+# then starts the server via the image's default `task docker:start` entrypoint
+# — no separate Job, no Helm hooks. Migrations run on every pod start and are
+# idempotent. With replicaCount > 1 a rollout starts several pods that each try
+# to migrate; set enabled=false and run migrations out-of-band (or keep a single
+# replica) if that matters for your schema changes.
 migrations:
   enabled: true
-  # Extra labels/annotations on the migration Job pod.
-  podAnnotations: {}
-  # Resource requests for the one-shot migration pod.
-  resources:
-    requests:
-      cpu: 50m
-      memory: 128Mi
-    limits:
-      cpu: 500m
-      memory: 256Mi
-  # Job backoff before giving up.
-  backoffLimit: 1
-  # Timeout for the migration step in seconds; the Job is failed if it runs longer.
-  activeDeadlineSeconds: 600
 
 # ---------------------------------------------------------------------------
 # App runtime configuration. Every key here maps to an env var read by the

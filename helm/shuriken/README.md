@@ -16,10 +16,11 @@ helm install shuriken ./helm/shuriken \
 
 ## What's in the chart
 
-- **Deployment** — single container running `deno task start`, with checksum
-  annotations so config-map / secret changes trigger rollouts.
-- **Pre-install/pre-upgrade Job** — runs `deno task migrations:run` before
-  any pod from the new revision starts. Disable via `migrations.enabled=false`.
+- **Deployment** — single container running the image's `task docker:start`
+  entrypoint, which runs migrations and then starts the server. Checksum
+  annotations roll pods when config-map / secret content changes. Set
+  `migrations.enabled=false` to start the server only (`task start`), e.g. when
+  migrating out-of-band or running multiple replicas.
 - **Service** — ClusterIP by default; exposes HTTP and optionally the LMTP
   port for inbound iMIP.
 - **ConfigMap + Secret** — every `config.*` value is rendered into env

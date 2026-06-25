@@ -1,4 +1,11 @@
-import { Config, ConfigProvider, Context, Effect, Layer } from "effect";
+import {
+	Config,
+	ConfigProvider,
+	Context,
+	Effect,
+	Layer,
+	LogLevel,
+} from "effect";
 
 // ---------------------------------------------------------------------------
 // Application configuration — all env vars read through Effect's Config API.
@@ -105,8 +112,21 @@ export const AuthConfig = Config.all({
 	),
 });
 
+// Accept log-level names case-insensitively. Effect's Config.logLevel only
+// matches its canonical capitalized labels ("Info"), but the Helm chart and the
+// wider ecosystem use lowercase ("info"); normalize before matching so either
+// works. An unrecognized value resolves to no override — the logger keeps its
+// default minimum level rather than crashing config loading.
+const logLevel = Config.string("logLevel").pipe(
+	Config.map((raw) =>
+		LogLevel.values.find(
+			(level) => level.toLowerCase() === raw.trim().toLowerCase(),
+		),
+	),
+);
+
 export const LogConfig = Config.all({
-	level: Config.logLevel("logLevel").pipe(Config.withDefault(undefined)),
+	level: logLevel.pipe(Config.withDefault(undefined)),
 });
 
 const DEFAULT_EXTERNAL_TICK_S = 60;
