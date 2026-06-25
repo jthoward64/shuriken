@@ -82,7 +82,13 @@ const encodeIrValue = (value: IrValue): string => {
 		case "DATE_LIST":
 			return value.value.map(formatPlainDate).join(",");
 		case "DATE_TIME_LIST":
-			return value.value.map(formatZonedDateTime).join(",");
+			return value.value
+				.map((item) =>
+					"timeZoneId" in item
+						? formatZonedDateTime(item)
+						: formatPlainDateTime(item),
+				)
+				.join(",");
 		case "PERIOD_LIST":
 			return value.value.join(",");
 		case "BINARY":
@@ -152,16 +158,12 @@ const decodeICalProperty = (line: ContentLine): IrProperty => {
 				value = { type: "DATE", value: parsePlainDate(raw) };
 				break;
 			case "DATE_TIME_LIST": {
-				// Each item may be UTC or TZID-qualified; TZID param applies to all
-				const parsed = raw.split(",").map((item) => {
-					const r = parseDateTimeString(item.trim(), tzid);
-					if (r.type !== "DATE_TIME") {
-						throw new Error(
-							`DATE_TIME_LIST item "${item}" is floating — TZID or Z required`,
-						);
-					}
-					return r.value;
-				});
+				// Each item is independently anchored (UTC "Z", numeric offset, or
+				// the property-level TZID) or floating (RFC 5545 Form 1). Floating is
+				// valid here — required for RDATE inside a VTIMEZONE observance.
+				const parsed = raw
+					.split(",")
+					.map((item) => parseDateTimeString(item.trim(), tzid).value);
 				value = { type: "DATE_TIME_LIST", value: parsed };
 				break;
 			}

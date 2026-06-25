@@ -39,7 +39,13 @@ const irSingleValueToJsZdt = (
 /** Any EXDATE/RDATE IrValue variant → list of @js-temporal/polyfill ZonedDateTimes. */
 const irDateListToJsZdts = (v: IrValue): Array<JSTemporal.ZonedDateTime> => {
 	if (v.type === "DATE_TIME_LIST") {
-		return v.value.map((zdt) => JSTemporal.ZonedDateTime.from(zdt.toString()));
+		return v.value.map((dt) =>
+			// Floating items (PlainDateTime) carry no zone — treat as UTC for range
+			// comparison, matching the single-value rule above.
+			"timeZoneId" in dt
+				? JSTemporal.ZonedDateTime.from(dt.toString())
+				: JSTemporal.ZonedDateTime.from(`${dt.toString()}[UTC]`),
+		);
 	}
 	if (v.type === "DATE_LIST") {
 		return v.value.map((pd) =>

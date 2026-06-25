@@ -99,7 +99,13 @@ const encodeIrValue = (value: IrValue): string => {
 		case "DATE_LIST":
 			return value.value.map(formatPlainDate).join(",");
 		case "DATE_TIME_LIST":
-			return value.value.map(formatZonedDateTime).join(",");
+			return value.value
+				.map((item) =>
+					"timeZoneId" in item
+						? formatZonedDateTime(item)
+						: formatPlainDateTime(item),
+				)
+				.join(",");
 		case "PERIOD_LIST":
 			return value.value.join(",");
 		case "BINARY":

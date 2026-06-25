@@ -291,6 +291,49 @@ describe("ComponentRepository value type round-trips (integration)", () => {
 		}
 	});
 
+	it("round-trips DATE_TIME_LIST with mixed zoned and floating items", async () => {
+		// RDATE in a VTIMEZONE observance is floating (RFC 5545 §3.6.5); a UTC item
+		// exercises the zoned branch. Order and per-item form must survive.
+		const utc = Temporal.ZonedDateTime.from("2023-11-05T01:00:00+00:00[UTC]");
+		const floating = Temporal.PlainDateTime.from("2024-11-03T01:00:00");
+		const result = await runSuccess(
+			Effect.gen(function* () {
+				const entity = yield* makeEntity();
+				const entityId = EntityId(entity.id);
+				const comp = yield* ComponentRepository;
+				yield* comp.insertTree(entityId, {
+					name: "VCALENDAR",
+					properties: [
+						{
+							name: "RDATE",
+							parameters: [],
+							value: { type: "DATE_TIME_LIST", value: [utc, floating] },
+							isKnown: true,
+						},
+					],
+					components: [],
+				});
+				return yield* comp.loadTree(entityId, "icalendar");
+			}).pipe(Effect.provide(layer), Effect.orDie),
+		);
+
+		const root = Option.getOrThrow(result);
+		const v = root.properties[0]?.value;
+		expect(v?.type).toBe("DATE_TIME_LIST");
+		if (v?.type === "DATE_TIME_LIST") {
+			expect(v.value).toHaveLength(2);
+			const [first, second] = v.value;
+			// First item: zoned UTC.
+			expect(first && "timeZoneId" in first).toBe(true);
+			if (first && "timeZoneId" in first) {
+				expect(Temporal.ZonedDateTime.compare(first, utc)).toBe(0);
+			}
+			// Second item: floating (PlainDateTime, no zone).
+			expect(second && "timeZoneId" in second).toBe(false);
+			expect(second?.toString()).toBe("2024-11-03T01:00:00");
+		}
+	});
+
 	it("round-trips TEXT_LIST value", async () => {
 		const result = await runSuccess(
 			Effect.gen(function* () {

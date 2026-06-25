@@ -19,6 +19,7 @@ import { principal } from "./principal.ts";
 import {
 	bytea,
 	dateStr,
+	datetimeList,
 	drizzleEnum,
 	type GetDrizzleEnumType,
 	timestampStr,
@@ -246,7 +247,12 @@ export const davProperty = pgTable(
 		groupName: text("group_name"),
 		valueTextArray: text("value_text_array").array(),
 		valueDateArray: dateStr("value_date_array").array(),
-		valueTstzArray: timestampTz("value_tstz_array").array(),
+		// DATE_TIME_LIST — array of the composite type `dav_datetime` (wall-clock +
+		// nullable zone). A NULL zone marks a floating item (RFC 5545 Form 1); a
+		// ZonedDateTime is reconstructed from wall+zone, which is the faithful
+		// iCalendar reading of a Form-2/3 value and the only way to admit floating
+		// items. See datetimeList in ./types.ts for the wire codec.
+		valueDatetimeList: datetimeList("value_datetime_list"),
 		valuePlainDatetime: timestampStr("value_plain_datetime"),
 		valueInterval: interval("value_interval"),
 		valueTextAsciiFold: text("value_text_ascii_fold").generatedAlwaysAs(
@@ -319,7 +325,7 @@ CASE
     ELSE 0
 END) +
 CASE
-    WHEN (value_tstz_array IS NOT NULL) THEN 1
+    WHEN (value_datetime_list IS NOT NULL) THEN 1
     ELSE 0
 END) +
 CASE
@@ -329,7 +335,7 @@ END) <= 1)`,
 		),
 		check(
 			"chk_dav_property_value_matches_type",
-			sql`(((value_text IS NULL) OR (value_type = ANY (ARRAY['TEXT'::text, 'DURATION'::text, 'URI'::text, 'UTC_OFFSET'::text, 'TIME'::text, 'DATE_AND_OR_TIME'::text, 'RECUR'::text, 'CAL_ADDRESS'::text, 'PERIOD'::text]))) AND ((value_int IS NULL) OR (value_type = 'INTEGER'::text)) AND ((value_float IS NULL) OR (value_type = 'FLOAT'::text)) AND ((value_bool IS NULL) OR (value_type = 'BOOLEAN'::text)) AND ((value_date IS NULL) OR (value_type = 'DATE'::text)) AND ((value_tstz IS NULL) OR (value_type = 'DATE_TIME'::text)) AND ((value_plain_datetime IS NULL) OR (value_type = 'PLAIN_DATE_TIME'::text)) AND ((value_bytes IS NULL) OR (value_type = 'BINARY'::text)) AND ((value_json IS NULL) OR (value_type = 'JSON'::text)) AND ((value_text_array IS NULL) OR (value_type = ANY (ARRAY['TEXT_LIST'::text, 'PERIOD_LIST'::text]))) AND ((value_date_array IS NULL) OR (value_type = 'DATE_LIST'::text)) AND ((value_tstz_array IS NULL) OR (value_type = 'DATE_TIME_LIST'::text)) AND ((value_interval IS NULL) OR (value_type = ANY (ARRAY['DURATION_INTERVAL'::text, 'UTC_OFFSET_INTERVAL'::text]))))`,
+			sql`(((value_text IS NULL) OR (value_type = ANY (ARRAY['TEXT'::text, 'DURATION'::text, 'URI'::text, 'UTC_OFFSET'::text, 'TIME'::text, 'DATE_AND_OR_TIME'::text, 'RECUR'::text, 'CAL_ADDRESS'::text, 'PERIOD'::text]))) AND ((value_int IS NULL) OR (value_type = 'INTEGER'::text)) AND ((value_float IS NULL) OR (value_type = 'FLOAT'::text)) AND ((value_bool IS NULL) OR (value_type = 'BOOLEAN'::text)) AND ((value_date IS NULL) OR (value_type = 'DATE'::text)) AND ((value_tstz IS NULL) OR (value_type = 'DATE_TIME'::text)) AND ((value_plain_datetime IS NULL) OR (value_type = 'PLAIN_DATE_TIME'::text)) AND ((value_bytes IS NULL) OR (value_type = 'BINARY'::text)) AND ((value_json IS NULL) OR (value_type = 'JSON'::text)) AND ((value_text_array IS NULL) OR (value_type = ANY (ARRAY['TEXT_LIST'::text, 'PERIOD_LIST'::text]))) AND ((value_date_array IS NULL) OR (value_type = 'DATE_LIST'::text)) AND ((value_datetime_list IS NULL) OR (value_type = 'DATE_TIME_LIST'::text)) AND ((value_interval IS NULL) OR (value_type = ANY (ARRAY['DURATION_INTERVAL'::text, 'UTC_OFFSET_INTERVAL'::text]))))`,
 		),
 		check("dav_property_value_type_check", valueTypeEnum.sql),
 	],

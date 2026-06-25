@@ -12,6 +12,7 @@ import type {
 import { isKnownVcardProperty } from "#src/data/vcard/known.ts";
 import { DatabaseClient } from "#src/db/client.ts";
 import {
+	type DatetimeListItem,
 	davComponent,
 	davParameter,
 	davProperty,
@@ -55,7 +56,9 @@ interface PropertyValueColumns {
 	readonly valueJson?: unknown;
 	readonly valueTextArray?: Array<string> | null;
 	readonly valueDateArray?: Array<Temporal.PlainDate> | null;
-	readonly valueTstzArray?: Array<Temporal.Instant> | null;
+	// DATE_TIME_LIST: array of wall-clock + nullable zone (floating = NULL zone).
+	// The datetimeList customType maps these ⇄ Temporal values.
+	readonly valueDatetimeList?: ReadonlyArray<DatetimeListItem> | null;
 	readonly valueInterval?: string | null;
 }
 
@@ -93,7 +96,9 @@ const irValueToDbColumns = (value: IrValue): PropertyValueColumns => {
 		case "DATE_LIST":
 			return { valueDateArray: value.value as Array<Temporal.PlainDate> };
 		case "DATE_TIME_LIST":
-			return { valueTstzArray: value.value.map((z) => z.toInstant()) };
+			// The datetimeList customType serializes each ZonedDateTime/PlainDateTime
+			// to the composite wire form (wall + nullable zone).
+			return { valueDatetimeList: value.value };
 		case "DURATION_INTERVAL":
 		case "UTC_OFFSET_INTERVAL":
 			return { valueInterval: value.value };
@@ -178,11 +183,11 @@ const dbColumnsToIrValue = (
 		case "DATE_LIST":
 			return { type: "DATE_LIST", value: row.valueDateArray ?? [] };
 		case "DATE_TIME_LIST":
+			// The customType already mapped the composite array back to
+			// ZonedDateTime/PlainDateTime items.
 			return {
 				type: "DATE_TIME_LIST",
-				value: (row.valueTstzArray ?? []).map((i) =>
-					i.toZonedDateTimeISO(tzid ?? "UTC"),
-				),
+				value: row.valueDatetimeList ?? [],
 			};
 		case "DURATION_INTERVAL":
 			return { type: "DURATION_INTERVAL", value: row.valueInterval ?? "" };

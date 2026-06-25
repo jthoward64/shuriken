@@ -114,9 +114,13 @@ const IrValueDateListSchema = Schema.Struct({
 	type: Schema.Literal("DATE_LIST"),
 	value: Schema.Array(PlainDateSchema),
 });
+// Each item is independently anchored (ZonedDateTime — RFC 5545 Form 2 "Z" or
+// Form 3 TZID) or floating (PlainDateTime — Form 1). A single EXDATE/RDATE may
+// legitimately mix forms; floating is in fact *required* for RDATE inside a
+// VTIMEZONE observance (RFC 5545 §3.6.5).
 const IrValueDateTimeListSchema = Schema.Struct({
 	type: Schema.Literal("DATE_TIME_LIST"),
-	value: Schema.Array(ZonedDateTimeSchema),
+	value: Schema.Array(Schema.Union([ZonedDateTimeSchema, PlainDateTimeSchema])),
 });
 const IrValueDurationIntervalSchema = Schema.Struct({
 	type: Schema.Literal("DURATION_INTERVAL"),

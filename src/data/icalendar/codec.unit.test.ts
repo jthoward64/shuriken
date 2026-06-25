@@ -615,8 +615,34 @@ describe("ICalendarCodec decode — default value types", () => {
 		expect(prop?.value.type).toBe("DATE_TIME_LIST");
 		if (prop?.value.type === "DATE_TIME_LIST") {
 			expect(prop.value.value).toHaveLength(3);
-			expect(prop.value.value[0]?.timeZoneId).toBe("UTC");
+			const first = prop.value.value[0];
+			expect(
+				first && "timeZoneId" in first ? first.timeZoneId : undefined,
+			).toBe("UTC");
 		}
+	});
+
+	it("RDATE with floating datetimes decodes as floating list items", async () => {
+		// Floating local times — valid RFC 5545 Form 1 (no "Z", no TZID). Required
+		// for RDATE inside a VTIMEZONE observance (RFC 5545 §3.6.5).
+		const doc = await run(wrap("RDATE:20231105T010000,20241103T010000"));
+		const prop = doc.root.components[0]?.properties.find(
+			(p) => p.name === "RDATE",
+		);
+		expect(prop?.value.type).toBe("DATE_TIME_LIST");
+		if (prop?.value.type === "DATE_TIME_LIST") {
+			expect(prop.value.value).toHaveLength(2);
+			// Floating items carry no zone (PlainDateTime, not ZonedDateTime).
+			expect(prop.value.value.every((d) => !("timeZoneId" in d))).toBe(true);
+			expect(prop.value.value[0]?.toString()).toBe("2023-11-05T01:00:00");
+		}
+	});
+
+	it("round-trips a floating RDATE list unchanged", async () => {
+		const input = wrap("RDATE:20231105T010000,20241103T010000");
+		const doc = await run(input);
+		const encoded = await enc(doc);
+		expect(encoded).toContain("RDATE:20231105T010000,20241103T010000");
 	});
 });
 

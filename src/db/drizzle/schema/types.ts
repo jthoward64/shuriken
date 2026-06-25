@@ -2,6 +2,14 @@ import { type SQL, sql } from "drizzle-orm";
 import { customType } from "drizzle-orm/pg-core";
 import { Redacted } from "effect";
 import { Temporal } from "temporal-polyfill";
+import {
+	COMPOSITE_TYPE,
+	type DatetimeListItem,
+	parseDatetimeArrayValue,
+	serializeDatetimeArray,
+} from "./datetime-list-codec.ts";
+
+export type { DatetimeListItem } from "./datetime-list-codec.ts";
 
 interface DrizzleEnumConfig<V> {
 	sql: SQL<unknown>;
@@ -78,6 +86,24 @@ export const tsvector = customType<{ data: string }>({
 /** bytea → Buffer */
 export const bytea = customType<{ data: Buffer; driverData: Buffer }>({
 	dataType: () => "bytea",
+});
+
+/**
+ * DATE_TIME_LIST → array of the `dav_datetime` composite type (wall + nullable
+ * zone). Each item is a ZonedDateTime (zoned) or PlainDateTime (floating).
+ *
+ * toDriver always emits the `{...}` composite-array literal (accepted by every
+ * driver). fromDriver must cope with both shapes drivers return for a composite
+ * array: the full `{...}` text (postgres.js, raw PGlite) or a pre-split array of
+ * record literals (the @effect/sql clients). See ./datetime-list-codec.ts.
+ */
+export const datetimeList = customType<{
+	data: ReadonlyArray<DatetimeListItem>;
+	driverData: string | ReadonlyArray<string>;
+}>({
+	dataType: () => `${COMPOSITE_TYPE}[]`,
+	toDriver: (items) => serializeDatetimeArray(items),
+	fromDriver: (value) => parseDatetimeArrayValue(value),
 });
 
 /** text → Redacted<string> — prevents sensitive values from appearing in logs */
