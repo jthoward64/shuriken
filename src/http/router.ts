@@ -269,6 +269,16 @@ export const handleRequest = (
 	const requestId = newRequestId();
 	const clientIp = Option.fromNullishOr(clientAddress);
 	const url = new URL(req.url);
+
+	// Liveness/readiness endpoint: a public, dependency-free 200, handled before
+	// auth, metrics, and tracing. Container probes (kubelet) can't carry proxy or
+	// basic credentials and follow same-host redirects, so they can't use the DAV
+	// discovery paths (/.well-known/{cal,card}dav) — those 301-redirect into
+	// /dav/, which requires auth and answers 401 to an unauthenticated probe.
+	if (url.pathname === "/healthz") {
+		return Effect.succeed(new Response("ok", { status: 200 }));
+	}
+
 	const group = pathGroup(url.pathname);
 
 	// Pre-tagged metric instances (method + path_group are stable for this request)

@@ -223,13 +223,15 @@ podDisruptionBudget:
   # maxUnavailable: ""
 
 # ---------------------------------------------------------------------------
-# Probes — the app responds to HEAD /.well-known/caldav unauthenticated
-# (it's part of the DAV discovery path and is cheap). Tune to your SLOs.
+# Probes hit /healthz — a public, dependency-free 200 served before auth. Do not
+# point these at /.well-known/{cal,card}dav: those 301-redirect to /dav/, and
+# kubelet follows same-host redirects into that authenticated path (→ 401), so
+# the probe fails. Tune the timings to your SLOs.
 # ---------------------------------------------------------------------------
 
 livenessProbe:
   httpGet:
-    path: /.well-known/caldav
+    path: /healthz
     port: http
   initialDelaySeconds: 10
   periodSeconds: 15
@@ -238,7 +240,7 @@ livenessProbe:
 
 readinessProbe:
   httpGet:
-    path: /.well-known/caldav
+    path: /healthz
     port: http
   initialDelaySeconds: 5
   periodSeconds: 5
@@ -247,7 +249,7 @@ readinessProbe:
 
 startupProbe:
   httpGet:
-    path: /.well-known/caldav
+    path: /healthz
     port: http
   initialDelaySeconds: 5
   periodSeconds: 5

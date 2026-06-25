@@ -404,6 +404,17 @@ describe("handleRequest — routing", () => {
 		expect(res.status).toBe(404);
 	});
 
+	it("returns 200 for /healthz before auth runs", async () => {
+		// The health endpoint must answer even when auth would fail — it is
+		// handled ahead of authentication so container probes (no credentials)
+		// always succeed.
+		const res = await runWith(
+			req("GET", "/healthz"),
+			Effect.fail(new AuthError({ reason: "should not be reached" })),
+		);
+		expect(res.status).toBe(200);
+	});
+
 	it("routes / to UI (200 HTML)", async () => {
 		const res = await runWith(req("GET", "/"), okAuth);
 		expect(res.status).toBe(200);
