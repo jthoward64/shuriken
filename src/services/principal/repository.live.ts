@@ -1,4 +1,4 @@
-import { and, eq, ilike, isNull, or, sql } from "drizzle-orm";
+import { and, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { Effect, Layer, Option } from "effect";
 import { DatabaseClient } from "#src/db/client.ts";
 import { principal, user } from "#src/db/drizzle/schema/index.ts";
@@ -10,6 +10,7 @@ import type { Email } from "#src/domain/types/strings.ts";
 import {
 	type PrincipalPropertyChanges,
 	PrincipalRepository,
+	type PrincipalRow,
 	type UserRow,
 } from "./repository.ts";
 
@@ -79,6 +80,37 @@ const findPrincipalById = Effect.fn("PrincipalRepository.findPrincipalById")(
 	},
 	Effect.tapError((e: DatabaseError) =>
 		Effect.logWarning("repo.principal.findPrincipalById failed", e.cause),
+	),
+);
+
+const findPrincipalByIds = Effect.fn("PrincipalRepository.findPrincipalByIds")(
+	function* (ids: ReadonlyArray<PrincipalId>) {
+		yield* Effect.annotateCurrentSpan({ "principal.count": ids.length });
+		yield* Effect.logTrace("repo.principal.findPrincipalByIds", {
+			count: ids.length,
+		});
+		const map = new Map<PrincipalId, PrincipalRow>();
+		if (ids.length === 0) {
+			return map as ReadonlyMap<PrincipalId, PrincipalRow>;
+		}
+		const rows = yield* runDbQuery((db) =>
+			db
+				.select()
+				.from(principal)
+				.where(
+					and(
+						inArray(principal.id, ids as Array<PrincipalId>),
+						isNull(principal.deletedAt),
+					),
+				),
+		);
+		for (const row of rows) {
+			map.set(row.id as PrincipalId, row);
+		}
+		return map as ReadonlyMap<PrincipalId, PrincipalRow>;
+	},
+	Effect.tapError((e: DatabaseError) =>
+		Effect.logWarning("repo.principal.findPrincipalByIds failed", e.cause),
 	),
 );
 
@@ -244,6 +276,8 @@ export const PrincipalRepositoryLive = Layer.effect(
 				run(findById(...args)),
 			findPrincipalById: (...args: Parameters<typeof findPrincipalById>) =>
 				run(findPrincipalById(...args)),
+			findPrincipalByIds: (...args: Parameters<typeof findPrincipalByIds>) =>
+				run(findPrincipalByIds(...args)),
 			findBySlug: (...args: Parameters<typeof findBySlug>) =>
 				run(findBySlug(...args)),
 			findPrincipalBySlug: (...args: Parameters<typeof findPrincipalBySlug>) =>

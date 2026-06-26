@@ -12,6 +12,7 @@ import type { Slug } from "#src/domain/types/path.ts";
 import {
 	type CollectionPropertyChanges,
 	CollectionRepository,
+	type CollectionRow,
 	type NewCollection,
 } from "./repository.ts";
 
@@ -33,6 +34,35 @@ const findById = Effect.fn("CollectionRepository.findById")(
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.collection.findById failed", e.cause),
+	),
+);
+
+const findByIds = Effect.fn("CollectionRepository.findByIds")(
+	function* (ids: ReadonlyArray<CollectionId>) {
+		yield* Effect.annotateCurrentSpan({ "collection.count": ids.length });
+		yield* Effect.logTrace("repo.collection.findByIds", { count: ids.length });
+		const map = new Map<CollectionId, CollectionRow>();
+		if (ids.length === 0) {
+			return map as ReadonlyMap<CollectionId, CollectionRow>;
+		}
+		const rows = yield* runDbQuery((db) =>
+			db
+				.select()
+				.from(davCollection)
+				.where(
+					and(
+						inArray(davCollection.id, ids as Array<CollectionId>),
+						isNull(davCollection.deletedAt),
+					),
+				),
+		);
+		for (const row of rows) {
+			map.set(row.id as CollectionId, row);
+		}
+		return map as ReadonlyMap<CollectionId, CollectionRow>;
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.collection.findByIds failed", e.cause),
 	),
 );
 
@@ -338,6 +368,8 @@ export const CollectionRepositoryLive = Layer.effect(
 		return {
 			findById: (...args: Parameters<typeof findById>) =>
 				run(findById(...args)),
+			findByIds: (...args: Parameters<typeof findByIds>) =>
+				run(findByIds(...args)),
 			findBySlug: (...args: Parameters<typeof findBySlug>) =>
 				run(findBySlug(...args)),
 			listByOwner: (...args: Parameters<typeof listByOwner>) =>

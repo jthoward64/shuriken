@@ -83,6 +83,7 @@ const stubLayers = Layer.mergeAll(
 		findById: die,
 		findBySlug: die,
 		findPrincipalById: die,
+		findPrincipalByIds: die,
 		findPrincipalBySlug: die,
 		findByEmail: die,
 		findUserByUserId: die,
@@ -92,6 +93,7 @@ const stubLayers = Layer.mergeAll(
 	}),
 	Layer.succeed(CollectionRepoTag, {
 		findById: die,
+		findByIds: die,
 		findBySlug: die,
 		listByOwner: die,
 		listByAutoManagedKind: die,
@@ -134,6 +136,8 @@ const stubLayers = Layer.mergeAll(
 		check: die,
 		currentUserPrivileges: die,
 		batchCurrentUserPrivileges: die,
+		batchMemberPrivileges: die,
+		batchCheckMembers: die,
 		getAces: die,
 		setAces: die,
 	}),
@@ -141,6 +145,7 @@ const stubLayers = Layer.mergeAll(
 		findById: die,
 		findBySlug: die,
 		findPrincipalById: die,
+		findPrincipalByIds: die,
 		findByEmail: die,
 		updateProperties: die,
 	}),
@@ -156,6 +161,7 @@ const stubLayers = Layer.mergeAll(
 	Layer.succeed(ComponentRepository, {
 		insertTree: die,
 		loadTree: die,
+		loadTreesByIds: die,
 		deleteByEntity: die,
 	}),
 	Layer.succeed(CalTimezoneRepository, {
@@ -168,10 +174,12 @@ const stubLayers = Layer.mergeAll(
 	Layer.succeed(CalIndexRepository, {
 		findByTimeRange: die,
 		findByComponentType: die,
+		findOverlappingRange: die,
 		indexRruleOccurrences: die,
 	}),
 	Layer.succeed(CardIndexRepository, {
 		findByText: die,
+		listForCollection: die,
 		listWithBday: die,
 	}),
 	Layer.succeed(UserRepository, {

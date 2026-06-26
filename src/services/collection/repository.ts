@@ -56,6 +56,14 @@ export interface CollectionRepositoryShape {
 	readonly findById: (
 		id: CollectionId,
 	) => Effect.Effect<Option.Option<CollectionRow>, DatabaseError>;
+	/**
+	 * Batch variant of findById: resolve many collections in a single
+	 * `WHERE id IN (...)` query. Returns a map keyed by collection id; ids that
+	 * don't resolve (or are soft-deleted) are simply absent from the map.
+	 */
+	readonly findByIds: (
+		ids: ReadonlyArray<CollectionId>,
+	) => Effect.Effect<ReadonlyMap<CollectionId, CollectionRow>, DatabaseError>;
 	readonly findBySlug: (
 		ownerPrincipalId: PrincipalId,
 		collectionType: CollectionType,

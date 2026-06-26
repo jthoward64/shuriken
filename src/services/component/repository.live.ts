@@ -321,6 +321,85 @@ const buildIrComponent = (
 	return { name: compRow.name, properties, components: children };
 };
 
+// Build the componentId → IrProperty[] map from flat property + parameter rows.
+// Component ids and property ids are globally unique, so a single shared index
+// works whether the rows came from one entity or many (batch load).
+const indexProperties = (
+	properties: Array<PropertyRow>,
+	parameters: Array<ParameterRow>,
+	isKnown: (name: string) => boolean,
+): Map<string, Array<IrProperty>> => {
+	const paramsByPropId = new Map<string, Array<IrParameter>>();
+	for (const param of parameters) {
+		const list = paramsByPropId.get(param.propertyId) ?? [];
+		list.push({ name: param.name, value: param.value });
+		paramsByPropId.set(param.propertyId, list);
+	}
+
+	const propertiesByCompId = new Map<string, Array<IrProperty>>();
+	for (const propRow of properties) {
+		const irParams = paramsByPropId.get(propRow.id) ?? [];
+		const irProp: IrProperty = {
+			name: propRow.name,
+			parameters: irParams,
+			value: dbColumnsToIrValue(propRow, irParams),
+			isKnown: isKnown(propRow.name),
+		};
+		const list = propertiesByCompId.get(propRow.componentId) ?? [];
+		list.push(irProp);
+		propertiesByCompId.set(propRow.componentId, list);
+	}
+	return propertiesByCompId;
+};
+
+// Load the active parameter rows for a set of property rows (one query, or
+// none at all when there are no properties). Shared by loadTree/loadTreesByIds.
+const loadParameters = (
+	properties: Array<PropertyRow>,
+): Effect.Effect<Array<ParameterRow>, DatabaseError, DatabaseClient> =>
+	properties.length === 0
+		? Effect.succeed<Array<ParameterRow>>([])
+		: runDbQuery((db) =>
+				db
+					.select()
+					.from(davParameter)
+					.where(
+						and(
+							inArray(
+								davParameter.propertyId,
+								properties.map((p) => p.id),
+							),
+							isNull(davParameter.deletedAt),
+						),
+					)
+					.orderBy(davParameter.ordinal),
+			);
+
+// Reconstruct one entity's tree from its component rows plus the shared
+// property index. Returns none if the entity has no root component.
+const assembleTree = (
+	components: Array<ComponentRow>,
+	propertiesByCompId: Map<string, Array<IrProperty>>,
+): Option.Option<IrComponent> => {
+	const childrenByParentId = new Map<string, Array<ComponentRow>>();
+	let rootComp: ComponentRow | undefined;
+	for (const comp of components) {
+		if (comp.parentComponentId === null) {
+			rootComp = comp;
+		} else {
+			const list = childrenByParentId.get(comp.parentComponentId) ?? [];
+			list.push(comp);
+			childrenByParentId.set(comp.parentComponentId, list);
+		}
+	}
+	if (!rootComp) {
+		return Option.none<IrComponent>();
+	}
+	return Option.some(
+		buildIrComponent(rootComp, childrenByParentId, propertiesByCompId),
+	);
+};
+
 const loadTree = Effect.fn("ComponentRepository.loadTree")(
 	function* (entityId: EntityId, entityType: EntityType) {
 		yield* Effect.annotateCurrentSpan({
@@ -366,69 +445,95 @@ const loadTree = Effect.fn("ComponentRepository.loadTree")(
 		);
 
 		// 3. Load all active parameter rows for those properties
-		let parameters: Array<ParameterRow> = [];
-		if (properties.length > 0) {
-			const propertyIds = properties.map((p) => p.id);
-			parameters = yield* runDbQuery((db) =>
-				db
-					.select()
-					.from(davParameter)
-					.where(
-						and(
-							inArray(davParameter.propertyId, propertyIds),
-							isNull(davParameter.deletedAt),
-						),
-					)
-					.orderBy(davParameter.ordinal),
-			);
-		}
+		const parameters = yield* loadParameters(properties);
 
-		// 4. Group parameters by propertyId
-		const paramsByPropId = new Map<string, Array<IrParameter>>();
-		for (const param of parameters) {
-			const list = paramsByPropId.get(param.propertyId) ?? [];
-			list.push({ name: param.name, value: param.value });
-			paramsByPropId.set(param.propertyId, list);
-		}
-
-		// 5. Build IrProperty list per componentId
-		const propertiesByCompId = new Map<string, Array<IrProperty>>();
-		for (const propRow of properties) {
-			const irParams = paramsByPropId.get(propRow.id) ?? [];
-			const irProp: IrProperty = {
-				name: propRow.name,
-				parameters: irParams,
-				value: dbColumnsToIrValue(propRow, irParams),
-				isKnown: isKnown(propRow.name),
-			};
-			const list = propertiesByCompId.get(propRow.componentId) ?? [];
-			list.push(irProp);
-			propertiesByCompId.set(propRow.componentId, list);
-		}
-
-		// 6. Build parent→children map and find root
-		const childrenByParentId = new Map<string, Array<ComponentRow>>();
-		let rootComp: ComponentRow | undefined;
-		for (const comp of components) {
-			if (comp.parentComponentId === null) {
-				rootComp = comp;
-			} else {
-				const list = childrenByParentId.get(comp.parentComponentId) ?? [];
-				list.push(comp);
-				childrenByParentId.set(comp.parentComponentId, list);
-			}
-		}
-
-		if (!rootComp) {
-			return Option.none<IrComponent>();
-		}
-
-		return Option.some(
-			buildIrComponent(rootComp, childrenByParentId, propertiesByCompId),
-		);
+		// 4. Index properties/parameters and reconstruct the tree
+		const propertiesByCompId = indexProperties(properties, parameters, isKnown);
+		return assembleTree(components, propertiesByCompId);
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.component.loadTree failed", e.cause),
+	),
+);
+
+// ---------------------------------------------------------------------------
+// loadTreesByIds — batch variant: 3 queries total for any number of entities
+// ---------------------------------------------------------------------------
+
+const loadTreesByIds = Effect.fn("ComponentRepository.loadTreesByIds")(
+	function* (entityIds: ReadonlyArray<EntityId>, entityType: EntityType) {
+		yield* Effect.annotateCurrentSpan({
+			"entity.count": entityIds.length,
+			"entity.type": entityType,
+		});
+		yield* Effect.logTrace("repo.component.loadTreesByIds", {
+			count: entityIds.length,
+			entityType,
+		});
+
+		const result = new Map<EntityId, IrComponent>();
+		if (entityIds.length === 0) {
+			return result as ReadonlyMap<EntityId, IrComponent>;
+		}
+
+		const isKnown =
+			entityType === "icalendar" ? isKnownIcalProperty : isKnownVcardProperty;
+
+		// 1. All active component rows across every requested entity
+		const components = yield* runDbQuery((db) =>
+			db
+				.select()
+				.from(davComponent)
+				.where(
+					and(
+						inArray(davComponent.entityId, entityIds as Array<EntityId>),
+						isNull(davComponent.deletedAt),
+					),
+				)
+				.orderBy(davComponent.ordinal),
+		);
+		if (components.length === 0) {
+			return result as ReadonlyMap<EntityId, IrComponent>;
+		}
+
+		const componentIds = components.map((c) => c.id);
+
+		// 2. All active property rows for those components
+		const properties = yield* runDbQuery((db) =>
+			db
+				.select()
+				.from(davProperty)
+				.where(
+					and(
+						inArray(davProperty.componentId, componentIds),
+						isNull(davProperty.deletedAt),
+					),
+				)
+				.orderBy(davProperty.ordinal),
+		);
+
+		// 3. All active parameter rows for those properties
+		const parameters = yield* loadParameters(properties);
+
+		const propertiesByCompId = indexProperties(properties, parameters, isKnown);
+
+		// Partition components by their owning entity, then assemble each tree.
+		const componentsByEntity = new Map<string, Array<ComponentRow>>();
+		for (const comp of components) {
+			const list = componentsByEntity.get(comp.entityId) ?? [];
+			list.push(comp);
+			componentsByEntity.set(comp.entityId, list);
+		}
+		for (const [eid, comps] of componentsByEntity) {
+			const tree = assembleTree(comps, propertiesByCompId);
+			if (Option.isSome(tree)) {
+				result.set(eid as EntityId, tree.value);
+			}
+		}
+		return result as ReadonlyMap<EntityId, IrComponent>;
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.component.loadTreesByIds failed", e.cause),
 	),
 );
 
@@ -480,6 +585,8 @@ export const ComponentRepositoryLive = Layer.effect(
 				run(insertTree(...args)),
 			loadTree: (...args: Parameters<typeof loadTree>) =>
 				run(loadTree(...args)),
+			loadTreesByIds: (...args: Parameters<typeof loadTreesByIds>) =>
+				run(loadTreesByIds(...args)),
 			deleteByEntity: (...args: Parameters<typeof deleteByEntity>) =>
 				run(deleteByEntity(...args)),
 		};

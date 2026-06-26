@@ -157,6 +157,66 @@ export const AclServiceLive = Layer.effect(
 				),
 			);
 
+		// Effective privileges for sibling members sharing one parent, computed
+		// with a single parent resolution + one batched direct-ACE query. A
+		// member's effective set = its direct ACEs ∪ the parent's effective set
+		// (which already includes the parent's own ancestors). Does not apply the
+		// role-based bypass — matches currentUserPrivileges. Shared by
+		// batchMemberPrivileges and batchCheckMembers.
+		const computeMemberPrivileges = (
+			principalId: PrincipalId,
+			parentId: AclResourceId,
+			parentType: AclResourceType,
+			memberIds: ReadonlyArray<AclResourceId>,
+			memberType: AclResourceType,
+		): Effect.Effect<
+			ReadonlyMap<AclResourceId, ReadonlyArray<DavPrivilege>>,
+			DatabaseError
+		> =>
+			Effect.gen(function* () {
+				const result = new Map<AclResourceId, ReadonlyArray<DavPrivilege>>();
+				if (memberIds.length === 0) {
+					return result;
+				}
+				const principalIds = yield* resolvePrincipalIds(principalId);
+
+				const parentDirect = yield* repo.getGrantedPrivileges(
+					principalIds,
+					parentId,
+					parentType,
+					true,
+				);
+				const parentInherited = yield* collectAncestorPrivileges(
+					principalIds,
+					parentId,
+					parentType,
+				);
+				const inheritedExpanded = new Set<DavPrivilege>();
+				for (const p of [...parentDirect, ...parentInherited]) {
+					for (const contained of expandContained(p)) {
+						inheritedExpanded.add(contained);
+					}
+				}
+
+				const directRaw = yield* repo.batchGetGrantedPrivileges(
+					principalIds,
+					memberIds as ReadonlyArray<UuidString>,
+					memberType,
+				);
+
+				for (const memberId of memberIds) {
+					const expanded = new Set<DavPrivilege>(inheritedExpanded);
+					const direct = directRaw.get(memberId as UuidString) ?? [];
+					for (const p of direct) {
+						for (const contained of expandContained(p)) {
+							expanded.add(contained);
+						}
+					}
+					result.set(memberId, Arr.fromIterable(expanded));
+				}
+				return result;
+			});
+
 		return {
 			getAces: Effect.fn("AclService.getAces")(
 				function* (resourceId, resourceType) {
@@ -324,6 +384,78 @@ export const AclServiceLive = Layer.effect(
 				}
 				return result;
 			}),
+
+			batchMemberPrivileges: Effect.fn("AclService.batchMemberPrivileges")(
+				function* (principalId, parentId, parentType, memberIds, memberType) {
+					yield* Effect.logTrace("acl.batchMemberPrivileges", {
+						principalId,
+						parentId,
+						parentType,
+						memberType,
+						memberCount: memberIds.length,
+					});
+					return yield* computeMemberPrivileges(
+						principalId,
+						parentId,
+						parentType,
+						memberIds,
+						memberType,
+					);
+				},
+			),
+
+			batchCheckMembers: Effect.fn("AclService.batchCheckMembers")(
+				function* (
+					principalId,
+					parentId,
+					parentType,
+					memberIds,
+					memberType,
+					privilege,
+				) {
+					yield* Effect.logTrace("acl.batchCheckMembers", {
+						principalId,
+						parentId,
+						parentType,
+						memberType,
+						privilege,
+						memberCount: memberIds.length,
+					});
+					const allowed = new Set<AclResourceId>();
+					if (memberIds.length === 0) {
+						return allowed;
+					}
+
+					// Role-based bypass is per-principal — resolve once. Mirrors the
+					// short-circuit in check() so super_admin et al. keep full access
+					// without any per-member ACE.
+					const role = yield* repo.getRoleForPrincipal(principalId);
+					if (bypassesAclCheck(role)) {
+						for (const id of memberIds) {
+							allowed.add(id);
+						}
+						return allowed;
+					}
+
+					// Otherwise a member passes iff its effective privilege set
+					// contains the requested privilege — equivalent to check() but
+					// computed for every member in a bounded number of queries.
+					const privMap = yield* computeMemberPrivileges(
+						principalId,
+						parentId,
+						parentType,
+						memberIds,
+						memberType,
+					);
+					for (const id of memberIds) {
+						const privs = privMap.get(id) ?? [];
+						if ((privs as ReadonlyArray<string>).includes(privilege)) {
+							allowed.add(id);
+						}
+					}
+					return allowed;
+				},
+			),
 		};
 	}),
 );

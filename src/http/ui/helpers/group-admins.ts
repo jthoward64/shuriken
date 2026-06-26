@@ -1,4 +1,4 @@
-import { Effect, Option } from "effect";
+import { Effect } from "effect";
 import type { DatabaseError } from "#src/domain/errors.ts";
 import type { PrincipalId } from "#src/domain/ids.ts";
 import { AclService } from "#src/services/acl/service.ts";
@@ -32,35 +32,28 @@ export const buildGroupAdminsData = (
 		const principalSvc = yield* PrincipalService;
 
 		const aces = yield* acl.getAces(groupPrincipalId, "principal");
-		const admins: Array<GroupAdminRow> = [];
 
-		for (const ace of aces) {
-			if (ace.privilege !== "DAV:all") {
-				continue;
-			}
-			if (ace.principalType !== "principal" || ace.principalId === null) {
-				continue;
-			}
-			const rowOpt = yield* principalSvc
-				.findPrincipalById(ace.principalId as PrincipalId)
-				.pipe(
-					Effect.map(
-						Option.some<
-							import("#src/services/principal/repository.ts").PrincipalRow
-						>,
-					),
-					Effect.catchTag("DavError", () => Effect.succeed(Option.none())),
-				);
-			const label = Option.match(rowOpt, {
-				onNone: () => ace.principalId ?? "Unknown",
-				onSome: (p) => p.displayName ?? p.slug,
-			});
-			admins.push({
+		const adminAces = aces.filter(
+			(ace) =>
+				ace.privilege === "DAV:all" &&
+				ace.principalType === "principal" &&
+				ace.principalId !== null,
+		);
+		// Resolve every admin principal in one query instead of one per ACE.
+		const principals = yield* principalSvc.findPrincipalByIds(
+			adminAces.map((ace) => ace.principalId as PrincipalId),
+		);
+
+		const admins: Array<GroupAdminRow> = adminAces.map((ace) => {
+			const row = principals.get(ace.principalId as PrincipalId);
+			return {
 				aceId: ace.id,
 				principalId: ace.principalId as PrincipalId,
-				label,
-			});
-		}
+				label: row
+					? (row.displayName ?? row.slug)
+					: (ace.principalId ?? "Unknown"),
+			};
+		});
 
 		return admins;
 	});

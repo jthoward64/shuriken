@@ -8,7 +8,7 @@
 // Response: raw iCalendar text (not multistatus), Content-Type: text/calendar.
 // ---------------------------------------------------------------------------
 
-import { Effect, Option } from "effect";
+import { Effect } from "effect";
 import { Temporal } from "temporal-polyfill";
 import {
 	buildVfreebusyText,
@@ -29,13 +29,14 @@ import {
 	methodNotAllowed,
 	unauthorized,
 } from "#src/domain/errors.ts";
-import { EntityId } from "#src/domain/ids.ts";
+import { EntityId, InstanceId, type UuidString } from "#src/domain/ids.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { HTTP_OK } from "#src/http/status.ts";
 import { AclService } from "#src/services/acl/index.ts";
+import { CalIndexRepository } from "#src/services/cal-index/index.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
-import { InstanceService } from "#src/services/instance/index.ts";
+import { InstanceRepository } from "#src/services/instance/repository.ts";
 
 const CALDAV_NS = "urn:ietf:params:xml:ns:caldav";
 
@@ -50,7 +51,7 @@ export const freeBusyQueryHandler = (
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError,
-	InstanceService | ComponentRepository | AclService
+	InstanceRepository | CalIndexRepository | ComponentRepository | AclService
 > =>
 	Effect.gen(function* () {
 		if (path.kind !== "collection") {
@@ -103,22 +104,43 @@ export const freeBusyQueryHandler = (
 			return yield* badRequest("Invalid time-range instant format");
 		}
 
-		// Load all instances and compute free-busy periods
-		const instSvc = yield* InstanceService;
-		const instances = yield* instSvc.listByCollection(path.collectionId);
+		// Narrow the candidate set in SQL: VEVENTs whose series could overlap the
+		// query window, plus every VFREEBUSY (rare, unfiltered — its busy periods
+		// aren't always bounded by DTSTART/DTEND, so we never drop one). This is a
+		// correct superset; the per-occurrence expansion below does the exact pass.
+		const instRepo = yield* InstanceRepository;
+		const calIdx = yield* CalIndexRepository;
+		const [veventIds, vfreebusyIds] = yield* Effect.all(
+			[
+				calIdx.findOverlappingRange(
+					path.collectionId,
+					"VEVENT",
+					queryStart,
+					queryEnd,
+				),
+				calIdx.findByComponentType(path.collectionId, "VFREEBUSY"),
+			],
+			{ concurrency: "unbounded" },
+		);
+		const candidateIds = [...new Set([...veventIds, ...vfreebusyIds])];
+		const instances = yield* instRepo.findByIds(
+			candidateIds.map((id) => InstanceId(id as UuidString)),
+		);
 
 		const componentRepo = yield* ComponentRepository;
 		const periods: Array<Period> = [];
 
+		// Batch-load every instance's tree in 3 queries instead of 3 per instance.
+		const trees = yield* componentRepo.loadTreesByIds(
+			instances.map((inst) => EntityId(inst.entityId)),
+			"icalendar",
+		);
+
 		for (const inst of instances) {
-			const treeOpt = yield* componentRepo.loadTree(
-				EntityId(inst.entityId),
-				"icalendar",
-			);
-			if (Option.isNone(treeOpt)) {
+			const root = trees.get(EntityId(inst.entityId));
+			if (root === undefined) {
 				continue;
 			}
-			const root = treeOpt.value;
 
 			for (const comp of root.components) {
 				if (comp.name === "VEVENT") {

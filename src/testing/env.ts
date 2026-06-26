@@ -9,9 +9,11 @@ import type {
 	PrincipalType,
 } from "#src/db/drizzle/schema/index.ts";
 import {
+	type CollectionId,
 	ComponentId,
 	EntityId,
 	InstanceId,
+	type PrincipalId,
 	type UuidString,
 } from "#src/domain/ids.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
@@ -69,6 +71,7 @@ import {
 } from "#src/services/principal/repository.ts";
 import { PrincipalServiceLive } from "#src/services/principal/service.live.ts";
 import type { PrincipalService } from "#src/services/principal/service.ts";
+import type { Role } from "#src/services/role/policy.ts";
 import { SchedulingService } from "#src/services/scheduling/service.ts";
 import {
 	type IanaTimezoneService,
@@ -155,6 +158,7 @@ export interface UserSeedData {
 	readonly slug?: string;
 	readonly email?: string;
 	readonly displayName?: string;
+	readonly role?: Role;
 }
 
 export interface CollectionSeedData {
@@ -454,6 +458,18 @@ const makePrincipalRepo = (stores: TestStores): PrincipalRepositoryShape => ({
 	findPrincipalById: (id) =>
 		Effect.succeed(Option.fromNullishOr(stores.principals.get(id) ?? null)),
 
+	findPrincipalByIds: (ids) =>
+		Effect.sync(() => {
+			const map = new Map<PrincipalId, PrincipalRow>();
+			for (const id of ids) {
+				const row = stores.principals.get(id);
+				if (row !== undefined && row.deletedAt === null) {
+					map.set(id, row);
+				}
+			}
+			return map;
+		}),
+
 	findPrincipalBySlug: (slug) =>
 		Effect.succeed(
 			Option.fromNullishOr(
@@ -545,6 +561,18 @@ const makeCollectionRepo = (stores: TestStores): CollectionRepositoryShape => ({
 				})(),
 			),
 		),
+
+	findByIds: (ids) =>
+		Effect.sync(() => {
+			const map = new Map<CollectionId, CollectionRow>();
+			for (const id of ids) {
+				const row = stores.collections.get(id);
+				if (row !== undefined && row.deletedAt === null) {
+					map.set(id, row);
+				}
+			}
+			return map;
+		}),
 
 	findBySlug: (ownerPrincipalId, collectionType, slug) =>
 		Effect.succeed(
@@ -1103,6 +1131,18 @@ const makeComponentRepo = (stores: TestStores): ComponentRepositoryShape => ({
 			Option.fromNullishOr(stores.components.get(entityId) ?? null),
 		),
 
+	loadTreesByIds: (entityIds, _entityType) =>
+		Effect.sync(() => {
+			const map = new Map<EntityId, IrComponent>();
+			for (const id of entityIds) {
+				const tree = stores.components.get(id);
+				if (tree !== undefined) {
+					map.set(id, tree);
+				}
+			}
+			return map;
+		}),
+
 	deleteByEntity: (entityId) =>
 		Effect.sync(() => {
 			stores.components.delete(entityId);
@@ -1113,6 +1153,7 @@ const makeComponentRepo = (stores: TestStores): ComponentRepositoryShape => ({
 const makeCalIndexRepo = (): typeof CalIndexRepository.Service => ({
 	findByTimeRange: () => Effect.succeed([]),
 	findByComponentType: () => Effect.succeed([]),
+	findOverlappingRange: () => Effect.succeed([]),
 	indexRruleOccurrences: () => Effect.void,
 });
 
@@ -1416,7 +1457,7 @@ export const makeTestEnv = (): TestEnvBuilder => {
 				id: userId,
 				principalId,
 				email: (seed.email ?? `test${i}@example.com`) as Email,
-				role: "normal",
+				role: seed.role ?? "normal",
 				updatedAt: now,
 			});
 			return self;

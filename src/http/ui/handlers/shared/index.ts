@@ -79,13 +79,13 @@ export const sharedWithMeHandler = (
 				uniqueOwners.add(c.ownerPrincipalId);
 			}
 		}
+		const owners = yield* principalRepo.findPrincipalByIds(
+			[...uniqueOwners].map((id) => id as PrincipalId),
+		);
 		const ownerLabels = new Map<string, string>();
 		for (const ownerId of uniqueOwners) {
-			const found = yield* principalRepo.findById(ownerId as PrincipalId);
-			ownerLabels.set(
-				ownerId,
-				found._tag === "Some" ? found.value.principal.slug : ownerId,
-			);
+			const row = owners.get(ownerId as PrincipalId);
+			ownerLabels.set(ownerId, row?.slug ?? ownerId);
 		}
 
 		const sharedCollections = collections.map((c) => ({
@@ -98,14 +98,14 @@ export const sharedWithMeHandler = (
 		// For instances, also fetch the parent collection so we can display
 		// "<event-uid> from <owner>'s <calendar-name>".
 		const instanceCollIds = [...new Set(instances.map((i) => i.collectionId))];
+		const instanceColls = yield* collRepo.findByIds(
+			instanceCollIds.map((cid) => CollectionId(cid)),
+		);
 		const instanceCollMap = new Map<string, string>();
 		for (const cid of instanceCollIds) {
-			const collOpt = yield* collRepo.findById(CollectionId(cid));
-			if (collOpt._tag === "Some") {
-				instanceCollMap.set(
-					cid,
-					collOpt.value.displayName ?? collOpt.value.slug,
-				);
+			const coll = instanceColls.get(CollectionId(cid));
+			if (coll !== undefined) {
+				instanceCollMap.set(cid, coll.displayName ?? coll.slug);
 			}
 		}
 		const sharedInstances = instances.map((i) => {

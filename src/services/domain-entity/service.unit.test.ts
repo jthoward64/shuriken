@@ -75,6 +75,17 @@ const makeTestComponentRepository = () => {
 				tree !== undefined ? Option.some(tree) : Option.none(),
 			);
 		},
+		loadTreesByIds: (entityIds, _entityType) =>
+			Effect.sync(() => {
+				const map = new Map<EntityId, IrComponent>();
+				for (const id of entityIds) {
+					const tree = store.get(id);
+					if (tree !== undefined) {
+						map.set(id, tree);
+					}
+				}
+				return map;
+			}),
 		deleteByEntity: (entityId) => {
 			store.delete(entityId);
 			return Effect.void;
@@ -293,6 +304,7 @@ describe("DomainEntityService.load", () => {
 		const emptyCompRepo: ComponentRepositoryShape = {
 			insertTree: () => Effect.succeed(ComponentId(crypto.randomUUID())),
 			loadTree: () => Effect.succeed(Option.none()),
+			loadTreesByIds: () => Effect.succeed(new Map()),
 			deleteByEntity: () => Effect.void,
 		};
 		const layer = makeTestLayer(entityRepo, emptyCompRepo);

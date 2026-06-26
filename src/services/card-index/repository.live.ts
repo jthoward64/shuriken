@@ -133,6 +133,50 @@ const findByText = Effect.fn("CardIndexRepository.findByText")(
 	),
 );
 
+const listForCollection = Effect.fn("CardIndexRepository.listForCollection")(
+	function* (collectionId: CollectionId, fnFilter?: string) {
+		yield* Effect.annotateCurrentSpan({ "collection.id": collectionId });
+		yield* Effect.logTrace("repo.card-index.listForCollection", {
+			collectionId,
+			filtered: fnFilter !== undefined && fnFilter !== "",
+		});
+
+		// When searching, match FN case-insensitively against the unicode fold
+		// column. This is the actual filter (not a pre-filter), so no in-memory
+		// second pass is required.
+		const fnCondition =
+			fnFilter !== undefined && fnFilter !== ""
+				? sql`${cardIndex.fnUnicodeFold} LIKE ${likePattern(
+						foldText(fnFilter, "i;unicode-casemap"),
+						"contains",
+					)} ESCAPE '\\'`
+				: undefined;
+
+		return yield* runDbQuery((db) =>
+			db
+				.select({
+					instanceId: davInstance.id,
+					fn: cardIndex.fn,
+					email: sql<string | null>`${cardIndex.data}->'emails'->>0`,
+					tel: sql<string | null>`${cardIndex.data}->'phones'->>0`,
+				})
+				.from(cardIndex)
+				.innerJoin(
+					davInstance,
+					and(
+						eq(cardIndex.entityId, davInstance.entityId),
+						eq(davInstance.collectionId, collectionId),
+						isNull(davInstance.deletedAt),
+					),
+				)
+				.where(and(isNull(cardIndex.deletedAt), fnCondition)),
+		);
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.card-index.listForCollection failed", e.cause),
+	),
+);
+
 const listWithBday = Effect.fn("CardIndexRepository.listWithBday")(
 	function* (collectionId: CollectionId) {
 		yield* Effect.annotateCurrentSpan({ "collection.id": collectionId });
@@ -184,6 +228,8 @@ export const CardIndexRepositoryLive = Layer.effect(
 		return {
 			findByText: (...args: Parameters<typeof findByText>) =>
 				run(findByText(...args)),
+			listForCollection: (...args: Parameters<typeof listForCollection>) =>
+				run(listForCollection(...args)),
 			listWithBday: (...args: Parameters<typeof listWithBday>) =>
 				run(listWithBday(...args)),
 		};

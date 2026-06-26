@@ -82,35 +82,58 @@ export const multigetHandler = (
 				? { type: "prop", names: params.propNames }
 				: { type: "allprop" };
 
-		const responses: Array<DavResponse> = [];
-
-		for (const href of params.hrefs) {
+		// Pass 1 — resolve every href to an instance (or mark it 404). Resolution
+		// is a point lookup per href; we collect the found instances so their
+		// component trees can be batch-loaded in 3 queries instead of 3 per href.
+		const resolved = yield* Effect.forEach(params.hrefs, (href) => {
 			// Extract the last path segment (slug or UUID)
 			const seg = href.split("/").filter(Boolean).at(-1) ?? "";
-
-			// Resolve to an InstanceRow
-			const instOpt = yield* isUuid(seg)
-				? instSvc.findById(InstanceId(seg)).pipe(
-						Effect.map(Option.some),
-						Effect.orElseSucceed(() => Option.none()),
-					)
-				: instSvc.findBySlug(params.collectionId, seg as Slug).pipe(
-						Effect.map(Option.some),
-						Effect.orElseSucceed(() => Option.none()),
+			return (
+				isUuid(seg)
+					? instSvc.findById(InstanceId(seg)).pipe(
+							Effect.map(Option.some),
+							Effect.orElseSucceed(() => Option.none()),
+						)
+					: instSvc.findBySlug(params.collectionId, seg as Slug).pipe(
+							Effect.map(Option.some),
+							Effect.orElseSucceed(() => Option.none()),
+						)
+			).pipe(
+				Effect.map((instOpt) => {
+					// Treat instances outside this collection as not found.
+					const inCollection = Option.filter(
+						instOpt,
+						(inst) => inst.collectionId === params.collectionId,
 					);
+					return { href, inst: Option.getOrNull(inCollection) };
+				}),
+			);
+		});
 
-			if (Option.isNone(instOpt)) {
-				responses.push({
-					href,
-					propstats: [{ props: {} as Record<ClarkName, unknown>, status: 404 }],
-				});
-				continue;
-			}
+		// Batch-load trees for every resolved instance (3 queries total).
+		const trees = yield* compRepo.loadTreesByIds(
+			resolved.flatMap((r) =>
+				r.inst === null ? [] : [r.inst.entityId as unknown as EntityId],
+			),
+			params.entityType,
+		);
 
-			const inst = instOpt.value;
+		// Authorize all resolved members in one batch (every member shares this
+		// collection as its ACL parent) instead of a per-href check. Preserves the
+		// per-resource 403 semantics of RFC 4791 §7.9.1.
+		const readable = yield* acl.batchCheckMembers(
+			params.actingPrincipalId,
+			params.collectionId,
+			"collection",
+			resolved.flatMap((r) => (r.inst === null ? [] : [InstanceId(r.inst.id)])),
+			"instance",
+			"DAV:read",
+		);
 
-			// Verify the instance belongs to this collection
-			if (inst.collectionId !== params.collectionId) {
+		// Pass 2 — build a response per href, preserving request order.
+		const responses: Array<DavResponse> = [];
+		for (const { href, inst } of resolved) {
+			if (inst === null) {
 				responses.push({
 					href,
 					propstats: [{ props: {} as Record<ClarkName, unknown>, status: 404 }],
@@ -119,18 +142,7 @@ export const multigetHandler = (
 			}
 
 			// ACL check — per-resource 403 on failure (RFC 4791 §7.9.1)
-			const canRead = yield* acl
-				.check(
-					params.actingPrincipalId,
-					InstanceId(inst.id),
-					"instance",
-					"DAV:read",
-				)
-				.pipe(
-					Effect.map(() => true),
-					Effect.catchTag("DavError", () => Effect.succeed(false)),
-				);
-			if (!canRead) {
+			if (!readable.has(InstanceId(inst.id))) {
 				responses.push({
 					href,
 					propstats: [{ props: {} as Record<ClarkName, unknown>, status: 403 }],
@@ -138,13 +150,8 @@ export const multigetHandler = (
 				continue;
 			}
 
-			// Load component tree
-			const treeOpt = yield* compRepo.loadTree(
-				inst.entityId as unknown as EntityId,
-				params.entityType,
-			);
-
-			if (Option.isNone(treeOpt)) {
+			const tree = trees.get(inst.entityId as unknown as EntityId);
+			if (tree === undefined) {
 				responses.push({
 					href,
 					propstats: [{ props: {} as Record<ClarkName, unknown>, status: 404 }],
@@ -154,8 +161,8 @@ export const multigetHandler = (
 
 			const irDoc: IrDocument =
 				params.entityType === "icalendar"
-					? { kind: "icalendar", root: treeOpt.value }
-					: { kind: "vcard", root: treeOpt.value };
+					? { kind: "icalendar", root: tree }
+					: { kind: "vcard", root: tree };
 
 			// Serialize (with subsetting applied inside serializeData)
 			const dataStr = yield* params.serializeData(irDoc, params.dataTree);

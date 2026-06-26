@@ -97,6 +97,53 @@ const rruleWeekBucketClause = (
 	);
 };
 
+/**
+ * Exact dtstart/dtend overlap clause for non-recurring (no RRULE) rows.
+ * Shared by findByTimeRange and findOverlappingRange.
+ */
+const nonRecurringOverlapClause = (
+	start: Temporal.Instant | null,
+	end: Temporal.Instant | null,
+) =>
+	and(
+		isNull(calIndex.rruleText),
+		start !== null
+			? or(
+					isNull(calIndex.dtendUtc),
+					sql`${calIndex.dtendUtc} > ${start.toString()}::timestamptz`,
+				)
+			: undefined,
+		// A NULL dtstart_utc must still be a candidate (e.g. a VTODO with only
+		// DUE, or a VFREEBUSY without DTSTART); the in-memory pass does the exact
+		// check. VEVENTs always carry DTSTART so this never loosens event queries.
+		end !== null
+			? sql`(${calIndex.dtstartUtc} IS NULL OR ${calIndex.dtstartUtc} < ${end.toString()}::timestamptz)`
+			: undefined,
+	);
+
+/**
+ * Window-agnostic RRULE superset clause: the series starts before `end` and is
+ * not provably finished before `start`. Correct for an arbitrary window (no
+ * week-bucket assumption); over-approximates (COUNT-bounded series, gaps) but
+ * never drops a series that could have an occurrence in range.
+ */
+const rruleRangeClause = (
+	start: Temporal.Instant | null,
+	end: Temporal.Instant | null,
+) =>
+	and(
+		isNotNull(calIndex.rruleText),
+		end !== null
+			? sql`(${calIndex.dtstartUtc} IS NULL OR ${calIndex.dtstartUtc} < ${end.toString()}::timestamptz)`
+			: undefined,
+		start !== null
+			? or(
+					isNull(calIndex.rruleUntilUtc),
+					sql`${calIndex.rruleUntilUtc} > ${start.toString()}::timestamptz`,
+				)
+			: undefined,
+	);
+
 const findByTimeRange = Effect.fn("CalIndexRepository.findByTimeRange")(
 	function* (
 		collectionId: CollectionId,
@@ -132,23 +179,7 @@ const findByTimeRange = Effect.fn("CalIndexRepository.findByTimeRange")(
 						isNull(calIndex.deletedAt),
 						or(
 							// Non-RRULE: standard dtstart/dtend overlap
-							and(
-								isNull(calIndex.rruleText),
-								start !== null
-									? or(
-											isNull(calIndex.dtendUtc),
-											sql`${calIndex.dtendUtc} > ${start.toString()}::timestamptz`,
-										)
-									: undefined,
-								// A NULL dtstart_utc must still be a candidate: a VTODO with
-								// only DUE, or with no DTSTART/DUE/DURATION at all (RFC 4791
-								// §9.9 — matches every range), has no indexed start. The
-								// in-memory §9.9 evaluation does the exact check. VEVENTs
-								// always carry DTSTART, so this never loosens event queries.
-								end !== null
-									? sql`(${calIndex.dtstartUtc} IS NULL OR ${calIndex.dtstartUtc} < ${end.toString()}::timestamptz)`
-									: undefined,
-							),
+							nonRecurringOverlapClause(start, end),
 							// RRULE: week-bucket pre-filter
 							rruleWeekBucketClause(weekStart, weekEnd),
 						),
@@ -193,6 +224,52 @@ const findByComponentType = Effect.fn("CalIndexRepository.findByComponentType")(
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.cal-index.findByComponentType failed", e.cause),
+	),
+);
+
+const findOverlappingRange = Effect.fn(
+	"CalIndexRepository.findOverlappingRange",
+)(
+	function* (
+		collectionId: CollectionId,
+		componentType: CalComponentType,
+		start: Temporal.Instant | null,
+		end: Temporal.Instant | null,
+	) {
+		yield* Effect.annotateCurrentSpan({
+			"collection.id": collectionId,
+			"cal.component_type": componentType,
+		});
+		yield* Effect.logTrace("repo.cal-index.findOverlappingRange", {
+			collectionId,
+			componentType,
+		});
+		return yield* runDbQuery((db) =>
+			db
+				.selectDistinct({ instanceId: davInstance.id })
+				.from(calIndex)
+				.innerJoin(
+					davInstance,
+					and(
+						eq(calIndex.entityId, davInstance.entityId),
+						eq(davInstance.collectionId, collectionId),
+						isNull(davInstance.deletedAt),
+					),
+				)
+				.where(
+					and(
+						eq(calIndex.componentType, componentType),
+						isNull(calIndex.deletedAt),
+						or(
+							nonRecurringOverlapClause(start, end),
+							rruleRangeClause(start, end),
+						),
+					),
+				),
+		).pipe(Effect.map((rows) => rows.map((r) => r.instanceId)));
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.cal-index.findOverlappingRange failed", e.cause),
 	),
 );
 
@@ -277,6 +354,9 @@ export const CalIndexRepositoryLive = Layer.effect(
 				run(findByTimeRange(...args)),
 			findByComponentType: (...args: Parameters<typeof findByComponentType>) =>
 				run(findByComponentType(...args)),
+			findOverlappingRange: (
+				...args: Parameters<typeof findOverlappingRange>
+			) => run(findOverlappingRange(...args)),
 			indexRruleOccurrences: (
 				...args: Parameters<typeof indexRruleOccurrences>
 			) => run(indexRruleOccurrences(...args)),

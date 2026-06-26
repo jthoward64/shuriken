@@ -95,6 +95,48 @@ export interface AclServiceShape {
 		ReadonlyMap<AclResourceId, ReadonlyArray<DavPrivilege>>,
 		DatabaseError
 	>;
+
+	/**
+	 * Effective privileges for many sibling members that all share the same
+	 * parent resource (e.g. every instance in one collection), in a bounded
+	 * number of queries instead of one ancestor walk per member.
+	 *
+	 * The inherited set — the parent's effective privileges — is resolved once,
+	 * then unioned with each member's own direct ACEs (fetched in a single batch
+	 * query). This is exactly equivalent to calling currentUserPrivileges() on
+	 * each member, since a member's effective privileges are its direct ACEs
+	 * unioned with its parent's effective privileges. Like currentUserPrivileges,
+	 * it does **not** apply role-based bypass.
+	 *
+	 * Returns a map covering every memberId; members with only inherited
+	 * privileges are present with the inherited set.
+	 */
+	readonly batchMemberPrivileges: (
+		principalId: PrincipalId,
+		parentId: AclResourceId,
+		parentType: AclResourceType,
+		memberIds: ReadonlyArray<AclResourceId>,
+		memberType: AclResourceType,
+	) => Effect.Effect<
+		ReadonlyMap<AclResourceId, ReadonlyArray<DavPrivilege>>,
+		DatabaseError
+	>;
+
+	/**
+	 * Batched privilege check for sibling members sharing one parent: returns the
+	 * subset of `memberIds` on which the principal holds `privilege`. Equivalent
+	 * to calling check() per member (including the super_admin role bypass and
+	 * ancestor inheritance) but in a bounded number of queries. Use at the edge
+	 * to authorize a list of members without an N-query loop.
+	 */
+	readonly batchCheckMembers: (
+		principalId: PrincipalId,
+		parentId: AclResourceId,
+		parentType: AclResourceType,
+		memberIds: ReadonlyArray<AclResourceId>,
+		memberType: AclResourceType,
+		privilege: DavPrivilege,
+	) => Effect.Effect<ReadonlySet<AclResourceId>, DatabaseError>;
 }
 
 export class AclService extends Context.Service<AclService, AclServiceShape>()(

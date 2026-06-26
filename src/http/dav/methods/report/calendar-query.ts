@@ -6,7 +6,7 @@
 // cal_index for time-range queries.
 // ---------------------------------------------------------------------------
 
-import { Effect, Option } from "effect";
+import { Effect } from "effect";
 import { encodeICalendar } from "#src/data/icalendar/codec.ts";
 import type { ClarkName, IrDocument } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
@@ -288,15 +288,18 @@ export const calendarQueryHandler = (
 				? (doc: IrDocument) => stripKnownVtimezones(doc, ianaSvc.isKnownTzid)
 				: (doc: IrDocument) => doc;
 
+		// Batch-load all candidate trees in 3 queries instead of 3 per instance.
+		const trees = yield* compRepo.loadTreesByIds(
+			instances.map((inst) => inst.entityId as unknown as EntityId),
+			"icalendar",
+		);
+
 		for (const inst of instances) {
-			const treeOpt = yield* compRepo.loadTree(
-				inst.entityId as unknown as EntityId,
-				"icalendar",
-			);
-			if (Option.isNone(treeOpt)) {
+			const tree = trees.get(inst.entityId as unknown as EntityId);
+			if (tree === undefined) {
 				continue;
 			}
-			const irDoc: IrDocument = { kind: "icalendar", root: treeOpt.value };
+			const irDoc: IrDocument = { kind: "icalendar", root: tree };
 
 			if (!evaluateCalFilter(irDoc, filter)) {
 				continue;

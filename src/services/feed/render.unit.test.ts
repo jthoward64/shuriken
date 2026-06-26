@@ -2,7 +2,11 @@ import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
 import { Effect, Layer, Option } from "effect";
 import type { IrComponent } from "#src/data/ir.ts";
-import { ComponentId, type UuidString } from "#src/domain/ids.ts";
+import {
+	ComponentId,
+	type EntityId,
+	type UuidString,
+} from "#src/domain/ids.ts";
 import type { ComponentRepositoryShape } from "#src/services/component/repository.ts";
 import { ComponentRepository } from "#src/services/component/repository.ts";
 import type {
@@ -103,6 +107,17 @@ const stubComponentRepo = (
 	insertTree: () => Effect.succeed(ComponentId(crypto.randomUUID())),
 	loadTree: (entityId) =>
 		Effect.succeed(Option.fromNullishOr(trees.get(entityId as string))),
+	loadTreesByIds: (entityIds) =>
+		Effect.sync(() => {
+			const map = new Map<EntityId, IrComponent>();
+			for (const id of entityIds) {
+				const tree = trees.get(id as string);
+				if (tree !== undefined) {
+					map.set(id, tree);
+				}
+			}
+			return map;
+		}),
 	deleteByEntity: () => Effect.void,
 });
 

@@ -92,26 +92,24 @@ export const buildAclPanelData = (
 
 		const rawAces = yield* acl.getAces(resourceId, resourceType);
 
+		// Resolve every referenced principal in one query instead of one per ACE.
+		const principalIds = rawAces.flatMap((ace) =>
+			ace.principalType === "principal" && ace.principalId != null
+				? [ace.principalId as PrincipalId]
+				: [],
+		);
+		const principals = yield* principalService.findPrincipalByIds(principalIds);
+
 		const enrichedAces: Array<AclPanelAce> = [];
 		for (const ace of rawAces) {
 			let principalLabel: string;
 			let resolvedPrincipalId: string | null = null;
 
 			if (ace.principalType === "principal" && ace.principalId != null) {
-				const maybeRow = yield* principalService
-					.findPrincipalById(ace.principalId as PrincipalId)
-					.pipe(
-						Effect.map(
-							Option.some<
-								import("#src/services/principal/repository.ts").PrincipalRow
-							>,
-						),
-						Effect.catchTag("DavError", () => Effect.succeed(Option.none())),
-					);
-				principalLabel = Option.match(maybeRow, {
-					onNone: () => ace.principalId ?? "Unknown",
-					onSome: (p) => p.displayName ?? p.slug,
-				});
+				const row = principals.get(ace.principalId as PrincipalId);
+				principalLabel = row
+					? (row.displayName ?? row.slug)
+					: (ace.principalId ?? "Unknown");
 				resolvedPrincipalId = ace.principalId;
 			} else {
 				principalLabel =

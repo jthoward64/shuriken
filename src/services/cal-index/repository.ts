@@ -51,6 +51,25 @@ export interface CalIndexRepositoryShape {
 	) => Effect.Effect<ReadonlyArray<string>, DatabaseError>;
 
 	/**
+	 * Return instance UUIDs whose component of the given type *could* overlap the
+	 * range [start, end) — a correct **superset** valid for an arbitrary window
+	 * (unlike `findByTimeRange`, whose RRULE handling is tuned to week-sized
+	 * windows). Non-recurring rows are matched by exact dtstart/dtend overlap;
+	 * recurring rows are included when the series starts before `end` and is not
+	 * provably finished before `start` (`rrule_until_utc` null or after `start`).
+	 *
+	 * Never produces false negatives — callers must still apply an exact pass
+	 * (e.g. occurrence expansion) to discard false positives. `start`/`end` may
+	 * be null to leave that side open-ended.
+	 */
+	readonly findOverlappingRange: (
+		collectionId: CollectionId,
+		componentType: CalComponentType,
+		start: Temporal.Instant | null,
+		end: Temporal.Instant | null,
+	) => Effect.Effect<ReadonlyArray<string>, DatabaseError>;
+
+	/**
 	 * After a PUT saves a recurring instance, populate the precomputed RRULE
 	 * shape columns (`rrule_occurrence_months`, `rrule_occurrence_day_min`,
 	 * `rrule_occurrence_day_max`) in cal_index.

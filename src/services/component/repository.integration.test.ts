@@ -631,3 +631,84 @@ describe("ComponentRepository ordinal and structural invariants (integration)", 
 		expect(params[1]?.name).toBe("VALUE");
 	});
 });
+
+// ---------------------------------------------------------------------------
+// loadTreesByIds — batch reconstruction
+// ---------------------------------------------------------------------------
+
+describe("ComponentRepository loadTreesByIds (integration)", () => {
+	let layer: TestLayer;
+
+	beforeAll(() => {
+		layer = makeTestLayer();
+	});
+
+	const named = (summary: string): IrComponent => ({
+		name: "VCALENDAR",
+		properties: [],
+		components: [
+			{
+				name: "VEVENT",
+				properties: [
+					{
+						name: "SUMMARY",
+						parameters: [],
+						value: { type: "TEXT", value: summary },
+						isKnown: true,
+					},
+				],
+				components: [],
+			},
+		],
+	});
+
+	it("reconstructs multiple entities' trees, keyed by entityId", async () => {
+		const { ids, map } = await runSuccess(
+			Effect.gen(function* () {
+				const comp = yield* ComponentRepository;
+				const idList: Array<EntityId> = [];
+				for (const s of ["First", "Second", "Third"]) {
+					const entity = yield* makeEntity("icalendar");
+					const entityId = EntityId(entity.id);
+					yield* comp.insertTree(entityId, named(s));
+					idList.push(entityId);
+				}
+				const result = yield* comp.loadTreesByIds(idList, "icalendar");
+				return { ids: idList, map: result };
+			}).pipe(Effect.provide(layer), Effect.orDie),
+		);
+
+		expect(map.size).toBe(3);
+		const summaryOf = (id: EntityId) =>
+			map.get(id)?.components[0]?.properties[0]?.value;
+		expect(summaryOf(ids[0] as EntityId)).toEqual({
+			type: "TEXT",
+			value: "First",
+		});
+		expect(summaryOf(ids[2] as EntityId)).toEqual({
+			type: "TEXT",
+			value: "Third",
+		});
+	});
+
+	it("omits unknown entityIds and returns empty map for empty input", async () => {
+		const { withMissing, empty } = await runSuccess(
+			Effect.gen(function* () {
+				const comp = yield* ComponentRepository;
+				const entity = yield* makeEntity("icalendar");
+				const entityId = EntityId(entity.id);
+				yield* comp.insertTree(entityId, named("Only"));
+				const missing = EntityId(crypto.randomUUID());
+				const withMissing = yield* comp.loadTreesByIds(
+					[entityId, missing],
+					"icalendar",
+				);
+				const empty = yield* comp.loadTreesByIds([], "icalendar");
+				return { withMissing, empty };
+			}).pipe(Effect.provide(layer), Effect.orDie),
+		);
+
+		expect(withMissing.size).toBe(1);
+		expect(empty.size).toBe(0);
+	});
+});

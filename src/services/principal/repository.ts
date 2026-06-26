@@ -39,6 +39,14 @@ export interface PrincipalRepositoryShape {
 	readonly findPrincipalById: (
 		id: PrincipalId,
 	) => Effect.Effect<Option.Option<PrincipalRow>, DatabaseError>;
+	/**
+	 * Batch variant of findPrincipalById: resolve many principals in a single
+	 * `WHERE id IN (...)` query. Returns a map keyed by principal id; ids that
+	 * don't resolve (or are soft-deleted) are simply absent from the map.
+	 */
+	readonly findPrincipalByIds: (
+		ids: ReadonlyArray<PrincipalId>,
+	) => Effect.Effect<ReadonlyMap<PrincipalId, PrincipalRow>, DatabaseError>;
 	/** Find any principal (user OR group) by slug — no user join required. */
 	readonly findPrincipalBySlug: (
 		slug: Slug,

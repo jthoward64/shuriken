@@ -29,6 +29,15 @@ export const PrincipalServiceLive = Layer.effect(
 				},
 			),
 
+			findPrincipalByIds: Effect.fn("PrincipalService.findPrincipalByIds")(
+				function* (ids: ReadonlyArray<PrincipalId>) {
+					yield* Effect.logTrace("principal.findPrincipalByIds", {
+						count: ids.length,
+					});
+					return yield* repo.findPrincipalByIds(ids);
+				},
+			),
+
 			findById: Effect.fn("PrincipalService.findById")(function* (
 				id: PrincipalId,
 			) {

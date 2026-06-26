@@ -11,6 +11,7 @@ import { Slug } from "#src/domain/types/path.ts";
 import { Email } from "#src/domain/types/strings.ts";
 import { handleRequest } from "#src/http/router.ts";
 import { CardEditService } from "#src/services/card-edit/service.ts";
+import { CardIndexRepository } from "#src/services/card-index/repository.ts";
 import { CollectionRepository } from "#src/services/collection/repository.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
 import { InstanceRepository } from "#src/services/instance/repository.ts";
@@ -206,6 +207,58 @@ describe("Contacts CRUD (integration)", () => {
 			);
 			// Just verify the call works (returns a defined array).
 			expect(Array.isArray(colls)).toBe(true);
+		} finally {
+			await runtime.dispose();
+		}
+	});
+
+	it("listForCollection projects fn/email/tel and filters by fn", async () => {
+		const runtime = ManagedRuntime.make(makeScriptRunnerLayer());
+		try {
+			const addressbookId = await runtime.runPromise(
+				Effect.gen(function* () {
+					const prov = yield* ProvisioningService;
+					const alice = yield* prov
+						.provisionUser({
+							email: Email("alice3@example.com"),
+							name: "Alice",
+							slug: Slug("alice"),
+						})
+						.pipe(Effect.orDie);
+					const ab = alice.addressBook.id as CollectionId;
+					const svc = yield* CardEditService;
+					yield* svc.create(ab, sampleForm());
+					yield* svc.create(ab, {
+						...emptyContactForm,
+						fn: "Carol Singer",
+						familyName: "Singer",
+						givenName: "Carol",
+						emails: [{ value: "carol@example.com", types: ["home"] }],
+						tels: [{ value: "+1-555-0202", types: ["cell"] }],
+					});
+					return ab;
+				}),
+			);
+
+			// Full listing: both contacts, projected straight from card_index.
+			const all = await runtime.runPromise(
+				Effect.flatMap(CardIndexRepository, (r) =>
+					r.listForCollection(addressbookId),
+				),
+			);
+			expect(all.length).toBe(2);
+			const bob = all.find((c) => c.fn === "Bob Builder");
+			expect(bob?.email).toBe("bob@example.com");
+			expect(bob?.tel).toBe("+1-555-0101");
+
+			// FN search: case-insensitive substring on the fold column.
+			const filtered = await runtime.runPromise(
+				Effect.flatMap(CardIndexRepository, (r) =>
+					r.listForCollection(addressbookId, "carol"),
+				),
+			);
+			expect(filtered.length).toBe(1);
+			expect(filtered[0]?.fn).toBe("Carol Singer");
 		} finally {
 			await runtime.dispose();
 		}

@@ -1,16 +1,37 @@
-import { Effect, Option } from "effect";
+import { Effect } from "effect";
+import { Temporal } from "temporal-polyfill";
 import type {
 	DatabaseError,
 	DavError,
 	InternalError,
 } from "#src/domain/errors.ts";
-import { type CollectionId, EntityId } from "#src/domain/ids.ts";
+import {
+	type CollectionId,
+	EntityId,
+	InstanceId,
+	type UuidString,
+} from "#src/domain/ids.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import { AclService } from "#src/services/acl/service.ts";
 import { parseVeventToForm } from "#src/services/cal-edit/parse-vevent.ts";
+import { CalIndexRepository } from "#src/services/cal-index/index.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
 import { InstanceRepository } from "#src/services/instance/repository.ts";
+
+/** Parse a FullCalendar `start`/`end` query param to an Instant, or null. */
+const parseInstantParam = (raw: string | null): Temporal.Instant | null => {
+	if (raw === null || raw === "") {
+		return null;
+	}
+	try {
+		return Temporal.Instant.from(raw);
+	} catch {
+		// Lenient: an unparseable bound leaves that side open-ended rather than
+		// erroring the feed.
+		return null;
+	}
+};
 
 // ---------------------------------------------------------------------------
 // GET /ui/api/calendar/:collectionId/events?start=…&end=…
@@ -43,13 +64,14 @@ export const calendarEventsHandler = (
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError | InternalError,
-	AclService | ComponentRepository | InstanceRepository
+	AclService | CalIndexRepository | ComponentRepository | InstanceRepository
 > =>
 	Effect.gen(function* () {
 		const principal = yield* requireAuthenticated(ctx.auth);
 		const acl = yield* AclService;
 		const componentRepo = yield* ComponentRepository;
 		const instRepo = yield* InstanceRepository;
+		const calIdx = yield* CalIndexRepository;
 
 		yield* acl.check(
 			principal.principalId,
@@ -58,18 +80,36 @@ export const calendarEventsHandler = (
 			"DAV:read",
 		);
 
-		const instances = yield* instRepo.listByCollection(collectionId);
-		const events: Array<FullCalendarEvent> = [];
+		// Narrow to events that could fall in the requested FullCalendar window in
+		// SQL (a correct superset — recurring series whose master precedes the
+		// window are kept so the client can expand them). With no range params
+		// this returns every VEVENT, preserving prior behaviour.
+		const rangeStart = parseInstantParam(ctx.url.searchParams.get("start"));
+		const rangeEnd = parseInstantParam(ctx.url.searchParams.get("end"));
+		const candidateIds = yield* calIdx.findOverlappingRange(
+			collectionId,
+			"VEVENT",
+			rangeStart,
+			rangeEnd,
+		);
+		const instances = yield* instRepo.findByIds(
+			candidateIds.map((id) => InstanceId(id as UuidString)),
+		);
 
+		// Batch-load every instance's component tree in 3 queries total instead
+		// of 3 per instance.
+		const trees = yield* componentRepo.loadTreesByIds(
+			instances.map((inst) => EntityId(inst.entityId)),
+			"icalendar",
+		);
+
+		const events: Array<FullCalendarEvent> = [];
 		for (const inst of instances) {
-			const tree = yield* componentRepo.loadTree(
-				EntityId(inst.entityId),
-				"icalendar",
-			);
-			if (Option.isNone(tree)) {
+			const tree = trees.get(EntityId(inst.entityId));
+			if (tree === undefined) {
 				continue;
 			}
-			const vevent = tree.value.components.find((c) => c.name === "VEVENT");
+			const vevent = tree.components.find((c) => c.name === "VEVENT");
 			if (!vevent) {
 				continue;
 			}

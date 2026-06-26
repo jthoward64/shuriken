@@ -19,6 +19,14 @@ export interface PrincipalServiceShape {
 	readonly findPrincipalById: (
 		id: PrincipalId,
 	) => Effect.Effect<PrincipalRow, DavError | DatabaseError>;
+	/**
+	 * Batch variant of findPrincipalById: resolve many principals in one query.
+	 * Returns a map keyed by id; unresolved ids are absent (no failure), so
+	 * callers enriching a list can fall back per missing entry.
+	 */
+	readonly findPrincipalByIds: (
+		ids: ReadonlyArray<PrincipalId>,
+	) => Effect.Effect<ReadonlyMap<PrincipalId, PrincipalRow>, DatabaseError>;
 	readonly findById: (
 		id: PrincipalId,
 	) => Effect.Effect<PrincipalWithUser, DavError | DatabaseError>;

@@ -6,7 +6,7 @@
 // card_index for FN text-match queries.
 // ---------------------------------------------------------------------------
 
-import { Effect, Option } from "effect";
+import { Effect } from "effect";
 import type { ClarkName, IrDocument } from "#src/data/ir.ts";
 import { encodeVCard } from "#src/data/vcard/codec.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
@@ -178,15 +178,18 @@ export const addressbookQueryHandler = (
 		const origin = ctx.url.origin;
 		const responses: Array<DavResponse> = [];
 
+		// Batch-load all candidate trees in 3 queries instead of 3 per instance.
+		const trees = yield* compRepo.loadTreesByIds(
+			instances.map((inst) => inst.entityId as unknown as EntityId),
+			"vcard",
+		);
+
 		for (const inst of instances) {
-			const treeOpt = yield* compRepo.loadTree(
-				inst.entityId as unknown as EntityId,
-				"vcard",
-			);
-			if (Option.isNone(treeOpt)) {
+			const tree = trees.get(inst.entityId as unknown as EntityId);
+			if (tree === undefined) {
 				continue;
 			}
-			const irDoc: IrDocument = { kind: "vcard", root: treeOpt.value };
+			const irDoc: IrDocument = { kind: "vcard", root: tree };
 
 			if (!evaluateCardFilter(irDoc, filter)) {
 				continue;

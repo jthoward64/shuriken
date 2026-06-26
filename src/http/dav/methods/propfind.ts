@@ -972,6 +972,43 @@ export const propfindHandler = (
 
 			if (depth === 1) {
 				const instances = yield* instSvc.listByCollection(path.collectionId);
+				const compRepo = yield* ComponentRepository;
+
+				// Every member shares this collection as its ACL parent, so the
+				// inherited privilege set is resolved once and unioned with each
+				// member's direct ACEs — one ancestor walk + one batched query
+				// instead of an ancestor walk per instance.
+				const privMap = yield* acl.batchMemberPrivileges(
+					actingPrincipalId,
+					path.collectionId,
+					"collection",
+					instances.map((inst) => InstanceId(inst.id)),
+					"instance",
+				);
+
+				// RFC 4791 §9.6 / RFC 6352 §10.4 — body-data is only emitted for an
+				// explicit `prop` request that names it (never allprop/propname). Load
+				// every requested tree in 3 queries instead of 3 per instance.
+				const dataClark = dataClarkForNamespace(path.namespace);
+				const wantsData =
+					propfind.type === "prop" &&
+					dataClark !== null &&
+					propfind.names.has(dataClark);
+				const dataEntityType =
+					dataClark === ADDRESS_DATA ? "vcard" : "icalendar";
+				const dataTrees = wantsData
+					? yield* compRepo.loadTreesByIds(
+							instances.map((inst) => inst.entityId as unknown as EntityId),
+							dataEntityType,
+						)
+					: undefined;
+
+				// DAV:acl is part of allprop/propname output (when read-acl is held),
+				// but for an explicit `prop` request it is only emitted when named —
+				// so the getAces fetch can be skipped entirely otherwise.
+				const aclMightBeNeeded =
+					propfind.type !== "prop" || propfind.names.has(DAV_ACL);
+
 				for (const inst of instances) {
 					const iHref = memberInstanceHref(
 						origin,
@@ -980,11 +1017,7 @@ export const propfindHandler = (
 						path.collectionSeg,
 						inst,
 					);
-					const instPrivileges = yield* acl.currentUserPrivileges(
-						actingPrincipalId,
-						InstanceId(inst.id),
-						"instance",
-					);
+					const instPrivileges = privMap.get(InstanceId(inst.id)) ?? [];
 					const instProps: Record<ClarkName, unknown> = {
 						...buildInstanceProps(inst),
 						[CURRENT_USER_PRINCIPAL]: {
@@ -994,20 +1027,22 @@ export const propfindHandler = (
 						// RFC 3744 §5.1: owner inherited from the parent collection
 						[DAV_OWNER]: { [cn(DAV_NS, "href")]: ownerHref },
 					};
-					// RFC 4791 §9.6 / RFC 6352 §10.4 — body-data when explicitly requested.
-					const dataOpt = yield* loadInstanceData(
-						inst,
-						path.namespace,
-						propfind,
-					);
-					if (Option.isSome(dataOpt)) {
-						const dataKey = dataClarkForNamespace(path.namespace);
-						if (dataKey !== null) {
-							instProps[dataKey] = dataOpt.value;
+					if (wantsData && dataTrees !== undefined && dataClark !== null) {
+						const tree = dataTrees.get(inst.entityId as unknown as EntityId);
+						if (tree !== undefined) {
+							const doc: IrDocument =
+								dataEntityType === "icalendar"
+									? { kind: "icalendar", root: tree }
+									: { kind: "vcard", root: tree };
+							instProps[dataClark] =
+								dataEntityType === "icalendar"
+									? yield* encodeICalendar(doc)
+									: yield* encodeVCard(doc);
 						}
 					}
 					// DAV:acl — RFC 3744 §5.5: only when the caller holds read-acl.
 					if (
+						aclMightBeNeeded &&
 						(instPrivileges as ReadonlyArray<string>).includes("DAV:read-acl")
 					) {
 						const instAces = yield* acl.getAces(

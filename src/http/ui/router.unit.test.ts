@@ -12,6 +12,7 @@ import { FileService } from "#src/platform/file.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import { AclRepository } from "#src/services/acl/repository.ts";
 import { CalEditService } from "#src/services/cal-edit/service.ts";
+import { CalIndexRepository } from "#src/services/cal-index/repository.ts";
 import { CardEditService } from "#src/services/card-edit/service.ts";
 import { CardIndexRepository } from "#src/services/card-index/repository.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
@@ -90,6 +91,8 @@ const stubLayers = Layer.mergeAll(
 		check: die,
 		currentUserPrivileges: () => Effect.succeed([]),
 		batchCurrentUserPrivileges: () => Effect.succeed(new Map()),
+		batchMemberPrivileges: () => Effect.succeed(new Map()),
+		batchCheckMembers: () => Effect.succeed(new Set()),
 		getAces: die,
 		setAces: die,
 	}),
@@ -105,6 +108,7 @@ const stubLayers = Layer.mergeAll(
 		findById: die,
 		findBySlug: die,
 		findPrincipalById: die,
+		findPrincipalByIds: die,
 		findByEmail: die,
 		updateProperties: die,
 	}),
@@ -137,6 +141,7 @@ const stubLayers = Layer.mergeAll(
 		findById: die,
 		findBySlug: die,
 		findPrincipalById: die,
+		findPrincipalByIds: die,
 		findPrincipalBySlug: die,
 		findByEmail: die,
 		findUserByUserId: die,
@@ -183,6 +188,7 @@ const stubLayers = Layer.mergeAll(
 	}),
 	Layer.succeed(CollectionRepoTag, {
 		findById: die,
+		findByIds: die,
 		findBySlug: die,
 		listByOwner: die,
 		listByAutoManagedKind: die,
@@ -215,11 +221,19 @@ const stubLayers = Layer.mergeAll(
 	}),
 	Layer.succeed(CardIndexRepository, {
 		findByText: () => Effect.succeed([]),
+		listForCollection: () => Effect.succeed([]),
 		listWithBday: () => Effect.succeed([]),
+	}),
+	Layer.succeed(CalIndexRepository, {
+		findByTimeRange: () => Effect.succeed([]),
+		findByComponentType: () => Effect.succeed([]),
+		findOverlappingRange: () => Effect.succeed([]),
+		indexRruleOccurrences: () => Effect.void,
 	}),
 	Layer.succeed(ComponentRepository, {
 		insertTree: die,
 		loadTree: () => Effect.succeed(Option.none()),
+		loadTreesByIds: () => Effect.succeed(new Map()),
 		deleteByEntity: die,
 	}),
 	Layer.succeed(CardEditService, {

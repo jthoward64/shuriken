@@ -501,3 +501,218 @@ describe("AclService.currentUserPrivileges — inheritance", () => {
 		expect(result).toContain("DAV:write-content");
 	});
 });
+
+// ---------------------------------------------------------------------------
+// AclService.batchMemberPrivileges — must equal per-member currentUserPrivileges
+// ---------------------------------------------------------------------------
+
+describe("AclService.batchMemberPrivileges", () => {
+	it("unions parent-inherited and per-member direct privileges", async () => {
+		const principalId = PrincipalId(crypto.randomUUID());
+		const collectionId = CollectionId(crypto.randomUUID());
+		const instA = InstanceId(crypto.randomUUID());
+		const instB = InstanceId(crypto.randomUUID());
+
+		const env = makeTestEnv();
+		env.withUser({ principalId });
+		env.withCollection({ id: collectionId, ownerPrincipalId: principalId });
+		env.withInstance({ id: instA, collectionId });
+		env.withInstance({ id: instB, collectionId });
+		// Inherited from the collection for both members.
+		env.withAce({
+			resourceType: "collection",
+			resourceId: collectionId,
+			principalType: "principal",
+			principalId,
+			privilege: "DAV:read",
+			grantDeny: "grant",
+		});
+		// Direct ACE on instA only.
+		env.withAce({
+			resourceType: "instance",
+			resourceId: instA,
+			principalType: "principal",
+			principalId,
+			privilege: "DAV:write-content",
+			grantDeny: "grant",
+		});
+
+		const layer = env.toLayer();
+		const { batch, singleA, singleB } = await runSuccess(
+			AclService.pipe(
+				Effect.flatMap((s) =>
+					Effect.all({
+						batch: s.batchMemberPrivileges(
+							principalId,
+							collectionId,
+							"collection",
+							[instA, instB],
+							"instance",
+						),
+						singleA: s.currentUserPrivileges(principalId, instA, "instance"),
+						singleB: s.currentUserPrivileges(principalId, instB, "instance"),
+					}),
+				),
+				Effect.provide(layer),
+				Effect.orDie,
+			),
+		);
+
+		// instA: inherited read + direct write-content; instB: inherited read only.
+		expect(batch.get(instA)).toContain("DAV:read");
+		expect(batch.get(instA)).toContain("DAV:write-content");
+		expect(batch.get(instB)).toContain("DAV:read");
+		expect(batch.get(instB)).not.toContain("DAV:write-content");
+
+		// Parity with calling currentUserPrivileges() per member.
+		expect([...(batch.get(instA) ?? [])].sort()).toEqual([...singleA].sort());
+		expect([...(batch.get(instB) ?? [])].sort()).toEqual([...singleB].sort());
+	});
+
+	it("returns an empty map for no members", async () => {
+		const principalId = PrincipalId(crypto.randomUUID());
+		const collectionId = CollectionId(crypto.randomUUID());
+		const env = makeTestEnv();
+		env.withUser({ principalId });
+		env.withCollection({ id: collectionId, ownerPrincipalId: principalId });
+
+		const batch = await runSuccess(
+			AclService.pipe(
+				Effect.flatMap((s) =>
+					s.batchMemberPrivileges(
+						principalId,
+						collectionId,
+						"collection",
+						[],
+						"instance",
+					),
+				),
+				Effect.provide(env.toLayer()),
+				Effect.orDie,
+			),
+		);
+
+		expect(batch.size).toBe(0);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// AclService.batchCheckMembers — must match per-member check() (incl. bypass)
+// ---------------------------------------------------------------------------
+
+describe("AclService.batchCheckMembers", () => {
+	it("returns the members on which the principal holds the privilege", async () => {
+		const principalId = PrincipalId(crypto.randomUUID());
+		const collectionId = CollectionId(crypto.randomUUID());
+		const granted = InstanceId(crypto.randomUUID());
+		const ungranted = InstanceId(crypto.randomUUID());
+
+		const env = makeTestEnv();
+		env.withUser({ principalId });
+		env.withCollection({ id: collectionId, ownerPrincipalId: principalId });
+		env.withInstance({ id: granted, collectionId });
+		env.withInstance({ id: ungranted, collectionId });
+		// Direct read on `granted` only; nothing inherited from the collection.
+		env.withAce({
+			resourceType: "instance",
+			resourceId: granted,
+			principalType: "principal",
+			principalId,
+			privilege: "DAV:read",
+			grantDeny: "grant",
+		});
+
+		const allowed = await runSuccess(
+			AclService.pipe(
+				Effect.flatMap((s) =>
+					s.batchCheckMembers(
+						principalId,
+						collectionId,
+						"collection",
+						[granted, ungranted],
+						"instance",
+						"DAV:read",
+					),
+				),
+				Effect.provide(env.toLayer()),
+				Effect.orDie,
+			),
+		);
+
+		expect(allowed.has(granted)).toBe(true);
+		expect(allowed.has(ungranted)).toBe(false);
+	});
+
+	it("honours inherited collection privileges for all members", async () => {
+		const principalId = PrincipalId(crypto.randomUUID());
+		const collectionId = CollectionId(crypto.randomUUID());
+		const instA = InstanceId(crypto.randomUUID());
+		const instB = InstanceId(crypto.randomUUID());
+
+		const env = makeTestEnv();
+		env.withUser({ principalId });
+		env.withCollection({ id: collectionId, ownerPrincipalId: principalId });
+		env.withInstance({ id: instA, collectionId });
+		env.withInstance({ id: instB, collectionId });
+		// Read granted on the parent collection → inherited by both members.
+		env.withAce({
+			resourceType: "collection",
+			resourceId: collectionId,
+			principalType: "principal",
+			principalId,
+			privilege: "DAV:read",
+			grantDeny: "grant",
+		});
+
+		const allowed = await runSuccess(
+			AclService.pipe(
+				Effect.flatMap((s) =>
+					s.batchCheckMembers(
+						principalId,
+						collectionId,
+						"collection",
+						[instA, instB],
+						"instance",
+						"DAV:read",
+					),
+				),
+				Effect.provide(env.toLayer()),
+				Effect.orDie,
+			),
+		);
+
+		expect(allowed.has(instA)).toBe(true);
+		expect(allowed.has(instB)).toBe(true);
+	});
+
+	it("super_admin bypass grants every member without an ACE", async () => {
+		const principalId = PrincipalId(crypto.randomUUID());
+		const collectionId = CollectionId(crypto.randomUUID());
+		const inst = InstanceId(crypto.randomUUID());
+
+		const env = makeTestEnv();
+		env.withUser({ principalId, role: "super_admin" });
+		env.withCollection({ id: collectionId, ownerPrincipalId: principalId });
+		env.withInstance({ id: inst, collectionId });
+		// No ACEs anywhere — only the role bypass can allow this.
+
+		const allowed = await runSuccess(
+			AclService.pipe(
+				Effect.flatMap((s) =>
+					s.batchCheckMembers(
+						principalId,
+						collectionId,
+						"collection",
+						[inst],
+						"instance",
+						"DAV:read",
+					),
+				),
+				Effect.provide(env.toLayer()),
+				Effect.orDie,
+			),
+		);
+
+		expect(allowed.has(inst)).toBe(true);
+	});
+});

@@ -32,6 +32,22 @@ export interface ComponentRepositoryShape {
 	) => Effect.Effect<Option.Option<IrComponent>, DatabaseError>;
 
 	/**
+	 * Batch variant of loadTree: reconstructs the IrComponent tree for many
+	 * entities in a fixed **3 queries total** (component, property, parameter)
+	 * regardless of how many entities are requested, instead of 3×N.
+	 *
+	 * Returns a map from entityId to its reconstructed tree. Entities with no
+	 * active component rows are simply absent from the map (mirrors loadTree's
+	 * Option.none()). The map has no guaranteed iteration order — callers that
+	 * need ordering should order their own id list (ideally in SQL) and look
+	 * each entity up by id.
+	 */
+	readonly loadTreesByIds: (
+		entityIds: ReadonlyArray<EntityId>,
+		entityType: EntityType,
+	) => Effect.Effect<ReadonlyMap<EntityId, IrComponent>, DatabaseError>;
+
+	/**
 	 * Soft-deletes all dav_component rows for the entity.
 	 * dav_property and dav_parameter rows are naturally invisible to loadTree
 	 * afterwards since loadTree always starts from active component IDs.

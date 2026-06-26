@@ -88,6 +88,7 @@ import type { FileService } from "#src/platform/file.ts";
 import type { AclService } from "#src/services/acl/index.ts";
 import type { AclRepository } from "#src/services/acl/repository.ts";
 import type { CalEditService } from "#src/services/cal-edit/service.ts";
+import type { CalIndexRepository } from "#src/services/cal-index/repository.ts";
 import type { CardEditService } from "#src/services/card-edit/service.ts";
 import type { CardIndexRepository } from "#src/services/card-index/repository.ts";
 import type { CollectionService } from "#src/services/collection/index.ts";
@@ -121,6 +122,7 @@ export type UiServices =
 	| AclService
 	| FileService
 	| CalEditService
+	| CalIndexRepository
 	| CardEditService
 	| DatabaseClient
 	| EmailCredentialService

@@ -24,6 +24,17 @@ export type CardCollation = "i;ascii-casemap" | "i;unicode-casemap";
 /** RFC 6352 §8.3.4 match types. */
 export type CardMatchType = "equals" | "contains" | "starts-with" | "ends-with";
 
+/**
+ * A contact summary projected directly from the card_index, sufficient to
+ * render a row in the contacts list without reloading the vCard component tree.
+ */
+export interface CardSummaryRow {
+	readonly instanceId: string;
+	readonly fn: string | null;
+	readonly email: string | null;
+	readonly tel: string | null;
+}
+
 export interface CardIndexRepositoryShape {
 	/**
 	 * Return entity UUIDs whose card_index entry matches the given text filter.
@@ -39,6 +50,20 @@ export interface CardIndexRepositoryShape {
 		collation: CardCollation,
 		matchType: CardMatchType,
 	) => Effect.Effect<ReadonlyArray<string>, DatabaseError>;
+
+	/**
+	 * Return a contact summary (instance id, fn, first email, first phone) for
+	 * every card in `collectionId`, directly from the card_index — no per-contact
+	 * vCard tree reload. When `fnFilter` is provided, restricts the result to
+	 * cards whose FN matches the substring case-insensitively (i;unicode-casemap)
+	 * using the generated fold column, so search needs no in-memory second pass.
+	 *
+	 * Used by the contacts list UI for both the full listing and search.
+	 */
+	readonly listForCollection: (
+		collectionId: CollectionId,
+		fnFilter?: string,
+	) => Effect.Effect<ReadonlyArray<CardSummaryRow>, DatabaseError>;
 
 	/**
 	 * Return every card in `collectionId` that has a non-empty BDAY value, joined

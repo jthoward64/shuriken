@@ -42,4 +42,19 @@ export const AclServiceAllowAll = Layer.succeed(AclService, {
 	setAces: (_resourceId, _resourceType, _aces) => Effect.void,
 	batchCurrentUserPrivileges: (_principalId, resourceIds, _resourceType) =>
 		Effect.succeed(new Map(resourceIds.map((id) => [id, ALL_PRIVILEGES]))),
+	batchMemberPrivileges: (
+		_principalId,
+		_parentId,
+		_parentType,
+		memberIds,
+		_memberType,
+	) => Effect.succeed(new Map(memberIds.map((id) => [id, ALL_PRIVILEGES]))),
+	batchCheckMembers: (
+		_principalId,
+		_parentId,
+		_parentType,
+		memberIds,
+		_memberType,
+		_privilege,
+	) => Effect.succeed(new Set(memberIds)),
 });
