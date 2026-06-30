@@ -106,6 +106,13 @@ Authentik, Keycloak gatekeeper, oauth2-proxy):
 4. Users keep their accounts: existing users are re-linked by verified email on
    first OIDC login (`oidcAutoProvision=true`, the default, also creates unknown
    users). Each user then generates app passwords for their DAV clients.
+5. To map IdP groups to roles (the OIDC replacement for `PROXY_ROLE_HEADER`),
+   set `config.auth.oidcGroupsClaim` (the ID-token claim holding the user's
+   groups, e.g. `groups`) and `config.auth.oidcRoleMap` (JSON, e.g.
+   `'{"shuriken-admins":"super_admin","staff":"admin"}'`). The role is then
+   re-synced from the IdP on every login — highest-privilege match wins, and a
+   user in no mapped group is reset to `normal`. Leave both blank to manage
+   roles in the web UI instead.
 
 No data migration is required beyond running the bundled schema migration
 (`migrations.enabled`, default on), which adds the `session` / `oidc_login`

@@ -70,6 +70,8 @@ const testConfig: AppConfigType = {
 		oidcScopes: "openid profile email",
 		oidcAutoProvision: true,
 		sessionTtlDays: 7,
+		oidcGroupsClaim: Option.none<string>(),
+		oidcRoleMap: new Map<string, string>(),
 	},
 	log: { level: undefined },
 	externalCalendar: {

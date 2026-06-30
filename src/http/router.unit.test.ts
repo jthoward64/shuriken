@@ -267,6 +267,8 @@ const stubLayers = Layer.mergeAll(
 			oidcScopes: "openid profile email",
 			oidcAutoProvision: true,
 			sessionTtlDays: 7,
+			oidcGroupsClaim: Option.none(),
+			oidcRoleMap: new Map<string, string>(),
 		},
 		log: { level: undefined },
 		externalCalendar: {

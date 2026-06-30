@@ -36,11 +36,42 @@ const stringClaim = (value: unknown): Option.Option<string> =>
 		? Option.some(value)
 		: Option.none();
 
+/**
+ * Extract the groups/roles claim named `claimName` from the ID-token claims.
+ * Returns None when no claim name is configured or the claim is absent (role
+ * sync is then skipped); Some (possibly empty) when the claim is present. A
+ * lone string is treated as a single-element list.
+ */
+const groupsClaim = (
+	claims: Record<string, unknown>,
+	claimName: Option.Option<string>,
+): Option.Option<ReadonlyArray<string>> =>
+	Option.flatMap(claimName, (name) => {
+		if (!(name in claims)) {
+			return Option.none();
+		}
+		const value = claims[name];
+		if (Array.isArray(value)) {
+			return Option.some(
+				value.filter((v): v is string => typeof v === "string"),
+			);
+		}
+		return typeof value === "string"
+			? Option.some([value])
+			: Option.some<ReadonlyArray<string>>([]);
+	});
+
 export const OidcServiceLive = Layer.effect(
 	OidcService,
 	Effect.gen(function* () {
 		const {
-			auth: { oidcIssuer, oidcClientId, oidcClientSecret, oidcScopes },
+			auth: {
+				oidcIssuer,
+				oidcClientId,
+				oidcClientSecret,
+				oidcScopes,
+				oidcGroupsClaim,
+			},
 		} = yield* AppConfigService;
 
 		const configRef = yield* SynchronizedRef.make(
@@ -155,6 +186,7 @@ export const OidcServiceLive = Layer.effect(
 					email: stringClaim(claims.email),
 					emailVerified: claims.email_verified === true,
 					name: stringClaim(claims.name),
+					groups: groupsClaim(claims, oidcGroupsClaim),
 				} satisfies OidcClaims;
 			});
 

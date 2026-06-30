@@ -99,6 +99,7 @@ export const callbackHandler = (
 
 		const principalOpt = yield* resolveOidcPrincipal(claims, {
 			autoProvision: cfg.auth.oidcAutoProvision,
+			roleMap: cfg.auth.oidcRoleMap,
 		});
 		if (Option.isNone(principalOpt)) {
 			return new Response("No account is associated with this login.", {

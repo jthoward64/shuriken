@@ -9,8 +9,10 @@ import { PrincipalId, UserId } from "#src/domain/ids.ts";
 import type { AuthenticatedPrincipal } from "#src/domain/types/dav.ts";
 import { isValidSlug, Slug } from "#src/domain/types/path.ts";
 import { Email } from "#src/domain/types/strings.ts";
+import { resolveRoleFromGroups } from "#src/services/oidc/role-mapping.ts";
 import type { OidcClaims } from "#src/services/oidc/service.ts";
 import { ProvisioningService } from "#src/services/provisioning/service.ts";
+import { DEFAULT_ROLE } from "#src/services/role/policy.ts";
 import type { UserWithPrincipal } from "#src/services/user/repository.ts";
 import { UserRepository } from "#src/services/user/repository.ts";
 
@@ -62,9 +64,30 @@ const slugFromEmail = (email: string): string => {
 		: `user-${randomSlugSuffix()}`;
 };
 
+/**
+ * The role the IdP says this user should have, or None when role syncing is off
+ * (no groups claim / empty role map) or the token omits the groups claim.
+ * Present-but-unmatched groups resolve to the default role (IdP is authoritative).
+ */
+const desiredRoleFromClaims = (
+	claims: OidcClaims,
+	roleMap: ReadonlyMap<string, string>,
+): Option.Option<string> =>
+	roleMap.size === 0
+		? Option.none()
+		: Option.map(claims.groups, (groups) =>
+				Option.getOrElse(
+					resolveRoleFromGroups(groups, roleMap),
+					() => DEFAULT_ROLE,
+				),
+			);
+
 export const resolveOidcPrincipal = (
 	claims: OidcClaims,
-	opts: { readonly autoProvision: boolean },
+	opts: {
+		readonly autoProvision: boolean;
+		readonly roleMap: ReadonlyMap<string, string>;
+	},
 ): Effect.Effect<
 	Option.Option<AuthenticatedPrincipal>,
 	DatabaseError | ConflictError | DavError | InternalError,
@@ -73,12 +96,32 @@ export const resolveOidcPrincipal = (
 	Effect.gen(function* () {
 		const repo = yield* UserRepository;
 		const authId = oidcAuthId(claims);
+		const desiredRole = desiredRoleFromClaims(claims, opts.roleMap);
+
+		// Re-sync an existing user's role from the IdP when it differs.
+		const syncRole = (uwp: UserWithPrincipal) =>
+			Option.match(desiredRole, {
+				onNone: () => Effect.void,
+				onSome: (role) =>
+					uwp.user.role === role
+						? Effect.void
+						: repo.update(UserId(uwp.user.id), { role }).pipe(
+								Effect.asVoid,
+								Effect.tap(() =>
+									Effect.logDebug("auth.oidc: synced role from IdP", {
+										userId: uwp.user.id,
+										role,
+									}),
+								),
+							),
+			});
 
 		// 1. Existing OIDC identity.
 		const existing = yield* repo.findCredential(ISSUER_SUBJECT_SOURCE, authId);
 		if (Option.isSome(existing)) {
 			const uwp = yield* repo.findById(UserId(existing.value.userId));
 			if (Option.isSome(uwp)) {
+				yield* syncRole(uwp.value);
 				return Option.some(toPrincipal(uwp.value));
 			}
 		}
@@ -100,6 +143,7 @@ export const resolveOidcPrincipal = (
 				authId,
 				authCredential: Option.none(),
 			});
+			yield* syncRole(byEmail.value);
 			yield* Effect.logDebug("auth.oidc: linked to existing user by email", {
 				email: emailValue,
 			});
@@ -128,7 +172,12 @@ export const resolveOidcPrincipal = (
 			ConflictError | DatabaseError | DavError | InternalError
 		> =>
 			provisioning
-				.provisionUser({ email, name, slug: Slug(slug) })
+				.provisionUser({
+					email,
+					name,
+					slug: Slug(slug),
+					role: Option.getOrUndefined(desiredRole),
+				})
 				.pipe(Effect.map((p) => p.user));
 
 		// One retry with a random suffix in case the derived slug collides.

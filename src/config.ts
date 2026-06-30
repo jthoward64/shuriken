@@ -55,6 +55,33 @@ export const DatabaseConfig = Config.all({
 
 const DEFAULT_SESSION_TTL_DAYS = 7;
 
+/**
+ * Parse OIDC_ROLE_MAP — a JSON object mapping IdP group/role names to app roles
+ * (e.g. `{"shuriken-admins":"super_admin","staff":"admin"}`). Malformed input
+ * yields an empty map (role sync stays off) rather than failing boot.
+ */
+const decodeOidcRoleMap = (raw: string): ReadonlyMap<string, string> => {
+	if (raw.trim() === "") {
+		return new Map();
+	}
+	try {
+		const parsed: unknown = JSON.parse(raw);
+		if (
+			typeof parsed !== "object" ||
+			parsed === null ||
+			Array.isArray(parsed)
+		) {
+			return new Map();
+		}
+		const entries = Object.entries(parsed).filter(
+			(entry): entry is [string, string] => typeof entry[1] === "string",
+		);
+		return new Map(entries);
+	} catch {
+		return new Map();
+	}
+};
+
 export const AuthConfig = Config.all({
 	/**
 	 * Auto-login email. When set, all requests are authenticated as this user
@@ -147,6 +174,24 @@ export const AuthConfig = Config.all({
 	/** Browser session lifetime in days (absolute, from login). Defaults to 7. */
 	sessionTtlDays: Config.int("sessionTtlDays").pipe(
 		Config.withDefault(DEFAULT_SESSION_TTL_DAYS),
+	),
+
+	/**
+	 * Name of the ID-token claim carrying the user's groups/roles (an array of
+	 * strings, e.g. "groups" or "roles"). Unset disables OIDC role syncing.
+	 */
+	oidcGroupsClaim: Config.string("oidcGroupsClaim").pipe(Config.option),
+
+	/**
+	 * JSON object mapping values from `oidcGroupsClaim` to app roles (see
+	 * services/role/policy.ts). When both this and `oidcGroupsClaim` are set,
+	 * the user's role is re-synced from the IdP on every login: the
+	 * highest-privilege matching role wins, and a user matching no mapped group
+	 * is set to the default role.
+	 */
+	oidcRoleMap: Config.string("oidcRoleMap").pipe(
+		Config.withDefault(""),
+		Config.map(decodeOidcRoleMap),
 	),
 });
 

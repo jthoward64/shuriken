@@ -48,6 +48,12 @@ data:
   OIDC_SCOPES: {{ .Values.config.auth.oidcScopes | quote }}
   OIDC_AUTO_PROVISION: {{ .Values.config.auth.oidcAutoProvision | quote }}
   SESSION_TTL_DAYS: {{ .Values.config.auth.sessionTtlDays | quote }}
+  {{- with .Values.config.auth.oidcGroupsClaim }}
+  OIDC_GROUPS_CLAIM: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.config.auth.oidcRoleMap }}
+  OIDC_ROLE_MAP: {{ . | quote }}
+  {{- end }}
 
   # ---- external calendar scheduler --------------------------------------
   EXTERNAL_CALENDAR_SCHEDULER_TICK_S: {{ .Values.config.externalCalendar.schedulerTickS | quote }}

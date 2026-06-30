@@ -28,6 +28,12 @@ export interface OidcClaims {
 	readonly email: Option.Option<string>;
 	readonly emailVerified: boolean;
 	readonly name: Option.Option<string>;
+	/**
+	 * Values of the configured groups/roles claim. None when no groups claim is
+	 * configured or the token omits it (role syncing is then skipped); Some (even
+	 * empty) when the claim is present.
+	 */
+	readonly groups: Option.Option<ReadonlyArray<string>>;
 }
 
 export interface OidcCompleteInput {

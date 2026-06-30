@@ -111,6 +111,13 @@ config:
     oidcAutoProvision: true
     # Browser session lifetime, in days.
     sessionTtlDays: 7
+    # Optional role sync from the IdP. oidcGroupsClaim names an ID-token claim
+    # holding the user's groups/roles (array of strings, e.g. "groups"); leave
+    # blank to disable. oidcRoleMap is a JSON object mapping those values to app
+    # roles (normal | admin | super_admin). When both are set, the role is
+    # re-applied on every login (highest-privilege match wins; no match → normal).
+    oidcGroupsClaim: ""
+    oidcRoleMap: ""    # e.g. '{"shuriken-admins":"super_admin","staff":"admin"}'
 
   externalCalendar:
     schedulerTickS: 60

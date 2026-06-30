@@ -160,6 +160,12 @@
 						},
 						"sessionTtlDays": {
 							"type": "integer"
+						},
+						"oidcGroupsClaim": {
+							"type": "string"
+						},
+						"oidcRoleMap": {
+							"type": "string"
 						}
 					}
 				},
