@@ -80,6 +80,14 @@ export interface UserServiceShape {
 		userId: UserId,
 		credential: NewCredential,
 	) => Effect.Effect<void, DavError | DatabaseError | InternalError>;
+	/**
+	 * The distinct `auth_source` values configured for a user (e.g. "local",
+	 * "oidc", "app_password"). Lets the UI gate credential-management affordances:
+	 * an OIDC-managed account has no local password and must use app passwords.
+	 */
+	readonly listAuthSources: (
+		userId: UserId,
+	) => Effect.Effect<ReadonlyArray<string>, DatabaseError>;
 }
 
 export class UserService extends Context.Service<

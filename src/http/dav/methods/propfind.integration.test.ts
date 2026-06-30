@@ -74,6 +74,17 @@ const PROPFIND_CURRENT_USER_PRINCIPAL = `<?xml version="1.0" encoding="utf-8"?>
   </D:prop>
 </D:propfind>`;
 
+// RFC 3744 §5.4: current-user-privilege-set — clients like iOS read this on
+// each collection (including during Depth:1 home enumeration) to decide whether
+// the calendar/addressbook is usable.
+const PROPFIND_PRIVILEGE_SET = `<?xml version="1.0" encoding="utf-8"?>
+<D:propfind xmlns:D="DAV:">
+  <D:prop>
+    <D:resourcetype/>
+    <D:current-user-privilege-set/>
+  </D:prop>
+</D:propfind>`;
+
 describe("PROPFIND collection", () => {
 	it("Depth:0 on calendar collection returns resourcetype with caldav:calendar", async () => {
 		const results = await runScript(
@@ -427,6 +438,34 @@ describe("PROPFIND CalDAV/CardDAV discovery properties", () => {
 		expect(results[0]?.body).not.toContain(
 			`<D:status>HTTP/1.1 404 Not Found</D:status>`,
 		);
+	});
+
+	// Regression: Depth:1 enumeration of the calendar home must include
+	// current-user-privilege-set on each member calendar — not just on the home
+	// itself. iOS reads it per-collection and hides calendars that report no
+	// privileges, so a 404 here makes calendars show no data.
+	it("Depth:1 calendar-home enumeration includes current-user-privilege-set on members", async () => {
+		const results = await runScript(
+			[
+				propfind("/dav/principals/test/cal/", PROPFIND_PRIVILEGE_SET, {
+					as: "test",
+					headers: { Depth: "1" },
+					expect: { status: 207 },
+				}),
+			],
+			singleUser(),
+		);
+		for (const result of results) {
+			expect(result.failures, result.step.name).toEqual([]);
+		}
+		const body = results[0]?.body ?? "";
+		// The member calendar must be enumerated...
+		expect(body).toContain("/dav/principals/test/cal/primary/");
+		// ...with a granted privilege set...
+		expect(body).toContain("current-user-privilege-set");
+		expect(body).toContain("<D:privilege>");
+		// ...and no requested property may land in a 404 propstat.
+		expect(body).not.toContain(`<D:status>HTTP/1.1 404 Not Found</D:status>`);
 	});
 });
 

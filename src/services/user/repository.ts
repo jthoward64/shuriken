@@ -64,6 +64,15 @@ export interface UserRepositoryShape {
 		authSource: string,
 		authId: string,
 	) => Effect.Effect<Option.Option<AuthUserRow>, DatabaseError>;
+	/**
+	 * The distinct `auth_source` values configured for a user (e.g. "local",
+	 * "oidc", "app_password"). Used by the UI to decide which credential-management
+	 * affordances to show — e.g. an OIDC-provisioned user has no local password to
+	 * change.
+	 */
+	readonly listAuthSources: (
+		userId: UserId,
+	) => Effect.Effect<ReadonlyArray<string>, DatabaseError>;
 	readonly insertCredential: (input: {
 		readonly userId: UserId;
 		readonly authSource: string;

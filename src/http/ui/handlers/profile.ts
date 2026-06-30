@@ -34,6 +34,12 @@ export const profileHandler = (
 			principal.userId,
 		);
 
+		// OIDC-managed accounts have no local password — they authenticate DAV
+		// clients with app passwords — so the change-password form is hidden for
+		// them. (Still gated by the global basic-auth toggle.)
+		const authSources = yield* userService.listAuthSources(principal.userId);
+		const isOidcManaged = authSources.includes("oidc");
+
 		const nav = yield* buildNavContext(
 			principal,
 			ctx.url.pathname,
@@ -68,7 +74,7 @@ export const profileHandler = (
 				user,
 				principal: principalRow,
 				canEditSlug: false,
-				showPasswordForm: config.auth.basicAuthEnabled,
+				showPasswordForm: config.auth.basicAuthEnabled && !isOidcManaged,
 				showSignOut: config.auth.oidcEnabled,
 				authSettingsUrl,
 				authSettingsLabel,

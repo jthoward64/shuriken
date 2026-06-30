@@ -22,6 +22,7 @@ import { CollectionService } from "#src/services/collection/index.ts";
 import { GroupService } from "#src/services/group/index.ts";
 import { PrincipalService } from "#src/services/principal/index.ts";
 import { KNOWN_ROLES } from "#src/services/role/policy.ts";
+import { UserService } from "#src/services/user/index.ts";
 
 // ---------------------------------------------------------------------------
 // GET /ui/users/:principalId
@@ -41,6 +42,7 @@ export const usersEditHandler = (
 	| GroupService
 	| PrincipalService
 	| TemplateService
+	| UserService
 > =>
 	Effect.gen(function* () {
 		const principal = yield* requireAuthenticated(ctx.auth);
@@ -50,9 +52,15 @@ export const usersEditHandler = (
 		const principalService = yield* PrincipalService;
 		const groupService = yield* GroupService;
 		const collectionService = yield* CollectionService;
+		const userService = yield* UserService;
 
 		const { user, principal: principalRow } =
 			yield* principalService.findById(principalId);
+
+		// OIDC-managed accounts have no local password to set/change — they use
+		// app passwords for DAV — so hide the password form even from admins.
+		const authSources = yield* userService.listAuthSources(user.id as UserId);
+		const isOidcManaged = authSources.includes("oidc");
 
 		const isSelf = user.id === principal.userId;
 		if (!isSelf) {
@@ -166,7 +174,7 @@ export const usersEditHandler = (
 				groups: enrichedGroups,
 				canEditSlug,
 				canDelete,
-				showPasswordForm: config.auth.basicAuthEnabled,
+				showPasswordForm: config.auth.basicAuthEnabled && !isOidcManaged,
 				isSelf,
 				collections,
 				principalUrl: `${davBase}/`,

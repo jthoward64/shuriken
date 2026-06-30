@@ -42,6 +42,17 @@ export const usersSetPasswordHandler = (
 		const { user } = yield* principalService.findById(principalId);
 		const isSelf = user.id === principal.userId;
 
+		// OIDC-managed accounts have no local password — they connect DAV clients
+		// with app passwords. Refuse to set one even if this endpoint is reached
+		// directly (the UI hides the form for these users).
+		const authSources = yield* userService.listAuthSources(user.id as UserId);
+		if (authSources.includes("oidc")) {
+			return new Response(
+				"Password management is not available for SSO accounts.",
+				{ status: 403 },
+			);
+		}
+
 		if (!isSelf) {
 			const usersVirtualPrivs = yield* acl.currentUserPrivileges(
 				principal.principalId,

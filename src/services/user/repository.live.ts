@@ -239,6 +239,22 @@ const findCredential = Effect.fn("UserRepository.findCredential")(
 	),
 );
 
+const listAuthSources = Effect.fn("UserRepository.listAuthSources")(
+	function* (userId: UserId) {
+		yield* Effect.annotateCurrentSpan({ "user.id": userId });
+		yield* Effect.logTrace("repo.user.listAuthSources", { userId });
+		return yield* runDbQuery((db) =>
+			db
+				.selectDistinct({ authSource: authUser.authSource })
+				.from(authUser)
+				.where(eq(authUser.userId, userId)),
+		).pipe(Effect.map((rows) => rows.map((r) => r.authSource)));
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.user.listAuthSources failed", e.cause),
+	),
+);
+
 const insertCredential = Effect.fn("UserRepository.insertCredential")(
 	function* (input: HashedCredential & { readonly userId: UserId }) {
 		yield* Effect.annotateCurrentSpan({
@@ -391,6 +407,8 @@ export const UserRepositoryLive = Layer.effect(
 			update: (...args: Parameters<typeof update>) => run(update(...args)),
 			findCredential: (...args: Parameters<typeof findCredential>) =>
 				run(findCredential(...args)),
+			listAuthSources: (...args: Parameters<typeof listAuthSources>) =>
+				run(listAuthSources(...args)),
 			insertCredential: (...args: Parameters<typeof insertCredential>) =>
 				run(insertCredential(...args)),
 			deleteCredential: (...args: Parameters<typeof deleteCredential>) =>

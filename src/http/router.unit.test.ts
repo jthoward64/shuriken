@@ -195,6 +195,7 @@ const stubLayers = Layer.mergeAll(
 		create: die,
 		update: die,
 		findCredential: die,
+		listAuthSources: die,
 		insertCredential: die,
 		deleteCredential: die,
 	}),
@@ -223,6 +224,7 @@ const stubLayers = Layer.mergeAll(
 		addCredential: die,
 		removeCredential: die,
 		setCredential: die,
+		listAuthSources: die,
 	}),
 	Layer.succeed(GroupService, {
 		create: die,

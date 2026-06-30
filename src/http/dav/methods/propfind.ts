@@ -36,6 +36,7 @@ import {
 	unauthorized,
 } from "#src/domain/errors.ts";
 import {
+	CollectionId,
 	type EntityId,
 	GroupId,
 	InstanceId,
@@ -671,11 +672,27 @@ const collectionResponse = (
 	href: string,
 	row: CollectionRow,
 	request: PropfindKind,
-	origin = "",
-): DavResponse => ({
-	href,
-	propstats: splitPropstats(buildCollectionProps(row, origin), request),
-});
+	origin: string,
+	// Member enumerations (depth:1) need the same live, per-caller properties a
+	// direct depth:0 request returns — most importantly current-user-privilege-set,
+	// which clients like iOS read on each calendar/addressbook to decide whether
+	// it's usable. buildCollectionProps is synchronous and can't run the ACL
+	// query, so privileges are computed by the caller and threaded in here.
+	privileges: ReadonlyArray<DavPrivilege>,
+	actingPrincipalHref: string,
+): DavResponse => {
+	const props: Record<ClarkName, unknown> = {
+		...buildCollectionProps(row, origin),
+		[CURRENT_USER_PRINCIPAL]: { [cn(DAV_NS, "href")]: actingPrincipalHref },
+		[CURRENT_USER_PRIVILEGE_SET]: buildPrivilegeSet(privileges),
+	};
+	if (origin !== "") {
+		props[DAV_OWNER] = {
+			[cn(DAV_NS, "href")]: `${origin}/dav/principals/${row.ownerPrincipalId}/`,
+		};
+	}
+	return { href, propstats: splitPropstats(props, request) };
+};
 
 // ---------------------------------------------------------------------------
 // Instance → DavResponse
@@ -892,7 +909,21 @@ export const propfindHandler = (
 						ns,
 						coll.slug || coll.id,
 					);
-					responses.push(collectionResponse(href, coll, propfind, origin));
+					const privileges = yield* acl.currentUserPrivileges(
+						actingPrincipalId,
+						CollectionId(coll.id),
+						"collection",
+					);
+					responses.push(
+						collectionResponse(
+							href,
+							coll,
+							propfind,
+							origin,
+							privileges,
+							actingPrincipalHref,
+						),
+					);
 				}
 				for (const [group, groupColls] of memberOfGroups.map(
 					(g, i) => [g, groupCollectionSets[i] ?? []] as const,
@@ -909,7 +940,21 @@ export const propfindHandler = (
 							ns,
 							coll.slug || coll.id,
 						);
-						responses.push(collectionResponse(href, coll, propfind, origin));
+						const privileges = yield* acl.currentUserPrivileges(
+							actingPrincipalId,
+							CollectionId(coll.id),
+							"collection",
+						);
+						responses.push(
+							collectionResponse(
+								href,
+								coll,
+								propfind,
+								origin,
+								privileges,
+								actingPrincipalHref,
+							),
+						);
 					}
 				}
 			}
@@ -1109,7 +1154,21 @@ export const propfindHandler = (
 						ns,
 						coll.slug || coll.id,
 					);
-					responses.push(collectionResponse(href, coll, propfind, origin));
+					const privileges = yield* acl.currentUserPrivileges(
+						actingPrincipalId,
+						CollectionId(coll.id),
+						"collection",
+					);
+					responses.push(
+						collectionResponse(
+							href,
+							coll,
+							propfind,
+							origin,
+							privileges,
+							actingPrincipalHref,
+						),
+					);
 				}
 			}
 		} else if (path.kind === "root") {

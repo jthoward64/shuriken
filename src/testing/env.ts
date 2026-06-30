@@ -328,6 +328,15 @@ const makeUserRepo = (stores: TestStores): UserRepositoryShape => ({
 			),
 		),
 
+	listAuthSources: (userId) =>
+		Effect.succeed([
+			...new Set(
+				[...stores.credentials.values()]
+					.filter((c) => c.userId === userId)
+					.map((c) => c.authSource),
+			),
+		]),
+
 	insertCredential: (input) =>
 		Effect.sync(() => {
 			const now = Temporal.Now.instant();

@@ -208,6 +208,14 @@ export const UserServiceLive = Layer.effect(
 				yield* Effect.logDebug("user.delete: deleted", { id });
 			}),
 
+			listAuthSources: Effect.fn("UserService.listAuthSources")(function* (
+				userId: UserId,
+			) {
+				yield* Effect.annotateCurrentSpan({ "user.id": userId });
+				yield* Effect.logTrace("user.listAuthSources", { userId });
+				return yield* repo.listAuthSources(userId);
+			}),
+
 			setCredential: Effect.fn("UserService.setCredential")(function* (
 				userId: UserId,
 				credential: NewCredential,
