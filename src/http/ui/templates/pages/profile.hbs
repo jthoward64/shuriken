@@ -99,6 +99,17 @@
   {{/if}}
 
   <section class="bg-white rounded-lg border border-gray-200 p-6 space-y-3">
+    <h2 class="text-base font-semibold text-gray-800">App passwords</h2>
+    <p class="text-sm text-gray-600">
+      Create per-device passwords to connect calendar and contact apps without sharing your sign-in credentials.
+    </p>
+    <a
+      href="/ui/profile/app-passwords"
+      class="inline-block px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded hover:bg-gray-50"
+    >Manage app passwords</a>
+  </section>
+
+  <section class="bg-white rounded-lg border border-gray-200 p-6 space-y-3">
     <h2 class="text-base font-semibold text-gray-800">Email credentials</h2>
     <p class="text-sm text-gray-600">
       Configure how outbound mail (event invitations) is sent on your behalf.
@@ -121,6 +132,17 @@
         rel="noopener noreferrer"
         class="inline-block px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded hover:bg-gray-700"
       >{{authSettingsLabel}}</a>
+    </section>
+  {{/if}}
+
+  {{#if showSignOut}}
+    <section class="bg-white rounded-lg border border-gray-200 p-6 space-y-3">
+      <h2 class="text-base font-semibold text-gray-800">Session</h2>
+      <form method="POST" action="/ui/auth/logout">
+        <button type="submit" class="px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded hover:bg-gray-50">
+          Sign out
+        </button>
+      </form>
     </section>
   {{/if}}
 </div>

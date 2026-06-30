@@ -12,9 +12,23 @@ export const authUser = pgTable(
 			.notNull()
 			.references(() => user.id, { onDelete: "cascade" })
 			.$type<UuidString>(),
+		/**
+		 * Identity provider for this credential:
+		 *   "local"        — password set in-app, verified via Basic auth
+		 *   "app_password" — generated per-device secret, verified via Basic auth
+		 *   "oidc"         — federated identity (authCredential is null)
+		 */
 		authSource: text("auth_source").notNull(),
+		/**
+		 * Provider-scoped identifier: the username for "local", a generated
+		 * username for "app_password", or "<issuer>|<sub>" for "oidc".
+		 */
 		authId: text("auth_id").notNull(),
+		/** User-facing name for an app password (e.g. "iPhone"); null otherwise. */
+		label: text(),
 		updatedAt: timestampTz("updated_at").default(sql`now()`).notNull(),
+		/** Last time this credential authenticated a request; app passwords only. */
+		lastUsedAt: timestampTz("last_used_at"),
 		authCredential: redactedText("auth_credential"),
 	},
 	(table) => [

@@ -1,8 +1,8 @@
 import { Option } from "effect";
-import { isClientTrusted } from "#src/auth/layers/proxy.ts";
 import type { AppConfigType } from "#src/config.ts";
 import type { SmtpSecurity } from "#src/db/drizzle/schema/index.ts";
 import type { SmtpProxyOverride } from "#src/http/smtp-headers-ref.ts";
+import { isClientTrusted } from "#src/http/trusted-proxy.ts";
 
 // ---------------------------------------------------------------------------
 // computeSmtpProxyOverride — derive the SMTP override when the request arrives

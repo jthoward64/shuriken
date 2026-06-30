@@ -1,10 +1,11 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull, or } from "drizzle-orm";
 import { Effect, Layer, Metric, Option, Redacted } from "effect";
+import { Temporal } from "temporal-polyfill";
 import { AuthService } from "#src/auth/service.ts";
 import { DatabaseClient } from "#src/db/client.ts";
 import { authUser, principal, user } from "#src/db/drizzle/schema/index.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
-import { PrincipalId, UserId } from "#src/domain/ids.ts";
+import { PrincipalId, UserId, type UuidString } from "#src/domain/ids.ts";
 import {
 	Authenticated,
 	type AuthResult,
@@ -16,8 +17,16 @@ import { CryptoService } from "#src/platform/crypto.ts";
 // ---------------------------------------------------------------------------
 // Basic auth
 //
-// Parses HTTP Basic Authentication credentials, looks up the user in the
-// auth_user table (authSource = "local"), and verifies the password.
+// Parses HTTP Basic Authentication credentials and verifies them against the
+// auth_user table. Two credential kinds are accepted:
+//   * authSource = "local"        — the username matches auth_id directly.
+//   * authSource = "app_password" — a per-device secret; the supplied username
+//     may be either the credential's generated username (auth_id) or the
+//     owner's principal slug, so an OIDC user (who has no local password) can
+//     still connect DAV clients.
+//
+// The password is verified (argon2id) against each matching candidate; the
+// first match wins and its last_used_at is stamped.
 // ---------------------------------------------------------------------------
 
 const BASIC_PREFIX = "Basic ";
@@ -52,10 +61,20 @@ export const parseBasicAuth = (
 	});
 };
 
+interface Candidate {
+	readonly authUserId: UuidString;
+	readonly authSource: string;
+	readonly authCredential: Redacted.Redacted<string> | null;
+	readonly userId: UuidString;
+	readonly principalId: UuidString;
+	readonly displayName: string | null;
+}
+
 /**
- * Core basic-auth logic. Parses the Authorization header, looks up the user,
- * verifies the password, and emits per-outcome metrics. Returns Unauthenticated
- * when no credentials are present, the user is unknown, or the password is wrong.
+ * Core basic-auth logic. Parses the Authorization header, looks up matching
+ * local / app-password credentials, verifies the password, and emits
+ * per-outcome metrics. Returns Unauthenticated when no credentials are present,
+ * no candidate matches, or every password check fails.
  *
  * Shared between BasicAuthLayer and CompositeAuthLayer.
  */
@@ -87,8 +106,10 @@ export const authenticateBasic = (
 						username: creds.username,
 					});
 
-					const rows = yield* db
+					const candidates: ReadonlyArray<Candidate> = yield* db
 						.select({
+							authUserId: authUser.id,
+							authSource: authUser.authSource,
 							authCredential: authUser.authCredential,
 							userId: user.id,
 							principalId: user.principalId,
@@ -99,15 +120,25 @@ export const authenticateBasic = (
 						.innerJoin(principal, eq(user.principalId, principal.id))
 						.where(
 							and(
-								eq(authUser.authSource, "local"),
-								eq(authUser.authId, creds.username),
+								isNull(principal.deletedAt),
+								or(
+									and(
+										eq(authUser.authSource, "local"),
+										eq(authUser.authId, creds.username),
+									),
+									and(
+										eq(authUser.authSource, "app_password"),
+										or(
+											eq(authUser.authId, creds.username),
+											eq(principal.slug, creds.username),
+										),
+									),
+								),
 							),
 						)
-						.limit(1)
 						.pipe(Effect.mapError((e) => new DatabaseError({ cause: e })));
 
-					const row = rows[0];
-					if (!row?.authCredential) {
+					if (candidates.length === 0) {
 						yield* Effect.logDebug("auth.basic: user not found", {
 							username: creds.username,
 						});
@@ -120,38 +151,60 @@ export const authenticateBasic = (
 						return new Unauthenticated() as AuthResult;
 					}
 
-					// InternalError from the crypto service is a defect (unexpected), not a domain error
-					const valid = yield* crypto
-						.verifyPassword(creds.password, row.authCredential)
-						.pipe(Effect.orDie);
-					if (!valid) {
-						yield* Effect.logDebug("auth.basic: invalid password", {
+					for (const candidate of candidates) {
+						if (candidate.authCredential === null) {
+							continue;
+						}
+						// InternalError from the crypto service is a defect, not a domain error.
+						const valid = yield* crypto
+							.verifyPassword(creds.password, candidate.authCredential)
+							.pipe(Effect.orDie);
+						if (!valid) {
+							continue;
+						}
+
+						if (candidate.authSource === "app_password") {
+							yield* db
+								.update(authUser)
+								.set({ lastUsedAt: Temporal.Now.instant() })
+								.where(eq(authUser.id, candidate.authUserId))
+								.pipe(
+									Effect.mapError((e) => new DatabaseError({ cause: e })),
+									// A failed last_used_at stamp must not fail the auth.
+									Effect.ignore,
+								);
+						}
+
+						yield* Effect.logDebug("auth.basic: success", {
+							userId: candidate.userId,
 							username: creds.username,
+							authSource: candidate.authSource,
 						});
 						yield* Metric.update(
 							Metric.withAttributes(authCounter, {
-								"auth.outcome": "invalid_password",
+								"auth.outcome": "success",
 							}),
 							1,
 						);
-						return new Unauthenticated() as AuthResult;
+						return new Authenticated({
+							principal: {
+								principalId: PrincipalId(candidate.principalId),
+								userId: UserId(candidate.userId),
+								displayName: Option.fromNullishOr(candidate.displayName),
+							},
+						}) as AuthResult;
 					}
 
-					yield* Effect.logDebug("auth.basic: success", {
-						userId: row.userId,
+					yield* Effect.logDebug("auth.basic: invalid password", {
 						username: creds.username,
 					});
 					yield* Metric.update(
-						Metric.withAttributes(authCounter, { "auth.outcome": "success" }),
+						Metric.withAttributes(authCounter, {
+							"auth.outcome": "invalid_password",
+						}),
 						1,
 					);
-					return new Authenticated({
-						principal: {
-							principalId: PrincipalId(row.principalId),
-							userId: UserId(row.userId),
-							displayName: Option.fromNullishOr(row.displayName),
-						},
-					}) as AuthResult;
+					return new Unauthenticated() as AuthResult;
 				}),
 		});
 	}).pipe(

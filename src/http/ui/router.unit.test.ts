@@ -11,6 +11,7 @@ import { TemplateService } from "#src/http/ui/template/index.ts";
 import { FileService } from "#src/platform/file.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import { AclRepository } from "#src/services/acl/repository.ts";
+import { AppPasswordService } from "#src/services/app-password/service.ts";
 import { CalEditService } from "#src/services/cal-edit/service.ts";
 import { CalIndexRepository } from "#src/services/cal-index/repository.ts";
 import { CardEditService } from "#src/services/card-edit/service.ts";
@@ -27,11 +28,15 @@ import { GroupService } from "#src/services/group/index.ts";
 import { ImipDispatchService } from "#src/services/imip/dispatch.ts";
 import { InstanceService } from "#src/services/instance/index.ts";
 import { InstanceRepository as InstanceRepoTag } from "#src/services/instance/repository.ts";
+import { OidcService } from "#src/services/oidc/service.ts";
 import { PrincipalService } from "#src/services/principal/index.ts";
 import { PrincipalRepository } from "#src/services/principal/repository.ts";
 import { ProvisioningService } from "#src/services/provisioning/service.ts";
+import { OidcLoginRepository } from "#src/services/session/oidc-login-repository.ts";
+import { SessionService } from "#src/services/session/service.ts";
 import { ShareLinkService } from "#src/services/share-link/service.ts";
 import { UserService } from "#src/services/user/index.ts";
+import { UserRepository } from "#src/services/user/repository.ts";
 import { uiRouter } from "./router.ts";
 
 // ---------------------------------------------------------------------------
@@ -65,7 +70,6 @@ const stubLayers = Layer.mergeAll(
 		database: { url: Redacted.make("postgres://localhost/test") },
 		auth: {
 			mode: "single-user" as const,
-			proxyHeader: "X-Remote-User",
 			trustedProxies: "*",
 			adminEmail: Option.none(),
 			adminPassword: Option.none(),
@@ -286,6 +290,37 @@ const stubLayers = Layer.mergeAll(
 		existsByUid: () => Effect.succeed(false),
 		existsByUidForPrincipal: () => Effect.succeed(false),
 		listActiveInstancesWithUid: () => Effect.succeed([]),
+	}),
+	Layer.succeed(AppPasswordService, {
+		generate: die,
+		list: () => Effect.succeed([]),
+		revoke: () => Effect.void,
+	}),
+	Layer.succeed(OidcService, {
+		beginLogin: die,
+		completeLogin: die,
+	}),
+	Layer.succeed(OidcLoginRepository, {
+		create: () => Effect.void,
+		consume: () => Effect.succeed(Option.none()),
+		deleteExpired: () => Effect.void,
+	}),
+	Layer.succeed(SessionService, {
+		create: die,
+		validate: () => Effect.succeed(Option.none()),
+		revoke: () => Effect.void,
+	}),
+	Layer.succeed(UserRepository, {
+		findById: () => Effect.succeed(Option.none()),
+		findBySlug: () => Effect.succeed(Option.none()),
+		findByEmail: () => Effect.succeed(Option.none()),
+		list: () => Effect.succeed([]),
+		softDelete: () => Effect.void,
+		create: die,
+		update: die,
+		findCredential: () => Effect.succeed(Option.none()),
+		insertCredential: die,
+		deleteCredential: () => Effect.void,
 	}),
 );
 

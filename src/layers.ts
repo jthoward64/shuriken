@@ -7,6 +7,8 @@ import { TemplateServiceLive } from "#src/http/ui/template/index.ts";
 import { type CryptoService, CryptoServiceLive } from "#src/platform/crypto.ts";
 import { FileServiceLive } from "#src/platform/file.ts";
 import { AclDomainLayer } from "#src/services/acl/index.ts";
+import { AppPasswordRepositoryLive } from "#src/services/app-password/repository.live.ts";
+import { AppPasswordServiceLive } from "#src/services/app-password/service.live.ts";
 import { BirthdaySchedulerLayer } from "#src/services/birthday/scheduler.live.ts";
 import { BirthdayServiceLive } from "#src/services/birthday/service.live.ts";
 import { CalEditServiceLive } from "#src/services/cal-edit/service.live.ts";
@@ -27,9 +29,14 @@ import { ImipInboundServiceLive } from "#src/services/imip/inbound.live.ts";
 import { LmtpServerLayer } from "#src/services/imip/lmtp-server.ts";
 import { InstanceDomainLayer } from "#src/services/instance/index.ts";
 import { MailerServiceLive } from "#src/services/mailer/service.live.ts";
+import { OidcServiceLive } from "#src/services/oidc/service.live.ts";
 import { PrincipalDomainLayer } from "#src/services/principal/index.ts";
 import { ProvisioningDomainLayer } from "#src/services/provisioning/index.ts";
 import { SchedulingDomainLayer } from "#src/services/scheduling/index.ts";
+import { SessionCleanupLayer } from "#src/services/session/cleanup.live.ts";
+import { OidcLoginRepositoryLive } from "#src/services/session/oidc-login-repository.live.ts";
+import { SessionRepositoryLive } from "#src/services/session/repository.live.ts";
+import { SessionServiceLive } from "#src/services/session/service.live.ts";
 import { ShareLinkRepositoryLive } from "#src/services/share-link/repository.live.ts";
 import { ShareLinkServiceLive } from "#src/services/share-link/service.live.ts";
 import {
@@ -64,17 +71,33 @@ const DevToolsLayer = Layer.unwrap(
 ).pipe(Layer.provide(InfraLayer));
 
 // ---------------------------------------------------------------------------
-// Auth layer — composite implementation; tries auto-login → proxy → basic on
+// Session / OIDC / app-password layers — built over InfraLayer.
+// ---------------------------------------------------------------------------
+
+const SessionRepositoryFull = SessionRepositoryLive.pipe(
+	Layer.provide(InfraLayer),
+);
+const OidcLoginRepositoryFull = OidcLoginRepositoryLive.pipe(
+	Layer.provide(InfraLayer),
+);
+const SessionServiceFull = SessionServiceLive.pipe(
+	Layer.provide(Layer.mergeAll(InfraLayer, SessionRepositoryFull)),
+);
+const AppPasswordRepositoryFull = AppPasswordRepositoryLive.pipe(
+	Layer.provide(InfraLayer),
+);
+const AppPasswordServiceFull = AppPasswordServiceLive.pipe(
+	Layer.provide(Layer.mergeAll(InfraLayer, AppPasswordRepositoryFull)),
+);
+const OidcServiceFull = OidcServiceLive.pipe(Layer.provide(InfraLayer));
+
+// ---------------------------------------------------------------------------
+// Auth layer — composite implementation; tries auto-login → session → basic on
 // every request and returns the first authenticated result.
 // ---------------------------------------------------------------------------
 
 export const AuthLayer = CompositeAuthLayer.pipe(
-	Layer.provide(
-		Layer.mergeAll(
-			InfraLayer,
-			ProvisioningDomainLayer.pipe(Layer.provide(InfraLayer)),
-		),
-	),
+	Layer.provide(Layer.mergeAll(InfraLayer, SessionServiceFull)),
 );
 
 // ---------------------------------------------------------------------------
@@ -115,6 +138,12 @@ const BaseAppLayer = Layer.mergeAll(
 	CardIndexRepositoryLive.pipe(Layer.provide(InfraLayer)),
 	UserEmailCredentialRepositoryLive.pipe(Layer.provide(InfraLayer)),
 	ShareLinkRepositoryLive.pipe(Layer.provide(InfraLayer)),
+	SessionRepositoryFull,
+	SessionServiceFull,
+	OidcLoginRepositoryFull,
+	OidcServiceFull,
+	AppPasswordRepositoryFull,
+	AppPasswordServiceFull,
 	FileServiceLive,
 	TemplateServiceLive.pipe(Layer.provide(FileServiceLive)),
 );
@@ -142,6 +171,7 @@ const MailerFull = MailerServiceLive.pipe(
 
 export const AppLayer = Layer.mergeAll(
 	BaseAppLayer,
+	SessionCleanupLayer.pipe(Layer.provide(BaseAppLayer)),
 	SchedulingDomainLayer.pipe(Layer.provide(BaseAppLayer)),
 	ExternalCalendarSyncFull,
 	SubscriptionServiceLive.pipe(Layer.provide(BaseAppLayer)),
@@ -197,6 +227,7 @@ export { TemplateService } from "#src/http/ui/template/index.ts";
 export { CryptoService } from "#src/platform/crypto.ts";
 export { FileService } from "#src/platform/file.ts";
 export { AclService } from "#src/services/acl/index.ts";
+export { AppPasswordService } from "#src/services/app-password/service.ts";
 export { BirthdayService } from "#src/services/birthday/service.ts";
 export { CalEditService } from "#src/services/cal-edit/service.ts";
 export {
@@ -235,11 +266,15 @@ export {
 	InstanceService,
 } from "#src/services/instance/index.ts";
 export { MailerService } from "#src/services/mailer/service.ts";
+export { OidcService } from "#src/services/oidc/service.ts";
 export {
 	PrincipalRepository,
 	PrincipalService,
 } from "#src/services/principal/index.ts";
 export { SchedulingService } from "#src/services/scheduling/index.ts";
+export { OidcLoginRepository } from "#src/services/session/oidc-login-repository.ts";
+export { SessionRepository } from "#src/services/session/repository.ts";
+export { SessionService } from "#src/services/session/service.ts";
 export { ShareLinkRepository } from "#src/services/share-link/repository.ts";
 export { ShareLinkService } from "#src/services/share-link/service.ts";
 export {

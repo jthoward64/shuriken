@@ -1,7 +1,7 @@
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
 import { Option } from "effect";
-import { isClientTrusted } from "./proxy.ts";
+import { isClientTrusted } from "./trusted-proxy.ts";
 
 // ---------------------------------------------------------------------------
 // isClientTrusted — pure function unit tests

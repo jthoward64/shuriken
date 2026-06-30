@@ -28,8 +28,10 @@
     "npm:fast-xml-parser@^5.9.3": "5.9.3",
     "npm:handlebars@^4.7.9": "4.7.9",
     "npm:hash-wasm@^4.12.0": "4.12.0",
+    "npm:jose@^6.1.0": "6.2.3",
     "npm:mailparser@^3.9.11": "3.9.11",
     "npm:nodemailer@^9.0.1": "9.0.1",
+    "npm:openid-client@^6.8.1": "6.8.4",
     "npm:postgres@^3.4.9": "3.4.9",
     "npm:rrule-temporal@^1.5.3": "1.5.3",
     "npm:temporal-polyfill@^1.0.1": "1.0.1",
@@ -1067,6 +1069,9 @@
       "integrity": "sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ==",
       "bin": true
     },
+    "jose@6.2.3": {
+      "integrity": "sha512-YYVDInQKFJfR/xa3ojUTl8c2KoTwiL1R5Wg9YCydwH0x0B9grbzlg5HC7mMjCtUJjbQ/YnGEZIhI5tCgfTb4Hw=="
+    },
     "jsbi@4.3.2": {
       "integrity": "sha512-9fqMSQbhJykSeii05nxKl4m6Eqn2P6rOlYiS+C5Dr/HPIU/7yZxu5qzbs40tgaFORiw2Amd0mirjxatXYMkIew=="
     },
@@ -1175,8 +1180,18 @@
     "nodemailer@9.0.1": {
       "integrity": "sha512-Gwv8SQewT616ZM/URn0H54b8PWo/Wum7md3EW2aWy1lO27+WZCX+Xyak3J+NlmHUjDh5ME+uesJUDRbR3Ye8Bw=="
     },
+    "oauth4webapi@3.8.6": {
+      "integrity": "sha512-iwemM91xz8nryHti2yTmg5fhyEMVOkOXwHNqbvcATjyajb5oQxCQzrNOA6uElRHuMhQQTKUyFKV9y/CNyg25BQ=="
+    },
     "obuf@1.1.2": {
       "integrity": "sha512-PX1wu0AmAdPqOL1mWhqmlOd8kOIZQwGZw6rh7uby9fTc5lhaOWFLX3I6R1hrF9k3zUY40e6igsLGkDXK92LJNg=="
+    },
+    "openid-client@6.8.4": {
+      "integrity": "sha512-QSw0BA08piujetEwfZsHoTrDpMEha7GDZDicQqVwX4u0ChCjefvjDB++TZ8BTg76UpwhzIQgdvvfgfl3HpCSAw==",
+      "dependencies": [
+        "jose",
+        "oauth4webapi"
+      ]
     },
     "parseley@0.13.1": {
       "integrity": "sha512-uNBJZzmb60l6p6VWLTmevizNAGnE0xoSf1n0B4q3ntegDNzcS68NRCcBDZTcyXHxt2XhBChsCuqj4M+nChvE/A==",
@@ -1447,8 +1462,10 @@
       "npm:fast-xml-parser@^5.9.3",
       "npm:handlebars@^4.7.9",
       "npm:hash-wasm@^4.12.0",
+      "npm:jose@^6.1.0",
       "npm:mailparser@^3.9.11",
       "npm:nodemailer@^9.0.1",
+      "npm:openid-client@^6.8.1",
       "npm:postgres@^3.4.9",
       "npm:rrule-temporal@^1.5.3",
       "npm:temporal-polyfill@^1.0.1",

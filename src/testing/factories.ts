@@ -69,7 +69,9 @@ export const makeAuthUserRow = (
 	userId,
 	authSource: "local",
 	authId: "testuser",
+	label: null,
 	updatedAt: now(),
+	lastUsedAt: null,
 	authCredential: Redacted.make("test:password"),
 	...overrides,
 });

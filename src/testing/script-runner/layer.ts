@@ -6,6 +6,8 @@ import { TemplateService } from "#src/http/ui/template/index.ts";
 import type { CryptoService } from "#src/platform/crypto.ts";
 import { FileService } from "#src/platform/file.ts";
 import { AclDomainLayer, AclRepositoryLive } from "#src/services/acl/index.ts";
+import { AppPasswordRepositoryLive } from "#src/services/app-password/repository.live.ts";
+import { AppPasswordServiceLive } from "#src/services/app-password/service.live.ts";
 import { BirthdayServiceLive } from "#src/services/birthday/service.live.ts";
 import { CalEditServiceLive } from "#src/services/cal-edit/service.live.ts";
 import { CalIndexRepositoryLive } from "#src/services/cal-index/index.ts";
@@ -22,9 +24,13 @@ import { ImipDispatchServiceLive } from "#src/services/imip/dispatch.live.ts";
 import { ImipInboundServiceLive } from "#src/services/imip/inbound.live.ts";
 import { InstanceDomainLayer } from "#src/services/instance/index.ts";
 import { MailerServiceLive } from "#src/services/mailer/service.live.ts";
+import { OidcServiceLive } from "#src/services/oidc/service.live.ts";
 import { PrincipalDomainLayer } from "#src/services/principal/index.ts";
 import { ProvisioningDomainLayer } from "#src/services/provisioning/index.ts";
 import { SchedulingDomainLayer } from "#src/services/scheduling/index.ts";
+import { OidcLoginRepositoryLive } from "#src/services/session/oidc-login-repository.live.ts";
+import { SessionRepositoryLive } from "#src/services/session/repository.live.ts";
+import { SessionServiceLive } from "#src/services/session/service.live.ts";
 import { ShareLinkRepositoryLive } from "#src/services/share-link/repository.live.ts";
 import { ShareLinkServiceLive } from "#src/services/share-link/service.live.ts";
 import {
@@ -49,8 +55,6 @@ const testConfig: AppConfigType = {
 	database: { url: Redacted.make("postgres://unused") },
 	auth: {
 		autoLogin: Option.none<string>(),
-		proxyHeader: Option.none<string>(),
-		proxyRoleHeader: Option.none<string>(),
 		trustedProxies: "*",
 		basicAuthEnabled: true,
 		adminEmail: Option.none<string>(),
@@ -58,7 +62,14 @@ const testConfig: AppConfigType = {
 		adminSlug: Option.none<string>(),
 		authSettingsUrl: Option.none<string>(),
 		authSettingsLabel: Option.none<string>(),
-		proxyAutoProvision: false,
+		oidcEnabled: false,
+		oidcIssuer: Option.none<string>(),
+		oidcClientId: Option.none<string>(),
+		oidcClientSecret: Option.none<Redacted.Redacted<string>>(),
+		oidcRedirectUri: Option.none<string>(),
+		oidcScopes: "openid profile email",
+		oidcAutoProvision: true,
+		sessionTtlDays: 7,
 	},
 	log: { level: undefined },
 	externalCalendar: {
@@ -154,6 +165,26 @@ export const makeScriptRunnerLayer = (overrides?: Partial<AppConfigType>) => {
 		withTestInfra(UserEmailCredentialRepositoryLive),
 		withTestInfra(ExternalCalendarRepositoryLive),
 		withTestInfra(ShareLinkRepositoryLive),
+		withTestInfra(SessionRepositoryLive),
+		SessionServiceLive.pipe(
+			Layer.provide(
+				Layer.mergeAll(
+					testInfraLayer,
+					SessionRepositoryLive.pipe(Layer.provide(testInfraLayer)),
+				),
+			),
+		),
+		withTestInfra(OidcLoginRepositoryLive),
+		OidcServiceLive.pipe(Layer.provide(testInfraLayer)),
+		withTestInfra(AppPasswordRepositoryLive),
+		AppPasswordServiceLive.pipe(
+			Layer.provide(
+				Layer.mergeAll(
+					testInfraLayer,
+					AppPasswordRepositoryLive.pipe(Layer.provide(testInfraLayer)),
+				),
+			),
+		),
 	);
 
 	const testStubsLayer = Layer.mergeAll(

@@ -53,6 +53,8 @@ export const DatabaseConfig = Config.all({
 	url: Config.redacted("databaseUrl"),
 });
 
+const DEFAULT_SESSION_TTL_DAYS = 7;
+
 export const AuthConfig = Config.all({
 	/**
 	 * Auto-login email. When set, all requests are authenticated as this user
@@ -62,24 +64,9 @@ export const AuthConfig = Config.all({
 	autoLogin: Config.string("autoLogin").pipe(Config.option),
 
 	/**
-	 * Header the reverse proxy injects with the authenticated username.
-	 * When set, proxy auth is enabled and requests from trusted IPs (see
-	 * TRUSTED_PROXIES) are authenticated via this header. Leave unset to
-	 * disable proxy auth.
-	 */
-	proxyHeader: Config.string("proxyHeader").pipe(Config.option),
-	/**
-	 * Optional header carrying the new user's role tag when proxy auth
-	 * auto-creates them. Header value should match a role from
-	 * `services/role/policy.ts` (e.g. "admin", "super_admin"); unknown
-	 * values fall back to "normal".
-	 */
-	proxyRoleHeader: Config.string("proxyRoleHeader").pipe(Config.option),
-
-	/**
 	 * Comma-separated list of trusted proxy IPs, or "*" to trust all.
-	 * Only meaningful when PROXY_HEADER is set; requests from untrusted IPs
-	 * have the proxy header ignored.
+	 * Requests from untrusted IPs have their `X-Forwarded-*` headers (public
+	 * scheme/host reconstruction) and SMTP credential override headers ignored.
 	 */
 	trustedProxies: Config.string("trustedProxies").pipe(Config.withDefault("*")),
 
@@ -121,13 +108,45 @@ export const AuthConfig = Config.all({
 	authSettingsLabel: Config.string("authSettingsLabel").pipe(Config.option),
 
 	/**
-	 * When true and proxy auth identifies an unknown email, the user is
-	 * auto-provisioned with the role from `proxyRoleHeader` (default
-	 * "normal"). Off by default — opt in only when the proxy is the
-	 * authoritative source of truth for user identity.
+	 * OpenID Connect login for the web UI. When enabled, the UI offers an
+	 * authorization-code (PKCE) login against the configured provider and
+	 * issues a server-side session cookie. DAV clients are unaffected — they
+	 * keep using Basic auth (local password or an app password).
 	 */
-	proxyAutoProvision: Config.boolean("proxyAutoProvision").pipe(
-		Config.withDefault(false),
+	oidcEnabled: Config.boolean("oidcEnabled").pipe(Config.withDefault(false)),
+
+	/** Issuer URL used for OIDC discovery (`<issuer>/.well-known/openid-configuration`). */
+	oidcIssuer: Config.string("oidcIssuer").pipe(Config.option),
+
+	/** OIDC client id registered with the provider. */
+	oidcClientId: Config.string("oidcClientId").pipe(Config.option),
+
+	/** OIDC client secret. Omit for a public client using PKCE only. */
+	oidcClientSecret: Config.redacted("oidcClientSecret").pipe(Config.option),
+
+	/**
+	 * Full callback URL registered with the provider. When unset it is derived
+	 * from the request's public origin plus `/ui/auth/callback`.
+	 */
+	oidcRedirectUri: Config.string("oidcRedirectUri").pipe(Config.option),
+
+	/** Space-separated OIDC scopes. Defaults to "openid profile email". */
+	oidcScopes: Config.string("oidcScopes").pipe(
+		Config.withDefault("openid profile email"),
+	),
+
+	/**
+	 * When true (default), a successful OIDC login for an unknown identity
+	 * provisions a new user from the token's email/name claims. Set false to
+	 * require an admin to pre-create the user first.
+	 */
+	oidcAutoProvision: Config.boolean("oidcAutoProvision").pipe(
+		Config.withDefault(true),
+	),
+
+	/** Browser session lifetime in days (absolute, from login). Defaults to 7. */
+	sessionTtlDays: Config.int("sessionTtlDays").pipe(
+		Config.withDefault(DEFAULT_SESSION_TTL_DAYS),
 	),
 });
 

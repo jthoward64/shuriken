@@ -16,6 +16,7 @@ import {
 import { FileService } from "#src/platform/file.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import { AclRepository as AclRepoTag } from "#src/services/acl/repository.ts";
+import { AppPasswordService } from "#src/services/app-password/service.ts";
 import { CalEditService } from "#src/services/cal-edit/service.ts";
 import { CalIndexRepository } from "#src/services/cal-index/index.ts";
 import { CardEditService } from "#src/services/card-edit/service.ts";
@@ -30,9 +31,12 @@ import { SubscriptionService } from "#src/services/external-calendar/subscriptio
 import { GroupRepository, GroupService } from "#src/services/group/index.ts";
 import { ImipDispatchService } from "#src/services/imip/dispatch.ts";
 import { InstanceService } from "#src/services/instance/index.ts";
+import { OidcService } from "#src/services/oidc/service.ts";
 import { PrincipalService } from "#src/services/principal/service.ts";
 import { ProvisioningService } from "#src/services/provisioning/service.ts";
 import { SchedulingService } from "#src/services/scheduling/service.ts";
+import { OidcLoginRepository } from "#src/services/session/oidc-login-repository.ts";
+import { SessionService } from "#src/services/session/service.ts";
 import { ShareLinkService } from "#src/services/share-link/service.ts";
 import { IanaTimezoneServiceLive } from "#src/services/timezone/iana.ts";
 import { CalTimezoneRepository } from "#src/services/timezone/index.ts";
@@ -248,8 +252,6 @@ const stubLayers = Layer.mergeAll(
 		database: { url: Redacted.make("postgres://localhost/test") },
 		auth: {
 			autoLogin: Option.none(),
-			proxyHeader: Option.none(),
-			proxyRoleHeader: Option.none(),
 			trustedProxies: "*",
 			basicAuthEnabled: true,
 			adminEmail: Option.none(),
@@ -257,7 +259,14 @@ const stubLayers = Layer.mergeAll(
 			adminSlug: Option.none(),
 			authSettingsUrl: Option.none(),
 			authSettingsLabel: Option.none(),
-			proxyAutoProvision: false,
+			oidcEnabled: false,
+			oidcIssuer: Option.none(),
+			oidcClientId: Option.none(),
+			oidcClientSecret: Option.none(),
+			oidcRedirectUri: Option.none(),
+			oidcScopes: "openid profile email",
+			oidcAutoProvision: true,
+			sessionTtlDays: 7,
 		},
 		log: { level: undefined },
 		externalCalendar: {
@@ -378,6 +387,25 @@ const stubLayers = Layer.mergeAll(
 		addCalendar: die,
 		removeCalendar: die,
 		delete: die,
+	}),
+	Layer.succeed(AppPasswordService, {
+		generate: die,
+		list: () => Effect.succeed([]),
+		revoke: () => Effect.void,
+	}),
+	Layer.succeed(OidcService, {
+		beginLogin: die,
+		completeLogin: die,
+	}),
+	Layer.succeed(OidcLoginRepository, {
+		create: () => Effect.void,
+		consume: () => Effect.succeed(Option.none()),
+		deleteExpired: () => Effect.void,
+	}),
+	Layer.succeed(SessionService, {
+		create: die,
+		validate: () => Effect.succeed(Option.none()),
+		revoke: () => Effect.void,
 	}),
 );
 

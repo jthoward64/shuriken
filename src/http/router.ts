@@ -11,6 +11,7 @@ import {
 import { davRouter } from "#src/http/dav/router.ts";
 import { buildXml } from "#src/http/dav/xml/builder.ts";
 import { feedHandler, isFeedPath } from "#src/http/feed/handler.ts";
+import { resolveForwardedUrl } from "#src/http/forwarded-url.ts";
 import { computeSmtpProxyOverride } from "#src/http/smtp-headers-apply.ts";
 import { SmtpProxyOverrideRef } from "#src/http/smtp-headers-ref.ts";
 import {
@@ -36,6 +37,7 @@ import {
 import type { FileService } from "#src/platform/file.ts";
 import type { AclService } from "#src/services/acl/index.ts";
 import type { AclRepository } from "#src/services/acl/repository.ts";
+import type { AppPasswordService } from "#src/services/app-password/service.ts";
 import type { CalEditService } from "#src/services/cal-edit/service.ts";
 import type { CalIndexRepository } from "#src/services/cal-index/index.ts";
 import type { CardEditService } from "#src/services/card-edit/service.ts";
@@ -53,8 +55,11 @@ import type {
 } from "#src/services/group/index.ts";
 import type { ImipDispatchService } from "#src/services/imip/dispatch.ts";
 import type { InstanceService } from "#src/services/instance/index.ts";
+import type { OidcService } from "#src/services/oidc/service.ts";
 import type { PrincipalService } from "#src/services/principal/service.ts";
 import type { ProvisioningService } from "#src/services/provisioning/service.ts";
+import type { OidcLoginRepository } from "#src/services/session/oidc-login-repository.ts";
+import type { SessionService } from "#src/services/session/service.ts";
 import type { ShareLinkService } from "#src/services/share-link/service.ts";
 import type { CalTimezoneRepository } from "#src/services/timezone/index.ts";
 import type { TombstoneRepository } from "#src/services/tombstone/index.ts";
@@ -90,6 +95,10 @@ type AppServices =
 	| CalIndexRepository
 	| CardIndexRepository
 	| UserRepository
+	| OidcService
+	| OidcLoginRepository
+	| SessionService
+	| AppPasswordService
 	| GroupRepository
 	| UserService
 	| GroupService
@@ -313,6 +322,17 @@ export const handleRequest = (
 		const cfg = yield* AppConfigService;
 		const smtpOverride = computeSmtpProxyOverride(req.headers, clientIp, cfg);
 
+		// Externally-visible URL — corrects scheme/host from a trusted proxy's
+		// X-Forwarded-* headers so every absolute href we emit (DAV responses,
+		// timezone service, Location headers, web UI) matches the public URL
+		// rather than the internal http hop Deno.serve sees.
+		const publicUrl = resolveForwardedUrl(
+			url,
+			req.headers,
+			clientIp,
+			cfg.auth.trustedProxies,
+		);
+
 		const caldavTimezones = req.headers.get("CalDAV-Timezones") as
 			| "T"
 			| "F"
@@ -321,7 +341,7 @@ export const handleRequest = (
 		const ctx: HttpRequestContext = {
 			requestId,
 			method: req.method,
-			url,
+			url: publicUrl,
 			headers: req.headers,
 			auth,
 			clientIp,
@@ -334,7 +354,7 @@ export const handleRequest = (
 			}
 
 			if (isTimezonePath(url.pathname)) {
-				return yield* timezonesHandler(req, url);
+				return yield* timezonesHandler(req, publicUrl);
 			}
 
 			if (isUiPath(url.pathname)) {

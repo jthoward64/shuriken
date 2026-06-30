@@ -1,28 +1,27 @@
-import { Effect, Layer, Option } from "effect";
+import { Effect, Layer, Option, Redacted } from "effect";
 import { authenticateBasic } from "#src/auth/layers/basic.ts";
-import {
-	authenticateProxy,
-	type ProxyAutoProvisionOpts,
-} from "#src/auth/layers/proxy.ts";
 import { resolveAutoLoginPrincipal } from "#src/auth/layers/single-user.ts";
 import { AuthService } from "#src/auth/service.ts";
 import { AppConfigService } from "#src/config.ts";
 import { DatabaseClient } from "#src/db/client.ts";
 import { Authenticated, Unauthenticated } from "#src/domain/types/dav.ts";
 import { Email } from "#src/domain/types/strings.ts";
+import { getCookie, SESSION_COOKIE } from "#src/http/cookie.ts";
 import { CryptoService } from "#src/platform/crypto.ts";
-import { ProvisioningService } from "#src/services/provisioning/service.ts";
+import { SessionService } from "#src/services/session/service.ts";
 
 // ---------------------------------------------------------------------------
 // Composite auth layer
 //
-// Replaces the old AUTH_MODE-driven single-strategy selection. All enabled
-// methods run on every request in priority order:
+// All enabled methods run on every request in priority order:
 //
-//   1. AUTO_LOGIN          — if set, the configured user is always returned;
-//                            no headers are inspected and no other method runs.
-//   2. PROXY_HEADER (set)  — proxy auth: trusted-IP check, header lookup, DB lookup.
-//   3. BASIC_AUTH_ENABLED  — basic auth: Authorization header, credential verify.
+//   1. AUTO_LOGIN        — if set, the configured user is always returned;
+//                          no headers are inspected and no other method runs.
+//   2. Session cookie    — a valid web-UI session (issued after OIDC login)
+//                          resolves to its user. DAV clients never send the
+//                          cookie, so this is a no-op for them.
+//   3. BASIC_AUTH        — basic auth: Authorization header verified against a
+//                          local password or an app-password credential.
 //
 // The first method that returns Authenticated wins. If none authenticate, the
 // composite returns Unauthenticated and the HTTP edge maps to 401.
@@ -33,30 +32,16 @@ export const CompositeAuthLayer = Layer.effect(
 	Effect.gen(function* () {
 		const db = yield* DatabaseClient;
 		const crypto = yield* CryptoService;
-		const provisioning = yield* ProvisioningService;
+		const sessions = yield* SessionService;
 		const {
-			auth: {
-				autoLogin,
-				proxyHeader,
-				proxyRoleHeader,
-				trustedProxies,
-				basicAuthEnabled,
-				proxyAutoProvision,
-			},
+			auth: { autoLogin, basicAuthEnabled },
 		} = yield* AppConfigService;
 
 		const autoLoginEmail = Option.map(autoLogin, Email);
-		const provisionOpts: Option.Option<ProxyAutoProvisionOpts> =
-			proxyAutoProvision
-				? Option.some({
-						autoProvision: true,
-						roleHeader: proxyRoleHeader,
-					})
-				: Option.none();
 
 		return {
 			authenticate: Effect.fn("auth.composite.authenticate")(
-				function* (headers, clientIp) {
+				function* (headers, _clientIp) {
 					yield* Effect.annotateCurrentSpan({ "auth.mode": "composite" });
 
 					// 1. AUTO_LOGIN — short-circuit when configured
@@ -69,20 +54,15 @@ export const CompositeAuthLayer = Layer.effect(
 						return new Authenticated({ principal });
 					}
 
-					// 2. Proxy auth — when PROXY_HEADER is set
-					if (Option.isSome(proxyHeader)) {
-						const result = yield* authenticateProxy(
-							headers,
-							clientIp,
-							proxyHeader.value,
-							trustedProxies,
-							provisionOpts,
-						).pipe(
-							Effect.provideService(DatabaseClient, db),
-							Effect.provideService(ProvisioningService, provisioning),
+					// 2. Session cookie — only when one is present
+					const sessionToken = getCookie(headers, SESSION_COOKIE);
+					if (Option.isSome(sessionToken)) {
+						const principalOpt = yield* sessions.validate(
+							Redacted.make(sessionToken.value),
 						);
-						if (result._tag === "Authenticated") {
-							return result;
+						if (Option.isSome(principalOpt)) {
+							yield* Effect.annotateCurrentSpan({ "auth.mode": "session" });
+							return new Authenticated({ principal: principalOpt.value });
 						}
 					}
 

@@ -49,6 +49,8 @@ import { groupsCollectionsCreateHandler } from "#src/http/ui/api/groups/create-c
 import { groupsDeleteHandler } from "#src/http/ui/api/groups/delete.ts";
 import { groupsMembersHandler } from "#src/http/ui/api/groups/members.ts";
 import { groupsUpdateHandler } from "#src/http/ui/api/groups/update.ts";
+import { appPasswordsCreateHandler } from "#src/http/ui/api/profile/app-passwords-create.ts";
+import { appPasswordsRevokeHandler } from "#src/http/ui/api/profile/app-passwords-revoke.ts";
 import { emailCredentialsClearHandler } from "#src/http/ui/api/profile/email-credentials-clear.ts";
 import { emailCredentialsSaveHandler } from "#src/http/ui/api/profile/email-credentials-save.ts";
 import { subscriptionsCreateHandler } from "#src/http/ui/api/subscriptions/create.ts";
@@ -58,6 +60,9 @@ import { usersCollectionsCreateHandler } from "#src/http/ui/api/users/create-col
 import { usersDeleteHandler } from "#src/http/ui/api/users/delete.ts";
 import { usersSetPasswordHandler } from "#src/http/ui/api/users/set-password.ts";
 import { usersUpdateHandler } from "#src/http/ui/api/users/update.ts";
+import { callbackHandler } from "#src/http/ui/handlers/auth/callback.ts";
+import { loginHandler } from "#src/http/ui/handlers/auth/login.ts";
+import { logoutHandler } from "#src/http/ui/handlers/auth/logout.ts";
 import { eventEditHandler } from "#src/http/ui/handlers/calendar/event-edit.ts";
 import { eventNewHandler } from "#src/http/ui/handlers/calendar/event-new.ts";
 import { calendarExportHandler } from "#src/http/ui/handlers/calendar/export.ts";
@@ -75,6 +80,7 @@ import { groupsEditHandler } from "#src/http/ui/handlers/groups/edit.ts";
 import { groupsListHandler } from "#src/http/ui/handlers/groups/list.ts";
 import { groupsNewHandler } from "#src/http/ui/handlers/groups/new.ts";
 import { instanceAclHandler } from "#src/http/ui/handlers/instances/acl.ts";
+import { appPasswordsPageHandler } from "#src/http/ui/handlers/profile/app-passwords.ts";
 import { emailCredentialsPageHandler } from "#src/http/ui/handlers/profile/email-credentials.ts";
 import { sharedWithMeHandler } from "#src/http/ui/handlers/shared/index.ts";
 import { staticHandler } from "#src/http/ui/handlers/static.ts";
@@ -84,9 +90,11 @@ import { usersCollectionsNewHandler } from "#src/http/ui/handlers/users/collecti
 import { usersEditHandler } from "#src/http/ui/handlers/users/edit.ts";
 import { usersListHandler } from "#src/http/ui/handlers/users/list.ts";
 import { usersNewHandler } from "#src/http/ui/handlers/users/new.ts";
+import { isHtmxRequest } from "#src/http/ui/helpers/htmx.ts";
 import type { FileService } from "#src/platform/file.ts";
 import type { AclService } from "#src/services/acl/index.ts";
 import type { AclRepository } from "#src/services/acl/repository.ts";
+import type { AppPasswordService } from "#src/services/app-password/service.ts";
 import type { CalEditService } from "#src/services/cal-edit/service.ts";
 import type { CalIndexRepository } from "#src/services/cal-index/repository.ts";
 import type { CardEditService } from "#src/services/card-edit/service.ts";
@@ -103,11 +111,15 @@ import type { GroupService } from "#src/services/group/index.ts";
 import type { ImipDispatchService } from "#src/services/imip/dispatch.ts";
 import type { InstanceService } from "#src/services/instance/index.ts";
 import type { InstanceRepository } from "#src/services/instance/repository.ts";
+import type { OidcService } from "#src/services/oidc/service.ts";
 import type { PrincipalService } from "#src/services/principal/index.ts";
 import type { PrincipalRepository } from "#src/services/principal/repository.ts";
 import type { ProvisioningService } from "#src/services/provisioning/service.ts";
+import type { OidcLoginRepository } from "#src/services/session/oidc-login-repository.ts";
+import type { SessionService } from "#src/services/session/service.ts";
 import type { ShareLinkService } from "#src/services/share-link/service.ts";
 import type { UserService } from "#src/services/user/index.ts";
+import type { UserRepository } from "#src/services/user/repository.ts";
 import { profileHandler } from "./handlers/profile.ts";
 import { renderError } from "./helpers/render-page.ts";
 import type { TemplateService } from "./template/index.ts";
@@ -120,6 +132,11 @@ export type UiServices =
 	| AppConfigService
 	| AclRepository
 	| AclService
+	| AppPasswordService
+	| OidcService
+	| OidcLoginRepository
+	| SessionService
+	| UserRepository
 	| FileService
 	| CalEditService
 	| CalIndexRepository
@@ -155,10 +172,33 @@ const mapUiError = (
 	err: UiError,
 	ctx: HttpRequestContext,
 	basicAuthEnabled: boolean,
+	oidcEnabled: boolean,
 ): Effect.Effect<Response, never, TemplateService> =>
 	Match.value(err).pipe(
 		Match.tag("DavError", (e) => {
 			if (e.status === HTTP_UNAUTHORIZED) {
+				// Browser UI: send unauthenticated users to the OIDC login page rather
+				// than provoking a Basic-auth popup. DAV/API 401s (handled in the
+				// top-level router) still advertise Basic for client compatibility.
+				if (oidcEnabled) {
+					const loginUrl = `/ui/auth/login?returnTo=${encodeURIComponent(
+						ctx.url.pathname,
+					)}`;
+					if (isHtmxRequest(ctx.headers)) {
+						return Effect.succeed(
+							new Response(null, {
+								status: HTTP_OK,
+								headers: { "HX-Redirect": loginUrl },
+							}),
+						);
+					}
+					return Effect.succeed(
+						new Response(null, {
+							status: HTTP_SEE_OTHER,
+							headers: { Location: loginUrl },
+						}),
+					);
+				}
 				if (basicAuthEnabled) {
 					return Effect.succeed(
 						new Response(null, {
@@ -285,7 +325,12 @@ export const uiRouter = (
 			const config = yield* AppConfigService;
 			return yield* eff.pipe(
 				Effect.catch((err) =>
-					mapUiError(err, ctx, config.auth.basicAuthEnabled),
+					mapUiError(
+						err,
+						ctx,
+						config.auth.basicAuthEnabled,
+						config.auth.oidcEnabled,
+					),
 				),
 			);
 		});
@@ -309,6 +354,19 @@ export const uiRouter = (
 		);
 	}
 
+	// OIDC web-login flow (reachable unauthenticated)
+	if (seg0 === "auth" && !seg2) {
+		if (seg1 === "login" && method === "GET") {
+			return handle(loginHandler(req, ctx));
+		}
+		if (seg1 === "callback" && method === "GET") {
+			return handle(callbackHandler(req, ctx));
+		}
+		if (seg1 === "logout" && method === "POST") {
+			return handle(logoutHandler(req, ctx));
+		}
+	}
+
 	// Profile
 	if (seg0 === "profile" && !seg1 && method === "GET") {
 		return handle(profileHandler(req, ctx));
@@ -320,6 +378,14 @@ export const uiRouter = (
 		method === "GET"
 	) {
 		return handle(emailCredentialsPageHandler(req, ctx));
+	}
+	if (
+		seg0 === "profile" &&
+		seg1 === "app-passwords" &&
+		!seg2 &&
+		method === "GET"
+	) {
+		return handle(appPasswordsPageHandler(req, ctx));
 	}
 
 	// Collections (GET pages)
@@ -569,6 +635,14 @@ export const uiRouter = (
 			}
 			if (seg3 === "clear" && !seg4) {
 				return handle(emailCredentialsClearHandler(req, ctx));
+			}
+		}
+		if (seg1 === "profile" && seg2 === "app-passwords") {
+			if (seg3 === "create" && !seg4) {
+				return handle(appPasswordsCreateHandler(req, ctx));
+			}
+			if (seg3 === "revoke" && !seg4) {
+				return handle(appPasswordsRevokeHandler(req, ctx));
 			}
 		}
 		if (seg1 === "contacts") {

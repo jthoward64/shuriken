@@ -6,7 +6,11 @@ import { AppConfigLive, AppConfigService } from "#src/config.ts";
 import { metricsHandler } from "#src/http/metrics/handler.ts";
 import { handleRequest } from "#src/http/router.ts";
 import { AppLayer } from "#src/layers.ts";
-import { autoLoginStartup, basicAuthStartup } from "#src/startup.ts";
+import {
+	autoLoginStartup,
+	basicAuthStartup,
+	oidcStartup,
+} from "#src/startup.ts";
 import { HTTP_INTERNAL_SERVER_ERROR } from "./http/status.ts";
 
 const program = Effect.gen(function* () {
@@ -22,6 +26,7 @@ const program = Effect.gen(function* () {
 			Effect.gen(function* () {
 				yield* autoLoginStartup;
 				yield* basicAuthStartup;
+				yield* oidcStartup;
 			}).pipe(Effect.tapError((err) => Effect.logError("startup failed", err))),
 		),
 	);

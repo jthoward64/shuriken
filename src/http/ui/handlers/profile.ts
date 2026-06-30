@@ -69,6 +69,7 @@ export const profileHandler = (
 				principal: principalRow,
 				canEditSlug: false,
 				showPasswordForm: config.auth.basicAuthEnabled,
+				showSignOut: config.auth.oidcEnabled,
 				authSettingsUrl,
 				authSettingsLabel,
 				principalUrl: `${davBase}/`,

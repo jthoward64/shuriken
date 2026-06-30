@@ -81,6 +81,36 @@ export const autoLoginStartup: Effect.Effect<
 });
 
 // ---------------------------------------------------------------------------
+// oidcStartup — config sanity check when OIDC is enabled. Discovery itself is
+// lazy (first login), so this only warns about missing required settings.
+// ---------------------------------------------------------------------------
+
+export const oidcStartup: Effect.Effect<void, never, AppConfigService> =
+	Effect.gen(function* () {
+		const config = yield* AppConfigService;
+		if (!config.auth.oidcEnabled) {
+			return;
+		}
+		const missing: Array<string> = [];
+		if (Option.isNone(config.auth.oidcIssuer)) {
+			missing.push("OIDC_ISSUER");
+		}
+		if (Option.isNone(config.auth.oidcClientId)) {
+			missing.push("OIDC_CLIENT_ID");
+		}
+		if (missing.length > 0) {
+			yield* Effect.logWarning(
+				"OIDC is enabled but required configuration is missing; web login will fail",
+				{ missing },
+			);
+		} else {
+			yield* Effect.logInfo("OIDC web login enabled", {
+				issuer: Option.getOrUndefined(config.auth.oidcIssuer),
+			});
+		}
+	});
+
+// ---------------------------------------------------------------------------
 // basicAuthStartup — runs when basic auth is enabled and ADMIN_EMAIL is set.
 //
 // If ADMIN_PASSWORD is not set, generates a random password and prints it

@@ -276,7 +276,9 @@ const makeUserRepo = (stores: TestStores): UserRepositoryShape => ({
 					userId,
 					authSource: cred.authSource,
 					authId: cred.authId,
+					label: null,
 					updatedAt: now,
+					lastUsedAt: null,
 					authCredential: Option.getOrNull(cred.authCredential),
 				};
 				stores.credentials.set(`${cred.authSource}:${cred.authId}`, credRow);
@@ -334,7 +336,9 @@ const makeUserRepo = (stores: TestStores): UserRepositoryShape => ({
 				userId: input.userId,
 				authSource: input.authSource,
 				authId: input.authId,
+				label: null,
 				updatedAt: now,
+				lastUsedAt: null,
 				authCredential: Option.getOrNull(input.authCredential),
 			};
 			stores.credentials.set(`${input.authSource}:${input.authId}`, credRow);
@@ -1542,7 +1546,9 @@ export const makeTestEnv = (): TestEnvBuilder => {
 				userId: seed.userId,
 				authSource: seed.authSource,
 				authId: seed.authId,
+				label: null,
 				updatedAt: now,
+				lastUsedAt: null,
 				authCredential: seed.authCredential ?? null,
 			};
 			stores.credentials.set(`${seed.authSource}:${seed.authId}`, credRow);

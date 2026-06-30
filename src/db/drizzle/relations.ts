@@ -35,6 +35,7 @@ export const relations = defineRelations(schema, (r) => ({
 		memberships: r.many.membership(),
 		emailCredential: r.one.userEmailCredential(),
 		shareLinks: r.many.shareLink(),
+		sessions: r.many.session(),
 		// M:N convenience over the `membership` junction.
 		groups: r.many.group({
 			from: r.user.id.through(r.membership.userId),
@@ -45,6 +46,13 @@ export const relations = defineRelations(schema, (r) => ({
 	authUser: {
 		user: r.one.user({
 			from: r.authUser.userId,
+			to: r.user.id,
+			optional: false,
+		}),
+	},
+	session: {
+		user: r.one.user({
+			from: r.session.userId,
 			to: r.user.id,
 			optional: false,
 		}),
