@@ -29,7 +29,7 @@ migrations:
 # ---------------------------------------------------------------------------
 # App runtime configuration. Every key here maps to an env var read by the
 # app via Effect's Config API. The chart auto-derives the SCREAMING_SNAKE
-# name (e.g. config.server.port → PORT, config.auth.proxyHeader → PROXY_HEADER).
+# name (e.g. config.server.port → PORT, config.auth.oidcIssuer → OIDC_ISSUER).
 #
 # Values are split into two cohorts:
 #   * non-sensitive — rendered into a ConfigMap
@@ -70,16 +70,16 @@ config:
     # When set, every request is auto-authenticated as this email.
     # Useful for single-user self-hosted setups. Leave blank to disable.
     autoLogin: ""
-    # Enable HTTP Basic auth. Disable if you only want proxy auth.
+    # Enable HTTP Basic auth (DAV clients). Required for app passwords; only
+    # disable if every client uses the web UI (OIDC) exclusively.
     basicAuthEnabled: true
-    # Proxy auth toggle: when proxyHeader is set, the server trusts the
-    # header on requests from trusted IPs.
-    proxyHeader: ""
-    proxyRoleHeader: ""
-    # Comma-separated trusted-proxy IPs / CIDRs. "*" trusts every source.
+    # Comma-separated trusted-proxy IPs / CIDRs, or "*" to trust every source.
+    # NOT an auth method: it gates X-Forwarded-* (public scheme/host) and SMTP
+    # override headers. Behind a TLS-terminating ingress this MUST trust the
+    # ingress IPs so X-Forwarded-Proto=https is honoured — otherwise session
+    # cookies won't be marked Secure and the derived OIDC redirect URI will be
+    # http://<internal-host>. Alternatively set config.auth.oidcRedirectUri.
     trustedProxies: "*"
-    # Auto-create unknown users from proxy headers + role header.
-    proxyAutoProvision: false
     # First-boot admin user (basic auth). Password goes into the Secret.
     adminEmail: ""
     adminPassword: ""
@@ -87,6 +87,30 @@ config:
     # External account-management link shown on the profile page.
     authSettingsUrl: ""
     authSettingsLabel: ""
+
+    # ---- OIDC (web UI single sign-on) ----------------------------------
+    # When enabled, the web UI runs an OpenID Connect authorization-code
+    # (PKCE) flow and issues a session cookie. DAV clients are unaffected —
+    # OIDC users generate app passwords (UI → Profile → App passwords) to
+    # connect CalDAV/CardDAV clients over Basic auth.
+    oidcEnabled: false
+    # Issuer URL (discovery is <issuer>/.well-known/openid-configuration).
+    oidcIssuer: ""
+    oidcClientId: ""
+    # Client secret is sensitive → rendered into the Secret. Leave blank for
+    # a public client using PKCE only.
+    oidcClientSecret: ""
+    # Full callback URL registered with the provider. Leave blank to derive
+    # it from the request's public origin + /ui/auth/callback (requires the
+    # ingress to be trusted via trustedProxies — see note above).
+    oidcRedirectUri: ""
+    # Space-separated scopes.
+    oidcScopes: "openid profile email"
+    # Create a local user on first successful login (linked by email/sub).
+    # Set false to require an admin to pre-create users.
+    oidcAutoProvision: true
+    # Browser session lifetime, in days.
+    sessionTtlDays: 7
 
   externalCalendar:
     schedulerTickS: 60
@@ -125,8 +149,9 @@ config:
 
 # ---------------------------------------------------------------------------
 # Secret handling. Sensitive values above (database.url, adminPassword,
-# mail.defaultPassword, mail.credsKey, mail.profilesJson) are rendered into
-# a chart-managed Secret named `<release>-shuriken-secret` by default.
+# auth.oidcClientSecret, mail.defaultPassword, mail.credsKey, mail.profilesJson)
+# are rendered into a chart-managed Secret named `<release>-shuriken-secret` by
+# default.
 #
 # To use an externally-managed Secret (e.g. created by ExternalSecrets,
 # Sealed Secrets, or your own pipeline), set `existingSecret.name`. The

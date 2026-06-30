@@ -27,14 +27,19 @@ services:
     environment:
       DATABASE_URL: postgresql://shuriken:shuriken@database:5432/shuriken
       PORT: "3000"
-      AUTH_MODE: single-user
-      SINGLE_USER_EMAIL: admin@example.com
-      # For basic auth:
-      # AUTH_MODE: basic
-      # For proxy auth:
-      # AUTH_MODE: proxy
-      # PROXY_HEADER: X-Remote-User
-      # TRUSTED_PROXIES: "*"
+      # Single-user mode: every request is this user (no credentials).
+      AUTO_LOGIN: admin@example.com
+      # For Basic auth (DAV clients + app passwords), drop AUTO_LOGIN and set:
+      # BASIC_AUTH_ENABLED: "true"
+      # ADMIN_EMAIL: admin@example.com
+      # ADMIN_PASSWORD: change-me        # omit to get a random one printed at first boot
+      # For OIDC single sign-on on the web UI (drop AUTO_LOGIN):
+      # OIDC_ENABLED: "true"
+      # OIDC_ISSUER: https://idp.example.com/realms/main
+      # OIDC_CLIENT_ID: shuriken
+      # OIDC_CLIENT_SECRET: change-me
+      # OIDC_REDIRECT_URI: https://dav.example.com/ui/auth/callback
+      # TRUSTED_PROXIES: "*"             # trust the proxy so X-Forwarded-Proto/Host are honoured
       # LOG_LEVEL: info
     ports:
       - "3000:3000"

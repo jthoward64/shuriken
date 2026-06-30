@@ -21,14 +21,7 @@ data:
   AUTO_LOGIN: {{ . | quote }}
   {{- end }}
   BASIC_AUTH_ENABLED: {{ .Values.config.auth.basicAuthEnabled | quote }}
-  {{- with .Values.config.auth.proxyHeader }}
-  PROXY_HEADER: {{ . | quote }}
-  {{- end }}
-  {{- with .Values.config.auth.proxyRoleHeader }}
-  PROXY_ROLE_HEADER: {{ . | quote }}
-  {{- end }}
   TRUSTED_PROXIES: {{ .Values.config.auth.trustedProxies | quote }}
-  PROXY_AUTO_PROVISION: {{ .Values.config.auth.proxyAutoProvision | quote }}
   {{- with .Values.config.auth.adminEmail }}
   ADMIN_EMAIL: {{ . | quote }}
   {{- end }}
@@ -41,6 +34,20 @@ data:
   {{- with .Values.config.auth.authSettingsLabel }}
   AUTH_SETTINGS_LABEL: {{ . | quote }}
   {{- end }}
+  # ---- OIDC (web UI) -----------------------------------------------------
+  OIDC_ENABLED: {{ .Values.config.auth.oidcEnabled | quote }}
+  {{- with .Values.config.auth.oidcIssuer }}
+  OIDC_ISSUER: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.config.auth.oidcClientId }}
+  OIDC_CLIENT_ID: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.config.auth.oidcRedirectUri }}
+  OIDC_REDIRECT_URI: {{ . | quote }}
+  {{- end }}
+  OIDC_SCOPES: {{ .Values.config.auth.oidcScopes | quote }}
+  OIDC_AUTO_PROVISION: {{ .Values.config.auth.oidcAutoProvision | quote }}
+  SESSION_TTL_DAYS: {{ .Values.config.auth.sessionTtlDays | quote }}
 
   # ---- external calendar scheduler --------------------------------------
   EXTERNAL_CALENDAR_SCHEDULER_TICK_S: {{ .Values.config.externalCalendar.schedulerTickS | quote }}

@@ -39,7 +39,9 @@ Everything is documented inline in [values.yaml](./values.yaml). Highlights:
 | Key | What it does |
 | --- | --- |
 | `config.database.url` | Postgres connection string (rendered into the Secret) |
-| `config.auth.basicAuthEnabled` / `proxyHeader` / `proxyAutoProvision` | Auth strategy selection |
+| `config.auth.autoLogin` / `basicAuthEnabled` | Single-user and Basic-auth (DAV + app passwords) selection |
+| `config.auth.oidcEnabled` / `oidcIssuer` / `oidcClientId` / `oidcClientSecret` | OIDC single sign-on for the web UI (client secret → Secret) |
+| `config.auth.trustedProxies` | Trusted ingress IPs for `X-Forwarded-*` / SMTP headers (not an auth method; see note below) |
 | `config.mail.enabled` + `mail.*` | Outbound SMTP + iMIP LMTP |
 | `existingSecret.name` | Read env vars from an out-of-band Secret |
 | `migrations.enabled` | Run schema migrations as a Helm hook Job |
@@ -72,7 +74,7 @@ Three modes:
 2. **External Secret**: set `existingSecret.name` to a Secret you manage
    via External Secrets / Sealed Secrets / your CI. The chart will
    `envFrom` that Secret directly. Expected keys are SCREAMING_SNAKE_CASE
-   (e.g. `DATABASE_URL`, `ADMIN_PASSWORD`, `EMAIL_CREDS_KEY`).
+   (e.g. `DATABASE_URL`, `ADMIN_PASSWORD`, `OIDC_CLIENT_SECRET`, `EMAIL_CREDS_KEY`).
 3. **Mix**: keep `existingSecret.name` set but also pass `extraEnv` for
    one-off overrides.
 
@@ -80,3 +82,31 @@ Three modes:
 
 Liveness / readiness / startup all hit `/.well-known/caldav` (HEAD-safe,
 no auth required). Tune timing in values if your DB cold-start is slow.
+
+## Auth & upgrading from proxy auth
+
+Proxy auth (`PROXY_HEADER` / `X-Remote-User` / `PROXY_AUTO_PROVISION`) has been
+**removed**. The web UI now uses OIDC; DAV clients use Basic auth with either a
+local password or a per-device **app password** (UI → Profile → App passwords).
+
+If you previously ran proxy auth behind an authenticating proxy (Authelia,
+Authentik, Keycloak gatekeeper, oauth2-proxy):
+
+1. Drop `config.auth.proxyHeader` / `proxyRoleHeader` / `proxyAutoProvision`
+   from your values (they no longer exist; with the new `values.schema.json`
+   they'll be rejected at install time).
+2. Point shuriken straight at your IdP: set `config.auth.oidcEnabled=true`,
+   `oidcIssuer`, `oidcClientId`, and `oidcClientSecret`, and register
+   `https://<your-host>/ui/auth/callback` as a redirect URI at the provider.
+3. Behind a TLS-terminating ingress, set `config.auth.trustedProxies` to the
+   ingress source IPs (or `"*"` if the listener isn't otherwise reachable) so
+   `X-Forwarded-Proto=https` is honoured — otherwise session cookies won't be
+   `Secure` and the auto-derived redirect URI will be `http://<internal-host>`.
+   Alternatively pin `config.auth.oidcRedirectUri` explicitly.
+4. Users keep their accounts: existing users are re-linked by verified email on
+   first OIDC login (`oidcAutoProvision=true`, the default, also creates unknown
+   users). Each user then generates app passwords for their DAV clients.
+
+No data migration is required beyond running the bundled schema migration
+(`migrations.enabled`, default on), which adds the `session` / `oidc_login`
+tables and app-password columns.

@@ -119,17 +119,8 @@
 						"basicAuthEnabled": {
 							"type": "boolean"
 						},
-						"proxyHeader": {
-							"type": "string"
-						},
-						"proxyRoleHeader": {
-							"type": "string"
-						},
 						"trustedProxies": {
 							"type": "string"
-						},
-						"proxyAutoProvision": {
-							"type": "boolean"
 						},
 						"adminEmail": {
 							"type": "string"
@@ -145,6 +136,30 @@
 						},
 						"authSettingsLabel": {
 							"type": "string"
+						},
+						"oidcEnabled": {
+							"type": "boolean"
+						},
+						"oidcIssuer": {
+							"type": "string"
+						},
+						"oidcClientId": {
+							"type": "string"
+						},
+						"oidcClientSecret": {
+							"type": "string"
+						},
+						"oidcRedirectUri": {
+							"type": "string"
+						},
+						"oidcScopes": {
+							"type": "string"
+						},
+						"oidcAutoProvision": {
+							"type": "boolean"
+						},
+						"sessionTtlDays": {
+							"type": "integer"
 						}
 					}
 				},
