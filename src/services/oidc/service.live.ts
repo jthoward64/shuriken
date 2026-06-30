@@ -180,13 +180,55 @@ export const OidcServiceLive = Layer.effect(
 						new OidcError({ reason: "ID token missing from token response" }),
 					);
 				}
+
+				let email = stringClaim(claims.email);
+				let name = stringClaim(claims.name);
+				let emailVerified = claims.email_verified === true;
+				let groups = groupsClaim(claims, oidcGroupsClaim);
+
+				// Some providers (e.g. Authentik with "Include claims in id_token"
+				// off) surface email / name / groups only via the userinfo endpoint.
+				// Fetch it once to fill anything the ID token omitted; a userinfo
+				// failure is logged and ignored rather than blocking login.
+				const needGroups =
+					Option.isSome(oidcGroupsClaim) && Option.isNone(groups);
+				if (Option.isNone(email) || Option.isNone(name) || needGroups) {
+					const userInfo = yield* Effect.tryPromise({
+						try: () =>
+							client.fetchUserInfo(config, tokens.access_token, claims.sub),
+						catch: (e) =>
+							new OidcError({ reason: "userinfo fetch failed", cause: e }),
+					}).pipe(
+						Effect.catchTag("OidcError", (e) =>
+							Effect.as(
+								Effect.logWarning("auth.oidc: userinfo fetch failed", {
+									reason: e.reason,
+								}),
+								null,
+							),
+						),
+					);
+					if (userInfo !== null) {
+						if (Option.isNone(email)) {
+							email = stringClaim(userInfo.email);
+							emailVerified = emailVerified || userInfo.email_verified === true;
+						}
+						if (Option.isNone(name)) {
+							name = stringClaim(userInfo.name);
+						}
+						if (needGroups) {
+							groups = groupsClaim(userInfo, oidcGroupsClaim);
+						}
+					}
+				}
+
 				return {
 					issuer: claims.iss,
 					subject: claims.sub,
-					email: stringClaim(claims.email),
-					emailVerified: claims.email_verified === true,
-					name: stringClaim(claims.name),
-					groups: groupsClaim(claims, oidcGroupsClaim),
+					email,
+					emailVerified,
+					name,
+					groups,
 				} satisfies OidcClaims;
 			});
 
