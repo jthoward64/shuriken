@@ -129,6 +129,31 @@ describe("Birthday calendar (integration)", () => {
 			expect(responseCount).toBe(2);
 			expect(propfindBody).toContain("text/calendar");
 
+			// 5b. current-user-privilege-set must advertise the Birthdays calendar
+			//     (and its derived instance) as read-only so clients don't offer an
+			//     edit that will 403. Content-write privileges are stripped; read
+			//     and write-properties (local rename/recolor) are retained.
+			expect(propfindBody).toContain("<D:read/>");
+			expect(propfindBody).toContain("<D:write-properties/>");
+			expect(propfindBody).not.toContain("<D:write/>");
+			expect(propfindBody).not.toContain("<D:write-content/>");
+			expect(propfindBody).not.toContain("<D:bind/>");
+			expect(propfindBody).not.toContain("<D:unbind/>");
+
+			// Contrast: a normal (writable) calendar still advertises write, so the
+			// stripping above is specific to read-only collections, not global.
+			const primaryReq = new Request(
+				"http://localhost/dav/principals/alice/cal/primary/",
+				{ method: "PROPFIND", headers: { Authorization: auth, Depth: "0" } },
+			);
+			const primaryRes = await runtime.runPromise(
+				handleRequest(primaryReq, mockClientAddress),
+			);
+			expect(primaryRes.status).toBe(207);
+			const primaryBody = await primaryRes.text();
+			expect(primaryBody).toContain("<D:write/>");
+			expect(primaryBody).toContain("<D:bind/>");
+
 			// 6. Read-only enforcement: PUT to the Birthdays collection must
 			//    be rejected with 403.
 			const writeAttempt = new Request(

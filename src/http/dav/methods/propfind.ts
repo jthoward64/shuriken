@@ -65,8 +65,13 @@ import { parseXml, readXmlBody } from "#src/http/dav/xml/parser.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import type { AceRow } from "#src/services/acl/repository.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
+import {
+	applyReadOnlyPrivileges,
+	isReadOnlyCollectionRow,
+} from "#src/services/collection/read-only-guard.ts";
 import type { CollectionRow } from "#src/services/collection/repository.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
+import type { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
 import { GroupService } from "#src/services/group/index.ts";
 import { InstanceService } from "#src/services/instance/index.ts";
 import type { InstanceRow } from "#src/services/instance/repository.ts";
@@ -717,6 +722,7 @@ export const propfindHandler = (
 	| CalTimezoneRepository
 	| GroupService
 	| ComponentRepository
+	| ExternalCalendarRepository
 > =>
 	Effect.gen(function* () {
 		// RFC 4918 §9.1 says missing Depth ≡ infinity; we reject infinity with
@@ -909,10 +915,13 @@ export const propfindHandler = (
 						ns,
 						coll.slug || coll.id,
 					);
-					const privileges = yield* acl.currentUserPrivileges(
-						actingPrincipalId,
-						CollectionId(coll.id),
-						"collection",
+					const privileges = applyReadOnlyPrivileges(
+						yield* acl.currentUserPrivileges(
+							actingPrincipalId,
+							CollectionId(coll.id),
+							"collection",
+						),
+						yield* isReadOnlyCollectionRow(coll),
 					);
 					responses.push(
 						collectionResponse(
@@ -940,10 +949,13 @@ export const propfindHandler = (
 							ns,
 							coll.slug || coll.id,
 						);
-						const privileges = yield* acl.currentUserPrivileges(
-							actingPrincipalId,
-							CollectionId(coll.id),
-							"collection",
+						const privileges = applyReadOnlyPrivileges(
+							yield* acl.currentUserPrivileges(
+								actingPrincipalId,
+								CollectionId(coll.id),
+								"collection",
+							),
+							yield* isReadOnlyCollectionRow(coll),
 						);
 						responses.push(
 							collectionResponse(
@@ -971,6 +983,12 @@ export const propfindHandler = (
 				"collection",
 			);
 			const collRow = yield* collSvc.findById(path.collectionId);
+			// Subscription (ICS feed) and auto-managed (birthdays) calendars are
+			// writable in the ACL — the caller owns them — but the server rejects
+			// content writes. Hide the write privileges so clients render them
+			// read-only instead of offering an edit that will 403. The same status
+			// applies to every member instance below.
+			const collReadOnly = yield* isReadOnlyCollectionRow(collRow);
 			const href = collectionHref(
 				origin,
 				path.principalSeg,
@@ -981,7 +999,9 @@ export const propfindHandler = (
 			const collProps: Record<ClarkName, unknown> = {
 				...buildCollectionProps(collRow, origin),
 				[CURRENT_USER_PRINCIPAL]: { [cn(DAV_NS, "href")]: actingPrincipalHref },
-				[CURRENT_USER_PRIVILEGE_SET]: buildPrivilegeSet(collectionPrivileges),
+				[CURRENT_USER_PRIVILEGE_SET]: buildPrivilegeSet(
+					applyReadOnlyPrivileges(collectionPrivileges, collReadOnly),
+				),
 				// RFC 3744 §5.1: owner of this resource
 				[DAV_OWNER]: { [cn(DAV_NS, "href")]: ownerHref },
 			};
@@ -1068,7 +1088,9 @@ export const propfindHandler = (
 						[CURRENT_USER_PRINCIPAL]: {
 							[cn(DAV_NS, "href")]: actingPrincipalHref,
 						},
-						[CURRENT_USER_PRIVILEGE_SET]: buildPrivilegeSet(instPrivileges),
+						[CURRENT_USER_PRIVILEGE_SET]: buildPrivilegeSet(
+							applyReadOnlyPrivileges(instPrivileges, collReadOnly),
+						),
 						// RFC 3744 §5.1: owner inherited from the parent collection
 						[DAV_OWNER]: { [cn(DAV_NS, "href")]: ownerHref },
 					};
@@ -1154,10 +1176,13 @@ export const propfindHandler = (
 						ns,
 						coll.slug || coll.id,
 					);
-					const privileges = yield* acl.currentUserPrivileges(
-						actingPrincipalId,
-						CollectionId(coll.id),
-						"collection",
+					const privileges = applyReadOnlyPrivileges(
+						yield* acl.currentUserPrivileges(
+							actingPrincipalId,
+							CollectionId(coll.id),
+							"collection",
+						),
+						yield* isReadOnlyCollectionRow(coll),
 					);
 					responses.push(
 						collectionResponse(
@@ -1268,6 +1293,8 @@ export const propfindHandler = (
 			const instRow = yield* instSvc.findById(path.instanceId);
 			// DAV:owner comes from the parent collection.
 			const instCollRow = yield* collSvc.findById(path.collectionId);
+			// A member of a read-only calendar is itself read-only to the client.
+			const instReadOnly = yield* isReadOnlyCollectionRow(instCollRow);
 			const ownerHref = `${origin}/dav/principals/${instCollRow.ownerPrincipalId}/`;
 			const href = instanceHref(
 				origin,
@@ -1279,7 +1306,9 @@ export const propfindHandler = (
 			const instProps: Record<ClarkName, unknown> = {
 				...buildInstanceProps(instRow),
 				[CURRENT_USER_PRINCIPAL]: { [cn(DAV_NS, "href")]: actingPrincipalHref },
-				[CURRENT_USER_PRIVILEGE_SET]: buildPrivilegeSet(instancePrivileges),
+				[CURRENT_USER_PRIVILEGE_SET]: buildPrivilegeSet(
+					applyReadOnlyPrivileges(instancePrivileges, instReadOnly),
+				),
 				// RFC 3744 §5.1: owner inherited from the parent collection
 				[DAV_OWNER]: { [cn(DAV_NS, "href")]: ownerHref },
 			};
