@@ -1,0 +1,52 @@
+<div class="space-y-4">
+  <div class="flex items-center gap-2 flex-wrap">
+    <a href="/ui/contacts" class="text-sm text-gray-500 hover:text-gray-700">Contacts</a>
+    <span class="text-gray-400">/</span>
+    <h1 class="text-2xl font-bold text-gray-900">{{pageTitle}}</h1>
+  </div>
+
+  {{> flash}}
+
+  {{#if hasAddressbook}}
+    <form method="GET" action="/ui/contacts/cleanup"
+          class="flex flex-wrap items-end gap-4 bg-white border border-gray-200 rounded-lg p-4">
+      <label class="text-sm text-gray-700">
+        Address book
+        <select name="addressbook"
+                class="mt-1 block rounded border border-gray-300 px-2 py-1.5 text-sm">
+          {{#each addressbooks}}
+            <option value="{{id}}" {{#if selected}}selected{{/if}}>{{displayName}}</option>
+          {{/each}}
+        </select>
+      </label>
+
+      <label class="text-sm text-gray-700">
+        Region for phone numbers
+        <select name="region"
+                class="mt-1 block rounded border border-gray-300 px-2 py-1.5 text-sm">
+          {{#each regions}}
+            <option value="{{code}}" {{#if selected}}selected{{/if}}>{{name}}</option>
+          {{/each}}
+        </select>
+      </label>
+
+      <button type="submit"
+              class="px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded hover:bg-gray-700">
+        Rescan
+      </button>
+    </form>
+
+    {{#if suggestions}}
+      <p class="text-sm text-gray-600">{{suggestionCount}} suggestion(s) found.</p>
+      <ul class="space-y-2">
+        {{#each suggestions}}
+          {{> cleanup-suggestion}}
+        {{/each}}
+      </ul>
+    {{else}}
+      <p class="text-gray-500 text-sm">Nothing to clean up here &#127881;</p>
+    {{/if}}
+  {{else}}
+    <p class="text-gray-500 text-sm">No address book available. Create one from your profile.</p>
+  {{/if}}
+</div>

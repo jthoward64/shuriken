@@ -29,6 +29,7 @@
     "npm:handlebars@^4.7.9": "4.7.9",
     "npm:hash-wasm@^4.12.0": "4.12.0",
     "npm:jose@^6.1.0": "6.2.3",
+    "npm:libphonenumber-js@^1.11.0": "1.13.7",
     "npm:mailparser@^3.9.11": "3.9.11",
     "npm:nodemailer@^9.0.1": "9.0.1",
     "npm:openid-client@^6.8.1": "6.8.4",
@@ -1096,6 +1097,9 @@
         "libqp"
       ]
     },
+    "libphonenumber-js@1.13.7": {
+      "integrity": "sha512-rvr3HIMdOgzhz1RFGjftji+wjoAFlzhqCNqJOU/MKTZQ8d9NZxAR/tI+0weDicyoucqVR0U1GCniqHJ0f8aM2A=="
+    },
     "libqp@2.1.1": {
       "integrity": "sha512-0Wd+GPz1O134cP62YU2GTOPNA7Qgl09XwCqM5zpBv87ERCXdfDtyKXvV7c9U22yWJh44QZqBocFnXN11K96qow=="
     },
@@ -1463,6 +1467,7 @@
       "npm:handlebars@^4.7.9",
       "npm:hash-wasm@^4.12.0",
       "npm:jose@^6.1.0",
+      "npm:libphonenumber-js@^1.11.0",
       "npm:mailparser@^3.9.11",
       "npm:nodemailer@^9.0.1",
       "npm:openid-client@^6.8.1",

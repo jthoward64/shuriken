@@ -23,6 +23,8 @@ import { CardEditService } from "#src/services/card-edit/service.ts";
 import { CardIndexRepository } from "#src/services/card-index/index.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
+import { ContactCleanupService } from "#src/services/contact-cleanup/service.ts";
+import { ContactMergeService } from "#src/services/contact-merge/service.ts";
 import { UserEmailCredentialRepository } from "#src/services/email-credential/repository.ts";
 import { EmailCredentialService } from "#src/services/email-credential/service.ts";
 import { EntityRepository } from "#src/services/entity/index.ts";
@@ -184,6 +186,7 @@ const stubLayers = Layer.mergeAll(
 	Layer.succeed(CardIndexRepository, {
 		findByText: die,
 		listForCollection: die,
+		listForDedup: die,
 		listWithBday: die,
 	}),
 	Layer.succeed(UserRepository, {
@@ -355,6 +358,14 @@ const stubLayers = Layer.mergeAll(
 		create: die,
 		update: die,
 		delete: die,
+		removePhoto: die,
+	}),
+	Layer.succeed(ContactMergeService, {
+		merge: die,
+	}),
+	Layer.succeed(ContactCleanupService, {
+		scan: die,
+		applyFix: die,
 	}),
 	Layer.succeed(CalEditService, {
 		create: die,

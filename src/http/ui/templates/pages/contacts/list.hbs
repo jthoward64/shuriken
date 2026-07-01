@@ -27,6 +27,14 @@
             <option value="merge">Replace duplicates</option>
           </select>
         </form>
+        <a href="/ui/contacts/merge?scope={{selectedId}}"
+           class="inline-flex items-center px-3 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded hover:bg-gray-50">
+          Find duplicates
+        </a>
+        <a href="/ui/contacts/cleanup?addressbook={{selectedId}}"
+           class="inline-flex items-center px-3 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded hover:bg-gray-50">
+          Clean up
+        </a>
         <a href="/ui/contacts/new?addressbook={{selectedId}}"
            class="inline-flex items-center px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded hover:bg-gray-700">
           New contact
@@ -58,30 +66,70 @@
 
   {{#if hasAddressbook}}
     {{#if contacts}}
-      <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <table class="min-w-full divide-y divide-gray-200">
-          <thead class="bg-gray-50">
-            <tr>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
-              <th class="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-200">
-            {{#each contacts}}
+      <form method="POST" action="/ui/api/contacts/bulk-download" class="space-y-3">
+        <input type="hidden" name="addressbook" value="{{selectedId}}" />
+
+        <div class="flex flex-wrap items-center gap-2 bg-white border border-gray-200 rounded-lg p-2">
+          <span class="text-sm text-gray-500 mr-1">With selected:</span>
+          <button type="submit" formaction="/ui/api/contacts/bulk-download"
+                  class="px-3 py-1.5 bg-white border border-gray-300 text-gray-700 text-sm rounded hover:bg-gray-50">
+            Download .vcf
+          </button>
+          <button type="submit" formaction="/ui/api/contacts/bulk-clear-photo"
+                  onclick="return confirm('Remove the profile picture from the selected contacts?')"
+                  class="px-3 py-1.5 bg-white border border-gray-300 text-gray-700 text-sm rounded hover:bg-gray-50">
+            Remove picture
+          </button>
+          <button type="submit" formaction="/ui/api/contacts/bulk-delete"
+                  onclick="return confirm('Delete the selected contacts? This cannot be undone.')"
+                  class="px-3 py-1.5 bg-white border border-red-300 text-red-700 text-sm rounded hover:bg-red-50">
+            Delete
+          </button>
+        </div>
+
+        <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
               <tr>
-                <td class="px-4 py-3 text-sm text-gray-900">{{fn}}</td>
-                <td class="px-4 py-3 text-sm text-gray-600">{{email}}</td>
-                <td class="px-4 py-3 text-sm text-gray-600">{{tel}}</td>
-                <td class="px-4 py-3 text-right text-sm">
-                  <a href="/ui/contacts/{{instanceId}}" class="text-gray-600 hover:text-gray-900">Open</a>
-                </td>
+                <th class="px-4 py-3 w-8">
+                  <input type="checkbox" aria-label="Select all contacts"
+                         onclick="for (const c of this.closest('table').querySelectorAll('input[name=id]')) c.checked = this.checked" />
+                </th>
+                <th class="px-4 py-3 w-12 sr-only">Photo</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
+                <th class="px-4 py-3"></th>
               </tr>
-            {{/each}}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+              {{#each contacts}}
+                <tr>
+                  <td class="px-4 py-3">
+                    <input type="checkbox" name="id" value="{{instanceId}}"
+                           aria-label="Select {{fn}}" />
+                  </td>
+                  <td class="px-4 py-2">
+                    {{#if hasPhoto}}
+                      <img src="/ui/contacts/{{instanceId}}/photo" alt="" loading="lazy"
+                           class="w-9 h-9 rounded-full object-cover bg-gray-100" />
+                    {{else}}
+                      <span class="w-9 h-9 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center text-sm font-medium"
+                            aria-hidden="true">{{initial}}</span>
+                    {{/if}}
+                  </td>
+                  <td class="px-4 py-3 text-sm text-gray-900">{{fn}}</td>
+                  <td class="px-4 py-3 text-sm text-gray-600">{{email}}</td>
+                  <td class="px-4 py-3 text-sm text-gray-600">{{tel}}</td>
+                  <td class="px-4 py-3 text-right text-sm">
+                    <a href="/ui/contacts/{{instanceId}}" class="text-gray-600 hover:text-gray-900">Open</a>
+                  </td>
+                </tr>
+              {{/each}}
+            </tbody>
+          </table>
+        </div>
+      </form>
     {{else}}
       <p class="text-gray-500 text-sm">No contacts here yet.</p>
     {{/if}}

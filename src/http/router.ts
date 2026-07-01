@@ -44,6 +44,8 @@ import type { CardEditService } from "#src/services/card-edit/service.ts";
 import type { CardIndexRepository } from "#src/services/card-index/index.ts";
 import type { CollectionService } from "#src/services/collection/index.ts";
 import type { ComponentRepository } from "#src/services/component/index.ts";
+import type { ContactCleanupService } from "#src/services/contact-cleanup/service.ts";
+import type { ContactMergeService } from "#src/services/contact-merge/service.ts";
 import type { UserEmailCredentialRepository } from "#src/services/email-credential/repository.ts";
 import type { EmailCredentialService } from "#src/services/email-credential/service.ts";
 import type { EntityRepository } from "#src/services/entity/index.ts";
@@ -110,6 +112,8 @@ type AppServices =
 	| AclRepository
 	| CalEditService
 	| CardEditService
+	| ContactCleanupService
+	| ContactMergeService
 	| EmailCredentialService
 	| ImipDispatchService
 	| UserEmailCredentialRepository

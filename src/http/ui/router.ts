@@ -36,9 +36,14 @@ import { calendarEventsHandler } from "#src/http/ui/api/calendar/events.ts";
 import { calendarImportHandler } from "#src/http/ui/api/calendar/import.ts";
 import { collectionsDeleteHandler } from "#src/http/ui/api/collections/delete.ts";
 import { collectionsUpdateHandler } from "#src/http/ui/api/collections/update.ts";
+import { contactsBulkClearPhotoHandler } from "#src/http/ui/api/contacts/bulk-clear-photo.ts";
+import { contactsBulkDeleteHandler } from "#src/http/ui/api/contacts/bulk-delete.ts";
+import { contactsBulkDownloadHandler } from "#src/http/ui/api/contacts/bulk-download.ts";
+import { contactsCleanupFixHandler } from "#src/http/ui/api/contacts/cleanup-fix.ts";
 import { contactsCreateHandler } from "#src/http/ui/api/contacts/create.ts";
 import { contactsDeleteHandler } from "#src/http/ui/api/contacts/delete.ts";
 import { contactsImportHandler } from "#src/http/ui/api/contacts/import.ts";
+import { contactsMergeExecuteHandler } from "#src/http/ui/api/contacts/merge.ts";
 import { contactsUpdateHandler } from "#src/http/ui/api/contacts/update.ts";
 import { feedsCreateHandler } from "#src/http/ui/api/feeds/create.ts";
 import { feedsDeleteHandler } from "#src/http/ui/api/feeds/delete.ts";
@@ -68,10 +73,13 @@ import { eventNewHandler } from "#src/http/ui/handlers/calendar/event-new.ts";
 import { calendarExportHandler } from "#src/http/ui/handlers/calendar/export.ts";
 import { calendarViewHandler } from "#src/http/ui/handlers/calendar/view.ts";
 import { collectionsEditHandler } from "#src/http/ui/handlers/collections/edit.ts";
+import { contactsCleanupHandler } from "#src/http/ui/handlers/contacts/cleanup.ts";
 import { contactsEditHandler } from "#src/http/ui/handlers/contacts/edit.ts";
 import { contactsExportHandler } from "#src/http/ui/handlers/contacts/export.ts";
 import { contactsListHandler } from "#src/http/ui/handlers/contacts/list.ts";
+import { contactsMergeHandler } from "#src/http/ui/handlers/contacts/merge.ts";
 import { contactsNewHandler } from "#src/http/ui/handlers/contacts/new.ts";
+import { contactsPhotoHandler } from "#src/http/ui/handlers/contacts/photo.ts";
 import { feedsEditHandler } from "#src/http/ui/handlers/feeds/edit.ts";
 import { feedsListHandler } from "#src/http/ui/handlers/feeds/list.ts";
 import { feedsNewHandler } from "#src/http/ui/handlers/feeds/new.ts";
@@ -102,6 +110,8 @@ import type { CardIndexRepository } from "#src/services/card-index/repository.ts
 import type { CollectionService } from "#src/services/collection/index.ts";
 import type { CollectionRepository } from "#src/services/collection/repository.ts";
 import type { ComponentRepository } from "#src/services/component/index.ts";
+import type { ContactCleanupService } from "#src/services/contact-cleanup/service.ts";
+import type { ContactMergeService } from "#src/services/contact-merge/service.ts";
 import type { UserEmailCredentialRepository } from "#src/services/email-credential/repository.ts";
 import type { EmailCredentialService } from "#src/services/email-credential/service.ts";
 import type { EntityRepository } from "#src/services/entity/index.ts";
@@ -150,6 +160,8 @@ export type UiServices =
 	| CollectionRepository
 	| CollectionService
 	| ComponentRepository
+	| ContactCleanupService
+	| ContactMergeService
 	| ExternalCalendarRepository
 	| GroupService
 	| InstanceRepository
@@ -512,6 +524,12 @@ export const uiRouter = (
 		if (seg1 === "new" && !seg2) {
 			return handle(contactsNewHandler(req, ctx));
 		}
+		if (seg1 === "merge" && !seg2) {
+			return handle(contactsMergeHandler(req, ctx));
+		}
+		if (seg1 === "cleanup" && !seg2) {
+			return handle(contactsCleanupHandler(req, ctx));
+		}
 		if (seg1 === "export.vcf" && !seg2) {
 			const bookId = ctx.url.searchParams.get("addressbook");
 			if (bookId !== null && isUuid(bookId)) {
@@ -524,6 +542,9 @@ export const uiRouter = (
 					),
 				);
 			}
+		}
+		if (seg1 && isUuid(seg1) && seg2 === "photo" && !seg3) {
+			return handle(contactsPhotoHandler(req, ctx, InstanceId(seg1)));
 		}
 		if (seg1 && isUuid(seg1) && !seg2) {
 			return handle(contactsEditHandler(req, ctx, InstanceId(seg1)));
@@ -648,6 +669,21 @@ export const uiRouter = (
 		if (seg1 === "contacts") {
 			if (seg2 === "create" && !seg3) {
 				return handle(contactsCreateHandler(req, ctx));
+			}
+			if (seg2 === "bulk-delete" && !seg3) {
+				return handle(contactsBulkDeleteHandler(req, ctx));
+			}
+			if (seg2 === "bulk-clear-photo" && !seg3) {
+				return handle(contactsBulkClearPhotoHandler(req, ctx));
+			}
+			if (seg2 === "bulk-download" && !seg3) {
+				return handle(contactsBulkDownloadHandler(req, ctx));
+			}
+			if (seg2 === "merge" && !seg3) {
+				return handle(contactsMergeExecuteHandler(req, ctx));
+			}
+			if (seg2 === "cleanup" && seg3 === "fix" && !seg4) {
+				return handle(contactsCleanupFixHandler(req, ctx));
 			}
 			if (seg2 && isUuid(seg2) && seg3 === "import" && !seg4) {
 				return handle(contactsImportHandler(req, ctx, CollectionId(seg2)));

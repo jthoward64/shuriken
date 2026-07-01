@@ -1,0 +1,107 @@
+<div class="space-y-4">
+  <div class="flex items-center gap-2 flex-wrap">
+    <a href="/ui/contacts" class="text-sm text-gray-500 hover:text-gray-700">Contacts</a>
+    <span class="text-gray-400">/</span>
+    <h1 class="text-2xl font-bold text-gray-900">{{pageTitle}}</h1>
+  </div>
+
+  {{> flash}}
+
+  {{#if hasAddressbook}}
+    <form method="GET" action="/ui/contacts/merge"
+          class="flex flex-wrap items-end gap-4 bg-white border border-gray-200 rounded-lg p-4">
+      <input type="hidden" name="run" value="1" />
+
+      <label class="text-sm text-gray-700">
+        Scope
+        <select name="scope" class="mt-1 block rounded border border-gray-300 px-2 py-1.5 text-sm">
+          <option value="all" {{#if scopeAll}}selected{{/if}}>All my address books</option>
+          {{#each addressbooks}}
+            <option value="{{id}}" {{#if selected}}selected{{/if}}>{{displayName}}</option>
+          {{/each}}
+        </select>
+      </label>
+
+      <fieldset class="text-sm text-gray-700">
+        <legend class="mb-1">Match when contacts share any of</legend>
+        <div class="flex items-center gap-4">
+          <label class="inline-flex items-center gap-1">
+            <input type="checkbox" name="email" {{#if emailChecked}}checked{{/if}} /> Email
+          </label>
+          <label class="inline-flex items-center gap-1">
+            <input type="checkbox" name="phone" {{#if phoneChecked}}checked{{/if}} /> Phone
+          </label>
+          <label class="inline-flex items-center gap-1">
+            <input type="checkbox" name="name" {{#if nameChecked}}checked{{/if}} /> Name
+          </label>
+        </div>
+      </fieldset>
+
+      <button type="submit"
+              class="px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded hover:bg-gray-700">
+        Find duplicates
+      </button>
+    </form>
+
+    {{#if noCriteria}}
+      <p class="text-sm text-yellow-800 bg-yellow-50 border border-yellow-300 rounded p-3">
+        Select at least one field to match on.
+      </p>
+    {{else if run}}
+      {{#if groups}}
+        <p class="text-sm text-gray-600">{{groupCount}} duplicate group(s) found.</p>
+        <div class="space-y-4">
+          {{#each groups}}
+            <div class="merge-group bg-white border border-gray-200 rounded-lg p-4 space-y-3">
+              <table class="min-w-full divide-y divide-gray-200 text-sm">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
+                    {{#if ../showAddressbook}}
+                      <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Address book</th>
+                    {{/if}}
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                  {{#each members}}
+                    <tr>
+                      <td class="px-3 py-2 text-gray-900">
+                        <a href="/ui/contacts/{{instanceId}}" class="hover:underline">{{fn}}</a>
+                      </td>
+                      <td class="px-3 py-2 text-gray-600">{{email}}</td>
+                      <td class="px-3 py-2 text-gray-600">{{tel}}</td>
+                      {{#if ../../showAddressbook}}
+                        <td class="px-3 py-2 text-gray-600">{{addressbook}}</td>
+                      {{/if}}
+                    </tr>
+                  {{/each}}
+                </tbody>
+              </table>
+              <div class="flex items-center justify-between gap-3">
+                <p class="text-xs text-gray-500">
+                  The most complete contact is kept; the rest are merged into it.
+                </p>
+                <form method="POST" action="/ui/api/contacts/merge"
+                      hx-post="/ui/api/contacts/merge"
+                      hx-target="closest .merge-group"
+                      hx-swap="outerHTML">
+                  <input type="hidden" name="ids" value="{{ids}}" />
+                  <button type="submit"
+                          class="px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded hover:bg-gray-700">
+                    Merge {{count}}
+                  </button>
+                </form>
+              </div>
+            </div>
+          {{/each}}
+        </div>
+      {{else}}
+        <p class="text-gray-500 text-sm">No duplicates found for the selected criteria.</p>
+      {{/if}}
+    {{/if}}
+  {{else}}
+    <p class="text-gray-500 text-sm">No address book available. Create one from your profile.</p>
+  {{/if}}
+</div>

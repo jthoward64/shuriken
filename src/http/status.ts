@@ -14,6 +14,7 @@ export const HTTP_CREATED = HttpStatus(201);
 export const HTTP_NO_CONTENT = HttpStatus(204);
 export const HTTP_MULTI_STATUS = HttpStatus(207);
 export const HTTP_MOVED_PERMANENTLY = HttpStatus(301);
+export const HTTP_FOUND = HttpStatus(302);
 export const HTTP_SEE_OTHER = HttpStatus(303);
 export const HTTP_NOT_MODIFIED = HttpStatus(304);
 export const HTTP_BAD_REQUEST = HttpStatus(400);

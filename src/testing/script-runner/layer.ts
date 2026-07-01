@@ -14,6 +14,8 @@ import { CalIndexRepositoryLive } from "#src/services/cal-index/index.ts";
 import { CardEditServiceLive } from "#src/services/card-edit/service.live.ts";
 import { CardIndexRepositoryLive } from "#src/services/card-index/index.ts";
 import { CollectionDomainLayer } from "#src/services/collection/index.ts";
+import { ContactCleanupServiceLive } from "#src/services/contact-cleanup/service.live.ts";
+import { ContactMergeServiceLive } from "#src/services/contact-merge/service.live.ts";
 import { DomainEntityDomainLayer } from "#src/services/domain-entity/index.ts";
 import { UserEmailCredentialRepositoryLive } from "#src/services/email-credential/repository.live.ts";
 import { EmailCredentialServiceLive } from "#src/services/email-credential/service.live.ts";
@@ -214,6 +216,8 @@ export const makeScriptRunnerLayer = (overrides?: Partial<AppConfigType>) => {
 		SubscriptionServiceLive.pipe(Layer.provide(testBaseLayer)),
 		BirthdayServiceLive.pipe(Layer.provide(testBaseLayer)),
 		CardEditServiceLive.pipe(Layer.provide(testBaseLayer)),
+		ContactCleanupServiceLive.pipe(Layer.provide(testBaseLayer)),
+		ContactMergeServiceLive.pipe(Layer.provide(testBaseLayer)),
 		CalEditServiceLive.pipe(Layer.provide(testBaseLayer)),
 		ShareLinkServiceLive.pipe(Layer.provide(testBaseLayer)),
 		EmailCredentialServiceLive.pipe(Layer.provide(testBaseLayer)),

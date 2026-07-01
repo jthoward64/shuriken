@@ -47,6 +47,17 @@ export interface CardEditServiceShape {
 	readonly delete: (
 		instanceId: InstanceId,
 	) => Effect.Effect<void, DatabaseError | DavError | InternalError>;
+	/**
+	 * Remove the PHOTO property from a contact's vCard, preserving every other
+	 * property verbatim (unlike a form round-trip, which drops properties the UI
+	 * doesn't surface). A no-op if the card has no photo.
+	 */
+	readonly removePhoto: (
+		instanceId: InstanceId,
+	) => Effect.Effect<
+		CardEditCreateResult,
+		DatabaseError | DavError | InternalError
+	>;
 }
 
 export class CardEditService extends Context.Service<

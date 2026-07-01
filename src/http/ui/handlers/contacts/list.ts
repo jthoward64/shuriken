@@ -25,6 +25,9 @@ interface ContactRow {
 	readonly fn: string;
 	readonly email: string;
 	readonly tel: string;
+	readonly hasPhoto: boolean;
+	/** First character of the display name, for the initials placeholder. */
+	readonly initial: string;
 }
 
 export const contactsListHandler = (
@@ -67,12 +70,18 @@ export const contactsListHandler = (
 				query === "" ? undefined : query,
 			);
 			contacts = summaries
-				.map((s) => ({
-					instanceId: s.instanceId,
-					fn: s.fn || "(no name)",
-					email: s.email ?? "",
-					tel: s.tel ?? "",
-				}))
+				.map((s) => {
+					const fn = s.fn || "(no name)";
+					const first = fn.trim().charAt(0).toUpperCase();
+					return {
+						instanceId: s.instanceId,
+						fn,
+						email: s.email ?? "",
+						tel: s.tel ?? "",
+						hasPhoto: s.hasPhoto,
+						initial: /[A-Z0-9]/i.test(first) ? first : "?",
+					};
+				})
 				.sort((a, b) => a.fn.localeCompare(b.fn));
 		}
 

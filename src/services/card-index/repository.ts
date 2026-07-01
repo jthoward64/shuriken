@@ -33,6 +33,25 @@ export interface CardSummaryRow {
 	readonly fn: string | null;
 	readonly email: string | null;
 	readonly tel: string | null;
+	/** Whether the underlying vCard carries a PHOTO property (see the
+	 * card_index trigger's data->>'has_photo'). Used by the list UI to decide
+	 * between an <img> (served by the photo endpoint) and a placeholder. */
+	readonly hasPhoto: boolean;
+}
+
+/**
+ * A contact projected for duplicate detection: identity plus the *full* set of
+ * emails and phones (not just the first of each), read straight from the
+ * card_index `data` JSONB so no vCard tree reload is needed. `collectionId` is
+ * carried so callers can group across several addressbooks at once.
+ */
+export interface DedupCardRow {
+	readonly instanceId: string;
+	readonly entityId: string;
+	readonly collectionId: string;
+	readonly fn: string | null;
+	readonly emails: ReadonlyArray<string>;
+	readonly phones: ReadonlyArray<string>;
 }
 
 export interface CardIndexRepositoryShape {
@@ -64,6 +83,15 @@ export interface CardIndexRepositoryShape {
 		collectionId: CollectionId,
 		fnFilter?: string,
 	) => Effect.Effect<ReadonlyArray<CardSummaryRow>, DatabaseError>;
+
+	/**
+	 * Return a {@link DedupCardRow} for every active card across the given
+	 * collections, carrying the full emails/phones arrays needed by duplicate
+	 * detection. An empty `collectionIds` yields an empty result without a query.
+	 */
+	readonly listForDedup: (
+		collectionIds: ReadonlyArray<CollectionId>,
+	) => Effect.Effect<ReadonlyArray<DedupCardRow>, DatabaseError>;
 
 	/**
 	 * Return every card in `collectionId` that has a non-empty BDAY value, joined

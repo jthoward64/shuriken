@@ -1,13 +1,14 @@
 import { Effect, Layer } from "effect";
 import { makeEtag } from "#src/data/etag.ts";
-import type { IrDocument } from "#src/data/ir.ts";
+import type { IrComponent, IrDocument } from "#src/data/ir.ts";
 import { encodeVCard } from "#src/data/vcard/codec.ts";
 import { DatabaseClient } from "#src/db/client.ts";
 import { withTransaction } from "#src/db/transaction.ts";
-import type {
-	DatabaseError,
-	DavError,
-	InternalError,
+import {
+	type DatabaseError,
+	type DavError,
+	type InternalError,
+	notFound,
 } from "#src/domain/errors.ts";
 import { CollectionId, EntityId, type InstanceId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
@@ -169,6 +170,67 @@ const del = (
 		yield* instanceSvc.delete(instanceId);
 	});
 
+const removePhoto = (
+	instanceId: InstanceId,
+): Effect.Effect<
+	{
+		readonly entityId: EntityId;
+		readonly instanceId: InstanceId;
+		readonly slug: string;
+		readonly uid: string;
+	},
+	DatabaseError | DavError | InternalError,
+	ComponentRepository | DatabaseClient | InstanceService
+> =>
+	Effect.gen(function* () {
+		const componentRepo = yield* ComponentRepository;
+		const instanceSvc = yield* InstanceService;
+		const db = yield* DatabaseClient;
+
+		const existing = yield* instanceSvc.findById(instanceId);
+		const entityId = EntityId(existing.entityId);
+		const treeOpt = yield* componentRepo.loadTree(entityId, "vcard");
+		if (treeOpt._tag === "None" || treeOpt.value.name !== "VCARD") {
+			return yield* Effect.fail(notFound("Contact not found"));
+		}
+		const root = treeOpt.value;
+		const uid =
+			root.properties.find((p) => p.name === "UID")?.value.value?.toString() ??
+			`urn:uuid:${existing.entityId}`;
+
+		// Structural edit: strip PHOTO, keep everything else exactly as stored so
+		// properties the UI form doesn't model (NICKNAME, IMPP, …) survive.
+		const stripped: IrComponent = {
+			name: root.name,
+			properties: root.properties.filter((p) => p.name !== "PHOTO"),
+			components: root.components,
+		};
+
+		const canonical = yield* encodeVCard({ kind: "vcard", root: stripped });
+		const etag = ETag(yield* makeEtag(canonical));
+		const contentLength = new TextEncoder().encode(canonical).byteLength;
+
+		yield* withTransaction(
+			Effect.gen(function* () {
+				yield* componentRepo.deleteByEntity(entityId);
+				yield* componentRepo.insertTree(entityId, stripped);
+				yield* instanceSvc.put(
+					{
+						collectionId: CollectionId(existing.collectionId),
+						entityId,
+						contentType: "text/vcard",
+						etag,
+						slug: Slug(existing.slug),
+						contentLength,
+					},
+					instanceId,
+				);
+			}),
+		).pipe(Effect.provideService(DatabaseClient, db));
+
+		return { entityId, instanceId, slug: existing.slug, uid };
+	});
+
 export const CardEditServiceLive = Layer.effect(
 	CardEditService,
 	Effect.gen(function* () {
@@ -193,6 +255,12 @@ export const CardEditServiceLive = Layer.effect(
 				),
 			delete: (instanceId) =>
 				del(instanceId).pipe(
+					Effect.provideService(InstanceService, instanceSvc),
+				),
+			removePhoto: (instanceId) =>
+				removePhoto(instanceId).pipe(
+					Effect.provideService(ComponentRepository, componentRepo),
+					Effect.provideService(DatabaseClient, db),
 					Effect.provideService(InstanceService, instanceSvc),
 				),
 		};

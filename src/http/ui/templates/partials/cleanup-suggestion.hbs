@@ -1,0 +1,60 @@
+<li data-suggestion
+    class="bg-white border border-gray-200 rounded-lg p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+  <div class="min-w-0 space-y-1">
+    <div class="flex items-center gap-2 flex-wrap">
+      <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
+        {{title}}
+      </span>
+      <a href="/ui/contacts/{{instanceId}}" class="text-sm font-medium text-gray-900 hover:underline">
+        {{contactFn}}
+      </a>
+    </div>
+    <p class="text-xs text-gray-500">{{description}}</p>
+    <p class="text-sm text-gray-700 font-mono break-all">
+      <span class="line-through text-gray-400">{{current}}</span>
+      {{#if proposed}}
+        <span class="text-gray-400"> &rarr; </span>
+        <span class="text-gray-900">{{proposed}}</span>
+      {{/if}}
+    </p>
+  </div>
+
+  <div class="flex items-center gap-2 shrink-0">
+    <form method="POST" action="/ui/api/contacts/cleanup/fix"
+          hx-post="/ui/api/contacts/cleanup/fix"
+          hx-target="closest [data-suggestion]"
+          hx-swap="outerHTML"
+          class="flex items-center gap-2">
+      <input type="hidden" name="instanceId" value="{{instanceId}}" />
+      <input type="hidden" name="fix" value="{{json fix}}" />
+      <input type="hidden" name="region" value="{{region}}" />
+      <input type="hidden" name="contactFn" value="{{contactFn}}" />
+
+      {{#if needsAreaCode}}
+        <input type="text" name="areaCode" inputmode="numeric" placeholder="Area code"
+               class="w-24 rounded border border-gray-300 px-2 py-1.5 text-sm" />
+      {{/if}}
+
+      {{#if needsLabel}}
+        <select name="newType"
+                class="rounded border border-gray-300 px-2 py-1.5 text-sm">
+          {{#each labelOptions}}
+            <option value="{{this}}">{{this}}</option>
+          {{/each}}
+          <option value="">(remove label)</option>
+        </select>
+      {{/if}}
+
+      <button type="submit"
+              class="px-3 py-1.5 bg-gray-800 text-white text-sm font-medium rounded hover:bg-gray-700">
+        Fix
+      </button>
+    </form>
+
+    <button type="button"
+            onclick="this.closest('[data-suggestion]').remove()"
+            class="px-3 py-1.5 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded hover:bg-gray-50">
+      Ignore
+    </button>
+  </div>
+</li>

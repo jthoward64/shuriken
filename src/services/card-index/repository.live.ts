@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { Effect, Layer } from "effect";
 import { DatabaseClient } from "#src/db/client.ts";
 import { cardIndex, davInstance } from "#src/db/drizzle/schema/index.ts";
@@ -159,6 +159,7 @@ const listForCollection = Effect.fn("CardIndexRepository.listForCollection")(
 					fn: cardIndex.fn,
 					email: sql<string | null>`${cardIndex.data}->'emails'->>0`,
 					tel: sql<string | null>`${cardIndex.data}->'phones'->>0`,
+					hasPhoto: sql<boolean>`COALESCE((${cardIndex.data}->>'has_photo')::boolean, false)`,
 				})
 				.from(cardIndex)
 				.innerJoin(
@@ -174,6 +175,57 @@ const listForCollection = Effect.fn("CardIndexRepository.listForCollection")(
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.card-index.listForCollection failed", e.cause),
+	),
+);
+
+/** Coerce a JSONB array of strings (or null) into a plain string array. */
+const asStringArray = (raw: unknown): ReadonlyArray<string> =>
+	Array.isArray(raw)
+		? raw.filter((v): v is string => typeof v === "string")
+		: [];
+
+const listForDedup = Effect.fn("CardIndexRepository.listForDedup")(
+	function* (collectionIds: ReadonlyArray<CollectionId>) {
+		yield* Effect.annotateCurrentSpan({
+			"collection.count": collectionIds.length,
+		});
+		if (collectionIds.length === 0) {
+			return [];
+		}
+
+		const rows = yield* runDbQuery((db) =>
+			db
+				.select({
+					instanceId: davInstance.id,
+					entityId: cardIndex.entityId,
+					collectionId: davInstance.collectionId,
+					fn: cardIndex.fn,
+					emails: sql<unknown>`${cardIndex.data}->'emails'`,
+					phones: sql<unknown>`${cardIndex.data}->'phones'`,
+				})
+				.from(cardIndex)
+				.innerJoin(
+					davInstance,
+					and(
+						eq(cardIndex.entityId, davInstance.entityId),
+						inArray(davInstance.collectionId, collectionIds),
+						isNull(davInstance.deletedAt),
+					),
+				)
+				.where(isNull(cardIndex.deletedAt)),
+		);
+
+		return rows.map((r) => ({
+			instanceId: r.instanceId,
+			entityId: r.entityId,
+			collectionId: r.collectionId,
+			fn: r.fn,
+			emails: asStringArray(r.emails),
+			phones: asStringArray(r.phones),
+		}));
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.card-index.listForDedup failed", e.cause),
 	),
 );
 
@@ -230,6 +282,8 @@ export const CardIndexRepositoryLive = Layer.effect(
 				run(findByText(...args)),
 			listForCollection: (...args: Parameters<typeof listForCollection>) =>
 				run(listForCollection(...args)),
+			listForDedup: (...args: Parameters<typeof listForDedup>) =>
+				run(listForDedup(...args)),
 			listWithBday: (...args: Parameters<typeof listWithBday>) =>
 				run(listWithBday(...args)),
 		};

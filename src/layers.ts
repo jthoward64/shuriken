@@ -16,6 +16,8 @@ import { CalIndexRepositoryLive } from "#src/services/cal-index/index.ts";
 import { CardEditServiceLive } from "#src/services/card-edit/service.live.ts";
 import { CardIndexRepositoryLive } from "#src/services/card-index/index.ts";
 import { CollectionDomainLayer } from "#src/services/collection/index.ts";
+import { ContactCleanupServiceLive } from "#src/services/contact-cleanup/service.live.ts";
+import { ContactMergeServiceLive } from "#src/services/contact-merge/service.live.ts";
 import { DomainEntityDomainLayer } from "#src/services/domain-entity/index.ts";
 import { UserEmailCredentialRepositoryLive } from "#src/services/email-credential/repository.live.ts";
 import { EmailCredentialServiceLive } from "#src/services/email-credential/service.live.ts";
@@ -177,6 +179,8 @@ export const AppLayer = Layer.mergeAll(
 	ExternalCalendarSyncFull,
 	SubscriptionServiceLive.pipe(Layer.provide(BaseAppLayer)),
 	CardEditServiceLive.pipe(Layer.provide(BaseAppLayer)),
+	ContactCleanupServiceLive.pipe(Layer.provide(BaseAppLayer)),
+	ContactMergeServiceLive.pipe(Layer.provide(BaseAppLayer)),
 	CalEditServiceLive.pipe(Layer.provide(BaseAppLayer)),
 	ShareLinkServiceLive.pipe(Layer.provide(BaseAppLayer)),
 	EmailCredentialFull,
