@@ -89,10 +89,31 @@ export const extractPropNames = (tree: unknown): ReadonlySet<ClarkName> => {
 // ---------------------------------------------------------------------------
 
 /**
+ * Extract the text of one `{DAV:}href` node.
+ *
+ * A bare `<D:href>/x</D:href>` parses to a string, but an `<D:href>` that
+ * carries its own attributes — most importantly a per-element `xmlns:`
+ * declaration, which iOS/macOS emit on EVERY href in a multiget — parses to an
+ * object whose text lives under `#text` (the xmlns attr is consumed by Clark
+ * normalization). Handle both, or return null for anything else.
+ */
+const hrefText = (node: unknown): string | null => {
+	if (typeof node === "string") {
+		return node;
+	}
+	if (typeof node === "object" && node !== null) {
+		const text = (node as Record<string, unknown>)["#text"];
+		return typeof text === "string" ? text : null;
+	}
+	return null;
+};
+
+/**
  * Extract all `<D:href>` text values from a Clark-normalized element tree.
  *
- * Handles both a single `{DAV:}href` string value and an array of them
- * (fast-xml-parser collapses duplicate elements into an array).
+ * Handles a single `{DAV:}href` or an array of them (fast-xml-parser collapses
+ * duplicate elements into an array), and — critically — hrefs that parse to an
+ * object because they carry a per-element `xmlns:` attribute (Apple clients).
  *
  * Returns an empty array if no hrefs are found.
  */
@@ -101,11 +122,8 @@ export const extractHrefs = (tree: unknown): ReadonlyArray<string> => {
 		return [];
 	}
 	const hrefEl = (tree as Record<string, unknown>)[cn(DAV_NS, "href")];
-	if (typeof hrefEl === "string") {
-		return [hrefEl];
-	}
-	if (Array.isArray(hrefEl)) {
-		return hrefEl.filter((h): h is string => typeof h === "string");
-	}
-	return [];
+	const nodes = Array.isArray(hrefEl) ? hrefEl : [hrefEl];
+	return nodes
+		.map(hrefText)
+		.filter((h): h is string => h !== null && h.length > 0);
 };
