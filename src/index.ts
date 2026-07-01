@@ -2,7 +2,7 @@ import "temporal-polyfill/global";
 
 import { NodeRuntime } from "@effect/platform-node";
 import { Effect, Layer, Logger, ManagedRuntime } from "effect";
-import { AppConfigLive, AppConfigService } from "#src/config.ts";
+import { AppConfigLive, AppConfigService, LogLevelLive } from "#src/config.ts";
 import { metricsHandler } from "#src/http/metrics/handler.ts";
 import { handleRequest } from "#src/http/router.ts";
 import { AppLayer } from "#src/layers.ts";
@@ -77,7 +77,11 @@ const program = Effect.gen(function* () {
 NodeRuntime.runMain(
 	program.pipe(
 		Effect.provide(
-			Layer.mergeAll(Logger.layer([Logger.consolePretty()]), AppConfigLive),
+			Layer.mergeAll(
+				Logger.layer([Logger.consolePretty()]),
+				LogLevelLive,
+				AppConfigLive,
+			),
 		),
 	),
 );

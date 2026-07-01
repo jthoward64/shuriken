@@ -3,6 +3,7 @@ import { and, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { Effect, Layer } from "effect";
 import { RRuleTemporal } from "rrule-temporal";
 import type { Temporal } from "temporal-polyfill";
+import { normalizeRruleUntil } from "#src/data/icalendar/recurrence/recurrence-check.ts";
 import { DatabaseClient } from "#src/db/client.ts";
 import { calIndex, davInstance } from "#src/db/drizzle/schema/index.ts";
 import { runDbQuery } from "#src/db/query.ts";
@@ -309,12 +310,28 @@ const indexRruleOccurrences = Effect.fn(
 				row.dtstartUtc.epochMilliseconds,
 			).toZonedDateTimeISO("UTC");
 
-			const rule = new RRuleTemporal({ rruleString: row.rruleText, dtstart });
-
-			// Sample 24 occurrences — sufficient to determine the pattern:
-			//   MONTHLY → covers 24 months (2 years)
-			//   YEARLY  → covers 24 years
-			const sample = rule.all((_, i) => i < 24);
+			// A malformed RRULE (beyond the naive-UNTIL case normalizeRruleUntil
+			// handles) must not fail the whole write/index pass. On a residual
+			// expansion error, log and skip THIS row's occurrence hints — they stay
+			// NULL, so the week-bucket pre-filter passes the row conservatively
+			// (correct, just less selective). The skip is logged, never silent.
+			let sample: ReturnType<RRuleTemporal["all"]>;
+			try {
+				const rule = new RRuleTemporal({
+					rruleString: normalizeRruleUntil(row.rruleText, dtstart),
+					dtstart,
+				});
+				// Sample 24 occurrences — sufficient to determine the pattern:
+				//   MONTHLY → covers 24 months (2 years)
+				//   YEARLY  → covers 24 years
+				sample = rule.all((_, i) => i < 24);
+			} catch (cause) {
+				yield* Effect.logWarning(
+					"repo.cal-index: skipping occurrence-hint indexing for a malformed RRULE",
+					{ rruleText: row.rruleText, cause },
+				);
+				continue;
+			}
 			if (sample.length === 0) {
 				continue;
 			}

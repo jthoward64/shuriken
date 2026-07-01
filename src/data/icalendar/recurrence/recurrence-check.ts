@@ -57,6 +57,53 @@ const irDateListToJsZdts = (v: IrValue): Array<JSTemporal.ZonedDateTime> => {
 	return single ? [single] : [];
 };
 
+const TWO_DIGITS = 2;
+const YEAR_DIGITS = 4;
+const pad = (n: number, width = TWO_DIGITS): string =>
+	String(n).padStart(width, "0");
+
+/**
+ * rrule-temporal requires an RRULE `UNTIL` to be a UTC datetime (trailing `Z`)
+ * or a DATE, and THROWS otherwise. Real-world clients (Google, Apple, older
+ * Exchange) routinely emit a naive local datetime `UNTIL=YYYYMMDDTHHMMSS` with
+ * no `Z`; left unhandled, one such event crashes the entire calendar-query
+ * REPORT (HTTP 500), which stops a client like iOS from syncing the collection
+ * at all.
+ *
+ * Rewrite a naive datetime UNTIL to its UTC equivalent. RFC 5545 §3.3.10 says a
+ * datetime UNTIL shares DTSTART's time reference, so the naive value is
+ * interpreted in DTSTART's timezone (e.g. `UNTIL=20260502T010000` with
+ * `DTSTART;TZID=America/New_York` is 01:00 New York → 05:00 UTC), not blindly as
+ * UTC — otherwise the series-end bound is off by the zone offset and can drop the
+ * final occurrence. When DTSTART is floating/unknown we fall back to UTC (which
+ * matches how floating DTSTARTs are handled elsewhere in this module).
+ * Already-UTC (`…Z`) and DATE-only UNTILs are left untouched (rrule-temporal
+ * accepts both).
+ */
+export const normalizeRruleUntil = (
+	rruleString: string,
+	dtstart?: JSTemporal.ZonedDateTime,
+): string => {
+	const timeZone = dtstart?.timeZoneId ?? "UTC";
+	return rruleString.replace(
+		/UNTIL=(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(?![\dZ])/g,
+		(_match, y, mo, d, h, mi, s) => {
+			const utc = JSTemporal.PlainDateTime.from({
+				year: Number(y),
+				month: Number(mo),
+				day: Number(d),
+				hour: Number(h),
+				minute: Number(mi),
+				second: Number(s),
+			})
+				.toZonedDateTime(timeZone)
+				.toInstant()
+				.toZonedDateTimeISO("UTC");
+			return `UNTIL=${pad(utc.year, YEAR_DIGITS)}${pad(utc.month)}${pad(utc.day)}T${pad(utc.hour)}${pad(utc.minute)}${pad(utc.second)}Z`;
+		},
+	);
+};
+
 // ---------------------------------------------------------------------------
 // hasOccurrenceInRange
 // ---------------------------------------------------------------------------
@@ -81,12 +128,13 @@ export const getOccurrenceInstantsInRange = (
 	if (!rruleProp || rruleProp.value.type !== "RECUR") {
 		return [];
 	}
-	const rruleString = rruleProp.value.value;
 
 	const dtstartProp = vevent.properties.find((p) => p.name === "DTSTART");
 	const dtstart = dtstartProp
 		? irSingleValueToJsZdt(dtstartProp.value)
 		: undefined;
+
+	const rruleString = normalizeRruleUntil(rruleProp.value.value, dtstart);
 
 	const exDate: Array<JSTemporal.ZonedDateTime> = [];
 	for (const prop of vevent.properties) {
@@ -169,13 +217,15 @@ export const hasOccurrenceInRange = (
 	if (!rruleProp || rruleProp.value.type !== "RECUR") {
 		return false;
 	}
-	const rruleString = rruleProp.value.value;
 
-	// 2. DTSTART → @js-temporal/polyfill ZonedDateTime
+	// 2. DTSTART → @js-temporal/polyfill ZonedDateTime (needed to interpret a
+	//    naive UNTIL in the event's timezone).
 	const dtstartProp = vevent.properties.find((p) => p.name === "DTSTART");
 	const dtstart = dtstartProp
 		? irSingleValueToJsZdt(dtstartProp.value)
 		: undefined;
+
+	const rruleString = normalizeRruleUntil(rruleProp.value.value, dtstart);
 
 	// 3a. exDate from EXDATE properties
 	const exDate: Array<JSTemporal.ZonedDateTime> = [];

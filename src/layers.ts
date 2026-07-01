@@ -1,7 +1,7 @@
 import { Effect, Layer, Logger } from "effect";
 import { DevTools } from "effect/unstable/devtools";
 import { CompositeAuthLayer } from "#src/auth/index.ts";
-import { AppConfigLive, AppConfigService } from "#src/config.ts";
+import { AppConfigLive, AppConfigService, LogLevelLive } from "#src/config.ts";
 import { type DatabaseClient, DatabaseClientLive } from "#src/db/client.ts";
 import { TemplateServiceLive } from "#src/http/ui/template/index.ts";
 import { type CryptoService, CryptoServiceLive } from "#src/platform/crypto.ts";
@@ -119,6 +119,7 @@ const withInfra = <A, E>(
 // BaseAppLayer — all services except those with cross-domain dependencies.
 const BaseAppLayer = Layer.mergeAll(
 	Logger.layer([Logger.consolePretty()]),
+	LogLevelLive,
 	InfraLayer,
 	AuthLayer,
 	DevToolsLayer,

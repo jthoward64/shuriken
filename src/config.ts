@@ -5,6 +5,7 @@ import {
 	Effect,
 	Layer,
 	LogLevel,
+	References,
 } from "effect";
 
 // ---------------------------------------------------------------------------
@@ -449,3 +450,23 @@ export const AppConfigLive = Layer.effect(
 	AppConfigService,
 	AppConfigService.make,
 );
+
+// ---------------------------------------------------------------------------
+// LogLevelLive — applies LOG_LEVEL to the logger's minimum level.
+//
+// Config parses LOG_LEVEL into `config.log.level`, but a bare
+// `Logger.layer([...])` keeps the default minimum (Info). This layer sets
+// References.MinimumLogLevel from the parsed level so LOG_LEVEL=debug|trace
+// actually takes effect; when LOG_LEVEL is unset it is a no-op (default Info).
+// Merge it alongside the logger layer at the application boundary.
+// ---------------------------------------------------------------------------
+
+export const LogLevelLive = Layer.unwrap(
+	AppConfigService.pipe(
+		Effect.map(({ log }) =>
+			log.level !== undefined
+				? Layer.succeed(References.MinimumLogLevel, log.level)
+				: Layer.empty,
+		),
+	),
+).pipe(Layer.provide(AppConfigLive));
