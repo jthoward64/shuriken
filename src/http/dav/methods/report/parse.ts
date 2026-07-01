@@ -109,11 +109,26 @@ const hrefText = (node: unknown): string | null => {
 };
 
 /**
- * Extract all `<D:href>` text values from a Clark-normalized element tree.
+ * True when a parsed element key names an `href` element, regardless of how its
+ * namespace prefix resolved. We match by LOCAL NAME because iOS/macOS multiget
+ * bodies declare `xmlns:` on `<prop>` and then reuse that prefix on the sibling
+ * `<href>` elements without declaring it in their own scope (technically invalid
+ * but ubiquitous). Clark normalization then can't resolve the prefix and leaves
+ * the key as e.g. `"A:href"` instead of `"{DAV:}href"`. In a multiget/report
+ * body the only `href`-named elements are DAV hrefs, so this is unambiguous.
  *
- * Handles a single `{DAV:}href` or an array of them (fast-xml-parser collapses
- * duplicate elements into an array), and — critically — hrefs that parse to an
- * object because they carry a per-element `xmlns:` attribute (Apple clients).
+ * Matches: `{DAV:}href` (resolved), `A:href` (unresolved prefix), `href` (none).
+ */
+const isHrefKey = (key: string): boolean =>
+	key === "href" || key.endsWith(":href") || key.endsWith("}href");
+
+/**
+ * Extract all `href` text values from a Clark-normalized element tree.
+ *
+ * Handles a single value or an array (fast-xml-parser collapses duplicate
+ * elements into an array), hrefs that parse to an object because they carry a
+ * per-element attribute (text under `#text`), and hrefs whose namespace prefix
+ * didn't resolve to `{DAV:}` (Apple clients — see `isHrefKey`).
  *
  * Returns an empty array if no hrefs are found.
  */
@@ -121,9 +136,18 @@ export const extractHrefs = (tree: unknown): ReadonlyArray<string> => {
 	if (typeof tree !== "object" || tree === null) {
 		return [];
 	}
-	const hrefEl = (tree as Record<string, unknown>)[cn(DAV_NS, "href")];
-	const nodes = Array.isArray(hrefEl) ? hrefEl : [hrefEl];
-	return nodes
-		.map(hrefText)
-		.filter((h): h is string => h !== null && h.length > 0);
+	const out: Array<string> = [];
+	for (const [key, value] of Object.entries(tree as Record<string, unknown>)) {
+		if (!isHrefKey(key)) {
+			continue;
+		}
+		const nodes = Array.isArray(value) ? value : [value];
+		for (const node of nodes) {
+			const href = hrefText(node);
+			if (href !== null && href.length > 0) {
+				out.push(href);
+			}
+		}
+	}
+	return out;
 };

@@ -22,11 +22,14 @@ const EVENT = makeCalEvent({
 	dtend: "20260115T110000Z",
 });
 
-// Apple style: xmlns declared on <A:prop> and on the <A:href>, NOT on the root.
+// Apple style (verified against a real iOS request): xmlns:A="DAV:" is declared
+// only on <A:prop>, then the A: prefix is reused on the sibling <A:href>
+// elements WITHOUT being in their scope — so the prefix doesn't resolve and the
+// key stays "A:href" rather than "{DAV:}href".
 const APPLE_MULTIGET = `<?xml version="1.0" encoding="UTF-8"?>
 <C:calendar-multiget xmlns:C="urn:ietf:params:xml:ns:caldav">
   <A:prop xmlns:A="DAV:"><A:getetag/><C:calendar-data/></A:prop>
-  <A:href xmlns:A="DAV:">/dav/principals/test/cal/primary/ns.ics</A:href>
+  <A:href>/dav/principals/test/cal/primary/ns.ics</A:href>
 </C:calendar-multiget>`;
 
 describe("calendar-multiget with per-element xmlns on <href> (Apple style)", () => {
