@@ -59,6 +59,15 @@ export const calendarMultigetHandler = (
 		);
 
 		const hrefs = extractHrefs(tree);
+		if (hrefs.length === 0) {
+			// Diagnostic: a multiget with no resolvable hrefs returns an empty
+			// multistatus, which silently yields no data on the client. Log the
+			// parsed tree so an unexpected client href encoding can be identified.
+			yield* Effect.logWarning(
+				"dav.calendar-multiget: no hrefs extracted from request body",
+				{ tree: JSON.stringify(tree) },
+			);
+		}
 		const propNames = extractPropNames(tree);
 		// <C:calendar-data> is nested inside <D:prop>, not at the top level
 		const propEl =

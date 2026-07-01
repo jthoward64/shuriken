@@ -54,6 +54,12 @@ export const addressbookMultigetHandler = (
 		);
 
 		const hrefs = extractHrefs(tree);
+		if (hrefs.length === 0) {
+			yield* Effect.logWarning(
+				"dav.addressbook-multiget: no hrefs extracted from request body",
+				{ tree: JSON.stringify(tree) },
+			);
+		}
 		const propNames = extractPropNames(tree);
 		// <C:address-data> is nested inside <D:prop>, not at the top level
 		const propEl =
