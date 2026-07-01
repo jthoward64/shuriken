@@ -77,18 +77,22 @@ describe("parseCardFilter — invalid inputs", () => {
 		expect(result._tag).toBe("Failure");
 	});
 
-	it("fails when filter element is null", async () => {
+	// An empty <filter/> is valid (RFC 6352 §10.5.1 — matches all cards) and is
+	// what iOS Contacts sends; fast-xml-parser represents it as "" (or the client
+	// may send an explicitly empty value). These parse to a match-all filter, not
+	// an error. Only a wholly ABSENT filter element (above) is invalid.
+	it("treats an empty-string filter element as match-all", async () => {
 		const result = await Effect.runPromise(
-			Effect.result(parseCardFilter({ [cn("filter")]: null })),
+			parseCardFilter({ [cn("filter")]: "" }),
 		);
-		expect(result._tag).toBe("Failure");
+		expect(result.propFilters).toEqual([]);
 	});
 
-	it("fails when filter element is a string", async () => {
+	it("treats a null filter element as match-all", async () => {
 		const result = await Effect.runPromise(
-			Effect.result(parseCardFilter({ [cn("filter")]: "bad" })),
+			parseCardFilter({ [cn("filter")]: null }),
 		);
-		expect(result._tag).toBe("Failure");
+		expect(result.propFilters).toEqual([]);
 	});
 });
 

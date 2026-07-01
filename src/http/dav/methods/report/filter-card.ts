@@ -54,10 +54,19 @@ export const parseCardFilter = (
 	}
 	const obj = tree as Record<string, unknown>;
 	const filterEl = obj[cn("filter")];
-	if (typeof filterEl !== "object" || filterEl === null) {
+	// The <filter> element is required (RFC 6352 §8.6), but an EMPTY <filter/> is
+	// valid and matches every card (§10.5.1) — and it's what iOS Contacts sends
+	// to fetch the whole address book. fast-xml-parser collapses an empty element
+	// to "" (a string) rather than an object, so treat any present-but-non-object
+	// filter as an empty (match-all) filter instead of rejecting it with a 403.
+	// Only a wholly absent <filter> is invalid.
+	if (filterEl === undefined) {
 		return Effect.fail(forbidden("CARDDAV:valid-filter"));
 	}
-	const filterObj = filterEl as Record<string, unknown>;
+	const filterObj =
+		typeof filterEl === "object" && filterEl !== null
+			? (filterEl as Record<string, unknown>)
+			: {};
 	const test = filterObj["@_test"] === "anyof" ? "anyof" : "allof";
 
 	const propFilterEls = filterObj[cn("prop-filter")];
