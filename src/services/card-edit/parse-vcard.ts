@@ -1,33 +1,44 @@
 import type { IrComponent, IrProperty } from "#src/data/ir.ts";
+import {
+	baseName,
+	getText,
+	getTypeTokens,
+	groupOf,
+} from "#src/data/vcard/prop.ts";
+import { serializeParams } from "./build-vcard.ts";
+import { isOtherEditable } from "./field-registry.ts";
 import type {
 	ContactAddress,
 	ContactFormData,
+	ContactOtherProp,
+	ContactServiceValue,
 	ContactTypedValue,
 } from "./types.ts";
 import { emptyContactForm } from "./types.ts";
 
-// ---------------------------------------------------------------------------
-// parseVcardToForm — inverse of `buildVcardComponent`. Loses some fidelity
-// for properties the UI doesn't surface (NICKNAME, ROLE, IMPP, …): those
-// fields are dropped here, which means an edit-save round-trip would erase
-// them. Documented limitation of the v1 UI — clients still see them via
-// CardDAV REPORT. A future revision can either preserve unknown props in
-// a hidden form field or replace this with a structural-merge.
-// ---------------------------------------------------------------------------
-
-const textOf = (p: IrProperty): string =>
-	p.value.type === "TEXT" || p.value.type === "URI" ? p.value.value : "";
-
-const typesParam = (p: IrProperty): ReadonlyArray<string> => {
-	const t = p.parameters.find((pp) => pp.name === "TYPE");
-	if (!t || t.value === "") {
-		return [];
+// SOCIALPROFILE/IMPP service comes from SERVICE-TYPE; fall back to a TYPE token
+// (Apple's legacy X-SOCIALPROFILE uses TYPE).
+const serviceOf = (p: IrProperty): string => {
+	const st = p.parameters.find((x) => x.name === "SERVICE-TYPE");
+	if (st && st.value !== "") {
+		return st.value;
 	}
-	return t.value
-		.split(",")
-		.map((s) => s.trim())
-		.filter((s) => s !== "");
+	return getTypeTokens(p)[0] ?? "";
 };
+
+// Include `label` only when present, so label-free values stay `{value, types}`.
+const labelPart = (p: IrProperty): { label?: string } => {
+	const v = p.parameters.find((x) => x.name === "LABEL")?.value ?? "";
+	return v === "" ? {} : { label: v };
+};
+
+// ---------------------------------------------------------------------------
+// parseVcardToForm — pre-populates the edit form from a vCard. It surfaces only
+// the fields the form knows; properties it doesn't surface are NOT lost, because
+// the write-back (`mergeFormIntoVcard`) carries every unmanaged property/param
+// through verbatim. Matching is group-aware (`item1.EMAIL` → EMAIL) and reads
+// repeated TYPE params, so Apple/Google vCard 3.0 populates correctly.
+// ---------------------------------------------------------------------------
 
 const splitAddress = (raw: string): Omit<ContactAddress, "types"> => {
 	const parts = raw.split(";");
@@ -42,15 +53,31 @@ const splitAddress = (raw: string): Omit<ContactAddress, "types"> => {
 	};
 };
 
+const dateStr = (p: IrProperty): string => {
+	if (p.value.type === "DATE") {
+		return p.value.value.toString();
+	}
+	return p.value.type === "TEXT" || p.value.type === "URI" ? p.value.value : "";
+};
+
 export const parseVcardToForm = (vcard: IrComponent): ContactFormData => {
 	const emails: Array<ContactTypedValue> = [];
 	const tels: Array<ContactTypedValue> = [];
 	const urls: Array<string> = [];
 	const addresses: Array<ContactAddress> = [];
+	const socialProfiles: Array<ContactServiceValue> = [];
+	const impps: Array<ContactServiceValue> = [];
+	const otherProps: Array<ContactOtherProp> = [];
+	let kind = "";
 	let fn = "";
 	let familyName = "";
 	let givenName = "";
+	let nickname = "";
 	let bday = "";
+	let anniversary = "";
+	let gender = "";
+	let gramGender = "";
+	let pronouns = "";
 	let org = "";
 	let title = "";
 	let note = "";
@@ -58,73 +85,125 @@ export const parseVcardToForm = (vcard: IrComponent): ContactFormData => {
 	let photo = "";
 
 	for (const p of vcard.properties) {
-		switch (p.name) {
+		switch (baseName(p.name)) {
+			case "KIND":
+				kind = getText(p);
+				break;
 			case "FN":
-				fn = textOf(p);
+				fn = getText(p);
 				break;
 			case "N": {
-				const parts = textOf(p).split(";");
+				const parts = getText(p).split(";");
 				familyName = parts[0] ?? "";
 				givenName = parts[1] ?? "";
 				break;
 			}
+			case "NICKNAME":
+				nickname =
+					p.value.type === "TEXT_LIST"
+						? [...p.value.value].join(", ")
+						: getText(p);
+				break;
 			case "EMAIL":
-				emails.push({ value: textOf(p), types: typesParam(p) });
+				emails.push({
+					value: getText(p),
+					types: getTypeTokens(p),
+					...labelPart(p),
+				});
 				break;
 			case "TEL":
-				tels.push({ value: textOf(p), types: typesParam(p) });
+				tels.push({
+					value: getText(p),
+					types: getTypeTokens(p),
+					...labelPart(p),
+				});
 				break;
 			case "URL":
-				urls.push(textOf(p));
+				urls.push(getText(p));
 				break;
 			case "ADR":
-				addresses.push({ ...splitAddress(textOf(p)), types: typesParam(p) });
+				addresses.push({
+					...splitAddress(getText(p)),
+					types: getTypeTokens(p),
+					...labelPart(p),
+				});
+				break;
+			case "SOCIALPROFILE":
+				socialProfiles.push({ service: serviceOf(p), value: getText(p) });
+				break;
+			case "IMPP":
+				impps.push({ service: serviceOf(p), value: getText(p) });
 				break;
 			case "BDAY":
-				if (p.value.type === "DATE") {
-					bday = p.value.value.toString();
-				} else if (p.value.type === "TEXT" || p.value.type === "URI") {
-					bday = p.value.value;
-				}
+				bday = dateStr(p);
+				break;
+			case "ANNIVERSARY":
+				anniversary = dateStr(p);
+				break;
+			case "GENDER":
+				gender = getText(p);
+				break;
+			case "GRAMGENDER":
+				gramGender = getText(p);
+				break;
+			case "PRONOUNS":
+				pronouns = getText(p);
 				break;
 			case "ORG":
-				org = textOf(p);
+				org = getText(p);
 				break;
 			case "TITLE":
-				title = textOf(p);
+				title = getText(p);
 				break;
 			case "NOTE":
-				note = textOf(p);
+				note = getText(p);
 				break;
 			case "CATEGORIES":
 				if (p.value.type === "TEXT_LIST") {
 					categoriesCsv = [...p.value.value].join(", ");
 				} else {
-					categoriesCsv = textOf(p);
+					categoriesCsv = getText(p);
 				}
 				break;
 			case "PHOTO":
-				photo = textOf(p);
+				photo = getText(p);
 				break;
 			default:
+				if (isOtherEditable(p)) {
+					otherProps.push({
+						name: baseName(p.name),
+						group: groupOf(p.name),
+						value: getText(p),
+						params: serializeParams(p.parameters),
+					});
+				}
 				break;
 		}
 	}
 
 	return {
 		...emptyContactForm,
+		kind,
 		fn,
 		familyName,
 		givenName,
+		nickname,
 		emails,
 		tels,
 		urls,
 		addresses,
+		socialProfiles,
+		impps,
 		bday,
+		anniversary,
+		gender,
+		gramGender,
+		pronouns,
 		org,
 		title,
 		note,
 		categoriesCsv,
 		photo,
+		otherProps,
 	};
 };

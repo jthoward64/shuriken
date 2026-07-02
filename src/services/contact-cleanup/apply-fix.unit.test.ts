@@ -4,7 +4,7 @@ import { describe, it } from "@std/testing/bdd";
 import { Result } from "effect";
 import type { IrComponent, IrParameter, IrProperty } from "#src/data/ir.ts";
 import { applyFix } from "./apply-fix.ts";
-import { getText, getTypeValue } from "./fields.ts";
+import { getText, getTypeTokens } from "./fields.ts";
 import type { CleanupFix } from "./types.ts";
 
 const prop = (
@@ -86,9 +86,14 @@ describe("applyFix", () => {
 		expect(emails(out).length).toBe(1);
 	});
 
-	it("SetLabel sets a TYPE parameter", () => {
+	it("SetLabel swaps the junk TYPE token, keeping others", () => {
 		const out = apply(
-			vcard([prop("EMAIL", "a@x.com", [{ name: "TYPE", value: "VALUE" }])]),
+			vcard([
+				prop("EMAIL", "a@x.com", [
+					{ name: "TYPE", value: "INTERNET" },
+					{ name: "TYPE", value: "VALUE" },
+				]),
+			]),
 			{
 				_tag: "SetLabel",
 				propName: "EMAIL",
@@ -98,10 +103,10 @@ describe("applyFix", () => {
 			},
 		);
 		const e = emails(out)[0];
-		expect(e && getTypeValue(e)).toBe("home");
+		expect(e && [...getTypeTokens(e)]).toEqual(["INTERNET", "home"]);
 	});
 
-	it("SetLabel with null removes the TYPE parameter", () => {
+	it("SetLabel with null just drops the junk token", () => {
 		const out = apply(
 			vcard([prop("EMAIL", "a@x.com", [{ name: "TYPE", value: "other" }])]),
 			{
@@ -113,7 +118,28 @@ describe("applyFix", () => {
 			},
 		);
 		const e = emails(out)[0];
-		expect(e && getTypeValue(e)).toBe("");
+		expect(e && [...getTypeTokens(e)]).toEqual([]);
+	});
+
+	it("SetAbLabel rewrites an X-ABLABEL to Apple's wrapped form", () => {
+		const out = apply(
+			vcard([prop("item1.EMAIL", "a@x.com"), prop("item1.X-ABLABEL", "VALUE")]),
+			{ _tag: "SetAbLabel", occurrence: 0, current: "VALUE", newLabel: "Home" },
+		);
+		const label = out.properties.find((p) => p.name === "item1.X-ABLABEL");
+		expect(getText(label)).toBe("_$!<Home>!$_");
+	});
+
+	it("SetAbLabel with null removes the X-ABLABEL property", () => {
+		const out = apply(
+			vcard([prop("item1.EMAIL", "a@x.com"), prop("item1.X-ABLABEL", "VALUE")]),
+			{ _tag: "SetAbLabel", occurrence: 0, current: "VALUE", newLabel: null },
+		);
+		expect(out.properties.some((p) => p.name === "item1.X-ABLABEL")).toBe(
+			false,
+		);
+		// the labelled property survives
+		expect(out.properties.some((p) => p.name === "item1.EMAIL")).toBe(true);
 	});
 
 	it("preserves unrelated properties", () => {

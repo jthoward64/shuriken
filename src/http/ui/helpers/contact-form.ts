@@ -1,6 +1,8 @@
 import type {
 	ContactAddress,
 	ContactFormData,
+	ContactOtherProp,
+	ContactServiceValue,
 	ContactTypedValue,
 } from "#src/services/card-edit/types.ts";
 import { emptyContactForm } from "#src/services/card-edit/types.ts";
@@ -37,6 +39,7 @@ const buildTypedValues = (
 ): ReadonlyArray<ContactTypedValue> => {
 	const values = stringsFor(form, `${field}[].value`);
 	const types = stringsFor(form, `${field}[].types`);
+	const labels = stringsFor(form, `${field}[].label`);
 	const out: Array<ContactTypedValue> = [];
 	for (let i = 0; i < values.length; i++) {
 		const value = (values[i] ?? "").trim();
@@ -45,7 +48,40 @@ const buildTypedValues = (
 			.split(",")
 			.map((t) => t.trim())
 			.filter((t) => t !== "");
-		out.push({ value, types: typeList });
+		out.push({ value, types: typeList, label: (labels[i] ?? "").trim() });
+	}
+	return out;
+};
+
+const buildServiceValues = (
+	form: FormLike,
+	field: string,
+): ReadonlyArray<ContactServiceValue> => {
+	const services = stringsFor(form, `${field}[].service`);
+	const values = stringsFor(form, `${field}[].value`);
+	const out: Array<ContactServiceValue> = [];
+	for (let i = 0; i < values.length; i++) {
+		out.push({
+			service: (services[i] ?? "").trim(),
+			value: (values[i] ?? "").trim(),
+		});
+	}
+	return out;
+};
+
+const buildOtherProps = (form: FormLike): ReadonlyArray<ContactOtherProp> => {
+	const names = stringsFor(form, "other[].name");
+	const groups = stringsFor(form, "other[].group");
+	const values = stringsFor(form, "other[].value");
+	const params = stringsFor(form, "other[].params");
+	const out: Array<ContactOtherProp> = [];
+	for (let i = 0; i < names.length; i++) {
+		out.push({
+			name: (names[i] ?? "").trim(),
+			group: (groups[i] ?? "").trim(),
+			value: (values[i] ?? "").trim(),
+			params: (params[i] ?? "").trim(),
+		});
 	}
 	return out;
 };
@@ -75,6 +111,7 @@ const buildAddresses = (form: FormLike): ReadonlyArray<ContactAddress> => {
 			.split(",")
 			.map((t) => t.trim())
 			.filter((t) => t !== "");
+		row.label = (stringsFor(form, "addresses[].label")[i] ?? "").trim();
 		out.push(row as unknown as ContactAddress);
 	}
 	return out;
@@ -85,19 +122,28 @@ export const parseContactForm = (form: FormLike): ContactFormData => {
 	const urls = stringsFor(form, "urls[]").map((u) => u.trim());
 	return {
 		...emptyContactForm,
+		kind: single("kind"),
 		fn: single("fn"),
 		familyName: single("familyName"),
 		givenName: single("givenName"),
+		nickname: single("nickname"),
 		emails: buildTypedValues(form, "emails"),
 		tels: buildTypedValues(form, "tels"),
 		urls,
 		addresses: buildAddresses(form),
+		socialProfiles: buildServiceValues(form, "social"),
+		impps: buildServiceValues(form, "impp"),
 		bday: single("bday"),
+		anniversary: single("anniversary"),
+		gender: single("gender"),
+		gramGender: single("gramGender"),
+		pronouns: single("pronouns"),
 		org: single("org"),
 		title: single("title"),
 		note: single("note"),
 		categoriesCsv: single("categoriesCsv"),
 		photo: single("photo"),
+		otherProps: buildOtherProps(form),
 	};
 };
 

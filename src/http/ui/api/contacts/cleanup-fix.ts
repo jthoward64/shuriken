@@ -128,5 +128,12 @@ const finalizeFix = (
 			fix: { ...fix, newType: chosen === "" ? null : chosen },
 		};
 	}
+	if (fix._tag === "SetAbLabel") {
+		const chosen = form.get("newType")?.toString() ?? "";
+		return {
+			ok: true,
+			fix: { ...fix, newLabel: chosen === "" ? null : chosen },
+		};
+	}
 	return { ok: true, fix };
 };

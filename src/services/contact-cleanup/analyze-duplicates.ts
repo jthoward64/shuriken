@@ -1,5 +1,5 @@
 import type { IrComponent } from "#src/data/ir.ts";
-import { digitsOf, getText } from "./fields.ts";
+import { digitsOf, getText, isProp } from "./fields.ts";
 import { normalizePhone } from "./phone.ts";
 import { type PartialSuggestion, removeDuplicateFix } from "./types.ts";
 
@@ -28,7 +28,7 @@ const analyzeProp = (
 	const seen = new Set<string>();
 	let occ = -1;
 	for (const p of vcard.properties) {
-		if (p.name !== propName) {
+		if (!isProp(p, propName)) {
 			continue;
 		}
 		occ++;

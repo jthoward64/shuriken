@@ -27,8 +27,28 @@
                class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm" />
       </label>
       <label class="block">
+        <span class="block text-sm font-medium text-gray-700">Nickname</span>
+        <input type="text" name="nickname" value="{{form.nickname}}"
+               class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+      </label>
+      <label class="block">
+        <span class="block text-sm font-medium text-gray-700">Kind</span>
+        <select name="kind" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm">
+          <option value="" {{#if (eq form.kind '')}}selected{{/if}}>(unspecified)</option>
+          <option value="individual" {{#if (eq form.kind 'individual')}}selected{{/if}}>Individual</option>
+          <option value="group" {{#if (eq form.kind 'group')}}selected{{/if}}>Group</option>
+          <option value="org" {{#if (eq form.kind 'org')}}selected{{/if}}>Organisation</option>
+          <option value="location" {{#if (eq form.kind 'location')}}selected{{/if}}>Location</option>
+        </select>
+      </label>
+      <label class="block">
         <span class="block text-sm font-medium text-gray-700">Birthday</span>
         <input type="date" name="bday" value="{{form.bday}}"
+               class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+      </label>
+      <label class="block">
+        <span class="block text-sm font-medium text-gray-700">Anniversary</span>
+        <input type="date" name="anniversary" value="{{form.anniversary}}"
                class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm" />
       </label>
     </section>
@@ -40,14 +60,18 @@
           <input type="email" name="emails[].value" value="{{value}}" placeholder="address@example.com"
                  class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm" />
           <input type="text" name="emails[].types" value="{{types}}" placeholder="home, work"
-                 class="w-40 rounded border border-gray-300 px-3 py-2 text-sm" />
+                 class="w-32 rounded border border-gray-300 px-3 py-2 text-sm" />
+          <input type="text" name="emails[].label" value="{{label}}" placeholder="Label"
+                 class="w-32 rounded border border-gray-300 px-3 py-2 text-sm" />
         </div>
       {{/each}}
       <div class="flex gap-2 mb-2">
         <input type="email" name="emails[].value" value="" placeholder="address@example.com"
                class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm" />
         <input type="text" name="emails[].types" value="" placeholder="home, work"
-               class="w-40 rounded border border-gray-300 px-3 py-2 text-sm" />
+               class="w-32 rounded border border-gray-300 px-3 py-2 text-sm" />
+        <input type="text" name="emails[].label" value="" placeholder="Label"
+               class="w-32 rounded border border-gray-300 px-3 py-2 text-sm" />
       </div>
       <p class="text-xs text-gray-500">Add another by submitting; blank rows are dropped server-side.</p>
     </section>
@@ -59,14 +83,18 @@
           <input type="tel" name="tels[].value" value="{{value}}"
                  class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm" />
           <input type="text" name="tels[].types" value="{{types}}" placeholder="cell, voice"
-                 class="w-40 rounded border border-gray-300 px-3 py-2 text-sm" />
+                 class="w-32 rounded border border-gray-300 px-3 py-2 text-sm" />
+          <input type="text" name="tels[].label" value="{{label}}" placeholder="Label"
+                 class="w-32 rounded border border-gray-300 px-3 py-2 text-sm" />
         </div>
       {{/each}}
       <div class="flex gap-2 mb-2">
         <input type="tel" name="tels[].value" value=""
                class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm" />
         <input type="text" name="tels[].types" value="" placeholder="cell, voice"
-               class="w-40 rounded border border-gray-300 px-3 py-2 text-sm" />
+               class="w-32 rounded border border-gray-300 px-3 py-2 text-sm" />
+        <input type="text" name="tels[].label" value="" placeholder="Label"
+               class="w-32 rounded border border-gray-300 px-3 py-2 text-sm" />
       </div>
     </section>
 
@@ -98,8 +126,10 @@
                  class="rounded border border-gray-300 px-3 py-2 text-sm" />
           <input type="text" name="addresses[].country" value="{{country}}" placeholder="Country"
                  class="rounded border border-gray-300 px-3 py-2 text-sm" />
-          <input type="text" name="addresses[].types" value="{{types}}" placeholder="home, work"
-                 class="md:col-span-2 rounded border border-gray-300 px-3 py-2 text-sm" />
+          <input type="text" name="addresses[].types" value="{{types}}" placeholder="home, work, billing, delivery"
+                 class="rounded border border-gray-300 px-3 py-2 text-sm" />
+          <input type="text" name="addresses[].label" value="{{label}}" placeholder="Label"
+                 class="rounded border border-gray-300 px-3 py-2 text-sm" />
         </div>
       {{/each}}
       <details class="text-sm">
@@ -119,10 +149,73 @@
                  class="rounded border border-gray-300 px-3 py-2 text-sm" />
           <input type="text" name="addresses[].country" value="" placeholder="Country"
                  class="rounded border border-gray-300 px-3 py-2 text-sm" />
-          <input type="text" name="addresses[].types" value="" placeholder="home, work"
-                 class="md:col-span-2 rounded border border-gray-300 px-3 py-2 text-sm" />
+          <input type="text" name="addresses[].types" value="" placeholder="home, work, billing, delivery"
+                 class="rounded border border-gray-300 px-3 py-2 text-sm" />
+          <input type="text" name="addresses[].label" value="" placeholder="Label"
+                 class="rounded border border-gray-300 px-3 py-2 text-sm" />
         </div>
       </details>
+    </section>
+
+    <section>
+      <h2 class="text-sm font-semibold text-gray-700 mb-2">Social profiles</h2>
+      {{#each form.socialProfiles}}
+        <div class="flex gap-2 mb-2">
+          <input type="text" name="social[].service" value="{{service}}" placeholder="Service (Mastodon, Nextcloud…)"
+                 class="w-48 rounded border border-gray-300 px-3 py-2 text-sm" />
+          <input type="text" name="social[].value" value="{{value}}" placeholder="URL or username"
+                 class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm" />
+        </div>
+      {{/each}}
+      <div class="flex gap-2 mb-2">
+        <input type="text" name="social[].service" value="" placeholder="Service (Mastodon, Nextcloud…)"
+               class="w-48 rounded border border-gray-300 px-3 py-2 text-sm" />
+        <input type="text" name="social[].value" value="" placeholder="URL or username"
+               class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm" />
+      </div>
+    </section>
+
+    <section>
+      <h2 class="text-sm font-semibold text-gray-700 mb-2">Instant messaging</h2>
+      {{#each form.impps}}
+        <div class="flex gap-2 mb-2">
+          <input type="text" name="impp[].service" value="{{service}}" placeholder="Service (Skype, XMPP…)"
+                 class="w-48 rounded border border-gray-300 px-3 py-2 text-sm" />
+          <input type="text" name="impp[].value" value="{{value}}" placeholder="handle or URI"
+                 class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm" />
+        </div>
+      {{/each}}
+      <div class="flex gap-2 mb-2">
+        <input type="text" name="impp[].service" value="" placeholder="Service (Skype, XMPP…)"
+               class="w-48 rounded border border-gray-300 px-3 py-2 text-sm" />
+        <input type="text" name="impp[].value" value="" placeholder="handle or URI"
+               class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm" />
+      </div>
+    </section>
+
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <label class="block">
+        <span class="block text-sm font-medium text-gray-700">Pronouns</span>
+        <input type="text" name="pronouns" value="{{form.pronouns}}" placeholder="they/them"
+               class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+      </label>
+      <label class="block">
+        <span class="block text-sm font-medium text-gray-700">Gender</span>
+        <input type="text" name="gender" value="{{form.gender}}" placeholder="e.g. F, M, O…"
+               class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+      </label>
+      <label class="block">
+        <span class="block text-sm font-medium text-gray-700">Grammatical gender</span>
+        <select name="gramGender" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm">
+          <option value="" {{#if (eq form.gramGender '')}}selected{{/if}}>(unspecified)</option>
+          <option value="animate" {{#if (eq form.gramGender 'animate')}}selected{{/if}}>animate</option>
+          <option value="common" {{#if (eq form.gramGender 'common')}}selected{{/if}}>common</option>
+          <option value="feminine" {{#if (eq form.gramGender 'feminine')}}selected{{/if}}>feminine</option>
+          <option value="inanimate" {{#if (eq form.gramGender 'inanimate')}}selected{{/if}}>inanimate</option>
+          <option value="masculine" {{#if (eq form.gramGender 'masculine')}}selected{{/if}}>masculine</option>
+          <option value="neuter" {{#if (eq form.gramGender 'neuter')}}selected{{/if}}>neuter</option>
+        </select>
+      </label>
     </section>
 
     <section class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -162,6 +255,38 @@
         <input type="url" name="photo" value="{{form.photo}}"
                class="ml-2 rounded border border-gray-300 px-3 py-2 text-sm w-2/3" />
       </label>
+    </section>
+
+    <section>
+      <details class="text-sm" {{#if form.otherProps}}open{{/if}}>
+        <summary class="cursor-pointer text-sm font-semibold text-gray-700">
+          Other fields ({{form.otherProps.length}})
+        </summary>
+        <p class="text-xs text-gray-500 mt-1 mb-2">
+          Any other vCard property. Parameters go in the last box as
+          <code>NAME=value;NAME=value</code>. Clear the name to remove a row.
+        </p>
+        {{#each form.otherProps}}
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-2 mb-2">
+            <input type="text" name="other[].name" value="{{name}}" placeholder="PROPERTY"
+                   class="rounded border border-gray-300 px-3 py-2 text-sm font-mono uppercase" />
+            <input type="text" name="other[].value" value="{{value}}" placeholder="value"
+                   class="md:col-span-2 rounded border border-gray-300 px-3 py-2 text-sm" />
+            <input type="text" name="other[].params" value="{{params}}" placeholder="TYPE=work;PREF=1"
+                   class="rounded border border-gray-300 px-3 py-2 text-sm font-mono" />
+            <input type="hidden" name="other[].group" value="{{group}}" />
+          </div>
+        {{/each}}
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-2 mb-2">
+          <input type="text" name="other[].name" value="" placeholder="PROPERTY"
+                 class="rounded border border-gray-300 px-3 py-2 text-sm font-mono uppercase" />
+          <input type="text" name="other[].value" value="" placeholder="value"
+                 class="md:col-span-2 rounded border border-gray-300 px-3 py-2 text-sm" />
+          <input type="text" name="other[].params" value="" placeholder="TYPE=work;PREF=1"
+                 class="rounded border border-gray-300 px-3 py-2 text-sm font-mono" />
+          <input type="hidden" name="other[].group" value="" />
+        </div>
+      </details>
     </section>
 
     <div class="flex flex-wrap gap-3 pt-2">

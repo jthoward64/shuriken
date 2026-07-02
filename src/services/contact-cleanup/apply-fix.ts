@@ -1,6 +1,7 @@
 import { Data, Result } from "effect";
-import type { IrComponent, IrParameter, IrProperty } from "#src/data/ir.ts";
-import { getText, getTypeValue, nthPropIndex } from "./fields.ts";
+import type { IrComponent, IrProperty } from "#src/data/ir.ts";
+import { getText, getTypeTokens, nthPropIndex } from "./fields.ts";
+import { wrapAppleLabel } from "./labels.ts";
 import type { CleanupFix } from "./types.ts";
 
 // ---------------------------------------------------------------------------
@@ -29,14 +30,28 @@ const withTextValue = (prop: IrProperty, next: string): IrProperty => ({
 			: { type: "TEXT", value: next },
 });
 
-// Replace, add, or drop (newType null/empty) the TYPE parameter.
-const withType = (prop: IrProperty, newType: string | null): IrProperty => {
-	const others: ReadonlyArray<IrParameter> = prop.parameters.filter(
-		(p) => p.name !== "TYPE",
+// Remove one TYPE token (case-insensitive) and optionally add another, then
+// re-emit the surviving tokens as a single comma-joined TYPE param (dropping
+// TYPE entirely if none remain). Non-TYPE params are preserved.
+const rewriteTypeTokens = (
+	prop: IrProperty,
+	removeToken: string,
+	addToken: string | null,
+): IrProperty => {
+	const kept = getTypeTokens(prop).filter(
+		(t) => t.toLowerCase() !== removeToken.toLowerCase(),
 	);
+	if (
+		addToken &&
+		addToken !== "" &&
+		!kept.some((t) => t.toLowerCase() === addToken.toLowerCase())
+	) {
+		kept.push(addToken);
+	}
+	const others = prop.parameters.filter((p) => p.name !== "TYPE");
 	const parameters =
-		newType && newType !== ""
-			? [...others, { name: "TYPE", value: newType }]
+		kept.length > 0
+			? [...others, { name: "TYPE", value: kept.join(",") }]
 			: others;
 	return { ...prop, parameters };
 };
@@ -122,15 +137,37 @@ export const applyFix = (
 			if (index < 0 || prop === undefined) {
 				return stale(`${fix.propName} #${fix.occurrence} no longer exists`);
 			}
-			if (getTypeValue(prop) !== fix.current) {
+			const hasToken = getTypeTokens(prop).some(
+				(t) => t.toLowerCase() === fix.current.toLowerCase(),
+			);
+			if (!hasToken) {
 				return stale(`${fix.propName} #${fix.occurrence} label changed`);
 			}
 			return Result.succeed(
 				withProps(
 					vcard,
-					replaceAt(vcard.properties, index, withType(prop, fix.newType)),
+					replaceAt(
+						vcard.properties,
+						index,
+						rewriteTypeTokens(prop, fix.current, fix.newType),
+					),
 				),
 			);
 		}
+		case "SetAbLabel":
+			return Result.map(
+				locate(vcard, "X-ABLABEL", fix.occurrence, fix.current),
+				({ index, prop }) =>
+					fix.newLabel === null
+						? withProps(vcard, removeAt(vcard.properties, index))
+						: withProps(
+								vcard,
+								replaceAt(
+									vcard.properties,
+									index,
+									withTextValue(prop, wrapAppleLabel(fix.newLabel)),
+								),
+							),
+			);
 	}
 };

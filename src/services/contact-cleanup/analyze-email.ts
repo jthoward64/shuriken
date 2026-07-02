@@ -1,5 +1,5 @@
 import type { IrComponent } from "#src/data/ir.ts";
-import { getText } from "./fields.ts";
+import { getText, isProp } from "./fields.ts";
 import { lowercaseEmailFix, type PartialSuggestion } from "./types.ts";
 
 // ---------------------------------------------------------------------------
@@ -15,7 +15,7 @@ export const analyzeEmails = (
 	const out: Array<PartialSuggestion> = [];
 	let occ = -1;
 	for (const p of vcard.properties) {
-		if (p.name !== "EMAIL") {
+		if (!isProp(p, "EMAIL")) {
 			continue;
 		}
 		occ++;

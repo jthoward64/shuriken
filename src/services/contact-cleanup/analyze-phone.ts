@@ -1,5 +1,5 @@
 import type { IrComponent } from "#src/data/ir.ts";
-import { getText } from "./fields.ts";
+import { getText, isProp } from "./fields.ts";
 import { looksMissingAreaCode, normalizePhone } from "./phone.ts";
 import { type PartialSuggestion, setPhoneFix } from "./types.ts";
 
@@ -19,7 +19,7 @@ export const analyzePhones = (
 	const out: Array<PartialSuggestion> = [];
 	let occ = -1;
 	for (const p of vcard.properties) {
-		if (p.name !== "TEL") {
+		if (!isProp(p, "TEL")) {
 			continue;
 		}
 		occ++;

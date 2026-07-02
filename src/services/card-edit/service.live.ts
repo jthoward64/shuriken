@@ -1,7 +1,8 @@
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Option } from "effect";
 import { makeEtag } from "#src/data/etag.ts";
 import type { IrComponent, IrDocument } from "#src/data/ir.ts";
 import { encodeVCard } from "#src/data/vcard/codec.ts";
+import { baseName } from "#src/data/vcard/prop.ts";
 import { DatabaseClient } from "#src/db/client.ts";
 import { withTransaction } from "#src/db/transaction.ts";
 import {
@@ -17,6 +18,7 @@ import { ComponentRepository } from "#src/services/component/index.ts";
 import { EntityRepository } from "#src/services/entity/index.ts";
 import { InstanceService } from "#src/services/instance/index.ts";
 import { buildVcardComponent } from "./build-vcard.ts";
+import { mergeFormIntoVcard } from "./merge-vcard.ts";
 import { CardEditService } from "./service.ts";
 import type { ContactFormData } from "./types.ts";
 
@@ -113,21 +115,24 @@ const update = (
 		const existing = yield* instanceSvc.findById(instanceId);
 		const existingEntityId = EntityId(existing.entityId);
 		const existingCollectionId = CollectionId(existing.collectionId);
-		// Preserve the existing entity UID — vCard identity is the UID, so
-		// editing the form must not invent a fresh one.
 		const existingTreeOpt = yield* componentRepo.loadTree(
 			existingEntityId,
 			"vcard",
 		);
+		const existingTree = Option.getOrNull(existingTreeOpt);
+		// Preserve the existing entity UID — vCard identity is the UID, so
+		// editing the form must not invent a fresh one.
 		const uidFromTree =
-			existingTreeOpt._tag === "Some"
-				? (existingTreeOpt.value.properties
-						.find((p) => p.name === "UID")
-						?.value.value?.toString() ?? null)
-				: null;
+			existingTree?.properties
+				.find((p) => baseName(p.name) === "UID")
+				?.value.value?.toString() ?? null;
 		const finalUid = uidFromTree ?? `urn:uuid:${existing.entityId}`;
 
-		const vcard = buildVcardComponent(finalUid, form);
+		// Non-destructive: merge the form onto the existing card so every
+		// unmanaged property/parameter is preserved. (No tree → fresh build.)
+		const vcard = existingTree
+			? mergeFormIntoVcard(existingTree, form, finalUid)
+			: buildVcardComponent(finalUid, form);
 		const canonical = yield* encodeVCard(wrapInDoc(vcard));
 		const etag = ETag(yield* makeEtag(canonical));
 		const contentLength = new TextEncoder().encode(canonical).byteLength;

@@ -40,9 +40,17 @@ export const CleanupFixSchema = Schema.Union([
 	Schema.TaggedStruct("SetLabel", {
 		propName: Schema.Literals(["EMAIL", "TEL"]),
 		occurrence: Schema.Number,
+		// The offending TYPE token to remove (e.g. "VALUE"), not the whole param.
 		current: Schema.String,
-		// null → drop the TYPE parameter entirely.
+		// null → just remove the junk token; else also add this token.
 		newType: Schema.NullOr(Schema.String),
+	}),
+	// Apple X-ABLabel (vCard 3.0): targets the occurrence-th X-ABLABEL property.
+	Schema.TaggedStruct("SetAbLabel", {
+		occurrence: Schema.Number,
+		current: Schema.String,
+		// null → remove the X-ABLABEL property; else set it to _$!<newLabel>!$_.
+		newLabel: Schema.NullOr(Schema.String),
 	}),
 ]);
 
@@ -82,6 +90,12 @@ export const setLabelFix = (
 	current: string,
 	newType: string | null,
 ): CleanupFix => ({ _tag: "SetLabel", propName, occurrence, current, newType });
+
+export const setAbLabelFix = (
+	occurrence: number,
+	current: string,
+	newLabel: string | null,
+): CleanupFix => ({ _tag: "SetAbLabel", occurrence, current, newLabel });
 
 export type CleanupCategory =
 	| "phone"

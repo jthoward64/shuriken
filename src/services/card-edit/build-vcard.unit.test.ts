@@ -1,6 +1,13 @@
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
-import { buildVcardComponent } from "./build-vcard.ts";
+import {
+	adrProp,
+	bdayValue,
+	buildVcardComponent,
+	categoriesValue,
+	nValue,
+	typeParams,
+} from "./build-vcard.ts";
 import { parseVcardToForm } from "./parse-vcard.ts";
 import { emptyContactForm } from "./types.ts";
 
@@ -54,6 +61,46 @@ describe("buildVcardComponent / parseVcardToForm round-trip", () => {
 		expect(back.photo).toBe(form.photo);
 	});
 
+	it("round-trips per-value LABEL (RFC 9554) on email/tel/adr", () => {
+		const form = {
+			...emptyContactForm,
+			fn: "A",
+			emails: [{ value: "a@x.com", types: ["home"], label: "Personal" }],
+			tels: [{ value: "+1", types: ["cell"], label: "Cell" }],
+		};
+		const back = parseVcardToForm(buildVcardComponent("u", form));
+		expect(back.emails[0]?.label).toBe("Personal");
+		expect(back.tels[0]?.label).toBe("Cell");
+	});
+
+	it("round-trips the Phase-2 friendly fields", () => {
+		const form = {
+			...emptyContactForm,
+			fn: "A",
+			kind: "individual",
+			nickname: "Ace",
+			socialProfiles: [{ service: "Mastodon", value: "https://m.example/@a" }],
+			impps: [{ service: "Skype", value: "a.b" }],
+			anniversary: "2020-01-02",
+			gender: "F",
+			gramGender: "feminine",
+			pronouns: "she/her",
+		};
+		const back = parseVcardToForm(buildVcardComponent("u", form));
+		expect(back.kind).toBe("individual");
+		expect(back.nickname).toBe("Ace");
+		expect(back.socialProfiles).toEqual([
+			{ service: "Mastodon", value: "https://m.example/@a" },
+		]);
+		expect(back.impps).toEqual([{ service: "Skype", value: "a.b" }]);
+		expect(back.anniversary).toBe("2020-01-02");
+		expect(back.gender).toBe("F");
+		expect(back.gramGender).toBe("feminine");
+		expect(back.pronouns).toBe("she/her");
+		// friendly fields are not misclassified as generic
+		expect(back.otherProps).toEqual([]);
+	});
+
 	it("emits a minimal VCARD when only FN is provided", () => {
 		const vcard = buildVcardComponent("only-fn", {
 			...emptyContactForm,
@@ -100,5 +147,45 @@ describe("buildVcardComponent / parseVcardToForm round-trip", () => {
 		expect(propNames).not.toContain("EMAIL");
 		expect(propNames).not.toContain("TEL");
 		expect(propNames).not.toContain("URL");
+	});
+});
+
+describe("build-vcard exported helpers", () => {
+	it("nValue lays out Family;Given;;;", () => {
+		expect(nValue("Smith", "John")).toBe("Smith;John;;;");
+	});
+
+	it("typeParams emits one comma-joined TYPE or none", () => {
+		expect(typeParams([])).toEqual([]);
+		expect(typeParams(["home", "work"])).toEqual([
+			{ name: "TYPE", value: "home,work" },
+		]);
+	});
+
+	it("adrProp joins the 7 components in order", () => {
+		expect(
+			adrProp({
+				poBox: "",
+				extended: "",
+				street: "1 St",
+				locality: "Town",
+				region: "",
+				postalCode: "ZZ1",
+				country: "UK",
+				types: [],
+			}).value,
+		).toEqual({ type: "TEXT", value: ";;1 St;Town;;ZZ1;UK" });
+	});
+
+	it("bdayValue: full → DATE, yearless → TEXT, junk → null", () => {
+		expect(bdayValue("1990-07-04")).toMatchObject({ type: "DATE" });
+		expect(bdayValue("--07-04")).toEqual({ type: "TEXT", value: "--0704" });
+		expect(bdayValue("nonsense")).toBeNull();
+		expect(bdayValue("")).toBeNull();
+	});
+
+	it("categoriesValue trims and drops blanks", () => {
+		expect(categoriesValue(" a, b ,, c ")).toEqual(["a", "b", "c"]);
+		expect(categoriesValue("")).toEqual([]);
 	});
 });

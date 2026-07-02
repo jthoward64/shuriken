@@ -149,6 +149,58 @@ describe("analyzeLabels", () => {
 			).length,
 		).toBe(0);
 	});
+
+	it("flags a junk Apple X-ABLABEL and offers to remove it", () => {
+		const out = analyzeLabels(
+			vcard([prop("item1.EMAIL", "a@x.com"), prop("item1.X-ABLABEL", "VALUE")]),
+		);
+		expect(out.length).toBe(1);
+		expect(out[0]?.fix).toMatchObject({
+			_tag: "SetAbLabel",
+			occurrence: 0,
+			current: "VALUE",
+			newLabel: null,
+		});
+	});
+
+	it("leaves Apple wrapped built-ins and genuine custom labels alone", () => {
+		expect(
+			analyzeLabels(
+				vcard([
+					prop("item1.EMAIL", "a@x.com"),
+					prop("item1.X-ABLABEL", "_$!<Other>!$_"),
+				]),
+			).length,
+		).toBe(0);
+		expect(
+			analyzeLabels(
+				vcard([
+					prop("item2.URL", "https://tiktok.com/@x"),
+					prop("item2.X-ABLABEL", "TikTok"),
+				]),
+			).length,
+		).toBe(0);
+	});
+});
+
+describe("grouped (Apple) properties", () => {
+	it("email/phone analyzers see item1.EMAIL and repeated TYPE", () => {
+		const emailOut = analyzeEmails(vcard([prop("item1.EMAIL", "John@X.COM")]));
+		expect(emailOut.length).toBe(1);
+		expect(emailOut[0]?.proposed).toBe("john@x.com");
+
+		const telProp: IrProperty = {
+			name: "item1.TEL",
+			parameters: [
+				{ name: "TYPE", value: "CELL" },
+				{ name: "TYPE", value: "VOICE" },
+			],
+			value: { type: "TEXT", value: "(415) 555-2671" },
+			isKnown: true,
+		};
+		const phoneOut = analyzePhones(vcard([telProp]), REGION);
+		expect(phoneOut[0]?.proposed).toBe("+14155552671");
+	});
 });
 
 describe("analyzeCard", () => {

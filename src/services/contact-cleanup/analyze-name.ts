@@ -1,5 +1,5 @@
 import type { IrComponent } from "#src/data/ir.ts";
-import { getText } from "./fields.ts";
+import { getText, isProp } from "./fields.ts";
 import {
 	looksMiscased,
 	smartNameCase,
@@ -31,7 +31,7 @@ export const analyzeNames = (
 ): ReadonlyArray<PartialSuggestion> => {
 	const out: Array<PartialSuggestion> = [];
 
-	const fn = vcard.properties.find((p) => p.name === "FN");
+	const fn = vcard.properties.find((p) => isProp(p, "FN"));
 	const fnValue = getText(fn);
 	if (fnValue.trim() !== "" && looksMiscased(fnValue)) {
 		const next = smartNameCase(fnValue);
@@ -40,7 +40,7 @@ export const analyzeNames = (
 		}
 	}
 
-	const n = vcard.properties.find((p) => p.name === "N");
+	const n = vcard.properties.find((p) => isProp(p, "N"));
 	const nValue = getText(n);
 	if (nValue.replace(/;/g, "").trim() !== "" && looksMiscased(nValue)) {
 		const next = smartStructuredNameCase(nValue);
