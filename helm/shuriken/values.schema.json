@@ -110,8 +110,8 @@
 						"url": {
 							"type": "string"
 						},
-						"existingSecretKey": {
-							"type": "string"
+						"existingSecret": {
+							"$ref": "#/$defs/existingSecretRef"
 						}
 					}
 				},
@@ -718,6 +718,18 @@
 		}
 	},
 	"$defs": {
+		"existingSecretRef": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"name": {
+					"type": "string"
+				},
+				"key": {
+					"type": "string"
+				}
+			}
+		},
 		"resources": {
 			"type": "object",
 			"additionalProperties": false,
