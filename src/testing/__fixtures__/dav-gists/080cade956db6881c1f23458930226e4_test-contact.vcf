@@ -1,0 +1,9 @@
+BEGIN:VCARD
+VERSION:3.0
+FN:تجربة Twilio
+N:Twilio;تجربة;;;
+TEL;TYPE=CELL:+966500000000
+EMAIL:test@example.com
+ORG:AI WhatsApp Lab
+NOTE:جهة اتصال تجريبية من Twilio WhatsApp API
+END:VCARD

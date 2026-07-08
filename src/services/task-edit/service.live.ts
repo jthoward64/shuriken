@@ -1,0 +1,313 @@
+import { Effect, Layer } from "effect";
+import { Temporal } from "temporal-polyfill";
+import { makeEtag } from "#src/data/etag.ts";
+import { encodeICalendar } from "#src/data/icalendar/codec.ts";
+import type { IrComponent, IrDocument } from "#src/data/ir.ts";
+import { DatabaseClient } from "#src/db/client.ts";
+import { withTransaction } from "#src/db/transaction.ts";
+import {
+	type DatabaseError,
+	type DavError,
+	InternalError,
+} from "#src/domain/errors.ts";
+import { CollectionId, EntityId, type InstanceId } from "#src/domain/ids.ts";
+import { Slug } from "#src/domain/types/path.ts";
+import { ETag } from "#src/domain/types/strings.ts";
+import { ComponentRepository } from "#src/services/component/index.ts";
+import { EntityRepository } from "#src/services/entity/index.ts";
+import { InstanceService } from "#src/services/instance/index.ts";
+import { buildVtodoComponent } from "./build-vtodo.ts";
+import { TaskEditService } from "./service.ts";
+import type { TaskFormData } from "./types.ts";
+
+// ---------------------------------------------------------------------------
+// Live TaskEditService — see service.ts.
+//
+// Edit semantics mirror cal-edit's CalEditServiceLive: properties the form
+// doesn't surface (ATTACH, ATTENDEE, ALARM components, …) are copied from the
+// existing IR tree into the new VTODO. Form-owned properties are replaced
+// wholesale. COMPLETED is handled specially (see `resolveCompletedAt`) since
+// it's a server-stamped timestamp, not a directly form-owned field.
+// ---------------------------------------------------------------------------
+
+const FORM_OWNED_PROPS = new Set([
+	"UID",
+	"SUMMARY",
+	"DESCRIPTION",
+	"LOCATION",
+	"DTSTART",
+	"DUE",
+	"CATEGORIES",
+	"STATUS",
+	"COMPLETED",
+	"PRIORITY",
+	"PERCENT-COMPLETE",
+	"RRULE",
+]);
+
+const SLUG_MAX_BODY = 120;
+
+const slugFromUid = (uid: string): Slug => {
+	const safe = uid.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, SLUG_MAX_BODY);
+	return Slug(`${safe || "task"}.ics`);
+};
+
+const wrapInDoc = (vtodo: IrComponent): IrDocument => ({
+	kind: "icalendar",
+	root: {
+		name: "VCALENDAR",
+		properties: [
+			{
+				name: "VERSION",
+				parameters: [],
+				value: { type: "TEXT", value: "2.0" },
+				isKnown: true,
+			},
+			{
+				name: "PRODID",
+				parameters: [],
+				value: { type: "TEXT", value: "-//shuriken//calendar//EN" },
+				isKnown: true,
+			},
+		],
+		components: [vtodo],
+	},
+});
+
+const newUid = (): string => `${crypto.randomUUID()}@shuriken`;
+
+/** Existing COMPLETED value on the prior VTODO tree, if any. */
+const existingCompletedAt = (
+	existing: IrComponent | null,
+): Temporal.ZonedDateTime | null => {
+	const prop = existing?.properties.find((p) => p.name === "COMPLETED");
+	return prop && prop.value.type === "DATE_TIME" ? prop.value.value : null;
+};
+
+const existingStatus = (existing: IrComponent | null): string => {
+	const prop = existing?.properties.find((p) => p.name === "STATUS");
+	return prop && prop.value.type === "TEXT" ? prop.value.value : "";
+};
+
+/**
+ * Resolve the COMPLETED timestamp to write: null when the form's status isn't
+ * COMPLETED; the prior value when the task was already COMPLETED (don't
+ * restamp on unrelated edits); a fresh stamp on transition into COMPLETED.
+ */
+const resolveCompletedAt = (
+	form: TaskFormData,
+	existing: IrComponent | null,
+): Temporal.ZonedDateTime | null => {
+	if (form.status !== "COMPLETED") {
+		return null;
+	}
+	if (existingStatus(existing) === "COMPLETED") {
+		const prior = existingCompletedAt(existing);
+		if (prior !== null) {
+			return prior;
+		}
+	}
+	return Temporal.Now.zonedDateTimeISO("UTC");
+};
+
+const create = (
+	calendarId: CollectionId,
+	form: TaskFormData,
+): Effect.Effect<
+	{
+		readonly entityId: EntityId;
+		readonly instanceId: InstanceId;
+		readonly slug: string;
+		readonly uid: string;
+	},
+	DatabaseError | DavError | InternalError,
+	ComponentRepository | DatabaseClient | EntityRepository | InstanceService
+> =>
+	Effect.gen(function* () {
+		const componentRepo = yield* ComponentRepository;
+		const entityRepo = yield* EntityRepository;
+		const instanceSvc = yield* InstanceService;
+		const db = yield* DatabaseClient;
+
+		const uid = newUid();
+		const vtodo = buildVtodoComponent(
+			uid,
+			form,
+			resolveCompletedAt(form, null),
+		);
+		if (!vtodo) {
+			return yield* Effect.fail(
+				new InternalError({ cause: new Error("invalid task form") }),
+			);
+		}
+		const doc = wrapInDoc(vtodo);
+		const canonical = yield* encodeICalendar(doc);
+		const etag = ETag(yield* makeEtag(canonical));
+		const slug = slugFromUid(uid);
+		const contentLength = new TextEncoder().encode(canonical).byteLength;
+
+		const result = yield* withTransaction(
+			Effect.gen(function* () {
+				const entityRow = yield* entityRepo.insert({
+					entityType: "icalendar",
+					logicalUid: uid,
+				});
+				const eid = EntityId(entityRow.id);
+				// Match DAV PUT convention: store the VCALENDAR root, not the bare
+				// VTODO, so readers (REPORT, the tasks list) find it under
+				// tree.components.
+				yield* componentRepo.insertTree(eid, doc.root);
+				const instance = yield* instanceSvc.put({
+					collectionId: calendarId,
+					entityId: eid,
+					contentType: "text/calendar",
+					etag,
+					slug,
+					contentLength,
+				});
+				return { entityId: eid, instanceId: instance.id as InstanceId };
+			}),
+		).pipe(Effect.provideService(DatabaseClient, db));
+
+		return {
+			entityId: result.entityId,
+			instanceId: result.instanceId,
+			slug,
+			uid,
+		};
+	});
+
+const mergePreservedProps = (
+	existing: IrComponent | null,
+	rebuilt: IrComponent,
+): IrComponent => {
+	if (!existing) {
+		return rebuilt;
+	}
+	const preserved = existing.properties.filter(
+		(p) => !FORM_OWNED_PROPS.has(p.name),
+	);
+	return {
+		...rebuilt,
+		properties: [...rebuilt.properties, ...preserved],
+		// VALARM / sub-components are also preserved as-is.
+		components: existing.components,
+	};
+};
+
+const update = (
+	instanceId: InstanceId,
+	form: TaskFormData,
+): Effect.Effect<
+	{
+		readonly entityId: EntityId;
+		readonly instanceId: InstanceId;
+		readonly slug: string;
+		readonly uid: string;
+	},
+	DatabaseError | DavError | InternalError,
+	ComponentRepository | DatabaseClient | EntityRepository | InstanceService
+> =>
+	Effect.gen(function* () {
+		const componentRepo = yield* ComponentRepository;
+		const instanceSvc = yield* InstanceService;
+		const db = yield* DatabaseClient;
+
+		const existing = yield* instanceSvc.findById(instanceId);
+		const entityId = EntityId(existing.entityId);
+		const existingDocOpt = yield* componentRepo.loadTree(entityId, "icalendar");
+		const existingVtodo =
+			existingDocOpt._tag === "Some"
+				? (existingDocOpt.value.components.find((c) => c.name === "VTODO") ??
+					null)
+				: null;
+		// Carry UID through — vCard-style logical-UID stability.
+		const uidFromTree =
+			existingVtodo?.properties
+				.find((p) => p.name === "UID")
+				?.value.value?.toString() ?? null;
+		const finalUid = uidFromTree ?? `${existing.entityId}@shuriken`;
+
+		const rebuilt = buildVtodoComponent(
+			finalUid,
+			form,
+			resolveCompletedAt(form, existingVtodo),
+		);
+		if (!rebuilt) {
+			return yield* Effect.fail(
+				new InternalError({ cause: new Error("invalid task form") }),
+			);
+		}
+		const merged = mergePreservedProps(existingVtodo, rebuilt);
+		const doc = wrapInDoc(merged);
+		const canonical = yield* encodeICalendar(doc);
+		const etag = ETag(yield* makeEtag(canonical));
+		const contentLength = new TextEncoder().encode(canonical).byteLength;
+
+		yield* withTransaction(
+			Effect.gen(function* () {
+				yield* componentRepo.deleteByEntity(entityId);
+				yield* componentRepo.insertTree(entityId, doc.root);
+				yield* instanceSvc.put(
+					{
+						collectionId: CollectionId(existing.collectionId),
+						entityId,
+						contentType: "text/calendar",
+						etag,
+						slug: Slug(existing.slug),
+						contentLength,
+					},
+					instanceId,
+				);
+			}),
+		).pipe(Effect.provideService(DatabaseClient, db));
+
+		return {
+			entityId,
+			instanceId,
+			slug: existing.slug,
+			uid: finalUid,
+		};
+	});
+
+const del = (
+	instanceId: InstanceId,
+): Effect.Effect<
+	void,
+	DatabaseError | DavError | InternalError,
+	InstanceService
+> =>
+	Effect.gen(function* () {
+		const instanceSvc = yield* InstanceService;
+		yield* instanceSvc.delete(instanceId);
+	});
+
+export const TaskEditServiceLive = Layer.effect(
+	TaskEditService,
+	Effect.gen(function* () {
+		const componentRepo = yield* ComponentRepository;
+		const db = yield* DatabaseClient;
+		const entityRepo = yield* EntityRepository;
+		const instanceSvc = yield* InstanceService;
+		return {
+			create: (calendarId, form) =>
+				create(calendarId, form).pipe(
+					Effect.provideService(ComponentRepository, componentRepo),
+					Effect.provideService(DatabaseClient, db),
+					Effect.provideService(EntityRepository, entityRepo),
+					Effect.provideService(InstanceService, instanceSvc),
+				),
+			update: (instanceId, form) =>
+				update(instanceId, form).pipe(
+					Effect.provideService(ComponentRepository, componentRepo),
+					Effect.provideService(DatabaseClient, db),
+					Effect.provideService(EntityRepository, entityRepo),
+					Effect.provideService(InstanceService, instanceSvc),
+				),
+			delete: (instanceId) =>
+				del(instanceId).pipe(
+					Effect.provideService(InstanceService, instanceSvc),
+				),
+		};
+	}),
+);

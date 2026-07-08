@@ -1,0 +1,1 @@
+ALTER TABLE "dav_acl" DROP CONSTRAINT "dav_acl_resource_type_check", ADD CONSTRAINT "dav_acl_resource_type_check" CHECK ((resource_type = ANY (ARRAY['collection'::text, 'instance'::text, 'principal'::text, 'virtual'::text])));

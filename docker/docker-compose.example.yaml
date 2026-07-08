@@ -1,0 +1,48 @@
+name: shuriken
+
+services:
+  database:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: shuriken
+      POSTGRES_PASSWORD: shuriken
+      POSTGRES_DB: shuriken
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shuriken"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    image: ghcr.io/jthoward64/shuriken-ts:latest
+    # To build from source instead:
+    # build:
+    #   context: ..
+    #   dockerfile: docker/Dockerfile
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://shuriken:shuriken@database:5432/shuriken
+      PORT: "3000"
+      # Single-user mode: every request is this user (no credentials).
+      AUTO_LOGIN: admin@example.com
+      # For Basic auth (DAV clients + app passwords), drop AUTO_LOGIN and set:
+      # BASIC_AUTH_ENABLED: "true"
+      # ADMIN_EMAIL: admin@example.com
+      # ADMIN_PASSWORD: change-me        # omit to get a random one printed at first boot
+      # For OIDC single sign-on on the web UI (drop AUTO_LOGIN):
+      # OIDC_ENABLED: "true"
+      # OIDC_ISSUER: https://idp.example.com/realms/main
+      # OIDC_CLIENT_ID: shuriken
+      # OIDC_CLIENT_SECRET: change-me
+      # OIDC_REDIRECT_URI: https://dav.example.com/ui/auth/callback
+      # TRUSTED_PROXIES: "*"             # trust the proxy so X-Forwarded-Proto/Host are honoured
+      # LOG_LEVEL: info
+    ports:
+      - "3000:3000"
+
+volumes:
+  db_data:

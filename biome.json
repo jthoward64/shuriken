@@ -1,0 +1,138 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.4.9/schema.json",
+	"vcs": {
+		"enabled": true,
+		"clientKind": "git",
+		"useIgnoreFile": true
+	},
+	"files": {
+		"ignoreUnknown": false,
+		"includes": ["**", "!**/static/vendor"]
+	},
+	"formatter": {
+		"enabled": true,
+		"indentStyle": "tab",
+		"expand": "auto"
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"recommended": true,
+			"suspicious": {
+				"noUnknownAtRules": {
+					"level": "error",
+					"options": {
+						"ignore": [
+							"tailwind",
+							"apply",
+							"layer",
+							"screen",
+							"variants",
+							"responsive"
+						]
+					}
+				}
+			},
+			"style": {
+				"recommended": true,
+				"useNamingConvention": {
+					"level": "warn",
+					"options": {
+						"strictCase": false,
+						"requireAscii": true,
+						"conventions": [
+							{
+								"selector": {
+									"kind": "objectLiteralProperty"
+								},
+								"formats": [
+									"camelCase",
+									"PascalCase",
+									"CONSTANT_CASE",
+									"snake_case"
+								]
+							}
+						]
+					}
+				},
+				"noCommonJs": "error",
+				"noEnum": "error",
+				"noDescendingSpecificity": "warn",
+				"noExportedImports": "error",
+				"noMagicNumbers": {
+					"level": "warn"
+				},
+				"noNamespace": "error",
+				"noParameterAssign": "error",
+				"noProcessEnv": "error",
+				"noSubstr": "warn",
+				"noYodaExpression": "warn",
+				"useAsConstAssertion": "warn",
+				"useAtIndex": "warn",
+				"useBlockStatements": "warn",
+				"useCollapsedElseIf": "warn",
+				"useCollapsedIf": "warn",
+				"useConsistentArrayType": {
+					"level": "warn",
+					"options": {
+						"syntax": "generic"
+					}
+				},
+				"useConsistentArrowReturn": "warn",
+				"useConsistentBuiltinInstantiation": "warn",
+				"useConsistentCurlyBraces": "warn",
+				"useConsistentMemberAccessibility": "warn",
+				"useConsistentObjectDefinitions": "warn",
+				"useConsistentTypeDefinitions": "warn",
+				"useForOf": "warn",
+				"useDefaultParameterLast": "warn",
+				"useFilenamingConvention": {
+					"level": "warn",
+					"options": {
+						"strictCase": false,
+						"requireAscii": true
+					}
+				},
+				"useGroupedAccessorPairs": "warn",
+				"useNumberNamespace": "warn",
+				"useObjectSpread": "warn",
+				"useReadonlyClassProperties": "warn"
+			}
+		},
+		"domains": {
+			"test": "recommended"
+		}
+	},
+	"javascript": {
+		"formatter": {
+			"quoteStyle": "double",
+			"semicolons": "always"
+		},
+		"globals": ["Deno"]
+	},
+	"css": {
+		"parser": {
+			"tailwindDirectives": true
+		}
+	},
+	"overrides": [
+		{
+			"includes": ["**/*.test.ts", "**/*.test.tsx"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noMagicNumbers": "off"
+					}
+				}
+			}
+		}
+	],
+	"assist": {
+		"enabled": true,
+		"actions": {
+			"source": {
+				"organizeImports": "on"
+			}
+		}
+	}
+}

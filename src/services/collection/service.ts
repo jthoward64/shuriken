@@ -1,0 +1,52 @@
+import type { Effect } from "effect";
+import { Context } from "effect";
+import type { DatabaseError, DavError } from "#src/domain/errors.ts";
+import type { CollectionId, PrincipalId } from "#src/domain/ids.ts";
+import type { Slug } from "#src/domain/types/path.ts";
+import type {
+	CollectionPropertyChanges,
+	CollectionRow,
+	CollectionType,
+	NewCollection,
+} from "./repository.ts";
+
+// ---------------------------------------------------------------------------
+// CollectionService — business logic for DAV collection management
+// ---------------------------------------------------------------------------
+
+export interface CollectionServiceShape {
+	readonly findById: (
+		id: CollectionId,
+	) => Effect.Effect<CollectionRow, DavError | DatabaseError>;
+	readonly findBySlug: (
+		ownerPrincipalId: PrincipalId,
+		collectionType: CollectionType,
+		slug: Slug,
+	) => Effect.Effect<CollectionRow, DavError | DatabaseError>;
+	readonly listByOwner: (
+		ownerPrincipalId: PrincipalId,
+	) => Effect.Effect<ReadonlyArray<CollectionRow>, DatabaseError>;
+	readonly create: (
+		input: NewCollection,
+	) => Effect.Effect<CollectionRow, DavError | DatabaseError>;
+	readonly delete: (
+		id: CollectionId,
+	) => Effect.Effect<CollectionRow, DavError | DatabaseError>;
+	/**
+	 * Permanently remove a collection (and its instances) with no trash-bin
+	 * recovery. Used only when trash retention is disabled (0 days) — the
+	 * normal delete path is {@link CollectionServiceShape.delete}.
+	 */
+	readonly hardDelete: (
+		id: CollectionId,
+	) => Effect.Effect<void, DavError | DatabaseError>;
+	readonly updateProperties: (
+		id: CollectionId,
+		changes: CollectionPropertyChanges,
+	) => Effect.Effect<CollectionRow, DatabaseError>;
+}
+
+export class CollectionService extends Context.Service<
+	CollectionService,
+	CollectionServiceShape
+>()("CollectionService") {}

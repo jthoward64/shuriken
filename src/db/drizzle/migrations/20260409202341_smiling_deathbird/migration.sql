@@ -1,0 +1,1 @@
+ALTER TABLE "dav_instance" ADD COLUMN "content_length" bigint;

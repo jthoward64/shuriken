@@ -1,0 +1,212 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    name: Type check & lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: deno install
+      - run: deno task check
+      - run: deno run -A npm:@biomejs/biome@2.4.9 ci --reporter=github
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: deno install
+      - run: deno task test
+
+  version:
+    name: Determine release version
+    runs-on: ubuntu-latest
+    needs: [check, test]
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.info.outputs.version }}
+      bumped: ${{ steps.info.outputs.bumped }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Determine version and bump status
+        id: info
+        run: |
+          VERSION=$(jq -r .version deno.json)
+          if git ls-remote --tags origin "refs/tags/v$VERSION" | grep -q .; then
+            echo "bumped=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "bumped=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      # Only actually cut the tag on a real push to main with a new version;
+      # PRs and no-op main pushes just report bumped=false and stop here.
+      - name: Tag release
+        if: steps.info.outputs.bumped == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git tag "v${{ steps.info.outputs.version }}"
+          git push origin "v${{ steps.info.outputs.version }}"
+
+  helm:
+    name: Helm chart lint & template
+    runs-on: ubuntu-latest
+    needs: [version]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.18.4
+
+      - name: Install kubeconform
+        run: |
+          curl -sSL -o /tmp/kubeconform.tar.gz \
+            https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
+          tar -xzf /tmp/kubeconform.tar.gz -C /usr/local/bin kubeconform
+
+      - name: helm lint --strict
+        run: helm lint --strict helm/shuriken
+
+      - name: helm template (defaults)
+        run: helm template ci helm/shuriken --debug > /tmp/render-defaults.yaml
+
+      - name: helm template (all optional features on)
+        run: |
+          helm template ci helm/shuriken \
+            --set config.database.url='postgresql://x:y@db:5432/z' \
+            --set config.auth.adminPassword='dummy' \
+            --set ingress.enabled=true \
+            --set autoscaling.enabled=true \
+            --set podDisruptionBudget.enabled=true \
+            --set networkPolicy.enabled=true \
+            --set config.mail.enabled=true \
+            --set config.mail.lmtpEnabled=true \
+            --set service.lmtp.enabled=true \
+            > /tmp/render-full.yaml
+
+      - name: helm template (HTTPRoute variant)
+        run: |
+          helm template ci helm/shuriken \
+            --set config.database.url='postgresql://x:y@db:5432/z' \
+            --set httpRoute.enabled=true \
+            > /tmp/render-httproute.yaml
+
+      - name: Reject combos that should fail schema or template
+        run: |
+          set +e
+          # Schema: invalid pullPolicy must fail
+          helm template ci helm/shuriken --set image.pullPolicy=Bogus 2>/dev/null
+          if [ $? -eq 0 ]; then echo "schema regression: bad pullPolicy accepted"; exit 1; fi
+          # Mutex: ingress + httpRoute must fail
+          helm template ci helm/shuriken --set ingress.enabled=true --set httpRoute.enabled=true 2>/dev/null
+          if [ $? -eq 0 ]; then echo "mutex regression: ingress + httpRoute both rendered"; exit 1; fi
+          echo "negative cases rejected as expected"
+
+      - name: kubeconform (validate rendered manifests against k8s 1.31 schemas)
+        run: |
+          for f in /tmp/render-defaults.yaml /tmp/render-full.yaml /tmp/render-httproute.yaml; do
+            echo "==> $f"
+            kubeconform -strict -ignore-missing-schemas \
+              -schema-location default \
+              -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+              -kubernetes-version 1.31.0 \
+              -summary "$f"
+          done
+
+      - name: helm package
+        run: helm package helm/shuriken --destination /tmp/charts
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: helm-chart
+          path: /tmp/charts/*.tgz
+          retention-days: 14
+
+      - name: Push chart to GHCR (version bumps only)
+        if: needs.version.outputs.bumped == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GH_TOKEN" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+          helm push /tmp/charts/*.tgz "oci://ghcr.io/${{ github.repository_owner }}/charts"
+
+  docker:
+    name: Build & push image
+    runs-on: ubuntu-latest
+    needs: [check, test, version]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        if: github.event_name != 'pull_request'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@v6
+        id: meta
+        with:
+          images: ghcr.io/${{ github.event.repository.full_name }}
+          tags: |
+            type=sha,format=long
+            type=raw,value=main,enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ needs.version.outputs.bumped == 'true' }}
+            type=raw,value=v${{ needs.version.outputs.version }},enable=${{ needs.version.outputs.bumped == 'true' }}
+
+      # If an image was already built for this commit (e.g. a re-run), retag it rather than rebuild.
+      - name: Check if image exists for this commit
+        id: exists
+        if: github.event_name != 'pull_request'
+        env:
+          SHA_IMAGE: ghcr.io/${{ github.event.repository.full_name }}:sha-${{ github.sha }}
+        run: |
+          if docker manifest inspect "$SHA_IMAGE" > /dev/null 2>&1; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Retag existing image
+        if: github.event_name != 'pull_request' && steps.exists.outputs.found == 'true'
+        env:
+          SHA_IMAGE: ghcr.io/${{ github.event.repository.full_name }}:sha-${{ github.sha }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          TAG_ARGS=$(printf '%s\n' "$TAGS" | sed 's/^/--tag /' | tr '\n' ' ')
+          docker buildx imagetools create $TAG_ARGS "$SHA_IMAGE"
+
+      - uses: docker/build-push-action@v7
+        if: steps.exists.outputs.found != 'true'
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

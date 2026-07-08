@@ -1,0 +1,382 @@
+import { Temporal as JSTemporal } from "@js-temporal/polyfill";
+import { and, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { Effect, Layer } from "effect";
+import { RRuleTemporal } from "rrule-temporal";
+import type { Temporal } from "temporal-polyfill";
+import { normalizeRruleUntil } from "#src/data/icalendar/recurrence/recurrence-check.ts";
+import { DatabaseClient } from "#src/db/client.ts";
+import { calIndex, davInstance } from "#src/db/drizzle/schema/index.ts";
+import { runDbQuery } from "#src/db/query.ts";
+import type { CollectionId, EntityId } from "#src/domain/ids.ts";
+import { type CalComponentType, CalIndexRepository } from "./repository.ts";
+
+// ---------------------------------------------------------------------------
+// CalIndexRepository — Drizzle implementation
+// ---------------------------------------------------------------------------
+
+/**
+ * Build the RRULE WHERE clause for findByTimeRange.
+ *
+ * When weekStart/weekEnd are provided, applies a week-bucket heuristic that
+ * filters out recurring events whose pattern cannot produce an occurrence in
+ * the calendar week [weekStart, weekEnd). False positives are acceptable
+ * (the in-memory filter does the exact check); false negatives are not.
+ *
+ * When either is null, falls back to the conservative "all RRULE rows pass".
+ */
+const rruleWeekBucketClause = (
+	weekStart: Temporal.Instant | null,
+	weekEnd: Temporal.Instant | null,
+) => {
+	if (weekStart === null || weekEnd === null) {
+		return isNotNull(calIndex.rruleText);
+	}
+	const ws = weekStart.toString();
+	const we = weekEnd.toString();
+
+	return and(
+		isNotNull(calIndex.rruleText),
+		// Series must have started by weekEnd
+		sql`${calIndex.dtstartUtc} <= ${we}::timestamptz`,
+		// Active rule: no UNTIL, or UNTIL is at or after weekStart
+		or(
+			isNull(calIndex.rruleUntilUtc),
+			sql`${calIndex.rruleUntilUtc} >= ${ws}::timestamptz`,
+		),
+		// Week-bucket match — one of the following must be true:
+		or(
+			// Sub-daily frequencies always fire within any week
+			sql`${calIndex.rruleFreq} IN ('DAILY', 'HOURLY', 'MINUTELY', 'SECONDLY')`,
+
+			// WEEKLY: the week containing dtstart + n*interval weeks lands on weekStart
+			sql`(
+				${calIndex.rruleFreq} = 'WEEKLY'
+				AND FLOOR(EXTRACT(EPOCH FROM (${ws}::timestamptz - ${calIndex.dtstartUtc})) / 604800.0)::bigint
+					% COALESCE(${calIndex.rruleInterval}, 1) = 0
+			)`,
+
+			// MONTHLY: precomputed day range intersects the week + interval check.
+			// Pass conservatively when not yet indexed (day_min IS NULL).
+			and(
+				sql`${calIndex.rruleFreq} = 'MONTHLY'`,
+				or(
+					isNull(calIndex.rruleOccurrenceDayMin),
+					and(
+						sql`${calIndex.rruleOccurrenceDayMin} <= EXTRACT(DAY FROM ${we}::timestamptz)::int`,
+						sql`${calIndex.rruleOccurrenceDayMax} >= EXTRACT(DAY FROM ${ws}::timestamptz)::int`,
+						sql`(
+							(EXTRACT(YEAR  FROM ${ws}::timestamptz)::int - EXTRACT(YEAR  FROM ${calIndex.dtstartUtc})::int) * 12
+							+ EXTRACT(MONTH FROM ${ws}::timestamptz)::int - EXTRACT(MONTH FROM ${calIndex.dtstartUtc})::int
+						) % COALESCE(${calIndex.rruleInterval}, 1) = 0`,
+					),
+				),
+			),
+
+			// YEARLY: precomputed months contains the queried week's month + interval check.
+			// Pass conservatively when not yet indexed (occurrence_months IS NULL).
+			and(
+				sql`${calIndex.rruleFreq} = 'YEARLY'`,
+				or(
+					isNull(calIndex.rruleOccurrenceMonths),
+					and(
+						sql`(
+							EXTRACT(MONTH FROM ${ws}::timestamptz)::int = ANY(${calIndex.rruleOccurrenceMonths})
+							OR EXTRACT(MONTH FROM ${we}::timestamptz)::int = ANY(${calIndex.rruleOccurrenceMonths})
+						)`,
+						sql`(EXTRACT(YEAR FROM ${ws}::timestamptz)::int - EXTRACT(YEAR FROM ${calIndex.dtstartUtc})::int)
+							% COALESCE(${calIndex.rruleInterval}, 1) = 0`,
+					),
+				),
+			),
+
+			// Unknown / unrecognised freq: pass conservatively
+			sql`(
+				${calIndex.rruleFreq} IS NULL
+				OR ${calIndex.rruleFreq} NOT IN ('DAILY', 'HOURLY', 'MINUTELY', 'SECONDLY', 'WEEKLY', 'MONTHLY', 'YEARLY')
+			)`,
+		),
+	);
+};
+
+/**
+ * Exact dtstart/dtend overlap clause for non-recurring (no RRULE) rows.
+ * Shared by findByTimeRange and findOverlappingRange.
+ */
+const nonRecurringOverlapClause = (
+	start: Temporal.Instant | null,
+	end: Temporal.Instant | null,
+) =>
+	and(
+		isNull(calIndex.rruleText),
+		start !== null
+			? or(
+					isNull(calIndex.dtendUtc),
+					sql`${calIndex.dtendUtc} > ${start.toString()}::timestamptz`,
+				)
+			: undefined,
+		// A NULL dtstart_utc must still be a candidate (e.g. a VTODO with only
+		// DUE, or a VFREEBUSY without DTSTART); the in-memory pass does the exact
+		// check. VEVENTs always carry DTSTART so this never loosens event queries.
+		end !== null
+			? sql`(${calIndex.dtstartUtc} IS NULL OR ${calIndex.dtstartUtc} < ${end.toString()}::timestamptz)`
+			: undefined,
+	);
+
+/**
+ * Window-agnostic RRULE superset clause: the series starts before `end` and is
+ * not provably finished before `start`. Correct for an arbitrary window (no
+ * week-bucket assumption); over-approximates (COUNT-bounded series, gaps) but
+ * never drops a series that could have an occurrence in range.
+ */
+const rruleRangeClause = (
+	start: Temporal.Instant | null,
+	end: Temporal.Instant | null,
+) =>
+	and(
+		isNotNull(calIndex.rruleText),
+		end !== null
+			? sql`(${calIndex.dtstartUtc} IS NULL OR ${calIndex.dtstartUtc} < ${end.toString()}::timestamptz)`
+			: undefined,
+		start !== null
+			? or(
+					isNull(calIndex.rruleUntilUtc),
+					sql`${calIndex.rruleUntilUtc} > ${start.toString()}::timestamptz`,
+				)
+			: undefined,
+	);
+
+const findByTimeRange = Effect.fn("CalIndexRepository.findByTimeRange")(
+	function* (
+		collectionId: CollectionId,
+		componentType: CalComponentType,
+		start: Temporal.Instant | null,
+		end: Temporal.Instant | null,
+		weekStart: Temporal.Instant | null,
+		weekEnd: Temporal.Instant | null,
+	) {
+		yield* Effect.annotateCurrentSpan({
+			"collection.id": collectionId,
+			"cal.component_type": componentType,
+		});
+		yield* Effect.logTrace("repo.cal-index.findByTimeRange", {
+			collectionId,
+			componentType,
+		});
+		return yield* runDbQuery((db) =>
+			db
+				.selectDistinct({ instanceId: davInstance.id })
+				.from(calIndex)
+				.innerJoin(
+					davInstance,
+					and(
+						eq(calIndex.entityId, davInstance.entityId),
+						eq(davInstance.collectionId, collectionId),
+						isNull(davInstance.deletedAt),
+					),
+				)
+				.where(
+					and(
+						eq(calIndex.componentType, componentType),
+						isNull(calIndex.deletedAt),
+						or(
+							// Non-RRULE: standard dtstart/dtend overlap
+							nonRecurringOverlapClause(start, end),
+							// RRULE: week-bucket pre-filter
+							rruleWeekBucketClause(weekStart, weekEnd),
+						),
+					),
+				),
+		).pipe(Effect.map((rows) => rows.map((r) => r.instanceId)));
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.cal-index.findByTimeRange failed", e.cause),
+	),
+);
+
+const findByComponentType = Effect.fn("CalIndexRepository.findByComponentType")(
+	function* (collectionId: CollectionId, componentType: CalComponentType) {
+		yield* Effect.annotateCurrentSpan({
+			"collection.id": collectionId,
+			"cal.component_type": componentType,
+		});
+		yield* Effect.logTrace("repo.cal-index.findByComponentType", {
+			collectionId,
+			componentType,
+		});
+		return yield* runDbQuery((db) =>
+			db
+				.selectDistinct({ instanceId: davInstance.id })
+				.from(calIndex)
+				.innerJoin(
+					davInstance,
+					and(
+						eq(calIndex.entityId, davInstance.entityId),
+						eq(davInstance.collectionId, collectionId),
+						isNull(davInstance.deletedAt),
+					),
+				)
+				.where(
+					and(
+						eq(calIndex.componentType, componentType),
+						isNull(calIndex.deletedAt),
+					),
+				),
+		).pipe(Effect.map((rows) => rows.map((r) => r.instanceId)));
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.cal-index.findByComponentType failed", e.cause),
+	),
+);
+
+const findOverlappingRange = Effect.fn(
+	"CalIndexRepository.findOverlappingRange",
+)(
+	function* (
+		collectionId: CollectionId,
+		componentType: CalComponentType,
+		start: Temporal.Instant | null,
+		end: Temporal.Instant | null,
+	) {
+		yield* Effect.annotateCurrentSpan({
+			"collection.id": collectionId,
+			"cal.component_type": componentType,
+		});
+		yield* Effect.logTrace("repo.cal-index.findOverlappingRange", {
+			collectionId,
+			componentType,
+		});
+		return yield* runDbQuery((db) =>
+			db
+				.selectDistinct({ instanceId: davInstance.id })
+				.from(calIndex)
+				.innerJoin(
+					davInstance,
+					and(
+						eq(calIndex.entityId, davInstance.entityId),
+						eq(davInstance.collectionId, collectionId),
+						isNull(davInstance.deletedAt),
+					),
+				)
+				.where(
+					and(
+						eq(calIndex.componentType, componentType),
+						isNull(calIndex.deletedAt),
+						or(
+							nonRecurringOverlapClause(start, end),
+							rruleRangeClause(start, end),
+						),
+					),
+				),
+		).pipe(Effect.map((rows) => rows.map((r) => r.instanceId)));
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.cal-index.findOverlappingRange failed", e.cause),
+	),
+);
+
+const indexRruleOccurrences = Effect.fn(
+	"CalIndexRepository.indexRruleOccurrences",
+)(
+	function* (entityId: EntityId) {
+		yield* Effect.annotateCurrentSpan({ "entity.id": entityId });
+		yield* Effect.logTrace("repo.cal-index.indexRruleOccurrences", {
+			entityId,
+		});
+
+		const rows = yield* runDbQuery((db) =>
+			db
+				.select({
+					componentId: calIndex.componentId,
+					rruleText: calIndex.rruleText,
+					dtstartUtc: calIndex.dtstartUtc,
+				})
+				.from(calIndex)
+				.where(
+					and(
+						eq(calIndex.entityId, entityId),
+						isNotNull(calIndex.rruleText),
+						isNull(calIndex.deletedAt),
+					),
+				),
+		);
+
+		for (const row of rows) {
+			if (row.rruleText === null || row.dtstartUtc === null) {
+				continue;
+			}
+
+			// Convert temporal-polyfill Instant → @js-temporal/polyfill ZonedDateTime
+			const dtstart = JSTemporal.Instant.fromEpochMilliseconds(
+				row.dtstartUtc.epochMilliseconds,
+			).toZonedDateTimeISO("UTC");
+
+			// A malformed RRULE (beyond the naive-UNTIL case normalizeRruleUntil
+			// handles) must not fail the whole write/index pass. On a residual
+			// expansion error, log and skip THIS row's occurrence hints — they stay
+			// NULL, so the week-bucket pre-filter passes the row conservatively
+			// (correct, just less selective). The skip is logged, never silent.
+			let sample: ReturnType<RRuleTemporal["all"]>;
+			try {
+				const rule = new RRuleTemporal({
+					rruleString: normalizeRruleUntil(row.rruleText, dtstart),
+					dtstart,
+				});
+				// Sample 24 occurrences — sufficient to determine the pattern:
+				//   MONTHLY → covers 24 months (2 years)
+				//   YEARLY  → covers 24 years
+				sample = rule.all((_, i) => i < 24);
+			} catch (cause) {
+				yield* Effect.logWarning(
+					"repo.cal-index: skipping occurrence-hint indexing for a malformed RRULE",
+					{ rruleText: row.rruleText, cause },
+				);
+				continue;
+			}
+			if (sample.length === 0) {
+				continue;
+			}
+
+			const months = [...new Set(sample.map((d) => d.month))].sort(
+				(a, b) => a - b,
+			);
+			const dayMin = Math.min(...sample.map((d) => d.day));
+			const dayMax = Math.max(...sample.map((d) => d.day));
+
+			yield* runDbQuery((db) =>
+				db
+					.update(calIndex)
+					.set({
+						rruleOccurrenceMonths: months,
+						rruleOccurrenceDayMin: dayMin,
+						rruleOccurrenceDayMax: dayMax,
+					})
+					.where(eq(calIndex.componentId, row.componentId)),
+			).pipe(Effect.asVoid);
+		}
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.cal-index.indexRruleOccurrences failed", e.cause),
+	),
+);
+
+export const CalIndexRepositoryLive = Layer.effect(
+	CalIndexRepository,
+	Effect.gen(function* () {
+		const dc = yield* DatabaseClient;
+		const run = <A, E>(
+			e: Effect.Effect<A, E, DatabaseClient>,
+		): Effect.Effect<A, E> => Effect.provideService(e, DatabaseClient, dc);
+		return {
+			findByTimeRange: (...args: Parameters<typeof findByTimeRange>) =>
+				run(findByTimeRange(...args)),
+			findByComponentType: (...args: Parameters<typeof findByComponentType>) =>
+				run(findByComponentType(...args)),
+			findOverlappingRange: (
+				...args: Parameters<typeof findOverlappingRange>
+			) => run(findOverlappingRange(...args)),
+			indexRruleOccurrences: (
+				...args: Parameters<typeof indexRruleOccurrences>
+			) => run(indexRruleOccurrences(...args)),
+		};
+	}),
+);

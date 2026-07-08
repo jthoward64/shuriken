@@ -1,0 +1,20 @@
+{
+	"permissions": {
+		"allow": [
+			"Bash(bun test:*)",
+			"Bash(bun run:*)",
+			"Bash(bunx biome:*)",
+			"Bash(deno task check *)",
+			"Bash(cargo check *)",
+			"Bash(deno task verify *)",
+			"Bash(deno check *)",
+			"Bash(deno task test:unit *)",
+			"Bash(deno task lint *)",
+			"Bash(cargo clippy *)",
+			"Bash(deno task test *)",
+			"Bash(awk *)",
+			"Bash(cargo test -p *)",
+			"Bash(cargo metadata *)"
+		]
+	}
+}

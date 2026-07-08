@@ -1,0 +1,102 @@
+// ---------------------------------------------------------------------------
+// CALDAV:calendar-multiget REPORT — RFC 4791 §7.9
+//
+// Fetches specific calendar objects by href, applying optional calendar-data
+// subsetting per the <C:calendar-data> element in the request body.
+// ---------------------------------------------------------------------------
+
+import { Effect } from "effect";
+import { encodeICalendar } from "#src/data/icalendar/codec.ts";
+import type { ClarkName, IrDocument } from "#src/data/ir.ts";
+import type { DatabaseError, DavError } from "#src/domain/errors.ts";
+import { methodNotAllowed, unauthorized } from "#src/domain/errors.ts";
+import type { ResolvedDavPath } from "#src/domain/types/path.ts";
+import type { HttpRequestContext } from "#src/http/context.ts";
+import { AclService } from "#src/services/acl/index.ts";
+import type { ComponentRepository } from "#src/services/component/index.ts";
+import type { InstanceService } from "#src/services/instance/index.ts";
+import { IanaTimezoneService } from "#src/services/timezone/iana.ts";
+import {
+	parseCalendarDataSpec,
+	stripKnownVtimezones,
+	subsetIrDocument,
+} from "./calendar-data.ts";
+import { multigetHandler } from "./multiget.ts";
+import { extractHrefs, extractPropNames } from "./parse.ts";
+
+const CALDAV_NS = "urn:ietf:params:xml:ns:caldav";
+const cn = (local: string): ClarkName => `{${CALDAV_NS}}${local}` as ClarkName;
+
+const CALENDAR_DATA = cn("calendar-data");
+
+export const calendarMultigetHandler = (
+	path: ResolvedDavPath,
+	ctx: HttpRequestContext,
+	tree: unknown,
+): Effect.Effect<
+	Response,
+	DavError | DatabaseError,
+	InstanceService | ComponentRepository | AclService | IanaTimezoneService
+> =>
+	Effect.gen(function* () {
+		if (path.kind !== "collection") {
+			return yield* methodNotAllowed(
+				"CALDAV:calendar-multiget REPORT requires a collection URL",
+			);
+		}
+
+		if (ctx.auth._tag !== "Authenticated") {
+			return yield* unauthorized();
+		}
+		const actingPrincipalId = ctx.auth.principal.principalId;
+
+		const acl = yield* AclService;
+		yield* acl.check(
+			actingPrincipalId,
+			path.collectionId,
+			"collection",
+			"DAV:read",
+		);
+
+		const hrefs = extractHrefs(tree);
+		if (hrefs.length === 0) {
+			// Diagnostic: a multiget with no resolvable hrefs returns an empty
+			// multistatus, which silently yields no data on the client. Log the
+			// parsed tree so an unexpected client href encoding can be identified.
+			yield* Effect.logWarning(
+				"dav.calendar-multiget: no hrefs extracted from request body",
+				{ tree: JSON.stringify(tree) },
+			);
+		}
+		const propNames = extractPropNames(tree);
+		// <C:calendar-data> is nested inside <D:prop>, not at the top level
+		const propEl =
+			typeof tree === "object" && tree !== null
+				? (tree as Record<string, unknown>)["{DAV:}prop"]
+				: undefined;
+		const dataTree =
+			typeof propEl === "object" && propEl !== null
+				? (propEl as Record<string, unknown>)[CALENDAR_DATA]
+				: undefined;
+		const spec = parseCalendarDataSpec(dataTree);
+
+		// RFC 7809 §3.1.3: resolve the VTIMEZONE stripping function once per request.
+		const ianaSvc = yield* IanaTimezoneService;
+		const stripTimezones =
+			ctx.caldavTimezones === "F"
+				? (doc: IrDocument) => stripKnownVtimezones(doc, ianaSvc.isKnownTzid)
+				: (doc: IrDocument) => doc;
+
+		return yield* multigetHandler({
+			hrefs,
+			collectionId: path.collectionId,
+			actingPrincipalId,
+			propNames,
+			entityType: "icalendar",
+			origin: ctx.url.origin,
+			dataClarkName: CALENDAR_DATA,
+			dataTree,
+			serializeData: (doc: IrDocument) =>
+				encodeICalendar(stripTimezones(subsetIrDocument(doc, spec))),
+		});
+	});

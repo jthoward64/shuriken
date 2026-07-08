@@ -1,0 +1,107 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "shuriken.fullname" . }}
+  labels: {{- include "shuriken.labels" . | nindent 4 }}
+  {{- with .Values.commonAnnotations }}
+  annotations: {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  strategy: {{- toYaml .Values.strategy | nindent 4 }}
+  selector:
+    matchLabels: {{- include "shuriken.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "shuriken.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        # Rolls pods when ConfigMap / Secret content changes so env-var
+        # updates take effect without bumping the image tag.
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "shuriken.serviceAccountName" . }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
+      securityContext: {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: shuriken
+          image: {{ include "shuriken.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext: {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          # The image's default CMD is `task docker:start`, which runs database
+          # migrations and then starts the server (see the app Dockerfile). When
+          # migrations are disabled, override the args to start the server only.
+          # Uses args, not command, so the base image's tini entrypoint is kept.
+          {{- if not .Values.migrations.enabled }}
+          args: ["task", "start"]
+          {{- end }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "shuriken.fullname" . }}-config
+          env:
+            {{- include "shuriken.secretEnvVar" (dict "root" $ "name" "DATABASE_URL" "value" .Values.config.database.url "existingSecret" .Values.config.database.existingSecret) | nindent 12 }}
+            {{- include "shuriken.secretEnvVar" (dict "root" $ "name" "ADMIN_PASSWORD" "value" .Values.config.auth.adminPassword "existingSecret" .Values.config.auth.adminPasswordExistingSecret) | nindent 12 }}
+            {{- include "shuriken.secretEnvVar" (dict "root" $ "name" "OIDC_CLIENT_SECRET" "value" .Values.config.auth.oidcClientSecret "existingSecret" .Values.config.auth.oidcClientSecretExistingSecret) | nindent 12 }}
+            {{- include "shuriken.secretEnvVar" (dict "root" $ "name" "SMTP_PASSWORD" "value" .Values.config.mail.defaultPassword "existingSecret" .Values.config.mail.defaultPasswordExistingSecret) | nindent 12 }}
+            {{- include "shuriken.secretEnvVar" (dict "root" $ "name" "EMAIL_CREDS_KEY" "value" .Values.config.mail.credsKey "existingSecret" .Values.config.mail.credsKeyExistingSecret) | nindent 12 }}
+            {{- include "shuriken.secretEnvVar" (dict "root" $ "name" "SMTP_PROFILES_JSON" "value" .Values.config.mail.profilesJson "existingSecret" .Values.config.mail.profilesJsonExistingSecret) | nindent 12 }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.config.server.port }}
+              protocol: TCP
+            {{- if .Values.config.metrics.enabled }}
+            - name: metrics
+              containerPort: {{ .Values.config.metrics.port }}
+              protocol: TCP
+            {{- end }}
+            {{- if .Values.config.mail.lmtpEnabled }}
+            - name: lmtp
+              containerPort: {{ .Values.config.mail.lmtpPort }}
+              protocol: TCP
+            {{- end }}
+          {{- with .Values.livenessProbe }}
+          livenessProbe: {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe: {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.startupProbe }}
+          startupProbe: {{- toYaml . | nindent 12 }}
+          {{- end }}
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+          {{- with .Values.extraVolumeMounts }}
+          volumeMounts: {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.extraVolumes }}
+      volumes: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints: {{- toYaml . | nindent 8 }}
+      {{- end }}

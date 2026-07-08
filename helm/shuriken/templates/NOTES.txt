@@ -1,0 +1,42 @@
+shuriken-ts is now installed in namespace {{ .Release.Namespace }}.
+
+{{- if .Values.ingress.enabled }}
+
+Reach the server at:
+{{- range .Values.ingress.hosts }}
+{{- range .paths }}
+  https://{{ .host }}{{ .path }}
+{{- end }}
+{{- end }}
+{{- else if eq .Values.service.type "LoadBalancer" }}
+
+Get the load-balancer address:
+  kubectl get svc -n {{ .Release.Namespace }} {{ include "shuriken.fullname" . }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+{{- else }}
+
+Port-forward to try it locally:
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "shuriken.fullname" . }} 3000:{{ .Values.service.port }}
+  open http://localhost:3000/ui/
+{{- end }}
+
+Useful next steps:
+
+  # Tail logs from every replica
+  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }} -f
+
+  # Re-run migrations on demand (the entrypoint migrates on every pod start)
+  kubectl rollout restart -n {{ .Release.Namespace }} deployment/{{ include "shuriken.fullname" . }}
+
+{{- $allExternal := and .Values.config.database.existingSecret.name .Values.config.auth.adminPasswordExistingSecret.name .Values.config.auth.oidcClientSecretExistingSecret.name .Values.config.mail.defaultPasswordExistingSecret.name .Values.config.mail.credsKeyExistingSecret.name .Values.config.mail.profilesJsonExistingSecret.name }}
+{{- if not $allExternal }}
+
+NOTE: one or more sensitive values are managed by the chart from
+values.yaml — for production deployments prefer setting the relevant
+`*ExistingSecret.name` (see values.yaml) to source them from a Secret
+created via ExternalSecrets / Sealed Secrets / your CI/CD pipeline instead.
+{{- end }}
+
+CalDAV / CardDAV discovery URLs (point your client at these):
+
+  https://<your-host>/.well-known/caldav
+  https://<your-host>/.well-known/carddav

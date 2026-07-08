@@ -1,0 +1,452 @@
+# ---------------------------------------------------------------------------
+# shuriken values.yaml
+#
+# Configures a production deployment of shuriken-ts. Every key is documented
+# inline; the JSON schema in values.schema.json validates types and required
+# fields at `helm install --install` time.
+# ---------------------------------------------------------------------------
+
+image:
+  repository: ghcr.io/jthoward64/shuriken
+  tag: ""           # defaults to .Chart.AppVersion when empty
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+replicaCount: 1
+
+# ---------------------------------------------------------------------------
+# Labels/annotations merged onto every resource this chart renders, on top
+# of the standard app.kubernetes.io/* labels. Useful for cluster-tooling
+# concerns (GitOps visibility/gating labels, backup selectors, etc.) that
+# shuriken itself never reads. Individual resources (ingress, service,
+# serviceAccount, httpRoute, serviceMonitor) also expose their own
+# `labels`/`annotations` for cases that only apply to one resource;
+# resource-specific annotations win over commonAnnotations on key conflicts.
+# ---------------------------------------------------------------------------
+commonLabels: {}
+commonAnnotations: {}
+
+# Database migrations. When enabled (default) the container runs migrations and
+# then starts the server via the image's default `task docker:start` entrypoint
+# — no separate Job, no Helm hooks. Migrations run on every pod start and are
+# idempotent. With replicaCount > 1 a rollout starts several pods that each try
+# to migrate; set enabled=false and run migrations out-of-band (or keep a single
+# replica) if that matters for your schema changes.
+migrations:
+  enabled: true
+
+# ---------------------------------------------------------------------------
+# App runtime configuration. Every key here maps to an env var read by the
+# app via Effect's Config API. The chart auto-derives the SCREAMING_SNAKE
+# name (e.g. config.server.port → PORT, config.auth.oidcIssuer → OIDC_ISSUER).
+#
+# Values are split into two cohorts:
+#   * non-sensitive — rendered into a ConfigMap
+#   * sensitive (anything with credentials/keys/tokens) — by default rendered
+#     into a chart-managed Secret (`<release>-shuriken-secret`). Each one also
+#     has a sibling `existingSecret: {name, key}` — set `name` to source that
+#     one value from a pre-existing Secret (ExternalSecrets, Sealed Secrets,
+#     your own pipeline) instead, leaving the plaintext value blank. Fields
+#     are independent: mix chart-managed and externally-sourced freely.
+# ---------------------------------------------------------------------------
+
+config:
+  server:
+    port: 3000
+    host: "::"
+
+  # Prometheus metrics endpoint. Served on a dedicated port (kept off the
+  # public HTTP port / ingress) at /metrics. Scrape it in-cluster — see the
+  # `serviceMonitor` section below for Prometheus Operator integration.
+  metrics:
+    enabled: true
+    port: 9464
+
+  # NODE_ENV — leave as "production" unless you specifically need dev-mode
+  # tooling (DevTools, more verbose logs).
+  nodeEnv: production
+
+  # LOG_LEVEL — one of trace|debug|info|warn|error|fatal. Empty falls back
+  # to the app default (info in production).
+  logLevel: info
+
+  database:
+    # Populate `url` and the chart renders it into its own Secret. To read
+    # DATABASE_URL from a pre-existing Secret instead, leave `url` blank and
+    # set `existingSecret.name` (+ `key` if it's not called DATABASE_URL there).
+    url: ""
+    existingSecret:
+      name: ""
+      key: DATABASE_URL
+
+  auth:
+    # When set, every request is auto-authenticated as this email.
+    # Useful for single-user self-hosted setups. Leave blank to disable.
+    autoLogin: ""
+    # Enable HTTP Basic auth (DAV clients). Required for app passwords; only
+    # disable if every client uses the web UI (OIDC) exclusively.
+    basicAuthEnabled: true
+    # Comma-separated trusted-proxy IPs / CIDRs, or "*" to trust every source.
+    # NOT an auth method: it gates X-Forwarded-* (public scheme/host) and SMTP
+    # override headers. Behind a TLS-terminating ingress this MUST trust the
+    # ingress IPs so X-Forwarded-Proto=https is honoured — otherwise session
+    # cookies won't be marked Secure and the derived OIDC redirect URI will be
+    # http://<internal-host>. Alternatively set config.auth.oidcRedirectUri.
+    trustedProxies: "*"
+    # First-boot admin user (basic auth). Password goes into the Secret
+    # (or set adminPasswordExistingSecret.name to source it externally).
+    adminEmail: ""
+    adminPassword: ""
+    adminPasswordExistingSecret:
+      name: ""
+      key: ADMIN_PASSWORD
+    adminSlug: ""
+    # External account-management link shown on the profile page.
+    authSettingsUrl: ""
+    authSettingsLabel: ""
+
+    # ---- OIDC (web UI single sign-on) ----------------------------------
+    # When enabled, the web UI runs an OpenID Connect authorization-code
+    # (PKCE) flow and issues a session cookie. DAV clients are unaffected —
+    # OIDC users generate app passwords (UI → Profile → App passwords) to
+    # connect CalDAV/CardDAV clients over Basic auth.
+    oidcEnabled: false
+    # Issuer URL (discovery is <issuer>/.well-known/openid-configuration).
+    oidcIssuer: ""
+    oidcClientId: ""
+    # Client secret is sensitive → rendered into the Secret (or sourced via
+    # oidcClientSecretExistingSecret.name). Leave blank for a public client
+    # using PKCE only.
+    oidcClientSecret: ""
+    oidcClientSecretExistingSecret:
+      name: ""
+      key: OIDC_CLIENT_SECRET
+    # Full callback URL registered with the provider. Leave blank to derive
+    # it from the request's public origin + /ui/auth/callback (requires the
+    # ingress to be trusted via trustedProxies — see note above).
+    oidcRedirectUri: ""
+    # Space-separated scopes.
+    oidcScopes: "openid profile email"
+    # Create a local user on first successful login (linked by email/sub).
+    # Set false to require an admin to pre-create users.
+    oidcAutoProvision: true
+    # Browser session lifetime, in days.
+    sessionTtlDays: 7
+    # Optional role sync from the IdP. oidcGroupsClaim names an ID-token claim
+    # holding the user's groups/roles (array of strings, e.g. "groups"); leave
+    # blank to disable. oidcRoleMap is a JSON object mapping those values to app
+    # roles (normal | admin | super_admin). When both are set, the role is
+    # re-applied on every login (highest-privilege match wins; no match → normal).
+    oidcGroupsClaim: ""
+    oidcRoleMap: ""    # e.g. '{"shuriken-admins":"super_admin","staff":"admin"}'
+
+  externalCalendar:
+    schedulerTickS: 60
+    fetchConcurrency: 4
+    claimCap: 100
+
+  birthday:
+    schedulerTickS: 600
+    concurrency: 4
+
+  # Soft-delete retention for the trash bin. 0 disables the trash entirely:
+  # deletes become immediate hard-deletes and the purge job is a no-op.
+  trash:
+    retentionDays: 30
+
+  # Embedding — chrome-less authenticated panes (/ui/embed/*) and a public,
+  # no-login calendar widget (/embed/<token>) built on share-links. Both off
+  # by default; the widget additionally requires the per-calendar toggle in
+  # the Feeds UI.
+  embed:
+    panesEnabled: false
+    calendarWidgetEnabled: false
+
+  # Response security headers (CSP + hardening set). `enabled` is a single
+  # kill-switch for all of them; each header below its own flag. Defaults are
+  # secure-by-default — only relax these if a reverse proxy already sets them.
+  securityHeaders:
+    enabled: true
+    cspEnabled: true
+    # Extra origins allowed to frame the authenticated /ui/embed/* panes
+    # (comma-separated), e.g. "https://intranet.example.com". The public
+    # /embed/* widget is never restricted by this list — see CLAUDE.md /
+    # security-headers.ts for the rationale.
+    frameAncestors: ""
+    xContentTypeOptionsEnabled: true
+    referrerPolicyEnabled: true
+    hstsEnabled: true
+    permissionsPolicyEnabled: true
+
+  mail:
+    enabled: false
+    defaultFromAddress: ""
+    defaultFromName: ""
+    defaultHost: ""
+    defaultPort: 587
+    defaultUsername: ""
+    defaultPassword: ""
+    defaultPasswordExistingSecret:
+      name: ""
+      key: SMTP_PASSWORD
+    defaultSecurity: starttls    # none | starttls | tls
+    # AES-GCM key used to encrypt per-user SMTP creds at rest. Required
+    # when you want users to save their own credentials in the UI.
+    credsKey: ""
+    credsKeyExistingSecret:
+      name: ""
+      key: EMAIL_CREDS_KEY
+    # iMIP LMTP listener (postfix transport / dovecot). Disabled by default.
+    lmtpEnabled: false
+    lmtpPort: 2400
+    lmtpHost: "0.0.0.0"
+    # JSON-encoded regex-scoped relay profiles. See README of the app
+    # for the schema.
+    profilesJson: ""
+    profilesJsonExistingSecret:
+      name: ""
+      key: SMTP_PROFILES_JSON
+
+# ---------------------------------------------------------------------------
+# Service definition. By default exposes only HTTP. Enable lmtp to also
+# expose the iMIP LMTP listener (requires config.mail.lmtpEnabled).
+# ---------------------------------------------------------------------------
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+  annotations: {}
+  labels: {}
+  lmtp:
+    enabled: false
+    port: 2400
+    targetPort: 2400
+
+# ---------------------------------------------------------------------------
+# Prometheus Operator ServiceMonitor. Requires the CRD (kube-prometheus-stack
+# or the Prometheus Operator) and config.metrics.enabled. The scraper hits the
+# Service's `metrics` port at `path`.
+# ---------------------------------------------------------------------------
+
+serviceMonitor:
+  enabled: false
+  # Namespace for the ServiceMonitor; defaults to the release namespace.
+  namespace: ""
+  # Extra labels — set these to match your Prometheus `serviceMonitorSelector`
+  # (e.g. `release: kube-prometheus-stack`) so the operator picks it up.
+  labels: {}
+  annotations: {}
+  path: /metrics
+  interval: 30s
+  scrapeTimeout: ""
+  honorLabels: false
+  # Service labels to copy onto scraped metrics.
+  targetLabels: []
+  relabelings: []
+  metricRelabelings: []
+
+# ---------------------------------------------------------------------------
+# Ingress for the HTTP service. CalDAV clients are sensitive to .well-known
+# redirects; the default rewrites keep them under /.well-known/{cal,card}dav.
+# ---------------------------------------------------------------------------
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  labels: {}
+  hosts:
+    - host: dav.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  # tls:
+  #   - secretName: dav-tls
+  #     hosts:
+  #       - dav.example.com
+
+# ---------------------------------------------------------------------------
+# Gateway API HTTPRoute — the modern alternative to Ingress. Attaches to
+# one or more Gateways managed elsewhere in the cluster (Contour, Istio,
+# Cilium, GKE Gateway, etc.). Enable EITHER ingress OR httpRoute, not both.
+# ---------------------------------------------------------------------------
+
+httpRoute:
+  enabled: false
+  # Gateway parents this route attaches to. At least one entry required
+  # when enabled. `name` is mandatory; `namespace`, `sectionName`, `kind`
+  # are optional and follow Gateway API semantics.
+  parentRefs:
+    - name: gateway
+      # namespace: gateway-system
+      # sectionName: https
+      # kind: Gateway
+  # Hostnames the route matches. Empty list = all hostnames the Gateway listens on.
+  hostnames:
+    - dav.example.com
+  # Path matches. Defaults to `/` PathPrefix; extend for sub-path mounts.
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      # Optional per-rule timeouts (Gateway API v1.2+).
+      # timeouts:
+      #   request: 30s
+      #   backendRequest: 25s
+      # Optional filters (URL rewrites, header mutation, redirects).
+      filters: []
+  annotations: {}
+  # Extra labels merged onto the route's metadata, on top of the chart's
+  # standard app.kubernetes.io/* labels (e.g. GitOps visibility/gating
+  # labels consumed by cluster policy, not anything shuriken itself reads).
+  labels: {}
+
+# ---------------------------------------------------------------------------
+# Resource requests / limits + scaling.
+# ---------------------------------------------------------------------------
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 75
+  targetMemoryUtilizationPercentage: 80
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+  # maxUnavailable: ""
+
+# ---------------------------------------------------------------------------
+# Probes hit /healthz — a public, dependency-free 200 served before auth. Do not
+# point these at /.well-known/{cal,card}dav: those 301-redirect to /dav/, and
+# kubelet follows same-host redirects into that authenticated path (→ 401), so
+# the probe fails. Tune the timings to your SLOs.
+# ---------------------------------------------------------------------------
+
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 15
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /healthz
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+startupProbe:
+  httpGet:
+    path: /healthz
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  failureThreshold: 30
+
+# ---------------------------------------------------------------------------
+# Pod-level security context. Image runs as the deno user (UID 1000); these
+# defaults make it strictly non-root with a read-only rootfs.
+# ---------------------------------------------------------------------------
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# Volume mounts for the writable scratch + cache the app needs even with
+# read-only rootfs (Deno writes to /tmp; the timezone polyfill loads zone
+# data at startup).
+extraVolumes:
+  - name: tmp
+    emptyDir: {}
+
+extraVolumeMounts:
+  - name: tmp
+    mountPath: /tmp
+
+# ---------------------------------------------------------------------------
+# Deployment-level knobs.
+# ---------------------------------------------------------------------------
+
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 25%
+    maxUnavailable: 0
+
+podAnnotations: {}
+podLabels: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints: []
+priorityClassName: ""
+terminationGracePeriodSeconds: 30
+
+# ---------------------------------------------------------------------------
+# ServiceAccount — kept minimal because the app doesn't talk to the
+# Kubernetes API. Disable to use the namespace default.
+# ---------------------------------------------------------------------------
+
+serviceAccount:
+  create: true
+  automount: false
+  annotations: {}
+  labels: {}
+  name: ""
+
+# ---------------------------------------------------------------------------
+# NetworkPolicy — deny-all-by-default style; opens HTTP to the cluster
+# ingress and the database egress port. Leave disabled if you manage
+# network policy elsewhere (Cilium, Calico tiers, service mesh).
+# ---------------------------------------------------------------------------
+
+networkPolicy:
+  enabled: false
+  # Allow ingress from these namespaces (pod selector match labels).
+  ingressNamespaces: []
+  # Egress port for Postgres (override if you use a non-standard port).
+  databasePort: 5432
+  # Allow egress to these CIDRs for outbound SMTP / external calendar sync.
+  egressCidrs:
+    - 0.0.0.0/0
+
+# ---------------------------------------------------------------------------
+# Extra env vars — appended verbatim after the rendered config. Useful
+# for one-off knobs you don't want to model in values.yaml.
+# ---------------------------------------------------------------------------
+
+extraEnv: []
+# - name: DEBUG
+#   value: "true"

@@ -1,0 +1,700 @@
+/*
+ * Shuriken web UI design system — single source of truth for theme + components.
+ *
+ * Compiled (purged + minified) at server startup by CssService and served at
+ * /static/app.css. Tailwind utilities remain available to templates; the classes
+ * below are the shared vocabulary pages should prefer over hand-rolled markup.
+ *
+ * Theming is token-driven (CSS custom properties). Tokens flip for dark mode via
+ * BOTH an explicit `.dark` class (persisted toggle / JS) AND
+ * `prefers-color-scheme` (so system dark works even without JavaScript). An
+ * explicit `.light` class always wins, letting the toggle force light.
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ------------------------------------------------------------------ */
+/* Theme tokens                                                        */
+/* ------------------------------------------------------------------ */
+
+@layer base {
+	:root {
+		--canvas: 248 250 252;
+		--surface: 255 255 255;
+		--surface-2: 241 245 249;
+		--line: 226 232 240;
+		--line-strong: 203 213 225;
+		--fg: 15 23 42;
+		--muted: 71 85 105;
+		--subtle: 148 163 184;
+		--brand: 79 70 229;
+		--brand-hover: 67 56 202;
+		--brand-fg: 255 255 255;
+		/* High-contrast "ink" for primary actions — quieter than a saturated
+		   accent button, and inverts in dark mode. */
+		--ink: 24 32 46;
+		--ink-hover: 40 50 66;
+		--ink-fg: 255 255 255;
+		--ring: 99 102 241;
+		--danger: 220 38 38;
+		--danger-hover: 185 28 28;
+		--danger-fg: 255 255 255;
+		--success: 22 163 74;
+		--warning: 180 129 8;
+		--nav: 15 23 42;
+		--nav-border: 30 41 59;
+
+		/* FullCalendar theming — mirrors FullCalendar's own official "forma"
+		   Tailwind starter (github.com/fullcalendar/tailwind-starters), which
+		   builds the calendar's look entirely from class-name-prop options
+		   (see calendar.client.ts) reading this exact `--fc-forma-*` variable
+		   set, rather than importing FullCalendar's packaged theme CSS. Values
+		   here are our own design tokens, not the starter's default palette. */
+		--fc-forma-primary: rgb(var(--brand));
+		--fc-forma-primary-over: rgb(var(--brand-hover));
+		--fc-forma-primary-down: rgb(var(--brand-hover));
+		--fc-forma-primary-foreground: rgb(var(--brand-fg));
+		--fc-forma-event: rgb(var(--ink));
+		--fc-forma-event-contrast: rgb(var(--ink-fg));
+		--fc-forma-highlight: rgb(var(--brand) / 0.14);
+		--fc-forma-background: rgb(var(--surface));
+		--fc-forma-faint: rgb(var(--fg) / 0.03);
+		--fc-forma-muted: rgb(var(--fg) / 0.06);
+		--fc-forma-strong: rgb(var(--fg) / 0.12);
+		--fc-forma-stronger: rgb(var(--fg) / 0.18);
+		--fc-forma-strongest: rgb(var(--fg) / 0.24);
+		--fc-forma-foreground: rgb(var(--fg));
+		--fc-forma-faint-foreground: rgb(var(--subtle));
+		--fc-forma-muted-foreground: rgb(var(--muted));
+		--fc-forma-border: rgb(var(--line));
+		--fc-forma-muted-border: rgb(var(--line));
+		--fc-forma-strong-border: rgb(var(--line-strong));
+	}
+
+	/* Dark palette shared by both activation mechanisms. */
+	.dark {
+		--canvas: 15 18 24;
+		--surface: 22 27 34;
+		--surface-2: 30 37 46;
+		--line: 42 50 62;
+		--line-strong: 58 68 82;
+		--fg: 226 232 240;
+		--muted: 148 163 184;
+		--subtle: 107 118 135;
+		--brand: 129 140 248;
+		--brand-hover: 165 180 252;
+		--brand-fg: 17 20 26;
+		--ink: 226 232 240;
+		--ink-hover: 203 213 225;
+		--ink-fg: 17 20 26;
+		--ring: 129 140 248;
+		--danger: 248 113 113;
+		--danger-hover: 239 68 68;
+		--danger-fg: 17 20 26;
+		--success: 74 222 128;
+		--warning: 250 204 21;
+		--nav: 12 15 20;
+		--nav-border: 30 37 46;
+	}
+
+	@media (prefers-color-scheme: dark) {
+		:root:not(.light) {
+			--canvas: 15 18 24;
+			--surface: 22 27 34;
+			--surface-2: 30 37 46;
+			--line: 42 50 62;
+			--line-strong: 58 68 82;
+			--fg: 226 232 240;
+			--muted: 148 163 184;
+			--subtle: 107 118 135;
+			--brand: 129 140 248;
+			--brand-hover: 165 180 252;
+			--brand-fg: 17 20 26;
+			--ink: 226 232 240;
+			--ink-hover: 203 213 225;
+			--ink-fg: 17 20 26;
+			--ring: 129 140 248;
+			--danger: 248 113 113;
+			--danger-hover: 239 68 68;
+			--danger-fg: 17 20 26;
+			--success: 74 222 128;
+			--warning: 250 204 21;
+			--nav: 12 15 20;
+			--nav-border: 30 37 46;
+		}
+	}
+
+	/* Base element defaults ------------------------------------------- */
+	html {
+		-webkit-text-size-adjust: 100%;
+		font-feature-settings: "cv11", "ss01";
+	}
+
+	body {
+		@apply bg-canvas text-fg antialiased;
+		font-family:
+			ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+			"Helvetica Neue", Arial, sans-serif;
+	}
+
+	h1,
+	h2,
+	h3,
+	h4 {
+		@apply font-semibold tracking-tight text-fg;
+		text-wrap: balance;
+	}
+
+	a {
+		color: inherit;
+	}
+
+	/* NOTE: visibility-state helpers ([hidden], .htmx-indicator, no-JS-only
+	   controls, the theme-icon swap) intentionally live OUTSIDE @layer, near the
+	   end of this file — see the "Visibility state" section. They must sit after
+	   `@tailwind utilities` so a stray display utility can't defeat them. */
+
+	/* Raw form controls — many pages predate the .form-* classes and ship
+	   inputs with no background, which renders as browser-default white and goes
+	   unreadable in dark mode. Theme them by element so text stays legible
+	   everywhere. `:where()` keeps specificity at 0 so .form-* and utility
+	   classes still win. */
+	select,
+	textarea,
+	input:where(
+			:not(
+					[type="checkbox"],
+					[type="radio"],
+					[type="file"],
+					[type="range"],
+					[type="color"],
+					[type="submit"],
+					[type="button"],
+					[type="reset"],
+					[type="image"]
+				)
+		) {
+		background-color: rgb(var(--surface));
+		color: rgb(var(--fg));
+	}
+	input::placeholder,
+	textarea::placeholder {
+		color: rgb(var(--subtle));
+	}
+	input:where([type="checkbox"], [type="radio"]) {
+		accent-color: rgb(var(--brand));
+	}
+
+	/* Consistent, visible keyboard focus everywhere. */
+	:focus-visible {
+		@apply outline-none ring-2 ring-offset-2;
+		--tw-ring-color: rgb(var(--ring));
+		--tw-ring-offset-color: rgb(var(--canvas));
+	}
+
+	::selection {
+		background-color: rgb(var(--brand) / 0.22);
+	}
+
+	/* ---------------------------------------------------------------- */
+	/* Legacy dark bridge                                               */
+	/*                                                                  */
+	/* Pages not yet migrated to the token classes below still use raw */
+	/* gray/white Tailwind utilities. Under an explicit .dark class we  */
+	/* remap the light-surface + body-text grays to tokens so those    */
+	/* pages remain legible in dark mode. Only surfaces and text are    */
+	/* remapped — intentional dark chrome (bg-gray-800/900, text-white) */
+	/* and accent colors are left alone. `:where()` keeps specificity   */
+	/* at zero so any real dark: utilities a page adds still win.       */
+	/* ---------------------------------------------------------------- */
+	.dark :where(.bg-white) {
+		background-color: rgb(var(--surface));
+	}
+	.dark :where(.bg-gray-50) {
+		background-color: rgb(var(--surface-2));
+	}
+	.dark :where(.bg-gray-100) {
+		background-color: rgb(var(--canvas));
+	}
+	.dark :where(.bg-gray-200) {
+		background-color: rgb(var(--surface-2));
+	}
+	.dark :where(.hover\:bg-gray-50:hover) {
+		background-color: rgb(var(--surface-2));
+	}
+	.dark :where(.hover\:bg-gray-100:hover) {
+		background-color: rgb(var(--surface-2));
+	}
+	.dark :where(.text-gray-900, .text-gray-800, .text-gray-700) {
+		color: rgb(var(--fg));
+	}
+	.dark :where(.text-gray-600, .text-gray-500) {
+		color: rgb(var(--muted));
+	}
+	.dark :where(.text-gray-400) {
+		color: rgb(var(--subtle));
+	}
+	.dark :where(.border-gray-100, .border-gray-200, .border-gray-300) {
+		border-color: rgb(var(--line));
+	}
+	.dark
+		:where(
+			.divide-gray-100 > * + *,
+			.divide-gray-200 > * + *,
+			.divide-gray-300 > * + *
+		) {
+		border-color: rgb(var(--line));
+	}
+
+	/* Pastel status boxes (alerts, flashes) → subtle tinted surfaces with a
+	   readable, lightened foreground in dark mode. */
+	.dark :where(.bg-red-50) {
+		background-color: rgb(var(--danger) / 0.14);
+	}
+	.dark :where(.bg-green-50) {
+		background-color: rgb(var(--success) / 0.14);
+	}
+	.dark :where(.bg-yellow-50, .bg-amber-50) {
+		background-color: rgb(var(--warning) / 0.14);
+	}
+	.dark :where(.text-red-900, .text-red-800, .text-red-700) {
+		color: rgb(var(--danger));
+	}
+	.dark :where(.text-green-900, .text-green-800, .text-green-700) {
+		color: rgb(var(--success));
+	}
+	.dark :where(.text-yellow-900, .text-yellow-800, .text-yellow-700) {
+		color: rgb(var(--warning));
+	}
+	.dark :where(.border-red-200, .border-red-300) {
+		border-color: rgb(var(--danger) / 0.4);
+	}
+	.dark :where(.border-green-200, .border-green-300) {
+		border-color: rgb(var(--success) / 0.4);
+	}
+	.dark :where(.border-yellow-200, .border-yellow-300) {
+		border-color: rgb(var(--warning) / 0.4);
+	}
+}
+
+/* ------------------------------------------------------------------ */
+/* Components                                                          */
+/* ------------------------------------------------------------------ */
+
+@layer components {
+	/* Buttons --------------------------------------------------------- */
+	.btn {
+		@apply inline-flex items-center justify-center gap-2 rounded-md border border-transparent px-3.5 py-2 text-sm font-medium leading-5 transition-colors duration-150 cursor-pointer select-none;
+	}
+	.btn:disabled,
+	.btn[aria-disabled="true"] {
+		@apply opacity-50 pointer-events-none;
+	}
+	.btn-sm {
+		@apply px-2.5 py-1 text-xs;
+	}
+	.btn-lg {
+		@apply px-5 py-2.5 text-base;
+	}
+
+	.btn-primary {
+		background-color: rgb(var(--ink));
+		color: rgb(var(--ink-fg));
+	}
+	.btn-primary:hover {
+		background-color: rgb(var(--ink-hover));
+	}
+
+	.btn-secondary {
+		background-color: rgb(var(--surface));
+		color: rgb(var(--fg));
+		border-color: rgb(var(--line-strong));
+	}
+	.btn-secondary:hover {
+		background-color: rgb(var(--surface-2));
+	}
+
+	.btn-danger {
+		background-color: rgb(var(--danger));
+		color: rgb(var(--danger-fg));
+	}
+	.btn-danger:hover {
+		background-color: rgb(var(--danger-hover));
+	}
+
+	.btn-ghost {
+		background-color: transparent;
+		color: rgb(var(--muted));
+	}
+	.btn-ghost:hover {
+		background-color: rgb(var(--surface-2));
+		color: rgb(var(--fg));
+	}
+
+	/* Text link ------------------------------------------------------- */
+	.link {
+		color: rgb(var(--brand));
+		@apply font-medium underline-offset-2 hover:underline;
+	}
+
+	/* Cards — flat: a hairline border, no drop shadow. --------------- */
+	.card {
+		background-color: rgb(var(--surface));
+		border: 1px solid rgb(var(--line));
+		@apply rounded-md;
+	}
+	.card-pad {
+		@apply p-5;
+	}
+	.card-header {
+		border-bottom: 1px solid rgb(var(--line));
+		@apply px-5 py-3.5 flex items-center justify-between gap-3;
+	}
+	.card-title {
+		@apply text-sm font-semibold;
+	}
+
+	/* Page header ----------------------------------------------------- */
+	.page-header {
+		border-bottom: 1px solid rgb(var(--line));
+		@apply flex flex-wrap items-end justify-between gap-x-4 gap-y-2 pb-4 mb-6;
+	}
+	.page-title {
+		@apply text-2xl font-bold tracking-tight;
+	}
+	.page-subtitle {
+		color: rgb(var(--muted));
+		@apply text-sm mt-1;
+	}
+	.page-actions {
+		@apply flex items-center gap-2;
+	}
+
+	/* Forms ----------------------------------------------------------- */
+	.form-group {
+		@apply space-y-1.5;
+	}
+	.form-label {
+		color: rgb(var(--fg));
+		@apply block text-sm font-medium;
+	}
+	.form-hint {
+		color: rgb(var(--muted));
+		@apply text-xs;
+	}
+	.form-input,
+	.form-select,
+	.form-textarea {
+		background-color: rgb(var(--surface));
+		color: rgb(var(--fg));
+		border: 1px solid rgb(var(--line-strong));
+		@apply w-full rounded-md px-3 py-2 text-sm transition-colors placeholder:text-subtle;
+	}
+	.form-input:focus,
+	.form-select:focus,
+	.form-textarea:focus {
+		@apply outline-none ring-2 ring-offset-0;
+		border-color: rgb(var(--ring));
+		--tw-ring-color: rgb(var(--ring) / 0.35);
+	}
+
+	/* Tables ---------------------------------------------------------- */
+	.table-wrap {
+		background-color: rgb(var(--surface));
+		border: 1px solid rgb(var(--line));
+		@apply rounded-md overflow-hidden;
+	}
+	.table {
+		@apply min-w-full text-sm;
+	}
+	.table thead th {
+		background-color: rgb(var(--surface-2));
+		color: rgb(var(--muted));
+		border-bottom: 1px solid rgb(var(--line));
+		@apply px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider;
+	}
+	.table tbody td {
+		border-top: 1px solid rgb(var(--line));
+		@apply px-4 py-2.5 align-middle;
+	}
+	.table tbody tr:hover td {
+		background-color: rgb(var(--surface-2) / 0.5);
+	}
+
+	/* Badges ---------------------------------------------------------- */
+	.badge {
+		@apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium;
+		background-color: rgb(var(--surface-2));
+		color: rgb(var(--muted));
+	}
+	.badge-brand {
+		background-color: rgb(var(--brand) / 0.14);
+		color: rgb(var(--brand));
+	}
+	.badge-success {
+		background-color: rgb(var(--success) / 0.16);
+		color: rgb(var(--success));
+	}
+	.badge-danger {
+		background-color: rgb(var(--danger) / 0.16);
+		color: rgb(var(--danger));
+	}
+	.badge-warning {
+		background-color: rgb(var(--warning) / 0.18);
+		color: rgb(var(--warning));
+	}
+
+	/* Dropdown menus (built on <details>) ----------------------------- */
+	/* Open on hover / keyboard focus, and also on click (the native <details>
+	   toggle) so touch + no-hover devices still work. We take full control of
+	   the panel's visibility rather than relying on the browser's default
+	   details hiding. */
+	.menu {
+		@apply relative inline-block;
+	}
+	.menu > summary {
+		@apply inline-flex items-center gap-1 cursor-pointer list-none;
+	}
+	.menu > summary::-webkit-details-marker {
+		display: none;
+	}
+	.menu-caret {
+		@apply transition-transform duration-150;
+	}
+	.menu-panel {
+		display: none;
+		background-color: rgb(var(--surface));
+		border: 1px solid rgb(var(--line));
+		@apply absolute right-0 mt-2 min-w-[12rem] rounded-md shadow-lg p-1 z-30;
+	}
+	/* Invisible bridge across the summary→panel gap so hover doesn't drop. */
+	.menu-panel::before {
+		content: "";
+		position: absolute;
+		left: 0;
+		right: 0;
+		top: -0.5rem;
+		height: 0.5rem;
+	}
+	.menu[open] > .menu-panel,
+	.menu:hover > .menu-panel,
+	.menu:focus-within > .menu-panel {
+		display: block;
+	}
+	/* Chromium ≥131 / Firefox ≥139 hide a closed <details>'s content via the
+	   `::details-content` pseudo (content-visibility: hidden), which overrides
+	   the panel's `display: block` above — so hover/focus would rotate the caret
+	   but never reveal the panel (only a click, which sets [open], did). Re-assert
+	   visibility on the pseudo for the hover/focus triggers; the [open] case is
+	   already handled by the UA `details[open]` rule. Browsers without
+	   `::details-content` drop this rule and never had the problem — kept in its
+	   own rule so that unknown-pseudo fallback stays scoped. */
+	.menu:hover::details-content,
+	.menu:focus-within::details-content {
+		content-visibility: visible;
+	}
+	.menu[open] > summary .menu-caret,
+	.menu:hover > summary .menu-caret,
+	.menu:focus-within > summary .menu-caret {
+		transform: rotate(180deg);
+	}
+	.menu-item {
+		color: rgb(var(--fg));
+		@apply flex items-center gap-2 rounded-md px-3 py-2 text-sm;
+	}
+	.menu-item:hover {
+		background-color: rgb(var(--surface-2));
+	}
+	.menu-item[aria-current="page"] {
+		color: rgb(var(--brand));
+		@apply font-medium;
+	}
+	.menu-label {
+		color: rgb(var(--subtle));
+		@apply px-3 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider;
+	}
+
+	/* Top navigation bar ---------------------------------------------- */
+	.app-nav {
+		background-color: rgb(var(--nav));
+		border-bottom: 1px solid rgb(var(--nav-border));
+	}
+	.app-brand {
+		@apply font-semibold text-lg tracking-tight text-white;
+	}
+	.nav-link {
+		@apply rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors cursor-pointer;
+		color: rgb(255 255 255 / 0.72);
+	}
+	.nav-link:hover {
+		color: rgb(255 255 255);
+		background-color: rgb(255 255 255 / 0.08);
+	}
+	.nav-link[aria-current="page"],
+	.nav-link.is-active {
+		color: rgb(255 255 255);
+		background-color: rgb(255 255 255 / 0.12);
+	}
+	/* Left-aligned dropdown panel variant (nav menus open below-left). */
+	.menu-panel-left {
+		left: 0;
+		right: auto;
+	}
+
+	/* Event dialogs (<dialog>, shown via showModal()) — a centered modal card in
+	   the top layer. The UA gives `dialog[open]` position:fixed + centering; we
+	   size it and make it a transparent frame so the inner
+	   `.event-popover-panel` (a `card`) is the visible surface. Show/hide is the
+	   browser's native dialog machinery, so no display utilities are involved. */
+	.event-popover {
+		width: min(42rem, calc(100vw - 2rem));
+		max-height: calc(100dvh - 2rem);
+		margin: auto;
+		border: 0;
+		padding: 0;
+		background: transparent;
+		overflow: visible;
+	}
+	.event-popover::backdrop {
+		background: rgb(0 0 0 / 0.45);
+	}
+	.event-popover-panel {
+		max-height: calc(100dvh - 2rem);
+		overflow-y: auto;
+	}
+
+	/* Generic modal dialog — same top-layer mechanics as .event-popover but
+	   wider, for the contacts New / Find-duplicates / Clean-up dialogs. */
+	.modal-popover {
+		width: min(52rem, calc(100vw - 2rem));
+		max-height: calc(100dvh - 2rem);
+		margin: auto;
+		border: 0;
+		padding: 0;
+		background: transparent;
+		overflow: visible;
+	}
+	.modal-popover::backdrop {
+		background: rgb(0 0 0 / 0.45);
+	}
+	.modal-popover-panel {
+		max-height: calc(100dvh - 2rem);
+		overflow-y: auto;
+	}
+
+	/* Read-only hover/click preview card (calendar events, contacts) —
+	   `popover="manual"`, NOT a <dialog>: non-modal, shown on hover as well as
+	   click, and positioned by JS next to the trigger rather than centered.
+	   Overrides the popover UA default of `inset: 0; margin: auto` (which
+	   centers like .event-popover/.modal-popover) so JS-set `top`/`left` win. */
+	.hover-card {
+		position: fixed;
+		inset: auto;
+		margin: 0;
+		border: 0;
+		padding: 0;
+		background: transparent;
+		max-width: 20rem;
+	}
+	.hover-card-panel {
+		max-height: min(24rem, calc(100dvh - 2rem));
+		overflow-y: auto;
+	}
+
+	/* Contacts bulk-action progress bar — injected by contacts.js at the top
+	   of the viewport during long-running bulk ops. Defined statically here
+	   (rather than via a runtime-injected <style> tag) so it isn't blocked by
+	   the style-src-elem CSP directive. */
+	#contacts-progress {
+		position: fixed;
+		top: 0;
+		left: 0;
+		right: 0;
+		height: 3px;
+		z-index: 60;
+		overflow: hidden;
+		background-color: rgb(var(--line));
+	}
+	#contacts-progress::after {
+		content: "";
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		background-color: rgb(var(--brand));
+		animation: shuriken-progress 1.1s ease-in-out infinite;
+	}
+	@keyframes shuriken-progress {
+		0% {
+			left: -40%;
+			width: 40%;
+		}
+		50% {
+			width: 55%;
+		}
+		100% {
+			left: 100%;
+			width: 40%;
+		}
+	}
+}
+
+/* ------------------------------------------------------------------ */
+/* Visibility state — UNLAYERED ON PURPOSE                             */
+/*                                                                     */
+/* Rules that toggle an element between hidden and shown. Tailwind v3   */
+/* flattens `@layer base/components` AHEAD of the utilities in the      */
+/* compiled CSS, so a `display: none` written in @layer base loses, at  */
+/* equal specificity, to any display utility (`flex`, `inline-flex`,    */
+/* `block`, `grid`, …) a template happens to put on the same element.   */
+/* That footgun left `[hidden]` copy spans and the htmx `Importing…`    */
+/* indicator permanently visible without JS.                           */
+/*                                                                      */
+/* Keeping these OUTSIDE every `@layer` and physically after            */
+/* `@tailwind utilities` (like the FullCalendar block below) makes them */
+/* land after the utilities in the output, so later-wins settles it —   */
+/* no `!important`, no specificity hacks. Add any new hide/show helper  */
+/* HERE, never in @layer base/components.                              */
+/* ------------------------------------------------------------------ */
+
+/* The `hidden` attribute always beats a display utility. */
+[hidden] {
+	display: none;
+}
+
+/* No-JS-only controls: rendered for everyone so forms still work without JS,
+   then hidden once `ui.js` (render-blocking, pre-paint) marks the document
+   `.js` — e.g. the calendar Switch/Upload submits, redundant once JS
+   auto-submits. */
+html.js [data-nojs-only] {
+	display: none;
+}
+
+/* HTMX request indicators: hidden until an ancestor/self is mid-request. The
+   show rules own the flex layout, so the element needs no `display` utility of
+   its own (which is exactly what would defeat the `display: none`). */
+.htmx-indicator {
+	display: none;
+}
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator {
+	display: inline-flex;
+}
+
+/* Dark-mode icon swap — the pre-paint script sets an explicit `.dark`/`.light`
+   on <html>, so `.dark` reliably marks the effective theme. */
+.theme-icon-dark {
+	display: none;
+}
+.dark .theme-icon-dark {
+	display: inline;
+}
+.dark .theme-icon-light {
+	display: none;
+}
+
+/* FullCalendar styling lives entirely in calendar.client.ts /
+   embed-widget.client.ts as Tailwind class-name-prop options, not CSS — v7
+   ships no visual theme CSS and sets no inline styles for anything but
+   per-event colours. */

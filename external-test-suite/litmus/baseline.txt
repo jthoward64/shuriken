@@ -1,0 +1,16 @@
+basic/begin: pass
+basic/delete: SKIPPED
+basic/delete_coll: SKIPPED
+basic/delete_fragment: FAIL (could not create collection)
+basic/delete_null: pass
+basic/finish: pass
+basic/init: pass
+basic/mkcol: FAIL (MKCOL /dav/principals/test/col/litmus/coll/: <NUM> Method Not Allowed)
+basic/mkcol_again: SKIPPED
+basic/mkcol_no_parent: WARNING: MKCOL with missing intermediate gave <NUM>, should be <NUM> (RFC2518:<NUM>.<NUM>.<NUM>)
+basic/mkcol_over_plain: SKIPPED
+basic/mkcol_with_body: pass
+basic/options: WARNING: server does not claim Class <NUM> compliance
+basic/put_get: FAIL (PUT of `/dav/principals/test/col/litmus/res' failed: <NUM> Unsupported Media Type)
+basic/put_get_utf8_segment: FAIL (PUT of `/dav/principals/test/col/litmus/res-%e2%<NUM>%ac' failed: <NUM> Forbidden)
+basic/put_no_parent: WARNING: MKCOL with missing intermediate gave <NUM>, should be <NUM>

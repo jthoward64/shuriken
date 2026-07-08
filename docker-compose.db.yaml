@@ -1,0 +1,16 @@
+name: shuriken-dev-db
+
+services:
+  database:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: shuriken
+      POSTGRES_PASSWORD: shuriken
+      POSTGRES_DB: shuriken
+    ports:
+      - "5435:5432"
+    volumes:
+      - db_data:/var/lib/postgresql
+
+volumes:
+  db_data:

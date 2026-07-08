@@ -1,0 +1,1 @@
+ALTER TABLE "cal_timezone" ADD COLUMN "last_modified_at" timestamptz;

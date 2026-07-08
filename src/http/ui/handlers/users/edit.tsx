@@ -1,0 +1,196 @@
+import { Effect, Option } from "effect";
+import { AppConfigService } from "#src/config.ts";
+import type {
+	DatabaseError,
+	DavError,
+	InternalError,
+} from "#src/domain/errors.ts";
+import type { GroupId, PrincipalId, UserId } from "#src/domain/ids.ts";
+import {
+	GROUPS_VIRTUAL_RESOURCE_ID,
+	USERS_VIRTUAL_RESOURCE_ID,
+} from "#src/domain/virtual-resources.ts";
+import type { HttpRequestContext } from "#src/http/context.ts";
+import { buildAclPanelData } from "#src/http/ui/helpers/acl-panel.ts";
+import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
+import { buildNavContext } from "#src/http/ui/helpers/nav-context.ts";
+import { UserEditPage } from "#src/http/ui/view/pages/users.tsx";
+import { renderPage } from "#src/http/ui/view/render.tsx";
+import { AclService } from "#src/services/acl/index.ts";
+import { AclRepository } from "#src/services/acl/repository.ts";
+import { CollectionService } from "#src/services/collection/index.ts";
+import { GroupService } from "#src/services/group/index.ts";
+import { PrincipalService } from "#src/services/principal/index.ts";
+import { KNOWN_ROLES } from "#src/services/role/policy.ts";
+import { UserService } from "#src/services/user/index.ts";
+
+// ---------------------------------------------------------------------------
+// GET /ui/users/:principalId
+// ---------------------------------------------------------------------------
+
+export const usersEditHandler = (
+	_req: Request,
+	ctx: HttpRequestContext,
+	principalId: PrincipalId,
+): Effect.Effect<
+	Response,
+	DavError | DatabaseError | InternalError,
+	| AclRepository
+	| AclService
+	| AppConfigService
+	| CollectionService
+	| GroupService
+	| PrincipalService
+	| UserService
+> =>
+	Effect.gen(function* () {
+		const principal = yield* requireAuthenticated(ctx.auth);
+		const config = yield* AppConfigService;
+		const acl = yield* AclService;
+		const aclRepo = yield* AclRepository;
+		const principalService = yield* PrincipalService;
+		const groupService = yield* GroupService;
+		const collectionService = yield* CollectionService;
+		const userService = yield* UserService;
+
+		const { user, principal: principalRow } =
+			yield* principalService.findById(principalId);
+
+		// OIDC-managed accounts have no local password to set/change — they use
+		// app passwords for DAV — so hide the password form even from admins.
+		const authSources = yield* userService.listAuthSources(user.id as UserId);
+		const isOidcManaged = authSources.includes("oidc");
+
+		const isSelf = user.id === principal.userId;
+		if (!isSelf) {
+			const usersVirtualPrivs = yield* acl.currentUserPrivileges(
+				principal.principalId,
+				USERS_VIRTUAL_RESOURCE_ID,
+				"virtual",
+			);
+			if (!usersVirtualPrivs.includes("DAV:write-properties")) {
+				yield* acl.check(
+					principal.principalId,
+					principalRow.id as PrincipalId,
+					"principal",
+					"DAV:write-properties",
+				);
+			}
+		}
+
+		const [allGroups, userGroups, allCollections] = yield* Effect.all([
+			groupService.list(),
+			groupService.listByMember(user.id as UserId),
+			collectionService.listByOwner(principalRow.id as PrincipalId),
+		]);
+
+		const userGroupIds = new Set(userGroups.map((g) => g.group.id));
+		const userGroupAutoAssignedBy = new Map(
+			userGroups.map((g) => [g.group.id, g.autoAssignedBy]),
+		);
+
+		const groupPrincipalIds = allGroups.map(
+			(g) => g.principal.id as PrincipalId,
+		);
+		const [groupPrivMap, groupsVirtualPrivs, usersPrivs] = yield* Effect.all([
+			acl.batchCurrentUserPrivileges(
+				principal.principalId,
+				groupPrincipalIds,
+				"principal",
+			),
+			acl.currentUserPrivileges(
+				principal.principalId,
+				GROUPS_VIRTUAL_RESOURCE_ID,
+				"virtual",
+			),
+			acl.currentUserPrivileges(
+				principal.principalId,
+				USERS_VIRTUAL_RESOURCE_ID,
+				"virtual",
+			),
+		]);
+
+		const hasGroupsVirtualWrite = groupsVirtualPrivs.includes(
+			"DAV:write-properties",
+		);
+		const canEditSlug = usersPrivs.includes("DAV:unbind");
+		const canDelete = usersPrivs.includes("DAV:unbind");
+
+		const collections = allCollections
+			.filter(
+				(c) =>
+					c.collectionType === "calendar" || c.collectionType === "addressbook",
+			)
+			.map((c) => ({
+				id: c.id,
+				displayName: c.displayName ?? c.slug,
+				collectionType: c.collectionType,
+			}));
+
+		const nav = yield* buildNavContext(
+			principal,
+			ctx.url.pathname,
+			config.auth.basicAuthEnabled,
+		);
+
+		const groups = allGroups.map((g) => {
+			const privs = groupPrivMap.get(g.principal.id as PrincipalId) ?? [];
+			return {
+				id: g.principal.id,
+				label: g.principal.displayName ?? g.principal.slug,
+				isMember: userGroupIds.has(g.group.id as GroupId),
+				canManageMembers:
+					hasGroupsVirtualWrite || privs.includes("DAV:write-properties"),
+				autoAssignedBy: userGroupAutoAssignedBy.get(g.group.id) ?? null,
+			};
+		});
+
+		const origin = ctx.url.origin;
+		const davBase = `${origin}/dav/principals/${principalRow.id}`;
+
+		const aclPanel = yield* buildAclPanelData(
+			principal.principalId,
+			principalRow.id as PrincipalId,
+			"principal",
+		).pipe(Effect.map(Option.getOrUndefined));
+
+		// Role dropdown is only shown to super-admins; everyone else gets a
+		// read-only badge of the current value (so they can see whose data
+		// they're looking at, but can't escalate themselves).
+		const callerRole = yield* aclRepo.getRoleForPrincipal(
+			principal.principalId,
+		);
+		const canEditRole = callerRole === "super_admin";
+		const roleOptions = KNOWN_ROLES.map((r) => ({
+			value: r,
+			selected: r === user.role,
+		}));
+
+		return yield* renderPage(
+			<UserEditPage
+				userId={user.id}
+				principalId={principalRow.id}
+				title={principalRow.displayName ?? principalRow.slug}
+				displayName={principalRow.displayName ?? ""}
+				email={user.email}
+				slug={principalRow.slug}
+				canEditSlug={canEditSlug}
+				canDelete={canDelete}
+				showPasswordForm={config.auth.basicAuthEnabled && !isOidcManaged}
+				collections={collections}
+				principalUrl={`${davBase}/`}
+				caldavUrl={`${davBase}/cal/`}
+				carddavUrl={`${davBase}/card/`}
+				aclPanel={aclPanel}
+				canEditRole={canEditRole}
+				roleOptions={roleOptions}
+				userRole={user.role}
+				groups={groups}
+			/>,
+			{
+				headers: ctx.headers,
+				title: principalRow.displayName ?? principalRow.slug,
+				nav,
+			},
+		);
+	});

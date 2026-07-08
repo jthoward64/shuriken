@@ -1,0 +1,9 @@
+.git
+.github
+documentation
+node_modules
+.env
+.env.local
+src/testing
+docker/docker-compose.example.yaml
+docker/Dockerfile

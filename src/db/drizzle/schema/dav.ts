@@ -1,0 +1,625 @@
+import { sql } from "drizzle-orm";
+import {
+	bigint,
+	boolean,
+	check,
+	doublePrecision,
+	foreignKey,
+	index,
+	integer,
+	interval,
+	jsonb,
+	pgTable,
+	text,
+	uniqueIndex,
+	uuid,
+} from "drizzle-orm/pg-core";
+import type { UuidString } from "#src/domain/ids.ts";
+import { principal } from "./principal.ts";
+import {
+	bytea,
+	dateStr,
+	datetimeList,
+	drizzleEnum,
+	type GetDrizzleEnumType,
+	timestampStr,
+	timestampTz,
+} from "./types.ts";
+
+const entityTypeEnum = drizzleEnum(
+	"entity_type",
+	["icalendar", "vcard"] as const,
+	"text",
+);
+export type EntityType = GetDrizzleEnumType<typeof entityTypeEnum>;
+
+export const davEntity = pgTable(
+	"dav_entity",
+	{
+		id: uuid().default(sql`uuidv7()`).primaryKey().$type<UuidString>(),
+		entityType: text("entity_type").notNull().$type<EntityType>(),
+		logicalUid: text("logical_uid"),
+		updatedAt: timestampTz("updated_at").default(sql`now()`).notNull(),
+		deletedAt: timestampTz("deleted_at"),
+	},
+	(table) => [
+		index("idx_dav_entity_deleted_at").using(
+			"btree",
+			table.deletedAt.asc().nullsLast(),
+		),
+		index("idx_dav_entity_logical_uid").using(
+			"btree",
+			table.logicalUid.asc().nullsLast(),
+		),
+		index("idx_dav_entity_logical_uid_active")
+			.using("btree", table.logicalUid.asc().nullsLast())
+			.where(sql`((deleted_at IS NULL) AND (logical_uid IS NOT NULL))`),
+		index("idx_dav_entity_type").using(
+			"btree",
+			table.entityType.asc().nullsLast(),
+		),
+		check("dav_entity_entity_type_check", entityTypeEnum.sql),
+	],
+);
+
+const collectionTypeEnum = drizzleEnum(
+	"collection_type",
+	["collection", "calendar", "addressbook", "inbox", "outbox"] as const,
+	"text",
+);
+export type CollectionType = GetDrizzleEnumType<typeof collectionTypeEnum>;
+
+const contentTypeEnum = drizzleEnum(
+	"content_type",
+	["text/calendar", "text/vcard"] as const,
+	"text",
+);
+export type ContentType = GetDrizzleEnumType<typeof contentTypeEnum>;
+
+// Type-default for `sort_order` at the DB level (a "normal" user collection).
+// Subscribed (0) and generated (1000) defaults are applied by the insert path;
+// see src/services/collection/sort-order.ts for the full ordering semantics.
+const DEFAULT_NORMAL_SORT_ORDER = -1000;
+
+export const davCollection = pgTable(
+	"dav_collection",
+	{
+		id: uuid().default(sql`uuidv7()`).primaryKey().$type<UuidString>(),
+		ownerPrincipalId: uuid("owner_principal_id")
+			.notNull()
+			.references(() => principal.id, { onDelete: "restrict" })
+			.$type<UuidString>(),
+		collectionType: text("collection_type").notNull().$type<CollectionType>(),
+		displayName: text("display_name"),
+		description: text(),
+		timezoneTzid: text("timezone_tzid"),
+		synctoken: bigint({ mode: "number" }).default(0).notNull(),
+		updatedAt: timestampTz("updated_at").default(sql`now()`).notNull(),
+		deletedAt: timestampTz("deleted_at"),
+		supportedComponents: text("supported_components").array(),
+		slug: text().default("").notNull(),
+		parentCollectionId: uuid("parent_collection_id").$type<UuidString>(),
+		// Client-set dead properties (RFC 4918 §4.1) — Clark-notation key, XML value string
+		clientProperties: jsonb("client_properties").default({}).notNull(),
+		// CalDAV per-collection constraints (RFC 4791 §5.2) — null = server-wide default
+		maxResourceSize: bigint("max_resource_size", { mode: "number" }),
+		minDateTime: timestampTz("min_date_time"),
+		maxDateTime: timestampTz("max_date_time"),
+		maxInstances: integer("max_instances"),
+		maxAttendeesPerInstance: integer("max_attendees_per_instance"),
+		// RFC 6638 §9.1: whether events in this calendar contribute to free-busy computation
+		scheduleTransp: text("schedule_transp")
+			.default("opaque")
+			.$type<"opaque" | "transparent">(),
+		// RFC 6638 §9.2: inbox-only — which calendar receives auto-placed invite copies
+		scheduleDefaultCalendarId: uuid(
+			"schedule_default_calendar_id",
+		).$type<UuidString>(),
+		// Marks server-managed derived calendars (e.g. "birthdays"). When set,
+		// handlers reject client-initiated mutations to the collection or its
+		// instances; the only writer is the corresponding generator service.
+		// Null on user-created collections.
+		autoManagedKind: text("auto_managed_kind"),
+		// User-controllable ordering within a collection kind. Collections are
+		// listed by (sort_order ASC, id ASC) — id is uuidv7 so ties fall back to
+		// creation order. Type-defaults: normal = -1000, subscribed = 0,
+		// generated = 1000. See src/services/collection/sort-order.ts. Exposed to
+		// CalDAV clients as the Apple `calendar-order` dead property.
+		sortOrder: integer("sort_order")
+			.default(DEFAULT_NORMAL_SORT_ORDER)
+			.notNull(),
+	},
+	(table) => [
+		foreignKey({
+			columns: [table.parentCollectionId],
+			foreignColumns: [table.id],
+			name: "dav_collection_parent_collection_id_fkey",
+		}).onDelete("cascade"),
+		foreignKey({
+			columns: [table.scheduleDefaultCalendarId],
+			foreignColumns: [table.id],
+			name: "dav_collection_schedule_default_calendar_id_fkey",
+		}).onDelete("set null"),
+		check(
+			"dav_collection_schedule_transp_check",
+			sql`schedule_transp IN ('opaque', 'transparent')`,
+		),
+		index("idx_dav_collection_deleted_at").using(
+			"btree",
+			table.deletedAt.asc().nullsLast(),
+		),
+		index("idx_dav_collection_owner").using(
+			"btree",
+			table.ownerPrincipalId.asc().nullsLast(),
+		),
+		index("idx_dav_collection_owner_active")
+			.using("btree", table.ownerPrincipalId.asc().nullsLast())
+			.where(sql`(deleted_at IS NULL)`),
+		index("idx_dav_collection_type_active")
+			.using("btree", table.collectionType.asc().nullsLast())
+			.where(sql`(deleted_at IS NULL)`),
+		// Supports the ordered per-kind listing: filter by owner + type, order by
+		// (sort_order, id). See CollectionRepository.listByOwner.
+		index("idx_dav_collection_order")
+			.using(
+				"btree",
+				table.ownerPrincipalId.asc().nullsLast(),
+				table.collectionType.asc().nullsLast(),
+				table.sortOrder.asc().nullsLast(),
+				table.id.asc().nullsLast(),
+			)
+			.where(sql`(deleted_at IS NULL)`),
+		uniqueIndex("unique_collection_slug_per_owner_type")
+			.using(
+				"btree",
+				table.ownerPrincipalId.asc().nullsLast(),
+				table.collectionType.asc().nullsLast(),
+				table.slug.asc().nullsLast(),
+			)
+			.where(sql`(deleted_at IS NULL)`),
+		check("dav_collection_collection_type_check", collectionTypeEnum.sql),
+	],
+);
+
+export const davComponent = pgTable(
+	"dav_component",
+	{
+		id: uuid().default(sql`uuidv7()`).primaryKey().$type<UuidString>(),
+		entityId: uuid("entity_id")
+			.notNull()
+			.references(() => davEntity.id, { onDelete: "cascade" })
+			.$type<UuidString>(),
+		parentComponentId: uuid("parent_component_id").$type<UuidString>(),
+		name: text().notNull(),
+		ordinal: integer().default(0).notNull(),
+		updatedAt: timestampTz("updated_at").default(sql`now()`).notNull(),
+		deletedAt: timestampTz("deleted_at"),
+	},
+	(table) => [
+		foreignKey({
+			columns: [table.parentComponentId],
+			foreignColumns: [table.id],
+			name: "dav_component_parent_component_id_fkey",
+		}).onDelete("cascade"),
+		index("idx_dav_component_deleted_at").using(
+			"btree",
+			table.deletedAt.asc().nullsLast(),
+		),
+		index("idx_dav_component_entity").using(
+			"btree",
+			table.entityId.asc().nullsLast(),
+		),
+		index("idx_dav_component_parent").using(
+			"btree",
+			table.parentComponentId.asc().nullsLast(),
+		),
+	],
+);
+
+const valueTypeEnum = drizzleEnum(
+	"value_type",
+	[
+		"TEXT",
+		"INTEGER",
+		"FLOAT",
+		"BOOLEAN",
+		"DATE",
+		"DATE_TIME",
+		"PLAIN_DATE_TIME",
+		"DURATION",
+		"URI",
+		"BINARY",
+		"JSON",
+		"TEXT_LIST",
+		"DATE_LIST",
+		"DATE_TIME_LIST",
+		"DURATION_INTERVAL",
+		"UTC_OFFSET",
+		"UTC_OFFSET_INTERVAL",
+		"PERIOD",
+		"PERIOD_LIST",
+		"TIME",
+		"DATE_AND_OR_TIME",
+		"RECUR",
+		"CAL_ADDRESS",
+	] as const,
+	"text",
+);
+export type ValueType = GetDrizzleEnumType<typeof valueTypeEnum>;
+
+export const davProperty = pgTable(
+	"dav_property",
+	{
+		id: uuid().default(sql`uuidv7()`).primaryKey().$type<UuidString>(),
+		componentId: uuid("component_id")
+			.notNull()
+			.references(() => davComponent.id, { onDelete: "cascade" })
+			.$type<UuidString>(),
+		name: text().notNull(),
+		valueType: text("value_type").notNull().$type<ValueType>(),
+		valueText: text("value_text"),
+		valueInt: bigint("value_int", { mode: "number" }),
+		valueFloat: doublePrecision("value_float"),
+		valueBool: boolean("value_bool"),
+		valueDate: dateStr("value_date"),
+		valueTstz: timestampTz("value_tstz"),
+		valueBytes: bytea("value_bytes"),
+		valueJson: jsonb("value_json"),
+		ordinal: integer().default(0).notNull(),
+		updatedAt: timestampTz("updated_at").default(sql`now()`).notNull(),
+		deletedAt: timestampTz("deleted_at"),
+		groupName: text("group_name"),
+		valueTextArray: text("value_text_array").array(),
+		valueDateArray: dateStr("value_date_array").array(),
+		// DATE_TIME_LIST — array of the composite type `dav_datetime` (wall-clock +
+		// nullable zone). A NULL zone marks a floating item (RFC 5545 Form 1); a
+		// ZonedDateTime is reconstructed from wall+zone, which is the faithful
+		// iCalendar reading of a Form-2/3 value and the only way to admit floating
+		// items. See datetimeList in ./types.ts for the wire codec.
+		valueDatetimeList: datetimeList("value_datetime_list"),
+		valuePlainDatetime: timestampStr("value_plain_datetime"),
+		valueInterval: interval("value_interval"),
+		valueTextAsciiFold: text("value_text_ascii_fold").generatedAlwaysAs(
+			sql`ascii_casemap(value_text)`,
+		),
+		valueTextUnicodeFold: text("value_text_unicode_fold").generatedAlwaysAs(
+			sql`unicode_casemap_nfc(value_text)`,
+		),
+	},
+	(table) => [
+		index("idx_dav_property_component").using(
+			"btree",
+			table.componentId.asc().nullsLast(),
+		),
+		index("idx_dav_property_component_name").using(
+			"btree",
+			table.componentId.asc().nullsLast(),
+			table.name.asc().nullsLast(),
+		),
+		index("idx_dav_property_deleted_at").using(
+			"btree",
+			table.deletedAt.asc().nullsLast(),
+		),
+		index("idx_dav_property_name").using("btree", table.name.asc().nullsLast()),
+		check(
+			"chk_dav_property_single_value",
+			sql`(((((((((((((
+CASE
+    WHEN (value_text IS NOT NULL) THEN 1
+    ELSE 0
+END +
+CASE
+    WHEN (value_int IS NOT NULL) THEN 1
+    ELSE 0
+END) +
+CASE
+    WHEN (value_float IS NOT NULL) THEN 1
+    ELSE 0
+END) +
+CASE
+    WHEN (value_bool IS NOT NULL) THEN 1
+    ELSE 0
+END) +
+CASE
+    WHEN (value_date IS NOT NULL) THEN 1
+    ELSE 0
+END) +
+CASE
+    WHEN (value_tstz IS NOT NULL) THEN 1
+    ELSE 0
+END) +
+CASE
+    WHEN (value_plain_datetime IS NOT NULL) THEN 1
+    ELSE 0
+END) +
+CASE
+    WHEN (value_bytes IS NOT NULL) THEN 1
+    ELSE 0
+END) +
+CASE
+    WHEN (value_json IS NOT NULL) THEN 1
+    ELSE 0
+END) +
+CASE
+    WHEN (value_text_array IS NOT NULL) THEN 1
+    ELSE 0
+END) +
+CASE
+    WHEN (value_date_array IS NOT NULL) THEN 1
+    ELSE 0
+END) +
+CASE
+    WHEN (value_datetime_list IS NOT NULL) THEN 1
+    ELSE 0
+END) +
+CASE
+    WHEN (value_interval IS NOT NULL) THEN 1
+    ELSE 0
+END) <= 1)`,
+		),
+		check(
+			"chk_dav_property_value_matches_type",
+			sql`(((value_text IS NULL) OR (value_type = ANY (ARRAY['TEXT'::text, 'DURATION'::text, 'URI'::text, 'UTC_OFFSET'::text, 'TIME'::text, 'DATE_AND_OR_TIME'::text, 'RECUR'::text, 'CAL_ADDRESS'::text, 'PERIOD'::text]))) AND ((value_int IS NULL) OR (value_type = 'INTEGER'::text)) AND ((value_float IS NULL) OR (value_type = 'FLOAT'::text)) AND ((value_bool IS NULL) OR (value_type = 'BOOLEAN'::text)) AND ((value_date IS NULL) OR (value_type = 'DATE'::text)) AND ((value_tstz IS NULL) OR (value_type = 'DATE_TIME'::text)) AND ((value_plain_datetime IS NULL) OR (value_type = 'PLAIN_DATE_TIME'::text)) AND ((value_bytes IS NULL) OR (value_type = 'BINARY'::text)) AND ((value_json IS NULL) OR (value_type = 'JSON'::text)) AND ((value_text_array IS NULL) OR (value_type = ANY (ARRAY['TEXT_LIST'::text, 'PERIOD_LIST'::text]))) AND ((value_date_array IS NULL) OR (value_type = 'DATE_LIST'::text)) AND ((value_datetime_list IS NULL) OR (value_type = 'DATE_TIME_LIST'::text)) AND ((value_interval IS NULL) OR (value_type = ANY (ARRAY['DURATION_INTERVAL'::text, 'UTC_OFFSET_INTERVAL'::text]))))`,
+		),
+		check("dav_property_value_type_check", valueTypeEnum.sql),
+	],
+);
+
+export const davParameter = pgTable(
+	"dav_parameter",
+	{
+		id: uuid().default(sql`uuidv7()`).primaryKey().$type<UuidString>(),
+		propertyId: uuid("property_id")
+			.notNull()
+			.references(() => davProperty.id, { onDelete: "cascade" })
+			.$type<UuidString>(),
+		name: text().notNull(),
+		value: text().notNull(),
+		ordinal: integer().default(0).notNull(),
+		updatedAt: timestampTz("updated_at").default(sql`now()`).notNull(),
+		deletedAt: timestampTz("deleted_at"),
+	},
+	(table) => [
+		index("idx_dav_parameter_deleted_at").using(
+			"btree",
+			table.deletedAt.asc().nullsLast(),
+		),
+		index("idx_dav_parameter_name").using(
+			"btree",
+			table.name.asc().nullsLast(),
+		),
+		index("idx_dav_parameter_property").using(
+			"btree",
+			table.propertyId.asc().nullsLast(),
+		),
+		index("idx_dav_parameter_property_name").using(
+			"btree",
+			table.propertyId.asc().nullsLast(),
+			table.name.asc().nullsLast(),
+		),
+	],
+);
+
+export const davInstance = pgTable(
+	"dav_instance",
+	{
+		id: uuid().default(sql`uuidv7()`).primaryKey().$type<UuidString>(),
+		collectionId: uuid("collection_id")
+			.notNull()
+			.references(() => davCollection.id, { onDelete: "restrict" })
+			.$type<UuidString>(),
+		entityId: uuid("entity_id")
+			.notNull()
+			.references(() => davEntity.id, { onDelete: "restrict" })
+			.$type<UuidString>(),
+		contentType: text("content_type").notNull().$type<ContentType>(),
+		etag: text().notNull(),
+		syncRevision: bigint("sync_revision", { mode: "number" })
+			.default(0)
+			.notNull(),
+		lastModified: timestampTz("last_modified").default(sql`now()`).notNull(),
+		updatedAt: timestampTz("updated_at").default(sql`now()`).notNull(),
+		deletedAt: timestampTz("deleted_at"),
+		scheduleTag: text("schedule_tag"),
+		// Byte length of the serialized iCalendar/vCard body (RFC 4918 §15.4 DAV:getcontentlength).
+		// Populated on every PUT; null on pre-migration rows.
+		contentLength: bigint("content_length", { mode: "number" }),
+		slug: text().default("").notNull(),
+		// Client-set dead properties (RFC 4918 §4.1) — Clark-notation key, XML value string
+		clientProperties: jsonb("client_properties").default({}).notNull(),
+	},
+	(table) => [
+		index("idx_dav_instance_collection").using(
+			"btree",
+			table.collectionId.asc().nullsLast(),
+		),
+		index("idx_dav_instance_collection_active")
+			.using("btree", table.collectionId.asc().nullsLast())
+			.where(sql`(deleted_at IS NULL)`),
+		index("idx_dav_instance_deleted_at").using(
+			"btree",
+			table.deletedAt.asc().nullsLast(),
+		),
+		index("idx_dav_instance_entity").using(
+			"btree",
+			table.entityId.asc().nullsLast(),
+		),
+		index("idx_dav_instance_sync_query").using(
+			"btree",
+			table.collectionId.asc().nullsLast(),
+			table.syncRevision.asc().nullsLast(),
+			table.deletedAt.asc().nullsLast(),
+		),
+		index("idx_dav_instance_sync_revision")
+			.using(
+				"btree",
+				table.collectionId.asc().nullsLast(),
+				table.syncRevision.asc().nullsLast(),
+			)
+			.where(sql`(deleted_at IS NULL)`),
+		uniqueIndex("unique_instance_slug_per_collection")
+			.using(
+				"btree",
+				table.collectionId.asc().nullsLast(),
+				table.slug.asc().nullsLast(),
+			)
+			.where(sql`(deleted_at IS NULL)`),
+		check("dav_instance_content_type_check", contentTypeEnum.sql),
+	],
+);
+
+const scheduleMethodEnum = drizzleEnum(
+	"method",
+	[
+		"REQUEST",
+		"REPLY",
+		"CANCEL",
+		"REFRESH",
+		"COUNTER",
+		"DECLINECOUNTER",
+		"ADD",
+	] as const,
+	"text",
+);
+export type ScheduleMethod = GetDrizzleEnumType<typeof scheduleMethodEnum>;
+
+const scheduleStatusEnum = drizzleEnum(
+	"status",
+	["pending", "delivered", "failed"] as const,
+	"text",
+);
+export type ScheduleStatus = GetDrizzleEnumType<typeof scheduleStatusEnum>;
+
+export const davScheduleMessage = pgTable(
+	"dav_schedule_message",
+	{
+		id: uuid().default(sql`uuidv7()`).primaryKey().$type<UuidString>(),
+		collectionId: uuid("collection_id")
+			.notNull()
+			.references(() => davCollection.id, { onDelete: "cascade" })
+			.$type<UuidString>(),
+		entityId: uuid("entity_id")
+			.notNull()
+			.references(() => davEntity.id, { onDelete: "restrict" })
+			.$type<UuidString>(),
+		sender: text().notNull(),
+		recipient: text().notNull(),
+		method: text().notNull().$type<ScheduleMethod>(),
+		status: text().default("pending").notNull().$type<ScheduleStatus>(),
+		diagnostics: jsonb(),
+		createdAt: timestampTz("created_at").default(sql`now()`).notNull(),
+		deliveredAt: timestampTz("delivered_at"),
+		updatedAt: timestampTz("updated_at").default(sql`now()`).notNull(),
+		deletedAt: timestampTz("deleted_at"),
+	},
+	(table) => [
+		index("idx_dav_schedule_message_collection").using(
+			"btree",
+			table.collectionId.asc().nullsLast(),
+		),
+		index("idx_dav_schedule_message_created").using(
+			"btree",
+			table.createdAt.asc().nullsLast(),
+		),
+		index("idx_dav_schedule_message_deleted_at").using(
+			"btree",
+			table.deletedAt.asc().nullsLast(),
+		),
+		index("idx_dav_schedule_message_recipient")
+			.using("btree", table.recipient.asc().nullsLast())
+			.where(sql`(deleted_at IS NULL)`),
+		index("idx_dav_schedule_message_status")
+			.using("btree", table.status.asc().nullsLast())
+			.where(sql`(deleted_at IS NULL)`),
+		check("dav_schedule_message_method_check", scheduleMethodEnum.sql),
+		check("dav_schedule_message_status_check", scheduleStatusEnum.sql),
+	],
+);
+
+const shadowDirectionEnum = drizzleEnum(
+	"direction",
+	["inbound", "outbound"] as const,
+	"text",
+);
+export type ShadowDirection = GetDrizzleEnumType<typeof shadowDirectionEnum>;
+
+export const davShadow = pgTable(
+	"dav_shadow",
+	{
+		id: uuid().default(sql`uuidv7()`).primaryKey().$type<UuidString>(),
+		instanceId: uuid("instance_id")
+			.references(() => davInstance.id, {
+				onDelete: "cascade",
+			})
+			.$type<UuidString>(),
+		entityId: uuid("entity_id")
+			.references(() => davEntity.id, {
+				onDelete: "cascade",
+			})
+			.$type<UuidString>(),
+		direction: text().notNull().$type<ShadowDirection>(),
+		contentType: text("content_type").notNull().$type<ContentType>(),
+		rawOriginal: bytea("raw_original"),
+		rawCanonical: bytea("raw_canonical"),
+		diagnostics: jsonb(),
+		requestId: text("request_id"),
+		updatedAt: timestampTz("updated_at").default(sql`now()`).notNull(),
+		deletedAt: timestampTz("deleted_at"),
+	},
+	(table) => [
+		index("idx_dav_shadow_deleted_at").using(
+			"btree",
+			table.deletedAt.asc().nullsLast(),
+		),
+		index("idx_dav_shadow_entity").using(
+			"btree",
+			table.entityId.asc().nullsLast(),
+		),
+		index("idx_dav_shadow_instance").using(
+			"btree",
+			table.instanceId.asc().nullsLast(),
+		),
+		index("idx_dav_shadow_request_id").using(
+			"btree",
+			table.requestId.asc().nullsLast(),
+		),
+		check(
+			"chk_dav_shadow_ref",
+			sql`((instance_id IS NOT NULL) OR (entity_id IS NOT NULL))`,
+		),
+		check("dav_shadow_content_type_check", contentTypeEnum.sql),
+		check("dav_shadow_direction_check", shadowDirectionEnum.sql),
+	],
+);
+
+export const davTombstone = pgTable(
+	"dav_tombstone",
+	{
+		id: uuid().default(sql`uuidv7()`).primaryKey().$type<UuidString>(),
+		collectionId: uuid("collection_id")
+			.notNull()
+			.references(() => davCollection.id, { onDelete: "restrict" })
+			.$type<UuidString>(),
+		entityId: uuid("entity_id")
+			.references(() => davEntity.id, {
+				onDelete: "set null",
+			})
+			.$type<UuidString>(),
+		synctoken: bigint({ mode: "number" }).notNull(),
+		syncRevision: bigint("sync_revision", { mode: "number" }).notNull(),
+		deletedAt: timestampTz("deleted_at").default(sql`now()`).notNull(),
+		lastEtag: text("last_etag"),
+		logicalUid: text("logical_uid"),
+		uriVariants: text("uri_variants").array().notNull(),
+	},
+	(table) => [
+		index("idx_dav_tombstone_collection").using(
+			"btree",
+			table.collectionId.asc().nullsLast(),
+		),
+		index("idx_dav_tombstone_deleted_at").using(
+			"btree",
+			table.deletedAt.asc().nullsLast(),
+		),
+	],
+);

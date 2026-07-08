@@ -1,0 +1,119 @@
+import type { InferSelectModel } from "drizzle-orm";
+import type { Effect, Option } from "effect";
+import { Context } from "effect";
+import type { Temporal } from "temporal-polyfill";
+import type { IrDeadProperties } from "#src/data/ir.ts";
+import type { ContentType, davInstance } from "#src/db/drizzle/schema/index.ts";
+import type { DatabaseError } from "#src/domain/errors.ts";
+import type {
+	CollectionId,
+	EntityId,
+	InstanceId,
+	PrincipalId,
+} from "#src/domain/ids.ts";
+import type { Slug } from "#src/domain/types/path.ts";
+import type { ETag } from "#src/domain/types/strings.ts";
+
+// ---------------------------------------------------------------------------
+// InstanceRepository — data access for dav_instance rows
+// ---------------------------------------------------------------------------
+
+export type InstanceRow = InferSelectModel<typeof davInstance>;
+
+export interface NewInstance {
+	readonly collectionId: CollectionId;
+	readonly entityId: EntityId;
+	readonly contentType: ContentType;
+	readonly etag: ETag;
+	readonly slug: Slug;
+	readonly scheduleTag?: string;
+	readonly clientProperties?: IrDeadProperties;
+	/** Byte length of the serialized UTF-8 body — stored for DAV:getcontentlength. */
+	readonly contentLength?: number;
+}
+
+export interface InstanceRepositoryShape {
+	readonly findById: (
+		id: InstanceId,
+	) => Effect.Effect<Option.Option<InstanceRow>, DatabaseError>;
+	/**
+	 * Find a soft-deleted instance by id. Used by TrashService to verify
+	 * ownership (via the parent collection) before restore/purge — findById
+	 * alone can't see soft-deleted rows.
+	 */
+	readonly findDeletedById: (
+		id: InstanceId,
+	) => Effect.Effect<Option.Option<InstanceRow>, DatabaseError>;
+	readonly findBySlug: (
+		collectionId: CollectionId,
+		slug: Slug,
+	) => Effect.Effect<Option.Option<InstanceRow>, DatabaseError>;
+	readonly listByCollection: (
+		collectionId: CollectionId,
+	) => Effect.Effect<ReadonlyArray<InstanceRow>, DatabaseError>;
+	/** Soft-deleted instances under the collection — the trash bin listing. */
+	readonly listDeletedByCollection: (
+		collectionId: CollectionId,
+	) => Effect.Effect<ReadonlyArray<InstanceRow>, DatabaseError>;
+	/**
+	 * Every soft-deleted instance (any collection) whose `deleted_at` is older
+	 * than `cutoff`. Used by the trash purge job's periodic sweep.
+	 */
+	readonly listDeletedOlderThan: (
+		cutoff: Temporal.Instant,
+	) => Effect.Effect<ReadonlyArray<InstanceRow>, DatabaseError>;
+	readonly findChangedSince: (
+		collectionId: CollectionId,
+		sinceSyncRevision: number,
+	) => Effect.Effect<ReadonlyArray<InstanceRow>, DatabaseError>;
+	readonly findByIds: (
+		ids: ReadonlyArray<InstanceId>,
+	) => Effect.Effect<ReadonlyArray<InstanceRow>, DatabaseError>;
+	readonly insert: (
+		input: NewInstance,
+	) => Effect.Effect<InstanceRow, DatabaseError>;
+	/** The sync trigger owns sync_revision; callers must not pass it. */
+	readonly updateEtag: (
+		id: InstanceId,
+		etag: ETag,
+		contentLength?: number,
+	) => Effect.Effect<void, DatabaseError>;
+	readonly softDelete: (id: InstanceId) => Effect.Effect<void, DatabaseError>;
+	/** Clear deleted_at on a soft-deleted instance (trash bin restore).
+	 * Fails DatabaseError if no soft-deleted row matches. */
+	readonly restore: (
+		id: InstanceId,
+	) => Effect.Effect<InstanceRow, DatabaseError>;
+	/** Permanently remove an instance row (0-retention deletes, purge job). */
+	readonly hardDelete: (id: InstanceId) => Effect.Effect<void, DatabaseError>;
+	/** Move an instance to a different collection and/or slug in-place.
+	 * Preserves entity identity, etag, lastModified, and clientProperties. */
+	readonly relocate: (
+		id: InstanceId,
+		targetCollectionId: CollectionId,
+		targetSlug: Slug,
+	) => Effect.Effect<InstanceRow, DatabaseError>;
+	/** Update dead properties in place without touching entity content or ETag. */
+	readonly updateClientProperties: (
+		id: InstanceId,
+		clientProperties: IrDeadProperties,
+	) => Effect.Effect<InstanceRow, DatabaseError>;
+	/**
+	 * Instances the principal-set has a direct grant on but whose parent
+	 * collection they do NOT own. The companion of
+	 * `CollectionRepository.listSharedWithPrincipals` for individual events
+	 * shared without sharing the whole calendar — see
+	 * `findUncoveredSharedInstances` (src/http/ui/api/calendar/shared-instances.ts)
+	 * for the higher-level use site (the Calendar page's synthetic "Shared
+	 * events" pseudo-calendar).
+	 */
+	readonly listSharedWithPrincipals: (
+		principalIds: ReadonlyArray<PrincipalId>,
+		privileges: ReadonlyArray<string>,
+	) => Effect.Effect<ReadonlyArray<InstanceRow>, DatabaseError>;
+}
+
+export class InstanceRepository extends Context.Service<
+	InstanceRepository,
+	InstanceRepositoryShape
+>()("InstanceRepository") {}
