@@ -15,7 +15,10 @@ import { type ClientAsset, ClientJsService } from "./service.ts";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 // Served filename → client TS entry module (relative to this directory).
-const ENTRIES: ReadonlyArray<{
+// Exported so the Docker build stage can warm DENO_DIR's npm resolution
+// cache for these entries before the runtime filesystem goes read-only —
+// see scripts/warm-client-bundle-cache.ts.
+export const ENTRIES: ReadonlyArray<{
 	readonly name: string;
 	readonly entry: string;
 }> = [

@@ -22,6 +22,7 @@
 		"hooks": "git config core.hooksPath .husky",
 		"studio": "deno run -A --env-file=.env drizzle-kit studio",
 		"ui:css": "deno run -A scripts/build-css.ts",
+		"warm:client-bundle-cache": "deno run -A scripts/warm-client-bundle-cache.ts",
 		"version-bump": "deno run -A scripts/version-bump.ts",
 		"icons": "deno run --allow-read --allow-write --allow-ffi --allow-env --allow-sys scripts/generate-icons.ts"
 	},
