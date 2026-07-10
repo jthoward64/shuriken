@@ -181,6 +181,16 @@
 						}
 					}
 				},
+				"sharing": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"userSearchMode": {
+							"type": "string",
+							"enum": ["admin_only", "exact_email", "open"]
+						}
+					}
+				},
 				"externalCalendar": {
 					"type": "object",
 					"additionalProperties": false,

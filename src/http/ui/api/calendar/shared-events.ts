@@ -89,8 +89,8 @@ export const sharedCalendarEventsHandler = (
 		const rangeStart = parseInstantParam(ctx.url.searchParams.get("start"));
 		const rangeEnd = parseInstantParam(ctx.url.searchParams.get("end"));
 		const views = yield* collectCalendarEventsForInstances(instances);
-		const events = filterViewsByRange(views, rangeStart, rangeEnd).map(
-			toFullCalendarEvent,
+		const events = filterViewsByRange(views, rangeStart, rangeEnd).map((ev) =>
+			toFullCalendarEvent(ev),
 		);
 
 		return withPageCacheHeaders(

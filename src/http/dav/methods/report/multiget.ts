@@ -41,10 +41,16 @@ export interface MultigetParams {
 	readonly entityType: EntityType;
 	/** Origin for ACL checks. */
 	readonly origin: string;
-	/** Apply subsetting and serialize the IrDocument to a string. */
+	/**
+	 * Apply subsetting and serialize the IrDocument to a string. `hasFullRead`
+	 * is false when the caller holds only CALDAV:read-free-busy (not
+	 * DAV:read) on this member — callers should redact private fields in
+	 * that case (see src/data/icalendar/visibility.ts).
+	 */
 	readonly serializeData: (
 		doc: IrDocument,
 		tree: unknown,
+		hasFullRead: boolean,
 	) => Effect.Effect<string, never>;
 	/** Clark name of the data property to include (e.g. {caldav}calendar-data). */
 	readonly dataClarkName: ClarkName;
@@ -120,12 +126,27 @@ export const multigetHandler = (
 
 		// Authorize all resolved members in one batch (every member shares this
 		// collection as its ACL parent) instead of a per-href check. Preserves the
-		// per-resource 403 semantics of RFC 4791 §7.9.1.
+		// per-resource 403 semantics of RFC 4791 §7.9.1. Two batches (both
+		// role-bypass-aware via batchCheckMembers, unlike batchMemberPrivileges)
+		// rather than one: `readable` gates enumeration at all (satisfied by
+		// CALDAV:read-free-busy or DAV:read), `fullReadable` gates whether the
+		// body is redacted.
+		const memberIds = resolved.flatMap((r) =>
+			r.inst === null ? [] : [InstanceId(r.inst.id)],
+		);
 		const readable = yield* acl.batchCheckMembers(
 			params.actingPrincipalId,
 			params.collectionId,
 			"collection",
-			resolved.flatMap((r) => (r.inst === null ? [] : [InstanceId(r.inst.id)])),
+			memberIds,
+			"instance",
+			"CALDAV:read-free-busy",
+		);
+		const fullReadable = yield* acl.batchCheckMembers(
+			params.actingPrincipalId,
+			params.collectionId,
+			"collection",
+			memberIds,
 			"instance",
 			"DAV:read",
 		);
@@ -142,7 +163,13 @@ export const multigetHandler = (
 			}
 
 			// ACL check — per-resource 403 on failure (RFC 4791 §7.9.1)
-			if (!readable.has(InstanceId(inst.id))) {
+			const hasFullRead = fullReadable.has(InstanceId(inst.id));
+			// Free-busy-only access has no meaning for CardDAV contacts — treat as
+			// unreadable rather than leak the full vCard.
+			if (
+				!readable.has(InstanceId(inst.id)) ||
+				(params.entityType !== "icalendar" && !hasFullRead)
+			) {
 				responses.push({
 					href,
 					propstats: [{ props: {} as Record<ClarkName, unknown>, status: 403 }],
@@ -165,7 +192,11 @@ export const multigetHandler = (
 					: { kind: "vcard", root: tree };
 
 			// Serialize (with subsetting applied inside serializeData)
-			const dataStr = yield* params.serializeData(irDoc, params.dataTree);
+			const dataStr = yield* params.serializeData(
+				irDoc,
+				params.dataTree,
+				hasFullRead,
+			);
 
 			// Build propstat
 			const baseProps = buildInstanceProps(inst);

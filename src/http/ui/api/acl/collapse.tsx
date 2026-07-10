@@ -4,48 +4,47 @@ import type {
 	DavError,
 	InternalError,
 } from "#src/domain/errors.ts";
-import { InternalError as InternalErr } from "#src/domain/errors.ts";
-import type { PrincipalId, UuidString } from "#src/domain/ids.ts";
+import type { UuidString } from "#src/domain/ids.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
-import { Slug } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import {
 	buildSharePanelData,
-	COMMON_PRIVILEGE_OPTIONS,
 	resolveIsCalendar,
 } from "#src/http/ui/helpers/share-panel.ts";
+import {
+	collapseToBasicTiers,
+	tiersFor,
+} from "#src/http/ui/helpers/share-tiers.ts";
 import { SharePanel } from "#src/http/ui/view/pages/share-panel.tsx";
 import { renderFragment } from "#src/http/ui/view/render.tsx";
 import type { AclResourceType, NewAce } from "#src/services/acl/index.ts";
 import { type AclResourceId, AclService } from "#src/services/acl/service.ts";
 import type { CollectionService } from "#src/services/collection/index.ts";
 import type { PrincipalService } from "#src/services/principal/index.ts";
-import { PrincipalRepository } from "#src/services/principal/repository.ts";
 
 // ---------------------------------------------------------------------------
-// POST /ui/api/acl/:resourceType/:resourceId/grant — Advanced-mode grant:
-// append one raw-privilege ACE for a principal.
+// POST /ui/api/acl/:resourceType/:resourceId/collapse — confirmed
+// Advanced→Basic switch when the current ACL state isn't exactly
+// representable by the tiers. Best-effort maps every grantee onto the
+// nearest tier (dropping deny/pseudo-principal/group grants — the
+// documented loss the confirmation warned about) and persists the
+// collapsed state in one setAces call.
 // ---------------------------------------------------------------------------
 
-const VALID_PRIVILEGES = new Set<string>(
-	COMMON_PRIVILEGE_OPTIONS.map((o) => o.value),
-);
-
-export const aclGrantHandler = (
-	req: Request,
+export const aclCollapseHandler = (
+	_req: Request,
 	ctx: HttpRequestContext,
 	resourceType: AclResourceType,
 	resourceId: AclResourceId,
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError | InternalError,
-	AclService | PrincipalRepository | PrincipalService | CollectionService
+	AclService | PrincipalService | CollectionService
 > =>
 	Effect.gen(function* () {
 		const principal = yield* requireAuthenticated(ctx.auth);
 		const acl = yield* AclService;
-		const principalRepo = yield* PrincipalRepository;
 
 		yield* acl.check(
 			principal.principalId,
@@ -54,35 +53,17 @@ export const aclGrantHandler = (
 			"DAV:write-acl",
 		);
 
-		const form = yield* Effect.tryPromise({
-			try: () => req.formData(),
-			catch: (e) => new InternalErr({ cause: e }),
-		});
-
-		const principalSlug = form.get("principalSlug")?.toString()?.trim() ?? "";
-		const privilege = form.get("privilege")?.toString() ?? "";
-
-		if (!principalSlug || !VALID_PRIVILEGES.has(privilege)) {
-			return new Response("Missing or invalid fields", { status: 400 });
-		}
-
-		const maybePrincipal = yield* principalRepo.findPrincipalBySlug(
-			Slug(principalSlug),
+		const isCalendar = yield* resolveIsCalendar(resourceType, resourceId);
+		const tierByName = new Map(
+			tiersFor(resourceType, isCalendar).map((t) => [t.tier, t]),
 		);
-		if (Option.isNone(maybePrincipal)) {
-			return new Response("Principal not found", { status: 400 });
-		}
-		const targetPrincipalId = maybePrincipal.value.id as PrincipalId;
 
 		const existingAces = yield* acl.getAces(resourceId, resourceType);
-		const nonProtected = existingAces.filter((a) => !a.protected);
-		const maxOrdinal = nonProtected.reduce(
-			(max, a) => Math.max(max, a.ordinal),
-			-10,
-		);
+		const protectedAces = existingAces.filter((a) => a.protected);
+		const collapsed = collapseToBasicTiers(existingAces);
 
 		const nextAces: ReadonlyArray<NewAce> = [
-			...nonProtected.map(
+			...protectedAces.map(
 				(a): NewAce => ({
 					resourceType: a.resourceType,
 					resourceId: a.resourceId as UuidString,
@@ -94,21 +75,28 @@ export const aclGrantHandler = (
 					ordinal: a.ordinal,
 				}),
 			),
-			{
-				resourceType,
-				resourceId: resourceId as UuidString,
-				principalType: "principal",
-				principalId: targetPrincipalId as UuidString,
-				privilege: privilege as DavPrivilege,
-				grantDeny: "grant",
-				protected: false,
-				ordinal: maxOrdinal + 10,
-			},
+			...collapsed.flatMap((g, gi) => {
+				const tier = tierByName.get(g.tier);
+				if (!tier) {
+					return [];
+				}
+				return tier.privileges.map(
+					(privilege, pi): NewAce => ({
+						resourceType,
+						resourceId: resourceId as UuidString,
+						principalType: "principal",
+						principalId: g.principalId as UuidString,
+						privilege,
+						grantDeny: "grant",
+						protected: false,
+						ordinal: gi * 10 + pi,
+					}),
+				);
+			}),
 		];
 
 		yield* acl.setAces(resourceId, resourceType, nextAces);
 
-		const isCalendar = yield* resolveIsCalendar(resourceType, resourceId);
 		const panelData = yield* buildSharePanelData(
 			principal.principalId,
 			resourceId,

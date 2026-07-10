@@ -12,6 +12,7 @@ import type {
 import { CollectionId, type UuidString } from "#src/domain/ids.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import {
+	applyVisibilityToEventView,
 	type CalendarEventView,
 	collectCalendarEvents,
 	collectCalendarEventsForInstances,
@@ -233,6 +234,7 @@ export const calendarViewHandler = (
 			active: boolean;
 			ownerSlug: string | null;
 			writable: boolean;
+			hasFullRead: boolean;
 		}> = calendars.map((c) => {
 			const sharing = sharingById.get(c.id);
 			return {
@@ -243,6 +245,7 @@ export const calendarViewHandler = (
 				active: c.id === active?.id,
 				ownerSlug: sharing?.ownerSlug ?? null,
 				writable: sharing?.writable ?? true,
+				hasFullRead: sharing?.hasFullRead ?? true,
 			};
 		});
 
@@ -263,6 +266,9 @@ export const calendarViewHandler = (
 				active: false,
 				ownerSlug: null,
 				writable: false,
+				// Individually-shared instances have no free-busy tier — always a
+				// full DAV:read grant.
+				hasFullRead: true,
 			});
 		}
 		const visibleCalendars = options.filter((o) => o.visible);
@@ -289,6 +295,7 @@ export const calendarViewHandler = (
 				c.row.updatedAt?.toString() ?? null,
 				c.row.sortOrder,
 				c.writable,
+				c.hasFullRead,
 			]),
 			uncovered: uncoveredInstances.map((i) => [i.id, i.etag]),
 		});
@@ -323,7 +330,14 @@ export const calendarViewHandler = (
 							);
 				return views.pipe(
 					Effect.map((vs) =>
-						vs.map((ev) => ({ ev, collectionId: o.id, color: o.color })),
+						vs.map((ev) => ({
+							ev: o.hasFullRead
+								? ev
+								: applyVisibilityToEventView(ev, "free_busy"),
+							collectionId: o.id,
+							color: o.color,
+							readable: o.hasFullRead,
+						})),
 					),
 				);
 			});
@@ -332,13 +346,14 @@ export const calendarViewHandler = (
 				.sort((a, b) =>
 					a.ev.start < b.ev.start ? -1 : a.ev.start > b.ev.start ? 1 : 0,
 				)
-				.map(({ ev, collectionId, color }) => ({
+				.map(({ ev, collectionId, color, readable }) => ({
 					id: ev.id,
 					collectionId,
 					title: ev.title,
 					color,
 					when: formatWhen(ev),
 					recurrence: recurrenceLabel(ev.rruleRaw),
+					readable,
 				}));
 		}
 

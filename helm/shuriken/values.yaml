@@ -143,6 +143,15 @@ config:
     oidcGroupsClaim: ""
     oidcRoleMap: ""    # e.g. '{"shuriken-admins":"super_admin","staff":"admin"}'
 
+  # Who can search the user directory in the Share UI's "pick a user" picker.
+  # admin_only (default) — only admin/super_admin can search; everyone else
+  #   sees no picker. exact_email — non-admins may look up a candidate only
+  #   by typing their exact email; admins keep full substring search.
+  # open — any authenticated user gets full substring search over display
+  #   name and email, same as admins.
+  sharing:
+    userSearchMode: admin_only
+
   externalCalendar:
     schedulerTickS: 60
     fetchConcurrency: 4

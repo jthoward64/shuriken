@@ -174,6 +174,8 @@ const stubLayers = Layer.mergeAll(
 		findPrincipalByIds: die,
 		findByEmail: die,
 		updateProperties: die,
+		searchByDisplayName: die,
+		findByEmailExact: die,
 	}),
 	Layer.succeed(EntityRepository, {
 		insert: die,
@@ -302,6 +304,7 @@ const stubLayers = Layer.mergeAll(
 			oidcGroupsClaim: Option.none(),
 			oidcRoleMap: new Map<string, string>(),
 		},
+		sharing: { userSearchMode: "admin_only" },
 		log: { level: undefined },
 		externalCalendar: {
 			schedulerTickS: 60,

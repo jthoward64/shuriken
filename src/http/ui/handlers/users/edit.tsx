@@ -11,9 +11,9 @@ import {
 	USERS_VIRTUAL_RESOURCE_ID,
 } from "#src/domain/virtual-resources.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
-import { buildAclPanelData } from "#src/http/ui/helpers/acl-panel.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import { buildNavContext } from "#src/http/ui/helpers/nav-context.ts";
+import { buildSharePanelData } from "#src/http/ui/helpers/share-panel.ts";
 import { UserEditPage } from "#src/http/ui/view/pages/users.tsx";
 import { renderPage } from "#src/http/ui/view/render.tsx";
 import { AclService } from "#src/services/acl/index.ts";
@@ -148,7 +148,7 @@ export const usersEditHandler = (
 		const origin = ctx.url.origin;
 		const davBase = `${origin}/dav/principals/${principalRow.id}`;
 
-		const aclPanel = yield* buildAclPanelData(
+		const sharePanel = yield* buildSharePanelData(
 			principal.principalId,
 			principalRow.id as PrincipalId,
 			"principal",
@@ -181,7 +181,7 @@ export const usersEditHandler = (
 				principalUrl={`${davBase}/`}
 				caldavUrl={`${davBase}/cal/`}
 				carddavUrl={`${davBase}/card/`}
-				aclPanel={aclPanel}
+				sharePanel={sharePanel}
 				canEditRole={canEditRole}
 				roleOptions={roleOptions}
 				userRole={user.role}

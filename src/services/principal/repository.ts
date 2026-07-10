@@ -74,6 +74,7 @@ export interface PrincipalRepositoryShape {
 	 */
 	readonly searchByDisplayName: (
 		query: string,
+		limit: number,
 	) => Effect.Effect<ReadonlyArray<PrincipalWithUser>, DatabaseError>;
 }
 

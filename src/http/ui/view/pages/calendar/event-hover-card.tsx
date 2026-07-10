@@ -84,19 +84,24 @@ export const EventHoverCard = ({
 	editHref,
 }: {
 	form: EventFormData;
-	editHref: string;
+	/** Omitted when the caller lacks write access — hides the Edit affordance
+	 * rather than linking to a page that would just 403 (or, for read-only
+	 * viewers, silently fail to save). */
+	editHref?: string;
 }): VNode => (
 	<>
 		<div class="flex items-start justify-between gap-3">
 			<h3 class="font-semibold text-fg">{form.summary || "Event"}</h3>
-			<a
-				href={editHref}
-				data-edit-event
-				aria-label="Edit event"
-				class="btn btn-ghost btn-sm shrink-0"
-			>
-				<IconEdit class="h-4 w-4" />
-			</a>
+			{editHref !== undefined && (
+				<a
+					href={editHref}
+					data-edit-event
+					aria-label="Edit event"
+					class="btn btn-ghost btn-sm shrink-0"
+				>
+					<IconEdit class="h-4 w-4" />
+				</a>
+			)}
 		</div>
 		<p class="mt-1 text-sm text-muted">{formatWhen(form)}</p>
 		{form.location !== "" && (

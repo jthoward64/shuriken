@@ -13,6 +13,7 @@ import { CollectionEditPage } from "#src/http/ui/view/pages/collections.tsx";
 import { renderFragment } from "#src/http/ui/view/render.tsx";
 import type { AclService } from "#src/services/acl/index.ts";
 import type { CollectionService } from "#src/services/collection/index.ts";
+import type { PrincipalService } from "#src/services/principal/index.ts";
 import { ShareLinkService } from "#src/services/share-link/service.ts";
 import { loadCollectionEditFragmentProps } from "./edit-fragment.ts";
 
@@ -31,7 +32,7 @@ export const collectionsFeedsAddHandler = (
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError | InternalError,
-	AclService | CollectionService | ShareLinkService
+	AclService | CollectionService | ShareLinkService | PrincipalService
 > =>
 	Effect.gen(function* () {
 		const principal = yield* requireAuthenticated(ctx.auth);

@@ -235,7 +235,7 @@ const listAll = Effect.fn("PrincipalRepository.listAll")(
 const searchByDisplayName = Effect.fn(
 	"PrincipalRepository.searchByDisplayName",
 )(
-	function* (query: string) {
+	function* (query: string, limit: number) {
 		yield* Effect.annotateCurrentSpan({ "search.query_len": query.length });
 		yield* Effect.logTrace("repo.principal.searchByDisplayName", { query });
 		const pattern = `%${query}%`;
@@ -252,7 +252,8 @@ const searchByDisplayName = Effect.fn(
 							ilike(user.email, pattern),
 						),
 					),
-				),
+				)
+				.limit(limit),
 		).pipe(
 			Effect.map((rows) =>
 				rows.map((r) => ({ principal: r.principal, user: r.user })),

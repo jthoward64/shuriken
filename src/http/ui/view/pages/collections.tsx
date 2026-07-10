@@ -1,7 +1,6 @@
 import type { VNode } from "preact";
-import type { AclPanelData } from "#src/http/ui/helpers/acl-panel.ts";
+import type { SharePanelData } from "#src/http/ui/helpers/share-panel.ts";
 import { Breadcrumb, Card, PageHeader } from "../ui.tsx";
-import { AclPanel } from "./acl-panel.tsx";
 import {
 	CALENDAR_POPOVER_BODY_ID,
 	CALENDAR_POPOVER_ID,
@@ -12,6 +11,7 @@ import {
 	type CalendarFeedOption,
 	CalendarFeedsSection,
 } from "./feeds.tsx";
+import { SharePanel } from "./share-panel.tsx";
 
 // ---------------------------------------------------------------------------
 // Collection pages: create (owned by a user or group) and edit. The edit page
@@ -168,10 +168,10 @@ export interface CollectionEditPageProps {
 	/** CSS `#RRGGBB` colour, calendars only. */
 	readonly calendarColor: string;
 	readonly canDelete: boolean;
-	readonly aclPanel: AclPanelData | undefined;
+	readonly sharePanel: SharePanelData | undefined;
 	/** "popover" renders the compact edit dialog (header instead of breadcrumb,
-	 * no ACL panel, submits back to the calendar) used by the calendar sidebar's
-	 * per-calendar Edit trigger. */
+	 * submits back to the calendar) used by the calendar sidebar's per-calendar
+	 * Edit trigger. The Share panel is shown in both variants. */
 	readonly variant?: "page" | "popover";
 	readonly popoverId?: string;
 	/** Feeds this calendar belongs to / can be added to — popover + calendars
@@ -369,7 +369,7 @@ export const CollectionEditPage = (props: CollectionEditPageProps): VNode => {
 				</Card>
 			)}
 
-			{!popover && <AclPanel data={props.aclPanel} />}
+			<SharePanel data={props.sharePanel} />
 		</div>
 	);
 };

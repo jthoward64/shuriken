@@ -1,7 +1,7 @@
 import type { VNode } from "preact";
-import type { AclPanelData } from "#src/http/ui/helpers/acl-panel.ts";
+import type { SharePanelData } from "#src/http/ui/helpers/share-panel.ts";
 import { Breadcrumb, Card, PageHeader } from "../ui.tsx";
-import { AclPanel } from "./acl-panel.tsx";
+import { SharePanel } from "./share-panel.tsx";
 
 // ---------------------------------------------------------------------------
 // Per-instance ACL editor — share or unshare a single event without granting
@@ -12,14 +12,14 @@ export interface InstanceAclPageProps {
 	readonly title: string;
 	readonly slug: string;
 	readonly collectionId: string;
-	readonly aclPanel: AclPanelData | undefined;
+	readonly sharePanel: SharePanelData | undefined;
 }
 
 export const InstanceAclPage = ({
 	title,
 	slug,
 	collectionId,
-	aclPanel,
+	sharePanel,
 }: InstanceAclPageProps): VNode => (
 	<div class="mx-auto max-w-2xl space-y-6">
 		<div>
@@ -43,6 +43,6 @@ export const InstanceAclPage = ({
 			</div>
 		</Card>
 
-		<AclPanel data={aclPanel} />
+		<SharePanel data={sharePanel} />
 	</div>
 );

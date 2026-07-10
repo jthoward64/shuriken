@@ -50,7 +50,10 @@ export const embedCalendarEventsHandler = (
 				),
 			),
 		);
-		const events = perCalendar.flat().map(toFullCalendarEvent);
+		// Public/anonymous widget — no edit affordance ever applies.
+		const events = perCalendar
+			.flat()
+			.map((ev) => toFullCalendarEvent(ev, false));
 
 		return new Response(JSON.stringify(events), {
 			status: HTTP_OK,

@@ -422,15 +422,22 @@ const openEditDialog = (url: string): void => {
 		}
 		// Sidebar "upcoming events" rows — a real link to the full edit page
 		// (no-JS fallback, and shared-events rows with no edit route); with JS,
-		// jump straight to the edit dialog instead of navigating away.
+		// jump straight to the edit dialog instead of navigating away — but only
+		// when the row is actually editable (`data-editable`); a free-busy-only
+		// or otherwise non-full-read row has no edit route to open (it would
+		// 403), so it shows the read-only preview card instead, same as hover.
 		const previewTrigger = el.closest("[data-hover-preview]");
 		if (
 			previewTrigger instanceof HTMLAnchorElement &&
 			previewTrigger.dataset.hoverPreview
 		) {
 			e.preventDefault();
-			hideHoverCard();
-			openEditDialog(previewTrigger.href);
+			if (previewTrigger.dataset.editable) {
+				hideHoverCard();
+				openEditDialog(previewTrigger.href);
+			} else {
+				showHoverCardNow(previewTrigger.dataset.hoverPreview, previewTrigger);
+			}
 		}
 	});
 
@@ -729,8 +736,17 @@ const openEditDialog = (url: string): void => {
 			eventMouseLeave: () => {
 				scheduleHoverCardClose();
 			},
+			// A free-busy-only (or otherwise non-full-read) event has no edit
+			// route to open (it would 403) — click falls back to showing the
+			// same read-only preview card hover would, instead of opening a
+			// dialog that immediately breaks.
 			eventClick: (info) => {
 				const collectionId = info.event.source?.id ?? el.dataset.active ?? "";
+				if (info.event.extendedProps.readable === false) {
+					const url = `/ui/calendar/${collectionId}/events/${info.event.id}/preview`;
+					showHoverCardNow(url, info.el);
+					return;
+				}
 				hideHoverCard();
 				openEditDialog(`/ui/calendar/${collectionId}/events/${info.event.id}`);
 			},

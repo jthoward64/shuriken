@@ -17,6 +17,7 @@
 import { Effect, Option } from "effect";
 import { Temporal } from "temporal-polyfill";
 import { encodeICalendar } from "#src/data/icalendar/codec.ts";
+import { redactDocumentToBusyOnly } from "#src/data/icalendar/visibility.ts";
 import {
 	type ClarkName,
 	cn,
@@ -381,6 +382,7 @@ const loadInstanceData = (
 	row: InstanceRow,
 	namespace: string,
 	propfind: PropfindKind,
+	redactToBusyOnly: boolean,
 ): Effect.Effect<Option.Option<string>, DatabaseError, ComponentRepository> =>
 	Effect.gen(function* () {
 		const dataClark = dataClarkForNamespace(namespace);
@@ -399,10 +401,18 @@ const loadInstanceData = (
 		if (Option.isNone(treeOpt)) {
 			return Option.none<string>();
 		}
-		const doc: IrDocument =
+		if (redactToBusyOnly && entityType !== "icalendar") {
+			// Free-busy-only access has no meaning for CardDAV contacts — omit
+			// address-data entirely rather than leak the full vCard.
+			return Option.none<string>();
+		}
+		let doc: IrDocument =
 			entityType === "icalendar"
 				? { kind: "icalendar", root: treeOpt.value }
 				: { kind: "vcard", root: treeOpt.value };
+		if (redactToBusyOnly) {
+			doc = redactDocumentToBusyOnly(doc);
+		}
 		const body = yield* entityType === "icalendar"
 			? encodeICalendar(doc)
 			: encodeVCard(doc);
@@ -935,7 +945,7 @@ export const propfindHandler = (
 				actingPrincipalId,
 				path.collectionId,
 				"collection",
-				"DAV:read",
+				"CALDAV:read-free-busy",
 			);
 			const collectionPrivileges = yield* acl.currentUserPrivileges(
 				actingPrincipalId,
@@ -1054,13 +1064,26 @@ export const propfindHandler = (
 						// RFC 3744 §5.1: owner inherited from the parent collection
 						[DAV_OWNER]: { [cn(DAV_NS, "href")]: ownerHref },
 					};
-					if (wantsData && dataTrees !== undefined && dataClark !== null) {
+					const instHasFullRead = (
+						instPrivileges as ReadonlyArray<string>
+					).includes("DAV:read");
+					if (
+						wantsData &&
+						dataTrees !== undefined &&
+						dataClark !== null &&
+						// Free-busy-only access has no meaning for CardDAV contacts —
+						// omit address-data entirely rather than leak the full vCard.
+						(instHasFullRead || dataEntityType === "icalendar")
+					) {
 						const tree = dataTrees.get(inst.entityId as unknown as EntityId);
 						if (tree !== undefined) {
-							const doc: IrDocument =
+							let doc: IrDocument =
 								dataEntityType === "icalendar"
 									? { kind: "icalendar", root: tree }
 									: { kind: "vcard", root: tree };
+							if (!instHasFullRead) {
+								doc = redactDocumentToBusyOnly(doc);
+							}
 							instProps[dataClark] =
 								dataEntityType === "icalendar"
 									? yield* encodeICalendar(doc)
@@ -1243,13 +1266,16 @@ export const propfindHandler = (
 				actingPrincipalId,
 				path.instanceId,
 				"instance",
-				"DAV:read",
+				"CALDAV:read-free-busy",
 			);
 			const instancePrivileges = yield* acl.currentUserPrivileges(
 				actingPrincipalId,
 				path.instanceId,
 				"instance",
 			);
+			const instHasFullRead = (
+				instancePrivileges as ReadonlyArray<string>
+			).includes("DAV:read");
 			const instRow = yield* instSvc.findById(path.instanceId);
 			// DAV:owner comes from the parent collection.
 			const instCollRow = yield* collSvc.findById(path.collectionId);
@@ -1277,6 +1303,7 @@ export const propfindHandler = (
 				instRow,
 				path.namespace,
 				propfind,
+				!instHasFullRead,
 			);
 			if (Option.isSome(dataOpt)) {
 				const dataKey = dataClarkForNamespace(path.namespace);

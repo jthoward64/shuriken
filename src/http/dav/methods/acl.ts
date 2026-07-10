@@ -91,6 +91,7 @@ const PRIVILEGE_MAP = new Map<string, DavPrivilege>([
 	[cn(CALDAV_NS, "schedule-send-invite"), "CALDAV:schedule-send-invite"],
 	[cn(CALDAV_NS, "schedule-send-reply"), "CALDAV:schedule-send-reply"],
 	[cn(CALDAV_NS, "schedule-send-freebusy"), "CALDAV:schedule-send-freebusy"],
+	[cn(CALDAV_NS, "read-free-busy"), "CALDAV:read-free-busy"],
 ]);
 
 // ---------------------------------------------------------------------------

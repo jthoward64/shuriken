@@ -1,6 +1,7 @@
 import { Effect, Option } from "effect";
 import type { Temporal } from "temporal-polyfill";
 import { encodeICalendar } from "#src/data/icalendar/codec.ts";
+import { redactDocumentToBusyOnly } from "#src/data/icalendar/visibility.ts";
 import type { IrDocument } from "#src/data/ir.ts";
 import { encodeVCard } from "#src/data/vcard/codec.ts";
 import type { EntityType } from "#src/db/drizzle/schema/index.ts";
@@ -9,6 +10,7 @@ import {
 	type DavError,
 	InternalError,
 	methodNotAllowed,
+	needPrivileges,
 	notFound,
 	unauthorized,
 } from "#src/domain/errors.ts";
@@ -84,14 +86,21 @@ export const getHandler = (
 			return yield* methodNotAllowed();
 		}
 
-		// 3. ACL check: read on the instance.
+		// 3. ACL check: at least free-busy-only read on the instance. DAV:read
+		// (or DAV:all) also satisfies this via the privilege hierarchy.
 		const acl = yield* AclService;
 		yield* acl.check(
 			principal.principalId,
 			path.instanceId,
 			"instance",
-			"DAV:read",
+			"CALDAV:read-free-busy",
 		);
+		const instancePrivileges = yield* acl.currentUserPrivileges(
+			principal.principalId,
+			path.instanceId,
+			"instance",
+		);
+		const hasFullRead = instancePrivileges.includes("DAV:read");
 
 		// 4. Load instance metadata.
 		const instanceSvc = yield* InstanceService;
@@ -102,6 +111,12 @@ export const getHandler = (
 			instance.contentType.split(";")[0]?.trim().toLowerCase() ?? "";
 		const entityType: EntityType =
 			baseContentType === "text/vcard" ? "vcard" : "icalendar";
+
+		// Free-busy-only access has no meaning for CardDAV contacts — require
+		// full DAV:read for vcard resources.
+		if (entityType === "vcard" && !hasFullRead) {
+			return yield* needPrivileges();
+		}
 
 		// 6. Load component tree.
 		const componentRepo = yield* ComponentRepository;
@@ -131,6 +146,13 @@ export const getHandler = (
 		if (entityType === "icalendar" && ctx.caldavTimezones === "F") {
 			const ianaSvc = yield* IanaTimezoneService;
 			doc = stripKnownVtimezones(doc, ianaSvc.isKnownTzid.bind(ianaSvc));
+		}
+
+		// 7b. A caller with only CALDAV:read-free-busy (not DAV:read) sees a
+		// redacted "Busy" body instead of a 403 — keeps GET consistent with
+		// PROPFIND/REPORT enumeration, which already succeeds for such callers.
+		if (!hasFullRead) {
+			doc = redactDocumentToBusyOnly(doc);
 		}
 
 		// 8. Serialize to text.

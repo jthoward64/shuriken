@@ -7,6 +7,7 @@
 
 import { Effect } from "effect";
 import { encodeICalendar } from "#src/data/icalendar/codec.ts";
+import { redactDocumentToBusyOnly } from "#src/data/icalendar/visibility.ts";
 import type { ClarkName, IrDocument } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import { methodNotAllowed, unauthorized } from "#src/domain/errors.ts";
@@ -55,7 +56,7 @@ export const calendarMultigetHandler = (
 			actingPrincipalId,
 			path.collectionId,
 			"collection",
-			"DAV:read",
+			"CALDAV:read-free-busy",
 		);
 
 		const hrefs = extractHrefs(tree);
@@ -96,7 +97,14 @@ export const calendarMultigetHandler = (
 			origin: ctx.url.origin,
 			dataClarkName: CALENDAR_DATA,
 			dataTree,
-			serializeData: (doc: IrDocument) =>
-				encodeICalendar(stripTimezones(subsetIrDocument(doc, spec))),
+			serializeData: (doc: IrDocument, _tree: unknown, hasFullRead: boolean) =>
+				encodeICalendar(
+					stripTimezones(
+						subsetIrDocument(
+							hasFullRead ? doc : redactDocumentToBusyOnly(doc),
+							spec,
+						),
+					),
+				),
 		});
 	});

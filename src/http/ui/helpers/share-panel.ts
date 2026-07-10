@@ -1,12 +1,40 @@
 import { Effect, Option } from "effect";
-import type { DatabaseError } from "#src/domain/errors.ts";
-import type { PrincipalId } from "#src/domain/ids.ts";
+import type { DatabaseError, DavError } from "#src/domain/errors.ts";
+import type { CollectionId, PrincipalId } from "#src/domain/ids.ts";
+import type { DavPrivilege } from "#src/domain/types/dav.ts";
 import type { AclResourceType } from "#src/services/acl/index.ts";
 import { type AclResourceId, AclService } from "#src/services/acl/service.ts";
+import { CollectionService } from "#src/services/collection/index.ts";
 import { PrincipalService } from "#src/services/principal/index.ts";
+import {
+	basicTierForGrant,
+	isRepresentableInBasicTiers,
+	type ShareTier,
+	tiersFor,
+} from "./share-tiers.ts";
+
+/**
+ * Resolves whether an ACL resource is a calendar collection — needed to
+ * decide which Basic tiers to offer (free_busy/manage are calendar-only).
+ * Always false for non-collection resource types.
+ */
+export const resolveIsCalendar = (
+	resourceType: AclResourceType,
+	resourceId: AclResourceId,
+): Effect.Effect<boolean, DavError | DatabaseError, CollectionService> =>
+	Effect.gen(function* () {
+		if (resourceType !== "collection") {
+			return false;
+		}
+		const collSvc = yield* CollectionService;
+		const coll = yield* collSvc.findById(resourceId as CollectionId);
+		return coll.collectionType === "calendar";
+	});
 
 // ---------------------------------------------------------------------------
-// AclPanelData — data model for the acl-panel.hbs partial
+// SharePanelData — data model for the share-panel.tsx component (renders as
+// "Basic" tiers by default, with an "Advanced" per-privilege view available
+// via toggle; see src/http/ui/view/pages/share-panel.tsx).
 // ---------------------------------------------------------------------------
 
 export interface AclPanelAce {
@@ -19,7 +47,17 @@ export interface AclPanelAce {
 	readonly protected: boolean;
 }
 
-export interface AclPanelData {
+export interface BasicGrant {
+	readonly principalId: string;
+	readonly principalLabel: string;
+	/** undefined when this principal's raw privilege set doesn't exactly
+	 * match a tier — e.g. after a partial edit in Advanced mode. Basic mode
+	 * shows these principals but can't offer an in-place tier edit for them
+	 * without first collapsing (see the /collapse endpoint). */
+	readonly tier: ShareTier | undefined;
+}
+
+export interface SharePanelData {
 	readonly resourceType: string;
 	readonly resourceId: string;
 	readonly aces: ReadonlyArray<AclPanelAce>;
@@ -27,6 +65,14 @@ export interface AclPanelData {
 		readonly value: string;
 		readonly label: string;
 	}>;
+	readonly tiers: ReadonlyArray<{
+		readonly tier: ShareTier;
+		readonly label: string;
+	}>;
+	readonly basicGrants: ReadonlyArray<BasicGrant>;
+	readonly defaultMode: "basic" | "advanced";
+	readonly representableInBasic: boolean;
+	readonly searchEndpoint: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -52,6 +98,7 @@ const PRIVILEGE_LABELS: Partial<Record<string, string>> = {
 	"DAV:read-acl": "Read access list",
 	"DAV:read-current-user-privilege-set": "Read own privileges",
 	"DAV:unlock": "Unlock",
+	"CALDAV:read-free-busy": "Free/busy only",
 };
 
 export const COMMON_PRIVILEGE_OPTIONS: ReadonlyArray<{
@@ -62,18 +109,20 @@ export const COMMON_PRIVILEGE_OPTIONS: ReadonlyArray<{
 	{ value: "DAV:read", label: "Read" },
 	{ value: "DAV:write", label: "Write" },
 	{ value: "DAV:write-acl", label: "Manage access" },
+	{ value: "CALDAV:read-free-busy", label: "Free/busy only" },
 ];
 
 // ---------------------------------------------------------------------------
-// buildAclPanelData — returns None if the caller lacks DAV:write-acl
+// buildSharePanelData — returns None if the caller lacks DAV:write-acl
 // ---------------------------------------------------------------------------
 
-export const buildAclPanelData = (
+export const buildSharePanelData = (
 	actingPrincipalId: PrincipalId,
 	resourceId: AclResourceId,
 	resourceType: AclResourceType,
+	isCalendar = false,
 ): Effect.Effect<
-	Option.Option<AclPanelData>,
+	Option.Option<SharePanelData>,
 	DatabaseError,
 	AclService | PrincipalService
 > =>
@@ -127,10 +176,46 @@ export const buildAclPanelData = (
 			});
 		}
 
-		return Option.some<AclPanelData>({
+		const representable = isRepresentableInBasicTiers(
+			rawAces,
+			resourceType,
+			isCalendar,
+		);
+
+		const byPrincipal = new Map<string, Array<AclPanelAce>>();
+		for (const ace of enrichedAces) {
+			if (
+				ace.protected ||
+				ace.principalType !== "principal" ||
+				!ace.principalId
+			) {
+				continue;
+			}
+			const list = byPrincipal.get(ace.principalId) ?? [];
+			list.push(ace);
+			byPrincipal.set(ace.principalId, list);
+		}
+		const basicGrants: Array<BasicGrant> = [...byPrincipal.entries()].map(
+			([principalId, group]) => ({
+				principalId,
+				principalLabel: group[0]?.principalLabel ?? principalId,
+				tier: basicTierForGrant(
+					group.map((a) => a.privilege as DavPrivilege),
+					resourceType,
+					isCalendar,
+				),
+			}),
+		);
+
+		return Option.some<SharePanelData>({
 			resourceType,
 			resourceId: resourceId as string,
 			aces: enrichedAces,
 			privilegeOptions: COMMON_PRIVILEGE_OPTIONS,
+			tiers: tiersFor(resourceType, isCalendar),
+			basicGrants,
+			defaultMode: representable ? "basic" : "advanced",
+			representableInBasic: representable,
+			searchEndpoint: `/ui/api/principals/search?resourceType=${resourceType}&resourceId=${resourceId}`,
 		});
 	});

@@ -177,6 +177,11 @@ export interface FullCalendarEvent {
 		readonly description: string;
 		readonly location: string;
 		readonly categoriesCsv: string;
+		/** False for a free-busy-only (or otherwise non-full-read) event — the
+		 * client must not open the edit dialog for it (that route requires
+		 * DAV:read and would 403); it falls back to the read-only preview
+		 * card instead. See calendar.client.ts's eventClick. */
+		readonly readable: boolean;
 	};
 }
 
@@ -217,11 +222,13 @@ const durationBetween = (
 
 export const toFullCalendarEvent = (
 	ev: CalendarEventView,
+	readable = true,
 ): FullCalendarEvent => {
 	const extendedProps = {
 		description: ev.description,
 		location: ev.location,
 		categoriesCsv: ev.categoriesCsv,
+		readable,
 	};
 	if (ev.rruleRaw !== null) {
 		const dtstart = ev.allDay

@@ -1,4 +1,4 @@
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Option } from "effect";
 import { someOrNotFound } from "#src/domain/errors.ts";
 import type { PrincipalId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
@@ -91,6 +91,29 @@ export const PrincipalServiceLive = Layer.effect(
 					yield* Effect.logTrace("principal.updateProperties done", {
 						principalId: result.id,
 					});
+					return result;
+				},
+			),
+
+			searchByDisplayName: Effect.fn("PrincipalService.searchByDisplayName")(
+				function* (query: string, limit: number) {
+					yield* Effect.annotateCurrentSpan({
+						"search.query_len": query.length,
+					});
+					yield* Effect.logTrace("principal.searchByDisplayName", { limit });
+					return yield* repo.searchByDisplayName(query, limit);
+				},
+			),
+
+			findByEmailExact: Effect.fn("PrincipalService.findByEmailExact")(
+				function* (email: Email) {
+					yield* Effect.logTrace("principal.findByEmailExact");
+					const result = yield* repo.findByEmail(email);
+					if (Option.isSome(result)) {
+						yield* Effect.logTrace("principal.findByEmailExact result", {
+							principalId: result.value.principal.id,
+						});
+					}
 					return result;
 				},
 			),

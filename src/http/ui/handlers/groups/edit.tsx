@@ -8,10 +8,10 @@ import type {
 import type { GroupId, PrincipalId, UserId } from "#src/domain/ids.ts";
 import { GROUPS_VIRTUAL_RESOURCE_ID } from "#src/domain/virtual-resources.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
-import { buildAclPanelData } from "#src/http/ui/helpers/acl-panel.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import { buildGroupAdminsData } from "#src/http/ui/helpers/group-admins.ts";
 import { buildNavContext } from "#src/http/ui/helpers/nav-context.ts";
+import { buildSharePanelData } from "#src/http/ui/helpers/share-panel.ts";
 import { GroupEditPage } from "#src/http/ui/view/pages/groups.tsx";
 import { renderPage } from "#src/http/ui/view/render.tsx";
 import { AclService } from "#src/services/acl/index.ts";
@@ -84,7 +84,7 @@ export const groupsEditHandler = (
 			config.auth.basicAuthEnabled,
 		);
 
-		const aclPanel = yield* buildAclPanelData(
+		const sharePanel = yield* buildSharePanelData(
 			principal.principalId,
 			principalRow.id as PrincipalId,
 			"principal",
@@ -102,7 +102,7 @@ export const groupsEditHandler = (
 				slug={principalRow.slug}
 				canDelete={canDelete}
 				collections={collections}
-				aclPanel={aclPanel}
+				sharePanel={sharePanel}
 				groupAdmins={groupAdmins.map((a) => ({
 					aceId: a.aceId,
 					label: a.label,

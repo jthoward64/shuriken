@@ -1,4 +1,4 @@
-import type { Effect } from "effect";
+import type { Effect, Option } from "effect";
 import { Context } from "effect";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import type { PrincipalId } from "#src/domain/ids.ts";
@@ -40,6 +40,24 @@ export interface PrincipalServiceShape {
 		id: PrincipalId,
 		changes: PrincipalPropertyChanges,
 	) => Effect.Effect<PrincipalRow, DatabaseError>;
+	/**
+	 * Search user principals whose display name or email contains `query`
+	 * (case-insensitive substring), for the Share UI's "pick a user" picker.
+	 * Results are capped at `limit`. Never fails on no-match — returns [].
+	 */
+	readonly searchByDisplayName: (
+		query: string,
+		limit: number,
+	) => Effect.Effect<ReadonlyArray<PrincipalWithUser>, DatabaseError>;
+	/**
+	 * Look up a user principal by exact email match, for the Share UI's
+	 * "exact_email" search mode. Unlike `findByEmail`, this never fails on
+	 * no-match — it returns `Option.none()`, since "no such user" is an
+	 * expected outcome of a search, not an error.
+	 */
+	readonly findByEmailExact: (
+		email: Email,
+	) => Effect.Effect<Option.Option<PrincipalWithUser>, DatabaseError>;
 }
 
 export class PrincipalService extends Context.Service<

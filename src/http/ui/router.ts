@@ -24,8 +24,10 @@ import {
 	HTTP_SEE_OTHER,
 	HTTP_UNAUTHORIZED,
 } from "#src/http/status.ts";
+import { aclCollapseHandler } from "#src/http/ui/api/acl/collapse.tsx";
 import { aclGrantHandler } from "#src/http/ui/api/acl/grant.tsx";
 import { aclRevokeHandler } from "#src/http/ui/api/acl/revoke.tsx";
+import { aclSetTierHandler } from "#src/http/ui/api/acl/set-tier.tsx";
 import {
 	eventCreateHandler,
 	eventDeleteHandler,
@@ -62,6 +64,7 @@ import { groupsCollectionsCreateHandler } from "#src/http/ui/api/groups/create-c
 import { groupsDeleteHandler } from "#src/http/ui/api/groups/delete.ts";
 import { groupsMembersHandler } from "#src/http/ui/api/groups/members.ts";
 import { groupsUpdateHandler } from "#src/http/ui/api/groups/update.ts";
+import { principalSearchHandler } from "#src/http/ui/api/principals/search.tsx";
 import { appPasswordsCreateHandler } from "#src/http/ui/api/profile/app-passwords-create.ts";
 import { appPasswordsRevokeHandler } from "#src/http/ui/api/profile/app-passwords-revoke.ts";
 import { emailCredentialsClearHandler } from "#src/http/ui/api/profile/email-credentials-clear.ts";
@@ -687,6 +690,17 @@ export const uiRouter = (
 		}
 	}
 
+	// Share picker "pick a user" typeahead
+	if (
+		seg0 === "api" &&
+		seg1 === "principals" &&
+		seg2 === "search" &&
+		!seg3 &&
+		method === "GET"
+	) {
+		return handle(principalSearchHandler(req, ctx));
+	}
+
 	// API endpoints (POST)
 	if (seg0 === "api" && method === "POST") {
 		if (
@@ -697,7 +711,10 @@ export const uiRouter = (
 				seg2 === "virtual") &&
 			seg3 &&
 			isUuid(seg3) &&
-			(seg4 === "grant" || seg4 === "revoke")
+			(seg4 === "grant" ||
+				seg4 === "revoke" ||
+				seg4 === "set-tier" ||
+				seg4 === "collapse")
 		) {
 			const resourceId =
 				seg2 === "principal"
@@ -710,7 +727,13 @@ export const uiRouter = (
 			if (seg4 === "grant") {
 				return handle(aclGrantHandler(req, ctx, seg2, resourceId));
 			}
-			return handle(aclRevokeHandler(req, ctx, seg2, resourceId));
+			if (seg4 === "revoke") {
+				return handle(aclRevokeHandler(req, ctx, seg2, resourceId));
+			}
+			if (seg4 === "set-tier") {
+				return handle(aclSetTierHandler(req, ctx, seg2, resourceId));
+			}
+			return handle(aclCollapseHandler(req, ctx, seg2, resourceId));
 		}
 		if (seg1 === "collections") {
 			if (seg2 === "reorder" && !seg3) {

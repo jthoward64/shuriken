@@ -20,6 +20,7 @@ import { CollectionRepository } from "#src/services/collection/repository.ts";
 import type { ComponentRepository } from "#src/services/component/index.ts";
 import type { InstanceRepository } from "#src/services/instance/repository.ts";
 import {
+	applyVisibilityToEventView,
 	collectCalendarEvents,
 	toFullCalendarEvent,
 } from "./collect-events.ts";
@@ -69,12 +70,20 @@ export const calendarEventsHandler = (
 		const acl = yield* AclService;
 		const collections = yield* CollectionRepository;
 
+		// At least free-busy-only read is required; DAV:read/DAV:all also
+		// satisfy this via the privilege hierarchy.
 		yield* acl.check(
 			principal.principalId,
 			collectionId,
 			"collection",
-			"DAV:read",
+			"CALDAV:read-free-busy",
 		);
+		const collectionPrivileges = yield* acl.currentUserPrivileges(
+			principal.principalId,
+			collectionId,
+			"collection",
+		);
+		const hasFullRead = collectionPrivileges.includes("DAV:read");
 
 		const rangeStart = parseInstantParam(ctx.url.searchParams.get("start"));
 		const rangeEnd = parseInstantParam(ctx.url.searchParams.get("end"));
@@ -95,6 +104,12 @@ export const calendarEventsHandler = (
 			updatedAt: Option.getOrNull(
 				Option.map(collection, (c) => c.updatedAt?.toString() ?? null),
 			),
+			// A tier change (e.g. free_busy -> view) doesn't touch the
+			// collection's own updatedAt/synctoken, so it must be part of the
+			// fingerprint itself — otherwise a caller whose access level just
+			// changed could get a stale 304 built from their previous tier's
+			// cached body.
+			hasFullRead,
 		});
 		const notModified = notModifiedPageResponse(ctx.headers, etag);
 		if (notModified !== undefined) {
@@ -106,7 +121,12 @@ export const calendarEventsHandler = (
 			rangeStart,
 			rangeEnd,
 		);
-		const events = views.map(toFullCalendarEvent);
+		const visibleViews = hasFullRead
+			? views
+			: views.map((ev) => applyVisibilityToEventView(ev, "free_busy"));
+		const events = visibleViews.map((ev) =>
+			toFullCalendarEvent(ev, hasFullRead),
+		);
 
 		return withPageCacheHeaders(
 			new Response(JSON.stringify(events), {

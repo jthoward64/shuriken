@@ -7,9 +7,9 @@ import type {
 } from "#src/domain/errors.ts";
 import type { InstanceId } from "#src/domain/ids.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
-import { buildAclPanelData } from "#src/http/ui/helpers/acl-panel.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import { buildNavContext } from "#src/http/ui/helpers/nav-context.ts";
+import { buildSharePanelData } from "#src/http/ui/helpers/share-panel.ts";
 import { InstanceAclPage } from "#src/http/ui/view/pages/instances.tsx";
 import { renderPage } from "#src/http/ui/view/render.tsx";
 import { AclService } from "#src/services/acl/service.ts";
@@ -44,7 +44,7 @@ export const instanceAclHandler = (
 		const instance = yield* instanceSvc.findById(instanceId);
 		yield* acl.check(principal.principalId, instanceId, "instance", "DAV:read");
 
-		const panel = yield* buildAclPanelData(
+		const panel = yield* buildSharePanelData(
 			principal.principalId,
 			instanceId,
 			"instance",
@@ -61,7 +61,7 @@ export const instanceAclHandler = (
 				title={`Access — ${instance.slug}`}
 				slug={instance.slug}
 				collectionId={instance.collectionId}
-				aclPanel={panel}
+				sharePanel={panel}
 			/>,
 			{ headers: ctx.headers, title: `Access — ${instance.slug}`, nav },
 		);

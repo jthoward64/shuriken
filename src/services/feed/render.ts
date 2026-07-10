@@ -1,17 +1,13 @@
 import { Effect, Option } from "effect";
 import { encodeICalendar } from "#src/data/icalendar/codec.ts";
+import { applyFieldVisibility } from "#src/data/icalendar/visibility.ts";
 import type { IrComponent, IrDocument, IrProperty } from "#src/data/ir.ts";
-import type { ShareLinkVisibility } from "#src/db/drizzle/schema/index.ts";
 import type { DatabaseError, InternalError } from "#src/domain/errors.ts";
 import { CollectionId, EntityId } from "#src/domain/ids.ts";
 import { ComponentRepository } from "#src/services/component/repository.ts";
 import { InstanceRepository } from "#src/services/instance/repository.ts";
 import type { ShareLinkSummary } from "#src/services/share-link/service.ts";
-import {
-	BUSY_SUMMARY,
-	stripsPrivateFields,
-	stripsTitle,
-} from "#src/services/share-link/visibility-policy.ts";
+import { toFieldVisibility } from "#src/services/share-link/visibility-policy.ts";
 
 // ---------------------------------------------------------------------------
 // renderFeed — assemble a public .ics from a ShareLinkSummary.
@@ -28,48 +24,6 @@ import {
 //   * limited   — keep SUMMARY, strip DESCRIPTION/LOCATION/ATTENDEE/ORGANIZER
 //   * free_busy — replace SUMMARY with "Busy" and strip the same private fields
 // ---------------------------------------------------------------------------
-
-const PRIVATE_PROPS: ReadonlySet<string> = new Set([
-	"DESCRIPTION",
-	"LOCATION",
-	"ATTENDEE",
-	"ORGANIZER",
-	"URL",
-	"CONTACT",
-	"X-APPLE-STRUCTURED-LOCATION",
-]);
-
-const isPrivate = (prop: IrProperty): boolean =>
-	PRIVATE_PROPS.has(prop.name.toUpperCase());
-
-const isSummary = (prop: IrProperty): boolean =>
-	prop.name.toUpperCase() === "SUMMARY";
-
-const busySummary = (): IrProperty => ({
-	name: "SUMMARY",
-	parameters: [],
-	value: { type: "TEXT", value: BUSY_SUMMARY },
-	isKnown: true,
-});
-
-const applyVisibility = (
-	component: IrComponent,
-	visibility: ShareLinkVisibility,
-): IrComponent => {
-	if (!stripsPrivateFields(visibility)) {
-		return component;
-	}
-	const stripped = component.properties.filter((p) => !isPrivate(p));
-	if (!stripsTitle(visibility)) {
-		return { ...component, properties: stripped };
-	}
-	// free_busy: replace SUMMARY with "Busy"
-	const withoutSummary = stripped.filter((p) => !isSummary(p));
-	return {
-		...component,
-		properties: [...withoutSummary, busySummary()],
-	};
-};
 
 const tzidOf = (vtimezone: IrComponent): Option.Option<string> => {
 	const tzid = vtimezone.properties.find(
@@ -166,7 +120,9 @@ export const renderFeed = (
 						}
 						continue;
 					}
-					eventComponents.push(applyVisibility(sub, cal.visibility));
+					eventComponents.push(
+						applyFieldVisibility(sub, toFieldVisibility(cal.visibility)),
+					);
 				}
 			}
 		}

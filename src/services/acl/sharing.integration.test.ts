@@ -239,4 +239,261 @@ describe("Calendar / event sharing (integration)", () => {
 			await runtime.dispose();
 		}
 	});
+
+	it("free_busy-only grant: enumeration and GET succeed with redacted bodies, free-busy-query succeeds", async () => {
+		const runtime = ManagedRuntime.make(makeScriptRunnerLayer());
+		try {
+			const { aliceId, bobId } = await runtime.runPromise(
+				Effect.gen(function* () {
+					const prov = yield* ProvisioningService;
+					const userSvc = yield* UserService;
+					const alice = yield* prov
+						.provisionUser({
+							email: Email("alice-fb@example.com"),
+							name: "Alice",
+							slug: Slug("alice-fb"),
+						})
+						.pipe(Effect.orDie);
+					const bob = yield* prov
+						.provisionUser({
+							email: Email("bob-fb@example.com"),
+							name: "Bob",
+							slug: Slug("bob-fb"),
+						})
+						.pipe(Effect.orDie);
+					yield* userSvc
+						.addCredential(UserId(alice.user.user.id), {
+							source: "local",
+							authId: "alice-fb@example.com",
+							password: Redacted.make("alice"),
+						})
+						.pipe(Effect.orDie);
+					yield* userSvc
+						.addCredential(UserId(bob.user.user.id), {
+							source: "local",
+							authId: "bob-fb@example.com",
+							password: Redacted.make("bob"),
+						})
+						.pipe(Effect.orDie);
+					return {
+						aliceId: alice.user.principal.id as PrincipalId,
+						bobId: bob.user.principal.id as PrincipalId,
+					};
+				}),
+			);
+
+			const aliceAuth = basicAuth("alice-fb@example.com", "alice");
+			const bobAuth = basicAuth("bob-fb@example.com", "bob");
+
+			const eventPutRes = await runtime.runPromise(
+				handleRequest(
+					new Request(
+						"http://localhost/dav/principals/alice-fb/cal/primary/lunch.ics",
+						{
+							method: "PUT",
+							headers: {
+								"Content-Type": "text/calendar; charset=utf-8",
+								Authorization: aliceAuth,
+							},
+							body: EVENT_ICS,
+						},
+					),
+					mockClientAddress,
+				),
+			);
+			expect(eventPutRes.status).toBe(201);
+
+			const { aliceCalendarId } = await runtime.runPromise(
+				Effect.gen(function* () {
+					const collRepo = yield* CollectionRepository;
+					const aliceCols = yield* collRepo.listByOwner(aliceId);
+					const cal = aliceCols.find(
+						(c) => c.slug === "primary" && c.collectionType === "calendar",
+					);
+					if (!cal) {
+						throw new Error("Alice's calendar missing");
+					}
+					return { aliceCalendarId: cal.id as CollectionId };
+				}),
+			);
+
+			// Grant Bob free-busy-only access — not DAV:read.
+			await runtime.runPromise(
+				Effect.gen(function* () {
+					const acl = yield* AclRepository;
+					yield* acl.grantAce({
+						resourceType: "collection",
+						resourceId: aliceCalendarId,
+						principalType: "principal",
+						principalId: bobId,
+						privilege: "CALDAV:read-free-busy",
+						grantDeny: "grant",
+						protected: false,
+						ordinal: 100,
+					});
+				}),
+			);
+
+			// PROPFIND succeeds — collection metadata is visible.
+			const propfindRes = await runtime.runPromise(
+				handleRequest(
+					new Request("http://localhost/dav/principals/alice-fb/cal/primary/", {
+						method: "PROPFIND",
+						headers: { Authorization: bobAuth, Depth: "1" },
+					}),
+					mockClientAddress,
+				),
+			);
+			expect(propfindRes.status).toBe(207);
+			const propfindBody = await propfindRes.text();
+			// Depth:1 member enumeration must not leak the real title/description.
+			expect(propfindBody).not.toContain("Confidential");
+
+			// GET the event succeeds but returns a redacted body.
+			const getRes = await runtime.runPromise(
+				handleRequest(
+					new Request(
+						"http://localhost/dav/principals/alice-fb/cal/primary/lunch.ics",
+						{ method: "GET", headers: { Authorization: bobAuth } },
+					),
+					mockClientAddress,
+				),
+			);
+			expect(getRes.status).toBe(200);
+			const getBody = await getRes.text();
+			expect(getBody).toContain("SUMMARY:Busy");
+			expect(getBody).not.toContain("SUMMARY:Lunch");
+
+			// free-busy-query REPORT succeeds and reports the busy block.
+			const freeBusyBody = [
+				'<?xml version="1.0" encoding="utf-8"?>',
+				'<C:free-busy-query xmlns:C="urn:ietf:params:xml:ns:caldav">',
+				"<C:time-range start=20260601T000000Z end=20260602T000000Z />",
+				"</C:free-busy-query>",
+			].join("\n");
+			const freeBusyRes = await runtime.runPromise(
+				handleRequest(
+					new Request("http://localhost/dav/principals/alice-fb/cal/primary/", {
+						method: "REPORT",
+						headers: {
+							Authorization: bobAuth,
+							"Content-Type": "application/xml",
+						},
+						body: freeBusyBody,
+					}),
+					mockClientAddress,
+				),
+			);
+			expect(freeBusyRes.status).toBe(200);
+			const freeBusyText = await freeBusyRes.text();
+			expect(freeBusyText).toContain("VFREEBUSY");
+
+			// Bob still can't write.
+			const writeRes = await runtime.runPromise(
+				handleRequest(
+					new Request(
+						"http://localhost/dav/principals/alice-fb/cal/primary/x.ics",
+						{
+							method: "PUT",
+							headers: {
+								"Content-Type": "text/calendar",
+								Authorization: bobAuth,
+							},
+							body: "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n",
+						},
+					),
+					mockClientAddress,
+				),
+			);
+			expect(writeRes.status).toBe(403);
+		} finally {
+			await runtime.dispose();
+		}
+	});
+
+	it("Basic-tier set-tier round trip: 'edit' persists exactly DAV:read+DAV:write, no stray DAV:all", async () => {
+		const runtime = ManagedRuntime.make(makeScriptRunnerLayer());
+		try {
+			const { aliceId, bobId } = await runtime.runPromise(
+				Effect.gen(function* () {
+					const prov = yield* ProvisioningService;
+					const userSvc = yield* UserService;
+					const alice = yield* prov
+						.provisionUser({
+							email: Email("alice-tier@example.com"),
+							name: "Alice",
+							slug: Slug("alice-tier"),
+						})
+						.pipe(Effect.orDie);
+					const bob = yield* prov
+						.provisionUser({
+							email: Email("bob-tier@example.com"),
+							name: "Bob",
+							slug: Slug("bob-tier"),
+						})
+						.pipe(Effect.orDie);
+					yield* userSvc
+						.addCredential(UserId(alice.user.user.id), {
+							source: "local",
+							authId: "alice-tier@example.com",
+							password: Redacted.make("alice"),
+						})
+						.pipe(Effect.orDie);
+					return {
+						aliceId: alice.user.principal.id as PrincipalId,
+						bobId: bob.user.principal.id as PrincipalId,
+					};
+				}),
+			);
+
+			const { aliceCalendarId } = await runtime.runPromise(
+				Effect.gen(function* () {
+					const collRepo = yield* CollectionRepository;
+					const aliceCols = yield* collRepo.listByOwner(aliceId);
+					const cal = aliceCols.find(
+						(c) => c.slug === "primary" && c.collectionType === "calendar",
+					);
+					if (!cal) {
+						throw new Error("Alice's calendar missing");
+					}
+					return { aliceCalendarId: cal.id as CollectionId };
+				}),
+			);
+
+			const aliceAuth = basicAuth("alice-tier@example.com", "alice");
+			const setTierRes = await runtime.runPromise(
+				handleRequest(
+					new Request(
+						`http://localhost/ui/api/acl/collection/${aliceCalendarId}/set-tier`,
+						{
+							method: "POST",
+							headers: {
+								Authorization: aliceAuth,
+								"Content-Type": "application/x-www-form-urlencoded",
+							},
+							body: new URLSearchParams({
+								principalSlug: "bob-tier",
+								tier: "edit",
+							}).toString(),
+						},
+					),
+					mockClientAddress,
+				),
+			);
+			expect(setTierRes.status).toBe(200);
+
+			const bobAces = await runtime.runPromise(
+				Effect.gen(function* () {
+					const acl = yield* AclRepository;
+					const aces = yield* acl.getAces(aliceCalendarId, "collection");
+					return aces.filter((a) => a.principalId === bobId);
+				}),
+			);
+			const privileges = bobAces.map((a) => a.privilege).sort();
+			expect(privileges).toEqual(["DAV:read", "DAV:write"]);
+			expect(privileges).not.toContain("DAV:all");
+		} finally {
+			await runtime.dispose();
+		}
+	});
 });

@@ -34,6 +34,10 @@ export interface CollectionWithSharing {
 	/** null when the caller owns this collection. */
 	readonly ownerSlug: string | null;
 	readonly writable: boolean;
+	/** False for a free-busy-only shared calendar — callers must redact event
+	 * details (see collect-events.ts's applyVisibilityToEventView) before
+	 * rendering. Always true for owned collections. */
+	readonly hasFullRead: boolean;
 }
 
 export const listOwnedAndShared = (
@@ -72,7 +76,7 @@ export const listOwnedAndShared = (
 		);
 
 		const ownedResults: ReadonlyArray<CollectionWithSharing> = owned.map(
-			(row) => ({ row, ownerSlug: null, writable: true }),
+			(row) => ({ row, ownerSlug: null, writable: true, hasFullRead: true }),
 		);
 
 		// Skip the owner-slug and privilege lookups entirely when nothing is
@@ -104,6 +108,7 @@ export const listOwnedAndShared = (
 				row,
 				ownerSlug: ownerRow?.slug ?? row.ownerPrincipalId,
 				writable: privileges.some((p) => WRITE_PRIVILEGES.has(p)),
+				hasFullRead: privileges.includes("DAV:read"),
 			};
 		});
 		sharedResults.sort((a, b) =>

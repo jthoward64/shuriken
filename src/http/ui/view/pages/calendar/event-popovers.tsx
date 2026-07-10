@@ -1,9 +1,11 @@
 import type { VNode } from "preact";
+import type { SharePanelData } from "#src/http/ui/helpers/share-panel.ts";
 import {
 	type EventFormData,
 	emptyEventForm,
 } from "#src/services/cal-edit/types.ts";
 import { IconClose } from "../../icons.tsx";
+import { SharePanel } from "../share-panel.tsx";
 import { EventFormBody } from "./event-form.tsx";
 
 // ---------------------------------------------------------------------------
@@ -125,11 +127,13 @@ export const EventEditPopoverForm = ({
 	form,
 	action,
 	deleteAction,
+	sharePanel,
 }: {
 	title: string;
 	form: EventFormData;
 	action: string;
 	deleteAction: string;
+	sharePanel?: SharePanelData;
 }): VNode => (
 	<>
 		<PopoverHeader
@@ -177,5 +181,8 @@ export const EventEditPopoverForm = ({
 			data-confirm="Delete this event?"
 			class="hidden"
 		/>
+		<div class="border-t border-line mt-4 pt-4">
+			<SharePanel data={sharePanel} />
+		</div>
 	</>
 );

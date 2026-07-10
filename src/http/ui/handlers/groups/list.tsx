@@ -8,9 +8,9 @@ import type {
 import type { PrincipalId } from "#src/domain/ids.ts";
 import { GROUPS_VIRTUAL_RESOURCE_ID } from "#src/domain/virtual-resources.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
-import { buildAclPanelData } from "#src/http/ui/helpers/acl-panel.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import { buildNavContext } from "#src/http/ui/helpers/nav-context.ts";
+import { buildSharePanelData } from "#src/http/ui/helpers/share-panel.ts";
 import { GroupsListPage } from "#src/http/ui/view/pages/groups.tsx";
 import { renderPage } from "#src/http/ui/view/render.tsx";
 import { AclService } from "#src/services/acl/index.ts";
@@ -75,7 +75,7 @@ export const groupsListHandler = (
 			};
 		});
 
-		const aclPanel = yield* buildAclPanelData(
+		const sharePanel = yield* buildSharePanelData(
 			principal.principalId,
 			GROUPS_VIRTUAL_RESOURCE_ID,
 			"virtual",
@@ -85,7 +85,7 @@ export const groupsListHandler = (
 			<GroupsListPage
 				groups={rows}
 				canCreateGroup={canCreateGroup}
-				aclPanel={aclPanel}
+				sharePanel={sharePanel}
 			/>,
 			{ headers: ctx.headers, title: "Groups", nav },
 		);

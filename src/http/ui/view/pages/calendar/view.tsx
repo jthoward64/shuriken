@@ -85,6 +85,10 @@ export interface CalendarEventListItem {
 	readonly when: string;
 	/** Human recurrence label (e.g. "Repeats weekly") or null. */
 	readonly recurrence: string | null;
+	/** False for a free-busy-only shared event — the edit route requires
+	 * DAV:read and would 403, so the row's click behaves like hover (shows
+	 * the read-only preview) instead of opening the edit dialog. */
+	readonly readable: boolean;
 }
 
 export interface CalendarViewProps {
@@ -515,6 +519,7 @@ const EventList = ({
 							target="_blank"
 							rel="noopener"
 							data-hover-preview={isShared ? undefined : `${href}/preview`}
+							data-editable={isShared || !ev.readable ? undefined : "true"}
 							class="flex items-start gap-3 px-1 py-3 transition-colors hover:bg-surface-2"
 						>
 							<span class="mt-1.5">

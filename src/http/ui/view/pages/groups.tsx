@@ -1,8 +1,8 @@
 import type { VNode } from "preact";
-import type { AclPanelData } from "#src/http/ui/helpers/acl-panel.ts";
+import type { SharePanelData } from "#src/http/ui/helpers/share-panel.ts";
 import { IconPlus } from "../icons.tsx";
 import { Breadcrumb, Card, PageHeader } from "../ui.tsx";
-import { AclPanel } from "./acl-panel.tsx";
+import { SharePanel } from "./share-panel.tsx";
 
 // ---------------------------------------------------------------------------
 // Group management pages: list, create, edit. Admin-scoped. The edit page
@@ -22,13 +22,13 @@ export interface GroupListRow {
 export interface GroupsListPageProps {
 	readonly groups: ReadonlyArray<GroupListRow>;
 	readonly canCreateGroup: boolean;
-	readonly aclPanel: AclPanelData | undefined;
+	readonly sharePanel: SharePanelData | undefined;
 }
 
 export const GroupsListPage = ({
 	groups,
 	canCreateGroup,
-	aclPanel,
+	sharePanel,
 }: GroupsListPageProps): VNode => (
 	<div class="space-y-6">
 		<PageHeader
@@ -74,7 +74,7 @@ export const GroupsListPage = ({
 			<p class="text-sm text-muted">No groups found.</p>
 		)}
 
-		<AclPanel data={aclPanel} />
+		<SharePanel data={sharePanel} />
 	</div>
 );
 
@@ -167,7 +167,7 @@ export interface GroupEditPageProps {
 	readonly slug: string;
 	readonly canDelete: boolean;
 	readonly collections: ReadonlyArray<GroupEditCollection>;
-	readonly aclPanel: AclPanelData | undefined;
+	readonly sharePanel: SharePanelData | undefined;
 	readonly groupAdmins: ReadonlyArray<GroupAdminRow>;
 	readonly members: ReadonlyArray<GroupMemberRow>;
 	readonly oidcSyncEnabled: boolean;
@@ -316,7 +316,7 @@ export const GroupEditPage = (props: GroupEditPageProps): VNode => {
 				)}
 			</Card>
 
-			<AclPanel data={props.aclPanel} />
+			<SharePanel data={props.sharePanel} />
 
 			<Card title="Group admins">
 				<div class="space-y-4">

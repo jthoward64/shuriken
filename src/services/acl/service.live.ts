@@ -37,13 +37,17 @@ const PRIVILEGE_CONTAINERS: Readonly<
 	"CALDAV:schedule-send-reply": ["CALDAV:schedule-send", "DAV:all"],
 	"CALDAV:schedule-send-freebusy": ["CALDAV:schedule-send", "DAV:all"],
 	"CALDAV:schedule-send": ["DAV:all"],
+	// shuriken extension: anyone holding DAV:read (or DAV:all) already sees
+	// the full calendar, so they trivially satisfy the narrower free-busy-only
+	// privilege too.
+	"CALDAV:read-free-busy": ["DAV:read", "DAV:all"],
 };
 
 // All privileges contained within each aggregate (for currentUserPrivileges expansion)
 const PRIVILEGE_CONTAINED: Readonly<
 	Partial<Record<DavPrivilege, ReadonlyArray<DavPrivilege>>>
 > = {
-	"DAV:read": ["DAV:read-current-user-privilege-set"],
+	"DAV:read": ["DAV:read-current-user-privilege-set", "CALDAV:read-free-busy"],
 	"DAV:write": [
 		"DAV:write-properties",
 		"DAV:write-content",
@@ -69,6 +73,7 @@ const PRIVILEGE_CONTAINED: Readonly<
 		"CALDAV:schedule-send-invite",
 		"CALDAV:schedule-send-reply",
 		"CALDAV:schedule-send-freebusy",
+		"CALDAV:read-free-busy",
 	],
 	"CALDAV:schedule-deliver": [
 		"CALDAV:schedule-deliver-invite",

@@ -1,9 +1,9 @@
 import type { VNode } from "preact";
-import type { AclPanelData } from "#src/http/ui/helpers/acl-panel.ts";
+import type { SharePanelData } from "#src/http/ui/helpers/share-panel.ts";
 import { CopyField } from "../copy.tsx";
 import { IconPlus } from "../icons.tsx";
 import { Breadcrumb, Card, PageHeader } from "../ui.tsx";
-import { AclPanel } from "./acl-panel.tsx";
+import { SharePanel } from "./share-panel.tsx";
 
 // ---------------------------------------------------------------------------
 // User management pages: list, create, edit. Admin-scoped (reached from the
@@ -24,13 +24,13 @@ export interface UserListRow {
 export interface UsersListPageProps {
 	readonly users: ReadonlyArray<UserListRow>;
 	readonly canCreateUser: boolean;
-	readonly aclPanel: AclPanelData | undefined;
+	readonly sharePanel: SharePanelData | undefined;
 }
 
 export const UsersListPage = ({
 	users,
 	canCreateUser,
-	aclPanel,
+	sharePanel,
 }: UsersListPageProps): VNode => (
 	<div class="space-y-6">
 		<PageHeader
@@ -78,7 +78,7 @@ export const UsersListPage = ({
 			<p class="text-sm text-muted">No users found.</p>
 		)}
 
-		<AclPanel data={aclPanel} />
+		<SharePanel data={sharePanel} />
 	</div>
 );
 
@@ -206,7 +206,7 @@ export interface UserEditPageProps {
 	readonly principalUrl: string;
 	readonly caldavUrl: string;
 	readonly carddavUrl: string;
-	readonly aclPanel: AclPanelData | undefined;
+	readonly sharePanel: SharePanelData | undefined;
 	readonly canEditRole: boolean;
 	readonly roleOptions: ReadonlyArray<UserRoleOption>;
 	readonly userRole: string;
@@ -404,7 +404,7 @@ export const UserEditPage = (props: UserEditPageProps): VNode => {
 				)}
 			</Card>
 
-			<AclPanel data={props.aclPanel} />
+			<SharePanel data={props.sharePanel} />
 
 			{props.groups.length > 0 && (
 				<Card title="Group memberships">

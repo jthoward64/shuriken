@@ -196,6 +196,33 @@ export const AuthConfig = Config.all({
 	),
 });
 
+// ---------------------------------------------------------------------------
+// SharingConfig — controls user-discovery visibility for the ACL "share with"
+// picker (collections and events). Does not affect the Feeds share-link
+// mechanism, which is unauthenticated and token-scoped by design.
+// ---------------------------------------------------------------------------
+
+export const SharingConfig = Config.all({
+	/**
+	 * Who can search the user directory when granting access:
+	 *   - "admin_only"  — only admin/super_admin can search at all; everyone
+	 *     else sees no picker (server returns zero results).
+	 *   - "exact_email" — non-admins may look up a candidate only by typing
+	 *     their full, exact email address (no substring/display-name search);
+	 *     admins keep full substring search regardless of this setting.
+	 *   - "open"        — any authenticated user gets full substring search
+	 *     over display name and email, same as admins.
+	 * Defaults to "admin_only": the most restrictive option, so a fresh
+	 * deployment doesn't silently expose the user directory (email addresses)
+	 * to every authenticated user before an operator has made a deliberate
+	 * choice. Single-user / trusted-team deployments can opt into "open".
+	 */
+	userSearchMode: Config.literals(
+		["admin_only", "exact_email", "open"],
+		"sharingUserSearchMode",
+	).pipe(Config.withDefault("admin_only")),
+});
+
 // Accept log-level names case-insensitively. Effect's Config.logLevel only
 // matches its canonical capitalized labels ("Info"), but the Helm chart and the
 // wider ecosystem use lowercase ("info"); normalize before matching so either
@@ -513,6 +540,7 @@ export const AppConfig = Config.all({
 	metrics: MetricsConfig,
 	database: DatabaseConfig,
 	auth: AuthConfig,
+	sharing: SharingConfig,
 	log: LogConfig,
 	externalCalendar: ExternalCalendarConfig,
 	birthday: BirthdayConfig,

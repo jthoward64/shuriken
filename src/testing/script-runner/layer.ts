@@ -80,6 +80,7 @@ const testConfig: AppConfigType = {
 		oidcGroupsClaim: Option.none<string>(),
 		oidcRoleMap: new Map<string, string>(),
 	},
+	sharing: { userSearchMode: "admin_only" },
 	log: { level: undefined },
 	externalCalendar: {
 		schedulerTickS: 60,

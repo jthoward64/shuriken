@@ -8,6 +8,7 @@
 
 import { Effect } from "effect";
 import { encodeICalendar } from "#src/data/icalendar/codec.ts";
+import { redactDocumentToBusyOnly } from "#src/data/icalendar/visibility.ts";
 import type { ClarkName, IrDocument } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import {
@@ -135,8 +136,16 @@ export const calendarQueryHandler = (
 			actingPrincipalId,
 			path.collectionId,
 			"collection",
-			"DAV:read",
+			"CALDAV:read-free-busy",
 		);
+		const collectionPrivileges = yield* acl.currentUserPrivileges(
+			actingPrincipalId,
+			path.collectionId,
+			"collection",
+		);
+		const hasFullRead = (
+			collectionPrivileges as ReadonlyArray<string>
+		).includes("DAV:read");
 
 		// Parse filter
 		const obj =
@@ -305,8 +314,9 @@ export const calendarQueryHandler = (
 				continue;
 			}
 
+			const redactedDoc = hasFullRead ? irDoc : redactDocumentToBusyOnly(irDoc);
 			const dataStr = yield* encodeICalendar(
-				stripTimezones(subsetIrDocument(irDoc, spec)),
+				stripTimezones(subsetIrDocument(redactedDoc, spec)),
 			);
 
 			const href = `${origin}/dav/principals/${path.principalSeg}/${path.namespace}/${path.collectionSeg}/${encodeSegment(inst.slug || inst.id)}`;

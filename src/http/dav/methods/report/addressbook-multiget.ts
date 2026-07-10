@@ -82,6 +82,9 @@ export const addressbookMultigetHandler = (
 			dataClarkName: ADDRESS_DATA,
 			dataTree,
 			serializeData: (doc: IrDocument) =>
+				// entityType "vcard" means multigetHandler already rejects any
+				// member lacking full DAV:read (free-busy has no meaning for
+				// contacts), so hasFullRead is always true when this runs.
 				encodeVCard(subsetVCardDocument(doc, spec)),
 		});
 	});

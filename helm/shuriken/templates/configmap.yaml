@@ -58,6 +58,9 @@ data:
   OIDC_ROLE_MAP: {{ . | quote }}
   {{- end }}
 
+  # ---- sharing -------------------------------------------------------------
+  SHARING_USER_SEARCH_MODE: {{ .Values.config.sharing.userSearchMode | quote }}
+
   # ---- external calendar scheduler --------------------------------------
   EXTERNAL_CALENDAR_SCHEDULER_TICK_S: {{ .Values.config.externalCalendar.schedulerTickS | quote }}
   EXTERNAL_CALENDAR_FETCH_CONCURRENCY: {{ .Values.config.externalCalendar.fetchConcurrency | quote }}

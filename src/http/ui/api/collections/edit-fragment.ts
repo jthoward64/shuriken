@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import type { IrDeadProperties } from "#src/data/ir.ts";
 import { resolveCalendarColor, toCssHex } from "#src/domain/calendar-color.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
@@ -8,10 +8,12 @@ import {
 	GROUPS_VIRTUAL_RESOURCE_ID,
 	USERS_VIRTUAL_RESOURCE_ID,
 } from "#src/domain/virtual-resources.ts";
+import { buildSharePanelData } from "#src/http/ui/helpers/share-panel.ts";
 import { CALENDAR_POPOVER_ID } from "#src/http/ui/view/pages/calendar/popover.tsx";
 import type { CollectionEditPageProps } from "#src/http/ui/view/pages/collections.tsx";
 import { AclService } from "#src/services/acl/index.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
+import type { PrincipalService } from "#src/services/principal/index.ts";
 import { ShareLinkService } from "#src/services/share-link/service.ts";
 
 // ---------------------------------------------------------------------------
@@ -25,7 +27,7 @@ export const loadCollectionEditFragmentProps = (
 ): Effect.Effect<
 	CollectionEditPageProps,
 	DavError | DatabaseError,
-	AclService | CollectionService | ShareLinkService
+	AclService | CollectionService | ShareLinkService | PrincipalService
 > =>
 	Effect.gen(function* () {
 		const acl = yield* AclService;
@@ -95,6 +97,13 @@ export const loadCollectionEditFragmentProps = (
 				)
 			: undefined;
 
+		const sharePanel = yield* buildSharePanelData(
+			principal.principalId,
+			collection.id as CollectionId,
+			"collection",
+			isCalendar,
+		).pipe(Effect.map(Option.getOrUndefined));
+
 		return {
 			id: collection.id,
 			title: collection.displayName ?? collection.slug,
@@ -116,7 +125,7 @@ export const loadCollectionEditFragmentProps = (
 				),
 			),
 			canDelete,
-			aclPanel: undefined,
+			sharePanel,
 			variant: "popover",
 			popoverId: CALENDAR_POPOVER_ID,
 			feeds,

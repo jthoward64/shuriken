@@ -25,6 +25,10 @@ const CARDDAV_NS = "urn:ietf:params:xml:ns:carddav";
 const DISPLAYNAME = cn(DAV_NS, "displayname");
 const CAL_HOME_SET = cn(CALDAV_NS, "calendar-home-set");
 const CARD_HOME_SET = cn(CARDDAV_NS, "addressbook-home-set");
+// Generous cap for this RFC 3744 §9.4 REPORT (distinct from the Share UI's
+// tighter, keystroke-driven search limit) — avoids an unbounded scan while
+// still supporting the "list all principals" idiom for realistic directory sizes.
+const PRINCIPAL_SEARCH_LIMIT = 1000;
 
 // ---------------------------------------------------------------------------
 // Body parsing helpers
@@ -122,7 +126,10 @@ export const principalPropertySearchHandler = (
 		const principalRepo = yield* PrincipalRepository;
 		const matched = yield* Effect.gen(function* () {
 			if (searches.length === 0) {
-				return yield* principalRepo.searchByDisplayName("");
+				return yield* principalRepo.searchByDisplayName(
+					"",
+					PRINCIPAL_SEARCH_LIMIT,
+				);
 			}
 			const displayNameMatches = searches
 				.filter((s) => s.propNames.includes(DISPLAYNAME))
@@ -133,6 +140,7 @@ export const principalPropertySearchHandler = (
 			// Use the first match string (clients typically send one search).
 			return yield* principalRepo.searchByDisplayName(
 				displayNameMatches[0] ?? "",
+				PRINCIPAL_SEARCH_LIMIT,
 			);
 		});
 

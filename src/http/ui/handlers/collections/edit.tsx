@@ -15,10 +15,10 @@ import {
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { HTTP_NOT_FOUND } from "#src/http/status.ts";
 import { loadCollectionEditFragmentProps } from "#src/http/ui/api/collections/edit-fragment.ts";
-import { buildAclPanelData } from "#src/http/ui/helpers/acl-panel.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import { isHtmxRequest } from "#src/http/ui/helpers/htmx.ts";
 import { buildNavContext } from "#src/http/ui/helpers/nav-context.ts";
+import { buildSharePanelData } from "#src/http/ui/helpers/share-panel.ts";
 import { CollectionEditPage } from "#src/http/ui/view/pages/collections.tsx";
 import { renderFragment, renderPage } from "#src/http/ui/view/render.tsx";
 import { AclService } from "#src/services/acl/index.ts";
@@ -132,10 +132,11 @@ export const collectionsEditHandler = (
 			config.auth.basicAuthEnabled,
 		);
 
-		const aclPanel = yield* buildAclPanelData(
+		const sharePanel = yield* buildSharePanelData(
 			principal.principalId,
 			collection.id as CollectionId,
 			"collection",
+			collection.collectionType === "calendar",
 		).pipe(Effect.map(Option.getOrUndefined));
 
 		return yield* renderPage(
@@ -153,7 +154,7 @@ export const collectionsEditHandler = (
 				timezoneTzid={collection.timezoneTzid ?? ""}
 				calendarColor={calendarColor}
 				canDelete={canDelete}
-				aclPanel={aclPanel}
+				sharePanel={sharePanel}
 				isBirthdaysCollection={collection.autoManagedKind === "birthdays"}
 			/>,
 			{

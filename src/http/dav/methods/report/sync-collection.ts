@@ -102,7 +102,7 @@ export const syncCollectionHandler = (
 			actingPrincipalId,
 			path.collectionId,
 			"collection",
-			"DAV:read",
+			"CALDAV:read-free-busy",
 		);
 
 		const collSvc = yield* CollectionService;

@@ -8,9 +8,9 @@ import type {
 import type { PrincipalId } from "#src/domain/ids.ts";
 import { USERS_VIRTUAL_RESOURCE_ID } from "#src/domain/virtual-resources.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
-import { buildAclPanelData } from "#src/http/ui/helpers/acl-panel.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import { buildNavContext } from "#src/http/ui/helpers/nav-context.ts";
+import { buildSharePanelData } from "#src/http/ui/helpers/share-panel.ts";
 import { UsersListPage } from "#src/http/ui/view/pages/users.tsx";
 import { renderPage } from "#src/http/ui/view/render.tsx";
 import { AclService } from "#src/services/acl/index.ts";
@@ -78,7 +78,7 @@ export const usersListHandler = (
 			};
 		});
 
-		const aclPanel = yield* buildAclPanelData(
+		const sharePanel = yield* buildSharePanelData(
 			principal.principalId,
 			USERS_VIRTUAL_RESOURCE_ID,
 			"virtual",
@@ -88,7 +88,7 @@ export const usersListHandler = (
 			<UsersListPage
 				users={rows}
 				canCreateUser={canCreateUser}
-				aclPanel={aclPanel}
+				sharePanel={sharePanel}
 			/>,
 			{ headers: ctx.headers, title: "Users", nav },
 		);

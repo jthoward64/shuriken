@@ -197,6 +197,7 @@ describe("AclService.currentUserPrivileges", () => {
 		);
 		expect(result).toContain("DAV:read");
 		expect(result).toContain("DAV:read-current-user-privilege-set");
+		expect(result).toContain("CALDAV:read-free-busy");
 	});
 
 	it("DAV:write expands to include write-properties, write-content, bind, unbind", async () => {
@@ -246,6 +247,7 @@ describe("AclService.currentUserPrivileges", () => {
 			"CALDAV:schedule-send-invite",
 			"CALDAV:schedule-send-reply",
 			"CALDAV:schedule-send-freebusy",
+			"CALDAV:read-free-busy",
 		] as const;
 
 		const principalId = PrincipalId(crypto.randomUUID());

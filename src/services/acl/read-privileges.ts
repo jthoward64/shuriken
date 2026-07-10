@@ -9,4 +9,8 @@ export const SHARED_READ_PRIVILEGES: ReadonlyArray<DavPrivilege> = [
 	"DAV:read",
 	"DAV:all",
 	"DAV:write",
+	// Free-busy-only grants are calendar-only and never imply full read, but
+	// they still qualify a calendar as "shared with me" for the sidebar list —
+	// callers must redact event details themselves (see calendar/events.ts).
+	"CALDAV:read-free-busy",
 ];

@@ -70,7 +70,7 @@ export const freeBusyQueryHandler = (
 			actingPrincipalId,
 			path.collectionId,
 			"collection",
-			"DAV:read",
+			"CALDAV:read-free-busy",
 		);
 
 		// Parse time-range from request body

@@ -93,4 +93,10 @@ export type DavPrivilege =
 	| "CALDAV:schedule-send"
 	| "CALDAV:schedule-send-invite"
 	| "CALDAV:schedule-send-reply"
-	| "CALDAV:schedule-send-freebusy";
+	| "CALDAV:schedule-send-freebusy"
+	// shuriken extension: read-only access to a calendar's aggregate busy/free
+	// schedule without exposing event details (title/description/location/
+	// attendees). Distinct from CALDAV:schedule-query-freebusy (RFC 6638
+	// §6.3, a scheduling-inbox delivery privilege) — see src/services/acl/
+	// service.live.ts for the containment rules.
+	| "CALDAV:read-free-busy";

@@ -540,7 +540,7 @@ const makePrincipalRepo = (stores: TestStores): PrincipalRepositoryShape => ({
 			return results;
 		}),
 
-	searchByDisplayName: (query) =>
+	searchByDisplayName: (query, limit) =>
 		Effect.sync(() => {
 			const lower = query.toLowerCase();
 			const results: Array<{
@@ -565,6 +565,9 @@ const makePrincipalRepo = (stores: TestStores): PrincipalRepositoryShape => ({
 					userRow.email.toLowerCase().includes(lower)
 				) {
 					results.push({ principal: principalRow, user: userRow });
+				}
+				if (results.length >= limit) {
+					break;
 				}
 			}
 			return results;

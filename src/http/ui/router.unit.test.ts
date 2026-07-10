@@ -125,6 +125,8 @@ const stubLayers = Layer.mergeAll(
 		findPrincipalByIds: die,
 		findByEmail: die,
 		updateProperties: die,
+		searchByDisplayName: die,
+		findByEmailExact: die,
 	}),
 	Layer.succeed(UserService, {
 		create: die,

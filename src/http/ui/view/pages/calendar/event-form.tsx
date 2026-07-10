@@ -1,9 +1,11 @@
 import type { VNode } from "preact";
+import type { SharePanelData } from "#src/http/ui/helpers/share-panel.ts";
 import type {
 	EventFormData,
 	RecurrenceFreq,
 } from "#src/services/cal-edit/types.ts";
 import { Breadcrumb, Card, PageHeader } from "../../ui.tsx";
+import { SharePanel } from "../share-panel.tsx";
 
 // ---------------------------------------------------------------------------
 // Event create/edit form.
@@ -245,6 +247,8 @@ export interface EventFormPageProps {
 	/** Delete target — only used in edit mode. */
 	readonly deleteAction?: string;
 	readonly backHref: string;
+	/** Undefined in "new" mode (nothing to share until the event exists). */
+	readonly sharePanel?: SharePanelData;
 }
 
 // Standalone page — the no-JS path for editing an event (and the fallback if
@@ -257,6 +261,7 @@ export const EventFormPage = ({
 	action,
 	deleteAction,
 	backHref,
+	sharePanel,
 }: EventFormPageProps): VNode => (
 	<div class="mx-auto max-w-2xl space-y-6">
 		<div>
@@ -279,6 +284,8 @@ export const EventFormPage = ({
 				</div>
 			</form>
 		</Card>
+
+		{mode === "edit" && sharePanel && <SharePanel data={sharePanel} />}
 
 		{mode === "edit" && deleteAction && (
 			<Card>
