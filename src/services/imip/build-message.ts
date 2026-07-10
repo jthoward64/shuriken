@@ -126,6 +126,27 @@ export const extractAttendeeAddresses = (
 	return out;
 };
 
+// Extract the ORGANIZER address from a VEVENT (CAL-ADDRESS / mailto: …),
+// normalized to lowercase with any "mailto:" prefix stripped. Returns null if
+// the property is absent.
+export const extractOrganizerAddress = (vevent: IrComponent): string | null => {
+	const p = vevent.properties.find((pp) => pp.name === "ORGANIZER");
+	if (!p) {
+		return null;
+	}
+	const raw =
+		p.value.type === "URI" || p.value.type === "TEXT"
+			? p.value.value
+			: p.value.type === "CAL_ADDRESS"
+				? p.value.value
+				: "";
+	if (raw === "") {
+		return null;
+	}
+	const lower = raw.toLowerCase();
+	return lower.startsWith("mailto:") ? lower.slice("mailto:".length) : lower;
+};
+
 // True iff `address` looks like one of `localDomains`.
 export const isLocalAddress = (
 	address: string,

@@ -22,6 +22,8 @@ const PRIVATE_PROPS: ReadonlySet<string> = new Set([
 	"URL",
 	"CONTACT",
 	"X-APPLE-STRUCTURED-LOCATION",
+	"ATTACH",
+	"GEO",
 ]);
 
 const isPrivate = (prop: IrProperty): boolean =>
@@ -37,11 +39,25 @@ const busySummary = (): IrProperty => ({
 	isKnown: true,
 });
 
+/** Strips private properties from a component and every nested sub-component
+ * (VALARM, etc.) — a redacted VEVENT must not leak private data through a
+ * child it forgot to filter. */
+const stripPrivateRecursive = (component: IrComponent): IrComponent => ({
+	...component,
+	properties: component.properties.filter((p) => !isPrivate(p)),
+	components: component.components.map(stripPrivateRecursive),
+});
+
 /**
- * Applies a redaction level to one VEVENT/VTODO/VJOURNAL sub-component.
+ * Applies a redaction level to one VEVENT/VTODO/VJOURNAL sub-component,
+ * recursing into nested components (VALARM, etc.) so they can't carry
+ * private data past the redaction.
  *   - full      — verbatim.
- *   - titled    — keep SUMMARY, strip DESCRIPTION/LOCATION/ATTENDEE/ORGANIZER.
- *   - busy_only — same stripping as `titled`, plus SUMMARY replaced with "Busy".
+ *   - titled    — keep SUMMARY, strip DESCRIPTION/LOCATION/ATTENDEE/ORGANIZER/
+ *                 ATTACH/GEO/etc. at every nesting level.
+ *   - busy_only — same stripping as `titled`, plus the top-level SUMMARY
+ *                 replaced with "Busy" (nested components have no SUMMARY of
+ *                 their own to redact this way).
  */
 export const applyFieldVisibility = (
 	component: IrComponent,
@@ -50,13 +66,13 @@ export const applyFieldVisibility = (
 	if (visibility === "full") {
 		return component;
 	}
-	const stripped = component.properties.filter((p) => !isPrivate(p));
+	const stripped = stripPrivateRecursive(component);
 	if (visibility === "titled") {
-		return { ...component, properties: stripped };
+		return stripped;
 	}
-	const withoutSummary = stripped.filter((p) => !isSummary(p));
+	const withoutSummary = stripped.properties.filter((p) => !isSummary(p));
 	return {
-		...component,
+		...stripped,
 		properties: [...withoutSummary, busySummary()],
 	};
 };

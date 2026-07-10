@@ -37,6 +37,20 @@ const vtimezone = (): IrComponent => ({
 	components: [],
 });
 
+const veventWithAlarm = (): IrComponent => ({
+	...vevent(),
+	components: [
+		{
+			name: "VALARM",
+			properties: [
+				textProp("ACTION", "DISPLAY"),
+				textProp("DESCRIPTION", "Reminder: confidential board meeting"),
+			],
+			components: [],
+		},
+	],
+});
+
 describe("applyFieldVisibility", () => {
 	it("returns the component unchanged for 'full'", () => {
 		const component = vevent();
@@ -65,6 +79,14 @@ describe("applyFieldVisibility", () => {
 		const summaries = result.properties.filter((p) => p.name === "SUMMARY");
 		expect(summaries).toHaveLength(1);
 		expect(summaries[0]?.value).toEqual({ type: "TEXT", value: BUSY_SUMMARY });
+	});
+
+	it("strips private fields from nested components (e.g. VALARM) too", () => {
+		const result = applyFieldVisibility(veventWithAlarm(), "busy_only");
+		const alarm = result.components.find((c) => c.name === "VALARM");
+		const names = alarm?.properties.map((p) => p.name) ?? [];
+		expect(names).not.toContain("DESCRIPTION");
+		expect(names).toContain("ACTION");
 	});
 
 	it("leaves scheduling-relevant fields untouched for 'busy_only'", () => {

@@ -16,6 +16,7 @@
 // ---------------------------------------------------------------------------
 
 import { Effect } from "effect";
+import type { AppConfigService } from "#src/config.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import { forbidden } from "#src/domain/errors.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
@@ -72,6 +73,7 @@ export const reportHandler = (
 	| IanaTimezoneService
 	| PrincipalRepository
 	| AclService
+	| AppConfigService
 > =>
 	Effect.gen(function* () {
 		const { type, tree } = yield* parseReportBody(req);

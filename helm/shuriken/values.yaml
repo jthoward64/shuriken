@@ -73,6 +73,13 @@ config:
   # to the app default (info in production).
   logLevel: info
 
+  # Bounds on RRULE (recurrence rule) expansion for calendar-query /
+  # free-busy-query REPORTs — guards against a rule like FREQ=SECONDLY with
+  # no COUNT/UNTIL enumerating enough occurrences to hang the process.
+  recurrence:
+    rruleMaxOccurrences: 200000
+    rruleTimeBudgetMs: 250
+
   database:
     # Populate `url` and the chart renders it into its own Secret. To read
     # DATABASE_URL from a pre-existing Secret instead, leave `url` blank and
@@ -89,6 +96,9 @@ config:
     # Enable HTTP Basic auth (DAV clients). Required for app passwords; only
     # disable if every client uses the web UI (OIDC) exclusively.
     basicAuthEnabled: true
+    # Per-client-IP rate limit on failed Basic-auth attempts.
+    authRateLimitMaxAttempts: 10
+    authRateLimitWindowS: 60
     # Comma-separated trusted-proxy IPs / CIDRs, or "*" to trust every source.
     # NOT an auth method: it gates X-Forwarded-* (public scheme/host) and SMTP
     # override headers. Behind a TLS-terminating ingress this MUST trust the
@@ -133,6 +143,10 @@ config:
     # Create a local user on first successful login (linked by email/sub).
     # Set false to require an admin to pre-create users.
     oidcAutoProvision: true
+    # Require the IdP's email_verified claim before linking an OIDC identity
+    # to an existing local user by email. Only disable for a known-trustworthy
+    # IdP that never sets this claim.
+    oidcRequireEmailVerified: true
     # Browser session lifetime, in days.
     sessionTtlDays: 7
     # Optional role sync from the IdP. oidcGroupsClaim names an ID-token claim
@@ -156,6 +170,11 @@ config:
     schedulerTickS: 60
     fetchConcurrency: 4
     claimCap: 100
+    # Response body size cap for feed fetches (MiB).
+    maxResponseMib: 25
+    # Max redirects manually followed per fetch (each hop re-validated against
+    # private/loopback/link-local/metadata addresses).
+    maxRedirects: 5
 
   birthday:
     schedulerTickS: 600
@@ -212,6 +231,10 @@ config:
     lmtpEnabled: false
     lmtpPort: 2400
     lmtpHost: "0.0.0.0"
+    # DATA body size cap (MiB) and max RCPT TO count per message — guards
+    # against unbounded memory growth from a malicious/misbehaving peer.
+    lmtpMaxDataMib: 25
+    lmtpMaxRecipients: 100
     # JSON-encoded regex-scoped relay profiles. See README of the app
     # for the schema.
     profilesJson: ""

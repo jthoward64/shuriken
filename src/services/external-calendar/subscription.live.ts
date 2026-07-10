@@ -11,6 +11,10 @@ import {
 import { CollectionId, type UuidString } from "#src/domain/ids.ts";
 import { isValidSlug, Slug } from "#src/domain/types/path.ts";
 import { HTTP_BAD_REQUEST } from "#src/http/status.ts";
+import {
+	isBlockedAddress,
+	NetworkGuardService,
+} from "#src/platform/network-guard.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
 import { DEFAULT_SORT_ORDER } from "#src/services/collection/sort-order.ts";
 import { ExternalCalendarRepository } from "./repository.ts";
@@ -28,35 +32,65 @@ import {
  * Reject obviously-bad subscription URLs at the edge. Lets non-http(s)
  * schemes (file:, gopher:, javascript:) and malformed URLs fail with a
  * useful message rather than reaching the HttpClient and erroring with a
- * stack trace.
+ * stack trace. Also rejects hostnames that resolve (today) to a private/
+ * loopback/link-local/metadata address, as an early UX check — this is
+ * advisory only: DNS can change between subscribe-time and sync-time, so
+ * `sync.live.ts` re-validates on every actual fetch (including each
+ * redirect hop), which is the real enforcement point.
  */
-const validateUrl = (raw: string): Effect.Effect<URL, DavError> =>
-	Effect.try({
-		try: () => new URL(raw),
-		catch: () =>
-			new DavError({
-				status: HTTP_BAD_REQUEST,
-				message: `Invalid URL: ${raw}`,
-			}),
-	}).pipe(
-		Effect.flatMap((u) =>
-			u.protocol === "http:" || u.protocol === "https:"
-				? Effect.succeed(u)
-				: Effect.fail(
+const validateUrl = (
+	raw: string,
+): Effect.Effect<URL, DavError, NetworkGuardService> =>
+	Effect.gen(function* () {
+		const url = yield* Effect.try({
+			try: () => new URL(raw),
+			catch: () =>
+				new DavError({
+					status: HTTP_BAD_REQUEST,
+					message: `Invalid URL: ${raw}`,
+				}),
+		});
+		if (url.protocol !== "http:" && url.protocol !== "https:") {
+			return yield* Effect.fail(
+				new DavError({
+					status: HTTP_BAD_REQUEST,
+					message: `Unsupported scheme: ${url.protocol}`,
+				}),
+			);
+		}
+		const guard = yield* NetworkGuardService;
+		const addresses = yield* guard.resolveAddresses(url.hostname).pipe(
+			Effect.catchTag(
+				"InternalError",
+				() =>
+					Effect.fail(
 						new DavError({
 							status: HTTP_BAD_REQUEST,
-							message: `Unsupported scheme: ${u.protocol}`,
+							message: `Could not resolve host: ${url.hostname}`,
 						}),
-					),
-		),
-	);
+					) as Effect.Effect<ReadonlyArray<string>, DavError>,
+			),
+		);
+		if (addresses.length === 0 || addresses.some(isBlockedAddress)) {
+			return yield* Effect.fail(
+				new DavError({
+					status: HTTP_BAD_REQUEST,
+					message: `URL host is not allowed: ${url.hostname}`,
+				}),
+			);
+		}
+		return url;
+	});
 
 const subscribe = (
 	input: SubscribeInput,
 ): Effect.Effect<
 	SubscribeResult,
 	DatabaseError | DavError | ConflictError | InternalError,
-	ExternalCalendarRepository | CollectionService | AppConfigService
+	| ExternalCalendarRepository
+	| CollectionService
+	| AppConfigService
+	| NetworkGuardService
 > =>
 	Effect.gen(function* () {
 		const config = yield* AppConfigService;
@@ -169,12 +203,14 @@ export const SubscriptionServiceLive = Layer.effect(
 		const repo = yield* ExternalCalendarRepository;
 		const collSvc = yield* CollectionService;
 		const config = yield* AppConfigService;
+		const networkGuard = yield* NetworkGuardService;
 		return {
 			subscribe: (input) =>
 				subscribe(input).pipe(
 					Effect.provideService(ExternalCalendarRepository, repo),
 					Effect.provideService(CollectionService, collSvc),
 					Effect.provideService(AppConfigService, config),
+					Effect.provideService(NetworkGuardService, networkGuard),
 				),
 			unsubscribe: (id) =>
 				unsubscribe(id).pipe(

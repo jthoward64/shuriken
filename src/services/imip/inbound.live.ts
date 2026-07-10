@@ -9,7 +9,7 @@ import {
 	InternalError,
 } from "#src/domain/errors.ts";
 import type { CollectionId, PrincipalId, UserId } from "#src/domain/ids.ts";
-import { Email } from "#src/domain/types/strings.ts";
+import { parseEmail } from "#src/domain/types/strings.ts";
 import { parseVeventToForm } from "#src/services/cal-edit/parse-vevent.ts";
 import { CalEditService } from "#src/services/cal-edit/service.ts";
 import { CollectionRepository } from "#src/services/collection/repository.ts";
@@ -18,6 +18,10 @@ import { EntityRepository } from "#src/services/entity/index.ts";
 import { InstanceService } from "#src/services/instance/index.ts";
 import { InstanceRepository } from "#src/services/instance/repository.ts";
 import { UserRepository } from "#src/services/user/repository.ts";
+import {
+	extractAttendeeAddresses,
+	extractOrganizerAddress,
+} from "./build-message.ts";
 import type { ImipInboundOutcome } from "./inbound.ts";
 import { ImipInboundService } from "./inbound.ts";
 
@@ -73,6 +77,37 @@ const uidOf = (vevent: IrComponent): string | null => {
 	return null;
 };
 
+/**
+ * Whether an inbound message claiming to be from `incomingOrganizer` about
+ * `recipientEmail` is authorized to modify/cancel `existingVevent`. Checks
+ * only run against fields the stored event actually records — an event with
+ * no ORGANIZER/ATTENDEE on file (e.g. created locally, never scheduled)
+ * can't be authenticated this way and is left unauthenticated as before.
+ */
+const isAuthorizedSender = (
+	existingVevent: IrComponent,
+	incomingOrganizer: string | null,
+	recipientEmail: string,
+): boolean => {
+	const existingOrganizer = extractOrganizerAddress(existingVevent);
+	if (
+		existingOrganizer !== null &&
+		existingOrganizer !== incomingOrganizer?.toLowerCase()
+	) {
+		return false;
+	}
+	const existingAttendees = extractAttendeeAddresses(existingVevent).map((a) =>
+		a.toLowerCase(),
+	);
+	if (
+		existingAttendees.length > 0 &&
+		!existingAttendees.includes(recipientEmail.toLowerCase())
+	) {
+		return false;
+	}
+	return true;
+};
+
 const findExistingByUid = (
 	collectionId: CollectionId,
 	uid: string,
@@ -114,7 +149,7 @@ const process_ = (input: {
 
 		// 1. Recipient lookup (case-insensitive on email).
 		const userOpt = yield* userRepo.findByEmail(
-			Email(input.recipientEmail.toLowerCase()),
+			parseEmail(input.recipientEmail),
 		);
 		if (Option.isNone(userOpt)) {
 			return {
@@ -178,6 +213,32 @@ const process_ = (input: {
 		// 4. Apply by method.
 		const existing = yield* findExistingByUid(calendarId, uid);
 		const form = parseVeventToForm(vevent);
+		const incomingOrganizer = extractOrganizerAddress(vevent);
+
+		if (existing) {
+			const componentRepo = yield* ComponentRepository;
+			const existingTreeOpt = yield* componentRepo.loadTree(
+				existing.entityId,
+				"icalendar",
+			);
+			const existingVevent = Option.isSome(existingTreeOpt)
+				? veventOf(existingTreeOpt.value)
+				: null;
+			if (
+				existingVevent !== null &&
+				!isAuthorizedSender(
+					existingVevent,
+					incomingOrganizer,
+					input.recipientEmail,
+				)
+			) {
+				return {
+					_tag: "SenderNotAuthorized" as const,
+					recipientEmail: input.recipientEmail,
+					uid,
+				};
+			}
+		}
 
 		if (method === "CANCEL") {
 			if (existing) {

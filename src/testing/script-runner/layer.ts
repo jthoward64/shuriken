@@ -7,6 +7,7 @@ import { CssService } from "#src/http/ui/css/index.ts";
 import { PageCacheServiceLive } from "#src/http/ui/page-cache/index.ts";
 import type { CryptoService } from "#src/platform/crypto.ts";
 import { FileService } from "#src/platform/file.ts";
+import { NetworkGuardServiceLive } from "#src/platform/network-guard.ts";
 import { AclDomainLayer, AclRepositoryLive } from "#src/services/acl/index.ts";
 import { AppPasswordRepositoryLive } from "#src/services/app-password/repository.live.ts";
 import { AppPasswordServiceLive } from "#src/services/app-password/service.live.ts";
@@ -64,6 +65,8 @@ const testConfig: AppConfigType = {
 		autoLogin: Option.none<string>(),
 		trustedProxies: "*",
 		basicAuthEnabled: true,
+		authRateLimitMaxAttempts: 10,
+		authRateLimitWindowS: 60,
 		adminEmail: Option.none<string>(),
 		adminPassword: Option.none<Redacted.Redacted<string>>(),
 		adminSlug: Option.none<string>(),
@@ -76,16 +79,20 @@ const testConfig: AppConfigType = {
 		oidcRedirectUri: Option.none<string>(),
 		oidcScopes: "openid profile email",
 		oidcAutoProvision: true,
+		oidcRequireEmailVerified: true,
 		sessionTtlDays: 7,
 		oidcGroupsClaim: Option.none<string>(),
 		oidcRoleMap: new Map<string, string>(),
 	},
 	sharing: { userSearchMode: "admin_only" },
 	log: { level: undefined },
+	recurrence: { rruleMaxOccurrences: 200_000, rruleTimeBudgetMs: 250 },
 	externalCalendar: {
 		schedulerTickS: 60,
 		fetchConcurrency: 4,
 		claimCap: 100,
+		maxResponseBytes: 26_214_400,
+		maxRedirects: 5,
 	},
 	birthday: {
 		schedulerTickS: 600,
@@ -103,18 +110,20 @@ const testConfig: AppConfigType = {
 		defaultHost: "",
 		defaultPort: 587,
 		defaultUsername: "",
-		defaultPassword: "",
+		defaultPassword: Redacted.make(""),
 		defaultSecurity: "starttls" as const,
-		credsKey: "",
+		credsKey: Redacted.make(""),
 		lmtpEnabled: false,
 		lmtpPort: 2400,
 		lmtpHost: "127.0.0.1",
+		lmtpMaxDataBytes: 26_214_400,
+		lmtpMaxRecipients: 100,
 		profiles: [] as ReadonlyArray<{
 			pattern: string;
 			host: string;
 			port: number;
 			username: string;
-			password: string;
+			password: Redacted.Redacted<string>;
 			security?: "none" | "starttls" | "tls";
 		}>,
 	},
@@ -227,7 +236,9 @@ export const makeScriptRunnerLayer = (overrides?: Partial<AppConfigType>) => {
 	return Layer.mergeAll(
 		testBaseLayer,
 		SchedulingDomainLayer.pipe(Layer.provide(testBaseLayer)),
-		SubscriptionServiceLive.pipe(Layer.provide(testBaseLayer)),
+		SubscriptionServiceLive.pipe(
+			Layer.provide(Layer.mergeAll(testBaseLayer, NetworkGuardServiceLive)),
+		),
 		BirthdayServiceLive.pipe(Layer.provide(testBaseLayer)),
 		CardEditServiceLive.pipe(
 			Layer.provide(

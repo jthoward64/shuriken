@@ -165,6 +165,14 @@ const copyInstance = (
 				"collection",
 				"DAV:bind",
 			);
+			// Overwriting an existing destination is effectively a delete —
+			// require DAV:unbind too, mirroring delete.ts.
+			yield* acl.check(
+				principalId,
+				destPath.collectionId,
+				"collection",
+				"DAV:unbind",
+			);
 			const destInstance = yield* instanceSvc.findById(destPath.instanceId);
 			// Preserve the existing destination slug (its URL identity).
 			destSlug = Slug(destInstance.slug);
@@ -301,6 +309,9 @@ const copyCollection = (
 			destSlug = Slug(destPath.collectionSeg);
 			destPrincipalId = destPath.principalId;
 			yield* acl.check(principalId, destPrincipalId, "principal", "DAV:bind");
+			// Overwriting an existing destination is effectively a delete —
+			// require DAV:unbind too, mirroring delete.ts.
+			yield* acl.check(principalId, destPrincipalId, "principal", "DAV:unbind");
 			yield* deleteCollection(destPath.collectionId);
 		} else {
 			// destPath.kind === "new-collection"

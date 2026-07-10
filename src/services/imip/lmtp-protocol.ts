@@ -24,7 +24,25 @@ export type LmtpState =
 			readonly mailFrom: string;
 			readonly recipients: ReadonlyArray<string>;
 			readonly buffer: string;
+			/** Set once `buffer` hits `maxDataBytes` — further lines are dropped
+			 * (not appended) to bound memory, but the DATA phase still runs to
+			 * its `<CRLF>.<CRLF>` terminator so the connection stays in sync;
+			 * DataEnd rejects instead of starting delivery. */
+			readonly sizeExceeded: boolean;
 	  };
+
+export interface LmtpLimits {
+	readonly maxDataBytes: number;
+	readonly maxRecipients: number;
+}
+
+const DEFAULT_MAX_DATA_BYTES = 25 * 1024 * 1024; // 25 MiB, matches the DAV XML/external-calendar body caps' order of magnitude
+const DEFAULT_MAX_RECIPIENTS = 100;
+
+export const DEFAULT_LMTP_LIMITS: LmtpLimits = {
+	maxDataBytes: DEFAULT_MAX_DATA_BYTES,
+	maxRecipients: DEFAULT_MAX_RECIPIENTS,
+};
 
 export type LmtpCommand =
 	| { readonly tag: "Lhlo"; readonly host: string }
@@ -123,6 +141,7 @@ export const apply = (
 	state: LmtpState,
 	cmd: LmtpCommand,
 	hostname: string,
+	limits: LmtpLimits = DEFAULT_LMTP_LIMITS,
 ): LmtpStep => {
 	if (cmd.tag === "Quit") {
 		return {
@@ -156,6 +175,9 @@ export const apply = (
 		if (state.tag !== "Tx") {
 			return { state, replies: [ok(503, "MAIL FROM first")] };
 		}
+		if (state.recipients.length >= limits.maxRecipients) {
+			return { state, replies: [ok(452, "Too many recipients")] };
+		}
 		return {
 			state: { ...state, recipients: [...state.recipients, cmd.addr] },
 			replies: [ok(250, "OK")],
@@ -171,6 +193,7 @@ export const apply = (
 				mailFrom: state.mailFrom,
 				recipients: state.recipients,
 				buffer: "",
+				sizeExceeded: false,
 			},
 			replies: [ok(354, "End data with <CR><LF>.<CR><LF>")],
 		};
@@ -179,14 +202,32 @@ export const apply = (
 		if (state.tag !== "Data") {
 			return { state, replies: [ok(503, "DATA first")] };
 		}
+		if (state.sizeExceeded) {
+			return { state, replies: [] };
+		}
+		const nextBuffer = `${state.buffer}${cmd.line}\r\n`;
+		if (nextBuffer.length > limits.maxDataBytes) {
+			// Drop the buffer now (bound memory) but stay in Data until the
+			// client's terminator arrives, so the connection doesn't desync.
+			return {
+				state: { ...state, buffer: "", sizeExceeded: true },
+				replies: [],
+			};
+		}
 		return {
-			state: { ...state, buffer: `${state.buffer}${cmd.line}\r\n` },
+			state: { ...state, buffer: nextBuffer },
 			replies: [],
 		};
 	}
 	// cmd.tag === "DataEnd"
 	if (state.tag !== "Data") {
 		return { state, replies: [ok(503, "DATA first")] };
+	}
+	if (state.sizeExceeded) {
+		return {
+			state: { tag: "Idle" },
+			replies: [ok(552, "Message size exceeds fixed maximum message size")],
+		};
 	}
 	return {
 		state: { tag: "Idle" },
@@ -217,6 +258,7 @@ export type DeliveryOutcome =
 	| { readonly tag: "MissingCalendar" }
 	| { readonly tag: "NotImip" }
 	| { readonly tag: "MalformedIcs"; readonly cause: string }
+	| { readonly tag: "SenderNotAuthorized" }
 	| { readonly tag: "Rejected" };
 
 export const deliveryReply = (
@@ -234,6 +276,8 @@ export const deliveryReply = (
 			return { code: 550, text: "Not an iMIP message" };
 		case "MalformedIcs":
 			return { code: 550, text: `Malformed iCalendar: ${outcome.cause}` };
+		case "SenderNotAuthorized":
+			return { code: 550, text: "Sender not authorized for this event" };
 		case "Rejected":
 			return { code: 451, text: "Temporary failure" };
 	}

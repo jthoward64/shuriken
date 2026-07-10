@@ -5,6 +5,8 @@ import {
 	Effect,
 	Layer,
 	LogLevel,
+	Option,
+	Redacted,
 	References,
 } from "effect";
 
@@ -55,6 +57,8 @@ export const DatabaseConfig = Config.all({
 });
 
 const DEFAULT_SESSION_TTL_DAYS = 7;
+const DEFAULT_AUTH_RATE_LIMIT_MAX_ATTEMPTS = 10;
+const DEFAULT_AUTH_RATE_LIMIT_WINDOW_S = 60;
 
 /**
  * Parse OIDC_ROLE_MAP — a JSON object mapping IdP group/role names to app roles
@@ -88,8 +92,21 @@ export const AuthConfig = Config.all({
 	 * Auto-login email. When set, all requests are authenticated as this user
 	 * without credential checks. Use for development or single-user self-hosted
 	 * setups. Takes precedence over both proxy and basic auth.
+	 *
+	 * A present-but-blank value (`AUTO_LOGIN=`, as opposed to unset) normalizes
+	 * to `None` here — the single place this env var is read — so every
+	 * consumer sees a consistent "unset" state. Without this, `Option.some("")`
+	 * would reach `resolveAutoLoginPrincipal` (auth/layers/single-user.ts),
+	 * which looks up `email = ""`, finds nothing, and falls back to the first
+	 * user in the database: a full auth bypass on any deployment that blanks
+	 * rather than removes the variable.
 	 */
-	autoLogin: Config.string("autoLogin").pipe(Config.option),
+	autoLogin: Config.string("autoLogin").pipe(
+		Config.option,
+		Config.map(
+			Option.flatMap((v) => (v === "" ? Option.none() : Option.some(v))),
+		),
+	),
 
 	/**
 	 * Comma-separated list of trusted proxy IPs, or "*" to trust all.
@@ -105,6 +122,20 @@ export const AuthConfig = Config.all({
 	 */
 	basicAuthEnabled: Config.boolean("basicAuthEnabled").pipe(
 		Config.withDefault(true),
+	),
+
+	/**
+	 * Simple per-client-IP fixed-window rate limit on failed Basic-auth
+	 * attempts (local password or app password). Once an IP hits
+	 * `authRateLimitMaxAttempts` failures within `authRateLimitWindowS`
+	 * seconds, further attempts from it are rejected without even checking
+	 * the credential (also saves the argon2id cost) until the window rolls.
+	 */
+	authRateLimitMaxAttempts: Config.int("authRateLimitMaxAttempts").pipe(
+		Config.withDefault(DEFAULT_AUTH_RATE_LIMIT_MAX_ATTEMPTS),
+	),
+	authRateLimitWindowS: Config.int("authRateLimitWindowS").pipe(
+		Config.withDefault(DEFAULT_AUTH_RATE_LIMIT_WINDOW_S),
 	),
 
 	/**
@@ -169,6 +200,17 @@ export const AuthConfig = Config.all({
 	 * require an admin to pre-create the user first.
 	 */
 	oidcAutoProvision: Config.boolean("oidcAutoProvision").pipe(
+		Config.withDefault(true),
+	),
+
+	/**
+	 * When true (default), linking an OIDC identity to an existing local user
+	 * by email requires the token's `email_verified` claim to be true. Set
+	 * false only if your IdP is known-trustworthy but never sets the claim —
+	 * disabling this lets an attacker who can get the IdP to assert an
+	 * unverified email matching a victim's account take it over.
+	 */
+	oidcRequireEmailVerified: Config.boolean("oidcRequireEmailVerified").pipe(
 		Config.withDefault(true),
 	),
 
@@ -240,9 +282,36 @@ export const LogConfig = Config.all({
 	level: logLevel.pipe(Config.withDefault(undefined)),
 });
 
+const DEFAULT_RRULE_MAX_OCCURRENCES = 200_000;
+const DEFAULT_RRULE_TIME_BUDGET_MS = 250;
+
+// ---------------------------------------------------------------------------
+// RecurrenceConfig — bounds on RRULE expansion (RFC 5545 recurrence rules).
+// Without a cap, a rule like `FREQ=SECONDLY` with no COUNT/UNTIL over a wide
+// calendar-query/free-busy-query time-range enumerates enough occurrences to
+// hang the process. Both caps are generous by default and independent of the
+// requested range width; either one tripping just truncates the occurrence
+// list rather than failing the request.
+// ---------------------------------------------------------------------------
+
+export const RecurrenceConfig = Config.all({
+	/** Hard cap on occurrences enumerated per RRULE expansion call. */
+	rruleMaxOccurrences: Config.int("rruleMaxOccurrences").pipe(
+		Config.withDefault(DEFAULT_RRULE_MAX_OCCURRENCES),
+	),
+	/** Wall-clock budget (ms) per RRULE expansion call, checked periodically. */
+	rruleTimeBudgetMs: Config.int("rruleTimeBudgetMs").pipe(
+		Config.withDefault(DEFAULT_RRULE_TIME_BUDGET_MS),
+	),
+});
+
 const DEFAULT_EXTERNAL_TICK_S = 60;
 const DEFAULT_EXTERNAL_CONCURRENCY = 4;
 const DEFAULT_EXTERNAL_CLAIM_CAP = 100;
+const BYTES_PER_KIB = 1024;
+const BYTES_PER_MIB = BYTES_PER_KIB * BYTES_PER_KIB;
+const DEFAULT_EXTERNAL_MAX_RESPONSE_MIB = 25;
+const DEFAULT_EXTERNAL_MAX_REDIRECTS = 5;
 const DEFAULT_BIRTHDAY_TICK_S = 21_600; // 6 hours
 const DEFAULT_BIRTHDAY_CONCURRENCY = 4;
 const DEFAULT_BIRTHDAY_STARTUP_JITTER_MAX_S = 900; // up to 15 min
@@ -278,6 +347,19 @@ export const ExternalCalendarConfig = Config.all({
 	claimCap: Config.int("externalCalendarClaimCap").pipe(
 		Config.withDefault(DEFAULT_EXTERNAL_CLAIM_CAP),
 	),
+	/**
+	 * Response body size cap for external calendar fetches, in bytes. Guards
+	 * against a malicious or misbehaving feed exhausting memory; 25 MiB is
+	 * generous for any real iCalendar feed.
+	 */
+	maxResponseBytes: Config.int("externalCalendarMaxResponseMib").pipe(
+		Config.withDefault(DEFAULT_EXTERNAL_MAX_RESPONSE_MIB),
+		Config.map((mib) => mib * BYTES_PER_MIB),
+	),
+	/** Max redirects manually followed per fetch, each re-validated against the SSRF blocklist. */
+	maxRedirects: Config.int("externalCalendarMaxRedirects").pipe(
+		Config.withDefault(DEFAULT_EXTERNAL_MAX_REDIRECTS),
+	),
 });
 
 // ---------------------------------------------------------------------------
@@ -298,8 +380,10 @@ export const ExternalCalendarConfig = Config.all({
 
 const SMTP_DEFAULT_PORT = 587;
 const LMTP_DEFAULT_PORT = 2400;
+const DEFAULT_LMTP_MAX_DATA_MIB = 25;
+const DEFAULT_LMTP_MAX_RECIPIENTS = 100;
 
-interface RawMailProfileShape {
+interface RawMailProfileJson {
 	readonly pattern: string;
 	readonly host: string;
 	readonly port: number;
@@ -308,9 +392,16 @@ interface RawMailProfileShape {
 	readonly security?: "none" | "starttls" | "tls";
 }
 
-const decodeMailProfiles = (
-	raw: string,
-): ReadonlyArray<RawMailProfileShape> => {
+export interface MailProfileShape {
+	readonly pattern: string;
+	readonly host: string;
+	readonly port: number;
+	readonly username: string;
+	readonly password: Redacted.Redacted<string>;
+	readonly security?: "none" | "starttls" | "tls";
+}
+
+const decodeMailProfiles = (raw: string): ReadonlyArray<MailProfileShape> => {
 	if (raw.trim() === "") {
 		return [];
 	}
@@ -322,13 +413,15 @@ const decodeMailProfiles = (
 		// Best-effort shape filter; ConfigValidationError is preferable but
 		// SMTP_PROFILES_JSON is admin-controlled, so we just drop malformed
 		// entries rather than failing boot.
-		return parsed.filter(
-			(p): p is RawMailProfileShape =>
-				typeof p === "object" &&
-				p !== null &&
-				typeof (p as { pattern?: unknown }).pattern === "string" &&
-				typeof (p as { host?: unknown }).host === "string",
-		);
+		return parsed
+			.filter(
+				(p): p is RawMailProfileJson =>
+					typeof p === "object" &&
+					p !== null &&
+					typeof (p as { pattern?: unknown }).pattern === "string" &&
+					typeof (p as { host?: unknown }).host === "string",
+			)
+			.map((p) => ({ ...p, password: Redacted.make(p.password) }));
 	} catch {
 		return [];
 	}
@@ -355,7 +448,9 @@ export const MailConfig = Config.all({
 		Config.withDefault(SMTP_DEFAULT_PORT),
 	),
 	defaultUsername: Config.string("smtpUsername").pipe(Config.withDefault("")),
-	defaultPassword: Config.string("smtpPassword").pipe(Config.withDefault("")),
+	defaultPassword: Config.redacted("smtpPassword").pipe(
+		Config.withDefault(Redacted.make("")),
+	),
 	defaultSecurity: Config.literals(
 		["none", "starttls", "tls"],
 		"smtpSecurity",
@@ -365,7 +460,9 @@ export const MailConfig = Config.all({
 	 * Required to write or read user-level creds; if unset, that source is
 	 * disabled and the resolver falls through to profiles + default.
 	 */
-	credsKey: Config.string("emailCredsKey").pipe(Config.withDefault("")),
+	credsKey: Config.redacted("emailCredsKey").pipe(
+		Config.withDefault(Redacted.make("")),
+	),
 	/**
 	 * iMIP LMTP listener. When `lmtpEnabled` is true a Deno TCP listener is
 	 * spawned on `lmtpPort` (default 2400) accepting LMTP delivery from a
@@ -375,6 +472,15 @@ export const MailConfig = Config.all({
 	lmtpEnabled: Config.boolean("lmtpEnabled").pipe(Config.withDefault(false)),
 	lmtpPort: Config.int("lmtpPort").pipe(Config.withDefault(LMTP_DEFAULT_PORT)),
 	lmtpHost: Config.string("lmtpHost").pipe(Config.withDefault("127.0.0.1")),
+	/** DATA body size cap, in bytes — guards against unbounded memory growth from a malicious/misbehaving peer. */
+	lmtpMaxDataBytes: Config.int("lmtpMaxDataMib").pipe(
+		Config.withDefault(DEFAULT_LMTP_MAX_DATA_MIB),
+		Config.map((mib) => mib * BYTES_PER_MIB),
+	),
+	/** Max RCPT TO count per message. */
+	lmtpMaxRecipients: Config.int("lmtpMaxRecipients").pipe(
+		Config.withDefault(DEFAULT_LMTP_MAX_RECIPIENTS),
+	),
 	/**
 	 * Server-wide regex-scoped SMTP profiles. JSON-encoded array; each entry:
 	 *   {
@@ -389,9 +495,9 @@ export const MailConfig = Config.all({
 	 * resolver still sets From: to the user's address (the relay is expected
 	 * to permit it).
 	 */
-	profiles: Config.string("smtpProfilesJson").pipe(
-		Config.withDefault(""),
-		Config.map(decodeMailProfiles),
+	profiles: Config.redacted("smtpProfilesJson").pipe(
+		Config.withDefault(Redacted.make("")),
+		Config.map((r) => decodeMailProfiles(Redacted.value(r))),
 	),
 });
 
@@ -542,6 +648,7 @@ export const AppConfig = Config.all({
 	auth: AuthConfig,
 	sharing: SharingConfig,
 	log: LogConfig,
+	recurrence: RecurrenceConfig,
 	externalCalendar: ExternalCalendarConfig,
 	birthday: BirthdayConfig,
 	trash: TrashConfig,

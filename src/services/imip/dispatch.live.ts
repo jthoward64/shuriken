@@ -1,6 +1,6 @@
 import { Effect, Layer, Option } from "effect";
 import type { InternalError } from "#src/domain/errors.ts";
-import { Email } from "#src/domain/types/strings.ts";
+import { parseEmail } from "#src/domain/types/strings.ts";
 import { MailerService } from "#src/services/mailer/service.ts";
 import { UserRepository } from "#src/services/user/repository.ts";
 import { buildImipMessage, extractAttendeeAddresses } from "./build-message.ts";
@@ -43,7 +43,7 @@ const dispatch = (
 				continue;
 			}
 			const local = yield* userRepo
-				.findByEmail(Email(lower))
+				.findByEmail(parseEmail(lower))
 				.pipe(Effect.orElseSucceed(() => Option.none()));
 			if (Option.isSome(local)) {
 				skippedLocal += 1;

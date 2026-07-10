@@ -7,6 +7,7 @@ import {
 	getDtendInstant,
 	getDtstartInstant,
 } from "#src/data/icalendar/ir-helpers.ts";
+import { isUnboundedHighFrequencyRrule } from "#src/data/icalendar/recurrence/recurrence-check.ts";
 import { extractVtimezones } from "#src/data/icalendar/timezone.ts";
 import { extractUid as extractICalUid } from "#src/data/icalendar/uid.ts";
 import { decodeVCard, encodeVCard } from "#src/data/vcard/codec.ts";
@@ -276,6 +277,18 @@ export const putHandler = (
 					dtstart !== undefined &&
 					dtend !== undefined &&
 					Temporal.Instant.compare(dtend, dtstart) < 0
+				) {
+					return yield* forbidden("CALDAV:valid-calendar-object-resource");
+				}
+			}
+			// Rule 4: reject RRULEs dense enough to be pathological even under the
+			// query-time expansion caps (FREQ=SECONDLY/MINUTELY with no COUNT/UNTIL
+			// bound) — better to fail the write than let it sit as a DoS trigger.
+			for (const c of nonTzComponents) {
+				const rruleProp = c.properties.find((p) => p.name === "RRULE");
+				if (
+					rruleProp?.value.type === "RECUR" &&
+					isUnboundedHighFrequencyRrule(rruleProp.value.value)
 				) {
 					return yield* forbidden("CALDAV:valid-calendar-object-resource");
 				}

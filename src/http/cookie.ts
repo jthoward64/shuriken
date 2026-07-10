@@ -6,6 +6,15 @@ import { Option } from "effect";
 // Transport-neutral string helpers used by the UI edge to read the session
 // cookie and to emit it. Kept out of business logic; handlers return values and
 // the edge attaches the header.
+//
+// CSRF stance (deliberate, not an oversight): there is no CSRF token anywhere
+// in the UI. The session cookie's `SameSite=Lax` default below is the only
+// defense, and it is sufficient *because* every mutating UI action is a POST
+// (verified end-to-end — no state change is reachable via GET/link/image), so
+// Lax's "top-level GET is exempt" carve-out never comes into play. If a future
+// UI change ever adds a mutating GET/HEAD endpoint, or weakens SameSite to
+// "None", this stance needs revisiting — add a real CSRF token at that point
+// rather than assuming Lax still covers it.
 // ---------------------------------------------------------------------------
 
 /** Name of the browser-session cookie. */

@@ -7,7 +7,7 @@ import type {
 } from "#src/domain/errors.ts";
 import { methodNotAllowed, unauthorized } from "#src/domain/errors.ts";
 import type { ResolvedDavPath, Slug } from "#src/domain/types/path.ts";
-import { Email } from "#src/domain/types/strings.ts";
+import { parseEmail } from "#src/domain/types/strings.ts";
 import {
 	SHURIKEN_NS,
 	USERS_VIRTUAL_RESOURCE_ID,
@@ -122,7 +122,7 @@ export const userMkcolHandler = (
 		const userSvc = yield* UserService;
 		yield* userSvc.create({
 			slug: path.slug as Slug,
-			email: Email(email),
+			email: parseEmail(email),
 			displayName,
 		});
 

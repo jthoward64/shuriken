@@ -13,7 +13,11 @@ import {
 	getDtstartProp,
 	instantFromIrValue,
 } from "#src/data/icalendar/ir-helpers.ts";
-import { hasOccurrenceInRange } from "#src/data/icalendar/recurrence/recurrence-check.ts";
+import {
+	DEFAULT_RRULE_LIMITS,
+	hasOccurrenceInRange,
+	type RruleExpansionLimits,
+} from "#src/data/icalendar/recurrence/recurrence-check.ts";
 import type { IrComponent, IrDocument, IrProperty } from "#src/data/ir.ts";
 import type { DavError } from "#src/domain/errors.ts";
 import { forbidden } from "#src/domain/errors.ts";
@@ -222,12 +226,14 @@ const parseChildren = <T>(
 export const evaluateCalFilter = (
 	doc: IrDocument,
 	filter: CalFilter,
-): boolean => evalCompFilter(doc.root, filter.compFilter, doc.root);
+	limits: RruleExpansionLimits = DEFAULT_RRULE_LIMITS,
+): boolean => evalCompFilter(doc.root, filter.compFilter, doc.root, limits);
 
 const evalCompFilter = (
 	comp: IrComponent,
 	f: CompFilter,
 	vcalRoot: IrComponent,
+	limits: RruleExpansionLimits,
 	// The component enclosing `comp`, when there is one. Needed to evaluate a
 	// VALARM time-range, whose TRIGGER is relative to its parent component.
 	parent?: IrComponent,
@@ -235,7 +241,7 @@ const evalCompFilter = (
 	if (f.name !== comp.name) {
 		// comp-filter applies to a different component name — look in children
 		return comp.components.some((child) =>
-			evalCompFilter(child, f, vcalRoot, comp),
+			evalCompFilter(child, f, vcalRoot, limits, comp),
 		);
 	}
 
@@ -247,7 +253,7 @@ const evalCompFilter = (
 	// Time-range filter on the component
 	if (
 		f.timeRange &&
-		!evalComponentTimeRange(comp, f.timeRange, vcalRoot, parent)
+		!evalComponentTimeRange(comp, f.timeRange, vcalRoot, limits, parent)
 	) {
 		return false;
 	}
@@ -267,7 +273,9 @@ const evalCompFilter = (
 				return false;
 			}
 		} else if (
-			!matchingChildren.some((c) => evalCompFilter(c, cf, vcalRoot, comp))
+			!matchingChildren.some((c) =>
+				evalCompFilter(c, cf, vcalRoot, limits, comp),
+			)
 		) {
 			return false;
 		}
@@ -674,6 +682,7 @@ const evalComponentTimeRange = (
 	comp: IrComponent,
 	range: { start?: Temporal.Instant; end?: Temporal.Instant },
 	vcalRoot: IrComponent,
+	limits: RruleExpansionLimits,
 	parent?: IrComponent,
 ): boolean => {
 	// RFC 4791 §9.10: VALARM matches if a computed trigger falls in the range.
@@ -696,6 +705,7 @@ const evalComponentTimeRange = (
 			comp,
 			range.start ?? OPEN_RANGE_START,
 			range.end ?? OPEN_RANGE_END,
+			limits,
 		);
 	}
 

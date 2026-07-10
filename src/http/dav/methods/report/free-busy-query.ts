@@ -10,6 +10,7 @@
 
 import { Effect } from "effect";
 import { Temporal } from "temporal-polyfill";
+import { AppConfigService } from "#src/config.ts";
 import {
 	buildVfreebusyText,
 	coalescePeriods,
@@ -51,7 +52,11 @@ export const freeBusyQueryHandler = (
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError,
-	InstanceRepository | CalIndexRepository | ComponentRepository | AclService
+	| InstanceRepository
+	| CalIndexRepository
+	| ComponentRepository
+	| AclService
+	| AppConfigService
 > =>
 	Effect.gen(function* () {
 		if (path.kind !== "collection") {
@@ -65,6 +70,7 @@ export const freeBusyQueryHandler = (
 		}
 		const actingPrincipalId = ctx.auth.principal.principalId;
 
+		const config = yield* AppConfigService;
 		const acl = yield* AclService;
 		yield* acl.check(
 			actingPrincipalId,
@@ -192,6 +198,10 @@ export const freeBusyQueryHandler = (
 							comp,
 							queryStart,
 							queryEnd,
+							{
+								maxOccurrencesChecked: config.recurrence.rruleMaxOccurrences,
+								timeBudgetMs: config.recurrence.rruleTimeBudgetMs,
+							},
 						);
 						for (const start of starts) {
 							occurrencePairs.push({

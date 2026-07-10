@@ -13,6 +13,7 @@ import {
 } from "#src/domain/virtual-resources.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { HTTP_NOT_FOUND } from "#src/http/status.ts";
+import { sanitizeReturnTo } from "#src/http/ui/handlers/auth/helpers.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import { isHtmxRequest } from "#src/http/ui/helpers/htmx.ts";
 import { AclService } from "#src/services/acl/index.ts";
@@ -108,7 +109,11 @@ export const collectionsDeleteHandler = (
 
 		// The calendar sidebar's Edit popover passes returnTo=/ui/calendar so it
 		// lands back on the calendar view instead of the owner's page.
-		const returnTo = form.get("returnTo")?.toString();
+		const returnToRaw = form.get("returnTo")?.toString() ?? null;
+		const returnTo =
+			returnToRaw !== null && sanitizeReturnTo(returnToRaw) === returnToRaw
+				? returnToRaw
+				: undefined;
 		const redirectTo = returnTo
 			? Effect.succeed(returnTo)
 			: principalService.findById(ownerPrincipalId).pipe(

@@ -8,7 +8,7 @@ import type {
 import { PrincipalId, UserId } from "#src/domain/ids.ts";
 import type { AuthenticatedPrincipal } from "#src/domain/types/dav.ts";
 import { isValidSlug, Slug } from "#src/domain/types/path.ts";
-import { Email } from "#src/domain/types/strings.ts";
+import { parseEmail } from "#src/domain/types/strings.ts";
 import { GroupService } from "#src/services/group/index.ts";
 import { resolveRoleFromGroups } from "#src/services/oidc/role-mapping.ts";
 import type { OidcClaims } from "#src/services/oidc/service.ts";
@@ -88,6 +88,7 @@ export const resolveOidcPrincipal = (
 	opts: {
 		readonly autoProvision: boolean;
 		readonly roleMap: ReadonlyMap<string, string>;
+		readonly requireEmailVerified: boolean;
 	},
 ): Effect.Effect<
 	Option.Option<AuthenticatedPrincipal>,
@@ -147,11 +148,20 @@ export const resolveOidcPrincipal = (
 			return Option.none();
 		}
 		const emailValue = claims.email.value;
-		const email = Email(emailValue);
+		const email = parseEmail(emailValue);
 
-		// 2. Link to an existing user by email.
+		// 2. Link to an existing user by email. Refuse to link an unverified
+		// email to an existing account — otherwise an attacker who can get the
+		// IdP to assert a victim's (unverified) email takes over their account.
 		const byEmail = yield* repo.findByEmail(email);
 		if (Option.isSome(byEmail)) {
+			if (opts.requireEmailVerified && !claims.emailVerified) {
+				yield* Effect.logWarning(
+					"auth.oidc: refusing to link unverified email to existing user",
+					{ email: emailValue },
+				);
+				return Option.none();
+			}
 			yield* repo.insertCredential({
 				userId: UserId(byEmail.value.user.id),
 				authSource: ISSUER_SUBJECT_SOURCE,

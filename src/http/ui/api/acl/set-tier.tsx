@@ -5,7 +5,7 @@ import type {
 	InternalError,
 } from "#src/domain/errors.ts";
 import { InternalError as InternalErr } from "#src/domain/errors.ts";
-import type { PrincipalId, UuidString } from "#src/domain/ids.ts";
+import { isUuid, PrincipalId, type UuidString } from "#src/domain/ids.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
@@ -82,7 +82,16 @@ export const aclSetTierHandler = (
 
 		let targetPrincipalId: PrincipalId;
 		if (targetPrincipalIdRaw) {
-			targetPrincipalId = targetPrincipalIdRaw as PrincipalId;
+			if (!isUuid(targetPrincipalIdRaw)) {
+				return new Response("Invalid principalId", { status: 400 });
+			}
+			const maybePrincipal = yield* principalRepo.findPrincipalById(
+				PrincipalId(targetPrincipalIdRaw),
+			);
+			if (Option.isNone(maybePrincipal)) {
+				return new Response("Principal not found", { status: 400 });
+			}
+			targetPrincipalId = PrincipalId(targetPrincipalIdRaw);
 		} else {
 			const maybePrincipal = yield* principalRepo.findPrincipalBySlug(
 				Slug(principalSlug),

@@ -19,11 +19,17 @@ data:
   LOG_LEVEL: {{ . | quote }}
   {{- end }}
 
+  # ---- RRULE expansion bounds ---------------------------------------------
+  RRULE_MAX_OCCURRENCES: {{ .Values.config.recurrence.rruleMaxOccurrences | quote }}
+  RRULE_TIME_BUDGET_MS: {{ .Values.config.recurrence.rruleTimeBudgetMs | quote }}
+
   # ---- auth --------------------------------------------------------------
   {{- with .Values.config.auth.autoLogin }}
   AUTO_LOGIN: {{ . | quote }}
   {{- end }}
   BASIC_AUTH_ENABLED: {{ .Values.config.auth.basicAuthEnabled | quote }}
+  AUTH_RATE_LIMIT_MAX_ATTEMPTS: {{ .Values.config.auth.authRateLimitMaxAttempts | quote }}
+  AUTH_RATE_LIMIT_WINDOW_S: {{ .Values.config.auth.authRateLimitWindowS | quote }}
   TRUSTED_PROXIES: {{ .Values.config.auth.trustedProxies | quote }}
   {{- with .Values.config.auth.adminEmail }}
   ADMIN_EMAIL: {{ . | quote }}
@@ -50,6 +56,7 @@ data:
   {{- end }}
   OIDC_SCOPES: {{ .Values.config.auth.oidcScopes | quote }}
   OIDC_AUTO_PROVISION: {{ .Values.config.auth.oidcAutoProvision | quote }}
+  OIDC_REQUIRE_EMAIL_VERIFIED: {{ .Values.config.auth.oidcRequireEmailVerified | quote }}
   SESSION_TTL_DAYS: {{ .Values.config.auth.sessionTtlDays | quote }}
   {{- with .Values.config.auth.oidcGroupsClaim }}
   OIDC_GROUPS_CLAIM: {{ . | quote }}
@@ -65,6 +72,8 @@ data:
   EXTERNAL_CALENDAR_SCHEDULER_TICK_S: {{ .Values.config.externalCalendar.schedulerTickS | quote }}
   EXTERNAL_CALENDAR_FETCH_CONCURRENCY: {{ .Values.config.externalCalendar.fetchConcurrency | quote }}
   EXTERNAL_CALENDAR_CLAIM_CAP: {{ .Values.config.externalCalendar.claimCap | quote }}
+  EXTERNAL_CALENDAR_MAX_RESPONSE_MIB: {{ .Values.config.externalCalendar.maxResponseMib | quote }}
+  EXTERNAL_CALENDAR_MAX_REDIRECTS: {{ .Values.config.externalCalendar.maxRedirects | quote }}
 
   # ---- birthday scheduler ----------------------------------------------
   BIRTHDAY_SCHEDULER_TICK_S: {{ .Values.config.birthday.schedulerTickS | quote }}
@@ -107,3 +116,5 @@ data:
   LMTP_ENABLED: {{ .Values.config.mail.lmtpEnabled | quote }}
   LMTP_PORT: {{ .Values.config.mail.lmtpPort | quote }}
   LMTP_HOST: {{ .Values.config.mail.lmtpHost | quote }}
+  LMTP_MAX_DATA_MIB: {{ .Values.config.mail.lmtpMaxDataMib | quote }}
+  LMTP_MAX_RECIPIENTS: {{ .Values.config.mail.lmtpMaxRecipients | quote }}

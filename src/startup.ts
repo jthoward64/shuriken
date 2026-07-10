@@ -8,7 +8,7 @@ import type {
 } from "#src/domain/errors.ts";
 import type { PrincipalId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
-import { Email } from "#src/domain/types/strings.ts";
+import { parseEmail } from "#src/domain/types/strings.ts";
 import { HTTP_NOT_FOUND } from "#src/http/status.ts";
 import { PrincipalService } from "#src/services/principal/service.ts";
 import { ProvisioningService } from "#src/services/provisioning/service.ts";
@@ -45,15 +45,12 @@ export const autoLoginStartup: Effect.Effect<
 > = Effect.gen(function* () {
 	const config = yield* AppConfigService;
 
-	if (
-		Option.isNone(config.auth.autoLogin) ||
-		config.auth.autoLogin.value === ""
-	) {
+	if (Option.isNone(config.auth.autoLogin)) {
 		return;
 	}
 
 	const adminEmailStr = config.auth.autoLogin.value;
-	const email = Email(adminEmailStr);
+	const email = parseEmail(adminEmailStr);
 	const principalSvc = yield* PrincipalService;
 	const provisioningSvc = yield* ProvisioningService;
 
@@ -134,7 +131,7 @@ export const basicAuthStartup: Effect.Effect<
 	}
 
 	const adminEmailStr = config.auth.adminEmail.value;
-	const email = Email(adminEmailStr);
+	const email = parseEmail(adminEmailStr);
 	const principalSvc = yield* PrincipalService;
 	const provisioningSvc = yield* ProvisioningService;
 

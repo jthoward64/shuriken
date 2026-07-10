@@ -1,20 +1,13 @@
 import { Effect, Layer, Option } from "effect";
-import {
-	FetchHttpClient,
-	HttpClient,
-	HttpClientRequest,
-} from "effect/unstable/http";
 import { Temporal } from "temporal-polyfill";
+import { AppConfigService } from "#src/config.ts";
 import { makeEtag } from "#src/data/etag.ts";
 import { decodeICalendar, encodeICalendar } from "#src/data/icalendar/codec.ts";
 import type { IrComponent, IrDocument } from "#src/data/ir.ts";
 import { DatabaseClient, type DbClient } from "#src/db/client.ts";
 import { withTransaction } from "#src/db/transaction.ts";
-import type {
-	DatabaseError,
-	DavError,
-	InternalError,
-} from "#src/domain/errors.ts";
+import type { DatabaseError, DavError } from "#src/domain/errors.ts";
+import { InternalError } from "#src/domain/errors.ts";
 import {
 	type CollectionId,
 	EntityId,
@@ -27,6 +20,11 @@ import {
 	HTTP_NOT_MODIFIED,
 	HTTP_OK,
 } from "#src/http/status.ts";
+import {
+	isBlockedAddress,
+	NetworkGuardService,
+	NetworkGuardServiceLive,
+} from "#src/platform/network-guard.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
 import type { CollectionRow } from "#src/services/collection/repository.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
@@ -111,6 +109,7 @@ const extractCalProp = (
 // whitespace / structural chars. Truncate so the trailing `.ics` extension
 // still fits inside the cap.
 const SLUG_MAX_BODY = 120;
+const HTTP_MULTIPLE_CHOICES = 300;
 const HASH_MULTIPLIER = 31;
 const HEX_RADIX = 16;
 const U32_MASK = 0xff_ff_ff_ff;
@@ -274,6 +273,143 @@ const reconcileClaim = (
 		}
 	});
 
+interface GuardedFetchResult {
+	readonly status: number;
+	readonly etag: string | null;
+	readonly lastModified: string | null;
+	readonly body: string;
+}
+
+/** Read a response body up to `maxBytes`, rejecting (and cancelling the stream) if exceeded. */
+const readCapped = async (
+	response: Response,
+	maxBytes: number,
+): Promise<string> => {
+	if (response.body === null) {
+		return "";
+	}
+	const reader = response.body.getReader();
+	const chunks: Array<Uint8Array> = [];
+	let total = 0;
+	for (;;) {
+		const { done, value } = await reader.read();
+		if (done) {
+			break;
+		}
+		total += value.byteLength;
+		if (total > maxBytes) {
+			await reader.cancel();
+			throw new Error(`response body exceeded ${maxBytes} bytes`);
+		}
+		chunks.push(value);
+	}
+	const combined = new Uint8Array(total);
+	let offset = 0;
+	for (const chunk of chunks) {
+		combined.set(chunk, offset);
+		offset += chunk.byteLength;
+	}
+	return new TextDecoder("utf-8").decode(combined);
+};
+
+/**
+ * SSRF-guarded fetch: resolves and rejects private/loopback/link-local/
+ * metadata hosts before *every* connection attempt — including each redirect
+ * hop, since `fetch`'s automatic redirect-following would otherwise connect
+ * to an unvalidated host (DNS rebinding, or a feed 302-ing to the cloud
+ * metadata address). Follows redirects manually up to `maxRedirects`, and
+ * caps the final response body at `maxResponseBytes`.
+ */
+const fetchWithGuard = (
+	startUrl: URL,
+	opts: {
+		readonly ifNoneMatch: string | null;
+		readonly ifModifiedSince: string | null;
+		readonly maxRedirects: number;
+		readonly maxResponseBytes: number;
+	},
+): Effect.Effect<GuardedFetchResult, InternalError, NetworkGuardService> =>
+	Effect.gen(function* () {
+		const guard = yield* NetworkGuardService;
+		let url = startUrl;
+		let hop = 0;
+		for (;;) {
+			const addresses = yield* guard.resolveAddresses(url.hostname);
+			if (addresses.length === 0 || addresses.some(isBlockedAddress)) {
+				return yield* Effect.fail(
+					new InternalError({
+						cause: new Error(`URL host is not allowed: ${url.hostname}`),
+					}),
+				);
+			}
+
+			const headers = new Headers({
+				Accept: "text/calendar, text/*;q=0.5",
+				"User-Agent": "shuriken-ts/sync",
+			});
+			if (hop === 0 && opts.ifNoneMatch !== null) {
+				headers.set("If-None-Match", opts.ifNoneMatch);
+			}
+			if (hop === 0 && opts.ifModifiedSince !== null) {
+				headers.set("If-Modified-Since", opts.ifModifiedSince);
+			}
+
+			const response = yield* Effect.tryPromise({
+				try: () => fetch(url, { headers, redirect: "manual" }),
+				catch: (e) => new InternalError({ cause: e }),
+			});
+
+			if (
+				response.status >= HTTP_MULTIPLE_CHOICES &&
+				response.status < HTTP_BAD_REQUEST
+			) {
+				const location = response.headers.get("location");
+				if (location === null) {
+					return yield* Effect.fail(
+						new InternalError({
+							cause: new Error(
+								`redirect (status ${response.status}) with no Location header`,
+							),
+						}),
+					);
+				}
+				if (hop >= opts.maxRedirects) {
+					return yield* Effect.fail(
+						new InternalError({ cause: new Error("too many redirects") }),
+					);
+				}
+				const next = yield* Effect.try({
+					try: () => new URL(location, url),
+					catch: (e) => new InternalError({ cause: e }),
+				});
+				if (next.protocol !== "http:" && next.protocol !== "https:") {
+					return yield* Effect.fail(
+						new InternalError({
+							cause: new Error(
+								`redirect to unsupported scheme: ${next.protocol}`,
+							),
+						}),
+					);
+				}
+				url = next;
+				hop += 1;
+				continue;
+			}
+
+			const body = yield* Effect.tryPromise({
+				try: () => readCapped(response, opts.maxResponseBytes),
+				catch: (e) => new InternalError({ cause: e }),
+			});
+
+			return {
+				status: response.status,
+				etag: response.headers.get("etag"),
+				lastModified: response.headers.get("last-modified"),
+				body,
+			};
+		}
+	});
+
 const stampError = (
 	repo: SyncDependencies["repo"],
 	id: UuidString,
@@ -297,7 +433,8 @@ const syncOne = (
 	| InstanceService
 	| CollectionService
 	| DatabaseClient
-	| HttpClient.HttpClient
+	| NetworkGuardService
+	| AppConfigService
 > =>
 	Effect.gen(function* () {
 		yield* Effect.annotateCurrentSpan({ "external_calendar.id": id });
@@ -306,7 +443,7 @@ const syncOne = (
 		const componentRepo = yield* ComponentRepository;
 		const instanceSvc = yield* InstanceService;
 		const db = yield* DatabaseClient;
-		const http = yield* HttpClient.HttpClient;
+		const config = yield* AppConfigService;
 
 		const externalOpt = yield* repo.findById(id);
 		if (Option.isNone(externalOpt)) {
@@ -323,37 +460,32 @@ const syncOne = (
 			db,
 		};
 
-		// Conditional GET — pass through the cached validators if we have them.
-		const req = HttpClientRequest.get(external.url).pipe(
-			external.httpEtag !== null
-				? HttpClientRequest.setHeader("If-None-Match", external.httpEtag)
-				: (r) => r,
-			external.httpLastModified !== null
-				? HttpClientRequest.setHeader(
-						"If-Modified-Since",
-						external.httpLastModified,
-					)
-				: (r) => r,
-			HttpClientRequest.setHeader("Accept", "text/calendar, text/*;q=0.5"),
-			HttpClientRequest.setHeader("User-Agent", "shuriken-ts/sync"),
-		);
+		const targetUrl = yield* Effect.try({
+			try: () => new URL(external.url),
+			catch: (e) => new InternalError({ cause: e }),
+		});
 
-		const responseResult = yield* http.execute(req).pipe(Effect.result);
-		if (responseResult._tag === "Failure") {
+		const fetchResult = yield* fetchWithGuard(targetUrl, {
+			ifNoneMatch: external.httpEtag,
+			ifModifiedSince: external.httpLastModified,
+			maxRedirects: config.externalCalendar.maxRedirects,
+			maxResponseBytes: config.externalCalendar.maxResponseBytes,
+		}).pipe(Effect.result);
+		if (fetchResult._tag === "Failure") {
 			yield* stampError(
 				repo,
 				id,
 				now,
-				`fetch failed: ${String(responseResult.failure)}`,
+				`fetch failed: ${String(fetchResult.failure)}`,
 			);
 			yield* Effect.logWarning("sync.external: fetch failed", {
 				id,
 				url: external.url,
-				cause: responseResult.failure,
+				cause: fetchResult.failure,
 			});
 			return;
 		}
-		const response = responseResult.success;
+		const response = fetchResult.success;
 
 		if (response.status === HTTP_NOT_MODIFIED) {
 			yield* repo.recordSyncResult(id, {
@@ -363,26 +495,14 @@ const syncOne = (
 			});
 			return;
 		}
-		// Treat any non-2xx (after 304 short-circuit) as failure. HttpClient
-		// follows 3xx redirects, so anything <200 or ≥400 here is a real error.
+		// Treat any non-2xx (after 304 short-circuit) as failure. Redirects are
+		// resolved inside fetchWithGuard, so anything <200 or ≥400 here is real.
 		if (response.status < HTTP_OK || response.status >= HTTP_BAD_REQUEST) {
 			yield* stampError(repo, id, now, `HTTP ${response.status}`);
 			return;
 		}
 
-		const bodyResult = yield* response.text.pipe(Effect.result);
-		if (bodyResult._tag === "Failure") {
-			yield* stampError(
-				repo,
-				id,
-				now,
-				`body read failed: ${String(bodyResult.failure)}`,
-			);
-			return;
-		}
-		const docResult = yield* decodeICalendar(bodyResult.success).pipe(
-			Effect.result,
-		);
+		const docResult = yield* decodeICalendar(response.body).pipe(Effect.result);
 		if (docResult._tag === "Failure") {
 			yield* stampError(
 				repo,
@@ -401,8 +521,8 @@ const syncOne = (
 			extractCalProp(doc.root, "X-WR-CALNAME") ??
 			extractCalProp(doc.root, "NAME");
 		const defaultColor = extractCalProp(doc.root, "X-APPLE-CALENDAR-COLOR");
-		const etagHeader = response.headers.etag;
-		const lastModHeader = response.headers["last-modified"];
+		const etagHeader = response.etag;
+		const lastModHeader = response.lastModified;
 
 		const claims = yield* repo.listClaimsForExternal(id);
 		const collSvc = yield* CollectionService;
@@ -477,7 +597,8 @@ export const ExternalCalendarSyncServiceLive = Layer.effect(
 		const instanceSvc = yield* InstanceService;
 		const collSvc = yield* CollectionService;
 		const db = yield* DatabaseClient;
-		const http = yield* HttpClient.HttpClient;
+		const networkGuard = yield* NetworkGuardService;
+		const config = yield* AppConfigService;
 		return {
 			syncOne: (id) =>
 				syncOne(id).pipe(
@@ -487,15 +608,16 @@ export const ExternalCalendarSyncServiceLive = Layer.effect(
 					Effect.provideService(InstanceService, instanceSvc),
 					Effect.provideService(CollectionService, collSvc),
 					Effect.provideService(DatabaseClient, db),
-					Effect.provideService(HttpClient.HttpClient, http),
+					Effect.provideService(NetworkGuardService, networkGuard),
+					Effect.provideService(AppConfigService, config),
 				),
 		};
 	}),
 );
 
-/** Convenience layer providing a fetch-backed HttpClient for the sync service. */
+/** Convenience layer providing the SSRF-guard dependency for the sync service. */
 export const ExternalCalendarSyncLayer = ExternalCalendarSyncServiceLive.pipe(
-	Layer.provide(FetchHttpClient.layer),
+	Layer.provide(NetworkGuardServiceLive),
 );
 
 export type { ParsedEvent };

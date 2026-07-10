@@ -42,6 +42,11 @@ describe("staticHandler", () => {
 		expect(res.status).toBe(404);
 	});
 
+	it("rejects a literal .. segment even with a would-be file match", async () => {
+		const res = await run("/static/../../etc/passwd", oneFileLayer);
+		expect(res.status).toBe(404);
+	});
+
 	it("returns 404 for any path when no files exist", async () => {
 		const res = await run("/static/styles.css");
 		expect(res.status).toBe(404);

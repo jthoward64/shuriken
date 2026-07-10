@@ -9,6 +9,7 @@ import {
 import { isUuid, type UuidString } from "#src/domain/ids.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { HTTP_SEE_OTHER } from "#src/http/status.ts";
+import { sanitizeReturnTo } from "#src/http/ui/handlers/auth/helpers.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import type { AclService } from "#src/services/acl/index.ts";
 import { ShareLinkService } from "#src/services/share-link/service.ts";
@@ -79,8 +80,10 @@ export const feedsCreateHandler = (
 
 		// The calendar sidebar's edit popover passes returnTo=/ui/calendar so it
 		// lands back on the calendar view instead of the new feed's edit page.
-		const returnTo =
-			form.get("returnTo")?.toString() || `/ui/feeds/${summary.link.id}`;
+		const returnTo = sanitizeReturnTo(
+			form.get("returnTo")?.toString() ?? null,
+			`/ui/feeds/${summary.link.id}`,
+		);
 		return new Response(null, {
 			status: HTTP_SEE_OTHER,
 			headers: { Location: returnTo },

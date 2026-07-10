@@ -26,6 +26,8 @@ const outcomeToDelivery = (o: ImipInboundOutcome): DeliveryOutcome => {
 			return { tag: "NotImip" };
 		case "MalformedIcs":
 			return { tag: "MalformedIcs", cause: o.cause };
+		case "SenderNotAuthorized":
+			return { tag: "SenderNotAuthorized" };
 	}
 };
 
@@ -97,6 +99,10 @@ export const LmtpServerLayer = Layer.effectDiscard(
 		const hostname = "shuriken";
 		const port = config.mail.lmtpPort;
 		const host = config.mail.lmtpHost;
+		const limits = {
+			maxDataBytes: config.mail.lmtpMaxDataBytes,
+			maxRecipients: config.mail.lmtpMaxRecipients,
+		};
 
 		// ---------------------------------------------------------------------
 		// Per-connection handler. Deno's socket API is stream-shaped (async
@@ -144,7 +150,7 @@ export const LmtpServerLayer = Layer.effectDiscard(
 				let inData = inDataBefore;
 				for (const line of lines) {
 					const cmd = parseCommand(line, inData);
-					const step = apply(data.state, cmd, hostname);
+					const step = apply(data.state, cmd, hostname, limits);
 					data.state = step.state;
 					// QUIT's 221 reply is held back while a delivery is in flight
 					// so the per-RCPT 250/5xx replies aren't sent AFTER the close

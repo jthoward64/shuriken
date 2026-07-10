@@ -8,6 +8,7 @@ import { CssServiceLive } from "#src/http/ui/css/index.ts";
 import { PageCacheServiceLive } from "#src/http/ui/page-cache/index.ts";
 import { type CryptoService, CryptoServiceLive } from "#src/platform/crypto.ts";
 import { FileServiceLive } from "#src/platform/file.ts";
+import { NetworkGuardServiceLive } from "#src/platform/network-guard.ts";
 import { AclDomainLayer } from "#src/services/acl/index.ts";
 import { AppPasswordRepositoryLive } from "#src/services/app-password/repository.live.ts";
 import { AppPasswordServiceLive } from "#src/services/app-password/service.live.ts";
@@ -194,7 +195,9 @@ export const AppLayer = Layer.mergeAll(
 	TrashPurgeLayer.pipe(Layer.provide(BaseAppLayer)),
 	SchedulingDomainLayer.pipe(Layer.provide(BaseAppLayer)),
 	ExternalCalendarSyncFull,
-	SubscriptionServiceLive.pipe(Layer.provide(BaseAppLayer)),
+	SubscriptionServiceLive.pipe(
+		Layer.provide(Layer.mergeAll(BaseAppLayer, NetworkGuardServiceLive)),
+	),
 	CardEditServiceLive.pipe(
 		Layer.provide(Layer.mergeAll(BaseAppLayer, BirthdayServiceFull)),
 	),

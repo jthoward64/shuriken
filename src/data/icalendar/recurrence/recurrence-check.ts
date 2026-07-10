@@ -105,6 +105,87 @@ export const normalizeRruleUntil = (
 };
 
 // ---------------------------------------------------------------------------
+// Bounded expansion — RRULE occurrence generation is otherwise unbounded: a
+// rule like `FREQ=SECONDLY` with no COUNT/UNTIL, queried over a wide/open
+// time-range, would enumerate tens of millions of occurrences synchronously.
+// `rule.all(iterator)` supports early exit via its iterator callback (unlike
+// `.between()`, which calls `.all()` internally with no way to interrupt it),
+// so occurrence generation is capped here by both a hard iteration count and
+// a wall-clock budget, independent of how wide the caller's range is. Either
+// cap tripping just truncates the occurrence list rather than failing the
+// request — callers see "no more occurrences found," not an error.
+// ---------------------------------------------------------------------------
+
+/**
+ * True for RRULEs dense enough to be pathological even under the expansion
+ * caps above — `FREQ=SECONDLY`/`MINUTELY` with no `COUNT`/`UNTIL` bound
+ * generates an occurrence for every second/minute from DTSTART onward.
+ * Used at PUT time (`http/dav/methods/put.ts`) to reject such rules
+ * up front rather than silently truncating query results against them later.
+ */
+export const isUnboundedHighFrequencyRrule = (rruleValue: string): boolean => {
+	const freqMatch = /(?:^|;)FREQ=([A-Z]+)/.exec(rruleValue);
+	const freq = freqMatch?.[1];
+	if (freq !== "SECONDLY" && freq !== "MINUTELY") {
+		return false;
+	}
+	return !/(?:^|;)(?:COUNT|UNTIL)=/.test(rruleValue);
+};
+
+export interface RruleExpansionLimits {
+	readonly maxOccurrencesChecked: number;
+	readonly timeBudgetMs: number;
+}
+
+const DEFAULT_RRULE_MAX_OCCURRENCES_CHECKED = 200_000;
+const DEFAULT_RRULE_TIME_BUDGET_MS = 250;
+
+export const DEFAULT_RRULE_LIMITS: RruleExpansionLimits = {
+	maxOccurrencesChecked: DEFAULT_RRULE_MAX_OCCURRENCES_CHECKED,
+	timeBudgetMs: DEFAULT_RRULE_TIME_BUDGET_MS,
+};
+
+const TIME_CHECK_EVERY = 500;
+
+const boundedOccurrencesInRange = (
+	rule: RRuleTemporal,
+	queryStart: Temporal.Instant,
+	queryEnd: Temporal.Instant,
+	limits: RruleExpansionLimits,
+): ReadonlyArray<Temporal.Instant> => {
+	const results: Array<Temporal.Instant> = [];
+	const startedAt = Temporal.Now.instant();
+	let checked = 0;
+	rule.all((occZdt) => {
+		checked += 1;
+		const inst = Temporal.Instant.fromEpochMilliseconds(
+			occZdt.epochMilliseconds,
+		);
+		// Occurrences come out in chronological order — once we're at/past the
+		// end of the range nothing further can match, so stop entirely.
+		if (Temporal.Instant.compare(inst, queryEnd) >= 0) {
+			return false;
+		}
+		if (Temporal.Instant.compare(inst, queryStart) >= 0) {
+			results.push(inst);
+		}
+		if (checked >= limits.maxOccurrencesChecked) {
+			return false;
+		}
+		if (checked % TIME_CHECK_EVERY === 0) {
+			const elapsedMs = startedAt.until(Temporal.Now.instant(), {
+				largestUnit: "milliseconds",
+			}).milliseconds;
+			if (elapsedMs >= limits.timeBudgetMs) {
+				return false;
+			}
+		}
+		return true;
+	});
+	return results;
+};
+
+// ---------------------------------------------------------------------------
 // hasOccurrenceInRange
 // ---------------------------------------------------------------------------
 
@@ -123,6 +204,7 @@ export const getOccurrenceInstantsInRange = (
 	vevent: IrComponent,
 	queryStart: Temporal.Instant,
 	queryEnd: Temporal.Instant,
+	limits: RruleExpansionLimits = DEFAULT_RRULE_LIMITS,
 ): ReadonlyArray<Temporal.Instant> => {
 	const rruleProp = vevent.properties.find((p) => p.name === "RRULE");
 	if (!rruleProp || rruleProp.value.type !== "RECUR") {
@@ -186,14 +268,7 @@ export const getOccurrenceInstantsInRange = (
 				})
 			: baseRule;
 
-	const occurrences = rule.between(
-		new Date(queryStart.epochMilliseconds - 1),
-		new Date(queryEnd.epochMilliseconds),
-		false,
-	);
-	return occurrences.map((d) =>
-		Temporal.Instant.fromEpochMilliseconds(d.epochMilliseconds),
-	);
+	return boundedOccurrencesInRange(rule, queryStart, queryEnd, limits);
 };
 
 /**
@@ -211,85 +286,7 @@ export const hasOccurrenceInRange = (
 	vevent: IrComponent,
 	queryStart: Temporal.Instant,
 	queryEnd: Temporal.Instant,
-): boolean => {
-	// 1. RRULE text (type RECUR)
-	const rruleProp = vevent.properties.find((p) => p.name === "RRULE");
-	if (!rruleProp || rruleProp.value.type !== "RECUR") {
-		return false;
-	}
-
-	// 2. DTSTART → @js-temporal/polyfill ZonedDateTime (needed to interpret a
-	//    naive UNTIL in the event's timezone).
-	const dtstartProp = vevent.properties.find((p) => p.name === "DTSTART");
-	const dtstart = dtstartProp
-		? irSingleValueToJsZdt(dtstartProp.value)
-		: undefined;
-
-	const rruleString = normalizeRruleUntil(rruleProp.value.value, dtstart);
-
-	// 3a. exDate from EXDATE properties
-	const exDate: Array<JSTemporal.ZonedDateTime> = [];
-	for (const prop of vevent.properties) {
-		if (prop.name === "EXDATE") {
-			exDate.push(...irDateListToJsZdts(prop.value));
-		}
-	}
-
-	// 3b. exDate += RECURRENCE-ID values from sibling override components
-	//     (overrides replace those slots; the master must skip them)
-	const uidValue = vevent.properties.find((p) => p.name === "UID")?.value;
-	const uid = uidValue?.type === "TEXT" ? uidValue.value : undefined;
-	if (uid !== undefined) {
-		for (const sibling of vcalRoot.components) {
-			if (sibling === vevent || sibling.name !== vevent.name) {
-				continue;
-			}
-			const sibUid = sibling.properties.find((p) => p.name === "UID")?.value;
-			if (sibUid?.type !== "TEXT" || sibUid.value !== uid) {
-				continue;
-			}
-			const recIdProp = sibling.properties.find(
-				(p) => p.name === "RECURRENCE-ID",
-			);
-			if (!recIdProp) {
-				continue;
-			}
-			const jsZdt = irSingleValueToJsZdt(recIdProp.value);
-			if (jsZdt) {
-				exDate.push(jsZdt);
-			}
-		}
-	}
-
-	// 4. rDate from RDATE properties
-	const rDate: Array<JSTemporal.ZonedDateTime> = [];
-	for (const prop of vevent.properties) {
-		if (prop.name === "RDATE") {
-			rDate.push(...irDateListToJsZdts(prop.value));
-		}
-	}
-
-	// 5. Build RRuleTemporal from the RRULE string, then attach exDate / rDate
-	//    via .with() (IcsOpts doesn't expose exDate/rDate directly).
-	const baseRule = new RRuleTemporal({
-		rruleString,
-		...(dtstart !== undefined ? { dtstart } : {}),
-	});
-	const rule =
-		exDate.length > 0 || rDate.length > 0
-			? baseRule.with({
-					...(exDate.length > 0 ? { exDate } : {}),
-					...(rDate.length > 0 ? { rDate } : {}),
-				})
-			: baseRule;
-
-	// 6. between(after, before, inc=false) is exclusive on both ends.
-	//    We want [queryStart, queryEnd), so subtract 1ms from after to make
-	//    queryStart inclusive.
-	const occurrences = rule.between(
-		new Date(queryStart.epochMilliseconds - 1),
-		new Date(queryEnd.epochMilliseconds),
-		false,
-	);
-	return occurrences.length > 0;
-};
+	limits: RruleExpansionLimits = DEFAULT_RRULE_LIMITS,
+): boolean =>
+	getOccurrenceInstantsInRange(vcalRoot, vevent, queryStart, queryEnd, limits)
+		.length > 0;

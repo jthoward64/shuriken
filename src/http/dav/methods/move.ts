@@ -150,6 +150,15 @@ const moveInstance = (
 				return yield* preconditionFailed();
 			}
 			destExisted = true;
+			// Overwriting an existing destination is effectively a delete —
+			// require DAV:unbind on the destination collection too, mirroring
+			// delete.ts (the DAV:unbind check above only covers the source).
+			yield* acl.check(
+				principalId,
+				destPath.collectionId,
+				"collection",
+				"DAV:unbind",
+			);
 			const destInstance = yield* instanceSvc.findById(destPath.instanceId);
 			// Capture slug before deleting so we can move source into the same slot.
 			destSlug = Slug(destInstance.slug);
@@ -285,6 +294,15 @@ const moveCollection = (
 				return yield* preconditionFailed();
 			}
 			destExisted = true;
+			// Overwriting an existing destination is effectively a delete —
+			// require DAV:unbind on the destination principal too, mirroring
+			// delete.ts (the DAV:unbind check above only covers the source).
+			yield* acl.check(
+				principalId,
+				destPath.principalId,
+				"principal",
+				"DAV:unbind",
+			);
 			// Capture slug before deleting.
 			destSlug = Slug(destPath.collectionSeg);
 			yield* deleteCollection(destPath.collectionId);

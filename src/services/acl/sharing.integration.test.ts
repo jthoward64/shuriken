@@ -368,7 +368,7 @@ describe("Calendar / event sharing (integration)", () => {
 			const freeBusyBody = [
 				'<?xml version="1.0" encoding="utf-8"?>',
 				'<C:free-busy-query xmlns:C="urn:ietf:params:xml:ns:caldav">',
-				"<C:time-range start=20260601T000000Z end=20260602T000000Z />",
+				'<C:time-range start="20260601T000000Z" end="20260602T000000Z" />',
 				"</C:free-busy-query>",
 			].join("\n");
 			const freeBusyRes = await runtime.runPromise(

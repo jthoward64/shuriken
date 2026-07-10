@@ -12,6 +12,7 @@ import {
 	USERS_VIRTUAL_RESOURCE_ID,
 } from "#src/domain/virtual-resources.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
+import { sanitizeReturnTo } from "#src/http/ui/handlers/auth/helpers.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import { isHtmxRequest } from "#src/http/ui/helpers/htmx.ts";
 import { AclService } from "#src/services/acl/index.ts";
@@ -102,8 +103,10 @@ export const collectionsUpdateHandler = (
 
 		// The calendar sidebar's Edit popover passes returnTo=/ui/calendar so it
 		// lands back on the calendar view instead of the full edit page.
-		const redirectTo =
-			form.get("returnTo")?.toString() || `/ui/collections/${collectionId}`;
+		const redirectTo = sanitizeReturnTo(
+			form.get("returnTo")?.toString() ?? null,
+			`/ui/collections/${collectionId}`,
+		);
 		if (isHtmxRequest(ctx.headers)) {
 			return new Response(null, {
 				status: 200,

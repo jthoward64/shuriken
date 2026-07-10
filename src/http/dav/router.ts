@@ -1,4 +1,5 @@
 import { Effect, Metric, Option } from "effect";
+import type { AppConfigService } from "#src/config.ts";
 import type { DatabaseClient } from "#src/db/client.ts";
 import {
 	type AppError,
@@ -137,7 +138,8 @@ type DavServices =
 	| UserService
 	| GroupService
 	| ExternalCalendarRepository
-	| SchedulingService;
+	| SchedulingService
+	| AppConfigService;
 
 // Segment counts after stripping /dav (index 0 = "principals")
 const SEGMENTS_PRINCIPAL = 2; // ["principals", ":slug"]

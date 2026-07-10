@@ -7,6 +7,7 @@ import {
 	InternalError,
 } from "#src/domain/errors.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
+import { sanitizeReturnTo } from "#src/http/ui/handlers/auth/helpers.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import {
 	FormValidationError,
@@ -122,7 +123,10 @@ export const subscriptionsCreateHandler = (
 
 		// Popover subscribe passes returnTo=/ui/calendar so it lands back on the
 		// calendar (with the new subscription visible); default is the list page.
-		const returnTo = form.get("returnTo")?.toString() || "/ui/subscriptions";
+		const returnTo = sanitizeReturnTo(
+			form.get("returnTo")?.toString() ?? null,
+			"/ui/subscriptions",
+		);
 		if (isHtmxRequest(ctx.headers)) {
 			return new Response(null, {
 				status: 200,

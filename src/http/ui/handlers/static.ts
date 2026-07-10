@@ -23,10 +23,19 @@ export const staticHandler = (
 	const url = new URL(req.url);
 	// Strip the /static/ prefix to get the relative path
 	const relPath = url.pathname.replace(/^\/static\//, "");
-	if (!relPath || relPath.includes("..")) {
+	if (!relPath) {
 		return Effect.succeed(new Response(null, { status: 404 }));
 	}
-	const absPath = path.join(STATIC_DIR, relPath);
+	// Resolve-then-check-the-relative-path is the actual traversal guard here —
+	// robust to how `absPath` is joined, unlike a substring check on `relPath`
+	// (which would silently stop guarding anything if this were ever changed
+	// from `path.join` to `path.resolve`, since `..` segments could then escape
+	// STATIC_DIR before ever being substring-matched).
+	const absPath = path.resolve(STATIC_DIR, relPath);
+	const relToStatic = path.relative(STATIC_DIR, absPath);
+	if (relToStatic.startsWith("..") || path.isAbsolute(relToStatic)) {
+		return Effect.succeed(new Response(null, { status: 404 }));
+	}
 
 	return Effect.gen(function* () {
 		const files = yield* FileService;

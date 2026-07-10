@@ -1,4 +1,4 @@
-import { Effect, Option } from "effect";
+import { Effect, Option, Redacted } from "effect";
 import { AppConfigService } from "#src/config.ts";
 import type {
 	DatabaseError,
@@ -47,7 +47,7 @@ export const emailCredentialsPageHandler = (
 		let activeKind: ActiveKind = "disabled";
 		let activeFromAddress = "";
 		if (config.mail.enabled) {
-			if (existing && config.mail.credsKey !== "") {
+			if (existing && Redacted.value(config.mail.credsKey) !== "") {
 				activeKind = "user";
 				activeFromAddress = existing.fromAddress;
 			} else {
@@ -93,7 +93,7 @@ export const emailCredentialsPageHandler = (
 						: null
 				}
 				mailEnabled={config.mail.enabled}
-				credsKeyConfigured={config.mail.credsKey !== ""}
+				credsKeyConfigured={Redacted.value(config.mail.credsKey) !== ""}
 				activeKind={activeKind}
 				activeFromAddress={activeFromAddress}
 			/>,

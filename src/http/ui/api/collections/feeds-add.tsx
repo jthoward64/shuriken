@@ -7,6 +7,7 @@ import {
 } from "#src/domain/errors.ts";
 import { type CollectionId, isUuid } from "#src/domain/ids.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
+import { sanitizeReturnTo } from "#src/http/ui/handlers/auth/helpers.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import { isHtmxRequest } from "#src/http/ui/helpers/htmx.ts";
 import { CollectionEditPage } from "#src/http/ui/view/pages/collections.tsx";
@@ -56,7 +57,10 @@ export const collectionsFeedsAddHandler = (
 			);
 		}
 
-		const returnTo = form.get("returnTo")?.toString() || "/ui/calendar";
+		const returnTo = sanitizeReturnTo(
+			form.get("returnTo")?.toString() ?? null,
+			"/ui/calendar",
+		);
 
 		if (isHtmxRequest(ctx.headers)) {
 			// Re-render the popover fragment so the newly-added feed shows up

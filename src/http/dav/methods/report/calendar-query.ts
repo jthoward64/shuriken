@@ -7,6 +7,7 @@
 // ---------------------------------------------------------------------------
 
 import { Effect } from "effect";
+import { AppConfigService } from "#src/config.ts";
 import { encodeICalendar } from "#src/data/icalendar/codec.ts";
 import { redactDocumentToBusyOnly } from "#src/data/icalendar/visibility.ts";
 import type { ClarkName, IrDocument } from "#src/data/ir.ts";
@@ -118,6 +119,7 @@ export const calendarQueryHandler = (
 	| CalIndexRepository
 	| AclService
 	| IanaTimezoneService
+	| AppConfigService
 > =>
 	Effect.gen(function* () {
 		if (path.kind !== "collection") {
@@ -131,6 +133,7 @@ export const calendarQueryHandler = (
 		}
 		const actingPrincipalId = ctx.auth.principal.principalId;
 
+		const config = yield* AppConfigService;
 		const acl = yield* AclService;
 		yield* acl.check(
 			actingPrincipalId,
@@ -310,7 +313,12 @@ export const calendarQueryHandler = (
 			}
 			const irDoc: IrDocument = { kind: "icalendar", root: tree };
 
-			if (!evaluateCalFilter(irDoc, filter)) {
+			if (
+				!evaluateCalFilter(irDoc, filter, {
+					maxOccurrencesChecked: config.recurrence.rruleMaxOccurrences,
+					timeBudgetMs: config.recurrence.rruleTimeBudgetMs,
+				})
+			) {
 				continue;
 			}
 

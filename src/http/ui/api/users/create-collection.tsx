@@ -8,6 +8,7 @@ import {
 import type { PrincipalId } from "#src/domain/ids.ts";
 import { USERS_VIRTUAL_RESOURCE_ID } from "#src/domain/virtual-resources.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
+import { sanitizeReturnTo } from "#src/http/ui/handlers/auth/helpers.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import {
 	type FormValidationError,
@@ -107,8 +108,10 @@ export const usersCollectionsCreateHandler = (
 
 		// The Add-calendar popover passes returnTo=/ui/calendar so it lands back on
 		// the calendar (with the new calendar visible); default is the edit page.
-		const returnTo =
-			form.get("returnTo")?.toString() || `/ui/collections/${newCollection.id}`;
+		const returnTo = sanitizeReturnTo(
+			form.get("returnTo")?.toString() ?? null,
+			`/ui/collections/${newCollection.id}`,
+		);
 		if (isHtmxRequest(ctx.headers)) {
 			return new Response(null, {
 				status: 200,

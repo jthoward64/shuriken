@@ -40,13 +40,18 @@ const buildMail = (mail: MailOverride) => ({
 	defaultHost: mail.defaultHost ?? "",
 	defaultPort: 587,
 	defaultUsername: "",
-	defaultPassword: "",
+	defaultPassword: Redacted.make(""),
 	defaultSecurity: "starttls" as const,
-	credsKey: mail.credsKey ?? "",
+	credsKey: Redacted.make(mail.credsKey ?? ""),
 	lmtpEnabled: false,
 	lmtpPort: 2400,
 	lmtpHost: "127.0.0.1",
-	profiles: mail.profiles ?? [],
+	lmtpMaxDataBytes: 26_214_400,
+	lmtpMaxRecipients: 100,
+	profiles: (mail.profiles ?? []).map((p) => ({
+		...p,
+		password: Redacted.make(p.password),
+	})),
 });
 
 const provisionAlice = Effect.gen(function* () {

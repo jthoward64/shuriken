@@ -39,6 +39,54 @@ describe("LMTP protocol", () => {
 		expect(final.state.tag).toBe("Idle");
 	});
 
+	it("rejects RCPT TO beyond maxRecipients", () => {
+		let state = initialState;
+		state = apply(state, parseCommand("LHLO c", false), "h").state;
+		state = apply(state, parseCommand("MAIL FROM:<a@x>", false), "h").state;
+		state = apply(state, parseCommand("RCPT TO:<r1@y>", false), "h", {
+			maxDataBytes: 1000,
+			maxRecipients: 1,
+		}).state;
+		const second = apply(state, parseCommand("RCPT TO:<r2@y>", false), "h", {
+			maxDataBytes: 1000,
+			maxRecipients: 1,
+		});
+		expect(second.replies[0]?.code).toBe(452);
+		expect(state.tag).toBe("Tx");
+		if (state.tag === "Tx") {
+			expect(state.recipients).toEqual(["r1@y"]);
+		}
+	});
+
+	it("rejects DATA exceeding maxDataBytes instead of delivering", () => {
+		const limits = { maxDataBytes: 10, maxRecipients: 10 };
+		let state = initialState;
+		state = apply(state, parseCommand("LHLO c", false), "h", limits).state;
+		state = apply(
+			state,
+			parseCommand("MAIL FROM:<a@x>", false),
+			"h",
+			limits,
+		).state;
+		state = apply(
+			state,
+			parseCommand("RCPT TO:<r@y>", false),
+			"h",
+			limits,
+		).state;
+		state = apply(state, parseCommand("DATA", false), "h", limits).state;
+		state = apply(
+			state,
+			parseCommand("this line alone exceeds the 10 byte cap", true),
+			"h",
+			limits,
+		).state;
+		const final = apply(state, parseCommand(".", true), "h", limits);
+		expect(final.delivery).toBeUndefined();
+		expect(final.replies[0]?.code).toBe(552);
+		expect(final.state.tag).toBe("Idle");
+	});
+
 	it("rejects RCPT TO before MAIL FROM", () => {
 		const lhlo = apply(initialState, parseCommand("LHLO c", false), "h");
 		const bad = apply(lhlo.state, parseCommand("RCPT TO:<r@y>", false), "h");

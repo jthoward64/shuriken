@@ -1,6 +1,13 @@
-import { Effect, Layer, Option, Redacted } from "effect";
+import { Effect, Layer, Option, Redacted, Ref } from "effect";
+import { Temporal } from "temporal-polyfill";
 import { authenticateBasic } from "#src/auth/layers/basic.ts";
 import { resolveAutoLoginPrincipal } from "#src/auth/layers/single-user.ts";
+import {
+	emptyRateLimitState,
+	isRateLimited,
+	type RateLimitState,
+	recordFailure,
+} from "#src/auth/rate-limit.ts";
 import { AuthService } from "#src/auth/service.ts";
 import { AppConfigService } from "#src/config.ts";
 import { DatabaseClient } from "#src/db/client.ts";
@@ -34,14 +41,24 @@ export const CompositeAuthLayer = Layer.effect(
 		const crypto = yield* CryptoService;
 		const sessions = yield* SessionService;
 		const {
-			auth: { autoLogin, basicAuthEnabled },
+			auth: {
+				autoLogin,
+				basicAuthEnabled,
+				authRateLimitMaxAttempts,
+				authRateLimitWindowS,
+			},
 		} = yield* AppConfigService;
 
 		const autoLoginEmail = Option.map(autoLogin, Email);
+		const rateLimitConfig = {
+			maxAttempts: authRateLimitMaxAttempts,
+			windowSeconds: authRateLimitWindowS,
+		};
+		const rateLimitState = yield* Ref.make<RateLimitState>(emptyRateLimitState);
 
 		return {
 			authenticate: Effect.fn("auth.composite.authenticate")(
-				function* (headers, _clientIp) {
+				function* (headers, clientIp) {
 					yield* Effect.annotateCurrentSpan({ "auth.mode": "composite" });
 
 					// 1. AUTO_LOGIN — short-circuit when configured
@@ -66,8 +83,24 @@ export const CompositeAuthLayer = Layer.effect(
 						}
 					}
 
-					// 3. Basic auth — when enabled
+					// 3. Basic auth — when enabled, rate-limited per client IP.
 					if (basicAuthEnabled) {
+						const rateLimitKey = Option.getOrElse(clientIp, () => "unknown");
+						const now = Temporal.Now.instant();
+						const blocked = isRateLimited(
+							yield* Ref.get(rateLimitState),
+							rateLimitKey,
+							now,
+							rateLimitConfig,
+						);
+						if (blocked) {
+							yield* Effect.logWarning(
+								"auth.composite: rate-limited basic-auth attempt",
+								{ clientIp: rateLimitKey },
+							);
+							return new Unauthenticated();
+						}
+
 						const result = yield* authenticateBasic(headers).pipe(
 							Effect.provideService(DatabaseClient, db),
 							Effect.provideService(CryptoService, crypto),
@@ -75,6 +108,9 @@ export const CompositeAuthLayer = Layer.effect(
 						if (result._tag === "Authenticated") {
 							return result;
 						}
+						yield* Ref.update(rateLimitState, (s) =>
+							recordFailure(s, rateLimitKey, now, rateLimitConfig),
+						);
 					}
 
 					return new Unauthenticated();

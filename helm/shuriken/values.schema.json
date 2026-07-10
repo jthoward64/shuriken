@@ -103,6 +103,20 @@
 					"type": "string",
 					"enum": ["", "trace", "debug", "info", "warn", "error", "fatal"]
 				},
+				"recurrence": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"rruleMaxOccurrences": {
+							"type": "integer",
+							"minimum": 1
+						},
+						"rruleTimeBudgetMs": {
+							"type": "integer",
+							"minimum": 1
+						}
+					}
+				},
 				"database": {
 					"type": "object",
 					"additionalProperties": false,
@@ -124,6 +138,14 @@
 						},
 						"basicAuthEnabled": {
 							"type": "boolean"
+						},
+						"authRateLimitMaxAttempts": {
+							"type": "integer",
+							"minimum": 1
+						},
+						"authRateLimitWindowS": {
+							"type": "integer",
+							"minimum": 1
 						},
 						"trustedProxies": {
 							"type": "string"
@@ -170,6 +192,9 @@
 						"oidcAutoProvision": {
 							"type": "boolean"
 						},
+						"oidcRequireEmailVerified": {
+							"type": "boolean"
+						},
 						"sessionTtlDays": {
 							"type": "integer"
 						},
@@ -206,6 +231,14 @@
 						"claimCap": {
 							"type": "integer",
 							"minimum": 1
+						},
+						"maxResponseMib": {
+							"type": "integer",
+							"minimum": 1
+						},
+						"maxRedirects": {
+							"type": "integer",
+							"minimum": 0
 						}
 					}
 				},
@@ -322,6 +355,14 @@
 						},
 						"lmtpHost": {
 							"type": "string"
+						},
+						"lmtpMaxDataMib": {
+							"type": "integer",
+							"minimum": 1
+						},
+						"lmtpMaxRecipients": {
+							"type": "integer",
+							"minimum": 1
 						},
 						"profilesJson": {
 							"type": "string"

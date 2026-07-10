@@ -20,7 +20,7 @@ interface MailProfile {
 	readonly host: string;
 	readonly port: number;
 	readonly username: string;
-	readonly password: string;
+	readonly password: Redacted.Redacted<string>;
 	readonly security?: SmtpSecurity;
 }
 
@@ -78,7 +78,7 @@ const fromProfile = (
 	host: profile.host,
 	port: profile.port,
 	username: profile.username,
-	password: Redacted.make(profile.password),
+	password: profile.password,
 	security: profile.security ?? "starttls",
 	fromAddress: userEmail,
 	fromName: userDisplayName,
@@ -90,7 +90,7 @@ const fromDefault = (
 		readonly defaultHost: string;
 		readonly defaultPort: number;
 		readonly defaultUsername: string;
-		readonly defaultPassword: string;
+		readonly defaultPassword: Redacted.Redacted<string>;
 		readonly defaultSecurity: SmtpSecurity;
 		readonly defaultFromAddress: string;
 		readonly defaultFromName: string;
@@ -105,7 +105,7 @@ const fromDefault = (
 		host: conf.defaultHost,
 		port: conf.defaultPort,
 		username: conf.defaultUsername,
-		password: Redacted.make(conf.defaultPassword),
+		password: conf.defaultPassword,
 		security: conf.defaultSecurity,
 		fromAddress: conf.defaultFromAddress,
 		fromName: conf.defaultFromName !== "" ? conf.defaultFromName : null,
@@ -133,14 +133,14 @@ const resolveForUser = (
 		}
 
 		// 1. Per-user creds.
-		if (config.mail.credsKey !== "") {
+		if (Redacted.value(config.mail.credsKey) !== "") {
 			const rowOpt = yield* repo.findByUserId(userId);
 			if (Option.isSome(rowOpt)) {
 				const row = rowOpt.value;
-				const password = yield* decryptSecret(
-					Redacted.make(config.mail.credsKey),
-					{ ciphertext: row.passwordEncrypted, iv: row.passwordIv },
-				);
+				const password = yield* decryptSecret(config.mail.credsKey, {
+					ciphertext: row.passwordEncrypted,
+					iv: row.passwordIv,
+				});
 				return fromUserCreds(row, password);
 			}
 		}
@@ -173,7 +173,7 @@ const storeForUser = (input: {
 		const config = yield* AppConfigService;
 		const repo = yield* UserEmailCredentialRepository;
 		const encrypted = yield* encryptSecret(
-			Redacted.make(config.mail.credsKey),
+			config.mail.credsKey,
 			input.password,
 		);
 		yield* repo.upsert({

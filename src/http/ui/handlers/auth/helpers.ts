@@ -20,8 +20,10 @@ export const oidcRedirectUri = (origin: string, cfg: AppConfigType): string =>
  * Constrain a `returnTo` value to a same-site absolute path so it can't be used
  * as an open-redirect. Rejects protocol-relative (`//host`) and absolute URLs.
  */
-export const sanitizeReturnTo = (raw: string | null): string =>
-	raw?.startsWith("/") && !raw.startsWith("//") ? raw : "/ui";
+export const sanitizeReturnTo = (
+	raw: string | null,
+	fallback = "/ui",
+): string => (raw?.startsWith("/") && !raw.startsWith("//") ? raw : fallback);
 
 /** Whether cookies for this request should carry the Secure attribute. */
 export const isSecureRequest = (url: URL): boolean => url.protocol === "https:";
