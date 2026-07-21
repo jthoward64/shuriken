@@ -152,11 +152,15 @@ export const contactsListHandler = (
 			contacts = summaries.map((s) => {
 				const fn = s.fn || "(no name)";
 				const first = fn.trim().charAt(0).toUpperCase();
+				// Subtitle prefers the primary email; falls back to "Title, Org".
+				const orgLine = [s.title, s.org]
+					.map((v) => (v ?? "").trim())
+					.filter((v) => v !== "")
+					.join(", ");
 				return {
 					instanceId: s.instanceId,
 					fn,
-					email: s.email ?? "",
-					tel: s.tel ?? "",
+					subtitle: s.email?.trim() || orgLine,
 					hasPhoto: s.hasPhoto,
 					initial: /[A-Z0-9]/i.test(first) ? first : "?",
 				};

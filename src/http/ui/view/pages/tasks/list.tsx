@@ -261,6 +261,7 @@ export const TasksListPage = ({
 	return (
 		<SidebarShell
 			label="Calendars"
+			padContent
 			top={<CalendarList calendars={calendars} showCompleted={showCompleted} />}
 			bottom={null}
 		>

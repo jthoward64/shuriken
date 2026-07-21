@@ -198,6 +198,75 @@
 		});
 	};
 
+	// --- Preview pane (read-only, opened on row click) -----------------------
+	// A popover (`popover="auto"`) opened via showPopover() on a row click: a
+	// full-bleed sheet on mobile, a right-anchored panel over a dimmed (still-
+	// visible) list on desktop. Native light-dismiss handles the backdrop
+	// click / Escape, and the in-pane Back button hides it via popovertarget —
+	// no JS dismiss wiring needed. Its body is fetched from the same /preview
+	// route the no-JS new-tab link points at. Ids match preview-pane.tsx.
+	const paneId = "contacts-pane";
+	const paneBodyId = "contacts-pane-body";
+	let paneToken = 0;
+
+	const isPopoverOpen = (el) => {
+		try {
+			return el.matches(":popover-open");
+		} catch {
+			return false;
+		}
+	};
+
+	const closePane = () => {
+		const pane = document.getElementById(paneId);
+		if (pane && typeof pane.hidePopover === "function" && isPopoverOpen(pane)) {
+			try {
+				pane.hidePopover();
+			} catch {
+				/* not currently open */
+			}
+		}
+	};
+
+	// Fetch the preview fragment into the pane body, then show the popover.
+	// Token-guarded so a slow, superseded fetch never overwrites a newer
+	// selection (e.g. a fast second click while the first is still loading).
+	const openPane = (url) => {
+		const htmx = getHtmx();
+		const pane = document.getElementById(paneId);
+		if (!htmx || !pane || typeof pane.showPopover !== "function") {
+			window.open(url, "_blank");
+			return;
+		}
+		const token = ++paneToken;
+		if (!isPopoverOpen(pane)) {
+			try {
+				pane.showPopover();
+			} catch {
+				/* already open */
+			}
+		}
+		htmx
+			.ajax("GET", url, { target: `#${paneBodyId}`, swap: "innerHTML" })
+			.then(() => {
+				if (token !== paneToken) {
+					return;
+				}
+				const focusTarget = pane.querySelector("[data-edit-contact]");
+				if (focusTarget && typeof focusTarget.focus === "function") {
+					focusTarget.focus();
+				}
+			});
+	};
+
+	// Keep every [data-selected-count] in a form in sync with its checked rows.
+	const updateSelectedCount = (form) => {
+		const n = form.querySelectorAll("input[name=id]:checked").length;
+		for (const el of form.querySelectorAll("[data-selected-count]")) {
+			el.textContent = String(n);
+		}
+	};
+
 	// True when the element that triggered an HTMX request opted into guarding.
 	// htmx 4 dispatches lifecycle events on the requesting element, so read it
 	// from `evt.target` (htmx 2 exposed it as `evt.detail.elt`).
@@ -384,11 +453,20 @@
 			return;
 		}
 		if (t.matches("[data-check-all]")) {
-			const table = t.closest("table");
-			if (table) {
-				for (const c of table.querySelectorAll("input[name=id]")) {
+			// Scope to the bulk <form> (the table is gone in the list redesign).
+			const form = t.closest("form");
+			if (form) {
+				for (const c of form.querySelectorAll("input[name=id]")) {
 					c.checked = t.checked;
 				}
+				updateSelectedCount(form);
+			}
+			return;
+		}
+		if (t.matches("input[name=id]")) {
+			const form = t.closest("form");
+			if (form) {
+				updateSelectedCount(form);
 			}
 			return;
 		}
@@ -413,6 +491,15 @@
 		}
 		if (t.matches("[data-gender-select]")) {
 			syncGenderMode(t);
+		}
+	});
+
+	// The bulk bar's "Clear" is a native <button type=reset>: it unchecks every
+	// row on its own; we just refresh the count once the reset has applied.
+	document.addEventListener("reset", (e) => {
+		const form = e.target;
+		if (form instanceof HTMLFormElement) {
+			window.setTimeout(() => updateSelectedCount(form), 0);
 		}
 	});
 
@@ -485,13 +572,13 @@
 			return;
 		}
 
-		// Contact rows — a real link to the full edit page (no-JS fallback); with
-		// JS, jump straight to the edit dialog instead of navigating away.
-		const previewTrigger = t.closest("[data-hover-preview]");
-		if (previewTrigger?.dataset.hoverPreview) {
+		// Contact row body — a real link to the full preview page (no-JS opens it
+		// in a new tab); with JS, load it into the preview pane instead.
+		const openPaneTrigger = t.closest("[data-open-pane]");
+		if (openPaneTrigger instanceof HTMLAnchorElement) {
 			e.preventDefault();
 			hideHoverCard();
-			openEditDialog(previewTrigger.href);
+			openPane(openPaneTrigger.href);
 			return;
 		}
 
@@ -559,6 +646,11 @@
 	const hoverCardEl = document.getElementById(hoverCardId);
 	hoverCardEl?.addEventListener("mouseenter", clearHoverCloseTimer);
 	hoverCardEl?.addEventListener("mouseleave", scheduleHoverCardClose);
+
+	// The hover card is position:fixed and anchored once on open, so it would
+	// hang in place while the list scrolls under it. Dismiss it on any scroll
+	// (capture phase, since scroll on #contact-list doesn't bubble).
+	document.addEventListener("scroll", hideHoverCard, true);
 
 	// --- Bulk-job progress (SSE) ----------------------------------------------
 	// Chunked bulk actions (delete/clear-photo/download/export/import/cleanup
@@ -652,5 +744,6 @@
 			}
 		}
 		hideHoverCard();
+		closePane();
 	});
 })();

@@ -167,6 +167,8 @@ const listForCollection = Effect.fn("CardIndexRepository.listForCollection")(
 					fn: cardIndex.fn,
 					email: sql<string | null>`${cardIndex.data}->'emails'->>0`,
 					tel: sql<string | null>`${cardIndex.data}->'phones'->>0`,
+					org: sql<string | null>`${cardIndex.data}->>'org'`,
+					title: sql<string | null>`${cardIndex.data}->>'title'`,
 					hasPhoto: sql<boolean>`COALESCE((${cardIndex.data}->>'has_photo')::boolean, false)`,
 				})
 				.from(cardIndex)

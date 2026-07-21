@@ -45,6 +45,8 @@
 		--warning: 180 129 8;
 		--nav: 15 23 42;
 		--nav-border: 30 41 59;
+		/* Scroll-shadow tint — soft on the light canvas, stronger on the dark. */
+		--scroll-shadow: rgb(15 23 42 / 0.12);
 
 		/* FullCalendar theming — mirrors FullCalendar's own official "forma"
 		   Tailwind starter (github.com/fullcalendar/tailwind-starters), which
@@ -97,6 +99,7 @@
 		--warning: 250 204 21;
 		--nav: 12 15 20;
 		--nav-border: 30 37 46;
+		--scroll-shadow: rgb(0 0 0 / 0.45);
 	}
 
 	@media (prefers-color-scheme: dark) {
@@ -123,6 +126,7 @@
 			--warning: 250 204 21;
 			--nav: 12 15 20;
 			--nav-border: 30 37 46;
+			--scroll-shadow: rgb(0 0 0 / 0.45);
 		}
 	}
 
@@ -603,6 +607,123 @@
 		overflow-y: auto;
 	}
 
+	/* Contacts address-book drawer — a popover (`popover="auto"`) that is a
+	   left-anchored drawer on mobile (toggled via popovertarget, native light-
+	   dismiss) and a persistent inline column at xl (the desktop reveal lives in
+	   the unlayered section below). */
+	.contacts-drawer {
+		margin: 0;
+		height: 100dvh;
+		max-height: none;
+		width: min(20rem, 85vw);
+		border: 0;
+		padding: 0;
+		background-color: rgb(var(--surface));
+	}
+	.contacts-drawer::backdrop {
+		background: rgb(0 0 0 / 0.45);
+	}
+	/* Solid background by default so the mobile/mid-size slide-out drawer is
+	   opaque and readable over the content behind it. At xl the drawer becomes
+	   the persistent inline column, where it's made transparent again to blend
+	   into the page (see the xl override in the unlayered section below). */
+	.contacts-drawer-panel {
+		height: 100%;
+		overflow-y: auto;
+		background-color: rgb(var(--surface));
+		border-right: 1px solid rgb(var(--line));
+	}
+
+	/* Contacts preview pane — a popover (`popover="auto"`, opened by contacts.js
+	   via showPopover on every screen size). Mobile: a full-bleed, square-
+	   cornered sheet covering the viewport. Desktop: a right-anchored panel over
+	   a dimmed backdrop that keeps the list visible behind it; clicking the
+	   backdrop
+	   dismisses it. */
+	.contacts-pane {
+		margin: 0 0 0 auto;
+		height: 100dvh;
+		max-height: none;
+		width: 100vw;
+		border: 0;
+		padding: 0;
+		background: transparent;
+	}
+	.contacts-pane::backdrop {
+		background: rgb(0 0 0 / 0.3);
+	}
+	.contacts-pane-panel {
+		height: 100%;
+		overflow-y: auto;
+		scrollbar-gutter: stable;
+		border-width: 0;
+		border-radius: 0;
+	}
+	@media (min-width: 1024px) {
+		.contacts-pane {
+			width: min(30rem, calc(100vw - 2rem));
+			height: calc(100dvh - 2rem);
+			margin: 1rem 1rem 1rem auto;
+		}
+		.contacts-pane-panel {
+			border-width: 1px;
+			border-radius: 0.375rem;
+		}
+	}
+
+	/* Pure-CSS scroll shadow on the contact list: a soft shadow fades in at the
+	   top of the list only once it's scrolled, so the search header above reads
+	   as casting it (and stays clean when flush at the top). No JS.
+
+	   The classic background-attachment trick: a `--canvas`-coloured cover layer
+	   (background-attachment: local) scrolls up with the content and, at the top,
+	   hides the shadow layer beneath it; the shadow layer (background-attachment:
+	   scroll) is pinned to the top of the scrollport and shows once the cover
+	   scrolls away. On mobile the list doesn't scroll, so the cover never moves
+	   and no shadow shows. */
+	.contacts-scroll-shadow {
+		background:
+			linear-gradient(rgb(var(--canvas)) 30%, rgb(var(--canvas) / 0)) top / 100%
+			24px local no-repeat,
+			linear-gradient(var(--scroll-shadow), transparent) top / 100% 14px scroll
+			no-repeat;
+	}
+
+	/* Avatar-as-checkbox — the real checkbox is visually hidden; a ring plus a
+	   check overlay convey the selected state, all with no JS. */
+	.contact-avatar-check {
+		cursor: pointer;
+	}
+	.contact-avatar-check .avatar,
+	.contact-avatar-check .check-overlay {
+		transition:
+			box-shadow 0.12s ease,
+			opacity 0.12s ease;
+	}
+	.contact-avatar-check .check-overlay {
+		position: absolute;
+		inset: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 9999px;
+		opacity: 0;
+		background: rgb(var(--ink) / 0.55);
+		color: rgb(var(--ink-fg));
+	}
+	.contact-avatar-check:hover input:not(:checked) ~ .check-overlay {
+		opacity: 0.4;
+	}
+	.contact-avatar-check input:checked ~ .check-overlay {
+		opacity: 1;
+	}
+	.contact-avatar-check input:checked ~ .avatar {
+		box-shadow: 0 0 0 2px rgb(var(--ink));
+	}
+	.contact-avatar-check input:focus-visible ~ .avatar {
+		box-shadow: 0 0 0 2px rgb(var(--brand));
+	}
+
 	/* Contacts bulk-action progress bar — injected by contacts.js at the top
 	   of the viewport during long-running bulk ops. Defined statically here
 	   (rather than via a runtime-injected <style> tag) so it isn't blocked by
@@ -692,6 +813,90 @@ html.js [data-nojs-only] {
 }
 .dark .theme-icon-light {
 	display: none;
+}
+
+/* ------------------------------------------------------------------ */
+/* Contacts layout — UNLAYERED ON PURPOSE (see the note above)         */
+/*                                                                     */
+/* The drawer/pane are <dialog>s. On desktop they must display as      */
+/* static columns, overriding the UA `dialog:not([open]){display:none}`*/
+/* rule and beating any Tailwind display utility, so these live here    */
+/* after `@tailwind utilities`.                                        */
+/* ------------------------------------------------------------------ */
+/* Address-book drawer: a persistent inline column only at xl+, so it doesn't
+   cramp beside the list/preview split on mid-size screens. Below xl it stays
+   the mobile modal drawer (base styles above). */
+@media (min-width: 1280px) {
+	.contacts-drawer {
+		display: block;
+		position: static;
+		height: 100%;
+		max-height: none;
+		width: 18rem;
+		margin: 0;
+		flex-shrink: 0;
+	}
+	/* As the persistent desktop column, blend into the page (no box). */
+	.contacts-drawer,
+	.contacts-drawer-panel {
+		background-color: transparent;
+		border-right: 0;
+	}
+}
+/* Bulk-action bar: hidden until at least one row is selected, but only once JS
+   is active (`html.js`). No-JS keeps it visible so bulk forms stay usable.
+   `:has()` re-evaluates live, so it survives the #contact-list HTMX refresh. */
+html.js [data-bulk-bar] {
+	display: none;
+}
+html.js form:has(input[name="id"]:checked) [data-bulk-bar] {
+	display: flex;
+}
+
+/* ------------------------------------------------------------------ */
+/* Popover slide-in animations                                         */
+/*                                                                     */
+/* @starting-style + `transition-behavior: allow-discrete` animate the */
+/* transform on open AND close. Browsers without support just show/    */
+/* hide instantly. The pane is always a popover (slides from the       */
+/* right); the drawer is only a popover below xl (a static column at   */
+/* xl+), so its slide is scoped there to avoid shoving the desktop     */
+/* column off-screen. `prefers-reduced-motion` opts out.               */
+/* ------------------------------------------------------------------ */
+@media (prefers-reduced-motion: no-preference) {
+	.contacts-pane {
+		transform: translateX(100%);
+		transition:
+			transform 0.25s ease,
+			overlay 0.25s ease allow-discrete,
+			display 0.25s ease allow-discrete;
+	}
+	.contacts-pane:popover-open {
+		transform: translateX(0);
+	}
+	@starting-style {
+		.contacts-pane:popover-open {
+			transform: translateX(100%);
+		}
+	}
+
+	@media (max-width: 1279.98px) {
+		.contacts-drawer {
+			transform: translateX(-100%);
+			transition:
+				transform 0.25s ease,
+				overlay 0.25s ease allow-discrete,
+				display 0.25s ease allow-discrete;
+		}
+		.contacts-drawer:popover-open {
+			transform: translateX(0);
+		}
+		@starting-style {
+			.contacts-drawer:popover-open {
+				transform: translateX(-100%);
+			}
+		}
+	}
 }
 
 /* FullCalendar styling lives entirely in calendar.client.ts /

@@ -102,6 +102,19 @@ export const IconClose = (props: IconProps) => (
 	</Svg>
 );
 
+export const IconSearch = (props: IconProps) => (
+	<Svg {...props}>
+		<circle cx="11" cy="11" r="8" />
+		<path d="m21 21-4.3-4.3" />
+	</Svg>
+);
+
+export const IconMenu = (props: IconProps) => (
+	<Svg {...props}>
+		<path d="M4 6h16M4 12h16M4 18h16" />
+	</Svg>
+);
+
 export const IconRss = (props: IconProps) => (
 	<Svg {...props}>
 		<path d="M4 11a9 9 0 0 1 9 9M4 4a16 16 0 0 1 16 16" />

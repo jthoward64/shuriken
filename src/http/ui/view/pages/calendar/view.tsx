@@ -593,6 +593,7 @@ export const CalendarViewPage = (props: CalendarViewProps) => {
 		<>
 			<SidebarShell
 				label="Calendars"
+				gap={false}
 				top={
 					<>
 						<NewEventButton disabled={!hasActiveCalendar || !activeWritable} />
@@ -628,7 +629,7 @@ export const CalendarViewPage = (props: CalendarViewProps) => {
 				<div
 					id="cal-fallback"
 					data-nojs-only
-					class="card card-pad space-y-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto"
+					class="card card-pad space-y-3 rounded-none lg:min-h-0 lg:flex-1 lg:overflow-y-auto"
 				>
 					<MonthNav
 						activeId={activeId}
@@ -650,7 +651,7 @@ export const CalendarViewPage = (props: CalendarViewProps) => {
 				<div
 					id="fullcalendar"
 					hidden
-					class="card card-pad lg:min-h-0 lg:flex-1"
+					class="card card-pad rounded-none lg:min-h-0 lg:flex-1"
 					data-active={activeId}
 					data-initial-date={monthStartIso}
 					data-sources={JSON.stringify(sources)}

@@ -1,8 +1,13 @@
 import type { VNode } from "preact";
 import { emptyContactForm } from "#src/services/card-edit/types.ts";
-import { IconChevronDown, IconPlus, IconSpinner } from "../../icons.tsx";
+import {
+	IconCheck,
+	IconChevronDown,
+	IconPlus,
+	IconSearch,
+	IconSpinner,
+} from "../../icons.tsx";
 import { buttonClass, InlineModalPopover } from "../../ui.tsx";
-import { SidebarShell } from "../sidebar-shell.tsx";
 import { EditContactPopoverContainer } from "./edit-dialog.tsx";
 import { ContactFormPage } from "./form.tsx";
 import { ContactHoverCardContainer } from "./hover-card.tsx";
@@ -11,22 +16,29 @@ import {
 	ContactsPopoverContainer,
 	NEW_CONTACT_POPOVER_ID,
 } from "./popover.tsx";
+import { ContactsPaneContainer } from "./preview-pane.tsx";
+import { ContactsDrawerToggle, ContactsShell } from "./shell.tsx";
 
 // ---------------------------------------------------------------------------
 // Contacts list page.
 //
-// A left sidebar (new-contact button + an address-book list, with import /
-// export / tools pinned at the bottom) sits beside the main content: a search
-// bar over the contact table.
+// The address-book sidebar (new-contact button + address-book list, with
+// import / export / tools pinned at the bottom) is a popover drawer on mobile
+// and a persistent column at xl+ (ContactsShell). Beside it: an integrated
+// search header over a simple avatar+name list, and a read-only preview popover
+// that opens over the (dimmed, still-visible) list on a row click.
 //
-// The contact table + bulk toolbar live inside a `#contact-list` region that
-// re-fetches itself on the `contacts:changed` event (fired by the import
-// endpoint via an HX-Trigger header). So a successful import updates the table
-// without a full navigation, while the import summary lands in `#import-result`.
+// The list + bulk toolbar live inside a `#contact-list` region that re-fetches
+// itself on the `contacts:changed` event (fired by the import endpoint via an
+// HX-Trigger header). So a successful import updates the list without a full
+// navigation, while the import summary lands in `#import-result`. The search
+// header and preview popover sit OUTSIDE `#contact-list` so a refresh can't wipe
+// them.
 //
-// Bulk actions keep the original single-form / multiple-formaction shape so they
-// work without JavaScript; HTMX attributes are layered on as an override (with
-// the progress bar + navigate guard from static/contacts.js via [data-guard]).
+// Every interaction has a no-JS fallback (native GET/POST forms, native popover
+// toggles, target=_blank preview links); HTMX/contacts.js layer on the drawer/
+// pane/bulk enhancements. Bulk actions keep the single-form / multiple-
+// formaction shape so they work without JavaScript.
 // ---------------------------------------------------------------------------
 
 export interface AddressbookOption {
@@ -42,8 +54,8 @@ export interface AddressbookOption {
 export interface ContactRow {
 	readonly instanceId: string;
 	readonly fn: string;
-	readonly email: string;
-	readonly tel: string;
+	/** Muted secondary line: primary email, else "Title, Org" (may be empty). */
+	readonly subtitle: string;
 	readonly hasPhoto: boolean;
 	/** First character of the display name, for the initials placeholder. */
 	readonly initial: string;
@@ -285,12 +297,15 @@ const ImportForm = ({
 		data-guard=""
 		class="space-y-2"
 	>
-		<div class="flex items-center gap-2">
+		{/* Button group: a single bordered control split by a divider — the Import
+		    button takes ~2/3, the duplicate-mode select ~1/3. */}
+		<div
+			class={`flex items-stretch overflow-hidden rounded-md border border-line-strong bg-surface text-sm ${
+				disabled ? "pointer-events-none opacity-50" : ""
+			}`}
+		>
 			<label
-				class={buttonClass(
-					"secondary",
-					`flex-1 cursor-pointer ${disabled ? "pointer-events-none opacity-50" : ""}`,
-				)}
+				class="flex grow-[2] basis-0 cursor-pointer items-center justify-center gap-2 px-3 py-2 font-medium text-fg hover:bg-surface-2"
 				title={disabled ? "Read-only address book" : undefined}
 			>
 				Import .vcf
@@ -303,9 +318,14 @@ const ImportForm = ({
 					data-autosubmit=""
 				/>
 			</label>
+			<div
+				class="w-px shrink-0 self-stretch bg-line-strong"
+				aria-hidden="true"
+			/>
 			<select
 				name="mode"
-				class="form-select w-auto text-xs"
+				disabled={disabled}
+				class="grow basis-0 border-0 bg-transparent px-2 py-2 text-xs text-fg focus:outline-none focus-visible:bg-surface-2 focus-visible:ring-0 focus-visible:ring-offset-0"
 				aria-label="How to handle duplicate contacts"
 				title="How to handle duplicate contacts"
 			>
@@ -388,8 +408,10 @@ const ContactTools = ({
 // --- Bulk toolbar + table (the refreshable region) -------------------------
 
 const BulkToolbar = ({ writable }: { writable: boolean }): VNode => (
-	<div class="flex flex-wrap items-center gap-2 card card-pad !py-2">
-		<span class="text-sm text-muted mr-1">With selected:</span>
+	<div data-bulk-bar class="flex flex-wrap items-center gap-2">
+		<span class="text-sm text-muted mr-1">
+			<span data-selected-count>0</span> selected:
+		</span>
 		<button
 			type="submit"
 			formaction="/ui/api/contacts/bulk-download"
@@ -435,83 +457,87 @@ const BulkToolbar = ({ writable }: { writable: boolean }): VNode => (
 				</button>
 			</>
 		)}
+		{/* Native reset clears every checkbox in the form — no JS needed; the
+		    :has() rule then hides the bar (and contacts.js resets the count). */}
+		<button type="reset" class="btn btn-ghost btn-sm ml-auto">
+			Clear
+		</button>
 	</div>
 );
 
-const ContactTable = ({
+// A single list row with three interaction targets, all flex siblings so their
+// click areas never overlap:
+//   - the avatar is a <label> wrapping a visually-hidden real checkbox, so
+//     clicking it toggles selection (works with no JS; the bulk form posts the
+//     checked ids);
+//   - the body is a link that opens the preview — with JS contacts.js loads it
+//     into the pane / hover card; with no JS it opens the full preview page in a
+//     new tab;
+//   - the Edit link opens the edit dialog (JS) or the full edit page (no JS).
+const ContactListRow = ({ c }: { c: ContactRow }): VNode => (
+	<li class="flex items-center gap-3 py-2">
+		<label class="contact-avatar-check relative block h-10 w-10 shrink-0">
+			<input
+				type="checkbox"
+				name="id"
+				value={c.instanceId}
+				class="peer sr-only"
+				aria-label={`Select ${c.fn}`}
+			/>
+			{c.hasPhoto ? (
+				<img
+					src={`/ui/contacts/${c.instanceId}/photo`}
+					alt=""
+					loading="lazy"
+					class="avatar h-10 w-10 rounded-full bg-surface-2 object-cover"
+				/>
+			) : (
+				<span
+					class="avatar flex h-10 w-10 items-center justify-center rounded-full bg-surface-2 text-sm font-medium text-muted"
+					aria-hidden="true"
+				>
+					{c.initial}
+				</span>
+			)}
+			<span class="check-overlay" aria-hidden="true">
+				<IconCheck class="h-5 w-5" />
+			</span>
+		</label>
+		<a
+			href={`/ui/contacts/${c.instanceId}/preview`}
+			target="_blank"
+			rel="noopener"
+			data-open-pane
+			data-hover-preview={`/ui/contacts/${c.instanceId}/preview?variant=hover`}
+			class="min-w-0 flex-1 rounded-md px-2 py-1 hover:bg-surface-2"
+		>
+			<span class="block truncate text-fg">{c.fn}</span>
+			{c.subtitle !== "" && (
+				<span class="block truncate text-sm text-muted">{c.subtitle}</span>
+			)}
+		</a>
+		<a
+			href={`/ui/contacts/${c.instanceId}`}
+			data-edit-contact
+			class="link shrink-0"
+		>
+			Edit
+		</a>
+	</li>
+);
+
+const ContactListRows = ({
 	contacts,
 }: {
 	contacts: ReadonlyArray<ContactRow>;
 }): VNode => (
-	<div class="table-wrap">
-		<table class="table">
-			<thead>
-				<tr>
-					<th class="w-8">
-						<input
-							type="checkbox"
-							aria-label="Select all contacts"
-							data-check-all=""
-						/>
-					</th>
-					<th class="w-12 sr-only">Photo</th>
-					<th>Name</th>
-					<th>Email</th>
-					<th>Phone</th>
-					<th />
-				</tr>
-			</thead>
-			<tbody>
-				{contacts.map((c) => (
-					<tr key={c.instanceId}>
-						<td>
-							<input
-								type="checkbox"
-								name="id"
-								value={c.instanceId}
-								aria-label={`Select ${c.fn}`}
-							/>
-						</td>
-						<td>
-							{c.hasPhoto ? (
-								<img
-									src={`/ui/contacts/${c.instanceId}/photo`}
-									alt=""
-									loading="lazy"
-									class="w-9 h-9 rounded-full object-cover bg-surface-2"
-								/>
-							) : (
-								<span
-									class="w-9 h-9 rounded-full bg-surface-2 text-muted flex items-center justify-center text-sm font-medium"
-									aria-hidden="true"
-								>
-									{c.initial}
-								</span>
-							)}
-						</td>
-						<td class="text-fg">{c.fn}</td>
-						<td class="text-muted">{c.email}</td>
-						<td class="text-muted">{c.tel}</td>
-						<td class="text-right">
-							{/* With JS, hover or click loads the read-only preview into the
-							    hover card (contacts.js) instead of navigating; its Edit
-							    button opens the real edit dialog. Without JS, the link opens
-							    the full edit page in a new tab. */}
-							<a
-								href={`/ui/contacts/${c.instanceId}`}
-								target="_blank"
-								rel="noopener"
-								data-hover-preview={`/ui/contacts/${c.instanceId}/preview`}
-								class="link"
-							>
-								Open
-							</a>
-						</td>
-					</tr>
-				))}
-			</tbody>
-		</table>
-	</div>
+	// Small horizontal padding so the selected-avatar ring (a 2px box-shadow on
+	// the flush-left avatar) isn't clipped by the scroll container's edge.
+	<ul class="divide-y divide-line px-1">
+		{contacts.map((c) => (
+			<ContactListRow key={c.instanceId} c={c} />
+		))}
+	</ul>
 );
 
 const Pagination = ({
@@ -589,7 +615,7 @@ const ContactList = ({
 		hx-target="#contact-list"
 		hx-select="#contact-list"
 		hx-swap="outerHTML"
-		class="lg:min-h-0 lg:flex-1 lg:overflow-y-auto"
+		class="contacts-scroll-shadow lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:[scrollbar-gutter:stable] p-2"
 	>
 		{contacts.length > 0 ? (
 			<form
@@ -598,8 +624,14 @@ const ContactList = ({
 				class="space-y-3"
 			>
 				<input type="hidden" name="addressbook" value={selectedId} />
-				<BulkToolbar writable={writable} />
-				<ContactTable contacts={contacts} />
+				<div class="flex flex-wrap items-center gap-3 ml-1 min-h-8">
+					<label class="flex items-center gap-2 text-sm text-muted">
+						<input type="checkbox" data-check-all="" />
+						Select all
+					</label>
+					<BulkToolbar writable={writable} />
+				</div>
+				<ContactListRows contacts={contacts} />
 			</form>
 		) : (
 			<p class="text-sm text-muted">
@@ -643,9 +675,9 @@ export const ContactsListPage = ({
 
 	return (
 		<>
-			<SidebarShell
+			<ContactsShell
 				label="Address books"
-				top={
+				drawerTop={
 					<>
 						{/* Inline dialog: opens natively (no JS needed). */}
 						<button
@@ -662,7 +694,7 @@ export const ContactsListPage = ({
 						<AddressbookList addressbooks={addressbooks} query={query} />
 					</>
 				}
-				bottom={
+				drawerBottom={
 					<>
 						<ImportForm selectedId={selectedId} disabled={!selectedWritable} />
 						<ContactTools selectedId={selectedId} writable={selectedWritable} />
@@ -672,36 +704,39 @@ export const ContactsListPage = ({
 				{notice && <ImportNoticeBanner notice={notice} />}
 				<div id="import-result" class="empty:hidden lg:shrink-0" />
 
-				<form
-					method="GET"
-					action="/ui/contacts"
-					class="card card-pad !py-3 flex flex-wrap items-center gap-3 lg:shrink-0"
-				>
-					<input type="hidden" name="addressbook" value={selectedId} />
-					<label class="text-sm text-muted flex items-center gap-2 flex-1 min-w-[12rem]">
-						Search
+				{/* Integrated search header: the drawer toggle (mobile) sits inline
+				    with the search field. Plain GET form so it works with no JS. */}
+				<div class="flex items-center gap-2 lg:shrink-0 pl-2 pb-2">
+					<ContactsDrawerToggle />
+					<form method="GET" action="/ui/contacts" class="relative flex-1">
+						<input type="hidden" name="addressbook" value={selectedId} />
+						<IconSearch class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" />
+						{/* No submit button: a GET form with a single text input submits
+						    on Enter natively, with or without JS. */}
 						<input
 							type="search"
 							name="q"
 							value={query}
-							placeholder="Name…"
-							class="form-input"
+							placeholder="Search contacts…"
+							aria-label="Search contacts"
+							class="w-full border-0 bg-transparent py-2 pl-9 pr-2 text-base text-fg placeholder:text-subtle focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
 						/>
-					</label>
-					<button type="submit" class="btn btn-secondary btn-sm">
-						Filter
-					</button>
-				</form>
+					</form>
+				</div>
 
-				<ContactList
-					selectedId={selectedId}
-					query={query}
-					page={page}
-					totalPages={totalPages}
-					contacts={contacts}
-					writable={selectedWritable}
-				/>
-			</SidebarShell>
+				<div class="flex min-w-0 flex-1 flex-col lg:min-h-0">
+					<ContactList
+						selectedId={selectedId}
+						query={query}
+						page={page}
+						totalPages={totalPages}
+						contacts={contacts}
+						writable={selectedWritable}
+					/>
+				</div>
+				{/* Modal preview pane (top-layer; opened by contacts.js on row click). */}
+				<ContactsPaneContainer />
+			</ContactsShell>
 			{/* New contact — form rendered inline so the dialog opens with no JS. */}
 			<InlineModalPopover id={NEW_CONTACT_POPOVER_ID}>
 				<ContactFormPage

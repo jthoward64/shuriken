@@ -33,6 +33,10 @@ export interface CardSummaryRow {
 	readonly fn: string | null;
 	readonly email: string | null;
 	readonly tel: string | null;
+	/** ORG value (empty string when absent). Used for the list-row subtitle. */
+	readonly org: string | null;
+	/** TITLE value (empty string when absent). Used for the list-row subtitle. */
+	readonly title: string | null;
 	/** Whether the underlying vCard carries a PHOTO property (see the
 	 * card_index trigger's data->>'has_photo'). Used by the list UI to decide
 	 * between an <img> (served by the photo endpoint) and a placeholder. */

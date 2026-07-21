@@ -117,7 +117,7 @@ export const Layout = ({
 			</a>
 			{chrome === "full" && (
 				<header class="app-nav">
-					<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+					<div class="max-w-7xl mx-auto px-4">
 						<div class="flex items-center justify-between h-14 gap-4">
 							<div class="flex items-center gap-2">
 								<a href="/ui/calendar" class="app-brand mr-2">
@@ -167,8 +167,10 @@ export const Layout = ({
 			<main
 				id="main"
 				class={cx(
-					"flex-1 w-full mx-auto px-4 sm:px-6 lg:px-8 py-8",
-					wide ? "max-w-none" : "max-w-7xl",
+					"flex-1 w-full",
+					// Wide pages (calendar/contacts/tasks) go edge-to-edge and manage
+					// their own insets; everything else gets the centered padded column.
+					wide ? "max-w-none" : "mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8",
 					fill && "lg:min-h-0 lg:overflow-hidden",
 				)}
 			>

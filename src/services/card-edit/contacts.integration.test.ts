@@ -220,7 +220,7 @@ describe("Contacts CRUD (integration)", () => {
 		}
 	});
 
-	it("listForCollection projects fn/email/tel and filters by fn", async () => {
+	it("listForCollection projects fn/email/tel/org/title and filters by fn", async () => {
 		const runtime = ManagedRuntime.make(makeScriptRunnerLayer());
 		try {
 			const addressbookId = await runtime.runPromise(
@@ -264,6 +264,8 @@ describe("Contacts CRUD (integration)", () => {
 			const bob = all.find((c) => c.fn === "Bob Builder");
 			expect(bob?.email).toBe("bob@example.com");
 			expect(bob?.tel).toBe("+1-555-0101");
+			expect(bob?.org).toBe("Acme");
+			expect(bob?.title).toBe("Architect");
 
 			// FN search: case-insensitive substring on the fold column.
 			const filtered = await runtime.runPromise(
