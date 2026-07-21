@@ -5,8 +5,8 @@ description: |
   management UI, public iCal feeds, bulk import/export, and
   RFC 6638 scheduling (iMIP).
 type: application
-version: 0.4.3
-appVersion: 0.6.0
+version: 0.4.4
+appVersion: 0.7.0
 home: https://github.com/jthoward64/shuriken
 sources:
   - https://github.com/jthoward64/shuriken
