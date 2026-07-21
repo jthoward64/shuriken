@@ -153,20 +153,31 @@ const boundedOccurrencesInRange = (
 	queryEnd: Temporal.Instant,
 	limits: RruleExpansionLimits,
 ): ReadonlyArray<Temporal.Instant> => {
+	// rrule-temporal invokes the iterator callback more than once per occurrence
+	// (it re-runs it during its internal count-limit / RDATE-merge pass), so
+	// accumulating instants from the callback double-counts. The clean set is
+	// only observable by de-duplicating on the occurrence instant. We cannot use
+	// `all()`'s return value instead: a count/time cap that stops iteration early
+	// corrupts that return value to empty, whereas the iterator caps are exactly
+	// what bounds otherwise-unbounded rules.
 	const results: Array<Temporal.Instant> = [];
+	const seenEpochMs = new Set<number>();
 	const startedAt = Temporal.Now.instant();
 	let checked = 0;
 	rule.all((occZdt) => {
 		checked += 1;
-		const inst = Temporal.Instant.fromEpochMilliseconds(
-			occZdt.epochMilliseconds,
-		);
+		const epochMs = occZdt.epochMilliseconds;
+		const inst = Temporal.Instant.fromEpochMilliseconds(epochMs);
 		// Occurrences come out in chronological order — once we're at/past the
 		// end of the range nothing further can match, so stop entirely.
 		if (Temporal.Instant.compare(inst, queryEnd) >= 0) {
 			return false;
 		}
-		if (Temporal.Instant.compare(inst, queryStart) >= 0) {
+		if (
+			Temporal.Instant.compare(inst, queryStart) >= 0 &&
+			!seenEpochMs.has(epochMs)
+		) {
+			seenEpochMs.add(epochMs);
 			results.push(inst);
 		}
 		if (checked >= limits.maxOccurrencesChecked) {

@@ -1,6 +1,6 @@
 import { Effect, Layer, Option, Redacted, Ref } from "effect";
 import { Temporal } from "temporal-polyfill";
-import { authenticateBasic } from "#src/auth/layers/basic.ts";
+import { authenticateBasic, parseBasicAuth } from "#src/auth/layers/basic.ts";
 import { resolveAutoLoginPrincipal } from "#src/auth/layers/single-user.ts";
 import {
 	emptyRateLimitState,
@@ -84,21 +84,32 @@ export const CompositeAuthLayer = Layer.effect(
 					}
 
 					// 3. Basic auth — when enabled, rate-limited per client IP.
+					//
+					// The rate limit only counts requests that actually carry Basic
+					// credentials. A credential-less request is a client that hasn't
+					// been challenged yet, not a failed attempt — challenge-based
+					// clients (browsers, python-caldav, many DAV clients) always probe
+					// unauthenticated first, and counting those probes would let such a
+					// client lock its own IP out before it ever sends a password.
 					if (basicAuthEnabled) {
+						const hasCredentials = Option.isSome(parseBasicAuth(headers));
 						const rateLimitKey = Option.getOrElse(clientIp, () => "unknown");
 						const now = Temporal.Now.instant();
-						const blocked = isRateLimited(
-							yield* Ref.get(rateLimitState),
-							rateLimitKey,
-							now,
-							rateLimitConfig,
-						);
-						if (blocked) {
-							yield* Effect.logWarning(
-								"auth.composite: rate-limited basic-auth attempt",
-								{ clientIp: rateLimitKey },
+
+						if (hasCredentials) {
+							const blocked = isRateLimited(
+								yield* Ref.get(rateLimitState),
+								rateLimitKey,
+								now,
+								rateLimitConfig,
 							);
-							return new Unauthenticated();
+							if (blocked) {
+								yield* Effect.logWarning(
+									"auth.composite: rate-limited basic-auth attempt",
+									{ clientIp: rateLimitKey },
+								);
+								return new Unauthenticated();
+							}
 						}
 
 						const result = yield* authenticateBasic(headers).pipe(
@@ -108,9 +119,11 @@ export const CompositeAuthLayer = Layer.effect(
 						if (result._tag === "Authenticated") {
 							return result;
 						}
-						yield* Ref.update(rateLimitState, (s) =>
-							recordFailure(s, rateLimitKey, now, rateLimitConfig),
-						);
+						if (hasCredentials) {
+							yield* Ref.update(rateLimitState, (s) =>
+								recordFailure(s, rateLimitKey, now, rateLimitConfig),
+							);
+						}
 					}
 
 					return new Unauthenticated();

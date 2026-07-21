@@ -6,7 +6,10 @@ import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
 import { Temporal } from "temporal-polyfill";
 import type { IrComponent } from "#src/data/ir.ts";
-import { hasOccurrenceInRange } from "./recurrence-check.ts";
+import {
+	getOccurrenceInstantsInRange,
+	hasOccurrenceInRange,
+} from "./recurrence-check.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -461,5 +464,67 @@ describe("hasOccurrenceInRange", () => {
 				),
 			).toBe(false);
 		});
+	});
+});
+
+// ---------------------------------------------------------------------------
+// getOccurrenceInstantsInRange — the enumerated set used by <C:expand>. Unlike
+// hasOccurrenceInRange (which only checks existence and so masks duplicates),
+// this returns one instant per occurrence and must be exact and duplicate-free
+// when iteration stops early at the range end.
+// ---------------------------------------------------------------------------
+
+const starts = (occ: ReadonlyArray<Temporal.Instant>) =>
+	occ.map((i) => i.toString());
+
+describe("getOccurrenceInstantsInRange", () => {
+	it("does not duplicate occurrences when the range ends mid-series", () => {
+		// An unbounded bi-weekly master: iteration stops at the first occurrence
+		// past the range end, which is where the underlying rrule library
+		// re-emits already-yielded occurrences.
+		const vevent = makeVevent(
+			"biweekly@test",
+			zdtProp("DTSTART", "2024-04-11T12:30:00Z[UTC]"),
+			"FREQ=WEEKLY;INTERVAL=2",
+		);
+		const root = vcal(vevent);
+		const occ = getOccurrenceInstantsInRange(
+			root,
+			vevent,
+			inst("2024-03-31T00:00:00Z"),
+			inst("2024-05-04T00:00:00Z"),
+		);
+		expect(starts(occ)).toEqual([
+			"2024-04-11T12:30:00Z",
+			"2024-04-25T12:30:00Z",
+		]);
+	});
+
+	it("excludes a RECURRENCE-ID override from the master expansion", () => {
+		// The master expands to 04-11 and 04-25; a sibling override carries
+		// RECURRENCE-ID 04-25. The master must skip that slot (the override is
+		// emitted separately by the caller), so the master yields only 04-11.
+		const master = makeVevent(
+			"ovr@test",
+			zdtProp("DTSTART", "2024-04-11T12:30:00Z[UTC]"),
+			"FREQ=WEEKLY;INTERVAL=2",
+		);
+		const override: IrComponent = {
+			name: "VEVENT",
+			properties: [
+				textProp("UID", "ovr@test"),
+				zdtProp("RECURRENCE-ID", "2024-04-25T12:30:00Z[UTC]"),
+				zdtProp("DTSTART", "2024-04-25T12:30:00Z[UTC]"),
+			],
+			components: [],
+		};
+		const root = vcal(master, override);
+		const occ = getOccurrenceInstantsInRange(
+			root,
+			master,
+			inst("2024-03-31T00:00:00Z"),
+			inst("2024-05-04T00:00:00Z"),
+		);
+		expect(starts(occ)).toEqual(["2024-04-11T12:30:00Z"]);
 	});
 });

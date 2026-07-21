@@ -1,4 +1,4 @@
-import { Effect, Layer, Option, Redacted, References } from "effect";
+import { Effect, Layer, References } from "effect";
 import { BasicAuthLayer } from "#src/auth/layers/basic.ts";
 import { AppConfigService, type AppConfigType } from "#src/config.ts";
 import type { DatabaseClient } from "#src/db/client.ts";
@@ -47,6 +47,7 @@ import {
 import { TombstoneRepositoryLive } from "#src/services/tombstone/index.ts";
 import { TrashServiceLive } from "#src/services/trash/service.live.ts";
 import { UserDomainLayer } from "#src/services/user/index.ts";
+import { makeTestConfig, testAppConfig } from "#src/testing/config.ts";
 import { TestCryptoLayer } from "#src/testing/env.ts";
 import { makePgliteDatabaseLayer } from "#src/testing/pglite.ts";
 
@@ -57,93 +58,7 @@ import { makePgliteDatabaseLayer } from "#src/testing/pglite.ts";
 // (bypassed by the PGlite layer). Does not read any environment variables.
 // ---------------------------------------------------------------------------
 
-const testConfig: AppConfigType = {
-	server: { port: 3000, host: "localhost" },
-	metrics: { enabled: false, port: 9464 },
-	database: { url: Redacted.make("postgres://unused") },
-	auth: {
-		autoLogin: Option.none<string>(),
-		trustedProxies: "*",
-		basicAuthEnabled: true,
-		authRateLimitMaxAttempts: 10,
-		authRateLimitWindowS: 60,
-		adminEmail: Option.none<string>(),
-		adminPassword: Option.none<Redacted.Redacted<string>>(),
-		adminSlug: Option.none<string>(),
-		authSettingsUrl: Option.none<string>(),
-		authSettingsLabel: Option.none<string>(),
-		oidcEnabled: false,
-		oidcIssuer: Option.none<string>(),
-		oidcClientId: Option.none<string>(),
-		oidcClientSecret: Option.none<Redacted.Redacted<string>>(),
-		oidcRedirectUri: Option.none<string>(),
-		oidcScopes: "openid profile email",
-		oidcAutoProvision: true,
-		oidcRequireEmailVerified: true,
-		sessionTtlDays: 7,
-		oidcGroupsClaim: Option.none<string>(),
-		oidcRoleMap: new Map<string, string>(),
-	},
-	sharing: { userSearchMode: "admin_only" },
-	log: { level: undefined },
-	recurrence: { rruleMaxOccurrences: 200_000, rruleTimeBudgetMs: 250 },
-	externalCalendar: {
-		schedulerTickS: 60,
-		fetchConcurrency: 4,
-		claimCap: 100,
-		maxResponseBytes: 26_214_400,
-		maxRedirects: 5,
-	},
-	birthday: {
-		schedulerTickS: 600,
-		concurrency: 4,
-		startupJitterMaxS: 0,
-		sweepSpreadS: 0,
-	},
-	trash: {
-		retentionDays: 30,
-	},
-	mail: {
-		enabled: false,
-		defaultFromAddress: "",
-		defaultFromName: "",
-		defaultHost: "",
-		defaultPort: 587,
-		defaultUsername: "",
-		defaultPassword: Redacted.make(""),
-		defaultSecurity: "starttls" as const,
-		credsKey: Redacted.make(""),
-		lmtpEnabled: false,
-		lmtpPort: 2400,
-		lmtpHost: "127.0.0.1",
-		lmtpMaxDataBytes: 26_214_400,
-		lmtpMaxRecipients: 100,
-		profiles: [] as ReadonlyArray<{
-			pattern: string;
-			host: string;
-			port: number;
-			username: string;
-			password: Redacted.Redacted<string>;
-			security?: "none" | "starttls" | "tls";
-		}>,
-	},
-	embed: {
-		panesEnabled: false,
-		calendarWidgetEnabled: false,
-	},
-	securityHeaders: {
-		enabled: true,
-		cspEnabled: true,
-		frameAncestors: [] as ReadonlyArray<string>,
-		xContentTypeOptionsEnabled: true,
-		referrerPolicyEnabled: true,
-		hstsEnabled: true,
-		permissionsPolicyEnabled: true,
-	},
-	nodeEnv: "test",
-};
-
-const AppConfigTestLayer = Layer.succeed(AppConfigService, testConfig);
+const AppConfigTestLayer = Layer.succeed(AppConfigService, testAppConfig);
 
 // ---------------------------------------------------------------------------
 // makeScriptRunnerLayer
@@ -159,9 +74,7 @@ const AppConfigTestLayer = Layer.succeed(AppConfigService, testConfig);
 // ---------------------------------------------------------------------------
 
 export const makeScriptRunnerLayer = (overrides?: Partial<AppConfigType>) => {
-	const merged: AppConfigType = overrides
-		? { ...testConfig, ...overrides }
-		: testConfig;
+	const merged: AppConfigType = makeTestConfig(overrides);
 	const configLayer =
 		overrides === undefined
 			? AppConfigTestLayer
