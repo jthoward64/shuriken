@@ -66,6 +66,12 @@ describe("analyzePhones", () => {
 		expect(out[0]?.region).toBe(REGION);
 	});
 
+	it("ignores a number too short to be missing only an area code", () => {
+		expect(analyzePhones(vcard([prop("TEL", "732873")]), REGION).length).toBe(
+			0,
+		);
+	});
+
 	it("leaves an already-canonical number alone", () => {
 		expect(
 			analyzePhones(vcard([prop("TEL", "+14155552671")]), REGION).length,

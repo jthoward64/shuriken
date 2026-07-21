@@ -14,9 +14,11 @@ import { digitsOf } from "./fields.ts";
  * Canonical E.164 form of a phone number, or null when it cannot be parsed to a
  * valid number under `region`. Used to detect reformatting suggestions.
  */
-// A bare national number shorter than this (US: 7 digits without area code)
-// with no country code is treated as "missing an area code".
-const MIN_NATIONAL_DIGITS = 4;
+// A bare national number in this digit range with no country code is treated as
+// "missing an area code". The floor is a full local subscriber number (US: 7
+// digits, NXX-XXXX); anything shorter is just a short number, not one missing an
+// area code (e.g. 732873).
+const MIN_NATIONAL_DIGITS = 7;
 const MAX_NATIONAL_DIGITS = 8;
 
 export const normalizePhone = (
