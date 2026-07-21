@@ -22,6 +22,8 @@ import { AclService } from "#src/services/acl/index.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
 import { InstanceService } from "#src/services/instance/index.ts";
 import { IanaTimezoneService } from "#src/services/timezone/iana.ts";
+import { parseAcceptVCardVersion } from "./accept-version.ts";
+import { applyVersion } from "./report/address-data.ts";
 import { stripKnownVtimezones } from "./report/calendar-data.ts";
 
 // ---------------------------------------------------------------------------
@@ -155,16 +157,31 @@ export const getHandler = (
 			doc = redactDocumentToBusyOnly(doc);
 		}
 
+		// 7c. Negotiate vCard version from Accept (RFC 6352): downgrade the
+		// canonical 4.0 body to 3.0 when the client asks for it.
+		const vcardVersion =
+			entityType === "vcard"
+				? parseAcceptVCardVersion(ctx.headers.get("Accept"))
+				: undefined;
+		if (vcardVersion === "3.0") {
+			doc = applyVersion(doc, vcardVersion);
+		}
+
 		// 8. Serialize to text.
 		const body =
 			entityType === "icalendar"
 				? yield* encodeICalendar(doc)
 				: yield* encodeVCard(doc);
 
-		// 9. Build response headers.
+		// 9. Build response headers. Reflect a negotiated 3.0 downgrade so the
+		// client sees the version it will actually parse.
+		const contentTypeHeader =
+			vcardVersion === "3.0"
+				? `${instance.contentType}; charset=utf-8; version=3.0`
+				: `${instance.contentType}; charset=utf-8`;
 		const bodyBytes = new TextEncoder().encode(body);
 		const headers = new Headers({
-			"Content-Type": `${instance.contentType}; charset=utf-8`,
+			"Content-Type": contentTypeHeader,
 			ETag: instance.etag,
 			"Last-Modified": toRfc1123(instance.lastModified),
 			"Content-Length": String(bodyBytes.byteLength),

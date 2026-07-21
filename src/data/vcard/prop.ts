@@ -43,6 +43,15 @@ export const getTypeTokens = (prop: IrProperty): ReadonlyArray<string> =>
 export const isPreferred = (prop: IrProperty): boolean =>
 	prop.parameters.some((p) => p.name === "PREF");
 
+/** True when `prop`'s TYPE tokens include a case-insensitive `pref` (vCard 3.0 preference marker). */
+export const hasPrefTypeToken = (prop: IrProperty): boolean =>
+	getTypeTokens(prop).some((t) => t.toLowerCase() === "pref");
+
+/** TYPE tokens with any case-insensitive `pref` removed. */
+export const stripPrefToken = (
+	tokens: ReadonlyArray<string>,
+): ReadonlyArray<string> => tokens.filter((t) => t.toLowerCase() !== "pref");
+
 /** Text of a property when it is a TEXT/URI value; "" otherwise (or undefined). */
 export const getText = (prop: IrProperty | undefined): string => {
 	if (!prop) {

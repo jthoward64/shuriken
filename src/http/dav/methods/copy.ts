@@ -3,6 +3,7 @@ import { makeEtag } from "#src/data/etag.ts";
 import { encodeICalendar } from "#src/data/icalendar/codec.ts";
 import type { IrDeadProperties } from "#src/data/ir.ts";
 import { encodeVCard } from "#src/data/vcard/codec.ts";
+import { upgradeToV4 } from "#src/data/vcard/upgrade-v4.ts";
 import { DatabaseClient } from "#src/db/client.ts";
 import { withTransaction } from "#src/db/transaction.ts";
 import {
@@ -147,9 +148,14 @@ const copyInstance = (
 			sourceInstance.contentType === "text/calendar" ? "icalendar" : "vcard";
 
 		const componentRepo = yield* ComponentRepository;
-		const irRoot = yield* componentRepo
+		const loadedRoot = yield* componentRepo
 			.loadTree(EntityId(sourceInstance.entityId), entityType)
 			.pipe(Effect.flatMap(someOrNotFound("Source component tree not found")));
+		// Normalize copied vCards to canonical 4.0 (matches PUT ingest).
+		const irRoot =
+			entityType === "vcard"
+				? upgradeToV4({ kind: "vcard", root: loadedRoot }).root
+				: loadedRoot;
 
 		let destExisted = false;
 		let destSlug: Slug;
@@ -385,11 +391,16 @@ const copyCollection = (
 							EntityId(inst.entityId),
 							srcEntityType,
 						);
-						const irRoot = Option.getOrNull(irRootOpt);
-						if (irRoot === null) {
+						const loadedRoot = Option.getOrNull(irRootOpt);
+						if (loadedRoot === null) {
 							// Skip instances whose component tree is gone (should not happen in normal flow).
 							return;
 						}
+						// Normalize copied vCards to canonical 4.0 (matches PUT ingest).
+						const irRoot =
+							srcEntityType === "vcard"
+								? upgradeToV4({ kind: "vcard", root: loadedRoot }).root
+								: loadedRoot;
 
 						const srcEntity = yield* entityRepo
 							.findById(EntityId(inst.entityId))

@@ -4,7 +4,9 @@ import {
 	getText,
 	getTypeTokens,
 	groupOf,
+	hasPrefTypeToken,
 	isPreferred,
+	stripPrefToken,
 } from "#src/data/vcard/prop.ts";
 import { serializeParams } from "./build-vcard.ts";
 import { isOtherEditable } from "./field-registry.ts";
@@ -32,6 +34,16 @@ const labelPart = (p: IrProperty): { label?: string } => {
 	const v = p.parameters.find((x) => x.name === "LABEL")?.value ?? "";
 	return v === "" ? {} : { label: v };
 };
+
+// Canonical preference read: numeric PREF is authoritative, but honor a legacy
+// `TYPE=pref` token for any card not yet upgraded on ingest. The `pref` token is
+// stripped from `types` so preference lives on exactly one channel (`preferred`).
+const prefAndTypes = (
+	p: IrProperty,
+): { types: ReadonlyArray<string>; preferred: boolean } => ({
+	types: stripPrefToken(getTypeTokens(p)),
+	preferred: isPreferred(p) || hasPrefTypeToken(p),
+});
 
 // ---------------------------------------------------------------------------
 // parseVcardToForm — pre-populates the edit form from a vCard. It surfaces only
@@ -116,16 +128,14 @@ export const parseVcardToForm = (vcard: IrComponent): ContactFormData => {
 			case "EMAIL":
 				emails.push({
 					value: getText(p),
-					types: getTypeTokens(p),
-					preferred: isPreferred(p),
+					...prefAndTypes(p),
 					...labelPart(p),
 				});
 				break;
 			case "TEL":
 				tels.push({
 					value: getText(p),
-					types: getTypeTokens(p),
-					preferred: isPreferred(p),
+					...prefAndTypes(p),
 					...labelPart(p),
 				});
 				break;
@@ -135,8 +145,7 @@ export const parseVcardToForm = (vcard: IrComponent): ContactFormData => {
 			case "ADR":
 				addresses.push({
 					...splitAddress(getText(p)),
-					types: getTypeTokens(p),
-					preferred: isPreferred(p),
+					...prefAndTypes(p),
 					...labelPart(p),
 				});
 				break;

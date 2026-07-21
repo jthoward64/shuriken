@@ -15,7 +15,11 @@ import type { HttpRequestContext } from "#src/http/context.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import type { ComponentRepository } from "#src/services/component/index.ts";
 import type { InstanceService } from "#src/services/instance/index.ts";
-import { parseAddressDataSpec, subsetVCardDocument } from "./address-data.ts";
+import {
+	applyVersion,
+	parseAddressDataSpec,
+	subsetVCardDocument,
+} from "./address-data.ts";
 import { multigetHandler } from "./multiget.ts";
 import { extractHrefs, extractPropNames } from "./parse.ts";
 
@@ -85,6 +89,6 @@ export const addressbookMultigetHandler = (
 				// entityType "vcard" means multigetHandler already rejects any
 				// member lacking full DAV:read (free-busy has no meaning for
 				// contacts), so hasFullRead is always true when this runs.
-				encodeVCard(subsetVCardDocument(doc, spec)),
+				encodeVCard(applyVersion(subsetVCardDocument(doc, spec), spec.version)),
 		});
 	});

@@ -12,6 +12,7 @@ import { extractVtimezones } from "#src/data/icalendar/timezone.ts";
 import { extractUid as extractICalUid } from "#src/data/icalendar/uid.ts";
 import { decodeVCard, encodeVCard } from "#src/data/vcard/codec.ts";
 import { extractUid as extractVCardUid } from "#src/data/vcard/uid.ts";
+import { upgradeToV4 } from "#src/data/vcard/upgrade-v4.ts";
 import { DatabaseClient } from "#src/db/client.ts";
 import type { EntityType } from "#src/db/drizzle/schema/index.ts";
 import { withTransaction } from "#src/db/transaction.ts";
@@ -199,10 +200,12 @@ export const putHandler = (
 		// 5. Parse into IrDocument. Fill a missing DTSTAMP (required by RFC 5545
 		// §3.6 on VEVENT/VTODO/VJOURNAL/VFREEBUSY) with the store time so we never
 		// persist or serve invalid iCalendar; a client-supplied DTSTAMP is kept.
+		// vCard is normalized to canonical 4.0 on ingest (upgradeToV4); iCalendar
+		// only gets a DTSTAMP backfill.
 		const doc = ensureDtstamp(
 			entityType === "icalendar"
 				? yield* decodeICalendar(body)
-				: yield* decodeVCard(body),
+				: upgradeToV4(yield* decodeVCard(body)),
 		);
 
 		// 5a. Cache VTIMEZONE definitions in cal_timezone (iCalendar only).

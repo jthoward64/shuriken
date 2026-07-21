@@ -160,6 +160,16 @@ const CARD_SUPPORTED_COLLATIONS: Record<ClarkName, unknown> = {
 	[cn(CARDDAV_NS, "collation")]: COLLATION_NAMES,
 };
 
+// RFC 6352 §6.2.2 — the vCard media types + versions the server serializes.
+// Storage is canonical 4.0; 3.0 is offered via downgrade-on-serve negotiation.
+const CARD_SUPPORTED_DATA = cn(CARDDAV_NS, "supported-address-data");
+const CARD_SUPPORTED_DATA_VALUE: Record<ClarkName, unknown> = {
+	[cn(CARDDAV_NS, "address-data-type")]: [
+		{ "@_content-type": "text/vcard", "@_version": "3.0" },
+		{ "@_content-type": "text/vcard", "@_version": "4.0" },
+	],
+};
+
 // ---------------------------------------------------------------------------
 // ACL helpers
 // ---------------------------------------------------------------------------
@@ -593,11 +603,11 @@ const buildCollectionProps = (
 				row.maxAttendeesPerInstance,
 			);
 		}
-	} else if (
-		row.collectionType === "addressbook" &&
-		row.maxResourceSize !== null
-	) {
-		props[cn(CARDDAV_NS, "max-resource-size")] = String(row.maxResourceSize);
+	} else if (row.collectionType === "addressbook") {
+		if (row.maxResourceSize !== null) {
+			props[cn(CARDDAV_NS, "max-resource-size")] = String(row.maxResourceSize);
+		}
+		props[CARD_SUPPORTED_DATA] = CARD_SUPPORTED_DATA_VALUE;
 	}
 
 	// RFC 6638 §9.1: schedule-calendar-transp (calendar, inbox, outbox only)

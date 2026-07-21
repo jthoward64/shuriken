@@ -2,6 +2,7 @@ import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
 import { Effect } from "effect";
 import { decodeVCard, encodeVCard } from "./codec.ts";
+import { upgradeToV4 } from "./upgrade-v4.ts";
 
 // ---------------------------------------------------------------------------
 // Lossless round-trip of the Apple/Google vCard 3.0 conventions that clients
@@ -41,5 +42,28 @@ describe("vCard Apple 3.0 round-trip", () => {
 			Effect.flatMap(decodeVCard(APPLE_CARD), encodeVCard),
 		);
 		expect(lineSet(out)).toEqual(lineSet(APPLE_CARD));
+	});
+
+	// The codec is version-transparent (above); version normalization happens at
+	// ingest via upgradeToV4, which converges the card on canonical 4.0 while
+	// still preserving item-grouped and X- extension lines verbatim.
+	it("ingest upgrade converts to 4.0 + PREF, preserving item/X- lines", async () => {
+		const out = await Effect.runPromise(
+			decodeVCard(APPLE_CARD).pipe(
+				Effect.map(upgradeToV4),
+				Effect.flatMap(encodeVCard),
+			),
+		);
+		const lines = lineSet(out);
+		expect(lines).toContain("VERSION:4.0");
+		expect(lines).not.toContain("VERSION:3.0");
+		expect(lines).toContain("item1.X-ABLABEL:_$!<Other>!$_");
+		expect(lines).toContain("item2.X-ABLABEL:VALUE");
+		expect(lines).toContain(
+			"X-SOCIALPROFILE;TYPE=NEXTCLOUD:https://nc.example/u/j",
+		);
+		// TYPE=pref markers are upgraded to numeric PREF=1
+		expect(out).toContain("PREF=1");
+		expect(out).not.toContain("TYPE=pref");
 	});
 });

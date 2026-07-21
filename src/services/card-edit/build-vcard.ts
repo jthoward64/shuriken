@@ -39,11 +39,17 @@ const uriProp = (name: string, value: string): IrProperty => ({
 	isKnown: true,
 });
 
-/** `TYPE=a,b` parameter list for the given tokens (empty → no params). */
+/**
+ * `TYPE=a,b` parameter list for the given tokens (empty → no params).
+ * A `pref` token is dropped defensively — preference is written only via
+ * `prefParams` (numeric `PREF`), never as a TYPE token.
+ */
 export const typeParams = (
 	types: ReadonlyArray<string>,
-): ReadonlyArray<IrParameter> =>
-	types.length === 0 ? [] : [{ name: "TYPE", value: types.join(",") }];
+): ReadonlyArray<IrParameter> => {
+	const tokens = types.filter((t) => t.toLowerCase() !== "pref");
+	return tokens.length === 0 ? [] : [{ name: "TYPE", value: tokens.join(",") }];
+};
 
 /** `LABEL=…` parameter (RFC 9554 §4.5), or none when blank. */
 export const labelParams = (
@@ -175,10 +181,44 @@ export const parseParamString = (raw: string): ReadonlyArray<IrParameter> =>
 export const serializeParams = (params: ReadonlyArray<IrParameter>): string =>
 	params.map((p) => `${p.name}=${p.value}`).join(";");
 
+/**
+ * Fold a hand-typed `TYPE=pref` token (or bare `PREF`) into a numeric `PREF=1`
+ * so the free-text params field stays on the single canonical preference channel.
+ */
+const normalizeParamPref = (
+	params: ReadonlyArray<IrParameter>,
+): ReadonlyArray<IrParameter> => {
+	let sawPrefToken = false;
+	const out: Array<IrParameter> = [];
+	for (const p of params) {
+		if (p.name.toUpperCase() === "TYPE") {
+			const tokens = p.value
+				.split(",")
+				.map((t) => t.trim())
+				.filter((t) => t !== "");
+			const kept = tokens.filter((t) => t.toLowerCase() !== "pref");
+			if (kept.length !== tokens.length) {
+				sawPrefToken = true;
+			}
+			if (kept.length > 0) {
+				out.push({ name: p.name, value: kept.join(",") });
+			}
+		} else if (p.name.toUpperCase() === "PREF" && p.value === "") {
+			out.push({ name: "PREF", value: "1" });
+		} else {
+			out.push(p);
+		}
+	}
+	if (sawPrefToken && !out.some((p) => p.name.toUpperCase() === "PREF")) {
+		out.push({ name: "PREF", value: "1" });
+	}
+	return out;
+};
+
 /** Build a raw property from a generic editor row (value stored verbatim as TEXT). */
 export const otherProp = (o: ContactOtherProp): IrProperty => ({
 	name: o.group !== "" ? `${o.group}.${o.name}` : o.name,
-	parameters: [...parseParamString(o.params)],
+	parameters: [...normalizeParamPref(parseParamString(o.params))],
 	value: { type: "TEXT", value: o.value },
 	isKnown: false,
 });

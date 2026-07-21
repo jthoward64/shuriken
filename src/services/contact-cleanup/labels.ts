@@ -25,7 +25,9 @@ export const isWrappedAppleLabel = (value: string): boolean =>
 export const wrapAppleLabel = (label: string): string => `_$!<${label}>!$_`;
 
 // Values that are never a real label — leaked parameter keywords and blanks.
-// Deliberately tiny to avoid touching intentional custom labels.
+// Deliberately tiny to avoid touching intentional custom labels. Note: `pref`
+// here means a param keyword leaked into an X-ABLABEL *value*; it is unrelated
+// to the preference channel (numeric PREF / the `preferred` flag).
 const JUNK_LABELS = new Set(["value", "pref"]);
 
 /**

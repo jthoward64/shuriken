@@ -14,20 +14,23 @@ export interface ContactAddress {
 	readonly region: string;
 	readonly postalCode: string;
 	readonly country: string;
-	/** Optional `TYPE=` parameter values (e.g. "home", "work"). Empty = none. */
+	/** Display `TYPE=` tokens (e.g. "home", "work"); never contains `pref`. Empty = none. */
 	readonly types: ReadonlyArray<string>;
 	/** Optional free-text `LABEL=` parameter (RFC 9554 §4.5). */
 	readonly label?: string;
-	/** `PREF=1` parameter (RFC 6350 §5.3) — marks this the preferred address. */
+	/** Sole preference channel — highest-preference marker (`PREF=1`, RFC 6350 §5.3). The
+	 * underlying numeric `PREF` ranking lives in storage, not this UI model. */
 	readonly preferred: boolean;
 }
 
 export interface ContactTypedValue {
 	readonly value: string;
+	/** Display `TYPE=` tokens; never contains `pref` (preference is the `preferred` flag). */
 	readonly types: ReadonlyArray<string>;
 	/** Optional free-text `LABEL=` parameter (RFC 9554 §4.5). */
 	readonly label?: string;
-	/** `PREF=1` parameter (RFC 6350 §5.3) — marks this the preferred value. */
+	/** Sole preference channel — highest-preference marker (`PREF=1`, RFC 6350 §5.3). The
+	 * underlying numeric `PREF` ranking lives in storage, not this UI model. */
 	readonly preferred: boolean;
 }
 

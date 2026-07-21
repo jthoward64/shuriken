@@ -33,8 +33,9 @@ describe("parseVcardToForm (group-aware)", () => {
 			]),
 		);
 		expect(form.fn).toBe("Josh");
+		// A legacy `TYPE=pref` token folds into `preferred` and is stripped from `types`.
 		expect(form.emails).toEqual([
-			{ value: "a@x.com", types: ["INTERNET", "pref"], preferred: false },
+			{ value: "a@x.com", types: ["INTERNET"], preferred: true },
 		]);
 		expect(form.tels).toEqual([
 			{ value: "+1 555", types: ["CELL"], preferred: false },

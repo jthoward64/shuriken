@@ -34,7 +34,11 @@ import {
 	InstanceRepository,
 	InstanceService,
 } from "#src/services/instance/index.ts";
-import { parseAddressDataSpec, subsetVCardDocument } from "./address-data.ts";
+import {
+	applyVersion,
+	parseAddressDataSpec,
+	subsetVCardDocument,
+} from "./address-data.ts";
 import { evaluateCardFilter, parseCardFilter } from "./filter-card.ts";
 import { extractPropNames } from "./parse.ts";
 
@@ -195,7 +199,9 @@ export const addressbookQueryHandler = (
 				continue;
 			}
 
-			const dataStr = yield* encodeVCard(subsetVCardDocument(irDoc, spec));
+			const dataStr = yield* encodeVCard(
+				applyVersion(subsetVCardDocument(irDoc, spec), spec.version),
+			);
 
 			const href = `${origin}/dav/principals/${path.principalSeg}/${path.namespace}/${path.collectionSeg}/${encodeSegment(inst.slug || inst.id)}`;
 			const allProps: Record<ClarkName, unknown> = {

@@ -6,6 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import type { IrDocument } from "#src/data/ir.ts";
+import { downgradeToV3 } from "#src/data/vcard/downgrade-v3.ts";
 
 const CARDDAV_NS = "urn:ietf:params:xml:ns:carddav";
 const cn = (local: string): string => `{${CARDDAV_NS}}${local}`;
@@ -14,30 +15,49 @@ const cn = (local: string): string => `{${CARDDAV_NS}}${local}`;
 // Types
 // ---------------------------------------------------------------------------
 
+/** vCard versions the server can serialize to. Canonical storage is 4.0. */
+export type VCardVersion = "3.0" | "4.0";
+
 export interface AddressDataSpec {
 	/** If true, return the full IrDocument without subsetting. */
 	readonly allProps: boolean;
 	/** Explicit vCard property names to include (when allProps = false). Empty when allProps = true. */
 	readonly props: ReadonlySet<string>;
+	/** Requested vCard version (RFC 6352 §10.4.2 `version` attr); undefined = server default (4.0). */
+	readonly version: VCardVersion | undefined;
 }
-
-const ALLPROPS: AddressDataSpec = { allProps: true, props: new Set() };
 
 // ---------------------------------------------------------------------------
 // parseAddressDataSpec
 // ---------------------------------------------------------------------------
 
+/** Read the `version` attribute off a `<C:address-data>` element (RFC 6352 §10.4.2). */
+const parseVersion = (tree: unknown): VCardVersion | undefined => {
+	if (typeof tree !== "object" || tree === null) {
+		return undefined;
+	}
+	const raw = (tree as Record<string, unknown>)["@_version"];
+	return raw === "3.0" || raw === "4.0" ? raw : undefined;
+};
+
 /**
  * Parse the contents of a Clark-normalized `<C:address-data>` element.
- * Returns `{ allProps: true }` when the element is absent or has no prop children.
+ * Returns `allProps: true` when the element is absent or has no prop children;
+ * the requested `version` is read independently of prop subsetting.
  */
 export const parseAddressDataSpec = (tree: unknown): AddressDataSpec => {
+	const version = parseVersion(tree);
+	const allProps: AddressDataSpec = {
+		allProps: true,
+		props: new Set(),
+		version,
+	};
 	if (typeof tree !== "object" || tree === null) {
-		return ALLPROPS;
+		return allProps;
 	}
 	const propEls = (tree as Record<string, unknown>)[cn("prop")];
 	if (!propEls) {
-		return ALLPROPS;
+		return allProps;
 	}
 
 	const props = new Set<string>();
@@ -53,11 +73,17 @@ export const parseAddressDataSpec = (tree: unknown): AddressDataSpec => {
 	}
 
 	if (props.size === 0) {
-		return ALLPROPS;
+		return allProps;
 	}
 
-	return { allProps: false, props };
+	return { allProps: false, props, version };
 };
+
+/** Apply a negotiated version to a canonical 4.0 vCard: downgrade to 3.0 when requested. */
+export const applyVersion = (
+	doc: IrDocument,
+	version: VCardVersion | undefined,
+): IrDocument => (version === "3.0" ? downgradeToV3(doc) : doc);
 
 // ---------------------------------------------------------------------------
 // subsetVCardDocument

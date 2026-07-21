@@ -1,0 +1,239 @@
+================================================================
+>> suite: caldav-server-tester
+================================================================
+>>>> Executing external compose provider "/usr/bin/podman-compose". Please see podman-compose(1) for how to disable this message. <<<<
+
+[csc] second-user create: HTTP 200
+[caldav-server-tester] probing http://server:3000/dav/ (primary=test@example.com, second=scheduling2@example.com)
+[caldav-server-tester] tool exit code: 0 (informational; not the gate)
+[caldav-server-tester] normalized result:
+    features.search.recurrences.expanded.event.support: unsupported
+    features.search.recurrences.expanded.todo.support: unsupported
+[caldav-server-tester] REGRESSION — output differs from baseline:
+    (- baseline / + current run)
+    --- /suite/baseline.txt     2026-06-24 17:58:20.050521916 +0000
+    +++ /results/caldav-server-tester/normalized.txt    2026-07-21 19:50:21.206388184 +0000
+    @@ -1 +1,2 @@
+    -
+    +features.search.recurrences.expanded.event.support: unsupported
+    +features.search.recurrences.expanded.todo.support: unsupported
+[caldav-server-tester] if this change is intended, re-run with --update-baseline to accept it.
+Error: executing /usr/bin/podman-compose run --rm --no-deps -e UPDATE_BASELINE=0 caldav-server-tester: exit status 1
+>> caldav-server-tester: FAIL (exit 1)
+
+================================================================
+>> suite: litmus
+================================================================
+>>>> Executing external compose provider "/usr/bin/podman-compose". Please see podman-compose(1) for how to disable this message. <<<<
+
+[litmus] running suites [basic copymove props http] against http://server:3000/dav/principals/test/col/ as test@example.com
+[litmus] tool exit code: 1 (informational; not the gate)
+[litmus] normalized result:
+    basic/begin: pass
+    basic/delete: SKIPPED
+    basic/delete_coll: SKIPPED
+    basic/delete_fragment: FAIL (could not create collection)
+    basic/delete_null: pass
+    basic/finish: pass
+    basic/init: pass
+    basic/mkcol: FAIL (MKCOL /dav/principals/test/col/litmus/coll/: <NUM> Method Not Allowed)
+    basic/mkcol_again: SKIPPED
+    basic/mkcol_no_parent: WARNING: MKCOL with missing intermediate gave <NUM>, should be <NUM> (RFC2518:<NUM>.<NUM>.<NUM>)
+    basic/mkcol_over_plain: SKIPPED
+    basic/mkcol_with_body: pass
+    basic/options: WARNING: server does not claim Class <NUM> compliance
+    basic/put_get: FAIL (PUT of `/dav/principals/test/col/litmus/res' failed: <NUM> Unsupported Media Type)
+    basic/put_get_utf8_segment: FAIL (PUT of `/dav/principals/test/col/litmus/res-%e2%<NUM>%ac' failed: <NUM> Forbidden)
+    basic/put_no_parent: WARNING: MKCOL with missing intermediate gave <NUM>, should be <NUM>
+[litmus] OK — output matches baseline.
+>> litmus: PASS
+
+================================================================
+>> suite: python-caldav
+================================================================
+>>>> Executing external compose provider "/usr/bin/podman-compose". Please see podman-compose(1) for how to disable this message. <<<<
+
+[python-caldav] running pytest [tests/test_caldav.py] against http://server:3000/dav/ as test@example.com
+[python-caldav] pytest exit code: 1 (informational; not the gate)
+    ERROR tests/test_caldav.py::TestForServershuriken::testTodoCompletion - calda...
+    ERROR tests/test_caldav.py::TestForServershuriken::testTodoRecurringCompleteSafe
+    ERROR tests/test_caldav.py::TestForServershuriken::testTodoRecurringCompleteThisandfuture
+    ERROR tests/test_caldav.py::TestForServershuriken::testUtf8Event - caldav.lib...
+    ERROR tests/test_caldav.py::TestForServershuriken::testUnicodeEvent - caldav....
+    ERROR tests/test_caldav.py::TestForServershuriken::testSetCalendarProperties
+    ERROR tests/test_caldav.py::TestForServershuriken::testLookupEvent - caldav.l...
+    ERROR tests/test_caldav.py::TestForServershuriken::testCreateOverwriteDeleteEvent
+    ERROR tests/test_caldav.py::TestForServershuriken::testDateSearchAndFreeBusy
+    ERROR tests/test_caldav.py::TestForServershuriken::testRecurringDateSearch - ...
+    ERROR tests/test_caldav.py::TestForServershuriken::testRecurringDateWithExceptionSearch
+    ERROR tests/test_caldav.py::TestForServershuriken::testEditSingleRecurrence
+    ERROR tests/test_caldav.py::TestForServershuriken::testOffsetURL - caldav.lib...
+    ERROR tests/test_caldav.py::TestForServershuriken::testObjects - caldav.lib.e...
+    2 failed, 7 passed, 4 skipped, 1 warning, 57 errors in 7.26s
+[python-caldav] normalized result (first 40 lines):
+    tests.test_caldav.TestForServershuriken::testAddOrganizer: ERROR
+    tests.test_caldav.TestForServershuriken::testAddOrphanedRecurrence: ERROR
+    tests.test_caldav.TestForServershuriken::testAlarm: ERROR
+    tests.test_caldav.TestForServershuriken::testCalendarByFullURL: ERROR
+    tests.test_caldav.TestForServershuriken::testChangeAttendeeStatusWithEmailGiven: ERROR
+    tests.test_caldav.TestForServershuriken::testCheckCompatibility: SKIPPED
+    tests.test_caldav.TestForServershuriken::testCopyEvent: ERROR
+    tests.test_caldav.TestForServershuriken::testCreateCalendarAndEventFromVobject: ERROR
+    tests.test_caldav.TestForServershuriken::testCreateChildParent: ERROR
+    tests.test_caldav.TestForServershuriken::testCreateDeleteCalendar: ERROR
+    tests.test_caldav.TestForServershuriken::testCreateEvent: ERROR
+    tests.test_caldav.TestForServershuriken::testCreateEventFromiCal[Calendar]: ERROR
+    tests.test_caldav.TestForServershuriken::testCreateEventFromiCal[Event]: ERROR
+    tests.test_caldav.TestForServershuriken::testCreateJournalListAndJournalEntry: ERROR
+    tests.test_caldav.TestForServershuriken::testCreateOverwriteDeleteEvent: ERROR
+    tests.test_caldav.TestForServershuriken::testCreateTaskListAndTodo: ERROR
+    tests.test_caldav.TestForServershuriken::testDateSearchAndFreeBusy: ERROR
+    tests.test_caldav.TestForServershuriken::testEditSingleRecurrence: ERROR
+    tests.test_caldav.TestForServershuriken::testFindCalendarOwner: ERROR
+    tests.test_caldav.TestForServershuriken::testGetCalendar: ERROR
+    tests.test_caldav.TestForServershuriken::testGetCalendarHomeSet: ERROR
+    tests.test_caldav.TestForServershuriken::testGetDefaultCalendar: ERROR
+    tests.test_caldav.TestForServershuriken::testGetSupportedComponents: ERROR
+    tests.test_caldav.TestForServershuriken::testIssue397: ERROR
+    tests.test_caldav.TestForServershuriken::testIssue399ChangeAttendeeStatusUsernameEmailFallback: ERROR
+    tests.test_caldav.TestForServershuriken::testLoadEvent: ERROR
+    tests.test_caldav.TestForServershuriken::testLookupEvent: ERROR
+    tests.test_caldav.TestForServershuriken::testMultiGet: ERROR
+    tests.test_caldav.TestForServershuriken::testObjectBySyncToken: ERROR
+    tests.test_caldav.TestForServershuriken::testObjectByUID: ERROR
+    tests.test_caldav.TestForServershuriken::testObjects: ERROR
+    tests.test_caldav.TestForServershuriken::testOffsetURL: ERROR
+    tests.test_caldav.TestForServershuriken::testPrincipal: ERROR
+    tests.test_caldav.TestForServershuriken::testPrincipals: ERROR
+    tests.test_caldav.TestForServershuriken::testPropfind: ERROR
+    tests.test_caldav.TestForServershuriken::testRecurringDateSearch: ERROR
+    tests.test_caldav.TestForServershuriken::testRecurringDateWithExceptionSearch: ERROR
+    tests.test_caldav.TestForServershuriken::testSchedulingInfo: ERROR
+    tests.test_caldav.TestForServershuriken::testSchedulingMailboxes: ERROR
+    tests.test_caldav.TestForServershuriken::testSearchCompType: ERROR
+[python-caldav] REGRESSION — output differs from baseline:
+    (- baseline / + current run)
+    --- /suite/baseline.txt     2026-06-25 03:46:13.133894687 +0000
+    +++ /results/python-caldav/normalized.txt   2026-07-21 19:50:31.273463738 +0000
+    @@ -1,58 +1,58 @@
+    -tests.test_caldav.TestForServershuriken::testAddOrganizer: PASSED
+    -tests.test_caldav.TestForServershuriken::testAddOrphanedRecurrence: PASSED
+    -tests.test_caldav.TestForServershuriken::testAlarm: PASSED
+    -tests.test_caldav.TestForServershuriken::testCalendarByFullURL: PASSED
+    -tests.test_caldav.TestForServershuriken::testChangeAttendeeStatusWithEmailGiven: PASSED
+    +tests.test_caldav.TestForServershuriken::testAddOrganizer: ERROR
+    +tests.test_caldav.TestForServershuriken::testAddOrphanedRecurrence: ERROR
+    +tests.test_caldav.TestForServershuriken::testAlarm: ERROR
+    +tests.test_caldav.TestForServershuriken::testCalendarByFullURL: ERROR
+    +tests.test_caldav.TestForServershuriken::testChangeAttendeeStatusWithEmailGiven: ERROR
+     tests.test_caldav.TestForServershuriken::testCheckCompatibility: SKIPPED
+    -tests.test_caldav.TestForServershuriken::testCopyEvent: PASSED
+    -tests.test_caldav.TestForServershuriken::testCreateCalendarAndEventFromVobject: PASSED
+    -tests.test_caldav.TestForServershuriken::testCreateChildParent: PASSED
+    -tests.test_caldav.TestForServershuriken::testCreateDeleteCalendar: PASSED
+    -tests.test_caldav.TestForServershuriken::testCreateEvent: PASSED
+    -tests.test_caldav.TestForServershuriken::testCreateEventFromiCal[Calendar]: PASSED
+    -tests.test_caldav.TestForServershuriken::testCreateEventFromiCal[Event]: PASSED
+    -tests.test_caldav.TestForServershuriken::testCreateJournalListAndJournalEntry: PASSED
+    -tests.test_caldav.TestForServershuriken::testCreateOverwriteDeleteEvent: PASSED
+    -tests.test_caldav.TestForServershuriken::testCreateTaskListAndTodo: PASSED
+    -tests.test_caldav.TestForServershuriken::testDateSearchAndFreeBusy: PASSED
+    -tests.test_caldav.TestForServershuriken::testEditSingleRecurrence: PASSED
+    -tests.test_caldav.TestForServershuriken::testFindCalendarOwner: PASSED
+    -tests.test_caldav.TestForServershuriken::testGetCalendar: PASSED
+    -tests.test_caldav.TestForServershuriken::testGetCalendarHomeSet: PASSED
+    -tests.test_caldav.TestForServershuriken::testGetDefaultCalendar: PASSED
+    -tests.test_caldav.TestForServershuriken::testGetSupportedComponents: PASSED
+    -tests.test_caldav.TestForServershuriken::testIssue397: PASSED
+    -tests.test_caldav.TestForServershuriken::testIssue399ChangeAttendeeStatusUsernameEmailFallback: PASSED
+    -tests.test_caldav.TestForServershuriken::testLoadEvent: PASSED
+    -tests.test_caldav.TestForServershuriken::testLookupEvent: PASSED
+    -tests.test_caldav.TestForServershuriken::testMultiGet: PASSED
+    -tests.test_caldav.TestForServershuriken::testObjectBySyncToken: PASSED
+    -tests.test_caldav.TestForServershuriken::testObjectByUID: PASSED
+    -tests.test_caldav.TestForServershuriken::testObjects: PASSED
+    -tests.test_caldav.TestForServershuriken::testOffsetURL: PASSED
+    -tests.test_caldav.TestForServershuriken::testPrincipal: PASSED
+    -tests.test_caldav.TestForServershuriken::testPrincipals: PASSED
+    -tests.test_caldav.TestForServershuriken::testPropfind: PASSED
+    -tests.test_caldav.TestForServershuriken::testRecurringDateSearch: PASSED
+    -tests.test_caldav.TestForServershuriken::testRecurringDateWithExceptionSearch: PASSED
+    -tests.test_caldav.TestForServershuriken::testSchedulingInfo: PASSED
+    -tests.test_caldav.TestForServershuriken::testSchedulingMailboxes: PASSED
+    -tests.test_caldav.TestForServershuriken::testSearchCompType: PASSED
+    -tests.test_caldav.TestForServershuriken::testSearchEvent: PASSED
+    -tests.test_caldav.TestForServershuriken::testSearchShouldYieldData: PASSED
+    -tests.test_caldav.TestForServershuriken::testSearchSortTodo: PASSED
+    -tests.test_caldav.TestForServershuriken::testSearchTodos: PASSED
+    -tests.test_caldav.TestForServershuriken::testSearchWithoutCompType: PASSED
+    -tests.test_caldav.TestForServershuriken::testSetCalendarProperties: PASSED
+    -tests.test_caldav.TestForServershuriken::testSetDue: PASSED
+    -tests.test_caldav.TestForServershuriken::testSupport: PASSED
+    -tests.test_caldav.TestForServershuriken::testSync: PASSED
+    -tests.test_caldav.TestForServershuriken::testTodoCompletion: PASSED
+    -tests.test_caldav.TestForServershuriken::testTodoDatesearch: PASSED
+    -tests.test_caldav.TestForServershuriken::testTodoRecurringCompleteSafe: PASSED
+    -tests.test_caldav.TestForServershuriken::testTodoRecurringCompleteThisandfuture: PASSED
+    -tests.test_caldav.TestForServershuriken::testTodos: PASSED
+    -tests.test_caldav.TestForServershuriken::testUnicodeEvent: PASSED
+    -tests.test_caldav.TestForServershuriken::testUtf8Event: PASSED
+    -tests.test_caldav.TestForServershuriken::testWrongAuthType: PASSED
+    -tests.test_caldav.TestForServershuriken::testWrongPassword: PASSED
+    +tests.test_caldav.TestForServershuriken::testCopyEvent: ERROR
+    +tests.test_caldav.TestForServershuriken::testCreateCalendarAndEventFromVobject: ERROR
+    +tests.test_caldav.TestForServershuriken::testCreateChildParent: ERROR
+    +tests.test_caldav.TestForServershuriken::testCreateDeleteCalendar: ERROR
+    +tests.test_caldav.TestForServershuriken::testCreateEvent: ERROR
+    +tests.test_caldav.TestForServershuriken::testCreateEventFromiCal[Calendar]: ERROR
+    +tests.test_caldav.TestForServershuriken::testCreateEventFromiCal[Event]: ERROR
+    +tests.test_caldav.TestForServershuriken::testCreateJournalListAndJournalEntry: ERROR
+    +tests.test_caldav.TestForServershuriken::testCreateOverwriteDeleteEvent: ERROR
+    +tests.test_caldav.TestForServershuriken::testCreateTaskListAndTodo: ERROR
+    +tests.test_caldav.TestForServershuriken::testDateSearchAndFreeBusy: ERROR
+    +tests.test_caldav.TestForServershuriken::testEditSingleRecurrence: ERROR
+    +tests.test_caldav.TestForServershuriken::testFindCalendarOwner: ERROR
+    +tests.test_caldav.TestForServershuriken::testGetCalendar: ERROR
+    +tests.test_caldav.TestForServershuriken::testGetCalendarHomeSet: ERROR
+    +tests.test_caldav.TestForServershuriken::testGetDefaultCalendar: ERROR
+    +tests.test_caldav.TestForServershuriken::testGetSupportedComponents: ERROR
+    +tests.test_caldav.TestForServershuriken::testIssue397: ERROR
+    +tests.test_caldav.TestForServershuriken::testIssue399ChangeAttendeeStatusUsernameEmailFallback: ERROR
+    +tests.test_caldav.TestForServershuriken::testLoadEvent: ERROR
+    +tests.test_caldav.TestForServershuriken::testLookupEvent: ERROR
+    +tests.test_caldav.TestForServershuriken::testMultiGet: ERROR
+    +tests.test_caldav.TestForServershuriken::testObjectBySyncToken: ERROR
+    +tests.test_caldav.TestForServershuriken::testObjectByUID: ERROR
+    +tests.test_caldav.TestForServershuriken::testObjects: ERROR
+    +tests.test_caldav.TestForServershuriken::testOffsetURL: ERROR
+    +tests.test_caldav.TestForServershuriken::testPrincipal: ERROR
+    +tests.test_caldav.TestForServershuriken::testPrincipals: ERROR
+    +tests.test_caldav.TestForServershuriken::testPropfind: ERROR
+    +tests.test_caldav.TestForServershuriken::testRecurringDateSearch: ERROR
+    +tests.test_caldav.TestForServershuriken::testRecurringDateWithExceptionSearch: ERROR
+    +tests.test_caldav.TestForServershuriken::testSchedulingInfo: ERROR
+    +tests.test_caldav.TestForServershuriken::testSchedulingMailboxes: ERROR
+    +tests.test_caldav.TestForServershuriken::testSearchCompType: ERROR
+    +tests.test_caldav.TestForServershuriken::testSearchEvent: ERROR
+    +tests.test_caldav.TestForServershuriken::testSearchShouldYieldData: ERROR
+    +tests.test_caldav.TestForServershuriken::testSearchSortTodo: ERROR
+    +tests.test_caldav.TestForServershuriken::testSearchTodos: ERROR
+    +tests.test_caldav.TestForServershuriken::testSearchWithoutCompType: ERROR
+    +tests.test_caldav.TestForServershuriken::testSetCalendarProperties: ERROR
+    +tests.test_caldav.TestForServershuriken::testSetDue: ERROR
+    +tests.test_caldav.TestForServershuriken::testSupport: ERROR
+    +tests.test_caldav.TestForServershuriken::testSync: ERROR
+    +tests.test_caldav.TestForServershuriken::testTodoCompletion: ERROR
+    +tests.test_caldav.TestForServershuriken::testTodoDatesearch: ERROR
+    +tests.test_caldav.TestForServershuriken::testTodoRecurringCompleteSafe: ERROR
+    +tests.test_caldav.TestForServershuriken::testTodoRecurringCompleteThisandfuture: ERROR
+    +tests.test_caldav.TestForServershuriken::testTodos: ERROR
+    +tests.test_caldav.TestForServershuriken::testUnicodeEvent: ERROR
+    +tests.test_caldav.TestForServershuriken::testUtf8Event: ERROR
+    +tests.test_caldav.TestForServershuriken::testWrongAuthType: ERROR
+    +tests.test_caldav.TestForServershuriken::testWrongPassword: ERROR
+[python-caldav] if this change is intended, re-run with --update-baseline to accept it.
+Error: executing /usr/bin/podman-compose run --rm --no-deps -e UPDATE_BASELINE=0 python-caldav: exit status 1
+>> python-caldav: FAIL (exit 1)
+>> stopping server stack
+
+>> ONE OR MORE SUITES REGRESSED (see diffs above).

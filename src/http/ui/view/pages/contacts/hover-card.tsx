@@ -29,10 +29,9 @@ export const ContactHoverCardContainer = (): VNode => (
 	</div>
 );
 
-/** The "pref"-typed value if one exists, else the first — there's no explicit
- * primary flag on `ContactTypedValue`, just a `types` list. */
+/** The preferred value if one is marked, else the first. */
 const primaryValue = (values: ReadonlyArray<ContactTypedValue>): string =>
-	(values.find((v) => v.types.includes("pref")) ?? values[0])?.value ?? "";
+	(values.find((v) => v.preferred) ?? values[0])?.value ?? "";
 
 export const ContactHoverCard = ({
 	form,

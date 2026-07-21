@@ -23,13 +23,9 @@ import { IconChevronLeft, IconEdit } from "../../icons.tsx";
 export const CONTACTS_PANE_ID = "contacts-pane";
 export const CONTACTS_PANE_BODY_ID = "contacts-pane-body";
 
-/** A typed value is preferred when PREF=1 was set or a `TYPE=pref` is present. */
-const isPreferred = (v: ContactTypedValue): boolean =>
-	v.preferred || v.types.includes("pref");
-
-/** Human-readable type labels, dropping the internal `pref` marker. */
-const typeLabels = (types: ReadonlyArray<string>): string =>
-	types.filter((t) => t.toLowerCase() !== "pref").join(", ");
+// Preference is the single canonical `preferred` flag (parse-vcard folds any
+// legacy `TYPE=pref` into it and strips the token), so `types` never carries `pref`.
+const typeLabels = (types: ReadonlyArray<string>): string => types.join(", ");
 
 const PreferredBadge = (): VNode => (
 	<span class="badge badge-brand shrink-0">Preferred</span>
@@ -90,7 +86,7 @@ const TypedValueList = ({
 							<span class="ml-2 text-xs text-subtle">{labels}</span>
 						)}
 					</div>
-					{isPreferred(v) && <PreferredBadge />}
+					{v.preferred && <PreferredBadge />}
 				</li>
 			);
 		})}
