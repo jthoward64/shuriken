@@ -305,7 +305,7 @@ const ImportForm = ({
 			}`}
 		>
 			<label
-				class="flex grow-[2] basis-0 cursor-pointer items-center justify-center gap-2 px-3 py-2 font-medium text-fg hover:bg-surface-2"
+				class="flex basis-2/3 cursor-pointer items-center justify-center gap-2 px-3 py-2 font-medium text-fg hover:bg-surface-2"
 				title={disabled ? "Read-only address book" : undefined}
 			>
 				Import .vcf
@@ -325,7 +325,7 @@ const ImportForm = ({
 			<select
 				name="mode"
 				disabled={disabled}
-				class="grow basis-0 border-0 bg-transparent px-2 py-2 text-xs text-fg focus:outline-none focus-visible:bg-surface-2 focus-visible:ring-0 focus-visible:ring-offset-0"
+				class="basis-1/3 border-0 bg-transparent px-2 py-2 text-xs text-fg focus:outline-none focus-visible:bg-surface-2 focus-visible:ring-0 focus-visible:ring-offset-0"
 				aria-label="How to handle duplicate contacts"
 				title="How to handle duplicate contacts"
 			>

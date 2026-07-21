@@ -368,12 +368,15 @@ const ImportForm = ({
 		data-longop
 		class="space-y-2"
 	>
-		<div class="flex items-center gap-2">
+		{/* Button group: a single bordered control split by a divider — the Import
+		    button takes ~2/3, the duplicate-mode select ~1/3. */}
+		<div
+			class={`flex items-stretch overflow-hidden rounded-md border border-line-strong bg-surface text-sm ${
+				disabled ? "pointer-events-none opacity-50" : ""
+			}`}
+		>
 			<label
-				class={buttonClass(
-					"secondary",
-					`flex-1 cursor-pointer ${disabled ? "pointer-events-none opacity-50" : ""}`,
-				)}
+				class="flex basis-2/3 cursor-pointer items-center justify-center gap-2 px-3 py-2 font-medium text-fg hover:bg-surface-2"
 				title={disabled ? "Read-only calendar" : undefined}
 			>
 				Import .ics
@@ -386,9 +389,14 @@ const ImportForm = ({
 					class="hidden"
 				/>
 			</label>
+			<div
+				class="w-px shrink-0 self-stretch bg-line-strong"
+				aria-hidden="true"
+			/>
 			<select
 				name="mode"
-				class="form-select w-auto text-xs"
+				disabled={disabled}
+				class="basis-1/3 border-0 bg-transparent px-2 py-2 text-xs text-fg focus:outline-none focus-visible:bg-surface-2 focus-visible:ring-0 focus-visible:ring-offset-0"
 				aria-label="How to handle duplicate events"
 				title="How to handle duplicate events"
 			>
