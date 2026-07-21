@@ -1,6 +1,6 @@
 {
 	"name": "shuriken",
-	"version": "0.5.2",
+	"version": "0.6.0",
 	"exports": "./src/index.ts",
 	"license": "GPL-3.0-or-later",
 	"tasks": {
