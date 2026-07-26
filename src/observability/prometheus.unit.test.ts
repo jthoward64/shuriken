@@ -83,6 +83,23 @@ describe("encodePrometheus", () => {
 		expect(block).toContain('shuriken_test_latency_ms_bucket{le="10"}');
 	});
 
+	it('emits le="+Inf" exactly once when boundaries end with Infinity', () => {
+		const hist = Metric.histogram("shuriken.test.dur_ms", {
+			boundaries: Metric.exponentialBoundaries({
+				start: 0.5,
+				factor: 2,
+				count: 4,
+			}),
+		});
+		const text = encodePrometheus(snapshotAfter(Metric.update(hist, 1)));
+		const block = familyBlock(text, "shuriken_test_dur_ms");
+
+		const infLines = block
+			.split("\n")
+			.filter((l) => l.includes('_bucket{le="+Inf"}'));
+		expect(infLines).toHaveLength(1);
+	});
+
 	it("escapes label values and renders gauges without a suffix", () => {
 		const gauge = Metric.withAttributes(Metric.gauge("shuriken.test.queue"), {
 			note: 'a"b\\c',

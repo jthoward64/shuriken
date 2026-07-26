@@ -123,6 +123,11 @@ const renderSamples = (name: string, snapshot: Snapshot): Array<string> => {
 			const { buckets, count, sum } = snapshot.state;
 			const lines: Array<string> = [];
 			for (const [boundary, cumulative] of buckets) {
+				// Effect's boundary lists end with Infinity; the overflow bucket is
+				// emitted below, so rendering it here too would duplicate le="+Inf"
+				if (!Number.isFinite(boundary)) {
+					continue;
+				}
 				const le = renderLabels(snapshot.attributes, [
 					["le", formatNumber(boundary)],
 				]);
