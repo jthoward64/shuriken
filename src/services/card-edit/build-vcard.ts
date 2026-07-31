@@ -5,10 +5,18 @@ import type {
 	IrProperty,
 	IrValue,
 } from "#src/data/ir.ts";
+import {
+	RELATED_PROP,
+	RELATION_NAME_PARAM,
+	relationParams as relationTypeParams,
+} from "#src/data/vcard/related.ts";
+import { PHOTO_TYPE, PHOTO_TYPE_PHOTO } from "./field-registry.ts";
+import { relationValueFromTarget } from "./relation-value.ts";
 import type {
 	ContactAddress,
 	ContactFormData,
 	ContactOtherProp,
+	ContactRelation,
 	ContactServiceValue,
 	ContactTypedValue,
 } from "./types.ts";
@@ -162,6 +170,42 @@ export const imppProp = (sv: ContactServiceValue): IrProperty => ({
 	isKnown: true,
 });
 
+/** A relation row with nothing to point at — dropped rather than written. */
+export const isBlankRelation = (relation: ContactRelation): boolean =>
+	relationValueFromTarget(relation.target, relation.name).trim() === "";
+
+/**
+ * A `RELATED` property (RFC 6350 §6.6.6). The relation becomes a registered
+ * TYPE token, with the wording preserved in a parameter when the token cannot
+ * reproduce it; a URI target also carries the display name, so a downgrade to
+ * 3.0 can show a name rather than a UID.
+ */
+export const relatedProp = (relation: ContactRelation): IrProperty => {
+	const value = relationValueFromTarget(relation.target, relation.name);
+	const isUri = relation.target.kind !== "text";
+	return {
+		name: RELATED_PROP,
+		parameters: [
+			{ name: "VALUE", value: isUri ? "uri" : "text" },
+			...relationTypeParams(relation.relation),
+			...(isUri && relation.name !== ""
+				? [{ name: RELATION_NAME_PARAM, value: relation.name }]
+				: []),
+			...prefParams(relation.preferred),
+		],
+		value: { type: isUri ? "URI" : "TEXT", value },
+		isKnown: true,
+	};
+};
+
+/**
+ * Apple's photo companions for a newly set PHOTO. `X-IMAGEHASH` is deliberately
+ * not synthesised: Apple's hash input is undocumented, and a hash we computed
+ * differently would misdescribe the image more damagingly than its absence.
+ */
+export const photoMetaProps = (photo: string): ReadonlyArray<IrProperty> =>
+	photo === "" ? [] : [textProp(PHOTO_TYPE, PHOTO_TYPE_PHOTO)];
+
 // --- Generic ("other") property (de)serialisation -------------------------
 
 /** Parse a `NAME=value;NAME=value` string into IR parameters. */
@@ -293,6 +337,11 @@ export const buildVcardComponent = (
 	for (const im of form.impps) {
 		if (im.value !== "") {
 			props.push(imppProp(im));
+		}
+	}
+	for (const relation of form.relations) {
+		if (!isBlankRelation(relation)) {
+			props.push(relatedProp(relation));
 		}
 	}
 

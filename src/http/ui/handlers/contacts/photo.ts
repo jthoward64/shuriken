@@ -1,5 +1,6 @@
 import { Effect, Option } from "effect";
 import type { IrComponent } from "#src/data/ir.ts";
+import { isProp } from "#src/data/vcard/prop.ts";
 import type {
 	DatabaseError,
 	DavError,
@@ -41,7 +42,7 @@ const PHOTO_CACHE_CONTROL = "private, max-age=3600, must-revalidate";
 const photoValue = (vcard: IrComponent): Option.Option<string> => {
 	for (const p of vcard.properties) {
 		if (
-			p.name === "PHOTO" &&
+			isProp(p, "PHOTO") &&
 			(p.value.type === "TEXT" || p.value.type === "URI") &&
 			p.value.value !== ""
 		) {

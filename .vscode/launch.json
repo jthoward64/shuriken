@@ -5,43 +5,42 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"type": "bun",
-			"internalConsoleOptions": "neverOpen",
+			"type": "node",
 			"request": "launch",
 			"name": "Debug File",
 			"program": "${file}",
 			"cwd": "${workspaceFolder}",
-			"stopOnEntry": false,
-			"watchMode": false
+			"runtimeExecutable": "deno",
+			"runtimeArgs": ["run", "--inspect-wait", "--allow-all"],
+			"attachSimplePort": 9229
 		},
 		{
-			"type": "bun",
-			"internalConsoleOptions": "neverOpen",
+			"type": "node",
 			"request": "launch",
-			"name": "Run File",
+			"name": "Debug Test File",
 			"program": "${file}",
 			"cwd": "${workspaceFolder}",
-			"noDebug": true,
-			"watchMode": false
+			"runtimeExecutable": "deno",
+			"runtimeArgs": ["test", "--inspect-wait", "--allow-all", "--no-check"],
+			"attachSimplePort": 9229
 		},
 		{
-			"type": "bun",
-			"internalConsoleOptions": "neverOpen",
-			"request": "attach",
-			"name": "Attach Bun",
-			"url": "ws://localhost:6499/",
-			"stopOnEntry": false
-		},
-		{
-			"type": "bun",
-			"internalConsoleOptions": "neverOpen",
+			"type": "node",
 			"request": "launch",
 			"name": "Debug Application",
 			"program": "${workspaceFolder}/src/index.ts",
 			"cwd": "${workspaceFolder}",
-			"stopOnEntry": false,
-			"runtime": "/home/tagho/.local/share/nvm/v24.12.0/bin/bun",
-			"watchMode": false
+			"runtimeExecutable": "deno",
+			"runtimeArgs": [
+				"run",
+				"--inspect-wait",
+				"--allow-net",
+				"--allow-env",
+				"--allow-read",
+				"--allow-sys",
+				"--env-file=.env"
+			],
+			"attachSimplePort": 9229
 		}
 	]
 }

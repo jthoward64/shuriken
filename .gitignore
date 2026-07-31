@@ -35,5 +35,10 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # Test DB Cache
 src/testing/test-db-cache.tar.gz
-# Debug output of `deno task ui:css` (runtime serves CSS in-memory)
+# Build output of `deno task ui:assets`, served at runtime from these paths
 src/http/ui/static/app.css
+src/http/ui/static/calendar.js
+src/http/ui/static/calendar.css
+src/http/ui/static/reorder.js
+src/http/ui/static/embed-widget.js
+src/http/ui/static/embed-widget.css

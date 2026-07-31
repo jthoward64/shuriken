@@ -210,6 +210,7 @@ const stubLayers = Layer.mergeAll(
 		listForCollection: die,
 		countForCollection: die,
 		listForDedup: die,
+		findByUids: die,
 		listWithBday: die,
 	}),
 	Layer.succeed(UserRepository, {
@@ -282,6 +283,7 @@ const stubLayers = Layer.mergeAll(
 	Layer.succeed(DatabaseClient, noOpRouterDb),
 	Layer.succeed(AppConfigService, {
 		server: { port: 3000, host: "::" },
+		ui: { assetRoot: Option.none() },
 		metrics: { enabled: false, port: 9464 },
 		database: { url: Redacted.make("postgres://localhost/test") },
 		auth: {

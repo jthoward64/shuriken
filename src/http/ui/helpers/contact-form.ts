@@ -1,7 +1,9 @@
+import { relationTargetFromInput } from "#src/services/card-edit/relation-value.ts";
 import type {
 	ContactAddress,
 	ContactFormData,
 	ContactOtherProp,
+	ContactRelation,
 	ContactServiceValue,
 	ContactTypedValue,
 } from "#src/services/card-edit/types.ts";
@@ -92,6 +94,32 @@ const buildServiceValues = (
 	return out;
 };
 
+/**
+ * Relation rows. The type-ahead writes a picked contact's UID into the hidden
+ * `uid` field; with no UID the typed text is classified as an address or a
+ * plain name, so the feature degrades to a text box without JS.
+ */
+const buildRelations = (form: FormLike): ReadonlyArray<ContactRelation> => {
+	const names = stringsFor(form, "relations[].name");
+	const uids = stringsFor(form, "relations[].uid");
+	const kinds = stringsFor(form, "relations[].relation");
+	const preferred = stringsFor(form, "relations[].preferred");
+	const out: Array<ContactRelation> = [];
+	for (let i = 0; i < names.length; i++) {
+		const typed = (names[i] ?? "").trim();
+		const target = relationTargetFromInput(typed, uids[i] ?? "");
+		out.push({
+			target,
+			// An address lives in the target, so the name field is only a display
+			// name when it is not just the address typed back.
+			name: target.kind === "email" && typed === target.address ? "" : typed,
+			relation: (kinds[i] ?? "").trim(),
+			preferred: (preferred[i] ?? "") !== "",
+		});
+	}
+	return dedupePreferred(out);
+};
+
 const buildOtherProps = (form: FormLike): ReadonlyArray<ContactOtherProp> => {
 	const names = stringsFor(form, "other[].name");
 	const groups = stringsFor(form, "other[].group");
@@ -161,6 +189,7 @@ export const parseContactForm = (form: FormLike): ContactFormData => {
 		addresses: buildAddresses(form),
 		socialProfiles: buildServiceValues(form, "social"),
 		impps: buildServiceValues(form, "impp"),
+		relations: buildRelations(form),
 		bday: single("bday"),
 		anniversary: single("anniversary"),
 		gender: single("gender"),
@@ -170,7 +199,9 @@ export const parseContactForm = (form: FormLike): ContactFormData => {
 		title: single("title"),
 		note: single("note"),
 		categoriesCsv: single("categoriesCsv"),
-		photo: single("photo"),
+		// A pasted URL replaces the embedded photo the form carried through; with
+		// neither, the photo is being cleared.
+		photo: single("photo") !== "" ? single("photo") : single("photoInline"),
 		otherProps: buildOtherProps(form),
 	};
 };

@@ -30,6 +30,8 @@ export type CardMatchType = "equals" | "contains" | "starts-with" | "ends-with";
  */
 export interface CardSummaryRow {
 	readonly instanceId: string;
+	/** The vCard UID, as stored (`urn:uuid:…` for cards we created). */
+	readonly uid: string | null;
 	readonly fn: string | null;
 	readonly email: string | null;
 	readonly tel: string | null;
@@ -115,6 +117,16 @@ export interface CardIndexRepositoryShape {
 	 * + uid + fn + normalized bday). Used by BirthdayService to regenerate the
 	 * derived "Birthdays" calendar.
 	 */
+	/**
+	 * Resolve vCard UIDs to the cards holding them, within one collection.
+	 * Used to turn a `RELATED:urn:uuid:…` reference into a link to that contact;
+	 * a UID with no row simply has no entry in the result.
+	 */
+	readonly findByUids: (
+		collectionId: CollectionId,
+		uids: ReadonlyArray<string>,
+	) => Effect.Effect<ReadonlyArray<CardSummaryRow>, DatabaseError>;
+
 	readonly listWithBday: (collectionId: CollectionId) => Effect.Effect<
 		ReadonlyArray<{
 			readonly entityId: EntityId;

@@ -5,7 +5,7 @@
 	"license": "GPL-3.0-or-later",
 	"tasks": {
 		"start": "deno run --allow-net --allow-env --allow-read --allow-sys --env-file=.env src/index.ts",
-		"dev": "deno run --watch --allow-net --allow-env --allow-read --allow-sys --allow-ffi --env-file=.env src/index.ts",
+		"dev": "deno task ui:assets && deno run --watch --allow-net --allow-env --allow-read --allow-sys --allow-ffi --env-file=.env src/index.ts",
 		"docker:start": "deno task migrations:run && deno task start",
 		"test": "deno test --allow-all --env-file=.env --no-check",
 		"test:unit": "deno test --allow-all --no-check 'src/**/*.unit.test.ts'",
@@ -22,7 +22,8 @@
 		"hooks": "git config core.hooksPath .husky",
 		"studio": "deno run -A --env-file=.env drizzle-kit studio",
 		"ui:css": "deno run -A scripts/build-css.ts",
-		"warm:client-bundle-cache": "deno run -A scripts/warm-client-bundle-cache.ts",
+		"ui:js": "deno run -A scripts/build-client-js.ts",
+		"ui:assets": "deno task ui:css && deno task ui:js",
 		"version-bump": "deno run -A scripts/version-bump.ts",
 		"icons": "deno run --allow-read --allow-write --allow-ffi --allow-env --allow-sys scripts/generate-icons.ts"
 	},

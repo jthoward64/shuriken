@@ -1,11 +1,14 @@
 import type { IrDocument, IrParameter, IrProperty, IrValue } from "../ir.ts";
+import { upgradeInlineMedia } from "./inline-media.ts";
 import {
 	baseName,
 	getTypeTokens,
 	groupOf,
 	hasPrefTypeToken,
+	LABEL_PARAM_PREFIX,
 	stripPrefToken,
 } from "./prop.ts";
+import { upgradeRelated } from "./related.ts";
 
 // ---------------------------------------------------------------------------
 // vCard 2.1/3.0 → 4.0 canonical upgrade (RFC 6350 §A.1-A.2).
@@ -17,8 +20,9 @@ import {
 //
 // Reversible transforms: VERSION→4.0, TYPE=pref→PREF, structured GEO→geo: URI,
 // bare-UUID UID→urn:uuid:, X-ADDRESSBOOKSERVER-KIND/MEMBER→KIND/MEMBER,
-// X-GENDER→GENDER, grouped X-ABDATE(+Anniversary label)→ANNIVERSARY, and
-// standalone LABEL→ADR;LABEL=. Everything else (deprecated/obsolete props, X-
+// X-GENDER→GENDER, grouped X-ABDATE(+Anniversary label)→ANNIVERSARY,
+// grouped X-ABRELATEDNAMES(+label)→RELATED, ENCODING=b inline media→data: URI,
+// and standalone LABEL→ADR;LABEL=. Everything else (deprecated/obsolete props, X-
 // extensions, groups) passes through verbatim so no client data is lost.
 //
 // Two 3.0 limitations are irreversible and thus NOT round-trip-exact: PREF
@@ -136,7 +140,9 @@ const uncanonicalizeX = (prop: IrProperty): IrProperty => {
 
 /** Per-property upgrade — pure, never drops a property. */
 const upgradeProperty = (prop: IrProperty): IrProperty =>
-	upgradeUid(upgradeGeo(upgradePref(uncanonicalizeX(prop))));
+	upgradeInlineMedia(
+		upgradeUid(upgradeGeo(upgradePref(uncanonicalizeX(prop)))),
+	);
 
 /**
  * Grouped Apple anniversary (`itemN.X-ABDATE` + `itemN.X-ABLABEL:_$!<Anniversary>!$_`)
@@ -166,7 +172,9 @@ const foldAnniversary = (
 			if (isProp(p, "X-ABDATE")) {
 				out.push({
 					name: "ANNIVERSARY",
-					parameters: [],
+					// The client's own parameters ride along; only VALUE is dropped,
+					// since the value type is restated here.
+					parameters: p.parameters.filter((x) => x.name !== "VALUE"),
 					value: { type: "DATE_AND_OR_TIME", value: rawStr(p.value) },
 					isKnown: true,
 				});
@@ -185,6 +193,12 @@ const foldAnniversary = (
  * Standalone 3.0 `LABEL` property → 4.0 `ADR;LABEL=` param on the ADR whose TYPE
  * tokens match (inverse of downgrade's ADR-label split). A LABEL that matches no
  * ADR is left standalone rather than dropped.
+ *
+ * A property becomes a parameter here, and parameters cannot carry parameters,
+ * so a LABEL with parameters of its own has nowhere to put them. Rather than
+ * drop them, each is parked on the ADR under `LABEL_PARAM_PREFIX` and moved back
+ * when downgrade splits the LABEL out again. TYPE is excluded — downgrade
+ * rebuilds it from the ADR's own TYPE to correlate the two.
  */
 const foldLabels = (
 	props: ReadonlyArray<IrProperty>,
@@ -217,6 +231,12 @@ const foldLabels = (
 			parameters: [
 				...p.parameters,
 				{ name: "LABEL", value: rawStr(match.value) },
+				...match.parameters
+					.filter((x) => x.name !== "TYPE")
+					.map((x) => ({
+						name: `${LABEL_PARAM_PREFIX}${x.name}`,
+						value: x.value,
+					})),
 			],
 		};
 	});
@@ -244,6 +264,9 @@ export const upgradeToV4 = (doc: IrDocument): IrDocument => {
 		return doc;
 	}
 	const perProp = doc.root.properties.map(upgradeProperty);
-	const props = ensureVersion(foldLabels(foldAnniversary(perProp)), "4.0");
+	const props = ensureVersion(
+		foldLabels(upgradeRelated(foldAnniversary(perProp))),
+		"4.0",
+	);
 	return { ...doc, root: { ...doc.root, properties: props } };
 };

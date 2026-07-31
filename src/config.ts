@@ -641,8 +641,22 @@ export const SecurityHeadersConfig = Config.all({
 	),
 });
 
+// ---------------------------------------------------------------------------
+// UiAssetConfig — where the UI's on-disk assets live.
+//
+// The default derives the directory from this module's own location, which is
+// correct when running from source. A single-file bundle has no such location
+// (`import.meta.url` points at the bundle), so bundled deployments set
+// UI_ASSET_ROOT explicitly. See src/http/ui/asset-root.ts.
+// ---------------------------------------------------------------------------
+
+export const UiAssetConfig = Config.all({
+	assetRoot: Config.string("uiAssetRoot").pipe(Config.option),
+});
+
 export const AppConfig = Config.all({
 	server: ServerConfig,
+	ui: UiAssetConfig,
 	metrics: MetricsConfig,
 	database: DatabaseConfig,
 	auth: AuthConfig,

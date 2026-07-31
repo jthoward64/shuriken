@@ -61,6 +61,7 @@ export const contactsEditHandler = (
 					mode="edit"
 					addressbookId={instance.collectionId}
 					form={form}
+					instanceId={instanceId}
 					action={`/ui/api/contacts/${instanceId}/update`}
 					deleteAction={`/ui/api/contacts/${instanceId}/delete`}
 					variant="popover"
@@ -80,6 +81,7 @@ export const contactsEditHandler = (
 				mode="edit"
 				addressbookId={instance.collectionId}
 				form={form}
+				instanceId={instanceId}
 				action={`/ui/api/contacts/${instanceId}/update`}
 				deleteAction={`/ui/api/contacts/${instanceId}/delete`}
 			/>,

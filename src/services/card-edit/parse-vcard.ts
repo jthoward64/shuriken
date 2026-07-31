@@ -1,4 +1,5 @@
 import type { IrComponent, IrProperty } from "#src/data/ir.ts";
+import { unwrapAppleLabel } from "#src/data/vcard/ab-label.ts";
 import {
 	baseName,
 	getText,
@@ -8,12 +9,23 @@ import {
 	isPreferred,
 	stripPrefToken,
 } from "#src/data/vcard/prop.ts";
+import {
+	AB_LABEL_PROP,
+	AB_RELATED_PROP,
+	RELATED_PROP,
+	RELATION_NAME_PARAM,
+	RELATION_SOURCE_PROPS,
+	relationForSourceProp,
+	relationOf,
+} from "#src/data/vcard/related.ts";
 import { serializeParams } from "./build-vcard.ts";
 import { isOtherEditable } from "./field-registry.ts";
+import { relationTargetFromValue } from "./relation-value.ts";
 import type {
 	ContactAddress,
 	ContactFormData,
 	ContactOtherProp,
+	ContactRelation,
 	ContactServiceValue,
 	ContactTypedValue,
 } from "./types.ts";
@@ -75,13 +87,45 @@ const dateStr = (p: IrProperty): string => {
 	return p.value.type === "TEXT" || p.value.type === "URI" ? p.value.value : "";
 };
 
+/** Group → unwrapped label, from every `itemN.X-ABLABEL` in the card. */
+const labelsByGroup = (vcard: IrComponent): ReadonlyMap<string, string> => {
+	const out = new Map<string, string>();
+	for (const p of vcard.properties) {
+		const g = groupOf(p.name);
+		if (g !== "" && baseName(p.name) === AB_LABEL_PROP) {
+			out.set(g, unwrapAppleLabel(getText(p)));
+		}
+	}
+	return out;
+};
+
+/**
+ * A relation row from a canonical `RELATED`. The display name is the preserved
+ * name parameter for a URI target, else the value itself.
+ */
+const relationFromProp = (p: IrProperty): ContactRelation => {
+	const value = getText(p);
+	const target = relationTargetFromValue(value);
+	const preservedName =
+		p.parameters.find((x) => x.name.toUpperCase() === RELATION_NAME_PARAM)
+			?.value ?? "";
+	return {
+		target,
+		name: target.kind === "text" ? value : preservedName,
+		relation: relationOf(p),
+		preferred: isPreferred(p) || hasPrefTypeToken(p),
+	};
+};
+
 export const parseVcardToForm = (vcard: IrComponent): ContactFormData => {
+	const labels = labelsByGroup(vcard);
 	const emails: Array<ContactTypedValue> = [];
 	const tels: Array<ContactTypedValue> = [];
 	const urls: Array<string> = [];
 	const addresses: Array<ContactAddress> = [];
 	const socialProfiles: Array<ContactServiceValue> = [];
 	const impps: Array<ContactServiceValue> = [];
+	const relations: Array<ContactRelation> = [];
 	const otherProps: Array<ContactOtherProp> = [];
 	let kind = "";
 	let fn = "";
@@ -155,6 +199,20 @@ export const parseVcardToForm = (vcard: IrComponent): ContactFormData => {
 			case "IMPP":
 				impps.push({ service: serviceOf(p), value: getText(p) });
 				break;
+			case RELATED_PROP:
+				relations.push(relationFromProp(p));
+				break;
+			// Cards stored before relations were canonicalised still hold Apple's
+			// grouped pair; surface them so the editor is not blind to them, and
+			// saving rewrites them as RELATED.
+			case AB_RELATED_PROP:
+				relations.push({
+					target: { kind: "text" },
+					name: getText(p),
+					relation: labels.get(groupOf(p.name)) ?? "",
+					preferred: isPreferred(p) || hasPrefTypeToken(p),
+				});
+				break;
 			case "BDAY":
 				bday = dateStr(p);
 				break;
@@ -190,6 +248,18 @@ export const parseVcardToForm = (vcard: IrComponent): ContactFormData => {
 				photo = getText(p);
 				break;
 			default:
+				// The single-property relation forms (AGENT / X-SPOUSE / …) are a
+				// set rather than fixed cases. Like the grouped pair above, these
+				// only survive on cards stored before canonicalisation.
+				if (RELATION_SOURCE_PROPS.has(baseName(p.name))) {
+					relations.push({
+						target: { kind: "text" },
+						name: getText(p),
+						relation: relationForSourceProp(baseName(p.name)),
+						preferred: isPreferred(p) || hasPrefTypeToken(p),
+					});
+					break;
+				}
 				if (isOtherEditable(p)) {
 					otherProps.push({
 						name: baseName(p.name),
@@ -218,6 +288,7 @@ export const parseVcardToForm = (vcard: IrComponent): ContactFormData => {
 		addresses,
 		socialProfiles,
 		impps,
+		relations,
 		bday,
 		anniversary,
 		gender,

@@ -9,5 +9,12 @@
 		"source.organizeImports.biome": "explicit",
 		"source.fixAll.biome": "explicit"
 	},
-	"js/ts.tsdk.path": "node_modules/typescript/lib"
+	"js/ts.tsdk.path": "node_modules/typescript/lib",
+
+	"deno.enable": true,
+	"deno.config": "./deno.json",
+	"deno.codeLens.test": true,
+	"deno.codeLens.testArgs": ["--allow-all", "--no-check"],
+	"deno.testing.args": ["--allow-all", "--no-check"],
+	"bun.test.enable": false
 }

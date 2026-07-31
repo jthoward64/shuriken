@@ -21,6 +21,7 @@ import { ComponentRepository } from "#src/services/component/index.ts";
 import { EntityRepository } from "#src/services/entity/index.ts";
 import { InstanceService } from "#src/services/instance/index.ts";
 import { buildVcardComponent } from "./build-vcard.ts";
+import { PHOTO_META_BASES } from "./field-registry.ts";
 import { mergeFormIntoVcard } from "./merge-vcard.ts";
 import { CardEditService } from "./service.ts";
 import type { ContactFormData } from "./types.ts";
@@ -222,11 +223,15 @@ const removePhoto = (
 			root.properties.find((p) => p.name === "UID")?.value.value?.toString() ??
 			`urn:uuid:${existing.entityId}`;
 
-		// Structural edit: strip PHOTO, keep everything else exactly as stored so
-		// properties the UI form doesn't model (NICKNAME, IMPP, …) survive.
+		// Structural edit: strip PHOTO and the photo metadata that describes it,
+		// keeping everything else exactly as stored so properties the UI form
+		// doesn't model (NICKNAME, IMPP, …) survive.
 		const stripped: IrComponent = {
 			name: root.name,
-			properties: root.properties.filter((p) => p.name !== "PHOTO"),
+			properties: root.properties.filter((p) => {
+				const base = baseName(p.name);
+				return base !== "PHOTO" && !PHOTO_META_BASES.has(base);
+			}),
 			components: root.components,
 		};
 

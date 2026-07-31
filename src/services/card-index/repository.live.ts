@@ -164,6 +164,7 @@ const listForCollection = Effect.fn("CardIndexRepository.listForCollection")(
 			const query = db
 				.select({
 					instanceId: davInstance.id,
+					uid: cardIndex.uid,
 					fn: cardIndex.fn,
 					email: sql<string | null>`${cardIndex.data}->'emails'->>0`,
 					tel: sql<string | null>`${cardIndex.data}->'phones'->>0`,
@@ -311,6 +312,46 @@ const listWithBday = Effect.fn("CardIndexRepository.listWithBday")(
 	),
 );
 
+const findByUids = Effect.fn("CardIndexRepository.findByUids")(
+	function* (collectionId: CollectionId, uids: ReadonlyArray<string>) {
+		yield* Effect.annotateCurrentSpan({
+			"collection.id": collectionId,
+			"uid.count": uids.length,
+		});
+		if (uids.length === 0) {
+			return [];
+		}
+		return yield* runDbQuery((db) =>
+			db
+				.select({
+					instanceId: davInstance.id,
+					uid: cardIndex.uid,
+					fn: cardIndex.fn,
+					email: sql<string | null>`${cardIndex.data}->'emails'->>0`,
+					tel: sql<string | null>`${cardIndex.data}->'phones'->>0`,
+					org: sql<string | null>`${cardIndex.data}->>'org'`,
+					title: sql<string | null>`${cardIndex.data}->>'title'`,
+					hasPhoto: sql<boolean>`COALESCE((${cardIndex.data}->>'has_photo')::boolean, false)`,
+				})
+				.from(cardIndex)
+				.innerJoin(
+					davInstance,
+					and(
+						eq(cardIndex.entityId, davInstance.entityId),
+						eq(davInstance.collectionId, collectionId),
+						isNull(davInstance.deletedAt),
+					),
+				)
+				.where(
+					and(isNull(cardIndex.deletedAt), inArray(cardIndex.uid, [...uids])),
+				),
+		);
+	},
+	Effect.tapError((e) =>
+		Effect.logWarning("repo.card-index.findByUids failed", e.cause),
+	),
+);
+
 export const CardIndexRepositoryLive = Layer.effect(
 	CardIndexRepository,
 	Effect.gen(function* () {
@@ -327,6 +368,8 @@ export const CardIndexRepositoryLive = Layer.effect(
 				run(countForCollection(...args)),
 			listForDedup: (...args: Parameters<typeof listForDedup>) =>
 				run(listForDedup(...args)),
+			findByUids: (...args: Parameters<typeof findByUids>) =>
+				run(findByUids(...args)),
 			listWithBday: (...args: Parameters<typeof listWithBday>) =>
 				run(listWithBday(...args)),
 		};

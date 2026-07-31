@@ -1,9 +1,10 @@
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { Effect } from "effect";
+import { AppConfigService } from "#src/config.ts";
 import type { InternalError } from "#src/domain/errors.ts";
 import { HTTP_NOT_MODIFIED, HTTP_OK } from "#src/http/status.ts";
 import { strongEtag } from "#src/http/ui/asset-etag.ts";
+import { uiAssetRoot } from "#src/http/ui/asset-root.ts";
 import { FileService } from "#src/platform/file.ts";
 
 // ---------------------------------------------------------------------------
@@ -14,30 +15,31 @@ import { FileService } from "#src/platform/file.ts";
 // cheap 304 instead of a full re-transfer.
 // ---------------------------------------------------------------------------
 
-const HERE = path.dirname(fileURLToPath(import.meta.url));
-const STATIC_DIR = path.resolve(HERE, "../static");
-
 export const staticHandler = (
 	req: Request,
-): Effect.Effect<Response, never, FileService> => {
-	const url = new URL(req.url);
-	// Strip the /static/ prefix to get the relative path
-	const relPath = url.pathname.replace(/^\/static\//, "");
-	if (!relPath) {
-		return Effect.succeed(new Response(null, { status: 404 }));
-	}
-	// Resolve-then-check-the-relative-path is the actual traversal guard here —
-	// robust to how `absPath` is joined, unlike a substring check on `relPath`
-	// (which would silently stop guarding anything if this were ever changed
-	// from `path.join` to `path.resolve`, since `..` segments could then escape
-	// STATIC_DIR before ever being substring-matched).
-	const absPath = path.resolve(STATIC_DIR, relPath);
-	const relToStatic = path.relative(STATIC_DIR, absPath);
-	if (relToStatic.startsWith("..") || path.isAbsolute(relToStatic)) {
-		return Effect.succeed(new Response(null, { status: 404 }));
-	}
+): Effect.Effect<Response, never, FileService | AppConfigService> =>
+	Effect.gen(function* () {
+		const url = new URL(req.url);
+		// Strip the /static/ prefix to get the relative path
+		const relPath = url.pathname.replace(/^\/static\//, "");
+		if (!relPath) {
+			return new Response(null, { status: 404 });
+		}
 
-	return Effect.gen(function* () {
+		const config = yield* AppConfigService;
+		const staticDir = uiAssetRoot(config);
+
+		// Resolve-then-check-the-relative-path is the actual traversal guard here —
+		// robust to how `absPath` is joined, unlike a substring check on `relPath`
+		// (which would silently stop guarding anything if this were ever changed
+		// from `path.join` to `path.resolve`, since `..` segments could then escape
+		// the asset root before ever being substring-matched).
+		const absPath = path.resolve(staticDir, relPath);
+		const relToStatic = path.relative(staticDir, absPath);
+		if (relToStatic.startsWith("..") || path.isAbsolute(relToStatic)) {
+			return new Response(null, { status: 404 });
+		}
+
 		const files = yield* FileService;
 		const exists = yield* files.exists(absPath);
 		if (!exists) {
@@ -79,4 +81,3 @@ export const staticHandler = (
 			headers,
 		});
 	});
-};

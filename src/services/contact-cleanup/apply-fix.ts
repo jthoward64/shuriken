@@ -1,7 +1,7 @@
 import { Data, Result } from "effect";
 import type { IrComponent, IrProperty } from "#src/data/ir.ts";
+import { wrapAppleLabel } from "#src/data/vcard/ab-label.ts";
 import { getText, getTypeTokens, nthPropIndex } from "./fields.ts";
-import { wrapAppleLabel } from "./labels.ts";
 import type { CleanupFix } from "./types.ts";
 
 // ---------------------------------------------------------------------------

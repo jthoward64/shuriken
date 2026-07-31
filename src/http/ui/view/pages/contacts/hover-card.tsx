@@ -1,4 +1,5 @@
 import type { VNode } from "preact";
+import { photoSrcFor } from "#src/http/ui/helpers/contact-photo.ts";
 import type {
 	ContactFormData,
 	ContactTypedValue,
@@ -35,20 +36,24 @@ const primaryValue = (values: ReadonlyArray<ContactTypedValue>): string =>
 
 export const ContactHoverCard = ({
 	form,
+	instanceId,
 	editHref,
 }: {
 	form: ContactFormData;
+	instanceId: string;
 	editHref: string;
 }): VNode => {
 	const email = primaryValue(form.emails);
 	const tel = primaryValue(form.tels);
 	const orgLine = [form.title, form.org].filter((s) => s !== "").join(", ");
+	const photoSrc = photoSrcFor(form.photo, instanceId);
 	return (
 		<div class="flex items-start gap-3">
-			{form.photo !== "" ? (
+			{photoSrc !== "" ? (
 				<img
-					src={form.photo}
+					src={photoSrc}
 					alt=""
+					loading="lazy"
 					class="h-12 w-12 shrink-0 rounded-full bg-surface-2 object-cover"
 				/>
 			) : (

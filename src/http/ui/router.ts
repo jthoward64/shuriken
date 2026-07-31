@@ -105,6 +105,7 @@ import { contactsMergeHandler } from "#src/http/ui/handlers/contacts/merge.tsx";
 import { contactsNewHandler } from "#src/http/ui/handlers/contacts/new.tsx";
 import { contactsPhotoHandler } from "#src/http/ui/handlers/contacts/photo.ts";
 import { contactsPreviewHandler } from "#src/http/ui/handlers/contacts/preview.tsx";
+import { contactsRelationOptionsHandler } from "#src/http/ui/handlers/contacts/relation-options.tsx";
 import { cssAssetHandler } from "#src/http/ui/handlers/css.ts";
 import { feedsEditHandler } from "#src/http/ui/handlers/feeds/edit.tsx";
 import { feedsListHandler } from "#src/http/ui/handlers/feeds/list.tsx";
@@ -643,6 +644,14 @@ export const uiRouter = (
 		}
 		if (seg1 === "cleanup" && !seg2) {
 			return handle(contactsCleanupHandler(req, ctx));
+		}
+		if (seg1 === "relation-options" && !seg2) {
+			const bookId = ctx.url.searchParams.get("addressbook");
+			if (bookId !== null && isUuid(bookId)) {
+				return handle(
+					contactsRelationOptionsHandler(req, ctx, CollectionId(bookId)),
+				);
+			}
 		}
 		if (seg1 === "export.vcf" && !seg2) {
 			const bookId = ctx.url.searchParams.get("addressbook");

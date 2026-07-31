@@ -77,6 +77,7 @@ const makeCtx = (path: string, method = "GET"): HttpRequestContext => ({
 const stubLayers = Layer.mergeAll(
 	Layer.succeed(AppConfigService, {
 		server: { port: 3000, host: "::" },
+		ui: { assetRoot: Option.none() },
 		metrics: { enabled: false, port: 9464 },
 		database: { url: Redacted.make("postgres://localhost/test") },
 		auth: {
@@ -258,6 +259,7 @@ const stubLayers = Layer.mergeAll(
 		listForCollection: () => Effect.succeed([]),
 		countForCollection: () => Effect.succeed(0),
 		listForDedup: () => Effect.succeed([]),
+		findByUids: () => Effect.succeed([]),
 		listWithBday: () => Effect.succeed([]),
 	}),
 	Layer.succeed(CalIndexRepository, {

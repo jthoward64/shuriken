@@ -1,8 +1,12 @@
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
 import { Effect, Layer } from "effect";
+import { AppConfigService } from "#src/config.ts";
 import { FileService } from "#src/platform/file.ts";
+import { testAppConfig } from "#src/testing/config.ts";
 import { staticHandler } from "./static.ts";
+
+const configLayer = Layer.succeed(AppConfigService, testAppConfig);
 
 const die = () => Effect.die("stub");
 
@@ -32,7 +36,7 @@ const run = (
 	Effect.runPromise(
 		Effect.provide(
 			staticHandler(new Request(`http://localhost${path}`, { headers })),
-			layer,
+			Layer.mergeAll(layer, configLayer),
 		),
 	);
 

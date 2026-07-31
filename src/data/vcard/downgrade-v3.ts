@@ -1,12 +1,20 @@
 import { formatPlainDate } from "../format-utils.ts";
 import type { IrDocument, IrProperty, IrValue } from "../ir.ts";
+import { downgradeInlineMedia } from "./inline-media.ts";
 import {
 	baseName,
 	getText,
 	getTypeTokens,
 	groupOf,
+	LABEL_PARAM_PREFIX,
+	maxItemGroup,
 	stripPrefToken,
 } from "./prop.ts";
+import {
+	downgradeRelated,
+	EMBEDDED_AGENT_PROP,
+	restoreEmbeddedAgent,
+} from "./related.ts";
 
 // ---------------------------------------------------------------------------
 // vCard 4.0 → 3.0 downgrade (RFC 2426), applied only when a client negotiates
@@ -130,13 +138,26 @@ const splitAdrLabel = (prop: IrProperty): ReadonlyArray<IrProperty> => {
 	if (labelParam === undefined) {
 		return [prop];
 	}
+	const isParked = (name: string) => name.startsWith(LABEL_PARAM_PREFIX);
 	const adr = {
 		...prop,
-		parameters: prop.parameters.filter((p) => p.name !== "LABEL"),
+		parameters: prop.parameters.filter(
+			(p) => p.name !== "LABEL" && !isParked(p.name),
+		),
 	};
 	const label: IrProperty = {
+		// TYPE is mirrored from the ADR so upgrade can correlate the two again;
+		// anything parked on the ADR by that upgrade goes back on the LABEL.
+		parameters: [
+			...prop.parameters.filter((p) => p.name === "TYPE"),
+			...prop.parameters
+				.filter((p) => isParked(p.name))
+				.map((p) => ({
+					name: p.name.slice(LABEL_PARAM_PREFIX.length),
+					value: p.value,
+				})),
+		],
 		name: replaceBase(prop.name, "LABEL"),
-		parameters: prop.parameters.filter((p) => p.name === "TYPE"),
 		value: { type: "TEXT", value: labelParam.value },
 		isKnown: false,
 	};
@@ -160,7 +181,9 @@ const anniversaryToAb = (
 	return [
 		{
 			name: `${group}.X-ABDATE`,
-			parameters: [],
+			// Carry the client's parameters back onto the property they came from.
+			// VALUE goes: 4.0's `date-and-or-time` is not a 3.0 token.
+			parameters: prop.parameters.filter((p) => p.name !== "VALUE"),
 			value: { type: "TEXT", value: valueStr(prop.value) },
 			isKnown: false,
 		},
@@ -171,19 +194,6 @@ const anniversaryToAb = (
 			isKnown: false,
 		},
 	];
-};
-
-/** Highest existing `itemN` group index in the document, or 0. */
-const maxItemGroup = (props: ReadonlyArray<IrProperty>): number => {
-	let max = 0;
-	for (const p of props) {
-		const m = /^item(\d+)\./i.exec(p.name);
-		const n = m?.[1];
-		if (n !== undefined) {
-			max = Math.max(max, Number.parseInt(n, 10));
-		}
-	}
-	return max;
 };
 
 /** Ensure a `VERSION` property exists with the given value, positioned first. */
@@ -245,6 +255,24 @@ export const downgradeToV3 = (doc: IrDocument): IrDocument => {
 			out.push(...anniversaryToAb(prop, group));
 			continue;
 		}
+		if (base === EMBEDDED_AGENT_PROP) {
+			// Hand back the nested vCard 4.0 had nowhere to put. Only a property we
+			// parked is renamed; a client's own X-AGENT falls through untouched.
+			const restored = restoreEmbeddedAgent(prop);
+			if (restored !== undefined) {
+				out.push(restored);
+				continue;
+			}
+		}
+		if (base === "RELATED") {
+			const downgraded = downgradeRelated(prop, group + 1);
+			// Identity means there was no display name to write; no group consumed.
+			if (downgraded[0] !== prop) {
+				group += 1;
+			}
+			out.push(...downgraded);
+			continue;
+		}
 		if (base === "GENDER") {
 			// Preserve the full structured value (sex;identity) so upgrade can
 			// restore GENDER exactly; drop only a wholly-empty GENDER.
@@ -253,8 +281,8 @@ export const downgradeToV3 = (doc: IrDocument): IrDocument => {
 			}
 			continue;
 		}
-		const transformed = stripValueParam(
-			downgradeGeo(downgradeUid(downgradePref(prop))),
+		const transformed = downgradeInlineMedia(
+			stripValueParam(downgradeGeo(downgradeUid(downgradePref(prop)))),
 		);
 		out.push(...splitAdrLabel(transformed));
 	}

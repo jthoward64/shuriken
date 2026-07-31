@@ -159,8 +159,8 @@ const BaseAppLayer = Layer.mergeAll(
 	AppPasswordRepositoryFull,
 	AppPasswordServiceFull,
 	FileServiceLive,
-	CssServiceLive.pipe(Layer.provide(FileServiceLive)),
-	ClientJsServiceLive,
+	CssServiceLive.pipe(Layer.provide([FileServiceLive, AppConfigLive])),
+	ClientJsServiceLive.pipe(Layer.provide([FileServiceLive, AppConfigLive])),
 	PageCacheServiceLive,
 );
 

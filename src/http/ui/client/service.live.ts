@@ -1,23 +1,26 @@
-import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
 import { Effect, Layer } from "effect";
+import { AppConfigService } from "#src/config.ts";
 import { InternalError } from "#src/domain/errors.ts";
+import { FileService } from "#src/platform/file.ts";
 import { strongEtag } from "../asset-etag.ts";
-import { bundleClient } from "./compile.ts";
+import { uiAssetPath } from "../asset-root.ts";
 import { type ClientAsset, ClientJsService } from "./service.ts";
 
 // ---------------------------------------------------------------------------
-// ClientJsServiceLive — bundles the browser entry points at startup and caches
-// the results. Add an entry here to ship a new bundled script; the router maps
+// ClientJsServiceLive — loads the browser scripts compiled by
+// `deno task ui:js`. Add an entry here to ship a new script; the router maps
 // its `name` to a /static/<name> route.
+//
+// Bundling runs ahead of time rather than at startup for the same reasons as
+// the stylesheet: Deno.bundle() spends ~24 MB of RSS on esbuild's native
+// allocations, needs the .client.ts sources on disk (which a bundled server
+// distribution has no reason to ship), and cannot write under the runtime's
+// read-only root filesystem.
 // ---------------------------------------------------------------------------
 
-const HERE = path.dirname(fileURLToPath(import.meta.url));
-
 // Served filename → client TS entry module (relative to this directory).
-// Exported so the Docker build stage can warm DENO_DIR's npm resolution
-// cache for these entries before the runtime filesystem goes read-only —
-// see scripts/warm-client-bundle-cache.ts.
+// Shared with scripts/build-client-js.ts, which compiles these entries into the
+// UI asset directory; this service only reads what that script produced.
 export const ENTRIES: ReadonlyArray<{
 	readonly name: string;
 	readonly entry: string;
@@ -27,34 +30,51 @@ export const ENTRIES: ReadonlyArray<{
 	{ name: "embed-widget.js", entry: "embed-widget.client.ts" },
 ];
 
+/** Served filename of the stylesheet an entry emits, if it imports one. */
+export const cssNameFor = (name: string): string =>
+	name.replace(/\.js$/, ".css");
+
 export const ClientJsServiceLive = Layer.effect(
 	ClientJsService,
 	Effect.gen(function* () {
+		const files = yield* FileService;
+		const config = yield* AppConfigService;
 		const assets = new Map<string, ClientAsset>();
-		for (const { name, entry } of ENTRIES) {
-			const entryUrl = pathToFileURL(path.resolve(HERE, entry));
-			const { js, css } = yield* Effect.tryPromise({
-				try: () => bundleClient({ entry: entryUrl as URL }),
-				catch: (cause) => new InternalError({ cause }),
-			});
-			const jsEtag = yield* strongEtag(js);
-			assets.set(name, { code: js, etag: jsEtag });
-			yield* Effect.logInfo("bundled client script", {
-				name,
-				bytes: js.length,
-				etag: jsEtag,
-			});
-			if (css !== undefined) {
-				const cssName = name.replace(/\.js$/, ".css");
-				const cssEtag = yield* strongEtag(css);
-				assets.set(cssName, { code: css, etag: cssEtag });
-				yield* Effect.logInfo("bundled client stylesheet", {
-					name: cssName,
-					bytes: css.length,
-					etag: cssEtag,
+
+		const load = (name: string) =>
+			Effect.gen(function* () {
+				const assetPath = uiAssetPath(config, name);
+				const code = yield* files.readText(assetPath).pipe(
+					Effect.catch((cause: InternalError) =>
+						Effect.fail(
+							new InternalError({
+								cause: new Error(
+									`missing compiled client asset at ${assetPath} — run \`deno task ui:js\``,
+									{ cause },
+								),
+							}),
+						),
+					),
+				);
+				const etag = yield* strongEtag(code);
+				assets.set(name, { code, etag });
+				yield* Effect.logInfo("loaded client asset", {
+					name,
+					bytes: code.length,
+					etag,
 				});
+			});
+
+		for (const { name } of ENTRIES) {
+			yield* load(name);
+			// Only entries importing a stylesheet for side effect emit one, so a
+			// missing .css is expected rather than a misconfigured build.
+			const cssName = cssNameFor(name);
+			if (yield* files.exists(uiAssetPath(config, cssName))) {
+				yield* load(cssName);
 			}
 		}
+
 		return { assets };
 	}),
 );

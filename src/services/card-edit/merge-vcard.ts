@@ -1,5 +1,14 @@
 import type { IrComponent, IrProperty, IrValue } from "#src/data/ir.ts";
-import { baseName, groupOf } from "#src/data/vcard/prop.ts";
+import { baseName, getText, groupOf } from "#src/data/vcard/prop.ts";
+import {
+	AB_RELATED_PROP,
+	RELATED_PROP,
+	RELATION_LABEL_PARAM,
+	RELATION_NAME_PARAM,
+	RELATION_SOURCE_PARAM,
+	RELATION_SOURCE_PROPS,
+	sourceMatchesRelation,
+} from "#src/data/vcard/related.ts";
 import {
 	addressJoined,
 	adrProp,
@@ -8,18 +17,31 @@ import {
 	emailProp,
 	imppProp,
 	isBlankAddress,
+	isBlankRelation,
 	labelParams,
 	nValue,
 	otherProp,
+	photoMetaProps,
 	prefParams,
+	relatedProp,
 	serviceParams,
 	socialProp,
 	telProp,
 	typeParams,
 	urlProp,
 } from "./build-vcard.ts";
-import { isOtherEditable } from "./field-registry.ts";
-import type { ContactFormData, ContactServiceValue } from "./types.ts";
+import {
+	isOtherEditable,
+	PHOTO_CONTENT_META_BASES,
+	PHOTO_CROP_PARAM,
+	PHOTO_META_BASES,
+	PHOTO_TYPE,
+} from "./field-registry.ts";
+import type {
+	ContactFormData,
+	ContactRelation,
+	ContactServiceValue,
+} from "./types.ts";
 
 // ---------------------------------------------------------------------------
 // mergeFormIntoVcard — non-destructive edit. Walks the existing property list
@@ -37,7 +59,14 @@ import type { ContactFormData, ContactServiceValue } from "./types.ts";
 //     re-appended from `form.otherProps`, so add/edit/remove all take effect.
 // ---------------------------------------------------------------------------
 
-type Multi = "EMAIL" | "TEL" | "URL" | "ADR" | "SOCIALPROFILE" | "IMPP";
+type Multi =
+	| "EMAIL"
+	| "TEL"
+	| "URL"
+	| "ADR"
+	| "SOCIALPROFILE"
+	| "IMPP"
+	| "RELATED";
 const MULTI: ReadonlyArray<Multi> = [
 	"EMAIL",
 	"TEL",
@@ -45,7 +74,18 @@ const MULTI: ReadonlyArray<Multi> = [
 	"ADR",
 	"SOCIALPROFILE",
 	"IMPP",
+	"RELATED",
 ];
+
+/**
+ * The managed family a property belongs to. Apple's legacy grouped
+ * `X-ABRELATEDNAMES` joins the RELATED family so a card holding both forms
+ * pairs against one row list, and saving rewrites it canonically.
+ */
+const multiKeyOf = (base: string): string =>
+	base === AB_RELATED_PROP || RELATION_SOURCE_PROPS.has(base)
+		? "RELATED"
+		: base;
 
 type Single =
 	| "FN"
@@ -115,6 +155,51 @@ const withServiceValue = (
 	value: { type: prop.value.type === "TEXT" ? "TEXT" : "URI", value: sv.value },
 });
 
+// Parameters relatedProp owns; anything else on an existing RELATED (PID,
+// ALTID, …) is the client's and survives the edit.
+const RELATION_MANAGED_PARAMS: ReadonlySet<string> = new Set([
+	"VALUE",
+	"TYPE",
+	"PREF",
+	RELATION_LABEL_PARAM,
+	RELATION_NAME_PARAM,
+]);
+
+/**
+ * Update a relation in place. A legacy grouped `X-ABRELATEDNAMES` is rebuilt
+ * outright rather than patched — the whole point is to leave canonical RELATED
+ * behind, and its group prefix must not survive.
+ */
+const withRelation = (
+	prop: IrProperty,
+	relation: ContactRelation,
+): IrProperty => {
+	const rebuilt = relatedProp(relation);
+	if (baseName(prop.name) !== RELATED_PROP) {
+		return rebuilt;
+	}
+	return {
+		...rebuilt,
+		name: prop.name,
+		parameters: [
+			...prop.parameters.filter((p) => {
+				const name = p.name.toUpperCase();
+				if (RELATION_MANAGED_PARAMS.has(name)) {
+					return false;
+				}
+				// Provenance only holds while the wording still means what the
+				// source property means — retyping a spouse as a friend must not
+				// downgrade back to X-SPOUSE.
+				return (
+					name !== RELATION_SOURCE_PARAM ||
+					sourceMatchesRelation(p.value, relation.relation)
+				);
+			}),
+			...rebuilt.parameters,
+		],
+	};
+};
+
 const multiRows = (
 	form: ContactFormData,
 ): Record<Multi, ReadonlyArray<unknown>> => ({
@@ -124,6 +209,7 @@ const multiRows = (
 	ADR: form.addresses.filter((a) => !isBlankAddress(a)),
 	SOCIALPROFILE: form.socialProfiles.filter((s) => s.value !== ""),
 	IMPP: form.impps.filter((i) => i.value !== ""),
+	RELATED: form.relations.filter((r) => !isBlankRelation(r)),
 });
 
 const updateMulti = (
@@ -155,6 +241,8 @@ const updateMulti = (
 		case "SOCIALPROFILE":
 		case "IMPP":
 			return withServiceValue(prop, row as ContactServiceValue);
+		case "RELATED":
+			return withRelation(prop, row as ContactRelation);
 	}
 };
 
@@ -172,6 +260,8 @@ const buildMulti = (base: Multi, row: unknown): IrProperty => {
 			return socialProp(row as ContactServiceValue);
 		case "IMPP":
 			return imppProp(row as ContactServiceValue);
+		case "RELATED":
+			return relatedProp(row as ContactRelation);
 	}
 };
 
@@ -273,6 +363,44 @@ const buildSingle = (base: Single, form: ContactFormData): IrProperty => ({
 	isKnown: true,
 });
 
+/**
+ * Reconcile Apple's photo companions against a changed PHOTO. `X-IMAGEHASH` and
+ * the `X-ABCROP-RECTANGLE` parameter both describe the *old* image's bytes — a
+ * surviving crop would frame the new photo by the old one's coordinates — so
+ * both are dropped and left for a client to recompute. `X-IMAGETYPE` is a
+ * discriminator we can state correctly, so it is kept in step.
+ */
+const reconcilePhotoMeta = (
+	props: ReadonlyArray<IrProperty>,
+	form: ContactFormData,
+	photoChanged: boolean,
+): ReadonlyArray<IrProperty> => {
+	const hasPhoto = form.photo !== "";
+	const kept = props.filter((p) => {
+		const base = baseName(p.name);
+		if (base === PHOTO_TYPE) {
+			return false;
+		}
+		if (!PHOTO_META_BASES.has(base)) {
+			return true;
+		}
+		return !(photoChanged && PHOTO_CONTENT_META_BASES.has(base));
+	});
+	const withoutStaleCrop = kept.map((p) =>
+		photoChanged && baseName(p.name) === "PHOTO"
+			? {
+					...p,
+					parameters: p.parameters.filter(
+						(x) => x.name.toUpperCase() !== PHOTO_CROP_PARAM,
+					),
+				}
+			: p,
+	);
+	return hasPhoto
+		? [...withoutStaleCrop, ...photoMetaProps(form.photo)]
+		: withoutStaleCrop;
+};
+
 export const mergeFormIntoVcard = (
 	existing: IrComponent,
 	form: ContactFormData,
@@ -286,6 +414,7 @@ export const mergeFormIntoVcard = (
 		ADR: 0,
 		SOCIALPROFILE: 0,
 		IMPP: 0,
+		RELATED: 0,
 	};
 	const singleEmitted = new Set<Single>();
 	const removedGroups = new Set<string>();
@@ -305,18 +434,19 @@ export const mergeFormIntoVcard = (
 			sawUid = true;
 			continue;
 		}
-		if ((MULTI as ReadonlyArray<string>).includes(base)) {
-			const m = base as Multi;
+		if ((MULTI as ReadonlyArray<string>).includes(multiKeyOf(base))) {
+			const m = multiKeyOf(base) as Multi;
 			const list = rows[m];
 			const i = cursor[m];
 			cursor[m] = i + 1;
+			const g = groupOf(p.name);
+			// A legacy grouped related name leaves as an ungrouped RELATED either
+			// way, so its label is orphaned whether the row survived or not.
+			if (g !== "" && (i >= list.length || base === AB_RELATED_PROP)) {
+				removedGroups.add(g);
+			}
 			if (i < list.length) {
 				out.push(updateMulti(m, p, list[i]));
-			} else {
-				const g = groupOf(p.name);
-				if (g !== "") {
-					removedGroups.add(g);
-				}
 			}
 			continue;
 		}
@@ -369,7 +499,12 @@ export const mergeFormIntoVcard = (
 		});
 	}
 
-	const pruned = out.filter((p) => {
+	const photoChanged =
+		getText(existing.properties.find((p) => baseName(p.name) === "PHOTO")) !==
+		form.photo;
+	const reconciled = reconcilePhotoMeta(out, form, photoChanged);
+
+	const pruned = reconciled.filter((p) => {
 		if (baseName(p.name) !== "X-ABLABEL") {
 			return true;
 		}
@@ -377,7 +512,7 @@ export const mergeFormIntoVcard = (
 		if (g === "" || !removedGroups.has(g)) {
 			return true;
 		}
-		return out.some(
+		return reconciled.some(
 			(q) =>
 				q !== p && groupOf(q.name) === g && baseName(q.name) !== "X-ABLABEL",
 		);

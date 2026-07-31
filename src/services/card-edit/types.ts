@@ -43,6 +43,31 @@ export interface ContactServiceValue {
 	readonly value: string;
 }
 
+/**
+ * What a relation points at. `RELATED` holds a single URI (RFC 6350 §6.6.6),
+ * and the three shapes the UI distinguishes render differently: a contact on
+ * this server links to it, an address becomes a `mailto:` link, and anything
+ * else is just the person's name.
+ */
+export type ContactRelationTarget =
+	| { readonly kind: "contact"; readonly uid: string }
+	| { readonly kind: "email"; readonly address: string }
+	| { readonly kind: "text" };
+
+/**
+ * A related person (`RELATED`). Apple's grouped `X-ABRELATEDNAMES` is folded
+ * into this same shape on ingest, so the editor models one thing.
+ */
+export interface ContactRelation {
+	readonly target: ContactRelationTarget;
+	/** Display name — for a `text` target this is the whole value. */
+	readonly name: string;
+	/** Relation wording, e.g. "Spouse" or a user's own "Golf buddy". */
+	readonly relation: string;
+	/** Sole preference channel — see `ContactTypedValue.preferred`. */
+	readonly preferred: boolean;
+}
+
 export interface ContactFormData {
 	readonly kind: string;
 	readonly fn: string;
@@ -63,6 +88,7 @@ export interface ContactFormData {
 	readonly addresses: ReadonlyArray<ContactAddress>;
 	readonly socialProfiles: ReadonlyArray<ContactServiceValue>;
 	readonly impps: ReadonlyArray<ContactServiceValue>;
+	readonly relations: ReadonlyArray<ContactRelation>;
 	/** ISO date string ("YYYY-MM-DD") or empty. */
 	readonly bday: string;
 	/** ISO date string or empty (ANNIVERSARY). */
@@ -114,6 +140,7 @@ export const emptyContactForm: ContactFormData = {
 	addresses: [],
 	socialProfiles: [],
 	impps: [],
+	relations: [],
 	bday: "",
 	anniversary: "",
 	gender: "",

@@ -1,6 +1,9 @@
-// Debug helper: writes the compiled design-system stylesheet to disk so it can
-// be inspected. The running server does NOT read this file — CssService compiles
-// the same input in-memory at startup. Run with: `deno task ui:css`.
+// Build step: writes the compiled design-system stylesheet to disk. CssService
+// serves this file verbatim at runtime, so it must be regenerated whenever
+// input.css or the classes used in src/http/ui change. Running compilation here
+// rather than at server startup keeps the Tailwind/PostCSS/cssnano toolchain
+// (~36 MB of heap) out of the long-lived server process. Run with:
+// `deno task ui:css` — the Docker build and the `dev` task both do.
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";

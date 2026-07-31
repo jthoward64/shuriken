@@ -6,11 +6,12 @@ import type {
 	InternalError,
 } from "#src/domain/errors.ts";
 import { notFound } from "#src/domain/errors.ts";
-import { EntityId, type InstanceId } from "#src/domain/ids.ts";
+import { CollectionId, EntityId, type InstanceId } from "#src/domain/ids.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import { isHtmxRequest } from "#src/http/ui/helpers/htmx.ts";
 import { buildNavContext } from "#src/http/ui/helpers/nav-context.ts";
+import { resolveRelations } from "#src/http/ui/helpers/resolve-relations.ts";
 import { CONTACTS_ASSETS } from "#src/http/ui/view/assets.tsx";
 import { ContactHoverCard } from "#src/http/ui/view/pages/contacts/hover-card.tsx";
 import { ContactPreviewPane } from "#src/http/ui/view/pages/contacts/preview-pane.tsx";
@@ -18,6 +19,7 @@ import { contactsExtraHead } from "#src/http/ui/view/pages/contacts/shared.tsx";
 import { renderFragment, renderPage } from "#src/http/ui/view/render.tsx";
 import type { AclService } from "#src/services/acl/service.ts";
 import { parseVcardToForm } from "#src/services/card-edit/parse-vcard.ts";
+import type { CardIndexRepository } from "#src/services/card-index/repository.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
 import { InstanceService } from "#src/services/instance/index.ts";
 
@@ -39,7 +41,11 @@ export const contactsPreviewHandler = (
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError | InternalError,
-	AclService | AppConfigService | ComponentRepository | InstanceService
+	| AclService
+	| AppConfigService
+	| CardIndexRepository
+	| ComponentRepository
+	| InstanceService
 > =>
 	Effect.gen(function* () {
 		const principal = yield* requireAuthenticated(ctx.auth);
@@ -56,20 +62,31 @@ export const contactsPreviewHandler = (
 		}
 		const form = parseVcardToForm(tree.value);
 
-		// Hover card: the compact summary shown on mouse-over.
+		// Hover card: the compact summary shown on mouse-over. It shows no
+		// relations, so it skips the resolution query.
 		if (ctx.url.searchParams.get("variant") === "hover") {
 			return yield* renderFragment(
 				<ContactHoverCard
 					form={form}
+					instanceId={instanceId}
 					editHref={`/ui/contacts/${instanceId}`}
 				/>,
 			);
 		}
 
+		const relations = yield* resolveRelations(
+			form.relations,
+			CollectionId(instance.collectionId),
+		);
+
 		// Pane fragment: swapped into the desktop split column / mobile slide-over.
 		if (isHtmxRequest(ctx.headers)) {
 			return yield* renderFragment(
-				<ContactPreviewPane form={form} instanceId={instanceId} />,
+				<ContactPreviewPane
+					form={form}
+					instanceId={instanceId}
+					relations={relations}
+				/>,
 			);
 		}
 
@@ -81,7 +98,12 @@ export const contactsPreviewHandler = (
 			config.auth.basicAuthEnabled,
 		);
 		return yield* renderPage(
-			<ContactPreviewPane form={form} instanceId={instanceId} standalone />,
+			<ContactPreviewPane
+				form={form}
+				instanceId={instanceId}
+				relations={relations}
+				standalone
+			/>,
 			{
 				headers: ctx.headers,
 				title: form.fn || "Contact",

@@ -317,8 +317,77 @@
 		const clone = tpl.content.cloneNode(true);
 		list.appendChild(clone);
 		const added = list.lastElementChild;
+		if (added) {
+			rekeyRelationRow(added);
+			// Relation rows carry hx-* attributes for their type-ahead; a cloned
+			// node is invisible to htmx until it is told about it.
+			getHtmx()?.process?.(added);
+		}
 		const focusTarget = added?.querySelector("input, select, textarea");
 		focusTarget?.focus();
+	};
+
+	// --- Relation type-ahead -------------------------------------------------
+	// A relation row owns two <datalist>s addressed by id, so a cloned row must
+	// be given fresh ids or it would drive (and be driven by) the row it was
+	// cloned from.
+	let relationRowSeq = 0;
+	const rekeyRelationRow = (row) => {
+		const input = row.querySelector("[data-relation-input]");
+		if (!input) {
+			return;
+		}
+		relationRowSeq += 1;
+		const suffix = `c${relationRowSeq}`;
+		for (const [selector, attr] of [
+			["[data-relation-input]", "list"],
+			["input[list^='relation-kinds']", "list"],
+		]) {
+			const el = row.querySelector(selector);
+			const old = el?.getAttribute(attr);
+			if (!el || !old) {
+				continue;
+			}
+			const next = `${old.replace(/-\d+$/, "")}-${suffix}`;
+			const dl = row.querySelector(`datalist[id="${old}"]`);
+			el.setAttribute(attr, next);
+			dl?.setAttribute("id", next);
+			if (attr === "list" && el === input) {
+				el.setAttribute("hx-target", `#${next}`);
+				el.setAttribute(
+					"hx-vals",
+					JSON.stringify({
+						...JSON.parse(el.getAttribute("hx-vals") ?? "{}"),
+						list: next,
+					}),
+				);
+			}
+		}
+	};
+
+	// The typed value is what gets submitted; the hidden uid is what turns the
+	// entry into a link to another contact. It is set only on an exact match
+	// against a suggestion, and cleared as soon as the text diverges — so
+	// editing a linked name back to free text stops claiming to be that contact.
+	// Suggestions land after the keystroke that asked for them, so a value typed
+	// out in full matches nothing at input time. Re-check once they arrive.
+	const resyncRelationUids = () => {
+		for (const input of document.querySelectorAll("[data-relation-input]")) {
+			syncRelationUid(input);
+		}
+	};
+
+	const syncRelationUid = (input) => {
+		const row = input.closest("[data-row-item]");
+		const hidden = row?.querySelector("[data-relation-uid]");
+		if (!hidden) {
+			return;
+		}
+		const list = document.getElementById(input.getAttribute("list") ?? "");
+		const match = [...(list?.querySelectorAll("option") ?? [])].find(
+			(o) => o.value === input.value,
+		);
+		hidden.value = match?.getAttribute("data-uid") ?? "";
 	};
 
 	// A row's hidden `types` field carries the actual submitted value — the
@@ -430,6 +499,10 @@
 		}
 		if (t.matches("[data-type-other]")) {
 			syncTypeHidden(t.closest("[data-row-item]"));
+			return;
+		}
+		if (t.matches("[data-relation-input]")) {
+			syncRelationUid(t);
 			return;
 		}
 		if (
@@ -721,6 +794,7 @@
 	};
 
 	document.addEventListener("htmx:after:settle", bindBulkJobListeners);
+	document.addEventListener("htmx:after:settle", resyncRelationUids);
 	bindBulkJobListeners();
 
 	// --- Modal dialogs (New contact / Find duplicates / Clean up) -------------

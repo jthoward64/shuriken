@@ -24,6 +24,27 @@ export const baseName = (name: string): string => {
 	return dot === -1 ? name : name.slice(dot + 1);
 };
 
+/**
+ * Prefix under which a 3.0 `LABEL` property's own parameters are parked on the
+ * ADR that absorbs it, since a 4.0 `LABEL=` parameter cannot carry parameters
+ * of its own. Shared by the upgrade that parks them and the downgrade that
+ * restores them.
+ */
+export const LABEL_PARAM_PREFIX = "X-SKN-LABEL-PARAM-";
+
+/** Highest existing `itemN` group index across the given properties, or 0. */
+export const maxItemGroup = (props: ReadonlyArray<IrProperty>): number => {
+	let max = 0;
+	for (const p of props) {
+		const m = /^item(\d+)\./i.exec(p.name);
+		const n = m?.[1];
+		if (n !== undefined) {
+			max = Math.max(max, Number.parseInt(n, 10));
+		}
+	}
+	return max;
+};
+
 /** True when `prop`'s base name equals `base` (group-insensitive). */
 export const isProp = (prop: IrProperty, base: string): boolean =>
 	baseName(prop.name) === base;

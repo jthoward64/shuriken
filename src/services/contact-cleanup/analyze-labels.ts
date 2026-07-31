@@ -1,10 +1,7 @@
 import type { IrComponent, IrProperty } from "#src/data/ir.ts";
+import { isWrappedAppleLabel } from "#src/data/vcard/ab-label.ts";
 import { baseName, getText, getTypeTokens, groupOf, isProp } from "./fields.ts";
-import {
-	isJunkLabel,
-	isWrappedAppleLabel,
-	STANDARD_LABEL_OPTIONS,
-} from "./labels.ts";
+import { isJunkLabel, STANDARD_LABEL_OPTIONS } from "./labels.ts";
 import { type PartialSuggestion, setAbLabelFix, setLabelFix } from "./types.ts";
 
 // ---------------------------------------------------------------------------

@@ -1,4 +1,5 @@
 import type { ComponentChildren, VNode } from "preact";
+import { photoSrcFor } from "#src/http/ui/helpers/contact-photo.ts";
 import type {
 	ContactAddress,
 	ContactFormData,
@@ -6,6 +7,7 @@ import type {
 	ContactTypedValue,
 } from "#src/services/card-edit/types.ts";
 import { IconChevronLeft, IconEdit } from "../../icons.tsx";
+import { RelationList, type ResolvedRelation } from "./relations.tsx";
 
 // ---------------------------------------------------------------------------
 // Contact preview pane — a read-only view of every populated contact field.
@@ -152,15 +154,19 @@ const fullName = (form: ContactFormData): string =>
 export const ContactPreviewPane = ({
 	form,
 	instanceId,
+	relations = [],
 	standalone = false,
 }: {
 	form: ContactFormData;
 	instanceId: string;
+	/** Relations with their UID targets already resolved to links. */
+	relations?: ReadonlyArray<ResolvedRelation>;
 	/** True for the no-JS full-page render (Back links to the list instead of
 	 * closing an overlay). */
 	standalone?: boolean;
 }): VNode => {
 	const editHref = `/ui/contacts/${instanceId}`;
+	const photoSrc = photoSrcFor(form.photo, instanceId);
 	const orgLine = [form.title, form.org]
 		.filter((s) => s.trim() !== "")
 		.join(", ");
@@ -219,10 +225,11 @@ export const ContactPreviewPane = ({
 			{backBar}
 			<div class="min-h-0 flex-1 space-y-5 overflow-y-auto">
 				<div class="flex items-start gap-3">
-					{form.photo !== "" ? (
+					{photoSrc !== "" ? (
 						<img
-							src={form.photo}
+							src={photoSrc}
 							alt=""
+							loading="lazy"
 							class="h-16 w-16 shrink-0 rounded-full bg-surface-2 object-cover"
 						/>
 					) : (
@@ -292,6 +299,11 @@ export const ContactPreviewPane = ({
 				{form.impps.length > 0 && (
 					<PaneSection title="Instant messaging">
 						<ServiceList values={form.impps} />
+					</PaneSection>
+				)}
+				{relations.length > 0 && (
+					<PaneSection title="Related people">
+						<RelationList relations={relations} />
 					</PaneSection>
 				)}
 				{dates.length > 0 && (

@@ -1,14 +1,20 @@
 import type { ComponentChildren, VNode } from "preact";
+import {
+	isInlinePhoto,
+	photoSrcFor,
+} from "#src/http/ui/helpers/contact-photo.ts";
 import type {
 	ContactAddress,
 	ContactFormData,
 	ContactOtherProp,
+	ContactRelation,
 	ContactServiceValue,
 	ContactTypedValue,
 } from "#src/services/card-edit/types.ts";
 import { cx } from "../../cx.ts";
 import { Card } from "../../ui.tsx";
 import { CONTACTS_POPOVER_ID, ContactsPopoverHeader } from "./popover.tsx";
+import { RELATION_NAME_FIELD, relationOptionsFor } from "./relations.tsx";
 import { ContactsCrumb } from "./shared.tsx";
 
 // ---------------------------------------------------------------------------
@@ -38,6 +44,8 @@ export interface ContactFormPageProps {
 	readonly addressbookId: string;
 	readonly form: ContactFormData;
 	readonly action: string;
+	/** Present only in edit mode — used to stream an embedded photo. */
+	readonly instanceId?: string;
 	/** Present only in edit mode — the delete endpoint. */
 	readonly deleteAction?: string;
 	readonly errors?: ReadonlyArray<string>;
@@ -123,6 +131,13 @@ const BLANK_ADDRESS: ContactAddress = {
 };
 
 const BLANK_SERVICE: ContactServiceValue = { service: "", value: "" };
+
+const BLANK_RELATION: ContactRelation = {
+	target: { kind: "text" },
+	name: "",
+	relation: "",
+	preferred: false,
+};
 
 const TextField = ({
 	label,
@@ -481,6 +496,85 @@ const AddressRow = ({
 	</div>
 );
 
+/**
+ * One relation. The value is a single text box with a `<datalist>` type-ahead
+ * over the addressbook's contacts; picking a suggestion makes contacts.js write
+ * the contact's UID into the hidden field, which is what turns the entry into a
+ * link rather than a name. Typing anything else leaves the UID empty and the
+ * server classifies it as an address or free text.
+ *
+ * `index` keys the datalist to this row. Rows cloned from the template take
+ * their index from the DOM at add time (contacts.js), since a template cannot
+ * know its future position.
+ */
+const RelationRow = ({
+	value,
+	index,
+	addressbookId,
+	nojsOnly,
+}: {
+	value: ContactRelation;
+	index: number;
+	addressbookId: string;
+	nojsOnly?: boolean;
+}): VNode => {
+	const listId = `relation-options-${index}`;
+	const kindsId = `relation-kinds-${index}`;
+	const uid = value.target.kind === "contact" ? value.target.uid : "";
+	const shown =
+		value.target.kind === "email" && value.name === ""
+			? value.target.address
+			: value.name;
+	return (
+		<div
+			class="flex flex-wrap gap-2 items-center"
+			data-row-item
+			data-nojs-only={nojsOnly || undefined}
+		>
+			<input
+				type="text"
+				name={RELATION_NAME_FIELD}
+				value={shown}
+				list={listId}
+				placeholder="Name, or an email address"
+				class="form-input flex-1 min-w-[12rem]"
+				data-relation-input
+				hx-get="/ui/contacts/relation-options"
+				hx-trigger="input changed delay:200ms"
+				hx-target={`#${listId}`}
+				hx-swap="outerHTML"
+				hx-vals={JSON.stringify({ addressbook: addressbookId, list: listId })}
+				hx-params="*"
+			/>
+			<datalist id={listId} />
+			<input
+				type="hidden"
+				name="relations[].uid"
+				value={uid}
+				data-relation-uid
+			/>
+			{/* Combobox, not a select: the standard wordings are offered, this
+			    row's own non-standard wording is offered back to it so editing
+			    never coarsens it, and a new custom relation can still be typed. */}
+			<input
+				type="text"
+				name="relations[].relation"
+				value={value.relation}
+				list={kindsId}
+				placeholder="Relation"
+				class="form-input w-40"
+			/>
+			<datalist id={kindsId}>
+				{relationOptionsFor(value.relation).map((r) => (
+					<option key={r} value={r} />
+				))}
+			</datalist>
+			<PreferredCheckbox field="relations" preferred={value.preferred} />
+			<RemoveRowButton />
+		</div>
+	);
+};
+
 const OtherPropRow = ({
 	value,
 	nojsOnly,
@@ -527,6 +621,7 @@ export const ContactFormPage = ({
 	addressbookId,
 	form,
 	action,
+	instanceId,
 	deleteAction,
 	errors = [],
 	variant = "page",
@@ -552,6 +647,12 @@ export const ContactFormPage = ({
 
 	const isCustomGender = !STANDARD_GENDER_VALUES.has(form.gender);
 	const hasGramGender = form.gramGender !== "";
+
+	// An embedded photo is streamed from the photo endpoint rather than inlined
+	// into the page; a remote URL is used directly. A brand-new contact has no
+	// instance to stream from, so its photo can only be a URL.
+	const inlinePhoto = isInlinePhoto(form.photo) ? form.photo : "";
+	const photoSrc = photoSrcFor(form.photo, instanceId);
 
 	return (
 		<div class={popover ? "space-y-6" : "space-y-6 max-w-3xl"}>
@@ -626,6 +727,7 @@ export const ContactFormPage = ({
 						name="middleName"
 						value={form.middleName}
 					/>
+					<TextField label="Prefix" name="prefix" value={form.prefix} />
 					<TextField label="Suffix" name="suffix" value={form.suffix} />
 					<TextField label="Nickname" name="nickname" value={form.nickname} />
 					<SelectField
@@ -774,6 +876,36 @@ export const ContactFormPage = ({
 					addLabel="+ Add IM handle"
 				/>
 
+				<RowSection
+					field="relations"
+					title="Related people"
+					rows={[
+						...form.relations.map((r, i) => (
+							<RelationRow
+								key={`relation-${i}`}
+								value={r}
+								index={i}
+								addressbookId={addressbookId}
+							/>
+						)),
+						<RelationRow
+							key="relation-blank"
+							value={BLANK_RELATION}
+							index={form.relations.length}
+							addressbookId={addressbookId}
+							nojsOnly
+						/>,
+					]}
+					blankRow={
+						<RelationRow
+							value={BLANK_RELATION}
+							index={form.relations.length}
+							addressbookId={addressbookId}
+						/>
+					}
+					addLabel="+ Add related person"
+				/>
+
 				<section class="grid grid-cols-1 md:grid-cols-3 gap-4">
 					<TextField
 						label="Pronouns"
@@ -864,10 +996,11 @@ export const ContactFormPage = ({
 				</section>
 
 				<Section title="Photo">
-					{form.photo !== "" && (
+					{photoSrc !== "" && (
 						<img
-							src={form.photo}
+							src={photoSrc}
 							alt="Current contact avatar"
+							loading="lazy"
 							class="w-24 h-24 object-cover rounded-md"
 						/>
 					)}
@@ -885,10 +1018,18 @@ export const ContactFormPage = ({
 						<input
 							type="url"
 							name="photo"
-							value={form.photo}
+							value={inlinePhoto === "" ? form.photo : ""}
+							placeholder={inlinePhoto === "" ? "" : "Replaces the photo above"}
 							class="form-input mt-1"
 						/>
 					</label>
+					{/* An embedded photo is hundreds of KB of base64 — kept out of the
+					    visible box (and off the page, since the preview streams from
+					    the photo endpoint) but still round-tripped, so saving an
+					    unrelated field does not drop it. A pasted URL wins over it. */}
+					{inlinePhoto !== "" && (
+						<input type="hidden" name="photoInline" value={inlinePhoto} />
+					)}
 				</Section>
 
 				<section>

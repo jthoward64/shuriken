@@ -11,6 +11,7 @@ import type { AppConfigType } from "#src/config.ts";
 
 export const testAppConfig: AppConfigType = {
 	server: { port: 3000, host: "localhost" },
+	ui: { assetRoot: Option.none<string>() },
 	metrics: { enabled: false, port: 9464 },
 	database: { url: Redacted.make("postgres://unused") },
 	auth: {
