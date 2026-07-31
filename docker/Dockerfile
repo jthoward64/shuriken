@@ -19,15 +19,25 @@ RUN deno cache src/index.ts
 # server process never imports the Tailwind/PostCSS/cssnano toolchain and never
 # runs Deno.bundle(), and because the runtime root filesystem is read-only.
 RUN deno task ui:assets
+# Bundle the server into a single self-contained server.js. Tree-shaking and
+# minification cut the module graph's heap roughly in half (notably dropping
+# fast-check and Effect's JSDoc, which the `effect` barrel would otherwise
+# load in full) and collapse ~1500 module records into one script.
+RUN deno task bundle
 
 # Distroless has no shell, so the entrypoint is a Deno task (run via Deno's
 # built-in task shell) rather than entrypoint.sh. node_modules and the Deno
 # module cache (/deno-dir) are carried over from the build stage so nothing
-# needs to be fetched at runtime.
+# needs to be fetched at runtime — the bundle covers the server itself, but
+# `migrations:run` still shells out to drizzle-kit.
 FROM denoland/deno:distroless
 WORKDIR /app
 COPY --from=build /deno-dir /deno-dir
 COPY --from=build /app /app
+
+# A bundle has no source-tree location to resolve assets against, so the UI
+# asset directory is named explicitly rather than derived from import.meta.url.
+ENV UI_ASSET_ROOT=/app/src/http/ui/static
 
 EXPOSE 3000
 

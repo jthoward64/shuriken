@@ -1,12 +1,14 @@
 {
 	"name": "shuriken",
-	"version": "0.7.0",
+	"version": "0.8.0",
 	"exports": "./src/index.ts",
 	"license": "GPL-3.0-or-later",
 	"tasks": {
 		"start": "deno run --allow-net --allow-env --allow-read --allow-sys --env-file=.env src/index.ts",
 		"dev": "deno task ui:assets && deno run --watch --allow-net --allow-env --allow-read --allow-sys --allow-ffi --env-file=.env src/index.ts",
-		"docker:start": "deno task migrations:run && deno task start",
+		"start:bundle": "deno run --allow-net --allow-env --allow-read --allow-sys --env-file=.env server.js",
+		"bundle": "deno bundle --unstable-bundle --platform=deno --packages bundle --minify --output=server.js src/index.ts",
+		"docker:start": "deno task migrations:run && deno task start:bundle",
 		"test": "deno test --allow-all --env-file=.env --no-check",
 		"test:unit": "deno test --allow-all --no-check 'src/**/*.unit.test.ts'",
 		"test:integration": "deno test --allow-all --env-file=.env --no-check 'src/**/*.integration.test.ts'",

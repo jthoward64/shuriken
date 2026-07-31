@@ -19,6 +19,44 @@ jobs:
       - run: deno task check
       - run: deno run -A npm:@biomejs/biome@2.4.9 ci --reporter=github
 
+  bundle:
+    name: Build assets & bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: deno install
+
+      # The image serves these from disk rather than compiling them at startup,
+      # so a build failure here would only surface at deploy time otherwise.
+      - run: deno task ui:assets
+      - run: deno task bundle
+
+      # The server resolves its assets through UI_ASSET_ROOT once bundled; boot
+      # it far enough to prove that path still works. It is expected to fail on
+      # the unreachable database — an asset error would mean a regression in
+      # asset resolution (e.g. a new import.meta.url lookup).
+      - name: Smoke test the bundle
+        env:
+          UI_ASSET_ROOT: ${{ github.workspace }}/src/http/ui/static
+          DATABASE_URL: postgres://unused:unused@127.0.0.1:1/unused
+        run: |
+          timeout 90 deno run --allow-net --allow-env --allow-read --allow-sys server.js \
+            > /tmp/boot.log 2>&1 || true
+          cat /tmp/boot.log
+          if grep -qE 'missing compiled|ENOENT' /tmp/boot.log; then
+            echo "::error::bundled server failed to resolve its UI assets"
+            exit 1
+          fi
+          # Assert positively that the assets loaded, so an early crash cannot
+          # pass simply by never reaching the asset code.
+          grep -q 'loaded UI stylesheet' /tmp/boot.log \
+            || { echo "::error::bundled server never loaded app.css"; exit 1; }
+          grep -q 'loaded client asset' /tmp/boot.log \
+            || { echo "::error::bundled server never loaded a client script"; exit 1; }
+
   test:
     name: Test
     runs-on: ubuntu-latest
@@ -33,7 +71,7 @@ jobs:
   version:
     name: Determine release version
     runs-on: ubuntu-latest
-    needs: [check, test]
+    needs: [check, test, bundle]
     permissions:
       contents: write
     outputs:
@@ -152,7 +190,7 @@ jobs:
   docker:
     name: Build & push image
     runs-on: ubuntu-latest
-    needs: [check, test, version]
+    needs: [check, test, bundle, version]
     permissions:
       contents: read
       packages: write
