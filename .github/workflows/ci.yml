@@ -36,13 +36,26 @@ jobs:
 
       # The server resolves its assets through UI_ASSET_ROOT once bundled; boot
       # it far enough to prove that path still works. It is expected to fail on
-      # the unreachable database — an asset error would mean a regression in
-      # asset resolution (e.g. a new import.meta.url lookup).
+      # the database — an asset error would mean a regression in asset
+      # resolution (e.g. a new import.meta.url lookup).
+      #
+      # AppLayer builds the asset layers in parallel with the database layer, so
+      # a database that refuses instantly interrupts asset loading mid-flight and
+      # the run proves nothing. Point the server at a listener that accepts the
+      # connection and never speaks: the pg handshake then hangs until its own
+      # timeout, which is orders of magnitude longer than reading files off disk.
       - name: Smoke test the bundle
         env:
           UI_ASSET_ROOT: ${{ github.workspace }}/src/http/ui/static
-          DATABASE_URL: postgres://unused:unused@127.0.0.1:1/unused
+          DATABASE_URL: postgres://unused:unused@127.0.0.1:55432/unused
         run: |
+          deno eval 'const l = Deno.listen({ hostname: "127.0.0.1", port: 55432 }); for await (const c of l) { void c; }' &
+          trap 'kill %1 2>/dev/null || true' EXIT
+          for _ in $(seq 1 100); do
+            (exec 3<>/dev/tcp/127.0.0.1/55432) 2>/dev/null && break
+            sleep 0.1
+          done
+
           timeout 90 deno run --allow-net --allow-env --allow-read --allow-sys server.js \
             > /tmp/boot.log 2>&1 || true
           cat /tmp/boot.log
@@ -50,12 +63,25 @@ jobs:
             echo "::error::bundled server failed to resolve its UI assets"
             exit 1
           fi
-          # Assert positively that the assets loaded, so an early crash cannot
-          # pass simply by never reaching the asset code.
+          # Assert positively that every asset loaded, so neither an early crash
+          # nor a partially-interrupted boot can pass by never reaching the code.
           grep -q 'loaded UI stylesheet' /tmp/boot.log \
             || { echo "::error::bundled server never loaded app.css"; exit 1; }
-          grep -q 'loaded client asset' /tmp/boot.log \
-            || { echo "::error::bundled server never loaded a client script"; exit 1; }
+          # Expected client assets come from ClientJsServiceLive's own ENTRIES, so
+          # adding a browser entry point does not need this job updated too.
+          deno eval '
+            import { ENTRIES, cssNameFor } from "./src/http/ui/client/service.live.ts";
+            const root = Deno.env.get("UI_ASSET_ROOT");
+            for (const { name } of ENTRIES) {
+              console.log(name);
+              const css = cssNameFor(name);
+              try { Deno.statSync(`${root}/${css}`); console.log(css); } catch { /* entry emits no stylesheet */ }
+            }' > /tmp/expected-assets.txt
+          cat /tmp/expected-assets.txt
+          while read -r asset; do
+            grep -q "loaded client asset.*name: \"$asset\"" /tmp/boot.log \
+              || { echo "::error::bundled server never loaded $asset"; exit 1; }
+          done < /tmp/expected-assets.txt
 
   test:
     name: Test
