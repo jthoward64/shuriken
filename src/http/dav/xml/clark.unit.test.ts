@@ -103,6 +103,43 @@ describe("normalizeClarkNames", () => {
 		expect(normalizeClarkNames(null)).toBe(null);
 	});
 
+	it("leaves #text unresolved when a default namespace is in scope", () => {
+		// KDE/Qt clients declare xmlns="DAV:" on an element that has text content.
+		// Resolving the "#text" pseudo-key against that default namespace would
+		// rewrite it to "{DAV:}#text" and hide the text from every reader.
+		const input = { href: { "@_xmlns": "DAV:", "#text": "/a.vcf" } };
+		const result = normalizeClarkNames(input) as Record<string, unknown>;
+		const href = result["{DAV:}href"] as Record<string, unknown>;
+		expect(href["#text"]).toBe("/a.vcf");
+		expect("{DAV:}#text" in href).toBe(false);
+	});
+
+	it("leaves #text unresolved on nested elements under a default namespace", () => {
+		const input = {
+			multiget: {
+				"@_xmlns": "urn:ietf:params:xml:ns:carddav",
+				prop: { "@_xmlns": "DAV:", displayname: { "#text": "Work" } },
+			},
+		};
+		const result = normalizeClarkNames(input) as Record<string, unknown>;
+		const multiget = result[
+			"{urn:ietf:params:xml:ns:carddav}multiget"
+		] as Record<string, unknown>;
+		const prop = multiget["{DAV:}prop"] as Record<string, unknown>;
+		const displayname = prop["{DAV:}displayname"] as Record<string, unknown>;
+		expect(displayname["#text"]).toBe("Work");
+	});
+
+	it("passes the XML declaration through without resolution", () => {
+		const input = {
+			"?xml": { "@_version": "1.0" },
+			propfind: { "@_xmlns": "DAV:" },
+		};
+		const result = normalizeClarkNames(input) as Record<string, unknown>;
+		expect("?xml" in result).toBe(true);
+		expect("{DAV:}propfind" in result).toBe(true);
+	});
+
 	it("child namespace declaration is in scope for the child element's own name", () => {
 		// Per XML Namespaces spec §6.1: an element's own xmlns declarations are
 		// in scope for that element's name and all its descendants.

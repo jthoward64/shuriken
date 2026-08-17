@@ -23,6 +23,13 @@ const XMLNS_DEFAULT = "@_xmlns";
 const XMLNS_PREFIX = "@_xmlns:";
 const ATTR_PREFIX = "@_";
 
+// fast-xml-parser emits synthetic keys that are not XML element names: "#text"
+// for an element's character data and "?xml" for the XML declaration. They must
+// never be namespace-resolved — a default xmlns in scope would otherwise rewrite
+// "#text" to "{DAV:}#text" and hide the text from every reader that looks it up.
+const isPseudoKey = (key: string): boolean =>
+	key === "#text" || key.startsWith("?");
+
 /** Build a prefix→URI map from the xmlns declarations on an element node. */
 const buildPrefixMap = (
 	obj: Record<string, unknown>,
@@ -90,6 +97,7 @@ const resolveAttrKey = (key: string, prefixMap: PrefixMap): string => {
  * - Attribute keys (`@_prefix:localname`) are normalized to `@_{uri}localname`.
  * - Unprefixed attributes (`@_name`) are passed through unchanged.
  * - Nested elements inherit the parent's prefix map unless they declare their own.
+ * - Parser pseudo-keys (`#text`, `?xml`) are copied through without resolution.
  * - Arrays are normalized element-by-element.
  * - Non-object values (strings, numbers, etc.) are returned unchanged.
  *
@@ -119,7 +127,10 @@ export const normalizeClarkNames = (
 			continue;
 		}
 
-		if (key.startsWith(ATTR_PREFIX)) {
+		// Parser pseudo-keys carry no namespace — copy them through verbatim
+		if (isPseudoKey(key)) {
+			result[key] = normalizeClarkNames(value, selfPrefixMap);
+		} else if (key.startsWith(ATTR_PREFIX)) {
 			// Attribute: resolve using this element's own prefix map
 			result[resolveAttrKey(key, selfPrefixMap)] = value;
 		} else {

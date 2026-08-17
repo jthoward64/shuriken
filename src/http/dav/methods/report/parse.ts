@@ -91,11 +91,11 @@ export const extractPropNames = (tree: unknown): ReadonlySet<ClarkName> => {
 /**
  * Extract the text of one `{DAV:}href` node.
  *
- * A bare `<D:href>/x</D:href>` parses to a string, but an `<D:href>` that
- * carries its own attributes — most importantly a per-element `xmlns:`
- * declaration, which iOS/macOS emit on EVERY href in a multiget — parses to an
- * object whose text lives under `#text` (the xmlns attr is consumed by Clark
- * normalization). Handle both, or return null for anything else.
+ * A bare `<D:href>/x</D:href>` parses to a string, but an href carrying any
+ * attribute of its own parses to an object whose text lives under `#text` (the
+ * xmlns attr itself is consumed by Clark normalization). KDE/Qt clients hit the
+ * latter: they declare `xmlns="DAV:"` on each href rather than using a prefix.
+ * Handle both, or return null for anything else.
  */
 const hrefText = (node: unknown): string | null => {
 	if (typeof node === "string") {
