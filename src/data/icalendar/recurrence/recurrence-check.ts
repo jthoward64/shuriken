@@ -152,6 +152,7 @@ const boundedOccurrencesInRange = (
 	queryStart: Temporal.Instant,
 	queryEnd: Temporal.Instant,
 	limits: RruleExpansionLimits,
+	stopAtFirst = false,
 ): ReadonlyArray<Temporal.Instant> => {
 	// rrule-temporal invokes the iterator callback more than once per occurrence
 	// (it re-runs it during its internal count-limit / RDATE-merge pass), so
@@ -179,6 +180,11 @@ const boundedOccurrencesInRange = (
 		) {
 			seenEpochMs.add(epochMs);
 			results.push(inst);
+			// An existence check needs only the first hit; expanding an
+			// open-ended range further would blow rrule-temporal's iteration cap.
+			if (stopAtFirst) {
+				return false;
+			}
 		}
 		if (checked >= limits.maxOccurrencesChecked) {
 			return false;
@@ -216,6 +222,7 @@ export const getOccurrenceInstantsInRange = (
 	queryStart: Temporal.Instant,
 	queryEnd: Temporal.Instant,
 	limits: RruleExpansionLimits = DEFAULT_RRULE_LIMITS,
+	stopAtFirst = false,
 ): ReadonlyArray<Temporal.Instant> => {
 	const rruleProp = vevent.properties.find((p) => p.name === "RRULE");
 	if (!rruleProp || rruleProp.value.type !== "RECUR") {
@@ -279,7 +286,13 @@ export const getOccurrenceInstantsInRange = (
 				})
 			: baseRule;
 
-	return boundedOccurrencesInRange(rule, queryStart, queryEnd, limits);
+	return boundedOccurrencesInRange(
+		rule,
+		queryStart,
+		queryEnd,
+		limits,
+		stopAtFirst,
+	);
 };
 
 /**
@@ -299,5 +312,11 @@ export const hasOccurrenceInRange = (
 	queryEnd: Temporal.Instant,
 	limits: RruleExpansionLimits = DEFAULT_RRULE_LIMITS,
 ): boolean =>
-	getOccurrenceInstantsInRange(vcalRoot, vevent, queryStart, queryEnd, limits)
-		.length > 0;
+	getOccurrenceInstantsInRange(
+		vcalRoot,
+		vevent,
+		queryStart,
+		queryEnd,
+		limits,
+		true,
+	).length > 0;

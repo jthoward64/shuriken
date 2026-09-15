@@ -13,6 +13,12 @@ type SecurityHeadersConfigType = Config.Success<typeof SecurityHeadersConfig>;
 // frame-ancestors is path-differentiated:
 //   * /ui/embed/*  — 'self' plus the configured allowlist (authenticated
 //                    panes, operator-controlled iframing).
+//   * /ui/auth/*   — the same allowlist, but only once one is configured. A
+//                    framed pane redirects here when the session has lapsed,
+//                    and under 'none' the login renders as a blocked frame
+//                    instead, stranding the flow. Left at 'none' when no
+//                    allowlist is set, so deployments that don't embed keep
+//                    the login page unframable.
 //   * /embed/*     — no restriction at all: anyone holding a share-link
 //                    token can already fetch the data (same trust model as
 //                    the .ics feed), so the widget doesn't second-guess who
@@ -25,6 +31,10 @@ const isEmbedPanePath = (pathname: string): boolean =>
 
 const isPublicEmbedPath = (pathname: string): boolean =>
 	pathname.startsWith("/embed/");
+
+/** OIDC login and callback pages, which a lapsed pane session redirects through */
+const isAuthPath = (pathname: string): boolean =>
+	pathname.startsWith("/ui/auth/");
 
 const buildCsp = (cfg: SecurityHeadersConfigType, pathname: string): string => {
 	const directives = [
@@ -49,7 +59,10 @@ const buildCsp = (cfg: SecurityHeadersConfigType, pathname: string): string => {
 	];
 	if (isPublicEmbedPath(pathname)) {
 		// No frame-ancestors directive at all — deliberately unrestricted.
-	} else if (isEmbedPanePath(pathname)) {
+	} else if (
+		isEmbedPanePath(pathname) ||
+		(isAuthPath(pathname) && cfg.frameAncestors.length > 0)
+	) {
 		directives.push(
 			`frame-ancestors 'self' ${cfg.frameAncestors.join(" ")}`.trimEnd(),
 		);

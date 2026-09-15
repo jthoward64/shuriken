@@ -14,79 +14,140 @@ import { type CalComponentType, CalIndexRepository } from "./repository.ts";
 // CalIndexRepository — Drizzle implementation
 // ---------------------------------------------------------------------------
 
+const MS_PER_DAY = 86_400_000;
+// A span this long covers every day-of-month / every month, so the
+// corresponding narrowing can add nothing.
+const SPAN_DAYS_COVERING_ALL_DAYS = 28;
+const SPAN_DAYS_COVERING_ALL_MONTHS = 365;
+
+/**
+ * Day-of-month and month spans covered by [start, end), used to narrow MONTHLY
+ * and YEARLY series. Returns null for a span long enough to cover every value,
+ * in which case the corresponding check is skipped.
+ */
+const coveredSpans = (
+	start: Temporal.Instant,
+	end: Temporal.Instant,
+): {
+	days: { min: number; max: number } | null;
+	months: Array<number> | null;
+} => {
+	const spanDays =
+		end.epochMilliseconds - start.epochMilliseconds < 0
+			? 0
+			: (end.epochMilliseconds - start.epochMilliseconds) / MS_PER_DAY;
+	const zs = start.toZonedDateTimeISO("UTC");
+	const ze = end.toZonedDateTimeISO("UTC");
+
+	const days = (() => {
+		if (spanDays >= SPAN_DAYS_COVERING_ALL_DAYS) {
+			return null; // covers every day-of-month
+		}
+		if (zs.year !== ze.year || zs.month !== ze.month) {
+			return null; // crosses a month boundary; min/max would be 1..31
+		}
+		return { min: zs.day, max: ze.day };
+	})();
+
+	const months = (() => {
+		if (spanDays >= SPAN_DAYS_COVERING_ALL_MONTHS) {
+			return null; // covers every month
+		}
+		const out: Array<number> = [];
+		let cursor = zs.with({ day: 1 });
+		const limit = ze.with({ day: 1 });
+		while (cursor.epochMilliseconds <= limit.epochMilliseconds) {
+			out.push(cursor.month);
+			cursor = cursor.add({ months: 1 });
+		}
+		return out.length > 0 ? out : null;
+	})();
+
+	return { days, months };
+};
+
 /**
  * Build the RRULE WHERE clause for findByTimeRange.
  *
- * When weekStart/weekEnd are provided, applies a week-bucket heuristic that
- * filters out recurring events whose pattern cannot produce an occurrence in
- * the calendar week [weekStart, weekEnd). False positives are acceptable
+ * Always applies the window-agnostic bounds (the series starts before `end` and
+ * is not provably finished before `start`). When the window is bounded, it
+ * additionally applies a frequency-bucket heuristic that drops series whose
+ * pattern cannot fire anywhere in [start, end). False positives are acceptable
  * (the in-memory filter does the exact check); false negatives are not.
  *
- * When either is null, falls back to the conservative "all RRULE rows pass".
+ * An open-ended window admits every live series: RFC 4791 section 9.9 reads a
+ * missing `end` as +infinity, and any live recurrence eventually fires.
  */
-const rruleWeekBucketClause = (
-	weekStart: Temporal.Instant | null,
-	weekEnd: Temporal.Instant | null,
+const rruleBucketClause = (
+	start: Temporal.Instant | null,
+	end: Temporal.Instant | null,
 ) => {
-	if (weekStart === null || weekEnd === null) {
-		return isNotNull(calIndex.rruleText);
+	const base = rruleRangeClause(start, end);
+	if (start === null || end === null) {
+		return base;
 	}
-	const ws = weekStart.toString();
-	const we = weekEnd.toString();
+	const s = start.toString();
+	const e = end.toString();
+	const interval = sql`COALESCE(${calIndex.rruleInterval}, 1)`;
+
+	const weekIdx = (t: string) =>
+		sql`FLOOR(EXTRACT(EPOCH FROM (${t}::timestamptz - ${calIndex.dtstartUtc})) / 604800.0)::bigint`;
+	const monthIdx = (t: string) =>
+		sql`((EXTRACT(YEAR FROM ${t}::timestamptz)::int - EXTRACT(YEAR FROM ${calIndex.dtstartUtc})::int) * 12
+			+ EXTRACT(MONTH FROM ${t}::timestamptz)::int - EXTRACT(MONTH FROM ${calIndex.dtstartUtc})::int)`;
+	const yearIdx = (t: string) =>
+		sql`(EXTRACT(YEAR FROM ${t}::timestamptz)::int - EXTRACT(YEAR FROM ${calIndex.dtstartUtc})::int)`;
+
+	// Occurrences land on period indices k*interval. BYDAY/BYMONTHDAY can shift
+	// one off its period anchor, so widen the covered index range by one on each
+	// side, then test whether it contains a multiple of the interval.
+	const firesInSpan = (
+		i0: ReturnType<typeof sql>,
+		i1: ReturnType<typeof sql>,
+	) =>
+		sql`((${i0}) - 1 <= 0 OR FLOOR(((${i1}) + 1) / ${interval}) * ${interval} >= (${i0}) - 1)`;
+
+	const { days, months } = coveredSpans(start, end);
 
 	return and(
-		isNotNull(calIndex.rruleText),
-		// Series must have started by weekEnd
-		sql`${calIndex.dtstartUtc} <= ${we}::timestamptz`,
-		// Active rule: no UNTIL, or UNTIL is at or after weekStart
+		base,
 		or(
-			isNull(calIndex.rruleUntilUtc),
-			sql`${calIndex.rruleUntilUtc} >= ${ws}::timestamptz`,
-		),
-		// Week-bucket match — one of the following must be true:
-		or(
-			// Sub-daily frequencies always fire within any week
+			// Sub-daily frequencies fire within any window
 			sql`${calIndex.rruleFreq} IN ('DAILY', 'HOURLY', 'MINUTELY', 'SECONDLY')`,
 
-			// WEEKLY: the week containing dtstart + n*interval weeks lands on weekStart
-			sql`(
-				${calIndex.rruleFreq} = 'WEEKLY'
-				AND FLOOR(EXTRACT(EPOCH FROM (${ws}::timestamptz - ${calIndex.dtstartUtc})) / 604800.0)::bigint
-					% COALESCE(${calIndex.rruleInterval}, 1) = 0
-			)`,
-
-			// MONTHLY: precomputed day range intersects the week + interval check.
-			// Pass conservatively when not yet indexed (day_min IS NULL).
 			and(
-				sql`${calIndex.rruleFreq} = 'MONTHLY'`,
-				or(
-					isNull(calIndex.rruleOccurrenceDayMin),
-					and(
-						sql`${calIndex.rruleOccurrenceDayMin} <= EXTRACT(DAY FROM ${we}::timestamptz)::int`,
-						sql`${calIndex.rruleOccurrenceDayMax} >= EXTRACT(DAY FROM ${ws}::timestamptz)::int`,
-						sql`(
-							(EXTRACT(YEAR  FROM ${ws}::timestamptz)::int - EXTRACT(YEAR  FROM ${calIndex.dtstartUtc})::int) * 12
-							+ EXTRACT(MONTH FROM ${ws}::timestamptz)::int - EXTRACT(MONTH FROM ${calIndex.dtstartUtc})::int
-						) % COALESCE(${calIndex.rruleInterval}, 1) = 0`,
-					),
-				),
+				sql`${calIndex.rruleFreq} = 'WEEKLY'`,
+				firesInSpan(weekIdx(s), weekIdx(e)),
 			),
 
-			// YEARLY: precomputed months contains the queried week's month + interval check.
-			// Pass conservatively when not yet indexed (occurrence_months IS NULL).
+			// Pass conservatively when the day range is not yet indexed
+			and(
+				sql`${calIndex.rruleFreq} = 'MONTHLY'`,
+				firesInSpan(monthIdx(s), monthIdx(e)),
+				days === null
+					? undefined
+					: or(
+							isNull(calIndex.rruleOccurrenceDayMin),
+							and(
+								sql`${calIndex.rruleOccurrenceDayMin} <= ${days.max}`,
+								sql`${calIndex.rruleOccurrenceDayMax} >= ${days.min}`,
+							),
+						),
+			),
+
+			// Pass conservatively when the month set is not yet indexed
 			and(
 				sql`${calIndex.rruleFreq} = 'YEARLY'`,
-				or(
-					isNull(calIndex.rruleOccurrenceMonths),
-					and(
-						sql`(
-							EXTRACT(MONTH FROM ${ws}::timestamptz)::int = ANY(${calIndex.rruleOccurrenceMonths})
-							OR EXTRACT(MONTH FROM ${we}::timestamptz)::int = ANY(${calIndex.rruleOccurrenceMonths})
-						)`,
-						sql`(EXTRACT(YEAR FROM ${ws}::timestamptz)::int - EXTRACT(YEAR FROM ${calIndex.dtstartUtc})::int)
-							% COALESCE(${calIndex.rruleInterval}, 1) = 0`,
-					),
-				),
+				firesInSpan(yearIdx(s), yearIdx(e)),
+				months === null
+					? undefined
+					: or(
+							isNull(calIndex.rruleOccurrenceMonths),
+							sql`${calIndex.rruleOccurrenceMonths} && ARRAY[${sql.join(
+								months.map((m) => sql`${m}`),
+								sql`, `,
+							)}]::smallint[]`,
+						),
 			),
 
 			// Unknown / unrecognised freq: pass conservatively
@@ -151,8 +212,6 @@ const findByTimeRange = Effect.fn("CalIndexRepository.findByTimeRange")(
 		componentType: CalComponentType,
 		start: Temporal.Instant | null,
 		end: Temporal.Instant | null,
-		weekStart: Temporal.Instant | null,
-		weekEnd: Temporal.Instant | null,
 	) {
 		yield* Effect.annotateCurrentSpan({
 			"collection.id": collectionId,
@@ -181,8 +240,8 @@ const findByTimeRange = Effect.fn("CalIndexRepository.findByTimeRange")(
 						or(
 							// Non-RRULE: standard dtstart/dtend overlap
 							nonRecurringOverlapClause(start, end),
-							// RRULE: week-bucket pre-filter
-							rruleWeekBucketClause(weekStart, weekEnd),
+							// RRULE: range-aware bucket pre-filter
+							rruleBucketClause(start, end),
 						),
 					),
 				),

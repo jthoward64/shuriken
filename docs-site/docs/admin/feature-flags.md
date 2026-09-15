@@ -14,9 +14,11 @@ sidebar_position: 8
 - **Security response headers** — `SECURITY_HEADERS_ENABLED` is a
   master kill switch (default `true`) for a bundle of hardening
   headers: `CSP_ENABLED` (with `CSP_FRAME_ANCESTORS` listing extra
-  origins permitted to frame `/ui/embed/*` — all other routes deny
-  framing outright; the public `/embed/*` widget is never restricted by
-  this list, since a share-link token already grants the data),
+  origins permitted to frame `/ui/embed/*` and, once it is non-empty,
+  the `/ui/auth/*` login pages a lapsed pane session redirects through
+  — all other routes deny framing outright; the public `/embed/*`
+  widget is never restricted by this list, since a share-link token
+  already grants the data),
   `X_CONTENT_TYPE_OPTIONS_ENABLED`, `REFERRER_POLICY_ENABLED`,
   `HSTS_ENABLED` (only emitted when the resolved scheme is HTTPS),
   `PERMISSIONS_POLICY_ENABLED`. Disable the master switch only if a

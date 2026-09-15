@@ -37,8 +37,6 @@ export interface CalIndexRepositoryShape {
 		componentType: CalComponentType,
 		start: Temporal.Instant | null,
 		end: Temporal.Instant | null,
-		weekStart: Temporal.Instant | null,
-		weekEnd: Temporal.Instant | null,
 	) => Effect.Effect<ReadonlyArray<string>, DatabaseError>;
 
 	/**
@@ -53,7 +51,7 @@ export interface CalIndexRepositoryShape {
 	/**
 	 * Return instance UUIDs whose component of the given type *could* overlap the
 	 * range [start, end) — a correct **superset** valid for an arbitrary window
-	 * (unlike `findByTimeRange`, whose RRULE handling is tuned to week-sized
+	 * (unlike `findByTimeRange`, whose RRULE handling additionally buckets by
 	 * windows). Non-recurring rows are matched by exact dtstart/dtend overlap;
 	 * recurring rows are included when the series starts before `end` and is not
 	 * provably finished before `start` (`rrule_until_utc` null or after `start`).
@@ -74,7 +72,7 @@ export interface CalIndexRepositoryShape {
 	 * shape columns (`rrule_occurrence_months`, `rrule_occurrence_day_min`,
 	 * `rrule_occurrence_day_max`) in cal_index.
 	 *
-	 * These are used by the week-bucket SQL pre-filter in `findByTimeRange` to
+	 * These are used by the frequency-bucket SQL pre-filter in `findByTimeRange` to
 	 * accurately exclude YEARLY/MONTHLY rules whose occurrences fall outside
 	 * the queried week. They cannot be computed inside the PG trigger because
 	 * `rrule-temporal` is required for correct BY-rule expansion.

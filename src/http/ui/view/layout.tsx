@@ -58,7 +58,7 @@ export const Layout = ({
 			<meta charset="UTF-8" />
 			<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 			<meta name="color-scheme" content="light dark" />
-			<meta name="theme-color" content="#4f46e5" />
+			<meta name="theme-color" content="#0f172a" />
 			<link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
 			<link
 				rel="icon"
