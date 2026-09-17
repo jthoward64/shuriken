@@ -1,7 +1,7 @@
 import type { ComponentChildren } from "preact";
 import type { NavContext } from "#src/http/ui/helpers/nav-context.ts";
-import { cx } from "./cx.ts";
-import { IconChevronDown } from "./icons.tsx";
+import { cx } from "../components/cx.ts";
+import { IconChevronDown } from "../components/icons.tsx";
 
 // ---------------------------------------------------------------------------
 // Primary navigation — shared between the desktop and mobile nav slots in the

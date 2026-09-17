@@ -11,7 +11,7 @@ import type { HttpRequestContext } from "#src/http/context.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import { buildNavContext } from "#src/http/ui/helpers/nav-context.ts";
 import { CollectionNewPage } from "#src/http/ui/view/pages/collections.tsx";
-import { renderPage } from "#src/http/ui/view/render.tsx";
+import { renderPage } from "#src/http/ui/view/shell/render.tsx";
 import { AclService } from "#src/services/acl/index.ts";
 import { GroupService } from "#src/services/group/index.ts";
 

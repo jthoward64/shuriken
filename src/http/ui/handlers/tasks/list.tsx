@@ -27,7 +27,7 @@ import {
 	type TaskRow,
 	TasksListPage,
 } from "#src/http/ui/view/pages/tasks/list.tsx";
-import { renderPage } from "#src/http/ui/view/render.tsx";
+import { renderPage } from "#src/http/ui/view/shell/render.tsx";
 import type { AclRepository } from "#src/services/acl/repository.ts";
 import type { AclService } from "#src/services/acl/service.ts";
 import type { CalIndexRepository } from "#src/services/cal-index/index.ts";

@@ -116,3 +116,27 @@ export const Table = <T,>({
 		</div>
 	);
 };
+
+export const Card = ({
+	title,
+	actions,
+	pad = true,
+	class: cls,
+	children,
+}: {
+	title?: string;
+	actions?: ComponentChildren;
+	pad?: boolean;
+	class?: string;
+	children: ComponentChildren;
+}) => (
+	<div class={cx("card", cls)}>
+		{title && (
+			<div class="card-header">
+				<h2 class="card-title">{title}</h2>
+				{actions}
+			</div>
+		)}
+		<div class={pad ? "card-pad" : undefined}>{children}</div>
+	</div>
+);

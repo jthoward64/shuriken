@@ -15,7 +15,7 @@ import {
 	BulkJobProgress,
 	ImportResult,
 } from "#src/http/ui/view/pages/contacts/list.tsx";
-import { renderFragment } from "#src/http/ui/view/render.tsx";
+import { renderFragment } from "#src/http/ui/view/shell/render.tsx";
 import { AclService } from "#src/services/acl/service.ts";
 import { fireAndForgetBirthdayRegenerate } from "#src/services/birthday/event-hook.ts";
 import type { BirthdayService } from "#src/services/birthday/service.ts";

@@ -1,5 +1,5 @@
 import type { ComponentChildren, JSX, VNode } from "preact";
-import { cx } from "./cx.ts";
+import { cx } from "../cx.ts";
 
 // ---------------------------------------------------------------------------
 // Form controls - typed wrappers over the .form-* classes in styles/input.css.
@@ -158,3 +158,26 @@ export type FileInputProps = Omit<
 export const FileInput = ({ class: cls, ...rest }: FileInputProps): VNode => (
 	<input {...rest} type="file" class={cx("form-file", cls)} />
 );
+
+// Validation-error summary. Rendered as an HTMX fragment on failed form posts;
+// returns an empty fragment when there is nothing to show. `errors` is the
+// field-keyed message map produced by `validationErrorToContext`.
+export const FormErrors = ({ errors }: { errors: Record<string, string> }) => {
+	const messages = Object.values(errors);
+	if (messages.length === 0) {
+		return null;
+	}
+	return (
+		<div
+			role="alert"
+			class="mb-4 rounded-md border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger"
+		>
+			<p class="mb-1 font-medium">Please correct the following errors:</p>
+			<ul class="list-inside list-disc space-y-0.5">
+				{messages.map((m) => (
+					<li key={m}>{m}</li>
+				))}
+			</ul>
+		</div>
+	);
+};

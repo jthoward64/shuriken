@@ -16,7 +16,7 @@ import {
 } from "#src/http/ui/helpers/share-panel.ts";
 import { tiersFor } from "#src/http/ui/helpers/share-tiers.ts";
 import { SharePanel } from "#src/http/ui/view/pages/share-panel.tsx";
-import { renderFragment } from "#src/http/ui/view/render.tsx";
+import { renderFragment } from "#src/http/ui/view/shell/render.tsx";
 import type { AclResourceType, NewAce } from "#src/services/acl/index.ts";
 import { type AclResourceId, AclService } from "#src/services/acl/service.ts";
 import type { CollectionService } from "#src/services/collection/index.ts";

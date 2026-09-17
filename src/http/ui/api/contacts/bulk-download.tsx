@@ -11,7 +11,7 @@ import { HTTP_OK, HTTP_SEE_OTHER } from "#src/http/status.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import { isHtmxRequest } from "#src/http/ui/helpers/htmx.ts";
 import { BulkJobProgress } from "#src/http/ui/view/pages/contacts/list.tsx";
-import { renderFragment } from "#src/http/ui/view/render.tsx";
+import { renderFragment } from "#src/http/ui/view/shell/render.tsx";
 import { AclService } from "#src/services/acl/service.ts";
 import {
 	type BulkJobRepository,

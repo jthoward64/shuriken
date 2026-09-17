@@ -10,13 +10,13 @@ import {
 } from "#src/http/status.ts";
 import { isHtmxRequest } from "#src/http/ui/helpers/htmx.ts";
 import type { NavContext } from "#src/http/ui/helpers/nav-context.ts";
-import { BASE_ASSETS, preloadLinkHeader, type UiAsset } from "./assets.tsx";
-import { Layout } from "./layout.tsx";
 import {
 	ForbiddenPage,
 	NotFoundPage,
 	ServerErrorPage,
-} from "./pages/errors.tsx";
+} from "../pages/errors.tsx";
+import { BASE_ASSETS, preloadLinkHeader, type UiAsset } from "./assets.tsx";
+import { Layout } from "./layout.tsx";
 
 // ---------------------------------------------------------------------------
 // JSX render helpers — turn typed page components into HTML Responses inside

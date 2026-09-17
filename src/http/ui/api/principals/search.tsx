@@ -13,7 +13,7 @@ import {
 } from "#src/domain/virtual-resources.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
-import { renderFragment } from "#src/http/ui/view/render.tsx";
+import { renderFragment } from "#src/http/ui/view/shell/render.tsx";
 import type { AclResourceType } from "#src/services/acl/index.ts";
 import { type AclResourceId, AclService } from "#src/services/acl/service.ts";
 import { PrincipalService } from "#src/services/principal/index.ts";

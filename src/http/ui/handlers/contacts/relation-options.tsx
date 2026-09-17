@@ -11,7 +11,7 @@ import {
 	RELATION_NAME_FIELD,
 	RelationOptions,
 } from "#src/http/ui/view/pages/contacts/relations.tsx";
-import { renderFragment } from "#src/http/ui/view/render.tsx";
+import { renderFragment } from "#src/http/ui/view/shell/render.tsx";
 import { AclService } from "#src/services/acl/service.ts";
 import { CardIndexRepository } from "#src/services/card-index/repository.ts";
 

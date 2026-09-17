@@ -1,6 +1,6 @@
 import type { VNode } from "preact";
-import { cx } from "./cx.ts";
-import { Select } from "./select.tsx";
+import { cx } from "../cx.ts";
+import { Select } from "../form/select.tsx";
 
 // ---------------------------------------------------------------------------
 // TagPicker - chip-style editor for a comma-separated list of tags.

@@ -1,4 +1,4 @@
-import { PageHeader } from "../ui.tsx";
+import { PageHeader } from "../components/page-header.tsx";
 
 // ---------------------------------------------------------------------------
 // Error pages. Rendered without nav context (they can occur pre-auth), so the

@@ -1,5 +1,5 @@
-import { AssetTags, CALENDAR_ASSETS } from "../../assets.tsx";
-import { contrastTextColor } from "../../color-contrast.ts";
+import { buttonClass } from "../../components/button.tsx";
+import { contrastTextColor } from "../../components/color-contrast.ts";
 import {
 	IconChevronDown,
 	IconChevronLeft,
@@ -7,8 +7,10 @@ import {
 	IconEdit,
 	IconPlus,
 	IconSpinner,
-} from "../../icons.tsx";
-import { buttonClass, InlineModalPopover } from "../../ui.tsx";
+} from "../../components/icons.tsx";
+import { InlineModalPopover } from "../../components/overlay.tsx";
+import { AssetTags, CALENDAR_ASSETS } from "../../shell/assets.tsx";
+
 import { CollectionNewPage } from "../collections.tsx";
 import { SidebarShell } from "../sidebar-shell.tsx";
 import type {

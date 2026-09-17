@@ -2,10 +2,10 @@ import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
 import { h } from "preact";
 import { render } from "preact-render-to-string";
+import { Select } from "../form/select.tsx";
 import { DateField } from "./date-picker.tsx";
 import { RichTextField } from "./rich-text.tsx";
 import { SearchPicker } from "./search-picker.tsx";
-import { Select } from "./select.tsx";
 import { TagCombobox } from "./tag-combobox.tsx";
 import { TagPicker } from "./tag-picker.tsx";
 

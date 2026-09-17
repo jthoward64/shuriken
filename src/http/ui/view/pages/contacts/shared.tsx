@@ -1,5 +1,5 @@
 import type { VNode } from "preact";
-import { AssetTags, CONTACTS_ASSETS } from "../../assets.tsx";
+import { AssetTags, CONTACTS_ASSETS } from "../../shell/assets.tsx";
 
 // ---------------------------------------------------------------------------
 // Shared bits for the contacts pages.

@@ -1,5 +1,5 @@
 import type { VNode } from "preact";
-import { cx } from "./cx.ts";
+import { cx } from "../cx.ts";
 
 // ---------------------------------------------------------------------------
 // SearchPicker - text field backed by an incremental lookup against the

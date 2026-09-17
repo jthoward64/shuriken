@@ -4,7 +4,7 @@ import {
 	type EventFormData,
 	emptyEventForm,
 } from "#src/services/cal-edit/types.ts";
-import { IconClose } from "../../icons.tsx";
+import { IconClose } from "../../components/icons.tsx";
 import { SharePanel } from "../share-panel.tsx";
 import { EventFormBody } from "./event-form.tsx";
 

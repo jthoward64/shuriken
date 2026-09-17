@@ -10,13 +10,13 @@ import type { HttpRequestContext } from "#src/http/context.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import { isHtmxRequest } from "#src/http/ui/helpers/htmx.ts";
 import { buildNavContext } from "#src/http/ui/helpers/nav-context.ts";
-import { CONTACTS_ASSETS } from "#src/http/ui/view/assets.tsx";
 import {
 	ContactsMergePage,
 	type MergeGroupData,
 } from "#src/http/ui/view/pages/contacts/merge.tsx";
 import { contactsExtraHead } from "#src/http/ui/view/pages/contacts/shared.tsx";
-import { renderFragment, renderPage } from "#src/http/ui/view/render.tsx";
+import { CONTACTS_ASSETS } from "#src/http/ui/view/shell/assets.tsx";
+import { renderFragment, renderPage } from "#src/http/ui/view/shell/render.tsx";
 import type { AclService } from "#src/services/acl/service.ts";
 import { CardIndexRepository } from "#src/services/card-index/repository.ts";
 import { CollectionRepository } from "#src/services/collection/repository.ts";

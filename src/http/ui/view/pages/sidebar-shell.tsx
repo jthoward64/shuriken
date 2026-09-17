@@ -1,5 +1,5 @@
 import type { ComponentChildren, VNode } from "preact";
-import { cx } from "../cx.ts";
+import { cx } from "../components/cx.ts";
 
 // ---------------------------------------------------------------------------
 // Two-column sidebar shell used by the calendar and tasks pages (edge-to-edge

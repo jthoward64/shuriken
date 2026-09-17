@@ -12,7 +12,7 @@ import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import { buildNavContext } from "#src/http/ui/helpers/nav-context.ts";
 import { buildSharePanelData } from "#src/http/ui/helpers/share-panel.ts";
 import { UsersListPage } from "#src/http/ui/view/pages/users.tsx";
-import { renderPage } from "#src/http/ui/view/render.tsx";
+import { renderPage } from "#src/http/ui/view/shell/render.tsx";
 import { AclService } from "#src/services/acl/index.ts";
 import type { PrincipalService } from "#src/services/principal/index.ts";
 import { UserService } from "#src/services/user/index.ts";

@@ -1,5 +1,7 @@
 import type { VNode } from "preact";
-import { Breadcrumb, buttonClass, PageHeader } from "../../ui.tsx";
+import { buttonClass } from "../../components/button.tsx";
+import { Breadcrumb, PageHeader } from "../../components/page-header.tsx";
+
 import { SidebarShell } from "../sidebar-shell.tsx";
 
 // ---------------------------------------------------------------------------

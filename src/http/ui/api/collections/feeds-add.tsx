@@ -11,7 +11,7 @@ import { sanitizeReturnTo } from "#src/http/ui/handlers/auth/helpers.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import { isHtmxRequest } from "#src/http/ui/helpers/htmx.ts";
 import { CollectionEditPage } from "#src/http/ui/view/pages/collections.tsx";
-import { renderFragment } from "#src/http/ui/view/render.tsx";
+import { renderFragment } from "#src/http/ui/view/shell/render.tsx";
 import type { AclService } from "#src/services/acl/index.ts";
 import type { CollectionService } from "#src/services/collection/index.ts";
 import type { PrincipalService } from "#src/services/principal/index.ts";

@@ -32,14 +32,14 @@ import {
 	pageEtag,
 	withPageCacheHeaders,
 } from "#src/http/ui/page-cache/index.ts";
-import { CALENDAR_ASSETS } from "#src/http/ui/view/assets.tsx";
 import {
 	type CalendarEventListItem,
 	CalendarViewPage,
 	SHARED_EVENTS_CALENDAR_ID,
 	SHARED_EVENTS_COLOR,
 } from "#src/http/ui/view/pages/calendar/view.tsx";
-import { renderPage } from "#src/http/ui/view/render.tsx";
+import { CALENDAR_ASSETS } from "#src/http/ui/view/shell/assets.tsx";
+import { renderPage } from "#src/http/ui/view/shell/render.tsx";
 import type { AclRepository } from "#src/services/acl/repository.ts";
 import type { AclService } from "#src/services/acl/service.ts";
 import type { CalIndexRepository } from "#src/services/cal-index/index.ts";

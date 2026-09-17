@@ -12,7 +12,7 @@ import { HTTP_SEE_OTHER } from "#src/http/status.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import { isHtmxRequest } from "#src/http/ui/helpers/htmx.ts";
 import { CalendarImportResult } from "#src/http/ui/view/pages/calendar/view.tsx";
-import { renderFragment } from "#src/http/ui/view/render.tsx";
+import { renderFragment } from "#src/http/ui/view/shell/render.tsx";
 import { AclService } from "#src/services/acl/service.ts";
 import {
 	type ImportMode,

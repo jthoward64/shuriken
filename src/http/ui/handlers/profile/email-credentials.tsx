@@ -12,7 +12,7 @@ import {
 	type ActiveKind,
 	EmailCredentialsPage,
 } from "#src/http/ui/view/pages/profile-email-credentials.tsx";
-import { renderPage } from "#src/http/ui/view/render.tsx";
+import { renderPage } from "#src/http/ui/view/shell/render.tsx";
 import type { AclService } from "#src/services/acl/index.ts";
 import { UserEmailCredentialRepository } from "#src/services/email-credential/repository.ts";
 import { UserService } from "#src/services/user/index.ts";

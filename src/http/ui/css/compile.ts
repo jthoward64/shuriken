@@ -77,8 +77,8 @@ const COMPONENT_CLASSES = [
 	"app-nav",
 	"app-brand",
 	"nav-link",
-	// Form-control component set (view/form.tsx, select.tsx, display.tsx,
-	// overlay.tsx and the four scripted controls). Several of these are only
+	// Form-control component set (view/components/**: form/, display.tsx,
+	// overlay.tsx and the scripted controls). Several of these are only
 	// ever attached by the browser scripts, so scanning alone would not keep
 	// them.
 	"form-error",

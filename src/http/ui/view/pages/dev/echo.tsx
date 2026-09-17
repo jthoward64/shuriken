@@ -1,5 +1,5 @@
 import type { VNode } from "preact";
-import { Badge } from "#src/http/ui/view/display.tsx";
+import { Badge } from "#src/http/ui/view/components/display.tsx";
 
 // ---------------------------------------------------------------------------
 // Echo panel for the component gallery - shows exactly what the server parsed

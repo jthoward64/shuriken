@@ -17,8 +17,9 @@ import {
 	validationErrorToContext,
 } from "#src/http/ui/helpers/form.ts";
 import { isHtmxRequest } from "#src/http/ui/helpers/htmx.ts";
-import { renderFragment } from "#src/http/ui/view/render.tsx";
-import { FormErrors } from "#src/http/ui/view/ui.tsx";
+import { FormErrors } from "#src/http/ui/view/components/form/form.tsx";
+import { renderFragment } from "#src/http/ui/view/shell/render.tsx";
+
 import { AclService } from "#src/services/acl/index.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
 import type { CollectionType } from "#src/services/collection/repository.ts";

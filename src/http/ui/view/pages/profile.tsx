@@ -1,7 +1,8 @@
 import type { VNode } from "preact";
-import { CopyField } from "../copy.tsx";
-import { IconExternalLink, IconKey, IconMail } from "../icons.tsx";
-import { Card, PageHeader } from "../ui.tsx";
+import { CopyField } from "../components/copy.tsx";
+import { Card } from "../components/display.tsx";
+import { IconExternalLink, IconKey, IconMail } from "../components/icons.tsx";
+import { PageHeader } from "../components/page-header.tsx";
 
 // ---------------------------------------------------------------------------
 // GET /ui/profile — the signed-in user's account page: identity form, DAV

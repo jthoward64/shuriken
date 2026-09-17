@@ -10,7 +10,7 @@ import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import { isHtmxRequest } from "#src/http/ui/helpers/htmx.ts";
 import { buildNavContext } from "#src/http/ui/helpers/nav-context.ts";
 import { SubscriptionsListPage } from "#src/http/ui/view/pages/subscriptions.tsx";
-import { renderFragment, renderPage } from "#src/http/ui/view/render.tsx";
+import { renderFragment, renderPage } from "#src/http/ui/view/shell/render.tsx";
 import type { AclService } from "#src/services/acl/index.ts";
 import { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
 

@@ -13,7 +13,7 @@ import { buildGroupAdminsData } from "#src/http/ui/helpers/group-admins.ts";
 import { buildNavContext } from "#src/http/ui/helpers/nav-context.ts";
 import { buildSharePanelData } from "#src/http/ui/helpers/share-panel.ts";
 import { GroupEditPage } from "#src/http/ui/view/pages/groups.tsx";
-import { renderPage } from "#src/http/ui/view/render.tsx";
+import { renderPage } from "#src/http/ui/view/shell/render.tsx";
 import { AclService } from "#src/services/acl/index.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
 import { GroupService } from "#src/services/group/index.ts";

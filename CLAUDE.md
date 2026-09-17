@@ -53,13 +53,18 @@ All application logic must use [Effect](https://effect.website) (`effect` packag
 - Styling is plain **Tailwind CSS** (`npm:tailwindcss`), built via `deno task ui:css` (`scripts/build-css.ts`). TW Elements is no longer used/referenced in the codebase — don't reintroduce it without checking with the user first.
 - A couple of legacy files still reference `handlebars`/`.hbs` (`src/http/ui/css/service.live.ts`, `src/http/ui/helpers/acl-panel.ts`) — treat these as remnants, not the current pattern, when touching that area.
 - HTMX docs are available at https://four.htmx.org/reference
-- **Shared components live in `src/http/ui/view/`** and are rendered live at
-  **`/ui/dev/components`** - check the gallery before hand-writing class strings.
-  Foundations: `form.tsx`, `button.tsx`, `display.tsx`, `overlay.tsx`, `select.tsx`.
-  Scripted controls, each with a no-JS fallback: `tag-combobox.tsx` (the default tag
-  control), `date-picker.tsx`, `search-picker.tsx`, `rich-text.tsx`; `tag-picker.tsx`
-  is a kept `<select>`-based alternative. Their browser halves are in
+- **Shared components live in `src/http/ui/view/components/`** and are rendered live
+  at **`/ui/dev/components`** - check the gallery before hand-writing class strings.
+  Foundations sit at the `components/` root (`button.tsx`, `display.tsx` with
+  `Card`/`Badge`/`EmptyState`/`Table`, `overlay.tsx`, `page-header.tsx`, `copy.tsx`,
+  `icons.tsx`, `cx.ts`); form primitives in `components/form/` (`form.tsx`,
+  `select.tsx`). Scripted controls, each with a no-JS fallback, live in
+  `components/controls/`: `tag-combobox.tsx` (the default tag control),
+  `date-picker.tsx`, `search-picker.tsx`, `rich-text.tsx`; `tag-picker.tsx` is a kept
+  `<select>`-based alternative. Their browser halves are in
   `src/http/ui/client/controls/`.
+- **The page frame lives in `src/http/ui/view/shell/`**: `layout.tsx`, `nav.tsx`,
+  `render.tsx` (the `renderPage`/`renderFragment` entry points), `assets.tsx`.
 - Many existing pages still hand-write the raw classes these components wrap. When
   you touch a page, migrate its controls rather than adding more raw-class markup.
 - Progressive-enhancement contract: `html.js [data-nojs-only]` and
@@ -76,7 +81,7 @@ All application logic must use [Effect](https://effect.website) (`effect` packag
 - The UI should be progressively enhanced and functional without JavaScript where possible, but can use HTMX for dynamic interactions.
 - The UI should use the same DAV APIs as external clients, rather than having separate endpoints or logic for the web UI. This ensures consistency and reduces the amount of code we have to maintain.
 - The UI should be designed with accessibility in mind, using semantic HTML and ARIA attributes as needed to ensure it is usable by all users.
-- Components should be reusable and composable where possible (see `src/http/ui/view/`), to avoid duplication and make it easier to maintain the UI codebase.
+- Components should be reusable and composable where possible (see `src/http/ui/view/components/`), to avoid duplication and make it easier to maintain the UI codebase.
 
 ## HTTP Server
 
@@ -173,7 +178,7 @@ Top level: `src/` (app code), `documentation/rfcs/` (RFC/spec reference material
 ### `src/http/` — HTTP edge and routing
 - `router.ts` — top-level dispatch to the DAV/UI/feed/metrics/timezones sub-routers; also `context.ts`, `cookie.ts`, `forwarded-url.ts`, `trusted-proxy.ts`, `status.ts`, `smtp-headers-*.ts` (shared HTTP utilities).
 - `src/http/dav/` — the WebDAV/CalDAV/CardDAV protocol engine. `router.ts` (dispatch + `parseDavPath`), `encode-segment.ts`; `methods/` has one file per HTTP verb (`propfind.ts`, `proppatch.ts`, `mkcol.ts`, `get.ts`, `delete.ts`, `copy.ts`/`copy-move.ts`, `move.ts`, `options.ts`, `acl.ts`, `instance-props.ts`) plus `report.ts` + `report/sync-collection.ts` (RFC 6578 sync-collection, calendar-query/addressbook-query); `methods/groups/` holds group-specific PROPFIND/PROPPATCH/MKCOL/member-put/member-delete; `xml/` holds the parser/builder (see XML section above), `clark.ts` (Clark-notation namespacing), `multistatus.ts`, `ns.ts`. Tests for this area live in `src/http/dav/__tests__/`.
-- `src/http/ui/` — the web UI (see Web UI section). `handlers/` — one subdir per feature (auth, calendar, contacts, collections, groups, feeds, instances, profile, subscriptions, tasks, trash, users); `api/` — JSON API endpoints mirroring the handlers (incl. `acl/`); `view/` — JSX/TSX templates (`layout.tsx`, `nav.tsx`, `ui.tsx`, `render.tsx`, `pages/`); `client/` — client-side JS bundled at build time (`calendar.client.ts`, `reorder.client.ts`, `compile.ts`); `css/`/`styles/`/`static/` — Tailwind + static assets; `page-cache/` — response caching.
+- `src/http/ui/` — the web UI (see Web UI section). `handlers/` — one subdir per feature (auth, calendar, contacts, collections, groups, feeds, instances, profile, subscriptions, tasks, trash, users); `api/` — JSON API endpoints mirroring the handlers (incl. `acl/`); `view/` — JSX/TSX templates, split into `components/` (reusable, with `form/` and `controls/` subfolders), `shell/` (`layout.tsx`, `nav.tsx`, `render.tsx`, `assets.tsx`) and `pages/`; `client/` — client-side JS bundled at build time (`calendar.client.ts`, `reorder.client.ts`, `compile.ts`); `css/`/`styles/`/`static/` — Tailwind + static assets; `page-cache/` — response caching.
 - `src/http/feed/`, `src/http/metrics/`, `src/http/timezones/` — small single-purpose routes (iCal feed export, Prometheus metrics, timezone data).
 
 ### `src/auth/` and related services — authentication

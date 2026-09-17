@@ -1,5 +1,5 @@
 import type { VNode } from "preact";
-import { PageHeader } from "../ui.tsx";
+import { PageHeader } from "../components/page-header.tsx";
 
 // ---------------------------------------------------------------------------
 // Trash — soft-deleted collections and instances, with restore / purge.

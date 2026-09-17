@@ -1,5 +1,5 @@
 import type { JSX, VNode } from "preact";
-import { type ButtonVariant, buttonClass } from "./ui.tsx";
+import { cx } from "./cx.ts";
 
 // ---------------------------------------------------------------------------
 // Button / LinkButton - typed wrappers over the .btn classes.
@@ -8,6 +8,21 @@ import { type ButtonVariant, buttonClass } from "./ui.tsx";
 // submits it by accident; submits opt in with type="submit". `LinkButton` is
 // the same styling on an <a>, for navigation rather than action.
 // ---------------------------------------------------------------------------
+
+export type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
+
+const VARIANT_CLASS: Record<ButtonVariant, string> = {
+	primary: "btn-primary",
+	secondary: "btn-secondary",
+	danger: "btn-danger",
+	ghost: "btn-ghost",
+};
+
+// Class string for a button/link styled as a button
+export const buttonClass = (
+	variant: ButtonVariant = "secondary",
+	extra?: string,
+): string => cx("btn", VARIANT_CLASS[variant], extra);
 
 export type ButtonSize = "sm" | "md" | "lg";
 

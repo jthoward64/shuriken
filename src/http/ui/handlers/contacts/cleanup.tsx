@@ -14,13 +14,13 @@ import {
 	DEFAULT_REGION,
 	REGION_OPTIONS,
 } from "#src/http/ui/helpers/regions.ts";
-import { CONTACTS_ASSETS } from "#src/http/ui/view/assets.tsx";
 import {
 	type CleanupSuggestionData,
 	ContactsCleanupPage,
 } from "#src/http/ui/view/pages/contacts/cleanup.tsx";
 import { contactsExtraHead } from "#src/http/ui/view/pages/contacts/shared.tsx";
-import { renderFragment, renderPage } from "#src/http/ui/view/render.tsx";
+import { CONTACTS_ASSETS } from "#src/http/ui/view/shell/assets.tsx";
+import { renderFragment, renderPage } from "#src/http/ui/view/shell/render.tsx";
 import { AclService } from "#src/services/acl/service.ts";
 import type { CollectionRow } from "#src/services/collection/repository.ts";
 import { CollectionRepository } from "#src/services/collection/repository.ts";

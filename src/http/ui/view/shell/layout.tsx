@@ -1,7 +1,7 @@
 import type { ComponentChildren, VNode } from "preact";
 import type { NavContext } from "#src/http/ui/helpers/nav-context.ts";
-import { cx } from "./cx.ts";
-import { IconMoon, IconSun } from "./icons.tsx";
+import { cx } from "../components/cx.ts";
+import { IconMoon, IconSun } from "../components/icons.tsx";
 import { Nav } from "./nav.tsx";
 
 // ---------------------------------------------------------------------------

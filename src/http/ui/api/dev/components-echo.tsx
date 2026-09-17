@@ -5,7 +5,7 @@ import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import { normalizeRichText } from "#src/http/ui/helpers/rich-text.ts";
 import type { ComponentEchoData } from "#src/http/ui/view/pages/dev/echo.tsx";
 import { ComponentEchoPanel } from "#src/http/ui/view/pages/dev/echo.tsx";
-import { renderFragment } from "#src/http/ui/view/render.tsx";
+import { renderFragment } from "#src/http/ui/view/shell/render.tsx";
 
 // ---------------------------------------------------------------------------
 // POST /ui/api/dev/components/echo - parses the gallery form and renders back

@@ -1,5 +1,5 @@
 import type { VNode } from "preact";
-import { cx } from "./cx.ts";
+import { cx } from "../cx.ts";
 
 // ---------------------------------------------------------------------------
 // DateField / DateRangeField - date and date-range entry with a three-step

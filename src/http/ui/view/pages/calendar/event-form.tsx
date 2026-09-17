@@ -4,7 +4,9 @@ import type {
 	EventFormData,
 	RecurrenceFreq,
 } from "#src/services/cal-edit/types.ts";
-import { Breadcrumb, Card, PageHeader } from "../../ui.tsx";
+import { Card } from "../../components/display.tsx";
+import { Breadcrumb, PageHeader } from "../../components/page-header.tsx";
+
 import { SharePanel } from "../share-panel.tsx";
 
 // ---------------------------------------------------------------------------

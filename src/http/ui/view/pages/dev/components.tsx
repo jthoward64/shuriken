@@ -1,32 +1,40 @@
 import type { ComponentChildren, VNode } from "preact";
-import { Button, LinkButton } from "#src/http/ui/view/button.tsx";
-import { DateField, DateRangeField } from "#src/http/ui/view/date-picker.tsx";
+import {
+	Button,
+	buttonClass,
+	LinkButton,
+} from "#src/http/ui/view/components/button.tsx";
+import {
+	DateField,
+	DateRangeField,
+} from "#src/http/ui/view/components/controls/date-picker.tsx";
+import { RichTextField } from "#src/http/ui/view/components/controls/rich-text.tsx";
+import { SearchPicker } from "#src/http/ui/view/components/controls/search-picker.tsx";
+import { TagCombobox } from "#src/http/ui/view/components/controls/tag-combobox.tsx";
+import { TagPicker } from "#src/http/ui/view/components/controls/tag-picker.tsx";
 import {
 	Badge,
+	Card,
 	type Column,
 	EmptyState,
 	Table,
-} from "#src/http/ui/view/display.tsx";
+} from "#src/http/ui/view/components/display.tsx";
 import {
 	Checkbox,
 	Field,
 	FileInput,
 	Textarea,
 	TextInput,
-} from "#src/http/ui/view/form.tsx";
+} from "#src/http/ui/view/components/form/form.tsx";
+import { Select } from "#src/http/ui/view/components/form/select.tsx";
 import {
 	Menu,
 	MenuItem,
 	MenuLabel,
 	Modal,
 	ModalTrigger,
-} from "#src/http/ui/view/overlay.tsx";
-import { RichTextField } from "#src/http/ui/view/rich-text.tsx";
-import { SearchPicker } from "#src/http/ui/view/search-picker.tsx";
-import { Select } from "#src/http/ui/view/select.tsx";
-import { TagCombobox } from "#src/http/ui/view/tag-combobox.tsx";
-import { TagPicker } from "#src/http/ui/view/tag-picker.tsx";
-import { buttonClass, Card, PageHeader } from "#src/http/ui/view/ui.tsx";
+} from "#src/http/ui/view/components/overlay.tsx";
+import { PageHeader } from "#src/http/ui/view/components/page-header.tsx";
 
 // ---------------------------------------------------------------------------
 // Component gallery - every shared UI component rendered live, so look, dark

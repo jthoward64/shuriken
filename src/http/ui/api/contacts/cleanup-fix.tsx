@@ -12,7 +12,7 @@ import {
 	CleanupDone,
 	CleanupError,
 } from "#src/http/ui/view/pages/contacts/cleanup.tsx";
-import { renderFragment } from "#src/http/ui/view/render.tsx";
+import { renderFragment } from "#src/http/ui/view/shell/render.tsx";
 import { AclService } from "#src/services/acl/service.ts";
 import { applyAreaCode } from "#src/services/contact-cleanup/phone.ts";
 import { ContactCleanupService } from "#src/services/contact-cleanup/service.ts";

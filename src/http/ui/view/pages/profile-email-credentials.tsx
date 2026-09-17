@@ -1,5 +1,6 @@
 import type { VNode } from "preact";
-import { Card, PageHeader } from "../ui.tsx";
+import { Card } from "../components/display.tsx";
+import { PageHeader } from "../components/page-header.tsx";
 
 // ---------------------------------------------------------------------------
 // GET /ui/profile/email-credentials — manage per-user SMTP credentials and show

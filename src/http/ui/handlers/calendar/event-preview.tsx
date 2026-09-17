@@ -9,7 +9,7 @@ import { EntityId, type InstanceId } from "#src/domain/ids.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import { EventHoverCard } from "#src/http/ui/view/pages/calendar/event-hover-card.tsx";
-import { renderFragment } from "#src/http/ui/view/render.tsx";
+import { renderFragment } from "#src/http/ui/view/shell/render.tsx";
 import { AclService } from "#src/services/acl/service.ts";
 import { parseVeventToForm } from "#src/services/cal-edit/parse-vevent.ts";
 import type { EventFormData } from "#src/services/cal-edit/types.ts";

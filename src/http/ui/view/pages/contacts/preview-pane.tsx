@@ -6,7 +6,7 @@ import type {
 	ContactServiceValue,
 	ContactTypedValue,
 } from "#src/services/card-edit/types.ts";
-import { IconChevronLeft, IconEdit } from "../../icons.tsx";
+import { IconChevronLeft, IconEdit } from "../../components/icons.tsx";
 import { RelationList, type ResolvedRelation } from "./relations.tsx";
 
 // ---------------------------------------------------------------------------

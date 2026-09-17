@@ -1,6 +1,7 @@
 import type { VNode } from "preact";
-import { CopyField } from "../copy.tsx";
-import { Card, PageHeader } from "../ui.tsx";
+import { CopyField } from "../components/copy.tsx";
+import { Card } from "../components/display.tsx";
+import { PageHeader } from "../components/page-header.tsx";
 
 // ---------------------------------------------------------------------------
 // GET /ui/profile/app-passwords — manage per-device DAV credentials. A freshly

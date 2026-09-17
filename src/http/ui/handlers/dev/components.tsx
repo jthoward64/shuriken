@@ -8,9 +8,9 @@ import type {
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import { buildNavContext } from "#src/http/ui/helpers/nav-context.ts";
-import { AssetTags, FORM_ASSETS } from "#src/http/ui/view/assets.tsx";
 import { ComponentGalleryPage } from "#src/http/ui/view/pages/dev/components.tsx";
-import { renderPage } from "#src/http/ui/view/render.tsx";
+import { AssetTags, FORM_ASSETS } from "#src/http/ui/view/shell/assets.tsx";
+import { renderPage } from "#src/http/ui/view/shell/render.tsx";
 import type { AclService } from "#src/services/acl/index.ts";
 
 // ---------------------------------------------------------------------------

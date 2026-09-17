@@ -1,5 +1,5 @@
 import type { VNode } from "preact";
-import { IconClose } from "../../icons.tsx";
+import { IconClose } from "../../components/icons.tsx";
 
 // ---------------------------------------------------------------------------
 // Shared contacts modal popover.

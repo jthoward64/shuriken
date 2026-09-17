@@ -125,3 +125,19 @@ export const MenuItem = ({
 			{children}
 		</button>
 	);
+
+// A modal dialog (styled by `.modal-popover`). The content is rendered inline
+// (present in the DOM at load) so a `<button commandfor={id} command="show-modal">`
+// opens a fully-populated dialog with zero JS. For lazily-loaded dialogs, use
+// the section-specific *PopoverContainer instead.
+export const InlineModalPopover = ({
+	id,
+	children,
+}: {
+	id: string;
+	children: ComponentChildren;
+}) => (
+	<dialog id={id} aria-labelledby={`${id}-title`} class="modal-popover">
+		<div class="modal-popover-panel card card-pad">{children}</div>
+	</dialog>
+);

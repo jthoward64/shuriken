@@ -11,8 +11,9 @@ import type {
 	ContactServiceValue,
 	ContactTypedValue,
 } from "#src/services/card-edit/types.ts";
-import { cx } from "../../cx.ts";
-import { Card } from "../../ui.tsx";
+import { cx } from "../../components/cx.ts";
+import { Card } from "../../components/display.tsx";
+
 import { CONTACTS_POPOVER_ID, ContactsPopoverHeader } from "./popover.tsx";
 import { RELATION_NAME_FIELD, relationOptionsFor } from "./relations.tsx";
 import { ContactsCrumb } from "./shared.tsx";

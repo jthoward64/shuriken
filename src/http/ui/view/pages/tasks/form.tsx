@@ -4,7 +4,8 @@ import type {
 	TaskFormData,
 	TaskStatus,
 } from "#src/services/task-edit/types.ts";
-import { Breadcrumb, Card, PageHeader } from "../../ui.tsx";
+import { Card } from "../../components/display.tsx";
+import { Breadcrumb, PageHeader } from "../../components/page-header.tsx";
 
 // ---------------------------------------------------------------------------
 // Task create/edit form. Mirrors EventFormBody/EventFormPage (calendar/

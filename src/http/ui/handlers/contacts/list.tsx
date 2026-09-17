@@ -18,14 +18,14 @@ import {
 	pageEtag,
 	withPageCacheHeaders,
 } from "#src/http/ui/page-cache/index.ts";
-import { CONTACTS_ASSETS } from "#src/http/ui/view/assets.tsx";
 import {
 	type ContactRow,
 	ContactsListPage,
 	type ImportNotice,
 } from "#src/http/ui/view/pages/contacts/list.tsx";
 import { contactsExtraHead } from "#src/http/ui/view/pages/contacts/shared.tsx";
-import { renderPage } from "#src/http/ui/view/render.tsx";
+import { CONTACTS_ASSETS } from "#src/http/ui/view/shell/assets.tsx";
+import { renderPage } from "#src/http/ui/view/shell/render.tsx";
 import type { AclRepository } from "#src/services/acl/repository.ts";
 import type { AclService } from "#src/services/acl/service.ts";
 import { CardIndexRepository } from "#src/services/card-index/repository.ts";

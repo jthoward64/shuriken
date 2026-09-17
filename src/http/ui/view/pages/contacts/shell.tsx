@@ -1,5 +1,5 @@
 import type { ComponentChildren, VNode } from "preact";
-import { IconClose, IconMenu } from "../../icons.tsx";
+import { IconClose, IconMenu } from "../../components/icons.tsx";
 
 // ---------------------------------------------------------------------------
 // Contacts-specific layout shell (the calendar's SidebarShell only knows two

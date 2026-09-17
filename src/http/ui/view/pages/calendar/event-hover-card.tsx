@@ -1,7 +1,7 @@
 import type { VNode } from "preact";
 import { Temporal } from "temporal-polyfill";
 import type { EventFormData } from "#src/services/cal-edit/types.ts";
-import { IconEdit } from "../../icons.tsx";
+import { IconEdit } from "../../components/icons.tsx";
 
 // ---------------------------------------------------------------------------
 // Calendar event hover card — a read-only preview shown on both hover and

@@ -1,7 +1,9 @@
 import type { VNode } from "preact";
 import type { SharePanelData } from "#src/http/ui/helpers/share-panel.ts";
-import { IconPlus } from "../icons.tsx";
-import { Breadcrumb, Card, PageHeader } from "../ui.tsx";
+import { Card } from "../components/display.tsx";
+import { IconPlus } from "../components/icons.tsx";
+import { Breadcrumb, PageHeader } from "../components/page-header.tsx";
+
 import { SharePanel } from "./share-panel.tsx";
 
 // ---------------------------------------------------------------------------

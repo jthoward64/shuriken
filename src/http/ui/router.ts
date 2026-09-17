@@ -137,7 +137,7 @@ import {
 	renderForbidden,
 	renderNotFound,
 	renderServerError,
-} from "#src/http/ui/view/render.tsx";
+} from "#src/http/ui/view/shell/render.tsx";
 import type { FileService } from "#src/platform/file.ts";
 import type { AclService } from "#src/services/acl/index.ts";
 import type { AclRepository } from "#src/services/acl/repository.ts";

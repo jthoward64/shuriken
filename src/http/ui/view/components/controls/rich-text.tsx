@@ -1,5 +1,5 @@
 import type { VNode } from "preact";
-import { cx } from "./cx.ts";
+import { cx } from "../cx.ts";
 
 // ---------------------------------------------------------------------------
 // RichTextField - HTML editor over a contenteditable surface.

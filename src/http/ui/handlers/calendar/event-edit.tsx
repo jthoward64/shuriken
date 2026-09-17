@@ -14,7 +14,7 @@ import { buildNavContext } from "#src/http/ui/helpers/nav-context.ts";
 import { buildSharePanelData } from "#src/http/ui/helpers/share-panel.ts";
 import { EventFormPage } from "#src/http/ui/view/pages/calendar/event-form.tsx";
 import { EventEditPopoverForm } from "#src/http/ui/view/pages/calendar/event-popovers.tsx";
-import { renderFragment, renderPage } from "#src/http/ui/view/render.tsx";
+import { renderFragment, renderPage } from "#src/http/ui/view/shell/render.tsx";
 import { AclService } from "#src/services/acl/service.ts";
 import { parseVeventToForm } from "#src/services/cal-edit/parse-vevent.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";

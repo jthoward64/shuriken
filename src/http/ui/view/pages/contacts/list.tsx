@@ -1,13 +1,15 @@
 import type { VNode } from "preact";
 import { emptyContactForm } from "#src/services/card-edit/types.ts";
+import { buttonClass } from "../../components/button.tsx";
 import {
 	IconCheck,
 	IconChevronDown,
 	IconPlus,
 	IconSearch,
 	IconSpinner,
-} from "../../icons.tsx";
-import { buttonClass, InlineModalPopover } from "../../ui.tsx";
+} from "../../components/icons.tsx";
+import { InlineModalPopover } from "../../components/overlay.tsx";
+
 import { EditContactPopoverContainer } from "./edit-dialog.tsx";
 import { ContactFormPage } from "./form.tsx";
 import { ContactHoverCardContainer } from "./hover-card.tsx";

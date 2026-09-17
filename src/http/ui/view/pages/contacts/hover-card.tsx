@@ -4,7 +4,7 @@ import type {
 	ContactFormData,
 	ContactTypedValue,
 } from "#src/services/card-edit/types.ts";
-import { IconEdit } from "../../icons.tsx";
+import { IconEdit } from "../../components/icons.tsx";
 
 // ---------------------------------------------------------------------------
 // Contact hover card — a read-only preview shown on both hover and click (see

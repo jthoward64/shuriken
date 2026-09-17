@@ -1,5 +1,5 @@
 import type { VNode } from "preact";
-import { cx } from "./cx.ts";
+import { cx } from "../cx.ts";
 
 // ---------------------------------------------------------------------------
 // TagCombobox - a single bounded field holding the chosen tags as tokens with

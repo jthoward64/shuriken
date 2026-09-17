@@ -1,7 +1,8 @@
 import type { VNode } from "preact";
-import { CopyButton } from "../copy.tsx";
-import { IconPlus } from "../icons.tsx";
-import { PageHeader } from "../ui.tsx";
+import { CopyButton } from "../components/copy.tsx";
+import { IconPlus } from "../components/icons.tsx";
+import { PageHeader } from "../components/page-header.tsx";
+
 import {
 	CALENDAR_POPOVER_BODY_ID,
 	CALENDAR_POPOVER_ID,

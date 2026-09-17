@@ -1,5 +1,5 @@
 import type { JSX, VNode } from "preact";
-import { cx } from "./cx.ts";
+import { cx } from "../cx.ts";
 
 // ---------------------------------------------------------------------------
 // Select - a real <select> opted into the customizable-select styling.

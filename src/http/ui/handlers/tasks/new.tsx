@@ -10,7 +10,7 @@ import { HTTP_BAD_REQUEST } from "#src/http/status.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import { buildNavContext } from "#src/http/ui/helpers/nav-context.ts";
 import { TaskFormPage } from "#src/http/ui/view/pages/tasks/form.tsx";
-import { renderPage } from "#src/http/ui/view/render.tsx";
+import { renderPage } from "#src/http/ui/view/shell/render.tsx";
 import type { AclService } from "#src/services/acl/service.ts";
 import { CollectionRepository } from "#src/services/collection/repository.ts";
 import { emptyTaskForm } from "#src/services/task-edit/types.ts";

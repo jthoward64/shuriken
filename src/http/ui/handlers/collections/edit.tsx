@@ -20,7 +20,7 @@ import { isHtmxRequest } from "#src/http/ui/helpers/htmx.ts";
 import { buildNavContext } from "#src/http/ui/helpers/nav-context.ts";
 import { buildSharePanelData } from "#src/http/ui/helpers/share-panel.ts";
 import { CollectionEditPage } from "#src/http/ui/view/pages/collections.tsx";
-import { renderFragment, renderPage } from "#src/http/ui/view/render.tsx";
+import { renderFragment, renderPage } from "#src/http/ui/view/shell/render.tsx";
 import { AclService } from "#src/services/acl/index.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
 import { PrincipalService } from "#src/services/principal/index.ts";
