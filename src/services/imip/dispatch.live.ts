@@ -53,6 +53,10 @@ const dispatch = (
 				method: input.method,
 				vevent: input.vevent,
 				to: [raw],
+				...(input.zone !== undefined ? { zone: input.zone } : {}),
+				...(input.vtimezone !== undefined
+					? { vtimezone: input.vtimezone }
+					: {}),
 			});
 			const outcome = yield* mailer
 				.sendForUser(

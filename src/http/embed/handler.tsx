@@ -16,6 +16,7 @@ import {
 	type EmbedWidgetView,
 } from "#src/http/ui/view/pages/embed/calendar-widget.tsx";
 import type { CalIndexRepository } from "#src/services/cal-index/index.ts";
+import type { CollectionRepository } from "#src/services/collection/index.ts";
 import type { ComponentRepository } from "#src/services/component/index.ts";
 import type { InstanceRepository } from "#src/services/instance/repository.ts";
 import type { ShareLinkCalendarRow } from "#src/services/share-link/repository.ts";
@@ -61,6 +62,7 @@ export const embedHandler = (
 	DavError | DatabaseError | InternalError,
 	| ShareLinkService
 	| CalIndexRepository
+	| CollectionRepository
 	| ComponentRepository
 	| InstanceRepository
 > =>

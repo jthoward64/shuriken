@@ -2,6 +2,7 @@ import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
 import { Effect } from "effect";
 import { Temporal } from "temporal-polyfill";
+import { resolutionZone, UTC } from "#src/data/icalendar/resolve-floating.ts";
 import type { IrComponent, IrDocument, IrProperty } from "#src/data/ir.ts";
 import {
 	type CalFilter,
@@ -371,7 +372,7 @@ describe("evaluateCalFilter — comp-filter matching", () => {
 			propFilters: [],
 			compFilters: [{ name: "VEVENT", propFilters: [], compFilters: [] }],
 		});
-		expect(evaluateCalFilter(doc, filter)).toBe(true);
+		expect(evaluateCalFilter(doc, filter, UTC)).toBe(true);
 	});
 
 	it("does not match when VEVENT child is absent", () => {
@@ -381,7 +382,7 @@ describe("evaluateCalFilter — comp-filter matching", () => {
 			propFilters: [],
 			compFilters: [{ name: "VEVENT", propFilters: [], compFilters: [] }],
 		});
-		expect(evaluateCalFilter(doc, filter)).toBe(false);
+		expect(evaluateCalFilter(doc, filter, UTC)).toBe(false);
 	});
 
 	it("is-not-defined on comp-filter: false when component exists", () => {
@@ -398,7 +399,7 @@ describe("evaluateCalFilter — comp-filter matching", () => {
 				},
 			],
 		});
-		expect(evaluateCalFilter(doc, filter)).toBe(false);
+		expect(evaluateCalFilter(doc, filter, UTC)).toBe(false);
 	});
 
 	it("is-not-defined on comp-filter: true when component absent", () => {
@@ -415,7 +416,7 @@ describe("evaluateCalFilter — comp-filter matching", () => {
 				},
 			],
 		});
-		expect(evaluateCalFilter(doc, filter)).toBe(true);
+		expect(evaluateCalFilter(doc, filter, UTC)).toBe(true);
 	});
 
 	it("comp-filter on wrong component name falls through to children", () => {
@@ -426,7 +427,7 @@ describe("evaluateCalFilter — comp-filter matching", () => {
 			propFilters: [],
 			compFilters: [],
 		});
-		expect(evaluateCalFilter(doc, filter)).toBe(true);
+		expect(evaluateCalFilter(doc, filter, UTC)).toBe(true);
 	});
 });
 
@@ -461,7 +462,7 @@ describe("evaluateCalFilter — prop-filter matching", () => {
 				},
 			},
 		]);
-		expect(evaluateCalFilter(doc, filter)).toBe(true);
+		expect(evaluateCalFilter(doc, filter, UTC)).toBe(true);
 	});
 
 	it("text-match contains: case-insensitive", () => {
@@ -480,7 +481,7 @@ describe("evaluateCalFilter — prop-filter matching", () => {
 				},
 			},
 		]);
-		expect(evaluateCalFilter(doc, filter)).toBe(true);
+		expect(evaluateCalFilter(doc, filter, UTC)).toBe(true);
 	});
 
 	it("text-match equals: exact match", () => {
@@ -499,7 +500,7 @@ describe("evaluateCalFilter — prop-filter matching", () => {
 				},
 			},
 		]);
-		expect(evaluateCalFilter(doc, filter)).toBe(true);
+		expect(evaluateCalFilter(doc, filter, UTC)).toBe(true);
 	});
 
 	it("text-match equals: fails when not equal", () => {
@@ -518,7 +519,7 @@ describe("evaluateCalFilter — prop-filter matching", () => {
 				},
 			},
 		]);
-		expect(evaluateCalFilter(doc, filter)).toBe(false);
+		expect(evaluateCalFilter(doc, filter, UTC)).toBe(false);
 	});
 
 	it("text-match starts-with: matches prefix", () => {
@@ -537,7 +538,7 @@ describe("evaluateCalFilter — prop-filter matching", () => {
 				},
 			},
 		]);
-		expect(evaluateCalFilter(doc, filter)).toBe(true);
+		expect(evaluateCalFilter(doc, filter, UTC)).toBe(true);
 	});
 
 	it("text-match ends-with: matches suffix", () => {
@@ -556,7 +557,7 @@ describe("evaluateCalFilter — prop-filter matching", () => {
 				},
 			},
 		]);
-		expect(evaluateCalFilter(doc, filter)).toBe(true);
+		expect(evaluateCalFilter(doc, filter, UTC)).toBe(true);
 	});
 
 	it("text-match negated: fails when value does match", () => {
@@ -575,7 +576,7 @@ describe("evaluateCalFilter — prop-filter matching", () => {
 				},
 			},
 		]);
-		expect(evaluateCalFilter(doc, filter)).toBe(false);
+		expect(evaluateCalFilter(doc, filter, UTC)).toBe(false);
 	});
 
 	it("text-match negated: passes when value does not match", () => {
@@ -594,7 +595,7 @@ describe("evaluateCalFilter — prop-filter matching", () => {
 				},
 			},
 		]);
-		expect(evaluateCalFilter(doc, filter)).toBe(true);
+		expect(evaluateCalFilter(doc, filter, UTC)).toBe(true);
 	});
 
 	it("text-match unicode-casemap: normalizes NFC before comparing", () => {
@@ -613,7 +614,7 @@ describe("evaluateCalFilter — prop-filter matching", () => {
 				},
 			},
 		]);
-		expect(evaluateCalFilter(doc, filter)).toBe(true);
+		expect(evaluateCalFilter(doc, filter, UTC)).toBe(true);
 	});
 
 	it("prop-filter is-not-defined: passes when property is absent", () => {
@@ -625,7 +626,7 @@ describe("evaluateCalFilter — prop-filter matching", () => {
 				paramFilters: [],
 			},
 		]);
-		expect(evaluateCalFilter(doc, filter)).toBe(true);
+		expect(evaluateCalFilter(doc, filter, UTC)).toBe(true);
 	});
 
 	it("prop-filter is-not-defined: fails when property is present", () => {
@@ -639,13 +640,13 @@ describe("evaluateCalFilter — prop-filter matching", () => {
 				paramFilters: [],
 			},
 		]);
-		expect(evaluateCalFilter(doc, filter)).toBe(false);
+		expect(evaluateCalFilter(doc, filter, UTC)).toBe(false);
 	});
 
 	it("prop-filter: fails when property is absent (no is-not-defined)", () => {
 		const doc = makeDoc([makeComponent("VEVENT")]);
 		const filter = makeFilter([{ name: "SUMMARY", paramFilters: [] }]);
-		expect(evaluateCalFilter(doc, filter)).toBe(false);
+		expect(evaluateCalFilter(doc, filter, UTC)).toBe(false);
 	});
 });
 
@@ -675,7 +676,7 @@ describe("evaluateCalFilter — param-filter matching", () => {
 			makeComponent("VEVENT", [textProp("DTSTART", "20260115T100000Z")]),
 		]);
 		const filter = makeFilter([{ name: "TZID", isNotDefined: true }]);
-		expect(evaluateCalFilter(doc, filter)).toBe(true);
+		expect(evaluateCalFilter(doc, filter, UTC)).toBe(true);
 	});
 
 	it("is-not-defined: fails when parameter present", () => {
@@ -687,7 +688,7 @@ describe("evaluateCalFilter — param-filter matching", () => {
 			]),
 		]);
 		const filter = makeFilter([{ name: "TZID", isNotDefined: true }]);
-		expect(evaluateCalFilter(doc, filter)).toBe(false);
+		expect(evaluateCalFilter(doc, filter, UTC)).toBe(false);
 	});
 
 	it("param exists (no text-match): passes when param is present", () => {
@@ -699,7 +700,7 @@ describe("evaluateCalFilter — param-filter matching", () => {
 			]),
 		]);
 		const filter = makeFilter([{ name: "TZID" }]);
-		expect(evaluateCalFilter(doc, filter)).toBe(true);
+		expect(evaluateCalFilter(doc, filter, UTC)).toBe(true);
 	});
 
 	it("param exists (no text-match): fails when param is absent", () => {
@@ -707,7 +708,7 @@ describe("evaluateCalFilter — param-filter matching", () => {
 			makeComponent("VEVENT", [textProp("DTSTART", "20260115T100000Z")]),
 		]);
 		const filter = makeFilter([{ name: "TZID" }]);
-		expect(evaluateCalFilter(doc, filter)).toBe(false);
+		expect(evaluateCalFilter(doc, filter, UTC)).toBe(false);
 	});
 
 	it("param text-match: passes when param value matches", () => {
@@ -729,7 +730,7 @@ describe("evaluateCalFilter — param-filter matching", () => {
 				},
 			},
 		]);
-		expect(evaluateCalFilter(doc, filter)).toBe(true);
+		expect(evaluateCalFilter(doc, filter, UTC)).toBe(true);
 	});
 });
 
@@ -761,7 +762,7 @@ describe("evaluateCalFilter — time-range matching", () => {
 				],
 			},
 		};
-		expect(evaluateCalFilter(doc, filter)).toBe(true);
+		expect(evaluateCalFilter(doc, filter, UTC)).toBe(true);
 	});
 
 	it("event before range start is excluded", () => {
@@ -787,7 +788,7 @@ describe("evaluateCalFilter — time-range matching", () => {
 				],
 			},
 		};
-		expect(evaluateCalFilter(doc, filter)).toBe(false);
+		expect(evaluateCalFilter(doc, filter, UTC)).toBe(false);
 	});
 
 	it("event after range end is excluded", () => {
@@ -813,7 +814,7 @@ describe("evaluateCalFilter — time-range matching", () => {
 				],
 			},
 		};
-		expect(evaluateCalFilter(doc, filter)).toBe(false);
+		expect(evaluateCalFilter(doc, filter, UTC)).toBe(false);
 	});
 
 	it("event without DTSTART passes conservatively (no DTSTART)", () => {
@@ -836,7 +837,7 @@ describe("evaluateCalFilter — time-range matching", () => {
 				],
 			},
 		};
-		expect(evaluateCalFilter(doc, filter)).toBe(true);
+		expect(evaluateCalFilter(doc, filter, UTC)).toBe(true);
 	});
 
 	it("event with only start range (no end): passes when event starts before range limit", () => {
@@ -861,7 +862,7 @@ describe("evaluateCalFilter — time-range matching", () => {
 				],
 			},
 		};
-		expect(evaluateCalFilter(doc, filter)).toBe(true);
+		expect(evaluateCalFilter(doc, filter, UTC)).toBe(true);
 	});
 
 	it("event with only end range (no start): passes when event ends after range start", () => {
@@ -886,7 +887,7 @@ describe("evaluateCalFilter — time-range matching", () => {
 				],
 			},
 		};
-		expect(evaluateCalFilter(doc, filter)).toBe(true);
+		expect(evaluateCalFilter(doc, filter, UTC)).toBe(true);
 	});
 
 	// RFC 4791 §9.9: event with DATE (all-day) DTSTART passes time-range if start falls in range
@@ -910,7 +911,7 @@ describe("evaluateCalFilter — time-range matching", () => {
 				],
 			},
 		};
-		expect(evaluateCalFilter(doc, filter)).toBe(true);
+		expect(evaluateCalFilter(doc, filter, UTC)).toBe(true);
 	});
 
 	// DTEND absent → use DTSTART as zero-duration point
@@ -934,7 +935,7 @@ describe("evaluateCalFilter — time-range matching", () => {
 				],
 			},
 		};
-		expect(evaluateCalFilter(doc, filter)).toBe(true);
+		expect(evaluateCalFilter(doc, filter, UTC)).toBe(true);
 	});
 });
 
@@ -972,7 +973,9 @@ describe("evaluateCalFilter — propValueText covers multiple IrValue types", ()
 		const doc = makeDoc([
 			makeComponent("VEVENT", [textProp("SUMMARY", "hello")]),
 		]);
-		expect(evaluateCalFilter(doc, makeFilterForProp("SUMMARY"))).toBe(true);
+		expect(evaluateCalFilter(doc, makeFilterForProp("SUMMARY"), UTC)).toBe(
+			true,
+		);
 	});
 
 	it("INTEGER value is stringified", () => {
@@ -986,7 +989,7 @@ describe("evaluateCalFilter — propValueText covers multiple IrValue types", ()
 				},
 			]),
 		]);
-		expect(evaluateCalFilter(doc, makeFilterForProp("X-INT"))).toBe(true);
+		expect(evaluateCalFilter(doc, makeFilterForProp("X-INT"), UTC)).toBe(true);
 	});
 
 	it("FLOAT value is stringified", () => {
@@ -1000,7 +1003,9 @@ describe("evaluateCalFilter — propValueText covers multiple IrValue types", ()
 				},
 			]),
 		]);
-		expect(evaluateCalFilter(doc, makeFilterForProp("X-FLOAT"))).toBe(true);
+		expect(evaluateCalFilter(doc, makeFilterForProp("X-FLOAT"), UTC)).toBe(
+			true,
+		);
 	});
 
 	it("BOOLEAN value is stringified", () => {
@@ -1014,7 +1019,7 @@ describe("evaluateCalFilter — propValueText covers multiple IrValue types", ()
 				},
 			]),
 		]);
-		expect(evaluateCalFilter(doc, makeFilterForProp("X-BOOL"))).toBe(true);
+		expect(evaluateCalFilter(doc, makeFilterForProp("X-BOOL"), UTC)).toBe(true);
 	});
 
 	it("DATE value is stringified as ISO date", () => {
@@ -1028,7 +1033,7 @@ describe("evaluateCalFilter — propValueText covers multiple IrValue types", ()
 				},
 			]),
 		]);
-		expect(evaluateCalFilter(doc, makeFilterForProp("X-DATE"))).toBe(true);
+		expect(evaluateCalFilter(doc, makeFilterForProp("X-DATE"), UTC)).toBe(true);
 	});
 
 	it("DATE_TIME value is stringified", () => {
@@ -1047,7 +1052,7 @@ describe("evaluateCalFilter — propValueText covers multiple IrValue types", ()
 				},
 			]),
 		]);
-		expect(evaluateCalFilter(doc, makeFilterForProp("X-DT"))).toBe(true);
+		expect(evaluateCalFilter(doc, makeFilterForProp("X-DT"), UTC)).toBe(true);
 	});
 
 	it("URI value (has string 'value') falls through to generic string path", () => {
@@ -1061,7 +1066,7 @@ describe("evaluateCalFilter — propValueText covers multiple IrValue types", ()
 				},
 			]),
 		]);
-		expect(evaluateCalFilter(doc, makeFilterForProp("URL"))).toBe(true);
+		expect(evaluateCalFilter(doc, makeFilterForProp("URL"), UTC)).toBe(true);
 	});
 
 	// CATEGORIES is multi-valued (TEXT_LIST). A text-match must see *every*
@@ -1108,19 +1113,23 @@ describe("evaluateCalFilter — propValueText covers multiple IrValue types", ()
 
 	it("TEXT_LIST text-match matches a non-first member", () => {
 		expect(
-			evaluateCalFilter(categoriesDoc, makeCategoriesFilter("PERSONAL")),
+			evaluateCalFilter(categoriesDoc, makeCategoriesFilter("PERSONAL"), UTC),
 		).toBe(true);
 	});
 
 	it("TEXT_LIST text-match matches the first member", () => {
 		expect(
-			evaluateCalFilter(categoriesDoc, makeCategoriesFilter("ANNIVERSARY")),
+			evaluateCalFilter(
+				categoriesDoc,
+				makeCategoriesFilter("ANNIVERSARY"),
+				UTC,
+			),
 		).toBe(true);
 	});
 
 	it("TEXT_LIST text-match does not match an absent value", () => {
 		expect(
-			evaluateCalFilter(categoriesDoc, makeCategoriesFilter("FINANCE")),
+			evaluateCalFilter(categoriesDoc, makeCategoriesFilter("FINANCE"), UTC),
 		).toBe(false);
 	});
 
@@ -1151,14 +1160,255 @@ describe("evaluateCalFilter — propValueText covers multiple IrValue types", ()
 	});
 
 	it("i;octet collation matches case-exactly", () => {
-		expect(evaluateCalFilter(categoriesDoc, makeOctetFilter("PERSONAL"))).toBe(
-			true,
-		);
+		expect(
+			evaluateCalFilter(categoriesDoc, makeOctetFilter("PERSONAL"), UTC),
+		).toBe(true);
 	});
 
 	it("i;octet collation is case-sensitive (lowercase does not match)", () => {
-		expect(evaluateCalFilter(categoriesDoc, makeOctetFilter("personal"))).toBe(
-			false,
+		expect(
+			evaluateCalFilter(categoriesDoc, makeOctetFilter("personal"), UTC),
+		).toBe(false);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Floating-time resolution — RFC 4791 §7.3
+//
+// A floating DTSTART names wall-clock time with no instant, so which events a
+// time-range filter matches depends on the zone the server resolves it in.
+// ---------------------------------------------------------------------------
+
+const floatingProp = (name: string, wall: string): IrProperty => ({
+	name,
+	parameters: [],
+	value: { type: "PLAIN_DATE_TIME", value: Temporal.PlainDateTime.from(wall) },
+	isKnown: true,
+});
+
+const rangeFilter = (start: string, end: string): CalFilter => ({
+	compFilter: {
+		name: "VCALENDAR",
+		propFilters: [],
+		compFilters: [
+			{
+				name: "VEVENT",
+				timeRange: {
+					start: Temporal.Instant.from(start),
+					end: Temporal.Instant.from(end),
+				},
+				propFilters: [],
+				compFilters: [],
+			},
+		],
+	},
+});
+
+describe("evaluateCalFilter — floating time resolution", () => {
+	// 09:00-10:00 floating: 09:00Z in UTC, but 07:00-08:00Z in Berlin (CEST)
+	const floatingEvent = makeDoc([
+		makeComponent("VEVENT", [
+			floatingProp("DTSTART", "2026-06-01T09:00"),
+			floatingProp("DTEND", "2026-06-01T10:00"),
+		]),
+	]);
+
+	it("resolves a floating event in the supplied zone", () => {
+		const berlin = resolutionZone("Europe/Berlin");
+		// 07:00-08:00Z window catches the event in Berlin but not in UTC
+		const morning = rangeFilter("2026-06-01T07:00:00Z", "2026-06-01T08:00:00Z");
+		expect(evaluateCalFilter(floatingEvent, morning, berlin)).toBe(true);
+		expect(evaluateCalFilter(floatingEvent, morning, UTC)).toBe(false);
+	});
+
+	it("excludes a floating event that falls outside the range in that zone", () => {
+		const berlin = resolutionZone("Europe/Berlin");
+		const nineToTen = rangeFilter(
+			"2026-06-01T09:00:00Z",
+			"2026-06-01T10:00:00Z",
 		);
+		expect(evaluateCalFilter(floatingEvent, nineToTen, berlin)).toBe(false);
+		expect(evaluateCalFilter(floatingEvent, nineToTen, UTC)).toBe(true);
+	});
+
+	// An all-day event's day boundaries are local, not UTC midnight
+	it("resolves an all-day event's boundaries in the supplied zone", () => {
+		const allDay = makeDoc([
+			makeComponent("VEVENT", [
+				dateProp("DTSTART", "2026-06-02"),
+				dateProp("DTEND", "2026-06-03"),
+			]),
+		]);
+		// 22:00Z on Jun 1 is already Jun 2 in Berlin, but still Jun 1 in UTC
+		const lateOnTheFirst = rangeFilter(
+			"2026-06-01T22:00:00Z",
+			"2026-06-01T23:00:00Z",
+		);
+		expect(
+			evaluateCalFilter(
+				allDay,
+				lateOnTheFirst,
+				resolutionZone("Europe/Berlin"),
+			),
+		).toBe(true);
+		expect(evaluateCalFilter(allDay, lateOnTheFirst, UTC)).toBe(false);
+	});
+
+	// Before the zone was threaded through, a floating VJOURNAL could never match
+	it("matches a floating VJOURNAL rather than dropping it", () => {
+		const journal = makeDoc([
+			makeComponent("VJOURNAL", [floatingProp("DTSTART", "2026-06-01T09:00")]),
+		]);
+		const filter: CalFilter = {
+			compFilter: {
+				name: "VCALENDAR",
+				propFilters: [],
+				compFilters: [
+					{
+						name: "VJOURNAL",
+						timeRange: {
+							start: Temporal.Instant.from("2026-06-01T00:00:00Z"),
+							end: Temporal.Instant.from("2026-06-02T00:00:00Z"),
+						},
+						propFilters: [],
+						compFilters: [],
+					},
+				],
+			},
+		};
+		expect(evaluateCalFilter(journal, filter, UTC)).toBe(true);
+	});
+
+	// A floating recurring series shifts with the zone the same way
+	it("resolves floating RRULE occurrences in the supplied zone", () => {
+		const series = makeDoc([
+			makeComponent("VEVENT", [
+				textProp("UID", "floating-series@test"),
+				floatingProp("DTSTART", "2026-06-01T09:00"),
+				floatingProp("DTEND", "2026-06-01T10:00"),
+				{
+					name: "RRULE",
+					parameters: [],
+					value: { type: "RECUR", value: "FREQ=DAILY" },
+					isKnown: true,
+				},
+			]),
+		]);
+		const thirdAtSeven = rangeFilter(
+			"2026-06-03T07:00:00Z",
+			"2026-06-03T07:30:00Z",
+		);
+		expect(
+			evaluateCalFilter(series, thirdAtSeven, resolutionZone("Europe/Berlin")),
+		).toBe(true);
+		expect(evaluateCalFilter(series, thirdAtSeven, UTC)).toBe(false);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// All-day duration — RFC 5545 §3.6.1 / RFC 4791 §9.9
+//
+// A DATE-valued DTSTART with no DTEND or DURATION lasts one day. Treated as an
+// instant it would be invisible to any window opening at or after its midnight.
+// ---------------------------------------------------------------------------
+
+describe("evaluateCalFilter — all-day event without DTEND", () => {
+	const bareAllDay = makeDoc([
+		makeComponent("VEVENT", [dateProp("DTSTART", "2026-06-01")]),
+	]);
+
+	it("matches a query for its own day", () => {
+		expect(
+			evaluateCalFilter(
+				bareAllDay,
+				rangeFilter("2026-06-01T00:00:00Z", "2026-06-02T00:00:00Z"),
+				UTC,
+			),
+		).toBe(true);
+	});
+
+	it("matches a query for an afternoon of that day", () => {
+		expect(
+			evaluateCalFilter(
+				bareAllDay,
+				rangeFilter("2026-06-01T12:00:00Z", "2026-06-01T18:00:00Z"),
+				UTC,
+			),
+		).toBe(true);
+	});
+
+	it("matches a month window that opens on its own midnight", () => {
+		expect(
+			evaluateCalFilter(
+				bareAllDay,
+				rangeFilter("2026-06-01T00:00:00Z", "2026-07-01T00:00:00Z"),
+				UTC,
+			),
+		).toBe(true);
+	});
+
+	it("does not match the day before or the day after", () => {
+		expect(
+			evaluateCalFilter(
+				bareAllDay,
+				rangeFilter("2026-05-31T00:00:00Z", "2026-06-01T00:00:00Z"),
+				UTC,
+			),
+		).toBe(false);
+		expect(
+			evaluateCalFilter(
+				bareAllDay,
+				rangeFilter("2026-06-02T00:00:00Z", "2026-06-03T00:00:00Z"),
+				UTC,
+			),
+		).toBe(false);
+	});
+
+	// The day runs midnight to midnight in the resolution zone, not in UTC
+	it("spans its own day in the resolution zone", () => {
+		const berlin = resolutionZone("Europe/Berlin");
+		// 22:00Z on May 31 is already June 1 in Berlin
+		expect(
+			evaluateCalFilter(
+				bareAllDay,
+				rangeFilter("2026-05-31T22:30:00Z", "2026-05-31T23:00:00Z"),
+				berlin,
+			),
+		).toBe(true);
+		// ...and 22:30Z on June 1 is already June 2 there, so it is over
+		expect(
+			evaluateCalFilter(
+				bareAllDay,
+				rangeFilter("2026-06-01T22:30:00Z", "2026-06-01T23:00:00Z"),
+				berlin,
+			),
+		).toBe(false);
+	});
+
+	// An explicit DTEND still wins, and a timed event keeps zero duration
+	it("leaves an explicit DTEND and timed events alone", () => {
+		const withEnd = makeDoc([
+			makeComponent("VEVENT", [
+				dateProp("DTSTART", "2026-06-01"),
+				dateProp("DTEND", "2026-06-02"),
+			]),
+		]);
+		expect(
+			evaluateCalFilter(
+				withEnd,
+				rangeFilter("2026-06-02T00:00:00Z", "2026-06-03T00:00:00Z"),
+				UTC,
+			),
+		).toBe(false);
+		const timed = makeDoc([
+			makeComponent("VEVENT", [floatingProp("DTSTART", "2026-06-01T09:00")]),
+		]);
+		expect(
+			evaluateCalFilter(
+				timed,
+				rangeFilter("2026-06-01T08:00:00Z", "2026-06-01T08:30:00Z"),
+				UTC,
+			),
+		).toBe(false);
 	});
 });

@@ -13,6 +13,7 @@
 // ---------------------------------------------------------------------------
 
 import { Effect, Option } from "effect";
+import { extractTzidFromVtimezone } from "#src/data/icalendar/calendar-zone.ts";
 import { type ClarkName, cn, type IrDeadProperties } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import {
@@ -91,15 +92,6 @@ const SCHEDULE_DEFAULT_CAL_URL_PROP = cn(
 	CALDAV_NS,
 	"schedule-default-calendar-URL",
 );
-
-/**
- * Extract the TZID from a raw VTIMEZONE/VCALENDAR iCalendar text string.
- * Returns null if no TZID line is found.
- */
-const extractTzidFromVtimezone = (raw: string): string | null => {
-	const match = /^TZID[;:]([^\r\n]+)/m.exec(raw);
-	return match?.[1]?.trim() ?? null;
-};
 
 // Maps Clark name → DB field on principal
 const PRINCIPAL_LIVE_PROPS = new Map<ClarkName, "displayName">([

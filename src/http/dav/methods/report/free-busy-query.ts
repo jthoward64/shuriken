@@ -8,9 +8,10 @@
 // Response: raw iCalendar text (not multistatus), Content-Type: text/calendar.
 // ---------------------------------------------------------------------------
 
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import { Temporal } from "temporal-polyfill";
 import { AppConfigService } from "#src/config.ts";
+import { resolveCalendarZone } from "#src/data/icalendar/calendar-zone.ts";
 import {
 	buildVfreebusyText,
 	coalescePeriods,
@@ -36,6 +37,7 @@ import type { HttpRequestContext } from "#src/http/context.ts";
 import { HTTP_OK } from "#src/http/status.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import { CalIndexRepository } from "#src/services/cal-index/index.ts";
+import { CollectionRepository } from "#src/services/collection/index.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
 import { InstanceRepository } from "#src/services/instance/repository.ts";
 
@@ -57,6 +59,7 @@ export const freeBusyQueryHandler = (
 	| ComponentRepository
 	| AclService
 	| AppConfigService
+	| CollectionRepository
 > =>
 	Effect.gen(function* () {
 		if (path.kind !== "collection") {
@@ -110,6 +113,15 @@ export const freeBusyQueryHandler = (
 			return yield* badRequest("Invalid time-range instant format");
 		}
 
+		// RFC 4791 §5.2.2: free-busy reads floating and DATE values in the
+		// collection's CALDAV:calendar-timezone. The report body carries no
+		// timezone of its own, so the collection is the only named source.
+		const collRepo = yield* CollectionRepository;
+		const collOpt = yield* collRepo.findById(path.collectionId);
+		const zone = resolveCalendarZone({
+			collectionTzid: Option.getOrUndefined(collOpt)?.timezoneTzid,
+		});
+
 		// Narrow the candidate set in SQL: VEVENTs whose series could overlap the
 		// query window, plus every VFREEBUSY (rare, unfiltered — its busy periods
 		// aren't always bounded by DTSTART/DTEND, so we never drop one). This is a
@@ -123,6 +135,7 @@ export const freeBusyQueryHandler = (
 					"VEVENT",
 					queryStart,
 					queryEnd,
+					zone,
 				),
 				calIdx.findByComponentType(path.collectionId, "VFREEBUSY"),
 			],
@@ -172,11 +185,11 @@ export const freeBusyQueryHandler = (
 					}> = [];
 
 					if (isOverride && !hasRrule) {
-						const dtstart = getDtstartInstant(comp);
+						const dtstart = getDtstartInstant(comp, zone);
 						if (!dtstart) {
 							continue;
 						}
-						const dtend = effectiveDtend(comp, dtstart);
+						const dtend = effectiveDtend(comp, dtstart, zone);
 						if (
 							dtstart.epochMilliseconds >= queryEnd.epochMilliseconds ||
 							dtend.epochMilliseconds <= queryStart.epochMilliseconds
@@ -185,12 +198,12 @@ export const freeBusyQueryHandler = (
 						}
 						occurrencePairs.push({ start: dtstart, end: dtend });
 					} else if (hasRrule) {
-						const masterDtstart = getDtstartInstant(comp);
+						const masterDtstart = getDtstartInstant(comp, zone);
 						if (!masterDtstart) {
-							continue; // Floating — no timezone context, skip
+							continue; // DTSTART absent or not a date value
 						}
 						const duration =
-							effectiveDtend(comp, masterDtstart).epochMilliseconds -
+							effectiveDtend(comp, masterDtstart, zone).epochMilliseconds -
 							masterDtstart.epochMilliseconds;
 
 						const starts = getOccurrenceInstantsInRange(
@@ -198,6 +211,7 @@ export const freeBusyQueryHandler = (
 							comp,
 							queryStart,
 							queryEnd,
+							zone,
 							{
 								maxOccurrencesChecked: config.recurrence.rruleMaxOccurrences,
 								timeBudgetMs: config.recurrence.rruleTimeBudgetMs,
@@ -212,11 +226,11 @@ export const freeBusyQueryHandler = (
 							});
 						}
 					} else {
-						const dtstart = getDtstartInstant(comp);
+						const dtstart = getDtstartInstant(comp, zone);
 						if (!dtstart) {
-							continue; // Floating time — no timezone context, skip
+							continue; // DTSTART absent or not a date value
 						}
-						const dtend = effectiveDtend(comp, dtstart);
+						const dtend = effectiveDtend(comp, dtstart, zone);
 						// Skip if entirely outside query range
 						if (
 							dtstart.epochMilliseconds >= queryEnd.epochMilliseconds ||

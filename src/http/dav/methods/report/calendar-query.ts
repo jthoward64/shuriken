@@ -6,8 +6,9 @@
 // cal_index for time-range queries.
 // ---------------------------------------------------------------------------
 
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import { AppConfigService } from "#src/config.ts";
+import { resolveCalendarZone } from "#src/data/icalendar/calendar-zone.ts";
 import { encodeICalendar } from "#src/data/icalendar/codec.ts";
 import { redactDocumentToBusyOnly } from "#src/data/icalendar/visibility.ts";
 import type { ClarkName, IrDocument } from "#src/data/ir.ts";
@@ -32,6 +33,7 @@ import { multistatusResponse } from "#src/http/dav/xml/multistatus.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import { CalIndexRepository } from "#src/services/cal-index/index.ts";
 import type { CalComponentType } from "#src/services/cal-index/repository.ts";
+import { CollectionRepository } from "#src/services/collection/index.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
 import {
 	InstanceRepository,
@@ -120,6 +122,7 @@ export const calendarQueryHandler = (
 	| AclService
 	| IanaTimezoneService
 	| AppConfigService
+	| CollectionRepository
 > =>
 	Effect.gen(function* () {
 		if (path.kind !== "collection") {
@@ -160,9 +163,6 @@ export const calendarQueryHandler = (
 
 		// RFC 7809 §6.2: parse optional <C:timezone-id> for floating-datetime context.
 		// Validate against known IANA timezones; fail with CALDAV:valid-timezone if unknown.
-		// (Floating-datetime resolution using this context is not yet implemented — RFC 4791
-		// §7.8.5 says filters against floating times with no timezone context MAY return no
-		// match, which is the current behaviour.)
 		const ianaSvc = yield* IanaTimezoneService;
 		const timezoneIdEl = obj[cn("timezone-id")];
 		const timezoneIdStr =
@@ -180,6 +180,18 @@ export const calendarQueryHandler = (
 		) {
 			return yield* forbidden("CALDAV:valid-timezone");
 		}
+
+		// RFC 4791 §7.3: floating and DATE values in this collection are read in
+		// the request's CALDAV:timezone / timezone-id, else the collection's
+		// CALDAV:calendar-timezone, else UTC.
+		const timezoneEl = obj[cn("timezone")];
+		const collRepo = yield* CollectionRepository;
+		const collOpt = yield* collRepo.findById(path.collectionId);
+		const zone = resolveCalendarZone({
+			requestTimezone: typeof timezoneEl === "string" ? timezoneEl : null,
+			requestTzid: timezoneIdStr,
+			collectionTzid: Option.getOrUndefined(collOpt)?.timezoneTzid,
+		});
 
 		// Parse optional calendar-data subsetting spec (<C:calendar-data> is inside <D:prop>)
 		const propEl =
@@ -221,6 +233,7 @@ export const calendarQueryHandler = (
 						componentType,
 						timeRange.start,
 						timeRange.end,
+						zone,
 					)
 					.pipe(
 						Effect.flatMap((entityIds) =>
@@ -271,7 +284,7 @@ export const calendarQueryHandler = (
 			const irDoc: IrDocument = { kind: "icalendar", root: tree };
 
 			if (
-				!evaluateCalFilter(irDoc, filter, {
+				!evaluateCalFilter(irDoc, filter, zone, {
 					maxOccurrencesChecked: config.recurrence.rruleMaxOccurrences,
 					timeBudgetMs: config.recurrence.rruleTimeBudgetMs,
 				})
@@ -281,7 +294,7 @@ export const calendarQueryHandler = (
 
 			const redactedDoc = hasFullRead ? irDoc : redactDocumentToBusyOnly(irDoc);
 			const dataStr = yield* encodeICalendar(
-				stripTimezones(subsetIrDocument(redactedDoc, spec)),
+				stripTimezones(subsetIrDocument(redactedDoc, spec, zone)),
 			);
 
 			const href = `${origin}/dav/principals/${path.principalSeg}/${path.namespace}/${path.collectionSeg}/${encodeSegment(inst.slug || inst.id)}`;

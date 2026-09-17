@@ -24,7 +24,10 @@ import type { HttpRequestContext } from "#src/http/context.ts";
 import type { AclService } from "#src/services/acl/index.ts";
 import type { CalIndexRepository } from "#src/services/cal-index/index.ts";
 import type { CardIndexRepository } from "#src/services/card-index/index.ts";
-import type { CollectionService } from "#src/services/collection/index.ts";
+import type {
+	CollectionRepository,
+	CollectionService,
+} from "#src/services/collection/index.ts";
 import type { ComponentRepository } from "#src/services/component/index.ts";
 import type {
 	InstanceRepository,
@@ -70,6 +73,7 @@ export const reportHandler = (
 	| ComponentRepository
 	| CalIndexRepository
 	| CardIndexRepository
+	| CollectionRepository
 	| IanaTimezoneService
 	| PrincipalRepository
 	| AclService

@@ -14,6 +14,7 @@ import { Temporal as JSTemporal } from "@js-temporal/polyfill";
 import { RRuleTemporal } from "rrule-temporal";
 import { Temporal } from "temporal-polyfill";
 import type { IrComponent, IrValue } from "#src/data/ir.ts";
+import type { ResolutionZone } from "../resolve-floating.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers: convert temporal-polyfill values → @js-temporal/polyfill via strings
@@ -22,38 +23,45 @@ import type { IrComponent, IrValue } from "#src/data/ir.ts";
 /** Single date/time IrValue → @js-temporal/polyfill ZonedDateTime, or undefined. */
 const irSingleValueToJsZdt = (
 	v: IrValue,
+	zone: ResolutionZone,
 ): JSTemporal.ZonedDateTime | undefined => {
 	if (v.type === "DATE_TIME") {
 		return JSTemporal.ZonedDateTime.from(v.value.toString());
 	}
 	if (v.type === "DATE") {
-		return JSTemporal.ZonedDateTime.from(`${v.value.toString()}T00:00:00[UTC]`);
+		// An all-day occurrence starts when the day starts in the resolution zone
+		return JSTemporal.ZonedDateTime.from(
+			`${v.value.toString()}T00:00:00[${zone}]`,
+		);
 	}
 	if (v.type === "PLAIN_DATE_TIME") {
-		// Floating — no timezone; treat as UTC for range comparison
-		return JSTemporal.ZonedDateTime.from(`${v.value.toString()}[UTC]`);
+		// Floating — the wall time is read in the resolution zone (RFC 4791 7.3)
+		return JSTemporal.ZonedDateTime.from(`${v.value.toString()}[${zone}]`);
 	}
 	return undefined;
 };
 
 /** Any EXDATE/RDATE IrValue variant → list of @js-temporal/polyfill ZonedDateTimes. */
-const irDateListToJsZdts = (v: IrValue): Array<JSTemporal.ZonedDateTime> => {
+const irDateListToJsZdts = (
+	v: IrValue,
+	zone: ResolutionZone,
+): Array<JSTemporal.ZonedDateTime> => {
 	if (v.type === "DATE_TIME_LIST") {
 		return v.value.map((dt) =>
-			// Floating items (PlainDateTime) carry no zone — treat as UTC for range
-			// comparison, matching the single-value rule above.
+			// Floating items (PlainDateTime) carry no zone — read in the resolution
+			// zone, matching the single-value rule above
 			"timeZoneId" in dt
 				? JSTemporal.ZonedDateTime.from(dt.toString())
-				: JSTemporal.ZonedDateTime.from(`${dt.toString()}[UTC]`),
+				: JSTemporal.ZonedDateTime.from(`${dt.toString()}[${zone}]`),
 		);
 	}
 	if (v.type === "DATE_LIST") {
 		return v.value.map((pd) =>
-			JSTemporal.ZonedDateTime.from(`${pd.toString()}T00:00:00[UTC]`),
+			JSTemporal.ZonedDateTime.from(`${pd.toString()}T00:00:00[${zone}]`),
 		);
 	}
 	// Single-value fallback (some clients emit EXDATE with a single DATE_TIME)
-	const single = irSingleValueToJsZdt(v);
+	const single = irSingleValueToJsZdt(v, zone);
 	return single ? [single] : [];
 };
 
@@ -75,16 +83,17 @@ const pad = (n: number, width = TWO_DIGITS): string =>
  * interpreted in DTSTART's timezone (e.g. `UNTIL=20260502T010000` with
  * `DTSTART;TZID=America/New_York` is 01:00 New York → 05:00 UTC), not blindly as
  * UTC — otherwise the series-end bound is off by the zone offset and can drop the
- * final occurrence. When DTSTART is floating/unknown we fall back to UTC (which
- * matches how floating DTSTARTs are handled elsewhere in this module).
+ * final occurrence. When DTSTART is floating or absent the value is read in
+ * `zone`, matching how floating DTSTARTs are resolved elsewhere in this module.
  * Already-UTC (`…Z`) and DATE-only UNTILs are left untouched (rrule-temporal
  * accepts both).
  */
 export const normalizeRruleUntil = (
 	rruleString: string,
+	zone: ResolutionZone,
 	dtstart?: JSTemporal.ZonedDateTime,
 ): string => {
-	const timeZone = dtstart?.timeZoneId ?? "UTC";
+	const timeZone = dtstart?.timeZoneId ?? zone;
 	return rruleString.replace(
 		/UNTIL=(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(?![\dZ])/g,
 		(_match, y, mo, d, h, mi, s) => {
@@ -215,12 +224,14 @@ const boundedOccurrencesInRange = (
  * @param vevent     The master recurring component (VEVENT / VTODO etc.).
  * @param queryStart Inclusive start of the query time range.
  * @param queryEnd   Exclusive end of the query time range.
+ * @param zone       Zone that floating and DATE values are read in.
  */
 export const getOccurrenceInstantsInRange = (
 	vcalRoot: IrComponent,
 	vevent: IrComponent,
 	queryStart: Temporal.Instant,
 	queryEnd: Temporal.Instant,
+	zone: ResolutionZone,
 	limits: RruleExpansionLimits = DEFAULT_RRULE_LIMITS,
 	stopAtFirst = false,
 ): ReadonlyArray<Temporal.Instant> => {
@@ -231,15 +242,15 @@ export const getOccurrenceInstantsInRange = (
 
 	const dtstartProp = vevent.properties.find((p) => p.name === "DTSTART");
 	const dtstart = dtstartProp
-		? irSingleValueToJsZdt(dtstartProp.value)
+		? irSingleValueToJsZdt(dtstartProp.value, zone)
 		: undefined;
 
-	const rruleString = normalizeRruleUntil(rruleProp.value.value, dtstart);
+	const rruleString = normalizeRruleUntil(rruleProp.value.value, zone, dtstart);
 
 	const exDate: Array<JSTemporal.ZonedDateTime> = [];
 	for (const prop of vevent.properties) {
 		if (prop.name === "EXDATE") {
-			exDate.push(...irDateListToJsZdts(prop.value));
+			exDate.push(...irDateListToJsZdts(prop.value, zone));
 		}
 	}
 
@@ -260,7 +271,7 @@ export const getOccurrenceInstantsInRange = (
 			if (!recIdProp) {
 				continue;
 			}
-			const jsZdt = irSingleValueToJsZdt(recIdProp.value);
+			const jsZdt = irSingleValueToJsZdt(recIdProp.value, zone);
 			if (jsZdt) {
 				exDate.push(jsZdt);
 			}
@@ -270,7 +281,7 @@ export const getOccurrenceInstantsInRange = (
 	const rDate: Array<JSTemporal.ZonedDateTime> = [];
 	for (const prop of vevent.properties) {
 		if (prop.name === "RDATE") {
-			rDate.push(...irDateListToJsZdts(prop.value));
+			rDate.push(...irDateListToJsZdts(prop.value, zone));
 		}
 	}
 
@@ -304,12 +315,14 @@ export const getOccurrenceInstantsInRange = (
  * @param vevent     The master recurring component (VEVENT / VTODO etc.).
  * @param queryStart Inclusive start of the query time range.
  * @param queryEnd   Exclusive end of the query time range.
+ * @param zone       Zone that floating and DATE values are read in.
  */
 export const hasOccurrenceInRange = (
 	vcalRoot: IrComponent,
 	vevent: IrComponent,
 	queryStart: Temporal.Instant,
 	queryEnd: Temporal.Instant,
+	zone: ResolutionZone,
 	limits: RruleExpansionLimits = DEFAULT_RRULE_LIMITS,
 ): boolean =>
 	getOccurrenceInstantsInRange(
@@ -317,6 +330,7 @@ export const hasOccurrenceInRange = (
 		vevent,
 		queryStart,
 		queryEnd,
+		zone,
 		limits,
 		true,
 	).length > 0;

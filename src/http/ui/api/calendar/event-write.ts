@@ -12,11 +12,13 @@ import { AclService } from "#src/services/acl/service.ts";
 import { CalEditService } from "#src/services/cal-edit/service.ts";
 import type { EventFormData } from "#src/services/cal-edit/types.ts";
 import { emptyEventForm } from "#src/services/cal-edit/types.ts";
+import type { CollectionRepository } from "#src/services/collection/index.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
 import { extractAttendeeAddresses } from "#src/services/imip/build-message.ts";
 import type { ImipDispatchService } from "#src/services/imip/dispatch.ts";
 import { fireAndForgetDispatch } from "#src/services/imip/event-hook.ts";
 import { InstanceService } from "#src/services/instance/index.ts";
+import type { IanaTimezoneService } from "#src/services/timezone/iana.ts";
 import type { UserService } from "#src/services/user/index.ts";
 
 // ---------------------------------------------------------------------------
@@ -92,6 +94,8 @@ export const eventCreateHandler = (
 	| ImipDispatchService
 	| InstanceService
 	| UserService
+	| CollectionRepository
+	| IanaTimezoneService
 > =>
 	Effect.gen(function* () {
 		const principal = yield* requireAuthenticated(ctx.auth);
@@ -136,6 +140,8 @@ export const eventUpdateHandler = (
 	| ImipDispatchService
 	| InstanceService
 	| UserService
+	| CollectionRepository
+	| IanaTimezoneService
 > =>
 	Effect.gen(function* () {
 		const principal = yield* requireAuthenticated(ctx.auth);
@@ -213,6 +219,8 @@ export const eventDeleteHandler = (
 	| ImipDispatchService
 	| InstanceService
 	| UserService
+	| CollectionRepository
+	| IanaTimezoneService
 > =>
 	Effect.gen(function* () {
 		const principal = yield* requireAuthenticated(ctx.auth);

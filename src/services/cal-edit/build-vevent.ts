@@ -12,9 +12,9 @@ import type { EventFormData } from "./types.ts";
 //                caller decides whether to wrap in a VTIMEZONE later. Keeping
 //                events floating works for personal-use single-server flows.
 //
-// RRULE: builds a simple `FREQ=…[;COUNT=…][;UNTIL=…]` string. UNTIL is
-// rendered as the iCalendar basic format (`YYYYMMDDTHHMMSSZ` for date-times,
-// `YYYYMMDD` for dates). UI exposes only FREQ + a single bound.
+// RRULE: builds a simple `FREQ=…[;COUNT=…][;UNTIL=…]` string. UNTIL mirrors
+// DTSTART's form (`YYYYMMDD` for dates, floating `YYYYMMDDTHHMMSS` for
+// date-times). UI exposes only FREQ + a single bound.
 // ---------------------------------------------------------------------------
 
 const textProp = (name: string, value: string): IrProperty => ({
@@ -40,24 +40,38 @@ const tryPlainDateTime = (raw: string): Temporal.PlainDateTime | null => {
 	}
 };
 
+/**
+ * Formats the RRULE UNTIL value to match DTSTART's form.
+ *
+ * RFC 5545 section 3.3.10: UNTIL must have the same value type as DTSTART, and
+ * "if the DTSTART property is specified as a date with local time, then the
+ * UNTIL rule part MUST also be specified as a date with local time". `buildDtProp`
+ * below emits DTSTART as a DATE for all-day and as floating local time
+ * otherwise, so UNTIL follows: a bare date, or a local date-time with no `Z`.
+ *
+ * Appending `Z` here would make UNTIL an instant while DTSTART stayed floating,
+ * which shifts the end of the series by each reader's UTC offset and can add or
+ * drop the final occurrence.
+ */
 const formatRruleUntil = (raw: string, allDay: boolean): string | null => {
 	if (raw === "") {
 		return null;
 	}
+	const pad = (n: number, width = 2): string => String(n).padStart(width, "0");
 	if (allDay) {
 		const d = tryPlainDate(raw);
 		if (!d) {
 			return null;
 		}
-		return `${d.year.toString().padStart(4, "0")}${String(d.month).padStart(2, "0")}${String(d.day).padStart(2, "0")}`;
+		return `${pad(d.year, 4)}${pad(d.month)}${pad(d.day)}`;
 	}
 	const dt = tryPlainDateTime(raw);
 	if (!dt) {
 		return null;
 	}
-	const date = `${dt.year.toString().padStart(4, "0")}${String(dt.month).padStart(2, "0")}${String(dt.day).padStart(2, "0")}`;
-	const time = `${String(dt.hour).padStart(2, "0")}${String(dt.minute).padStart(2, "0")}${String(dt.second).padStart(2, "0")}`;
-	return `${date}T${time}Z`;
+	const date = `${pad(dt.year, 4)}${pad(dt.month)}${pad(dt.day)}`;
+	const time = `${pad(dt.hour)}${pad(dt.minute)}${pad(dt.second)}`;
+	return `${date}T${time}`;
 };
 
 const buildDtProp = (

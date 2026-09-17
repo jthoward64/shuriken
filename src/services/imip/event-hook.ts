@@ -1,13 +1,24 @@
 import { Effect, Option } from "effect";
+import { resolveCalendarZone } from "#src/data/icalendar/calendar-zone.ts";
+import { decodeICalendar } from "#src/data/icalendar/codec.ts";
+import type { ResolutionZone } from "#src/data/icalendar/resolve-floating.ts";
+import { UTC } from "#src/data/icalendar/resolve-floating.ts";
 import type { IrComponent } from "#src/data/ir.ts";
 import type {
 	DatabaseError,
 	DavError,
 	InternalError,
 } from "#src/domain/errors.ts";
-import { EntityId, type InstanceId, type UserId } from "#src/domain/ids.ts";
+import {
+	CollectionId,
+	EntityId,
+	type InstanceId,
+	type UserId,
+} from "#src/domain/ids.ts";
+import { CollectionRepository } from "#src/services/collection/index.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
 import { InstanceService } from "#src/services/instance/index.ts";
+import { IanaTimezoneService } from "#src/services/timezone/iana.ts";
 import { UserService } from "#src/services/user/index.ts";
 import type { ImipMethod } from "./build-message.ts";
 import { ImipDispatchService } from "./dispatch.ts";
@@ -23,6 +34,33 @@ import { ImipDispatchService } from "./dispatch.ts";
 // returns immediately while delivery happens in the background.
 // ---------------------------------------------------------------------------
 
+/**
+ * VTIMEZONE component for a resolution zone, or null when none is needed or
+ * available. UTC is self-describing, and a zone the library cannot render is
+ * not worth failing an invitation over - the anchored values still carry a
+ * TZID the recipient's own tz database can resolve.
+ */
+const resolveVtimezoneComponent = (
+	zone: ResolutionZone,
+): Effect.Effect<IrComponent | null, never, IanaTimezoneService> =>
+	Effect.gen(function* () {
+		if (zone === UTC) {
+			return null;
+		}
+		const iana = yield* IanaTimezoneService;
+		const text = iana.getVtimezone(zone);
+		if (Option.isNone(text)) {
+			return null;
+		}
+		const doc = yield* decodeICalendar(text.value).pipe(
+			Effect.catchCause(() => Effect.succeed(null)),
+		);
+		if (doc === null || doc.kind !== "icalendar") {
+			return null;
+		}
+		return doc.root.components.find((c) => c.name === "VTIMEZONE") ?? null;
+	});
+
 export const dispatchForInstance = (
 	method: ImipMethod,
 	instanceId: InstanceId,
@@ -31,7 +69,12 @@ export const dispatchForInstance = (
 ): Effect.Effect<
 	void,
 	DavError | DatabaseError | InternalError,
-	ComponentRepository | ImipDispatchService | InstanceService | UserService
+	| ComponentRepository
+	| ImipDispatchService
+	| InstanceService
+	| UserService
+	| CollectionRepository
+	| IanaTimezoneService
 > =>
 	Effect.gen(function* () {
 		const instanceSvc = yield* InstanceService;
@@ -60,6 +103,18 @@ export const dispatchForInstance = (
 			return;
 		}
 
+		// An invitation must name one instant, so floating times are anchored to
+		// the organizing calendar's zone (falling back to UTC) before they leave
+		// the server. See services/imip/build-message.ts.
+		const collRepo = yield* CollectionRepository;
+		const collOpt = yield* collRepo.findById(
+			CollectionId(instance.collectionId),
+		);
+		const zone = resolveCalendarZone({
+			collectionTzid: Option.getOrUndefined(collOpt)?.timezoneTzid,
+		});
+		const vtimezone = yield* resolveVtimezoneComponent(zone);
+
 		const { user, principal } = yield* userSvc.findById(organizerUserId);
 		const outcome = yield* dispatch.dispatch({
 			method,
@@ -67,6 +122,8 @@ export const dispatchForInstance = (
 			organizerUserId,
 			organizerEmail: user.email,
 			organizerDisplayName: principal.displayName,
+			zone,
+			vtimezone,
 			...(onlyRecipients !== undefined ? { onlyRecipients } : {}),
 		});
 		yield* Effect.logDebug("imip.dispatch result", { outcome, instanceId });

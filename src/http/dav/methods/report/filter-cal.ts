@@ -18,6 +18,7 @@ import {
 	hasOccurrenceInRange,
 	type RruleExpansionLimits,
 } from "#src/data/icalendar/recurrence/recurrence-check.ts";
+import type { ResolutionZone } from "#src/data/icalendar/resolve-floating.ts";
 import type { IrComponent, IrDocument, IrProperty } from "#src/data/ir.ts";
 import type { DavError } from "#src/domain/errors.ts";
 import { forbidden } from "#src/domain/errors.ts";
@@ -223,16 +224,24 @@ const parseChildren = <T>(
 // evaluateCalFilter
 // ---------------------------------------------------------------------------
 
+/**
+ * @param zone Zone that floating and DATE values are read in, per RFC 4791
+ *             section 7.3. Resolved by the caller from the request's
+ *             CALDAV:timezone or the collection's CALDAV:calendar-timezone.
+ */
 export const evaluateCalFilter = (
 	doc: IrDocument,
 	filter: CalFilter,
+	zone: ResolutionZone,
 	limits: RruleExpansionLimits = DEFAULT_RRULE_LIMITS,
-): boolean => evalCompFilter(doc.root, filter.compFilter, doc.root, limits);
+): boolean =>
+	evalCompFilter(doc.root, filter.compFilter, doc.root, zone, limits);
 
 const evalCompFilter = (
 	comp: IrComponent,
 	f: CompFilter,
 	vcalRoot: IrComponent,
+	zone: ResolutionZone,
 	limits: RruleExpansionLimits,
 	// The component enclosing `comp`, when there is one. Needed to evaluate a
 	// VALARM time-range, whose TRIGGER is relative to its parent component.
@@ -241,7 +250,7 @@ const evalCompFilter = (
 	if (f.name !== comp.name) {
 		// comp-filter applies to a different component name — look in children
 		return comp.components.some((child) =>
-			evalCompFilter(child, f, vcalRoot, limits, comp),
+			evalCompFilter(child, f, vcalRoot, zone, limits, comp),
 		);
 	}
 
@@ -253,14 +262,14 @@ const evalCompFilter = (
 	// Time-range filter on the component
 	if (
 		f.timeRange &&
-		!evalComponentTimeRange(comp, f.timeRange, vcalRoot, limits, parent)
+		!evalComponentTimeRange(comp, f.timeRange, vcalRoot, zone, limits, parent)
 	) {
 		return false;
 	}
 
 	// Prop filters
 	for (const pf of f.propFilters) {
-		if (!evalPropFilter(comp, pf)) {
+		if (!evalPropFilter(comp, pf, zone)) {
 			return false;
 		}
 	}
@@ -274,7 +283,7 @@ const evalCompFilter = (
 			}
 		} else if (
 			!matchingChildren.some((c) =>
-				evalCompFilter(c, cf, vcalRoot, limits, comp),
+				evalCompFilter(c, cf, vcalRoot, zone, limits, comp),
 			)
 		) {
 			return false;
@@ -284,7 +293,11 @@ const evalCompFilter = (
 	return true;
 };
 
-const evalPropFilter = (comp: IrComponent, f: PropFilter): boolean => {
+const evalPropFilter = (
+	comp: IrComponent,
+	f: PropFilter,
+	zone: ResolutionZone,
+): boolean => {
 	const props = comp.properties.filter((p) => p.name === f.name);
 
 	if (f.isNotDefined) {
@@ -296,7 +309,7 @@ const evalPropFilter = (comp: IrComponent, f: PropFilter): boolean => {
 
 	return props.some((prop) => {
 		if (f.timeRange) {
-			const instant = instantFromIrValue(prop);
+			const instant = instantFromIrValue(prop, zone);
 			if (!instant) {
 				return false;
 			} // floating time, no timezone → no match
@@ -401,24 +414,27 @@ const evalTextMatch = (text: string, tm: TextMatch): boolean => {
 const evalVtodoTimeRange = (
 	comp: IrComponent,
 	range: { start?: Temporal.Instant; end?: Temporal.Instant },
+	zone: ResolutionZone,
 ): boolean => {
 	const { start, end } = range;
-	const dtstart = getDtstartInstant(comp);
-	const due = getDtendInstant(comp); // getDtendProp checks DUE for VTODO
+	const dtstart = getDtstartInstant(comp, zone);
+	const due = getDtendInstant(comp, zone); // getDtendProp checks DUE for VTODO
 	const hasDuration = comp.properties.some((p) => p.name === "DURATION");
 
 	const completedProp = comp.properties.find((p) => p.name === "COMPLETED");
 	const completed = completedProp
-		? instantFromIrValue(completedProp)
+		? instantFromIrValue(completedProp, zone)
 		: undefined;
 
 	const createdProp = comp.properties.find((p) => p.name === "CREATED");
-	const created = createdProp ? instantFromIrValue(createdProp) : undefined;
+	const created = createdProp
+		? instantFromIrValue(createdProp, zone)
+		: undefined;
 
 	// RFC: rows with Y in DTSTART column — COMPLETED/CREATED columns are "*" (irrelevant).
 	if (dtstart !== undefined && hasDuration && due === undefined) {
 		// Y, Y, N: (start <= DTSTART+DURATION) AND ((end > DTSTART) OR (end >= DTSTART+DURATION))
-		const effectiveDue = effectiveDtend(comp, dtstart);
+		const effectiveDue = effectiveDtend(comp, dtstart, zone);
 		const startOk =
 			start === undefined ||
 			start.epochMilliseconds <= effectiveDue.epochMilliseconds;
@@ -510,14 +526,15 @@ const evalVtodoTimeRange = (
 const evalVjournalTimeRange = (
 	comp: IrComponent,
 	range: { start?: Temporal.Instant; end?: Temporal.Instant },
+	zone: ResolutionZone,
 ): boolean => {
 	const dtstartProp = getDtstartProp(comp);
 	if (!dtstartProp) {
 		return false;
 	}
-	const dtstart = instantFromIrValue(dtstartProp);
+	const dtstart = instantFromIrValue(dtstartProp, zone);
 	if (dtstart === undefined) {
-		return false; // Floating — no timezone context
+		return false; // DTSTART is not a date value
 	}
 	const { start, end } = range;
 
@@ -535,8 +552,12 @@ const evalVjournalTimeRange = (
 		return startOk && endOk;
 	}
 
-	// DATE value: effective duration is 1 day
-	const dtendPlusOneDay = dtstart.add({ hours: 24 });
+	// DATE value: effective duration is 1 day, counted on the resolution zone's
+	// calendar so a day carrying a DST change is still one day rather than 24h
+	const dtendPlusOneDay = dtstart
+		.toZonedDateTimeISO(zone)
+		.add({ days: 1 })
+		.toInstant();
 	const startOk =
 		start === undefined ||
 		start.epochMilliseconds < dtendPlusOneDay.epochMilliseconds;
@@ -557,9 +578,10 @@ const evalVjournalTimeRange = (
 const evalVfreebusyTimeRange = (
 	comp: IrComponent,
 	range: { start?: Temporal.Instant; end?: Temporal.Instant },
+	zone: ResolutionZone,
 ): boolean => {
-	const dtstart = getDtstartInstant(comp);
-	const dtend = getDtendInstant(comp);
+	const dtstart = getDtstartInstant(comp, zone);
+	const dtend = getDtendInstant(comp, zone);
 
 	if (dtstart && dtend) {
 		// Y | *: (range.start <= DTEND) AND (range.end > DTSTART)
@@ -620,19 +642,20 @@ const evalVfreebusyTimeRange = (
 const valarmTriggerInstants = (
 	alarm: IrComponent,
 	parent: IrComponent | undefined,
+	zone: ResolutionZone,
 ): ReadonlyArray<Temporal.Instant> => {
 	const trigger = alarm.properties.find((p) => p.name === "TRIGGER");
 	if (!trigger) {
 		return [];
 	}
 	if (trigger.value.type === "DATE_TIME") {
-		const abs = instantFromIrValue(trigger);
+		const abs = instantFromIrValue(trigger, zone);
 		return abs ? [abs] : [];
 	}
 	if (trigger.value.type !== "DURATION" || parent === undefined) {
 		return [];
 	}
-	const dtstart = getDtstartInstant(parent);
+	const dtstart = getDtstartInstant(parent, zone);
 	if (dtstart === undefined) {
 		return [];
 	}
@@ -640,14 +663,16 @@ const valarmTriggerInstants = (
 		trigger.parameters
 			.find((p) => p.name.toUpperCase() === "RELATED")
 			?.value.toUpperCase() === "END";
-	const anchor = relatedEnd ? effectiveDtend(parent, dtstart) : dtstart;
+	const anchor = relatedEnd ? effectiveDtend(parent, dtstart, zone) : dtstart;
 	const addDuration = (
 		base: Temporal.Instant,
 		iso: string,
 	): Temporal.Instant | undefined => {
 		try {
+			// Nominal units are counted on the resolution zone's calendar, so a
+			// "one day before" alarm stays at the same wall time across a DST change
 			return base
-				.toZonedDateTimeISO("UTC")
+				.toZonedDateTimeISO(zone)
 				.add(Temporal.Duration.from(iso))
 				.toInstant();
 		} catch {
@@ -682,12 +707,13 @@ const evalComponentTimeRange = (
 	comp: IrComponent,
 	range: { start?: Temporal.Instant; end?: Temporal.Instant },
 	vcalRoot: IrComponent,
+	zone: ResolutionZone,
 	limits: RruleExpansionLimits,
 	parent?: IrComponent,
 ): boolean => {
 	// RFC 4791 §9.10: VALARM matches if a computed trigger falls in the range.
 	if (comp.name === "VALARM") {
-		return valarmTriggerInstants(comp, parent).some((t) => {
+		return valarmTriggerInstants(comp, parent, zone).some((t) => {
 			if (range.start && t.epochMilliseconds < range.start.epochMilliseconds) {
 				return false;
 			}
@@ -705,29 +731,30 @@ const evalComponentTimeRange = (
 			comp,
 			range.start ?? OPEN_RANGE_START,
 			range.end ?? OPEN_RANGE_END,
+			zone,
 			limits,
 		);
 	}
 
 	if (comp.name === "VTODO") {
-		return evalVtodoTimeRange(comp, range);
+		return evalVtodoTimeRange(comp, range, zone);
 	}
 
 	if (comp.name === "VFREEBUSY") {
-		return evalVfreebusyTimeRange(comp, range);
+		return evalVfreebusyTimeRange(comp, range, zone);
 	}
 
 	if (comp.name === "VJOURNAL") {
-		return evalVjournalTimeRange(comp, range);
+		return evalVjournalTimeRange(comp, range, zone);
 	}
 
 	// VEVENT: DTSTART < end AND effective_DTEND > start.
-	const dtstart = getDtstartInstant(comp);
+	const dtstart = getDtstartInstant(comp, zone);
 	if (!dtstart) {
 		return true; // No DTSTART → pass conservatively
 	}
 
-	const dtend = effectiveDtend(comp, dtstart); // RFC 4791 §9.9: DTEND, or DTSTART + DURATION, or DTSTART
+	const dtend = effectiveDtend(comp, dtstart, zone); // RFC 4791 §9.9: DTEND, or DTSTART + DURATION, or DTSTART
 
 	const startMs = dtstart.epochMilliseconds;
 	const endMs = dtend.epochMilliseconds;

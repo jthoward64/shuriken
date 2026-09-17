@@ -15,6 +15,7 @@
 import { Effect, Layer, Option } from "effect";
 import { Temporal } from "temporal-polyfill";
 import { makeEtag } from "#src/data/etag.ts";
+import { resolveCalendarZone } from "#src/data/icalendar/calendar-zone.ts";
 import { encodeICalendar } from "#src/data/icalendar/codec.ts";
 import {
 	buildVfreebusyText,
@@ -1307,6 +1308,11 @@ export const SchedulingServiceLive = Layer.effect(
 						yield* repo.listOpaqueCalendarCollections(recipientId);
 
 					for (const coll of collections) {
+						// RFC 4791 5.2.2: each calendar's own CALDAV:calendar-timezone
+						// fixes how its floating and DATE values are read
+						const zone = resolveCalendarZone({
+							collectionTzid: coll.timezoneTzid,
+						});
 						const instances = yield* instanceSvc.listByCollection(
 							CollectionId(coll.id),
 						);
@@ -1342,11 +1348,11 @@ export const SchedulingServiceLive = Layer.effect(
 								// that slot from the master so we don't double-count.
 								// Emit the override's actual time as a one-shot period.
 								if (isOverride && !hasRrule) {
-									const dtstart = getDtstartInstant(comp);
+									const dtstart = getDtstartInstant(comp, zone);
 									if (!dtstart) {
 										continue;
 									}
-									const dtend = effectiveDtend(comp, dtstart);
+									const dtend = effectiveDtend(comp, dtstart, zone);
 									if (
 										dtstart.epochMilliseconds >= queryEnd.epochMilliseconds ||
 										dtend.epochMilliseconds <= queryStart.epochMilliseconds
@@ -1366,18 +1372,19 @@ export const SchedulingServiceLive = Layer.effect(
 								}
 
 								if (hasRrule) {
-									const masterStart = getDtstartInstant(comp);
+									const masterStart = getDtstartInstant(comp, zone);
 									if (!masterStart) {
 										continue;
 									}
 									const duration =
-										effectiveDtend(comp, masterStart).epochMilliseconds -
+										effectiveDtend(comp, masterStart, zone).epochMilliseconds -
 										masterStart.epochMilliseconds;
 									const starts = getOccurrenceInstantsInRange(
 										root,
 										comp,
 										queryStart,
 										queryEnd,
+										zone,
 									);
 									for (const start of starts) {
 										const end = Temporal.Instant.fromEpochMilliseconds(
@@ -1394,11 +1401,11 @@ export const SchedulingServiceLive = Layer.effect(
 										periods.push({ start: ps, end: pe, fbType });
 									}
 								} else {
-									const dtstart = getDtstartInstant(comp);
+									const dtstart = getDtstartInstant(comp, zone);
 									if (!dtstart) {
 										continue;
 									}
-									const dtend = effectiveDtend(comp, dtstart);
+									const dtend = effectiveDtend(comp, dtstart, zone);
 									if (
 										dtstart.epochMilliseconds >= queryEnd.epochMilliseconds ||
 										dtend.epochMilliseconds <= queryStart.epochMilliseconds

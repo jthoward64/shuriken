@@ -5,7 +5,8 @@
 	"license": "GPL-3.0-or-later",
 	"tasks": {
 		"start": "deno run --allow-net --allow-env --allow-read --allow-sys --env-file=.env src/index.ts",
-		"dev": "deno task ui:assets && deno run --watch --allow-net --allow-env --allow-read --allow-sys --allow-ffi --env-file=.env src/index.ts",
+		"dev": "deno task ui:assets && deno task dev:watch",
+		"dev:watch": "deno run -A --watch=src/http/ui/styles scripts/build-css.ts & deno run -A --watch=src/http/ui/client scripts/build-client-js.ts & deno run --watch=src/http/ui/static --allow-net --allow-env --allow-read --allow-sys --allow-ffi --env-file=.env src/index.ts",
 		"start:bundle": "deno run --allow-net --allow-env --allow-read --allow-sys --env-file=.env server.js",
 		"bundle": "deno bundle --unstable-bundle --platform=deno --packages bundle --minify --output=server.js src/index.ts",
 		"docker:start": "deno task migrations:run && deno task start:bundle",
@@ -53,6 +54,8 @@
 		"postcss": "npm:postcss@^8.4.49",
 		"cssnano": "npm:cssnano@^7.0.6",
 		"hash-wasm": "npm:hash-wasm@^4.12.0",
+		"sanitize-html": "npm:sanitize-html@^2.13.1",
+		"html-to-text": "npm:html-to-text@^9.0.5",
 		"jose": "npm:jose@^6.1.0",
 		"libphonenumber-js": "npm:libphonenumber-js@^1.11.0",
 		"openid-client": "npm:openid-client@^6.8.1",

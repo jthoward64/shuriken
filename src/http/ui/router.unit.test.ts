@@ -42,6 +42,7 @@ import { OidcLoginRepository } from "#src/services/session/oidc-login-repository
 import { SessionService } from "#src/services/session/service.ts";
 import { ShareLinkService } from "#src/services/share-link/service.ts";
 import { TaskEditService } from "#src/services/task-edit/service.ts";
+import { IanaTimezoneService } from "#src/services/timezone/iana.ts";
 import { TrashService } from "#src/services/trash/service.ts";
 import { UserService } from "#src/services/user/index.ts";
 import {
@@ -338,6 +339,11 @@ const stubLayers = Layer.mergeAll(
 		restoreInstance: die,
 		purgeCollectionForever: die,
 		purgeInstanceForever: die,
+	}),
+	Layer.succeed(IanaTimezoneService, {
+		getVtimezone: () => Option.none(),
+		listTzids: () => [],
+		isKnownTzid: () => false,
 	}),
 	Layer.succeed(BulkJobRepository, {
 		create: die,

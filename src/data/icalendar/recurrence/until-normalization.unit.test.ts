@@ -4,6 +4,7 @@ import { describe, it } from "@std/testing/bdd";
 import { Effect } from "effect";
 import { Temporal } from "temporal-polyfill";
 import { decodeICalendar } from "#src/data/icalendar/codec.ts";
+import { UTC } from "../resolve-floating.ts";
 import {
 	hasOccurrenceInRange,
 	normalizeRruleUntil,
@@ -17,7 +18,7 @@ import {
 describe("normalizeRruleUntil", () => {
 	it("interprets a naive datetime UNTIL as UTC when DTSTART is unknown/floating", () => {
 		expect(
-			normalizeRruleUntil("FREQ=WEEKLY;UNTIL=20260502T010000;BYDAY=TU"),
+			normalizeRruleUntil("FREQ=WEEKLY;UNTIL=20260502T010000;BYDAY=TU", UTC),
 		).toBe("FREQ=WEEKLY;UNTIL=20260502T010000Z;BYDAY=TU");
 	});
 	it("interprets a naive datetime UNTIL in DTSTART's timezone", () => {
@@ -28,17 +29,18 @@ describe("normalizeRruleUntil", () => {
 		expect(
 			normalizeRruleUntil(
 				"FREQ=WEEKLY;UNTIL=20260502T010000;BYDAY=TU",
+				UTC,
 				dtstart,
 			),
 		).toBe("FREQ=WEEKLY;UNTIL=20260502T050000Z;BYDAY=TU");
 	});
 	it("leaves an already-UTC UNTIL untouched", () => {
-		expect(normalizeRruleUntil("FREQ=WEEKLY;UNTIL=20260502T010000Z")).toBe(
+		expect(normalizeRruleUntil("FREQ=WEEKLY;UNTIL=20260502T010000Z", UTC)).toBe(
 			"FREQ=WEEKLY;UNTIL=20260502T010000Z",
 		);
 	});
 	it("leaves a DATE-only UNTIL untouched (rrule-temporal accepts it)", () => {
-		expect(normalizeRruleUntil("FREQ=WEEKLY;UNTIL=20260502")).toBe(
+		expect(normalizeRruleUntil("FREQ=WEEKLY;UNTIL=20260502", UTC)).toBe(
 			"FREQ=WEEKLY;UNTIL=20260502",
 		);
 	});
@@ -72,6 +74,7 @@ END:VCALENDAR`;
 			vevent,
 			Temporal.Instant.from("2026-06-01T00:00:00Z"),
 			Temporal.Instant.from("2026-07-01T00:00:00Z"),
+			UTC,
 		);
 		expect(after).toBe(false);
 
@@ -81,6 +84,7 @@ END:VCALENDAR`;
 			vevent,
 			Temporal.Instant.from("2026-04-01T00:00:00Z"),
 			Temporal.Instant.from("2026-05-01T00:00:00Z"),
+			UTC,
 		);
 		expect(during).toBe(true);
 	});

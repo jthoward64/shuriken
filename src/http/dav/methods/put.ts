@@ -8,6 +8,7 @@ import {
 	getDtstartInstant,
 } from "#src/data/icalendar/ir-helpers.ts";
 import { isUnboundedHighFrequencyRrule } from "#src/data/icalendar/recurrence/recurrence-check.ts";
+import { UTC } from "#src/data/icalendar/resolve-floating.ts";
 import { extractVtimezones } from "#src/data/icalendar/timezone.ts";
 import { extractUid as extractICalUid } from "#src/data/icalendar/uid.ts";
 import { decodeVCard, encodeVCard } from "#src/data/vcard/codec.ts";
@@ -271,11 +272,12 @@ export const putHandler = (
 			// Rule 3: DTEND/DUE MUST be later than DTSTART (RFC 5545 §3.8.2.2,
 			// §3.8.2.3). Servers that don't enforce this push the burden onto
 			// every querying client, so e.g. a calendar-query time-range would
-			// silently miss inverted events. Only checked when both endpoints
-			// resolve to comparable instants — floating or partial dates skip.
+			// silently miss inverted events. Ordering two endpoints of the same
+			// event is zone-independent, so UTC is used rather than resolving the
+			// collection's zone: it cannot change the sign of the comparison.
 			for (const c of nonTzComponents) {
-				const dtstart = getDtstartInstant(c);
-				const dtend = getDtendInstant(c);
+				const dtstart = getDtstartInstant(c, UTC);
+				const dtend = getDtendInstant(c, UTC);
 				if (
 					dtstart !== undefined &&
 					dtend !== undefined &&

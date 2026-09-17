@@ -7,6 +7,11 @@
 
 import { Temporal } from "temporal-polyfill";
 import { getOccurrenceInstantsInRange } from "#src/data/icalendar/recurrence/recurrence-check.ts";
+import {
+	type ResolutionZone,
+	resolveFloatingDate,
+	resolveFloatingDateTime,
+} from "#src/data/icalendar/resolve-floating.ts";
 import type { IrComponent, IrDocument, IrProperty } from "#src/data/ir.ts";
 
 const CALDAV_NS = "urn:ietf:params:xml:ns:caldav";
@@ -157,13 +162,17 @@ const parseCompSpec = (el: unknown): CompSpec => {
 export const subsetIrDocument = (
 	doc: IrDocument,
 	spec: CalendarDataSpec,
+	zone: ResolutionZone,
 ): IrDocument => {
 	const subset =
 		spec.allProps || !spec.compSpec
 			? doc
 			: { ...doc, root: subsetComponent(doc.root, spec.compSpec) };
 	if (spec.expand && subset.kind === "icalendar") {
-		return { ...subset, root: expandRecurrences(subset.root, spec.expand) };
+		return {
+			...subset,
+			root: expandRecurrences(subset.root, spec.expand, zone),
+		};
 	}
 	return subset;
 };
@@ -197,6 +206,7 @@ const EXPAND_DROPPED_PROPS = new Set([
 const expandRecurrences = (
 	vcalRoot: IrComponent,
 	expand: ExpandSpec,
+	zone: ResolutionZone,
 ): IrComponent => {
 	const expanded: Array<IrComponent> = [];
 	for (const sub of vcalRoot.components) {
@@ -217,8 +227,8 @@ const expandRecurrences = (
 		);
 		const hasRrule = sub.properties.some((p) => p.name === "RRULE");
 		if (hasRecurrenceId) {
-			if (occurrenceIntersectsRange(sub, expand)) {
-				expanded.push(rewriteToUtc(sub));
+			if (occurrenceIntersectsRange(sub, expand, zone)) {
+				expanded.push(rewriteToUtc(sub, zone));
 			}
 			continue;
 		}
@@ -226,8 +236,8 @@ const expandRecurrences = (
 			// One-shot component without recurrence: include verbatim if it
 			// intersects the range. Comparing against DTSTART only is sufficient
 			// because callers compose expand with a time-range filter.
-			if (occurrenceIntersectsRange(sub, expand)) {
-				expanded.push(rewriteToUtc(sub));
+			if (occurrenceIntersectsRange(sub, expand, zone)) {
+				expanded.push(rewriteToUtc(sub, zone));
 			}
 			continue;
 		}
@@ -237,10 +247,13 @@ const expandRecurrences = (
 			sub,
 			expand.start,
 			expand.end,
+			zone,
 		);
-		const duration = componentDuration(sub);
+		const duration = componentDuration(sub, zone);
 		for (const occurrenceStart of instants) {
-			expanded.push(buildExpandedInstance(sub, occurrenceStart, duration));
+			expanded.push(
+				buildExpandedInstance(sub, occurrenceStart, duration, zone),
+			);
 		}
 	}
 	return { ...vcalRoot, components: expanded };
@@ -254,8 +267,9 @@ const expandRecurrences = (
 const occurrenceIntersectsRange = (
 	comp: IrComponent,
 	expand: ExpandSpec,
+	zone: ResolutionZone,
 ): boolean => {
-	const dtstart = componentStartInstant(comp);
+	const dtstart = componentStartInstant(comp, zone);
 	if (dtstart === undefined) {
 		return true;
 	}
@@ -267,24 +281,26 @@ const occurrenceIntersectsRange = (
 
 const componentStartInstant = (
 	comp: IrComponent,
+	zone: ResolutionZone,
 ): Temporal.Instant | undefined => {
 	const dtstartProp = comp.properties.find((p) => p.name === "DTSTART");
 	if (!dtstartProp) {
 		return undefined;
 	}
-	return valueToInstant(dtstartProp.value);
+	return valueToInstant(dtstartProp.value, zone);
 };
 
 const componentDuration = (
 	comp: IrComponent,
+	zone: ResolutionZone,
 ): Temporal.Duration | undefined => {
 	const dtstartProp = comp.properties.find((p) => p.name === "DTSTART");
 	const dtendProp = comp.properties.find(
 		(p) => p.name === "DTEND" || p.name === "DUE",
 	);
 	if (dtstartProp && dtendProp) {
-		const startI = valueToInstant(dtstartProp.value);
-		const endI = valueToInstant(dtendProp.value);
+		const startI = valueToInstant(dtstartProp.value, zone);
+		const endI = valueToInstant(dtendProp.value, zone);
 		if (startI && endI) {
 			return endI.since(startI);
 		}
@@ -302,20 +318,16 @@ const componentDuration = (
 
 const valueToInstant = (
 	value: IrProperty["value"],
+	zone: ResolutionZone,
 ): Temporal.Instant | undefined => {
 	if (value.type === "DATE_TIME") {
 		return value.value.toInstant();
 	}
 	if (value.type === "DATE") {
-		return value.value
-			.toZonedDateTime({
-				timeZone: "UTC",
-				plainTime: "00:00:00",
-			})
-			.toInstant();
+		return resolveFloatingDate(value.value, zone);
 	}
 	if (value.type === "PLAIN_DATE_TIME") {
-		return value.value.toZonedDateTime("UTC").toInstant();
+		return resolveFloatingDateTime(value.value, zone);
 	}
 	return undefined;
 };
@@ -325,6 +337,7 @@ const buildExpandedInstance = (
 	master: IrComponent,
 	start: Temporal.Instant,
 	duration: Temporal.Duration | undefined,
+	zone: ResolutionZone,
 ): IrComponent => {
 	const preserved = master.properties.filter(
 		(p) => !EXPAND_DROPPED_PROPS.has(p.name),
@@ -343,9 +356,12 @@ const buildExpandedInstance = (
 		? [{ name: "VALUE", value: "DATE" }]
 		: [];
 
+	// Timed occurrences are emitted in UTC per RFC 4791 9.6.5, but an all-day
+	// occurrence's date is the one it falls on in the resolution zone: reading
+	// it off the UTC instant would shift the day for any zone behind UTC
 	const startZdt = start.toZonedDateTimeISO("UTC");
 	const dtstartValue: IrProperty["value"] = isAllDay
-		? { type: "DATE", value: startZdt.toPlainDate() }
+		? { type: "DATE", value: start.toZonedDateTimeISO(zone).toPlainDate() }
 		: { type: "DATE_TIME", value: startZdt };
 	newProps.push({
 		name: "DTSTART",
@@ -361,7 +377,7 @@ const buildExpandedInstance = (
 			name: master.name === "VTODO" ? "DUE" : "DTEND",
 			parameters: [...dateParams],
 			value: isAllDay
-				? { type: "DATE", value: endZdt.toPlainDate() }
+				? { type: "DATE", value: end.toZonedDateTimeISO(zone).toPlainDate() }
 				: { type: "DATE_TIME", value: endZdt },
 			isKnown: true,
 		});
@@ -383,7 +399,7 @@ const buildExpandedInstance = (
 };
 
 /** Rewrite DTSTART/DTEND/RECURRENCE-ID to UTC for an already-single-occurrence component. */
-const rewriteToUtc = (comp: IrComponent): IrComponent => {
+const rewriteToUtc = (comp: IrComponent, zone: ResolutionZone): IrComponent => {
 	const rewritten: Array<IrProperty> = [];
 	for (const prop of comp.properties) {
 		if (
@@ -395,7 +411,7 @@ const rewriteToUtc = (comp: IrComponent): IrComponent => {
 			rewritten.push(prop);
 			continue;
 		}
-		const instant = valueToInstant(prop.value);
+		const instant = valueToInstant(prop.value, zone);
 		if (instant === undefined) {
 			rewritten.push(prop);
 			continue;

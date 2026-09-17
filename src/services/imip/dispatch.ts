@@ -1,5 +1,6 @@
 import type { Effect } from "effect";
 import { Context } from "effect";
+import type { ResolutionZone } from "#src/data/icalendar/resolve-floating.ts";
 import type { IrComponent } from "#src/data/ir.ts";
 import type { InternalError } from "#src/domain/errors.ts";
 import type { UserId } from "#src/domain/ids.ts";
@@ -32,6 +33,10 @@ export interface ImipDispatchInput {
 	 * and drops the meeting.
 	 */
 	readonly onlyRecipients?: ReadonlyArray<string>;
+	/** Zone the organizing calendar anchors floating times to before sending. */
+	readonly zone?: ResolutionZone;
+	/** VTIMEZONE component for `zone`, attached when a value is anchored to it. */
+	readonly vtimezone?: IrComponent | null;
 }
 
 export interface ImipDispatchOutcome {

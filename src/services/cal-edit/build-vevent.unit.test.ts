@@ -75,4 +75,52 @@ describe("buildVeventComponent / parseVeventToForm round-trip", () => {
 			value: "FREQ=DAILY;UNTIL=20260701",
 		});
 	});
+
+	// RFC 5545 section 3.3.10: a floating DTSTART requires a floating UNTIL, so
+	// the value carries no `Z`
+	it("encodes RRULE UNTIL as floating local time for timed events", () => {
+		const v = buildVeventComponent("evt-5", {
+			...emptyEventForm,
+			summary: "X",
+			allDay: false,
+			start: "2026-06-01T09:00",
+			recurrenceFreq: "WEEKLY",
+			recurrenceUntil: "2026-07-01T17:30",
+		});
+		const rrule = v?.properties.find((p) => p.name === "RRULE");
+		expect(rrule?.value).toMatchObject({
+			type: "RECUR",
+			value: "FREQ=WEEKLY;UNTIL=20260701T173000",
+		});
+	});
+
+	// The UI only offers a date for the bound, which widens to midnight local
+	it("widens a date-only UNTIL to midnight for timed events", () => {
+		const v = buildVeventComponent("evt-6", {
+			...emptyEventForm,
+			summary: "X",
+			allDay: false,
+			start: "2026-06-01T09:00",
+			recurrenceFreq: "DAILY",
+			recurrenceUntil: "2026-07-01",
+		});
+		const rrule = v?.properties.find((p) => p.name === "RRULE");
+		expect(rrule?.value).toMatchObject({
+			type: "RECUR",
+			value: "FREQ=DAILY;UNTIL=20260701T000000",
+		});
+	});
+
+	it("drops a malformed UNTIL rather than emitting an invalid RRULE", () => {
+		const v = buildVeventComponent("evt-7", {
+			...emptyEventForm,
+			summary: "X",
+			allDay: false,
+			start: "2026-06-01T09:00",
+			recurrenceFreq: "DAILY",
+			recurrenceUntil: "not-a-date",
+		});
+		const rrule = v?.properties.find((p) => p.name === "RRULE");
+		expect(rrule?.value).toMatchObject({ type: "RECUR", value: "FREQ=DAILY" });
+	});
 });

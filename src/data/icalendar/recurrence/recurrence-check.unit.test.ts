@@ -6,6 +6,7 @@ import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
 import { Temporal } from "temporal-polyfill";
 import type { IrComponent } from "#src/data/ir.ts";
+import { UTC } from "../resolve-floating.ts";
 import {
 	getOccurrenceInstantsInRange,
 	hasOccurrenceInRange,
@@ -110,6 +111,7 @@ describe("hasOccurrenceInRange", () => {
 					vevent,
 					inst("2026-01-05T00:00:00Z"),
 					inst("2026-01-06T00:00:00Z"),
+					UTC,
 				),
 			).toBe(true);
 		});
@@ -128,6 +130,7 @@ describe("hasOccurrenceInRange", () => {
 					vevent,
 					inst("2026-01-05T00:00:00Z"),
 					inst("2026-01-06T00:00:00Z"),
+					UTC,
 				),
 			).toBe(false);
 		});
@@ -149,6 +152,7 @@ describe("hasOccurrenceInRange", () => {
 					vevent,
 					inst("2026-01-07T00:00:00Z"),
 					inst("2026-01-08T00:00:00Z"),
+					UTC,
 				),
 			).toBe(true);
 		});
@@ -167,6 +171,7 @@ describe("hasOccurrenceInRange", () => {
 					vevent,
 					inst("2026-01-11T00:00:00Z"),
 					inst("2026-01-12T00:00:00Z"),
+					UTC,
 				),
 			).toBe(false);
 		});
@@ -187,6 +192,7 @@ describe("hasOccurrenceInRange", () => {
 					vevent,
 					inst("2026-02-09T00:00:00Z"),
 					inst("2026-02-10T00:00:00Z"),
+					UTC,
 				),
 			).toBe(true);
 		});
@@ -205,6 +211,7 @@ describe("hasOccurrenceInRange", () => {
 					vevent,
 					inst("2026-02-27T00:00:00Z"),
 					inst("2026-02-28T00:00:00Z"),
+					UTC,
 				),
 			).toBe(true);
 		});
@@ -225,6 +232,7 @@ describe("hasOccurrenceInRange", () => {
 					vevent,
 					inst("2026-06-08T00:00:00Z"),
 					inst("2026-06-09T00:00:00Z"),
+					UTC,
 				),
 			).toBe(true);
 		});
@@ -242,6 +250,7 @@ describe("hasOccurrenceInRange", () => {
 					vevent,
 					inst("2026-03-01T00:00:00Z"),
 					inst("2026-04-01T00:00:00Z"),
+					UTC,
 				),
 			).toBe(false);
 		});
@@ -261,6 +270,7 @@ describe("hasOccurrenceInRange", () => {
 					vevent,
 					inst("2026-01-10T00:00:00Z"),
 					inst("2026-01-11T00:00:00Z"),
+					UTC,
 				),
 			).toBe(false);
 		});
@@ -278,6 +288,7 @@ describe("hasOccurrenceInRange", () => {
 					vevent,
 					inst("2026-01-05T00:00:00Z"),
 					inst("2026-01-06T00:00:00Z"),
+					UTC,
 				),
 			).toBe(true);
 		});
@@ -302,6 +313,7 @@ describe("hasOccurrenceInRange", () => {
 					vevent,
 					inst("2026-01-12T00:00:00Z"),
 					inst("2026-01-13T00:00:00Z"),
+					UTC,
 				),
 			).toBe(false);
 		});
@@ -325,6 +337,7 @@ describe("hasOccurrenceInRange", () => {
 					vevent,
 					inst("2026-01-05T00:00:00Z"),
 					inst("2026-01-08T00:00:00Z"),
+					UTC,
 				),
 			).toBe(true);
 		});
@@ -359,6 +372,7 @@ describe("hasOccurrenceInRange", () => {
 					master,
 					inst("2026-01-12T00:00:00Z"),
 					inst("2026-01-13T00:00:00Z"),
+					UTC,
 				),
 			).toBe(false);
 		});
@@ -390,6 +404,7 @@ describe("hasOccurrenceInRange", () => {
 					master,
 					inst("2026-01-19T00:00:00Z"),
 					inst("2026-01-20T00:00:00Z"),
+					UTC,
 				),
 			).toBe(true);
 		});
@@ -416,6 +431,7 @@ describe("hasOccurrenceInRange", () => {
 					vevent,
 					inst("2026-06-15T00:00:00Z"),
 					inst("2026-06-16T00:00:00Z"),
+					UTC,
 				),
 			).toBe(true);
 		});
@@ -440,6 +456,7 @@ describe("hasOccurrenceInRange", () => {
 					vevent,
 					inst("2026-06-12T00:00:00Z"),
 					inst("2026-06-13T00:00:00Z"),
+					UTC,
 				),
 			).toBe(true);
 		});
@@ -461,6 +478,7 @@ describe("hasOccurrenceInRange", () => {
 					vevent,
 					inst("2026-06-13T00:00:00Z"),
 					inst("2026-06-14T00:00:00Z"),
+					UTC,
 				),
 			).toBe(false);
 		});
@@ -493,6 +511,7 @@ describe("getOccurrenceInstantsInRange", () => {
 			vevent,
 			inst("2024-03-31T00:00:00Z"),
 			inst("2024-05-04T00:00:00Z"),
+			UTC,
 		);
 		expect(starts(occ)).toEqual([
 			"2024-04-11T12:30:00Z",
@@ -524,6 +543,7 @@ describe("getOccurrenceInstantsInRange", () => {
 			master,
 			inst("2024-03-31T00:00:00Z"),
 			inst("2024-05-04T00:00:00Z"),
+			UTC,
 		);
 		expect(starts(occ)).toEqual(["2024-04-11T12:30:00Z"]);
 	});

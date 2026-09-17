@@ -53,6 +53,26 @@ All application logic must use [Effect](https://effect.website) (`effect` packag
 - Styling is plain **Tailwind CSS** (`npm:tailwindcss`), built via `deno task ui:css` (`scripts/build-css.ts`). TW Elements is no longer used/referenced in the codebase — don't reintroduce it without checking with the user first.
 - A couple of legacy files still reference `handlebars`/`.hbs` (`src/http/ui/css/service.live.ts`, `src/http/ui/helpers/acl-panel.ts`) — treat these as remnants, not the current pattern, when touching that area.
 - HTMX docs are available at https://four.htmx.org/reference
+- **Shared components live in `src/http/ui/view/`** and are rendered live at
+  **`/ui/dev/components`** - check the gallery before hand-writing class strings.
+  Foundations: `form.tsx`, `button.tsx`, `display.tsx`, `overlay.tsx`, `select.tsx`.
+  Scripted controls, each with a no-JS fallback: `tag-combobox.tsx` (the default tag
+  control), `date-picker.tsx`, `search-picker.tsx`, `rich-text.tsx`; `tag-picker.tsx`
+  is a kept `<select>`-based alternative. Their browser halves are in
+  `src/http/ui/client/controls/`.
+- Many existing pages still hand-write the raw classes these components wrap. When
+  you touch a page, migrate its controls rather than adding more raw-class markup.
+- Progressive-enhancement contract: `html.js [data-nojs-only]` and
+  `html:not(.js) [data-js-only]` hide the inapplicable half. Both rules must stay
+  **unlayered and physically after `@tailwind utilities`** in
+  `src/http/ui/styles/input.css`, or Tailwind's display utilities win.
+- The scripted controls use `appearance: base-select`. Avoid `<select multiple>` and
+  `<select size>` styling - Firefox and Safari do not support those parts yet.
+- CSS and client JS are built ahead of time into `src/http/ui/static/` and read into
+  memory **once at startup**, so a UI change does nothing until `deno task ui:css` /
+  `ui:js` / `ui:assets` runs. `deno task dev` watches the built assets and restarts
+  on a rebuild; if a change appears to have no effect, suspect a stale asset before
+  suspecting the code.
 - The UI should be progressively enhanced and functional without JavaScript where possible, but can use HTMX for dynamic interactions.
 - The UI should use the same DAV APIs as external clients, rather than having separate endpoints or logic for the web UI. This ensures consistency and reduces the amount of code we have to maintain.
 - The UI should be designed with accessibility in mind, using semantic HTML and ARIA attributes as needed to ensure it is usable by all users.
@@ -86,7 +106,40 @@ Note: `Deno.serve` itself is called directly in `src/index.ts` rather than throu
 
 - Use the **Temporal API** for all date/time logic (`Temporal.PlainDate`, `Temporal.ZonedDateTime`, etc.).
 - The polyfill is **`temporal-polyfill`**, loaded globally via `import "temporal-polyfill/global"` (see `src/index.ts`, `src/domain/ids.ts`). `@js-temporal/polyfill` also appears in a small number of files (3) — prefer `temporal-polyfill` for new code and consolidate onto it if you touch those files. `rrule-temporal` is used for RRULE handling.
-- Do not use `Date`, `Date.now()`, or `new Date()` in application code. **Known violation to be aware of**: `src/data/icalendar/recurrence/recurrence-check.ts` currently converts `Temporal` instants to `Date` at a couple of call sites, likely to satisfy an RRULE library's API boundary — flag this to the user before changing it, don't assume it's accidental debt vs. a deliberate interop shim.
+- Do not use `Date`, `Date.now()`, or `new Date()` in application code. There are currently no violations in `src/`. Note that `src/data/icalendar/recurrence/recurrence-check.ts` converts `temporal-polyfill` values to `@js-temporal/polyfill` ones (via ISO strings) because `rrule-temporal` uses the latter internally — that is a deliberate interop shim between two Temporal implementations, not a `Date` conversion.
+- **Floating time (RFC 5545 form 1) is the storage stance.** Events written by this
+  server keep `DTSTART`/`DTEND` floating: no `TZID`, no `Z` (see
+  `src/services/cal-edit/build-vevent.ts`). Do not "fix" this by pinning a zone at
+  write time - it is deliberate, and an `UNTIL` must match `DTSTART`'s form
+  (RFC 5545 section 3.3.10), so it stays floating too.
+- **Resolving a floating value is the caller's decision, and is always explicit.**
+  `src/data/icalendar/resolve-floating.ts` turns a floating or DATE value into an
+  `Instant` given a `ResolutionZone` (a branded, validated TZID; unknown zones fall
+  back to UTC rather than throwing). Every helper that produces an `Instant` from a
+  component - `ir-helpers.ts`, `recurrence-check.ts`, `filter-cal.ts`,
+  `calendar-data.ts` - takes that zone as a required parameter. Never reintroduce a
+  hardcoded `"UTC"` at those sites.
+- **Which zone to use is fixed by RFC 4791 section 7.3**, applied by
+  `src/data/icalendar/calendar-zone.ts`: the request's `CALDAV:timezone` (or RFC 7809
+  `CALDAV:timezone-id`), else the collection's `CALDAV:calendar-timezone`
+  (`dav.timezone_tzid`), else UTC. Resolve it once at the edge and thread it down.
+- `cal_index` is maintained by the `maintain_cal_index_on_instance_change` SQL
+  trigger, which pins every local value to UTC: DATE at UTC midnight, floating
+  DATE-TIME at its wall time. A NULL `dtstart_utc` therefore means the component
+  has **no** DTSTART (a VTODO with only DUE, a VFREEBUSY without one), not that it
+  was floating - do not reintroduce NULL for floating values, because the RRULE
+  bucket narrowing computes offsets *from* `dtstart_utc` and a NULL there makes the
+  whole clause NULL, silently dropping the series.
+  It is only ever a **pre-filter superset** - the exact check happens in memory - so
+  a non-UTC zone widens the scanned window (`zonePaddedRange` in
+  `src/services/cal-index/repository.live.ts`) instead of reindexing.
+- An all-day (`DATE`-valued `DTSTART`) event with no `DTEND`/`DURATION` lasts
+  **one day**, not zero (RFC 5545 section 3.6.1). `effectiveDtend` applies this,
+  counting the day on the resolution zone's calendar so a DST day is still one
+  day. `build-vevent.ts` emits this shape whenever the form's end field is blank.
+- Outbound iMIP invitations are the one place floating values are anchored before
+  leaving the server (`src/services/imip/build-message.ts`): a floating time would
+  otherwise be read as the *recipient's* local time.
 - Store timestamps as timestamptz in the database; parse them back to Temporal objects at the DB boundary via custom codecs in `src/db/drizzle/schema/types.ts` (`timestampTz`, `timestampStr`). Note these codecs explicitly handle both `string` and `Date` driver values (`fromDriver(value: Date | string)`) — the underlying `@effect/sql-pg` driver does not guarantee raw-string-only delivery the way the old `drizzle-orm/postgres-js` "transparent parser" setup did, so don't assume the value is always a string without checking.
 
 ## XML

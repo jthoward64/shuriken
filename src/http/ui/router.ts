@@ -55,6 +55,8 @@ import { contactsExportStartHandler } from "#src/http/ui/api/contacts/export-sta
 import { contactsImportHandler } from "#src/http/ui/api/contacts/import.tsx";
 import { contactsMergeExecuteHandler } from "#src/http/ui/api/contacts/merge.tsx";
 import { contactsUpdateHandler } from "#src/http/ui/api/contacts/update.ts";
+import { componentEchoHandler } from "#src/http/ui/api/dev/components-echo.tsx";
+import { componentSearchHandler } from "#src/http/ui/api/dev/components-search.ts";
 import { feedsCreateHandler } from "#src/http/ui/api/feeds/create.ts";
 import { feedsDeleteHandler } from "#src/http/ui/api/feeds/delete.ts";
 import { feedsRegenerateHandler } from "#src/http/ui/api/feeds/regenerate.ts";
@@ -107,6 +109,7 @@ import { contactsPhotoHandler } from "#src/http/ui/handlers/contacts/photo.ts";
 import { contactsPreviewHandler } from "#src/http/ui/handlers/contacts/preview.tsx";
 import { contactsRelationOptionsHandler } from "#src/http/ui/handlers/contacts/relation-options.tsx";
 import { cssAssetHandler } from "#src/http/ui/handlers/css.ts";
+import { componentGalleryHandler } from "#src/http/ui/handlers/dev/components.tsx";
 import { feedsEditHandler } from "#src/http/ui/handlers/feeds/edit.tsx";
 import { feedsListHandler } from "#src/http/ui/handlers/feeds/list.tsx";
 import { feedsNewHandler } from "#src/http/ui/handlers/feeds/new.tsx";
@@ -167,6 +170,7 @@ import type { OidcLoginRepository } from "#src/services/session/oidc-login-repos
 import type { SessionService } from "#src/services/session/service.ts";
 import type { ShareLinkService } from "#src/services/share-link/service.ts";
 import type { TaskEditService } from "#src/services/task-edit/service.ts";
+import type { IanaTimezoneService } from "#src/services/timezone/iana.ts";
 import type { TrashService } from "#src/services/trash/index.ts";
 import type { UserService } from "#src/services/user/index.ts";
 import type { UserRepository } from "#src/services/user/repository.ts";
@@ -216,6 +220,7 @@ export type UiServices =
 	| ShareLinkService
 	| TaskEditService
 	| TrashService
+	| IanaTimezoneService
 	| UserService;
 
 // ---------------------------------------------------------------------------
@@ -337,6 +342,9 @@ export const uiRouter = (
 	if (pathname === "/static/reorder.js") {
 		return clientJsHandler(req, "reorder.js");
 	}
+	if (pathname === "/static/forms.js") {
+		return clientJsHandler(req, "forms.js");
+	}
 	if (pathname === "/static/embed-widget.js") {
 		return clientJsHandler(req, "embed-widget.js");
 	}
@@ -401,6 +409,11 @@ export const uiRouter = (
 		if (seg1 === "logout" && method === "POST") {
 			return handle(logoutHandler(req, ctx));
 		}
+	}
+
+	// Component gallery (see handlers/dev/components.tsx)
+	if (seg0 === "dev" && seg1 === "components" && !seg2 && method === "GET") {
+		return handle(componentGalleryHandler(req, ctx));
 	}
 
 	// Profile
@@ -583,6 +596,17 @@ export const uiRouter = (
 		}
 		if (seg1 && isUuid(seg1) && !seg2) {
 			return handle(taskEditHandler(req, ctx, InstanceId(seg1)));
+		}
+	}
+
+	// Component gallery demo endpoints — the echo panel and the SearchPicker's
+	// lookup. Static demo data only; see api/dev/components-search.ts.
+	if (seg0 === "api" && seg1 === "dev" && seg2 === "components" && !seg4) {
+		if (seg3 === "echo" && method === "POST") {
+			return handle(componentEchoHandler(req, ctx));
+		}
+		if (seg3 === "search" && method === "GET") {
+			return handle(componentSearchHandler(req, ctx));
 		}
 	}
 

@@ -42,6 +42,13 @@ export const CALENDAR_ASSETS: ReadonlyArray<UiAsset> = [
 	{ href: "/static/reorder.js", as: "script" },
 ];
 
+// Form-control enhancement bundle - the tag picker, date picker, search picker
+// and rich-text editor (see client/forms.client.ts). Loaded by pages carrying
+// any of those controls; each one degrades to a native input without it.
+export const FORM_ASSETS: ReadonlyArray<UiAsset> = [
+	{ href: "/static/forms.js", as: "script" },
+];
+
 // Contacts enhancement script (progress bar + navigate-away guard + delegated
 // behaviours) — loaded on the contacts pages that run long HTMX operations.
 export const CONTACTS_ASSETS: ReadonlyArray<UiAsset> = [

@@ -792,6 +792,15 @@ html.js [data-nojs-only] {
 	display: none;
 }
 
+/* JS-only controls: the enhanced half of a progressively-enhanced control
+   (tag picker chips, rich-text editor, date-picker trigger). Hidden until
+   `ui.js` marks the document `.js`, which happens pre-paint, so the enhanced
+   UI never flashes for no-JS users and the native fallback never flashes for
+   everyone else. */
+html:not(.js) [data-js-only] {
+	display: none;
+}
+
 /* HTMX request indicators: hidden until an ancestor/self is mid-request. The
    show rules own the flex layout, so the element needs no `display` utility of
    its own (which is exactly what would defeat the `display: none`). */
@@ -903,3 +912,520 @@ html.js form:has(input[name="id"]:checked) [data-bulk-bar] {
    embed-widget.client.ts as Tailwind class-name-prop options, not CSS — v7
    ships no visual theme CSS and sets no inline styles for anything but
    per-event colours. */
+
+/* ------------------------------------------------------------------ */
+/* Form-control component set                                          */
+/*                                                                     */
+/* Styling for the typed components in view/ (form.tsx, select.tsx,    */
+/* display.tsx, overlay.tsx) and the four scripted controls            */
+/* (tag-picker, date-picker, search-picker, rich-text).                */
+/* ------------------------------------------------------------------ */
+@layer components {
+	/* Field furniture ------------------------------------------------- */
+	.form-error {
+		color: rgb(var(--danger));
+		@apply text-xs;
+	}
+	.form-input[aria-invalid="true"],
+	.form-select[aria-invalid="true"],
+	.form-textarea[aria-invalid="true"] {
+		border-color: rgb(var(--danger));
+	}
+	.form-check {
+		@apply flex items-start gap-2.5;
+	}
+	.form-check-input {
+		accent-color: rgb(var(--brand));
+		@apply mt-0.5 h-4 w-4 rounded;
+	}
+	.form-check-text {
+		@apply space-y-0.5;
+	}
+	.form-check-label {
+		color: rgb(var(--fg));
+		@apply text-sm;
+	}
+	.form-file {
+		color: rgb(var(--muted));
+		@apply w-full text-sm;
+	}
+	.form-file::file-selector-button {
+		background-color: rgb(var(--surface-2));
+		color: rgb(var(--fg));
+		border: 1px solid rgb(var(--line-strong));
+		@apply mr-3 cursor-pointer rounded-md px-3 py-1.5 text-sm;
+	}
+	.form-file::file-selector-button:hover {
+		background-color: rgb(var(--surface));
+	}
+
+	/* Customizable select --------------------------------------------- */
+	/* Opting in is split across single-selector rules on purpose: a browser
+	   that does not know `::picker()` drops that whole rule, and pairing the
+	   two selectors would take the <select> half down with it. Everything
+	   below is additive - without support the element stays a native
+	   dropdown. */
+	.form-select {
+		appearance: base-select;
+	}
+	.form-select::picker(select) {
+		appearance: base-select;
+	}
+	/* The author-supplied trigger, ignored where base-select is unsupported */
+	.form-select > button {
+		border: 0;
+		color: inherit;
+		background: none;
+		@apply flex w-full items-center justify-between gap-2 p-0 text-left;
+	}
+	.form-select::picker-icon {
+		color: rgb(var(--subtle));
+		transition: rotate 0.15s ease;
+	}
+	.form-select:open::picker-icon {
+		rotate: 180deg;
+	}
+	.form-select::picker(select) {
+		background-color: rgb(var(--surface));
+		border: 1px solid rgb(var(--line));
+		top: calc(anchor(bottom) + 4px);
+		opacity: 0;
+		transition:
+			opacity 0.12s ease,
+			display 0.12s ease allow-discrete,
+			overlay 0.12s ease allow-discrete;
+		@apply max-h-72 overflow-auto rounded-md p-1 shadow-lg;
+	}
+	.form-select:open::picker(select) {
+		opacity: 1;
+	}
+	@starting-style {
+		.form-select:open::picker(select) {
+			opacity: 0;
+		}
+	}
+	.form-select option {
+		color: rgb(var(--fg));
+		@apply flex items-start gap-2 rounded px-2 py-1.5 text-sm;
+	}
+	.form-select option:hover,
+	.form-select option:focus {
+		background-color: rgb(var(--surface-2));
+	}
+	.form-select option:checked {
+		@apply font-medium;
+	}
+	.form-select option::checkmark {
+		color: rgb(var(--brand));
+		order: 1;
+		margin-left: auto;
+	}
+	.select-option-body {
+		@apply flex flex-col;
+	}
+	.select-option-desc {
+		color: rgb(var(--muted));
+		@apply text-xs;
+	}
+	/* The closed trigger shows the label alone; the description is picker-only.
+	   <selectedcontent> is part of the customizable-select markup and is simply
+	   newer than the linter's element list. */
+	/* biome-ignore lint/correctness/noUnknownTypeSelector: selectedcontent is a real HTML element (customizable select) */
+	selectedcontent .select-option-desc {
+		display: none;
+	}
+	/* biome-ignore lint/correctness/noUnknownTypeSelector: selectedcontent is a real HTML element (customizable select) */
+	selectedcontent .select-option-icon {
+		display: none;
+	}
+
+	/* Tag picker ------------------------------------------------------ */
+	.tag-picker {
+		@apply space-y-2;
+	}
+	.tag-picker-ui {
+		@apply space-y-2;
+	}
+	.tag-list {
+		@apply m-0 flex list-none flex-wrap gap-1.5 p-0;
+	}
+	.tag-chip {
+		background-color: rgb(var(--surface-2));
+		color: rgb(var(--fg));
+		@apply inline-flex items-center gap-1 rounded-full py-0.5 pl-2.5 pr-1 text-xs font-medium;
+	}
+	.tag-chip-remove {
+		color: rgb(var(--subtle));
+		@apply flex h-4 w-4 items-center justify-center rounded-full leading-none;
+	}
+	.tag-chip-remove:hover {
+		background-color: rgb(var(--danger) / 0.15);
+		color: rgb(var(--danger));
+	}
+	.tag-picker-empty {
+		color: rgb(var(--muted));
+		@apply text-xs;
+	}
+	.tag-picker-add {
+		@apply flex flex-wrap items-center gap-2;
+	}
+	.tag-picker-add > .form-select {
+		@apply w-auto min-w-[10rem];
+	}
+	.tag-picker-custom {
+		@apply w-auto min-w-[8rem];
+	}
+
+	/* Date field and range -------------------------------------------- */
+	.datefield {
+		@apply relative;
+	}
+	.datefield-input {
+		@apply pr-9;
+	}
+	.datefield-trigger {
+		color: rgb(var(--subtle));
+		@apply absolute inset-y-0 right-0 flex w-9 items-center justify-center;
+	}
+	.datefield-trigger:hover {
+		color: rgb(var(--fg));
+	}
+	/* Our trigger stands in for the native indicator once the script runs */
+	html.js .datefield-input::-webkit-calendar-picker-indicator {
+		display: none;
+	}
+	.date-range {
+		@apply grid gap-3 sm:grid-cols-2;
+	}
+	.date-range-part {
+		@apply space-y-1.5;
+	}
+
+	/* Calendar popover ------------------------------------------------ */
+	/* No `display` on the element itself: the UA hides a closed popover with
+	   `display: none`, which an author `display` would override, leaving the
+	   panel permanently visible in the corner. Layout lives on the
+	   `:popover-open` rule below, same as the other popovers above.
+	   `inset: auto` overrides the popover UA default (`inset: 0; margin: auto`,
+	   which would center it) so the JS-set top/left win. */
+	.datepicker {
+		position: fixed;
+		inset: auto;
+		margin: 0;
+		background-color: rgb(var(--surface));
+		border: 1px solid rgb(var(--line));
+		color: rgb(var(--fg));
+		@apply z-50 rounded-lg p-3 shadow-xl;
+	}
+	.datepicker:popover-open {
+		@apply flex gap-3;
+	}
+	/* Two months plus a preset column is wide, and a range with times is tall.
+	   Cap both against the viewport so the panel can always be fully reached,
+	   whatever `placeUnder` computes. */
+	.datepicker {
+		max-width: calc(100vw - 1rem);
+		max-height: calc(100dvh - 1rem);
+		overflow: auto;
+	}
+	.datepicker-presets {
+		border-right: 1px solid rgb(var(--line));
+		@apply flex w-36 shrink-0 flex-col gap-0.5 pr-3;
+	}
+	.datepicker-preset {
+		color: rgb(var(--muted));
+		@apply rounded px-2 py-1.5 text-left text-xs;
+	}
+	.datepicker-preset:hover {
+		background-color: rgb(var(--surface-2));
+		color: rgb(var(--fg));
+	}
+	.datepicker-body {
+		@apply space-y-2;
+	}
+	.datepicker-nav {
+		@apply flex items-center justify-between gap-2;
+	}
+	.datepicker-nav-btn {
+		color: rgb(var(--muted));
+		@apply flex h-7 w-7 items-center justify-center rounded text-base leading-none;
+	}
+	.datepicker-nav-btn:hover {
+		background-color: rgb(var(--surface-2));
+		color: rgb(var(--fg));
+	}
+	.datepicker-title {
+		@apply text-sm font-medium;
+	}
+	/* Wraps the second month below the first rather than hiding it, so the
+	   heading's month range always matches what is on screen */
+	.datepicker-months {
+		@apply flex flex-wrap gap-4;
+	}
+	.datepicker-grid {
+		@apply grid grid-cols-7 gap-0.5;
+	}
+	.datepicker-month-label {
+		color: rgb(var(--muted));
+		@apply col-span-7 pb-1 text-center text-xs font-medium;
+	}
+	.datepicker-weekday {
+		color: rgb(var(--subtle));
+		@apply flex h-7 w-8 items-center justify-center text-[0.65rem] font-medium uppercase;
+	}
+	.datepicker-day {
+		color: rgb(var(--fg));
+		@apply flex h-8 w-8 items-center justify-center rounded text-xs;
+	}
+	.datepicker-day:hover:not(:disabled) {
+		background-color: rgb(var(--surface-2));
+	}
+	.datepicker-day.is-outside {
+		color: rgb(var(--subtle));
+	}
+	.datepicker-day.is-today {
+		color: rgb(var(--brand));
+		@apply font-bold;
+	}
+	.datepicker-day.is-in-range {
+		background-color: rgb(var(--brand) / 0.14);
+		@apply rounded-none;
+	}
+	.datepicker-day.is-selected {
+		background-color: rgb(var(--brand));
+		color: rgb(var(--brand-fg));
+		@apply font-medium;
+	}
+	.datepicker-day:disabled {
+		@apply cursor-not-allowed opacity-40;
+	}
+	.datepicker-time {
+		@apply flex gap-2;
+	}
+	.datepicker-time-label {
+		color: rgb(var(--muted));
+		@apply flex flex-1 flex-col gap-1 text-xs;
+	}
+	.datepicker-zone-note {
+		color: rgb(var(--muted));
+		@apply max-w-[16rem] text-xs;
+	}
+	.date-range-note {
+		@apply col-span-full;
+	}
+	.datepicker-actions {
+		@apply flex justify-end gap-2 pt-1;
+	}
+
+	/* Below the two-month width, the preset column becomes a wrapped row above
+	   the calendar instead of a sidebar squeezing it. */
+	@media (max-width: 34rem) {
+		.datepicker:popover-open {
+			@apply flex-col;
+		}
+		.datepicker-presets {
+			border-right: 0;
+			border-bottom: 1px solid rgb(var(--line));
+			@apply w-auto flex-row flex-wrap gap-1 pb-2 pr-0;
+		}
+	}
+
+	/* Combobox listbox ------------------------------------------------ */
+	/* Shared by the search picker and the tag combobox; both anchor it to a
+	   `relative` wrapper, so the popup itself needs no per-host variant. */
+	.listbox {
+		background-color: rgb(var(--surface));
+		border: 1px solid rgb(var(--line));
+		@apply absolute inset-x-0 top-full z-40 mt-1 max-h-64 list-none overflow-auto rounded-md p-1 shadow-lg;
+	}
+	.listbox-option {
+		color: rgb(var(--fg));
+		@apply flex cursor-pointer flex-col rounded px-2 py-1.5 text-sm;
+	}
+	.listbox-option:hover,
+	.listbox-option.is-active {
+		background-color: rgb(var(--surface-2));
+	}
+	.listbox-option-desc {
+		color: rgb(var(--muted));
+		@apply text-xs;
+	}
+	.listbox-empty,
+	.listbox-more {
+		color: rgb(var(--muted));
+		@apply px-2 py-1.5 text-xs;
+	}
+
+	/* Search picker --------------------------------------------------- */
+	.search-picker {
+		@apply relative;
+	}
+
+	/* Tag combobox ---------------------------------------------------- */
+	/* One bounded field: the box carries the border and focus ring, the tokens
+	   sit inside it, and the entry grows to fill whatever row space is left. */
+	.tag-combobox-ui {
+		@apply relative;
+	}
+	.tag-combobox-box {
+		background-color: rgb(var(--surface));
+		border: 1px solid rgb(var(--line-strong));
+		@apply flex w-full cursor-text flex-wrap items-center gap-1.5 rounded-md px-2 py-1.5;
+	}
+	/* The same focus treatment as .form-input, so the box reads as an ordinary
+	   field alongside the other controls. */
+	.tag-combobox-box:focus-within {
+		border-color: rgb(var(--ring));
+		--tw-ring-color: rgb(var(--ring) / 0.35);
+		@apply ring-2 ring-offset-0;
+	}
+	.tag-combobox-entry {
+		color: rgb(var(--fg));
+		background: none;
+		border: 0;
+		min-width: 8rem;
+		@apply flex-1 py-0.5 text-sm placeholder:text-subtle;
+	}
+	/* The box carries the focus treatment for the whole control, so the entry
+	   must paint nothing of its own: an inner ring would sit inside the box and
+	   move every time a token is added or removed. All three decorations are
+	   cleared, since the ring is a box-shadow rather than an outline and the
+	   UA's own focus indicator is an outline. */
+	.tag-combobox-entry:focus,
+	.tag-combobox-entry:focus-visible {
+		outline: none;
+		box-shadow: none;
+		border-color: transparent;
+	}
+	.tag-token {
+		background-color: rgb(var(--surface-2));
+		color: rgb(var(--fg));
+		@apply inline-flex max-w-full items-center gap-1 rounded py-0.5 pl-2 pr-1 text-xs font-medium;
+	}
+	.tag-token-label {
+		@apply truncate;
+	}
+	.tag-token-remove {
+		color: rgb(var(--subtle));
+		@apply flex h-4 w-4 shrink-0 items-center justify-center rounded leading-none;
+	}
+	.tag-token-remove:hover {
+		background-color: rgb(var(--danger) / 0.15);
+		color: rgb(var(--danger));
+	}
+
+	/* Rich text ------------------------------------------------------- */
+	.richtext-toolbar {
+		background-color: rgb(var(--surface-2));
+		border: 1px solid rgb(var(--line-strong));
+		border-bottom: 0;
+		@apply flex flex-wrap items-center gap-0.5 rounded-t-md p-1;
+	}
+	.richtext-btn {
+		color: rgb(var(--muted));
+		@apply flex h-7 min-w-[1.75rem] items-center justify-center rounded px-1.5 text-xs;
+	}
+	.richtext-btn:hover {
+		background-color: rgb(var(--surface));
+		color: rgb(var(--fg));
+	}
+	.richtext-btn[aria-pressed="true"] {
+		background-color: rgb(var(--surface));
+		color: rgb(var(--brand));
+	}
+	.richtext-sep {
+		background-color: rgb(var(--line));
+		@apply mx-1 h-4 w-px;
+	}
+	.richtext-surface {
+		@apply overflow-auto rounded-t-none;
+	}
+	.richtext-surface:focus {
+		border-color: rgb(var(--ring));
+		--tw-ring-color: rgb(var(--ring) / 0.35);
+		@apply outline-none ring-2;
+	}
+	.richtext.is-empty .richtext-surface::before {
+		content: attr(data-placeholder);
+		color: rgb(var(--subtle));
+		@apply pointer-events-none;
+	}
+
+	/* Shared typography for editor content and its rendered output */
+	.richtext-surface h1,
+	.rich-content h1 {
+		@apply mb-1 mt-2 text-xl font-semibold;
+	}
+	.richtext-surface h2,
+	.rich-content h2 {
+		@apply mb-1 mt-2 text-lg font-semibold;
+	}
+	.richtext-surface h3,
+	.rich-content h3 {
+		@apply mb-1 mt-2 text-base font-semibold;
+	}
+	.richtext-surface p,
+	.rich-content p {
+		@apply my-1;
+	}
+	.richtext-surface ul,
+	.rich-content ul {
+		@apply my-1 list-disc pl-5;
+	}
+	.richtext-surface ol,
+	.rich-content ol {
+		@apply my-1 list-decimal pl-5;
+	}
+	.richtext-surface blockquote,
+	.rich-content blockquote {
+		border-left: 3px solid rgb(var(--line-strong));
+		color: rgb(var(--muted));
+		@apply my-1 pl-3 italic;
+	}
+	.richtext-surface pre,
+	.rich-content pre {
+		background-color: rgb(var(--surface-2));
+		@apply my-1 overflow-auto rounded p-2 text-xs;
+	}
+	.richtext-surface a,
+	.rich-content a {
+		color: rgb(var(--brand));
+		@apply underline;
+	}
+
+	/* Empty state ----------------------------------------------------- */
+	.empty-state {
+		border: 1px dashed rgb(var(--line-strong));
+		@apply rounded-md px-6 py-8 text-center;
+	}
+	.empty-state-title {
+		color: rgb(var(--fg));
+		@apply text-sm font-medium;
+	}
+	.empty-state-desc {
+		color: rgb(var(--muted));
+		@apply mt-1 text-sm;
+	}
+	.empty-state-action {
+		@apply mt-4 flex justify-center;
+	}
+
+	/* Modal furniture ------------------------------------------------- */
+	.modal-header {
+		@apply mb-3 flex items-start justify-between gap-4;
+	}
+	.modal-close {
+		color: rgb(var(--subtle));
+		@apply flex h-7 w-7 items-center justify-center rounded text-lg leading-none;
+	}
+	.modal-close:hover {
+		background-color: rgb(var(--surface-2));
+		color: rgb(var(--fg));
+	}
+	.modal-body {
+		@apply space-y-4;
+	}
+	.modal-footer {
+		@apply mt-4 flex justify-end gap-2;
+	}
+}

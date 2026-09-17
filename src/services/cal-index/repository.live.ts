@@ -4,6 +4,10 @@ import { Effect, Layer } from "effect";
 import { RRuleTemporal } from "rrule-temporal";
 import type { Temporal } from "temporal-polyfill";
 import { normalizeRruleUntil } from "#src/data/icalendar/recurrence/recurrence-check.ts";
+import {
+	type ResolutionZone,
+	UTC,
+} from "#src/data/icalendar/resolve-floating.ts";
 import { DatabaseClient } from "#src/db/client.ts";
 import { calIndex, davInstance } from "#src/db/drizzle/schema/index.ts";
 import { runDbQuery } from "#src/db/query.ts";
@@ -15,6 +19,33 @@ import { type CalComponentType, CalIndexRepository } from "./repository.ts";
 // ---------------------------------------------------------------------------
 
 const MS_PER_DAY = 86_400_000;
+// UTC offsets run from -12:00 to +14:00, so a wall time indexed at UTC sits at
+// most 14 hours from the instant it names in some other zone.
+const MAX_ZONE_OFFSET_HOURS = 14;
+
+/**
+ * Widen a query window to stay a correct superset for a non-UTC zone.
+ *
+ * The `maintain_cal_index_on_instance_change` trigger pins both kinds of local
+ * value to UTC: an all-day DTSTART at UTC midnight, a floating DTSTART at its
+ * wall time. Either can sit up to a whole offset away from the instant it names
+ * in the resolution zone, and a narrow window would then drop it. Widening by
+ * the largest possible offset keeps the pre-filter a superset without
+ * reindexing anything; the in-memory pass still does the exact check.
+ */
+const zonePaddedRange = (
+	start: Temporal.Instant | null,
+	end: Temporal.Instant | null,
+	zone: ResolutionZone,
+): { start: Temporal.Instant | null; end: Temporal.Instant | null } => {
+	if (zone === UTC) {
+		return { start, end };
+	}
+	return {
+		start: start?.subtract({ hours: MAX_ZONE_OFFSET_HOURS }) ?? null,
+		end: end?.add({ hours: MAX_ZONE_OFFSET_HOURS }) ?? null,
+	};
+};
 // A span this long covers every day-of-month / every month, so the
 // corresponding narrowing can add nothing.
 const SPAN_DAYS_COVERING_ALL_DAYS = 28;
@@ -175,9 +206,11 @@ const nonRecurringOverlapClause = (
 					sql`${calIndex.dtendUtc} > ${start.toString()}::timestamptz`,
 				)
 			: undefined,
-		// A NULL dtstart_utc must still be a candidate (e.g. a VTODO with only
-		// DUE, or a VFREEBUSY without DTSTART); the in-memory pass does the exact
-		// check. VEVENTs always carry DTSTART so this never loosens event queries.
+		// A NULL dtstart_utc means the component has no DTSTART at all (a VTODO
+		// with only DUE, a VFREEBUSY without one), so it must stay a candidate and
+		// the in-memory pass does the exact check. Floating DTSTARTs are indexed
+		// at their wall time pinned to UTC and narrowed by zonePaddedRange above,
+		// so they are NOT in this branch - they filter like any other row.
 		end !== null
 			? sql`(${calIndex.dtstartUtc} IS NULL OR ${calIndex.dtstartUtc} < ${end.toString()}::timestamptz)`
 			: undefined,
@@ -210,8 +243,9 @@ const findByTimeRange = Effect.fn("CalIndexRepository.findByTimeRange")(
 	function* (
 		collectionId: CollectionId,
 		componentType: CalComponentType,
-		start: Temporal.Instant | null,
-		end: Temporal.Instant | null,
+		rangeStart: Temporal.Instant | null,
+		rangeEnd: Temporal.Instant | null,
+		zone: ResolutionZone,
 	) {
 		yield* Effect.annotateCurrentSpan({
 			"collection.id": collectionId,
@@ -221,6 +255,7 @@ const findByTimeRange = Effect.fn("CalIndexRepository.findByTimeRange")(
 			collectionId,
 			componentType,
 		});
+		const { start, end } = zonePaddedRange(rangeStart, rangeEnd, zone);
 		return yield* runDbQuery((db) =>
 			db
 				.selectDistinct({ instanceId: davInstance.id })
@@ -293,8 +328,9 @@ const findOverlappingRange = Effect.fn(
 	function* (
 		collectionId: CollectionId,
 		componentType: CalComponentType,
-		start: Temporal.Instant | null,
-		end: Temporal.Instant | null,
+		rangeStart: Temporal.Instant | null,
+		rangeEnd: Temporal.Instant | null,
+		zone: ResolutionZone,
 	) {
 		yield* Effect.annotateCurrentSpan({
 			"collection.id": collectionId,
@@ -304,6 +340,7 @@ const findOverlappingRange = Effect.fn(
 			collectionId,
 			componentType,
 		});
+		const { start, end } = zonePaddedRange(rangeStart, rangeEnd, zone);
 		return yield* runDbQuery((db) =>
 			db
 				.selectDistinct({ instanceId: davInstance.id })
@@ -377,7 +414,7 @@ const indexRruleOccurrences = Effect.fn(
 			let sample: ReturnType<RRuleTemporal["all"]>;
 			try {
 				const rule = new RRuleTemporal({
-					rruleString: normalizeRruleUntil(row.rruleText, dtstart),
+					rruleString: normalizeRruleUntil(row.rruleText, UTC, dtstart),
 					dtstart,
 				});
 				// Sample 24 occurrences — sufficient to determine the pattern:

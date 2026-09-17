@@ -1,6 +1,7 @@
 import type { Effect } from "effect";
 import { Context } from "effect";
 import type { Temporal } from "temporal-polyfill";
+import type { ResolutionZone } from "#src/data/icalendar/resolve-floating.ts";
 import type { DatabaseError } from "#src/domain/errors.ts";
 import type { CollectionId, EntityId } from "#src/domain/ids.ts";
 
@@ -31,12 +32,18 @@ export interface CalIndexRepositoryShape {
 	 * afterwards.
 	 *
 	 * Pass null for start or end to leave that side open-ended.
+	 *
+	 * `zone` is the zone floating and DATE values resolve in for this request
+	 * (RFC 4791 section 7.3). Indexed instants are pinned to UTC by the
+	 * `maintain_cal_index_on_instance_change` trigger, so a non-UTC zone widens
+	 * the scanned window to stay a superset. See {@link zonePaddedRange}.
 	 */
 	readonly findByTimeRange: (
 		collectionId: CollectionId,
 		componentType: CalComponentType,
 		start: Temporal.Instant | null,
 		end: Temporal.Instant | null,
+		zone: ResolutionZone,
 	) => Effect.Effect<ReadonlyArray<string>, DatabaseError>;
 
 	/**
@@ -58,13 +65,15 @@ export interface CalIndexRepositoryShape {
 	 *
 	 * Never produces false negatives — callers must still apply an exact pass
 	 * (e.g. occurrence expansion) to discard false positives. `start`/`end` may
-	 * be null to leave that side open-ended.
+	 * be null to leave that side open-ended. `zone` widens the window the same
+	 * way it does for {@link CalIndexRepositoryShape.findByTimeRange}.
 	 */
 	readonly findOverlappingRange: (
 		collectionId: CollectionId,
 		componentType: CalComponentType,
 		start: Temporal.Instant | null,
 		end: Temporal.Instant | null,
+		zone: ResolutionZone,
 	) => Effect.Effect<ReadonlyArray<string>, DatabaseError>;
 
 	/**

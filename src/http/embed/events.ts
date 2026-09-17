@@ -13,6 +13,7 @@ import {
 } from "#src/http/ui/api/calendar/collect-events.ts";
 import { parseInstantParam } from "#src/http/ui/api/calendar/events.ts";
 import type { CalIndexRepository } from "#src/services/cal-index/index.ts";
+import type { CollectionRepository } from "#src/services/collection/index.ts";
 import type { ComponentRepository } from "#src/services/component/index.ts";
 import type { InstanceRepository } from "#src/services/instance/repository.ts";
 import type { ShareLinkCalendarRow } from "#src/services/share-link/repository.ts";
@@ -33,7 +34,10 @@ export const embedCalendarEventsHandler = (
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError | InternalError,
-	CalIndexRepository | ComponentRepository | InstanceRepository
+	| CalIndexRepository
+	| ComponentRepository
+	| InstanceRepository
+	| CollectionRepository
 > =>
 	Effect.gen(function* () {
 		const rangeStart = parseInstantParam(url.searchParams.get("start"));

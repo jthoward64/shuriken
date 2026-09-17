@@ -1,5 +1,6 @@
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import { Temporal } from "temporal-polyfill";
+import { resolveCalendarZone } from "#src/data/icalendar/calendar-zone.ts";
 import type { ShareLinkVisibility } from "#src/db/drizzle/schema/index.ts";
 import type {
 	DatabaseError,
@@ -14,6 +15,7 @@ import {
 } from "#src/domain/ids.ts";
 import { parseVeventToForm } from "#src/services/cal-edit/parse-vevent.ts";
 import { CalIndexRepository } from "#src/services/cal-index/index.ts";
+import { CollectionRepository } from "#src/services/collection/index.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
 import {
 	InstanceRepository,
@@ -139,17 +141,29 @@ export const collectCalendarEvents = (
 ): Effect.Effect<
 	ReadonlyArray<CalendarEventView>,
 	DavError | DatabaseError | InternalError,
-	CalIndexRepository | ComponentRepository | InstanceRepository
+	| CalIndexRepository
+	| ComponentRepository
+	| InstanceRepository
+	| CollectionRepository
 > =>
 	Effect.gen(function* () {
 		const instRepo = yield* InstanceRepository;
 		const calIdx = yield* CalIndexRepository;
+
+		// The index pins all-day starts to UTC midnight, so the pre-filter needs
+		// the calendar's own zone to stay a superset (RFC 4791 5.2.2)
+		const collRepo = yield* CollectionRepository;
+		const collOpt = yield* collRepo.findById(collectionId);
+		const zone = resolveCalendarZone({
+			collectionTzid: Option.getOrUndefined(collOpt)?.timezoneTzid,
+		});
 
 		const candidateIds = yield* calIdx.findOverlappingRange(
 			collectionId,
 			"VEVENT",
 			rangeStart,
 			rangeEnd,
+			zone,
 		);
 		const instances = yield* instRepo.findByIds(
 			candidateIds.map((id) => InstanceId(id as UuidString)),

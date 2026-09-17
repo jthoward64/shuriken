@@ -5,7 +5,8 @@
 // subsetting per the <C:calendar-data> element in the request body.
 // ---------------------------------------------------------------------------
 
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
+import { resolveCalendarZone } from "#src/data/icalendar/calendar-zone.ts";
 import { encodeICalendar } from "#src/data/icalendar/codec.ts";
 import { redactDocumentToBusyOnly } from "#src/data/icalendar/visibility.ts";
 import type { ClarkName, IrDocument } from "#src/data/ir.ts";
@@ -14,6 +15,7 @@ import { methodNotAllowed, unauthorized } from "#src/domain/errors.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { AclService } from "#src/services/acl/index.ts";
+import { CollectionRepository } from "#src/services/collection/index.ts";
 import type { ComponentRepository } from "#src/services/component/index.ts";
 import type { InstanceService } from "#src/services/instance/index.ts";
 import { IanaTimezoneService } from "#src/services/timezone/iana.ts";
@@ -37,7 +39,11 @@ export const calendarMultigetHandler = (
 ): Effect.Effect<
 	Response,
 	DavError | DatabaseError,
-	InstanceService | ComponentRepository | AclService | IanaTimezoneService
+	| InstanceService
+	| ComponentRepository
+	| AclService
+	| IanaTimezoneService
+	| CollectionRepository
 > =>
 	Effect.gen(function* () {
 		if (path.kind !== "collection") {
@@ -81,6 +87,14 @@ export const calendarMultigetHandler = (
 				: undefined;
 		const spec = parseCalendarDataSpec(dataTree);
 
+		// RFC 4791 7.3: multiget carries no timezone of its own, so floating and
+		// DATE values are read in the collection's CALDAV:calendar-timezone
+		const collRepo = yield* CollectionRepository;
+		const collOpt = yield* collRepo.findById(path.collectionId);
+		const zone = resolveCalendarZone({
+			collectionTzid: Option.getOrUndefined(collOpt)?.timezoneTzid,
+		});
+
 		// RFC 7809 §3.1.3: resolve the VTIMEZONE stripping function once per request.
 		const ianaSvc = yield* IanaTimezoneService;
 		const stripTimezones =
@@ -103,6 +117,7 @@ export const calendarMultigetHandler = (
 						subsetIrDocument(
 							hasFullRead ? doc : redactDocumentToBusyOnly(doc),
 							spec,
+							zone,
 						),
 					),
 				),
