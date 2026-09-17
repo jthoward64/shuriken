@@ -1,5 +1,5 @@
 import type { VNode } from "preact";
-import { Badge } from "#src/http/ui/view/components/display.tsx";
+import { Badge, Card } from "#src/http/ui/view/components/display.tsx";
 
 // ---------------------------------------------------------------------------
 // Echo panel for the component gallery - shows exactly what the server parsed
@@ -60,14 +60,15 @@ export const ComponentEchoPanel = ({
 }: {
 	data: ComponentEchoData;
 }): VNode => (
-	<div id="demo-echo" class="card card-pad space-y-4">
-		<div class="flex items-center justify-between gap-4">
-			<h2 class="card-title">What the server received</h2>
+	<Card
+		class="space-y-4"
+		title="What the server received"
+		actions={
 			<Badge tone={data.scripted ? "brand" : "neutral"}>
 				{data.scripted ? "scripted path" : "no-JS path"}
 			</Badge>
-		</div>
-
+		}
+	>
 		<div class="divide-y divide-line">
 			<Line field="categoriesCsv">
 				<TagList tags={data.tags} />
@@ -116,5 +117,5 @@ export const ComponentEchoPanel = ({
 				/>
 			</div>
 		)}
-	</div>
+	</Card>
 );

@@ -11,8 +11,16 @@ import type {
 	ContactServiceValue,
 	ContactTypedValue,
 } from "#src/services/card-edit/types.ts";
+import { Button, LinkButton } from "../../components/button.tsx";
 import { cx } from "../../components/cx.ts";
-import { Card } from "../../components/display.tsx";
+import { Alert, Card } from "../../components/display.tsx";
+import {
+	FileInput,
+	Textarea,
+	TextInput,
+	type TextInputType,
+} from "../../components/form/form.tsx";
+import { Select } from "../../components/form/select.tsx";
 
 import { CONTACTS_POPOVER_ID, ContactsPopoverHeader } from "./popover.tsx";
 import { RELATION_NAME_FIELD, relationOptionsFor } from "./relations.tsx";
@@ -152,20 +160,20 @@ const TextField = ({
 	label: ComponentChildren;
 	name: string;
 	value: string;
-	type?: string;
+	type?: TextInputType;
 	placeholder?: string;
 	required?: boolean;
 	class?: string;
 }): VNode => (
 	<label class={cx("form-group block", cls)}>
 		<span class="form-label">{label}</span>
-		<input
+		<TextInput
 			type={type}
 			name={name}
 			value={value}
 			placeholder={placeholder}
 			required={required}
-			class="form-input mt-1"
+			class="mt-1"
 		/>
 	</label>
 );
@@ -185,13 +193,7 @@ const SelectField = ({
 }): VNode => (
 	<label class={cx("form-group block", cls)}>
 		<span class="form-label">{label}</span>
-		<select name={name} class="form-select mt-1">
-			{options.map((o) => (
-				<option key={o.value} value={o.value} selected={value === o.value}>
-					{o.label}
-				</option>
-			))}
-		</select>
+		<Select name={name} options={options} value={value} class="mt-1" />
 	</label>
 );
 
@@ -228,9 +230,9 @@ const RowSection = ({
 			{rows}
 		</div>
 		<template data-row-template={field}>{blankRow}</template>
-		<button type="button" class="btn btn-secondary btn-sm" data-add-row={field}>
+		<Button size="sm" data-add-row={field}>
 			{addLabel}
-		</button>
+		</Button>
 	</Section>
 );
 
@@ -257,14 +259,9 @@ const splitKnownTypes = (
 };
 
 const RemoveRowButton = (): VNode => (
-	<button
-		type="button"
-		class="btn btn-secondary btn-sm"
-		data-remove-row
-		aria-label="Remove this row"
-	>
+	<Button size="sm" data-remove-row aria-label="Remove this row">
 		Remove
-	</button>
+	</Button>
 );
 
 const PreferredCheckbox = ({
@@ -306,19 +303,18 @@ const TypedValueRow = ({
 			data-nojs-only={nojsOnly || undefined}
 		>
 			<div class="flex flex-wrap gap-2 items-start">
-				<input
+				<TextInput
 					type={field === "emails" ? "email" : "tel"}
 					name={`${field}[].value`}
 					value={value.value}
 					placeholder={field === "emails" ? "address@example.com" : ""}
-					class="form-input flex-1 min-w-[12rem]"
+					class="flex-1 min-w-[12rem]"
 				/>
-				<input
-					type="text"
+				<TextInput
 					name={`${field}[].label`}
 					value={value.label ?? ""}
 					placeholder="Label"
-					class="form-input w-32"
+					class="w-32"
 				/>
 				<RemoveRowButton />
 			</div>
@@ -334,14 +330,16 @@ const TypedValueRow = ({
 						{opt}
 					</label>
 				))}
+				{/* Rows are cloned from a <template>, so there is no unique id to
+				    point a `for` at - the label wraps its control instead, which
+				    also keeps Biome's noLabelWithoutControl satisfied. */}
 				<label class="inline-flex items-center gap-1">
 					<span class="form-hint">Other:</span>
-					<input
-						type="text"
+					<TextInput
 						value={other}
 						placeholder="custom, tags"
-						class="form-input w-28"
 						data-type-other
+						class="w-28"
 					/>
 				</label>
 				<PreferredCheckbox field={field} preferred={value.preferred} />
@@ -374,19 +372,17 @@ const ServiceRow = ({
 		data-row-item
 		data-nojs-only={nojsOnly || undefined}
 	>
-		<input
-			type="text"
+		<TextInput
 			name={`${field}[].service`}
 			value={value.service}
 			placeholder={servicePlaceholder}
-			class="form-input w-48"
+			class="w-48"
 		/>
-		<input
-			type="text"
+		<TextInput
 			name={`${field}[].value`}
 			value={value.value}
 			placeholder={valuePlaceholder}
-			class="form-input flex-1 min-w-[12rem]"
+			class="flex-1 min-w-[12rem]"
 		/>
 		<RemoveRowButton />
 	</div>
@@ -404,12 +400,12 @@ const UrlRow = ({
 		data-row-item
 		data-nojs-only={nojsOnly || undefined}
 	>
-		<input
+		<TextInput
 			type="url"
 			name="urls[]"
 			value={value}
 			placeholder="https://example.com"
-			class="form-input flex-1 min-w-[12rem]"
+			class="flex-1 min-w-[12rem]"
 		/>
 		<RemoveRowButton />
 	</div>
@@ -427,68 +423,51 @@ const AddressRow = ({
 		data-row-item
 		data-nojs-only={nojsOnly || undefined}
 	>
-		<input
-			type="text"
+		<TextInput
 			name="addresses[].street"
 			value={value.street}
 			placeholder="Street"
-			class="form-input md:col-span-2"
+			class="md:col-span-2"
 		/>
-		<input
-			type="text"
+		<TextInput
 			name="addresses[].extended"
 			value={value.extended}
 			placeholder="Suite / unit"
-			class="form-input"
 		/>
-		<input
-			type="text"
+		<TextInput
 			name="addresses[].poBox"
 			value={value.poBox}
 			placeholder="PO Box"
-			class="form-input"
 		/>
-		<input
-			type="text"
+		<TextInput
 			name="addresses[].locality"
 			value={value.locality}
 			placeholder="City"
-			class="form-input"
 		/>
-		<input
-			type="text"
+		<TextInput
 			name="addresses[].region"
 			value={value.region}
 			placeholder="State / region"
-			class="form-input"
 		/>
-		<input
-			type="text"
+		<TextInput
 			name="addresses[].postalCode"
 			value={value.postalCode}
 			placeholder="Postal code"
-			class="form-input"
 		/>
-		<input
-			type="text"
+		<TextInput
 			name="addresses[].country"
 			value={value.country}
 			placeholder="Country"
-			class="form-input"
 		/>
-		<input
-			type="text"
+		<TextInput
 			name="addresses[].types"
 			value={value.types.join(", ")}
 			placeholder="home, work, billing, delivery"
-			class="form-input"
 		/>
-		<input
-			type="text"
+		<TextInput
 			name="addresses[].label"
 			value={value.label ?? ""}
 			placeholder="Label"
-			class="form-input"
 		/>
 		<div class="flex items-center gap-3 md:col-span-2">
 			<PreferredCheckbox field="addresses" preferred={value.preferred} />
@@ -532,13 +511,11 @@ const RelationRow = ({
 			data-row-item
 			data-nojs-only={nojsOnly || undefined}
 		>
-			<input
-				type="text"
+			<TextInput
 				name={RELATION_NAME_FIELD}
 				value={shown}
 				list={listId}
 				placeholder="Name, or an email address"
-				class="form-input flex-1 min-w-[12rem]"
 				data-relation-input
 				hx-get="/ui/contacts/relation-options"
 				hx-trigger="input changed delay:200ms"
@@ -546,6 +523,7 @@ const RelationRow = ({
 				hx-swap="outerHTML"
 				hx-vals={JSON.stringify({ addressbook: addressbookId, list: listId })}
 				hx-params="*"
+				class="flex-1 min-w-[12rem]"
 			/>
 			<datalist id={listId} />
 			<input
@@ -557,13 +535,12 @@ const RelationRow = ({
 			{/* Combobox, not a select: the standard wordings are offered, this
 			    row's own non-standard wording is offered back to it so editing
 			    never coarsens it, and a new custom relation can still be typed. */}
-			<input
-				type="text"
+			<TextInput
 				name="relations[].relation"
 				value={value.relation}
 				list={kindsId}
 				placeholder="Relation"
-				class="form-input w-40"
+				class="w-40"
 			/>
 			<datalist id={kindsId}>
 				{relationOptionsFor(value.relation).map((r) => (
@@ -588,26 +565,23 @@ const OtherPropRow = ({
 		data-row-item
 		data-nojs-only={nojsOnly || undefined}
 	>
-		<input
-			type="text"
+		<TextInput
 			name="other[].name"
 			value={value?.name ?? ""}
 			placeholder="PROPERTY"
-			class="form-input font-mono uppercase"
+			class="font-mono uppercase"
 		/>
-		<input
-			type="text"
+		<TextInput
 			name="other[].value"
 			value={value?.value ?? ""}
 			placeholder="value"
-			class="form-input md:col-span-2"
+			class="md:col-span-2"
 		/>
-		<input
-			type="text"
+		<TextInput
 			name="other[].params"
 			value={value?.params ?? ""}
 			placeholder="TYPE=work;PREF=1"
-			class="form-input font-mono"
+			class="font-mono"
 		/>
 		<input type="hidden" name="other[].group" value={value?.group ?? ""} />
 		<div class="md:col-span-4">
@@ -664,17 +638,13 @@ export const ContactFormPage = ({
 			)}
 
 			{errors.length > 0 && (
-				<div
-					role="alert"
-					class="rounded-md border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger"
-				>
-					<p class="font-medium mb-1">Please correct the following:</p>
+				<Alert tone="danger" title="Please correct the following:">
 					<ul class="list-disc list-inside space-y-0.5">
 						{errors.map((e) => (
 							<li key={e}>{e}</li>
 						))}
 					</ul>
-				</div>
+				</Alert>
 			)}
 
 			<form
@@ -690,9 +660,8 @@ export const ContactFormPage = ({
 					<label class="form-group block">
 						<span class="form-label flex items-center gap-2">
 							Display name <span class="text-danger">*</span>
-							<button
-								type="button"
-								class="btn btn-secondary btn-sm"
+							<Button
+								size="sm"
 								data-fn-mode-toggle
 								aria-pressed={isAutoFn}
 								title={
@@ -702,7 +671,7 @@ export const ContactFormPage = ({
 								}
 							>
 								{isAutoFn ? "Auto" : "Manual"}
-							</button>
+							</Button>
 						</span>
 						<input
 							type="text"
@@ -916,31 +885,18 @@ export const ContactFormPage = ({
 					/>
 					<div class="form-group block" data-gender-field>
 						<span class="form-label">Gender</span>
-						<select
+						<Select
 							{...(isCustomGender ? {} : { name: "gender" })}
-							class="form-select mt-1"
+							options={GENDER_OPTIONS}
+							value={isCustomGender ? GENDER_CUSTOM_SENTINEL : form.gender}
+							class="mt-1"
 							data-gender-select
-						>
-							{GENDER_OPTIONS.map((o) => (
-								<option
-									key={o.value}
-									value={o.value}
-									selected={
-										isCustomGender
-											? o.value === GENDER_CUSTOM_SENTINEL
-											: form.gender === o.value
-									}
-								>
-									{o.label}
-								</option>
-							))}
-						</select>
-						<input
-							type="text"
+						/>
+						<TextInput
 							{...(isCustomGender ? { name: "gender" } : {})}
 							value={isCustomGender ? form.gender : ""}
 							placeholder="Custom GENDER value"
-							class="form-input mt-2"
+							class="mt-2"
 							hidden={!isCustomGender}
 							data-gender-custom
 						/>
@@ -961,17 +917,12 @@ export const ContactFormPage = ({
 						hidden={!hasGramGender}
 					>
 						<span class="form-label">Grammatical gender</span>
-						<select name="gramGender" class="form-select mt-1 max-w-sm">
-							{GRAM_GENDER_OPTIONS.map((o) => (
-								<option
-									key={o.value}
-									value={o.value}
-									selected={form.gramGender === o.value}
-								>
-									{o.label}
-								</option>
-							))}
-						</select>
+						<Select
+							name="gramGender"
+							options={GRAM_GENDER_OPTIONS}
+							value={form.gramGender}
+							class="mt-1 max-w-sm"
+						/>
 						<p class="form-hint mt-1">
 							Used by some address book apps for grammatical agreement (e.g. in
 							translated salutations) — usually safe to leave unspecified.
@@ -990,9 +941,12 @@ export const ContactFormPage = ({
 					/>
 					<label class="form-group block md:col-span-2">
 						<span class="form-label">Note</span>
-						<textarea name="note" rows={NOTE_ROWS} class="form-textarea mt-1">
-							{form.note}
-						</textarea>
+						<Textarea
+							name="note"
+							rows={NOTE_ROWS}
+							value={form.note}
+							class="mt-1"
+						/>
 					</label>
 				</section>
 
@@ -1007,21 +961,16 @@ export const ContactFormPage = ({
 					)}
 					<label class="form-group block text-sm">
 						<span class="form-hint">Upload (max 512 KB)</span>
-						<input
-							type="file"
-							name="photoFile"
-							accept="image/*"
-							class="mt-1 block"
-						/>
+						<FileInput name="photoFile" accept="image/*" class="mt-1 block" />
 					</label>
 					<label class="form-group block text-sm">
 						<span class="form-hint">…or paste a URL</span>
-						<input
+						<TextInput
 							type="url"
 							name="photo"
 							value={inlinePhoto === "" ? form.photo : ""}
 							placeholder={inlinePhoto === "" ? "" : "Replaces the photo above"}
-							class="form-input mt-1"
+							class="mt-1"
 						/>
 					</label>
 					{/* An embedded photo is hundreds of KB of base64 — kept out of the
@@ -1052,33 +1001,22 @@ export const ContactFormPage = ({
 						<template data-row-template="other">
 							<OtherPropRow />
 						</template>
-						<button
-							type="button"
-							class="btn btn-secondary btn-sm mt-2"
-							data-add-row="other"
-						>
+						<Button size="sm" class="mt-2" data-add-row="other">
 							+ Add field
-						</button>
+						</Button>
 					</details>
 				</section>
 
 				<div class="flex flex-wrap gap-3 pt-2">
-					<button type="submit" class="btn btn-primary">
+					<Button type="submit" variant="primary">
 						{mode === "edit" ? "Save changes" : "Create contact"}
-					</button>
+					</Button>
 					{popover ? (
-						<button
-							type="button"
-							commandfor={popoverId}
-							command="request-close"
-							class="btn btn-secondary"
-						>
+						<Button commandfor={popoverId} command="request-close">
 							Cancel
-						</button>
+						</Button>
 					) : (
-						<a href={backHref} class="btn btn-secondary">
-							Cancel
-						</a>
+						<LinkButton href={backHref}>Cancel</LinkButton>
 					)}
 				</div>
 			</form>
@@ -1095,9 +1033,9 @@ export const ContactFormPage = ({
 						class="card-pad space-y-2"
 					>
 						<h2 class="text-sm font-semibold text-danger">Danger zone</h2>
-						<button type="submit" class="btn btn-danger">
+						<Button type="submit" variant="danger">
 							Delete contact
-						</button>
+						</Button>
 					</form>
 				</Card>
 			)}

@@ -1,3 +1,4 @@
+import { LinkButton } from "../components/button.tsx";
 import { PageHeader } from "../components/page-header.tsx";
 
 // ---------------------------------------------------------------------------
@@ -21,9 +22,9 @@ const ErrorBody = ({
 		</div>
 		<p class="text-muted">{message}</p>
 		<p class="mt-6">
-			<a href="/ui" class="btn btn-primary">
+			<LinkButton href="/ui" variant="primary">
 				Back to dashboard
-			</a>
+			</LinkButton>
 		</p>
 	</div>
 );

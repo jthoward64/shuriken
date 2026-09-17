@@ -1,6 +1,9 @@
 import type { VNode } from "preact";
 import { emptyContactForm } from "#src/services/card-edit/types.ts";
-import { buttonClass } from "../../components/button.tsx";
+import { Button, LinkButton } from "../../components/button.tsx";
+import { Alert, Badge, EmptyState } from "../../components/display.tsx";
+import { Checkbox } from "../../components/form/form.tsx";
+import { Select } from "../../components/form/select.tsx";
 import {
 	IconCheck,
 	IconChevronDown,
@@ -9,6 +12,8 @@ import {
 	IconSpinner,
 } from "../../components/icons.tsx";
 import { InlineModalPopover } from "../../components/overlay.tsx";
+import { PageHeader } from "../../components/page-header.tsx";
+import { Pagination } from "../../components/pagination.tsx";
 
 import { EditContactPopoverContainer } from "./edit-dialog.tsx";
 import { ContactFormPage } from "./form.tsx";
@@ -163,10 +168,11 @@ export const ImportResult = ({
 	total = 0,
 }: ImportResultProps): VNode =>
 	conflict ? (
-		<div class="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm space-y-2">
-			<p class="font-medium text-warning">
-				{conflicts.length} item(s) already exist with these UIDs:
-			</p>
+		<Alert
+			tone="warning"
+			title={`${conflicts.length} item(s) already exist with these UIDs:`}
+			class="space-y-2"
+		>
 			<ul class="list-disc list-inside text-xs max-h-32 overflow-auto font-mono text-muted">
 				{conflicts.map((c) => (
 					<li key={c}>{c}</li>
@@ -176,12 +182,12 @@ export const ImportResult = ({
 				Re-select the file with <strong>Skip duplicates</strong> or{" "}
 				<strong>Replace duplicates</strong> to proceed.
 			</p>
-		</div>
+		</Alert>
 	) : (
-		<div class="rounded-md border border-success/40 bg-success/10 p-3 text-sm text-success">
+		<Alert tone="success">
 			Imported {inserted} new, replaced {merged}, skipped {skipped}.
 			{total > 0 && <span class="text-muted"> ({total} total)</span>}
-		</div>
+		</Alert>
 	);
 
 // --- Sidebar ---------------------------------------------------------------
@@ -235,9 +241,9 @@ const AddressbookList = ({
 							{a.displayName}
 						</a>
 						{a.ownerSlug !== null && (
-							<span class="badge shrink-0" title={`Shared by ${a.ownerSlug}`}>
+							<Badge class="shrink-0" title={`Shared by ${a.ownerSlug}`}>
 								{a.ownerSlug}
-							</span>
+							</Badge>
 						)}
 						{mutable && (
 							<>
@@ -279,6 +285,12 @@ const AddressbookList = ({
 		</ul>
 	</div>
 );
+
+const DUPLICATE_MODE_OPTIONS = [
+	{ value: "error", label: "Conflict" },
+	{ value: "skip", label: "Skip" },
+	{ value: "merge", label: "Replace" },
+];
 
 const ImportForm = ({
 	selectedId,
@@ -324,27 +336,25 @@ const ImportForm = ({
 				class="w-px shrink-0 self-stretch bg-line-strong"
 				aria-hidden="true"
 			/>
-			<select
+			<Select
 				name="mode"
 				disabled={disabled}
-				class="basis-1/3 border-0 bg-transparent px-2 py-2 text-xs text-fg focus:outline-none focus-visible:bg-surface-2 focus-visible:ring-0 focus-visible:ring-offset-0"
+				options={DUPLICATE_MODE_OPTIONS}
+				class="basis-1/3 border-0 bg-transparent px-2 py-2 text-xs focus:outline-none focus-visible:bg-surface-2 focus-visible:ring-0 focus-visible:ring-offset-0"
 				aria-label="How to handle duplicate contacts"
 				title="How to handle duplicate contacts"
-			>
-				<option value="error">Conflict</option>
-				<option value="skip">Skip</option>
-				<option value="merge">Replace</option>
-			</select>
+			/>
 		</div>
 		{/* No-JS submit; JS auto-submits on file pick (see static/contacts.js). */}
-		<button
+		<Button
 			type="submit"
 			disabled={disabled}
+			size="sm"
 			data-nojs-only
-			class={buttonClass("secondary", "btn-sm w-full")}
+			class="w-full"
 		>
 			Upload
-		</button>
+		</Button>
 		<span class="htmx-indicator items-center gap-1 text-sm text-muted">
 			<IconSpinner class="h-4 w-4 animate-spin" />
 			Importing…
@@ -360,17 +370,17 @@ const ContactTools = ({
 	writable: boolean;
 }): VNode => (
 	<div class="space-y-1">
-		<a
+		<LinkButton
 			href={`/ui/contacts/export.vcf?addressbook=${selectedId}`}
 			hx-post={`/ui/api/contacts/export?addressbook=${selectedId}`}
 			hx-target="#import-result"
 			hx-swap="innerHTML"
 			hx-disable="this"
 			data-guard=""
-			class={buttonClass("secondary", "w-full")}
+			class="w-full"
 		>
 			Export .vcf
-		</a>
+		</LinkButton>
 		{/* Merge/cleanup write to the address book, so gate them (like the New
 		    contact / Import actions) on the caller's actual privileges. */}
 		{writable && (
@@ -414,8 +424,9 @@ const BulkToolbar = ({ writable }: { writable: boolean }): VNode => (
 		<span class="text-sm text-muted mr-1">
 			<span data-selected-count>0</span> selected:
 		</span>
-		<button
+		<Button
 			type="submit"
+			size="sm"
 			formaction="/ui/api/contacts/bulk-download"
 			hx-post="/ui/api/contacts/bulk-download"
 			hx-include="closest form"
@@ -423,14 +434,14 @@ const BulkToolbar = ({ writable }: { writable: boolean }): VNode => (
 			hx-swap="innerHTML"
 			hx-disable="this"
 			data-guard=""
-			class="btn btn-secondary btn-sm"
 		>
 			Download .vcf
-		</button>
+		</Button>
 		{writable && (
 			<>
-				<button
+				<Button
 					type="submit"
+					size="sm"
 					formaction="/ui/api/contacts/bulk-clear-photo"
 					hx-post="/ui/api/contacts/bulk-clear-photo"
 					hx-include="closest form"
@@ -439,12 +450,13 @@ const BulkToolbar = ({ writable }: { writable: boolean }): VNode => (
 					hx-confirm="Remove the profile picture from the selected contacts?"
 					hx-disable="this"
 					data-guard=""
-					class="btn btn-secondary btn-sm"
 				>
 					Remove picture
-				</button>
-				<button
+				</Button>
+				<Button
 					type="submit"
+					variant="danger"
+					size="sm"
 					formaction="/ui/api/contacts/bulk-delete"
 					hx-post="/ui/api/contacts/bulk-delete"
 					hx-include="closest form"
@@ -453,17 +465,16 @@ const BulkToolbar = ({ writable }: { writable: boolean }): VNode => (
 					hx-confirm="Delete the selected contacts? This cannot be undone."
 					hx-disable="this"
 					data-guard=""
-					class="btn btn-danger btn-sm"
 				>
 					Delete
-				</button>
+				</Button>
 			</>
 		)}
 		{/* Native reset clears every checkbox in the form — no JS needed; the
 		    :has() rule then hides the bar (and contacts.js resets the count). */}
-		<button type="reset" class="btn btn-ghost btn-sm ml-auto">
+		<Button type="reset" variant="ghost" size="sm" class="ml-auto">
 			Clear
-		</button>
+		</Button>
 	</div>
 );
 
@@ -542,56 +553,6 @@ const ContactListRows = ({
 	</ul>
 );
 
-const Pagination = ({
-	selectedId,
-	query,
-	page,
-	totalPages,
-}: {
-	selectedId: string;
-	query: string;
-	page: number;
-	totalPages: number;
-}): VNode | null => {
-	if (totalPages <= 1) {
-		return null;
-	}
-	return (
-		<nav
-			aria-label="Contacts pages"
-			class="flex items-center justify-between gap-2 pt-1 text-sm text-muted"
-		>
-			{page > 1 ? (
-				<a
-					href={listUrl(selectedId, query, page - 1)}
-					class="btn btn-secondary btn-sm"
-				>
-					Previous
-				</a>
-			) : (
-				<span class="btn btn-secondary btn-sm opacity-50" aria-disabled="true">
-					Previous
-				</span>
-			)}
-			<span>
-				Page {page} of {totalPages}
-			</span>
-			{page < totalPages ? (
-				<a
-					href={listUrl(selectedId, query, page + 1)}
-					class="btn btn-secondary btn-sm"
-				>
-					Next
-				</a>
-			) : (
-				<span class="btn btn-secondary btn-sm opacity-50" aria-disabled="true">
-					Next
-				</span>
-			)}
-		</nav>
-	);
-};
-
 // The self-refreshing region. Re-fetches on `contacts:changed` and swaps only
 // this subtree (hx-select mirrors the id), so an import updates the table in
 // place. Rendered whether or not there are contacts so the trigger persists.
@@ -627,26 +588,29 @@ const ContactList = ({
 			>
 				<input type="hidden" name="addressbook" value={selectedId} />
 				<div class="flex flex-wrap items-center gap-3 ml-1 min-h-8">
-					<label class="flex items-center gap-2 text-sm text-muted">
-						<input type="checkbox" data-check-all="" />
-						Select all
-					</label>
+					<Checkbox
+						id="contacts-check-all"
+						label="Select all"
+						data-check-all=""
+					/>
 					<BulkToolbar writable={writable} />
 				</div>
 				<ContactListRows contacts={contacts} />
 			</form>
 		) : (
-			<p class="text-sm text-muted">
-				{query === ""
-					? "No contacts here yet."
-					: "No contacts match your search."}
-			</p>
+			<EmptyState
+				title={
+					query === ""
+						? "No contacts here yet."
+						: "No contacts match your search."
+				}
+			/>
 		)}
 		<Pagination
-			selectedId={selectedId}
-			query={query}
+			label="Contacts pages"
 			page={page}
 			totalPages={totalPages}
+			hrefFor={(n) => listUrl(selectedId, query, n)}
 		/>
 	</div>
 );
@@ -667,10 +631,11 @@ export const ContactsListPage = ({
 	if (!hasAddressbook) {
 		return (
 			<div class="space-y-4">
-				<h1 class="page-title">Contacts</h1>
-				<p class="text-sm text-muted">
-					No address book available. Create one from your profile.
-				</p>
+				<PageHeader title="Contacts" />
+				<EmptyState
+					title="No address book available."
+					description="Create one from your profile."
+				/>
 			</div>
 		);
 	}
@@ -682,17 +647,17 @@ export const ContactsListPage = ({
 				drawerTop={
 					<>
 						{/* Inline dialog: opens natively (no JS needed). */}
-						<button
-							type="button"
+						<Button
+							variant="primary"
+							class="w-full"
 							commandfor={selectedWritable ? NEW_CONTACT_POPOVER_ID : undefined}
 							command={selectedWritable ? "show-modal" : undefined}
 							disabled={!selectedWritable}
 							title={selectedWritable ? undefined : "Read-only address book"}
-							class={buttonClass("primary", "w-full")}
 						>
 							<IconPlus class="h-4 w-4" />
 							New contact
-						</button>
+						</Button>
 						<AddressbookList addressbooks={addressbooks} query={query} />
 					</>
 				}
@@ -761,20 +726,14 @@ export const ContactsListPage = ({
 
 const ImportNoticeBanner = ({ notice }: { notice: ImportNotice }): VNode =>
 	notice.conflicts > 0 ? (
-		<div
-			role="alert"
-			class="rounded-md border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning"
-		>
+		<Alert tone="warning">
 			{notice.conflicts} contact(s) already exist with the same UID. Re-import
 			with <strong>Skip duplicates</strong> or{" "}
 			<strong>Replace duplicates</strong> to proceed.
-		</div>
+		</Alert>
 	) : (
-		<div
-			role="alert"
-			class="rounded-md border border-success/40 bg-success/10 px-4 py-3 text-sm text-success"
-		>
+		<Alert tone="success">
 			Imported {notice.imported} new, replaced {notice.merged}, skipped{" "}
 			{notice.skipped}.
-		</div>
+		</Alert>
 	);

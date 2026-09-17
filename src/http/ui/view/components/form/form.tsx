@@ -34,6 +34,7 @@ export const Field = ({
 	class: cls,
 	children,
 }: FieldProps): VNode => {
+	const message = error ?? hint;
 	const describedBy =
 		error !== undefined ? `${htmlFor}-error` : `${htmlFor}-hint`;
 	return (
@@ -47,22 +48,24 @@ export const Field = ({
 				)}
 			</label>
 			{children}
-			{error !== undefined ? (
-				<p id={describedBy} class="form-error" role="alert">
-					{error}
+			{message !== undefined && (
+				<p
+					id={describedBy}
+					class={error !== undefined ? "form-error" : "form-hint"}
+					role={error !== undefined ? "alert" : undefined}
+				>
+					{message}
 				</p>
-			) : (
-				hint !== undefined && (
-					<p id={describedBy} class="form-hint">
-						{hint}
-					</p>
-				)
 			)}
 		</div>
 	);
 };
 
-/** Input types that take free text; date/checkbox/file have their own controls. */
+/**
+ * Input types this wraps. "date" is the plain native picker, for a field that
+ * wants nothing more than that; `controls/date-picker.tsx`'s DateField is the
+ * scripted alternative. Checkbox and file have their own controls.
+ */
 export type TextInputType =
 	| "text"
 	| "email"
@@ -70,7 +73,8 @@ export type TextInputType =
 	| "tel"
 	| "password"
 	| "number"
-	| "search";
+	| "search"
+	| "date";
 
 export type TextInputProps = Omit<
 	JSX.InputHTMLAttributes<HTMLInputElement>,

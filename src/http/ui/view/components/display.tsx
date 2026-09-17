@@ -1,4 +1,4 @@
-import type { ComponentChildren, VNode } from "preact";
+import type { ComponentChildren, JSX, VNode } from "preact";
 import { cx } from "./cx.ts";
 
 // ---------------------------------------------------------------------------
@@ -20,15 +20,22 @@ const TONE_CLASS: Record<BadgeTone, string | undefined> = {
 	warning: "badge-warning",
 };
 
+export type BadgeProps = Omit<JSX.HTMLAttributes<HTMLSpanElement>, "class"> & {
+	readonly tone?: BadgeTone;
+	readonly class?: string;
+	readonly children: ComponentChildren;
+};
+
 export const Badge = ({
 	tone = "neutral",
 	class: cls,
 	children,
-}: {
-	tone?: BadgeTone;
-	class?: string;
-	children: ComponentChildren;
-}): VNode => <span class={cx("badge", TONE_CLASS[tone], cls)}>{children}</span>;
+	...rest
+}: BadgeProps): VNode => (
+	<span {...rest} class={cx("badge", TONE_CLASS[tone], cls)}>
+		{children}
+	</span>
+);
 
 export const EmptyState = ({
 	title,
@@ -55,6 +62,8 @@ export interface Column<T> {
 	readonly align?: "left" | "right" | "center";
 	/** Collapse the column to its content width (for action cells). */
 	readonly shrink?: boolean;
+	/** Keep the header for screen readers but hide it visually. */
+	readonly headerHidden?: boolean;
 }
 
 const ALIGN_CLASS: Record<"left" | "right" | "center", string | undefined> = {
@@ -90,7 +99,11 @@ export const Table = <T,>({
 						{columns.map((c) => (
 							<th
 								key={c.header}
-								class={cx(ALIGN_CLASS[c.align ?? "left"], c.shrink && "w-0")}
+								class={cx(
+									ALIGN_CLASS[c.align ?? "left"],
+									c.shrink && "w-0",
+									c.headerHidden && "sr-only",
+								)}
 							>
 								{/* Action columns have no meaningful heading but still need a cell */}
 								{c.header === "" ? null : c.header}
@@ -117,20 +130,23 @@ export const Table = <T,>({
 	);
 };
 
+export type CardProps = Omit<JSX.HTMLAttributes<HTMLDivElement>, "class"> & {
+	readonly title?: string;
+	readonly actions?: ComponentChildren;
+	readonly pad?: boolean;
+	readonly class?: string;
+	readonly children: ComponentChildren;
+};
+
 export const Card = ({
 	title,
 	actions,
 	pad = true,
 	class: cls,
 	children,
-}: {
-	title?: string;
-	actions?: ComponentChildren;
-	pad?: boolean;
-	class?: string;
-	children: ComponentChildren;
-}) => (
-	<div class={cx("card", cls)}>
+	...rest
+}: CardProps) => (
+	<div {...rest} class={cx("card", cls)}>
 		{title && (
 			<div class="card-header">
 				<h2 class="card-title">{title}</h2>
@@ -138,5 +154,37 @@ export const Card = ({
 			</div>
 		)}
 		<div class={pad ? "card-pad" : undefined}>{children}</div>
+	</div>
+);
+
+export type AlertTone = "info" | "success" | "warning" | "danger";
+
+const ALERT_CLASS: Record<AlertTone, string> = {
+	info: "border-line bg-surface-2 text-fg",
+	success: "border-success/40 bg-success/10 text-success",
+	warning: "border-warning/40 bg-warning/10 text-warning",
+	danger: "border-danger/40 bg-danger/10 text-danger",
+};
+
+// Inline callout for the result of an action or a caveat about one. `role`
+// defaults to "alert" for the tones that report a problem so assistive tech
+// announces them; informational callouts stay silent.
+export const Alert = ({
+	tone = "info",
+	title,
+	class: cls,
+	children,
+}: {
+	tone?: AlertTone;
+	title?: string;
+	class?: string;
+	children?: ComponentChildren;
+}): VNode => (
+	<div
+		role={tone === "danger" || tone === "warning" ? "alert" : undefined}
+		class={cx("rounded-md border px-4 py-3 text-sm", ALERT_CLASS[tone], cls)}
+	>
+		{title !== undefined && <p class="mb-1 font-medium">{title}</p>}
+		{children}
 	</div>
 );

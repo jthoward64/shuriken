@@ -1,6 +1,8 @@
 import type { VNode } from "preact";
+import { Button, LinkButton } from "../components/button.tsx";
 import { CopyField } from "../components/copy.tsx";
 import { Card } from "../components/display.tsx";
+import { Field, TextInput } from "../components/form/form.tsx";
 import { IconExternalLink, IconKey, IconMail } from "../components/icons.tsx";
 import { PageHeader } from "../components/page-header.tsx";
 
@@ -74,47 +76,20 @@ export const ProfilePage = ({
 				hx-swap="outerHTML"
 				class="space-y-4"
 			>
-				<div class="form-group">
-					<label for="displayName" class="form-label">
-						Display name
-					</label>
-					<input
-						type="text"
-						id="displayName"
-						name="displayName"
-						value={displayName}
-						class="form-input"
-					/>
-				</div>
-				<div class="form-group">
-					<label for="email" class="form-label">
-						Email
-					</label>
-					<input
-						type="email"
-						id="email"
-						name="email"
-						value={email}
-						class="form-input"
-					/>
-				</div>
+				<Field for="displayName" label="Display name">
+					<TextInput id="displayName" name="displayName" value={displayName} />
+				</Field>
+				<Field for="email" label="Email">
+					<TextInput type="email" id="email" name="email" value={email} />
+				</Field>
 				{canEditSlug && (
-					<div class="form-group">
-						<label for="slug" class="form-label">
-							Username (slug)
-						</label>
-						<input
-							type="text"
-							id="slug"
-							name="slug"
-							value={slug}
-							class="form-input"
-						/>
-					</div>
+					<Field for="slug" label="Username (slug)">
+						<TextInput id="slug" name="slug" value={slug} />
+					</Field>
 				)}
-				<button type="submit" class="btn btn-primary">
+				<Button type="submit" variant="primary">
 					Save changes
-				</button>
+				</Button>
 			</form>
 		</Card>
 
@@ -144,21 +119,17 @@ export const ProfilePage = ({
 					hx-swap="outerHTML"
 					class="space-y-4"
 				>
-					<div class="form-group">
-						<label for="newPassword" class="form-label">
-							New password
-						</label>
-						<input
+					<Field for="newPassword" label="New password">
+						<TextInput
 							type="password"
 							id="newPassword"
 							name="newPassword"
 							autocomplete="new-password"
-							class="form-input"
 						/>
-					</div>
-					<button type="submit" class="btn btn-primary">
+					</Field>
+					<Button type="submit" variant="primary">
 						Update password
-					</button>
+					</Button>
 				</form>
 			</Card>
 		)}
@@ -184,24 +155,21 @@ export const ProfilePage = ({
 					Password, recovery email, and MFA are managed by your identity
 					provider.
 				</p>
-				<a
+				<LinkButton
 					href={authSettingsUrl}
 					target="_blank"
 					rel="noopener noreferrer"
-					class="btn btn-secondary"
 				>
 					<IconExternalLink class="h-4 w-4" />
 					{authSettingsLabel}
-				</a>
+				</LinkButton>
 			</Card>
 		)}
 
 		{showSignOut && (
 			<Card title="Session">
 				<form method="POST" action="/ui/auth/logout">
-					<button type="submit" class="btn btn-secondary">
-						Sign out
-					</button>
+					<Button type="submit">Sign out</Button>
 				</form>
 			</Card>
 		)}

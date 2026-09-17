@@ -1,7 +1,9 @@
 import type { VNode } from "preact";
+import { Button } from "../components/button.tsx";
 import { CopyField } from "../components/copy.tsx";
-import { Card } from "../components/display.tsx";
-import { PageHeader } from "../components/page-header.tsx";
+import { Alert, Card } from "../components/display.tsx";
+import { Field, TextInput } from "../components/form/form.tsx";
+import { Breadcrumb, PageHeader } from "../components/page-header.tsx";
 
 // ---------------------------------------------------------------------------
 // GET /ui/profile/app-passwords — manage per-device DAV credentials. A freshly
@@ -26,23 +28,18 @@ export interface AppPasswordsPageProps {
 	} | null;
 }
 
-const Breadcrumb = ({ title }: { title: string }) => (
-	<nav aria-label="Breadcrumb" class="mb-2 flex items-center gap-2 text-sm">
-		<a href="/ui/profile" class="link">
-			Profile
-		</a>
-		<span class="text-subtle">/</span>
-		<span class="text-muted">{title}</span>
-	</nav>
-);
-
 export const AppPasswordsPage = ({
 	appPasswords,
 	generated,
 }: AppPasswordsPageProps): VNode => (
 	<div class="mx-auto max-w-2xl space-y-6">
 		<div>
-			<Breadcrumb title="App passwords" />
+			<Breadcrumb
+				items={[
+					{ label: "Profile", href: "/ui/profile" },
+					{ label: "App passwords" },
+				]}
+			/>
 			<PageHeader
 				title="App passwords"
 				subtitle="Connect calendar and contact apps without sharing your sign-in."
@@ -59,11 +56,8 @@ export const AppPasswordsPage = ({
 		</Card>
 
 		{generated && (
-			<div class="rounded-md border border-success/40 bg-success/10 p-5">
-				<h2 class="text-sm font-semibold text-success">
-					New app password created
-				</h2>
-				<p class="mt-1 mb-4 text-sm text-muted">
+			<Alert tone="success" title="New app password created">
+				<p class="mb-4 text-muted">
 					Copy these now — the password is shown only once and cannot be
 					retrieved later.
 				</p>
@@ -71,7 +65,7 @@ export const AppPasswordsPage = ({
 					<CopyField label="Username" value={generated.username} />
 					<CopyField label="Password" value={generated.password} />
 				</div>
-			</div>
+			</Alert>
 		)}
 
 		<Card title="Create an app password">
@@ -80,22 +74,17 @@ export const AppPasswordsPage = ({
 				action="/ui/api/profile/app-passwords/create"
 				class="space-y-4"
 			>
-				<div class="form-group">
-					<label for="label" class="form-label">
-						Label (optional)
-					</label>
-					<input
-						type="text"
+				<Field for="label" label="Label (optional)">
+					<TextInput
 						id="label"
 						name="label"
 						maxlength={MAX_LABEL_LENGTH}
 						placeholder="e.g. iPhone, Thunderbird"
-						class="form-input"
 					/>
-				</div>
-				<button type="submit" class="btn btn-primary">
+				</Field>
+				<Button type="submit" variant="primary">
 					Generate
-				</button>
+				</Button>
 			</form>
 		</Card>
 
@@ -128,9 +117,9 @@ export const AppPasswordsPage = ({
 								data-confirm="Revoke this app password? Any client using it will stop working."
 							>
 								<input type="hidden" name="id" value={ap.id} />
-								<button type="submit" class="btn btn-danger btn-sm">
+								<Button type="submit" variant="danger" size="sm">
 									Revoke
-								</button>
+								</Button>
 							</form>
 						</li>
 					))}

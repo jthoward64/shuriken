@@ -4,6 +4,7 @@ import type {
 	ContactFormData,
 	ContactTypedValue,
 } from "#src/services/card-edit/types.ts";
+import { LinkButton } from "../../components/button.tsx";
 import { IconEdit } from "../../components/icons.tsx";
 
 // ---------------------------------------------------------------------------
@@ -69,14 +70,16 @@ export const ContactHoverCard = ({
 					<h3 class="truncate font-semibold text-fg">
 						{form.fn || "(no name)"}
 					</h3>
-					<a
+					<LinkButton
 						href={editHref}
+						variant="ghost"
+						size="sm"
 						data-edit-contact
 						aria-label="Edit contact"
-						class="btn btn-ghost btn-sm shrink-0"
+						class="shrink-0"
 					>
 						<IconEdit class="h-4 w-4" />
-					</a>
+					</LinkButton>
 				</div>
 				{orgLine !== "" && <p class="truncate text-sm text-muted">{orgLine}</p>}
 				{email !== "" && <p class="mt-2 truncate text-sm text-fg">{email}</p>}

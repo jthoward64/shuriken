@@ -1,5 +1,7 @@
-import { buttonClass } from "../../components/button.tsx";
+import { Button, buttonClass, LinkButton } from "../../components/button.tsx";
 import { contrastTextColor } from "../../components/color-contrast.ts";
+import { Alert, Badge, EmptyState } from "../../components/display.tsx";
+import { Select } from "../../components/form/select.tsx";
 import {
 	IconChevronDown,
 	IconChevronLeft,
@@ -9,6 +11,7 @@ import {
 	IconSpinner,
 } from "../../components/icons.tsx";
 import { InlineModalPopover } from "../../components/overlay.tsx";
+import { PageHeader } from "../../components/page-header.tsx";
 import { AssetTags, CALENDAR_ASSETS } from "../../shell/assets.tsx";
 
 import { CollectionNewPage } from "../collections.tsx";
@@ -145,18 +148,24 @@ const calHref = (
 
 // --- Sidebar ---------------------------------------------------------------
 
+const DUPLICATE_MODE_OPTIONS = [
+	{ value: "error", label: "Conflict" },
+	{ value: "skip", label: "Skip" },
+	{ value: "merge", label: "Replace" },
+];
+
 const NewEventButton = ({ disabled }: { disabled: boolean }) => (
-	<button
-		type="button"
+	<Button
+		variant="primary"
+		class="w-full"
 		commandfor={disabled ? undefined : NEW_EVENT_POPOVER_ID}
 		command={disabled ? undefined : "show-modal"}
 		disabled={disabled}
 		title={disabled ? "Read-only calendar" : undefined}
-		class={buttonClass("primary", "w-full")}
 	>
 		<IconPlus class="h-4 w-4" />
 		New event
-	</button>
+	</Button>
 );
 
 // The calendar list — a GET form so no-JS users can toggle visibility and hit
@@ -182,13 +191,9 @@ const CalendarList = ({
 				Calendars
 			</h2>
 			{/* No-JS visibility apply; JS toggles sources live instead. */}
-			<button
-				type="submit"
-				data-nojs-only
-				class={buttonClass("secondary", "btn-sm")}
-			>
+			<Button type="submit" size="sm" data-nojs-only>
 				Apply
-			</button>
+			</Button>
 		</div>
 		<ul class="space-y-0.5" data-reorder-list data-collection-type="calendar">
 			{calendars.map((c) => {
@@ -255,9 +260,9 @@ const CalendarList = ({
 							</a>
 						)}
 						{c.ownerSlug !== null && (
-							<span class="badge shrink-0" title={`Shared by ${c.ownerSlug}`}>
+							<Badge class="shrink-0" title={`Shared by ${c.ownerSlug}`}>
 								{c.ownerSlug}
-							</span>
+							</Badge>
 						)}
 						{mutable && (
 							<>
@@ -395,27 +400,25 @@ const ImportForm = ({
 				class="w-px shrink-0 self-stretch bg-line-strong"
 				aria-hidden="true"
 			/>
-			<select
+			<Select
 				name="mode"
 				disabled={disabled}
-				class="basis-1/3 border-0 bg-transparent px-2 py-2 text-xs text-fg focus:outline-none focus-visible:bg-surface-2 focus-visible:ring-0 focus-visible:ring-offset-0"
+				options={DUPLICATE_MODE_OPTIONS}
+				class="basis-1/3 border-0 bg-transparent px-2 py-2 text-xs focus:outline-none focus-visible:bg-surface-2 focus-visible:ring-0 focus-visible:ring-offset-0"
 				aria-label="How to handle duplicate events"
 				title="How to handle duplicate events"
-			>
-				<option value="error">Conflict</option>
-				<option value="skip">Skip</option>
-				<option value="merge">Replace</option>
-			</select>
+			/>
 		</div>
 		{/* No-JS submit; JS auto-submits on file pick (see enhancement script). */}
-		<button
+		<Button
 			type="submit"
+			size="sm"
 			disabled={disabled}
 			data-nojs-only
-			class={buttonClass("secondary", "btn-sm w-full")}
+			class="w-full"
 		>
 			Upload
-		</button>
+		</Button>
 		<span class="htmx-indicator items-center gap-1 text-sm text-muted">
 			<IconSpinner class="h-4 w-4 animate-spin" />
 			Importing…
@@ -425,13 +428,13 @@ const ImportForm = ({
 
 const ExportButton = ({ activeId }: { activeId: string }) => (
 	<>
-		<a
+		<LinkButton
 			id="cal-export"
 			href={`/ui/calendar/${activeId}/export.ics`}
-			class={buttonClass("secondary", "w-full")}
+			class="w-full"
 		>
 			Export .ics
-		</a>
+		</LinkButton>
 		<span
 			id="cal-export-indicator"
 			class="hidden items-center [&.is-busy]:inline-flex text-sm text-muted"
@@ -446,7 +449,7 @@ const ExportButton = ({ activeId }: { activeId: string }) => (
 // into the shared popover + opens it. Without JS, opens in a new tab instead
 // of navigating this embedded page away.
 const FeedsButton = () => (
-	<a
+	<LinkButton
 		href="/ui/feeds"
 		target="_blank"
 		rel="noopener"
@@ -454,10 +457,10 @@ const FeedsButton = () => (
 		hx-target={`#${CALENDAR_POPOVER_BODY_ID}`}
 		hx-swap="innerHTML"
 		data-popover={CALENDAR_POPOVER_ID}
-		class={buttonClass("secondary", "w-full")}
+		class="w-full"
 	>
 		Feeds
-	</a>
+	</LinkButton>
 );
 
 // --- Main content ----------------------------------------------------------
@@ -476,23 +479,25 @@ const MonthNav = ({
 	nextMonth: string;
 }) => (
 	<div class="flex items-center justify-between gap-3">
-		<a
+		<LinkButton
 			href={calHref(activeId, visibleIds, prevMonth)}
+			variant="ghost"
+			size="sm"
 			data-cal-nav
-			class={buttonClass("ghost", "btn-sm")}
 		>
 			<IconChevronLeft class="h-4 w-4" />
 			<span class="sr-only">Previous month</span>
-		</a>
+		</LinkButton>
 		<span class="text-sm font-semibold text-fg">{monthLabel}</span>
-		<a
+		<LinkButton
 			href={calHref(activeId, visibleIds, nextMonth)}
+			variant="ghost"
+			size="sm"
 			data-cal-nav
-			class={buttonClass("ghost", "btn-sm")}
 		>
 			<span class="sr-only">Next month</span>
 			<IconChevronRight class="h-4 w-4" />
-		</a>
+		</LinkButton>
 	</div>
 );
 
@@ -541,9 +546,7 @@ const EventList = ({
 								</span>
 								<span class="block text-sm text-muted">{ev.when}</span>
 							</span>
-							{ev.recurrence && (
-								<span class="badge shrink-0">{ev.recurrence}</span>
-							)}
+							{ev.recurrence && <Badge class="shrink-0">{ev.recurrence}</Badge>}
 						</a>
 					</li>
 				);
@@ -572,8 +575,8 @@ export const CalendarViewPage = (props: CalendarViewProps) => {
 	if (!hasCalendar) {
 		return (
 			<div class="space-y-6">
-				<h1 class="page-title">Calendar</h1>
-				<p class="text-sm text-muted">No calendars available.</p>
+				<PageHeader title="Calendar" />
+				<EmptyState title="No calendars available." />
 			</div>
 		);
 	}
@@ -730,10 +733,11 @@ export const CalendarImportResult = ({
 	total = 0,
 }: CalendarImportResultProps) =>
 	conflict ? (
-		<div class="space-y-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
-			<p class="font-medium text-warning">
-				{conflicts.length} item(s) already exist with these UIDs:
-			</p>
+		<Alert
+			tone="warning"
+			title={`${conflicts.length} item(s) already exist with these UIDs:`}
+			class="space-y-2"
+		>
 			<ul class="max-h-32 list-inside list-disc overflow-auto font-mono text-xs text-muted">
 				{conflicts.map((c) => (
 					<li key={c}>{c}</li>
@@ -743,10 +747,10 @@ export const CalendarImportResult = ({
 				Re-select the file with <strong>Skip duplicates</strong> or{" "}
 				<strong>Replace duplicates</strong> to proceed.
 			</p>
-		</div>
+		</Alert>
 	) : (
-		<div class="rounded-md border border-success/40 bg-success/10 p-3 text-sm text-success">
+		<Alert tone="success">
 			Imported {inserted} new, replaced {merged}, skipped {skipped}.
 			{total > 0 && <span class="text-muted"> ({total} total)</span>}
-		</div>
+		</Alert>
 	);

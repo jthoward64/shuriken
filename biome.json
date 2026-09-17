@@ -18,6 +18,14 @@
 		"enabled": true,
 		"rules": {
 			"recommended": true,
+			"a11y": {
+				"noLabelWithoutControl": {
+					"level": "error",
+					"options": {
+						"inputComponents": ["TextInput", "Textarea", "Select", "FileInput"]
+					}
+				}
+			},
 			"suspicious": {
 				"noUnknownAtRules": {
 					"level": "error",

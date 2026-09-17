@@ -4,7 +4,15 @@ import type {
 	TaskFormData,
 	TaskStatus,
 } from "#src/services/task-edit/types.ts";
+import { Button, LinkButton } from "../../components/button.tsx";
 import { Card } from "../../components/display.tsx";
+import {
+	Checkbox,
+	Field,
+	Textarea,
+	TextInput,
+} from "../../components/form/form.tsx";
+import { Select } from "../../components/form/select.tsx";
 import { Breadcrumb, PageHeader } from "../../components/page-header.tsx";
 
 // ---------------------------------------------------------------------------
@@ -36,201 +44,117 @@ export interface TaskFormBodyProps {
 
 export const TaskFormBody = ({ form }: TaskFormBodyProps): VNode => (
 	<div class="space-y-5">
-		<div class="form-group">
-			<label for="summary" class="form-label">
-				Title <span class="text-danger">*</span>
-			</label>
-			<input
+		<Field for="summary" label="Title" required>
+			<TextInput
 				required
 				autofocus
-				type="text"
 				id="summary"
 				name="summary"
 				value={form.summary}
-				class="form-input"
 			/>
-		</div>
+		</Field>
 
-		<div class="flex items-center gap-2">
-			{form.allDay ? (
-				<input
-					id="allDay"
-					type="checkbox"
-					name="allDay"
-					checked
-					class="rounded"
-				/>
-			) : (
-				<input id="allDay" type="checkbox" name="allDay" class="rounded" />
-			)}
-			<label for="allDay" class="text-sm text-fg">
-				All-day (dates instead of date/times)
-			</label>
-		</div>
+		<Checkbox
+			id="allDay"
+			label="All-day (dates instead of date/times)"
+			name="allDay"
+			checked={form.allDay}
+		/>
 
 		<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-			<div class="form-group">
-				<label for="start" class="form-label">
-					Start
-				</label>
-				<input
-					type="text"
+			<Field for="start" label="Start">
+				<TextInput
 					id="start"
 					name="start"
 					value={form.start}
 					placeholder="YYYY-MM-DDTHH:mm or YYYY-MM-DD"
-					class="form-input"
 				/>
-			</div>
-			<div class="form-group">
-				<label for="due" class="form-label">
-					Due
-				</label>
-				<input
-					type="text"
+			</Field>
+			<Field for="due" label="Due">
+				<TextInput
 					id="due"
 					name="due"
 					value={form.due}
 					placeholder="YYYY-MM-DDTHH:mm or YYYY-MM-DD"
-					class="form-input"
 				/>
-			</div>
+			</Field>
 		</div>
 
 		<div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-			<div class="form-group">
-				<label for="status" class="form-label">
-					Status
-				</label>
-				<select id="status" name="status" class="form-select">
-					{STATUS_OPTIONS.map((o) =>
-						o.value === form.status ? (
-							<option key={o.value} value={o.value} selected>
-								{o.label}
-							</option>
-						) : (
-							<option key={o.value} value={o.value}>
-								{o.label}
-							</option>
-						),
-					)}
-				</select>
-			</div>
-			<div class="form-group">
-				<label for="priority" class="form-label">
-					Priority (0-9, lower = more important)
-				</label>
-				<input
+			<Field for="status" label="Status">
+				<Select
+					id="status"
+					name="status"
+					options={STATUS_OPTIONS}
+					value={form.status}
+				/>
+			</Field>
+			<Field for="priority" label="Priority (0-9, lower = more important)">
+				<TextInput
 					type="number"
 					min={0}
 					max={9}
 					id="priority"
 					name="priority"
 					value={form.priority}
-					class="form-input"
 				/>
-			</div>
-			<div class="form-group">
-				<label for="percentComplete" class="form-label">
-					Percent complete
-				</label>
-				<input
+			</Field>
+			<Field for="percentComplete" label="Percent complete">
+				<TextInput
 					type="number"
 					min={0}
 					max={100}
 					id="percentComplete"
 					name="percentComplete"
 					value={form.percentComplete}
-					class="form-input"
 				/>
-			</div>
+			</Field>
 		</div>
 
-		<div class="form-group">
-			<label for="location" class="form-label">
-				Location
-			</label>
-			<input
-				type="text"
-				id="location"
-				name="location"
-				value={form.location}
-				class="form-input"
-			/>
-		</div>
+		<Field for="location" label="Location">
+			<TextInput id="location" name="location" value={form.location} />
+		</Field>
 
-		<div class="form-group">
-			<label for="description" class="form-label">
-				Description
-			</label>
-			<textarea
-				id="description"
-				name="description"
-				rows={3}
-				class="form-textarea"
-				value={form.description}
-			/>
-		</div>
+		<Field for="description" label="Description">
+			<Textarea id="description" name="description" value={form.description} />
+		</Field>
 
-		<div class="form-group">
-			<label for="categoriesCsv" class="form-label">
-				Categories (comma-separated)
-			</label>
-			<input
-				type="text"
+		<Field for="categoriesCsv" label="Categories (comma-separated)">
+			<TextInput
 				id="categoriesCsv"
 				name="categoriesCsv"
 				value={form.categoriesCsv}
-				class="form-input"
 			/>
-		</div>
+		</Field>
 
 		<fieldset class="space-y-3 rounded border border-line p-4">
 			<legend class="form-label px-1">Repeat</legend>
-			<div class="form-group">
-				<label for="recurrenceFreq" class="form-label">
-					Frequency
-				</label>
-				<select id="recurrenceFreq" name="recurrenceFreq" class="form-select">
-					{FREQ_OPTIONS.map((o) =>
-						o.value === form.recurrenceFreq ? (
-							<option key={o.value} value={o.value} selected>
-								{o.label}
-							</option>
-						) : (
-							<option key={o.value} value={o.value}>
-								{o.label}
-							</option>
-						),
-					)}
-				</select>
-			</div>
+			<Field for="recurrenceFreq" label="Frequency">
+				<Select
+					id="recurrenceFreq"
+					name="recurrenceFreq"
+					options={FREQ_OPTIONS}
+					value={form.recurrenceFreq}
+				/>
+			</Field>
 			<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-				<div class="form-group">
-					<label for="recurrenceCount" class="form-label">
-						Occurrence count
-					</label>
-					<input
+				<Field for="recurrenceCount" label="Occurrence count">
+					<TextInput
 						type="number"
 						min={1}
 						id="recurrenceCount"
 						name="recurrenceCount"
 						value={form.recurrenceCount}
-						class="form-input"
 					/>
-				</div>
-				<div class="form-group">
-					<label for="recurrenceUntil" class="form-label">
-						Or until
-					</label>
-					<input
+				</Field>
+				<Field for="recurrenceUntil" label="Or until">
+					<TextInput
 						type="date"
 						id="recurrenceUntil"
 						name="recurrenceUntil"
 						value={form.recurrenceUntil}
-						class="form-input"
 					/>
-				</div>
+				</Field>
 			</div>
 			<p class="form-hint">Count wins over Until when both are set.</p>
 		</fieldset>
@@ -268,12 +192,10 @@ export const TaskFormPage = ({
 			<form method="POST" action={action}>
 				<TaskFormBody form={form} />
 				<div class="flex flex-wrap gap-3 pt-5">
-					<button type="submit" class="btn btn-primary">
+					<Button type="submit" variant="primary">
 						{mode === "edit" ? "Save changes" : "Create task"}
-					</button>
-					<a href={backHref} class="btn btn-secondary">
-						Cancel
-					</a>
+					</Button>
+					<LinkButton href={backHref}>Cancel</LinkButton>
 				</div>
 			</form>
 		</Card>
@@ -286,9 +208,9 @@ export const TaskFormPage = ({
 					data-confirm="Delete this task?"
 				>
 					<h2 class="mb-2 text-sm font-semibold text-danger">Danger zone</h2>
-					<button type="submit" class="btn btn-danger">
+					<Button type="submit" variant="danger">
 						Delete task
-					</button>
+					</Button>
 				</form>
 			</Card>
 		)}

@@ -1,6 +1,14 @@
 import type { VNode } from "preact";
 import type { SharePanelData } from "#src/http/ui/helpers/share-panel.ts";
-import { Card } from "../components/display.tsx";
+import { Button, LinkButton } from "../components/button.tsx";
+import {
+	Badge,
+	Card,
+	type Column,
+	EmptyState,
+	Table,
+} from "../components/display.tsx";
+import { Field, Textarea, TextInput } from "../components/form/form.tsx";
 import { IconPlus } from "../components/icons.tsx";
 import { Breadcrumb, PageHeader } from "../components/page-header.tsx";
 
@@ -27,6 +35,25 @@ export interface GroupsListPageProps {
 	readonly sharePanel: SharePanelData | undefined;
 }
 
+const GROUP_COLUMNS: ReadonlyArray<Column<GroupListRow>> = [
+	{ header: "Name", cell: (g) => g.displayName },
+	{
+		header: "Slug",
+		cell: (g) => <span class="font-mono text-muted">{g.slug}</span>,
+	},
+	{
+		header: "",
+		align: "right",
+		shrink: true,
+		cell: (g) =>
+			g.canEdit && (
+				<a href={`/ui/groups/${g.id}`} class="link">
+					Edit
+				</a>
+			),
+	},
+];
+
 export const GroupsListPage = ({
 	groups,
 	canCreateGroup,
@@ -37,44 +64,20 @@ export const GroupsListPage = ({
 			title="Groups"
 			actions={
 				canCreateGroup && (
-					<a href="/ui/groups/new" class="btn btn-primary btn-sm">
+					<LinkButton href="/ui/groups/new" variant="primary" size="sm">
 						<IconPlus class="h-4 w-4" />
 						New group
-					</a>
+					</LinkButton>
 				)
 			}
 		/>
 
-		{groups.length > 0 ? (
-			<div class="table-wrap">
-				<table class="table">
-					<thead>
-						<tr>
-							<th>Name</th>
-							<th>Slug</th>
-							<th class="w-0" />
-						</tr>
-					</thead>
-					<tbody>
-						{groups.map((g) => (
-							<tr key={g.id}>
-								<td class="text-fg">{g.displayName}</td>
-								<td class="font-mono text-muted">{g.slug}</td>
-								<td class="text-right">
-									{g.canEdit && (
-										<a href={`/ui/groups/${g.id}`} class="link">
-											Edit
-										</a>
-									)}
-								</td>
-							</tr>
-						))}
-					</tbody>
-				</table>
-			</div>
-		) : (
-			<p class="text-sm text-muted">No groups found.</p>
-		)}
+		<Table
+			columns={GROUP_COLUMNS}
+			rows={groups}
+			getKey={(g) => g.id}
+			empty={<EmptyState title="No groups found." />}
+		/>
 
 		<SharePanel data={sharePanel} />
 	</div>
@@ -103,39 +106,28 @@ export const GroupNewPage = (): VNode => (
 				hx-swap="outerHTML"
 				class="space-y-4"
 			>
-				<div class="form-group">
-					<label for="slug" class="form-label">
-						Slug <span class="text-danger">*</span>
-					</label>
-					<input
-						type="text"
+				<Field
+					for="slug"
+					label="Slug"
+					required
+					hint="Lowercase letters, digits, and hyphens only."
+				>
+					<TextInput
 						id="slug"
 						name="slug"
 						required
 						pattern="[a-z0-9-]+"
 						placeholder="e.g. engineering"
-						class="form-input"
 					/>
-					<p class="form-hint">Lowercase letters, digits, and hyphens only.</p>
-				</div>
-				<div class="form-group">
-					<label for="displayName" class="form-label">
-						Display name
-					</label>
-					<input
-						type="text"
-						id="displayName"
-						name="displayName"
-						class="form-input"
-					/>
-				</div>
+				</Field>
+				<Field for="displayName" label="Display name">
+					<TextInput id="displayName" name="displayName" />
+				</Field>
 				<div class="flex gap-3 pt-2">
-					<button type="submit" class="btn btn-primary">
+					<Button type="submit" variant="primary">
 						Create group
-					</button>
-					<a href="/ui/groups" class="btn btn-secondary">
-						Cancel
-					</a>
+					</Button>
+					<LinkButton href="/ui/groups">Cancel</LinkButton>
 				</div>
 			</form>
 		</Card>
@@ -176,6 +168,21 @@ export interface GroupEditPageProps {
 	readonly oidcGroups: ReadonlyArray<string>;
 }
 
+const GROUP_COLLECTION_COLUMNS: ReadonlyArray<Column<GroupEditCollection>> = [
+	{
+		header: "Name",
+		cell: (c) => (
+			<a href={`/ui/collections/${c.id}`} class="link">
+				{c.displayName}
+			</a>
+		),
+	},
+	{
+		header: "Type",
+		cell: (c) => <span class="text-muted">{c.collectionType}</span>,
+	},
+];
+
 export const GroupEditPage = (props: GroupEditPageProps): VNode => {
 	const base = `/ui/api/groups/${props.principalId}`;
 	const grantAdmin = `/ui/api/acl/principal/${props.principalId}/grant`;
@@ -203,9 +210,9 @@ export const GroupEditPage = (props: GroupEditPageProps): VNode => {
 								data-confirm="Delete this group? This cannot be undone."
 								class="inline"
 							>
-								<button type="submit" class="btn btn-danger btn-sm">
+								<Button type="submit" variant="danger" size="sm">
 									Delete
-								</button>
+								</Button>
 							</form>
 						)
 					}
@@ -221,25 +228,20 @@ export const GroupEditPage = (props: GroupEditPageProps): VNode => {
 					hx-swap="outerHTML"
 					class="space-y-4"
 				>
-					<div class="form-group">
-						<label for="displayName" class="form-label">
-							Display name
-						</label>
-						<input
-							type="text"
+					<Field for="displayName" label="Display name">
+						<TextInput
 							id="displayName"
 							name="displayName"
 							value={props.displayName}
-							class="form-input"
 						/>
-					</div>
+					</Field>
 					<p class="text-sm text-muted">
 						<span class="font-medium text-fg">Slug:</span>{" "}
 						<span class="font-mono">{props.slug}</span>
 					</p>
-					<button type="submit" class="btn btn-primary">
+					<Button type="submit" variant="primary">
 						Save changes
-					</button>
+					</Button>
 				</form>
 			</Card>
 
@@ -253,28 +255,21 @@ export const GroupEditPage = (props: GroupEditPageProps): VNode => {
 						hx-swap="outerHTML"
 						class="space-y-4"
 					>
-						<div class="form-group">
-							<label for="oidcGroups" class="form-label">
-								IdP group names
-							</label>
-							<textarea
+						<Field
+							for="oidcGroups"
+							label="IdP group names"
+							hint="One per line (or comma-separated). Users whose OIDC groups claim includes any of these are automatically added as members on login; removed automatically when it no longer does."
+						>
+							<Textarea
 								id="oidcGroups"
 								name="oidcGroups"
-								rows={3}
-								class="form-input"
 								placeholder="e.g. engineering, on-call"
-							>
-								{props.oidcGroups.join("\n")}
-							</textarea>
-							<p class="form-hint">
-								One per line (or comma-separated). Users whose OIDC groups claim
-								includes any of these are automatically added as members on
-								login; removed automatically when it no longer does.
-							</p>
-						</div>
-						<button type="submit" class="btn btn-primary">
+								value={props.oidcGroups.join("\n")}
+							/>
+						</Field>
+						<Button type="submit" variant="primary">
 							Save
-						</button>
+						</Button>
 					</form>
 				</Card>
 			)}
@@ -282,40 +277,20 @@ export const GroupEditPage = (props: GroupEditPageProps): VNode => {
 			<Card
 				title="Collections"
 				actions={
-					<a
+					<LinkButton
 						href={`/ui/groups/${props.principalId}/collections/new`}
-						class="btn btn-secondary btn-sm"
+						size="sm"
 					>
 						Add collection
-					</a>
+					</LinkButton>
 				}
 			>
-				{props.collections.length > 0 ? (
-					<div class="table-wrap">
-						<table class="table">
-							<thead>
-								<tr>
-									<th>Name</th>
-									<th>Type</th>
-								</tr>
-							</thead>
-							<tbody>
-								{props.collections.map((c) => (
-									<tr key={c.id}>
-										<td>
-											<a href={`/ui/collections/${c.id}`} class="link">
-												{c.displayName}
-											</a>
-										</td>
-										<td class="text-muted">{c.collectionType}</td>
-									</tr>
-								))}
-							</tbody>
-						</table>
-					</div>
-				) : (
-					<p class="text-sm text-muted">No collections yet.</p>
-				)}
+				<Table
+					columns={GROUP_COLLECTION_COLUMNS}
+					rows={props.collections}
+					getKey={(c) => c.id}
+					empty={<EmptyState title="No collections yet." />}
+				/>
 			</Card>
 
 			<SharePanel data={props.sharePanel} />
@@ -351,7 +326,7 @@ export const GroupEditPage = (props: GroupEditPageProps): VNode => {
 							))}
 						</ul>
 					) : (
-						<p class="text-sm text-muted">No group admins yet.</p>
+						<EmptyState title="No group admins yet." />
 					)}
 
 					<form
@@ -362,23 +337,18 @@ export const GroupEditPage = (props: GroupEditPageProps): VNode => {
 						hx-swap="outerHTML"
 						class="flex flex-wrap items-end gap-2 border-t border-line pt-4"
 					>
-						<div class="form-group">
-							<label for="adminSlug" class="form-label">
-								Add admin (user slug)
-							</label>
-							<input
-								type="text"
+						<Field for="adminSlug" label="Add admin (user slug)">
+							<TextInput
 								id="adminSlug"
 								name="principalSlug"
 								placeholder="e.g. alice"
-								class="form-input"
 								required
 							/>
-						</div>
+						</Field>
 						<input type="hidden" name="privilege" value="DAV:all" />
-						<button type="submit" class="btn btn-primary btn-sm">
+						<Button type="submit" variant="primary" size="sm">
 							Add admin
-						</button>
+						</Button>
 					</form>
 				</div>
 			</Card>
@@ -395,9 +365,7 @@ export const GroupEditPage = (props: GroupEditPageProps): VNode => {
 									<span class="flex items-center gap-2 text-fg">
 										{m.label}
 										{m.autoAssignedBy && (
-											<span class="badge">
-												Auto-assigned ({m.autoAssignedBy})
-											</span>
+											<Badge>Auto-assigned ({m.autoAssignedBy})</Badge>
 										)}
 									</span>
 									<span class="font-mono text-xs text-muted">{m.slug}</span>
@@ -405,7 +373,7 @@ export const GroupEditPage = (props: GroupEditPageProps): VNode => {
 							))}
 						</ul>
 					) : (
-						<p class="text-sm text-muted">No members yet.</p>
+						<EmptyState title="No members yet." />
 					)}
 					<p class="text-xs text-subtle">
 						Manage membership from individual user edit pages.

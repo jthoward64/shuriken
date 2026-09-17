@@ -1,7 +1,17 @@
 import type { VNode } from "preact";
-import { CopyButton } from "../components/copy.tsx";
+import { Button, LinkButton } from "../components/button.tsx";
+import { CopyButton, CopyField } from "../components/copy.tsx";
+import {
+	Badge,
+	Card,
+	type Column,
+	EmptyState,
+	Table,
+} from "../components/display.tsx";
+import { Checkbox, Field, TextInput } from "../components/form/form.tsx";
+import { Select } from "../components/form/select.tsx";
 import { IconPlus } from "../components/icons.tsx";
-import { PageHeader } from "../components/page-header.tsx";
+import { Breadcrumb, PageHeader } from "../components/page-header.tsx";
 
 import {
 	CALENDAR_POPOVER_BODY_ID,
@@ -14,28 +24,13 @@ import {
 // Calendar-scoped: reached from the Calendar menu.
 // ---------------------------------------------------------------------------
 
+// Feeds hang off the calendar section, so every trail starts there
 const CalendarCrumb = ({
 	items,
 }: {
 	items: ReadonlyArray<{ label: string; href?: string }>;
 }) => (
-	<nav aria-label="Breadcrumb" class="mb-2 flex items-center gap-2 text-sm">
-		<a href="/ui/calendar" class="link">
-			Calendar
-		</a>
-		{items.map((it) => (
-			<>
-				<span class="text-subtle">/</span>
-				{it.href ? (
-					<a href={it.href} class="link">
-						{it.label}
-					</a>
-				) : (
-					<span class="text-muted">{it.label}</span>
-				)}
-			</>
-		))}
-	</nav>
+	<Breadcrumb items={[{ label: "Calendar", href: "/ui/calendar" }, ...items]} />
 );
 
 const VISIBILITY_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
@@ -51,17 +46,13 @@ const VisibilitySelect = ({
 	calendarId: string;
 	selected: string;
 }) => (
-	<select name={`visibility:${calendarId}`} class="form-select w-auto text-xs">
-		{VISIBILITY_OPTIONS.map((o) =>
-			o.value === selected ? (
-				<option value={o.value} selected>
-					{o.label}
-				</option>
-			) : (
-				<option value={o.value}>{o.label}</option>
-			),
-		)}
-	</select>
+	<Select
+		name={`visibility:${calendarId}`}
+		aria-label="Visibility"
+		options={VISIBILITY_OPTIONS}
+		value={selected}
+		class="w-auto text-xs"
+	/>
 );
 
 // --- List ------------------------------------------------------------------
@@ -74,6 +65,52 @@ export interface FeedListRow {
 	readonly calendarCount: number;
 	readonly feedUrl: string;
 }
+
+const FEED_COLUMNS: ReadonlyArray<Column<FeedListRow>> = [
+	{
+		header: "Name",
+		cell: (f) => (
+			<a
+				href={`/ui/feeds/${f.id}`}
+				class="font-medium text-fg hover:text-muted"
+			>
+				{f.displayName}
+			</a>
+		),
+	},
+	{
+		header: "Calendars",
+		cell: (f) => <span class="text-muted">{f.calendarCount}</span>,
+	},
+	{
+		header: "Status",
+		cell: (f) => (
+			<>
+				<Badge tone={f.enabled ? "success" : "neutral"}>
+					{f.enabled ? "enabled" : "disabled"}
+				</Badge>
+				{f.expiresAt && (
+					<span class="ml-2 text-xs text-subtle">expires {f.expiresAt}</span>
+				)}
+			</>
+		),
+	},
+	{
+		header: "",
+		align: "right",
+		shrink: true,
+		cell: (f) => (
+			<div class="whitespace-nowrap">
+				<a href={f.feedUrl} class="link mr-3" title="Open feed">
+					Open
+				</a>
+				<a href={`/ui/feeds/${f.id}`} class="link">
+					Edit
+				</a>
+			</div>
+		),
+	},
+];
 
 export const FeedsListPage = ({
 	feeds,
@@ -92,76 +129,36 @@ export const FeedsListPage = ({
 					title="Feeds"
 					subtitle="Public read-only iCalendar links, each protected by a random token."
 					actions={
-						<a href="/ui/feeds/new" class="btn btn-primary">
+						<LinkButton href="/ui/feeds/new" variant="primary">
 							<IconPlus class="h-4 w-4" />
 							New feed
-						</a>
+						</LinkButton>
 					}
 				/>
 			)}
 			{popover && (
-				<a href="/ui/feeds/new" class="btn btn-primary btn-sm">
+				<LinkButton href="/ui/feeds/new" variant="primary" size="sm">
 					<IconPlus class="h-4 w-4" />
 					New feed
-				</a>
+				</LinkButton>
 			)}
 
-			{feeds.length > 0 ? (
-				<div class="table-wrap">
-					<table class="table">
-						<thead>
-							<tr>
-								<th>Name</th>
-								<th>Calendars</th>
-								<th>Status</th>
-								<th class="w-0" />
-							</tr>
-						</thead>
-						<tbody>
-							{feeds.map((f) => (
-								<tr>
-									<td>
-										<a
-											href={`/ui/feeds/${f.id}`}
-											class="font-medium text-fg hover:text-muted"
-										>
-											{f.displayName}
-										</a>
-									</td>
-									<td class="text-muted">{f.calendarCount}</td>
-									<td class="text-sm">
-										<span class={f.enabled ? "badge badge-success" : "badge"}>
-											{f.enabled ? "enabled" : "disabled"}
-										</span>
-										{f.expiresAt && (
-											<span class="ml-2 text-xs text-subtle">
-												expires {f.expiresAt}
-											</span>
-										)}
-									</td>
-									<td class="text-right">
-										<a href={f.feedUrl} class="link mr-3" title="Open feed">
-											Open
-										</a>
-										<a href={`/ui/feeds/${f.id}`} class="link">
-											Edit
-										</a>
-									</td>
-								</tr>
-							))}
-						</tbody>
-					</table>
-				</div>
-			) : (
-				<div class="card card-pad text-center">
-					<p class="text-sm text-muted">
-						No feeds yet.{" "}
-						<a href="/ui/feeds/new" class="link">
-							Create one.
-						</a>
-					</p>
-				</div>
-			)}
+			<Table
+				columns={FEED_COLUMNS}
+				rows={feeds}
+				getKey={(f) => f.id}
+				empty={
+					<EmptyState
+						title="No feeds yet."
+						action={
+							<LinkButton href="/ui/feeds/new" variant="primary" size="sm">
+								<IconPlus class="h-4 w-4" />
+								New feed
+							</LinkButton>
+						}
+					/>
+				}
+			/>
 		</div>
 	);
 };
@@ -206,7 +203,7 @@ export const CalendarFeedsSection = ({
 				))}
 			</ul>
 		) : (
-			<p class="text-sm text-muted">Not part of any feed yet.</p>
+			<EmptyState title="Not part of any feed yet." />
 		)}
 		{addableFeeds.length > 0 && (
 			<form
@@ -218,16 +215,23 @@ export const CalendarFeedsSection = ({
 				class="flex items-center gap-2"
 			>
 				<input type="hidden" name="returnTo" value="/ui/calendar" />
-				<select name="feedId" required class="form-select flex-1 text-xs">
-					<option value="">Add to feed…</option>
-					{addableFeeds.map((f) => (
-						<option value={f.id}>{f.displayName}</option>
-					))}
-				</select>
+				<Select
+					name="feedId"
+					required
+					aria-label="Feed"
+					class="flex-1 text-xs"
+					options={[
+						{ value: "", label: "Add to feed…" },
+						...addableFeeds.map((f) => ({
+							value: f.id,
+							label: f.displayName,
+						})),
+					]}
+				/>
 				<VisibilitySelect calendarId={calendarId} selected="all" />
-				<button type="submit" class="btn btn-secondary btn-sm">
+				<Button type="submit" size="sm">
 					Add
-				</button>
+				</Button>
 			</form>
 		)}
 		<a
@@ -279,78 +283,60 @@ export const FeedNewPage = ({
 				</div>
 			)}
 
-			<div class="card card-pad">
+			<Card>
 				<form method="POST" action="/ui/api/feeds/create" class="space-y-4">
 					{popover && (
 						<input type="hidden" name="returnTo" value="/ui/calendar" />
 					)}
-					<div class="form-group">
-						<label for="displayName" class="form-label">
-							Display name
-						</label>
-						<input
-							type="text"
+					<Field for="displayName" label="Display name">
+						<TextInput
 							id="displayName"
 							name="displayName"
 							placeholder="e.g. Work calendar"
-							class="form-input"
 						/>
-					</div>
+					</Field>
 
-					<div class="form-group">
-						<label for="expiresAt" class="form-label">
-							Expires at (optional ISO instant)
-						</label>
-						<input
-							type="text"
+					<Field for="expiresAt" label="Expires at (optional ISO instant)">
+						<TextInput
 							id="expiresAt"
 							name="expiresAt"
 							placeholder="2026-12-31T00:00:00Z"
-							class="form-input"
 						/>
-					</div>
+					</Field>
 
 					<fieldset class="space-y-2">
 						<legend class="form-label mb-1">Calendars to include</legend>
 						{calendars.length > 0 ? (
 							calendars.map((c) => (
 								<div class="flex items-center gap-3 py-1">
-									<input
-										type="checkbox"
+									<Checkbox
 										id={`cal-${c.id}`}
+										label={c.displayName}
 										name="calendar"
 										value={c.id}
 										checked={c.id === preselectedCalendarId}
-										class="rounded"
+										class="flex-1"
 									/>
-									<label for={`cal-${c.id}`} class="flex-1 text-sm">
-										{c.displayName}
-									</label>
 									<VisibilitySelect calendarId={c.id} selected="all" />
 								</div>
 							))
 						) : (
-							<p class="text-sm text-muted">You don't own any calendars yet.</p>
+							<EmptyState title="You don't own any calendars yet." />
 						)}
 					</fieldset>
 
 					<div class="flex items-center gap-3">
-						<button type="submit" class="btn btn-primary">
+						<Button type="submit" variant="primary">
 							Create feed
-						</button>
+						</Button>
 						{popover && (
-							<button
-								type="button"
-								commandfor={CALENDAR_POPOVER_ID}
-								command="request-close"
-								class="btn btn-secondary"
-							>
+							<Button commandfor={CALENDAR_POPOVER_ID} command="request-close">
 								Cancel
-							</button>
+							</Button>
 						)}
 					</div>
 				</form>
-			</div>
+			</Card>
 		</div>
 	);
 };
@@ -406,22 +392,16 @@ export const FeedEditPage = ({
 						action={`/ui/api/feeds/${feed.id}/delete`}
 						data-confirm="Delete this feed? The URL will stop working immediately."
 					>
-						<button type="submit" class="btn btn-danger btn-sm">
+						<Button type="submit" variant="danger" size="sm">
 							Delete
-						</button>
+						</Button>
 					</form>
 				}
 			/>
 		</div>
 
-		<div class="card card-pad space-y-3">
-			<h2 class="text-sm font-semibold text-fg">Feed URL</h2>
-			<div class="flex items-stretch gap-2">
-				<code class="block min-w-0 flex-1 select-all overflow-x-auto whitespace-nowrap rounded-md border border-line bg-surface-2 px-3 py-2 font-mono text-sm text-fg">
-					{feed.feedShareUrl}
-				</code>
-				<CopyButton value={feed.feedShareUrl} label="feed URL" />
-			</div>
+		<Card class="space-y-3">
+			<CopyField label="Feed URL" value={feed.feedShareUrl} />
 			<form
 				method="POST"
 				action={`/ui/api/feeds/${feed.id}/regenerate`}
@@ -431,10 +411,10 @@ export const FeedEditPage = ({
 					Regenerate token
 				</button>
 			</form>
-		</div>
+		</Card>
 
 		{calendars.some((c) => c.embedEnabled) && (
-			<div class="card card-pad space-y-3">
+			<Card class="space-y-3">
 				<h2 class="text-sm font-semibold text-fg">Embed snippet</h2>
 				<p class="text-sm text-muted">
 					Paste this into any page to show a read-only calendar widget. No login
@@ -461,110 +441,68 @@ export const FeedEditPage = ({
 						label="embed snippet"
 					/>
 				</div>
-			</div>
+			</Card>
 		)}
 
-		<div class="card card-pad">
+		<Card>
 			<form
 				method="POST"
 				action={`/ui/api/feeds/${feed.id}/update`}
 				class="space-y-4"
 			>
-				<div class="form-group">
-					<label for="displayName" class="form-label">
-						Display name
-					</label>
-					<input
-						type="text"
+				<Field for="displayName" label="Display name">
+					<TextInput
 						id="displayName"
 						name="displayName"
 						value={feed.displayName}
-						class="form-input"
 					/>
-				</div>
+				</Field>
 
-				<div class="form-group">
-					<label for="expiresAt" class="form-label">
-						Expires at (optional ISO instant)
-					</label>
-					<input
-						type="text"
+				<Field for="expiresAt" label="Expires at (optional ISO instant)">
+					<TextInput
 						id="expiresAt"
 						name="expiresAt"
 						value={feed.expiresAt}
 						placeholder="2026-12-31T00:00:00Z"
-						class="form-input"
 					/>
-				</div>
+				</Field>
 
-				<div class="flex items-center gap-2">
-					{feed.enabled ? (
-						<input type="checkbox" id="enabled" name="enabled" checked />
-					) : (
-						<input type="checkbox" id="enabled" name="enabled" />
-					)}
-					<label for="enabled" class="text-sm text-fg">
-						Enabled
-					</label>
-				</div>
+				<Checkbox
+					id="enabled"
+					label="Enabled"
+					name="enabled"
+					checked={feed.enabled}
+				/>
 
 				<fieldset class="space-y-2">
 					<legend class="form-label mb-1">Calendars</legend>
 					{calendars.map((c) => (
 						<div class="flex items-center gap-3 py-1">
-							{c.linked ? (
-								<input
-									type="checkbox"
-									id={`cal-${c.id}`}
-									name="calendar"
-									value={c.id}
-									checked
-									class="rounded"
-								/>
-							) : (
-								<input
-									type="checkbox"
-									id={`cal-${c.id}`}
-									name="calendar"
-									value={c.id}
-									class="rounded"
-								/>
-							)}
-							<label for={`cal-${c.id}`} class="flex-1 text-sm">
-								{c.displayName}
-							</label>
+							<Checkbox
+								id={`cal-${c.id}`}
+								label={c.displayName}
+								name="calendar"
+								value={c.id}
+								checked={c.linked}
+								class="flex-1"
+							/>
 							<VisibilitySelect calendarId={c.id} selected={c.visibility} />
-							<label
-								for={`embed-${c.id}`}
-								class="flex items-center gap-1.5 text-xs text-muted"
+							<Checkbox
+								id={`embed-${c.id}`}
+								label="Embed"
+								name={`embed:${c.id}`}
+								checked={c.embedEnabled}
 								title="Show this calendar in the public, no-login embed widget"
-							>
-								{c.embedEnabled ? (
-									<input
-										type="checkbox"
-										id={`embed-${c.id}`}
-										name={`embed:${c.id}`}
-										checked
-										class="rounded"
-									/>
-								) : (
-									<input
-										type="checkbox"
-										id={`embed-${c.id}`}
-										name={`embed:${c.id}`}
-										class="rounded"
-									/>
-								)}
-								Embed
-							</label>
+								class="text-xs text-muted"
+							/>
 						</div>
 					))}
 				</fieldset>
 
-				<button type="submit" class="btn btn-primary">
+				<Button type="submit" variant="primary">
 					Save changes
-				</button>
+				</Button>
 			</form>
-		</div>
+		</Card>
 	</div>
 );

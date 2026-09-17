@@ -4,6 +4,7 @@ import {
 	type EventFormData,
 	emptyEventForm,
 } from "#src/services/cal-edit/types.ts";
+import { Button } from "../../components/button.tsx";
 import { IconClose } from "../../components/icons.tsx";
 import { SharePanel } from "../share-panel.tsx";
 import { EventFormBody } from "./event-form.tsx";
@@ -44,15 +45,15 @@ const PopoverHeader = ({
 		<h2 id={titleId} class="card-title">
 			{title}
 		</h2>
-		<button
-			type="button"
+		<Button
+			variant="ghost"
+			size="sm"
 			commandfor={popoverId}
 			command="request-close"
 			aria-label="Close"
-			class="btn btn-ghost btn-sm"
 		>
 			<IconClose class="h-4 w-4" />
-		</button>
+		</Button>
 	</div>
 );
 
@@ -87,17 +88,12 @@ export const NewEventPopover = ({
 				>
 					<EventFormBody form={form} idPrefix="new-" autofocus />
 					<div class="flex flex-wrap gap-3 pt-5">
-						<button type="submit" class="btn btn-primary">
+						<Button type="submit" variant="primary">
 							Create event
-						</button>
-						<button
-							type="button"
-							commandfor={NEW_EVENT_POPOVER_ID}
-							command="request-close"
-							class="btn btn-secondary"
-						>
+						</Button>
+						<Button commandfor={NEW_EVENT_POPOVER_ID} command="request-close">
 							Cancel
-						</button>
+						</Button>
 					</div>
 				</form>
 			</div>
@@ -150,24 +146,20 @@ export const EventEditPopoverForm = ({
 		>
 			<EventFormBody form={form} idPrefix="edit-" autofocus />
 			<div class="flex flex-wrap items-center gap-3 pt-5">
-				<button type="submit" class="btn btn-primary">
+				<Button type="submit" variant="primary">
 					Save changes
-				</button>
-				<button
-					type="button"
-					commandfor={EDIT_EVENT_POPOVER_ID}
-					command="request-close"
-					class="btn btn-secondary"
-				>
+				</Button>
+				<Button commandfor={EDIT_EVENT_POPOVER_ID} command="request-close">
 					Cancel
-				</button>
-				<button
+				</Button>
+				<Button
 					type="submit"
+					variant="danger"
+					class="ml-auto"
 					form={`${EDIT_EVENT_POPOVER_ID}-delete`}
-					class="btn btn-danger ml-auto"
 				>
 					Delete
-				</button>
+				</Button>
 			</div>
 		</form>
 		{/* Separate form so Delete never carries the edit fields. Associated with

@@ -1,6 +1,7 @@
 import type { VNode } from "preact";
 import { Temporal } from "temporal-polyfill";
 import type { EventFormData } from "#src/services/cal-edit/types.ts";
+import { LinkButton } from "../../components/button.tsx";
 import { IconEdit } from "../../components/icons.tsx";
 
 // ---------------------------------------------------------------------------
@@ -93,14 +94,16 @@ export const EventHoverCard = ({
 		<div class="flex items-start justify-between gap-3">
 			<h3 class="font-semibold text-fg">{form.summary || "Event"}</h3>
 			{editHref !== undefined && (
-				<a
+				<LinkButton
 					href={editHref}
+					variant="ghost"
+					size="sm"
 					data-edit-event
 					aria-label="Edit event"
-					class="btn btn-ghost btn-sm shrink-0"
+					class="shrink-0"
 				>
 					<IconEdit class="h-4 w-4" />
-				</a>
+				</LinkButton>
 			)}
 		</div>
 		<p class="mt-1 text-sm text-muted">{formatWhen(form)}</p>

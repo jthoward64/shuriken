@@ -1,6 +1,9 @@
 import type { VNode } from "preact";
-import { Card } from "../components/display.tsx";
-import { PageHeader } from "../components/page-header.tsx";
+import { Button, LinkButton } from "../components/button.tsx";
+import { Badge, type BadgeTone, Card } from "../components/display.tsx";
+import { Field, TextInput } from "../components/form/form.tsx";
+import { Select } from "../components/form/select.tsx";
+import { Breadcrumb, PageHeader } from "../components/page-header.tsx";
 
 // ---------------------------------------------------------------------------
 // GET /ui/profile/email-credentials — manage per-user SMTP credentials and show
@@ -40,39 +43,18 @@ const STATUS_TEXT: Record<ActiveKind, string> = {
 	disabled: "Mail is currently disabled on this server.",
 };
 
-const STATUS_BADGE: Record<ActiveKind, string> = {
-	user: "badge badge-success",
-	profile: "badge badge-brand",
-	default: "badge",
-	disabled: "badge badge-warning",
+const STATUS_TONE: Record<ActiveKind, BadgeTone> = {
+	user: "success",
+	profile: "brand",
+	default: "neutral",
+	disabled: "warning",
 };
 
-const Breadcrumb = ({ title }: { title: string }) => (
-	<nav aria-label="Breadcrumb" class="mb-2 flex items-center gap-2 text-sm">
-		<a href="/ui/profile" class="link">
-			Profile
-		</a>
-		<span class="text-subtle">/</span>
-		<span class="text-muted">{title}</span>
-	</nav>
-);
-
-const SecurityOption = ({
-	value,
-	label,
-	selected,
-}: {
-	value: string;
-	label: string;
-	selected: boolean;
-}) =>
-	selected ? (
-		<option value={value} selected>
-			{label}
-		</option>
-	) : (
-		<option value={value}>{label}</option>
-	);
+const SECURITY_OPTIONS = [
+	{ value: "none", label: "None" },
+	{ value: "starttls", label: "STARTTLS" },
+	{ value: "tls", label: "TLS / SSL" },
+];
 
 export const EmailCredentialsPage = ({
 	userEmail,
@@ -84,7 +66,12 @@ export const EmailCredentialsPage = ({
 }: EmailCredentialsPageProps): VNode => (
 	<div class="mx-auto max-w-2xl space-y-6">
 		<div>
-			<Breadcrumb title="Email credentials" />
+			<Breadcrumb
+				items={[
+					{ label: "Profile", href: "/ui/profile" },
+					{ label: "Email credentials" },
+				]}
+			/>
 			<PageHeader
 				title="Email credentials"
 				subtitle="How outbound invitation mail is sent on your behalf."
@@ -93,7 +80,7 @@ export const EmailCredentialsPage = ({
 
 		<Card title="Current status">
 			<div class="flex flex-wrap items-center gap-2">
-				<span class={STATUS_BADGE[activeKind]}>{activeKind}</span>
+				<Badge tone={STATUS_TONE[activeKind]}>{activeKind}</Badge>
 				<span class="text-sm text-muted">{STATUS_TEXT[activeKind]}</span>
 			</div>
 			{activeFromAddress && (
@@ -127,50 +114,33 @@ export const EmailCredentialsPage = ({
 				class="space-y-4"
 			>
 				<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-					<div class="form-group">
-						<label for="fromAddress" class="form-label">
-							From address <span class="text-danger">*</span>
-						</label>
-						<input
+					<Field for="fromAddress" label="From address" required>
+						<TextInput
 							required
 							type="email"
 							id="fromAddress"
 							name="fromAddress"
 							value={existing ? existing.fromAddress : userEmail}
-							class="form-input"
 						/>
-					</div>
-					<div class="form-group">
-						<label for="fromName" class="form-label">
-							From display name
-						</label>
-						<input
-							type="text"
+					</Field>
+					<Field for="fromName" label="From display name">
+						<TextInput
 							id="fromName"
 							name="fromName"
 							value={existing ? existing.fromName : ""}
-							class="form-input"
 						/>
-					</div>
-					<div class="form-group">
-						<label for="host" class="form-label">
-							SMTP host <span class="text-danger">*</span>
-						</label>
-						<input
+					</Field>
+					<Field for="host" label="SMTP host" required>
+						<TextInput
 							required
-							type="text"
 							id="host"
 							name="host"
 							value={existing ? existing.host : ""}
 							placeholder="smtp.example.com"
-							class="form-input"
 						/>
-					</div>
-					<div class="form-group">
-						<label for="port" class="form-label">
-							Port <span class="text-danger">*</span>
-						</label>
-						<input
+					</Field>
+					<Field for="port" label="Port" required>
+						<TextInput
 							required
 							type="number"
 							min={1}
@@ -178,67 +148,45 @@ export const EmailCredentialsPage = ({
 							id="port"
 							name="port"
 							value={existing ? existing.port : DEFAULT_SMTP_PORT}
-							class="form-input"
 						/>
-					</div>
-					<div class="form-group">
-						<label for="username" class="form-label">
-							Username <span class="text-danger">*</span>
-						</label>
-						<input
+					</Field>
+					<Field for="username" label="Username" required>
+						<TextInput
 							required
-							type="text"
 							id="username"
 							name="username"
 							value={existing ? existing.username : ""}
-							class="form-input"
 						/>
-					</div>
-					<div class="form-group">
-						<label for="password" class="form-label">
-							Password <span class="text-danger">*</span>
-						</label>
-						<input
+					</Field>
+					<Field for="password" label="Password" required>
+						<TextInput
 							required
 							type="password"
 							id="password"
 							name="password"
 							autocomplete="new-password"
 							placeholder={existing ? "Leave blank to keep current" : ""}
-							class="form-input"
 						/>
-					</div>
-					<div class="form-group md:col-span-2">
-						<label for="security" class="form-label">
-							Connection security
-						</label>
-						<select id="security" name="security" class="form-select">
-							<SecurityOption
-								value="none"
-								label="None"
-								selected={existing?.security === "none"}
-							/>
-							<SecurityOption
-								value="starttls"
-								label="STARTTLS"
-								selected={existing ? existing.security === "starttls" : true}
-							/>
-							<SecurityOption
-								value="tls"
-								label="TLS / SSL"
-								selected={existing?.security === "tls"}
-							/>
-						</select>
-					</div>
+					</Field>
+					<Field
+						for="security"
+						label="Connection security"
+						class="md:col-span-2"
+					>
+						<Select
+							id="security"
+							name="security"
+							options={SECURITY_OPTIONS}
+							value={existing ? existing.security : "starttls"}
+						/>
+					</Field>
 				</div>
 
 				<div class="flex flex-wrap gap-3 pt-1">
-					<button type="submit" class="btn btn-primary">
+					<Button type="submit" variant="primary">
 						Save credentials
-					</button>
-					<a href="/ui/profile" class="btn btn-secondary">
-						Cancel
-					</a>
+					</Button>
+					<LinkButton href="/ui/profile">Cancel</LinkButton>
 				</div>
 			</form>
 		</Card>
@@ -253,9 +201,9 @@ export const EmailCredentialsPage = ({
 					action="/ui/api/profile/email-credentials/clear"
 					data-confirm="Remove your saved SMTP credentials? You will fall back to the server profile or default."
 				>
-					<button type="submit" class="btn btn-danger">
+					<Button type="submit" variant="danger">
 						Clear credentials
-					</button>
+					</Button>
 				</form>
 			</Card>
 		)}

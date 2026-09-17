@@ -4,7 +4,15 @@ import type {
 	EventFormData,
 	RecurrenceFreq,
 } from "#src/services/cal-edit/types.ts";
+import { Button, LinkButton } from "../../components/button.tsx";
 import { Card } from "../../components/display.tsx";
+import {
+	Checkbox,
+	Field,
+	Textarea,
+	TextInput,
+} from "../../components/form/form.tsx";
+import { Select } from "../../components/form/select.tsx";
 import { Breadcrumb, PageHeader } from "../../components/page-header.tsx";
 
 import { SharePanel } from "../share-panel.tsx";
@@ -44,195 +52,118 @@ export const EventFormBody = ({
 	const id = (name: string) => `${idPrefix}${name}`;
 	return (
 		<div class="space-y-5">
-			<div class="form-group">
-				<label for={id("summary")} class="form-label">
-					Title <span class="text-danger">*</span>
-				</label>
-				<input
+			<Field for={id("summary")} label="Title" required>
+				<TextInput
 					required
 					autofocus={autofocus}
-					type="text"
 					id={id("summary")}
 					name="summary"
 					value={form.summary}
-					class="form-input"
 				/>
-			</div>
+			</Field>
 
-			<div class="flex items-center gap-2">
-				{form.allDay ? (
-					<input
-						id={id("allDay")}
-						type="checkbox"
-						name="allDay"
-						checked
-						class="rounded"
-					/>
-				) : (
-					<input
-						id={id("allDay")}
-						type="checkbox"
-						name="allDay"
-						class="rounded"
-					/>
-				)}
-				<label for={id("allDay")} class="text-sm text-fg">
-					All-day event
-				</label>
-			</div>
+			<Checkbox
+				id={id("allDay")}
+				label="All-day event"
+				name="allDay"
+				checked={form.allDay}
+			/>
 
 			<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-				<div class="form-group">
-					<label for={id("start")} class="form-label">
-						Start <span class="text-danger">*</span>
-					</label>
-					<input
+				<Field for={id("start")} label="Start" required>
+					<TextInput
 						required
-						type="text"
 						id={id("start")}
 						name="start"
 						value={form.start}
 						placeholder="YYYY-MM-DDTHH:mm or YYYY-MM-DD"
-						class="form-input"
 					/>
-				</div>
-				<div class="form-group">
-					<label for={id("end")} class="form-label">
-						End
-					</label>
-					<input
-						type="text"
+				</Field>
+				<Field for={id("end")} label="End">
+					<TextInput
 						id={id("end")}
 						name="end"
 						value={form.end}
 						placeholder="YYYY-MM-DDTHH:mm or YYYY-MM-DD"
-						class="form-input"
 					/>
-				</div>
+				</Field>
 			</div>
 
-			<div class="form-group">
-				<label for={id("location")} class="form-label">
-					Location
-				</label>
-				<input
-					type="text"
-					id={id("location")}
-					name="location"
-					value={form.location}
-					class="form-input"
-				/>
-			</div>
+			<Field for={id("location")} label="Location">
+				<TextInput id={id("location")} name="location" value={form.location} />
+			</Field>
 
-			<div class="form-group">
-				<label for={id("description")} class="form-label">
-					Description
-				</label>
-				<textarea
+			<Field for={id("description")} label="Description">
+				<Textarea
 					id={id("description")}
 					name="description"
-					rows={3}
-					class="form-textarea"
 					value={form.description}
 				/>
-			</div>
+			</Field>
 
-			<div class="form-group">
-				<label for={id("categoriesCsv")} class="form-label">
-					Categories (comma-separated)
-				</label>
-				<input
-					type="text"
+			<Field for={id("categoriesCsv")} label="Categories (comma-separated)">
+				<TextInput
 					id={id("categoriesCsv")}
 					name="categoriesCsv"
 					value={form.categoriesCsv}
-					class="form-input"
 				/>
-			</div>
+			</Field>
 
 			<fieldset class="space-y-3 rounded border border-line p-4">
 				<legend class="form-label px-1">Attendees</legend>
-				<div class="form-group">
-					<label for={id("attendeesCsv")} class="form-label">
-						Email addresses (one per line or comma-separated)
-					</label>
-					<textarea
+				<Field
+					for={id("attendeesCsv")}
+					label="Email addresses (one per line or comma-separated)"
+				>
+					<Textarea
 						id={id("attendeesCsv")}
 						name="attendeesCsv"
-						rows={3}
 						placeholder="alice@example.com&#10;bob@example.org"
-						class="form-textarea"
 						value={form.attendees.join("\n")}
 					/>
-				</div>
-				<div class="form-group">
-					<label for={id("organizer")} class="form-label">
-						Organizer (optional override)
-					</label>
-					<input
+				</Field>
+				<Field
+					for={id("organizer")}
+					label="Organizer (optional override)"
+					hint="Non-local attendees receive an iMIP invite when the event is saved or cancelled."
+				>
+					<TextInput
 						type="email"
 						id={id("organizer")}
 						name="organizer"
 						value={form.organizer}
-						class="form-input"
 					/>
-				</div>
-				<p class="form-hint">
-					Non-local attendees receive an iMIP invite when the event is saved or
-					cancelled.
-				</p>
+				</Field>
 			</fieldset>
 
 			<fieldset class="space-y-3 rounded border border-line p-4">
 				<legend class="form-label px-1">Repeat</legend>
-				<div class="form-group">
-					<label for={id("recurrenceFreq")} class="form-label">
-						Frequency
-					</label>
-					<select
+				<Field for={id("recurrenceFreq")} label="Frequency">
+					<Select
 						id={id("recurrenceFreq")}
 						name="recurrenceFreq"
-						class="form-select"
-					>
-						{FREQ_OPTIONS.map((o) =>
-							o.value === form.recurrenceFreq ? (
-								<option key={o.value} value={o.value} selected>
-									{o.label}
-								</option>
-							) : (
-								<option key={o.value} value={o.value}>
-									{o.label}
-								</option>
-							),
-						)}
-					</select>
-				</div>
+						options={FREQ_OPTIONS}
+						value={form.recurrenceFreq}
+					/>
+				</Field>
 				<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-					<div class="form-group">
-						<label for={id("recurrenceCount")} class="form-label">
-							Occurrence count
-						</label>
-						<input
+					<Field for={id("recurrenceCount")} label="Occurrence count">
+						<TextInput
 							type="number"
 							min={1}
 							id={id("recurrenceCount")}
 							name="recurrenceCount"
 							value={form.recurrenceCount}
-							class="form-input"
 						/>
-					</div>
-					<div class="form-group">
-						<label for={id("recurrenceUntil")} class="form-label">
-							Or until
-						</label>
-						<input
+					</Field>
+					<Field for={id("recurrenceUntil")} label="Or until">
+						<TextInput
 							type="date"
 							id={id("recurrenceUntil")}
 							name="recurrenceUntil"
 							value={form.recurrenceUntil}
-							class="form-input"
 						/>
-					</div>
+					</Field>
 				</div>
 				<p class="form-hint">Count wins over Until when both are set.</p>
 			</fieldset>
@@ -277,12 +208,10 @@ export const EventFormPage = ({
 			<form method="POST" action={action}>
 				<EventFormBody form={form} idPrefix="edit-" />
 				<div class="flex flex-wrap gap-3 pt-5">
-					<button type="submit" class="btn btn-primary">
+					<Button type="submit" variant="primary">
 						{mode === "edit" ? "Save changes" : "Create event"}
-					</button>
-					<a href={backHref} class="btn btn-secondary">
-						Cancel
-					</a>
+					</Button>
+					<LinkButton href={backHref}>Cancel</LinkButton>
 				</div>
 			</form>
 		</Card>
@@ -297,9 +226,9 @@ export const EventFormPage = ({
 					data-confirm="Delete this event?"
 				>
 					<h2 class="mb-2 text-sm font-semibold text-danger">Danger zone</h2>
-					<button type="submit" class="btn btn-danger">
+					<Button type="submit" variant="danger">
 						Delete event
-					</button>
+					</Button>
 				</form>
 			</Card>
 		)}

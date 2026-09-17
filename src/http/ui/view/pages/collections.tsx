@@ -1,6 +1,9 @@
 import type { VNode } from "preact";
 import type { SharePanelData } from "#src/http/ui/helpers/share-panel.ts";
+import { Button, LinkButton } from "../components/button.tsx";
 import { Card } from "../components/display.tsx";
+import { Field, Textarea, TextInput } from "../components/form/form.tsx";
+import { Select } from "../components/form/select.tsx";
 import { Breadcrumb, PageHeader } from "../components/page-header.tsx";
 
 import {
@@ -37,6 +40,12 @@ const ownerCrumb = (
 				{ label: ownerDisplayName, href: ownerHref },
 			];
 
+const COLLECTION_TYPE_OPTIONS = [
+	{ value: "", label: "Select a type…" },
+	{ value: "calendar", label: "Calendar" },
+	{ value: "addressbook", label: "Address Book" },
+];
+
 // --- New -------------------------------------------------------------------
 
 export interface CollectionNewPageProps {
@@ -60,9 +69,12 @@ export const CollectionNewPage = ({
 	popoverId = CALENDAR_POPOVER_ID,
 }: CollectionNewPageProps): VNode => {
 	const popover = variant === "popover";
-	// The inline dialog is always in the DOM, so its fields use wrapping labels
-	// (no ids) to avoid clashing with the lazily-loaded Subscribe form. Errors
-	// swap into the form's own [data-errors] region; success redirects.
+	// The inline dialog is always in the DOM alongside the lazily-loaded
+	// Subscribe form, so its field ids are scoped by the popover id to keep them
+	// unique. Errors swap into the form's own [data-errors] region; success
+	// redirects.
+	const fieldId = (name: string): string =>
+		popover ? `${popoverId}-${name}` : name;
 	const formProps = popover
 		? { "hx-target": "find [data-errors]", "hx-swap": "innerHTML" }
 		: { "hx-target": "body", "hx-swap": "outerHTML" };
@@ -96,55 +108,42 @@ export const CollectionNewPage = ({
 							<div data-errors />
 						</>
 					)}
-					<label class="form-group block">
-						<span class="form-label">
-							Type <span class="text-danger">*</span>
-						</span>
-						<select name="collectionType" required class="form-select">
-							<option value="">Select a type…</option>
-							<option value="calendar" selected={popover}>
-								Calendar
-							</option>
-							<option value="addressbook">Address Book</option>
-						</select>
-					</label>
-					<label class="form-group block">
-						<span class="form-label">
-							Slug <span class="text-danger">*</span>
-						</span>
-						<input
-							type="text"
+					<Field for={fieldId("collectionType")} label="Type" required>
+						<Select
+							id={fieldId("collectionType")}
+							name="collectionType"
+							required
+							options={COLLECTION_TYPE_OPTIONS}
+							value={popover ? "calendar" : ""}
+						/>
+					</Field>
+					<Field
+						for={fieldId("slug")}
+						label="Slug"
+						required
+						hint="Lowercase letters, digits, and hyphens only. Used in DAV URLs."
+					>
+						<TextInput
+							id={fieldId("slug")}
 							name="slug"
 							required
 							pattern="[a-z0-9-]+"
 							placeholder="e.g. personal-calendar"
-							class="form-input"
 						/>
-						<span class="form-hint">
-							Lowercase letters, digits, and hyphens only. Used in DAV URLs.
-						</span>
-					</label>
-					<label class="form-group block">
-						<span class="form-label">Display name</span>
-						<input type="text" name="displayName" class="form-input" />
-					</label>
+					</Field>
+					<Field for={fieldId("displayName")} label="Display name">
+						<TextInput id={fieldId("displayName")} name="displayName" />
+					</Field>
 					<div class="flex gap-3 pt-2">
-						<button type="submit" class="btn btn-primary">
+						<Button type="submit" variant="primary">
 							Create collection
-						</button>
+						</Button>
 						{popover ? (
-							<button
-								type="button"
-								commandfor={popoverId}
-								command="request-close"
-								class="btn btn-secondary"
-							>
+							<Button commandfor={popoverId} command="request-close">
 								Cancel
-							</button>
+							</Button>
 						) : (
-							<a href={backUrl} class="btn btn-secondary">
-								Cancel
-							</a>
+							<LinkButton href={backUrl}>Cancel</LinkButton>
 						)}
 					</div>
 				</form>
@@ -205,9 +204,9 @@ export const CollectionEditPage = (props: CollectionEditPageProps): VNode => {
 			{...formProps}
 			class="inline"
 		>
-			<button type="submit" class="btn btn-secondary btn-sm">
+			<Button type="submit" size="sm">
 				Refresh now
-			</button>
+			</Button>
 		</form>
 	);
 	const deleteButton = props.canDelete && (
@@ -221,9 +220,9 @@ export const CollectionEditPage = (props: CollectionEditPageProps): VNode => {
 			class="inline"
 		>
 			{popover && <input type="hidden" name="returnTo" value="/ui/calendar" />}
-			<button type="submit" class="btn btn-danger btn-sm">
+			<Button type="submit" variant="danger" size="sm">
 				Delete
-			</button>
+			</Button>
 		</form>
 	);
 	return (
@@ -266,49 +265,31 @@ export const CollectionEditPage = (props: CollectionEditPageProps): VNode => {
 							<div data-errors />
 						</>
 					)}
-					<div class="form-group">
-						<label for="displayName" class="form-label">
-							Display name
-						</label>
-						<input
-							type="text"
+					<Field for="displayName" label="Display name">
+						<TextInput
 							id="displayName"
 							name="displayName"
 							value={props.displayName}
-							class="form-input"
 						/>
-					</div>
-					<div class="form-group">
-						<label for="description" class="form-label">
-							Description
-						</label>
-						<textarea
+					</Field>
+					<Field for="description" label="Description">
+						<Textarea
 							id="description"
 							name="description"
-							rows={3}
-							class="form-textarea"
 							value={props.description}
 						/>
-					</div>
+					</Field>
 					{props.isCalendar && (
 						<>
-							<div class="form-group">
-								<label for="timezoneTzid" class="form-label">
-									Timezone
-								</label>
-								<input
-									type="text"
+							<Field for="timezoneTzid" label="Timezone">
+								<TextInput
 									id="timezoneTzid"
 									name="timezoneTzid"
 									value={props.timezoneTzid}
 									placeholder="e.g. America/New_York"
-									class="form-input"
 								/>
-							</div>
-							<div class="form-group">
-								<label for="color" class="form-label">
-									Color
-								</label>
+							</Field>
+							<Field for="color" label="Color">
 								<div class="flex items-center gap-3">
 									<input
 										type="color"
@@ -322,7 +303,7 @@ export const CollectionEditPage = (props: CollectionEditPageProps): VNode => {
 										clients.
 									</span>
 								</div>
-							</div>
+							</Field>
 						</>
 					)}
 					<p class="text-sm text-muted">
@@ -337,18 +318,13 @@ export const CollectionEditPage = (props: CollectionEditPageProps): VNode => {
 						{props.collectionType}
 					</p>
 					<div class="flex items-center gap-3 pt-2">
-						<button type="submit" class="btn btn-primary">
+						<Button type="submit" variant="primary">
 							Save changes
-						</button>
+						</Button>
 						{popover && (
-							<button
-								type="button"
-								commandfor={popoverId}
-								command="request-close"
-								class="btn btn-secondary"
-							>
+							<Button commandfor={popoverId} command="request-close">
 								Cancel
-							</button>
+							</Button>
 						)}
 					</div>
 				</form>

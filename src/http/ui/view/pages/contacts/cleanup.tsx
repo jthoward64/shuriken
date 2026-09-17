@@ -1,4 +1,8 @@
 import type { VNode } from "preact";
+import { Button } from "../../components/button.tsx";
+import { Alert, Badge, EmptyState } from "../../components/display.tsx";
+import { Field, TextInput } from "../../components/form/form.tsx";
+import { Select } from "../../components/form/select.tsx";
 import { CONTACTS_POPOVER_BODY_ID, ContactsPopoverHeader } from "./popover.tsx";
 import { ContactsCrumb } from "./shared.tsx";
 
@@ -49,29 +53,27 @@ export interface ContactsCleanupPageProps {
 // --- Result fragments (swapped into the [data-suggestion] item) -------------
 
 export const CleanupDone = ({ contactFn }: { contactFn: string }): VNode => (
-	<li
-		data-suggestion=""
-		class="rounded-md border border-success/40 bg-success/10 p-4 text-sm text-success"
-	>
-		Fixed ✓
-		{contactFn !== "" && (
-			<>
-				{" "}
-				— <strong>{contactFn}</strong>
-			</>
-		)}
+	<li data-suggestion="">
+		<Alert tone="success">
+			Fixed ✓
+			{contactFn !== "" && (
+				<>
+					{" "}
+					— <strong>{contactFn}</strong>
+				</>
+			)}
+		</Alert>
 	</li>
 );
 
 export const CleanupError = ({ message }: { message: string }): VNode => (
-	<li
-		data-suggestion=""
-		class="rounded-md border border-warning/40 bg-warning/10 p-4 text-sm text-warning"
-	>
-		{message}{" "}
-		<button type="button" data-reload="" class="underline">
-			Rescan
-		</button>
+	<li data-suggestion="">
+		<Alert tone="warning">
+			{message}{" "}
+			<button type="button" data-reload="" class="underline">
+				Rescan
+			</button>
+		</Alert>
 	</li>
 );
 
@@ -88,7 +90,7 @@ export const CleanupSuggestion = ({
 	>
 		<div class="min-w-0 space-y-1">
 			<div class="flex items-center gap-2 flex-wrap">
-				<span class="badge">{s.title}</span>
+				<Badge>{s.title}</Badge>
 				<a
 					href={`/ui/contacts/${s.instanceId}`}
 					class="text-sm font-medium text-fg hover:underline"
@@ -125,38 +127,35 @@ export const CleanupSuggestion = ({
 				<input type="hidden" name="contactFn" value={s.contactFn} />
 
 				{s.needsAreaCode && (
-					<input
-						type="text"
+					<TextInput
 						name="areaCode"
 						inputmode="numeric"
 						placeholder="Area code"
-						class="form-input w-24"
+						aria-label="Area code"
+						class="w-24"
 					/>
 				)}
 
 				{s.needsLabel && (
-					<select name="newType" class="form-select w-auto">
-						{s.labelOptions.map((o) => (
-							<option key={o} value={o}>
-								{o}
-							</option>
-						))}
-						<option value="">(remove label)</option>
-					</select>
+					<Select
+						name="newType"
+						aria-label="Label"
+						class="w-auto"
+						options={[
+							...s.labelOptions.map((o) => ({ value: o, label: o })),
+							{ value: "", label: "(remove label)" },
+						]}
+					/>
 				)}
 
-				<button type="submit" class="btn btn-primary btn-sm">
+				<Button type="submit" variant="primary" size="sm">
 					Fix
-				</button>
+				</Button>
 			</form>
 
-			<button
-				type="button"
-				data-dismiss-suggestion=""
-				class="btn btn-secondary btn-sm"
-			>
+			<Button data-dismiss-suggestion="" size="sm">
 				Ignore
-			</button>
+			</Button>
 		</div>
 	</li>
 );
@@ -197,31 +196,32 @@ export const ContactsCleanupPage = ({
 						{...rescanProps}
 						class="card card-pad flex flex-wrap items-end gap-4"
 					>
-						<label class="form-group block">
-							<span class="form-label">Address book</span>
-							<select name="addressbook" class="form-select mt-1 w-auto">
-								{addressbooks.map((a) => (
-									<option key={a.id} value={a.id} selected={a.selected}>
-										{a.displayName}
-									</option>
-								))}
-							</select>
-						</label>
+						<Field for="cleanup-addressbook" label="Address book">
+							<Select
+								id="cleanup-addressbook"
+								name="addressbook"
+								class="w-auto"
+								options={addressbooks.map((a) => ({
+									value: a.id,
+									label: a.displayName,
+								}))}
+								value={addressbooks.find((a) => a.selected)?.id}
+							/>
+						</Field>
 
-						<label class="form-group block">
-							<span class="form-label">Region for phone numbers</span>
-							<select name="region" class="form-select mt-1 w-auto">
-								{regions.map((r) => (
-									<option key={r.code} value={r.code} selected={r.selected}>
-										{r.name}
-									</option>
-								))}
-							</select>
-						</label>
+						<Field for="cleanup-region" label="Region for phone numbers">
+							<Select
+								id="cleanup-region"
+								name="region"
+								class="w-auto"
+								options={regions.map((r) => ({ value: r.code, label: r.name }))}
+								value={regions.find((r) => r.selected)?.code}
+							/>
+						</Field>
 
-						<button type="submit" class="btn btn-primary btn-sm">
+						<Button type="submit" variant="primary" size="sm">
 							Rescan
-						</button>
+						</Button>
 					</form>
 
 					{suggestions.length > 0 ? (
@@ -250,9 +250,9 @@ export const ContactsCleanupPage = ({
 											name="region"
 											value={regions.find((r) => r.selected)?.code ?? ""}
 										/>
-										<button type="submit" class="btn btn-secondary btn-sm">
+										<Button type="submit" size="sm">
 											Fix all
-										</button>
+										</Button>
 									</form>
 								)}
 							</div>
@@ -265,7 +265,7 @@ export const ContactsCleanupPage = ({
 							</div>
 						</>
 					) : (
-						<p class="text-sm text-muted">Nothing to clean up here 🎉</p>
+						<EmptyState title="Nothing to clean up here 🎉" />
 					)}
 				</>
 			) : (

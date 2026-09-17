@@ -1,6 +1,16 @@
 import type { VNode } from "preact";
+import { Button, LinkButton } from "../components/button.tsx";
+import {
+	Badge,
+	Card,
+	type Column,
+	EmptyState,
+	Table,
+} from "../components/display.tsx";
+import { Field, TextInput } from "../components/form/form.tsx";
+import { Select } from "../components/form/select.tsx";
 import { IconPlus } from "../components/icons.tsx";
-import { PageHeader } from "../components/page-header.tsx";
+import { Breadcrumb, PageHeader } from "../components/page-header.tsx";
 
 import {
 	CALENDAR_POPOVER_BODY_ID,
@@ -23,14 +33,11 @@ export interface SubscriptionRow {
 	readonly lastSyncError: string | null;
 }
 
+// Subscriptions hang off the calendar section, so the trail starts there
 const CalendarCrumb = ({ title }: { title: string }) => (
-	<nav aria-label="Breadcrumb" class="mb-2 flex items-center gap-2 text-sm">
-		<a href="/ui/calendar" class="link">
-			Calendar
-		</a>
-		<span class="text-subtle">/</span>
-		<span class="text-muted">{title}</span>
-	</nav>
+	<Breadcrumb
+		items={[{ label: "Calendar", href: "/ui/calendar" }, { label: title }]}
+	/>
 );
 
 const SyncStatus = ({ sub }: { sub: SubscriptionRow }) => {
@@ -39,15 +46,9 @@ const SyncStatus = ({ sub }: { sub: SubscriptionRow }) => {
 	}
 	return (
 		<div>
-			<span
-				class={
-					sub.lastSyncStatus === "failure"
-						? "badge badge-danger"
-						: "badge badge-success"
-				}
-			>
+			<Badge tone={sub.lastSyncStatus === "failure" ? "danger" : "success"}>
 				{sub.lastSyncStatus}
-			</span>
+			</Badge>
 			<span class="ml-2 text-xs text-subtle">{sub.lastSyncAt}</span>
 			{sub.lastSyncError && (
 				<div class="mt-1 text-xs text-danger">{sub.lastSyncError}</div>
@@ -55,6 +56,48 @@ const SyncStatus = ({ sub }: { sub: SubscriptionRow }) => {
 		</div>
 	);
 };
+
+const SUBSCRIPTION_COLUMNS: ReadonlyArray<Column<SubscriptionRow>> = [
+	{
+		header: "Calendar",
+		cell: (sub) => (
+			<span class="inline-flex items-center gap-2">
+				<span
+					class="inline-block h-3 w-3 shrink-0 rounded-full"
+					style={{ backgroundColor: sub.color ?? "rgb(var(--subtle))" }}
+				/>
+				<span class="font-medium text-fg">{sub.displayName}</span>
+			</span>
+		),
+	},
+	{
+		header: "Source",
+		cell: (sub) => (
+			<span class="block max-w-md break-all font-mono text-xs text-muted">
+				{sub.url}
+			</span>
+		),
+	},
+	{ header: "Last sync", cell: (sub) => <SyncStatus sub={sub} /> },
+	{
+		header: "",
+		align: "right",
+		shrink: true,
+		cell: (sub) => (
+			<form
+				method="POST"
+				action={`/ui/api/subscriptions/${sub.claimId}/delete`}
+				hx-post={`/ui/api/subscriptions/${sub.claimId}/delete`}
+				data-confirm="Unsubscribe and delete this calendar?"
+				class="inline"
+			>
+				<Button type="submit" variant="danger" size="sm">
+					Unsubscribe
+				</Button>
+			</form>
+		),
+	},
+];
 
 export const SubscriptionsListPage = ({
 	subscriptions,
@@ -82,83 +125,45 @@ export const SubscriptionsListPage = ({
 					title="Subscriptions"
 					subtitle="Read-only calendars synced from external iCalendar feeds."
 					actions={
-						<a href="/ui/subscriptions/new" class="btn btn-primary">
+						<LinkButton href="/ui/subscriptions/new" variant="primary">
 							<IconPlus class="h-4 w-4" />
 							Subscribe
-						</a>
+						</LinkButton>
 					}
 				/>
 			)}
 			{popover && (
-				<a
+				<LinkButton
 					href="/ui/subscriptions/new"
 					{...subscribeProps}
-					class="btn btn-primary btn-sm"
+					variant="primary"
+					size="sm"
 				>
 					<IconPlus class="h-4 w-4" />
 					Subscribe
-				</a>
+				</LinkButton>
 			)}
 
-			{subscriptions.length > 0 ? (
-				<div class="table-wrap">
-					<table class="table">
-						<thead>
-							<tr>
-								<th>Calendar</th>
-								<th>Source</th>
-								<th>Last sync</th>
-								<th class="w-0" />
-							</tr>
-						</thead>
-						<tbody>
-							{subscriptions.map((sub) => (
-								<tr>
-									<td>
-										<span class="inline-flex items-center gap-2">
-											<span
-												class="inline-block h-3 w-3 shrink-0 rounded-full"
-												style={{
-													backgroundColor: sub.color ?? "rgb(var(--subtle))",
-												}}
-											/>
-											<span class="font-medium text-fg">{sub.displayName}</span>
-										</span>
-									</td>
-									<td class="max-w-md break-all font-mono text-xs text-muted">
-										{sub.url}
-									</td>
-									<td class="text-sm">
-										<SyncStatus sub={sub} />
-									</td>
-									<td class="text-right">
-										<form
-											method="POST"
-											action={`/ui/api/subscriptions/${sub.claimId}/delete`}
-											hx-post={`/ui/api/subscriptions/${sub.claimId}/delete`}
-											data-confirm="Unsubscribe and delete this calendar?"
-											class="inline"
-										>
-											<button type="submit" class="btn btn-danger btn-sm">
-												Unsubscribe
-											</button>
-										</form>
-									</td>
-								</tr>
-							))}
-						</tbody>
-					</table>
-				</div>
-			) : (
-				<div class="card card-pad text-center">
-					<p class="text-sm text-muted">
-						You have no subscriptions yet.{" "}
-						<a href="/ui/subscriptions/new" class="link">
-							Subscribe to a calendar.
-						</a>
-					</p>
-				</div>
-			)}
+			<Table
+				columns={SUBSCRIPTION_COLUMNS}
+				rows={subscriptions}
+				getKey={(sub) => sub.claimId}
+				empty={
+					<EmptyState
+						title="You have no subscriptions yet."
+						action={
+							<LinkButton
+								href="/ui/subscriptions/new"
+								variant="primary"
+								size="sm"
+							>
+								<IconPlus class="h-4 w-4" />
+								Subscribe
+							</LinkButton>
+						}
+					/>
+				}
+			/>
 		</div>
 	);
 };
@@ -194,6 +199,10 @@ export const SubscriptionsNewPage = ({
 	popoverId = CALENDAR_POPOVER_ID,
 }: SubscriptionsNewPageProps): VNode => {
 	const popover = variant === "popover";
+	// This form can share the DOM with the inline Create-calendar form, so in the
+	// popover its field ids are scoped by the popover id to keep them unique.
+	const fieldId = (name: string): string =>
+		popover ? `${popoverId}-sub-${name}` : name;
 	// Errors swap into the form's own [data-errors] region, whether the form is
 	// rendered inline (Add-calendar → Subscribe) or lazily loaded into the
 	// shared popover body (Feeds / Subscriptions); success follows the create
@@ -216,7 +225,7 @@ export const SubscriptionsNewPage = ({
 			)}
 
 			{!preset && (
-				<div class="card card-pad">
+				<Card>
 					<h2 class="mb-3 text-sm font-semibold text-fg">Holiday presets</h2>
 					<ul class="grid gap-1 sm:grid-cols-2">
 						{presets.map((p) => (
@@ -230,10 +239,10 @@ export const SubscriptionsNewPage = ({
 							</li>
 						))}
 					</ul>
-				</div>
+				</Card>
 			)}
 
-			<div class="card card-pad">
+			<Card>
 				<form
 					method="POST"
 					action="/ui/api/subscriptions/create"
@@ -247,91 +256,75 @@ export const SubscriptionsNewPage = ({
 							<div data-errors />
 						</>
 					)}
-					<label class="form-group block">
-						<span class="form-label">
-							iCalendar URL <span class="text-danger">*</span>
-						</span>
-						<input
+					<Field for={fieldId("url")} label="iCalendar URL" required>
+						<TextInput
 							type="url"
+							id={fieldId("url")}
 							name="url"
 							required
 							value={preset ? preset.url : ""}
 							placeholder="https://example.com/calendar.ics"
-							class="form-input"
 						/>
-					</label>
-					<label class="form-group block">
-						<span class="form-label">
-							Slug <span class="text-danger">*</span>
-						</span>
-						<input
-							type="text"
+					</Field>
+					<Field
+						for={fieldId("slug")}
+						label="Slug"
+						required
+						hint="URL segment for this subscription's collection."
+					>
+						<TextInput
+							id={fieldId("slug")}
 							name="slug"
 							required
 							pattern="[a-z0-9-]+"
 							value={preset ? `holidays-${preset.id}` : ""}
 							placeholder="e.g. holidays-us"
-							class="form-input"
 						/>
-						<span class="form-hint">
-							URL segment for this subscription's collection.
-						</span>
-					</label>
-					<label class="form-group block">
-						<span class="form-label">Display name override</span>
-						<input
-							type="text"
+					</Field>
+					<Field
+						for={fieldId("displayName")}
+						label="Display name override"
+						hint="Leave blank to use the feed's own name."
+					>
+						<TextInput
+							id={fieldId("displayName")}
 							name="displayName"
 							value={preset ? preset.displayName : ""}
-							class="form-input"
 						/>
-						<span class="form-hint">
-							Leave blank to use the feed's own name.
-						</span>
-					</label>
-					<label class="form-group block">
-						<span class="form-label">Color override</span>
+					</Field>
+					<Field for={fieldId("color")} label="Color override">
 						<input
 							type="color"
+							id={fieldId("color")}
 							name="color"
 							class="h-10 w-20 rounded-md border border-line-strong"
 						/>
-					</label>
-					<label class="form-group block">
-						<span class="form-label">Sync frequency</span>
-						<select name="syncIntervalS" class="form-select">
-							{intervals.map((o) =>
-								o.selected ? (
-									<option value={o.seconds} selected>
-										{o.label}
-									</option>
-								) : (
-									<option value={o.seconds}>{o.label}</option>
-								),
-							)}
-						</select>
-					</label>
+					</Field>
+					<Field for={fieldId("syncIntervalS")} label="Sync frequency">
+						<Select
+							id={fieldId("syncIntervalS")}
+							name="syncIntervalS"
+							options={intervals.map((o) => ({
+								value: String(o.seconds),
+								label: o.label,
+							}))}
+							value={String(intervals.find((o) => o.selected)?.seconds ?? "")}
+						/>
+					</Field>
 					<div class="flex gap-3 pt-1">
-						<button type="submit" class="btn btn-primary">
+						<Button type="submit" variant="primary">
 							Subscribe
-						</button>
+						</Button>
 						{popover ? (
-							<button
-								type="button"
-								commandfor={popoverId}
-								command="request-close"
-								class="btn btn-secondary"
-							>
+							<Button commandfor={popoverId} command="request-close">
 								Cancel
-							</button>
+							</Button>
 						) : (
-							<a href="/ui/subscriptions" class="btn btn-secondary">
-								Cancel
-							</a>
+							<LinkButton href="/ui/subscriptions">Cancel</LinkButton>
 						)}
 					</div>
 				</form>
-			</div>
+			</Card>
 		</div>
 	);
 };

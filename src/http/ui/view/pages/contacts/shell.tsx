@@ -1,4 +1,5 @@
 import type { ComponentChildren, VNode } from "preact";
+import { Button } from "../../components/button.tsx";
 import { IconClose, IconMenu } from "../../components/icons.tsx";
 
 // ---------------------------------------------------------------------------
@@ -43,15 +44,15 @@ export const ContactsShell = ({
 			<div class="contacts-drawer-panel flex flex-col">
 				<div class="flex items-center justify-between p-3 pb-0 xl:hidden">
 					<h2 class="card-title">{label}</h2>
-					<button
-						type="button"
+					<Button
+						variant="ghost"
+						size="sm"
 						popovertarget={CONTACTS_DRAWER_ID}
 						popovertargetaction="hide"
 						aria-label="Close"
-						class="btn btn-ghost btn-sm"
 					>
 						<IconClose class="h-4 w-4" />
-					</button>
+					</Button>
 				</div>
 				<div class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
 					{drawerTop}
@@ -70,12 +71,12 @@ export const ContactsShell = ({
 // The mobile trigger that toggles the drawer (hidden on desktop, where the
 // drawer is always visible). Native popovertarget — works with no JS.
 export const ContactsDrawerToggle = (): VNode => (
-	<button
-		type="button"
+	<Button
+		size="sm"
 		popovertarget={CONTACTS_DRAWER_ID}
-		class="btn btn-secondary btn-sm shrink-0 xl:hidden"
+		class="shrink-0 xl:hidden"
 	>
 		<IconMenu class="h-4 w-4" />
 		Address books
-	</button>
+	</Button>
 );

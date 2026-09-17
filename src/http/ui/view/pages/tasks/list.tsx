@@ -1,6 +1,15 @@
 import type { VNode } from "preact";
-import { buttonClass } from "../../components/button.tsx";
+import { Button, LinkButton } from "../../components/button.tsx";
+import {
+	Badge,
+	type BadgeTone,
+	type Column,
+	EmptyState,
+	Table,
+} from "../../components/display.tsx";
+import { Checkbox } from "../../components/form/form.tsx";
 import { Breadcrumb, PageHeader } from "../../components/page-header.tsx";
+import { Pagination } from "../../components/pagination.tsx";
 
 import { SidebarShell } from "../sidebar-shell.tsx";
 
@@ -98,9 +107,9 @@ const CalendarList = ({
 						{c.displayName}
 					</a>
 					{c.ownerSlug !== null && (
-						<span class="badge shrink-0" title={`Shared by ${c.ownerSlug}`}>
+						<Badge class="shrink-0" title={`Shared by ${c.ownerSlug}`}>
 							{c.ownerSlug}
-						</span>
+						</Badge>
 					)}
 				</li>
 			))}
@@ -108,136 +117,76 @@ const CalendarList = ({
 	</div>
 );
 
-const StatusBadge = ({ row }: { row: TaskRow }): VNode => {
-	const cls = row.completed
-		? "badge bg-success/10 text-success"
-		: row.status === "CANCELLED"
-			? "badge bg-surface-2 text-subtle"
-			: row.overdue
-				? "badge bg-danger/10 text-danger"
-				: "badge";
-	return <span class={cls}>{row.statusLabel}</span>;
+const statusTone = (row: TaskRow): BadgeTone => {
+	if (row.completed) {
+		return "success";
+	}
+	if (row.status !== "CANCELLED" && row.overdue) {
+		return "danger";
+	}
+	return "neutral";
 };
 
-const TaskTable = ({
-	tasks,
-	writable,
-	collectionId,
-}: {
-	tasks: ReadonlyArray<TaskRow>;
-	writable: boolean;
-	collectionId: string;
-}): VNode => (
-	<div class="table-wrap">
-		<table class="table">
-			<thead>
-				<tr>
-					<th class="w-8 sr-only">Done</th>
-					<th>Title</th>
-					<th>Due</th>
-					<th>Priority</th>
-					<th>Status</th>
-					<th />
-				</tr>
-			</thead>
-			<tbody>
-				{tasks.map((t) => (
-					<tr key={t.id}>
-						<td>
-							<form
-								method="POST"
-								action={`/ui/api/tasks/${collectionId}/tasks/${t.id}/toggle`}
-								class="contents"
-							>
-								<button
-									type="submit"
-									disabled={!writable}
-									aria-label={t.completed ? "Mark as not done" : "Mark as done"}
-									class="flex h-5 w-5 items-center justify-center rounded border border-line text-xs disabled:opacity-40"
-								>
-									{t.completed ? "✓" : ""}
-								</button>
-							</form>
-						</td>
-						<td class={t.completed ? "text-muted line-through" : "text-fg"}>
-							{t.title}
-							{t.recurring && (
-								<span class="ml-1 text-xs text-subtle">(repeats)</span>
-							)}
-						</td>
-						<td class={t.overdue ? "text-danger" : "text-muted"}>
-							{t.dueLabel}
-						</td>
-						<td class="text-muted">{t.priorityLabel ?? "—"}</td>
-						<td>
-							<StatusBadge row={t} />
-						</td>
-						<td class="text-right">
-							<a
-								href={`/ui/tasks/${t.id}`}
-								target="_blank"
-								rel="noopener"
-								class="link"
-							>
-								Open
-							</a>
-						</td>
-					</tr>
-				))}
-			</tbody>
-		</table>
-	</div>
+const StatusBadge = ({ row }: { row: TaskRow }): VNode => (
+	<Badge tone={statusTone(row)}>{row.statusLabel}</Badge>
 );
 
-const Pagination = ({
-	selectedId,
-	showCompleted,
-	page,
-	totalPages,
-}: {
-	selectedId: string;
-	showCompleted: boolean;
-	page: number;
-	totalPages: number;
-}): VNode | null => {
-	if (totalPages <= 1) {
-		return null;
-	}
-	return (
-		<nav
-			aria-label="Tasks pages"
-			class="flex items-center justify-between gap-2 pt-1 text-sm text-muted"
-		>
-			{page > 1 ? (
-				<a
-					href={listUrl(selectedId, showCompleted, page - 1)}
-					class="btn btn-secondary btn-sm"
+const taskColumns = (
+	writable: boolean,
+	collectionId: string,
+): ReadonlyArray<Column<TaskRow>> => [
+	{
+		header: "Done",
+		headerHidden: true,
+		shrink: true,
+		cell: (t) => (
+			<form
+				method="POST"
+				action={`/ui/api/tasks/${collectionId}/tasks/${t.id}/toggle`}
+				class="contents"
+			>
+				<button
+					type="submit"
+					disabled={!writable}
+					aria-label={t.completed ? "Mark as not done" : "Mark as done"}
+					class="flex h-5 w-5 items-center justify-center rounded border border-line text-xs disabled:opacity-40"
 				>
-					Previous
-				</a>
-			) : (
-				<span class="btn btn-secondary btn-sm opacity-50" aria-disabled="true">
-					Previous
-				</span>
-			)}
-			<span>
-				Page {page} of {totalPages}
+					{t.completed ? "✓" : ""}
+				</button>
+			</form>
+		),
+	},
+	{
+		header: "Title",
+		cell: (t) => (
+			<span class={t.completed ? "text-muted line-through" : undefined}>
+				{t.title}
+				{t.recurring && <span class="ml-1 text-xs text-subtle">(repeats)</span>}
 			</span>
-			{page < totalPages ? (
-				<a
-					href={listUrl(selectedId, showCompleted, page + 1)}
-					class="btn btn-secondary btn-sm"
-				>
-					Next
-				</a>
-			) : (
-				<span class="btn btn-secondary btn-sm opacity-50" aria-disabled="true">
-					Next
-				</span>
-			)}
-		</nav>
-	);
-};
+		),
+	},
+	{
+		header: "Due",
+		cell: (t) => (
+			<span class={t.overdue ? "text-danger" : "text-muted"}>{t.dueLabel}</span>
+		),
+	},
+	{
+		header: "Priority",
+		cell: (t) => <span class="text-muted">{t.priorityLabel ?? "—"}</span>,
+	},
+	{ header: "Status", cell: (t) => <StatusBadge row={t} /> },
+	{
+		header: "",
+		align: "right",
+		shrink: true,
+		cell: (t) => (
+			<a href={`/ui/tasks/${t.id}`} target="_blank" rel="noopener" class="link">
+				Open
+			</a>
+		),
+	},
+];
 
 export const TasksListPage = ({
 	calendars,
@@ -252,10 +201,11 @@ export const TasksListPage = ({
 	if (!hasCalendar) {
 		return (
 			<div class="space-y-4">
-				<h1 class="page-title">Tasks</h1>
-				<p class="text-sm text-muted">
-					No calendar available. Create one from your profile.
-				</p>
+				<PageHeader title="Tasks" />
+				<EmptyState
+					title="No calendar available."
+					description="Create one from your profile."
+				/>
 			</div>
 		);
 	}
@@ -273,12 +223,12 @@ export const TasksListPage = ({
 					title="Tasks"
 					actions={
 						selectedWritable && (
-							<a
+							<LinkButton
 								href={`/ui/tasks/new?calendar=${selectedId}`}
-								class={buttonClass("primary")}
+								variant="primary"
 							>
 								New task
-							</a>
+							</LinkButton>
 						)
 					}
 				/>
@@ -286,36 +236,30 @@ export const TasksListPage = ({
 
 			<form method="GET" action="/ui/tasks" class="flex items-center gap-2">
 				<input type="hidden" name="calendar" value={selectedId} />
-				<label class="flex items-center gap-2 text-sm text-muted">
-					<input
-						type="checkbox"
-						name="completed"
-						value="1"
-						checked={showCompleted}
-						class="rounded"
-					/>
-					Show completed
-				</label>
-				<button type="submit" class="btn btn-secondary btn-sm">
+				<Checkbox
+					id="show-completed"
+					label="Show completed"
+					name="completed"
+					value="1"
+					checked={showCompleted}
+				/>
+				<Button type="submit" size="sm">
 					Apply
-				</button>
+				</Button>
 			</form>
 
-			{tasks.length === 0 ? (
-				<p class="text-sm text-muted">No tasks here.</p>
-			) : (
-				<TaskTable
-					tasks={tasks}
-					writable={selectedWritable}
-					collectionId={selectedId}
-				/>
-			)}
+			<Table
+				columns={taskColumns(selectedWritable, selectedId)}
+				rows={tasks}
+				getKey={(t) => t.id}
+				empty={<EmptyState title="No tasks here." />}
+			/>
 
 			<Pagination
-				selectedId={selectedId}
-				showCompleted={showCompleted}
+				label="Tasks pages"
 				page={page}
 				totalPages={totalPages}
+				hrefFor={(n) => listUrl(selectedId, showCompleted, n)}
 			/>
 		</SidebarShell>
 	);

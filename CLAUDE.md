@@ -56,17 +56,29 @@ All application logic must use [Effect](https://effect.website) (`effect` packag
 - **Shared components live in `src/http/ui/view/components/`** and are rendered live
   at **`/ui/dev/components`** - check the gallery before hand-writing class strings.
   Foundations sit at the `components/` root (`button.tsx`, `display.tsx` with
-  `Card`/`Badge`/`EmptyState`/`Table`, `overlay.tsx`, `page-header.tsx`, `copy.tsx`,
-  `icons.tsx`, `cx.ts`); form primitives in `components/form/` (`form.tsx`,
-  `select.tsx`). Scripted controls, each with a no-JS fallback, live in
+  `Card`/`Badge`/`EmptyState`/`Table`/`Alert`, `overlay.tsx`, `page-header.tsx`,
+  `pagination.tsx`, `copy.tsx`, `icons.tsx`, `cx.ts`); form primitives in
+  `components/form/` (`form.tsx`, `select.tsx`). Scripted controls, each with a
+  no-JS fallback, live in
   `components/controls/`: `tag-combobox.tsx` (the default tag control),
   `date-picker.tsx`, `search-picker.tsx`, `rich-text.tsx`; `tag-picker.tsx` is a kept
   `<select>`-based alternative. Their browser halves are in
   `src/http/ui/client/controls/`.
 - **The page frame lives in `src/http/ui/view/shell/`**: `layout.tsx`, `nav.tsx`,
   `render.tsx` (the `renderPage`/`renderFragment` entry points), `assets.tsx`.
-- Many existing pages still hand-write the raw classes these components wrap. When
-  you touch a page, migrate its controls rather than adding more raw-class markup.
+- The pages under `view/pages/` are fully migrated onto these components: no page
+  hand-writes `form-input`/`form-select`/`form-textarea`/`btn`/`badge` any more.
+  Use `Field` (label + hint/error, wired by id) around a control wherever the
+  control can carry a unique id. Where it cannot - a row cloned from a
+  `<template>`, or a dialog sharing the document with another copy of the same
+  form - wrap the control in a `<label class="form-group block">` with a
+  `<span class="form-label">` instead; `biome.json` lists `TextInput`/`Textarea`/
+  `Select`/`FileInput` under `a11y/noLabelWithoutControl`'s `inputComponents` so
+  the rule accepts them there. Add any new control component to that list.
+- Two deliberate escape hatches remain: `card`/`card-pad` stay raw on elements
+  `Card` cannot be (a `<form>` or `<li>` that is itself the padded flex
+  container), and `buttonClass` is the exported helper for an element with no
+  Button/LinkButton equivalent, such as a `<summary>` trigger.
 - Progressive-enhancement contract: `html.js [data-nojs-only]` and
   `html:not(.js) [data-js-only]` hide the inapplicable half. Both rules must stay
   **unlayered and physically after `@tailwind utilities`** in

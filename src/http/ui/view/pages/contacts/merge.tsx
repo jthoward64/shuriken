@@ -1,4 +1,13 @@
 import type { VNode } from "preact";
+import { Button } from "../../components/button.tsx";
+import {
+	Alert,
+	type Column,
+	EmptyState,
+	Table,
+} from "../../components/display.tsx";
+import { Checkbox, Field } from "../../components/form/form.tsx";
+import { Select } from "../../components/form/select.tsx";
 import { CONTACTS_POPOVER_BODY_ID, ContactsPopoverHeader } from "./popover.tsx";
 import { ContactsCrumb } from "./shared.tsx";
 
@@ -56,12 +65,37 @@ export const MergeResult = ({
 	fn: string;
 	mergedCount: number;
 }): VNode => (
-	<div class="merge-group rounded-md border border-success/40 bg-success/10 p-3 text-sm text-success">
+	<Alert tone="success" class="merge-group">
 		Merged {mergedCount} duplicate(s) into <strong>{fn}</strong>.
-	</div>
+	</Alert>
 );
 
 // --- One detected duplicate group ------------------------------------------
+
+const memberColumns = (
+	showAddressbook: boolean,
+): ReadonlyArray<Column<MergeMember>> => [
+	{
+		header: "Name",
+		cell: (m) => (
+			<a href={`/ui/contacts/${m.instanceId}`} class="link">
+				{m.fn}
+			</a>
+		),
+	},
+	{ header: "Email", cell: (m) => <span class="text-muted">{m.email}</span> },
+	{ header: "Phone", cell: (m) => <span class="text-muted">{m.tel}</span> },
+	...(showAddressbook
+		? [
+				{
+					header: "Address book",
+					cell: (m: MergeMember) => (
+						<span class="text-muted">{m.addressbook}</span>
+					),
+				},
+			]
+		: []),
+];
 
 const MergeGroup = ({
 	group,
@@ -71,32 +105,11 @@ const MergeGroup = ({
 	showAddressbook: boolean;
 }): VNode => (
 	<div class="merge-group card card-pad space-y-3">
-		<div class="table-wrap">
-			<table class="table">
-				<thead>
-					<tr>
-						<th>Name</th>
-						<th>Email</th>
-						<th>Phone</th>
-						{showAddressbook && <th>Address book</th>}
-					</tr>
-				</thead>
-				<tbody>
-					{group.members.map((m) => (
-						<tr key={m.instanceId}>
-							<td class="text-fg">
-								<a href={`/ui/contacts/${m.instanceId}`} class="link">
-									{m.fn}
-								</a>
-							</td>
-							<td class="text-muted">{m.email}</td>
-							<td class="text-muted">{m.tel}</td>
-							{showAddressbook && <td class="text-muted">{m.addressbook}</td>}
-						</tr>
-					))}
-				</tbody>
-			</table>
-		</div>
+		<Table
+			columns={memberColumns(showAddressbook)}
+			rows={group.members}
+			getKey={(m) => m.instanceId}
+		/>
 		<div class="flex items-center justify-between gap-3">
 			<p class="form-hint">
 				The most complete contact is kept; the rest are merged into it.
@@ -111,9 +124,9 @@ const MergeGroup = ({
 				data-guard=""
 			>
 				<input type="hidden" name="ids" value={group.ids} />
-				<button type="submit" class="btn btn-primary btn-sm">
+				<Button type="submit" variant="primary" size="sm">
 					Merge {group.count}
-				</button>
+				</Button>
 			</form>
 		</div>
 	</div>
@@ -164,53 +177,55 @@ export const ContactsMergePage = ({
 					>
 						<input type="hidden" name="run" value="1" />
 
-						<label class="form-group block">
-							<span class="form-label">Scope</span>
-							<select name="scope" class="form-select mt-1 w-auto">
-								<option value="all" selected={scopeAll}>
-									All my address books
-								</option>
-								{addressbooks.map((a) => (
-									<option
-										key={a.id}
-										value={a.id}
-										selected={!scopeAll && a.id === scope}
-									>
-										{a.displayName}
-									</option>
-								))}
-							</select>
-						</label>
+						<Field for="merge-scope" label="Scope">
+							<Select
+								id="merge-scope"
+								name="scope"
+								class="w-auto"
+								options={[
+									{ value: "all", label: "All my address books" },
+									...addressbooks.map((a) => ({
+										value: a.id,
+										label: a.displayName,
+									})),
+								]}
+								value={scopeAll ? "all" : scope}
+							/>
+						</Field>
 
 						<fieldset class="text-sm text-muted">
 							<legend class="form-label mb-1">
 								Match when contacts share any of
 							</legend>
 							<div class="flex items-center gap-4">
-								<label class="inline-flex items-center gap-1">
-									<input type="checkbox" name="email" checked={emailChecked} />{" "}
-									Email
-								</label>
-								<label class="inline-flex items-center gap-1">
-									<input type="checkbox" name="phone" checked={phoneChecked} />{" "}
-									Phone
-								</label>
-								<label class="inline-flex items-center gap-1">
-									<input type="checkbox" name="name" checked={nameChecked} />{" "}
-									Name
-								</label>
+								<Checkbox
+									id="merge-by-email"
+									label="Email"
+									name="email"
+									checked={emailChecked}
+								/>
+								<Checkbox
+									id="merge-by-phone"
+									label="Phone"
+									name="phone"
+									checked={phoneChecked}
+								/>
+								<Checkbox
+									id="merge-by-name"
+									label="Name"
+									name="name"
+									checked={nameChecked}
+								/>
 							</div>
 						</fieldset>
 
-						<button type="submit" class="btn btn-primary btn-sm">
+						<Button type="submit" variant="primary" size="sm">
 							Find duplicates
-						</button>
+						</Button>
 					</form>
 
 					{noCriteria ? (
-						<p class="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
-							Select at least one field to match on.
-						</p>
+						<Alert tone="warning">Select at least one field to match on.</Alert>
 					) : run ? (
 						groups.length > 0 ? (
 							<>
@@ -228,16 +243,15 @@ export const ContactsMergePage = ({
 								</div>
 							</>
 						) : (
-							<p class="text-sm text-muted">
-								No duplicates found for the selected criteria.
-							</p>
+							<EmptyState title="No duplicates found for the selected criteria." />
 						)
 					) : null}
 				</>
 			) : (
-				<p class="text-sm text-muted">
-					No address book available. Create one from your profile.
-				</p>
+				<EmptyState
+					title="No address book available."
+					description="Create one from your profile."
+				/>
 			)}
 		</div>
 	);

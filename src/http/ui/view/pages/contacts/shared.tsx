@@ -1,4 +1,5 @@
 import type { VNode } from "preact";
+import { Breadcrumb, PageHeader } from "../../components/page-header.tsx";
 import { AssetTags, CONTACTS_ASSETS } from "../../shell/assets.tsx";
 
 // ---------------------------------------------------------------------------
@@ -22,15 +23,10 @@ export const ContactsCrumb = ({
 	title: string;
 	backHref?: string;
 }): VNode => (
-	<div class="page-header">
-		<div class="flex items-center gap-2 flex-wrap">
-			<a href={backHref} class="text-sm text-muted hover:text-fg">
-				Contacts
-			</a>
-			<span class="text-subtle" aria-hidden="true">
-				/
-			</span>
-			<h1 class="page-title">{title}</h1>
-		</div>
+	<div>
+		<Breadcrumb
+			items={[{ label: "Contacts", href: backHref }, { label: title }]}
+		/>
+		<PageHeader title={title} />
 	</div>
 );

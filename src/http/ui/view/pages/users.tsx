@@ -1,7 +1,16 @@
 import type { VNode } from "preact";
 import type { SharePanelData } from "#src/http/ui/helpers/share-panel.ts";
+import { Button, LinkButton } from "../components/button.tsx";
 import { CopyField } from "../components/copy.tsx";
-import { Card } from "../components/display.tsx";
+import {
+	Badge,
+	Card,
+	type Column,
+	EmptyState,
+	Table,
+} from "../components/display.tsx";
+import { Checkbox, Field, TextInput } from "../components/form/form.tsx";
+import { Select } from "../components/form/select.tsx";
 import { IconPlus } from "../components/icons.tsx";
 import { Breadcrumb, PageHeader } from "../components/page-header.tsx";
 
@@ -29,6 +38,23 @@ export interface UsersListPageProps {
 	readonly sharePanel: SharePanelData | undefined;
 }
 
+const USER_COLUMNS: ReadonlyArray<Column<UserListRow>> = [
+	{ header: "Name", cell: (u) => u.displayName },
+	{ header: "Username", cell: (u) => <span class="font-mono">{u.slug}</span> },
+	{ header: "Email", cell: (u) => u.email },
+	{
+		header: "",
+		align: "right",
+		shrink: true,
+		cell: (u) =>
+			u.canEdit && (
+				<a href={`/ui/users/${u.id}`} class="link">
+					Edit
+				</a>
+			),
+	},
+];
+
 export const UsersListPage = ({
 	users,
 	canCreateUser,
@@ -39,46 +65,20 @@ export const UsersListPage = ({
 			title="Users"
 			actions={
 				canCreateUser && (
-					<a href="/ui/users/new" class="btn btn-primary btn-sm">
+					<LinkButton href="/ui/users/new" variant="primary" size="sm">
 						<IconPlus class="h-4 w-4" />
 						New user
-					</a>
+					</LinkButton>
 				)
 			}
 		/>
 
-		{users.length > 0 ? (
-			<div class="table-wrap">
-				<table class="table">
-					<thead>
-						<tr>
-							<th>Name</th>
-							<th>Username</th>
-							<th>Email</th>
-							<th class="w-0" />
-						</tr>
-					</thead>
-					<tbody>
-						{users.map((u) => (
-							<tr key={u.id}>
-								<td class="text-fg">{u.displayName}</td>
-								<td class="font-mono text-fg">{u.slug}</td>
-								<td class="text-fg">{u.email}</td>
-								<td class="text-right">
-									{u.canEdit && (
-										<a href={`/ui/users/${u.id}`} class="link">
-											Edit
-										</a>
-									)}
-								</td>
-							</tr>
-						))}
-					</tbody>
-				</table>
-			</div>
-		) : (
-			<p class="text-sm text-muted">No users found.</p>
-		)}
+		<Table
+			columns={USER_COLUMNS}
+			rows={users}
+			getKey={(u) => u.id}
+			empty={<EmptyState title="No users found." />}
+		/>
 
 		<SharePanel data={sharePanel} />
 	</div>
@@ -108,65 +108,41 @@ export const UserNewPage = ({ showPasswordForm }: UserNewPageProps): VNode => (
 				hx-swap="outerHTML"
 				class="space-y-4"
 			>
-				<div class="form-group">
-					<label for="slug" class="form-label">
-						Username <span class="text-danger">*</span>
-					</label>
-					<input
-						type="text"
+				<Field
+					for="slug"
+					label="Username"
+					required
+					hint="Lowercase letters, digits, and hyphens only."
+				>
+					<TextInput
 						id="slug"
 						name="slug"
 						required
 						pattern="[a-z0-9-]+"
 						placeholder="e.g. jane-doe"
-						class="form-input"
 					/>
-					<p class="form-hint">Lowercase letters, digits, and hyphens only.</p>
-				</div>
-				<div class="form-group">
-					<label for="displayName" class="form-label">
-						Display name
-					</label>
-					<input
-						type="text"
-						id="displayName"
-						name="displayName"
-						class="form-input"
-					/>
-				</div>
-				<div class="form-group">
-					<label for="email" class="form-label">
-						Email <span class="text-danger">*</span>
-					</label>
-					<input
-						type="email"
-						id="email"
-						name="email"
-						required
-						class="form-input"
-					/>
-				</div>
+				</Field>
+				<Field for="displayName" label="Display name">
+					<TextInput id="displayName" name="displayName" />
+				</Field>
+				<Field for="email" label="Email" required>
+					<TextInput type="email" id="email" name="email" required />
+				</Field>
 				{showPasswordForm && (
-					<div class="form-group">
-						<label for="password" class="form-label">
-							Password <span class="text-danger">*</span>
-						</label>
-						<input
+					<Field for="password" label="Password" required>
+						<TextInput
 							type="password"
 							id="password"
 							name="password"
 							autocomplete="new-password"
-							class="form-input"
 						/>
-					</div>
+					</Field>
 				)}
 				<div class="flex gap-3 pt-2">
-					<button type="submit" class="btn btn-primary">
+					<Button type="submit" variant="primary">
 						Create user
-					</button>
-					<a href="/ui/users" class="btn btn-secondary">
-						Cancel
-					</a>
+					</Button>
+					<LinkButton href="/ui/users">Cancel</LinkButton>
 				</div>
 			</form>
 		</Card>
@@ -215,6 +191,21 @@ export interface UserEditPageProps {
 	readonly groups: ReadonlyArray<UserEditGroup>;
 }
 
+const USER_COLLECTION_COLUMNS: ReadonlyArray<Column<UserEditCollection>> = [
+	{
+		header: "Name",
+		cell: (c) => (
+			<a href={`/ui/collections/${c.id}`} class="link">
+				{c.displayName}
+			</a>
+		),
+	},
+	{
+		header: "Type",
+		cell: (c) => <span class="text-muted">{c.collectionType}</span>,
+	},
+];
+
 export const UserEditPage = (props: UserEditPageProps): VNode => {
 	const base = `/ui/api/users/${props.principalId}`;
 	return (
@@ -240,9 +231,9 @@ export const UserEditPage = (props: UserEditPageProps): VNode => {
 								data-confirm="Delete this user? This cannot be undone."
 								class="inline"
 							>
-								<button type="submit" class="btn btn-danger btn-sm">
+								<Button type="submit" variant="danger" size="sm">
 									Delete
-								</button>
+								</Button>
 							</form>
 						)
 					}
@@ -258,72 +249,53 @@ export const UserEditPage = (props: UserEditPageProps): VNode => {
 					hx-swap="outerHTML"
 					class="space-y-4"
 				>
-					<div class="form-group">
-						<label for="displayName" class="form-label">
-							Display name
-						</label>
-						<input
-							type="text"
+					<Field for="displayName" label="Display name">
+						<TextInput
 							id="displayName"
 							name="displayName"
 							value={props.displayName}
-							class="form-input"
 						/>
-					</div>
-					<div class="form-group">
-						<label for="email" class="form-label">
-							Email
-						</label>
-						<input
+					</Field>
+					<Field for="email" label="Email">
+						<TextInput
 							type="email"
 							id="email"
 							name="email"
 							value={props.email}
-							class="form-input"
 						/>
-					</div>
+					</Field>
 					{props.canEditSlug && (
-						<div class="form-group">
-							<label for="slug" class="form-label">
-								Username (slug)
-							</label>
-							<input
-								type="text"
-								id="slug"
-								name="slug"
-								value={props.slug}
-								class="form-input"
-							/>
-						</div>
+						<Field for="slug" label="Username (slug)">
+							<TextInput id="slug" name="slug" value={props.slug} />
+						</Field>
 					)}
-					<div class="form-group">
-						<span class="form-label">Role</span>
-						{props.canEditRole ? (
-							<>
-								<select name="role" class="form-select">
-									{props.roleOptions.map((r) =>
-										r.selected ? (
-											<option key={r.value} value={r.value} selected>
-												{r.value}
-											</option>
-										) : (
-											<option key={r.value} value={r.value}>
-												{r.value}
-											</option>
-										),
-									)}
-								</select>
-								<p class="form-hint">Only super-admins see this control.</p>
-							</>
-						) : (
+					{props.canEditRole ? (
+						<Field
+							for="role"
+							label="Role"
+							hint="Only super-admins see this control."
+						>
+							<Select
+								id="role"
+								name="role"
+								options={props.roleOptions.map((r) => ({
+									value: r.value,
+									label: r.value,
+								}))}
+								value={props.roleOptions.find((r) => r.selected)?.value}
+							/>
+						</Field>
+					) : (
+						<div class="form-group">
+							<span class="form-label">Role</span>
 							<p class="text-sm text-fg">
 								<span class="font-mono">{props.userRole}</span>
 							</p>
-						)}
-					</div>
-					<button type="submit" class="btn btn-primary">
+						</div>
+					)}
+					<Button type="submit" variant="primary">
 						Save changes
-					</button>
+					</Button>
 				</form>
 			</Card>
 
@@ -348,21 +320,17 @@ export const UserEditPage = (props: UserEditPageProps): VNode => {
 						hx-swap="outerHTML"
 						class="space-y-4"
 					>
-						<div class="form-group">
-							<label for="newPassword" class="form-label">
-								New password
-							</label>
-							<input
+						<Field for="newPassword" label="New password">
+							<TextInput
 								type="password"
 								id="newPassword"
 								name="newPassword"
 								autocomplete="new-password"
-								class="form-input"
 							/>
-						</div>
-						<button type="submit" class="btn btn-primary">
+						</Field>
+						<Button type="submit" variant="primary">
 							Update password
-						</button>
+						</Button>
 					</form>
 				</Card>
 			)}
@@ -370,40 +338,20 @@ export const UserEditPage = (props: UserEditPageProps): VNode => {
 			<Card
 				title="Collections"
 				actions={
-					<a
+					<LinkButton
 						href={`/ui/users/${props.principalId}/collections/new`}
-						class="btn btn-secondary btn-sm"
+						size="sm"
 					>
 						Add collection
-					</a>
+					</LinkButton>
 				}
 			>
-				{props.collections.length > 0 ? (
-					<div class="table-wrap">
-						<table class="table">
-							<thead>
-								<tr>
-									<th>Name</th>
-									<th>Type</th>
-								</tr>
-							</thead>
-							<tbody>
-								{props.collections.map((c) => (
-									<tr key={c.id}>
-										<td>
-											<a href={`/ui/collections/${c.id}`} class="link">
-												{c.displayName}
-											</a>
-										</td>
-										<td class="text-muted">{c.collectionType}</td>
-									</tr>
-								))}
-							</tbody>
-						</table>
-					</div>
-				) : (
-					<p class="text-sm text-muted">No collections yet.</p>
-				)}
+				<Table
+					columns={USER_COLLECTION_COLUMNS}
+					rows={props.collections}
+					getKey={(c) => c.id}
+					empty={<EmptyState title="No collections yet." />}
+				/>
 			</Card>
 
 			<SharePanel data={props.sharePanel} />
@@ -424,9 +372,7 @@ export const UserEditPage = (props: UserEditPageProps): VNode => {
 									<p class="mb-2 flex items-center gap-2 text-sm font-medium text-fg">
 										{g.label}
 										{g.autoAssignedBy && (
-											<span class="badge">
-												Auto-assigned ({g.autoAssignedBy})
-											</span>
+											<Badge>Auto-assigned ({g.autoAssignedBy})</Badge>
 										)}
 									</p>
 									<form
@@ -438,35 +384,16 @@ export const UserEditPage = (props: UserEditPageProps): VNode => {
 										class="inline-flex items-center gap-3"
 									>
 										<input type="hidden" name="userId" value={props.userId} />
-										<span class="inline-flex items-center gap-2">
-											{g.isMember ? (
-												<input
-													id={`member-${g.id}`}
-													type="checkbox"
-													name="members"
-													value={props.userId}
-													checked
-													class="rounded"
-												/>
-											) : (
-												<input
-													id={`member-${g.id}`}
-													type="checkbox"
-													name="members"
-													value={props.userId}
-													class="rounded"
-												/>
-											)}
-											<label
-												for={`member-${g.id}`}
-												class="cursor-pointer text-sm text-fg"
-											>
-												Member
-											</label>
-										</span>
-										<button type="submit" class="btn btn-secondary btn-sm">
+										<Checkbox
+											id={`member-${g.id}`}
+											label="Member"
+											name="members"
+											value={props.userId}
+											checked={g.isMember}
+										/>
+										<Button type="submit" size="sm">
 											Save
-										</button>
+										</Button>
 									</form>
 								</div>
 							) : (
@@ -483,9 +410,7 @@ export const UserEditPage = (props: UserEditPageProps): VNode => {
 										<span class="text-xs text-muted">(member)</span>
 									)}
 									{g.autoAssignedBy && (
-										<span class="badge">
-											Auto-assigned ({g.autoAssignedBy})
-										</span>
+										<Badge>Auto-assigned ({g.autoAssignedBy})</Badge>
 									)}
 								</div>
 							),

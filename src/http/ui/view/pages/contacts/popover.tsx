@@ -1,4 +1,5 @@
 import type { VNode } from "preact";
+import { Button } from "../../components/button.tsx";
 import { IconClose } from "../../components/icons.tsx";
 
 // ---------------------------------------------------------------------------
@@ -45,14 +46,14 @@ export const ContactsPopoverHeader = ({
 		<h2 id={`${popoverId}-title`} class="card-title">
 			{title}
 		</h2>
-		<button
-			type="button"
+		<Button
+			variant="ghost"
+			size="sm"
 			commandfor={popoverId}
 			command="request-close"
 			aria-label="Close"
-			class="btn btn-ghost btn-sm"
 		>
 			<IconClose class="h-4 w-4" />
-		</button>
+		</Button>
 	</div>
 );

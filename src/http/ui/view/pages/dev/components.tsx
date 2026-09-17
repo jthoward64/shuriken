@@ -13,6 +13,7 @@ import { SearchPicker } from "#src/http/ui/view/components/controls/search-picke
 import { TagCombobox } from "#src/http/ui/view/components/controls/tag-combobox.tsx";
 import { TagPicker } from "#src/http/ui/view/components/controls/tag-picker.tsx";
 import {
+	Alert,
 	Badge,
 	Card,
 	type Column,
@@ -35,6 +36,7 @@ import {
 	ModalTrigger,
 } from "#src/http/ui/view/components/overlay.tsx";
 import { PageHeader } from "#src/http/ui/view/components/page-header.tsx";
+import { Pagination } from "#src/http/ui/view/components/pagination.tsx";
 
 // ---------------------------------------------------------------------------
 // Component gallery - every shared UI component rendered live, so look, dark
@@ -281,6 +283,46 @@ export const ComponentGalleryPage = (): VNode => (
 						action={<Button variant="primary">New collection</Button>}
 					/>
 				}
+			/>
+		</Section>
+
+		<Section
+			title="Callouts"
+			note="Alert reports the outcome of an action or a caveat about one. The warning and danger tones are announced by assistive tech; the others stay silent."
+		>
+			<Alert>Nothing has changed since the last sync.</Alert>
+			<Alert tone="success">Imported 12 new, replaced 3, skipped 0.</Alert>
+			<Alert tone="warning" title="4 item(s) already exist with these UIDs:">
+				Re-select the file with <strong>Skip duplicates</strong> to proceed.
+			</Alert>
+			<Alert tone="danger" title="Please correct the following:">
+				<ul class="list-inside list-disc space-y-0.5">
+					<li>Start must be before End.</li>
+				</ul>
+			</Alert>
+		</Section>
+
+		<Section
+			title="Pagination"
+			note="Link-based, so it works with the page's own query string and needs no JS. The ends of the range render as disabled steps."
+		>
+			<Pagination
+				label="Demo pages"
+				page={1}
+				totalPages={3}
+				hrefFor={(n) => `?page=${n}`}
+			/>
+			<Pagination
+				label="Demo pages"
+				page={2}
+				totalPages={3}
+				hrefFor={(n) => `?page=${n}`}
+			/>
+			<Pagination
+				label="Demo pages"
+				page={3}
+				totalPages={3}
+				hrefFor={(n) => `?page=${n}`}
 			/>
 		</Section>
 

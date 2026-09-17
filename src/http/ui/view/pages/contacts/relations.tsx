@@ -1,6 +1,7 @@
 import type { VNode } from "preact";
 import { RELATED_TYPE_VALUES } from "#src/data/vcard/related.ts";
 import type { ContactRelation } from "#src/services/card-edit/types.ts";
+import { Badge } from "../../components/display.tsx";
 
 // ---------------------------------------------------------------------------
 // Relations — the `RELATED` rows, shared between the editor form and the
@@ -140,7 +141,9 @@ export const RelationList = ({
 					)}
 				</div>
 				{r.relation.preferred && (
-					<span class="badge badge-brand shrink-0">Preferred</span>
+					<Badge tone="brand" class="shrink-0">
+						Preferred
+					</Badge>
 				)}
 			</li>
 		))}

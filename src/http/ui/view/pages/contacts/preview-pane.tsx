@@ -6,6 +6,8 @@ import type {
 	ContactServiceValue,
 	ContactTypedValue,
 } from "#src/services/card-edit/types.ts";
+import { Button, LinkButton } from "../../components/button.tsx";
+import { Badge } from "../../components/display.tsx";
 import { IconChevronLeft, IconEdit } from "../../components/icons.tsx";
 import { RelationList, type ResolvedRelation } from "./relations.tsx";
 
@@ -30,7 +32,9 @@ export const CONTACTS_PANE_BODY_ID = "contacts-pane-body";
 const typeLabels = (types: ReadonlyArray<string>): string => types.join(", ");
 
 const PreferredBadge = (): VNode => (
-	<span class="badge badge-brand shrink-0">Preferred</span>
+	<Badge tone="brand" class="shrink-0">
+		Preferred
+	</Badge>
 );
 
 // A titled group, rendered only when it has content.
@@ -200,23 +204,23 @@ export const ContactPreviewPane = ({
 	// keeps the pane open beside the list).
 	const backBar = standalone ? (
 		<div class="mb-3">
-			<a href="/ui/contacts" class="btn btn-ghost btn-sm">
+			<LinkButton href="/ui/contacts" variant="ghost" size="sm">
 				<IconChevronLeft class="h-4 w-4" />
 				Back
-			</a>
+			</LinkButton>
 		</div>
 	) : (
 		<div class="mb-3 lg:hidden">
-			<button
-				type="button"
+			<Button
+				variant="ghost"
+				size="sm"
 				popovertarget={CONTACTS_PANE_ID}
 				popovertargetaction="hide"
 				aria-label="Close preview"
-				class="btn btn-ghost btn-sm"
 			>
 				<IconChevronLeft class="h-4 w-4" />
 				Back
-			</button>
+			</Button>
 		</div>
 	);
 
@@ -248,14 +252,15 @@ export const ContactPreviewPane = ({
 							<p class="break-words text-sm text-muted">{orgLine}</p>
 						)}
 					</div>
-					<a
+					<LinkButton
 						href={editHref}
+						size="sm"
 						data-edit-contact
-						class="btn btn-secondary btn-sm shrink-0"
+						class="shrink-0"
 					>
 						<IconEdit class="h-4 w-4" />
 						Edit
-					</a>
+					</LinkButton>
 				</div>
 
 				{form.emails.length > 0 && (
@@ -324,9 +329,7 @@ export const ContactPreviewPane = ({
 					<PaneSection title="Categories">
 						<div class="flex flex-wrap gap-1.5">
 							{categories.map((c) => (
-								<span key={c} class="badge">
-									{c}
-								</span>
+								<Badge key={c}>{c}</Badge>
 							))}
 						</div>
 					</PaneSection>

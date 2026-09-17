@@ -1,5 +1,15 @@
 import type { VNode } from "preact";
 import type { SharePanelData } from "#src/http/ui/helpers/share-panel.ts";
+import { Button } from "../components/button.tsx";
+import {
+	Alert,
+	Card,
+	type Column,
+	EmptyState,
+	Table,
+} from "../components/display.tsx";
+import { Field, TextInput } from "../components/form/form.tsx";
+import { Select } from "../components/form/select.tsx";
 
 // ---------------------------------------------------------------------------
 // SharePanel — access-control editor shown on user/group/collection/instance
@@ -35,293 +45,247 @@ export const SharePanel = ({
 	const revokeAction = `${base}/revoke`;
 	const setTierAction = `${base}/set-tier`;
 	const collapseAction = `${base}/collapse`;
+	const tierOptions = data.tiers.map((t) => ({
+		value: t.tier,
+		label: t.label,
+	}));
+
+	type BasicGrant = (typeof data.basicGrants)[number];
+	const basicColumns: ReadonlyArray<Column<BasicGrant>> = [
+		{ header: "Person", cell: (g) => g.principalLabel },
+		{
+			header: "Access",
+			cell: (g) =>
+				g.tier !== undefined ? (
+					<form
+						method="POST"
+						action={setTierAction}
+						hx-post={setTierAction}
+						hx-target="#share-panel"
+						hx-swap="outerHTML"
+						class="inline-flex items-center gap-2"
+					>
+						<input type="hidden" name="principalId" value={g.principalId} />
+						<Select
+							name="tier"
+							aria-label="Access"
+							options={tierOptions}
+							value={g.tier}
+							class="w-auto"
+						/>
+						<Button type="submit" size="sm">
+							Update
+						</Button>
+					</form>
+				) : (
+					<span
+						class="text-xs text-subtle"
+						title="Custom access — edit in Advanced mode"
+					>
+						Custom access
+					</span>
+				),
+		},
+		{
+			header: "",
+			align: "right",
+			shrink: true,
+			cell: (g) => (
+				<form
+					method="POST"
+					action={revokeAction}
+					hx-post={revokeAction}
+					hx-target="#share-panel"
+					hx-swap="outerHTML"
+					class="inline"
+				>
+					<input type="hidden" name="principalId" value={g.principalId} />
+					<button
+						type="submit"
+						class="link text-xs text-danger"
+						title="Remove access"
+					>
+						Remove
+					</button>
+				</form>
+			),
+		},
+	];
+
+	type Ace = (typeof data.aces)[number];
+	const aceColumns: ReadonlyArray<Column<Ace>> = [
+		{ header: "Principal", cell: (ace) => ace.principalLabel },
+		{ header: "Privilege", cell: (ace) => ace.privilegeLabel },
+		{
+			header: "",
+			align: "right",
+			shrink: true,
+			cell: (ace) =>
+				ace.protected ? (
+					<span
+						class="text-xs text-subtle"
+						title="System-managed, cannot be removed"
+					>
+						🔒
+					</span>
+				) : (
+					<form
+						method="POST"
+						action={revokeAction}
+						hx-post={revokeAction}
+						hx-target="#share-panel"
+						hx-swap="outerHTML"
+						class="inline"
+					>
+						<input type="hidden" name="aceId" value={ace.aceId} />
+						<button
+							type="submit"
+							class="link text-xs text-danger"
+							title="Revoke"
+						>
+							Revoke
+						</button>
+					</form>
+				),
+		},
+	];
 
 	return (
-		<section id="share-panel" class="card card-pad space-y-4">
-			<h2 class="card-title">Access control</h2>
+		<section id="share-panel">
+			<Card title="Access control">
+				<div class="space-y-4">
+					{/* Basic view */}
+					<details open={data.defaultMode === "basic"} class="space-y-4">
+						<summary class="cursor-pointer text-sm font-medium">Simple</summary>
+						<div class="space-y-4 pt-2">
+							{!data.representableInBasic && (
+								<Alert tone="warning" class="space-y-2 text-xs">
+									<p>
+										Some access here uses advanced options (custom privilege
+										combinations, deny rules, or group/everyone grants) that
+										Simple mode can't show individually. Making a change below
+										will simplify that entry to the closest Simple option
+										(View/Edit
+										{data.tiers.some((t) => t.tier === "manage")
+											? "/Manage"
+											: ""}
+										).
+									</p>
+									<form
+										method="POST"
+										action={collapseAction}
+										hx-post={collapseAction}
+										hx-target="#share-panel"
+										hx-swap="outerHTML"
+									>
+										<Button type="submit" size="sm">
+											Simplify now
+										</Button>
+									</form>
+								</Alert>
+							)}
 
-			{/* Basic view */}
-			<details open={data.defaultMode === "basic"} class="space-y-4">
-				<summary class="cursor-pointer text-sm font-medium">Simple</summary>
-				<div class="space-y-4 pt-2">
-					{!data.representableInBasic && (
-						<div class="rounded border border-yellow-200 bg-yellow-50 p-3 text-xs text-yellow-900 space-y-2">
-							<p>
-								Some access here uses advanced options (custom privilege
-								combinations, deny rules, or group/everyone grants) that Simple
-								mode can't show individually. Making a change below will
-								simplify that entry to the closest Simple option (View/Edit
-								{data.tiers.some((t) => t.tier === "manage") ? "/Manage" : ""}).
-							</p>
-							<form
-								method="POST"
-								action={collapseAction}
-								hx-post={collapseAction}
-								hx-target="#share-panel"
-								hx-swap="outerHTML"
-							>
-								<button type="submit" class="btn btn-sm btn-secondary">
-									Simplify now
-								</button>
-							</form>
-						</div>
-					)}
+							<Table
+								columns={basicColumns}
+								rows={data.basicGrants}
+								getKey={(g) => g.principalId}
+								empty={<EmptyState title="Not shared with anyone yet." />}
+							/>
 
-					{data.basicGrants.length > 0 ? (
-						<div class="table-wrap">
-							<table class="table">
-								<thead>
-									<tr>
-										<th>Person</th>
-										<th>Access</th>
-										<th class="w-0" />
-									</tr>
-								</thead>
-								<tbody>
-									{data.basicGrants.map((g) => (
-										<tr key={g.principalId}>
-											<td class="text-fg">{g.principalLabel}</td>
-											<td class="text-fg">
-												{g.tier !== undefined ? (
-													<form
-														method="POST"
-														action={setTierAction}
-														hx-post={setTierAction}
-														hx-target="#share-panel"
-														hx-swap="outerHTML"
-														class="inline"
-													>
-														<input
-															type="hidden"
-															name="principalId"
-															value={g.principalId}
-														/>
-														<select name="tier" class="form-select">
-															{data.tiers.map((t) => (
-																<option
-																	key={t.tier}
-																	value={t.tier}
-																	selected={t.tier === g.tier}
-																>
-																	{t.label}
-																</option>
-															))}
-														</select>
-														<button
-															type="submit"
-															class="btn btn-secondary btn-sm"
-														>
-															Update
-														</button>
-													</form>
-												) : (
-													<span
-														class="text-xs text-subtle"
-														title="Custom access — edit in Advanced mode"
-													>
-														Custom access
-													</span>
-												)}
-											</td>
-											<td class="text-right">
-												<form
-													method="POST"
-													action={revokeAction}
-													hx-post={revokeAction}
-													hx-target="#share-panel"
-													hx-swap="outerHTML"
-													class="inline"
-												>
-													<input
-														type="hidden"
-														name="principalId"
-														value={g.principalId}
-													/>
-													<button
-														type="submit"
-														class="link text-xs text-danger"
-														title="Remove access"
-													>
-														Remove
-													</button>
-												</form>
-											</td>
-										</tr>
-									))}
-								</tbody>
-							</table>
-						</div>
-					) : (
-						<p class="text-sm text-muted">Not shared with anyone yet.</p>
-					)}
-
-					<div class="border-t border-line pt-4">
-						<p class="form-label mb-2">Share with someone</p>
-						<form
-							method="POST"
-							action={setTierAction}
-							hx-post={setTierAction}
-							hx-target="#share-panel"
-							hx-swap="outerHTML"
-							class="flex flex-wrap items-end gap-2"
-						>
-							<div class="form-group">
-								<label
-									for={`share-principal-${data.resourceId}`}
-									class="form-label"
+							<div class="border-t border-line pt-4">
+								<p class="form-label mb-2">Share with someone</p>
+								<form
+									method="POST"
+									action={setTierAction}
+									hx-post={setTierAction}
+									hx-target="#share-panel"
+									hx-swap="outerHTML"
+									class="flex flex-wrap items-end gap-2"
 								>
-									Person
-								</label>
-								<input
-									type="text"
-									id={`share-principal-${data.resourceId}`}
-									name="principalSlug"
-									list={`share-candidates-${data.resourceId}`}
-									placeholder="Name, username, or email"
-									class="form-input"
-									autocomplete="off"
-									hx-get={data.searchEndpoint}
-									hx-trigger="keyup changed delay:250ms"
-									hx-target={`#share-candidates-${data.resourceId}`}
-									hx-swap="innerHTML"
-									hx-params="*"
-									required
-								/>
-								<datalist id={`share-candidates-${data.resourceId}`} />
+									<Field
+										for={`share-principal-${data.resourceId}`}
+										label="Person"
+									>
+										<TextInput
+											id={`share-principal-${data.resourceId}`}
+											name="principalSlug"
+											list={`share-candidates-${data.resourceId}`}
+											placeholder="Name, username, or email"
+											autocomplete="off"
+											hx-get={data.searchEndpoint}
+											hx-trigger="keyup changed delay:250ms"
+											hx-target={`#share-candidates-${data.resourceId}`}
+											hx-swap="innerHTML"
+											hx-params="*"
+											required
+										/>
+										<datalist id={`share-candidates-${data.resourceId}`} />
+									</Field>
+									<Field for={`share-tier-${data.resourceId}`} label="Access">
+										<Select
+											id={`share-tier-${data.resourceId}`}
+											name="tier"
+											options={tierOptions}
+										/>
+									</Field>
+									<Button type="submit" variant="primary" size="sm">
+										Share
+									</Button>
+								</form>
 							</div>
-							<div class="form-group">
-								<label for={`share-tier-${data.resourceId}`} class="form-label">
-									Access
-								</label>
-								<select
-									id={`share-tier-${data.resourceId}`}
-									name="tier"
-									class="form-select"
+						</div>
+					</details>
+
+					{/* Advanced view */}
+					<details open={data.defaultMode === "advanced"} class="space-y-4">
+						<summary class="cursor-pointer text-sm font-medium">
+							Advanced
+						</summary>
+						<div class="space-y-4 pt-2">
+							<Table
+								columns={aceColumns}
+								rows={data.aces}
+								getKey={(ace) => ace.aceId}
+								empty={<EmptyState title="No access entries yet." />}
+							/>
+
+							<div class="border-t border-line pt-4">
+								<p class="form-label mb-2">Grant access</p>
+								<form
+									method="POST"
+									action={grantAction}
+									hx-post={grantAction}
+									hx-target="#share-panel"
+									hx-swap="outerHTML"
+									class="flex flex-wrap items-end gap-2"
 								>
-									{data.tiers.map((t) => (
-										<option key={t.tier} value={t.tier}>
-											{t.label}
-										</option>
-									))}
-								</select>
+									<Field
+										for={`principalSlug-adv-${data.resourceId}`}
+										label="Username or group slug"
+									>
+										<TextInput
+											id={`principalSlug-adv-${data.resourceId}`}
+											name="principalSlug"
+											placeholder="e.g. alice"
+											required
+										/>
+									</Field>
+									<Field for={`privilege-${data.resourceId}`} label="Privilege">
+										<Select
+											id={`privilege-${data.resourceId}`}
+											name="privilege"
+											options={data.privilegeOptions}
+										/>
+									</Field>
+									<Button type="submit" variant="primary" size="sm">
+										Grant
+									</Button>
+								</form>
 							</div>
-							<button type="submit" class="btn btn-primary btn-sm">
-								Share
-							</button>
-						</form>
-					</div>
+						</div>
+					</details>
 				</div>
-			</details>
-
-			{/* Advanced view */}
-			<details open={data.defaultMode === "advanced"} class="space-y-4">
-				<summary class="cursor-pointer text-sm font-medium">Advanced</summary>
-				<div class="space-y-4 pt-2">
-					{data.aces.length > 0 ? (
-						<div class="table-wrap">
-							<table class="table">
-								<thead>
-									<tr>
-										<th>Principal</th>
-										<th>Privilege</th>
-										<th class="w-0" />
-									</tr>
-								</thead>
-								<tbody>
-									{data.aces.map((ace) => (
-										<tr key={ace.aceId}>
-											<td class="text-fg">{ace.principalLabel}</td>
-											<td class="text-fg">{ace.privilegeLabel}</td>
-											<td class="text-right">
-												{ace.protected ? (
-													<span
-														class="text-xs text-subtle"
-														title="System-managed, cannot be removed"
-													>
-														🔒
-													</span>
-												) : (
-													<form
-														method="POST"
-														action={revokeAction}
-														hx-post={revokeAction}
-														hx-target="#share-panel"
-														hx-swap="outerHTML"
-														class="inline"
-													>
-														<input
-															type="hidden"
-															name="aceId"
-															value={ace.aceId}
-														/>
-														<button
-															type="submit"
-															class="link text-xs text-danger"
-															title="Revoke"
-														>
-															Revoke
-														</button>
-													</form>
-												)}
-											</td>
-										</tr>
-									))}
-								</tbody>
-							</table>
-						</div>
-					) : (
-						<p class="text-sm text-muted">No access entries yet.</p>
-					)}
-
-					<div class="border-t border-line pt-4">
-						<p class="form-label mb-2">Grant access</p>
-						<form
-							method="POST"
-							action={grantAction}
-							hx-post={grantAction}
-							hx-target="#share-panel"
-							hx-swap="outerHTML"
-							class="flex flex-wrap items-end gap-2"
-						>
-							<div class="form-group">
-								<label
-									for={`principalSlug-adv-${data.resourceId}`}
-									class="form-label"
-								>
-									Username or group slug
-								</label>
-								<input
-									type="text"
-									id={`principalSlug-adv-${data.resourceId}`}
-									name="principalSlug"
-									placeholder="e.g. alice"
-									class="form-input"
-									required
-								/>
-							</div>
-							<div class="form-group">
-								<label for={`privilege-${data.resourceId}`} class="form-label">
-									Privilege
-								</label>
-								<select
-									id={`privilege-${data.resourceId}`}
-									name="privilege"
-									class="form-select"
-								>
-									{data.privilegeOptions.map((o) => (
-										<option key={o.value} value={o.value}>
-											{o.label}
-										</option>
-									))}
-								</select>
-							</div>
-							<button type="submit" class="btn btn-primary btn-sm">
-								Grant
-							</button>
-						</form>
-					</div>
-				</div>
-			</details>
+			</Card>
 		</section>
 	);
 };

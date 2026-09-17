@@ -1,4 +1,5 @@
 import type { VNode } from "preact";
+import { type Column, EmptyState, Table } from "../components/display.tsx";
 import { PageHeader } from "../components/page-header.tsx";
 
 // ---------------------------------------------------------------------------
@@ -51,93 +52,60 @@ const PurgeForm = ({
 	</form>
 );
 
-const CollectionsSection = ({
-	collections,
-}: {
-	collections: ReadonlyArray<TrashCollectionRow>;
-}): VNode => (
-	<div class="space-y-3">
-		<h2 class="text-sm font-semibold text-fg">Calendars &amp; address books</h2>
-		{collections.length > 0 ? (
-			<div class="table-wrap">
-				<table class="table">
-					<thead>
-						<tr>
-							<th>Name</th>
-							<th>Type</th>
-							<th>Deleted</th>
-							<th class="w-0" />
-						</tr>
-					</thead>
-					<tbody>
-						{collections.map((c) => (
-							<tr key={c.id}>
-								<td class="text-fg">{c.displayName}</td>
-								<td class="text-muted">{c.collectionType}</td>
-								<td class="text-muted">{c.deletedAt}</td>
-								<td class="text-right whitespace-nowrap">
-									<RestoreForm
-										action={`/ui/api/trash/collections/${c.id}/restore`}
-									/>
-									<PurgeForm
-										action={`/ui/api/trash/collections/${c.id}/purge`}
-										confirm={`Permanently delete "${c.displayName}" and everything in it? This cannot be undone.`}
-									/>
-								</td>
-							</tr>
-						))}
-					</tbody>
-				</table>
+const COLLECTION_COLUMNS: ReadonlyArray<Column<TrashCollectionRow>> = [
+	{ header: "Name", cell: (c) => c.displayName },
+	{
+		header: "Type",
+		cell: (c) => <span class="text-muted">{c.collectionType}</span>,
+	},
+	{
+		header: "Deleted",
+		cell: (c) => <span class="text-muted">{c.deletedAt}</span>,
+	},
+	{
+		header: "",
+		align: "right",
+		shrink: true,
+		cell: (c) => (
+			<div class="whitespace-nowrap">
+				<RestoreForm action={`/ui/api/trash/collections/${c.id}/restore`} />
+				<PurgeForm
+					action={`/ui/api/trash/collections/${c.id}/purge`}
+					confirm={`Permanently delete "${c.displayName}" and everything in it? This cannot be undone.`}
+				/>
 			</div>
-		) : (
-			<p class="text-sm text-muted">No deleted calendars or address books.</p>
-		)}
-	</div>
-);
+		),
+	},
+];
 
-const InstancesSection = ({
-	instances,
-}: {
-	instances: ReadonlyArray<TrashInstanceRow>;
-}): VNode => (
-	<div class="space-y-3">
-		<h2 class="text-sm font-semibold text-fg">Events &amp; contacts</h2>
-		{instances.length > 0 ? (
-			<div class="table-wrap">
-				<table class="table">
-					<thead>
-						<tr>
-							<th>Item</th>
-							<th>From</th>
-							<th>Deleted</th>
-							<th class="w-0" />
-						</tr>
-					</thead>
-					<tbody>
-						{instances.map((i) => (
-							<tr key={i.id}>
-								<td class="font-mono text-xs text-fg">{i.slug}</td>
-								<td class="text-muted">{i.collectionName}</td>
-								<td class="text-muted">{i.deletedAt}</td>
-								<td class="text-right whitespace-nowrap">
-									<RestoreForm
-										action={`/ui/api/trash/instances/${i.id}/restore`}
-									/>
-									<PurgeForm
-										action={`/ui/api/trash/instances/${i.id}/purge`}
-										confirm="Permanently delete this item? This cannot be undone."
-									/>
-								</td>
-							</tr>
-						))}
-					</tbody>
-				</table>
+const INSTANCE_COLUMNS: ReadonlyArray<Column<TrashInstanceRow>> = [
+	{
+		header: "Item",
+		cell: (i) => <span class="font-mono text-xs">{i.slug}</span>,
+	},
+	{
+		header: "From",
+		cell: (i) => <span class="text-muted">{i.collectionName}</span>,
+	},
+	{
+		header: "Deleted",
+		cell: (i) => <span class="text-muted">{i.deletedAt}</span>,
+	},
+	{
+		header: "",
+		align: "right",
+		shrink: true,
+		cell: (i) => (
+			<div class="whitespace-nowrap">
+				<RestoreForm action={`/ui/api/trash/instances/${i.id}/restore`} />
+				<PurgeForm
+					action={`/ui/api/trash/instances/${i.id}/purge`}
+					confirm="Permanently delete this item? This cannot be undone."
+				/>
 			</div>
-		) : (
-			<p class="text-sm text-muted">No deleted events or contacts.</p>
-		)}
-	</div>
-);
+		),
+	},
+];
 
 export const TrashPage = ({
 	collections,
@@ -148,7 +116,25 @@ export const TrashPage = ({
 			title="Trash"
 			subtitle="Deleted calendars, address books, events, and contacts. Restore them or delete them forever."
 		/>
-		<CollectionsSection collections={collections} />
-		<InstancesSection instances={instances} />
+		<div class="space-y-3">
+			<h2 class="text-sm font-semibold text-fg">
+				Calendars &amp; address books
+			</h2>
+			<Table
+				columns={COLLECTION_COLUMNS}
+				rows={collections}
+				getKey={(c) => c.id}
+				empty={<EmptyState title="No deleted calendars or address books." />}
+			/>
+		</div>
+		<div class="space-y-3">
+			<h2 class="text-sm font-semibold text-fg">Events &amp; contacts</h2>
+			<Table
+				columns={INSTANCE_COLUMNS}
+				rows={instances}
+				getKey={(i) => i.id}
+				empty={<EmptyState title="No deleted events or contacts." />}
+			/>
+		</div>
 	</div>
 );
