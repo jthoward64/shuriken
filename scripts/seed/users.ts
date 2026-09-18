@@ -42,13 +42,16 @@ export interface SeededUser {
 
 const createExtraCollections = (
 	ownerPrincipalId: PrincipalId,
-	slugPrefix: string,
-	uniqueSuffix: number,
-	count: number,
-	namePool: ReadonlyArray<string>,
-	collectionType: "calendar" | "addressbook",
+	spec: {
+		readonly slugPrefix: string;
+		readonly uniqueSuffix: number;
+		readonly count: number;
+		readonly namePool: ReadonlyArray<string>;
+		readonly collectionType: "calendar" | "addressbook";
+	},
 ) =>
 	Effect.gen(function* () {
+		const { slugPrefix, uniqueSuffix, count, namePool, collectionType } = spec;
 		const collections = yield* CollectionService;
 		const rows: Array<CollectionRow> = [];
 		for (let i = 0; i < count; i++) {
@@ -72,12 +75,16 @@ const createExtraCollections = (
  */
 export const seedUser = (
 	index: number,
-	calendarsMin: number,
-	calendarsMax: number,
-	addressBooksMin: number,
-	addressBooksMax: number,
+	counts: {
+		readonly calendarsMin: number;
+		readonly calendarsMax: number;
+		readonly addressBooksMin: number;
+		readonly addressBooksMax: number;
+	},
 ) =>
 	Effect.gen(function* () {
+		const { calendarsMin, calendarsMax, addressBooksMin, addressBooksMax } =
+			counts;
 		const provisioning = yield* ProvisioningService;
 		const appPasswords = yield* AppPasswordService;
 
@@ -111,24 +118,22 @@ export const seedUser = (
 		});
 
 		const extraCalendarCount = intBetween(calendarsMin, calendarsMax);
-		const extraCalendars = yield* createExtraCollections(
-			principalId,
-			`${slug}-cal`,
-			index,
-			extraCalendarCount,
-			EXTRA_CALENDAR_NAMES,
-			"calendar",
-		);
+		const extraCalendars = yield* createExtraCollections(principalId, {
+			slugPrefix: `${slug}-cal`,
+			uniqueSuffix: index,
+			count: extraCalendarCount,
+			namePool: EXTRA_CALENDAR_NAMES,
+			collectionType: "calendar",
+		});
 
 		const extraAddressBookCount = intBetween(addressBooksMin, addressBooksMax);
-		const extraAddressBooks = yield* createExtraCollections(
-			principalId,
-			`${slug}-ab`,
-			index,
-			extraAddressBookCount,
-			EXTRA_ADDRESSBOOK_NAMES,
-			"addressbook",
-		);
+		const extraAddressBooks = yield* createExtraCollections(principalId, {
+			slugPrefix: `${slug}-ab`,
+			uniqueSuffix: index,
+			count: extraAddressBookCount,
+			namePool: EXTRA_ADDRESSBOOK_NAMES,
+			collectionType: "addressbook",
+		});
 
 		const seeded: SeededUser = {
 			userId,

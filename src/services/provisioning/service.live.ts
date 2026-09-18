@@ -152,8 +152,7 @@ export const ProvisioningServiceLive = Layer.effect(
 					]) {
 						const has = yield* acl.hasPrivilege(
 							[principalId],
-							resourceId,
-							"virtual",
+							{ resourceId, resourceType: "virtual" },
 							["DAV:all"],
 							true,
 						);

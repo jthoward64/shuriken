@@ -55,12 +55,15 @@ export interface SeededGroup {
  */
 export const seedGroup = (
 	index: number,
-	size: number,
-	shouldGetAddressbook: boolean,
-	batchSize: number,
+	spec: {
+		readonly size: number;
+		readonly shouldGetAddressbook: boolean;
+		readonly batchSize: number;
+	},
 	users: ReadonlyArray<SeededUser>,
 ) =>
 	Effect.gen(function* () {
+		const { size, shouldGetAddressbook, batchSize } = spec;
 		const groups = yield* GroupService;
 		const acl = yield* AclRepository;
 		const collections = yield* CollectionService;

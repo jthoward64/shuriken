@@ -132,8 +132,7 @@ describe("AclRepository.hasPrivilege (integration)", () => {
 				Effect.flatMap((r) =>
 					r.hasPrivilege(
 						[],
-						crypto.randomUUID(),
-						"collection",
+						{ resourceId: crypto.randomUUID(), resourceType: "collection" },
 						["DAV:read"],
 						true,
 					),
@@ -163,8 +162,7 @@ describe("AclRepository.hasPrivilege (integration)", () => {
 						});
 						return yield* r.hasPrivilege(
 							[],
-							resourceId,
-							"collection",
+							{ resourceId, resourceType: "collection" },
 							["DAV:read"],
 							false,
 						);
@@ -195,8 +193,7 @@ describe("AclRepository.hasPrivilege (integration)", () => {
 						});
 						return yield* r.hasPrivilege(
 							[],
-							resourceId,
-							"collection",
+							{ resourceId, resourceType: "collection" },
 							["DAV:write"],
 							true, // isAuthenticated = true
 						);
@@ -227,8 +224,7 @@ describe("AclRepository.hasPrivilege (integration)", () => {
 						});
 						return yield* r.hasPrivilege(
 							[],
-							resourceId,
-							"collection",
+							{ resourceId, resourceType: "collection" },
 							["DAV:write"],
 							false, // isAuthenticated = false
 						);

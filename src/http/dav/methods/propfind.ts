@@ -1024,13 +1024,12 @@ export const propfindHandler = (
 				// inherited privilege set is resolved once and unioned with each
 				// member's direct ACEs — one ancestor walk + one batched query
 				// instead of an ancestor walk per instance.
-				const privMap = yield* acl.batchMemberPrivileges(
-					actingPrincipalId,
-					path.collectionId,
-					"collection",
-					instances.map((inst) => InstanceId(inst.id)),
-					"instance",
-				);
+				const privMap = yield* acl.batchMemberPrivileges(actingPrincipalId, {
+					parentId: path.collectionId,
+					parentType: "collection",
+					memberIds: instances.map((inst) => InstanceId(inst.id)),
+					memberType: "instance",
+				});
 
 				// RFC 4791 §9.6 / RFC 6352 §10.4 — body-data is only emitted for an
 				// explicit `prop` request that names it (never allprop/propname). Load

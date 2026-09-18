@@ -1078,8 +1078,7 @@ const makeAclRepo = (stores: TestStores): AclRepositoryShape => ({
 
 	hasPrivilege: (
 		principalIds,
-		resourceId,
-		resourceType,
+		{ resourceId, resourceType },
 		privileges,
 		isAuthenticated,
 	) =>

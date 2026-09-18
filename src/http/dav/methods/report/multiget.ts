@@ -136,18 +136,22 @@ export const multigetHandler = (
 		);
 		const readable = yield* acl.batchCheckMembers(
 			params.actingPrincipalId,
-			params.collectionId,
-			"collection",
-			memberIds,
-			"instance",
+			{
+				parentId: params.collectionId,
+				parentType: "collection",
+				memberIds,
+				memberType: "instance",
+			},
 			"CALDAV:read-free-busy",
 		);
 		const fullReadable = yield* acl.batchCheckMembers(
 			params.actingPrincipalId,
-			params.collectionId,
-			"collection",
-			memberIds,
-			"instance",
+			{
+				parentId: params.collectionId,
+				parentType: "collection",
+				memberIds,
+				memberType: "instance",
+			},
 			"DAV:read",
 		);
 

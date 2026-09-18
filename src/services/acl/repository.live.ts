@@ -13,7 +13,11 @@ import {
 import { runDbQuery } from "#src/db/query.ts";
 import type { PrincipalId, UuidString } from "#src/domain/ids.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
-import { AclRepository, type NewAce } from "./repository.ts";
+import {
+	AclRepository,
+	type AclResourceRef,
+	type NewAce,
+} from "./repository.ts";
 
 // ---------------------------------------------------------------------------
 // AclRepository — Drizzle implementation over dav_acl
@@ -153,11 +157,11 @@ function buildPrincipalFilter(
 const hasPrivilege = Effect.fn("AclRepository.hasPrivilege")(
 	function* (
 		principalIds: ReadonlyArray<PrincipalId>,
-		resourceId: UuidString,
-		resourceType: ResourceType,
+		resource: AclResourceRef,
 		privileges: ReadonlyArray<DavPrivilege>,
 		isAuthenticated: boolean,
 	) {
+		const { resourceId, resourceType } = resource;
 		yield* Effect.annotateCurrentSpan({
 			"resource.id": resourceId,
 			"resource.type": resourceType,

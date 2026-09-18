@@ -6,7 +6,11 @@ import type { DavPrivilege } from "#src/domain/types/dav.ts";
 import { aclChecksTotal } from "#src/observability/metrics.ts";
 import { bypassesAclCheck } from "#src/services/role/policy.ts";
 import { AclRepository } from "./repository.ts";
-import { type AclResourceId, AclService } from "./service.ts";
+import {
+	type AclMemberBatch,
+	type AclResourceId,
+	AclService,
+} from "./service.ts";
 
 // ---------------------------------------------------------------------------
 // Privilege hierarchy (RFC 3744 §3 + CalDAV §6)
@@ -132,7 +136,12 @@ export const AclServiceLive = Layer.effect(
 						onNone: () => Effect.succeed(false),
 						onSome: ({ id, type }) =>
 							repo
-								.hasPrivilege(principalIds, id, type, privileges, true)
+								.hasPrivilege(
+									principalIds,
+									{ resourceId: id, resourceType: type },
+									privileges,
+									true,
+								)
 								.pipe(
 									Effect.flatMap((ok) =>
 										ok
@@ -171,15 +180,13 @@ export const AclServiceLive = Layer.effect(
 		// batchMemberPrivileges and batchCheckMembers.
 		const computeMemberPrivileges = (
 			principalId: PrincipalId,
-			parentId: AclResourceId,
-			parentType: ResourceType,
-			memberIds: ReadonlyArray<AclResourceId>,
-			memberType: ResourceType,
+			batch: AclMemberBatch,
 		): Effect.Effect<
 			ReadonlyMap<AclResourceId, ReadonlyArray<DavPrivilege>>,
 			DatabaseError
 		> =>
 			Effect.gen(function* () {
+				const { parentId, parentType, memberIds, memberType } = batch;
 				const result = new Map<AclResourceId, ReadonlyArray<DavPrivilege>>();
 				if (memberIds.length === 0) {
 					return result;
@@ -283,8 +290,7 @@ export const AclServiceLive = Layer.effect(
 					const privileges = expandContainers(privilege);
 					const allowed = yield* repo.hasPrivilege(
 						principalIds,
-						resourceId,
-						resourceType,
+						{ resourceId, resourceType },
 						privileges,
 						true,
 					);
@@ -392,33 +398,21 @@ export const AclServiceLive = Layer.effect(
 			}),
 
 			batchMemberPrivileges: Effect.fn("AclService.batchMemberPrivileges")(
-				function* (principalId, parentId, parentType, memberIds, memberType) {
+				function* (principalId, batch) {
 					yield* Effect.logTrace("acl.batchMemberPrivileges", {
 						principalId,
-						parentId,
-						parentType,
-						memberType,
-						memberCount: memberIds.length,
+						parentId: batch.parentId,
+						parentType: batch.parentType,
+						memberType: batch.memberType,
+						memberCount: batch.memberIds.length,
 					});
-					return yield* computeMemberPrivileges(
-						principalId,
-						parentId,
-						parentType,
-						memberIds,
-						memberType,
-					);
+					return yield* computeMemberPrivileges(principalId, batch);
 				},
 			),
 
 			batchCheckMembers: Effect.fn("AclService.batchCheckMembers")(
-				function* (
-					principalId,
-					parentId,
-					parentType,
-					memberIds,
-					memberType,
-					privilege,
-				) {
+				function* (principalId, batch, privilege) {
+					const { parentId, parentType, memberIds, memberType } = batch;
 					yield* Effect.logTrace("acl.batchCheckMembers", {
 						principalId,
 						parentId,
@@ -446,13 +440,7 @@ export const AclServiceLive = Layer.effect(
 					// Otherwise a member passes iff its effective privilege set
 					// contains the requested privilege — equivalent to check() but
 					// computed for every member in a bounded number of queries.
-					const privMap = yield* computeMemberPrivileges(
-						principalId,
-						parentId,
-						parentType,
-						memberIds,
-						memberType,
-					);
+					const privMap = yield* computeMemberPrivileges(principalId, batch);
 					for (const id of memberIds) {
 						const privs = privMap.get(id) ?? [];
 						if ((privs as ReadonlyArray<string>).includes(privilege)) {

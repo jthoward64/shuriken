@@ -34,13 +34,12 @@ const config = loadSeedConfig();
 
 const seedOneUser = (index: number) =>
 	Effect.gen(function* () {
-		const user = yield* seedUser(
-			index,
-			config.calendarsPerUserMin,
-			config.calendarsPerUserMax,
-			config.addressBooksPerUserMin,
-			config.addressBooksPerUserMax,
-		);
+		const user = yield* seedUser(index, {
+			calendarsMin: config.calendarsPerUserMin,
+			calendarsMax: config.calendarsPerUserMax,
+			addressBooksMin: config.addressBooksPerUserMin,
+			addressBooksMax: config.addressBooksPerUserMax,
+		});
 
 		const eventSplits = weightedSplit(
 			config.eventsPerUser,
@@ -89,9 +88,11 @@ const program = Effect.gen(function* () {
 		(spec, i) =>
 			seedGroup(
 				i,
-				intBetween(spec.min, spec.max),
-				shouldSeedAddressbook(i, config.smallGroups),
-				config.batchSize,
+				{
+					size: intBetween(spec.min, spec.max),
+					shouldGetAddressbook: shouldSeedAddressbook(i, config.smallGroups),
+					batchSize: config.batchSize,
+				},
 				users,
 			).pipe(
 				Effect.tap(() =>

@@ -544,13 +544,12 @@ describe("AclService.batchMemberPrivileges", () => {
 			AclService.pipe(
 				Effect.flatMap((s) =>
 					Effect.all({
-						batch: s.batchMemberPrivileges(
-							principalId,
-							collectionId,
-							"collection",
-							[instA, instB],
-							"instance",
-						),
+						batch: s.batchMemberPrivileges(principalId, {
+							parentId: collectionId,
+							parentType: "collection",
+							memberIds: [instA, instB],
+							memberType: "instance",
+						}),
 						singleA: s.currentUserPrivileges(principalId, instA, "instance"),
 						singleB: s.currentUserPrivileges(principalId, instB, "instance"),
 					}),
@@ -581,13 +580,12 @@ describe("AclService.batchMemberPrivileges", () => {
 		const batch = await runSuccess(
 			AclService.pipe(
 				Effect.flatMap((s) =>
-					s.batchMemberPrivileges(
-						principalId,
-						collectionId,
-						"collection",
-						[],
-						"instance",
-					),
+					s.batchMemberPrivileges(principalId, {
+						parentId: collectionId,
+						parentType: "collection",
+						memberIds: [],
+						memberType: "instance",
+					}),
 				),
 				Effect.provide(env.toLayer()),
 				Effect.orDie,
@@ -629,10 +627,12 @@ describe("AclService.batchCheckMembers", () => {
 				Effect.flatMap((s) =>
 					s.batchCheckMembers(
 						principalId,
-						collectionId,
-						"collection",
-						[granted, ungranted],
-						"instance",
+						{
+							parentId: collectionId,
+							parentType: "collection",
+							memberIds: [granted, ungranted],
+							memberType: "instance",
+						},
 						"DAV:read",
 					),
 				),
@@ -671,10 +671,12 @@ describe("AclService.batchCheckMembers", () => {
 				Effect.flatMap((s) =>
 					s.batchCheckMembers(
 						principalId,
-						collectionId,
-						"collection",
-						[instA, instB],
-						"instance",
+						{
+							parentId: collectionId,
+							parentType: "collection",
+							memberIds: [instA, instB],
+							memberType: "instance",
+						},
 						"DAV:read",
 					),
 				),
@@ -703,10 +705,12 @@ describe("AclService.batchCheckMembers", () => {
 				Effect.flatMap((s) =>
 					s.batchCheckMembers(
 						principalId,
-						collectionId,
-						"collection",
-						[inst],
-						"instance",
+						{
+							parentId: collectionId,
+							parentType: "collection",
+							memberIds: [inst],
+							memberType: "instance",
+						},
 						"DAV:read",
 					),
 				),

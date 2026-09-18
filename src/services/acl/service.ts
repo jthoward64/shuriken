@@ -36,6 +36,14 @@ export type AclResourceId =
 // proceeding. On failure it returns a `DavError` with "DAV:need-privileges".
 // ---------------------------------------------------------------------------
 
+/** A parent resource and the members of it one batched ACL question covers. */
+export interface AclMemberBatch {
+	readonly parentId: AclResourceId;
+	readonly parentType: ResourceType;
+	readonly memberIds: ReadonlyArray<AclResourceId>;
+	readonly memberType: ResourceType;
+}
+
 export interface AclServiceShape {
 	/**
 	 * Check whether the given principal has the privilege on the resource.
@@ -114,10 +122,7 @@ export interface AclServiceShape {
 	 */
 	readonly batchMemberPrivileges: (
 		principalId: PrincipalId,
-		parentId: AclResourceId,
-		parentType: ResourceType,
-		memberIds: ReadonlyArray<AclResourceId>,
-		memberType: ResourceType,
+		batch: AclMemberBatch,
 	) => Effect.Effect<
 		ReadonlyMap<AclResourceId, ReadonlyArray<DavPrivilege>>,
 		DatabaseError
@@ -132,10 +137,7 @@ export interface AclServiceShape {
 	 */
 	readonly batchCheckMembers: (
 		principalId: PrincipalId,
-		parentId: AclResourceId,
-		parentType: ResourceType,
-		memberIds: ReadonlyArray<AclResourceId>,
-		memberType: ResourceType,
+		batch: AclMemberBatch,
 		privilege: DavPrivilege,
 	) => Effect.Effect<ReadonlySet<AclResourceId>, DatabaseError>;
 }

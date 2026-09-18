@@ -27,6 +27,12 @@ import type { DavPrivilege } from "#src/domain/types/dav.ts";
 
 export type AceRow = InferSelectModel<typeof davAcl>;
 
+/** The resource an ACL question is asked about. */
+export interface AclResourceRef {
+	readonly resourceId: UuidString;
+	readonly resourceType: ResourceType;
+}
+
 export interface NewAce {
 	readonly resourceType: ResourceType;
 	readonly resourceId: UuidString;
@@ -63,8 +69,7 @@ export interface AclRepositoryShape {
 	 */
 	readonly hasPrivilege: (
 		principalIds: ReadonlyArray<PrincipalId>,
-		resourceId: UuidString,
-		resourceType: ResourceType,
+		resource: AclResourceRef,
 		privileges: ReadonlyArray<DavPrivilege>,
 		isAuthenticated: boolean,
 	) => Effect.Effect<boolean, DatabaseError>;
