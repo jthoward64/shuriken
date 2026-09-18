@@ -5,11 +5,7 @@
 
 import { faker } from "@faker-js/faker";
 import { Effect, Option, Redacted } from "effect";
-import {
-	CollectionId,
-	type PrincipalId,
-	type UserId,
-} from "#src/domain/ids.ts";
+import { CollectionId, PrincipalId, UserId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import { Email } from "#src/domain/types/strings.ts";
 import { AppPasswordService } from "#src/services/app-password/service.ts";
@@ -40,7 +36,7 @@ export interface SeededUser {
 	readonly addressBookIds: ReadonlyArray<CollectionId>;
 }
 
-const createExtraCollections = (
+const createExtraCollections = Effect.fn("seed.extraCollections")(function* (
 	ownerPrincipalId: PrincipalId,
 	spec: {
 		readonly slugPrefix: string;
@@ -49,31 +45,30 @@ const createExtraCollections = (
 		readonly namePool: ReadonlyArray<string>;
 		readonly collectionType: "calendar" | "addressbook";
 	},
-) =>
-	Effect.gen(function* () {
-		const { slugPrefix, uniqueSuffix, count, namePool, collectionType } = spec;
-		const collections = yield* CollectionService;
-		const rows: Array<CollectionRow> = [];
-		for (let i = 0; i < count; i++) {
-			const row = yield* collections.create({
-				ownerPrincipalId,
-				collectionType,
-				slug: Slug(`${slugPrefix}-${i}`),
-				displayName: `${pick(namePool)} (${uniqueSuffix})`,
-				supportedComponents:
-					collectionType === "calendar" ? ["VEVENT"] : ["VCARD"],
-			});
-			rows.push(row);
-		}
-		return rows;
-	});
+) {
+	const { slugPrefix, uniqueSuffix, count, namePool, collectionType } = spec;
+	const collections = yield* CollectionService;
+	const rows: Array<CollectionRow> = [];
+	for (let i = 0; i < count; i++) {
+		const row = yield* collections.create({
+			ownerPrincipalId,
+			collectionType,
+			slug: Slug(`${slugPrefix}-${i}`),
+			displayName: `${pick(namePool)} (${uniqueSuffix})`,
+			supportedComponents:
+				collectionType === "calendar" ? ["VEVENT"] : ["VCARD"],
+		});
+		rows.push(row);
+	}
+	return rows;
+});
 
 /**
  * Provision one fake user: account + local password + one app password, plus
  * a randomized number of extra personal calendars/addressbooks beyond the
  * auto-created "primary" ones.
  */
-export const seedUser = (
+export const seedUser = Effect.fn("seed.user")(function* (
 	index: number,
 	counts: {
 		readonly calendarsMin: number;
@@ -81,73 +76,71 @@ export const seedUser = (
 		readonly addressBooksMin: number;
 		readonly addressBooksMax: number;
 	},
-) =>
-	Effect.gen(function* () {
-		const { calendarsMin, calendarsMax, addressBooksMin, addressBooksMax } =
-			counts;
-		const provisioning = yield* ProvisioningService;
-		const appPasswords = yield* AppPasswordService;
+) {
+	const { calendarsMin, calendarsMax, addressBooksMin, addressBooksMax } =
+		counts;
+	const provisioning = yield* ProvisioningService;
+	const appPasswords = yield* AppPasswordService;
 
-		const firstName = faker.person.firstName();
-		const lastName = faker.person.lastName();
-		const displayName = `${firstName} ${lastName}`;
-		const slug = Slug(
-			`${faker.helpers.slugify(displayName).toLowerCase()}-${index}`,
-		);
-		const email = Email(`${slug}@seed.example`);
+	const firstName = faker.person.firstName();
+	const lastName = faker.person.lastName();
+	const displayName = `${firstName} ${lastName}`;
+	const slug = Slug(
+		`${faker.helpers.slugify(displayName).toLowerCase()}-${index}`,
+	);
+	const email = Email(`${slug}@seed.example`);
 
-		const provisioned = yield* provisioning.provisionUser({
-			email,
-			name: displayName,
-			slug,
-			credentials: [
-				{
-					source: "local",
-					authId: slug,
-					password: Redacted.make(SEED_PASSWORD),
-				},
-			],
-		});
-
-		const userId = provisioned.user.user.id as UserId;
-		const principalId = provisioned.user.principal.id as PrincipalId;
-
-		yield* appPasswords.generate({
-			userId,
-			label: Option.some(APP_PASSWORD_LABEL),
-		});
-
-		const extraCalendarCount = intBetween(calendarsMin, calendarsMax);
-		const extraCalendars = yield* createExtraCollections(principalId, {
-			slugPrefix: `${slug}-cal`,
-			uniqueSuffix: index,
-			count: extraCalendarCount,
-			namePool: EXTRA_CALENDAR_NAMES,
-			collectionType: "calendar",
-		});
-
-		const extraAddressBookCount = intBetween(addressBooksMin, addressBooksMax);
-		const extraAddressBooks = yield* createExtraCollections(principalId, {
-			slugPrefix: `${slug}-ab`,
-			uniqueSuffix: index,
-			count: extraAddressBookCount,
-			namePool: EXTRA_ADDRESSBOOK_NAMES,
-			collectionType: "addressbook",
-		});
-
-		const seeded: SeededUser = {
-			userId,
-			principalId,
-			email,
-			displayName,
-			calendarIds: [
-				CollectionId(provisioned.calendar.id),
-				...extraCalendars.map((c) => CollectionId(c.id)),
-			],
-			addressBookIds: [
-				CollectionId(provisioned.addressBook.id),
-				...extraAddressBooks.map((c) => CollectionId(c.id)),
-			],
-		};
-		return seeded;
+	const provisioned = yield* provisioning.provisionUser({
+		email,
+		name: displayName,
+		slug,
+		credentials: [
+			{
+				source: "local",
+				authId: slug,
+				password: Redacted.make(SEED_PASSWORD),
+			},
+		],
 	});
+
+	const userId = UserId(provisioned.user.user.id);
+	const principalId = PrincipalId(provisioned.user.principal.id);
+
+	yield* appPasswords.generate({
+		userId,
+		label: Option.some(APP_PASSWORD_LABEL),
+	});
+
+	const extraCalendarCount = intBetween(calendarsMin, calendarsMax);
+	const extraCalendars = yield* createExtraCollections(principalId, {
+		slugPrefix: `${slug}-cal`,
+		uniqueSuffix: index,
+		count: extraCalendarCount,
+		namePool: EXTRA_CALENDAR_NAMES,
+		collectionType: "calendar",
+	});
+
+	const extraAddressBookCount = intBetween(addressBooksMin, addressBooksMax);
+	const extraAddressBooks = yield* createExtraCollections(principalId, {
+		slugPrefix: `${slug}-ab`,
+		uniqueSuffix: index,
+		count: extraAddressBookCount,
+		namePool: EXTRA_ADDRESSBOOK_NAMES,
+		collectionType: "addressbook",
+	});
+
+	const calendarIds = [provisioned.calendar, ...extraCalendars].map((c) =>
+		CollectionId(c.id),
+	);
+	const addressBookIds = [provisioned.addressBook, ...extraAddressBooks].map(
+		(c) => CollectionId(c.id),
+	);
+	return {
+		userId,
+		principalId,
+		email,
+		displayName,
+		calendarIds,
+		addressBookIds,
+	} satisfies SeededUser;
+});

@@ -15,7 +15,7 @@
 // scripts/seed/layer.ts for the lean layer composition this implies.
 // ---------------------------------------------------------------------------
 
-import { Effect } from "effect";
+import { Effect, ManagedRuntime } from "effect";
 import { Temporal } from "temporal-polyfill";
 import { loadSeedConfig } from "./seed/config.ts";
 import { seedContacts } from "./seed/contacts.ts";
@@ -32,43 +32,52 @@ import { type SeededUser, seedUser } from "./seed/users.ts";
 
 const config = loadSeedConfig();
 
-const seedOneUser = (index: number) =>
-	Effect.gen(function* () {
-		const user = yield* seedUser(index, {
-			calendarsMin: config.calendarsPerUserMin,
-			calendarsMax: config.calendarsPerUserMax,
-			addressBooksMin: config.addressBooksPerUserMin,
-			addressBooksMax: config.addressBooksPerUserMax,
-		});
-
-		const eventSplits = weightedSplit(
-			config.eventsPerUser,
-			user.calendarIds.length,
-		);
-		yield* Effect.forEach(user.calendarIds, (calendarId, i) =>
-			seedEvents(calendarId, eventSplits[i] ?? 0, config.batchSize),
-		);
-
-		const contactSplits = weightedSplit(
-			config.contactsPerUser,
-			user.addressBookIds.length,
-		);
-		yield* Effect.forEach(user.addressBookIds, (addressBookId, i) =>
-			seedContacts(addressBookId, contactSplits[i] ?? 0, config.batchSize),
-		);
-
-		yield* Effect.logInfo(
-			`seed: user ${index + 1}/${config.users} provisioned`,
-			{
-				email: user.email,
-				calendars: user.calendarIds.length,
-				addressBooks: user.addressBookIds.length,
-			},
-		);
-		return user;
+const seedOneUser = Effect.fn("seed.seedOneUser")(function* (index: number) {
+	const user = yield* seedUser(index, {
+		calendarsMin: config.calendarsPerUserMin,
+		calendarsMax: config.calendarsPerUserMax,
+		addressBooksMin: config.addressBooksPerUserMin,
+		addressBooksMax: config.addressBooksPerUserMax,
 	});
 
-const program = Effect.gen(function* () {
+	const eventSplits = weightedSplit(
+		config.eventsPerUser,
+		user.calendarIds.length,
+	);
+	yield* Effect.forEach(user.calendarIds, (calendarId, i) =>
+		seedEvents(calendarId, eventSplits[i] ?? 0, config.batchSize),
+	);
+
+	const contactSplits = weightedSplit(
+		config.contactsPerUser,
+		user.addressBookIds.length,
+	);
+	yield* Effect.forEach(user.addressBookIds, (addressBookId, i) =>
+		seedContacts(addressBookId, contactSplits[i] ?? 0, config.batchSize),
+	);
+
+	yield* Effect.logInfo(`seed: user ${index + 1}/${config.users} provisioned`, {
+		email: user.email,
+		calendars: user.calendarIds.length,
+		addressBooks: user.addressBookIds.length,
+	});
+	return user;
+});
+
+/** Give a seeded user a random share of the direct-share and share-link paths */
+const seedSharingFor = Effect.fn("seed.sharingFor")(function* (
+	user: SeededUser,
+	users: ReadonlyArray<SeededUser>,
+) {
+	if (chance(config.directShareFraction)) {
+		yield* seedDirectShare(user, users);
+	}
+	if (chance(config.shareLinkFraction)) {
+		yield* seedShareLink(user);
+	}
+});
+
+const program = Effect.fn("seed.program")(function* () {
 	const startedAt = Temporal.Now.instant();
 	yield* Effect.logInfo("seed: starting", { ...config });
 
@@ -102,19 +111,9 @@ const program = Effect.gen(function* () {
 		{ concurrency: config.concurrency },
 	);
 
-	yield* Effect.forEach(
-		users,
-		(user) =>
-			Effect.gen(function* () {
-				if (chance(config.directShareFraction)) {
-					yield* seedDirectShare(user, users);
-				}
-				if (chance(config.shareLinkFraction)) {
-					yield* seedShareLink(user);
-				}
-			}),
-		{ concurrency: config.concurrency },
-	);
+	yield* Effect.forEach(users, (user) => seedSharingFor(user, users), {
+		concurrency: config.concurrency,
+	});
 
 	const durationSeconds = startedAt.until(Temporal.Now.instant()).total({
 		unit: "seconds",
@@ -128,7 +127,9 @@ const program = Effect.gen(function* () {
 	});
 });
 
-Effect.runPromise(program.pipe(Effect.provide(SeedLayer))).catch((err) => {
+const runtime = ManagedRuntime.make(SeedLayer);
+
+runtime.runPromise(program()).catch((err) => {
 	console.error("seed: failed", err);
 	Deno.exit(1);
 });

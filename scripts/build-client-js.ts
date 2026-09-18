@@ -20,7 +20,7 @@ await Deno.mkdir(OUT_DIR, { recursive: true });
 
 for (const { name, entry } of ENTRIES) {
 	const entryUrl = pathToFileURL(path.resolve(CLIENT_DIR, entry));
-	const { js, css } = await bundleClient({ entry: entryUrl });
+	const { js, css } = await bundleClient({ entry: entryUrl.href });
 
 	const jsOut = path.join(OUT_DIR, name);
 	await Deno.writeTextFile(jsOut, js);

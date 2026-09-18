@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { faker } from "@faker-js/faker";
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import { Temporal } from "temporal-polyfill";
 import { encodeICalendar } from "#src/data/icalendar/codec.ts";
 import type { IrComponent, IrDocument, IrProperty } from "#src/data/ir.ts";
@@ -129,26 +129,24 @@ const wrapCalendar = (components: ReadonlyArray<IrComponent>): IrDocument => ({
  * `batchSize`-sized chunks via the same `importIcs` bulk-import path a real
  * .ics file upload uses.
  */
-export const seedEvents = (
+export const seedEvents = Effect.fn("seed.seedEvents")(function* (
 	calendarId: CollectionId,
 	count: number,
 	batchSize: number,
 	attendeeEmails: ReadonlyArray<string> = [],
-) =>
-	Effect.gen(function* () {
-		let remaining = count;
-		while (remaining > 0) {
-			const chunkSize = Math.min(batchSize, remaining);
-			const components: Array<IrComponent> = [];
-			for (let i = 0; i < chunkSize; i++) {
-				const form = randomEventForm(attendeeEmails);
-				const component = buildVeventComponent(crypto.randomUUID(), form);
-				if (component) {
-					components.push(component);
-				}
-			}
-			const body = yield* encodeICalendar(wrapCalendar(components));
-			yield* importIcs(calendarId, body, "skip");
-			remaining -= chunkSize;
+) {
+	let remaining = count;
+	while (remaining > 0) {
+		const chunkSize = Math.min(batchSize, remaining);
+		const components: Array<IrComponent> = [];
+		for (let i = 0; i < chunkSize; i++) {
+			const form = randomEventForm(attendeeEmails);
+			components.push(
+				...Option.toArray(buildVeventComponent(crypto.randomUUID(), form)),
+			);
 		}
-	});
+		const body = yield* encodeICalendar(wrapCalendar(components));
+		yield* importIcs(calendarId, body, "skip");
+		remaining -= chunkSize;
+	}
+});

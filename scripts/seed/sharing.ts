@@ -22,56 +22,56 @@ const MIN_SHARE_LINK_CALENDARS = 1;
  * user's non-primary calendars — the individual-principal sharing path
  * CalDAV clients use, distinct from the group-ACL sharing in groups.ts.
  */
-export const seedDirectShare = (
+export const seedDirectShare = Effect.fn("seed.seedDirectShare")(function* (
 	owner: SeededUser,
 	allUsers: ReadonlyArray<SeededUser>,
-) =>
-	Effect.gen(function* () {
-		const acl = yield* AclRepository;
-		const shareable = owner.calendarIds.slice(1);
-		if (shareable.length === 0) {
-			return;
-		}
-		const calendarId = pick(shareable) as CollectionId;
-		const otherUsers = allUsers.filter((u) => u.userId !== owner.userId);
-		const targets = sampleDistinct(
-			otherUsers,
-			intBetween(MIN_DIRECT_SHARE_TARGETS, MAX_DIRECT_SHARE_TARGETS),
-		);
-		const allowWrite = chance(DIRECT_SHARE_WRITE_PROBABILITY);
-		for (const target of targets) {
-			yield* acl.grantAce({
-				resourceType: "collection",
-				resourceId: calendarId,
-				principalType: "principal",
-				principalId: target.principalId,
-				privilege: allowWrite ? "DAV:write" : "DAV:read",
-				grantDeny: "grant",
-				protected: false,
-				ordinal: ACL_ORDINAL,
-			});
-		}
-	});
+) {
+	const acl = yield* AclRepository;
+	const shareable = owner.calendarIds.slice(1);
+	if (shareable.length === 0) {
+		return;
+	}
+	const calendarId = pick(shareable) as CollectionId;
+	const otherUsers = allUsers.filter((u) => u.userId !== owner.userId);
+	const targets = sampleDistinct(
+		otherUsers,
+		intBetween(MIN_DIRECT_SHARE_TARGETS, MAX_DIRECT_SHARE_TARGETS),
+	);
+	const allowWrite = chance(DIRECT_SHARE_WRITE_PROBABILITY);
+	for (const target of targets) {
+		yield* acl.grantAce({
+			resourceType: "collection",
+			resourceId: calendarId,
+			principalType: "principal",
+			principalId: target.principalId,
+			privilege: allowWrite ? "DAV:write" : "DAV:read",
+			grantDeny: "grant",
+			protected: false,
+			ordinal: ACL_ORDINAL,
+		});
+	}
+});
 
 /**
  * Create one public share link covering 1..all of a user's calendars, each
  * with its own randomized visibility.
  */
-export const seedShareLink = (owner: SeededUser) =>
-	Effect.gen(function* () {
-		const shareLinks = yield* ShareLinkService;
-		const calendarCount = intBetween(
-			MIN_SHARE_LINK_CALENDARS,
-			owner.calendarIds.length,
-		);
-		const calendars = sampleDistinct(owner.calendarIds, calendarCount).map(
-			(calendarId) => ({
-				calendarId,
-				visibility: pick(SHARE_LINK_VISIBILITIES),
-			}),
-		);
-		yield* shareLinks.create(
-			{ userId: owner.userId, principalId: owner.principalId },
-			{ displayName: `${owner.displayName}'s Feed`, calendars },
-		);
-	});
+export const seedShareLink = Effect.fn("seed.seedShareLink")(function* (
+	owner: SeededUser,
+) {
+	const shareLinks = yield* ShareLinkService;
+	const calendarCount = intBetween(
+		MIN_SHARE_LINK_CALENDARS,
+		owner.calendarIds.length,
+	);
+	const calendars = sampleDistinct(owner.calendarIds, calendarCount).map(
+		(calendarId) => ({
+			calendarId,
+			visibility: pick(SHARE_LINK_VISIBILITIES),
+		}),
+	);
+	yield* shareLinks.create(
+		{ userId: owner.userId, principalId: owner.principalId },
+		{ displayName: `${owner.displayName}'s Feed`, calendars },
+	);
+});

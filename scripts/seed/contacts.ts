@@ -44,18 +44,23 @@ export const randomContactForm = (): ContactFormData => {
 	const firstName = faker.person.firstName();
 	const lastName = faker.person.lastName();
 	const emails = [
-		{ value: faker.internet.email({ firstName, lastName }), types: ["home"] },
+		{
+			value: faker.internet.email({ firstName, lastName }),
+			types: ["home"],
+			preferred: true,
+		},
 		...(chance(HAS_SECOND_EMAIL_PROBABILITY)
 			? [
 					{
 						value: faker.internet.email({ firstName, lastName }),
 						types: ["work"],
+						preferred: false,
 					},
 				]
 			: []),
 	];
 	const tels = chance(HAS_TEL_PROBABILITY)
-		? [{ value: faker.phone.number(), types: ["cell"] }]
+		? [{ value: faker.phone.number(), types: ["cell"], preferred: true }]
 		: [];
 
 	return {
@@ -77,24 +82,23 @@ export const randomContactForm = (): ContactFormData => {
  * `batchSize`-sized chunks via the same `importVcf` bulk-import path a real
  * .vcf file upload uses.
  */
-export const seedContacts = (
+export const seedContacts = Effect.fn("seed.seedContacts")(function* (
 	addressBookId: CollectionId,
 	count: number,
 	batchSize: number,
-) =>
-	Effect.gen(function* () {
-		let remaining = count;
-		while (remaining > 0) {
-			const chunkSize = Math.min(batchSize, remaining);
-			const cards: Array<IrComponent> = [];
-			for (let i = 0; i < chunkSize; i++) {
-				const form = randomContactForm();
-				cards.push(buildVcardComponent(crypto.randomUUID(), form));
-			}
-			const bodies = yield* Effect.forEach(cards, (card) =>
-				encodeVCard({ kind: "vcard", root: card }),
-			);
-			yield* importVcf(addressBookId, bodies.join("\n"), "skip");
-			remaining -= chunkSize;
+) {
+	let remaining = count;
+	while (remaining > 0) {
+		const chunkSize = Math.min(batchSize, remaining);
+		const cards: Array<IrComponent> = [];
+		for (let i = 0; i < chunkSize; i++) {
+			const form = randomContactForm();
+			cards.push(buildVcardComponent(crypto.randomUUID(), form));
 		}
-	});
+		const bodies = yield* Effect.forEach(cards, (card) =>
+			encodeVCard({ kind: "vcard", root: card }),
+		);
+		yield* importVcf(addressBookId, bodies.join("\n"), "skip");
+		remaining -= chunkSize;
+	}
+});
