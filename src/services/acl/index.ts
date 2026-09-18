@@ -2,8 +2,9 @@ import { Layer } from "effect";
 import { AclRepositoryLive } from "./repository.live.ts";
 import { AclServiceLive } from "./service.live.ts";
 
+export type { ResourceType } from "#src/db/drizzle/schema/index.ts";
 export { AclRepositoryLive } from "./repository.live.ts";
-export type { AceRow, AclResourceType, NewAce } from "./repository.ts";
+export type { AceRow, NewAce } from "./repository.ts";
 export { AclRepository } from "./repository.ts";
 export { AclServiceAllowAll } from "./service.allow-all.ts";
 export { AclServiceLive } from "./service.live.ts";

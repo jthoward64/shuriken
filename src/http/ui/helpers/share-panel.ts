@@ -2,7 +2,7 @@ import { Effect, Option } from "effect";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import type { CollectionId, PrincipalId } from "#src/domain/ids.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
-import type { AclResourceType } from "#src/services/acl/index.ts";
+import type { ResourceType } from "#src/services/acl/index.ts";
 import { type AclResourceId, AclService } from "#src/services/acl/service.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
 import { PrincipalService } from "#src/services/principal/index.ts";
@@ -19,7 +19,7 @@ import {
  * Always false for non-collection resource types.
  */
 export const resolveIsCalendar = (
-	resourceType: AclResourceType,
+	resourceType: ResourceType,
 	resourceId: AclResourceId,
 ): Effect.Effect<boolean, DavError | DatabaseError, CollectionService> =>
 	Effect.gen(function* () {
@@ -119,7 +119,7 @@ export const COMMON_PRIVILEGE_OPTIONS: ReadonlyArray<{
 export const buildSharePanelData = (
 	actingPrincipalId: PrincipalId,
 	resourceId: AclResourceId,
-	resourceType: AclResourceType,
+	resourceType: ResourceType,
 	isCalendar = false,
 ): Effect.Effect<
 	Option.Option<SharePanelData>,
@@ -143,7 +143,7 @@ export const buildSharePanelData = (
 
 		// Resolve every referenced principal in one query instead of one per ACE.
 		const principalIds = rawAces.flatMap((ace) =>
-			ace.principalType === "principal" && ace.principalId !== null
+			ace.principalType === "principal" && ace.principalId != null
 				? [ace.principalId as PrincipalId]
 				: [],
 		);
@@ -154,7 +154,7 @@ export const buildSharePanelData = (
 			let principalLabel: string;
 			let resolvedPrincipalId: string | null = null;
 
-			if (ace.principalType === "principal" && ace.principalId !== null) {
+			if (ace.principalType === "principal" && ace.principalId != null) {
 				const row = principals.get(ace.principalId as PrincipalId);
 				principalLabel = row
 					? (row.displayName ?? row.slug)

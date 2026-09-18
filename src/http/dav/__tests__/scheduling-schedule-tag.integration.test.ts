@@ -66,7 +66,7 @@ const PROPFIND_SCHEDULE_TAG = [
  * wants a path). Percent-encoding (e.g. `%40` for `@`) is preserved.
  */
 const firstIcsHref = (body: string): string | undefined => {
-	const href = body.match(ICS_HREF)?.[1];
+	const href = ICS_HREF.exec(body)?.[1];
 	if (href === undefined) {
 		return undefined;
 	}

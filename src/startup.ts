@@ -216,11 +216,14 @@ const provisionAdminUser = (
 
 		Option.match(credential.generated, {
 			onSome: (p) => {
+				// biome-ignore lint/suspicious/noConsole: the generated password must reach the operator's terminal, not the log sink
 				console.log(
 					`\n*** shuriken-ts: default admin credentials ***\n  Email:    ${email}\n  Password: ${p}\n  Save this password — it will not be shown again.\n`,
 				);
 			},
-			onNone: () => {},
+			onNone: () => {
+				/* the password was set by the operator, so there is nothing to print */
+			},
 		});
 
 		return Option.some(result.user.principal.id as PrincipalId);

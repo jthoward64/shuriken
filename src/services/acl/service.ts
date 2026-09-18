@@ -1,5 +1,6 @@
 import type { Effect } from "effect";
 import { Context } from "effect";
+import type { ResourceType } from "#src/db/drizzle/schema/index.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import type {
 	CollectionId,
@@ -8,9 +9,9 @@ import type {
 	VirtualResourceId,
 } from "#src/domain/ids.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
-import type { AceRow, AclResourceType, NewAce } from "./repository.ts";
+import type { AceRow, NewAce } from "./repository.ts";
 
-export type { AclResourceType } from "./repository.ts";
+export type { ResourceType } from "#src/db/drizzle/schema/index.ts";
 
 // ---------------------------------------------------------------------------
 // AclResourceId — the UUID of the resource being access-checked.
@@ -47,7 +48,7 @@ export interface AclServiceShape {
 	readonly check: (
 		principalId: PrincipalId,
 		resourceId: AclResourceId,
-		resourceType: AclResourceType,
+		resourceType: ResourceType,
 		privilege: DavPrivilege,
 	) => Effect.Effect<void, DavError | DatabaseError>;
 
@@ -57,7 +58,7 @@ export interface AclServiceShape {
 	readonly currentUserPrivileges: (
 		principalId: PrincipalId,
 		resourceId: AclResourceId,
-		resourceType: AclResourceType,
+		resourceType: ResourceType,
 	) => Effect.Effect<ReadonlyArray<DavPrivilege>, DatabaseError>;
 
 	/**
@@ -67,7 +68,7 @@ export interface AclServiceShape {
 	 */
 	readonly getAces: (
 		resourceId: AclResourceId,
-		resourceType: AclResourceType,
+		resourceType: ResourceType,
 	) => Effect.Effect<ReadonlyArray<AceRow>, DatabaseError>;
 
 	/**
@@ -77,7 +78,7 @@ export interface AclServiceShape {
 	 */
 	readonly setAces: (
 		resourceId: AclResourceId,
-		resourceType: AclResourceType,
+		resourceType: ResourceType,
 		aces: ReadonlyArray<NewAce>,
 	) => Effect.Effect<void, DatabaseError>;
 
@@ -90,7 +91,7 @@ export interface AclServiceShape {
 	readonly batchCurrentUserPrivileges: (
 		principalId: PrincipalId,
 		resourceIds: ReadonlyArray<AclResourceId>,
-		resourceType: AclResourceType,
+		resourceType: ResourceType,
 	) => Effect.Effect<
 		ReadonlyMap<AclResourceId, ReadonlyArray<DavPrivilege>>,
 		DatabaseError
@@ -114,9 +115,9 @@ export interface AclServiceShape {
 	readonly batchMemberPrivileges: (
 		principalId: PrincipalId,
 		parentId: AclResourceId,
-		parentType: AclResourceType,
+		parentType: ResourceType,
 		memberIds: ReadonlyArray<AclResourceId>,
-		memberType: AclResourceType,
+		memberType: ResourceType,
 	) => Effect.Effect<
 		ReadonlyMap<AclResourceId, ReadonlyArray<DavPrivilege>>,
 		DatabaseError
@@ -132,9 +133,9 @@ export interface AclServiceShape {
 	readonly batchCheckMembers: (
 		principalId: PrincipalId,
 		parentId: AclResourceId,
-		parentType: AclResourceType,
+		parentType: ResourceType,
 		memberIds: ReadonlyArray<AclResourceId>,
-		memberType: AclResourceType,
+		memberType: ResourceType,
 		privilege: DavPrivilege,
 	) => Effect.Effect<ReadonlySet<AclResourceId>, DatabaseError>;
 }

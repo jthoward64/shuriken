@@ -28,7 +28,6 @@ async function makePgLiteInstance(): Promise<PGlite> {
 		.then((buf) => new Blob([new Uint8Array(buf)]))
 		.catch((): Blob | undefined => {
 			needGenerateDump = true;
-			// biome-ignore lint/complexity/noUselessUndefined: keeps the catch branch typed as Blob | undefined rather than void
 			return undefined;
 		});
 	const pg = new PGlite({

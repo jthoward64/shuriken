@@ -1,10 +1,11 @@
 import { Array as Arr, Effect, Layer, Metric, Option } from "effect";
+import type { ResourceType } from "#src/db/drizzle/schema/index.ts";
 import { type DatabaseError, needPrivileges } from "#src/domain/errors.ts";
 import type { PrincipalId, UuidString } from "#src/domain/ids.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
 import { aclChecksTotal } from "#src/observability/metrics.ts";
 import { bypassesAclCheck } from "#src/services/role/policy.ts";
-import { AclRepository, type AclResourceType } from "./repository.ts";
+import { AclRepository } from "./repository.ts";
 import { type AclResourceId, AclService } from "./service.ts";
 
 // ---------------------------------------------------------------------------
@@ -123,7 +124,7 @@ export const AclServiceLive = Layer.effect(
 			principalIds: ReadonlyArray<PrincipalId>,
 			privileges: ReadonlyArray<DavPrivilege>,
 			resourceId: UuidString,
-			resourceType: AclResourceType,
+			resourceType: ResourceType,
 		): Effect.Effect<boolean, DatabaseError> =>
 			repo.getResourceParent(resourceId, resourceType).pipe(
 				Effect.flatMap(
@@ -146,7 +147,7 @@ export const AclServiceLive = Layer.effect(
 		const collectAncestorPrivileges = (
 			principalIds: ReadonlyArray<PrincipalId>,
 			resourceId: UuidString,
-			resourceType: AclResourceType,
+			resourceType: ResourceType,
 		): Effect.Effect<ReadonlyArray<DavPrivilege>, DatabaseError> =>
 			repo.getResourceParent(resourceId, resourceType).pipe(
 				Effect.flatMap(
@@ -171,9 +172,9 @@ export const AclServiceLive = Layer.effect(
 		const computeMemberPrivileges = (
 			principalId: PrincipalId,
 			parentId: AclResourceId,
-			parentType: AclResourceType,
+			parentType: ResourceType,
 			memberIds: ReadonlyArray<AclResourceId>,
-			memberType: AclResourceType,
+			memberType: ResourceType,
 		): Effect.Effect<
 			ReadonlyMap<AclResourceId, ReadonlyArray<DavPrivilege>>,
 			DatabaseError

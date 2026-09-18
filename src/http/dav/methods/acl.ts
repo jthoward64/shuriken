@@ -36,7 +36,7 @@ import type { HttpRequestContext } from "#src/http/context.ts";
 import { normalizeClarkNames } from "#src/http/dav/xml/clark.ts";
 import { parseXml, readXmlBody } from "#src/http/dav/xml/parser.ts";
 import { HTTP_OK } from "#src/http/status.ts";
-import type { AclResourceType, NewAce } from "#src/services/acl/index.ts";
+import type { NewAce, ResourceType } from "#src/services/acl/index.ts";
 import type { AclResourceId } from "#src/services/acl/service.ts";
 import { AclService } from "#src/services/acl/service.ts";
 import { PrincipalRepository } from "#src/services/principal/repository.ts";
@@ -309,7 +309,7 @@ export const aclHandler = (
 
 		// Determine the target resource identity
 		let resourceId: AclResourceId;
-		let resourceType: AclResourceType;
+		let resourceType: ResourceType;
 		if (path.kind === "principal") {
 			resourceId = path.principalId;
 			resourceType = "principal";

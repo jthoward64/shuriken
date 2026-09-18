@@ -17,7 +17,7 @@ import {
 import { tiersFor } from "#src/http/ui/helpers/share-tiers.ts";
 import { SharePanel } from "#src/http/ui/view/pages/share-panel.tsx";
 import { renderFragment } from "#src/http/ui/view/shell/render.tsx";
-import type { AclResourceType, NewAce } from "#src/services/acl/index.ts";
+import type { NewAce, ResourceType } from "#src/services/acl/index.ts";
 import { type AclResourceId, AclService } from "#src/services/acl/service.ts";
 import type { CollectionService } from "#src/services/collection/index.ts";
 import type { PrincipalService } from "#src/services/principal/index.ts";
@@ -35,7 +35,7 @@ import { PrincipalRepository } from "#src/services/principal/repository.ts";
 export const aclSetTierHandler = (
 	req: Request,
 	ctx: HttpRequestContext,
-	resourceType: AclResourceType,
+	resourceType: ResourceType,
 	resourceId: AclResourceId,
 ): Effect.Effect<
 	Response,

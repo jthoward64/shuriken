@@ -7,6 +7,7 @@ import type {
 	ContentType,
 	GrantDeny,
 	PrincipalType,
+	ResourceType,
 } from "#src/db/drizzle/schema/index.ts";
 import {
 	type CollectionId,
@@ -25,7 +26,6 @@ import {
 	type AceRow,
 	AclRepository,
 	type AclRepositoryShape,
-	type AclResourceType,
 	type NewAce,
 } from "#src/services/acl/repository.ts";
 import { AclServiceLive } from "#src/services/acl/service.live.ts";
@@ -200,7 +200,7 @@ export interface CredentialSeedData {
 }
 
 export interface AceSeedData {
-	readonly resourceType: AclResourceType;
+	readonly resourceType: ResourceType;
 	readonly resourceId: UuidString;
 	readonly principalType: PrincipalType;
 	readonly principalId?: UuidString;
@@ -708,7 +708,7 @@ const makeCollectionRepo = (stores: TestStores): CollectionRepositoryShape => ({
 				autoManagedKind: input.autoManagedKind ?? null,
 				sortOrder:
 					input.sortOrder ??
-					(input.autoManagedKind !== null
+					(input.autoManagedKind != null
 						? DEFAULT_SORT_ORDER.generated
 						: DEFAULT_SORT_ORDER.normal),
 			};
@@ -1161,7 +1161,7 @@ const makeAclRepo = (stores: TestStores): AclRepositoryShape => ({
 				if (!inst) {
 					return Option.none<{
 						readonly id: UuidString;
-						readonly type: AclResourceType;
+						readonly type: ResourceType;
 					}>();
 				}
 				return Option.some({
@@ -1174,7 +1174,7 @@ const makeAclRepo = (stores: TestStores): AclRepositoryShape => ({
 				if (!col) {
 					return Option.none<{
 						readonly id: UuidString;
-						readonly type: AclResourceType;
+						readonly type: ResourceType;
 					}>();
 				}
 				if (col.parentCollectionId) {
@@ -1191,7 +1191,7 @@ const makeAclRepo = (stores: TestStores): AclRepositoryShape => ({
 			// principal — top of the hierarchy
 			return Option.none<{
 				readonly id: UuidString;
-				readonly type: AclResourceType;
+				readonly type: ResourceType;
 			}>();
 		}),
 

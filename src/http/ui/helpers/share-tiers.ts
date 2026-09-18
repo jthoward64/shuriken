@@ -1,5 +1,6 @@
+import type { ResourceType } from "#src/db/drizzle/schema/index.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
-import type { AceRow, AclResourceType } from "#src/services/acl/repository.ts";
+import type { AceRow } from "#src/services/acl/repository.ts";
 
 // ---------------------------------------------------------------------------
 // Share tiers — friendly Basic-mode groupings over the raw DavPrivilege
@@ -46,7 +47,7 @@ const MANAGE: TierDefinition = {
 
 /** Tiers offered for a given resource type + collection kind. */
 export const tiersFor = (
-	resourceType: AclResourceType,
+	resourceType: ResourceType,
 	isCalendar: boolean,
 ): ReadonlyArray<TierDefinition> => {
 	if (resourceType !== "collection") {
@@ -87,7 +88,7 @@ const groupByPrincipal = (
 ): ReadonlyArray<RawGrant> => {
 	const byPrincipal = new Map<string, Array<DavPrivilege>>();
 	for (const ace of aces) {
-		if (ace.principalType !== "principal" || ace.principalId === null) {
+		if (ace.principalType !== "principal" || ace.principalId == null) {
 			continue;
 		}
 		const list = byPrincipal.get(ace.principalId) ?? [];
@@ -110,7 +111,7 @@ const groupByPrincipal = (
  */
 export const isRepresentableInBasicTiers = (
 	aces: ReadonlyArray<AceRow>,
-	resourceType: AclResourceType,
+	resourceType: ResourceType,
 	isCalendar: boolean,
 ): boolean => {
 	const nonProtected = aces.filter((a) => !a.protected);
@@ -119,7 +120,7 @@ export const isRepresentableInBasicTiers = (
 	}
 	if (
 		nonProtected.some(
-			(a) => a.principalType !== "principal" || a.principalId === null,
+			(a) => a.principalType !== "principal" || a.principalId == null,
 		)
 	) {
 		return false;
@@ -135,7 +136,7 @@ export const isRepresentableInBasicTiers = (
  * is true for the same input. */
 export const basicTierForGrant = (
 	privileges: ReadonlyArray<DavPrivilege>,
-	resourceType: AclResourceType,
+	resourceType: ResourceType,
 	isCalendar: boolean,
 ): ShareTier | undefined =>
 	tiersFor(resourceType, isCalendar).find((t) =>
@@ -169,7 +170,7 @@ export const collapseToBasicTiers = (
 			!a.protected &&
 			a.grantDeny === "grant" &&
 			a.principalType === "principal" &&
-			a.principalId !== null,
+			a.principalId != null,
 	);
 	const grants = groupByPrincipal(nonProtected);
 	const collapsed: Array<CollapsedGrant> = [];

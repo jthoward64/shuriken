@@ -31,7 +31,9 @@ for (const { name, entry } of ENTRIES) {
 	// remove it rather than let ClientJsService pick it up.
 	const cssOut = path.join(OUT_DIR, cssNameFor(name));
 	if (css === undefined) {
-		await Deno.remove(cssOut).catch(() => {});
+		await Deno.remove(cssOut).catch(() => {
+			/* nothing to clean up */
+		});
 		continue;
 	}
 	await Deno.writeTextFile(cssOut, css);

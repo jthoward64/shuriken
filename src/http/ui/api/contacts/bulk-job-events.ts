@@ -53,6 +53,7 @@ export const contactsBulkJobEventsHandler = (
 				const poll = Effect.gen(function* () {
 					let lastStatus = "";
 					let ticksSinceEvent = 0;
+					// biome-ignore lint/nursery/noUnmodifiedLoopCondition: the abort listener above flips `closed`
 					while (!closed) {
 						const current = yield* jobRepo.findById(jobId);
 						const job = Option.getOrUndefined(current);

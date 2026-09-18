@@ -300,7 +300,9 @@ const showHoverCardNow = (url: string, anchor: Element): void => {
 				/* already open */
 			}
 			positionHoverCard(card, anchor);
-		});
+		})
+		// A failed fetch just leaves the hover card closed
+		.catch(() => {});
 };
 
 const scheduleHoverCardOpen = (url: string, anchor: Element): void => {
@@ -328,7 +330,10 @@ const openEditDialog = (url: string): void => {
 		return;
 	}
 	openDialog(byId(EDIT_POPOVER_ID));
-	htmx.ajax("GET", url, { target: `#${EDIT_BODY_ID}`, swap: "innerHTML" });
+	htmx
+		.ajax("GET", url, { target: `#${EDIT_BODY_ID}`, swap: "innerHTML" })
+		// A failed fetch leaves the dialog showing its loading state
+		.catch(() => {});
 };
 
 (() => {

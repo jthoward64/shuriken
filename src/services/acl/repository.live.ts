@@ -13,18 +13,14 @@ import {
 import { runDbQuery } from "#src/db/query.ts";
 import type { PrincipalId, UuidString } from "#src/domain/ids.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
-import {
-	AclRepository,
-	type AclResourceType,
-	type NewAce,
-} from "./repository.ts";
+import { AclRepository, type NewAce } from "./repository.ts";
 
 // ---------------------------------------------------------------------------
 // AclRepository — Drizzle implementation over dav_acl
 // ---------------------------------------------------------------------------
 
 const getAces = Effect.fn("AclRepository.getAces")(
-	function* (resourceId: UuidString, resourceType: AclResourceType) {
+	function* (resourceId: UuidString, resourceType: ResourceType) {
 		yield* Effect.annotateCurrentSpan({
 			"resource.id": resourceId,
 			"resource.type": resourceType,
@@ -49,7 +45,7 @@ const getAces = Effect.fn("AclRepository.getAces")(
 const setAces = Effect.fn("AclRepository.setAces")(
 	function* (
 		resourceId: UuidString,
-		resourceType: AclResourceType,
+		resourceType: ResourceType,
 		aces: ReadonlyArray<NewAce>,
 	) {
 		yield* Effect.annotateCurrentSpan({
@@ -158,7 +154,7 @@ const hasPrivilege = Effect.fn("AclRepository.hasPrivilege")(
 	function* (
 		principalIds: ReadonlyArray<PrincipalId>,
 		resourceId: UuidString,
-		resourceType: AclResourceType,
+		resourceType: ResourceType,
 		privileges: ReadonlyArray<DavPrivilege>,
 		isAuthenticated: boolean,
 	) {
@@ -195,7 +191,7 @@ const getGrantedPrivileges = Effect.fn("AclRepository.getGrantedPrivileges")(
 	function* (
 		principalIds: ReadonlyArray<PrincipalId>,
 		resourceId: UuidString,
-		resourceType: AclResourceType,
+		resourceType: ResourceType,
 		isAuthenticated: boolean,
 	) {
 		yield* Effect.annotateCurrentSpan({

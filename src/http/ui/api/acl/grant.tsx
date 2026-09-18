@@ -17,7 +17,7 @@ import {
 } from "#src/http/ui/helpers/share-panel.ts";
 import { SharePanel } from "#src/http/ui/view/pages/share-panel.tsx";
 import { renderFragment } from "#src/http/ui/view/shell/render.tsx";
-import type { AclResourceType, NewAce } from "#src/services/acl/index.ts";
+import type { NewAce, ResourceType } from "#src/services/acl/index.ts";
 import { type AclResourceId, AclService } from "#src/services/acl/service.ts";
 import type { CollectionService } from "#src/services/collection/index.ts";
 import type { PrincipalService } from "#src/services/principal/index.ts";
@@ -35,7 +35,7 @@ const VALID_PRIVILEGES = new Set<string>(
 export const aclGrantHandler = (
 	req: Request,
 	ctx: HttpRequestContext,
-	resourceType: AclResourceType,
+	resourceType: ResourceType,
 	resourceId: AclResourceId,
 ): Effect.Effect<
 	Response,

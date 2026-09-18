@@ -235,6 +235,8 @@
 						"maxLines": 1000
 					}
 				},
+				// error modules group the Data.TaggedError classes for one domain, which is the point of the file
+				"noExcessiveClassesPerFile": "off",
 				"noHeadElement": "off",
 				// <Foo disabled /> is the JSX idiom
 				"noImplicitBoolean": "off",
@@ -298,6 +300,16 @@
 			},
 			"suspicious": {
 				"noDocumentImportInPage": "off",
+				// `x == null` is the house nullish check, so only ==/!= against other
+				// values (including `undefined`) is rejected
+				"noDoubleEquals": {
+					"level": "error",
+					"options": {
+						"ignoreNull": true
+					}
+				},
+				// same: `x == null` is deliberate
+				"noEqualsToNull": "off",
 				"noHeadImportInDocument": "off",
 				"noReactSpecificProps": "off",
 				"noUndeclaredEnvVars": "off",
@@ -325,6 +337,8 @@
 				"noSecrets": "off"
 			},
 			"complexity": {
+				// `void promise` is how deliberate fire-and-forget is marked, which is also what noFloatingPromises asks for
+				"noVoid": "off",
 				// slightly above the default of 15; 79 sites to bring under it
 				"noExcessiveCognitiveComplexity": {
 					"level": "error",
@@ -453,6 +467,7 @@
 			"linter": {
 				"rules": {
 					"suspicious": {
+						"noAlert": "off",
 						"noConsole": "off"
 					},
 					"style": {

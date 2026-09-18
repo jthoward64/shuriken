@@ -85,6 +85,7 @@ export const Layout = ({
 			    which mirrors them for the `Link: rel=preload` header. */}
 			<link rel="stylesheet" href="/static/app.css" />
 			{/* Render-blocking: applies the theme before first paint. */}
+			{/* biome-ignore lint/performance/noSyncScripts: see above */}
 			<script src="/static/ui.js" />
 			{/* htmx 4 config, read at init from this meta tag. Restores the
 			    htmx-2 semantics this app relies on: no swapping of 4xx/5xx

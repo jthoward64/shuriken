@@ -27,9 +27,6 @@ import type { DavPrivilege } from "#src/domain/types/dav.ts";
 
 export type AceRow = InferSelectModel<typeof davAcl>;
 
-/** @deprecated Use ResourceType from schema directly */
-export type AclResourceType = ResourceType;
-
 export interface NewAce {
 	readonly resourceType: ResourceType;
 	readonly resourceId: UuidString;
