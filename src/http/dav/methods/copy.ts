@@ -41,6 +41,7 @@ import {
 } from "#src/services/instance/index.ts";
 import { parseDavPath } from "../parse-path.ts";
 import {
+	type CopyMoveRequest,
 	deleteCollection,
 	deleteInstance,
 	parseDepth,
@@ -79,21 +80,19 @@ export const copyHandler = (
 		const overwrite = parseOverwrite(req);
 
 		if (path.kind === "instance") {
-			return yield* copyInstance(
-				path,
-				principal.principalId,
+			return yield* copyInstance(path, {
+				principalId: principal.principalId,
 				destUrl,
 				overwrite,
 				req,
-			);
+			});
 		}
-		return yield* copyCollection(
-			path,
-			principal.principalId,
+		return yield* copyCollection(path, {
+			principalId: principal.principalId,
 			destUrl,
 			overwrite,
 			req,
-		);
+		});
 	});
 
 // ---------------------------------------------------------------------------
@@ -102,10 +101,7 @@ export const copyHandler = (
 
 const copyInstance = (
 	path: Extract<ResolvedDavPath, { kind: "instance" }>,
-	principalId: PrincipalId,
-	destUrl: URL,
-	overwrite: boolean,
-	_req: Request,
+	{ principalId, destUrl, overwrite }: CopyMoveRequest,
 ) =>
 	Effect.gen(function* () {
 		const db = yield* DatabaseClient;
@@ -272,10 +268,7 @@ const copyInstance = (
 
 const copyCollection = (
 	path: Extract<ResolvedDavPath, { kind: "collection" }>,
-	principalId: PrincipalId,
-	destUrl: URL,
-	overwrite: boolean,
-	req: Request,
+	{ principalId, destUrl, overwrite, req }: CopyMoveRequest,
 ) =>
 	Effect.gen(function* () {
 		const db = yield* DatabaseClient;

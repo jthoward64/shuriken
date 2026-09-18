@@ -99,6 +99,7 @@ export const normalizeRruleUntil = (
 	const timeZone = dtstart?.timeZoneId ?? zone;
 	return rruleString.replace(
 		/UNTIL=(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(?![\dZ])/gu,
+		// biome-ignore lint/complexity/useMaxParams: String.prototype.replace hands the callback one argument per capture group
 		(_match, y, mo, d, h, mi, s) => {
 			const utc = JSTemporal.PlainDateTime.from({
 				year: Number(y),
@@ -159,13 +160,29 @@ export const DEFAULT_RRULE_LIMITS: RruleExpansionLimits = {
 
 const TIME_CHECK_EVERY = 500;
 
+/** The window an expansion is bounded by, plus how the component's times are read. */
+export interface OccurrenceQuery {
+	/** Inclusive start of the query time range. */
+	readonly queryStart: Temporal.Instant;
+	/** Exclusive end of the query time range. */
+	readonly queryEnd: Temporal.Instant;
+	/** Zone that floating and DATE values are read in. */
+	readonly zone: ResolutionZone;
+	readonly limits?: RruleExpansionLimits;
+	/** Stop as soon as one occurrence lands in range. */
+	readonly stopAtFirst?: boolean;
+}
+
 const boundedOccurrencesInRange = (
 	rule: RRuleTemporal,
 	queryStart: Temporal.Instant,
 	queryEnd: Temporal.Instant,
-	limits: RruleExpansionLimits,
-	stopAtFirst = false,
+	bounds: {
+		readonly limits: RruleExpansionLimits;
+		readonly stopAtFirst: boolean;
+	},
 ): ReadonlyArray<Temporal.Instant> => {
+	const { limits, stopAtFirst } = bounds;
 	// rrule-temporal invokes the iterator callback more than once per occurrence
 	// (it re-runs it during its internal count-limit / RDATE-merge pass), so
 	// accumulating instants from the callback double-counts. The clean set is
@@ -232,12 +249,15 @@ const boundedOccurrencesInRange = (
 export const getOccurrenceInstantsInRange = (
 	vcalRoot: IrComponent,
 	vevent: IrComponent,
-	queryStart: Temporal.Instant,
-	queryEnd: Temporal.Instant,
-	zone: ResolutionZone,
-	limits: RruleExpansionLimits = DEFAULT_RRULE_LIMITS,
-	stopAtFirst = false,
+	query: OccurrenceQuery,
 ): ReadonlyArray<Temporal.Instant> => {
+	const {
+		queryStart,
+		queryEnd,
+		zone,
+		limits = DEFAULT_RRULE_LIMITS,
+		stopAtFirst = false,
+	} = query;
 	const rruleProp = vevent.properties.find((p) => p.name === "RRULE");
 	if (rruleProp?.value.type !== "RECUR") {
 		return [];
@@ -300,13 +320,10 @@ export const getOccurrenceInstantsInRange = (
 				})
 			: baseRule;
 
-	return boundedOccurrencesInRange(
-		rule,
-		queryStart,
-		queryEnd,
+	return boundedOccurrencesInRange(rule, queryStart, queryEnd, {
 		limits,
 		stopAtFirst,
-	);
+	});
 };
 
 /**
@@ -323,17 +340,9 @@ export const getOccurrenceInstantsInRange = (
 export const hasOccurrenceInRange = (
 	vcalRoot: IrComponent,
 	vevent: IrComponent,
-	queryStart: Temporal.Instant,
-	queryEnd: Temporal.Instant,
-	zone: ResolutionZone,
-	limits: RruleExpansionLimits = DEFAULT_RRULE_LIMITS,
+	query: OccurrenceQuery,
 ): boolean =>
-	getOccurrenceInstantsInRange(
-		vcalRoot,
-		vevent,
-		queryStart,
-		queryEnd,
-		zone,
-		limits,
-		true,
-	).length > 0;
+	getOccurrenceInstantsInRange(vcalRoot, vevent, {
+		...query,
+		stopAtFirst: true,
+	}).length > 0;

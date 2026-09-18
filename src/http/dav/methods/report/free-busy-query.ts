@@ -206,17 +206,15 @@ export const freeBusyQueryHandler = (
 							effectiveDtend(comp, masterDtstart, zone).epochMilliseconds -
 							masterDtstart.epochMilliseconds;
 
-						const starts = getOccurrenceInstantsInRange(
-							root,
-							comp,
+						const starts = getOccurrenceInstantsInRange(root, comp, {
 							queryStart,
 							queryEnd,
 							zone,
-							{
+							limits: {
 								maxOccurrencesChecked: config.recurrence.rruleMaxOccurrences,
 								timeBudgetMs: config.recurrence.rruleTimeBudgetMs,
 							},
-						);
+						});
 						for (const start of starts) {
 							occurrencePairs.push({
 								start,

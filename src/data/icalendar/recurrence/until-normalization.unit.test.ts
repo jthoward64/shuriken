@@ -69,23 +69,19 @@ END:VCALENDAR`;
 
 		// Range fully after the series ends → no occurrence (correctly bounded,
 		// not a conservative "always true" fallback).
-		const after = hasOccurrenceInRange(
-			root,
-			vevent,
-			Temporal.Instant.from("2026-06-01T00:00:00Z"),
-			Temporal.Instant.from("2026-07-01T00:00:00Z"),
-			UTC,
-		);
+		const after = hasOccurrenceInRange(root, vevent, {
+			queryStart: Temporal.Instant.from("2026-06-01T00:00:00Z"),
+			queryEnd: Temporal.Instant.from("2026-07-01T00:00:00Z"),
+			zone: UTC,
+		});
 		expect(after).toBe(false);
 
 		// Range during the series → an occurrence exists.
-		const during = hasOccurrenceInRange(
-			root,
-			vevent,
-			Temporal.Instant.from("2026-04-01T00:00:00Z"),
-			Temporal.Instant.from("2026-05-01T00:00:00Z"),
-			UTC,
-		);
+		const during = hasOccurrenceInRange(root, vevent, {
+			queryStart: Temporal.Instant.from("2026-04-01T00:00:00Z"),
+			queryEnd: Temporal.Instant.from("2026-05-01T00:00:00Z"),
+			zone: UTC,
+		});
 		expect(during).toBe(true);
 	});
 });

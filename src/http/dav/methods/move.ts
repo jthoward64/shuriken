@@ -33,6 +33,7 @@ import {
 } from "#src/services/instance/index.ts";
 import { parseDavPath } from "../parse-path.ts";
 import {
+	type CopyMoveRequest,
 	deleteCollection,
 	deleteInstance,
 	parseDestination,
@@ -77,13 +78,12 @@ export const moveHandler = (
 				overwrite,
 			);
 		}
-		return yield* moveCollection(
-			path,
-			principal.principalId,
+		return yield* moveCollection(path, {
+			principalId: principal.principalId,
 			destUrl,
 			overwrite,
 			req,
-		);
+		});
 	});
 
 // ---------------------------------------------------------------------------
@@ -234,10 +234,7 @@ const moveInstance = (
 
 const moveCollection = (
 	path: Extract<ResolvedDavPath, { kind: "collection" }>,
-	principalId: PrincipalId,
-	destUrl: URL,
-	overwrite: boolean,
-	req: Request,
+	{ principalId, destUrl, overwrite, req }: CopyMoveRequest,
 ) =>
 	Effect.gen(function* () {
 		// RFC 4918 §9.9: collection MOVE MUST act as Depth:infinity.

@@ -726,14 +726,12 @@ const evalComponentTimeRange = (
 
 	const rruleProp = comp.properties.find((p) => p.name === "RRULE");
 	if (rruleProp) {
-		return hasOccurrenceInRange(
-			vcalRoot,
-			comp,
-			range.start ?? OPEN_RANGE_START,
-			range.end ?? OPEN_RANGE_END,
+		return hasOccurrenceInRange(vcalRoot, comp, {
+			queryStart: range.start ?? OPEN_RANGE_START,
+			queryEnd: range.end ?? OPEN_RANGE_END,
 			zone,
 			limits,
-		);
+		});
 	}
 
 	if (comp.name === "VTODO") {

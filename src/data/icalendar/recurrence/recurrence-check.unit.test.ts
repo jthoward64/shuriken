@@ -106,13 +106,11 @@ describe("hasOccurrenceInRange", () => {
 			);
 			const root = vcal(vevent);
 			expect(
-				hasOccurrenceInRange(
-					root,
-					vevent,
-					inst("2026-01-05T00:00:00Z"),
-					inst("2026-01-06T00:00:00Z"),
-					UTC,
-				),
+				hasOccurrenceInRange(root, vevent, {
+					queryStart: inst("2026-01-05T00:00:00Z"),
+					queryEnd: inst("2026-01-06T00:00:00Z"),
+					zone: UTC,
+				}),
 			).toBe(true);
 		});
 
@@ -125,13 +123,11 @@ describe("hasOccurrenceInRange", () => {
 			const root = vcal(vevent);
 			// COUNT=3 → occurrences on Jan 1, 2, 3 only
 			expect(
-				hasOccurrenceInRange(
-					root,
-					vevent,
-					inst("2026-01-05T00:00:00Z"),
-					inst("2026-01-06T00:00:00Z"),
-					UTC,
-				),
+				hasOccurrenceInRange(root, vevent, {
+					queryStart: inst("2026-01-05T00:00:00Z"),
+					queryEnd: inst("2026-01-06T00:00:00Z"),
+					zone: UTC,
+				}),
 			).toBe(false);
 		});
 	});
@@ -147,13 +143,11 @@ describe("hasOccurrenceInRange", () => {
 			const root = vcal(vevent);
 			// Query covers Wednesday Jan 7 2026
 			expect(
-				hasOccurrenceInRange(
-					root,
-					vevent,
-					inst("2026-01-07T00:00:00Z"),
-					inst("2026-01-08T00:00:00Z"),
-					UTC,
-				),
+				hasOccurrenceInRange(root, vevent, {
+					queryStart: inst("2026-01-07T00:00:00Z"),
+					queryEnd: inst("2026-01-08T00:00:00Z"),
+					zone: UTC,
+				}),
 			).toBe(true);
 		});
 
@@ -166,13 +160,11 @@ describe("hasOccurrenceInRange", () => {
 			const root = vcal(vevent);
 			// Query covers only Sunday Jan 11 2026
 			expect(
-				hasOccurrenceInRange(
-					root,
-					vevent,
-					inst("2026-01-11T00:00:00Z"),
-					inst("2026-01-12T00:00:00Z"),
-					UTC,
-				),
+				hasOccurrenceInRange(root, vevent, {
+					queryStart: inst("2026-01-11T00:00:00Z"),
+					queryEnd: inst("2026-01-12T00:00:00Z"),
+					zone: UTC,
+				}),
 			).toBe(false);
 		});
 	});
@@ -187,13 +179,11 @@ describe("hasOccurrenceInRange", () => {
 			const root = vcal(vevent);
 			// 2nd Monday of Feb 2026 is Feb 9
 			expect(
-				hasOccurrenceInRange(
-					root,
-					vevent,
-					inst("2026-02-09T00:00:00Z"),
-					inst("2026-02-10T00:00:00Z"),
-					UTC,
-				),
+				hasOccurrenceInRange(root, vevent, {
+					queryStart: inst("2026-02-09T00:00:00Z"),
+					queryEnd: inst("2026-02-10T00:00:00Z"),
+					zone: UTC,
+				}),
 			).toBe(true);
 		});
 
@@ -206,13 +196,11 @@ describe("hasOccurrenceInRange", () => {
 			const root = vcal(vevent);
 			// Last Friday of Feb 2026 is Feb 27
 			expect(
-				hasOccurrenceInRange(
-					root,
-					vevent,
-					inst("2026-02-27T00:00:00Z"),
-					inst("2026-02-28T00:00:00Z"),
-					UTC,
-				),
+				hasOccurrenceInRange(root, vevent, {
+					queryStart: inst("2026-02-27T00:00:00Z"),
+					queryEnd: inst("2026-02-28T00:00:00Z"),
+					zone: UTC,
+				}),
 			).toBe(true);
 		});
 	});
@@ -227,13 +215,11 @@ describe("hasOccurrenceInRange", () => {
 			const root = vcal(vevent);
 			// 2nd Monday of June 2026 is June 8
 			expect(
-				hasOccurrenceInRange(
-					root,
-					vevent,
-					inst("2026-06-08T00:00:00Z"),
-					inst("2026-06-09T00:00:00Z"),
-					UTC,
-				),
+				hasOccurrenceInRange(root, vevent, {
+					queryStart: inst("2026-06-08T00:00:00Z"),
+					queryEnd: inst("2026-06-09T00:00:00Z"),
+					zone: UTC,
+				}),
 			).toBe(true);
 		});
 
@@ -245,13 +231,11 @@ describe("hasOccurrenceInRange", () => {
 			);
 			const root = vcal(vevent);
 			expect(
-				hasOccurrenceInRange(
-					root,
-					vevent,
-					inst("2026-03-01T00:00:00Z"),
-					inst("2026-04-01T00:00:00Z"),
-					UTC,
-				),
+				hasOccurrenceInRange(root, vevent, {
+					queryStart: inst("2026-03-01T00:00:00Z"),
+					queryEnd: inst("2026-04-01T00:00:00Z"),
+					zone: UTC,
+				}),
 			).toBe(false);
 		});
 	});
@@ -265,13 +249,11 @@ describe("hasOccurrenceInRange", () => {
 			);
 			const root = vcal(vevent);
 			expect(
-				hasOccurrenceInRange(
-					root,
-					vevent,
-					inst("2026-01-10T00:00:00Z"),
-					inst("2026-01-11T00:00:00Z"),
-					UTC,
-				),
+				hasOccurrenceInRange(root, vevent, {
+					queryStart: inst("2026-01-10T00:00:00Z"),
+					queryEnd: inst("2026-01-11T00:00:00Z"),
+					zone: UTC,
+				}),
 			).toBe(false);
 		});
 
@@ -283,13 +265,11 @@ describe("hasOccurrenceInRange", () => {
 			);
 			const root = vcal(vevent);
 			expect(
-				hasOccurrenceInRange(
-					root,
-					vevent,
-					inst("2026-01-05T00:00:00Z"),
-					inst("2026-01-06T00:00:00Z"),
-					UTC,
-				),
+				hasOccurrenceInRange(root, vevent, {
+					queryStart: inst("2026-01-05T00:00:00Z"),
+					queryEnd: inst("2026-01-06T00:00:00Z"),
+					zone: UTC,
+				}),
 			).toBe(true);
 		});
 	});
@@ -308,13 +288,11 @@ describe("hasOccurrenceInRange", () => {
 			};
 			const root = vcal(vevent);
 			expect(
-				hasOccurrenceInRange(
-					root,
-					vevent,
-					inst("2026-01-12T00:00:00Z"),
-					inst("2026-01-13T00:00:00Z"),
-					UTC,
-				),
+				hasOccurrenceInRange(root, vevent, {
+					queryStart: inst("2026-01-12T00:00:00Z"),
+					queryEnd: inst("2026-01-13T00:00:00Z"),
+					zone: UTC,
+				}),
 			).toBe(false);
 		});
 
@@ -332,13 +310,11 @@ describe("hasOccurrenceInRange", () => {
 			const root = vcal(vevent);
 			// Jan 5 (DTSTART) and Jan 7 are in range; Jan 6 is excluded
 			expect(
-				hasOccurrenceInRange(
-					root,
-					vevent,
-					inst("2026-01-05T00:00:00Z"),
-					inst("2026-01-08T00:00:00Z"),
-					UTC,
-				),
+				hasOccurrenceInRange(root, vevent, {
+					queryStart: inst("2026-01-05T00:00:00Z"),
+					queryEnd: inst("2026-01-08T00:00:00Z"),
+					zone: UTC,
+				}),
 			).toBe(true);
 		});
 	});
@@ -367,13 +343,11 @@ describe("hasOccurrenceInRange", () => {
 			const root = vcal(master, override);
 			// Query covers only Jan 12 — the master's occurrence was replaced
 			expect(
-				hasOccurrenceInRange(
-					root,
-					master,
-					inst("2026-01-12T00:00:00Z"),
-					inst("2026-01-13T00:00:00Z"),
-					UTC,
-				),
+				hasOccurrenceInRange(root, master, {
+					queryStart: inst("2026-01-12T00:00:00Z"),
+					queryEnd: inst("2026-01-13T00:00:00Z"),
+					zone: UTC,
+				}),
 			).toBe(false);
 		});
 
@@ -399,13 +373,11 @@ describe("hasOccurrenceInRange", () => {
 			};
 			const root = vcal(master, override);
 			expect(
-				hasOccurrenceInRange(
-					root,
-					master,
-					inst("2026-01-19T00:00:00Z"),
-					inst("2026-01-20T00:00:00Z"),
-					UTC,
-				),
+				hasOccurrenceInRange(root, master, {
+					queryStart: inst("2026-01-19T00:00:00Z"),
+					queryEnd: inst("2026-01-20T00:00:00Z"),
+					zone: UTC,
+				}),
 			).toBe(true);
 		});
 	});
@@ -426,13 +398,11 @@ describe("hasOccurrenceInRange", () => {
 			};
 			const root = vcal(vevent);
 			expect(
-				hasOccurrenceInRange(
-					root,
-					vevent,
-					inst("2026-06-15T00:00:00Z"),
-					inst("2026-06-16T00:00:00Z"),
-					UTC,
-				),
+				hasOccurrenceInRange(root, vevent, {
+					queryStart: inst("2026-06-15T00:00:00Z"),
+					queryEnd: inst("2026-06-16T00:00:00Z"),
+					zone: UTC,
+				}),
 			).toBe(true);
 		});
 	});
@@ -451,13 +421,11 @@ describe("hasOccurrenceInRange", () => {
 			const root = vcal(vevent);
 			// June 12 2026 falls in range
 			expect(
-				hasOccurrenceInRange(
-					root,
-					vevent,
-					inst("2026-06-12T00:00:00Z"),
-					inst("2026-06-13T00:00:00Z"),
-					UTC,
-				),
+				hasOccurrenceInRange(root, vevent, {
+					queryStart: inst("2026-06-12T00:00:00Z"),
+					queryEnd: inst("2026-06-13T00:00:00Z"),
+					zone: UTC,
+				}),
 			).toBe(true);
 		});
 
@@ -473,13 +441,11 @@ describe("hasOccurrenceInRange", () => {
 			};
 			const root = vcal(vevent);
 			expect(
-				hasOccurrenceInRange(
-					root,
-					vevent,
-					inst("2026-06-13T00:00:00Z"),
-					inst("2026-06-14T00:00:00Z"),
-					UTC,
-				),
+				hasOccurrenceInRange(root, vevent, {
+					queryStart: inst("2026-06-13T00:00:00Z"),
+					queryEnd: inst("2026-06-14T00:00:00Z"),
+					zone: UTC,
+				}),
 			).toBe(false);
 		});
 	});
@@ -506,13 +472,11 @@ describe("getOccurrenceInstantsInRange", () => {
 			"FREQ=WEEKLY;INTERVAL=2",
 		);
 		const root = vcal(vevent);
-		const occ = getOccurrenceInstantsInRange(
-			root,
-			vevent,
-			inst("2024-03-31T00:00:00Z"),
-			inst("2024-05-04T00:00:00Z"),
-			UTC,
-		);
+		const occ = getOccurrenceInstantsInRange(root, vevent, {
+			queryStart: inst("2024-03-31T00:00:00Z"),
+			queryEnd: inst("2024-05-04T00:00:00Z"),
+			zone: UTC,
+		});
 		expect(starts(occ)).toEqual([
 			"2024-04-11T12:30:00Z",
 			"2024-04-25T12:30:00Z",
@@ -538,13 +502,11 @@ describe("getOccurrenceInstantsInRange", () => {
 			components: [],
 		};
 		const root = vcal(master, override);
-		const occ = getOccurrenceInstantsInRange(
-			root,
-			master,
-			inst("2024-03-31T00:00:00Z"),
-			inst("2024-05-04T00:00:00Z"),
-			UTC,
-		);
+		const occ = getOccurrenceInstantsInRange(root, master, {
+			queryStart: inst("2024-03-31T00:00:00Z"),
+			queryEnd: inst("2024-05-04T00:00:00Z"),
+			zone: UTC,
+		});
 		expect(starts(occ)).toEqual(["2024-04-11T12:30:00Z"]);
 	});
 });

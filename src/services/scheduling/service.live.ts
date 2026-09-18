@@ -1378,13 +1378,11 @@ export const SchedulingServiceLive = Layer.effect(
 									const duration =
 										effectiveDtend(comp, masterStart, zone).epochMilliseconds -
 										masterStart.epochMilliseconds;
-									const starts = getOccurrenceInstantsInRange(
-										root,
-										comp,
+									const starts = getOccurrenceInstantsInRange(root, comp, {
 										queryStart,
 										queryEnd,
 										zone,
-									);
+									});
 									for (const start of starts) {
 										const end = Temporal.Instant.fromEpochMilliseconds(
 											start.epochMilliseconds + duration,

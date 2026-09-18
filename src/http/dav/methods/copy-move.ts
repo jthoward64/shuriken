@@ -6,7 +6,12 @@ import {
 	type DavError,
 	davError,
 } from "#src/domain/errors.ts";
-import { type CollectionId, EntityId, InstanceId } from "#src/domain/ids.ts";
+import {
+	type CollectionId,
+	EntityId,
+	InstanceId,
+	type PrincipalId,
+} from "#src/domain/ids.ts";
 import { HTTP_BAD_REQUEST } from "#src/http/status.ts";
 import { CollectionRepository } from "#src/services/collection/index.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
@@ -22,6 +27,14 @@ import type { InstanceRow } from "#src/services/instance/repository.ts";
  * Parse the required Destination header into a URL.
  * Fails with 400 Bad Request if the header is absent or malformed.
  */
+/** What a COPY/MOVE worker needs about the request beyond the source path. */
+export interface CopyMoveRequest {
+	readonly principalId: PrincipalId;
+	readonly destUrl: URL;
+	readonly overwrite: boolean;
+	readonly req: Request;
+}
+
 export const parseDestination = (req: Request): Effect.Effect<URL, DavError> =>
 	Effect.gen(function* () {
 		const raw = req.headers.get("Destination");

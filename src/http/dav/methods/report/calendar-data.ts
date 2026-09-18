@@ -244,13 +244,11 @@ const expandRecurrences = (
 			continue;
 		}
 		// Recurrence master — emit one component per occurrence in range.
-		const instants = getOccurrenceInstantsInRange(
-			vcalRoot,
-			sub,
-			expand.start,
-			expand.end,
+		const instants = getOccurrenceInstantsInRange(vcalRoot, sub, {
+			queryStart: expand.start,
+			queryEnd: expand.end,
 			zone,
-		);
+		});
 		const duration = componentDuration(sub, zone);
 		for (const occurrenceStart of instants) {
 			expanded.push(
