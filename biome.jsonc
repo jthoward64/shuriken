@@ -1,0 +1,560 @@
+// Biome configuration.
+//
+// Every rule Biome ships is enabled: `preset: "all"` covers the stable groups and
+// `nursery` is listed out in full (its own preset only reaches the recommended
+// subset). Rules set to "off" below are the exceptions, each with its reason.
+// Rules for frameworks this project does not use are switched off in bulk at the
+// end of the `nursery` block and in the other groups; playwright is deliberately
+// left on for planned adoption.
+//
+// Effect composition rules come from the `@catenarycloud/linteffect` Grit plugins
+// listed under "plugins".
+{
+	"$schema": "https://biomejs.dev/schemas/2.5.14/schema.json",
+	"vcs": {
+		"enabled": true,
+		"clientKind": "git",
+		"useIgnoreFile": true
+	},
+	"files": {
+		"ignoreUnknown": false,
+		"includes": [
+			"**",
+			"!**/static/vendor",
+			"!docs-site/build",
+			"!docs-site/.docusaurus"
+		]
+	},
+	"formatter": {
+		"enabled": true,
+		"indentStyle": "tab",
+		"expand": "auto"
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"preset": "all",
+			"nursery": {
+				"noAstroSetHtmlDirective": "off",
+				"noBaseToString": "error",
+				"noBunModules": "error",
+				"noComponentHookFactories": "error",
+				"noConditionalExpect": "error",
+				"noDrizzleDeleteWithoutWhere": "error",
+				"noDrizzleUpdateWithoutWhere": "error",
+				"noDuplicateFieldDefinitionNames": "error",
+				"noDuplicateSelectors": "error",
+				"noEmptyObjectKeys": "error",
+				"noExcessiveNestedCallbacks": "error",
+				"noExcessiveSelectorClasses": "error",
+				"noExtendNative": "error",
+				"noFloatingPromises": "error",
+				"noIdenticalTestTitle": "error",
+				"noImpliedEval": "error",
+				"noInlineStyles": "error",
+				"noInvalidFileInputAccept": "error",
+				"noInvalidPropertyInitValue": "error",
+				"noJsRestrictedProperties": "error",
+				"noJsonUnsafeValues": "error",
+				"noJsxLeakedDollar": "error",
+				"noJsxNamespace": "error",
+				"noLoopFunc": "error",
+				"noMisleadingReturnType": "error",
+				"noMisusedPromises": "error",
+				"noNegationInEqualityCheck": "error",
+				"noNonScalableViewport": "error",
+				"noObsoleteTags": "error",
+				"noPlaywrightElementHandle": "error",
+				"noPlaywrightEval": "error",
+				"noPlaywrightForceOption": "error",
+				"noPlaywrightMissingAwait": "error",
+				"noPlaywrightNetworkidle": "error",
+				"noPlaywrightPagePause": "error",
+				"noPlaywrightUselessAwait": "error",
+				"noPlaywrightWaitForNavigation": "error",
+				"noPlaywrightWaitForSelector": "error",
+				"noPlaywrightWaitForTimeout": "error",
+				"noReactNativeDeepImports": "off",
+				"noReactNativeLiteralColors": "off",
+				"noReactNativeRawText": "off",
+				"noReactStringRefs": "error",
+				"noRestrictedDependencies": "error",
+				"noReturnInFinally": "error",
+				"noSvelteAtDebugTags": "off",
+				"noSvelteAtHtmlTags": "off",
+				"noSvelteLegacyConst": "off",
+				"noSvelteUnnecessaryStateWrap": "off",
+				"noTailwindArbitraryValue": "error",
+				"noThisOutsideOfClass": "error",
+				"noTopLevelLiterals": "error",
+				"noUndeclaredClasses": "error",
+				"noUndeclaredCustomProperties": "error",
+				"noUnmodifiedLoopCondition": "error",
+				"noUnnecessaryTemplateExpression": "error",
+				"noUnsafeIframeSandbox": "error",
+				"noUnsafePlusOperands": "error",
+				// too broad at 812 sites; the no-model-overlay-cast plugin covers assertions on decoded models
+				"noUnsafeTypeAssertion": "off",
+				"noUntrustedLicenses": "error",
+				// classes reached only from client JS or cx() helpers read as unused
+				"noUnusedClasses": "off",
+				"noUselessTypeConversion": "error",
+				"noVueDeprecatedScopedSlots": "off",
+				"noVueImportCompilerMacros": "off",
+				"noVueRefAsOperand": "off",
+				"noVueUndeclaredDirectives": "off",
+				"noVueVOnNumberValues": "off",
+				"noXorAsExponentiation": "error",
+				"useArraySome": "error",
+				"useAstroClientOnlyDirectiveValue": "off",
+				"useAwaitThenable": "error",
+				"useBaseline": {
+					"level": "on",
+					"options": {
+						"available": "newly",
+						"allowProperties": ["accent-color"],
+						"allowPropertyValues": {
+							"appearance": ["base-select"],
+							"font-family": ["ui-sans-serif"]
+						},
+						"allowSelectors": [
+							"open",
+							"checkmark",
+							"picker-icon",
+							"selection"
+						]
+					}
+				},
+				"useBetterDomTraversing": "error",
+				// declarations and expressions are both used deliberately
+				"useConsistentFunctionStyle": "off",
+				"useConsistentObjectKeys": "error",
+				"useConsistentTestIt": "error",
+				"useControlLabel": "error",
+				"useDisposables": "error",
+				"useDomNodeTextContent": "error",
+				"useDomQuerySelector": "error",
+				"useExhaustiveSwitchCases": "error",
+				"useExpect": "error",
+				// Effect infers the error and requirement channels; hand-written types desync from them
+				"useExplicitReturnType": "off",
+				// Effect infers the error and requirement channels; hand-written types desync from them
+				"useExplicitType": "off",
+				"useFlatMathMinMax": "error",
+				"useIframeSandbox": "error",
+				"useImportsFirst": "error",
+				"useIncludes": "error",
+				// the progressive-enhancement rules must stay unlayered to beat Tailwind utilities
+				"useLayeredStyles": "off",
+				"useMathMinMax": "error",
+				"useModernMathApis": "error",
+				// positional groups are fine in the short parsing regexes
+				"useNamedCaptureGroup": "off",
+				"useNamedLayer": "error",
+				"useNullishCoalescing": "error",
+				"usePlaywrightValidDescribeCallback": "error",
+				"useQwikLoaderLocation": "off",
+				"useReactAsyncServerFunction": "error",
+				"useReactCompiler": "error",
+				// reads plain consts as components, and arrow components are the house style
+				"useReactFunctionComponentDefinition": "off",
+				"useReactNamingConvention": "error",
+				"useReactNativePlatformComponents": "off",
+				"useReduceTypeParameter": "error",
+				"useRegexpExec": "error",
+				"useRegexpTest": "error",
+				"useScopedStyles": "off",
+				"useSortedClasses": "error",
+				"useStringStartsEndsWith": "error",
+				"useSvelteRequireEachKey": "off",
+				"useTailwindShorthandClasses": "error",
+				"useTestHooksInOrder": "error",
+				"useTestHooksOnTop": "error",
+				"useThisInClassMethods": "error",
+				"useUnicodeRegex": "error",
+				"useValidTestTitle": "error",
+				"useVarsOnTop": "error",
+				"useVueBaseImport": "off",
+				"useVueConsistentDefinePropsDeclaration": "off",
+				"useVueNextTickPromise": "off",
+				"useVueValidVFor": "off"
+			},
+			"correctness": {
+				"noBeforeInteractiveScriptOutsideDocument": "off",
+				"noNextAsyncClientComponent": "off",
+				"noQwikUseVisibleTask": "off",
+				"noSolidDestructuredProps": "off",
+				// dependencies live in deno.json, not a package.json
+				"noUndeclaredDependencies": "off",
+				// Deno resolves npm:/jsr: specifiers and the deno.json imports map; Biome sees neither
+				"noUnresolvedImports": "off",
+				"noVueDataObjectDeclaration": "off",
+				"noVueDuplicateKeys": "off",
+				"noVueReservedKeys": "off",
+				"noVueReservedProps": "off",
+				"noVueSetupPropsReactivityLoss": "off",
+				"noVueVIfWithVFor": "off",
+				"useImageSize": "off",
+				"useInlineScriptId": "off",
+				"useQwikClasslist": "off",
+				"useQwikMethodUsage": "off",
+				"useQwikValidLexicalScope": "off",
+				// server-rendered markup has no useId; ids wire labels to controls
+				"useUniqueElementIds": "off",
+				"useVueVForKey": "off",
+				"useVueValidTemplateRoot": "off",
+				"useVueValidVBind": "off",
+				"useVueValidVCloak": "off",
+				"useVueValidVElse": "off",
+				"useVueValidVElseIf": "off",
+				"useVueValidVHtml": "off",
+				"useVueValidVIf": "off",
+				"useVueValidVOn": "off",
+				"useVueValidVOnce": "off",
+				"useVueValidVPre": "off",
+				"useVueValidVText": "off"
+			},
+			"performance": {
+				"noImgElement": "off",
+				// server-side render, so a new prop identity costs nothing
+				"noJsxPropsBind": "off",
+				"noUnwantedPolyfillio": "off",
+				"useGoogleFontPreconnect": "off",
+				"useSolidForComponent": "off",
+				"useVueVapor": "off"
+			},
+			"style": {
+				// guard-and-continue keeps loop bodies flat
+				"noContinue": "off",
+				// Biome default; no value was specified
+				"noExcessiveLinesPerFile": {
+					"level": "error",
+					"options": {
+						"maxLines": 1000
+					}
+				},
+				"noHeadElement": "off",
+				// <Foo disabled /> is the JSX idiom
+				"noImplicitBoolean": "off",
+				// i++ in a plain for loop is clear
+				"noIncrementDecrement": "off",
+				// would force every piece of JSX text into a string expression
+				"noJsxLiterals": "off",
+				// arbitrary; reads worse at several call sites
+				"noNegationElse": "off",
+				// ternaries are the norm in JSX and Effect pipelines
+				"noNestedTernary": "off",
+				// ternaries are the norm in JSX and Effect pipelines
+				"noTernary": "off",
+				"noVueOptionsApi": "off",
+				// nothing hydrates, so there is no react-refresh boundary
+				"useComponentExportOnlyModules": "off",
+				"useConsistentArrayType": {
+					"level": "error",
+					"options": {
+						"syntax": "generic"
+					}
+				},
+				// tagged unions are matched exhaustively; a default clause hides a missing case
+				"useDefaultSwitchClause": "off",
+				// opinionated, and not how the services are written
+				"useDestructuring": "off",
+				// arbitrary ordering; exports sit next to what they describe
+				"useExportsLast": "off",
+				"useFilenamingConvention": {
+					"level": "error",
+					"options": {
+						"strictCase": false,
+						"requireAscii": true
+					}
+				},
+				"useNamingConvention": {
+					"level": "error",
+					"options": {
+						"strictCase": false,
+						"requireAscii": true,
+						"conventions": [
+							{
+								"selector": {
+									"kind": "objectLiteralProperty"
+								},
+								"formats": [
+									"camelCase",
+									"PascalCase",
+									"CONSTANT_CASE",
+									"snake_case"
+								]
+							}
+						]
+					}
+				},
+				"useVueConsistentVBindStyle": "off",
+				"useVueConsistentVOnStyle": "off",
+				"useVueDefineMacrosOrder": "off",
+				"useVueHyphenatedAttributes": "off",
+				"useVueMultiWordComponentNames": "off"
+			},
+			"suspicious": {
+				"noDocumentImportInPage": "off",
+				"noHeadImportInDocument": "off",
+				"noReactSpecificProps": "off",
+				"noUndeclaredEnvVars": "off",
+				"noUnknownAtRules": {
+					"level": "error",
+					"options": {
+						"ignore": [
+							"tailwind",
+							"apply",
+							"layer",
+							"screen",
+							"variants",
+							"responsive"
+						]
+					}
+				},
+				// preact takes `class`, not `className`
+				"noUnknownAttribute": "off",
+				"noVueArrowFuncInWatch": "off"
+			},
+			"security": {
+				// entropy heuristic with no real hits: it flags Effect.fn span names
+				// ("SchedulingRepository.findPrincipalByCalAddress"), public Google holiday
+				// calendar URLs, and biome-ignore comments, across ~40 files and growing.
+				"noSecrets": "off"
+			},
+			"complexity": {
+				// slightly above the default of 15; 79 sites to bring under it
+				"noExcessiveCognitiveComplexity": {
+					"level": "error",
+					"options": {
+						"maxAllowedComplexity": 18
+					}
+				},
+				// budget agreed with the team, not the Biome default of 50
+				"noExcessiveLinesPerFunction": {
+					"level": "error",
+					"options": {
+						"maxLines": 400,
+						"skipBlankLines": true,
+						"skipIifes": true
+					}
+				},
+				"useMaxParams": {
+					"level": "error",
+					"options": {
+						"max": 4
+					}
+				}
+			},
+			"a11y": {
+				"noLabelWithoutControl": {
+					"level": "error",
+					"options": {
+						"inputComponents": [
+							"TextInput",
+							"Textarea",
+							"Select",
+							"FileInput"
+						]
+					}
+				}
+			}
+		},
+		"domains": {
+			"drizzle": "all",
+			"playwright": "all",
+			"project": "all",
+			"react": "all",
+			"tailwind": "all",
+			"test": "all",
+			"types": "all"
+		}
+	},
+	"javascript": {
+		"formatter": {
+			"quoteStyle": "double",
+			"semicolons": "always"
+		},
+		"globals": [
+			"Deno"
+		]
+	},
+	"css": {
+		"parser": {
+			"tailwindDirectives": true
+		}
+	},
+	"plugins": [
+		"./node_modules/@catenarycloud/linteffect/rules/no-arrow-ladder.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-atom-registry-effect-sync.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-branch-in-object.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-call-tower.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-effect-all-step-sequencing.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-effect-as.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-effect-async.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-effect-bind.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-effect-do.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-effect-fn-generator.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-effect-ladder.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-effect-never.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-effect-orElse-ladder.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-effect-side-effect-wrapper.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-effect-step-const-staging.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-effect-succeed-variable.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-effect-sync-console.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-effect-type-alias.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-effect-wrapper-alias.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-family-collection-read.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-flatmap-ladder.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-fragmented-const-assembly.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-fromnullable-nullish-coalesce.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-iife-wrapper.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-inline-runtime-provide.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-match-effect-branch.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-match-void-branch.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-model-overlay-cast.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-naked-object-state-update.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-nested-effect-call.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-nested-effect-gen.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-option-as.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-option-boolean-normalization.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-pipe-ladder.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-pipeline-fragment-staging.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-react-state.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-render-side-effects.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-return-in-callback.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-return-null.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-runtime-runfork.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-string-sentinel-return.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-switch-statement.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-try-catch.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/no-unknown-boolean-coercion-helper.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/prevent-dynamic-imports.grit",
+		"./node_modules/@catenarycloud/linteffect/rules/warn-effect-sync-wrapper.grit"
+	],
+	"overrides": [
+		{
+			"includes": [
+				"src/platform/**",
+				"src/testing/**",
+				"scripts/**",
+				"docs-site/**",
+				"**/*.test.ts"
+			],
+			"linter": {
+				"rules": {
+					"correctness": {
+						"noNodejsModules": "off"
+					}
+				}
+			}
+		},
+		{
+			"includes": [
+				"scripts/**",
+				"src/http/ui/client/**",
+				"src/http/ui/static/**"
+			],
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noConsole": "off"
+					},
+					"style": {
+						"useGlobalThis": "off"
+					}
+				}
+			}
+		},
+		{
+			"includes": [
+				"src/db/drizzle/schema/index.ts",
+				"src/db/drizzle/schema.ts",
+				"src/domain/types/index.ts",
+				"src/**/index.ts"
+			],
+			"linter": {
+				"rules": {
+					"performance": {
+						"noBarrelFile": "off",
+						"noReExportAll": "off"
+					}
+				}
+			}
+		},
+		{
+			"includes": [
+				"drizzle.config.ts",
+				"docs-site/**"
+			],
+			"linter": {
+				"rules": {
+					"style": {
+						"noDefaultExport": "off"
+					}
+				}
+			}
+		},
+		{
+			"includes": [
+				"src/http/trusted-proxy.ts",
+				"src/platform/network-guard.ts",
+				"src/http/ui/view/components/color-contrast.ts",
+				"src/services/external-calendar/sync.live.ts"
+			],
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noBitwiseOperators": "off"
+					}
+				}
+			}
+		},
+		{
+			"includes": [
+				"src/http/ui/view/components/controls/rich-text.tsx",
+				"src/http/ui/view/pages/dev/echo.tsx"
+			],
+			"linter": {
+				"rules": {
+					"security": {
+						"noDangerouslySetInnerHtml": "off"
+					}
+				}
+			}
+		},
+		{
+			"includes": [
+				"docs-site/**"
+			],
+			"linter": {
+				"rules": {
+					"style": {
+						"noHexColors": "off"
+					}
+				}
+			}
+		},
+		{
+			"includes": [
+				"**/*.test.ts",
+				"**/*.test.tsx"
+			],
+			"linter": {
+				"rules": {
+					"style": {
+						"noMagicNumbers": "off"
+					}
+				}
+			}
+		}
+	],
+	"assist": {
+		"enabled": true,
+		"actions": {
+			"source": {
+				"organizeImports": "on"
+			}
+		}
+	}
+}

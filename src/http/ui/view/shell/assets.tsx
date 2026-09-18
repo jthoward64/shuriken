@@ -42,11 +42,20 @@ export const CALENDAR_ASSETS: ReadonlyArray<UiAsset> = [
 	{ href: "/static/reorder.js", as: "script" },
 ];
 
-// Form-control enhancement bundle - the tag picker, date picker, search picker
+// Form-control enhancement bundle - the tag picker, tag combobox, search picker
 // and rich-text editor (see client/forms.client.ts). Loaded by pages carrying
 // any of those controls; each one degrades to a native input without it.
 export const FORM_ASSETS: ReadonlyArray<UiAsset> = [
 	{ href: "/static/forms.js", as: "script" },
+];
+
+// Date-control enhancement bundle - DateField/DateRangeField only (see
+// client/date-picker.client.ts). Separate from FORM_ASSETS because it carries
+// the Temporal polyfill, which is most of its weight: pages that use the other
+// controls but no date field should not pay for it. Add it alongside
+// FORM_ASSETS on the pages that do.
+export const DATE_PICKER_ASSETS: ReadonlyArray<UiAsset> = [
+	{ href: "/static/date-picker.js", as: "script" },
 ];
 
 // Contacts enhancement script (progress bar + navigate-away guard + delegated

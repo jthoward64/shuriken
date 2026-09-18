@@ -345,6 +345,9 @@ export const uiRouter = (
 	if (pathname === "/static/forms.js") {
 		return clientJsHandler(req, "forms.js");
 	}
+	if (pathname === "/static/date-picker.js") {
+		return clientJsHandler(req, "date-picker.js");
+	}
 	if (pathname === "/static/embed-widget.js") {
 		return clientJsHandler(req, "embed-widget.js");
 	}

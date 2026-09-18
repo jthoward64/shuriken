@@ -29,6 +29,7 @@ export const ENTRIES: ReadonlyArray<{
 	{ name: "reorder.js", entry: "reorder.client.ts" },
 	{ name: "embed-widget.js", entry: "embed-widget.client.ts" },
 	{ name: "forms.js", entry: "forms.client.ts" },
+	{ name: "date-picker.js", entry: "date-picker.client.ts" },
 ];
 
 /** Served filename of the stylesheet an entry emits, if it imports one. */

@@ -9,7 +9,11 @@ import type { HttpRequestContext } from "#src/http/context.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import { buildNavContext } from "#src/http/ui/helpers/nav-context.ts";
 import { ComponentGalleryPage } from "#src/http/ui/view/pages/dev/components.tsx";
-import { AssetTags, FORM_ASSETS } from "#src/http/ui/view/shell/assets.tsx";
+import {
+	AssetTags,
+	DATE_PICKER_ASSETS,
+	FORM_ASSETS,
+} from "#src/http/ui/view/shell/assets.tsx";
 import { renderPage } from "#src/http/ui/view/shell/render.tsx";
 import type { AclService } from "#src/services/acl/index.ts";
 
@@ -20,6 +24,9 @@ import type { AclService } from "#src/services/acl/index.ts";
 // exists to be opened in a real browser against a real stylesheet, which is
 // the whole point of having it.
 // ---------------------------------------------------------------------------
+
+// The gallery renders every control, so it loads both bundles.
+const GALLERY_ASSETS = [...FORM_ASSETS, ...DATE_PICKER_ASSETS];
 
 export const componentGalleryHandler = (
 	_req: Request,
@@ -42,7 +49,7 @@ export const componentGalleryHandler = (
 			headers: ctx.headers,
 			title: "Components",
 			nav,
-			preload: FORM_ASSETS,
-			extraHead: <AssetTags assets={FORM_ASSETS} />,
+			preload: GALLERY_ASSETS,
+			extraHead: <AssetTags assets={GALLERY_ASSETS} />,
 		});
 	});

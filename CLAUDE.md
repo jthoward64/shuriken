@@ -18,7 +18,7 @@ A CalDAV/CardDAV server implementation in TypeScript.
 - **Module specifiers**: relative and `#src/*` imports must carry explicit `.ts` extensions — Deno requires them.
 - **Tasks**: defined in `deno.json`, run via `deno task <name>`: `start`, `dev`, `docker:start` (migrate then start), `test` (all tests), `test:unit` (`*.unit.test.ts` only, no DB needed), `test:integration` (`*.integration.test.ts`, loads `.env`), `check` (`deno check src/`), `lint`/`format`/`fix` (Biome), `verify` (`check` + Biome `check` — run this before considering work done), `migrations:gen`/`migrations:run` (drizzle-kit), `db:reset`/`db:seed`, `studio` (drizzle-kit studio), `ui:css` (Tailwind build), `hooks` (installs the `.husky` git hooks path).
 - **TypeScript**: Strict mode (plus `noUncheckedIndexedAccess`, `noImplicitOverride`, `verbatimModuleSyntax`). No `any` ever. Use `unknown` and then narrow with runtime checks as needed. The only time `any` is allowed is internal to very small functions in order to satisfy *extremely* complex generics.
-- **Biome**: Use Biome (`biome.json`) for linting and formatting, pinned via `npm:@biomejs/biome@2.4.9`. Warnings, errors, and infos should all be fixed. Prefer using Biome's autofix features (`deno task fix`) where possible, but feel free to make manual adjustments as needed. Disabling or ignoring lint rules requires express approval from the user.
+- **Biome**: Use Biome (`biome.jsonc`) for linting and formatting, pinned via `npm:@biomejs/biome@2.5.14`. Warnings, errors, and infos should all be fixed. Prefer using Biome's autofix features (`deno task fix`) where possible, but feel free to make manual adjustments as needed. Disabling or ignoring lint rules requires express approval from the user.
 
 ## Effect
 

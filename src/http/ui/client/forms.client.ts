@@ -1,13 +1,13 @@
-import { initDatePickers } from "./controls/date-picker.ts";
 import { initRichText } from "./controls/rich-text.ts";
 import { initSearchPickers } from "./controls/search-picker.ts";
 import { initTagComboboxes } from "./controls/tag-combobox.ts";
 import { initTagPickers } from "./controls/tag-picker.ts";
 
 // ---------------------------------------------------------------------------
-// Form-control bundle - progressive enhancement for the four scripted controls
-// (see view/tag-picker.tsx, date-picker.tsx, search-picker.tsx,
-// rich-text.tsx). Served as /static/forms.js and loaded by pages that use them.
+// Form-control bundle - progressive enhancement for the scripted controls
+// (see view/tag-picker.tsx, search-picker.tsx, rich-text.tsx). Served as
+// /static/forms.js and loaded by pages that use them. The date controls ship
+// separately as /static/date-picker.js, which carries the Temporal polyfill.
 //
 // Every control degrades to a working native input, so this script is
 // optional: nothing here is required for a form to submit correct data.
@@ -20,7 +20,6 @@ import { initTagPickers } from "./controls/tag-picker.ts";
 const initControls = (): void => {
 	initTagPickers();
 	initTagComboboxes();
-	initDatePickers();
 	initSearchPickers();
 	initRichText();
 };
