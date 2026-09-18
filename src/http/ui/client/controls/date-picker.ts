@@ -160,29 +160,73 @@ interface PickerOptions {
 	readonly end: FieldRefs | null;
 }
 
+/** The range presets column, or null when there is nothing to show */
+const buildPresetColumn = (
+	presets: ReadonlyArray<string>,
+): HTMLElement | null => {
+	const labelled = presets.flatMap((p) => {
+		const label = PRESET_LABELS[p];
+		return label === undefined ? [] : [{ preset: p, label }];
+	});
+	if (labelled.length === 0) {
+		return null;
+	}
+	const col = make("div", { class: "datepicker-presets" });
+	for (const { preset, label } of labelled) {
+		col.append(
+			make(
+				"button",
+				{ type: "button", class: "datepicker-preset", "data-preset": preset },
+				label,
+			),
+		);
+	}
+	return col;
+};
+
+/** Labelled time inputs for a datetime picker, or null for a date-only one */
+const buildTimeRow = (
+	withTime: boolean,
+	isRange: boolean,
+): {
+	readonly row: HTMLElement;
+	readonly startTime: HTMLInputElement;
+	readonly endTime: HTMLInputElement | null;
+} | null => {
+	if (!withTime) {
+		return null;
+	}
+	const row = make("div", { class: "datepicker-time" });
+	const startTime = make("input", { type: "time", class: "form-input" });
+	const startLabel = make(
+		"label",
+		{ class: "datepicker-time-label" },
+		isRange ? "Start time" : "Time",
+	);
+	startLabel.append(startTime);
+	row.append(startLabel);
+	if (!isRange) {
+		return { row, startTime, endTime: null };
+	}
+	const endTime = make("input", { type: "time", class: "form-input" });
+	const endLabel = make(
+		"label",
+		{ class: "datepicker-time-label" },
+		"End time",
+	);
+	endLabel.append(endTime);
+	row.append(endLabel);
+	return { row, startTime, endTime };
+};
+
 const buildPicker = (opts: PickerOptions): void => {
 	const { mode, presets, zoneNote, start, end } = opts;
 	const isRange = end !== null;
 	const months = isRange ? 2 : 1;
 
 	const panel = make("div", { class: "datepicker", popover: "auto" });
-	const presetCol =
-		isRange && presets.length > 0
-			? make("div", { class: "datepicker-presets" })
-			: null;
+	const presetCol = buildPresetColumn(isRange ? presets : []);
 	if (presetCol) {
-		for (const p of presets) {
-			const label = PRESET_LABELS[p];
-			if (label !== undefined) {
-				presetCol.append(
-					make(
-						"button",
-						{ type: "button", class: "datepicker-preset", "data-preset": p },
-						label,
-					),
-				);
-			}
-		}
 		panel.append(presetCol);
 	}
 
@@ -219,29 +263,11 @@ const buildPicker = (opts: PickerOptions): void => {
 	});
 	body.append(grids);
 
-	const timeRow =
-		mode === "datetime" ? make("div", { class: "datepicker-time" }) : null;
-	const startTime = timeRow
-		? make("input", { type: "time", class: "form-input" })
-		: null;
-	const endTime =
-		timeRow && isRange
-			? make("input", { type: "time", class: "form-input" })
-			: null;
-	if (timeRow && startTime) {
-		const l1 = make(
-			"label",
-			{ class: "datepicker-time-label" },
-			isRange ? "Start time" : "Time",
-		);
-		l1.append(startTime);
-		timeRow.append(l1);
-		if (endTime) {
-			const l2 = make("label", { class: "datepicker-time-label" }, "End time");
-			l2.append(endTime);
-			timeRow.append(l2);
-		}
-		body.append(timeRow);
+	const times = buildTimeRow(mode === "datetime", isRange);
+	const startTime = times?.startTime ?? null;
+	const endTime = times?.endTime ?? null;
+	if (times) {
+		body.append(times.row);
 		// The field states this too, but the popover is where the time is
 		// actually set, so it says so at the point of entry
 		if (zoneNote !== "") {
@@ -286,6 +312,37 @@ const buildPicker = (opts: PickerOptions): void => {
 
 	const weekdays = weekdayLabels();
 
+	/** One day button, carrying its own selection and bounds state */
+	const dayCell = (
+		d: Temporal.PlainDate,
+		ym: Temporal.PlainYearMonth,
+	): HTMLButtonElement => {
+		const classes = [
+			"datepicker-day",
+			d.month === ym.month ? "" : "is-outside",
+			isEdge(d) ? "is-selected" : "",
+			inRange(d) ? "is-in-range" : "",
+			d.equals(todayLocal()) ? "is-today" : "",
+		]
+			.filter(Boolean)
+			.join(" ");
+		const cell = make(
+			"button",
+			{
+				type: "button",
+				class: classes,
+				"data-day": d.toString(),
+				role: "gridcell",
+				"aria-pressed": isEdge(d) ? "true" : "false",
+			},
+			String(d.day),
+		);
+		cell.disabled =
+			(min !== null && Temporal.PlainDate.compare(d, min) < 0) ||
+			(max !== null && Temporal.PlainDate.compare(d, max) > 0);
+		return cell;
+	};
+
 	const render = (): void => {
 		const shown = Array.from({ length: months }, (_, i) =>
 			view.add({ months: i }),
@@ -297,50 +354,19 @@ const buildPicker = (opts: PickerOptions): void => {
 			if (!grid) {
 				return;
 			}
-			const cells: Array<HTMLElement> = [];
-			if (months > 1) {
-				cells.push(
-					make("div", { class: "datepicker-month-label" }, monthName(ym)),
-				);
-			}
-			for (const w of weekdays) {
-				cells.push(
+			grid.replaceChildren(
+				...(months > 1
+					? [make("div", { class: "datepicker-month-label" }, monthName(ym))]
+					: []),
+				...weekdays.map((w) =>
 					make(
 						"span",
 						{ class: "datepicker-weekday", role: "columnheader" },
 						w,
 					),
-				);
-			}
-			for (const d of monthCells(ym)) {
-				const outside = d.month !== ym.month;
-				const disabled =
-					(min !== null && Temporal.PlainDate.compare(d, min) < 0) ||
-					(max !== null && Temporal.PlainDate.compare(d, max) > 0);
-				const classes = [
-					"datepicker-day",
-					outside ? "is-outside" : "",
-					isEdge(d) ? "is-selected" : "",
-					inRange(d) ? "is-in-range" : "",
-					d.equals(todayLocal()) ? "is-today" : "",
-				]
-					.filter(Boolean)
-					.join(" ");
-				const cell = make(
-					"button",
-					{
-						type: "button",
-						class: classes,
-						"data-day": d.toString(),
-						role: "gridcell",
-						"aria-pressed": isEdge(d) ? "true" : "false",
-					},
-					String(d.day),
-				);
-				cell.disabled = disabled;
-				cells.push(cell);
-			}
-			grid.replaceChildren(...cells);
+				),
+				...monthCells(ym).map((d) => dayCell(d, ym)),
+			);
 		});
 	};
 

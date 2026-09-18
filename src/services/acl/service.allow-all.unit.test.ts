@@ -1,6 +1,6 @@
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
-import { Effect } from "effect";
+import { Effect, ManagedRuntime } from "effect";
 import { CollectionId, PrincipalId } from "#src/domain/ids.ts";
 import { AclServiceAllowAll } from "./service.allow-all.ts";
 import { AclService } from "./service.ts";
@@ -12,44 +12,42 @@ import { AclService } from "./service.ts";
 const PRINCIPAL = PrincipalId("00000000-0000-0000-0000-000000000001");
 const COLLECTION = CollectionId("00000000-0000-0000-0000-000000000002");
 
+// The permissive layer is stateless, so one runtime serves every case
+const runtime = ManagedRuntime.make(AclServiceAllowAll);
+
 // ---------------------------------------------------------------------------
 // AclServiceAllowAll
 // ---------------------------------------------------------------------------
 
 describe("AclServiceAllowAll", () => {
 	it("check returns void for DAV:read", async () => {
-		const result = await Effect.runPromise(
+		const result = await runtime.runPromise(
 			AclService.pipe(
 				Effect.flatMap((svc) =>
 					svc.check(PRINCIPAL, COLLECTION, "collection", "DAV:read"),
 				),
-				Effect.provide(AclServiceAllowAll),
 			),
 		);
 		expect(result).toBeUndefined();
 	});
 
 	it("check returns void for any other privilege", async () => {
-		const result = await Effect.runPromise(
+		const result = await runtime.runPromise(
 			AclService.pipe(
 				Effect.flatMap((svc) =>
 					svc.check(PRINCIPAL, COLLECTION, "collection", "DAV:write-acl"),
 				),
-				Effect.provide(AclServiceAllowAll),
 			),
 		);
 		expect(result).toBeUndefined();
 	});
 
 	it("currentUserPrivileges returns all 19 DavPrivilege values", async () => {
-		const privs = await Effect.runPromise(
-			Effect.provide(
-				AclService.pipe(
-					Effect.flatMap((svc) =>
-						svc.currentUserPrivileges(PRINCIPAL, COLLECTION, "collection"),
-					),
+		const privs = await runtime.runPromise(
+			AclService.pipe(
+				Effect.flatMap((svc) =>
+					svc.currentUserPrivileges(PRINCIPAL, COLLECTION, "collection"),
 				),
-				AclServiceAllowAll,
 			),
 		);
 		expect(privs).toHaveLength(19);

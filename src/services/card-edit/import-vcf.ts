@@ -1,4 +1,4 @@
-import { Effect, Option } from "effect";
+import { Effect, Option, Schema } from "effect";
 import { makeEtag } from "#src/data/etag.ts";
 import type { IrComponent } from "#src/data/ir.ts";
 import { decodeVCard, encodeVCard } from "#src/data/vcard/codec.ts";
@@ -11,6 +11,7 @@ import {
 	needPrivileges,
 } from "#src/domain/errors.ts";
 import { type CollectionId, EntityId } from "#src/domain/ids.ts";
+
 import { Slug } from "#src/domain/types/path.ts";
 import { ETag } from "#src/domain/types/strings.ts";
 import { fireAndForgetBirthdayRegenerate } from "#src/services/birthday/event-hook.ts";
@@ -21,6 +22,10 @@ import { ComponentRepository } from "#src/services/component/repository.ts";
 import { EntityRepository } from "#src/services/entity/repository.ts";
 import type { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
 import { InstanceService } from "#src/services/instance/service.ts";
+
+// Non-text values are folded into the dedup fingerprint by their JSON form,
+// which is what the fingerprint has always hashed.
+const encodeUnknown = Schema.encodeSync(Schema.UnknownFromJsonString);
 
 const LINE_BREAK = /\r?\n/u;
 
@@ -122,7 +127,7 @@ const syntheticUid = (root: IrComponent): Effect.Effect<string, never> =>
 			.map((p) => {
 				const v = p.value;
 				const text =
-					v.type === "TEXT" || v.type === "URI" ? v.value : JSON.stringify(v);
+					v.type === "TEXT" || v.type === "URI" ? v.value : encodeUnknown(v);
 				return `${p.name.toUpperCase()}=${text}`;
 			})
 			.join("\n");
