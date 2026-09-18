@@ -24,6 +24,9 @@
 (() => {
 	const autoHideMs = 2500;
 
+	// Ids come from server-rendered markup, so they are escaped before use as a selector
+	const byId = (id) => document.querySelector(`#${CSS.escape(id)}`);
+
 	let inFlight = 0;
 	let bar = null;
 	let downloadTimer = null;
@@ -127,7 +130,7 @@
 	const hideHoverCard = () => {
 		clearHoverOpenTimer();
 		clearHoverCloseTimer();
-		const card = document.getElementById(hoverCardId);
+		const card = byId(hoverCardId);
 		if (card && typeof card.hidePopover === "function") {
 			try {
 				card.hidePopover();
@@ -141,7 +144,7 @@
 	const showHoverCardNow = (url, anchor) => {
 		clearHoverOpenTimer();
 		clearHoverCloseTimer();
-		const card = document.getElementById(hoverCardId);
+		const card = byId(hoverCardId);
 		const htmx = getHtmx();
 		if (!card || typeof card.showPopover !== "function" || !htmx) {
 			window.location.href = url;
@@ -182,7 +185,7 @@
 	// htmx, fall back to navigating there).
 	const openEditDialog = (url) => {
 		const htmx = getHtmx();
-		const dialog = document.getElementById(editContactPopoverId);
+		const dialog = byId(editContactPopoverId);
 		if (!(htmx && dialog instanceof HTMLDialogElement)) {
 			window.location.href = url;
 			return;
@@ -218,7 +221,7 @@
 	};
 
 	const closePane = () => {
-		const pane = document.getElementById(paneId);
+		const pane = byId(paneId);
 		if (pane && typeof pane.hidePopover === "function" && isPopoverOpen(pane)) {
 			try {
 				pane.hidePopover();
@@ -233,7 +236,7 @@
 	// selection (e.g. a fast second click while the first is still loading).
 	const openPane = (url) => {
 		const htmx = getHtmx();
-		const pane = document.getElementById(paneId);
+		const pane = byId(paneId);
 		if (!(htmx && pane) || typeof pane.showPopover !== "function") {
 			window.open(url, "_blank");
 			return;
@@ -383,7 +386,7 @@
 		if (!hidden) {
 			return;
 		}
-		const list = document.getElementById(input.getAttribute("list") ?? "");
+		const list = byId(input.getAttribute("list") ?? "");
 		const match = [...(list?.querySelectorAll("option") ?? [])].find(
 			(o) => o.value === input.value,
 		);
@@ -622,9 +625,7 @@
 		// the inline dialogs.
 		const popTrigger = t.closest("[data-popover]");
 		if (popTrigger) {
-			const pop = document.getElementById(
-				popTrigger.getAttribute("data-popover"),
-			);
+			const pop = byId(popTrigger.getAttribute("data-popover"));
 			if (pop instanceof HTMLDialogElement) {
 				try {
 					pop.showModal();
@@ -716,7 +717,7 @@
 
 	// Keep the card open while the pointer is over it (so the Edit button is
 	// reachable), and let it close once the pointer leaves it.
-	const hoverCardEl = document.getElementById(hoverCardId);
+	const hoverCardEl = byId(hoverCardId);
 	hoverCardEl?.addEventListener("mouseenter", clearHoverCloseTimer);
 	hoverCardEl?.addEventListener("mouseleave", scheduleHoverCardClose);
 
@@ -808,7 +809,7 @@
 			"new-contact-popover",
 			editContactPopoverId,
 		]) {
-			const pop = document.getElementById(id);
+			const pop = byId(id);
 			if (pop instanceof HTMLDialogElement) {
 				try {
 					pop.close();

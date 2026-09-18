@@ -16,6 +16,19 @@
 //     delete) close any open dialog and refetch — or reload if FullCalendar is
 //     not loaded.
 
+import rrulePlugin from "@fullcalendar/rrule";
+import { Calendar, type EventSourceInput, joinClassNames } from "fullcalendar";
+import dayGridPlugin from "fullcalendar/daygrid";
+import interactionPlugin from "fullcalendar/interaction";
+import listPlugin from "fullcalendar/list";
+// Structural/layout CSS only — no colours, no theme (verified against the
+// package source: zero `color:`/`url()`/`@font-face` declarations). Bundled
+// to calendar.css by Deno.bundle() and served as a real stylesheet (see
+// assets.tsx's CALENDAR_ASSETS), not injected at runtime — all colour/spacing
+// theming instead comes from the class-name-prop options below.
+import "fullcalendar/skeleton.css";
+import timeGridPlugin from "fullcalendar/timegrid";
+
 // These ids MUST match src/http/ui/view/pages/calendar/event-popovers.tsx and
 // the `new-` idPrefix on its EventFormBody (client code is self-contained, so
 // the constants are duplicated rather than imported).
@@ -29,18 +42,9 @@ const CALENDAR_POPOVER_ID = "calendar-popover";
 const HOVER_CARD_ID = "event-hover-card";
 const HOVER_CARD_BODY_ID = "event-hover-card-body";
 
-import rrulePlugin from "@fullcalendar/rrule";
-import { Calendar, type EventSourceInput, joinClassNames } from "fullcalendar";
-import dayGridPlugin from "fullcalendar/daygrid";
-import interactionPlugin from "fullcalendar/interaction";
-import listPlugin from "fullcalendar/list";
-// Structural/layout CSS only — no colours, no theme (verified against the
-// package source: zero `color:`/`url()`/`@font-face` declarations). Bundled
-// to calendar.css by Deno.bundle() and served as a real stylesheet (see
-// assets.tsx's CALENDAR_ASSETS), not injected at runtime — all colour/spacing
-// theming instead comes from the class-name-prop options below.
-import "fullcalendar/skeleton.css";
-import timeGridPlugin from "fullcalendar/timegrid";
+// Ids come from server-rendered markup, so they are escaped before use as a selector
+const byId = (id: string): HTMLElement | null =>
+	document.querySelector<HTMLElement>(`#${CSS.escape(id)}`);
 
 // One remote event feed — a calendar's JSON endpoint, tinted with its colour.
 // `textColor` is server-computed (contrastTextColor, view/color-contrast.ts)
@@ -208,7 +212,7 @@ const openDialog = (el: HTMLElement | null): void => {
 	}
 };
 const closeDialogById = (id: string): void => {
-	const el = document.getElementById(id);
+	const el = byId(id);
 	if (el instanceof HTMLDialogElement) {
 		try {
 			el.close();
@@ -259,7 +263,7 @@ const positionHoverCard = (card: HTMLElement, anchor: Element): void => {
 const hideHoverCard = (): void => {
 	clearHoverOpenTimer();
 	clearHoverCloseTimer();
-	const card = document.getElementById(HOVER_CARD_ID);
+	const card = byId(HOVER_CARD_ID);
 	if (card instanceof HTMLElement && typeof card.hidePopover === "function") {
 		try {
 			card.hidePopover();
@@ -273,7 +277,7 @@ const hideHoverCard = (): void => {
 const showHoverCardNow = (url: string, anchor: Element): void => {
 	clearHoverOpenTimer();
 	clearHoverCloseTimer();
-	const card = document.getElementById(HOVER_CARD_ID);
+	const card = byId(HOVER_CARD_ID);
 	const htmx = getHtmx();
 	if (
 		!(card instanceof HTMLElement) ||
@@ -323,7 +327,7 @@ const openEditDialog = (url: string): void => {
 		window.location.href = url;
 		return;
 	}
-	openDialog(document.getElementById(EDIT_POPOVER_ID));
+	openDialog(byId(EDIT_POPOVER_ID));
 	htmx.ajax("GET", url, { target: `#${EDIT_BODY_ID}`, swap: "innerHTML" });
 };
 
@@ -359,8 +363,10 @@ const openEditDialog = (url: string): void => {
 	// Export is a native download link — show a transient indicator (a download
 	// never navigates the page, so no unload guard).
 	const exportIndicatorMs = 8000;
-	const exportLink = document.getElementById("cal-export");
-	const exportIndicator = document.getElementById("cal-export-indicator");
+	const exportLink = document.querySelector<HTMLElement>("#cal-export");
+	const exportIndicator = document.querySelector<HTMLElement>(
+		"#cal-export-indicator",
+	);
 	if (exportLink && exportIndicator) {
 		exportLink.addEventListener("click", () => {
 			exportIndicator.classList.add("is-busy");
@@ -371,7 +377,7 @@ const openEditDialog = (url: string): void => {
 	}
 
 	// Auto-submit the import form on file pick (no-JS users use Upload instead).
-	const importFile = document.getElementById("cal-import-file");
+	const importFile = document.querySelector<HTMLElement>("#cal-import-file");
 	if (importFile instanceof HTMLInputElement && importFile.form) {
 		importFile.addEventListener("change", () => {
 			importFile.form?.requestSubmit();
@@ -384,13 +390,13 @@ const openEditDialog = (url: string): void => {
 	let calendar: Calendar | null = null;
 
 	const setInputValue = (id: string, value: string): void => {
-		const el = document.getElementById(id);
+		const el = byId(id);
 		if (el instanceof HTMLInputElement) {
 			el.value = value;
 		}
 	};
 	const setChecked = (id: string, checked: boolean): void => {
-		const el = document.getElementById(id);
+		const el = byId(id);
 		if (el instanceof HTMLInputElement) {
 			el.checked = checked;
 		}
@@ -407,7 +413,7 @@ const openEditDialog = (url: string): void => {
 		}
 		const trigger = el.closest("[data-popover]");
 		if (trigger instanceof HTMLElement && trigger.dataset.popover) {
-			openDialog(document.getElementById(trigger.dataset.popover));
+			openDialog(byId(trigger.dataset.popover));
 			return;
 		}
 		// The hover card's Edit button — a real link to the full edit page (no-JS
@@ -474,7 +480,7 @@ const openEditDialog = (url: string): void => {
 
 	// Keep the card open while the pointer is over it (so the Edit button is
 	// reachable), and let it close once the pointer leaves it.
-	const hoverCardEl = document.getElementById(HOVER_CARD_ID);
+	const hoverCardEl = byId(HOVER_CARD_ID);
 	hoverCardEl?.addEventListener("mouseenter", clearHoverCloseTimer);
 	hoverCardEl?.addEventListener("mouseleave", scheduleHoverCardClose);
 
@@ -486,7 +492,9 @@ const openEditDialog = (url: string): void => {
 		closeDialogById(EDIT_POPOVER_ID);
 		closeDialogById(CALENDAR_POPOVER_ID);
 		hideHoverCard();
-		const newForm = document.querySelector(`#${NEW_POPOVER_ID} form`);
+		const newForm = document.querySelector<HTMLElement>(
+			`#${NEW_POPOVER_ID} form`,
+		);
 		if (newForm instanceof HTMLFormElement) {
 			newForm.reset();
 		}
@@ -540,18 +548,18 @@ const openEditDialog = (url: string): void => {
 	const setActive = (id: string): void => {
 		activeId = id;
 		retargetForm(
-			document.querySelector(`#${NEW_POPOVER_ID} form`),
+			document.querySelector<HTMLElement>(`#${NEW_POPOVER_ID} form`),
 			`/ui/api/calendar/${id}/events/create`,
 		);
 		retargetForm(
-			document.getElementById("cal-import-file")?.closest("form"),
+			document.querySelector<HTMLElement>("#cal-import-file")?.closest("form"),
 			`/ui/api/calendar/${id}/import`,
 		);
-		const exportLink = document.getElementById("cal-export");
+		const exportLink = document.querySelector<HTMLElement>("#cal-export");
 		if (exportLink instanceof HTMLAnchorElement) {
 			exportLink.href = `/ui/calendar/${id}/export.ics`;
 		}
-		const fc = document.getElementById("fullcalendar");
+		const fc = document.querySelector<HTMLElement>("#fullcalendar");
 		if (fc) {
 			fc.dataset.active = id;
 		}
@@ -610,11 +618,11 @@ const openEditDialog = (url: string): void => {
 
 	// --- FullCalendar boot ---------------------------------------------------
 	document.addEventListener("DOMContentLoaded", () => {
-		const el = document.getElementById("fullcalendar");
+		const el = document.querySelector<HTMLElement>("#fullcalendar");
 		if (!el) {
 			return;
 		}
-		const fallback = document.getElementById("cal-fallback");
+		const fallback = document.querySelector<HTMLElement>("#cal-fallback");
 		activeId = el.dataset.active ?? "";
 
 		// Initial event sources — one JSON feed per visible calendar, each tinted.
@@ -723,7 +731,7 @@ const openEditDialog = (url: string): void => {
 				setInputValue("new-start", info.startStr);
 				setInputValue("new-end", info.endStr);
 				setChecked("new-allDay", info.allDay);
-				openDialog(document.getElementById(NEW_POPOVER_ID));
+				openDialog(byId(NEW_POPOVER_ID));
 			},
 			// Hover shows the read-only preview card; click jumps straight to the
 			// real edit dialog (see openEditDialog above). The event's own calendar

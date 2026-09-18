@@ -45,7 +45,7 @@ const LIST_ITEM_EVENT_CLASS =
 	"border-s-4 pl-2 rounded-sm [border-color:var(--fc-event-color)] [background-color:color-mix(in_oklab,var(--fc-event-color)_15%,transparent)] hover:[background-color:color-mix(in_oklab,var(--fc-event-color)_25%,transparent)]";
 
 document.addEventListener("DOMContentLoaded", () => {
-	const el = document.getElementById("fullcalendar-embed");
+	const el = document.querySelector<HTMLElement>("#fullcalendar-embed");
 	if (!el) {
 		return;
 	}

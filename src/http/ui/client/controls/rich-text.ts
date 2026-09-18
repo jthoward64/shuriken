@@ -183,6 +183,7 @@ const initEditor = (root: HTMLElement): void => {
 
 	const sync = (): void => {
 		htmlField.value = serialize(surface);
+		// biome-ignore lint/nursery/useDomNodeTextContent: innerText keeps the rendered line breaks that the plain-text field needs
 		plainField.value = surface.innerText.trim();
 		root.classList.toggle("is-empty", surface.textContent?.trim() === "");
 	};
