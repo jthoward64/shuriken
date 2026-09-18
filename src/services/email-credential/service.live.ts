@@ -28,6 +28,7 @@ const compileProfile = (
 	profile: MailProfile,
 ): { readonly regex: RegExp; readonly profile: MailProfile } | null => {
 	try {
+		// biome-ignore lint/nursery/useUnicodeRegex: the pattern comes from operator config, and the u flag would reject patterns that work today
 		return { regex: new RegExp(profile.pattern), profile };
 	} catch {
 		return null;

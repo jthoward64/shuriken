@@ -392,7 +392,7 @@ const ImportForm = ({
 					id="cal-import-file"
 					type="file"
 					name="file"
-					accept=".ics,text/calendar"
+					accept=".ics, text/calendar"
 					disabled={disabled}
 					class="hidden"
 				/>

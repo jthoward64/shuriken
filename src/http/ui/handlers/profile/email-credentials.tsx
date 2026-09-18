@@ -53,6 +53,7 @@ export const emailCredentialsPageHandler = (
 			} else {
 				const matched = config.mail.profiles.find((p) => {
 					try {
+						// biome-ignore lint/nursery/useUnicodeRegex: the pattern comes from operator config, and the u flag would reject patterns that work today
 						return new RegExp(p.pattern).test(user.email);
 					} catch {
 						return false;

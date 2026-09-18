@@ -101,6 +101,7 @@ export const Select = ({
 	class: cls,
 	...rest
 }: SelectProps): VNode => (
+	// biome-ignore lint/nursery/useControlLabel: callers wrap Select in Field, which owns the label
 	<select {...rest} name={name} class={cx("form-select", cls)}>
 		{/* Ignored wholesale by browsers without base-select support */}
 		<button type="button">

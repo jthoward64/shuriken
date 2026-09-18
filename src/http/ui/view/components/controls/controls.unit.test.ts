@@ -90,6 +90,20 @@ describe("TagPicker", () => {
 		const select = html.slice(html.indexOf("<select"));
 		expect(select.slice(0, select.indexOf(">"))).not.toContain("name=");
 	});
+
+	it("offers no Add button, since the script commits on Enter", () => {
+		const html = render(
+			h(TagPicker, {
+				id: "t",
+				name: "categoriesCsv",
+				value: [],
+				suggestions: ["Work"],
+				allowCustom: true,
+			}),
+		);
+		expect(html).not.toContain("data-tag-add-custom");
+		expect(html).toContain("data-tag-custom");
+	});
 });
 
 describe("TagCombobox", () => {
@@ -154,22 +168,6 @@ describe("TagCombobox", () => {
 		const without = render(h(TagCombobox, { id: "t", name: "c", value: [] }));
 		expect(html).toContain("data-allow-custom");
 		expect(without).not.toContain("data-allow-custom");
-	});
-});
-
-describe("TagPicker", () => {
-	it("offers no Add button, since the script commits on Enter", () => {
-		const html = render(
-			h(TagPicker, {
-				id: "t",
-				name: "categoriesCsv",
-				value: [],
-				suggestions: ["Work"],
-				allowCustom: true,
-			}),
-		);
-		expect(html).not.toContain("data-tag-add-custom");
-		expect(html).toContain("data-tag-custom");
 	});
 });
 

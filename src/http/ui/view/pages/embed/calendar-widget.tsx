@@ -50,7 +50,7 @@ export const EmbedCalendarWidgetPage = ({
 				id="fullcalendar-embed"
 				data-initial-view={FC_VIEW[view]}
 				data-events-url={eventsUrl}
-				class="h-full min-h-[480px]"
+				class="h-full min-h-120"
 			/>
 		</body>
 	</html>

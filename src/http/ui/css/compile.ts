@@ -209,8 +209,27 @@ export const compileCss = async ({
 					success: token("success"),
 					warning: token("warning"),
 				},
+				// Named stops for the sizes the pages need, so class attributes
+				// stay free of arbitrary values.
+				minWidth: {
+					48: "12rem",
+				},
+				minHeight: {
+					120: "480px",
+				},
 			},
 		},
+		plugins: [
+			({
+				addUtilities,
+			}: {
+				addUtilities: (u: Record<string, Record<string, string>>) => void;
+			}) => {
+				addUtilities({
+					".scrollbar-gutter-stable": { "scrollbar-gutter": "stable" },
+				});
+			},
+		],
 	};
 
 	const plugins = [

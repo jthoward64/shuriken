@@ -80,7 +80,7 @@ const syncFutureToken = `<?xml version="1.0" encoding="utf-8"?>
 
 // Helper to extract sync-token value from a multistatus XML body
 const extractSyncToken = (body: string): string => {
-	const match = body.match(/urn:ietf:params:xml:ns:sync:\d+/u);
+	const match = /urn:ietf:params:xml:ns:sync:\d+/u.exec(body);
 	return match?.[0] ?? "";
 };
 

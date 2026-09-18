@@ -134,7 +134,7 @@ export const bdayValue = (raw: string): IrValue | null => {
 	if (!raw) {
 		return null;
 	}
-	const yearless = raw.match(/^--(\d{2})-?(\d{2})$/u);
+	const yearless = /^--(\d{2})-?(\d{2})$/u.exec(raw);
 	if (yearless) {
 		return { type: "TEXT", value: `--${yearless[1]}${yearless[2]}` };
 	}

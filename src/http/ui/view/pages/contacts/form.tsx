@@ -300,7 +300,7 @@ const TypedValueRow = ({
 		<div
 			class="space-y-2 rounded-md border border-line p-3"
 			data-row-item
-			data-nojs-only={nojsOnly || undefined}
+			data-nojs-only={nojsOnly ? "" : undefined}
 		>
 			<div class="flex flex-wrap items-start gap-2">
 				<TextInput
@@ -308,7 +308,7 @@ const TypedValueRow = ({
 					name={`${field}[].value`}
 					value={value.value}
 					placeholder={field === "emails" ? "address@example.com" : ""}
-					class="min-w-[12rem] flex-1"
+					class="min-w-48 flex-1"
 				/>
 				<TextInput
 					name={`${field}[].label`}
@@ -370,7 +370,7 @@ const ServiceRow = ({
 	<div
 		class="flex flex-wrap gap-2"
 		data-row-item
-		data-nojs-only={nojsOnly || undefined}
+		data-nojs-only={nojsOnly ? "" : undefined}
 	>
 		<TextInput
 			name={`${field}[].service`}
@@ -382,7 +382,7 @@ const ServiceRow = ({
 			name={`${field}[].value`}
 			value={value.value}
 			placeholder={valuePlaceholder}
-			class="min-w-[12rem] flex-1"
+			class="min-w-48 flex-1"
 		/>
 		<RemoveRowButton />
 	</div>
@@ -398,14 +398,14 @@ const UrlRow = ({
 	<div
 		class="flex flex-wrap gap-2"
 		data-row-item
-		data-nojs-only={nojsOnly || undefined}
+		data-nojs-only={nojsOnly ? "" : undefined}
 	>
 		<TextInput
 			type="url"
 			name="urls[]"
 			value={value}
 			placeholder="https://example.com"
-			class="min-w-[12rem] flex-1"
+			class="min-w-48 flex-1"
 		/>
 		<RemoveRowButton />
 	</div>
@@ -421,7 +421,7 @@ const AddressRow = ({
 	<div
 		class="grid grid-cols-1 gap-2 rounded-md border border-line p-3 md:grid-cols-2"
 		data-row-item
-		data-nojs-only={nojsOnly || undefined}
+		data-nojs-only={nojsOnly ? "" : undefined}
 	>
 		<TextInput
 			name="addresses[].street"
@@ -509,7 +509,7 @@ const RelationRow = ({
 		<div
 			class="flex flex-wrap items-center gap-2"
 			data-row-item
-			data-nojs-only={nojsOnly || undefined}
+			data-nojs-only={nojsOnly ? "" : undefined}
 		>
 			<TextInput
 				name={RELATION_NAME_FIELD}
@@ -523,7 +523,7 @@ const RelationRow = ({
 				hx-swap="outerHTML"
 				hx-vals={JSON.stringify({ addressbook: addressbookId, list: listId })}
 				hx-params="*"
-				class="min-w-[12rem] flex-1"
+				class="min-w-48 flex-1"
 			/>
 			<datalist id={listId} />
 			<input
@@ -563,7 +563,7 @@ const OtherPropRow = ({
 	<div
 		class="grid grid-cols-1 gap-2 md:grid-cols-4"
 		data-row-item
-		data-nojs-only={nojsOnly || undefined}
+		data-nojs-only={nojsOnly ? "" : undefined}
 	>
 		<TextInput
 			name="other[].name"

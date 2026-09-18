@@ -64,7 +64,7 @@ export interface LmtpReply {
 const ok = (code: number, text: string): LmtpReply => ({ code, text });
 
 const stripAddress = (raw: string): string | null => {
-	const m = raw.match(/<([^>]*)>/u);
+	const m = /<([^>]*)>/u.exec(raw);
 	return m && m[1] !== undefined ? m[1].trim() : null;
 };
 
