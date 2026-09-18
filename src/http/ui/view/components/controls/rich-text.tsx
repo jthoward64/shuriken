@@ -159,6 +159,7 @@ export const RichTextField = ({
 					tabIndex={0}
 					data-rich-surface
 					data-placeholder={placeholder}
+					// biome-ignore lint/nursery/noInlineStyles: height is computed from the caller's row count
 					style={{ minHeight: `${rows * LINE_HEIGHT_REM}rem` }}
 					dangerouslySetInnerHTML={{
 						// biome-ignore lint/style/useNamingConvention: preact's own prop name

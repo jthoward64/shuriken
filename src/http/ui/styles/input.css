@@ -711,11 +711,11 @@
 		background: rgb(var(--ink) / 0.55);
 		color: rgb(var(--ink-fg));
 	}
-	.contact-avatar-check:hover input:not(:checked) ~ .check-overlay {
-		opacity: 0.4;
-	}
 	.contact-avatar-check input:checked ~ .check-overlay {
 		opacity: 1;
+	}
+	.contact-avatar-check:hover input:not(:checked) ~ .check-overlay {
+		opacity: 0.4;
 	}
 	.contact-avatar-check input:checked ~ .avatar {
 		box-shadow: 0 0 0 2px rgb(var(--ink));
@@ -968,9 +968,6 @@ html.js form:has(input[name="id"]:checked) [data-bulk-bar] {
 	.form-select {
 		appearance: base-select;
 	}
-	.form-select::picker(select) {
-		appearance: base-select;
-	}
 	/* The author-supplied trigger, ignored where base-select is unsupported */
 	.form-select > button {
 		border: 0;
@@ -986,6 +983,7 @@ html.js form:has(input[name="id"]:checked) [data-bulk-bar] {
 		rotate: 180deg;
 	}
 	.form-select::picker(select) {
+		appearance: base-select;
 		background-color: rgb(var(--surface));
 		border: 1px solid rgb(var(--line));
 		top: calc(anchor(bottom) + 4px);
@@ -1108,6 +1106,9 @@ html.js form:has(input[name="id"]:checked) [data-bulk-bar] {
 	   `:popover-open` rule below, same as the other popovers above.
 	   `inset: auto` overrides the popover UA default (`inset: 0; margin: auto`,
 	   which would center it) so the JS-set top/left win. */
+	/* Two months plus a preset column is wide, and a range with times is tall,
+	   so the max sizes cap the panel against the viewport whatever
+	   `placeUnder` computes. */
 	.datepicker {
 		position: fixed;
 		inset: auto;
@@ -1115,18 +1116,13 @@ html.js form:has(input[name="id"]:checked) [data-bulk-bar] {
 		background-color: rgb(var(--surface));
 		border: 1px solid rgb(var(--line));
 		color: rgb(var(--fg));
+		max-width: calc(100vw - 1rem);
+		max-height: calc(100dvh - 1rem);
+		overflow: auto;
 		@apply z-50 rounded-lg p-3 shadow-xl;
 	}
 	.datepicker:popover-open {
 		@apply flex gap-3;
-	}
-	/* Two months plus a preset column is wide, and a range with times is tall.
-	   Cap both against the viewport so the panel can always be fully reached,
-	   whatever `placeUnder` computes. */
-	.datepicker {
-		max-width: calc(100vw - 1rem);
-		max-height: calc(100dvh - 1rem);
-		overflow: auto;
 	}
 	.datepicker-presets {
 		border-right: 1px solid rgb(var(--line));

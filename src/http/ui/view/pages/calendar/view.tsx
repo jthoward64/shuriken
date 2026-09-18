@@ -124,6 +124,7 @@ export interface CalendarViewProps {
 const Swatch = ({ color }: { color: string }) => (
 	<span
 		class="inline-block size-3 shrink-0 rounded-full ring-1 ring-line"
+		// biome-ignore lint/nursery/noInlineStyles: the swatch colour is per-calendar user data
 		style={`background-color:${color}`}
 		aria-hidden="true"
 	/>

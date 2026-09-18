@@ -22,7 +22,9 @@
 			"**",
 			"!**/static/vendor",
 			"!docs-site/build",
-			"!docs-site/.docusaurus"
+			"!docs-site/.docusaurus",
+			// standalone image assets, not authored markup
+			"!**/*.svg"
 		]
 	},
 	"formatter": {

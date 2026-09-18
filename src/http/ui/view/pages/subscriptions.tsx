@@ -64,6 +64,7 @@ const SUBSCRIPTION_COLUMNS: ReadonlyArray<Column<SubscriptionRow>> = [
 			<span class="inline-flex items-center gap-2">
 				<span
 					class="inline-block size-3 shrink-0 rounded-full"
+					// biome-ignore lint/nursery/noInlineStyles: the swatch colour is per-subscription user data
 					style={{ backgroundColor: sub.color ?? "rgb(var(--subtle))" }}
 				/>
 				<span class="font-medium text-fg">{sub.displayName}</span>
