@@ -34,11 +34,16 @@ import { contactsRedirect, parseBulkSelection } from "./bulk-shared.ts";
 // the whole batch.
 // ---------------------------------------------------------------------------
 
+/** The caller and the services one contact in the batch is edited through. */
+interface BatchContext {
+	readonly principalId: PrincipalId;
+	readonly acl: AclServiceShape;
+	readonly cardEdit: CardEditServiceShape;
+	readonly instanceRepo: InstanceRepositoryShape;
+}
+
 const clearPhotoOne = (
-	principalId: PrincipalId,
-	acl: AclServiceShape,
-	cardEdit: CardEditServiceShape,
-	instanceRepo: InstanceRepositoryShape,
+	{ principalId, acl, cardEdit, instanceRepo }: BatchContext,
 	id: InstanceId,
 ): Effect.Effect<
 	{ ok: boolean },
@@ -84,7 +89,10 @@ export const contactsBulkClearPhotoHandler = (
 				items: ids,
 				input: { addressbook },
 				perItem: (id) =>
-					clearPhotoOne(principal.principalId, acl, cardEdit, instanceRepo, id),
+					clearPhotoOne(
+						{ principalId: principal.principalId, acl, cardEdit, instanceRepo },
+						id,
+					),
 				onDone: () => Effect.succeed({}),
 			});
 			return yield* renderFragment(<BulkJobProgress jobId={job.id} />);
@@ -93,7 +101,10 @@ export const contactsBulkClearPhotoHandler = (
 		yield* Effect.forEach(
 			ids,
 			(id) =>
-				clearPhotoOne(principal.principalId, acl, cardEdit, instanceRepo, id),
+				clearPhotoOne(
+					{ principalId: principal.principalId, acl, cardEdit, instanceRepo },
+					id,
+				),
 			{ discard: true },
 		);
 		return new Response(null, { status: 303, headers: { Location: redirect } });

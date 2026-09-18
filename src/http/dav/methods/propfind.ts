@@ -453,20 +453,24 @@ const COLLECTION_HOME_DISPLAYNAME: Record<CollectionNamespace, string> = {
 	col: "Collections",
 };
 
+/** The collection an href is built under, as the client addressed it. */
+interface CollectionLocation {
+	readonly origin: string;
+	readonly principalSeg: string;
+	readonly ns: string;
+	readonly collectionSeg: string;
+}
+
 /**
  * Href for a directly-accessed instance: mirrors the URL segments the client
  * used. The instance segment is percent-encoded because object names may now
  * contain `@` and other UID characters (see isValidInstanceSlug); the parent
  * segments use the tighter collection-slug charset and need no encoding.
  */
-const instanceHref = (
-	origin: string,
-	principalSeg: string,
-	ns: string,
-	collectionSeg: string,
-	instanceSeg: string,
-): string =>
-	`${origin}/dav/principals/${principalSeg}/${ns}/${collectionSeg}/${encodeSegment(instanceSeg)}`;
+const instanceHref = (at: CollectionLocation, instanceSeg: string): string => {
+	const { origin, principalSeg, ns, collectionSeg } = at;
+	return `${origin}/dav/principals/${principalSeg}/${ns}/${collectionSeg}/${encodeSegment(instanceSeg)}`;
+};
 
 /**
  * Href for a depth:1 member instance. Uses the instance's stored slug so the
@@ -476,13 +480,9 @@ const instanceHref = (
  * the UUID only if the slug is somehow empty. Both forms resolve on input.
  */
 const memberInstanceHref = (
-	origin: string,
-	principalSeg: string,
-	ns: string,
-	collectionSeg: string,
+	at: CollectionLocation,
 	instanceRow: InstanceRow,
-): string =>
-	`${origin}/dav/principals/${principalSeg}/${ns}/${collectionSeg}/${encodeSegment(instanceRow.slug || instanceRow.id)}`;
+): string => instanceHref(at, instanceRow.slug || instanceRow.id);
 
 // ---------------------------------------------------------------------------
 // Property builders
@@ -653,19 +653,24 @@ const buildCollectionProps = (
 	return props;
 };
 
-const collectionResponse = (
-	href: string,
-	row: CollectionRow,
-	request: PropfindKind,
-	origin: string,
+interface CollectionResponseContext {
+	readonly request: PropfindKind;
+	readonly origin: string;
 	// Member enumerations (depth:1) need the same live, per-caller properties a
 	// direct depth:0 request returns — most importantly current-user-privilege-set,
 	// which clients like iOS read on each calendar/addressbook to decide whether
 	// it's usable. buildCollectionProps is synchronous and can't run the ACL
 	// query, so privileges are computed by the caller and threaded in here.
-	privileges: ReadonlyArray<DavPrivilege>,
-	actingPrincipalHref: string,
+	readonly privileges: ReadonlyArray<DavPrivilege>;
+	readonly actingPrincipalHref: string;
+}
+
+const collectionResponse = (
+	href: string,
+	row: CollectionRow,
+	ctx: CollectionResponseContext,
 ): DavResponse => {
+	const { request, origin, privileges, actingPrincipalHref } = ctx;
 	const props: Record<ClarkName, unknown> = {
 		...buildCollectionProps(row, origin),
 		[CURRENT_USER_PRINCIPAL]: { [cn(DAV_NS, "href")]: actingPrincipalHref },
@@ -904,14 +909,12 @@ export const propfindHandler = (
 						yield* isReadOnlyCollectionRow(coll),
 					);
 					responses.push(
-						collectionResponse(
-							href,
-							coll,
-							propfind,
+						collectionResponse(href, coll, {
+							request: propfind,
 							origin,
 							privileges,
 							actingPrincipalHref,
-						),
+						}),
 					);
 				}
 				for (const [group, groupColls] of memberOfGroups.map(
@@ -938,14 +941,12 @@ export const propfindHandler = (
 							yield* isReadOnlyCollectionRow(coll),
 						);
 						responses.push(
-							collectionResponse(
-								href,
-								coll,
-								propfind,
+							collectionResponse(href, coll, {
+								request: propfind,
 								origin,
 								privileges,
 								actingPrincipalHref,
-							),
+							}),
 						);
 					}
 				}
@@ -1056,10 +1057,12 @@ export const propfindHandler = (
 
 				for (const inst of instances) {
 					const iHref = memberInstanceHref(
-						origin,
-						path.principalSeg,
-						path.namespace,
-						path.collectionSeg,
+						{
+							origin,
+							principalSeg: path.principalSeg,
+							ns: path.namespace,
+							collectionSeg: path.collectionSeg,
+						},
 						inst,
 					);
 					const instPrivileges = privMap.get(InstanceId(inst.id)) ?? [];
@@ -1178,14 +1181,12 @@ export const propfindHandler = (
 						yield* isReadOnlyCollectionRow(coll),
 					);
 					responses.push(
-						collectionResponse(
-							href,
-							coll,
-							propfind,
+						collectionResponse(href, coll, {
+							request: propfind,
 							origin,
 							privileges,
 							actingPrincipalHref,
-						),
+						}),
 					);
 				}
 			}
@@ -1293,10 +1294,12 @@ export const propfindHandler = (
 			const instReadOnly = yield* isReadOnlyCollectionRow(instCollRow);
 			const ownerHref = `${origin}/dav/principals/${instCollRow.ownerPrincipalId}/`;
 			const href = instanceHref(
-				origin,
-				path.principalSeg,
-				path.namespace,
-				path.collectionSeg,
+				{
+					origin,
+					principalSeg: path.principalSeg,
+					ns: path.namespace,
+					collectionSeg: path.collectionSeg,
+				},
 				path.instanceSeg,
 			);
 			const instProps: Record<ClarkName, unknown> = {

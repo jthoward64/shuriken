@@ -35,11 +35,16 @@ import { contactsRedirect, parseBulkSelection } from "./bulk-shared.ts";
 // whole batch (we never silently ignore an authorization denial).
 // ---------------------------------------------------------------------------
 
+/** The caller and the services one contact in the batch is edited through. */
+interface BatchContext {
+	readonly principalId: PrincipalId;
+	readonly acl: AclServiceShape;
+	readonly cardEdit: CardEditServiceShape;
+	readonly instanceRepo: InstanceRepositoryShape;
+}
+
 const deleteOne = (
-	principalId: PrincipalId,
-	acl: AclServiceShape,
-	cardEdit: CardEditServiceShape,
-	instanceRepo: InstanceRepositoryShape,
+	{ principalId, acl, cardEdit, instanceRepo }: BatchContext,
 	id: InstanceId,
 ): Effect.Effect<
 	{ ok: boolean },
@@ -85,7 +90,10 @@ export const contactsBulkDeleteHandler = (
 				items: ids,
 				input: { addressbook },
 				perItem: (id) =>
-					deleteOne(principal.principalId, acl, cardEdit, instanceRepo, id),
+					deleteOne(
+						{ principalId: principal.principalId, acl, cardEdit, instanceRepo },
+						id,
+					),
 				onDone: () => Effect.succeed({}),
 			});
 			return yield* renderFragment(<BulkJobProgress jobId={job.id} />);
@@ -93,7 +101,11 @@ export const contactsBulkDeleteHandler = (
 
 		yield* Effect.forEach(
 			ids,
-			(id) => deleteOne(principal.principalId, acl, cardEdit, instanceRepo, id),
+			(id) =>
+				deleteOne(
+					{ principalId: principal.principalId, acl, cardEdit, instanceRepo },
+					id,
+				),
 			{ discard: true },
 		);
 		return new Response(null, { status: 303, headers: { Location: redirect } });
