@@ -130,13 +130,11 @@ export const freeBusyQueryHandler = (
 		const calIdx = yield* CalIndexRepository;
 		const [veventIds, vfreebusyIds] = yield* Effect.all(
 			[
-				calIdx.findOverlappingRange(
-					path.collectionId,
-					"VEVENT",
-					queryStart,
-					queryEnd,
+				calIdx.findOverlappingRange(path.collectionId, "VEVENT", {
+					start: queryStart,
+					end: queryEnd,
 					zone,
-				),
+				}),
 				calIdx.findByComponentType(path.collectionId, "VFREEBUSY"),
 			],
 			{ concurrency: "unbounded" },

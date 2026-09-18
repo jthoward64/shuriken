@@ -187,13 +187,7 @@ export const ShareLinkServiceLive = Layer.effect(
 					return token;
 				}),
 
-			setVisibility: (
-				id,
-				caller,
-				calendarId: UuidString,
-				visibility: ShareLinkVisibility,
-				embedEnabled?: boolean,
-			) =>
+			setVisibility: (id, caller, { calendarId, visibility, embedEnabled }) =>
 				Effect.gen(function* () {
 					yield* loadOwned(id, caller);
 					yield* repo.setCalendarVisibility(
@@ -204,13 +198,7 @@ export const ShareLinkServiceLive = Layer.effect(
 					);
 				}),
 
-			addCalendar: (
-				id,
-				caller,
-				calendarId: UuidString,
-				visibility: ShareLinkVisibility,
-				embedEnabled?: boolean,
-			) =>
+			addCalendar: (id, caller, { calendarId, visibility, embedEnabled }) =>
 				Effect.gen(function* () {
 					yield* loadOwned(id, caller);
 					yield* requireCalendarReadable(caller, calendarId);

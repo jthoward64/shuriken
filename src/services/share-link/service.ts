@@ -21,6 +21,13 @@ import type { ShareLinkCalendarRow, ShareLinkRow } from "./repository.ts";
 // expires_at gate so disabled or expired links 404.
 // ---------------------------------------------------------------------------
 
+/** One calendar on a share link, and how it is exposed. */
+export interface ShareLinkCalendarEntry {
+	readonly calendarId: UuidString;
+	readonly visibility: ShareLinkVisibility;
+	readonly embedEnabled?: boolean;
+}
+
 export interface ShareLinkSummary {
 	readonly link: ShareLinkRow;
 	readonly calendars: ReadonlyArray<ShareLinkCalendarRow>;
@@ -85,17 +92,13 @@ export interface ShareLinkServiceShape {
 	readonly setVisibility: (
 		id: UuidString,
 		caller: ShareLinkCaller,
-		calendarId: UuidString,
-		visibility: ShareLinkVisibility,
-		embedEnabled?: boolean,
+		entry: ShareLinkCalendarEntry,
 	) => Effect.Effect<void, DatabaseError | DavError>;
 
 	readonly addCalendar: (
 		id: UuidString,
 		caller: ShareLinkCaller,
-		calendarId: UuidString,
-		visibility: ShareLinkVisibility,
-		embedEnabled?: boolean,
+		entry: ShareLinkCalendarEntry,
 	) => Effect.Effect<void, DatabaseError | DavError>;
 
 	readonly removeCalendar: (

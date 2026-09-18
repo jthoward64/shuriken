@@ -12,7 +12,11 @@ import { DatabaseClient } from "#src/db/client.ts";
 import { calIndex, davInstance } from "#src/db/drizzle/schema/index.ts";
 import { runDbQuery } from "#src/db/query.ts";
 import type { CollectionId, EntityId } from "#src/domain/ids.ts";
-import { type CalComponentType, CalIndexRepository } from "./repository.ts";
+import {
+	type CalComponentType,
+	CalIndexRepository,
+	type CalIndexWindow,
+} from "./repository.ts";
 
 // ---------------------------------------------------------------------------
 // CalIndexRepository — Drizzle implementation
@@ -243,10 +247,9 @@ const findByTimeRange = Effect.fn("CalIndexRepository.findByTimeRange")(
 	function* (
 		collectionId: CollectionId,
 		componentType: CalComponentType,
-		rangeStart: Temporal.Instant | null,
-		rangeEnd: Temporal.Instant | null,
-		zone: ResolutionZone,
+		window: CalIndexWindow,
 	) {
+		const { start: rangeStart, end: rangeEnd, zone } = window;
 		yield* Effect.annotateCurrentSpan({
 			"collection.id": collectionId,
 			"cal.component_type": componentType,
@@ -328,10 +331,9 @@ const findOverlappingRange = Effect.fn(
 	function* (
 		collectionId: CollectionId,
 		componentType: CalComponentType,
-		rangeStart: Temporal.Instant | null,
-		rangeEnd: Temporal.Instant | null,
-		zone: ResolutionZone,
+		window: CalIndexWindow,
 	) {
+		const { start: rangeStart, end: rangeEnd, zone } = window;
 		yield* Effect.annotateCurrentSpan({
 			"collection.id": collectionId,
 			"cal.component_type": componentType,

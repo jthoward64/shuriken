@@ -88,24 +88,20 @@ export const feedsUpdateHandler = (
 			for (const [calId, wanted] of desired) {
 				const existing = current.get(calId);
 				if (existing === undefined) {
-					yield* svc.addCalendar(
-						id,
-						caller,
-						calId,
-						wanted.visibility,
-						wanted.embedEnabled,
-					);
+					yield* svc.addCalendar(id, caller, {
+						calendarId: calId,
+						visibility: wanted.visibility,
+						embedEnabled: wanted.embedEnabled,
+					});
 				} else if (
 					existing.visibility !== wanted.visibility ||
 					existing.embedEnabled !== wanted.embedEnabled
 				) {
-					yield* svc.setVisibility(
-						id,
-						caller,
-						calId,
-						wanted.visibility,
-						wanted.embedEnabled,
-					);
+					yield* svc.setVisibility(id, caller, {
+						calendarId: calId,
+						visibility: wanted.visibility,
+						embedEnabled: wanted.embedEnabled,
+					});
 				}
 			}
 			for (const calId of current.keys()) {

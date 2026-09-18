@@ -19,6 +19,13 @@ import type { CollectionId, EntityId } from "#src/domain/ids.ts";
 /** Component types tracked in cal_index. */
 export type CalComponentType = "VEVENT" | "VTODO" | "VJOURNAL" | "VFREEBUSY";
 
+/** The time range an index scan covers, and the zone its local values are read in. */
+export interface CalIndexWindow {
+	readonly start: Temporal.Instant | null;
+	readonly end: Temporal.Instant | null;
+	readonly zone: ResolutionZone;
+}
+
 export interface CalIndexRepositoryShape {
 	/**
 	 * Return entity UUIDs (as strings) whose cal_index entries overlap the
@@ -41,9 +48,7 @@ export interface CalIndexRepositoryShape {
 	readonly findByTimeRange: (
 		collectionId: CollectionId,
 		componentType: CalComponentType,
-		start: Temporal.Instant | null,
-		end: Temporal.Instant | null,
-		zone: ResolutionZone,
+		window: CalIndexWindow,
 	) => Effect.Effect<ReadonlyArray<string>, DatabaseError>;
 
 	/**
@@ -71,9 +76,7 @@ export interface CalIndexRepositoryShape {
 	readonly findOverlappingRange: (
 		collectionId: CollectionId,
 		componentType: CalComponentType,
-		start: Temporal.Instant | null,
-		end: Temporal.Instant | null,
-		zone: ResolutionZone,
+		window: CalIndexWindow,
 	) => Effect.Effect<ReadonlyArray<string>, DatabaseError>;
 
 	/**

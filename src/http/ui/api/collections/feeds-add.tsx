@@ -52,8 +52,7 @@ export const collectionsFeedsAddHandler = (
 			yield* shareLinkSvc.addCalendar(
 				feedIdRaw,
 				{ userId: principal.userId, principalId: principal.principalId },
-				collectionId,
-				visibility,
+				{ calendarId: collectionId, visibility },
 			);
 		}
 

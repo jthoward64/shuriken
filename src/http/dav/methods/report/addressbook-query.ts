@@ -159,13 +159,11 @@ export const addressbookQueryHandler = (
 		const instances = yield* (() => {
 			if (fnHint) {
 				return cardIdx
-					.findByText(
-						path.collectionId,
-						fnHint.text,
-						"fn",
-						fnHint.collation,
-						fnHint.matchType,
-					)
+					.findByText(path.collectionId, fnHint.text, {
+						field: "fn",
+						collation: fnHint.collation,
+						matchType: fnHint.matchType,
+					})
 					.pipe(
 						Effect.flatMap((entityIds) =>
 							instRepo.findByIds(

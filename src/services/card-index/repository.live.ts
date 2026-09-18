@@ -9,6 +9,7 @@ import {
 	type CardIndexField,
 	CardIndexRepository,
 	type CardMatchType,
+	type CardTextMatch,
 } from "./repository.ts";
 
 // ---------------------------------------------------------------------------
@@ -55,13 +56,8 @@ const likePattern = (foldedText: string, matchType: CardMatchType): string => {
 };
 
 const findByText = Effect.fn("CardIndexRepository.findByText")(
-	function* (
-		collectionId: CollectionId,
-		text: string,
-		field: CardIndexField,
-		collation: CardCollation,
-		matchType: CardMatchType,
-	) {
+	function* (collectionId: CollectionId, text: string, match: CardTextMatch) {
+		const { field, collation, matchType } = match;
 		yield* Effect.annotateCurrentSpan({
 			"collection.id": collectionId,
 			"card.field": field,

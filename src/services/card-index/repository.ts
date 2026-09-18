@@ -60,6 +60,13 @@ export interface DedupCardRow {
 	readonly phones: ReadonlyArray<string>;
 }
 
+/** Which indexed field a text search runs against, and how it is compared. */
+export interface CardTextMatch {
+	readonly field: CardIndexField;
+	readonly collation: CardCollation;
+	readonly matchType: CardMatchType;
+}
+
 export interface CardIndexRepositoryShape {
 	/**
 	 * Return entity UUIDs whose card_index entry matches the given text filter.
@@ -71,9 +78,7 @@ export interface CardIndexRepositoryShape {
 	readonly findByText: (
 		collectionId: CollectionId,
 		text: string,
-		field: CardIndexField,
-		collation: CardCollation,
-		matchType: CardMatchType,
+		match: CardTextMatch,
 	) => Effect.Effect<ReadonlyArray<string>, DatabaseError>;
 
 	/**

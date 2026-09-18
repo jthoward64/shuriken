@@ -228,13 +228,11 @@ export const calendarQueryHandler = (
 				// bucket narrowing from the range; an open-ended range (RFC 4791 §9.9)
 				// must not be narrowed to a window, so it is passed through as null.
 				return calIdx
-					.findByTimeRange(
-						path.collectionId,
-						componentType,
-						timeRange.start,
-						timeRange.end,
+					.findByTimeRange(path.collectionId, componentType, {
+						start: timeRange.start,
+						end: timeRange.end,
 						zone,
-					)
+					})
 					.pipe(
 						Effect.flatMap((entityIds) =>
 							instRepo.findByIds(

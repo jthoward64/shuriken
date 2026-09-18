@@ -161,9 +161,7 @@ export const collectCalendarEvents = (
 		const candidateIds = yield* calIdx.findOverlappingRange(
 			collectionId,
 			"VEVENT",
-			rangeStart,
-			rangeEnd,
-			zone,
+			{ start: rangeStart, end: rangeEnd, zone },
 		);
 		const instances = yield* instRepo.findByIds(
 			candidateIds.map((id) => InstanceId(id as UuidString)),
