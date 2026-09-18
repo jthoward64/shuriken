@@ -1,3 +1,4 @@
+// biome-ignore-all lint/plugin: plain CLI script with no Effect; the linteffect rules flag its try/catch and JSON use regardless
 import { readTextFile } from "@std/fs/unstable-read-text-file";
 import { writeTextFile } from "@std/fs/unstable-write-text-file";
 import { fromFileUrl } from "@std/path";

@@ -1,3 +1,4 @@
+// biome-ignore-all lint/plugin: plain browser script with no Effect; the linteffect rules flag its try/catch and JSON use regardless
 import { all, initAll, make, one, repointLabel } from "./dom.ts";
 import { createListbox } from "./listbox.ts";
 

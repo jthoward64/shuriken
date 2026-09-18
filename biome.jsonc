@@ -445,6 +445,20 @@
 	],
 	"overrides": [
 		{
+			// A stylesheet is a flat list of rules, so its line count is not the
+			// complexity signal it is for code. Splitting one to satisfy the cap
+			// also breaks noUndeclaredCustomProperties, which resolves design
+			// tokens per file and cannot see the base layer from another file.
+			"includes": ["**/*.css"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noExcessiveLinesPerFile": "off"
+					}
+				}
+			}
+		},
+		{
 			// Browser scripts and the plain build/release utilities contain no
 			// Effect, so the Effect-composition plugins have nothing to say about
 			// their try/catch and JSON use. service.live.ts and service.ts under
@@ -584,7 +598,6 @@
 				}
 			}
 		}
-
 	],
 	"assist": {
 		"enabled": true,

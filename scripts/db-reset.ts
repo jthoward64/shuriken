@@ -1,3 +1,4 @@
+// biome-ignore-all lint/plugin: plain CLI script with no Effect; the linteffect rules flag its try/catch and JSON use regardless
 // ---------------------------------------------------------------------------
 // db-reset — wipe the application database back to an empty state.
 //

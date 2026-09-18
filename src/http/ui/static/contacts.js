@@ -1,3 +1,4 @@
+// biome-ignore-all lint/plugin: plain browser script with no Effect; the linteffect rules flag its try/catch and JSON use regardless
 // Shuriken contacts UI enhancement. Loaded per-page (via `extraHead`) on the
 // contacts pages that run long HTMX operations or need light interactivity.
 //

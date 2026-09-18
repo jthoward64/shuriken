@@ -1,3 +1,4 @@
+// biome-ignore-all lint/plugin: plain browser script with no Effect; the linteffect rules flag its try/catch and JSON use regardless
 // Shuriken UI progressive-enhancement script. Served from /static/ui.js and
 // loaded (render-blocking) in <head> so the theme is applied before first paint.
 // No build step — plain browser JS. Keep it tiny.

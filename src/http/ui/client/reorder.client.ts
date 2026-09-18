@@ -1,3 +1,4 @@
+// biome-ignore-all lint/plugin: plain browser script with no Effect; the linteffect rules flag its try/catch and JSON use regardless
 // biome-ignore-all lint/nursery/noLoopFunc: every loop here binds its subject with `const`, so each closure captures its own
 // Sidebar reorder — native HTML5 drag-and-drop for `[data-reorder-list]`
 // containers (the calendar and address-book sidebars). Progressive

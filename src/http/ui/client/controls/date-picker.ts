@@ -1,3 +1,4 @@
+// biome-ignore-all lint/plugin: plain browser script with no Effect; the linteffect rules flag its try/catch and JSON use regardless
 import { Temporal } from "temporal-polyfill";
 import { all, initAll, make, one, placeUnder } from "./dom.ts";
 

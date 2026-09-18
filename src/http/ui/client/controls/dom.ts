@@ -1,3 +1,4 @@
+// biome-ignore-all lint/plugin: plain browser script with no Effect; the linteffect rules flag its try/catch and JSON use regardless
 // Small typed query helpers shared by the form controls. Kept local to the
 // client bundle rather than pulled from a library, since this is all they need.
 

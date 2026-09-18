@@ -1,3 +1,4 @@
+// biome-ignore-all lint/plugin: plain browser script with no Effect; the linteffect rules flag its try/catch and JSON use regardless
 import type { SearchPickerResponse } from "#src/http/ui/helpers/search-picker.ts";
 import { initAll, one } from "./dom.ts";
 import { createListbox } from "./listbox.ts";
