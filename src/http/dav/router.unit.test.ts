@@ -62,7 +62,8 @@ import { TombstoneRepository } from "#src/services/tombstone/index.ts";
 import { UserRepository, UserService } from "#src/services/user/index.ts";
 import type { UserRepositoryShape } from "#src/services/user/repository.ts";
 import type { UserServiceShape } from "#src/services/user/service.ts";
-import { davRouter, parseDavPath } from "./router.ts";
+import { parseDavPath } from "./parse-path.ts";
+import { davRouter } from "./router.ts";
 
 // ---------------------------------------------------------------------------
 // Test infrastructure

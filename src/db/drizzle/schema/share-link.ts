@@ -8,8 +8,9 @@ import {
 	uuid,
 } from "drizzle-orm/pg-core";
 import type { UuidString } from "#src/domain/ids.ts";
-import { davCollection, user } from "../schema.ts";
+import { davCollection } from "./dav.ts";
 import { drizzleEnum, type GetDrizzleEnumType, timestampTz } from "./types.ts";
+import { user } from "./user.ts";
 
 const shareLinkVisibilityEnum = drizzleEnum(
 	"visibility",

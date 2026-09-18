@@ -39,7 +39,7 @@ import {
 	InstanceRepository,
 	InstanceService,
 } from "#src/services/instance/index.ts";
-import { parseDavPath } from "../router.ts";
+import { parseDavPath } from "../parse-path.ts";
 import {
 	deleteCollection,
 	deleteInstance,
