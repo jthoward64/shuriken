@@ -277,11 +277,11 @@ export const calendarQueryHandler = (
 		);
 
 		for (const inst of instances) {
-			const tree = trees.get(inst.entityId as unknown as EntityId);
-			if (tree === undefined) {
+			const entityTree = trees.get(inst.entityId as unknown as EntityId);
+			if (entityTree === undefined) {
 				continue;
 			}
-			const irDoc: IrDocument = { kind: "icalendar", root: tree };
+			const irDoc: IrDocument = { kind: "icalendar", root: entityTree };
 
 			if (
 				!evaluateCalFilter(irDoc, filter, zone, {

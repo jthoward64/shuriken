@@ -565,9 +565,9 @@ const openEditDialog = (url: string): void => {
 			document.querySelector<HTMLElement>("#cal-import-file")?.closest("form"),
 			`/ui/api/calendar/${id}/import`,
 		);
-		const exportLink = document.querySelector<HTMLElement>("#cal-export");
-		if (exportLink instanceof HTMLAnchorElement) {
-			exportLink.href = `/ui/calendar/${id}/export.ics`;
+		const exportAnchor = document.querySelector<HTMLElement>("#cal-export");
+		if (exportAnchor instanceof HTMLAnchorElement) {
+			exportAnchor.href = `/ui/calendar/${id}/export.ics`;
 		}
 		const fc = document.querySelector<HTMLElement>("#fullcalendar");
 		if (fc) {

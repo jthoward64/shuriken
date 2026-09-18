@@ -334,8 +334,7 @@ const copyCollection = (
 			displayName: sourceCollection.displayName ?? undefined,
 			description: sourceCollection.description ?? undefined,
 			timezoneTzid: sourceCollection.timezoneTzid ?? undefined,
-			supportedComponents:
-				(sourceCollection.supportedComponents as Array<string>) ?? undefined,
+			supportedComponents: sourceCollection.supportedComponents ?? undefined,
 		});
 
 		// RFC 4918 §9.8.2: copy dead properties to the new collection.

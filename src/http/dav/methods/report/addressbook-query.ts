@@ -189,11 +189,11 @@ export const addressbookQueryHandler = (
 		);
 
 		for (const inst of instances) {
-			const tree = trees.get(inst.entityId as unknown as EntityId);
-			if (tree === undefined) {
+			const entityTree = trees.get(inst.entityId as unknown as EntityId);
+			if (entityTree === undefined) {
 				continue;
 			}
-			const irDoc: IrDocument = { kind: "vcard", root: tree };
+			const irDoc: IrDocument = { kind: "vcard", root: entityTree };
 
 			if (!evaluateCardFilter(irDoc, filter)) {
 				continue;

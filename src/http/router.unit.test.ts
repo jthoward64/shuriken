@@ -497,7 +497,7 @@ const stubLayers = Layer.mergeAll(
 );
 
 const runWith = (
-	req: Request,
+	request: Request,
 	auth: Effect.Effect<
 		Authenticated | Unauthenticated,
 		AuthError | DatabaseError
@@ -505,7 +505,7 @@ const runWith = (
 ): Promise<Response> => {
 	const layer = Layer.merge(authLayer(auth), stubLayers);
 	return Effect.runPromise(
-		Effect.provide(handleRequest(req, mockClientAddress), layer),
+		Effect.provide(handleRequest(request, mockClientAddress), layer),
 	);
 };
 

@@ -742,7 +742,7 @@ const NUMERIC_SUFFIX = /-\d+$/u;
 		const resultUrl = el.getAttribute("data-bulk-job-result");
 		const label = el.querySelector("[data-bulk-job-label]");
 		const count = el.querySelector("[data-bulk-job-count]");
-		const bar = el.querySelector("[data-bulk-job-bar]");
+		const barEl = el.querySelector("[data-bulk-job-bar]");
 		if (!url || typeof EventSource === "undefined") {
 			return;
 		}
@@ -772,7 +772,7 @@ const NUMERIC_SUFFIX = /-\d+$/u;
 			} catch {
 				return;
 			}
-			if (bar) {
+			if (barEl) {
 				bar.max = data.total || 1;
 				bar.value = data.done || 0;
 			}

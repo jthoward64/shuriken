@@ -27,7 +27,7 @@ import { renderFeed } from "./render.ts";
 
 const makeVevent = (
 	uid: string,
-	summary: string,
+	summaryText: string,
 	props: ReadonlyArray<{ name: string; value: string }> = [],
 ): IrComponent => ({
 	name: "VEVENT",
@@ -53,7 +53,7 @@ const makeVevent = (
 		{
 			name: "SUMMARY",
 			parameters: [],
-			value: { type: "TEXT", value: summary },
+			value: { type: "TEXT", value: summaryText },
 			isKnown: true,
 		},
 		...props.map((p) => ({

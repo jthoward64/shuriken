@@ -311,6 +311,9 @@
 				"noHeadImportInDocument": "off",
 				"noReactSpecificProps": "off",
 				"noUndeclaredEnvVars": "off",
+				// narrows RegExp.prototype.exec to non-nullish, so every null check on a
+				// match reads as dead code (biomejs/biome, nursery-era inference)
+				"noUnnecessaryConditions": "off",
 				"noUnknownAtRules": {
 					"level": "error",
 					"options": {

@@ -404,8 +404,8 @@ describe("InstanceRepository.updateEtag (integration)", () => {
 				});
 
 				yield* instanceRepo.updateEtag(InstanceId(inserted.id), ETag('"v2"'));
-				const found = yield* instanceRepo.findById(InstanceId(inserted.id));
-				return { insertedRevision: inserted.syncRevision, found };
+				const refetched = yield* instanceRepo.findById(InstanceId(inserted.id));
+				return { insertedRevision: inserted.syncRevision, found: refetched };
 			}).pipe(Effect.provide(layer), Effect.orDie),
 		);
 

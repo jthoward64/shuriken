@@ -699,12 +699,12 @@ describe("ComponentRepository loadTreesByIds (integration)", () => {
 				const entityId = EntityId(entity.id);
 				yield* comp.insertTree(entityId, named("Only"));
 				const missing = EntityId(crypto.randomUUID());
-				const withMissing = yield* comp.loadTreesByIds(
+				const loadedWithMissing = yield* comp.loadTreesByIds(
 					[entityId, missing],
 					"icalendar",
 				);
-				const empty = yield* comp.loadTreesByIds([], "icalendar");
-				return { withMissing, empty };
+				const loadedForEmpty = yield* comp.loadTreesByIds([], "icalendar");
+				return { withMissing: loadedWithMissing, empty: loadedForEmpty };
 			}).pipe(Effect.provide(layer), Effect.orDie),
 		);
 

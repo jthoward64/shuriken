@@ -7,7 +7,7 @@ import { upgradeToV4 } from "./upgrade-v4.ts";
 
 const LINE_BREAK = /\r?\n/u;
 
-const vcard = (...lines: Array<string>) => `${lines.join("\r\n")}\r\n`;
+const vcard = (...parts: Array<string>) => `${parts.join("\r\n")}\r\n`;
 
 // Unfold before splitting: a base64 photo is always folded across many lines.
 const lines = (out: string): Array<string> =>

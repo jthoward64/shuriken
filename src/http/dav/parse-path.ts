@@ -1,11 +1,5 @@
 import { Effect, Option } from "effect";
-import type { DatabaseClient } from "#src/db/client.ts";
-import {
-	conflict,
-	type DavError,
-	notFound,
-	unauthorized,
-} from "#src/domain/errors.ts";
+import { type DavError, notFound } from "#src/domain/errors.ts";
 import {
 	CollectionId,
 	GroupId,

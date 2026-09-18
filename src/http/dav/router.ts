@@ -1,27 +1,13 @@
-import { Effect, Metric, Option } from "effect";
+import { Effect, Metric } from "effect";
 import type { AppConfigService } from "#src/config.ts";
 import type { DatabaseClient } from "#src/db/client.ts";
 import {
 	type AppError,
 	conflict,
-	type DavError,
 	type DavPrecondition,
 	notFound,
 	unauthorized,
 } from "#src/domain/errors.ts";
-import {
-	CollectionId,
-	GroupId,
-	InstanceId,
-	isUuid,
-	PrincipalId,
-	UserId,
-} from "#src/domain/ids.ts";
-import {
-	NAMESPACE_TO_COLLECTION_TYPE,
-	parseCollectionNamespace,
-} from "#src/domain/types/collection-namespace.ts";
-import { type ResolvedDavPath, Slug } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import {
 	HTTP_METHOD_NOT_ALLOWED,

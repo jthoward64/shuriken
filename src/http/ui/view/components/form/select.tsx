@@ -28,6 +28,7 @@ import { cx } from "../cx.ts";
 declare module "preact" {
 	// biome-ignore lint/style/useNamingConvention: JSX is preact's own namespace name
 	// biome-ignore lint/style/noNamespace: required shape for a JSX intrinsic-element augmentation
+	// biome-ignore lint/suspicious/noShadow: augmenting preact's JSX namespace means reusing its name
 	namespace JSX {
 		interface IntrinsicElements {
 			/** Clone of the selected <option>'s content, shown inside the trigger. */

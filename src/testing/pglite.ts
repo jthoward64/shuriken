@@ -92,7 +92,7 @@ export const makePgliteDatabaseLayer = (): Layer.Layer<
 					// @effect-diagnostics-next-line globalErrorInEffectFailure:off
 					catch: (e) => new Error(`PGlite setup failed: ${String(e)}`),
 				}),
-				(pg) => Effect.promise(() => pg.close()),
+				(instance) => Effect.promise(() => instance.close()),
 			);
 			return PgliteClient.layer({ liveClient: pg as PGliteInterface });
 		}),

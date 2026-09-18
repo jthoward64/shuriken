@@ -87,34 +87,34 @@ export interface StepOptions {
  */
 export const mkcol = (
 	path: string,
-	options?: StepOptions & {
+	opts?: StepOptions & {
 		readonly method?: "MKCOL" | "MKCALENDAR" | "MKADDRESSBOOK";
 	},
 ): ScriptStep => ({
-	name: options?.name ?? `${options?.method ?? "MKCOL"} ${path}`,
-	method: options?.method ?? "MKCOL",
+	name: opts?.name ?? `${opts?.method ?? "MKCOL"} ${path}`,
+	method: opts?.method ?? "MKCOL",
 	path,
-	as: options?.as,
-	headers: options?.headers,
-	expect: options?.expect ?? { status: 201 },
+	as: opts?.as,
+	headers: opts?.headers,
+	expect: opts?.expect ?? { status: 201 },
 });
 
 /** PROPFIND — query properties on a resource. Expects 207 by default. */
 export const propfind = (
 	path: string,
 	body: string,
-	options?: StepOptions,
+	opts?: StepOptions,
 ): ScriptStep => ({
-	name: options?.name ?? `PROPFIND ${path}`,
+	name: opts?.name ?? `PROPFIND ${path}`,
 	method: "PROPFIND",
 	path,
-	as: options?.as,
+	as: opts?.as,
 	headers: {
 		"Content-Type": "application/xml; charset=utf-8",
-		...options?.headers,
+		...opts?.headers,
 	},
 	body,
-	expect: options?.expect ?? { status: 207 },
+	expect: opts?.expect ?? { status: 207 },
 });
 
 /** PUT — create or replace a resource. No default status (201 or 204 both valid). */
@@ -122,28 +122,28 @@ export const put = (
 	path: string,
 	body: string,
 	contentType: string,
-	options?: StepOptions,
+	opts?: StepOptions,
 ): ScriptStep => ({
-	name: options?.name ?? `PUT ${path}`,
+	name: opts?.name ?? `PUT ${path}`,
 	method: "PUT",
 	path,
-	as: options?.as,
+	as: opts?.as,
 	headers: {
 		"Content-Type": contentType,
-		...options?.headers,
+		...opts?.headers,
 	},
 	body,
-	expect: options?.expect,
+	expect: opts?.expect,
 });
 
 /** DELETE — delete a resource. Expects 204 by default. */
-export const del = (path: string, options?: StepOptions): ScriptStep => ({
-	name: options?.name ?? `DELETE ${path}`,
+export const del = (path: string, opts?: StepOptions): ScriptStep => ({
+	name: opts?.name ?? `DELETE ${path}`,
 	method: "DELETE",
 	path,
-	as: options?.as,
-	headers: options?.headers,
-	expect: options?.expect ?? { status: 204 },
+	as: opts?.as,
+	headers: opts?.headers,
+	expect: opts?.expect ?? { status: 204 },
 });
 
 /** COPY — duplicate a resource at the destination. Expects 201 by default.
@@ -153,7 +153,7 @@ export const del = (path: string, options?: StepOptions): ScriptStep => ({
 export const copy = (
 	path: string,
 	destination: string,
-	options?: StepOptions & {
+	opts?: StepOptions & {
 		readonly overwrite?: "T" | "F";
 		readonly depth?: "0" | "infinity";
 	},
@@ -162,19 +162,17 @@ export const copy = (
 		? destination
 		: `http://localhost${destination}`;
 	return {
-		name: options?.name ?? `COPY ${path} -> ${destination}`,
+		name: opts?.name ?? `COPY ${path} -> ${destination}`,
 		method: "COPY",
 		path,
-		as: options?.as,
+		as: opts?.as,
 		headers: {
 			Destination: destUri,
-			...(options?.overwrite !== undefined
-				? { Overwrite: options.overwrite }
-				: {}),
-			...(options?.depth !== undefined ? { Depth: options.depth } : {}),
-			...options?.headers,
+			...(opts?.overwrite !== undefined ? { Overwrite: opts.overwrite } : {}),
+			...(opts?.depth !== undefined ? { Depth: opts.depth } : {}),
+			...opts?.headers,
 		},
-		expect: options?.expect ?? { status: 201 },
+		expect: opts?.expect ?? { status: 201 },
 	};
 };
 
@@ -185,7 +183,7 @@ export const copy = (
 export const move = (
 	path: string,
 	destination: string,
-	options?: StepOptions & {
+	opts?: StepOptions & {
 		readonly overwrite?: "T" | "F";
 	},
 ): ScriptStep => {
@@ -193,29 +191,27 @@ export const move = (
 		? destination
 		: `http://localhost${destination}`;
 	return {
-		name: options?.name ?? `MOVE ${path} -> ${destination}`,
+		name: opts?.name ?? `MOVE ${path} -> ${destination}`,
 		method: "MOVE",
 		path,
-		as: options?.as,
+		as: opts?.as,
 		headers: {
 			Destination: destUri,
-			...(options?.overwrite !== undefined
-				? { Overwrite: options.overwrite }
-				: {}),
-			...options?.headers,
+			...(opts?.overwrite !== undefined ? { Overwrite: opts.overwrite } : {}),
+			...opts?.headers,
 		},
-		expect: options?.expect ?? { status: 201 },
+		expect: opts?.expect ?? { status: 201 },
 	};
 };
 
 /** GET — retrieve a resource. Expects 200 by default. */
-export const get = (path: string, options?: StepOptions): ScriptStep => ({
-	name: options?.name ?? `GET ${path}`,
+export const get = (path: string, opts?: StepOptions): ScriptStep => ({
+	name: opts?.name ?? `GET ${path}`,
 	method: "GET",
 	path,
-	as: options?.as,
-	headers: options?.headers,
-	expect: options?.expect ?? { status: 200 },
+	as: opts?.as,
+	headers: opts?.headers,
+	expect: opts?.expect ?? { status: 200 },
 });
 
 /** OPTIONS — capability discovery. Expects 200 by default. */

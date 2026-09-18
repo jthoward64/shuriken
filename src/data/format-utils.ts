@@ -327,8 +327,8 @@ export const paramsFromIr = (
 export const getValueParam = (
 	params: ReadonlyArray<ContentLineParam>,
 ): string | undefined => {
-	const p = params.find((p) => p.name.toUpperCase() === "VALUE");
-	return p?.values[0];
+	const param = params.find((p) => p.name.toUpperCase() === "VALUE");
+	return param?.values[0];
 };
 
 /**
@@ -338,6 +338,6 @@ export const getValueParam = (
 export const getTzidParam = (
 	params: ReadonlyArray<ContentLineParam>,
 ): string | undefined => {
-	const p = params.find((p) => p.name.toUpperCase() === "TZID");
-	return p?.values[0];
+	const param = params.find((p) => p.name.toUpperCase() === "TZID");
+	return param?.values[0];
 };
