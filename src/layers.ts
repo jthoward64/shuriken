@@ -1,3 +1,4 @@
+// biome-ignore-all lint/performance/noBarrelFile: the service tags are re-exported for handler R-type annotations
 import { Effect, Layer, Logger } from "effect";
 import { DevTools } from "effect/unstable/devtools";
 import { CompositeAuthLayer } from "#src/auth/index.ts";

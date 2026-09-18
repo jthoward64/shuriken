@@ -235,8 +235,6 @@
 						"maxLines": 1000
 					}
 				},
-				// error modules group the Data.TaggedError classes for one domain, which is the point of the file
-				"noExcessiveClassesPerFile": "off",
 				"noHeadElement": "off",
 				// <Foo disabled /> is the JSX idiom
 				"noImplicitBoolean": "off",

@@ -5,7 +5,7 @@ import { PgClient } from "@effect/sql-pg";
 import { PgliteClient } from "@effect/sql-pglite";
 import { MemoryFS, PGlite, type PGliteInterface } from "@electric-sql/pglite";
 import { icuDataDir } from "@electric-sql/pglite-icu-full";
-import * as PgDrizzle from "drizzle-orm/effect-postgres";
+import { makeWithDefaults } from "drizzle-orm/effect-postgres";
 import { readMigrationFiles } from "drizzle-orm/migrator";
 import { migrate } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/pglite";
@@ -111,8 +111,7 @@ export const makePgliteDatabaseLayer = (): Layer.Layer<
 		),
 	).pipe(Layer.provide(pgliteClientLayer));
 
-	return Layer.effect(
-		DatabaseClient,
-		PgDrizzle.makeWithDefaults({ relations }),
-	).pipe(Layer.provide(pgClientLayer)) as Layer.Layer<DatabaseClient, Error>;
+	return Layer.effect(DatabaseClient, makeWithDefaults({ relations })).pipe(
+		Layer.provide(pgClientLayer),
+	) as Layer.Layer<DatabaseClient, Error>;
 };

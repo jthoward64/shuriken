@@ -194,7 +194,7 @@ export const CalendarFeedsSection = ({
 		{memberFeeds.length > 0 ? (
 			<ul class="space-y-1 text-sm">
 				{memberFeeds.map((f) => (
-					<li class="flex items-center justify-between">
+					<li key={f.feedId} class="flex items-center justify-between">
 						<a href={`/ui/feeds/${f.feedId}`} class="link">
 							{f.displayName}
 						</a>
@@ -308,7 +308,7 @@ export const FeedNewPage = ({
 						<legend class="form-label mb-1">Calendars to include</legend>
 						{calendars.length > 0 ? (
 							calendars.map((c) => (
-								<div class="flex items-center gap-3 py-1">
+								<div key={c.id} class="flex items-center gap-3 py-1">
 									<Checkbox
 										id={`cal-${c.id}`}
 										label={c.displayName}
@@ -477,7 +477,7 @@ export const FeedEditPage = ({
 				<fieldset class="space-y-2">
 					<legend class="form-label mb-1">Calendars</legend>
 					{calendars.map((c) => (
-						<div class="flex items-center gap-3 py-1">
+						<div key={c.id} class="flex items-center gap-3 py-1">
 							<Checkbox
 								id={`cal-${c.id}`}
 								label={c.displayName}

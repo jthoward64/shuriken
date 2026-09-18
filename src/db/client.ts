@@ -1,5 +1,5 @@
 import { PgClient } from "@effect/sql-pg";
-import * as PgDrizzle from "drizzle-orm/effect-postgres";
+import { makeWithDefaults } from "drizzle-orm/effect-postgres";
 import { Context, Effect, Layer } from "effect";
 import { AppConfigService } from "#src/config.ts";
 import { relations } from "./drizzle/relations.ts";
@@ -36,7 +36,7 @@ export class DatabaseClient extends Context.Service<DatabaseClient>()(
 	{
 		// makeWithDefaults provides no-op EffectLogger/EffectCache; only PgClient
 		// remains as a requirement, satisfied by PgClientLive below.
-		make: PgDrizzle.makeWithDefaults({ relations }),
+		make: makeWithDefaults({ relations }),
 	},
 ) {}
 

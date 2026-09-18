@@ -13,6 +13,18 @@ import {
 } from "#src/startup.ts";
 import { HTTP_INTERNAL_SERVER_ERROR } from "./http/status.ts";
 
+/** Last-resort response for a defect, after logging it outside the failed fiber. */
+const defectResponse = (
+	runtime: { readonly runPromise: (e: Effect.Effect<void>) => Promise<void> },
+	message: string,
+	error: unknown,
+): Response => {
+	void runtime.runPromise(Effect.logError(message, error));
+	return new Response("Internal Server Error", {
+		status: HTTP_INTERNAL_SERVER_ERROR,
+	});
+};
+
 const program = Effect.gen(function* () {
 	const {
 		server: { port, host },
@@ -38,18 +50,15 @@ const program = Effect.gen(function* () {
 				info.remoteAddr.transport === "tcp"
 					? info.remoteAddr.hostname
 					: undefined;
-			return runtime
-				.runPromise(handleRequest(req, clientAddress))
-				.catch((error) => {
+			return (
+				runtime
+					.runPromise(handleRequest(req, clientAddress))
 					// Safety net: handleRequest is typed as never-failing, so this only
 					// fires on defects (bugs in Effect itself, OOM, etc.)
-					void runtime
-						.runPromise(Effect.logError("unhandled request defect", error))
-						.catch(() => undefined);
-					return new Response("Internal Server Error", {
-						status: HTTP_INTERNAL_SERVER_ERROR,
-					});
-				});
+					.catch((error) =>
+						defectResponse(runtime, "unhandled request defect", error),
+					)
+			);
 		},
 	);
 
@@ -62,14 +71,9 @@ const program = Effect.gen(function* () {
 		Deno.serve({ port: metrics.port, hostname: host }, (req) =>
 			runtime
 				.runPromise(metricsHandler(req, new URL(req.url)))
-				.catch((error) => {
-					void runtime
-						.runPromise(Effect.logError("metrics endpoint defect", error))
-						.catch(() => undefined);
-					return new Response("Internal Server Error", {
-						status: HTTP_INTERNAL_SERVER_ERROR,
-					});
-				}),
+				.catch((error) =>
+					defectResponse(runtime, "metrics endpoint defect", error),
+				),
 		);
 		yield* Effect.log(`shuriken-ts metrics on :${metrics.port}/metrics`);
 	}

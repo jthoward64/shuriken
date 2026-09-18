@@ -1,4 +1,5 @@
 import { defineRelations } from "drizzle-orm";
+// biome-ignore lint/performance/noNamespaceImport: defineRelations takes the whole schema module
 import * as schema from "./schema.ts";
 
 // ---------------------------------------------------------------------------

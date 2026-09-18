@@ -311,7 +311,9 @@ describe("InstanceRepository.listByCollection (integration)", () => {
 			}).pipe(Effect.provide(layer), Effect.orDie),
 		);
 		expect(result).toHaveLength(2);
-		const slugs = [...result].map((i) => i.slug).sort();
+		const slugs = [...result]
+			.map((i) => i.slug)
+			.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 		expect(slugs).toEqual(["a.ics", "b.ics"]);
 	});
 

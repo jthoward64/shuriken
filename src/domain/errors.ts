@@ -1,3 +1,4 @@
+// biome-ignore-all lint/style/noExcessiveClassesPerFile: grouping one domain's Data.TaggedError classes is the point of the file
 import { Cause, Data, Effect, Option } from "effect";
 import {
 	HTTP_BAD_REQUEST,

@@ -1,3 +1,4 @@
+// biome-ignore-all lint/performance/noBarrelFile: the @ts-types directive must stay attached to this one re-export
 // Typed re-export of sanitize-html.
 //
 // The package ships no types of its own, so the import needs a `@ts-types`

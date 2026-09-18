@@ -1,4 +1,4 @@
-import path from "node:path";
+import { isAbsolute, relative, resolve } from "@std/path";
 import { Effect } from "effect";
 import { AppConfigService } from "#src/config.ts";
 import type { InternalError } from "#src/domain/errors.ts";
@@ -34,11 +34,11 @@ export const staticHandler = (
 		// Resolve-then-check-the-relative-path is the actual traversal guard here —
 		// robust to how `absPath` is joined, unlike a substring check on `relPath`
 		// (which would silently stop guarding anything if this were ever changed
-		// from `path.join` to `path.resolve`, since `..` segments could then escape
+		// from `join` to `resolve`, since `..` segments could then escape
 		// the asset root before ever being substring-matched).
-		const absPath = path.resolve(staticDir, relPath);
-		const relToStatic = path.relative(staticDir, absPath);
-		if (relToStatic.startsWith("..") || path.isAbsolute(relToStatic)) {
+		const absPath = resolve(staticDir, relPath);
+		const relToStatic = relative(staticDir, absPath);
+		if (relToStatic.startsWith("..") || isAbsolute(relToStatic)) {
 			return new Response(null, { status: 404 });
 		}
 

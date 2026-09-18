@@ -230,7 +230,7 @@ export const SubscriptionsNewPage = ({
 					<h2 class="mb-3 font-semibold text-fg text-sm">Holiday presets</h2>
 					<ul class="grid gap-1 sm:grid-cols-2">
 						{presets.map((p) => (
-							<li>
+							<li key={p.id}>
 								<a
 									href={`/ui/subscriptions/new?preset=${p.id}`}
 									class="block rounded-md px-2 py-1.5 text-muted text-sm transition-colors hover:bg-surface-2 hover:text-fg"

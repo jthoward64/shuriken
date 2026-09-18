@@ -1,3 +1,4 @@
+// biome-ignore-all lint/performance/noBarrelFile: BUSY_SUMMARY is re-exported so both share surfaces read it from here
 import type { FieldVisibility } from "#src/data/icalendar/visibility.ts";
 import type { ShareLinkVisibility } from "#src/db/drizzle/schema/index.ts";
 

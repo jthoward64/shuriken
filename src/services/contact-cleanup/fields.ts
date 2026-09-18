@@ -1,3 +1,4 @@
+// biome-ignore-all lint/performance/noBarrelFile: the vcard prop helpers are re-exported so cleanup callers keep one import path
 import type { IrProperty } from "#src/data/ir.ts";
 import { baseName } from "#src/data/vcard/prop.ts";
 

@@ -1,5 +1,4 @@
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname, fromFileUrl, join, resolve } from "@std/path";
 import { Option } from "effect";
 import type { AppConfigType } from "#src/config.ts";
 
@@ -15,18 +14,15 @@ import type { AppConfigType } from "#src/config.ts";
 // override in one place instead of at each asset call site.
 // ---------------------------------------------------------------------------
 
-const DERIVED_ROOT = path.resolve(
-	path.dirname(fileURLToPath(import.meta.url)),
-	"static",
-);
+const DERIVED_ROOT = resolve(dirname(fromFileUrl(import.meta.url)), "static");
 
 /** Absolute path to the UI static asset directory. */
 export const uiAssetRoot = (config: AppConfigType): string =>
 	Option.match(config.ui.assetRoot, {
-		onSome: (root) => path.resolve(root),
+		onSome: (root) => resolve(root),
 		onNone: () => DERIVED_ROOT,
 	});
 
 /** Absolute path to `name` within the UI static asset directory. */
 export const uiAssetPath = (config: AppConfigType, name: string): string =>
-	path.join(uiAssetRoot(config), name);
+	join(uiAssetRoot(config), name);

@@ -66,7 +66,7 @@ const extractPairs = (body: string): Array<[string, string]> => {
 			currentSummary = line.slice(8);
 		}
 	}
-	return pairs.sort();
+	return pairs.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 };
 
 describe("import → export round-trip (integration)", () => {

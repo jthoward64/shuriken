@@ -93,7 +93,7 @@ const canonParams = (segs: ReadonlyArray<string>): string => {
 		params.push(`TYPE=${[...typeTokens].sort().join(",")}`);
 	}
 	params.push(...other);
-	return params.sort().join(";");
+	return params.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)).join(";");
 };
 
 const parseLine = (line: string): ParsedLine => {
@@ -124,13 +124,16 @@ const normalize = (text: string): Array<string> => {
 	}
 	const sig = new Map<string, string>();
 	for (const [g, bodies] of groupBodies) {
-		sig.set(g, [...bodies].sort().join("¦"));
+		sig.set(
+			g,
+			[...bodies].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)).join("¦"),
+		);
 	}
 	return parsed
 		.map(({ group, body }) =>
 			group === "" ? `·${body}` : `G[${sig.get(group)}]·${body}`,
 		)
-		.sort();
+		.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 };
 
 const expectEquivalent = (a: string, b: string): void => {

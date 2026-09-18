@@ -92,7 +92,10 @@ export const AppPasswordsPage = ({
 			{appPasswords.length > 0 ? (
 				<ul class="divide-y divide-line">
 					{appPasswords.map((ap) => (
-						<li class="flex items-center justify-between gap-4 px-5 py-3.5">
+						<li
+							key={ap.id}
+							class="flex items-center justify-between gap-4 px-5 py-3.5"
+						>
 							<div class="min-w-0">
 								<p class="truncate font-medium text-fg text-sm">
 									{ap.label ? (

@@ -1,4 +1,5 @@
 import { Effect, Layer, Option, Redacted, SynchronizedRef } from "effect";
+// biome-ignore lint/performance/noNamespaceImport: openid-client is used as a protocol namespace across a dozen calls
 import * as client from "openid-client";
 import { AppConfigService } from "#src/config.ts";
 import { OidcError } from "#src/services/oidc/error.ts";
