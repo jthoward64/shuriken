@@ -137,20 +137,15 @@ export const buildMultistatus = (
 		};
 	});
 
-	const multistatusObj =
-		xmlResponses.length === 1
-			? { "D:response": xmlResponses[0] }
-			: { "D:response": xmlResponses };
-
-	const root = {
+	const nsDeclarations = ns.declarations();
+	return buildXml({
 		"D:multistatus": {
-			...ns.declarations(),
-			...multistatusObj,
+			...nsDeclarations,
+			// Multiple responses → array; single → unwrap for compactness
+			"D:response": xmlResponses.length === 1 ? xmlResponses[0] : xmlResponses,
 			...(syncToken !== undefined ? { "D:sync-token": syncToken } : {}),
 		},
-	};
-
-	return buildXml(root);
+	});
 };
 
 /**

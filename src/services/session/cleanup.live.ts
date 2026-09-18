@@ -11,21 +11,21 @@ import { SessionRepository } from "#src/services/session/repository.ts";
 
 const CLEANUP_INTERVAL_HOURS = 1;
 
+/** One sweep: drop expired sessions and abandoned pending OIDC logins */
+const sweep = Effect.fn("scheduler.session-cleanup.sweep")(function* () {
+	const sessions = yield* SessionRepository;
+	const logins = yield* OidcLoginRepository;
+	const now = Temporal.Now.instant();
+	yield* sessions.deleteExpired(now);
+	yield* logins.deleteExpired(now);
+});
+
 export const SessionCleanupLayer = Layer.effectDiscard(
 	Effect.gen(function* () {
-		const sessions = yield* SessionRepository;
-		const logins = yield* OidcLoginRepository;
-
-		const sweep = Effect.gen(function* () {
-			const now = Temporal.Now.instant();
-			yield* sessions.deleteExpired(now);
-			yield* logins.deleteExpired(now);
-		});
-
 		yield* Effect.logInfo("scheduler.session-cleanup: starting sweep fiber", {
 			intervalHours: CLEANUP_INTERVAL_HOURS,
 		});
-		yield* sweep.pipe(
+		yield* sweep().pipe(
 			Effect.catchCause((cause) =>
 				Effect.logWarning("scheduler.session-cleanup: tick failed", { cause }),
 			),

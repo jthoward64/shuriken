@@ -1,6 +1,13 @@
 import { expect } from "@std/expect";
 import { beforeAll, describe, it } from "@std/testing/bdd";
-import { Effect, Layer, Option, Redacted } from "effect";
+import {
+	Effect,
+	Layer,
+	ManagedRuntime,
+	Option,
+	Redacted,
+	References,
+} from "effect";
 import { authenticateBasic } from "#src/auth/layers/basic.ts";
 import { UserId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
@@ -11,7 +18,6 @@ import { AppPasswordServiceLive } from "#src/services/app-password/service.live.
 import { AppPasswordService } from "#src/services/app-password/service.ts";
 import { UserRepositoryLive } from "#src/services/user/repository.live.ts";
 import { UserRepository } from "#src/services/user/repository.ts";
-import { runSuccess } from "#src/testing/effect.ts";
 import { makePgliteDatabaseLayer } from "#src/testing/pglite.ts";
 
 // ---------------------------------------------------------------------------
@@ -30,13 +36,9 @@ const basicHeaders = (username: string, password: string): Headers => {
 
 const makeLayer = () => {
 	const infra = Layer.mergeAll(makePgliteDatabaseLayer(), CryptoServiceLive);
+	const appPasswordRepo = AppPasswordRepositoryLive.pipe(Layer.provide(infra));
 	const appPasswords = AppPasswordServiceLive.pipe(
-		Layer.provide(
-			Layer.mergeAll(
-				infra,
-				AppPasswordRepositoryLive.pipe(Layer.provide(infra)),
-			),
-		),
+		Layer.provide(Layer.mergeAll(infra, appPasswordRepo)),
 	);
 	return Layer.mergeAll(
 		infra,
@@ -45,15 +47,17 @@ const makeLayer = () => {
 	);
 };
 
+const makeRuntime = () => ManagedRuntime.make(makeLayer());
+
 describe("app-password Basic auth (integration)", () => {
-	let layer: ReturnType<typeof makeLayer>;
+	let runtime: ReturnType<typeof makeRuntime>;
 
 	beforeAll(() => {
-		layer = makeLayer();
+		runtime = makeRuntime();
 	});
 
 	it("authenticates by slug or generated username, rejects a wrong password", async () => {
-		const result = await runSuccess(
+		const result = await runtime.runPromise(
 			Effect.gen(function* () {
 				const users = yield* UserRepository;
 				const created = yield* users.create({
@@ -79,7 +83,10 @@ describe("app-password Basic auth (integration)", () => {
 				);
 
 				return { userId, bySlug, byUsername, wrong };
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(
+				Effect.orDie,
+				Effect.provideService(References.MinimumLogLevel, "None"),
+			),
 		);
 
 		expect(result.bySlug._tag).toBe("Authenticated");

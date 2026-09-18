@@ -9,6 +9,7 @@ import {
 	preconditionFailed,
 	unauthorized,
 } from "#src/domain/errors.ts";
+import type { CollectionId, PrincipalId } from "#src/domain/ids.ts";
 import { EntityId } from "#src/domain/ids.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
@@ -31,6 +32,7 @@ import {
 	type InstanceRepository,
 	InstanceService,
 } from "#src/services/instance/index.ts";
+import type { InstanceRow } from "#src/services/instance/repository.ts";
 import { SchedulingService } from "#src/services/scheduling/index.ts";
 import { deleteCollection, deleteInstance } from "./copy-move.ts";
 
@@ -92,99 +94,130 @@ export const deleteHandler = (
 			return yield* forbidden("DAV:need-privileges");
 		}
 
-		const acl = yield* AclService;
-
-		if (path.kind === "instance") {
-			// ACL: unbind from the parent collection.
-			yield* acl.check(
-				principal.principalId,
-				path.collectionId,
-				"collection",
-				"DAV:unbind",
-			);
-
-			// Fetch instance to get entityId (findById returns 404 if not found).
-			const instanceSvc = yield* InstanceService;
-			const instance = yield* instanceSvc.findById(path.instanceId);
-
-			// RFC 7232 §3.1: If-Match must match the current ETag.
-			const ifMatch = ctx.headers.get("If-Match");
-			if (ifMatch !== null && ifMatch !== "*" && ifMatch !== instance.etag) {
-				return yield* preconditionFailed();
-			}
-
-			// RFC 6638: process scheduling before deletion (sends CANCEL or REPLY DECLINED).
-			if (instance.contentType === "text/calendar") {
-				const componentRepo = yield* ComponentRepository;
-				const treeOpt = yield* componentRepo.loadTree(
-					EntityId(instance.entityId),
-					"icalendar",
-				);
-				if (Option.isSome(treeOpt)) {
-					const schedulingSvc = yield* SchedulingService;
-					yield* Effect.ignore(
-						schedulingSvc.processAfterDelete({
-							actingPrincipalId: principal.principalId,
-							doc: { kind: "icalendar", root: treeOpt.value },
-							suppressReply: ctx.headers.get("Schedule-Reply") === "no",
-						}),
-					);
-				}
-			}
-
-			yield* deleteInstance(instance);
-
-			if (instance.contentType === "text/vcard") {
-				yield* fireAndForgetBirthdayRegenerate(path.collectionId);
-			}
-
-			return new Response(null, { status: HTTP_NO_CONTENT });
-		}
-
-		// path.kind === "collection"
-		// ACL: unbind from the owner principal's namespace.
-		yield* acl.check(
-			principal.principalId,
-			path.principalId,
-			"principal",
-			"DAV:unbind",
-		);
-
-		// Verify the collection exists (returns 404 via service if not found).
-		const collectionSvc = yield* CollectionService;
-		const collRow = yield* collectionSvc.findById(path.collectionId);
-
-		// RFC 6638: inbox and outbox are server-managed; clients must not delete them.
-		if (
-			collRow.collectionType === "inbox" ||
-			collRow.collectionType === "outbox"
-		) {
-			return yield* forbidden();
-		}
-
-		// External-subscription cleanup: when the user DELETEs a subscribed
-		// collection, also drop the claim. If that was the last claim on the
-		// shared external_calendar row, soft-delete it so the scheduler stops
-		// polling. Done before deleting the collection itself because the FK
-		// (claim.collection_id) is ON DELETE CASCADE — but we still want to
-		// recompute the external_calendar's sync interval / GC the parent row.
-		const extRepo = yield* ExternalCalendarRepository;
-		const claimOpt = yield* extRepo.findClaimByCollection(path.collectionId);
-		if (Option.isSome(claimOpt)) {
-			const claim = claimOpt.value;
-			yield* extRepo.deleteClaim(claim.id);
-			const remaining = yield* extRepo.countClaimsForExternal(
-				claim.externalCalendarId,
-			);
-			if (remaining === 0) {
-				yield* extRepo.softDelete(claim.externalCalendarId);
-			} else {
-				yield* extRepo.recomputeSyncInterval(claim.externalCalendarId);
-			}
-		}
-
-		// Delete all active instances then the collection (RFC 4918 §9.6.1).
-		yield* deleteCollection(path.collectionId);
-
-		return new Response(null, { status: HTTP_NO_CONTENT });
+		return path.kind === "instance"
+			? yield* deleteInstanceResource(path, ctx, principal.principalId)
+			: yield* deleteCollectionResource(path, principal.principalId);
 	});
+
+// ---------------------------------------------------------------------------
+// Instance DELETE
+// ---------------------------------------------------------------------------
+
+/**
+ * RFC 6638: process scheduling before deletion, which sends a CANCEL to the
+ * attendees of an organised event or a REPLY DECLINED to its organiser.
+ */
+const scheduleBeforeDelete = Effect.fn("dav.delete.schedule")(function* (
+	instance: InstanceRow,
+	actingPrincipalId: PrincipalId,
+	suppressReply: boolean,
+) {
+	const componentRepo = yield* ComponentRepository;
+	const treeOpt = yield* componentRepo.loadTree(
+		EntityId(instance.entityId),
+		"icalendar",
+	);
+	if (Option.isNone(treeOpt)) {
+		return;
+	}
+	const schedulingSvc = yield* SchedulingService;
+	yield* Effect.ignore(
+		schedulingSvc.processAfterDelete({
+			actingPrincipalId,
+			doc: { kind: "icalendar", root: treeOpt.value },
+			suppressReply,
+		}),
+	);
+});
+
+const deleteInstanceResource = Effect.fn("dav.delete.instance")(function* (
+	path: Extract<ResolvedDavPath, { kind: "instance" }>,
+	ctx: HttpRequestContext,
+	principalId: PrincipalId,
+) {
+	// ACL: unbind from the parent collection.
+	const acl = yield* AclService;
+	yield* acl.check(principalId, path.collectionId, "collection", "DAV:unbind");
+
+	// Fetch instance to get entityId (findById returns 404 if not found).
+	const instanceSvc = yield* InstanceService;
+	const instance = yield* instanceSvc.findById(path.instanceId);
+
+	// RFC 7232 §3.1: If-Match must match the current ETag.
+	const ifMatch = ctx.headers.get("If-Match");
+	if (ifMatch !== null && ifMatch !== "*" && ifMatch !== instance.etag) {
+		return yield* preconditionFailed();
+	}
+
+	if (instance.contentType === "text/calendar") {
+		yield* scheduleBeforeDelete(
+			instance,
+			principalId,
+			ctx.headers.get("Schedule-Reply") === "no",
+		);
+	}
+
+	yield* deleteInstance(instance);
+
+	if (instance.contentType === "text/vcard") {
+		yield* fireAndForgetBirthdayRegenerate(path.collectionId);
+	}
+
+	return new Response(null, { status: HTTP_NO_CONTENT });
+});
+
+// ---------------------------------------------------------------------------
+// Collection DELETE
+// ---------------------------------------------------------------------------
+
+/**
+ * Drops the subscription claim when a subscribed collection is deleted. If that
+ * was the last claim on the shared external_calendar row, soft-delete it so the
+ * scheduler stops polling; otherwise recompute its sync interval. Done before
+ * deleting the collection because claim.collection_id is ON DELETE CASCADE.
+ */
+const releaseExternalClaim = Effect.fn("dav.delete.externalClaim")(function* (
+	collectionId: CollectionId,
+) {
+	const extRepo = yield* ExternalCalendarRepository;
+	const claimOpt = yield* extRepo.findClaimByCollection(collectionId);
+	if (Option.isNone(claimOpt)) {
+		return;
+	}
+	const claim = claimOpt.value;
+	yield* extRepo.deleteClaim(claim.id);
+	const remaining = yield* extRepo.countClaimsForExternal(
+		claim.externalCalendarId,
+	);
+	yield* remaining === 0
+		? extRepo.softDelete(claim.externalCalendarId)
+		: extRepo.recomputeSyncInterval(claim.externalCalendarId);
+});
+
+const deleteCollectionResource = Effect.fn("dav.delete.collection")(function* (
+	path: Extract<ResolvedDavPath, { kind: "collection" }>,
+	principalId: PrincipalId,
+) {
+	// ACL: unbind from the owner principal's namespace.
+	const acl = yield* AclService;
+	yield* acl.check(principalId, path.principalId, "principal", "DAV:unbind");
+
+	// Verify the collection exists (returns 404 via service if not found).
+	const collectionSvc = yield* CollectionService;
+	const collRow = yield* collectionSvc.findById(path.collectionId);
+
+	// RFC 6638: inbox and outbox are server-managed; clients must not delete them.
+	if (
+		collRow.collectionType === "inbox" ||
+		collRow.collectionType === "outbox"
+	) {
+		return yield* forbidden();
+	}
+
+	yield* releaseExternalClaim(path.collectionId);
+
+	// Delete all active instances then the collection (RFC 4918 §9.6.1).
+	yield* deleteCollection(path.collectionId);
+
+	return new Response(null, { status: HTTP_NO_CONTENT });
+});

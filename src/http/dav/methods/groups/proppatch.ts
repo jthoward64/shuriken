@@ -8,6 +8,11 @@ import {
 	SHURIKEN_NS,
 } from "#src/domain/virtual-resources.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
+import {
+	isXmlNode,
+	xmlPath,
+	xmlText,
+} from "#src/http/dav/methods/xml-node.ts";
 import { normalizeClarkNames } from "#src/http/dav/xml/clark.ts";
 import { parseXml, readXmlBody } from "#src/http/dav/xml/parser.ts";
 import { HTTP_NO_CONTENT } from "#src/http/status.ts";
@@ -28,89 +33,95 @@ interface ProppatchUpdates {
 	readonly memberHrefs: ReadonlyArray<string> | undefined;
 }
 
-const extractUpdates = (tree: unknown): ProppatchUpdates => {
-	const empty: ProppatchUpdates = {
-		displayName: undefined,
-		memberHrefs: undefined,
-	};
-	if (typeof tree !== "object" || tree === null) {
-		return empty;
-	}
-	const root = tree as Record<string, unknown>;
-	const update = root[`{${DAV_NS}}propertyupdate`] as
-		| Record<string, unknown>
-		| undefined;
-	if (typeof update !== "object" || update === null) {
-		return empty;
-	}
-	const set = update[`{${DAV_NS}}set`] as Record<string, unknown> | undefined;
-	if (typeof set !== "object" || set === null) {
-		return empty;
-	}
-	const prop = set[`{${DAV_NS}}prop`] as Record<string, unknown> | undefined;
-	if (typeof prop !== "object" || prop === null) {
-		return empty;
-	}
-
-	const displayName =
-		typeof prop[`{${DAV_NS}}displayname`] === "string"
-			? (prop[`{${DAV_NS}}displayname`] as string)
-			: typeof prop[`{${SHURIKEN_NS}}displayname`] === "string"
-				? (prop[`{${SHURIKEN_NS}}displayname`] as string)
-				: undefined;
-
-	// DAV:group-member-set contains one or more DAV:href children
-	let memberHrefs: ReadonlyArray<string> | undefined;
-	const memberSetEl = prop[`{${DAV_NS}}group-member-set`];
-	if (typeof memberSetEl === "object" && memberSetEl !== null) {
-		const ms = memberSetEl as Record<string, unknown>;
-		const href = ms[`{${DAV_NS}}href`];
-		if (typeof href === "string") {
-			memberHrefs = [href];
-		} else if (Array.isArray(href)) {
-			memberHrefs = href.filter((h): h is string => typeof h === "string");
-		} else {
-			// group-member-set present but empty
-			memberHrefs = [];
-		}
-	} else if (memberSetEl === "") {
-		// Explicit empty string means clear all members
-		memberHrefs = [];
-	}
-
-	return { displayName, memberHrefs };
+const NO_UPDATES: ProppatchUpdates = {
+	displayName: undefined,
+	memberHrefs: undefined,
 };
+
+/**
+ * Reads the hrefs of a `DAV:group-member-set`. An absent element leaves
+ * membership untouched (undefined); a present but childless one clears it.
+ */
+const extractMemberHrefs = (
+	prop: Record<string, unknown>,
+): ReadonlyArray<string> | undefined => {
+	const memberSetEl = prop[`{${DAV_NS}}group-member-set`];
+	if (memberSetEl === "") {
+		return [];
+	}
+	if (!isXmlNode(memberSetEl)) {
+		return undefined;
+	}
+	const href = memberSetEl[`{${DAV_NS}}href`];
+	if (typeof href === "string") {
+		return [href];
+	}
+	return Array.isArray(href)
+		? href.filter((h): h is string => typeof h === "string")
+		: [];
+};
+
+const extractUpdates = (tree: unknown): ProppatchUpdates => {
+	const prop = xmlPath(
+		tree,
+		`{${DAV_NS}}propertyupdate`,
+		`{${DAV_NS}}set`,
+		`{${DAV_NS}}prop`,
+	);
+	if (prop === undefined) {
+		return NO_UPDATES;
+	}
+	// The shuriken-namespaced name is accepted as a fallback for older clients
+	return {
+		displayName:
+			xmlText(prop, `{${DAV_NS}}displayname`) ??
+			xmlText(prop, `{${SHURIKEN_NS}}displayname`),
+		memberHrefs: extractMemberHrefs(prop),
+	};
+};
+
+// Malformed XML is treated as an empty body rather than a hard failure
+const parseUpdates = (body: string): Effect.Effect<ProppatchUpdates> =>
+	parseXml(body).pipe(
+		Effect.map((parsed) => extractUpdates(normalizeClarkNames(parsed))),
+		Effect.catchTag("XmlParseError", () => Effect.succeed(NO_UPDATES)),
+	);
 
 const parseBody = (req: Request): Effect.Effect<ProppatchUpdates, DavError> =>
 	readXmlBody(req).pipe(
-		Effect.flatMap((body) => {
-			if (body.trim() === "") {
-				return Effect.succeed({
-					displayName: undefined,
-					memberHrefs: undefined,
-				} satisfies ProppatchUpdates);
-			}
-			return parseXml(body).pipe(
-				Effect.map((parsed) => extractUpdates(normalizeClarkNames(parsed))),
-				Effect.catchTag("XmlParseError", () =>
-					Effect.succeed({
-						displayName: undefined,
-						memberHrefs: undefined,
-					} satisfies ProppatchUpdates),
-				),
-			);
-		}),
+		Effect.flatMap((body) =>
+			body.trim() === "" ? Effect.succeed(NO_UPDATES) : parseUpdates(body),
+		),
 	);
 
 // ---------------------------------------------------------------------------
 // Href → slug extraction
 // ---------------------------------------------------------------------------
 
-/** Extracts the user slug from a /dav/users/:slug/ href, returning null if unrecognised. */
-const slugFromUserHref = (href: string): string | null => {
-	const match = USER_HREF.exec(href);
-	return match?.[1] ?? null;
-};
+/** Extracts the user slug from a /dav/users/:slug/ href */
+const slugFromUserHref = (href: string): Option.Option<string> =>
+	Option.fromUndefinedOr(USER_HREF.exec(href)?.[1]);
+
+/** Resolves member hrefs to user ids, silently dropping ones that name no user */
+const resolveMemberIds = (
+	hrefs: ReadonlyArray<string>,
+): Effect.Effect<ReadonlyArray<UserId>, DatabaseError, UserService> =>
+	Effect.gen(function* () {
+		const userSvc = yield* UserService;
+		const userIds: Array<UserId> = [];
+		for (const href of hrefs) {
+			const slug = slugFromUserHref(href);
+			if (Option.isNone(slug)) {
+				continue;
+			}
+			const found = yield* userSvc.findBySlug(slug.value as Slug).pipe(
+				Effect.map(Option.some),
+				Effect.catchTag("DavError", () => Effect.succeed(Option.none())),
+			);
+			Option.map(found, (f) => userIds.push(f.user.id as UserId));
+		}
+		return userIds;
+	});
 
 // ---------------------------------------------------------------------------
 // Handler
@@ -163,20 +174,7 @@ export const groupProppatchHandler = (
 		}
 
 		if (memberHrefs !== undefined) {
-			const userSvc = yield* UserService;
-			const userIds: Array<UserId> = [];
-			for (const href of memberHrefs) {
-				const slug = slugFromUserHref(href);
-				if (slug !== null) {
-					const found = yield* userSvc.findBySlug(slug as Slug).pipe(
-						Effect.map(Option.some),
-						Effect.catchTag("DavError", () => Effect.succeed(Option.none())),
-					);
-					if (Option.isSome(found)) {
-						userIds.push(found.value.user.id as UserId);
-					}
-				}
-			}
+			const userIds = yield* resolveMemberIds(memberHrefs);
 			yield* groupSvc.setMembers(path.groupId, userIds);
 		}
 

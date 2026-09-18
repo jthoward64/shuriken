@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import { encodeICalendar } from "#src/data/icalendar/codec.ts";
 import { normalizeRruleUntil } from "#src/data/icalendar/recurrence/recurrence-check.ts";
 import {
@@ -282,24 +282,24 @@ export const extractAttendeeAddresses = (
 };
 
 // Extract the ORGANIZER address from a VEVENT (CAL-ADDRESS / mailto: …),
-// normalized to lowercase with any "mailto:" prefix stripped. Returns null if
-// the property is absent.
-export const extractOrganizerAddress = (vevent: IrComponent): string | null => {
+// normalized to lowercase with any "mailto:" prefix stripped.
+export const extractOrganizerAddress = (
+	vevent: IrComponent,
+): Option.Option<string> => {
 	const p = vevent.properties.find((pp) => pp.name === "ORGANIZER");
-	if (!p) {
-		return null;
-	}
 	const raw =
-		p.value.type === "URI" || p.value.type === "TEXT"
+		p?.value.type === "URI" ||
+		p?.value.type === "TEXT" ||
+		p?.value.type === "CAL_ADDRESS"
 			? p.value.value
-			: p.value.type === "CAL_ADDRESS"
-				? p.value.value
-				: "";
+			: "";
 	if (raw === "") {
-		return null;
+		return Option.none();
 	}
 	const lower = raw.toLowerCase();
-	return lower.startsWith("mailto:") ? lower.slice("mailto:".length) : lower;
+	return Option.some(
+		lower.startsWith("mailto:") ? lower.slice("mailto:".length) : lower,
+	);
 };
 
 // True iff `address` looks like one of `localDomains`.

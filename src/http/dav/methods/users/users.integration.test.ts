@@ -32,6 +32,7 @@ const mkuser = (
 	slug: string,
 	as: string,
 	body?: string,
+	expectStatus = 201,
 ): {
 	name: string;
 	method: "MKCOL";
@@ -47,7 +48,7 @@ const mkuser = (
 	as,
 	headers: { "Content-Type": "application/xml; charset=utf-8" },
 	body: body ?? mkuserWithProps(slug, undefined, `${slug}@example.com`),
-	expect: { status: 201 },
+	expect: { status: expectStatus },
 });
 
 const mkuserWithProps = (_slug: string, displayName?: string, email?: string) =>
@@ -325,10 +326,7 @@ describe("MKCOL /dav/users/:slug", () => {
 		const results = await runScript(
 			[
 				mkuser("dup-user", "admin"),
-				{
-					...mkuser("dup-user", "admin"),
-					expect: { status: 405 },
-				},
+				mkuser("dup-user", "admin", undefined, 405),
 			],
 			singleAdminUser(),
 		);

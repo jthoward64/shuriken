@@ -59,13 +59,8 @@ const FREE_BUSY_QUERY = `{${CALDAV_NS}}free-busy-query`;
 const ADDRESSBOOK_MULTIGET = `{${CARDDAV_NS}}addressbook-multiget`;
 const ADDRESSBOOK_QUERY = `{${CARDDAV_NS}}addressbook-query`;
 
-export const reportHandler = (
-	path: ResolvedDavPath,
-	ctx: HttpRequestContext,
-	req: Request,
-): Effect.Effect<
-	Response,
-	DavError | DatabaseError,
+// Every service any REPORT sub-handler can reach for
+type ReportServices =
 	| CollectionService
 	| InstanceService
 	| InstanceRepository
@@ -77,40 +72,42 @@ export const reportHandler = (
 	| IanaTimezoneService
 	| PrincipalRepository
 	| AclService
-	| AppConfigService
-> =>
+	| AppConfigService;
+
+// Report document root (Clark name) → the sub-handler that answers it. Every
+// sub-handler takes the parsed request tree and answers a Response.
+const REPORT_HANDLERS: Record<
+	string,
+	| ((
+			path: ResolvedDavPath,
+			ctx: HttpRequestContext,
+			tree: unknown,
+	  ) => Effect.Effect<Response, DavError | DatabaseError, ReportServices>)
+	| undefined
+> = {
+	[SYNC_COLLECTION]: syncCollectionHandler,
+	[PRINCIPAL_MATCH]: principalMatchHandler,
+	[PRINCIPAL_PROPERTY_SEARCH]: principalPropertySearchHandler,
+	[CALENDAR_MULTIGET]: calendarMultigetHandler,
+	[CALENDAR_QUERY]: calendarQueryHandler,
+	[FREE_BUSY_QUERY]: freeBusyQueryHandler,
+	[ADDRESSBOOK_MULTIGET]: addressbookMultigetHandler,
+	[ADDRESSBOOK_QUERY]: addressbookQueryHandler,
+};
+
+export const reportHandler = (
+	path: ResolvedDavPath,
+	ctx: HttpRequestContext,
+	req: Request,
+): Effect.Effect<Response, DavError | DatabaseError, ReportServices> =>
 	Effect.gen(function* () {
 		const { type, tree } = yield* parseReportBody(req);
-
-		switch (type) {
-			case SYNC_COLLECTION:
-				return yield* syncCollectionHandler(path, ctx, tree);
-
-			case PRINCIPAL_MATCH:
-				return yield* principalMatchHandler(path, ctx, tree);
-
-			case PRINCIPAL_PROPERTY_SEARCH:
-				return yield* principalPropertySearchHandler(path, ctx, tree);
-
-			case CALENDAR_MULTIGET:
-				return yield* calendarMultigetHandler(path, ctx, tree);
-
-			case CALENDAR_QUERY:
-				return yield* calendarQueryHandler(path, ctx, tree);
-
-			case FREE_BUSY_QUERY:
-				return yield* freeBusyQueryHandler(path, ctx, tree);
-
-			case ADDRESSBOOK_MULTIGET:
-				return yield* addressbookMultigetHandler(path, ctx, tree);
-
-			case ADDRESSBOOK_QUERY:
-				return yield* addressbookQueryHandler(path, ctx, tree);
-
-			default:
-				return yield* forbidden(
-					"DAV:supported-report",
-					`Unsupported REPORT type: ${type}`,
-				);
+		const handler = REPORT_HANDLERS[type];
+		if (handler === undefined) {
+			return yield* forbidden(
+				"DAV:supported-report",
+				`Unsupported REPORT type: ${type}`,
+			);
 		}
+		return yield* handler(path, ctx, tree);
 	});

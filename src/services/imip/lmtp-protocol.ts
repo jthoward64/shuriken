@@ -139,11 +139,26 @@ export const initialState: LmtpState = { tag: "Greet" };
 export const greeting = (hostname: string): LmtpReply =>
 	ok(220, `${hostname} shuriken LMTP ready`);
 
-export const apply = (
+/** Session-level verbs, answerable from any state (RFC 2033 §4) */
+type SessionCommand = Extract<
+	LmtpCommand,
+	{ tag: "Quit" | "Noop" | "Rset" | "Bad" | "Lhlo" }
+>;
+
+/** Envelope verbs that build up a transaction (RFC 2033 §4.2) */
+type EnvelopeCommand = Extract<
+	LmtpCommand,
+	{ tag: "MailFrom" | "RcptTo" | "DataStart" }
+>;
+
+/** The verbs seen while the DATA phase is running */
+type DataCommand = Extract<LmtpCommand, { tag: "DataLine" | "DataEnd" }>;
+
+/** QUIT/NOOP/RSET/LHLO and unrecognised input, none of which inspect the state */
+const applySessionCommand = (
 	state: LmtpState,
-	cmd: LmtpCommand,
+	cmd: SessionCommand,
 	hostname: string,
-	limits: LmtpLimits = DEFAULT_LMTP_LIMITS,
 ): LmtpStep => {
 	if (cmd.tag === "Quit") {
 		return {
@@ -161,12 +176,18 @@ export const apply = (
 	if (cmd.tag === "Bad") {
 		return { state, replies: [ok(500, `Bad command: ${cmd.reason}`)] };
 	}
-	if (cmd.tag === "Lhlo") {
-		return {
-			state: { tag: "Idle" },
-			replies: [ok(250, `${hostname} hello ${cmd.host}`)],
-		};
-	}
+	return {
+		state: { tag: "Idle" },
+		replies: [ok(250, `${hostname} hello ${cmd.host}`)],
+	};
+};
+
+/** MAIL FROM / RCPT TO / DATA - the envelope build-up, ordered per RFC 2033 §4.2 */
+const applyEnvelopeCommand = (
+	state: LmtpState,
+	cmd: EnvelopeCommand,
+	limits: LmtpLimits,
+): LmtpStep => {
 	if (cmd.tag === "MailFrom") {
 		return {
 			state: { tag: "Tx", mailFrom: cmd.addr, recipients: [] },
@@ -185,25 +206,31 @@ export const apply = (
 			replies: [ok(250, "OK")],
 		};
 	}
-	if (cmd.tag === "DataStart") {
-		if (state.tag !== "Tx" || state.recipients.length === 0) {
-			return { state, replies: [ok(503, "RCPT TO first")] };
-		}
-		return {
-			state: {
-				tag: "Data",
-				mailFrom: state.mailFrom,
-				recipients: state.recipients,
-				buffer: "",
-				sizeExceeded: false,
-			},
-			replies: [ok(354, "End data with <CR><LF>.<CR><LF>")],
-		};
+	if (state.tag !== "Tx" || state.recipients.length === 0) {
+		return { state, replies: [ok(503, "RCPT TO first")] };
+	}
+	return {
+		state: {
+			tag: "Data",
+			mailFrom: state.mailFrom,
+			recipients: state.recipients,
+			buffer: "",
+			sizeExceeded: false,
+		},
+		replies: [ok(354, "End data with <CR><LF>.<CR><LF>")],
+	};
+};
+
+/** Message lines and the `<CRLF>.<CRLF>` terminator that starts delivery */
+const applyDataCommand = (
+	state: LmtpState,
+	cmd: DataCommand,
+	limits: LmtpLimits,
+): LmtpStep => {
+	if (state.tag !== "Data") {
+		return { state, replies: [ok(503, "DATA first")] };
 	}
 	if (cmd.tag === "DataLine") {
-		if (state.tag !== "Data") {
-			return { state, replies: [ok(503, "DATA first")] };
-		}
 		if (state.sizeExceeded) {
 			return { state, replies: [] };
 		}
@@ -216,14 +243,7 @@ export const apply = (
 				replies: [],
 			};
 		}
-		return {
-			state: { ...state, buffer: nextBuffer },
-			replies: [],
-		};
-	}
-	// cmd.tag === "DataEnd"
-	if (state.tag !== "Data") {
-		return { state, replies: [ok(503, "DATA first")] };
+		return { state: { ...state, buffer: nextBuffer }, replies: [] };
 	}
 	if (state.sizeExceeded) {
 		return {
@@ -240,6 +260,31 @@ export const apply = (
 			body: state.buffer,
 		},
 	};
+};
+
+export const apply = (
+	state: LmtpState,
+	cmd: LmtpCommand,
+	hostname: string,
+	limits: LmtpLimits = DEFAULT_LMTP_LIMITS,
+): LmtpStep => {
+	if (
+		cmd.tag === "Quit" ||
+		cmd.tag === "Noop" ||
+		cmd.tag === "Rset" ||
+		cmd.tag === "Bad" ||
+		cmd.tag === "Lhlo"
+	) {
+		return applySessionCommand(state, cmd, hostname);
+	}
+	if (
+		cmd.tag === "MailFrom" ||
+		cmd.tag === "RcptTo" ||
+		cmd.tag === "DataStart"
+	) {
+		return applyEnvelopeCommand(state, cmd, limits);
+	}
+	return applyDataCommand(state, cmd, limits);
 };
 
 export const formatReply = (reply: LmtpReply): string =>

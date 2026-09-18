@@ -7,17 +7,22 @@
 // displayName is not set).
 // ---------------------------------------------------------------------------
 
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import type { ClarkName } from "#src/data/ir.ts";
 import { cn } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import { methodNotAllowed, unauthorized } from "#src/domain/errors.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
+import {
+	type PropfindKind,
+	splitPropstats,
+} from "#src/http/dav/methods/instance-props.ts";
 import type { DavResponse } from "#src/http/dav/xml/multistatus.ts";
 import { multistatusResponse } from "#src/http/dav/xml/multistatus.ts";
 import type { AclService } from "#src/services/acl/index.ts";
 import { PrincipalRepository } from "#src/services/principal/index.ts";
+import type { PrincipalWithUser } from "#src/services/principal/repository.ts";
 
 const DAV_NS = "DAV:";
 const CALDAV_NS = "urn:ietf:params:xml:ns:caldav";
@@ -34,6 +39,16 @@ const PRINCIPAL_SEARCH_LIMIT = 1000;
 // Body parsing helpers
 // ---------------------------------------------------------------------------
 
+/** True when an unknown value is a plain (non-null) object */
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+	typeof value === "object" && value !== null;
+
+/** Clark-notation element names inside a `<D:prop>` element */
+const propNamesOf = (propEl: Record<string, unknown>): Array<ClarkName> =>
+	Object.keys(propEl)
+		.filter((k) => !k.startsWith("@_"))
+		.map((k) => k as ClarkName);
+
 interface PropertySearch {
 	readonly propNames: ReadonlyArray<ClarkName>;
 	readonly matchString: string;
@@ -48,24 +63,42 @@ const parsePropertySearches = (
 	const items = Array.isArray(raw) ? raw : raw !== undefined ? [raw] : [];
 
 	return items.flatMap((item) => {
-		if (typeof item !== "object" || item === null) {
+		if (!isRecord(item)) {
 			return [];
 		}
-		const obj = item as Record<string, unknown>;
-		const matchEl = obj[cn(DAV_NS, "match")];
+		const matchEl = item[cn(DAV_NS, "match")];
 		const matchString = typeof matchEl === "string" ? matchEl.trim() : "";
 		if (!matchString) {
 			return [];
 		}
-		const propEl = obj[cn(DAV_NS, "prop")];
-		if (typeof propEl !== "object" || propEl === null) {
-			return [];
-		}
-		const propNames = Object.keys(propEl as Record<string, unknown>)
-			.filter((k) => !k.startsWith("@_"))
-			.map((k) => k as ClarkName);
-		return [{ propNames, matchString }];
+		const propEl = item[cn(DAV_NS, "prop")];
+		return isRecord(propEl)
+			? [{ propNames: propNamesOf(propEl), matchString }]
+			: [];
 	});
+};
+
+/**
+ * The display-name substring to search for.
+ *
+ * RFC 3744 §9.4 expects at least one <property-search>, but the widespread
+ * "list all principals" idiom — python-caldav's search_principals() with no
+ * name filter — sends a criteria-less query to enumerate every principal.
+ * Treat that as a match-all (an empty substring matches every principal).
+ * A query that *does* carry criteria but only for properties we can't search
+ * (anything other than DAV:displayname) yields none, so no matches.
+ */
+const displayNameSearchTerm = (
+	searches: ReadonlyArray<PropertySearch>,
+): Option.Option<string> => {
+	if (searches.length === 0) {
+		return Option.some("");
+	}
+	// Use the first match string (clients typically send one search)
+	const matches = searches
+		.filter((s) => s.propNames.includes(DISPLAYNAME))
+		.map((s) => s.matchString);
+	return matches.length === 0 ? Option.none() : Option.some(matches[0] ?? "");
 };
 
 // ---------------------------------------------------------------------------
@@ -99,49 +132,21 @@ export const principalPropertySearchHandler = (
 
 		const origin = ctx.url.origin;
 
-		const obj =
-			typeof tree === "object" && tree !== null
-				? (tree as Record<string, unknown>)
-				: {};
+		const obj: Record<string, unknown> = isRecord(tree) ? tree : {};
 
 		const searches = parsePropertySearches(obj);
 
-		// Extract requested return prop names
-		const propEl = obj[cn(DAV_NS, "prop")];
-		const requestedProps =
-			typeof propEl === "object" && propEl !== null
-				? new Set<ClarkName>(
-						Object.keys(propEl as Record<string, unknown>)
-							.filter((k) => !k.startsWith("@_"))
-							.map((k) => k as ClarkName),
-					)
-				: null;
+		// Extract requested return prop names; an absent <D:prop> means every one
+		const returnPropEl = obj[cn(DAV_NS, "prop")];
+		const propfind: PropfindKind = isRecord(returnPropEl)
+			? { type: "prop", names: new Set(propNamesOf(returnPropEl)) }
+			: { type: "allprop" };
 
-		// RFC 3744 §9.4 expects at least one <property-search>, but the widespread
-		// "list all principals" idiom — python-caldav's search_principals() with no
-		// name filter — sends a criteria-less query to enumerate every principal.
-		// Treat that as a match-all (an empty substring matches every principal).
-		// A query that *does* carry criteria but only for properties we can't
-		// search (anything other than DAV:displayname) still yields no matches.
 		const principalRepo = yield* PrincipalRepository;
-		const matched = yield* Effect.gen(function* () {
-			if (searches.length === 0) {
-				return yield* principalRepo.searchByDisplayName(
-					"",
-					PRINCIPAL_SEARCH_LIMIT,
-				);
-			}
-			const displayNameMatches = searches
-				.filter((s) => s.propNames.includes(DISPLAYNAME))
-				.map((s) => s.matchString);
-			if (displayNameMatches.length === 0) {
-				return [];
-			}
-			// Use the first match string (clients typically send one search).
-			return yield* principalRepo.searchByDisplayName(
-				displayNameMatches[0] ?? "",
-				PRINCIPAL_SEARCH_LIMIT,
-			);
+		const matched = yield* Option.match(displayNameSearchTerm(searches), {
+			onNone: () => Effect.succeed<ReadonlyArray<PrincipalWithUser>>([]),
+			onSome: (term) =>
+				principalRepo.searchByDisplayName(term, PRINCIPAL_SEARCH_LIMIT),
 		});
 
 		const responses: Array<DavResponse> = [];
@@ -163,29 +168,10 @@ export const principalPropertySearchHandler = (
 				[CARD_HOME_SET]: { [cn(DAV_NS, "href")]: `${principalHref}card/` },
 			};
 
-			const propstats = requestedProps
-				? (() => {
-						const found: Record<ClarkName, unknown> = {};
-						const missing: Record<ClarkName, unknown> = {};
-						for (const name of requestedProps) {
-							if (name in allProps) {
-								found[name] = allProps[name];
-							} else {
-								missing[name] = "";
-							}
-						}
-						const stats: Array<{
-							props: Record<ClarkName, unknown>;
-							status: number;
-						}> = [{ props: found, status: 200 }];
-						if (Object.keys(missing).length > 0) {
-							stats.push({ props: missing, status: 404 });
-						}
-						return stats;
-					})()
-				: [{ props: allProps, status: 200 }];
-
-			responses.push({ href: principalHref, propstats });
+			responses.push({
+				href: principalHref,
+				propstats: splitPropstats(allProps, propfind),
+			});
 		}
 
 		return yield* multistatusResponse(responses);

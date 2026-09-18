@@ -199,9 +199,10 @@ describe("buildImipMessage — floating time anchoring", () => {
 
 	// A DTSTART the organizer already pinned must not be rewritten
 	it("leaves an already-zoned DTSTART alone", async () => {
+		const base = floatingVevent();
 		const zoned: IrComponent = {
-			...floatingVevent(),
-			properties: floatingVevent().properties.map((p) =>
+			...base,
+			properties: base.properties.map((p) =>
 				p.name === "DTSTART"
 					? {
 							...p,
@@ -267,8 +268,9 @@ describe("buildImipMessage — RRULE UNTIL follows DTSTART's form", () => {
 		components: [],
 	});
 
-	const build = (rrule: string, tzid: string) =>
-		Effect.runPromise(
+	// Build the iMIP message for a recurring event in the given zone
+	const build = async (rrule: string, tzid: string) =>
+		await Effect.runPromise(
 			buildImipMessage({
 				method: "REQUEST",
 				vevent: recurring(rrule),

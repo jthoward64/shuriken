@@ -2,7 +2,8 @@ import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
 import { Effect, Option } from "effect";
 import type { DatabaseClient } from "#src/db/client.ts";
-import type { DatabaseError, DavError } from "#src/domain/errors.ts";
+import type { DatabaseError } from "#src/domain/errors.ts";
+import { DavError } from "#src/domain/errors.ts";
 import {
 	CollectionId,
 	InstanceId,
@@ -180,48 +181,57 @@ const makeEnv = () =>
 			privilege: "DAV:write-content",
 		});
 
-type PutEffect<A> = Effect.Effect<
-	A,
-	DavError | DatabaseError,
-	| AclService
-	| BirthdayService
-	| InstanceService
-	| ComponentRepository
-	| EntityRepository
-	| CalTimezoneRepository
-	| CalIndexRepository
-	| CollectionRepository
-	| CollectionService
-	| ExternalCalendarRepository
-	| SchedulingService
-	| DatabaseClient
->;
-type PutFailEffect = Effect.Effect<
-	unknown,
-	DavError | DatabaseError,
-	| AclService
-	| BirthdayService
-	| InstanceService
-	| ComponentRepository
-	| EntityRepository
-	| CalTimezoneRepository
-	| CalIndexRepository
-	| CollectionRepository
-	| CollectionService
-	| ExternalCalendarRepository
-	| SchedulingService
-	| DatabaseClient
->;
+const run = <A>(
+	env: ReturnType<typeof makeTestEnv>,
+	effect: Effect.Effect<
+		A,
+		DavError | DatabaseError,
+		| AclService
+		| BirthdayService
+		| InstanceService
+		| ComponentRepository
+		| EntityRepository
+		| CalTimezoneRepository
+		| CalIndexRepository
+		| CollectionRepository
+		| CollectionService
+		| ExternalCalendarRepository
+		| SchedulingService
+		| DatabaseClient
+	>,
+) => runSuccess(Effect.provide(effect, env.toLayer()).pipe(Effect.orDie));
 
-const run = <A>(env: ReturnType<typeof makeTestEnv>, effect: PutEffect<A>) =>
-	runSuccess(effect.pipe(Effect.provide(env.toLayer()), Effect.orDie));
-
-const runErr = (env: ReturnType<typeof makeTestEnv>, effect: PutFailEffect) =>
-	runFailure(effect.pipe(Effect.provide(env.toLayer())));
+const runErr = (
+	env: ReturnType<typeof makeTestEnv>,
+	effect: Effect.Effect<
+		unknown,
+		DavError | DatabaseError,
+		| AclService
+		| BirthdayService
+		| InstanceService
+		| ComponentRepository
+		| EntityRepository
+		| CalTimezoneRepository
+		| CalIndexRepository
+		| CollectionRepository
+		| CollectionService
+		| ExternalCalendarRepository
+		| SchedulingService
+		| DatabaseClient
+	>,
+) => runFailure(Effect.provide(effect, env.toLayer()));
 
 // ---------------------------------------------------------------------------
 // Create new instance
 // ---------------------------------------------------------------------------
+
+/** Narrows a handler failure to a DavError so its status can be asserted */
+const asDavError = (err: unknown): DavError => {
+	if (err instanceof DavError) {
+		return err;
+	}
+	throw new Error(`Expected a DavError but got: ${String(err)}`);
+};
 
 describe("putHandler — new-instance (create)", () => {
 	it("creates a new iCalendar instance and returns 201 with ETag", async () => {
@@ -254,14 +264,16 @@ describe("putHandler — new-instance (create)", () => {
 
 	it("If-Match on a new-instance path returns 412", async () => {
 		const env = makeEnv();
-		const err = (await runErr(
-			env,
-			putHandler(
-				makeNewInstancePath(),
-				authenticatedCtx,
-				makeICalRequest(ICAL_BODY, { "If-Match": '"some-etag"' }),
+		const err = asDavError(
+			await runErr(
+				env,
+				putHandler(
+					makeNewInstancePath(),
+					authenticatedCtx,
+					makeICalRequest(ICAL_BODY, { "If-Match": '"some-etag"' }),
+				),
 			),
-		)) as DavError;
+		);
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_PRECONDITION_FAILED);
 	});
@@ -340,14 +352,16 @@ describe("putHandler — instance (update)", () => {
 			etag: '"current-etag"',
 			slug: "event.ics",
 		});
-		const err = (await runErr(
-			env,
-			putHandler(
-				makeInstancePath(),
-				authenticatedCtx,
-				makeICalRequest(ICAL_BODY, { "If-Match": '"wrong-etag"' }),
+		const err = asDavError(
+			await runErr(
+				env,
+				putHandler(
+					makeInstancePath(),
+					authenticatedCtx,
+					makeICalRequest(ICAL_BODY, { "If-Match": '"wrong-etag"' }),
+				),
 			),
-		)) as DavError;
+		);
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_PRECONDITION_FAILED);
 	});
@@ -360,14 +374,16 @@ describe("putHandler — instance (update)", () => {
 			etag: '"current-etag"',
 			slug: "event.ics",
 		});
-		const err = (await runErr(
-			env,
-			putHandler(
-				makeInstancePath(),
-				authenticatedCtx,
-				makeICalRequest(ICAL_BODY, { "If-None-Match": "*" }),
+		const err = asDavError(
+			await runErr(
+				env,
+				putHandler(
+					makeInstancePath(),
+					authenticatedCtx,
+					makeICalRequest(ICAL_BODY, { "If-None-Match": "*" }),
+				),
 			),
-		)) as DavError;
+		);
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_PRECONDITION_FAILED);
 	});
@@ -385,10 +401,12 @@ describe("putHandler — content-type validation", () => {
 			body: "not calendar data",
 			headers: { "Content-Type": "text/plain" },
 		});
-		const err = (await runErr(
-			env,
-			putHandler(makeNewInstancePath(), authenticatedCtx, req),
-		)) as DavError;
+		const err = asDavError(
+			await runErr(
+				env,
+				putHandler(makeNewInstancePath(), authenticatedCtx, req),
+			),
+		);
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_UNSUPPORTED_MEDIA_TYPE);
 		expect(err.precondition).toBe("CALDAV:supported-calendar-data");
@@ -407,10 +425,12 @@ describe("putHandler — content-type validation", () => {
 			body: "not vcard data",
 			headers: { "Content-Type": "text/plain" },
 		});
-		const err = (await runErr(
-			env,
-			putHandler(makeNewInstancePath("card"), authenticatedCtx, req),
-		)) as DavError;
+		const err = asDavError(
+			await runErr(
+				env,
+				putHandler(makeNewInstancePath("card"), authenticatedCtx, req),
+			),
+		);
 		expect(err.status).toBe(HTTP_UNSUPPORTED_MEDIA_TYPE);
 		expect(err.precondition).toBe("CARDDAV:supported-address-data");
 	});
@@ -428,10 +448,12 @@ describe("putHandler — parse errors", () => {
 			body: "BEGIN:NOTCALENDAR\r\nEND:NOTCALENDAR\r\n",
 			headers: { "Content-Type": "text/calendar" },
 		});
-		const err = (await runErr(
-			env,
-			putHandler(makeNewInstancePath(), authenticatedCtx, req),
-		)) as DavError;
+		const err = asDavError(
+			await runErr(
+				env,
+				putHandler(makeNewInstancePath(), authenticatedCtx, req),
+			),
+		);
 		expect(err._tag).toBe("DavError");
 		expect(err.precondition).toBe("CALDAV:valid-calendar-data");
 	});
@@ -443,10 +465,12 @@ describe("putHandler — parse errors", () => {
 			body: "BEGIN:NOTACARD\r\nEND:NOTACARD\r\n",
 			headers: { "Content-Type": "text/vcard" },
 		});
-		const err = (await runErr(
-			env,
-			putHandler(makeNewInstancePath("card"), authenticatedCtx, req),
-		)) as DavError;
+		const err = asDavError(
+			await runErr(
+				env,
+				putHandler(makeNewInstancePath("card"), authenticatedCtx, req),
+			),
+		);
 		expect(err._tag).toBe("DavError");
 		expect(err.precondition).toBe("CARDDAV:valid-address-data");
 	});
@@ -467,10 +491,9 @@ describe("putHandler — method not allowed", () => {
 			principalSeg: String(TEST_PRINCIPAL_ID),
 			collectionSeg: String(TEST_COLLECTION_ID),
 		};
-		const err = (await runErr(
-			env,
-			putHandler(path, authenticatedCtx, makeICalRequest()),
-		)) as DavError;
+		const err = asDavError(
+			await runErr(env, putHandler(path, authenticatedCtx, makeICalRequest())),
+		);
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_METHOD_NOT_ALLOWED);
 	});
@@ -482,10 +505,9 @@ describe("putHandler — method not allowed", () => {
 			principalId: TEST_PRINCIPAL_ID,
 			principalSeg: String(TEST_PRINCIPAL_ID),
 		};
-		const err = (await runErr(
-			env,
-			putHandler(path, authenticatedCtx, makeICalRequest()),
-		)) as DavError;
+		const err = asDavError(
+			await runErr(env, putHandler(path, authenticatedCtx, makeICalRequest())),
+		);
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_METHOD_NOT_ALLOWED);
 	});
@@ -498,10 +520,16 @@ describe("putHandler — method not allowed", () => {
 describe("putHandler — authentication", () => {
 	it("returns 401 for unauthenticated requests", async () => {
 		const env = makeEnv();
-		const err = (await runErr(
-			env,
-			putHandler(makeNewInstancePath(), unauthenticatedCtx, makeICalRequest()),
-		)) as DavError;
+		const err = asDavError(
+			await runErr(
+				env,
+				putHandler(
+					makeNewInstancePath(),
+					unauthenticatedCtx,
+					makeICalRequest(),
+				),
+			),
+		);
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_UNAUTHORIZED);
 	});

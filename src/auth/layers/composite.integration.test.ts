@@ -1,6 +1,13 @@
 import { expect } from "@std/expect";
-import { beforeAll, describe, it } from "@std/testing/bdd";
-import { Effect, Layer, Option, Redacted } from "effect";
+import { describe, it } from "@std/testing/bdd";
+import {
+	Effect,
+	Layer,
+	ManagedRuntime,
+	Option,
+	Redacted,
+	References,
+} from "effect";
 import { CompositeAuthLayer } from "#src/auth/layers/composite.ts";
 import { AuthService } from "#src/auth/service.ts";
 import { AppConfigService } from "#src/config.ts";
@@ -15,7 +22,6 @@ import { SessionService } from "#src/services/session/service.ts";
 import { UserRepositoryLive } from "#src/services/user/repository.live.ts";
 import { UserRepository } from "#src/services/user/repository.ts";
 import { makeTestConfig, testAppConfig } from "#src/testing/config.ts";
-import { runSuccess } from "#src/testing/effect.ts";
 import { makePgliteDatabaseLayer } from "#src/testing/pglite.ts";
 
 // ---------------------------------------------------------------------------
@@ -49,13 +55,9 @@ const makeLayer = () => {
 		auth: { ...testAppConfig.auth, authRateLimitMaxAttempts: MAX_ATTEMPTS },
 	});
 	const infra = Layer.mergeAll(makePgliteDatabaseLayer(), CryptoServiceLive);
+	const appPasswordRepo = AppPasswordRepositoryLive.pipe(Layer.provide(infra));
 	const appPasswords = AppPasswordServiceLive.pipe(
-		Layer.provide(
-			Layer.mergeAll(
-				infra,
-				AppPasswordRepositoryLive.pipe(Layer.provide(infra)),
-			),
-		),
+		Layer.provide(Layer.mergeAll(infra, appPasswordRepo)),
 	);
 	const auth = CompositeAuthLayer.pipe(
 		Layer.provide(
@@ -75,80 +77,90 @@ const makeLayer = () => {
 };
 
 // Provisions a user with a working app password and returns its credentials.
-const provisionAppPassword = Effect.gen(function* () {
-	const users = yield* UserRepository;
-	const created = yield* users.create({
-		slug: Slug("dave"),
-		email: Email("dave@example.com"),
-		credentials: [],
-	});
-	const appPasswords = yield* AppPasswordService;
-	const generated = yield* appPasswords.generate({
-		userId: UserId(created.user.id),
-		label: Option.some("phone"),
-	});
-	return {
-		username: generated.username,
-		secret: Redacted.value(generated.password),
-	};
-});
+const provisionAppPassword = Effect.fn("test.provisionAppPassword")(
+	function* () {
+		const users = yield* UserRepository;
+		const created = yield* users.create({
+			slug: Slug("dave"),
+			email: Email("dave@example.com"),
+			credentials: [],
+		});
+		const appPasswords = yield* AppPasswordService;
+		const generated = yield* appPasswords.generate({
+			userId: UserId(created.user.id),
+			label: Option.some("phone"),
+		});
+		return {
+			username: generated.username,
+			secret: Redacted.value(generated.password),
+		};
+	},
+);
 
 describe("CompositeAuthLayer rate limiting (integration)", () => {
-	let layer: ReturnType<typeof makeLayer>;
-
-	beforeAll(() => {
-		layer = makeLayer();
-	});
-
 	it("does not count credential-less probes toward the rate limit", async () => {
 		const clientIp = Option.some("203.0.113.7");
-		const result = await runSuccess(
-			Effect.gen(function* () {
-				const { username, secret } = yield* provisionAppPassword;
-				const auth = yield* AuthService;
+		const runtime = ManagedRuntime.make(makeLayer());
+		try {
+			const result = await runtime.runPromise(
+				Effect.gen(function* () {
+					const { username, secret } = yield* provisionAppPassword();
+					const auth = yield* AuthService;
 
-				// Far more unauthenticated probes than the limit — a challenge-based
-				// client hammering the endpoint before it has been challenged.
-				for (let i = 0; i < MAX_ATTEMPTS * 3; i++) {
-					const probe = yield* auth.authenticate(new Headers(), clientIp);
-					expect(probe._tag).toBe("Unauthenticated");
-				}
+					// Far more unauthenticated probes than the limit — a challenge-based
+					// client hammering the endpoint before it has been challenged.
+					for (let i = 0; i < MAX_ATTEMPTS * 3; i++) {
+						const probe = yield* auth.authenticate(new Headers(), clientIp);
+						expect(probe._tag).toBe("Unauthenticated");
+					}
 
-				// The valid credential must still authenticate from the same IP.
-				return yield* auth.authenticate(
-					basicHeaders(username, secret),
-					clientIp,
-				);
-			}).pipe(Effect.provide(layer), Effect.orDie),
-		);
-
-		expect(result._tag).toBe("Authenticated");
+					// The valid credential must still authenticate from the same IP.
+					return yield* auth.authenticate(
+						basicHeaders(username, secret),
+						clientIp,
+					);
+				}).pipe(
+					Effect.orDie,
+					Effect.provideService(References.MinimumLogLevel, "None"),
+				),
+			);
+			expect(result._tag).toBe("Authenticated");
+		} finally {
+			await runtime.dispose();
+		}
 	});
 
 	it("locks out an IP after too many wrong-password attempts", async () => {
 		const clientIp = Option.some("203.0.113.99");
-		const result = await runSuccess(
-			Effect.gen(function* () {
-				const { username, secret } = yield* provisionAppPassword;
-				const auth = yield* AuthService;
+		const runtime = ManagedRuntime.make(makeLayer());
+		try {
+			const result = await runtime.runPromise(
+				Effect.gen(function* () {
+					const { username, secret } = yield* provisionAppPassword();
+					const auth = yield* AuthService;
 
-				// Exhaust the limit with genuine wrong-password attempts.
-				for (let i = 0; i < MAX_ATTEMPTS; i++) {
-					const bad = yield* auth.authenticate(
-						basicHeaders(username, "wrong-password"),
+					// Exhaust the limit with genuine wrong-password attempts.
+					for (let i = 0; i < MAX_ATTEMPTS; i++) {
+						const bad = yield* auth.authenticate(
+							basicHeaders(username, "wrong-password"),
+							clientIp,
+						);
+						expect(bad._tag).toBe("Unauthenticated");
+					}
+
+					// Even the correct password is now rejected without being checked.
+					return yield* auth.authenticate(
+						basicHeaders(username, secret),
 						clientIp,
 					);
-					expect(bad._tag).toBe("Unauthenticated");
-				}
-
-				// Even the correct password is now rejected without being checked.
-				return yield* auth.authenticate(
-					basicHeaders(username, secret),
-					clientIp,
-				);
-			}).pipe(Effect.provide(layer), Effect.orDie),
-		);
-
-		expect(result._tag).toBe("Unauthenticated");
+				}).pipe(
+					Effect.orDie,
+					Effect.provideService(References.MinimumLogLevel, "None"),
+				),
+			);
+			expect(result._tag).toBe("Unauthenticated");
+		} finally {
+			await runtime.dispose();
+		}
 	});
 });

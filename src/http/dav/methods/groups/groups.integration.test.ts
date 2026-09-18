@@ -23,7 +23,12 @@ import { runScript } from "#src/testing/script-runner/runner.ts";
 // Helpers
 // ---------------------------------------------------------------------------
 
-const mkgroup = (slug: string, as: string, body?: string) => ({
+const mkgroup = (
+	slug: string,
+	as: string,
+	body?: string,
+	expectStatus = 201,
+) => ({
 	name: `MKCOL /dav/groups/${slug}/`,
 	method: "MKCOL" as const,
 	path: `/dav/groups/${slug}/`,
@@ -32,7 +37,7 @@ const mkgroup = (slug: string, as: string, body?: string) => ({
 		? { "Content-Type": "application/xml; charset=utf-8" }
 		: undefined,
 	body,
-	expect: { status: 201 },
+	expect: { status: expectStatus },
 });
 
 const putMember = (groupSlug: string, userSlug: string, as: string) => ({
@@ -369,10 +374,7 @@ describe("MKCOL /dav/groups/:slug", () => {
 		const results = await runScript(
 			[
 				mkgroup("existing", "admin"),
-				{
-					...mkgroup("existing", "admin"),
-					expect: { status: 405 },
-				},
+				mkgroup("existing", "admin", undefined, 405),
 			],
 			singleAdminUser(),
 		);

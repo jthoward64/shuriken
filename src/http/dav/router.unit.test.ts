@@ -104,6 +104,65 @@ const makeCtx = (method: string, pathname: string) => ({
 	caldavTimezones: null,
 });
 
+// ---------------------------------------------------------------------------
+// Row stubs — only the fields path resolution reads are populated
+// ---------------------------------------------------------------------------
+
+/** A principal row shaped just enough for path resolution */
+const makePrincipalRow = (id: string, slug: string): PrincipalRow =>
+	({
+		id,
+		slug,
+		principalType: "user",
+		displayName: null,
+		updatedAt: null,
+		deletedAt: null,
+	}) as unknown as PrincipalRow;
+
+/** A principal-with-user row shaped just enough for path resolution */
+const makePrincipalWithUser = (id: string, slug: string): PrincipalWithUser =>
+	({
+		principal: makePrincipalRow(id, slug),
+		user: {
+			id: crypto.randomUUID(),
+			principalId: id,
+			name: slug,
+			email: `${slug}@test`,
+			updatedAt: null,
+		},
+	}) as unknown as PrincipalWithUser;
+
+/** A collection row shaped just enough for path resolution */
+const makeCollectionRow = (
+	id: string,
+	slug: string,
+	ownerPrincipalId: string,
+	collectionType: string,
+): CollectionRow =>
+	({
+		id,
+		slug,
+		ownerPrincipalId,
+		collectionType,
+		deletedAt: null,
+	}) as unknown as CollectionRow;
+
+/** An instance row shaped just enough for path resolution */
+const makeInstanceRow = (
+	id: string,
+	slug: string,
+	collectionId: string,
+): InstanceRow =>
+	({ id, slug, collectionId, deletedAt: null }) as unknown as InstanceRow;
+
+/** Split a `${principalId}:${collectionType}:${slug}` collection seed key */
+const splitCollectionKey = (
+	key: string,
+): { principalId: string; collectionType: string; slug: string } => {
+	const [principalId = "", collectionType = "", slug = ""] = key.split(":");
+	return { principalId, collectionType, slug };
+};
+
 /**
  * Seed data for the router layer: slugs that should resolve successfully.
  * Any slug absent from these maps will produce a 404.
@@ -147,11 +206,18 @@ const noopComponentRepo: ComponentRepositoryShape =
 /** No-op CalTimezoneRepository — router path resolution never touches timezone storage. */
 const noopCalTimezoneRepo = stubService<CalTimezoneRepositoryShape>();
 
-const noOpDb = {
-	transaction: <A, E, R>(
-		fn: (tx: DbClient) => Effect.Effect<A, E, R>,
-	): Effect.Effect<A, E, R> => fn(noOpDb as unknown as DbClient),
-} as unknown as DbClient;
+/**
+ * No-op DatabaseClient — router path resolution never opens a real transaction,
+ * so `transaction` just hands the same stub back to its body.
+ */
+const makeNoOpDb = (): DbClient =>
+	({
+		transaction: <A, E, R>(
+			fn: (tx: DbClient) => Effect.Effect<A, E, R>,
+		): Effect.Effect<A, E, R> => fn(noOpDb),
+	}) as unknown as DbClient;
+
+const noOpDb: DbClient = makeNoOpDb();
 
 /** Build a Layer providing all DAV router requirements from simple slug→id maps. */
 const makeRouterLayer = (
@@ -192,14 +258,10 @@ const makeRouterLayer = (
 		string,
 		{ principalId: string; collectionType: string; slug: string }
 	>(
-		[...collections.entries()].map(([key, id]) => {
-			const [principalId, collectionType, slug] = key.split(":") as [
-				string,
-				string,
-				string,
-			];
-			return [id, { principalId, collectionType, slug }];
-		}),
+		[...collections.entries()].map(([key, id]) => [
+			id,
+			splitCollectionKey(key),
+		]),
 	);
 	// instance entries: `${collectionId}:${slug}` → id.
 	const instanceById = new Map<string, { collectionId: string; slug: string }>(
@@ -218,80 +280,28 @@ const makeRouterLayer = (
 				if (!id) {
 					return Effect.succeed(Option.none());
 				}
-				const row = {
-					principal: {
-						id,
-						slug,
-						principalType: "user",
-						displayName: null,
-						updatedAt: null,
-						deletedAt: null,
-					},
-					user: {
-						id: crypto.randomUUID(),
-						principalId: id,
-						name: slug,
-						email: `${slug}@test`,
-						updatedAt: null,
-					},
-				} as unknown as PrincipalWithUser;
-				return Effect.succeed(Option.some(row));
+				return Effect.succeed(Option.some(makePrincipalWithUser(id, slug)));
 			},
 			findById: (id) => {
 				const slug = principalById.get(id);
 				if (!slug) {
 					return Effect.succeed(Option.none());
 				}
-				const row = {
-					principal: {
-						id,
-						slug,
-						principalType: "user",
-						displayName: null,
-						updatedAt: null,
-						deletedAt: null,
-					},
-					user: {
-						id: crypto.randomUUID(),
-						principalId: id,
-						name: slug,
-						email: `${slug}@test`,
-						updatedAt: null,
-					},
-				} as unknown as PrincipalWithUser;
-				return Effect.succeed(Option.some(row));
+				return Effect.succeed(Option.some(makePrincipalWithUser(id, slug)));
 			},
 			findPrincipalBySlug: (slug) => {
 				const id = principals.get(slug);
 				if (!id) {
 					return Effect.succeed(Option.none());
 				}
-				return Effect.succeed(
-					Option.some({
-						id,
-						slug,
-						principalType: "user",
-						displayName: null,
-						updatedAt: null,
-						deletedAt: null,
-					} as unknown as PrincipalRow),
-				);
+				return Effect.succeed(Option.some(makePrincipalRow(id, slug)));
 			},
 			findPrincipalById: (id) => {
 				const slug = principalById.get(id);
 				if (!slug) {
 					return Effect.succeed(Option.none());
 				}
-				return Effect.succeed(
-					Option.some({
-						id,
-						slug,
-						principalType: "user",
-						displayName: null,
-						updatedAt: null,
-						deletedAt: null,
-					} as unknown as PrincipalRow),
-				);
+				return Effect.succeed(Option.some(makePrincipalRow(id, slug)));
 			},
 			findByEmail: () => Effect.succeed(Option.none()),
 			findUserByUserId: () => Effect.succeed(Option.none()),
@@ -305,28 +315,25 @@ const makeRouterLayer = (
 				if (!id) {
 					return Effect.succeed(Option.none());
 				}
-				const row = {
-					id,
-					slug,
-					ownerPrincipalId: principalId,
-					collectionType,
-					deletedAt: null,
-				} as unknown as CollectionRow;
-				return Effect.succeed(Option.some(row));
+				return Effect.succeed(
+					Option.some(makeCollectionRow(id, slug, principalId, collectionType)),
+				);
 			},
 			findById: (id) => {
 				const meta = collectionById.get(id);
 				if (!meta) {
 					return Effect.succeed(Option.none());
 				}
-				const row = {
-					id,
-					slug: meta.slug,
-					ownerPrincipalId: meta.principalId,
-					collectionType: meta.collectionType,
-					deletedAt: null,
-				} as unknown as CollectionRow;
-				return Effect.succeed(Option.some(row));
+				return Effect.succeed(
+					Option.some(
+						makeCollectionRow(
+							id,
+							meta.slug,
+							meta.principalId,
+							meta.collectionType,
+						),
+					),
+				);
 			},
 			listByOwner: () => Effect.succeed([]),
 		});
@@ -339,26 +346,18 @@ const makeRouterLayer = (
 				if (!id) {
 					return Effect.succeed(Option.none());
 				}
-				const row = {
-					id,
-					slug,
-					collectionId,
-					deletedAt: null,
-				} as unknown as InstanceRow;
-				return Effect.succeed(Option.some(row));
+				return Effect.succeed(
+					Option.some(makeInstanceRow(id, slug, collectionId)),
+				);
 			},
 			findById: (id) => {
 				const meta = instanceById.get(id);
 				if (!meta) {
 					return Effect.succeed(Option.none());
 				}
-				const row = {
-					id,
-					slug: meta.slug,
-					collectionId: meta.collectionId,
-					deletedAt: null,
-				} as unknown as InstanceRow;
-				return Effect.succeed(Option.some(row));
+				return Effect.succeed(
+					Option.some(makeInstanceRow(id, meta.slug, meta.collectionId)),
+				);
 			},
 			listByCollection: () => Effect.succeed([]),
 		});
@@ -464,24 +463,28 @@ const makeRouterLayer = (
 	);
 };
 
+/** Dispatch one request through the router against a seeded layer */
 const run = (method: string, pathname: string, seeds?: RouterSeeds) => {
 	const req = new Request(`http://localhost${pathname}`, { method });
 	const ctx = makeCtx(method, pathname);
 	// `Layer.merge`'s output-type inference loses precision when the merged
 	// layers exceed the tuple-overload arity of `Layer.mergeAll` (around 18
 	// entries). The runtime is correct; we just need to tell TS what we know.
-	const provided = davRouter(req, ctx).pipe(
-		Effect.provide(makeRouterLayer(seeds)),
-	) as unknown as Effect.Effect<Response, unknown, never>;
-	return Effect.runPromise(provided);
+	return Effect.runPromise(
+		Effect.provide(
+			davRouter(req, ctx),
+			makeRouterLayer(seeds),
+		) as unknown as Effect.Effect<Response, unknown, never>,
+	);
 };
 
-const runPath = (pathname: string, seeds?: RouterSeeds) =>
-	Effect.runPromise(
-		parseDavPath(new URL(`http://localhost${pathname}`)).pipe(
-			Effect.provide(makeRouterLayer(seeds)),
-		),
+/** Resolve one DAV path against a seeded layer */
+function runPath(pathname: string, seeds?: RouterSeeds) {
+	const url = new URL(`http://localhost${pathname}`);
+	return Effect.provide(parseDavPath(url), makeRouterLayer(seeds)).pipe(
+		Effect.runPromise,
 	);
+}
 
 // ---------------------------------------------------------------------------
 // Well-known redirects (RFC 6764 §5)
@@ -718,11 +721,7 @@ describe("davRouter — new-resource path resolution", () => {
 	});
 
 	it("missing principal resolves to unknownPrincipal (not new-collection)", async () => {
-		const path = await Effect.runPromise(
-			parseDavPath(
-				new URL("http://localhost/dav/principals/nobody/cal/new-cal"),
-			).pipe(Effect.provide(makeRouterLayer())),
-		);
+		const path = await runPath("/dav/principals/nobody/cal/new-cal");
 		expect(path.kind).toBe("unknownPrincipal");
 	});
 });

@@ -53,26 +53,28 @@ const makeDoc = (properties: Array<IrProperty>): IrDocument => ({
 describe("parseCardFilter — invalid inputs", () => {
 	it("fails when input is null", async () => {
 		const result = await Effect.runPromise(
-			Effect.result(parseCardFilter(null)),
+			parseCardFilter(null).pipe(Effect.result),
 		);
 		expect(result._tag).toBe("Failure");
 	});
 
 	it("fails when input is a string", async () => {
 		const result = await Effect.runPromise(
-			Effect.result(parseCardFilter("hello")),
+			parseCardFilter("hello").pipe(Effect.result),
 		);
 		expect(result._tag).toBe("Failure");
 	});
 
 	it("fails when input is a number", async () => {
-		const result = await Effect.runPromise(Effect.result(parseCardFilter(42)));
+		const result = await Effect.runPromise(
+			parseCardFilter(42).pipe(Effect.result),
+		);
 		expect(result._tag).toBe("Failure");
 	});
 
 	it("fails when filter element is missing from the object", async () => {
 		const result = await Effect.runPromise(
-			Effect.result(parseCardFilter({ unrelated: {} })),
+			parseCardFilter({ unrelated: {} }).pipe(Effect.result),
 		);
 		expect(result._tag).toBe("Failure");
 	});

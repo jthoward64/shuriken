@@ -5,6 +5,7 @@
 // the described component/property filters to an IrDocument before serialization.
 // ---------------------------------------------------------------------------
 
+import { Option } from "effect";
 import { Temporal } from "temporal-polyfill";
 import { getOccurrenceInstantsInRange } from "#src/data/icalendar/recurrence/recurrence-check.ts";
 import {
@@ -18,6 +19,10 @@ const UTC_DATE_TIME = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/u;
 
 const CALDAV_NS = "urn:ietf:params:xml:ns:caldav";
 const cn = (local: string): string => `{${CALDAV_NS}}${local}`;
+
+/** True when an unknown value is a plain (non-null) object */
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+	typeof value === "object" && value !== null;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -59,12 +64,11 @@ export interface CompSpec {
  * Returns `{ allProps: true }` when the element is absent or has no comp child.
  */
 export const parseCalendarDataSpec = (tree: unknown): CalendarDataSpec => {
-	if (typeof tree !== "object" || tree === null) {
+	if (!isRecord(tree)) {
 		return { allProps: true };
 	}
-	const obj = tree as Record<string, unknown>;
-	const expand = parseExpandSpec(obj[cn("expand")]);
-	const compEl = obj[cn("comp")];
+	const expand = parseExpandSpec(tree[cn("expand")]);
+	const compEl = tree[cn("comp")];
 	if (!compEl) {
 		return expand ? { allProps: true, expand } : { allProps: true };
 	}
@@ -74,12 +78,11 @@ export const parseCalendarDataSpec = (tree: unknown): CalendarDataSpec => {
 };
 
 const parseExpandSpec = (el: unknown): ExpandSpec | undefined => {
-	if (typeof el !== "object" || el === null) {
+	if (!isRecord(el)) {
 		return undefined;
 	}
-	const obj = el as Record<string, unknown>;
-	const startRaw = obj["@_start"];
-	const endRaw = obj["@_end"];
+	const startRaw = el["@_start"];
+	const endRaw = el["@_end"];
 	if (typeof startRaw !== "string" || typeof endRaw !== "string") {
 		return undefined;
 	}
@@ -102,45 +105,41 @@ const parseICalDatetime = (s: string): Temporal.Instant | undefined => {
 		return undefined;
 	}
 	const iso = `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}Z`;
-	try {
-		return Temporal.Instant.from(iso);
-	} catch {
-		return undefined;
+	return Option.getOrUndefined(parseInstant(iso));
+};
+
+/** Parse an ISO instant, yielding none for an unparseable value */
+const parseInstant = Option.liftThrowable((iso: string) =>
+	Temporal.Instant.from(iso),
+);
+
+/** Children of a repeatable element, which parses to a single value or an array */
+const childElements = (el: unknown): ReadonlyArray<unknown> => {
+	if (!el) {
+		return [];
 	}
+	return Array.isArray(el) ? el : [el];
+};
+
+/** The names of the explicit `<C:prop name="...">` children of a comp spec */
+const parsePropNames = (el: unknown): Set<string> => {
+	const names = new Set<string>();
+	for (const p of childElements(el)) {
+		const propName = isRecord(p) ? p["@_name"] : undefined;
+		if (typeof propName === "string") {
+			names.add(propName);
+		}
+	}
+	return names;
 };
 
 const parseCompSpec = (el: unknown): CompSpec => {
-	if (typeof el !== "object" || el === null) {
+	if (!isRecord(el)) {
 		return { name: "", allProps: true, props: new Set(), comps: [] };
 	}
-	const obj = el as Record<string, unknown>;
-	const name = typeof obj["@_name"] === "string" ? obj["@_name"] : "";
-
-	// Collect explicit props
-	const propEls = obj[cn("prop")];
-	const props = new Set<string>();
-	if (propEls) {
-		const arr = Array.isArray(propEls) ? propEls : [propEls];
-		for (const p of arr) {
-			if (
-				typeof p === "object" &&
-				p !== null &&
-				typeof (p as Record<string, unknown>)["@_name"] === "string"
-			) {
-				props.add((p as Record<string, unknown>)["@_name"] as string);
-			}
-		}
-	}
-
-	// Collect nested comp specs
-	const compEls = obj[cn("comp")];
-	const comps: Array<CompSpec> = [];
-	if (compEls) {
-		const arr = Array.isArray(compEls) ? compEls : [compEls];
-		for (const c of arr) {
-			comps.push(parseCompSpec(c));
-		}
-	}
+	const name = typeof el["@_name"] === "string" ? el["@_name"] : "";
+	const props = parsePropNames(el[cn("prop")]);
+	const comps = childElements(el[cn("comp")]).map(parseCompSpec);
 
 	return {
 		name,
@@ -306,15 +305,15 @@ const componentDuration = (
 		}
 	}
 	const durationProp = comp.properties.find((p) => p.name === "DURATION");
-	if (durationProp?.value.type === "DURATION") {
-		try {
-			return Temporal.Duration.from(durationProp.value.value);
-		} catch {
-			return undefined;
-		}
-	}
-	return undefined;
+	return durationProp?.value.type === "DURATION"
+		? Option.getOrUndefined(parseDuration(durationProp.value.value))
+		: undefined;
 };
+
+/** Parse an ISO duration, yielding none for an unparseable value */
+const parseDuration = Option.liftThrowable((iso: string) =>
+	Temporal.Duration.from(iso),
+);
 
 const valueToInstant = (
 	value: IrProperty["value"],

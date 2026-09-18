@@ -11,6 +11,7 @@ import {
 	SHURIKEN_NS,
 } from "#src/domain/virtual-resources.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
+import { xmlPath, xmlText } from "#src/http/dav/methods/xml-node.ts";
 import { normalizeClarkNames } from "#src/http/dav/xml/clark.ts";
 import { parseXml, readXmlBody } from "#src/http/dav/xml/parser.ts";
 import { HTTP_CREATED } from "#src/http/status.ts";
@@ -30,46 +31,35 @@ interface GroupMkcolProps {
 const EMPTY_PROPS: GroupMkcolProps = { displayName: undefined };
 
 const extractProps = (tree: unknown): GroupMkcolProps => {
-	if (typeof tree !== "object" || tree === null) {
+	const prop = xmlPath(
+		tree,
+		`{${DAV_NS}}mkcol`,
+		`{${DAV_NS}}set`,
+		`{${DAV_NS}}prop`,
+	);
+	if (prop === undefined) {
 		return EMPTY_PROPS;
 	}
-	const root = tree as Record<string, unknown>;
-	const rootEl = root[`{${DAV_NS}}mkcol`] as
-		| Record<string, unknown>
-		| undefined;
-	if (typeof rootEl !== "object" || rootEl === null) {
-		return EMPTY_PROPS;
-	}
-	const set = rootEl[`{${DAV_NS}}set`] as Record<string, unknown> | undefined;
-	if (typeof set !== "object" || set === null) {
-		return EMPTY_PROPS;
-	}
-	const prop = set[`{${DAV_NS}}prop`] as Record<string, unknown> | undefined;
-	if (typeof prop !== "object" || prop === null) {
-		return EMPTY_PROPS;
-	}
-
-	const displayName =
-		typeof prop[`{${DAV_NS}}displayname`] === "string"
-			? (prop[`{${DAV_NS}}displayname`] as string)
-			: typeof prop[`{${SHURIKEN_NS}}displayname`] === "string"
-				? (prop[`{${SHURIKEN_NS}}displayname`] as string)
-				: undefined;
-
-	return { displayName };
+	// The shuriken-namespaced name is accepted as a fallback for older clients
+	return {
+		displayName:
+			xmlText(prop, `{${DAV_NS}}displayname`) ??
+			xmlText(prop, `{${SHURIKEN_NS}}displayname`),
+	};
 };
+
+// Malformed XML is treated as an empty body rather than a hard failure
+const parseProps = (body: string): Effect.Effect<GroupMkcolProps> =>
+	parseXml(body).pipe(
+		Effect.map((parsed) => extractProps(normalizeClarkNames(parsed))),
+		Effect.catchTag("XmlParseError", () => Effect.succeed(EMPTY_PROPS)),
+	);
 
 const parseBody = (req: Request): Effect.Effect<GroupMkcolProps, DavError> =>
 	readXmlBody(req).pipe(
-		Effect.flatMap((body) => {
-			if (body.trim() === "") {
-				return Effect.succeed(EMPTY_PROPS);
-			}
-			return parseXml(body).pipe(
-				Effect.map((parsed) => extractProps(normalizeClarkNames(parsed))),
-				Effect.catchTag("XmlParseError", () => Effect.succeed(EMPTY_PROPS)),
-			);
-		}),
+		Effect.flatMap((body) =>
+			body.trim() === "" ? Effect.succeed(EMPTY_PROPS) : parseProps(body),
+		),
 	);
 
 // ---------------------------------------------------------------------------

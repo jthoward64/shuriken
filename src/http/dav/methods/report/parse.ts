@@ -4,13 +4,46 @@
 // Shared by all REPORT sub-handlers.
 // ---------------------------------------------------------------------------
 
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import { type ClarkName, cn } from "#src/data/ir.ts";
 import { badRequest, type DavError } from "#src/domain/errors.ts";
 import { normalizeClarkNames } from "#src/http/dav/xml/clark.ts";
 import { parseXml, readXmlBody } from "#src/http/dav/xml/parser.ts";
 
 const DAV_NS = "DAV:";
+
+/** True when an unknown value is a plain (non-null) object */
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+	typeof value === "object" && value !== null;
+
+/** True when a parsed element key is a Clark name (`{namespace}localname`) */
+const isClarkKey = (key: string): key is ClarkName => key.startsWith("{");
+
+/** The report type and child tree of an already Clark-normalized root element */
+export interface ReportRoot {
+	readonly type: ClarkName;
+	readonly tree: unknown;
+}
+
+const UNKNOWN_REPORT: ReportRoot = { type: cn(DAV_NS, "unknown"), tree: {} };
+
+/**
+ * Read the report type and child tree from a parsed XML root.
+ *
+ * The root element key is the report type in Clark notation; `?xml` (the XML
+ * declaration emitted by fast-xml-parser) and `@_*` attributes are skipped.
+ */
+const readReportRoot = (raw: unknown): ReportRoot => {
+	const normalized = normalizeClarkNames(raw);
+	if (!isRecord(normalized)) {
+		return UNKNOWN_REPORT;
+	}
+	const reportType = Object.keys(normalized).find(isClarkKey);
+	if (reportType === undefined) {
+		return UNKNOWN_REPORT;
+	}
+	return { type: reportType, tree: normalized[reportType] ?? {} };
+};
 
 // ---------------------------------------------------------------------------
 // parseReportBody
@@ -26,34 +59,12 @@ const DAV_NS = "DAV:";
  */
 export const parseReportBody = (
 	req: Request,
-): Effect.Effect<{ type: ClarkName; tree: unknown }, DavError> =>
+): Effect.Effect<ReportRoot, DavError> =>
 	readXmlBody(req).pipe(
-		Effect.flatMap((body) =>
-			parseXml(body).pipe(
-				Effect.map((raw) => {
-					const normalized = normalizeClarkNames(raw) as Record<
-						string,
-						unknown
-					>;
-					// The root element key is the report type in Clark notation.
-					// After normalizeClarkNames, legitimate element keys are Clark
-					// names like `{namespace}localname`. We skip `?xml` (the XML
-					// declaration emitted by fast-xml-parser) and `@_*` attributes.
-					const reportType = Object.keys(normalized).find((k) =>
-						k.startsWith("{"),
-					) as ClarkName | undefined;
-					if (!reportType) {
-						return { type: cn(DAV_NS, "unknown") as ClarkName, tree: {} };
-					}
-					return {
-						type: reportType,
-						tree: normalized[reportType] ?? {},
-					};
-				}),
-				Effect.catchTag("XmlParseError", () =>
-					Effect.fail(badRequest("Malformed REPORT XML")),
-				),
-			),
+		Effect.flatMap(parseXml),
+		Effect.map(readReportRoot),
+		Effect.catchTag("XmlParseError", () =>
+			Effect.fail(badRequest("Malformed REPORT XML")),
 		),
 	);
 
@@ -70,15 +81,15 @@ export const parseReportBody = (
  * Returns an empty set if `{DAV:}prop` is absent.
  */
 export const extractPropNames = (tree: unknown): ReadonlySet<ClarkName> => {
-	if (typeof tree !== "object" || tree === null) {
+	if (!isRecord(tree)) {
 		return new Set();
 	}
-	const propEl = (tree as Record<string, unknown>)[cn(DAV_NS, "prop")];
-	if (typeof propEl !== "object" || propEl === null) {
+	const propEl = tree[cn(DAV_NS, "prop")];
+	if (!isRecord(propEl)) {
 		return new Set();
 	}
 	return new Set(
-		Object.keys(propEl as Record<string, unknown>)
+		Object.keys(propEl)
 			.filter((k) => !k.startsWith("@_"))
 			.map((k) => k as ClarkName),
 	);
@@ -95,17 +106,17 @@ export const extractPropNames = (tree: unknown): ReadonlySet<ClarkName> => {
  * attribute of its own parses to an object whose text lives under `#text` (the
  * xmlns attr itself is consumed by Clark normalization). KDE/Qt clients hit the
  * latter: they declare `xmlns="DAV:"` on each href rather than using a prefix.
- * Handle both, or return null for anything else.
+ * Handle both; anything else yields `Option.none`.
  */
-const hrefText = (node: unknown): string | null => {
+const hrefText = (node: unknown): Option.Option<string> => {
 	if (typeof node === "string") {
-		return node;
+		return Option.some(node);
 	}
-	if (typeof node === "object" && node !== null) {
-		const text = (node as Record<string, unknown>)["#text"];
-		return typeof text === "string" ? text : null;
+	if (isRecord(node)) {
+		const text = node["#text"];
+		return typeof text === "string" ? Option.some(text) : Option.none();
 	}
-	return null;
+	return Option.none();
 };
 
 /**
@@ -133,21 +144,12 @@ const isHrefKey = (key: string): boolean =>
  * Returns an empty array if no hrefs are found.
  */
 export const extractHrefs = (tree: unknown): ReadonlyArray<string> => {
-	if (typeof tree !== "object" || tree === null) {
+	if (!isRecord(tree)) {
 		return [];
 	}
-	const out: Array<string> = [];
-	for (const [key, value] of Object.entries(tree as Record<string, unknown>)) {
-		if (!isHrefKey(key)) {
-			continue;
-		}
-		const nodes = Array.isArray(value) ? value : [value];
-		for (const node of nodes) {
-			const href = hrefText(node);
-			if (href !== null && href.length > 0) {
-				out.push(href);
-			}
-		}
-	}
-	return out;
+	return Object.entries(tree)
+		.filter(([key]) => isHrefKey(key))
+		.flatMap(([, value]) => (Array.isArray(value) ? value : [value]))
+		.flatMap((node) => Option.toArray(hrefText(node)))
+		.filter((href) => href.length > 0);
 };

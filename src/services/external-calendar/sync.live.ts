@@ -10,8 +10,9 @@ import { withTransaction } from "#src/db/transaction.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import { InternalError } from "#src/domain/errors.ts";
 import {
-	type CollectionId,
+	CollectionId,
 	EntityId,
+	type InstanceId,
 	type UuidString,
 } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
@@ -31,7 +32,11 @@ import type { CollectionRow } from "#src/services/collection/repository.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
 import { EntityRepository } from "#src/services/entity/index.ts";
 import { InstanceService } from "#src/services/instance/index.ts";
-import { ExternalCalendarRepository } from "./repository.ts";
+import {
+	type ExternalCalendarClaimRow,
+	ExternalCalendarRepository,
+	type ExternalCalendarRow,
+} from "./repository.ts";
 import { ExternalCalendarSyncService } from "./sync.ts";
 
 // ---------------------------------------------------------------------------
@@ -185,6 +190,57 @@ interface SyncDependencies {
 	readonly db: DbClient;
 }
 
+/** One feed event rendered for storage: its canonical form, etag and slug */
+interface FeedEventWrite {
+	readonly collectionId: CollectionId;
+	readonly uid: string;
+	readonly root: IrComponent;
+	readonly etag: ETag;
+	readonly slug: Slug;
+	readonly contentLength: number;
+}
+
+/** Insert a new feed event's entity, component tree and instance */
+const insertFeedEvent = Effect.fn("sync.external.insertFeedEvent")(function* (
+	deps: SyncDependencies,
+	write: FeedEventWrite,
+) {
+	const entityRow = yield* deps.entityRepo.insert({
+		entityType: "icalendar",
+		logicalUid: write.uid,
+	});
+	yield* deps.componentRepo.insertTree(EntityId(entityRow.id), write.root);
+	yield* deps.instanceSvc.put({
+		collectionId: write.collectionId,
+		entityId: EntityId(entityRow.id),
+		contentType: "text/calendar",
+		etag: write.etag,
+		slug: write.slug,
+		contentLength: write.contentLength,
+	});
+});
+
+/** Replace an existing feed event's component tree and instance in place */
+const replaceFeedEvent = Effect.fn("sync.external.replaceFeedEvent")(function* (
+	deps: SyncDependencies,
+	write: FeedEventWrite,
+	prev: { readonly entityId: EntityId; readonly instanceId: InstanceId },
+) {
+	yield* deps.componentRepo.deleteByEntity(prev.entityId);
+	yield* deps.componentRepo.insertTree(prev.entityId, write.root);
+	yield* deps.instanceSvc.put(
+		{
+			collectionId: write.collectionId,
+			entityId: prev.entityId,
+			contentType: "text/calendar",
+			etag: write.etag,
+			slug: write.slug,
+			contentLength: write.contentLength,
+		},
+		prev.instanceId,
+	);
+});
+
 /**
  * Reconcile one claim's collection against the parsed feed. New UIDs are
  * inserted; existing UIDs have their component trees + etag replaced; UIDs
@@ -202,7 +258,7 @@ const reconcileClaim = (
 		const existingByUid = new Map(
 			existing
 				.filter((r) => r.logicalUid !== null)
-				.map((r) => [r.logicalUid as string, r] as const),
+				.map((r) => [String(r.logicalUid), r] as const),
 		);
 		const feedUids = new Set(events.map((e) => e.uid));
 
@@ -212,58 +268,32 @@ const reconcileClaim = (
 				root: buildSubVcalendar(rootForVtimezones, event),
 			};
 			const canonical = yield* encodeICalendar(subDoc);
-			const etag = ETag(yield* makeEtag(canonical));
-			const slug = sanitizeSlug(event.uid);
-			const contentLength = new TextEncoder().encode(canonical).byteLength;
-
 			const prev = existingByUid.get(event.uid);
+			const write: FeedEventWrite = {
+				collectionId,
+				uid: event.uid,
+				root: subDoc.root,
+				etag: ETag(yield* makeEtag(canonical)),
+				slug: prev === undefined ? sanitizeSlug(event.uid) : Slug(prev.slug),
+				contentLength: new TextEncoder().encode(canonical).byteLength,
+			};
+
 			if (prev === undefined) {
 				// New event — insert entity + tree + instance atomically.
-				yield* withTransaction(
-					Effect.gen(function* () {
-						const entityRow = yield* deps.entityRepo.insert({
-							entityType: "icalendar",
-							logicalUid: event.uid,
-						});
-						yield* deps.componentRepo.insertTree(
-							EntityId(entityRow.id),
-							subDoc.root,
-						);
-						yield* deps.instanceSvc.put({
-							collectionId,
-							entityId: EntityId(entityRow.id),
-							contentType: "text/calendar",
-							etag,
-							slug,
-							contentLength,
-						});
-					}),
-				).pipe(Effect.provideService(DatabaseClient, deps.db));
+				yield* withTransaction(insertFeedEvent(deps, write)).pipe(
+					Effect.provideService(DatabaseClient, deps.db),
+				);
 				continue;
 			}
 
-			// Existing UID — only rewrite if etag changed. Avoids churn on idempotent
-			// resyncs of a feed that hasn't changed.
-			if (prev.etag === etag) {
+			// Existing UID — only rewrite if etag changed. Avoids churn on
+			// idempotent resyncs of a feed that hasn't changed.
+			if (prev.etag === write.etag) {
 				continue;
 			}
-			yield* withTransaction(
-				Effect.gen(function* () {
-					yield* deps.componentRepo.deleteByEntity(prev.entityId);
-					yield* deps.componentRepo.insertTree(prev.entityId, subDoc.root);
-					yield* deps.instanceSvc.put(
-						{
-							collectionId,
-							entityId: prev.entityId,
-							contentType: "text/calendar",
-							etag,
-							slug: Slug(prev.slug),
-							contentLength,
-						},
-						prev.instanceId,
-					);
-				}),
-			).pipe(Effect.provideService(DatabaseClient, deps.db));
+			yield* withTransaction(replaceFeedEvent(deps, write, prev)).pipe(
+				Effect.provideService(DatabaseClient, deps.db),
+			);
 		}
 
 		// Anything in the local collection that's no longer in the feed: delete.
@@ -322,78 +352,119 @@ const readCapped = async (
  * metadata address). Follows redirects manually up to `maxRedirects`, and
  * caps the final response body at `maxResponseBytes`.
  */
+/** Conditional-request inputs, sent only on the first hop */
+interface ConditionalHeaders {
+	readonly ifNoneMatch: string | null;
+	readonly ifModifiedSince: string | null;
+}
+
+/** Reject a host that resolves to no address, or to a blocked one */
+const assertHostAllowed = Effect.fn("sync.external.assertHostAllowed")(
+	function* (hostname: string) {
+		const guard = yield* NetworkGuardService;
+		const addresses = yield* guard.resolveAddresses(hostname);
+		if (addresses.length === 0 || addresses.some(isBlockedAddress)) {
+			return yield* Effect.fail(
+				new InternalError({
+					cause: new Error(`URL host is not allowed: ${hostname}`),
+				}),
+			);
+		}
+	},
+);
+
+/** Request headers for one hop; the conditional headers ride only on the first */
+const requestHeaders = (
+	hop: number,
+	conditional: ConditionalHeaders,
+): Headers => {
+	const headers = new Headers({
+		Accept: "text/calendar, text/*;q=0.5",
+		"User-Agent": "shuriken-ts/sync",
+	});
+	if (hop > 0) {
+		return headers;
+	}
+	if (conditional.ifNoneMatch !== null) {
+		headers.set("If-None-Match", conditional.ifNoneMatch);
+	}
+	if (conditional.ifModifiedSince !== null) {
+		headers.set("If-Modified-Since", conditional.ifModifiedSince);
+	}
+	return headers;
+};
+
+/** Validate a 3xx Location and resolve it against the URL that produced it */
+const nextRedirectUrl = Effect.fn("sync.external.nextRedirectUrl")(function* (
+	response: Response,
+	url: URL,
+	hop: number,
+	maxRedirects: number,
+) {
+	const location = response.headers.get("location");
+	if (location === null) {
+		return yield* Effect.fail(
+			new InternalError({
+				cause: new Error(
+					`redirect (status ${response.status}) with no Location header`,
+				),
+			}),
+		);
+	}
+	if (hop >= maxRedirects) {
+		return yield* Effect.fail(
+			new InternalError({ cause: new Error("too many redirects") }),
+		);
+	}
+	const next = yield* Effect.try({
+		try: () => new URL(location, url),
+		catch: (e) => new InternalError({ cause: e }),
+	});
+	if (next.protocol !== "http:" && next.protocol !== "https:") {
+		return yield* Effect.fail(
+			new InternalError({
+				cause: new Error(`redirect to unsupported scheme: ${next.protocol}`),
+			}),
+		);
+	}
+	return next;
+});
+
+/** True for a 3xx status, which fetchWithGuard resolves itself */
+const isRedirect = (status: number): boolean =>
+	status >= HTTP_MULTIPLE_CHOICES && status < HTTP_BAD_REQUEST;
+
+/**
+ * SSRF-guarded fetch: resolves and rejects private/loopback/link-local/
+ * metadata hosts before *every* connection attempt — including each redirect
+ * hop, since `fetch`'s automatic redirect-following would otherwise connect
+ * to an unvalidated host (DNS rebinding, or a feed 302-ing to the cloud
+ * metadata address). Follows redirects manually up to `maxRedirects`, and
+ * caps the final response body at `maxResponseBytes`.
+ */
 const fetchWithGuard = (
 	startUrl: URL,
-	opts: {
-		readonly ifNoneMatch: string | null;
-		readonly ifModifiedSince: string | null;
+	opts: ConditionalHeaders & {
 		readonly maxRedirects: number;
 		readonly maxResponseBytes: number;
 	},
 ): Effect.Effect<GuardedFetchResult, InternalError, NetworkGuardService> =>
 	Effect.gen(function* () {
-		const guard = yield* NetworkGuardService;
 		let url = startUrl;
 		let hop = 0;
 		for (;;) {
-			const addresses = yield* guard.resolveAddresses(url.hostname);
-			if (addresses.length === 0 || addresses.some(isBlockedAddress)) {
-				return yield* Effect.fail(
-					new InternalError({
-						cause: new Error(`URL host is not allowed: ${url.hostname}`),
-					}),
-				);
-			}
-
-			const headers = new Headers({
-				Accept: "text/calendar, text/*;q=0.5",
-				"User-Agent": "shuriken-ts/sync",
-			});
-			if (hop === 0 && opts.ifNoneMatch !== null) {
-				headers.set("If-None-Match", opts.ifNoneMatch);
-			}
-			if (hop === 0 && opts.ifModifiedSince !== null) {
-				headers.set("If-Modified-Since", opts.ifModifiedSince);
-			}
-
+			yield* assertHostAllowed(url.hostname);
 			const response = yield* Effect.tryPromise({
-				try: () => fetch(url, { headers, redirect: "manual" }),
+				try: () =>
+					fetch(url, {
+						headers: requestHeaders(hop, opts),
+						redirect: "manual",
+					}),
 				catch: (e) => new InternalError({ cause: e }),
 			});
 
-			if (
-				response.status >= HTTP_MULTIPLE_CHOICES &&
-				response.status < HTTP_BAD_REQUEST
-			) {
-				const location = response.headers.get("location");
-				if (location === null) {
-					return yield* Effect.fail(
-						new InternalError({
-							cause: new Error(
-								`redirect (status ${response.status}) with no Location header`,
-							),
-						}),
-					);
-				}
-				if (hop >= opts.maxRedirects) {
-					return yield* Effect.fail(
-						new InternalError({ cause: new Error("too many redirects") }),
-					);
-				}
-				const next = yield* Effect.try({
-					try: () => new URL(location, url),
-					catch: (e) => new InternalError({ cause: e }),
-				});
-				if (next.protocol !== "http:" && next.protocol !== "https:") {
-					return yield* Effect.fail(
-						new InternalError({
-							cause: new Error(
-								`redirect to unsupported scheme: ${next.protocol}`,
-							),
-						}),
-					);
-				}
-				url = next;
+			if (isRedirect(response.status)) {
+				url = yield* nextRedirectUrl(response, url, hop, opts.maxRedirects);
 				hop += 1;
 				continue;
 			}
@@ -424,6 +495,148 @@ const stampError = (
 		lastSyncError: error,
 	});
 
+/** Feed-level defaults, used by any claim that has no override of its own */
+interface FeedDefaults {
+	readonly displayname: string | null;
+	readonly color: string | null;
+}
+
+/** A successfully fetched and parsed feed, with its HTTP validators */
+interface LoadedFeed {
+	readonly doc: IrDocument;
+	readonly etag: string | null;
+	readonly lastModified: string | null;
+}
+
+/**
+ * Fetch and parse the feed. Every failure mode is recorded on the row and
+ * reported as `None`, so the caller simply stops.
+ */
+const loadFeed = Effect.fn("sync.external.loadFeed")(function* (
+	repo: SyncDependencies["repo"],
+	external: ExternalCalendarRow,
+	now: Temporal.Instant,
+) {
+	const config = yield* AppConfigService;
+	const targetUrl = yield* Effect.try({
+		try: () => new URL(external.url),
+		catch: (e) => new InternalError({ cause: e }),
+	});
+	const fetchResult = yield* fetchWithGuard(targetUrl, {
+		ifNoneMatch: external.httpEtag,
+		ifModifiedSince: external.httpLastModified,
+		maxRedirects: config.externalCalendar.maxRedirects,
+		maxResponseBytes: config.externalCalendar.maxResponseBytes,
+	}).pipe(Effect.result);
+	if (fetchResult._tag === "Failure") {
+		yield* stampError(
+			repo,
+			external.id,
+			now,
+			`fetch failed: ${String(fetchResult.failure)}`,
+		);
+		yield* Effect.logWarning("sync.external: fetch failed", {
+			id: external.id,
+			url: external.url,
+			cause: fetchResult.failure,
+		});
+		return Option.none<LoadedFeed>();
+	}
+	const response = fetchResult.success;
+
+	if (response.status === HTTP_NOT_MODIFIED) {
+		yield* repo.recordSyncResult(external.id, {
+			lastSyncStatus: "success",
+			lastSyncAt: now,
+			lastSyncError: null,
+		});
+		return Option.none<LoadedFeed>();
+	}
+	// Treat any non-2xx (after 304 short-circuit) as failure. Redirects are
+	// resolved inside fetchWithGuard, so anything <200 or ≥400 here is real.
+	if (response.status < HTTP_OK || response.status >= HTTP_BAD_REQUEST) {
+		yield* stampError(repo, external.id, now, `HTTP ${response.status}`);
+		return Option.none<LoadedFeed>();
+	}
+
+	const docResult = yield* decodeICalendar(response.body).pipe(Effect.result);
+	if (docResult._tag === "Failure") {
+		yield* stampError(
+			repo,
+			external.id,
+			now,
+			`parse failed: ${String(docResult.failure)}`,
+		);
+		return Option.none<LoadedFeed>();
+	}
+	return Option.some<LoadedFeed>({
+		doc: docResult.success,
+		etag: response.etag,
+		lastModified: response.lastModified,
+	});
+});
+
+/**
+ * Apply the feed to one claim: metadata first, then the event reconcile.
+ *
+ * Policy B (chosen for #7+#12): the claim's override always wins; when null
+ * the dav_collection follows the feed's freshly-parsed default. So feed
+ * renames propagate automatically until the user PROPPATCHes a name/color of
+ * their own (M4 routes that into the override columns).
+ *
+ * Per-claim failures don't abort the rest of the sync; they are logged so one
+ * user's broken collection doesn't starve the others.
+ */
+const syncClaim = Effect.fn("sync.external.syncClaim")(function* (
+	deps: SyncDependencies,
+	feed: {
+		readonly id: UuidString;
+		readonly root: IrComponent;
+		readonly events: ReadonlyArray<ParsedEvent>;
+		readonly defaults: FeedDefaults;
+	},
+	claim: ExternalCalendarClaimRow,
+) {
+	const collSvc = yield* CollectionService;
+	const collectionId = CollectionId(claim.collectionId);
+
+	const metadataPatch = yield* applyClaimMetadata(
+		collSvc,
+		collectionId,
+		claim.displaynameOverride ?? feed.defaults.displayname,
+		claim.colorOverride ?? feed.defaults.color,
+	).pipe(Effect.result);
+	if (metadataPatch._tag === "Failure") {
+		yield* Effect.logWarning("sync.external: metadata update failed", {
+			id: feed.id,
+			claimId: claim.id,
+			cause: metadataPatch.failure,
+		});
+	}
+
+	const claimResult = yield* reconcileClaim(
+		deps,
+		collectionId,
+		feed.root,
+		feed.events,
+	).pipe(Effect.result);
+	if (claimResult._tag === "Failure") {
+		yield* Effect.logWarning("sync.external: claim reconcile failed", {
+			id: feed.id,
+			claimId: claim.id,
+			cause: claimResult.failure,
+		});
+	}
+});
+
+/** Sync failures are surfaced on the row and in the log, never raised upward */
+const logUnexpected = Effect.fn("sync.external.logUnexpected")(function* (
+	id: UuidString,
+	cause: unknown,
+) {
+	yield* Effect.logError("sync.external: unexpected error", { id, cause });
+});
+
 const syncOne = (
 	id: UuidString,
 ): Effect.Effect<
@@ -441,131 +654,48 @@ const syncOne = (
 	Effect.gen(function* () {
 		yield* Effect.annotateCurrentSpan({ "external_calendar.id": id });
 		const repo = yield* ExternalCalendarRepository;
-		const entityRepo = yield* EntityRepository;
-		const componentRepo = yield* ComponentRepository;
-		const instanceSvc = yield* InstanceService;
-		const db = yield* DatabaseClient;
-		const config = yield* AppConfigService;
+		const deps: SyncDependencies = {
+			repo,
+			entityRepo: yield* EntityRepository,
+			componentRepo: yield* ComponentRepository,
+			instanceSvc: yield* InstanceService,
+			db: yield* DatabaseClient,
+		};
 
 		const externalOpt = yield* repo.findById(id);
 		if (Option.isNone(externalOpt)) {
 			yield* Effect.logDebug("sync.external: row missing or deleted", { id });
 			return;
 		}
-		const external = externalOpt.value;
 		const now = Temporal.Now.instant();
-		const deps: SyncDependencies = {
-			repo,
-			entityRepo,
-			componentRepo,
-			instanceSvc,
-			db,
-		};
-
-		const targetUrl = yield* Effect.try({
-			try: () => new URL(external.url),
-			catch: (e) => new InternalError({ cause: e }),
-		});
-
-		const fetchResult = yield* fetchWithGuard(targetUrl, {
-			ifNoneMatch: external.httpEtag,
-			ifModifiedSince: external.httpLastModified,
-			maxRedirects: config.externalCalendar.maxRedirects,
-			maxResponseBytes: config.externalCalendar.maxResponseBytes,
-		}).pipe(Effect.result);
-		if (fetchResult._tag === "Failure") {
-			yield* stampError(
-				repo,
-				id,
-				now,
-				`fetch failed: ${String(fetchResult.failure)}`,
-			);
-			yield* Effect.logWarning("sync.external: fetch failed", {
-				id,
-				url: external.url,
-				cause: fetchResult.failure,
-			});
+		const loaded = yield* loadFeed(repo, externalOpt.value, now);
+		if (Option.isNone(loaded)) {
 			return;
 		}
-		const response = fetchResult.success;
-
-		if (response.status === HTTP_NOT_MODIFIED) {
-			yield* repo.recordSyncResult(id, {
-				lastSyncStatus: "success",
-				lastSyncAt: now,
-				lastSyncError: null,
-			});
-			return;
-		}
-		// Treat any non-2xx (after 304 short-circuit) as failure. Redirects are
-		// resolved inside fetchWithGuard, so anything <200 or ≥400 here is real.
-		if (response.status < HTTP_OK || response.status >= HTTP_BAD_REQUEST) {
-			yield* stampError(repo, id, now, `HTTP ${response.status}`);
-			return;
-		}
-
-		const docResult = yield* decodeICalendar(response.body).pipe(Effect.result);
-		if (docResult._tag === "Failure") {
-			yield* stampError(
-				repo,
-				id,
-				now,
-				`parse failed: ${String(docResult.failure)}`,
-			);
-			return;
-		}
-		const doc = docResult.success;
-		const events = groupByUid(doc);
+		const feed = loaded.value;
 
 		// Apply feed-level defaults so future claims can read them. Live claims
 		// own their displayname/color separately (Policy B handled in M4).
-		const defaultDisplayname =
-			extractCalProp(doc.root, "X-WR-CALNAME") ??
-			extractCalProp(doc.root, "NAME");
-		const defaultColor = extractCalProp(doc.root, "X-APPLE-CALENDAR-COLOR");
-		const etagHeader = response.etag;
-		const lastModHeader = response.lastModified;
+		const defaults: FeedDefaults = {
+			displayname:
+				extractCalProp(feed.doc.root, "X-WR-CALNAME") ??
+				extractCalProp(feed.doc.root, "NAME") ??
+				null,
+			color: extractCalProp(feed.doc.root, "X-APPLE-CALENDAR-COLOR") ?? null,
+		};
 
 		const claims = yield* repo.listClaimsForExternal(id);
-		const collSvc = yield* CollectionService;
 		for (const claim of claims) {
-			// Policy B (chosen for #7+#12): the claim's override always wins;
-			// when null the dav_collection follows the feed's freshly-parsed
-			// default. So feed renames propagate automatically until the user
-			// PROPPATCHes a name/color of their own (M4 routes that into the
-			// override columns).
-			const effectiveDisplayname =
-				claim.displaynameOverride ?? defaultDisplayname ?? null;
-			const effectiveColor = claim.colorOverride ?? defaultColor ?? null;
-			const metadataPatch = yield* applyClaimMetadata(
-				collSvc,
-				claim.collectionId as CollectionId,
-				effectiveDisplayname,
-				effectiveColor,
-			).pipe(Effect.result);
-			if (metadataPatch._tag === "Failure") {
-				yield* Effect.logWarning("sync.external: metadata update failed", {
-					id,
-					claimId: claim.id,
-					cause: metadataPatch.failure,
-				});
-			}
-
-			const claimResult = yield* reconcileClaim(
+			yield* syncClaim(
 				deps,
-				claim.collectionId as CollectionId,
-				doc.root,
-				events,
-			).pipe(Effect.result);
-			if (claimResult._tag === "Failure") {
-				// Per-claim failures don't abort the rest of the sync; log and
-				// continue so one user's broken collection doesn't starve others.
-				yield* Effect.logWarning("sync.external: claim reconcile failed", {
+				{
 					id,
-					claimId: claim.id,
-					cause: claimResult.failure,
-				});
-			}
+					root: feed.doc.root,
+					events: groupByUid(feed.doc),
+					defaults,
+				},
+				claim,
+			);
 		}
 
 		yield* repo.recordSyncResult(id, {
@@ -573,22 +703,12 @@ const syncOne = (
 			lastSyncAt: now,
 			fetchedAt: now,
 			lastSyncError: null,
-			httpEtag: etagHeader ?? null,
-			httpLastModified: lastModHeader ?? null,
-			defaultDisplayname: defaultDisplayname ?? null,
-			defaultColor: defaultColor ?? null,
+			httpEtag: feed.etag,
+			httpLastModified: feed.lastModified,
+			defaultDisplayname: defaults.displayname,
+			defaultColor: defaults.color,
 		});
-	}).pipe(
-		// `syncOne` is intentionally not allowed to fail upward — sync errors are
-		// surfaced via `last_sync_status`/`last_sync_error` on the row and via
-		// logs. Background scheduler treats all returns as "tried; move on."
-		Effect.catch((err) =>
-			Effect.logError("sync.external: unexpected error", {
-				id,
-				cause: err,
-			}).pipe(Effect.as<void>(undefined)),
-		),
-	);
+	}).pipe(Effect.catch((err) => logUnexpected(id, err)));
 
 export const ExternalCalendarSyncServiceLive = Layer.effect(
 	ExternalCalendarSyncService,

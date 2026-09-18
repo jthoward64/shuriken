@@ -7,11 +7,14 @@
 // ---------------------------------------------------------------------------
 
 import { Effect, Option } from "effect";
+import type { Temporal } from "temporal-polyfill";
 import { AppConfigService } from "#src/config.ts";
 import { resolveCalendarZone } from "#src/data/icalendar/calendar-zone.ts";
 import { encodeICalendar } from "#src/data/icalendar/codec.ts";
+import type { RruleExpansionLimits } from "#src/data/icalendar/recurrence/recurrence-check.ts";
+import type { ResolutionZone } from "#src/data/icalendar/resolve-floating.ts";
 import { redactDocumentToBusyOnly } from "#src/data/icalendar/visibility.ts";
-import type { ClarkName, IrDocument } from "#src/data/ir.ts";
+import type { ClarkName, IrComponent, IrDocument } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import {
 	forbidden,
@@ -39,13 +42,19 @@ import {
 	InstanceRepository,
 	InstanceService,
 } from "#src/services/instance/index.ts";
+import type { InstanceRow } from "#src/services/instance/repository.ts";
 import { IanaTimezoneService } from "#src/services/timezone/iana.ts";
 import {
+	type CalendarDataSpec,
 	parseCalendarDataSpec,
 	stripKnownVtimezones,
 	subsetIrDocument,
 } from "./calendar-data.ts";
-import { evaluateCalFilter, parseCalFilter } from "./filter-cal.ts";
+import {
+	type CalFilter,
+	evaluateCalFilter,
+	parseCalFilter,
+} from "./filter-cal.ts";
 import { extractPropNames } from "./parse.ts";
 
 const CALDAV_NS = "urn:ietf:params:xml:ns:caldav";
@@ -54,32 +63,40 @@ const cn = (local: string): ClarkName => `{${CALDAV_NS}}${local}` as ClarkName;
 const CALENDAR_DATA = cn("calendar-data");
 
 // ---------------------------------------------------------------------------
-// Extract top-level component type from filter (e.g. VEVENT, VTODO)
+// Extract top-level component type from filter
 // ---------------------------------------------------------------------------
+
+/** Component names cal_index can pre-filter candidates on */
+const CAL_COMPONENT_TYPES: ReadonlySet<string> = new Set([
+	"VEVENT",
+	"VTODO",
+	"VJOURNAL",
+	"VFREEBUSY",
+]);
+
+const isCalComponentType = (name: string): name is CalComponentType =>
+	CAL_COMPONENT_TYPES.has(name);
+
+/** A cal_index time-range pre-filter; an open-ended bound stays null */
+interface IndexTimeRange {
+	readonly start: Temporal.Instant | null;
+	readonly end: Temporal.Instant | null;
+}
 
 /**
  * Walk the comp-filter tree to find the first non-VCALENDAR component name.
  * This is used to pre-filter candidates from cal_index by component type.
  */
 const extractComponentType = (
-	filter: import("./filter-cal.ts").CalFilter,
-): CalComponentType | null => {
+	filter: CalFilter,
+): Option.Option<CalComponentType> => {
 	const vcal = filter.compFilter;
 	if (vcal.name !== "VCALENDAR") {
-		return null;
+		return Option.none();
 	}
-	for (const cf of vcal.compFilters) {
-		const name = cf.name as CalComponentType;
-		if (
-			name === "VEVENT" ||
-			name === "VTODO" ||
-			name === "VJOURNAL" ||
-			name === "VFREEBUSY"
-		) {
-			return name;
-		}
-	}
-	return null;
+	return Option.fromNullishOr(
+		vcal.compFilters.map((cf) => cf.name).find(isCalComponentType),
+	);
 };
 
 /**
@@ -87,22 +104,91 @@ const extractComponentType = (
  * inside VCALENDAR, if any.
  */
 const extractTimeRange = (
-	filter: import("./filter-cal.ts").CalFilter,
+	filter: CalFilter,
 	componentType: CalComponentType,
-): {
-	start: import("temporal-polyfill").Temporal.Instant | null;
-	end: import("temporal-polyfill").Temporal.Instant | null;
-} | null => {
-	const vcal = filter.compFilter;
-	const cf = vcal.compFilters.find((c) => c.name === componentType);
-	if (!cf?.timeRange) {
-		return null;
-	}
-	return {
-		start: cf.timeRange.start ?? null,
-		end: cf.timeRange.end ?? null,
-	};
+): Option.Option<IndexTimeRange> => {
+	const cf = filter.compFilter.compFilters.find(
+		(c) => c.name === componentType,
+	);
+	return cf?.timeRange === undefined
+		? Option.none()
+		: Option.some({
+				start: cf.timeRange.start ?? null,
+				end: cf.timeRange.end ?? null,
+			});
 };
+
+// ---------------------------------------------------------------------------
+// Request-body accessors
+// ---------------------------------------------------------------------------
+
+/** True when an unknown value is a plain (non-null) object */
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+	typeof value === "object" && value !== null;
+
+/** Text of an element that fast-xml-parser may have collapsed to a bare string */
+const elementText = (el: unknown): string | null => {
+	if (typeof el === "string") {
+		return el.trim();
+	}
+	return isRecord(el) && "#text" in el ? String(el["#text"]).trim() : null;
+};
+
+/** The `<C:calendar-data>` subsetting element inside `<D:prop>`, if present */
+const calendarDataTree = (tree: unknown): unknown => {
+	if (!isRecord(tree)) {
+		return undefined;
+	}
+	const propEl = tree["{DAV:}prop"];
+	return isRecord(propEl) ? propEl[CALENDAR_DATA] : undefined;
+};
+
+// ---------------------------------------------------------------------------
+// Per-instance response
+// ---------------------------------------------------------------------------
+
+/** What building one matching instance's response needs besides the instance */
+interface QueryResponseContext {
+	readonly filter: CalFilter;
+	readonly zone: ResolutionZone;
+	readonly limits: RruleExpansionLimits;
+	readonly spec: CalendarDataSpec;
+	readonly propfind: PropfindKind;
+	readonly hasFullRead: boolean;
+	readonly hrefBase: string;
+	readonly stripTimezones: (doc: IrDocument) => IrDocument;
+}
+
+/**
+ * Multistatus entry for one candidate instance, or none when its tree is
+ * missing or the filter rejects it.
+ */
+const buildQueryResponse = Effect.fn("calendar-query.buildResponse")(function* (
+	inst: InstanceRow,
+	root: IrComponent | undefined,
+	ctx: QueryResponseContext,
+) {
+	if (root === undefined) {
+		return Option.none<DavResponse>();
+	}
+	const irDoc: IrDocument = { kind: "icalendar", root };
+	if (!evaluateCalFilter(irDoc, ctx.filter, ctx.zone, ctx.limits)) {
+		return Option.none<DavResponse>();
+	}
+	const redactedDoc = ctx.hasFullRead ? irDoc : redactDocumentToBusyOnly(irDoc);
+	const dataStr = yield* encodeICalendar(
+		ctx.stripTimezones(subsetIrDocument(redactedDoc, ctx.spec, ctx.zone)),
+	);
+	const instanceProps = buildInstanceProps(inst);
+	const allProps: Record<ClarkName, unknown> = {
+		...instanceProps,
+		[CALENDAR_DATA]: dataStr,
+	};
+	return Option.some<DavResponse>({
+		href: `${ctx.hrefBase}/${encodeSegment(inst.slug || inst.id)}`,
+		propstats: splitPropstats(allProps, ctx.propfind),
+	});
+});
 
 // ---------------------------------------------------------------------------
 // Handler
@@ -154,25 +240,14 @@ export const calendarQueryHandler = (
 		).includes("DAV:read");
 
 		// Parse filter
-		const obj =
-			typeof tree === "object" && tree !== null
-				? (tree as Record<string, unknown>)
-				: {};
+		const obj: Record<string, unknown> = isRecord(tree) ? tree : {};
 		const filterTree = obj[cn("filter")];
 		const filter = yield* parseCalFilter({ [cn("filter")]: filterTree });
 
 		// RFC 7809 §6.2: parse optional <C:timezone-id> for floating-datetime context.
 		// Validate against known IANA timezones; fail with CALDAV:valid-timezone if unknown.
 		const ianaSvc = yield* IanaTimezoneService;
-		const timezoneIdEl = obj[cn("timezone-id")];
-		const timezoneIdStr =
-			typeof timezoneIdEl === "string"
-				? timezoneIdEl.trim()
-				: typeof timezoneIdEl === "object" &&
-						timezoneIdEl !== null &&
-						"#text" in (timezoneIdEl as Record<string, unknown>)
-					? String((timezoneIdEl as Record<string, unknown>)["#text"]).trim()
-					: null;
+		const timezoneIdStr = elementText(obj[cn("timezone-id")]);
 		if (
 			timezoneIdStr !== null &&
 			timezoneIdStr !== "" &&
@@ -194,15 +269,7 @@ export const calendarQueryHandler = (
 		});
 
 		// Parse optional calendar-data subsetting spec (<C:calendar-data> is inside <D:prop>)
-		const propEl =
-			typeof tree === "object" && tree !== null
-				? (tree as Record<string, unknown>)["{DAV:}prop"]
-				: undefined;
-		const dataTree =
-			typeof propEl === "object" && propEl !== null
-				? (propEl as Record<string, unknown>)[CALENDAR_DATA]
-				: undefined;
-		const spec = parseCalendarDataSpec(dataTree);
+		const spec = parseCalendarDataSpec(calendarDataTree(tree));
 
 		// Determine prop names
 		const propNames = extractPropNames(tree);
@@ -213,60 +280,59 @@ export const calendarQueryHandler = (
 
 		// Determine component type for pre-filtering
 		const componentType = extractComponentType(filter);
-		const timeRange = componentType
-			? extractTimeRange(filter, componentType)
-			: null;
+		const timeRange = Option.flatMap(componentType, (type) =>
+			extractTimeRange(filter, type),
+		);
 
 		// Retrieve candidate instances via SQL pre-filter or full scan
 		const instSvc = yield* InstanceService;
 		const instRepo = yield* InstanceRepository;
 		const calIdx = yield* CalIndexRepository;
 
-		const instances = yield* (() => {
-			if (componentType && timeRange) {
-				// Time-range pre-filter via cal_index. The repository derives its own
-				// bucket narrowing from the range; an open-ended range (RFC 4791 §9.9)
-				// must not be narrowed to a window, so it is passed through as null.
-				return calIdx
-					.findByTimeRange(path.collectionId, componentType, {
-						start: timeRange.start,
-						end: timeRange.end,
-						zone,
-					})
-					.pipe(
-						Effect.flatMap((entityIds) =>
-							instRepo.findByIds(
-								entityIds.map((id) => InstanceId(id as UuidString)),
-							),
-						),
-					);
-			}
-			if (componentType) {
-				// Component-type pre-filter via cal_index (no time range)
-				return calIdx
-					.findByComponentType(path.collectionId, componentType)
-					.pipe(
-						Effect.flatMap((entityIds) =>
-							instRepo.findByIds(
-								entityIds.map((id) => InstanceId(id as UuidString)),
-							),
-						),
-					);
-			}
-			// No structural hint — scan all instances
-			return instSvc.listByCollection(path.collectionId);
-		})();
+		// A structural hint lets cal_index narrow the candidates. The repository
+		// derives its own bucket narrowing from the range; an open-ended range
+		// (RFC 4791 §9.9) must not be narrowed to a window, so it stays null.
+		const indexed = Option.map(componentType, (type) =>
+			Effect.flatMap(
+				Option.match(timeRange, {
+					onNone: () => calIdx.findByComponentType(path.collectionId, type),
+					onSome: (range) =>
+						calIdx.findByTimeRange(path.collectionId, type, {
+							start: range.start,
+							end: range.end,
+							zone,
+						}),
+				}),
+				(ids) =>
+					instRepo.findByIds(ids.map((id) => InstanceId(id as UuidString))),
+			),
+		);
+
+		// No structural hint — scan all instances
+		const instances = yield* Option.getOrElse(indexed, () =>
+			instSvc.listByCollection(path.collectionId),
+		);
 
 		// Load, evaluate, serialize
 		const compRepo = yield* ComponentRepository;
-		const origin = ctx.url.origin;
-		const responses: Array<DavResponse> = [];
 
-		// RFC 7809 §3.1.3: resolve the VTIMEZONE stripping function once per request.
-		const stripTimezones =
-			ctx.caldavTimezones === "F"
-				? (doc: IrDocument) => stripKnownVtimezones(doc, ianaSvc.isKnownTzid)
-				: (doc: IrDocument) => doc;
+		const responseCtx: QueryResponseContext = {
+			filter,
+			zone,
+			limits: {
+				maxOccurrencesChecked: config.recurrence.rruleMaxOccurrences,
+				timeBudgetMs: config.recurrence.rruleTimeBudgetMs,
+			},
+			spec,
+			propfind,
+			hasFullRead,
+			hrefBase: `${ctx.url.origin}/dav/principals/${path.principalSeg}/${path.namespace}/${path.collectionSeg}`,
+			// RFC 7809 §3.1.3: resolve the VTIMEZONE stripping function once per request
+			stripTimezones:
+				ctx.caldavTimezones === "F"
+					? (doc: IrDocument) => stripKnownVtimezones(doc, ianaSvc.isKnownTzid)
+					: (doc: IrDocument) => doc,
+		};
 
 		// Batch-load all candidate trees in 3 queries instead of 3 per instance.
 		const trees = yield* compRepo.loadTreesByIds(
@@ -274,37 +340,13 @@ export const calendarQueryHandler = (
 			"icalendar",
 		);
 
-		for (const inst of instances) {
-			const entityTree = trees.get(inst.entityId as unknown as EntityId);
-			if (entityTree === undefined) {
-				continue;
-			}
-			const irDoc: IrDocument = { kind: "icalendar", root: entityTree };
+		const built = yield* Effect.forEach(instances, (inst) =>
+			buildQueryResponse(
+				inst,
+				trees.get(inst.entityId as unknown as EntityId),
+				responseCtx,
+			),
+		);
 
-			if (
-				!evaluateCalFilter(irDoc, filter, zone, {
-					maxOccurrencesChecked: config.recurrence.rruleMaxOccurrences,
-					timeBudgetMs: config.recurrence.rruleTimeBudgetMs,
-				})
-			) {
-				continue;
-			}
-
-			const redactedDoc = hasFullRead ? irDoc : redactDocumentToBusyOnly(irDoc);
-			const dataStr = yield* encodeICalendar(
-				stripTimezones(subsetIrDocument(redactedDoc, spec, zone)),
-			);
-
-			const href = `${origin}/dav/principals/${path.principalSeg}/${path.namespace}/${path.collectionSeg}/${encodeSegment(inst.slug || inst.id)}`;
-			const allProps: Record<ClarkName, unknown> = {
-				...buildInstanceProps(inst),
-				[CALENDAR_DATA]: dataStr,
-			};
-			responses.push({
-				href,
-				propstats: splitPropstats(allProps, propfind),
-			});
-		}
-
-		return yield* multistatusResponse(responses);
+		return yield* multistatusResponse(built.flatMap(Option.toArray));
 	});

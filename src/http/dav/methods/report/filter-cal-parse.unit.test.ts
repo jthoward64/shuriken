@@ -2,11 +2,7 @@ import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
 import { Effect } from "effect";
 import { Temporal } from "temporal-polyfill";
-import {
-	type CalFilter,
-	type CompFilter,
-	parseCalFilter,
-} from "./filter-cal.ts";
+import { parseCalFilter } from "./filter-cal.ts";
 
 // Parsing of the CALDAV:filter element. Evaluation of a parsed filter against a
 // component lives in filter-cal.unit.test.ts.
@@ -24,19 +20,23 @@ const T_JAN15_11 = Temporal.Instant.from(
 
 describe("parseCalFilter — invalid inputs", () => {
 	it("fails with CALDAV:valid-filter when tree is null", async () => {
-		const result = await Effect.runPromise(Effect.result(parseCalFilter(null)));
+		const result = await Effect.runPromise(
+			parseCalFilter(null).pipe(Effect.result),
+		);
 		expect(result._tag).toBe("Failure");
 	});
 
 	it("fails when tree is not an object", async () => {
 		const result = await Effect.runPromise(
-			Effect.result(parseCalFilter("bad")),
+			parseCalFilter("bad").pipe(Effect.result),
 		);
 		expect(result._tag).toBe("Failure");
 	});
 
 	it("fails when filter element is missing", async () => {
-		const result = await Effect.runPromise(Effect.result(parseCalFilter({})));
+		const result = await Effect.runPromise(
+			parseCalFilter({}).pipe(Effect.result),
+		);
 		expect(result._tag).toBe("Failure");
 	});
 
@@ -44,7 +44,7 @@ describe("parseCalFilter — invalid inputs", () => {
 		const CaldavNs = "urn:ietf:params:xml:ns:caldav";
 		const cn = (l: string) => `{${CaldavNs}}${l}`;
 		const result = await Effect.runPromise(
-			Effect.result(parseCalFilter({ [cn("filter")]: {} })),
+			parseCalFilter({ [cn("filter")]: {} }).pipe(Effect.result),
 		);
 		expect(result._tag).toBe("Failure");
 	});
@@ -53,7 +53,7 @@ describe("parseCalFilter — invalid inputs", () => {
 		const CaldavNs = "urn:ietf:params:xml:ns:caldav";
 		const cn = (l: string) => `{${CaldavNs}}${l}`;
 		const result = await Effect.runPromise(
-			Effect.result(parseCalFilter({ [cn("filter")]: "bad" })),
+			parseCalFilter({ [cn("filter")]: "bad" }).pipe(Effect.result),
 		);
 		expect(result._tag).toBe("Failure");
 	});

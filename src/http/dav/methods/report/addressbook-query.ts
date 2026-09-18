@@ -6,8 +6,8 @@
 // card_index for FN text-match queries.
 // ---------------------------------------------------------------------------
 
-import { Effect } from "effect";
-import type { ClarkName, IrDocument } from "#src/data/ir.ts";
+import { Effect, Option } from "effect";
+import type { ClarkName, IrComponent, IrDocument } from "#src/data/ir.ts";
 import { encodeVCard } from "#src/data/vcard/codec.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import { methodNotAllowed, unauthorized } from "#src/domain/errors.ts";
@@ -34,12 +34,18 @@ import {
 	InstanceRepository,
 	InstanceService,
 } from "#src/services/instance/index.ts";
+import type { InstanceRow } from "#src/services/instance/repository.ts";
 import {
+	type AddressDataSpec,
 	applyVersion,
 	parseAddressDataSpec,
 	subsetVCardDocument,
 } from "./address-data.ts";
-import { evaluateCardFilter, parseCardFilter } from "./filter-card.ts";
+import {
+	type CardFilter,
+	evaluateCardFilter,
+	parseCardFilter,
+} from "./filter-card.ts";
 import { extractPropNames } from "./parse.ts";
 
 const CARDDAV_NS = "urn:ietf:params:xml:ns:carddav";
@@ -51,40 +57,103 @@ const ADDRESS_DATA = cn("address-data");
 // Pre-filter hint extraction
 // ---------------------------------------------------------------------------
 
+/** A card_index FN text-match that can narrow the candidate set in SQL */
+interface FnPreFilter {
+	readonly text: string;
+	readonly collation: CardCollation;
+	readonly matchType: CardMatchType;
+}
+
 /**
  * If the filter has an allof FN text-match, return it for SQL pre-filtering.
  * This is an optimisation — false negatives are caught by in-memory evaluation.
  */
-const extractFnPreFilter = (
-	filter: import("./filter-card.ts").CardFilter,
-): {
-	text: string;
-	collation: CardCollation;
-	matchType: CardMatchType;
-} | null => {
+const extractFnPreFilter = (filter: CardFilter): Option.Option<FnPreFilter> => {
 	// Multiple prop-filters with anyof semantics require a union of index results.
 	// Fall back to full scan to avoid false negatives.
 	if (filter.propFilters.length !== 1) {
-		return null;
+		return Option.none();
 	}
 	const fnFilter = filter.propFilters.find(
 		(pf) => pf.name.toUpperCase() === "FN",
 	);
 	if (!fnFilter || fnFilter.isNotDefined || fnFilter.textMatches.length === 0) {
-		return null;
+		return Option.none();
 	}
 	// Only use the first text-match as a pre-filter hint (in-memory eval handles the rest)
 	const tm = fnFilter.textMatches[0];
-	if (!tm || tm.negate) {
-		return null;
-	}
 	// The card index folds case, so it can't serve a case-sensitive i;octet
 	// match — fall back to a full scan (the in-memory eval handles i;octet).
-	if (tm.collation === "i;octet") {
-		return null;
+	if (!tm || tm.negate || tm.collation === "i;octet") {
+		return Option.none();
 	}
-	return { text: tm.value, collation: tm.collation, matchType: tm.matchType };
+	return Option.some({
+		text: tm.value,
+		collation: tm.collation,
+		matchType: tm.matchType,
+	});
 };
+
+// ---------------------------------------------------------------------------
+// Request-body accessors
+// ---------------------------------------------------------------------------
+
+/** True when an unknown value is a plain (non-null) object */
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+	typeof value === "object" && value !== null;
+
+/** The `<C:address-data>` subsetting element inside `<D:prop>`, if present */
+const addressDataTree = (tree: unknown): unknown => {
+	if (!isRecord(tree)) {
+		return undefined;
+	}
+	const propEl = tree["{DAV:}prop"];
+	return isRecord(propEl) ? propEl[ADDRESS_DATA] : undefined;
+};
+
+// ---------------------------------------------------------------------------
+// Per-instance response
+// ---------------------------------------------------------------------------
+
+/** What building one matching instance's response needs besides the instance */
+interface QueryResponseContext {
+	readonly filter: CardFilter;
+	readonly spec: AddressDataSpec;
+	readonly propfind: PropfindKind;
+	readonly hrefBase: string;
+}
+
+/**
+ * Multistatus entry for one candidate instance, or none when its tree is
+ * missing or the filter rejects it.
+ */
+const buildQueryResponse = Effect.fn("addressbook-query.buildResponse")(
+	function* (
+		inst: InstanceRow,
+		root: IrComponent | undefined,
+		ctx: QueryResponseContext,
+	) {
+		if (root === undefined) {
+			return Option.none<DavResponse>();
+		}
+		const irDoc: IrDocument = { kind: "vcard", root };
+		if (!evaluateCardFilter(irDoc, ctx.filter)) {
+			return Option.none<DavResponse>();
+		}
+		const dataStr = yield* encodeVCard(
+			applyVersion(subsetVCardDocument(irDoc, ctx.spec), ctx.spec.version),
+		);
+		const instanceProps = buildInstanceProps(inst);
+		const allProps: Record<ClarkName, unknown> = {
+			...instanceProps,
+			[ADDRESS_DATA]: dataStr,
+		};
+		return Option.some<DavResponse>({
+			href: `${ctx.hrefBase}/${encodeSegment(inst.slug || inst.id)}`,
+			propstats: splitPropstats(allProps, ctx.propfind),
+		});
+	},
+);
 
 // ---------------------------------------------------------------------------
 // Handler
@@ -124,23 +193,12 @@ export const addressbookQueryHandler = (
 		);
 
 		// Parse filter
-		const obj =
-			typeof tree === "object" && tree !== null
-				? (tree as Record<string, unknown>)
-				: {};
+		const obj: Record<string, unknown> = isRecord(tree) ? tree : {};
 		const filterTree = obj[cn("filter")];
 		const filter = yield* parseCardFilter({ [cn("filter")]: filterTree });
 
 		// Parse optional address-data subsetting spec (<C:address-data> is inside <D:prop>)
-		const propEl =
-			typeof tree === "object" && tree !== null
-				? (tree as Record<string, unknown>)["{DAV:}prop"]
-				: undefined;
-		const dataTree =
-			typeof propEl === "object" && propEl !== null
-				? (propEl as Record<string, unknown>)[ADDRESS_DATA]
-				: undefined;
-		const spec = parseAddressDataSpec(dataTree);
+		const spec = parseAddressDataSpec(addressDataTree(tree));
 
 		// Determine prop names
 		const propNames = extractPropNames(tree);
@@ -154,31 +212,33 @@ export const addressbookQueryHandler = (
 		const instRepo = yield* InstanceRepository;
 		const cardIdx = yield* CardIndexRepository;
 
-		const fnHint = extractFnPreFilter(filter);
-
-		const instances = yield* (() => {
-			if (fnHint) {
-				return cardIdx
-					.findByText(path.collectionId, fnHint.text, {
-						field: "fn",
-						collation: fnHint.collation,
-						matchType: fnHint.matchType,
-					})
-					.pipe(
-						Effect.flatMap((entityIds) =>
-							instRepo.findByIds(
-								entityIds.map((id) => InstanceId(id as UuidString)),
-							),
-						),
-					);
-			}
-			return instSvc.listByCollection(path.collectionId);
-		})();
+		// An FN text-match lets card_index narrow the candidates; otherwise scan all
+		const indexed = Option.map(extractFnPreFilter(filter), (fnHint) =>
+			Effect.flatMap(
+				cardIdx.findByText(path.collectionId, fnHint.text, {
+					field: "fn",
+					collation: fnHint.collation,
+					matchType: fnHint.matchType,
+				}),
+				(entityIds) =>
+					instRepo.findByIds(
+						entityIds.map((id) => InstanceId(id as UuidString)),
+					),
+			),
+		);
+		const instances = yield* Option.getOrElse(indexed, () =>
+			instSvc.listByCollection(path.collectionId),
+		);
 
 		// Load, evaluate, serialize
 		const compRepo = yield* ComponentRepository;
-		const origin = ctx.url.origin;
-		const responses: Array<DavResponse> = [];
+
+		const responseCtx: QueryResponseContext = {
+			filter,
+			spec,
+			propfind,
+			hrefBase: `${ctx.url.origin}/dav/principals/${path.principalSeg}/${path.namespace}/${path.collectionSeg}`,
+		};
 
 		// Batch-load all candidate trees in 3 queries instead of 3 per instance.
 		const trees = yield* compRepo.loadTreesByIds(
@@ -186,31 +246,13 @@ export const addressbookQueryHandler = (
 			"vcard",
 		);
 
-		for (const inst of instances) {
-			const entityTree = trees.get(inst.entityId as unknown as EntityId);
-			if (entityTree === undefined) {
-				continue;
-			}
-			const irDoc: IrDocument = { kind: "vcard", root: entityTree };
+		const built = yield* Effect.forEach(instances, (inst) =>
+			buildQueryResponse(
+				inst,
+				trees.get(inst.entityId as unknown as EntityId),
+				responseCtx,
+			),
+		);
 
-			if (!evaluateCardFilter(irDoc, filter)) {
-				continue;
-			}
-
-			const dataStr = yield* encodeVCard(
-				applyVersion(subsetVCardDocument(irDoc, spec), spec.version),
-			);
-
-			const href = `${origin}/dav/principals/${path.principalSeg}/${path.namespace}/${path.collectionSeg}/${encodeSegment(inst.slug || inst.id)}`;
-			const allProps: Record<ClarkName, unknown> = {
-				...buildInstanceProps(inst),
-				[ADDRESS_DATA]: dataStr,
-			};
-			responses.push({
-				href,
-				propstats: splitPropstats(allProps, propfind),
-			});
-		}
-
-		return yield* multistatusResponse(responses);
+		return yield* multistatusResponse(built.flatMap(Option.toArray));
 	});

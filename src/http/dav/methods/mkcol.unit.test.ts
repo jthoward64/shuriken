@@ -1,7 +1,7 @@
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
 import { Effect, Option } from "effect";
-import type { DavError } from "#src/domain/errors.ts";
+import { DavError } from "#src/domain/errors.ts";
 import {
 	CollectionId,
 	InstanceId,
@@ -98,16 +98,24 @@ const makeEnv = () =>
 // MKCALENDAR
 // ---------------------------------------------------------------------------
 
+/** Narrows a handler failure to a DavError so its status can be asserted */
+const asDavError = (err: unknown): DavError => {
+	if (err instanceof DavError) {
+		return err;
+	}
+	throw new Error(`Expected a DavError but got: ${String(err)}`);
+};
+
 describe("mkcolHandler — MKCALENDAR", () => {
 	it("creates a calendar collection and returns 201 with Location header", async () => {
 		const env = makeEnv();
 		const path = makeNewCollectionPath("cal");
 
 		const res = await runSuccess(
-			mkcolHandler(path, authenticatedCtx, emptyRequest).pipe(
-				Effect.provide(env.toLayer()),
-				Effect.orDie,
-			),
+			Effect.provide(
+				mkcolHandler(path, authenticatedCtx, emptyRequest),
+				env.toLayer(),
+			).pipe(Effect.orDie),
 		);
 
 		expect(res.status).toBe(HTTP_CREATED);
@@ -119,10 +127,10 @@ describe("mkcolHandler — MKCALENDAR", () => {
 		const path = makeNewCollectionPath("cal");
 
 		const res = await runSuccess(
-			mkcolHandler(path, authenticatedCtx, emptyRequest).pipe(
-				Effect.provide(env.toLayer()),
-				Effect.orDie,
-			),
+			Effect.provide(
+				mkcolHandler(path, authenticatedCtx, emptyRequest),
+				env.toLayer(),
+			).pipe(Effect.orDie),
 		);
 
 		const location = res.headers.get("Location") ?? "";
@@ -136,10 +144,10 @@ describe("mkcolHandler — MKCALENDAR", () => {
 		const path = makeNewCollectionPath("cal");
 
 		await runSuccess(
-			mkcolHandler(path, authenticatedCtx, emptyRequest).pipe(
-				Effect.provide(env.toLayer()),
-				Effect.orDie,
-			),
+			Effect.provide(
+				mkcolHandler(path, authenticatedCtx, emptyRequest),
+				env.toLayer(),
+			).pipe(Effect.orDie),
 		);
 
 		const rows = [...env.stores.collections.values()];
@@ -163,8 +171,7 @@ describe("mkcolHandler — MKADDRESSBOOK", () => {
 		);
 
 		const res = await runSuccess(
-			mkcolHandler(path, ctx, emptyRequest).pipe(
-				Effect.provide(env.toLayer()),
+			Effect.provide(mkcolHandler(path, ctx, emptyRequest), env.toLayer()).pipe(
 				Effect.orDie,
 			),
 		);
@@ -184,8 +191,7 @@ describe("mkcolHandler — MKADDRESSBOOK", () => {
 		);
 
 		const res = await runSuccess(
-			mkcolHandler(path, ctx, emptyRequest).pipe(
-				Effect.provide(env.toLayer()),
+			Effect.provide(mkcolHandler(path, ctx, emptyRequest), env.toLayer()).pipe(
 				Effect.orDie,
 			),
 		);
@@ -209,8 +215,7 @@ describe("mkcolHandler — MKCOL", () => {
 		);
 
 		const res = await runSuccess(
-			mkcolHandler(path, ctx, emptyRequest).pipe(
-				Effect.provide(env.toLayer()),
+			Effect.provide(mkcolHandler(path, ctx, emptyRequest), env.toLayer()).pipe(
 				Effect.orDie,
 			),
 		);
@@ -238,10 +243,10 @@ describe("mkcolHandler — extended-MKCOL body", () => {
 </C:mkcalendar>`;
 
 		await runSuccess(
-			mkcolHandler(path, authenticatedCtx, makeRequest(body)).pipe(
-				Effect.provide(env.toLayer()),
-				Effect.orDie,
-			),
+			Effect.provide(
+				mkcolHandler(path, authenticatedCtx, makeRequest(body)),
+				env.toLayer(),
+			).pipe(Effect.orDie),
 		);
 
 		const rows = [...env.stores.collections.values()];
@@ -260,10 +265,10 @@ describe("mkcolHandler — extended-MKCOL body", () => {
 </C:mkcalendar>`;
 
 		await runSuccess(
-			mkcolHandler(path, authenticatedCtx, makeRequest(body)).pipe(
-				Effect.provide(env.toLayer()),
-				Effect.orDie,
-			),
+			Effect.provide(
+				mkcolHandler(path, authenticatedCtx, makeRequest(body)),
+				env.toLayer(),
+			).pipe(Effect.orDie),
 		);
 
 		const rows = [...env.stores.collections.values()];
@@ -285,10 +290,10 @@ describe("mkcolHandler — extended-MKCOL body", () => {
 </C:mkcalendar>`;
 
 		await runSuccess(
-			mkcolHandler(path, authenticatedCtx, makeRequest(body)).pipe(
-				Effect.provide(env.toLayer()),
-				Effect.orDie,
-			),
+			Effect.provide(
+				mkcolHandler(path, authenticatedCtx, makeRequest(body)),
+				env.toLayer(),
+			).pipe(Effect.orDie),
 		);
 
 		const rows = [...env.stores.collections.values()];
@@ -302,10 +307,10 @@ describe("mkcolHandler — extended-MKCOL body", () => {
 		const path = makeNewCollectionPath("cal");
 
 		const res = await runSuccess(
-			mkcolHandler(path, authenticatedCtx, emptyRequest).pipe(
-				Effect.provide(env.toLayer()),
-				Effect.orDie,
-			),
+			Effect.provide(
+				mkcolHandler(path, authenticatedCtx, emptyRequest),
+				env.toLayer(),
+			).pipe(Effect.orDie),
 		);
 
 		expect(res.status).toBe(HTTP_CREATED);
@@ -317,11 +322,14 @@ describe("mkcolHandler — extended-MKCOL body", () => {
 		const env = makeEnv();
 		const path = makeNewCollectionPath("cal");
 
-		const err = (await runFailure(
-			mkcolHandler(path, authenticatedCtx, makeRequest("<not-closed-tag")).pipe(
-				Effect.provide(env.toLayer()),
+		const err = asDavError(
+			await runFailure(
+				Effect.provide(
+					mkcolHandler(path, authenticatedCtx, makeRequest("<not-closed-tag")),
+					env.toLayer(),
+				),
 			),
-		)) as DavError;
+		);
 
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_UNSUPPORTED_MEDIA_TYPE);
@@ -341,11 +349,14 @@ describe("mkcolHandler — extended-MKCOL body", () => {
 			"col",
 		);
 
-		const err = (await runFailure(
-			mkcolHandler(path, ctx, makeRequest("<dummy>foo</dummy>")).pipe(
-				Effect.provide(env.toLayer()),
+		const err = asDavError(
+			await runFailure(
+				Effect.provide(
+					mkcolHandler(path, ctx, makeRequest("<dummy>foo</dummy>")),
+					env.toLayer(),
+				),
 			),
-		)) as DavError;
+		);
 
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_UNSUPPORTED_MEDIA_TYPE);
@@ -369,11 +380,14 @@ describe("mkcolHandler — method not allowed", () => {
 			collectionSeg: "some-collection",
 		};
 
-		const err = (await runFailure(
-			mkcolHandler(collectionPath, authenticatedCtx, emptyRequest).pipe(
-				Effect.provide(env.toLayer()),
+		const err = asDavError(
+			await runFailure(
+				Effect.provide(
+					mkcolHandler(collectionPath, authenticatedCtx, emptyRequest),
+					env.toLayer(),
+				),
 			),
-		)) as DavError;
+		);
 
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_METHOD_NOT_ALLOWED);
@@ -392,11 +406,14 @@ describe("mkcolHandler — method not allowed", () => {
 			instanceSeg: "some-instance",
 		};
 
-		const err = (await runFailure(
-			mkcolHandler(instancePath, authenticatedCtx, emptyRequest).pipe(
-				Effect.provide(env.toLayer()),
+		const err = asDavError(
+			await runFailure(
+				Effect.provide(
+					mkcolHandler(instancePath, authenticatedCtx, emptyRequest),
+					env.toLayer(),
+				),
 			),
-		)) as DavError;
+		);
 
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_METHOD_NOT_ALLOWED);
@@ -410,11 +427,14 @@ describe("mkcolHandler — method not allowed", () => {
 			principalSeg: String(TEST_PRINCIPAL_ID),
 		};
 
-		const err = (await runFailure(
-			mkcolHandler(principalPath, authenticatedCtx, emptyRequest).pipe(
-				Effect.provide(env.toLayer()),
+		const err = asDavError(
+			await runFailure(
+				Effect.provide(
+					mkcolHandler(principalPath, authenticatedCtx, emptyRequest),
+					env.toLayer(),
+				),
 			),
-		)) as DavError;
+		);
 
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_METHOD_NOT_ALLOWED);
@@ -430,11 +450,14 @@ describe("mkcolHandler — authentication", () => {
 		const env = makeTestEnv();
 		const path = makeNewCollectionPath("cal");
 
-		const err = (await runFailure(
-			mkcolHandler(path, unauthenticatedCtx, emptyRequest).pipe(
-				Effect.provide(env.toLayer()),
+		const err = asDavError(
+			await runFailure(
+				Effect.provide(
+					mkcolHandler(path, unauthenticatedCtx, emptyRequest),
+					env.toLayer(),
+				),
 			),
-		)) as DavError;
+		);
 
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_UNAUTHORIZED);

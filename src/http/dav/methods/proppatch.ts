@@ -15,6 +15,7 @@
 import { Effect, Option } from "effect";
 import { extractTzidFromVtimezone } from "#src/data/icalendar/calendar-zone.ts";
 import { type ClarkName, cn, type IrDeadProperties } from "#src/data/ir.ts";
+import { APPLE_ICAL_NS } from "#src/domain/calendar-color.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import {
 	badRequest,
@@ -22,10 +23,16 @@ import {
 	notFound,
 	unauthorized,
 } from "#src/domain/errors.ts";
-import { CollectionId, isUuid } from "#src/domain/ids.ts";
+import { CollectionId, isUuid, type PrincipalId } from "#src/domain/ids.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { encodeSegment } from "#src/http/dav/encode-segment.ts";
+import { readDeadProperties } from "#src/http/dav/methods/dead-properties.ts";
+import {
+	isXmlNode,
+	xmlChild,
+	xmlPath,
+} from "#src/http/dav/methods/xml-node.ts";
 import { normalizeClarkNames } from "#src/http/dav/xml/clark.ts";
 import type { DavResponse, Propstat } from "#src/http/dav/xml/multistatus.ts";
 import { multistatusResponse } from "#src/http/dav/xml/multistatus.ts";
@@ -95,6 +102,9 @@ const SCHEDULE_DEFAULT_CAL_URL_PROP = cn(
 	"schedule-default-calendar-URL",
 );
 
+// Apple's calendar-color, the one dead property a subscription claim mirrors
+const APPLE_CALENDAR_COLOR = cn(APPLE_ICAL_NS, "calendar-color");
+
 // Maps Clark name → DB field on principal
 const PRINCIPAL_LIVE_PROPS = new Map<ClarkName, "displayName">([
 	[cn(DAV_NS, "displayname"), "displayName"],
@@ -111,69 +121,6 @@ interface PropOp {
 	readonly remove: ReadonlySet<ClarkName>;
 }
 
-const parseProppatchBody = (req: Request): Effect.Effect<PropOp, DavError> =>
-	readXmlBody(req).pipe(
-		Effect.flatMap((body) => {
-			if (body.trim() === "") {
-				return Effect.fail(forbidden(undefined, "Empty PROPPATCH body"));
-			}
-			return parseXml(body).pipe(
-				Effect.map((raw) => {
-					const tree = normalizeClarkNames(raw) as Record<string, unknown>;
-					const update = tree[cn(DAV_NS, "propertyupdate")] as
-						| Record<string, unknown>
-						| undefined;
-
-					const set = new Map<ClarkName, unknown>();
-					const remove = new Set<ClarkName>();
-
-					if (update) {
-						for (const setEl of toArray(update[cn(DAV_NS, "set")])) {
-							if (typeof setEl !== "object" || setEl === null) {
-								continue;
-							}
-							const prop = (setEl as Record<string, unknown>)[
-								cn(DAV_NS, "prop")
-							];
-							if (typeof prop !== "object" || prop === null) {
-								continue;
-							}
-							for (const [k, v] of Object.entries(
-								prop as Record<string, unknown>,
-							)) {
-								if (!k.startsWith("@_")) {
-									set.set(k as ClarkName, v);
-								}
-							}
-						}
-
-						for (const removeEl of toArray(update[cn(DAV_NS, "remove")])) {
-							if (typeof removeEl !== "object" || removeEl === null) {
-								continue;
-							}
-							const prop = (removeEl as Record<string, unknown>)[
-								cn(DAV_NS, "prop")
-							];
-							if (typeof prop !== "object" || prop === null) {
-								continue;
-							}
-							for (const k of Object.keys(prop as Record<string, unknown>)) {
-								if (!k.startsWith("@_")) {
-									remove.add(k as ClarkName);
-								}
-							}
-						}
-					}
-
-					return { set, remove } satisfies PropOp;
-				}),
-				Effect.catchTag("XmlParseError", () =>
-					Effect.fail(badRequest("Invalid PROPPATCH XML")),
-				),
-			);
-		}),
-	);
-
 /** Normalize a value that may be a single item or an array into an array. */
 const toArray = (v: unknown): ReadonlyArray<unknown> => {
 	if (v === undefined || v === null) {
@@ -183,6 +130,94 @@ const toArray = (v: unknown): ReadonlyArray<unknown> => {
 		return v;
 	}
 	return [v];
+};
+
+/** Reads the Clark-named children of every `<D:prop>` under one operation element */
+const collectPropEntries = (
+	update: Record<string, unknown>,
+	operation: ClarkName,
+): ReadonlyArray<readonly [ClarkName, unknown]> => {
+	const entries: Array<readonly [ClarkName, unknown]> = [];
+	for (const opEl of toArray(update[operation])) {
+		const prop = isXmlNode(opEl)
+			? xmlChild(opEl, cn(DAV_NS, "prop"))
+			: undefined;
+		if (prop === undefined) {
+			continue;
+		}
+		for (const [key, value] of Object.entries(prop)) {
+			if (!key.startsWith("@_")) {
+				entries.push([key as ClarkName, value]);
+			}
+		}
+	}
+	return entries;
+};
+
+/** Splits a DAV:propertyupdate document into its set and remove operations */
+const extractPropOps = (tree: unknown): PropOp => {
+	const update = xmlPath(tree, cn(DAV_NS, "propertyupdate"));
+	if (update === undefined) {
+		return { set: new Map(), remove: new Set() };
+	}
+	return {
+		set: new Map(collectPropEntries(update, cn(DAV_NS, "set"))),
+		remove: new Set(
+			collectPropEntries(update, cn(DAV_NS, "remove")).map(([key]) => key),
+		),
+	};
+};
+
+const parseProppatchDocument = (
+	body: string,
+): Effect.Effect<PropOp, DavError> =>
+	parseXml(body).pipe(
+		Effect.map((raw) => extractPropOps(normalizeClarkNames(raw))),
+		Effect.catchTag("XmlParseError", () =>
+			Effect.fail(badRequest("Invalid PROPPATCH XML")),
+		),
+	);
+
+const parseProppatchBody = (req: Request): Effect.Effect<PropOp, DavError> =>
+	readXmlBody(req).pipe(
+		Effect.flatMap((body) =>
+			body.trim() === ""
+				? Effect.fail(forbidden(undefined, "Empty PROPPATCH body"))
+				: parseProppatchDocument(body),
+		),
+	);
+
+/** A property value that may be plain text or an element carrying character data */
+const textValue = (rawVal: unknown): string => {
+	if (typeof rawVal === "string") {
+		return rawVal.trim();
+	}
+	return isXmlNode(rawVal) && "#text" in rawVal
+		? String(rawVal["#text"]).trim()
+		: "";
+};
+
+/** Applies the set/remove operations for the given names to a dead-property map */
+const applyDeadProps = (
+	current: IrDeadProperties,
+	names: Iterable<ClarkName>,
+	ops: PropOp,
+): IrDeadProperties => {
+	const next: Record<ClarkName, unknown> = { ...current };
+	for (const name of names) {
+		if (ops.set.has(name)) {
+			next[name] = ops.set.get(name);
+		} else {
+			delete next[name];
+		}
+	}
+	return next;
+};
+
+/** The value a live property is being set to, or null when it is being removed */
+const liveValue = (ops: PropOp, name: ClarkName): string | null => {
+	const value = ops.set.has(name) ? (ops.set.get(name) ?? null) : null;
+	return value !== null ? String(value) : null;
 };
 
 // ---------------------------------------------------------------------------
@@ -218,6 +253,388 @@ const buildFailurePropstats = (
 	}
 	return propstats;
 };
+
+/** The single-resource multistatus every PROPPATCH branch answers with */
+const proppatchResponse = (
+	href: string,
+	propstats: ReadonlyArray<Propstat>,
+): Effect.Effect<Response, DavError> =>
+	multistatusResponse([{ href, propstats } satisfies DavResponse]);
+
+/** What every PROPPATCH branch needs beyond the resolved path */
+interface ProppatchRequest {
+	readonly actingPrincipalId: PrincipalId;
+	readonly origin: string;
+	readonly ops: PropOp;
+	readonly allNames: ReadonlyArray<ClarkName>;
+}
+
+// ---------------------------------------------------------------------------
+// Collection PROPPATCH
+// ---------------------------------------------------------------------------
+
+type LiveField = "displayName" | "description";
+
+/** How the requested properties divide up for one collection */
+interface CollectionPropPlan {
+	readonly failedNames: ReadonlySet<ClarkName>;
+	readonly liveFields: ReadonlyMap<ClarkName, LiveField>;
+	readonly deadNames: ReadonlySet<ClarkName>;
+}
+
+// Collection types each specially-handled live property is valid on
+const COLLECTION_TYPE_SCOPES: ReadonlyMap<
+	ClarkName,
+	ReadonlySet<string>
+> = new Map([
+	[CALENDAR_TIMEZONE_PROP, new Set(["calendar"])],
+	[CALENDAR_TIMEZONE_ID_PROP, new Set(["calendar"])],
+	[SCHEDULE_CALENDAR_TRANSP_PROP, new Set(["calendar", "inbox", "outbox"])],
+	[SCHEDULE_DEFAULT_CAL_URL_PROP, new Set(["inbox"])],
+]);
+
+/** Sorts the requested names into protected, live-field and dead-property buckets */
+const classifyCollectionProps = (
+	allNames: ReadonlyArray<ClarkName>,
+	collectionType: string,
+): CollectionPropPlan => {
+	const failedNames = new Set<ClarkName>();
+	const liveFields = new Map<ClarkName, LiveField>();
+	const deadNames = new Set<ClarkName>();
+
+	for (const name of allNames) {
+		const scope = COLLECTION_TYPE_SCOPES.get(name);
+		const live = COLLECTION_LIVE_PROPS.get(name);
+		if (PROTECTED_PROPS.has(name)) {
+			failedNames.add(name);
+		} else if (scope !== undefined) {
+			// The timezone and scheduling properties are applied separately below
+			if (!scope.has(collectionType)) {
+				failedNames.add(name);
+			}
+		} else if (live === undefined) {
+			deadNames.add(name);
+		} else if (
+			live.collectionType !== "any" &&
+			collectionType !== live.collectionType
+		) {
+			// Property is valid but not for this collection type
+			failedNames.add(name);
+		} else {
+			liveFields.set(name, live.field);
+		}
+	}
+	return { failedNames, liveFields, deadNames };
+};
+
+/** calendar-timezone-id carries a bare TZID, validated against the IANA database */
+const resolveTimezoneId = Effect.fn("dav.proppatch.timezoneId")(function* (
+	rawVal: unknown,
+) {
+	const tzid = textValue(rawVal);
+	if (tzid === "") {
+		return;
+	}
+	const ianaSvc = yield* IanaTimezoneService;
+	if (!ianaSvc.isKnownTzid(tzid)) {
+		return yield* forbidden("CALDAV:valid-calendar-timezone");
+	}
+	// Upsert the IANA VTIMEZONE into the cache.
+	const vtOpt = ianaSvc.getVtimezone(tzid);
+	if (Option.isSome(vtOpt)) {
+		const tzRepo = yield* CalTimezoneRepository;
+		yield* tzRepo.upsert(tzid, vtOpt.value, Option.none(), Option.none());
+	}
+	return tzid;
+});
+
+/**
+ * CALDAV:calendar-timezone (RFC 4791 §5.2.2) and CALDAV:calendar-timezone-id
+ * (RFC 7809 §5.2) both drive the same timezoneTzid field; calendar-timezone wins
+ * when both are present because it carries the full VTIMEZONE data. Setting
+ * either also upserts the VTIMEZONE into cal_timezone so the cache is populated
+ * from PROPPATCH, not only from PUT.
+ */
+const resolveTimezone = Effect.fn("dav.proppatch.timezone")(function* (
+	ops: PropOp,
+) {
+	if (ops.set.has(CALENDAR_TIMEZONE_PROP)) {
+		const rawVal = ops.set.get(CALENDAR_TIMEZONE_PROP);
+		const valStr = typeof rawVal === "string" ? rawVal : "";
+		const tzid = extractTzidFromVtimezone(valStr);
+		if (tzid !== null && valStr !== "") {
+			// Upsert the client-provided VTIMEZONE into the cache.
+			const tzRepo = yield* CalTimezoneRepository;
+			yield* tzRepo.upsert(tzid, valStr, Option.none(), Option.none());
+		}
+		return tzid;
+	}
+	if (ops.set.has(CALENDAR_TIMEZONE_ID_PROP)) {
+		return yield* resolveTimezoneId(ops.set.get(CALENDAR_TIMEZONE_ID_PROP));
+	}
+	return ops.remove.has(CALENDAR_TIMEZONE_PROP) ||
+		ops.remove.has(CALENDAR_TIMEZONE_ID_PROP)
+		? null
+		: undefined;
+});
+
+/** RFC 6638 §9.1: the value is an element, either <C:opaque/> or <C:transparent/> */
+const resolveScheduleTransp = (
+	ops: PropOp,
+): "opaque" | "transparent" | null | undefined => {
+	if (!ops.set.has(SCHEDULE_CALENDAR_TRANSP_PROP)) {
+		// Removing it resets the collection to the default "opaque"
+		return ops.remove.has(SCHEDULE_CALENDAR_TRANSP_PROP) ? null : undefined;
+	}
+	const rawVal = ops.set.get(SCHEDULE_CALENDAR_TRANSP_PROP);
+	if (!isXmlNode(rawVal)) {
+		return undefined;
+	}
+	if (`{${CALDAV_NS}}opaque` in rawVal) {
+		return "opaque";
+	}
+	return `{${CALDAV_NS}}transparent` in rawVal ? "transparent" : undefined;
+};
+
+/** RFC 6638 §9.2: the value wraps a DAV:href naming a calendar the principal owns */
+const resolveScheduleDefaultCalendar = Effect.fn(
+	"dav.proppatch.defaultCalendar",
+)(function* (
+	ops: PropOp,
+	ownerPrincipalId: PrincipalId,
+): Generator<
+	Effect.Effect<unknown, DavError | DatabaseError, CollectionService>,
+	CollectionId | null | undefined
+> {
+	if (!ops.set.has(SCHEDULE_DEFAULT_CAL_URL_PROP)) {
+		return ops.remove.has(SCHEDULE_DEFAULT_CAL_URL_PROP) ? null : undefined;
+	}
+	const rawVal = ops.set.get(SCHEDULE_DEFAULT_CAL_URL_PROP);
+	const hrefStr = isXmlNode(rawVal)
+		? String(rawVal[`{${DAV_NS}}href`] ?? "")
+		: "";
+	// The last non-empty path segment is the collection UUID
+	const lastSeg = hrefStr.replace(TRAILING_SLASH, "").split("/").at(-1) ?? "";
+	if (!isUuid(lastSeg)) {
+		return undefined;
+	}
+	// Look up the collection to validate it exists and belongs to this principal.
+	const collSvc = yield* CollectionService;
+	const targetOpt = yield* collSvc
+		.findById(CollectionId(lastSeg))
+		.pipe(Effect.option);
+	return Option.match(targetOpt, {
+		onNone: () => undefined,
+		onSome: (target) =>
+			target.collectionType === "calendar" &&
+			target.ownerPrincipalId === ownerPrincipalId
+				? CollectionId(lastSeg)
+				: undefined,
+	});
+});
+
+/**
+ * Policy B for subscribed collections: PROPPATCH of displayname or
+ * calendar-color writes the new value into the claim's override columns.
+ * Otherwise the next sync pass would re-apply
+ * `external_calendar.default_displayname` and clobber the user's edit. The
+ * collection row's own column is still updated by the caller for immediate read
+ * consistency; the next sync sees the override and keeps the same value.
+ */
+const syncSubscriptionOverrides = Effect.fn("dav.proppatch.subscription")(
+	function* (
+		collectionId: CollectionId,
+		ops: PropOp,
+		newDisplayName: string | null | undefined,
+	) {
+		const extRepo = yield* ExternalCalendarRepository;
+		const claimOpt = yield* extRepo.findClaimByCollection(collectionId);
+		if (Option.isNone(claimOpt)) {
+			return;
+		}
+		const colorPatch = ops.set.has(APPLE_CALENDAR_COLOR)
+			? { colorOverride: String(ops.set.get(APPLE_CALENDAR_COLOR)) }
+			: ops.remove.has(APPLE_CALENDAR_COLOR)
+				? { colorOverride: null }
+				: {};
+		const namePatch =
+			newDisplayName !== undefined
+				? { displaynameOverride: newDisplayName }
+				: {};
+		if (
+			Object.keys(colorPatch).length > 0 ||
+			Object.keys(namePatch).length > 0
+		) {
+			yield* extRepo.updateClaim(claimOpt.value.id, {
+				...colorPatch,
+				...namePatch,
+			});
+		}
+	},
+);
+
+const proppatchCollection = Effect.fn("dav.proppatch.collection")(function* (
+	path: Extract<ResolvedDavPath, { kind: "collection" }>,
+	{ actingPrincipalId, origin, ops, allNames }: ProppatchRequest,
+) {
+	const acl = yield* AclService;
+	yield* acl.check(
+		actingPrincipalId,
+		path.collectionId,
+		"collection",
+		"DAV:write-properties",
+	);
+
+	const collSvc = yield* CollectionService;
+	const collRow = yield* collSvc.findById(path.collectionId);
+	const plan = classifyCollectionProps(allNames, collRow.collectionType);
+
+	const href = `${origin}/dav/principals/${path.principalSeg}/${path.namespace}/${path.collectionSeg}/`;
+	if (plan.failedNames.size > 0) {
+		return yield* proppatchResponse(
+			href,
+			buildFailurePropstats(allNames, plan.failedNames),
+		);
+	}
+
+	const newDead = applyDeadProps(
+		readDeadProperties(collRow.clientProperties),
+		plan.deadNames,
+		ops,
+	);
+
+	let newDisplayName: string | null | undefined;
+	let newDescription: string | null | undefined;
+	for (const [name, field] of plan.liveFields) {
+		if (field === "displayName") {
+			newDisplayName = liveValue(ops, name);
+		} else {
+			newDescription = liveValue(ops, name);
+		}
+	}
+
+	const newTimezoneTzid =
+		collRow.collectionType === "calendar"
+			? yield* resolveTimezone(ops)
+			: undefined;
+	const newScheduleTransp = resolveScheduleTransp(ops);
+	const newScheduleDefaultCalendarId = yield* resolveScheduleDefaultCalendar(
+		ops,
+		path.principalId,
+	);
+
+	yield* syncSubscriptionOverrides(path.collectionId, ops, newDisplayName);
+
+	yield* collSvc.updateProperties(path.collectionId, {
+		clientProperties: newDead,
+		...(newDisplayName !== undefined ? { displayName: newDisplayName } : {}),
+		...(newDescription !== undefined ? { description: newDescription } : {}),
+		...(newTimezoneTzid !== undefined ? { timezoneTzid: newTimezoneTzid } : {}),
+		...(newScheduleTransp !== undefined
+			? { scheduleTransp: newScheduleTransp }
+			: {}),
+		...(newScheduleDefaultCalendarId !== undefined
+			? { scheduleDefaultCalendarId: newScheduleDefaultCalendarId }
+			: {}),
+	});
+
+	return yield* proppatchResponse(href, buildSuccessPropstats(allNames));
+});
+
+// ---------------------------------------------------------------------------
+// Instance PROPPATCH
+// ---------------------------------------------------------------------------
+
+const proppatchInstance = Effect.fn("dav.proppatch.instance")(function* (
+	path: Extract<ResolvedDavPath, { kind: "instance" }>,
+	{ actingPrincipalId, origin, ops, allNames }: ProppatchRequest,
+) {
+	const acl = yield* AclService;
+	yield* acl.check(
+		actingPrincipalId,
+		path.instanceId,
+		"instance",
+		"DAV:write-properties",
+	);
+
+	const instSvc = yield* InstanceService;
+	const instRow = yield* instSvc.findById(path.instanceId);
+
+	const failedNames = new Set(allNames.filter((n) => PROTECTED_PROPS.has(n)));
+	const href = `${origin}/dav/principals/${path.principalSeg}/${path.namespace}/${path.collectionSeg}/${encodeSegment(path.instanceSeg)}`;
+	if (failedNames.size > 0) {
+		return yield* proppatchResponse(
+			href,
+			buildFailurePropstats(allNames, failedNames),
+		);
+	}
+
+	yield* instSvc.updateClientProperties(
+		path.instanceId,
+		applyDeadProps(readDeadProperties(instRow.clientProperties), allNames, ops),
+	);
+
+	return yield* proppatchResponse(href, buildSuccessPropstats(allNames));
+});
+
+// ---------------------------------------------------------------------------
+// Principal PROPPATCH
+// ---------------------------------------------------------------------------
+
+// A collectionHome path carries the same principal identity and is patched as one
+const proppatchPrincipal = Effect.fn("dav.proppatch.principal")(function* (
+	path: Extract<ResolvedDavPath, { kind: "principal" | "collectionHome" }>,
+	{ actingPrincipalId, origin, ops, allNames }: ProppatchRequest,
+) {
+	const acl = yield* AclService;
+	yield* acl.check(
+		actingPrincipalId,
+		path.principalId,
+		"principal",
+		"DAV:write-properties",
+	);
+
+	const principalSvc = yield* PrincipalService;
+	const principalWithUser = yield* principalSvc.findById(path.principalId);
+	const principalRow = principalWithUser.principal;
+
+	const failedNames = new Set<ClarkName>();
+	const liveNames = new Set<ClarkName>();
+	const deadNames = new Set<ClarkName>();
+	for (const name of allNames) {
+		if (PROTECTED_PROPS.has(name)) {
+			failedNames.add(name);
+		} else if (PRINCIPAL_LIVE_PROPS.has(name)) {
+			liveNames.add(name);
+		} else {
+			deadNames.add(name);
+		}
+	}
+
+	const href = `${origin}/dav/principals/${path.principalSeg}/`;
+	if (failedNames.size > 0) {
+		return yield* proppatchResponse(
+			href,
+			buildFailurePropstats(allNames, failedNames),
+		);
+	}
+
+	let newDisplayName: string | null | undefined;
+	for (const name of liveNames) {
+		newDisplayName = liveValue(ops, name);
+	}
+
+	yield* principalSvc.updateProperties(path.principalId, {
+		clientProperties: applyDeadProps(
+			readDeadProperties(principalRow.clientProperties),
+			deadNames,
+			ops,
+		),
+		...(newDisplayName !== undefined ? { displayName: newDisplayName } : {}),
+	});
+
+	return yield* proppatchResponse(href, buildSuccessPropstats(allNames));
+});
 
 // ---------------------------------------------------------------------------
 // Handler
@@ -264,405 +681,26 @@ export const proppatchHandler = (
 		}
 		const actingPrincipalId = ctx.auth.principal.principalId;
 
-		const { set, remove } = yield* parseProppatchBody(req);
-		const acl = yield* AclService;
+		const ops = yield* parseProppatchBody(req);
 		const origin = ctx.url.origin;
 
 		// All names in request order: set first, then removes not already in set
 		const allNames: Array<ClarkName> = [
-			...set.keys(),
-			...[...remove].filter((n) => !set.has(n)),
+			...ops.set.keys(),
+			...[...ops.remove].filter((n) => !ops.set.has(n)),
 		];
 
-		// -----------------------------------------------------------------------
-		// Collection
-		// -----------------------------------------------------------------------
-		if (path.kind === "collection") {
-			yield* acl.check(
-				actingPrincipalId,
-				path.collectionId,
-				"collection",
-				"DAV:write-properties",
-			);
-
-			const collSvc = yield* CollectionService;
-			const collRow = yield* collSvc.findById(path.collectionId);
-
-			const failedNames = new Set<ClarkName>();
-			type LiveField = "displayName" | "description";
-			const liveFields = new Map<ClarkName, LiveField>();
-			const deadNames = new Set<ClarkName>();
-
-			for (const name of allNames) {
-				if (PROTECTED_PROPS.has(name)) {
-					failedNames.add(name);
-				} else if (
-					name === CALENDAR_TIMEZONE_PROP ||
-					name === CALENDAR_TIMEZONE_ID_PROP
-				) {
-					// calendar-timezone and calendar-timezone-id are live properties for
-					// calendar collections only. Both are handled separately below.
-					if (collRow.collectionType !== "calendar") {
-						failedNames.add(name);
-					}
-				} else if (name === SCHEDULE_CALENDAR_TRANSP_PROP) {
-					// Valid on calendar, inbox, and outbox collections only.
-					if (
-						collRow.collectionType !== "calendar" &&
-						collRow.collectionType !== "inbox" &&
-						collRow.collectionType !== "outbox"
-					) {
-						failedNames.add(name);
-					}
-				} else if (name === SCHEDULE_DEFAULT_CAL_URL_PROP) {
-					// Valid on inbox collections only.
-					if (collRow.collectionType !== "inbox") {
-						failedNames.add(name);
-					}
-				} else {
-					const live = COLLECTION_LIVE_PROPS.get(name);
-					if (live) {
-						if (
-							live.collectionType !== "any" &&
-							collRow.collectionType !== live.collectionType
-						) {
-							// Property is valid but not for this collection type
-							failedNames.add(name);
-						} else {
-							liveFields.set(name, live.field);
-						}
-					} else {
-						deadNames.add(name);
-					}
-				}
-			}
-
-			const href = `${origin}/dav/principals/${path.principalSeg}/${path.namespace}/${path.collectionSeg}/`;
-
-			if (failedNames.size > 0) {
-				return yield* multistatusResponse([
-					{
-						href,
-						propstats: buildFailurePropstats(allNames, failedNames),
-					} satisfies DavResponse,
-				]);
-			}
-
-			// Compute new clientProperties (dead props only)
-			const currentDead = (collRow.clientProperties ?? {}) as IrDeadProperties;
-			const newDead: Record<ClarkName, unknown> = { ...currentDead };
-			for (const name of deadNames) {
-				if (set.has(name)) {
-					newDead[name] = set.get(name);
-				} else {
-					delete newDead[name];
-				}
-			}
-
-			// Compute live field changes
-			let newDisplayName: string | null | undefined;
-			let newDescription: string | null | undefined;
-			for (const [name, field] of liveFields) {
-				const value = set.has(name) ? (set.get(name) ?? null) : null;
-				const strValue = value !== null ? String(value) : null;
-				if (field === "displayName") {
-					newDisplayName = strValue;
-				} else if (field === "description") {
-					newDescription = strValue;
-				}
-			}
-
-			// CALDAV:calendar-timezone — RFC 4791 §5.2.2
-			// CALDAV:calendar-timezone-id — RFC 7809 §5.2
-			//
-			// Both properties control the same underlying timezoneTzid field.
-			// calendar-timezone wins if both are present (it carries full VTIMEZONE data).
-			// When either is set, we also upsert the VTIMEZONE data into cal_timezone so
-			// the cache is populated from PROPPATCH (not only from PUT).
-			let newTimezoneTzid: string | null | undefined;
-			if (collRow.collectionType === "calendar") {
-				if (set.has(CALENDAR_TIMEZONE_PROP)) {
-					const rawVal = set.get(CALENDAR_TIMEZONE_PROP);
-					const valStr = typeof rawVal === "string" ? rawVal : "";
-					const tzid = extractTzidFromVtimezone(valStr);
-					if (tzid !== null && valStr) {
-						// Upsert the client-provided VTIMEZONE into the cache.
-						const tzRepo = yield* CalTimezoneRepository;
-						yield* tzRepo.upsert(tzid, valStr, Option.none(), Option.none());
-					}
-					newTimezoneTzid = tzid;
-				} else if (set.has(CALENDAR_TIMEZONE_ID_PROP)) {
-					// calendar-timezone-id: validate TZID against known IANA timezones.
-					const rawVal = set.get(CALENDAR_TIMEZONE_ID_PROP);
-					const tzid =
-						typeof rawVal === "string"
-							? rawVal.trim()
-							: typeof rawVal === "object" &&
-									rawVal !== null &&
-									"#text" in (rawVal as Record<string, unknown>)
-								? String((rawVal as Record<string, unknown>)["#text"]).trim()
-								: null;
-					if (tzid) {
-						const ianaSvc = yield* IanaTimezoneService;
-						if (!ianaSvc.isKnownTzid(tzid)) {
-							return yield* forbidden("CALDAV:valid-calendar-timezone");
-						}
-						// Upsert the IANA VTIMEZONE into the cache.
-						const vtOpt = ianaSvc.getVtimezone(tzid);
-						if (Option.isSome(vtOpt)) {
-							const tzRepo = yield* CalTimezoneRepository;
-							yield* tzRepo.upsert(
-								tzid,
-								vtOpt.value,
-								Option.none(),
-								Option.none(),
-							);
-						}
-						newTimezoneTzid = tzid;
-					}
-				} else if (
-					remove.has(CALENDAR_TIMEZONE_PROP) ||
-					remove.has(CALENDAR_TIMEZONE_ID_PROP)
-				) {
-					newTimezoneTzid = null;
-				}
-			}
-
-			// RFC 6638 §9.1: schedule-calendar-transp
-			let newScheduleTransp: "opaque" | "transparent" | null | undefined;
-			if (set.has(SCHEDULE_CALENDAR_TRANSP_PROP)) {
-				const rawVal = set.get(SCHEDULE_CALENDAR_TRANSP_PROP);
-				// Value is an element like <C:opaque/> or <C:transparent/>
-				if (
-					typeof rawVal === "object" &&
-					rawVal !== null &&
-					`{${CALDAV_NS}}opaque` in (rawVal as Record<string, unknown>)
-				) {
-					newScheduleTransp = "opaque";
-				} else if (
-					typeof rawVal === "object" &&
-					rawVal !== null &&
-					`{${CALDAV_NS}}transparent` in (rawVal as Record<string, unknown>)
-				) {
-					newScheduleTransp = "transparent";
-				}
-			} else if (remove.has(SCHEDULE_CALENDAR_TRANSP_PROP)) {
-				newScheduleTransp = null; // reset to default "opaque"
-			}
-
-			// RFC 6638 §9.2: schedule-default-calendar-URL
-			let newScheduleDefaultCalendarId: CollectionId | null | undefined;
-			if (set.has(SCHEDULE_DEFAULT_CAL_URL_PROP)) {
-				const rawVal = set.get(SCHEDULE_DEFAULT_CAL_URL_PROP);
-				// Value is an element containing a <D:href>
-				const hrefObj =
-					typeof rawVal === "object" && rawVal !== null
-						? (rawVal as Record<string, unknown>)
-						: null;
-				const hrefStr = hrefObj ? String(hrefObj[`{${DAV_NS}}href`] ?? "") : "";
-				// Extract the last non-empty path segment as the collection UUID/slug.
-				const segments = hrefStr.replace(TRAILING_SLASH, "").split("/");
-				const lastSeg = segments.at(-1) ?? "";
-				if (isUuid(lastSeg)) {
-					// Look up the collection to validate it exists and belongs to this principal.
-					const targetOpt = yield* collSvc
-						.findById(CollectionId(lastSeg))
-						.pipe(Effect.option);
-					const target = Option.getOrNull(targetOpt);
-					if (
-						target !== null &&
-						target.collectionType === "calendar" &&
-						target.ownerPrincipalId === path.principalId
-					) {
-						newScheduleDefaultCalendarId = CollectionId(lastSeg);
-					}
-				}
-			} else if (remove.has(SCHEDULE_DEFAULT_CAL_URL_PROP)) {
-				newScheduleDefaultCalendarId = null;
-			}
-
-			// Policy B for #7+#12: if this collection is a subscription claim,
-			// PROPPATCH on displayname / calendar-color writes the new value
-			// into the claim's override columns. Otherwise the next sync pass
-			// would re-apply `external_calendar.default_displayname` and clobber
-			// the user's edit. The collection row's own column is still updated
-			// below for immediate read consistency — the next sync sees the
-			// override and keeps the same value.
-			const extRepo = yield* ExternalCalendarRepository;
-			const claimOpt = yield* extRepo.findClaimByCollection(path.collectionId);
-			if (Option.isSome(claimOpt)) {
-				const claim = claimOpt.value;
-				const appleColorKey =
-					"{http://apple.com/ns/ical/}calendar-color" as ClarkName;
-				const colorPatch = set.has(appleColorKey)
-					? { colorOverride: String(set.get(appleColorKey)) }
-					: remove.has(appleColorKey)
-						? { colorOverride: null }
-						: {};
-				const namePatch =
-					newDisplayName !== undefined
-						? { displaynameOverride: newDisplayName }
-						: {};
-				if (
-					Object.keys(colorPatch).length > 0 ||
-					Object.keys(namePatch).length > 0
-				) {
-					yield* extRepo.updateClaim(claim.id, { ...colorPatch, ...namePatch });
-				}
-			}
-
-			yield* collSvc.updateProperties(path.collectionId, {
-				clientProperties: newDead as IrDeadProperties,
-				...(newDisplayName !== undefined
-					? { displayName: newDisplayName }
-					: {}),
-				...(newDescription !== undefined
-					? { description: newDescription }
-					: {}),
-				...(newTimezoneTzid !== undefined
-					? { timezoneTzid: newTimezoneTzid }
-					: {}),
-				...(newScheduleTransp !== undefined
-					? { scheduleTransp: newScheduleTransp }
-					: {}),
-				...(newScheduleDefaultCalendarId !== undefined
-					? { scheduleDefaultCalendarId: newScheduleDefaultCalendarId }
-					: {}),
-			});
-
-			return yield* multistatusResponse([
-				{
-					href,
-					propstats: buildSuccessPropstats(allNames),
-				} satisfies DavResponse,
-			]);
-		}
-
-		// -----------------------------------------------------------------------
-		// Instance
-		// -----------------------------------------------------------------------
-		if (path.kind === "instance") {
-			yield* acl.check(
-				actingPrincipalId,
-				path.instanceId,
-				"instance",
-				"DAV:write-properties",
-			);
-
-			const instSvc = yield* InstanceService;
-			const instRow = yield* instSvc.findById(path.instanceId);
-
-			const failedNames = new Set<ClarkName>();
-			for (const name of allNames) {
-				if (PROTECTED_PROPS.has(name)) {
-					failedNames.add(name);
-				}
-			}
-
-			const href = `${origin}/dav/principals/${path.principalSeg}/${path.namespace}/${path.collectionSeg}/${encodeSegment(path.instanceSeg)}`;
-
-			if (failedNames.size > 0) {
-				return yield* multistatusResponse([
-					{
-						href,
-						propstats: buildFailurePropstats(allNames, failedNames),
-					} satisfies DavResponse,
-				]);
-			}
-
-			const currentDead = (instRow.clientProperties ?? {}) as IrDeadProperties;
-			const newDead: Record<ClarkName, unknown> = { ...currentDead };
-			for (const name of allNames) {
-				if (set.has(name)) {
-					newDead[name] = set.get(name);
-				} else {
-					delete newDead[name];
-				}
-			}
-
-			yield* instSvc.updateClientProperties(
-				path.instanceId,
-				newDead as IrDeadProperties,
-			);
-
-			return yield* multistatusResponse([
-				{
-					href,
-					propstats: buildSuccessPropstats(allNames),
-				} satisfies DavResponse,
-			]);
-		}
-
-		// -----------------------------------------------------------------------
-		// Principal
-		// -----------------------------------------------------------------------
-
-		// path.kind === "principal"
-		yield* acl.check(
+		const request: ProppatchRequest = {
 			actingPrincipalId,
-			path.principalId,
-			"principal",
-			"DAV:write-properties",
-		);
-
-		const principalSvc = yield* PrincipalService;
-		const principalWithUser = yield* principalSvc.findById(path.principalId);
-		const principalRow = principalWithUser.principal;
-
-		const failedNames = new Set<ClarkName>();
-		const liveFields = new Map<ClarkName, "displayName">();
-		const deadNames = new Set<ClarkName>();
-
-		for (const name of allNames) {
-			if (PROTECTED_PROPS.has(name)) {
-				failedNames.add(name);
-			} else {
-				const field = PRINCIPAL_LIVE_PROPS.get(name);
-				if (field) {
-					liveFields.set(name, field);
-				} else {
-					deadNames.add(name);
-				}
-			}
+			origin,
+			ops,
+			allNames,
+		};
+		if (path.kind === "collection") {
+			return yield* proppatchCollection(path, request);
 		}
-
-		const principalHref = `${origin}/dav/principals/${path.principalSeg}/`;
-
-		if (failedNames.size > 0) {
-			return yield* multistatusResponse([
-				{
-					href: principalHref,
-					propstats: buildFailurePropstats(allNames, failedNames),
-				} satisfies DavResponse,
-			]);
+		if (path.kind === "instance") {
+			return yield* proppatchInstance(path, request);
 		}
-
-		const currentDead = (principalRow.clientProperties ??
-			{}) as IrDeadProperties;
-		const newDead: Record<ClarkName, unknown> = { ...currentDead };
-		for (const name of deadNames) {
-			if (set.has(name)) {
-				newDead[name] = set.get(name);
-			} else {
-				delete newDead[name];
-			}
-		}
-
-		let newDisplayName: string | null | undefined;
-		for (const [name] of liveFields) {
-			const value = set.has(name) ? (set.get(name) ?? null) : null;
-			newDisplayName = value !== null ? String(value) : null;
-		}
-
-		yield* principalSvc.updateProperties(path.principalId, {
-			clientProperties: newDead as IrDeadProperties,
-			...(newDisplayName !== undefined ? { displayName: newDisplayName } : {}),
-		});
-
-		return yield* multistatusResponse([
-			{
-				href: principalHref,
-				propstats: buildSuccessPropstats(allNames),
-			} satisfies DavResponse,
-		]);
+		return yield* proppatchPrincipal(path, request);
 	});

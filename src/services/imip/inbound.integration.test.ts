@@ -90,15 +90,16 @@ describe("ImipInboundService (integration)", () => {
 				}),
 			);
 
-			const inbound = (body: string, to: string) =>
-				Effect.flatMap(ImipInboundService, (s) =>
-					s.process({ recipientEmail: to, rawMessage: body }),
+			// Run one inbound delivery and hand back its outcome
+			const inbound = async (body: string, to: string) =>
+				await runtime.runPromise(
+					Effect.flatMap(ImipInboundService, (s) =>
+						s.process({ recipientEmail: to, rawMessage: body }),
+					),
 				);
 
 			const uid = "remote-evt-1@example.com";
-			const r1 = await runtime.runPromise(
-				inbound(REQUEST_BODY(uid, "Lunch"), "alice@example.com"),
-			);
+			const r1 = await inbound(REQUEST_BODY(uid, "Lunch"), "alice@example.com");
 			expect(r1._tag).toBe("Applied");
 
 			// Should now exist in Alice's calendar.
@@ -108,8 +109,9 @@ describe("ImipInboundService (integration)", () => {
 			expect(after1.length).toBe(1);
 
 			// Same UID, updated SUMMARY → applies as update (still 1 instance).
-			const r2 = await runtime.runPromise(
-				inbound(REQUEST_BODY(uid, "Long lunch"), "alice@example.com"),
+			const r2 = await inbound(
+				REQUEST_BODY(uid, "Long lunch"),
+				"alice@example.com",
 			);
 			expect(r2._tag).toBe("Applied");
 			const after2 = await runtime.runPromise(
@@ -118,9 +120,7 @@ describe("ImipInboundService (integration)", () => {
 			expect(after2.length).toBe(1);
 
 			// CANCEL → removes.
-			const r3 = await runtime.runPromise(
-				inbound(CANCEL_BODY(uid), "alice@example.com"),
-			);
+			const r3 = await inbound(CANCEL_BODY(uid), "alice@example.com");
 			expect(r3._tag).toBe("Applied");
 			const after3 = await runtime.runPromise(
 				Effect.flatMap(InstanceRepository, (r) => r.listByCollection(aliceCal)),
@@ -128,9 +128,7 @@ describe("ImipInboundService (integration)", () => {
 			expect(after3.length).toBe(0);
 
 			// Unknown recipient.
-			const r4 = await runtime.runPromise(
-				inbound(REQUEST_BODY("x", "x"), "bob@example.com"),
-			);
+			const r4 = await inbound(REQUEST_BODY("x", "x"), "bob@example.com");
 			expect(r4._tag).toBe("UnknownRecipient");
 		} finally {
 			await runtime.dispose();

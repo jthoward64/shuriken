@@ -11,7 +11,17 @@ import { parseXml } from "./parser.ts";
 const DAV = "DAV:";
 const CALDAV = "urn:ietf:params:xml:ns:caldav";
 
-const run = <A>(e: Effect.Effect<A, never, never>) => Effect.runPromise(e);
+/** True when a parsed XML node is an element object rather than text */
+const isElement = (value: unknown): value is Record<string, unknown> =>
+	typeof value === "object" && value !== null;
+
+/** Read a parsed XML node as an element, failing the test when it is not one */
+const element = (value: unknown): Record<string, unknown> => {
+	if (!isElement(value)) {
+		throw new Error(`expected an XML element, got ${typeof value}`);
+	}
+	return value;
+};
 
 // ---------------------------------------------------------------------------
 // buildMultistatus
@@ -19,7 +29,7 @@ const run = <A>(e: Effect.Effect<A, never, never>) => Effect.runPromise(e);
 
 describe("buildMultistatus", () => {
 	it("produces XML with a D:multistatus root element", async () => {
-		const xml = await run(
+		const xml = await Effect.runPromise(
 			buildMultistatus([
 				{ href: "/dav/", propstats: [{ props: {}, status: 200 }] },
 			]),
@@ -28,7 +38,7 @@ describe("buildMultistatus", () => {
 	});
 
 	it("emits DAV namespace declaration on the root element", async () => {
-		const xml = await run(
+		const xml = await Effect.runPromise(
 			buildMultistatus([
 				{ href: "/dav/", propstats: [{ props: {}, status: 200 }] },
 			]),
@@ -38,7 +48,7 @@ describe("buildMultistatus", () => {
 	});
 
 	it("includes the href for each response", async () => {
-		const xml = await run(
+		const xml = await Effect.runPromise(
 			buildMultistatus([
 				{
 					href: "/dav/principals/alice/",
@@ -50,7 +60,7 @@ describe("buildMultistatus", () => {
 	});
 
 	it("emits a 200 status line in the propstat", async () => {
-		const xml = await run(
+		const xml = await Effect.runPromise(
 			buildMultistatus([
 				{ href: "/dav/", propstats: [{ props: {}, status: 200 }] },
 			]),
@@ -59,7 +69,7 @@ describe("buildMultistatus", () => {
 	});
 
 	it("emits a 404 status line for missing properties", async () => {
-		const xml = await run(
+		const xml = await Effect.runPromise(
 			buildMultistatus([
 				{
 					href: "/dav/",
@@ -75,7 +85,7 @@ describe("buildMultistatus", () => {
 	});
 
 	it("splits found and not-found properties into separate propstat blocks", async () => {
-		const xml = await run(
+		const xml = await Effect.runPromise(
 			buildMultistatus([
 				{
 					href: "/a/",
@@ -86,20 +96,18 @@ describe("buildMultistatus", () => {
 				},
 			]),
 		);
-		const parsed = (await run(parseXml(xml).pipe(Effect.orDie))) as Record<
-			string,
-			unknown
-		>;
+		const parsed = element(
+			await Effect.runPromise(parseXml(xml).pipe(Effect.orDie)),
+		);
 		// Should have at least two propstat elements (fast-xml-parser may array them)
-		const ms = parsed["D:multistatus"] as Record<string, unknown>;
-		const resp = ms["D:response"] as Record<string, unknown>;
+		const resp = element(element(parsed["D:multistatus"])["D:response"]);
 		const propstat = resp["D:propstat"];
 		expect(Array.isArray(propstat)).toBe(true);
-		expect((propstat as Array<unknown>).length).toBe(2);
+		expect(Array.isArray(propstat) ? propstat.length : 0).toBe(2);
 	});
 
 	it("emits multiple D:response elements for multiple resources", async () => {
-		const xml = await run(
+		const xml = await Effect.runPromise(
 			buildMultistatus([
 				{ href: "/a/", propstats: [{ props: {}, status: 200 }] },
 				{ href: "/b/", propstats: [{ props: {}, status: 200 }] },
@@ -112,7 +120,7 @@ describe("buildMultistatus", () => {
 	});
 
 	it("emits Clark-keyed property values using canonical prefixes", async () => {
-		const xml = await run(
+		const xml = await Effect.runPromise(
 			buildMultistatus([
 				{
 					href: "/dav/principals/alice/cal/primary/",
@@ -136,7 +144,7 @@ describe("buildMultistatus", () => {
 	});
 
 	it("two different Clark keys in the same namespace share one xmlns declaration", async () => {
-		const xml = await run(
+		const xml = await Effect.runPromise(
 			buildMultistatus([
 				{
 					href: "/x/",
@@ -159,7 +167,7 @@ describe("buildMultistatus", () => {
 
 	it("unknown namespace gets a generated prefix and xmlns declaration", async () => {
 		const unknownNs = "http://example.com/ns/";
-		const xml = await run(
+		const xml = await Effect.runPromise(
 			buildMultistatus([
 				{
 					href: "/x/",
@@ -183,7 +191,7 @@ describe("buildMultistatus", () => {
 
 describe("multistatusResponse", () => {
 	it("returns a 207 Response", async () => {
-		const res = await run(
+		const res = await Effect.runPromise(
 			multistatusResponse([
 				{ href: "/dav/", propstats: [{ props: {}, status: 200 }] },
 			]),
@@ -192,7 +200,7 @@ describe("multistatusResponse", () => {
 	});
 
 	it("sets Content-Type to application/xml; charset=utf-8", async () => {
-		const res = await run(
+		const res = await Effect.runPromise(
 			multistatusResponse([
 				{ href: "/dav/", propstats: [{ props: {}, status: 200 }] },
 			]),

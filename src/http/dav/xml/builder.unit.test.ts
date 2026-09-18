@@ -11,6 +11,18 @@ import { parseXml } from "./parser.ts";
 // suppressEmptyNode = true, format = false (compact output).
 // ---------------------------------------------------------------------------
 
+/** True when a parsed XML node is an element object rather than text */
+const isElement = (value: unknown): value is Record<string, unknown> =>
+	typeof value === "object" && value !== null;
+
+/** Read a parsed XML node as an element, failing the test when it is not one */
+const element = (value: unknown): Record<string, unknown> => {
+	if (!isElement(value)) {
+		throw new Error(`expected an XML element, got ${typeof value}`);
+	}
+	return value;
+};
+
 describe("buildXml", () => {
 	// --- Output format -------------------------------------------------------
 
@@ -88,12 +100,9 @@ describe("buildXml", () => {
 			},
 		};
 		const xml = await Effect.runPromise(buildXml(obj));
-		const parsed = (await Effect.runPromise(parseXml(xml))) as Record<
-			string,
-			unknown
-		>;
+		const parsed = element(await Effect.runPromise(parseXml(xml)));
 
-		const error = parsed["D:error"] as Record<string, unknown>;
+		const error = element(parsed["D:error"]);
 		expect(error["@_xmlns:D"]).toBe("DAV:");
 		expect("D:need-privileges" in error).toBe(true);
 	});
@@ -112,14 +121,11 @@ describe("buildXml", () => {
 			},
 		};
 		const xml = await Effect.runPromise(buildXml(obj));
-		const parsed = (await Effect.runPromise(parseXml(xml))) as Record<
-			string,
-			unknown
-		>;
+		const parsed = element(await Effect.runPromise(parseXml(xml)));
 
-		const ms = parsed["D:multistatus"] as Record<string, unknown>;
-		const responses = ms["D:response"] as Array<Record<string, unknown>>;
-		expect(Array.isArray(responses)).toBe(true);
+		const raw = element(parsed["D:multistatus"])["D:response"];
+		expect(Array.isArray(raw)).toBe(true);
+		const responses = (Array.isArray(raw) ? raw : []).map(element);
 		expect(responses[0]?.["D:href"]).toBe("/dav/principals/alice/");
 		expect(responses[1]?.["D:status"]).toBe("HTTP/1.1 403 Forbidden");
 	});

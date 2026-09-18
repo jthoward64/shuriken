@@ -61,7 +61,7 @@ export const addressbookMultigetHandler = (
 		if (hrefs.length === 0) {
 			yield* Effect.logWarning(
 				"dav.addressbook-multiget: no hrefs extracted from request body",
-				{ tree: JSON.stringify(tree) },
+				{ tree },
 			);
 		}
 		const propNames = extractPropNames(tree);

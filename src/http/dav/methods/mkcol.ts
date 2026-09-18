@@ -11,6 +11,11 @@ import { CollectionId } from "#src/domain/ids.ts";
 import { NAMESPACE_TO_COLLECTION_TYPE } from "#src/domain/types/collection-namespace.ts";
 import { isValidSlug, type ResolvedDavPath } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
+import {
+	isXmlNode,
+	xmlChild,
+	xmlText,
+} from "#src/http/dav/methods/xml-node.ts";
 import { normalizeClarkNames } from "#src/http/dav/xml/clark.ts";
 import { parseXml, readXmlBody } from "#src/http/dav/xml/parser.ts";
 import { HTTP_CREATED } from "#src/http/status.ts";
@@ -41,7 +46,7 @@ const EMPTY_PROPS: MkcolProps = {
 	displayName: undefined,
 	description: undefined,
 	supportedComponents: undefined,
-	deadProps: {} as IrDeadProperties,
+	deadProps: {},
 };
 
 /**
@@ -67,17 +72,59 @@ const LIVE_PROP_KEYS: ReadonlySet<string> = new Set([
  * them with 415 (RFC 4918 §9.3) rather than silently creating a collection.
  */
 const findMkcolRoot = (tree: unknown): Record<string, unknown> | undefined => {
-	if (typeof tree !== "object" || tree === null) {
+	if (!isXmlNode(tree)) {
 		return undefined;
 	}
-	const root = tree as Record<string, unknown>;
-	const rootEl =
-		root[`{${DAV_NS}}mkcol`] ??
-		root[`{${CALDAV_NS}}mkcalendar`] ??
-		root[`{${CARDDAV_NS}}mkaddressbook`];
-	return typeof rootEl === "object" && rootEl !== null
-		? (rootEl as Record<string, unknown>)
-		: undefined;
+	return (
+		xmlChild(tree, `{${DAV_NS}}mkcol`) ??
+		xmlChild(tree, `{${CALDAV_NS}}mkcalendar`) ??
+		xmlChild(tree, `{${CARDDAV_NS}}mkaddressbook`)
+	);
+};
+
+/**
+ * Read the component names out of CALDAV:supported-calendar-component-set.
+ * Absent, empty, or nameless `<C:comp>` children leave the field unset so the
+ * collection keeps the server default.
+ */
+const extractSupportedComponents = (
+	prop: Record<string, unknown>,
+): ReadonlyArray<string> | undefined => {
+	const scs = xmlChild(prop, `{${CALDAV_NS}}supported-calendar-component-set`);
+	if (scs === undefined) {
+		return undefined;
+	}
+	const comps = scs[`{${CALDAV_NS}}comp`];
+	const compsArr = Array.isArray(comps) ? comps : toArrayOrEmpty(comps);
+	const names: Array<string> = [];
+	for (const comp of compsArr) {
+		const name = isXmlNode(comp) ? comp["@_name"] : undefined;
+		if (typeof name === "string") {
+			names.push(name);
+		}
+	}
+	return names.length > 0 ? names : undefined;
+};
+
+/** fast-xml-parser collapses a single repeated child to the value itself */
+const toArrayOrEmpty = (value: unknown): ReadonlyArray<unknown> =>
+	value === undefined ? [] : [value];
+
+/**
+ * Anything in `<D:set><D:prop>` not consumed as a live property is kept as a
+ * dead property - RFC 5689 §3 lets MKCOL bodies carry any property at all, and
+ * clients (Apple Calendar, DAVx5, …) routinely include
+ * {http://apple.com/ns/ical/}calendar-color here. Discarding them silently
+ * forces clients to follow MKCOL with a PROPPATCH for every common case.
+ */
+const extractDeadProps = (prop: Record<string, unknown>): IrDeadProperties => {
+	const deadProps: Record<ClarkName, unknown> = {};
+	for (const [key, value] of Object.entries(prop)) {
+		if (!(key.startsWith("@_") || LIVE_PROP_KEYS.has(key))) {
+			deadProps[key as ClarkName] = value;
+		}
+	}
+	return deadProps;
 };
 
 /**
@@ -88,79 +135,41 @@ const findMkcolRoot = (tree: unknown): Record<string, unknown> | undefined => {
  * properties are optional per RFC 5689 §3.
  */
 const extractMkcolProps = (rootEl: Record<string, unknown>): MkcolProps => {
-	const set = rootEl[`{${DAV_NS}}set`] as Record<string, unknown> | undefined;
-	if (typeof set !== "object" || set === null) {
+	const set = xmlChild(rootEl, `{${DAV_NS}}set`);
+	const prop = set === undefined ? undefined : xmlChild(set, `{${DAV_NS}}prop`);
+	if (prop === undefined) {
 		return EMPTY_PROPS;
-	}
-
-	const prop = set[`{${DAV_NS}}prop`] as Record<string, unknown> | undefined;
-	if (typeof prop !== "object" || prop === null) {
-		return EMPTY_PROPS;
-	}
-
-	const displayName =
-		typeof prop[`{${DAV_NS}}displayname`] === "string"
-			? (prop[`{${DAV_NS}}displayname`] as string)
-			: undefined;
-
-	const calDesc = prop[`{${CALDAV_NS}}calendar-description`];
-	const cardDesc = prop[`{${CARDDAV_NS}}addressbook-description`];
-	const description =
-		typeof calDesc === "string"
-			? calDesc
-			: typeof cardDesc === "string"
-				? cardDesc
-				: undefined;
-
-	let supportedComponents: ReadonlyArray<string> | undefined;
-	const scs = prop[`{${CALDAV_NS}}supported-calendar-component-set`] as
-		| Record<string, unknown>
-		| undefined;
-	if (typeof scs === "object" && scs !== null) {
-		const compKey = `{${CALDAV_NS}}comp`;
-		const comps = scs[compKey];
-		const compsArr = Array.isArray(comps)
-			? comps
-			: comps !== undefined
-				? [comps]
-				: [];
-		const names: Array<string> = [];
-		for (const comp of compsArr) {
-			if (typeof comp === "object" && comp !== null) {
-				const name = (comp as Record<string, unknown>)["@_name"];
-				if (typeof name === "string") {
-					names.push(name);
-				}
-			}
-		}
-		if (names.length > 0) {
-			supportedComponents = names;
-		}
-	}
-
-	// Anything in <D:set><D:prop> that we didn't recognise above is treated as
-	// a dead property — RFC 5689 §3 lets MKCOL bodies carry any property at
-	// all, and clients (Apple Calendar, DAVx5, …) routinely include
-	// {http://apple.com/ns/ical/}calendar-color here. Discarding them silently
-	// forces clients to follow MKCOL with a PROPPATCH for every common case.
-	const deadProps: Record<ClarkName, unknown> = {};
-	for (const [key, value] of Object.entries(prop)) {
-		if (key.startsWith("@_")) {
-			continue;
-		}
-		if (LIVE_PROP_KEYS.has(key)) {
-			continue;
-		}
-		deadProps[key as ClarkName] = value;
 	}
 
 	return {
-		displayName,
-		description,
-		supportedComponents,
-		deadProps: deadProps as IrDeadProperties,
+		displayName: xmlText(prop, `{${DAV_NS}}displayname`),
+		description:
+			xmlText(prop, `{${CALDAV_NS}}calendar-description`) ??
+			xmlText(prop, `{${CARDDAV_NS}}addressbook-description`),
+		supportedComponents: extractSupportedComponents(prop),
+		deadProps: extractDeadProps(prop),
 	};
 };
+
+/**
+ * Parse a non-empty MKCOL request document. A body that is not well-formed XML,
+ * or whose root element is not a recognized MKCOL request document, fails with
+ * 415 Unsupported Media Type: RFC 4918 §9.3 requires 415 for a MKCOL entity the
+ * server "does not support or understand", and RFC 5689 §3 reserves non-DAV:mkcol
+ * XML roots, so they are rejected rather than silently creating a collection.
+ */
+const parseMkcolDocument = (
+	body: string,
+): Effect.Effect<MkcolProps, DavError> =>
+	parseXml(body).pipe(
+		Effect.flatMap((parsed) => {
+			const rootEl = findMkcolRoot(normalizeClarkNames(parsed));
+			return rootEl === undefined
+				? unsupportedMediaType()
+				: Effect.succeed(extractMkcolProps(rootEl));
+		}),
+		Effect.catchTag("XmlParseError", () => unsupportedMediaType()),
+	);
 
 /**
  * Read and parse the optional extended-MKCOL request body.
@@ -178,20 +187,11 @@ const extractMkcolProps = (rootEl: Record<string, unknown>): MkcolProps => {
  */
 const parseMkcolBody = (req: Request): Effect.Effect<MkcolProps, DavError> =>
 	readXmlBody(req).pipe(
-		Effect.flatMap((body) => {
-			if (body.trim() === "") {
-				return Effect.succeed(EMPTY_PROPS);
-			}
-			return parseXml(body).pipe(
-				Effect.flatMap((parsed) => {
-					const rootEl = findMkcolRoot(normalizeClarkNames(parsed));
-					return rootEl === undefined
-						? unsupportedMediaType()
-						: Effect.succeed(extractMkcolProps(rootEl));
-				}),
-				Effect.catchTag("XmlParseError", () => unsupportedMediaType()),
-			);
-		}),
+		Effect.flatMap((body) =>
+			body.trim() === ""
+				? Effect.succeed(EMPTY_PROPS)
+				: parseMkcolDocument(body),
+		),
 	);
 
 // ---------------------------------------------------------------------------

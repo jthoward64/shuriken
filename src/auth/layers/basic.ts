@@ -2,7 +2,7 @@ import { and, eq, isNull, or } from "drizzle-orm";
 import { Effect, Layer, Metric, Option, Redacted } from "effect";
 import { Temporal } from "temporal-polyfill";
 import { AuthService } from "#src/auth/service.ts";
-import { DatabaseClient } from "#src/db/client.ts";
+import { DatabaseClient, type DbClient } from "#src/db/client.ts";
 import { authUser, principal, user } from "#src/db/drizzle/schema/index.ts";
 import { DatabaseError } from "#src/domain/errors.ts";
 import { PrincipalId, UserId, type UuidString } from "#src/domain/ids.ts";
@@ -12,7 +12,10 @@ import {
 	Unauthenticated,
 } from "#src/domain/types/dav.ts";
 import { authAttemptsTotal } from "#src/observability/metrics.ts";
-import { CryptoService } from "#src/platform/crypto.ts";
+import {
+	CryptoService,
+	type CryptoServiceShape,
+} from "#src/platform/crypto.ts";
 
 // ---------------------------------------------------------------------------
 // Basic auth
@@ -35,6 +38,15 @@ const authCounter = Metric.withAttributes(authAttemptsTotal, {
 	"auth.mode": "basic",
 });
 
+// atob throws on malformed base64; absence is the useful answer here
+const decodeBase64 = (encoded: string): Option.Option<string> =>
+	Effect.runSync(
+		Effect.try(() => atob(encoded)).pipe(
+			Effect.map(Option.some<string>),
+			Effect.catch(() => Effect.succeed(Option.none<string>())),
+		),
+	);
+
 export const parseBasicAuth = (
 	headers: Headers,
 ): Option.Option<{ username: string; password: Redacted.Redacted<string> }> => {
@@ -43,13 +55,11 @@ export const parseBasicAuth = (
 		return Option.none();
 	}
 
-	const encoded = authorization.slice(BASIC_PREFIX.length);
-	let decoded: string;
-	try {
-		decoded = atob(encoded);
-	} catch {
+	const decodedOpt = decodeBase64(authorization.slice(BASIC_PREFIX.length));
+	if (Option.isNone(decodedOpt)) {
 		return Option.none();
 	}
+	const decoded = decodedOpt.value;
 	const colonIdx = decoded.indexOf(":");
 	if (colonIdx === -1) {
 		return Option.none();
@@ -77,6 +87,151 @@ interface Candidate {
 	readonly displayName: string | null;
 }
 
+/** The collaborators a basic-auth attempt runs against */
+interface BasicAuthDeps {
+	readonly db: DbClient;
+	readonly crypto: CryptoServiceShape;
+}
+
+/** Count one basic-auth outcome */
+const recordOutcome = (outcome: string): Effect.Effect<void> =>
+	Metric.update(
+		Metric.withAttributes(authCounter, { "auth.outcome": outcome }),
+		1,
+	);
+
+/** No usable Authorization header: anonymous rather than failed */
+const noCredentials = Effect.fn("auth.basic.noCredentials")(function* () {
+	yield* Effect.logTrace("auth.basic: no credentials present");
+	yield* recordOutcome("no_credentials");
+	return new Unauthenticated() as AuthResult;
+});
+
+/** Credential rows a username could match: a local password or an app password */
+const findCandidates = Effect.fn("auth.basic.findCandidates")(function* (
+	db: DbClient,
+	username: string,
+) {
+	const candidates: ReadonlyArray<Candidate> = yield* db
+		.select({
+			authUserId: authUser.id,
+			authSource: authUser.authSource,
+			authCredential: authUser.authCredential,
+			userId: user.id,
+			principalId: user.principalId,
+			displayName: principal.displayName,
+		})
+		.from(authUser)
+		.innerJoin(user, eq(authUser.userId, user.id))
+		.innerJoin(principal, eq(user.principalId, principal.id))
+		.where(
+			and(
+				isNull(principal.deletedAt),
+				or(
+					and(eq(authUser.authSource, "local"), eq(authUser.authId, username)),
+					and(
+						eq(authUser.authSource, "app_password"),
+						or(eq(authUser.authId, username), eq(principal.slug, username)),
+					),
+				),
+			),
+		)
+		.pipe(Effect.mapError((e) => new DatabaseError({ cause: e })));
+	return candidates;
+});
+
+/** Stamp an app password's last-used time; a failed stamp must not fail the auth */
+const stampLastUsed = Effect.fn("auth.basic.stampLastUsed")(function* (
+	db: DbClient,
+	authUserId: UuidString,
+) {
+	yield* db
+		.update(authUser)
+		.set({ lastUsedAt: Temporal.Now.instant() })
+		.where(eq(authUser.id, authUserId))
+		.pipe(
+			Effect.mapError((e) => new DatabaseError({ cause: e })),
+			Effect.ignore,
+		);
+});
+
+/** Verify the password against each candidate in turn; the first match wins */
+const matchCandidate = Effect.fn("auth.basic.matchCandidate")(function* (
+	deps: BasicAuthDeps,
+	candidates: ReadonlyArray<Candidate>,
+	password: Redacted.Redacted<string>,
+) {
+	for (const candidate of candidates) {
+		if (candidate.authCredential === null) {
+			continue;
+		}
+		// InternalError from the crypto service is a defect, not a domain error.
+		const valid = yield* deps.crypto
+			.verifyPassword(password, candidate.authCredential)
+			.pipe(Effect.orDie);
+		if (!valid) {
+			continue;
+		}
+		if (candidate.authSource === "app_password") {
+			yield* stampLastUsed(deps.db, candidate.authUserId);
+		}
+		return Option.some(candidate);
+	}
+	return Option.none<Candidate>();
+});
+
+/** Look up the supplied username's credentials and verify the password */
+const attemptBasic = Effect.fn("auth.basic.attempt")(function* (
+	deps: BasicAuthDeps,
+	creds: { username: string; password: Redacted.Redacted<string> },
+) {
+	yield* Effect.annotateCurrentSpan({ "auth.username": creds.username });
+	yield* Effect.logTrace("auth.basic: attempt", { username: creds.username });
+
+	const candidates = yield* findCandidates(deps.db, creds.username);
+	if (candidates.length === 0) {
+		yield* Effect.logDebug("auth.basic: user not found", {
+			username: creds.username,
+		});
+		yield* recordOutcome("not_found");
+		return new Unauthenticated() as AuthResult;
+	}
+
+	const matched = yield* matchCandidate(deps, candidates, creds.password);
+	if (Option.isNone(matched)) {
+		yield* Effect.logDebug("auth.basic: invalid password", {
+			username: creds.username,
+		});
+		yield* recordOutcome("invalid_password");
+		return new Unauthenticated() as AuthResult;
+	}
+
+	const candidate = matched.value;
+	yield* Effect.logDebug("auth.basic: success", {
+		userId: candidate.userId,
+		username: creds.username,
+		authSource: candidate.authSource,
+	});
+	yield* recordOutcome("success");
+	return new Authenticated({
+		principal: {
+			principalId: PrincipalId(candidate.principalId),
+			userId: UserId(candidate.userId),
+			displayName: Option.fromNullishOr(candidate.displayName),
+		},
+	}) as AuthResult;
+});
+
+/** Log and count an unexpected failure during authentication */
+const logAuthError = Effect.fn("auth.basic.logAuthError")(function* (
+	error: DatabaseError,
+) {
+	yield* Effect.logWarning("auth.basic: error during authentication", {
+		cause: error instanceof DatabaseError ? error.cause : error,
+	});
+	yield* recordOutcome("error");
+});
+
 /**
  * Core basic-auth logic. Parses the Authorization header, looks up matching
  * local / app-password credentials, verifies the password, and emits
@@ -89,147 +244,15 @@ export const authenticateBasic = (
 	headers: Headers,
 ): Effect.Effect<AuthResult, DatabaseError, DatabaseClient | CryptoService> =>
 	Effect.gen(function* () {
-		const db = yield* DatabaseClient;
-		const crypto = yield* CryptoService;
-
+		const deps: BasicAuthDeps = {
+			db: yield* DatabaseClient,
+			crypto: yield* CryptoService,
+		};
 		return yield* Option.match(parseBasicAuth(headers), {
-			onNone: () =>
-				Effect.gen(function* () {
-					yield* Effect.logTrace("auth.basic: no credentials present");
-					yield* Metric.update(
-						Metric.withAttributes(authCounter, {
-							"auth.outcome": "no_credentials",
-						}),
-						1,
-					);
-					return new Unauthenticated() as AuthResult;
-				}),
-			onSome: (creds) =>
-				Effect.gen(function* () {
-					yield* Effect.annotateCurrentSpan({
-						"auth.username": creds.username,
-					});
-					yield* Effect.logTrace("auth.basic: attempt", {
-						username: creds.username,
-					});
-
-					const candidates: ReadonlyArray<Candidate> = yield* db
-						.select({
-							authUserId: authUser.id,
-							authSource: authUser.authSource,
-							authCredential: authUser.authCredential,
-							userId: user.id,
-							principalId: user.principalId,
-							displayName: principal.displayName,
-						})
-						.from(authUser)
-						.innerJoin(user, eq(authUser.userId, user.id))
-						.innerJoin(principal, eq(user.principalId, principal.id))
-						.where(
-							and(
-								isNull(principal.deletedAt),
-								or(
-									and(
-										eq(authUser.authSource, "local"),
-										eq(authUser.authId, creds.username),
-									),
-									and(
-										eq(authUser.authSource, "app_password"),
-										or(
-											eq(authUser.authId, creds.username),
-											eq(principal.slug, creds.username),
-										),
-									),
-								),
-							),
-						)
-						.pipe(Effect.mapError((e) => new DatabaseError({ cause: e })));
-
-					if (candidates.length === 0) {
-						yield* Effect.logDebug("auth.basic: user not found", {
-							username: creds.username,
-						});
-						yield* Metric.update(
-							Metric.withAttributes(authCounter, {
-								"auth.outcome": "not_found",
-							}),
-							1,
-						);
-						return new Unauthenticated() as AuthResult;
-					}
-
-					for (const candidate of candidates) {
-						if (candidate.authCredential === null) {
-							continue;
-						}
-						// InternalError from the crypto service is a defect, not a domain error.
-						const valid = yield* crypto
-							.verifyPassword(creds.password, candidate.authCredential)
-							.pipe(Effect.orDie);
-						if (!valid) {
-							continue;
-						}
-
-						if (candidate.authSource === "app_password") {
-							yield* db
-								.update(authUser)
-								.set({ lastUsedAt: Temporal.Now.instant() })
-								.where(eq(authUser.id, candidate.authUserId))
-								.pipe(
-									Effect.mapError((e) => new DatabaseError({ cause: e })),
-									// A failed last_used_at stamp must not fail the auth.
-									Effect.ignore,
-								);
-						}
-
-						yield* Effect.logDebug("auth.basic: success", {
-							userId: candidate.userId,
-							username: creds.username,
-							authSource: candidate.authSource,
-						});
-						yield* Metric.update(
-							Metric.withAttributes(authCounter, {
-								"auth.outcome": "success",
-							}),
-							1,
-						);
-						return new Authenticated({
-							principal: {
-								principalId: PrincipalId(candidate.principalId),
-								userId: UserId(candidate.userId),
-								displayName: Option.fromNullishOr(candidate.displayName),
-							},
-						}) as AuthResult;
-					}
-
-					yield* Effect.logDebug("auth.basic: invalid password", {
-						username: creds.username,
-					});
-					yield* Metric.update(
-						Metric.withAttributes(authCounter, {
-							"auth.outcome": "invalid_password",
-						}),
-						1,
-					);
-					return new Unauthenticated() as AuthResult;
-				}),
+			onNone: () => noCredentials(),
+			onSome: (creds) => attemptBasic(deps, creds),
 		});
-	}).pipe(
-		Effect.tapError((e) =>
-			Effect.all(
-				[
-					Effect.logWarning("auth.basic: error during authentication", {
-						cause: e instanceof DatabaseError ? e.cause : e,
-					}),
-					Metric.update(
-						Metric.withAttributes(authCounter, { "auth.outcome": "error" }),
-						1,
-					),
-				],
-				{ discard: true },
-			),
-		),
-	);
+	}).pipe(Effect.tapError(logAuthError));
 
 export const BasicAuthLayer = Layer.effect(
 	AuthService,

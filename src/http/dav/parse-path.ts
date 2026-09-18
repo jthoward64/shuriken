@@ -7,8 +7,10 @@ import {
 	isUuid,
 	PrincipalId,
 	UserId,
+	type UuidString,
 } from "#src/domain/ids.ts";
 import {
+	type CollectionNamespace,
 	NAMESPACE_TO_COLLECTION_TYPE,
 	parseCollectionNamespace,
 } from "#src/domain/types/collection-namespace.ts";
@@ -49,6 +51,129 @@ const SEGMENTS_COLLECTION = 4; // ["principals", ":slug", ":ns", ":collSlug"]
 // Segment counts for /dav/groups/ tree (index 0 = "groups")
 const SEGMENTS_GROUP = 2; // ["groups", ":slug"]
 const SEGMENTS_GROUP_MEMBERS = 3; // ["groups", ":slug", "members"]
+
+/**
+ * Resolve a segment that may address a row by UUID or by slug.
+ *
+ * A slug may itself be UUID-shaped — e.g. python-caldav's make_calendar() names
+ * a new calendar after a random uuid4() — so a UUID-shaped segment that matches
+ * no row by id, or matches one `owns` rejects, still falls back to the slug
+ * lookup. `bySlug` is always scoped to the parent, so the fallback can never
+ * resolve to another parent's row.
+ */
+const resolveByIdOrSlug = <A, E, R>(
+	segment: string,
+	byId: (id: UuidString) => Effect.Effect<Option.Option<A>, E, R>,
+	bySlug: Effect.Effect<Option.Option<A>, E, R>,
+	owns: (row: A) => boolean = () => true,
+): Effect.Effect<Option.Option<A>, E, R> =>
+	isUuid(segment)
+		? Effect.flatMap(
+				byId(segment),
+				Option.match({
+					onNone: () => bySlug,
+					onSome: (row) =>
+						owns(row) ? Effect.succeed(Option.some(row)) : bySlug,
+				}),
+			)
+		: bySlug;
+
+// ---------------------------------------------------------------------------
+// /dav/groups/ tree
+// ---------------------------------------------------------------------------
+
+/** Resolve /dav/groups/:slug[/members[/:member]] */
+const parseGroupPath = Effect.fn("dav.parsePath.group")(function* (
+	segments: ReadonlyArray<string>,
+	groupSeg: string,
+	path: string,
+) {
+	yield* Effect.logTrace("dav.parsePath: resolving group segment", {
+		segment: groupSeg,
+	});
+	const groupRepo = yield* GroupRepository;
+	const groupOpt = yield* isUuid(groupSeg)
+		? groupRepo.findById(GroupId(groupSeg))
+		: groupRepo.findBySlug(Slug(groupSeg));
+	if (Option.isNone(groupOpt)) {
+		yield* Effect.logTrace("dav.parsePath: group not found, treating as new", {
+			segment: groupSeg,
+		});
+		return {
+			kind: "newGroup",
+			slug: Slug(groupSeg),
+		} satisfies ResolvedDavPath;
+	}
+	const groupRow = groupOpt.value;
+	const principalId = PrincipalId(groupRow.principal.id);
+	const groupId = GroupId(groupRow.group.id);
+
+	if (segments.length === SEGMENTS_GROUP) {
+		yield* Effect.logTrace("dav.parsePath: group resolved", { groupId });
+		return {
+			kind: "group",
+			principalId,
+			groupId,
+			groupSeg,
+		} satisfies ResolvedDavPath;
+	}
+
+	// /dav/groups/:slug/members/
+	const seg2 = decodeURIComponent(segments[2] ?? "");
+	if (seg2 !== "members") {
+		return yield* Effect.fail(notFound(`Unknown DAV path: ${path}`));
+	}
+
+	if (segments.length === SEGMENTS_GROUP_MEMBERS) {
+		return {
+			kind: "groupMembers",
+			principalId,
+			groupId,
+			groupSeg,
+		} satisfies ResolvedDavPath;
+	}
+
+	return yield* parseGroupMember(decodeURIComponent(segments[3] ?? ""), {
+		principalId,
+		groupId,
+		groupSeg,
+	});
+});
+
+/** The resolved group a member segment hangs off */
+interface GroupContext {
+	readonly principalId: ReturnType<typeof PrincipalId>;
+	readonly groupId: ReturnType<typeof GroupId>;
+	readonly groupSeg: string;
+}
+
+/** Resolve the member segment of /dav/groups/:slug/members/:member */
+const parseGroupMember = Effect.fn("dav.parsePath.groupMember")(function* (
+	memberSeg: string,
+	group: GroupContext,
+) {
+	const userRepo = yield* UserRepository;
+	const memberOpt = yield* isUuid(memberSeg)
+		? userRepo.findById(UserId(memberSeg))
+		: userRepo.findBySlug(Slug(memberSeg));
+	if (Option.isNone(memberOpt)) {
+		return {
+			kind: "groupMemberNonExistent",
+			principalId: group.principalId,
+			groupId: group.groupId,
+			groupSeg: group.groupSeg,
+			slug: Slug(memberSeg),
+		} satisfies ResolvedDavPath;
+	}
+	return {
+		kind: "groupMember",
+		principalId: group.principalId,
+		groupId: group.groupId,
+		memberUserId: UserId(memberOpt.value.user.id),
+		groupSeg: group.groupSeg,
+		memberSeg,
+	} satisfies ResolvedDavPath;
+});
 
 /** Parse and resolve a DAV URL path, converting slugs/UUIDs to branded UUIDs.
  *
@@ -144,79 +269,11 @@ export const parseDavPath = (
 				kind: "groupCollection",
 			} satisfies ResolvedDavPath);
 		}
-		const groupSeg = decodeURIComponent(segments[1] ?? "");
-		return Effect.gen(function* () {
-			yield* Effect.logTrace("dav.parsePath: resolving group segment", {
-				segment: groupSeg,
-			});
-			const groupRepo = yield* GroupRepository;
-			const groupOpt = yield* isUuid(groupSeg)
-				? groupRepo.findById(GroupId(groupSeg))
-				: groupRepo.findBySlug(Slug(groupSeg));
-			if (Option.isNone(groupOpt)) {
-				yield* Effect.logTrace(
-					"dav.parsePath: group not found, treating as new",
-					{ segment: groupSeg },
-				);
-				return {
-					kind: "newGroup",
-					slug: Slug(groupSeg),
-				} satisfies ResolvedDavPath;
-			}
-			const groupRow = groupOpt.value;
-			const principalId = PrincipalId(groupRow.principal.id);
-			const groupId = GroupId(groupRow.group.id);
-
-			// /dav/groups/:slug/members/
-			if (segments.length === SEGMENTS_GROUP) {
-				yield* Effect.logTrace("dav.parsePath: group resolved", {
-					groupId,
-				});
-				return {
-					kind: "group",
-					principalId,
-					groupId,
-					groupSeg,
-				} satisfies ResolvedDavPath;
-			}
-
-			const seg2 = decodeURIComponent(segments[2] ?? "");
-			if (seg2 !== "members") {
-				return yield* Effect.fail(notFound(`Unknown DAV path: ${path}`));
-			}
-
-			if (segments.length === SEGMENTS_GROUP_MEMBERS) {
-				return {
-					kind: "groupMembers",
-					principalId,
-					groupId,
-					groupSeg,
-				} satisfies ResolvedDavPath;
-			}
-
-			const memberSeg = decodeURIComponent(segments[3] ?? "");
-			const userRepo = yield* UserRepository;
-			const memberOpt = yield* isUuid(memberSeg)
-				? userRepo.findById(UserId(memberSeg))
-				: userRepo.findBySlug(Slug(memberSeg));
-			if (Option.isNone(memberOpt)) {
-				return {
-					kind: "groupMemberNonExistent",
-					principalId,
-					groupId,
-					groupSeg,
-					slug: Slug(memberSeg),
-				} satisfies ResolvedDavPath;
-			}
-			return {
-				kind: "groupMember",
-				principalId,
-				groupId,
-				memberUserId: UserId(memberOpt.value.user.id),
-				groupSeg,
-				memberSeg,
-			} satisfies ResolvedDavPath;
-		});
+		return parseGroupPath(
+			segments,
+			decodeURIComponent(segments[1] ?? ""),
+			path,
+		);
 	}
 
 	if (segments[0] !== "principals") {
@@ -230,192 +287,196 @@ export const parseDavPath = (
 		} satisfies ResolvedDavPath);
 	}
 
-	const seg1 = decodeURIComponent(segments[1] ?? "");
+	return parsePrincipalPath(segments, decodeURIComponent(segments[1] ?? ""));
+};
 
-	return Effect.gen(function* () {
-		yield* Effect.logTrace("dav.parsePath: resolving principal segment", {
+// ---------------------------------------------------------------------------
+// /dav/principals/ tree
+// ---------------------------------------------------------------------------
+
+/** Resolve /dav/principals/:slug[/:ns[/:coll[/:instance]]] */
+const parsePrincipalPath = Effect.fn("dav.parsePath.principal")(function* (
+	segments: ReadonlyArray<string>,
+	seg1: string,
+) {
+	yield* Effect.logTrace("dav.parsePath: resolving principal segment", {
+		segment: seg1,
+	});
+	const principalRepo = yield* PrincipalRepository;
+	const principalOpt = yield* resolveByIdOrSlug(
+		seg1,
+		(id) => principalRepo.findPrincipalById(PrincipalId(id)),
+		principalRepo.findPrincipalBySlug(Slug(seg1)),
+	);
+	if (Option.isNone(principalOpt)) {
+		yield* Effect.logDebug("dav.parsePath: unknown principal", {
 			segment: seg1,
 		});
-		const principalRepo = yield* PrincipalRepository;
-		// Both UUID- and slug-addressed paths are accepted; a slug may be
-		// UUID-shaped, so a UUID-shaped segment that matches no principal *id*
-		// falls back to a slug lookup (mirrors collection/instance resolution).
-		const principalBySlug = principalRepo.findPrincipalBySlug(Slug(seg1));
-		const principalOpt = yield* isUuid(seg1)
-			? principalRepo.findPrincipalById(PrincipalId(seg1)).pipe(
-					Effect.flatMap(
-						Option.match({
-							onNone: () => principalBySlug,
-							onSome: (row) => Effect.succeed(Option.some(row)),
-						}),
-					),
-				)
-			: principalBySlug;
-		if (Option.isNone(principalOpt)) {
-			yield* Effect.logDebug("dav.parsePath: unknown principal", {
-				segment: seg1,
-			});
-			return {
-				kind: "unknownPrincipal",
-				principalSeg: seg1,
-			} satisfies ResolvedDavPath;
-		}
-		const principalRow = principalOpt.value;
-		const principalId = PrincipalId(principalRow.id);
+		return {
+			kind: "unknownPrincipal",
+			principalSeg: seg1,
+		} satisfies ResolvedDavPath;
+	}
+	const principalId = PrincipalId(principalOpt.value.id);
 
-		if (segments.length === SEGMENTS_PRINCIPAL) {
-			yield* Effect.logTrace("dav.parsePath: principal resolved", {
-				principalId,
-			});
-			return {
-				kind: "principal",
-				principalId,
-				principalSeg: seg1,
-			} satisfies ResolvedDavPath;
-		}
-
-		// seg2 must be a known collection namespace — reject anything else
-		const seg2 = decodeURIComponent(segments[2] ?? "");
-		const namespaceOpt = parseCollectionNamespace(seg2);
-		if (Option.isNone(namespaceOpt)) {
-			return yield* notFound(`Unknown collection namespace: ${seg2}`);
-		}
-		const namespace = namespaceOpt.value;
-		const collectionType = NAMESPACE_TO_COLLECTION_TYPE[namespace];
-
-		// /dav/principals/:slug/:ns — the per-type home collection (calendar home,
-		// addressbook home, …). RFC 4918 §5.2: this ancestor of the typed
-		// collections beneath it MUST be an addressable collection.
-		if (segments.length === SEGMENTS_NAMESPACE) {
-			yield* Effect.logTrace("dav.parsePath: collection home resolved", {
-				principalId,
-				namespace,
-			});
-			return {
-				kind: "collectionHome",
-				principalId,
-				namespace,
-				principalSeg: seg1,
-			} satisfies ResolvedDavPath;
-		}
-
-		const seg3 = decodeURIComponent(segments[3] ?? "");
-		yield* Effect.logTrace("dav.parsePath: resolving collection segment", {
+	if (segments.length === SEGMENTS_PRINCIPAL) {
+		yield* Effect.logTrace("dav.parsePath: principal resolved", {
 			principalId,
-			namespace,
-			segment: seg3,
-		});
-		const collRepo = yield* CollectionRepository;
-		// Both UUID- and slug-addressed paths are accepted (see CLAUDE.md "DAV URL
-		// and href policy"). A slug may itself be UUID-shaped — e.g. python-caldav's
-		// make_calendar() names a new calendar after a random uuid4() — so a
-		// UUID-shaped segment that matches no collection *id* must still fall back
-		// to a slug lookup, otherwise such a collection becomes unaddressable
-		// (PROPFIND → 404, PUT into it → 405). findBySlug is scoped to this
-		// principal, so the fallback can never resolve to another principal's
-		// collection.
-		const collBySlug = collRepo.findBySlug(
-			principalId,
-			collectionType,
-			Slug(seg3),
-		);
-		const collRowOpt = yield* isUuid(seg3)
-			? collRepo.findById(CollectionId(seg3)).pipe(
-					Effect.flatMap(
-						Option.match({
-							onNone: () => collBySlug,
-							onSome: (row) =>
-								row.ownerPrincipalId === principalId
-									? Effect.succeed(Option.some(row))
-									: collBySlug,
-						}),
-					),
-				)
-			: collBySlug;
-		if (Option.isNone(collRowOpt)) {
-			yield* Effect.logTrace(
-				"dav.parsePath: collection not found, treating as new",
-				{
-					segment: seg3,
-				},
-			);
-			return {
-				kind: "new-collection",
-				principalId,
-				namespace,
-				slug: Slug(seg3),
-				principalSeg: seg1,
-			} satisfies ResolvedDavPath;
-		}
-		const collectionId = CollectionId(collRowOpt.value.id);
-
-		if (segments.length === SEGMENTS_COLLECTION) {
-			yield* Effect.logTrace("dav.parsePath: collection resolved", {
-				collectionId,
-			});
-			return {
-				kind: "collection",
-				principalId,
-				namespace,
-				collectionId,
-				principalSeg: seg1,
-				collectionSeg: seg3,
-			} satisfies ResolvedDavPath;
-		}
-
-		const seg4 = decodeURIComponent(segments[4] ?? "");
-		yield* Effect.logTrace("dav.parsePath: resolving instance segment", {
-			collectionId,
-			segment: seg4,
-		});
-		const instRepo = yield* InstanceRepository;
-		// Same slug/UUID duality as collections above: an instance slug may be
-		// UUID-shaped, so a UUID-shaped segment that matches no instance *id* must
-		// fall back to a slug lookup. findBySlug is scoped to this collection.
-		const instBySlug = instRepo.findBySlug(collectionId, Slug(seg4));
-		const instRowOpt = yield* isUuid(seg4)
-			? instRepo.findById(InstanceId(seg4)).pipe(
-					Effect.flatMap(
-						Option.match({
-							onNone: () => instBySlug,
-							onSome: (row) =>
-								row.collectionId === collectionId
-									? Effect.succeed(Option.some(row))
-									: instBySlug,
-						}),
-					),
-				)
-			: instBySlug;
-		if (Option.isNone(instRowOpt)) {
-			yield* Effect.logTrace(
-				"dav.parsePath: instance not found, treating as new",
-				{
-					segment: seg4,
-				},
-			);
-			return {
-				kind: "new-instance",
-				principalId,
-				namespace,
-				collectionId,
-				slug: Slug(seg4),
-				principalSeg: seg1,
-				collectionSeg: seg3,
-			} satisfies ResolvedDavPath;
-		}
-
-		yield* Effect.logTrace("dav.parsePath: instance resolved", {
-			instanceId: instRowOpt.value.id,
 		});
 		return {
-			kind: "instance",
+			kind: "principal",
+			principalId,
+			principalSeg: seg1,
+		} satisfies ResolvedDavPath;
+	}
+
+	// seg2 must be a known collection namespace — reject anything else
+	const seg2 = decodeURIComponent(segments[2] ?? "");
+	const namespaceOpt = parseCollectionNamespace(seg2);
+	if (Option.isNone(namespaceOpt)) {
+		return yield* notFound(`Unknown collection namespace: ${seg2}`);
+	}
+	const namespace = namespaceOpt.value;
+
+	// /dav/principals/:slug/:ns — the per-type home collection (calendar home,
+	// addressbook home, …). RFC 4918 §5.2: this ancestor of the typed
+	// collections beneath it MUST be an addressable collection.
+	if (segments.length === SEGMENTS_NAMESPACE) {
+		yield* Effect.logTrace("dav.parsePath: collection home resolved", {
+			principalId,
+			namespace,
+		});
+		return {
+			kind: "collectionHome",
+			principalId,
+			namespace,
+			principalSeg: seg1,
+		} satisfies ResolvedDavPath;
+	}
+
+	return yield* parseCollectionPath(segments, {
+		principalId,
+		principalSeg: seg1,
+		namespace,
+	});
+});
+
+/** The resolved principal and namespace a collection segment hangs off */
+interface PrincipalContext {
+	readonly principalId: ReturnType<typeof PrincipalId>;
+	readonly principalSeg: string;
+	readonly namespace: CollectionNamespace;
+}
+
+/** Resolve the collection segment, and the instance segment beneath it */
+const parseCollectionPath = Effect.fn("dav.parsePath.collection")(function* (
+	segments: ReadonlyArray<string>,
+	parent: PrincipalContext,
+) {
+	const { principalId, principalSeg, namespace } = parent;
+	const seg3 = decodeURIComponent(segments[3] ?? "");
+	yield* Effect.logTrace("dav.parsePath: resolving collection segment", {
+		principalId,
+		namespace,
+		segment: seg3,
+	});
+	const collRepo = yield* CollectionRepository;
+	const collectionType = NAMESPACE_TO_COLLECTION_TYPE[namespace];
+	const collRowOpt = yield* resolveByIdOrSlug(
+		seg3,
+		(id) => collRepo.findById(CollectionId(id)),
+		collRepo.findBySlug(principalId, collectionType, Slug(seg3)),
+		(row) => row.ownerPrincipalId === principalId,
+	);
+	if (Option.isNone(collRowOpt)) {
+		yield* Effect.logTrace(
+			"dav.parsePath: collection not found, treating as new",
+			{ segment: seg3 },
+		);
+		return {
+			kind: "new-collection",
+			principalId,
+			namespace,
+			slug: Slug(seg3),
+			principalSeg,
+		} satisfies ResolvedDavPath;
+	}
+	const collectionId = CollectionId(collRowOpt.value.id);
+
+	if (segments.length === SEGMENTS_COLLECTION) {
+		yield* Effect.logTrace("dav.parsePath: collection resolved", {
+			collectionId,
+		});
+		return {
+			kind: "collection",
 			principalId,
 			namespace,
 			collectionId,
-			instanceId: InstanceId(instRowOpt.value.id),
-			principalSeg: seg1,
+			principalSeg,
 			collectionSeg: seg3,
-			instanceSeg: seg4,
 		} satisfies ResolvedDavPath;
+	}
+
+	return yield* parseInstancePath(decodeURIComponent(segments[4] ?? ""), {
+		principalId,
+		principalSeg,
+		namespace,
+		collectionId,
+		collectionSeg: seg3,
 	});
-};
+});
+
+/** The resolved collection an instance segment hangs off */
+interface CollectionContext extends PrincipalContext {
+	readonly collectionId: ReturnType<typeof CollectionId>;
+	readonly collectionSeg: string;
+}
+
+/** Resolve the final instance segment of a collection path */
+const parseInstancePath = Effect.fn("dav.parsePath.instance")(function* (
+	seg4: string,
+	parent: CollectionContext,
+) {
+	const { principalId, principalSeg, namespace, collectionId, collectionSeg } =
+		parent;
+	yield* Effect.logTrace("dav.parsePath: resolving instance segment", {
+		collectionId,
+		segment: seg4,
+	});
+	const instRepo = yield* InstanceRepository;
+	const instRowOpt = yield* resolveByIdOrSlug(
+		seg4,
+		(id) => instRepo.findById(InstanceId(id)),
+		instRepo.findBySlug(collectionId, Slug(seg4)),
+		(row) => row.collectionId === collectionId,
+	);
+	if (Option.isNone(instRowOpt)) {
+		yield* Effect.logTrace(
+			"dav.parsePath: instance not found, treating as new",
+			{ segment: seg4 },
+		);
+		return {
+			kind: "new-instance",
+			principalId,
+			namespace,
+			collectionId,
+			slug: Slug(seg4),
+			principalSeg,
+			collectionSeg,
+		} satisfies ResolvedDavPath;
+	}
+
+	yield* Effect.logTrace("dav.parsePath: instance resolved", {
+		instanceId: instRowOpt.value.id,
+	});
+	return {
+		kind: "instance",
+		principalId,
+		namespace,
+		collectionId,
+		instanceId: InstanceId(instRowOpt.value.id),
+		principalSeg,
+		collectionSeg,
+		instanceSeg: seg4,
+	} satisfies ResolvedDavPath;
+});

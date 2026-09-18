@@ -4,10 +4,12 @@ import type { DatabaseClient } from "#src/db/client.ts";
 import {
 	type AppError,
 	conflict,
+	type DavError,
 	type DavPrecondition,
 	notFound,
 	unauthorized,
 } from "#src/domain/errors.ts";
+import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import {
 	HTTP_METHOD_NOT_ALLOWED,
@@ -154,6 +156,139 @@ const COLLECTION_KINDS: ReadonlySet<string> = new Set([
 	"groupMembers",
 ]);
 
+// ---------------------------------------------------------------------------
+// Method dispatch tables
+// ---------------------------------------------------------------------------
+
+/** A dispatch table from HTTP method name to the handler that serves it */
+interface MethodHandlers {
+	readonly [method: string]: (
+		path: ResolvedDavPath,
+		ctx: HttpRequestContext,
+		req: Request,
+	) => Effect.Effect<Response, AppError, DavServices>;
+}
+
+/** Path kinds served by the admin user handlers */
+const USER_ADMIN_KINDS: ReadonlySet<string> = new Set([
+	"userCollection",
+	"user",
+	"newUser",
+]);
+
+/** Path kinds served by the admin group handlers */
+const GROUP_ADMIN_KINDS: ReadonlySet<string> = new Set([
+	"groupCollection",
+	"group",
+	"newGroup",
+	"groupMembers",
+	"groupMember",
+	"groupMemberNonExistent",
+]);
+
+/** Methods handled on an admin user path; any other falls through to the generic dispatch */
+const USER_METHOD_HANDLERS: MethodHandlers = {
+	PROPFIND: (path, ctx) => userPropfindHandler(path, ctx),
+	PROPPATCH: userProppatchHandler,
+	MKCOL: userMkcolHandler,
+	DELETE: (path, ctx) => userDeleteHandler(path, ctx),
+};
+
+/** Methods handled on an admin group path; any other falls through */
+const GROUP_METHOD_HANDLERS: MethodHandlers = {
+	PROPFIND: (path, ctx) => groupPropfindHandler(path, ctx),
+	PROPPATCH: groupProppatchHandler,
+	MKCOL: groupMkcolHandler,
+	DELETE: (path, ctx) =>
+		path.kind === "groupMember"
+			? groupMemberDeleteHandler(path, ctx)
+			: groupDeleteHandler(path, ctx),
+	PUT: (path, ctx) => groupMemberPutHandler(path, ctx),
+};
+
+/**
+ * Methods allowed on a per-type home collection (/dav/principals/:slug/:ns). It
+ * is a virtual container — enumerable, but not itself created, deleted or
+ * written — so everything else is 405.
+ */
+const COLLECTION_HOME_METHOD_HANDLERS: MethodHandlers = {
+	OPTIONS: (path, ctx) => optionsHandler(path, ctx),
+	PROPFIND: propfindHandler,
+};
+
+/** Generic per-resource dispatch */
+const DAV_METHOD_HANDLERS: MethodHandlers = {
+	OPTIONS: (path, ctx) => optionsHandler(path, ctx),
+	PROPFIND: propfindHandler,
+	PROPPATCH: proppatchHandler,
+	REPORT: reportHandler,
+	GET: (path, ctx) => getHandler(path, ctx),
+	HEAD: (path, ctx) => getHandler(path, ctx),
+	PUT: putHandler,
+	DELETE: (path, ctx) => deleteHandler(path, ctx),
+	COPY: copyHandler,
+	MOVE: moveHandler,
+	MKCOL: mkcolHandler,
+	MKCALENDAR: mkcolHandler,
+	MKADDRESSBOOK: mkcolHandler,
+	POST: postHandler,
+	ACL: aclHandler,
+};
+
+const SUPPORTED_METHODS =
+	"OPTIONS, GET, HEAD, PUT, DELETE, COPY, MOVE, PROPFIND, PROPPATCH, MKCOL, REPORT, MKCALENDAR, MKADDRESSBOOK, ACL";
+
+/** RFC 4918 §9: a 405 carrying the Allow header for the addressed resource */
+const methodNotAllowedResponse = (allow: string): Response =>
+	new Response(null, {
+		status: HTTP_METHOD_NOT_ALLOWED,
+		headers: { Allow: allow },
+	});
+
+/** Methods on an unknown principal that mean a missing intermediate collection */
+const CREATE_METHODS: ReadonlySet<string> = new Set([
+	"MKCOL",
+	"MKCALENDAR",
+	"PUT",
+]);
+
+/**
+ * Principal does not exist — MKCOL/MKCALENDAR/PUT → 409 (missing intermediate
+ * collection, RFC 4918 §9.3.1 / §9.7); everything else → 404.
+ */
+const unknownPrincipalError = (method: string): DavError =>
+	CREATE_METHODS.has(method) ? conflict() : notFound();
+
+/** RFC 6764 §5 service-discovery endpoints, served without authentication */
+const WELL_KNOWN_PATHS: ReadonlySet<string> = new Set([
+	"/.well-known/caldav",
+	"/.well-known/carddav",
+]);
+
+/**
+ * Central auth gate: every DAV request must be authenticated, except
+ * service-discovery endpoints (pure discovery, never principal-level data) and
+ * OPTIONS (RFC 4918 §10.1 — clients use it pre-auth to discover server
+ * capabilities). Without this gate, parseDavPath and the per-method handlers
+ * can leak resource topology to anonymous probes via 404 / 405 responses.
+ */
+const requiresAuth = (url: URL, method: string): boolean =>
+	method !== "OPTIONS" &&
+	!WELL_KNOWN_PATHS.has(url.pathname.replace(TRAILING_SLASH, ""));
+
+/** The admin handler owning a path kind and method, when the admin routes own it */
+const adminMethodHandler = (
+	kind: string,
+	method: string,
+): MethodHandlers[string] | undefined => {
+	if (USER_ADMIN_KINDS.has(kind)) {
+		return USER_METHOD_HANDLERS[method];
+	}
+	return GROUP_ADMIN_KINDS.has(kind)
+		? GROUP_METHOD_HANDLERS[method]
+		: undefined;
+};
+
 export const davRouter = (
 	req: Request,
 	ctx: HttpRequestContext,
@@ -167,24 +302,9 @@ export const davRouter = (
 	return Effect.gen(function* () {
 		const method = req.method.toUpperCase();
 
-		// RFC 6764 §5: /.well-known/{cal,card}dav redirects are public — no auth.
-		// They are pure service-discovery and never expose principal-level data.
-		const pathname = ctx.url.pathname.replace(TRAILING_SLASH, "");
-		const isWellKnown =
-			pathname === "/.well-known/caldav" || pathname === "/.well-known/carddav";
-
-		// Central auth gate: every DAV request must be authenticated, except
-		// service-discovery endpoints (well-known) and OPTIONS (RFC 4918 §10.1 —
-		// clients use OPTIONS pre-auth to discover server capabilities). Without
-		// this gate, parseDavPath and per-method handlers can leak resource
-		// topology to anonymous probes via 404 / 405 responses. Failing with
-		// AuthError lets the outer HTTP edge attach the right WWW-Authenticate
-		// header (only when basic auth is enabled).
-		if (
-			!isWellKnown &&
-			method !== "OPTIONS" &&
-			ctx.auth._tag !== "Authenticated"
-		) {
+		// Failing with AuthError lets the outer HTTP edge attach the right
+		// WWW-Authenticate header (only when basic auth is enabled).
+		if (requiresAuth(ctx.url, method) && ctx.auth._tag !== "Authenticated") {
 			return yield* unauthorized();
 		}
 
@@ -225,121 +345,34 @@ export const davRouter = (
 			1,
 		);
 
-		// Principal does not exist — MKCOL/MKCALENDAR/PUT → 409 (missing intermediate
-		// collection, RFC 4918 §9.3.1 / §9.7); everything else → 404.
 		if (path.kind === "unknownPrincipal") {
 			yield* Effect.logDebug("dav.route: unknown principal", {
 				method,
 				path: ctx.url.pathname,
 			});
-			if (method === "MKCOL" || method === "MKCALENDAR" || method === "PUT") {
-				return yield* conflict();
-			}
-			return yield* Effect.fail(notFound());
+			return yield* Effect.fail(unknownPrincipalError(method));
 		}
 
 		// Dispatch user/group admin paths first before the principal/collection handlers
-		if (
-			path.kind === "userCollection" ||
-			path.kind === "user" ||
-			path.kind === "newUser"
-		) {
-			switch (method) {
-				case "PROPFIND":
-					return yield* userPropfindHandler(path, ctx);
-				case "PROPPATCH":
-					return yield* userProppatchHandler(path, ctx, req);
-				case "MKCOL":
-					return yield* userMkcolHandler(path, ctx, req);
-				case "DELETE":
-					return yield* userDeleteHandler(path, ctx);
-				default:
-					break;
-			}
+		const adminHandler = adminMethodHandler(path.kind, method);
+		if (adminHandler !== undefined) {
+			return yield* adminHandler(path, ctx, req);
 		}
 
-		if (
-			path.kind === "groupCollection" ||
-			path.kind === "group" ||
-			path.kind === "newGroup" ||
-			path.kind === "groupMembers" ||
-			path.kind === "groupMember" ||
-			path.kind === "groupMemberNonExistent"
-		) {
-			switch (method) {
-				case "PROPFIND":
-					return yield* groupPropfindHandler(path, ctx);
-				case "PROPPATCH":
-					return yield* groupProppatchHandler(path, ctx, req);
-				case "MKCOL":
-					return yield* groupMkcolHandler(path, ctx, req);
-				case "DELETE":
-					if (path.kind === "groupMember") {
-						return yield* groupMemberDeleteHandler(path, ctx);
-					}
-					return yield* groupDeleteHandler(path, ctx);
-				case "PUT":
-					return yield* groupMemberPutHandler(path, ctx);
-				default:
-					break;
-			}
-		}
-
-		// Per-type home collection (/dav/principals/:slug/:ns). It is a virtual
-		// container — enumerable via PROPFIND, but not itself created, deleted, or
-		// written. Everything except OPTIONS/PROPFIND is 405.
 		if (path.kind === "collectionHome") {
-			switch (method) {
-				case "OPTIONS":
-					return yield* optionsHandler(path, ctx);
-				case "PROPFIND":
-					return yield* propfindHandler(path, ctx, req);
-				default:
-					return new Response(null, {
-						status: HTTP_METHOD_NOT_ALLOWED,
-						headers: { Allow: "OPTIONS, PROPFIND" },
-					});
+			const homeHandler = COLLECTION_HOME_METHOD_HANDLERS[method];
+			if (homeHandler === undefined) {
+				return methodNotAllowedResponse("OPTIONS, PROPFIND");
 			}
+			return yield* homeHandler(path, ctx, req);
 		}
 
-		switch (method) {
-			case "OPTIONS":
-				return yield* optionsHandler(path, ctx);
-			case "PROPFIND":
-				return yield* propfindHandler(path, ctx, req);
-			case "PROPPATCH":
-				return yield* proppatchHandler(path, ctx, req);
-			case "REPORT":
-				return yield* reportHandler(path, ctx, req);
-			case "GET":
-			case "HEAD":
-				return yield* getHandler(path, ctx);
-			case "PUT":
-				return yield* putHandler(path, ctx, req);
-			case "DELETE":
-				return yield* deleteHandler(path, ctx);
-			case "COPY":
-				return yield* copyHandler(path, ctx, req);
-			case "MOVE":
-				return yield* moveHandler(path, ctx, req);
-			case "MKCOL":
-			case "MKCALENDAR":
-			case "MKADDRESSBOOK":
-				return yield* mkcolHandler(path, ctx, req);
-			case "POST":
-				return yield* postHandler(path, ctx, req);
-			case "ACL":
-				return yield* aclHandler(path, ctx, req);
-			default:
-				yield* Effect.logInfo("dav.route: method not allowed", { method });
-				return new Response(null, {
-					status: HTTP_METHOD_NOT_ALLOWED,
-					headers: {
-						Allow:
-							"OPTIONS, GET, HEAD, PUT, DELETE, COPY, MOVE, PROPFIND, PROPPATCH, MKCOL, REPORT, MKCALENDAR, MKADDRESSBOOK, ACL",
-					},
-				});
+		const handler = DAV_METHOD_HANDLERS[method];
+		if (handler === undefined) {
+			yield* Effect.logInfo("dav.route: method not allowed", { method });
+			return methodNotAllowedResponse(SUPPORTED_METHODS);
 		}
+		return yield* handler(path, ctx, req);
 	}).pipe(
 		Effect.catchTag("DavError", (err) => {
 			// 401s propagate to the outer HTTP edge so it can attach the right

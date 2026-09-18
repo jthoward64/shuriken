@@ -33,6 +33,11 @@ import {
 	USERS_VIRTUAL_RESOURCE_ID,
 } from "#src/domain/virtual-resources.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
+import {
+	isXmlNode,
+	xmlChild,
+	xmlPath,
+} from "#src/http/dav/methods/xml-node.ts";
 import { normalizeClarkNames } from "#src/http/dav/xml/clark.ts";
 import { parseXml, readXmlBody } from "#src/http/dav/xml/parser.ts";
 import { HTTP_OK } from "#src/http/status.ts";
@@ -124,6 +129,92 @@ interface ParsedAce {
 // parseAclBody — extract ParsedAce list from the XML request body
 // ---------------------------------------------------------------------------
 
+// Non-href principal forms, in the order RFC 3744 §5.5.1 lists them
+const PRINCIPAL_TYPE_KEYS: ReadonlyArray<
+	readonly [string, ParsedAce["principalType"]]
+> = [
+	[ALL_KEY, "all"],
+	[AUTH_KEY, "authenticated"],
+	[UNAUTH_KEY, "unauthenticated"],
+	[SELF_KEY, "self"],
+];
+
+/** The principal half of an ACE */
+type AcePrincipal = Pick<ParsedAce, "principalType" | "principalHref">;
+
+/** Reads a DAV:principal element, rejecting the forms the server restricts */
+const parsePrincipal = (
+	principal: Record<string, unknown>,
+): Effect.Effect<AcePrincipal, DavError> => {
+	if (INVERT_KEY in principal) {
+		return Effect.fail(forbidden("DAV:no-invert"));
+	}
+	if (PROPERTY_KEY in principal) {
+		return Effect.fail(forbidden("DAV:not-supported-privilege"));
+	}
+	if (HREF_KEY in principal) {
+		return Effect.succeed({
+			principalType: "principal" as const,
+			principalHref: String(principal[HREF_KEY]),
+		});
+	}
+	const found = PRINCIPAL_TYPE_KEYS.find(([key]) => key in principal);
+	return found === undefined
+		? Effect.fail(forbidden("DAV:missing-required-principal"))
+		: Effect.succeed({ principalType: found[1] });
+};
+
+/** Reads the privileges of a DAV:grant, rejecting any name the server does not define */
+const parsePrivileges = (
+	grant: Record<string, unknown>,
+): Effect.Effect<ReadonlyArray<DavPrivilege>, DavError> =>
+	Effect.gen(function* () {
+		const privileges: Array<DavPrivilege> = [];
+		for (const rawPriv of toArray(grant[PRIVILEGE_KEY])) {
+			if (!isXmlNode(rawPriv)) {
+				continue;
+			}
+			for (const key of Object.keys(rawPriv)) {
+				if (key.startsWith("@_")) {
+					continue;
+				}
+				const privilege = PRIVILEGE_MAP.get(key);
+				if (privilege === undefined) {
+					return yield* Effect.fail(forbidden("DAV:not-supported-privilege"));
+				}
+				privileges.push(privilege);
+			}
+		}
+		return privileges;
+	});
+
+/** Reads one DAV:ace; an entry with no principal or no grant is skipped */
+const parseAce = (
+	rawAce: unknown,
+): Effect.Effect<Option.Option<ParsedAce>, DavError> =>
+	Effect.gen(function* () {
+		if (!isXmlNode(rawAce)) {
+			return Option.none();
+		}
+		const principalEl = xmlChild(rawAce, PRINCIPAL_KEY);
+		if (principalEl === undefined) {
+			return Option.none();
+		}
+		const { principalType, principalHref } = yield* parsePrincipal(principalEl);
+
+		// Deny ACEs are forbidden (server declares grant-only)
+		if (DENY_KEY in rawAce) {
+			return yield* Effect.fail(forbidden("DAV:grant-only"));
+		}
+
+		const grant = xmlChild(rawAce, GRANT_KEY);
+		if (grant === undefined) {
+			return Option.none();
+		}
+		const privileges = yield* parsePrivileges(grant);
+		return Option.some({ principalType, principalHref, privileges });
+	});
+
 const parseAclBody = (
 	req: Request,
 ): Effect.Effect<ReadonlyArray<ParsedAce>, DavError> =>
@@ -139,89 +230,15 @@ const parseAclBody = (
 			),
 		);
 
-		const tree = normalizeClarkNames(raw) as Record<string, unknown>;
-		const aclEl = tree[ACL_KEY];
-		if (typeof aclEl !== "object" || aclEl === null) {
+		const aclEl = xmlPath(normalizeClarkNames(raw), ACL_KEY);
+		if (aclEl === undefined) {
 			return [];
 		}
 
-		const aceEls = toArray((aclEl as Record<string, unknown>)[ACE_KEY]);
 		const parsedAces: Array<ParsedAce> = [];
-
-		for (const rawAce of aceEls) {
-			if (typeof rawAce !== "object" || rawAce === null) {
-				continue;
-			}
-			const ace = rawAce as Record<string, unknown>;
-
-			// Extract principal element
-			const principalEl = ace[PRINCIPAL_KEY];
-			if (typeof principalEl !== "object" || principalEl === null) {
-				continue;
-			}
-			const principal = principalEl as Record<string, unknown>;
-
-			// Detect principal type
-			let principalType: ParsedAce["principalType"];
-			let principalHref: string | undefined;
-
-			if (INVERT_KEY in principal) {
-				return yield* Effect.fail(forbidden("DAV:no-invert"));
-			}
-			if (PROPERTY_KEY in principal) {
-				return yield* Effect.fail(forbidden("DAV:not-supported-privilege"));
-			}
-			if (HREF_KEY in principal) {
-				principalType = "principal";
-				principalHref = String(principal[HREF_KEY]);
-			} else if (ALL_KEY in principal) {
-				principalType = "all";
-			} else if (AUTH_KEY in principal) {
-				principalType = "authenticated";
-			} else if (UNAUTH_KEY in principal) {
-				principalType = "unauthenticated";
-			} else if (SELF_KEY in principal) {
-				principalType = "self";
-			} else {
-				return yield* Effect.fail(forbidden("DAV:missing-required-principal"));
-			}
-
-			// Deny ACEs are forbidden (server declares grant-only)
-			if (DENY_KEY in ace) {
-				return yield* Effect.fail(forbidden("DAV:grant-only"));
-			}
-
-			// Extract grant element and privileges
-			const grantEl = ace[GRANT_KEY];
-			if (typeof grantEl !== "object" || grantEl === null) {
-				continue;
-			}
-			const grant = grantEl as Record<string, unknown>;
-
-			const privilegeEls = toArray(grant[PRIVILEGE_KEY]);
-			const privileges: Array<DavPrivilege> = [];
-
-			for (const rawPriv of privilegeEls) {
-				if (typeof rawPriv !== "object" || rawPriv === null) {
-					continue;
-				}
-				const privEl = rawPriv as Record<string, unknown>;
-
-				for (const key of Object.keys(privEl)) {
-					if (key.startsWith("@_")) {
-						continue;
-					}
-					const privilege = PRIVILEGE_MAP.get(key);
-					if (privilege === undefined) {
-						return yield* Effect.fail(forbidden("DAV:not-supported-privilege"));
-					}
-					privileges.push(privilege);
-				}
-			}
-
-			parsedAces.push({ principalType, principalHref, privileges });
+		for (const rawAce of toArray(aclEl[ACE_KEY])) {
+			Option.map(yield* parseAce(rawAce), (ace) => parsedAces.push(ace));
 		}
-
 		return parsedAces;
 	});
 
@@ -261,6 +278,90 @@ const resolveHrefPrincipal = (
 			onNone: () => Effect.fail(forbidden("DAV:recognized-principal")),
 			onSome: (principal) => Effect.succeed(principal.id as PrincipalId),
 		});
+	});
+
+// ---------------------------------------------------------------------------
+// ACL target resolution and ACE building
+// ---------------------------------------------------------------------------
+
+/** The resource an ACE row is stored against */
+interface AclTarget {
+	readonly resourceId: AclResourceId;
+	readonly resourceType: ResourceType;
+}
+
+/** Path kinds that carry an ACL; every other kind is rejected before this point */
+type AclTargetPath = Extract<
+	ResolvedDavPath,
+	{
+		kind:
+			| "principal"
+			| "collection"
+			| "instance"
+			| "userCollection"
+			| "groupCollection";
+	}
+>;
+
+/** Maps an ACL-bearing path to the resource its ACEs are stored against */
+const aclTarget = (path: AclTargetPath): AclTarget => {
+	if (path.kind === "principal") {
+		return { resourceId: path.principalId, resourceType: "principal" };
+	}
+	if (path.kind === "collection") {
+		return { resourceId: path.collectionId, resourceType: "collection" };
+	}
+	if (path.kind === "userCollection") {
+		return {
+			resourceId: USERS_VIRTUAL_RESOURCE_ID as AclResourceId,
+			resourceType: "virtual",
+		};
+	}
+	if (path.kind === "groupCollection") {
+		return {
+			resourceId: GROUPS_VIRTUAL_RESOURCE_ID as AclResourceId,
+			resourceType: "virtual",
+		};
+	}
+	return { resourceId: path.instanceId, resourceType: "instance" };
+};
+
+/**
+ * Turns parsed ACEs into the rows to store, resolving each href principal to its
+ * id. Ordinals are spaced by ten so the source ACE an ACE row came from stays
+ * recoverable.
+ */
+const buildNewAces = (
+	parsedAces: ReadonlyArray<ParsedAce>,
+	target: AclTarget,
+): Effect.Effect<
+	ReadonlyArray<NewAce>,
+	DavError | DatabaseError,
+	PrincipalRepository
+> =>
+	Effect.gen(function* () {
+		const AceOrdinalStride = 10;
+		const newAces: Array<NewAce> = [];
+		for (const [aceIndex, parsedAce] of parsedAces.entries()) {
+			const resolvedPrincipalId =
+				parsedAce.principalType === "principal"
+					? yield* resolveHrefPrincipal(parsedAce.principalHref ?? "")
+					: undefined;
+
+			for (const privilege of parsedAce.privileges) {
+				newAces.push({
+					resourceType: target.resourceType,
+					resourceId: target.resourceId,
+					principalType: parsedAce.principalType,
+					principalId: resolvedPrincipalId,
+					privilege,
+					grantDeny: "grant",
+					protected: false,
+					ordinal: aceIndex * AceOrdinalStride,
+				});
+			}
+		}
+		return newAces;
 	});
 
 // ---------------------------------------------------------------------------
@@ -308,25 +409,7 @@ export const aclHandler = (
 		}
 
 		// Determine the target resource identity
-		let resourceId: AclResourceId;
-		let resourceType: ResourceType;
-		if (path.kind === "principal") {
-			resourceId = path.principalId;
-			resourceType = "principal";
-		} else if (path.kind === "collection") {
-			resourceId = path.collectionId;
-			resourceType = "collection";
-		} else if (path.kind === "userCollection") {
-			resourceId = USERS_VIRTUAL_RESOURCE_ID as AclResourceId;
-			resourceType = "virtual";
-		} else if (path.kind === "groupCollection") {
-			resourceId = GROUPS_VIRTUAL_RESOURCE_ID as AclResourceId;
-			resourceType = "virtual";
-		} else {
-			// instance
-			resourceId = path.instanceId;
-			resourceType = "instance";
-		}
+		const { resourceId, resourceType } = aclTarget(path);
 
 		// Must have DAV:write-acl on the resource
 		const acl = yield* AclService;
@@ -343,28 +426,10 @@ export const aclHandler = (
 		const parsedAces = yield* parseAclBody(req);
 
 		// Resolve href principals and build NewAce rows
-		const newAces: Array<NewAce> = [];
-		for (const [aceIndex, parsedAce] of parsedAces.entries()) {
-			let resolvedPrincipalId: PrincipalId | undefined;
-			if (parsedAce.principalType === "principal") {
-				resolvedPrincipalId = yield* resolveHrefPrincipal(
-					parsedAce.principalHref ?? "",
-				);
-			}
-
-			for (const privilege of parsedAce.privileges) {
-				newAces.push({
-					resourceType,
-					resourceId,
-					principalType: parsedAce.principalType,
-					principalId: resolvedPrincipalId,
-					privilege,
-					grantDeny: "grant",
-					protected: false,
-					ordinal: aceIndex * 10,
-				});
-			}
-		}
+		const newAces = yield* buildNewAces(parsedAces, {
+			resourceId,
+			resourceType,
+		});
 
 		// Atomically replace all non-protected ACEs
 		yield* acl.setAces(resourceId, resourceType, newAces);

@@ -14,7 +14,10 @@ import { resolveRoleFromGroups } from "#src/services/oidc/role-mapping.ts";
 import type { OidcClaims } from "#src/services/oidc/service.ts";
 import { ProvisioningService } from "#src/services/provisioning/service.ts";
 import { DEFAULT_ROLE } from "#src/services/role/policy.ts";
-import type { UserWithPrincipal } from "#src/services/user/repository.ts";
+import type {
+	UserRepositoryShape,
+	UserWithPrincipal,
+} from "#src/services/user/repository.ts";
 import { UserRepository } from "#src/services/user/repository.ts";
 
 // ---------------------------------------------------------------------------
@@ -36,6 +39,16 @@ const ISSUER_SUBJECT_SOURCE = "oidc";
 const SLUG_SUFFIX_BYTES = 3;
 const HEX_RADIX = 16;
 const HEX_BYTE_WIDTH = 2;
+
+/** Write the IdP-derived role onto the user and record the change */
+const applyRole = Effect.fn("auth.oidc.applyRole")(function* (
+	repo: UserRepositoryShape,
+	userId: UserId,
+	role: string,
+) {
+	yield* repo.update(userId, { role });
+	yield* Effect.logDebug("auth.oidc: synced role from IdP", { userId, role });
+});
 
 const oidcAuthId = (claims: OidcClaims): string =>
 	`${claims.issuer}|${claims.subject}`;
@@ -103,21 +116,13 @@ export const resolveOidcPrincipal = (
 
 		// Re-sync an existing user's role from the IdP when it differs.
 		const syncRole = (uwp: UserWithPrincipal) =>
-			Option.match(desiredRole, {
-				onNone: () => Effect.void,
-				onSome: (role) =>
-					uwp.user.role === role
-						? Effect.void
-						: repo.update(UserId(uwp.user.id), { role }).pipe(
-								Effect.asVoid,
-								Effect.tap(() =>
-									Effect.logDebug("auth.oidc: synced role from IdP", {
-										userId: uwp.user.id,
-										role,
-									}),
-								),
-							),
-			});
+			Option.match(
+				Option.filter(desiredRole, (role) => uwp.user.role !== role),
+				{
+					onNone: () => Effect.void,
+					onSome: (role) => applyRole(repo, UserId(uwp.user.id), role),
+				},
+			);
 
 		// Reconcile auto-assigned group membership against the IdP's groups
 		// claim. Only runs when the claim is present — an absent claim means

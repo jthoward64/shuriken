@@ -7,7 +7,7 @@
 // Delta sync: returns instances changed since token + 404 hrefs for deleted.
 // ---------------------------------------------------------------------------
 
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import { type ClarkName, cn } from "#src/data/ir.ts";
 import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import {
@@ -34,7 +34,9 @@ import {
 	InstanceRepository,
 	InstanceService,
 } from "#src/services/instance/index.ts";
+import type { InstanceRow } from "#src/services/instance/repository.ts";
 import { TombstoneRepository } from "#src/services/tombstone/index.ts";
+import type { TombstoneRow } from "#src/services/tombstone/repository.ts";
 
 // ---------------------------------------------------------------------------
 // Sync token URN helpers
@@ -42,12 +44,13 @@ import { TombstoneRepository } from "#src/services/tombstone/index.ts";
 
 const SYNC_TOKEN_PREFIX = "urn:ietf:params:xml:ns:sync:";
 
-const parseSyncToken = (raw: string): number | null => {
+/** Read the revision number out of a sync-token URN */
+const parseSyncToken = (raw: string): Option.Option<number> => {
 	if (!raw.startsWith(SYNC_TOKEN_PREFIX)) {
-		return null;
+		return Option.none();
 	}
 	const n = Number.parseInt(raw.slice(SYNC_TOKEN_PREFIX.length), 10);
-	return Number.isFinite(n) ? n : null;
+	return Number.isFinite(n) ? Option.some(n) : Option.none();
 };
 
 const formatSyncToken = (n: number): string => `${SYNC_TOKEN_PREFIX}${n}`;
@@ -58,13 +61,44 @@ const formatSyncToken = (n: number): string => `${SYNC_TOKEN_PREFIX}${n}`;
 
 const DAV_NS = "DAV:";
 
+/** True when an unknown value is a plain (non-null) object */
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+	typeof value === "object" && value !== null;
+
 /** Extract the text value of the first child matching `key` from a tree object. */
 const childText = (tree: unknown, key: ClarkName): string | undefined => {
-	if (typeof tree !== "object" || tree === null) {
+	if (!isRecord(tree)) {
 		return undefined;
 	}
-	const val = (tree as Record<string, unknown>)[key];
+	const val = tree[key];
 	return typeof val === "string" ? val : undefined;
+};
+
+// ---------------------------------------------------------------------------
+// Response entries
+// ---------------------------------------------------------------------------
+
+/** Multistatus entry for one instance still present in the collection */
+const instanceResponse = (
+	inst: InstanceRow,
+	hrefBase: string,
+	propfind: PropfindKind,
+): DavResponse => ({
+	href: `${hrefBase}/${encodeSegment(inst.slug || inst.id)}`,
+	propstats: splitPropstats(buildInstanceProps(inst), propfind),
+});
+
+/** RFC 6578 §3.2: a removed member is reported as a bare 404 propstat */
+const tombstoneResponse = (
+	tombstone: TombstoneRow,
+	hrefBase: string,
+): DavResponse => {
+	// Prefer the client-supplied slug variant; fall back to the tombstone UUID
+	const seg = tombstone.uriVariants[0] ?? tombstone.id;
+	return {
+		href: `${hrefBase}/${encodeSegment(seg)}`,
+		propstats: [{ props: {} as Record<ClarkName, unknown>, status: 404 }],
+	};
 };
 
 // ---------------------------------------------------------------------------
@@ -117,12 +151,15 @@ export const syncCollectionHandler = (
 
 		// Parse sync-token from request body
 		const rawToken = childText(tree, cn(DAV_NS, "sync-token")) ?? "";
-		const initialRevision = rawToken === "" ? 0 : parseSyncToken(rawToken);
-
-		if (initialRevision === null) {
-			// Invalid token format
-			return yield* conflict("DAV:valid-sync-token", "Invalid sync token");
-		}
+		const initialRevision = yield* Option.match(
+			rawToken === "" ? Option.some(0) : parseSyncToken(rawToken),
+			{
+				// Invalid token format
+				onNone: () =>
+					Effect.fail(conflict("DAV:valid-sync-token", "Invalid sync token")),
+				onSome: Effect.succeed,
+			},
+		);
 
 		// Token must not be in the future
 		if (initialRevision > collRow.synctoken) {
@@ -139,11 +176,11 @@ export const syncCollectionHandler = (
 				? { type: "prop", names: propNames }
 				: { type: "allprop" };
 
-		const origin = ctx.url.origin;
 		const ns =
 			(COLLECTION_TYPE_TO_NAMESPACE as Record<string, string>)[
 				collRow.collectionType
 			] ?? "col";
+		const hrefBase = `${ctx.url.origin}/dav/principals/${path.principalSeg}/${ns}/${path.collectionSeg}`;
 
 		const responses: Array<DavResponse> = [];
 
@@ -151,13 +188,9 @@ export const syncCollectionHandler = (
 			// Initial sync: return all non-deleted instances
 			const instSvc = yield* InstanceService;
 			const instances = yield* instSvc.listByCollection(path.collectionId);
-			for (const inst of instances) {
-				const href = `${origin}/dav/principals/${path.principalSeg}/${ns}/${path.collectionSeg}/${encodeSegment(inst.slug || inst.id)}`;
-				responses.push({
-					href,
-					propstats: splitPropstats(buildInstanceProps(inst), propfind),
-				});
-			}
+			responses.push(
+				...instances.map((inst) => instanceResponse(inst, hrefBase, propfind)),
+			);
 		} else {
 			// Delta sync: changed instances + tombstones
 			const instRepo = yield* InstanceRepository;
@@ -168,23 +201,14 @@ export const syncCollectionHandler = (
 				tombstoneRepo.findSinceRevision(path.collectionId, initialRevision),
 			]);
 
-			for (const inst of changedInstances) {
-				const href = `${origin}/dav/principals/${path.principalSeg}/${ns}/${path.collectionSeg}/${encodeSegment(inst.slug || inst.id)}`;
-				responses.push({
-					href,
-					propstats: splitPropstats(buildInstanceProps(inst), propfind),
-				});
-			}
-
-			for (const tombstone of tombstones) {
-				// Prefer the client-supplied slug variant; fall back to the tombstone UUID.
-				const seg = tombstone.uriVariants[0] ?? tombstone.id;
-				const href = `${origin}/dav/principals/${path.principalSeg}/${ns}/${path.collectionSeg}/${encodeSegment(seg)}`;
-				responses.push({
-					href,
-					propstats: [{ props: {} as Record<ClarkName, unknown>, status: 404 }],
-				});
-			}
+			responses.push(
+				...changedInstances.map((inst) =>
+					instanceResponse(inst, hrefBase, propfind),
+				),
+				...tombstones.map((tombstone) =>
+					tombstoneResponse(tombstone, hrefBase),
+				),
+			);
 		}
 
 		const newSyncToken = formatSyncToken(collRow.synctoken);

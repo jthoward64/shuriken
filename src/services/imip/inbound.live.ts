@@ -8,7 +8,13 @@ import {
 	type DavError,
 	InternalError,
 } from "#src/domain/errors.ts";
-import type { CollectionId, PrincipalId, UserId } from "#src/domain/ids.ts";
+import {
+	CollectionId,
+	type EntityId,
+	type InstanceId,
+	PrincipalId,
+	type UserId,
+} from "#src/domain/ids.ts";
 import { parseEmail } from "#src/domain/types/strings.ts";
 import { parseVeventToForm } from "#src/services/cal-edit/parse-vevent.ts";
 import { CalEditService } from "#src/services/cal-edit/service.ts";
@@ -42,41 +48,42 @@ const VCALENDAR_MARKER = /BEGIN:VCALENDAR/iu;
 // is the simplest useful behaviour.
 // ---------------------------------------------------------------------------
 
+/** The text/calendar body of an inbound message, if it carries one */
 const findVCalendarPart = (
 	parsed: Awaited<ReturnType<typeof simpleParser>>,
-): string | null => {
+): Option.Option<string> => {
 	if (parsed.text && VCALENDAR_MARKER.test(parsed.text)) {
 		// `simpleParser` puts a text/calendar body into .text when it's the only
 		// body part — happy path for our own outbound messages.
-		return parsed.text;
+		return Option.some(parsed.text);
 	}
-	const attachments = parsed.attachments ?? [];
-	for (const att of attachments) {
-		const ct = (att.contentType ?? "").toLowerCase();
-		if (ct.startsWith("text/calendar")) {
-			return att.content.toString("utf8");
+	for (const att of parsed.attachments ?? []) {
+		if ((att.contentType ?? "").toLowerCase().startsWith("text/calendar")) {
+			return Option.some(att.content.toString("utf8"));
 		}
 	}
-	return null;
+	return Option.none();
 };
 
-const veventOf = (root: IrComponent): IrComponent | null =>
-	root.components.find((c) => c.name === "VEVENT") ?? null;
+/** The first VEVENT of a VCALENDAR tree */
+const veventOf = (root: IrComponent): Option.Option<IrComponent> =>
+	Option.fromNullishOr(root.components.find((c) => c.name === "VEVENT"));
 
-const methodOf = (root: IrComponent): string | null => {
+/** The VCALENDAR METHOD, upper-cased */
+const methodOf = (root: IrComponent): Option.Option<string> => {
 	const p = root.properties.find((pp) => pp.name === "METHOD");
-	return p && p.value.type === "TEXT" ? p.value.value.toUpperCase() : null;
+	return p?.value.type === "TEXT"
+		? Option.some(p.value.value.toUpperCase())
+		: Option.none();
 };
 
-const uidOf = (vevent: IrComponent): string | null => {
+/** The VEVENT's UID */
+const uidOf = (vevent: IrComponent): Option.Option<string> => {
 	const p = vevent.properties.find((pp) => pp.name === "UID");
-	if (!p) {
-		return null;
+	if (p?.value.type === "TEXT" || p?.value.type === "URI") {
+		return Option.some(p.value.value);
 	}
-	if (p.value.type === "TEXT" || p.value.type === "URI") {
-		return p.value.value;
-	}
-	return null;
+	return Option.none();
 };
 
 /**
@@ -88,47 +95,179 @@ const uidOf = (vevent: IrComponent): string | null => {
  */
 const isAuthorizedSender = (
 	existingVevent: IrComponent,
-	incomingOrganizer: string | null,
+	incomingOrganizer: Option.Option<string>,
 	recipientEmail: string,
 ): boolean => {
 	const existingOrganizer = extractOrganizerAddress(existingVevent);
 	if (
-		existingOrganizer !== null &&
-		existingOrganizer !== incomingOrganizer?.toLowerCase()
+		Option.isSome(existingOrganizer) &&
+		existingOrganizer.value !==
+			Option.getOrUndefined(incomingOrganizer)?.toLowerCase()
 	) {
 		return false;
 	}
 	const existingAttendees = extractAttendeeAddresses(existingVevent).map((a) =>
 		a.toLowerCase(),
 	);
-	if (
-		existingAttendees.length > 0 &&
-		!existingAttendees.includes(recipientEmail.toLowerCase())
-	) {
-		return false;
-	}
-	return true;
+	return (
+		existingAttendees.length === 0 ||
+		existingAttendees.includes(recipientEmail.toLowerCase())
+	);
 };
 
-const findExistingByUid = (
-	collectionId: CollectionId,
-	uid: string,
-): Effect.Effect<
-	{
-		readonly entityId: import("#src/domain/ids.ts").EntityId;
-		readonly instanceId: import("#src/domain/ids.ts").InstanceId;
-	} | null,
-	DatabaseError,
-	EntityRepository
-> =>
-	Effect.gen(function* () {
+/** An existing calendar object resource matched by UID */
+interface ExistingEvent {
+	readonly entityId: EntityId;
+	readonly instanceId: InstanceId;
+}
+
+/** Locate the recipient's stored copy of a UID, if they already have one */
+const findExistingByUid = Effect.fn("imip.inbound.findExistingByUid")(
+	function* (collectionId: CollectionId, uid: string) {
 		const entityRepo = yield* EntityRepository;
 		const rows = yield* entityRepo.listActiveInstancesWithUid(collectionId);
-		const match = rows.find((r) => r.logicalUid === uid);
-		return match
-			? { entityId: match.entityId, instanceId: match.instanceId }
-			: null;
+		return Option.map(
+			Option.fromNullishOr(rows.find((r) => r.logicalUid === uid)),
+			(match): ExistingEvent => ({
+				entityId: match.entityId,
+				instanceId: match.instanceId,
+			}),
+		);
+	},
+);
+
+/** The decoded scheduling content of an inbound iMIP message */
+interface ImipPayload {
+	readonly method: string;
+	readonly vevent: IrComponent;
+	readonly uid: string;
+}
+
+/** Decode the MIME message down to its iMIP payload, or say why it is unusable */
+const decodeImipMessage = Effect.fn("imip.inbound.decodeMessage")(function* (
+	rawMessage: string,
+) {
+	const parsed = yield* Effect.tryPromise({
+		try: () => simpleParser(rawMessage),
+		catch: (e) => new InternalError({ cause: e }),
 	});
+	const icsOpt = findVCalendarPart(parsed);
+	if (Option.isNone(icsOpt)) {
+		return { _tag: "NotImip" as const };
+	}
+	const doc = yield* decodeICalendar(icsOpt.value).pipe(
+		Effect.mapError(
+			(e) =>
+				new InternalError({
+					cause: e instanceof Error ? e : new Error(String(e)),
+				}),
+		),
+	);
+	const method = methodOf(doc.root);
+	const veventOpt = veventOf(doc.root);
+	if (Option.isNone(veventOpt) || Option.isNone(method)) {
+		return { _tag: "MalformedIcs" as const, cause: "no METHOD or VEVENT" };
+	}
+	const uid = uidOf(veventOpt.value);
+	if (Option.isNone(uid)) {
+		return { _tag: "MalformedIcs" as const, cause: "no UID" };
+	}
+	const payload: ImipPayload = {
+		method: method.value,
+		vevent: veventOpt.value,
+		uid: uid.value,
+	};
+	return payload;
+});
+
+/** Reject an update unless the stored copy authenticates the claimed sender */
+const isSenderAuthorized = Effect.fn("imip.inbound.isSenderAuthorized")(
+	function* (
+		existing: ExistingEvent,
+		payload: ImipPayload,
+		recipientEmail: string,
+	) {
+		const componentRepo = yield* ComponentRepository;
+		const existingTreeOpt = yield* componentRepo.loadTree(
+			existing.entityId,
+			"icalendar",
+		);
+		return Option.match(Option.flatMap(existingTreeOpt, veventOf), {
+			onNone: () => true,
+			onSome: (existingVevent) =>
+				isAuthorizedSender(
+					existingVevent,
+					extractOrganizerAddress(payload.vevent),
+					recipientEmail,
+				),
+		});
+	},
+);
+
+/** Apply a decoded payload to the recipient's primary calendar */
+const applyPayload = Effect.fn("imip.inbound.applyPayload")(function* (
+	target: {
+		readonly calendarId: CollectionId;
+		readonly recipientEmail: string;
+	},
+	payload: ImipPayload,
+) {
+	const calEdit = yield* CalEditService;
+	const existing = yield* findExistingByUid(target.calendarId, payload.uid);
+
+	if (
+		Option.isSome(existing) &&
+		!(yield* isSenderAuthorized(existing.value, payload, target.recipientEmail))
+	) {
+		return {
+			_tag: "SenderNotAuthorized" as const,
+			recipientEmail: target.recipientEmail,
+			uid: payload.uid,
+		};
+	}
+
+	if (payload.method === "CANCEL") {
+		if (Option.isSome(existing)) {
+			yield* calEdit.delete(existing.value.instanceId);
+		}
+	} else if (Option.isSome(existing)) {
+		// REQUEST / REPLY both apply the new state. REPLY would normally only
+		// adjust the ATTENDEE PARTSTAT; for v1 we treat it the same as REQUEST
+		// because the form-driven update only owns surface fields.
+		yield* calEdit.update(
+			existing.value.instanceId,
+			parseVeventToForm(payload.vevent),
+		);
+	} else {
+		yield* calEdit.create(
+			target.calendarId,
+			parseVeventToForm(payload.vevent),
+			payload.uid,
+		);
+	}
+	return {
+		_tag: "Applied" as const,
+		method: payload.method,
+		recipientEmail: target.recipientEmail,
+		uid: payload.uid,
+	};
+});
+
+/** The recipient's primary calendar - slug "primary", not deleted */
+const findPrimaryCalendar = Effect.fn("imip.inbound.findPrimaryCalendar")(
+	function* (principalId: PrincipalId) {
+		const collRepo = yield* CollectionRepository;
+		const collections = yield* collRepo.listByOwner(principalId);
+		return Option.fromNullishOr(
+			collections.find(
+				(c) =>
+					c.collectionType === "calendar" &&
+					c.deletedAt === null &&
+					c.slug === "primary",
+			),
+		);
+	},
+);
 
 const process_ = (input: {
 	readonly recipientEmail: string;
@@ -146,8 +285,6 @@ const process_ = (input: {
 > =>
 	Effect.gen(function* () {
 		const userRepo = yield* UserRepository;
-		const collRepo = yield* CollectionRepository;
-		const calEdit = yield* CalEditService;
 
 		// 1. Recipient lookup (case-insensitive on email).
 		const userOpt = yield* userRepo.findByEmail(
@@ -160,114 +297,36 @@ const process_ = (input: {
 			};
 		}
 		const recipient = userOpt.value;
-		const principalId = recipient.principal.id as PrincipalId;
 		// Tag once for telemetry; not relied on later.
 		yield* Effect.annotateCurrentSpan({
 			"imip.recipient_user_id": recipient.user.id,
 		});
 
 		// 2. Parse MIME → find VCALENDAR text → decode IR.
-		const parsed = yield* Effect.tryPromise({
-			try: () => simpleParser(input.rawMessage),
-			catch: (e) => new InternalError({ cause: e }),
-		});
-		const ics = findVCalendarPart(parsed);
-		if (ics === null) {
-			return { _tag: "NotImip" as const };
-		}
-		const doc = yield* decodeICalendar(ics).pipe(
-			Effect.mapError(
-				(e) =>
-					new InternalError({
-						cause: e instanceof Error ? e : new Error(String(e)),
-					}),
-			),
-		);
-		const method = methodOf(doc.root);
-		const vevent = veventOf(doc.root);
-		if (vevent === null || method === null) {
-			return {
-				_tag: "MalformedIcs" as const,
-				cause: "no METHOD or VEVENT",
-			};
-		}
-		const uid = uidOf(vevent);
-		if (uid === null) {
-			return { _tag: "MalformedIcs" as const, cause: "no UID" };
+		const decoded = yield* decodeImipMessage(input.rawMessage);
+		if ("_tag" in decoded) {
+			return decoded;
 		}
 
 		// 3. Locate primary calendar.
-		const collections = yield* collRepo.listByOwner(principalId);
-		const primary = collections.find(
-			(c) =>
-				c.collectionType === "calendar" &&
-				c.deletedAt === null &&
-				c.slug === "primary",
+		const primary = yield* findPrimaryCalendar(
+			PrincipalId(recipient.principal.id),
 		);
-		if (!primary) {
+		if (Option.isNone(primary)) {
 			return {
 				_tag: "MissingCalendar" as const,
 				recipientEmail: input.recipientEmail,
 			};
 		}
-		const calendarId = primary.id as CollectionId;
 
 		// 4. Apply by method.
-		const existing = yield* findExistingByUid(calendarId, uid);
-		const form = parseVeventToForm(vevent);
-		const incomingOrganizer = extractOrganizerAddress(vevent);
-
-		if (existing) {
-			const componentRepo = yield* ComponentRepository;
-			const existingTreeOpt = yield* componentRepo.loadTree(
-				existing.entityId,
-				"icalendar",
-			);
-			const existingVevent = Option.isSome(existingTreeOpt)
-				? veventOf(existingTreeOpt.value)
-				: null;
-			if (
-				existingVevent !== null &&
-				!isAuthorizedSender(
-					existingVevent,
-					incomingOrganizer,
-					input.recipientEmail,
-				)
-			) {
-				return {
-					_tag: "SenderNotAuthorized" as const,
-					recipientEmail: input.recipientEmail,
-					uid,
-				};
-			}
-		}
-
-		if (method === "CANCEL") {
-			if (existing) {
-				yield* calEdit.delete(existing.instanceId);
-			}
-			return {
-				_tag: "Applied" as const,
-				method,
+		return yield* applyPayload(
+			{
+				calendarId: CollectionId(primary.value.id),
 				recipientEmail: input.recipientEmail,
-				uid,
-			};
-		}
-
-		// REQUEST / REPLY both apply the new state. REPLY would normally only
-		// adjust the ATTENDEE PARTSTAT; for v1 we treat it the same as REQUEST
-		// because the form-driven update only owns surface fields.
-		if (existing) {
-			yield* calEdit.update(existing.instanceId, form);
-		} else {
-			yield* calEdit.create(calendarId, form, uid);
-		}
-		return {
-			_tag: "Applied" as const,
-			method,
-			recipientEmail: input.recipientEmail,
-			uid,
-		};
+			},
+			decoded,
+		);
 	});
 
 export const ImipInboundServiceLive = Layer.effect(

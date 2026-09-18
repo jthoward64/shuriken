@@ -2,7 +2,7 @@ import { Effect, Option } from "effect";
 import type { Temporal } from "temporal-polyfill";
 import { encodeICalendar } from "#src/data/icalendar/codec.ts";
 import { redactDocumentToBusyOnly } from "#src/data/icalendar/visibility.ts";
-import type { IrDocument } from "#src/data/ir.ts";
+import type { IrComponent, IrDocument } from "#src/data/ir.ts";
 import { encodeVCard } from "#src/data/vcard/codec.ts";
 import type { EntityType } from "#src/db/drizzle/schema/index.ts";
 import {
@@ -21,6 +21,7 @@ import { HTTP_OK } from "#src/http/status.ts";
 import { AclService } from "#src/services/acl/index.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
 import { InstanceService } from "#src/services/instance/index.ts";
+import type { InstanceRow } from "#src/services/instance/repository.ts";
 import { IanaTimezoneService } from "#src/services/timezone/iana.ts";
 import { parseAcceptVCardVersion } from "./accept-version.ts";
 import { applyVersion } from "./report/address-data.ts";
@@ -61,6 +62,139 @@ const toRfc1123 = (instant: Temporal.Instant): string => {
 	const ss = String(zdt.second).padStart(2, "0");
 	return `${day}, ${dd} ${month} ${zdt.year} ${hh}:${mm}:${ss} GMT`;
 };
+
+/** Strips the W/ prefix and quotes so ETags compare weakly (RFC 7232 §2.3.2) */
+const normalizeEtag = (tag: string): string =>
+	tag.trim().replace(WEAK_ETAG_PREFIX, "").replace(ETAG_QUOTES, "");
+
+/** RFC 7232 §3 conditional GET: If-None-Match wins, else If-Modified-Since */
+const isNotModified = (
+	ctx: HttpRequestContext,
+	instance: InstanceRow,
+): boolean => {
+	const ifNoneMatch = ctx.headers.get("If-None-Match");
+	if (ifNoneMatch !== null) {
+		const clientTags = ifNoneMatch.split(",").map((t) => normalizeEtag(t));
+		return (
+			clientTags.includes(normalizeEtag(instance.etag)) ||
+			ifNoneMatch.trim() === "*"
+		);
+	}
+	const ifModifiedSince = ctx.headers.get("If-Modified-Since");
+	if (ifModifiedSince === null) {
+		return false;
+	}
+	const sinceMs = Date.parse(ifModifiedSince);
+	return (
+		!Number.isNaN(sinceMs) && instance.lastModified.epochMilliseconds <= sinceMs
+	);
+};
+
+/**
+ * Builds the GET/HEAD response headers. A negotiated 3.0 downgrade is reflected
+ * in Content-Type so the client sees the version it will actually parse.
+ */
+const buildHeaders = (
+	instance: InstanceRow,
+	vcardVersion: string | undefined,
+	byteLength: number,
+): Headers => {
+	const headers = new Headers({
+		"Content-Type":
+			vcardVersion === "3.0"
+				? `${instance.contentType}; charset=utf-8; version=3.0`
+				: `${instance.contentType}; charset=utf-8`,
+		ETag: instance.etag,
+		"Last-Modified": toRfc1123(instance.lastModified),
+		"Content-Length": String(byteLength),
+		// DAV clients revalidate explicitly via If-None-Match/PROPFIND rather
+		// than relying on opportunistic caching, and resources are
+		// per-principal — keep intermediaries from serving stale/cross-user
+		// data on heuristic freshness.
+		"Cache-Control": "private, no-cache",
+	});
+	// RFC 6638 §8.2: scheduling object resources carry a Schedule-Tag. caldav
+	// clients read it from the GET response header (alongside the
+	// CALDAV:schedule-tag PROPFIND property) to drive If-Schedule-Tag-Match
+	// conditional requests. Only SORs have a stored tag, so gate on its
+	// presence.
+	if (instance.scheduleTag) {
+		headers.set("Schedule-Tag", instance.scheduleTag);
+	}
+	return headers;
+};
+
+/** Maps a stored content type to its entity type, ignoring parameters */
+const entityTypeFor = (contentType: string): EntityType =>
+	(contentType.split(";")[0]?.trim().toLowerCase() ?? "") === "text/vcard"
+		? "vcard"
+		: "icalendar";
+
+/** Serialises a document in the format its kind names */
+const encodeDocument = (
+	doc: IrDocument,
+): Effect.Effect<string, DavError | InternalError> =>
+	doc.kind === "icalendar" ? encodeICalendar(doc) : encodeVCard(doc);
+
+/** Loads the component tree a stored instance must have for GET to serve it */
+const requireComponentTree = Effect.fn("dav.get.tree")(function* (
+	instance: InstanceRow,
+	entityType: EntityType,
+) {
+	const componentRepo = yield* ComponentRepository;
+	const treeOpt = yield* componentRepo.loadTree(
+		EntityId(instance.entityId),
+		entityType,
+	);
+	return yield* Option.match(treeOpt, {
+		onNone: () =>
+			Effect.fail(
+				new InternalError({
+					cause: `Instance ${instance.id} has no component tree`,
+				}),
+			),
+		onSome: Effect.succeed,
+	});
+});
+
+/** What the response document is built from */
+interface DocumentRequest {
+	readonly root: IrComponent;
+	readonly entityType: EntityType;
+	readonly ctx: HttpRequestContext;
+	readonly hasFullRead: boolean;
+	readonly vcardVersion: string | undefined;
+}
+
+/**
+ * Rebuilds a stored component tree into the document this request should see:
+ * RFC 7809 §3.1.3 timezone-by-reference stripping, free-busy redaction for a
+ * caller without DAV:read, and an RFC 6352 vCard 3.0 downgrade.
+ */
+const buildResponseDocument = Effect.fn("dav.get.document")(function* ({
+	root,
+	entityType,
+	ctx,
+	hasFullRead,
+	vcardVersion,
+}: DocumentRequest) {
+	let doc: IrDocument =
+		entityType === "icalendar"
+			? { kind: "icalendar", root }
+			: { kind: "vcard", root };
+
+	if (entityType === "icalendar" && ctx.caldavTimezones === "F") {
+		const ianaSvc = yield* IanaTimezoneService;
+		doc = stripKnownVtimezones(doc, ianaSvc.isKnownTzid.bind(ianaSvc));
+	}
+	// A caller with only CALDAV:read-free-busy (not DAV:read) sees a redacted
+	// "Busy" body instead of a 403 - keeps GET consistent with PROPFIND/REPORT
+	// enumeration, which already succeeds for such callers.
+	if (!hasFullRead) {
+		doc = redactDocumentToBusyOnly(doc);
+	}
+	return vcardVersion === "3.0" ? applyVersion(doc, "3.0") : doc;
+});
 
 /** Handles GET and HEAD for CalDAV/CardDAV instances. */
 export const getHandler = (
@@ -112,10 +246,7 @@ export const getHandler = (
 		const instance = yield* instanceSvc.findById(path.instanceId);
 
 		// 5. Determine entity type from content type.
-		const baseContentType =
-			instance.contentType.split(";")[0]?.trim().toLowerCase() ?? "";
-		const entityType: EntityType =
-			baseContentType === "text/vcard" ? "vcard" : "icalendar";
+		const entityType = entityTypeFor(instance.contentType);
 
 		// Free-busy-only access has no meaning for CardDAV contacts — require
 		// full DAV:read for vcard resources.
@@ -124,115 +255,32 @@ export const getHandler = (
 		}
 
 		// 6. Load component tree.
-		const componentRepo = yield* ComponentRepository;
-		const treeOpt = yield* componentRepo.loadTree(
-			EntityId(instance.entityId),
-			entityType,
-		);
+		const root = yield* requireComponentTree(instance, entityType);
 
-		const root = yield* Option.match(treeOpt, {
-			onNone: () =>
-				Effect.fail(
-					new InternalError({
-						cause: `Instance ${path.instanceId} has no component tree`,
-					}),
-				),
-			onSome: Effect.succeed,
-		});
-
-		// 7. Reconstruct IrDocument.
-		let doc: IrDocument =
-			entityType === "icalendar"
-				? { kind: "icalendar", root }
-				: { kind: "vcard", root };
-
-		// 7a. RFC 7809 §3.1.3: strip VTIMEZONE components for known IANA timezones
-		// when the client requests timezones by reference (CalDAV-Timezones: F).
-		if (entityType === "icalendar" && ctx.caldavTimezones === "F") {
-			const ianaSvc = yield* IanaTimezoneService;
-			doc = stripKnownVtimezones(doc, ianaSvc.isKnownTzid.bind(ianaSvc));
-		}
-
-		// 7b. A caller with only CALDAV:read-free-busy (not DAV:read) sees a
-		// redacted "Busy" body instead of a 403 — keeps GET consistent with
-		// PROPFIND/REPORT enumeration, which already succeeds for such callers.
-		if (!hasFullRead) {
-			doc = redactDocumentToBusyOnly(doc);
-		}
-
-		// 7c. Negotiate vCard version from Accept (RFC 6352): downgrade the
+		// 7. Negotiate vCard version from Accept (RFC 6352): downgrade the
 		// canonical 4.0 body to 3.0 when the client asks for it.
 		const vcardVersion =
 			entityType === "vcard"
 				? parseAcceptVCardVersion(ctx.headers.get("Accept"))
 				: undefined;
-		if (vcardVersion === "3.0") {
-			doc = applyVersion(doc, vcardVersion);
-		}
-
-		// 8. Serialize to text.
-		const body =
-			entityType === "icalendar"
-				? yield* encodeICalendar(doc)
-				: yield* encodeVCard(doc);
-
-		// 9. Build response headers. Reflect a negotiated 3.0 downgrade so the
-		// client sees the version it will actually parse.
-		const contentTypeHeader =
-			vcardVersion === "3.0"
-				? `${instance.contentType}; charset=utf-8; version=3.0`
-				: `${instance.contentType}; charset=utf-8`;
-		const bodyBytes = new TextEncoder().encode(body);
-		const headers = new Headers({
-			"Content-Type": contentTypeHeader,
-			ETag: instance.etag,
-			"Last-Modified": toRfc1123(instance.lastModified),
-			"Content-Length": String(bodyBytes.byteLength),
-			// DAV clients revalidate explicitly via If-None-Match/PROPFIND rather
-			// than relying on opportunistic caching, and resources are
-			// per-principal — keep intermediaries from serving stale/cross-user
-			// data on heuristic freshness.
-			"Cache-Control": "private, no-cache",
+		const doc = yield* buildResponseDocument({
+			root,
+			entityType,
+			ctx,
+			hasFullRead,
+			vcardVersion,
 		});
 
-		// RFC 6638 §8.2: scheduling object resources carry a Schedule-Tag. caldav
-		// clients read it from the GET response header (alongside the
-		// CALDAV:schedule-tag PROPFIND property) to drive If-Schedule-Tag-Match
-		// conditional requests. Only SORs have a stored tag, so gate on its
-		// presence.
-		if (instance.scheduleTag) {
-			headers.set("Schedule-Tag", instance.scheduleTag);
+		// 8. Serialize to text.
+		const bodyBytes = new TextEncoder().encode(yield* encodeDocument(doc));
+		const headers = buildHeaders(instance, vcardVersion, bodyBytes.byteLength);
+
+		if (isNotModified(ctx, instance)) {
+			return new Response(null, { status: 304, headers });
 		}
 
-		// RFC 7232 §3 — conditional GET: check If-None-Match and If-Modified-Since.
-		const ifNoneMatch = ctx.headers.get("If-None-Match");
-		if (ifNoneMatch !== null) {
-			// Weak comparison: strip quotes and W/ prefix before comparing.
-			const normalize = (tag: string): string =>
-				tag.trim().replace(WEAK_ETAG_PREFIX, "").replace(ETAG_QUOTES, "");
-			const serverTag = normalize(instance.etag);
-			const clientTags = ifNoneMatch
-				.split(",")
-				.map((t: string) => normalize(t));
-			if (clientTags.includes(serverTag) || ifNoneMatch.trim() === "*") {
-				return new Response(null, { status: 304, headers });
-			}
-		} else {
-			const ifModifiedSince = ctx.headers.get("If-Modified-Since");
-			if (ifModifiedSince !== null) {
-				const sinceMs = Date.parse(ifModifiedSince);
-				if (
-					!Number.isNaN(sinceMs) &&
-					instance.lastModified.epochMilliseconds <= sinceMs
-				) {
-					return new Response(null, { status: 304, headers });
-				}
-			}
-		}
-
-		// 10. HEAD returns headers only; GET includes body.
+		// 9. HEAD returns headers only; GET includes body.
 		const isHead = ctx.method.toUpperCase() === "HEAD";
-
 		return new Response(isHead ? null : bodyBytes, {
 			status: HTTP_OK,
 			headers,

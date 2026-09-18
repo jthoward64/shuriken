@@ -6,13 +6,18 @@
 // ---------------------------------------------------------------------------
 
 import { Temporal } from "temporal-polyfill";
-import { type ClarkName, cn, type IrDeadProperties } from "#src/data/ir.ts";
+import { type ClarkName, cn } from "#src/data/ir.ts";
+import { readDeadProperties } from "#src/http/dav/methods/dead-properties.ts";
 import type { Propstat } from "#src/http/dav/xml/multistatus.ts";
 import type { InstanceRow } from "#src/services/instance/repository.ts";
 
 // UUIDv7's first 48 bits (12 hex chars) encode Unix milliseconds.
 const UUIDV7_TIMESTAMP_HEX_LENGTH = 12;
 const HEX_RADIX = 16;
+
+// Temporal.Instant is defined for ±10^8 days around the epoch; outside that
+// range fromEpochMilliseconds rejects the value.
+const MAX_INSTANT_EPOCH_MS = 8_640_000_000_000_000;
 
 // ---------------------------------------------------------------------------
 // RFC 1123 date formatter  (required by DAV:getlastmodified)
@@ -98,11 +103,10 @@ export const creationDateFromId = (id: string): string | undefined => {
 	if (!Number.isFinite(ms)) {
 		return undefined;
 	}
-	try {
-		return toIso8601Utc(Temporal.Instant.fromEpochMilliseconds(ms));
-	} catch {
+	if (Math.abs(ms) > MAX_INSTANT_EPOCH_MS) {
 		return undefined;
 	}
+	return toIso8601Utc(Temporal.Instant.fromEpochMilliseconds(ms));
 };
 
 // ---------------------------------------------------------------------------
@@ -118,6 +122,64 @@ export type PropfindKind =
 // splitPropstats — split a property map into 200/404 propstats
 // ---------------------------------------------------------------------------
 
+/** Appends a 404 propstat when any requested property was absent */
+const withMissing = (
+	found: Propstat,
+	missing: Record<ClarkName, unknown>,
+): ReadonlyArray<Propstat> =>
+	Object.keys(missing).length > 0
+		? [found, { props: missing, status: 404 }]
+		: [found];
+
+/** RFC 4918 §9.1: propname returns only property names as empty elements */
+const propnamePropstats = (
+	allProps: Readonly<Record<ClarkName, unknown>>,
+): ReadonlyArray<Propstat> => {
+	const names: Record<ClarkName, unknown> = {};
+	for (const name of Object.keys(allProps) as Array<ClarkName>) {
+		names[name] = "";
+	}
+	return [{ props: names, status: 200 }];
+};
+
+/**
+ * RFC 4918 §9.1 allprop+include: everything goes in the 200 block, plus any
+ * extra included property that is present; missing extras go to 404.
+ */
+const allpropPropstats = (
+	allProps: Readonly<Record<ClarkName, unknown>>,
+	extra: ReadonlySet<ClarkName> | undefined,
+): ReadonlyArray<Propstat> => {
+	const found: Propstat = { props: allProps, status: 200 };
+	if (extra === undefined || extra.size === 0) {
+		return [found];
+	}
+	const missing: Record<ClarkName, unknown> = {};
+	for (const name of extra) {
+		if (!(name in allProps)) {
+			missing[name] = "";
+		}
+	}
+	return withMissing(found, missing);
+};
+
+/** Named-property request: each name resolves to the 200 or the 404 block */
+const namedPropstats = (
+	allProps: Readonly<Record<ClarkName, unknown>>,
+	names: ReadonlySet<ClarkName>,
+): ReadonlyArray<Propstat> => {
+	const found: Record<ClarkName, unknown> = {};
+	const missing: Record<ClarkName, unknown> = {};
+	for (const name of names) {
+		if (name in allProps) {
+			found[name] = allProps[name];
+		} else {
+			missing[name] = "";
+		}
+	}
+	return withMissing({ props: found, status: 200 }, missing);
+};
+
 /**
  * Split a property map into found (200) and not-found (404) propstats.
  * For `allprop`/`propname`, all properties go into the found block.
@@ -127,56 +189,28 @@ export const splitPropstats = (
 	request: PropfindKind,
 ): ReadonlyArray<Propstat> => {
 	if (request.type === "propname") {
-		// RFC 4918 §9.1: propname returns only property names as empty elements.
-		const names: Record<ClarkName, unknown> = {};
-		for (const name of Object.keys(allProps) as Array<ClarkName>) {
-			names[name] = "";
-		}
-		return [{ props: names, status: 200 }];
+		return propnamePropstats(allProps);
 	}
 	if (request.type === "allprop") {
-		if (!request.extra || request.extra.size === 0) {
-			return [{ props: allProps, status: 200 }];
-		}
-		// RFC 4918 §9.1: allprop+include — return allprop in 200, plus any
-		// extra included properties that are present; missing extras go to 404.
-		const missing: Record<ClarkName, unknown> = {};
-		for (const name of request.extra) {
-			if (!(name in allProps)) {
-				missing[name] = "";
-			}
-		}
-		const propstats: Array<Propstat> = [{ props: allProps, status: 200 }];
-		if (Object.keys(missing).length > 0) {
-			propstats.push({ props: missing, status: 404 });
-		}
-		return propstats;
+		return allpropPropstats(allProps, request.extra);
 	}
-
-	const found: Record<ClarkName, unknown> = {};
-	const missing: Record<ClarkName, unknown> = {};
-
-	for (const name of request.names) {
-		if (name in allProps) {
-			found[name] = allProps[name];
-		} else {
-			missing[name] = "";
-		}
-	}
-
-	const propstats: Array<Propstat> = [{ props: found, status: 200 }];
-	if (Object.keys(missing).length > 0) {
-		propstats.push({ props: missing, status: 404 });
-	}
-	return propstats;
+	return namedPropstats(allProps, request.names);
 };
 
 // ---------------------------------------------------------------------------
 // buildInstanceProps — build property map for an instance row
 // ---------------------------------------------------------------------------
 
+/**
+ * Property map for an instance row.
+ *
+ * `live` carries the per-caller properties a response also needs (owner,
+ * current-user-privilege-set, body-data …); they are applied last so they win
+ * over a dead property of the same name.
+ */
 export const buildInstanceProps = (
 	row: InstanceRow,
+	live: Readonly<Record<ClarkName, unknown>> = {},
 ): Readonly<Record<ClarkName, unknown>> => {
 	const props: Record<ClarkName, unknown> = {
 		[RESOURCETYPE]: {},
@@ -207,11 +241,13 @@ export const buildInstanceProps = (
 		props[SCHEDULE_TAG] = row.scheduleTag;
 	}
 
-	const dead = row.clientProperties as IrDeadProperties | null;
-	if (dead) {
-		for (const [clark, xmlValue] of Object.entries(dead)) {
-			props[clark as ClarkName] = xmlValue;
-		}
+	for (const [clark, xmlValue] of Object.entries(
+		readDeadProperties(row.clientProperties),
+	)) {
+		props[clark as ClarkName] = xmlValue;
+	}
+	for (const [clark, xmlValue] of Object.entries(live)) {
+		props[clark as ClarkName] = xmlValue;
 	}
 
 	return props;

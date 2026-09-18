@@ -72,7 +72,7 @@ export const calendarMultigetHandler = (
 			// parsed tree so an unexpected client href encoding can be identified.
 			yield* Effect.logWarning(
 				"dav.calendar-multiget: no hrefs extracted from request body",
-				{ tree: JSON.stringify(tree) },
+				{ tree },
 			);
 		}
 		const propNames = extractPropNames(tree);

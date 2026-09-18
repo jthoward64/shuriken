@@ -12,6 +12,10 @@ import { forbidden } from "#src/domain/errors.ts";
 const CARDDAV_NS = "urn:ietf:params:xml:ns:carddav";
 const cn = (local: string): string => `{${CARDDAV_NS}}${local}`;
 
+/** True when an unknown value is a plain (non-null) object */
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+	typeof value === "object" && value !== null;
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -49,11 +53,10 @@ export interface CardFilter {
 export const parseCardFilter = (
 	tree: unknown,
 ): Effect.Effect<CardFilter, DavError> => {
-	if (typeof tree !== "object" || tree === null) {
+	if (!isRecord(tree)) {
 		return Effect.fail(forbidden("CARDDAV:valid-filter"));
 	}
-	const obj = tree as Record<string, unknown>;
-	const filterEl = obj[cn("filter")];
+	const filterEl = tree[cn("filter")];
 	// The <filter> element is required (RFC 6352 §8.6), but an EMPTY <filter/> is
 	// valid and matches every card (§10.5.1) — and it's what iOS Contacts sends
 	// to fetch the whole address book. fast-xml-parser collapses an empty element
@@ -63,10 +66,7 @@ export const parseCardFilter = (
 	if (filterEl === undefined) {
 		return Effect.fail(forbidden("CARDDAV:valid-filter"));
 	}
-	const filterObj =
-		typeof filterEl === "object" && filterEl !== null
-			? (filterEl as Record<string, unknown>)
-			: {};
+	const filterObj: Record<string, unknown> = isRecord(filterEl) ? filterEl : {};
 	const test = filterObj["@_test"] === "anyof" ? "anyof" : "allof";
 
 	const propFilterEls = filterObj[cn("prop-filter")];
@@ -76,28 +76,26 @@ export const parseCardFilter = (
 };
 
 const parsePropFilter = (el: unknown): CardPropFilter => {
-	if (typeof el !== "object" || el === null) {
+	if (!isRecord(el)) {
 		return { name: "", test: "allof", textMatches: [], paramFilters: [] };
 	}
-	const obj = el as Record<string, unknown>;
-	const name = typeof obj["@_name"] === "string" ? obj["@_name"] : "";
-	const test = obj["@_test"] === "anyof" ? "anyof" : "allof";
-	const isNotDefined = cn("is-not-defined") in obj;
+	const name = typeof el["@_name"] === "string" ? el["@_name"] : "";
+	const test = el["@_test"] === "anyof" ? "anyof" : "allof";
+	const isNotDefined = cn("is-not-defined") in el;
 
-	const textMatches = parseChildren(obj[cn("text-match")], parseTextMatch);
-	const paramFilters = parseChildren(obj[cn("param-filter")], parseParamFilter);
+	const textMatches = parseChildren(el[cn("text-match")], parseTextMatch);
+	const paramFilters = parseChildren(el[cn("param-filter")], parseParamFilter);
 
 	return { name, test, isNotDefined, textMatches, paramFilters };
 };
 
 const parseParamFilter = (el: unknown): ParamFilter => {
-	if (typeof el !== "object" || el === null) {
+	if (!isRecord(el)) {
 		return { name: "" };
 	}
-	const obj = el as Record<string, unknown>;
-	const name = typeof obj["@_name"] === "string" ? obj["@_name"] : "";
-	const isNotDefined = cn("is-not-defined") in obj;
-	const textMatch = parseTextMatchMaybe(obj[cn("text-match")]);
+	const name = typeof el["@_name"] === "string" ? el["@_name"] : "";
+	const isNotDefined = cn("is-not-defined") in el;
+	const textMatch = parseTextMatchMaybe(el[cn("text-match")]);
 	return { name, isNotDefined, textMatch };
 };
 
@@ -115,7 +113,7 @@ const parseTextMatch = (el: unknown): TextMatch => {
 			negate: false,
 		};
 	}
-	if (typeof el !== "object" || el === null) {
+	if (!isRecord(el)) {
 		return {
 			value: "",
 			collation: "i;ascii-casemap",
@@ -123,31 +121,30 @@ const parseTextMatch = (el: unknown): TextMatch => {
 			negate: false,
 		};
 	}
-	const obj = el as Record<string, unknown>;
-	const rawText = obj["#text"];
+	const rawText = el["#text"];
 	const value =
 		typeof rawText === "string"
 			? rawText
 			: typeof rawText === "number"
 				? String(rawText)
 				: "";
-	const rawCollation = obj["@_collation"];
-	const collation: TextMatch["collation"] =
-		rawCollation === "i;unicode-casemap"
-			? "i;unicode-casemap"
-			: rawCollation === "i;octet"
-				? "i;octet"
-				: "i;ascii-casemap";
-	const matchType = (
-		["equals", "contains", "starts-with", "ends-with"].includes(
-			obj["@_match-type"] as string,
-		)
-			? obj["@_match-type"]
-			: "contains"
-	) as TextMatch["matchType"];
-	const negate = obj["@_negate-condition"] === "yes";
-	return { value, collation, matchType, negate };
+	return {
+		value,
+		collation: parseCollation(el["@_collation"]),
+		matchType: parseMatchType(el["@_match-type"]),
+		negate: el["@_negate-condition"] === "yes",
+	};
 };
+
+/** Read a `collation` attribute, defaulting to the RFC 6352 default collation */
+const parseCollation = (raw: unknown): TextMatch["collation"] =>
+	raw === "i;unicode-casemap" || raw === "i;octet" ? raw : "i;ascii-casemap";
+
+/** Read a `match-type` attribute, defaulting to `contains` */
+const parseMatchType = (raw: unknown): TextMatch["matchType"] =>
+	raw === "equals" || raw === "starts-with" || raw === "ends-with"
+		? raw
+		: "contains";
 
 const parseTextMatchMaybe = (el: unknown): TextMatch | undefined => {
 	if (!el) {
@@ -249,37 +246,29 @@ const evalParamFilter = (prop: IrProperty, f: ParamFilter): boolean => {
 	return true;
 };
 
-const evalTextMatch = (text: string, tm: TextMatch): boolean => {
-	// i;octet is an exact, case-sensitive comparison; the casemap collations
-	// fold case (RFC 6352 §8.6.2 / RFC 4790).
-	const fold = (s: string) => {
-		switch (tm.collation) {
-			case "i;octet":
-				return s;
-			case "i;unicode-casemap":
-				return s.normalize("NFC").toLowerCase();
-			default:
-				return s.toLowerCase();
-		}
-	};
-	const haystack = fold(text);
-	const needle = fold(tm.value);
+// i;octet is an exact, case-sensitive comparison; the casemap collations
+// fold case (RFC 6352 §8.6.2 / RFC 4790).
+const COLLATION_FOLD: Readonly<
+	Record<TextMatch["collation"], (s: string) => string>
+> = {
+	"i;octet": (s) => s,
+	"i;unicode-casemap": (s) => s.normalize("NFC").toLowerCase(),
+	"i;ascii-casemap": (s) => s.toLowerCase(),
+};
 
-	let matches: boolean;
-	switch (tm.matchType) {
-		case "equals":
-			matches = haystack === needle;
-			break;
-		case "contains":
-			matches = haystack.includes(needle);
-			break;
-		case "starts-with":
-			matches = haystack.startsWith(needle);
-			break;
-		case "ends-with":
-			matches = haystack.endsWith(needle);
-			break;
-	}
+/** Comparison performed by each RFC 6352 text-match `match-type` */
+const MATCH_TYPE_TEST: Readonly<
+	Record<TextMatch["matchType"], (haystack: string, needle: string) => boolean>
+> = {
+	equals: (haystack, needle) => haystack === needle,
+	contains: (haystack, needle) => haystack.includes(needle),
+	"starts-with": (haystack, needle) => haystack.startsWith(needle),
+	"ends-with": (haystack, needle) => haystack.endsWith(needle),
+};
+
+const evalTextMatch = (text: string, tm: TextMatch): boolean => {
+	const fold = COLLATION_FOLD[tm.collation];
+	const matches = MATCH_TYPE_TEST[tm.matchType](fold(text), fold(tm.value));
 	return tm.negate ? !matches : matches;
 };
 

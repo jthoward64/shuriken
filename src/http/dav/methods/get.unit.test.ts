@@ -1,11 +1,8 @@
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
 import { Effect, Option } from "effect";
-import type {
-	DatabaseError,
-	DavError,
-	InternalError,
-} from "#src/domain/errors.ts";
+import type { DatabaseError, InternalError } from "#src/domain/errors.ts";
+import { DavError } from "#src/domain/errors.ts";
 import {
 	CollectionId,
 	EntityId,
@@ -86,22 +83,23 @@ const instancePath: ResolvedDavPath = {
 	instanceSeg: String(TEST_INSTANCE_ID),
 };
 
-type GetEffect<A> = Effect.Effect<
-	A,
-	DavError | DatabaseError | InternalError,
-	AclService | InstanceService | ComponentRepository | IanaTimezoneService
->;
-type GetFailEffect = Effect.Effect<
-	unknown,
-	unknown,
-	AclService | InstanceService | ComponentRepository | IanaTimezoneService
->;
+const run = <A>(
+	env: ReturnType<typeof makeTestEnv>,
+	effect: Effect.Effect<
+		A,
+		DavError | DatabaseError | InternalError,
+		AclService | InstanceService | ComponentRepository | IanaTimezoneService
+	>,
+) => runSuccess(Effect.provide(effect, env.toLayer()).pipe(Effect.orDie));
 
-const run = <A>(env: ReturnType<typeof makeTestEnv>, effect: GetEffect<A>) =>
-	runSuccess(effect.pipe(Effect.provide(env.toLayer()), Effect.orDie));
-
-const runErr = (env: ReturnType<typeof makeTestEnv>, effect: GetFailEffect) =>
-	runFailure(effect.pipe(Effect.provide(env.toLayer())));
+const runErr = (
+	env: ReturnType<typeof makeTestEnv>,
+	effect: Effect.Effect<
+		unknown,
+		unknown,
+		AclService | InstanceService | ComponentRepository | IanaTimezoneService
+	>,
+) => runFailure(Effect.provide(effect, env.toLayer()));
 
 // ---------------------------------------------------------------------------
 // Helpers to seed an instance + its component tree via PUT round-trip
@@ -221,6 +219,14 @@ const makeVCardEnv = () => {
 // GET — iCalendar
 // ---------------------------------------------------------------------------
 
+/** Narrows a handler failure to a DavError so its status can be asserted */
+const asDavError = (err: unknown): DavError => {
+	if (err instanceof DavError) {
+		return err;
+	}
+	throw new Error(`Expected a DavError but got: ${String(err)}`);
+};
+
 describe("getHandler — iCalendar", () => {
 	it("returns 200 with serialized iCalendar, Content-Type, ETag, and Last-Modified", async () => {
 		const env = makeICalEnv();
@@ -314,10 +320,9 @@ describe("getHandler — method not allowed", () => {
 			principalSeg: String(TEST_PRINCIPAL_ID),
 			collectionSeg: String(TEST_COLLECTION_ID),
 		};
-		const err = (await runErr(
-			env,
-			getHandler(path, authenticatedCtx),
-		)) as DavError;
+		const err = asDavError(
+			await runErr(env, getHandler(path, authenticatedCtx)),
+		);
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_METHOD_NOT_ALLOWED);
 	});
@@ -329,10 +334,9 @@ describe("getHandler — method not allowed", () => {
 			principalId: TEST_PRINCIPAL_ID,
 			principalSeg: String(TEST_PRINCIPAL_ID),
 		};
-		const err = (await runErr(
-			env,
-			getHandler(path, authenticatedCtx),
-		)) as DavError;
+		const err = asDavError(
+			await runErr(env, getHandler(path, authenticatedCtx)),
+		);
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_METHOD_NOT_ALLOWED);
 	});
@@ -350,10 +354,9 @@ describe("getHandler — method not allowed", () => {
 			principalSeg: String(TEST_PRINCIPAL_ID),
 			collectionSeg: String(TEST_COLLECTION_ID),
 		};
-		const err = (await runErr(
-			env,
-			getHandler(path, authenticatedCtx),
-		)) as DavError;
+		const err = asDavError(
+			await runErr(env, getHandler(path, authenticatedCtx)),
+		);
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_NOT_FOUND);
 	});
@@ -366,10 +369,9 @@ describe("getHandler — method not allowed", () => {
 describe("getHandler — authentication", () => {
 	it("returns 401 for unauthenticated requests", async () => {
 		const env = makeTestEnv();
-		const err = (await runErr(
-			env,
-			getHandler(instancePath, unauthenticatedCtx),
-		)) as DavError;
+		const err = asDavError(
+			await runErr(env, getHandler(instancePath, unauthenticatedCtx)),
+		);
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_UNAUTHORIZED);
 	});

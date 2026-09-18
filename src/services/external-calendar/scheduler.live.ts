@@ -18,7 +18,8 @@ import { ExternalCalendarSyncService } from "./sync.ts";
 // down the server.
 // ---------------------------------------------------------------------------
 
-const tickAll = Effect.gen(function* () {
+/** One scheduler pass: sync every subscription whose interval has elapsed */
+const tickAll = Effect.fn("scheduler.external.tickAll")(function* () {
 	const repo = yield* ExternalCalendarRepository;
 	const sync = yield* ExternalCalendarSyncService;
 	const config = yield* AppConfigService;
@@ -44,7 +45,7 @@ export const ExternalCalendarSchedulerLayer = Layer.effectDiscard(
 		yield* Effect.logInfo("scheduler.external: starting polling fiber", {
 			tickS: tick,
 		});
-		yield* tickAll.pipe(
+		yield* tickAll().pipe(
 			// `catchAllCause` keeps the fiber alive across defects too — a
 			// rogue exception in one tick mustn't kill the whole scheduler.
 			Effect.catchCause((cause) =>

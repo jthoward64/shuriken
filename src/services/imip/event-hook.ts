@@ -3,7 +3,7 @@ import { resolveCalendarZone } from "#src/data/icalendar/calendar-zone.ts";
 import { decodeICalendar } from "#src/data/icalendar/codec.ts";
 import type { ResolutionZone } from "#src/data/icalendar/resolve-floating.ts";
 import { UTC } from "#src/data/icalendar/resolve-floating.ts";
-import type { IrComponent } from "#src/data/ir.ts";
+import type { IrComponent, IrDocument } from "#src/data/ir.ts";
 import type {
 	DatabaseError,
 	DavError,
@@ -35,30 +35,34 @@ import { ImipDispatchService } from "./dispatch.ts";
 // ---------------------------------------------------------------------------
 
 /**
- * VTIMEZONE component for a resolution zone, or null when none is needed or
+ * VTIMEZONE component for a resolution zone, absent when none is needed or
  * available. UTC is self-describing, and a zone the library cannot render is
  * not worth failing an invitation over - the anchored values still carry a
  * TZID the recipient's own tz database can resolve.
  */
 const resolveVtimezoneComponent = (
 	zone: ResolutionZone,
-): Effect.Effect<IrComponent | null, never, IanaTimezoneService> =>
+): Effect.Effect<Option.Option<IrComponent>, never, IanaTimezoneService> =>
 	Effect.gen(function* () {
 		if (zone === UTC) {
-			return null;
+			return Option.none();
 		}
 		const iana = yield* IanaTimezoneService;
 		const text = iana.getVtimezone(zone);
 		if (Option.isNone(text)) {
-			return null;
+			return Option.none();
 		}
-		const doc = yield* decodeICalendar(text.value).pipe(
-			Effect.catchCause(() => Effect.succeed(null)),
+		const docOpt = yield* decodeICalendar(text.value).pipe(
+			Effect.map(Option.some),
+			Effect.catchCause(() => Effect.succeed(Option.none<IrDocument>())),
 		);
-		if (doc === null || doc.kind !== "icalendar") {
-			return null;
-		}
-		return doc.root.components.find((c) => c.name === "VTIMEZONE") ?? null;
+		return Option.flatMap(docOpt, (doc) =>
+			doc.kind === "icalendar"
+				? Option.fromNullishOr(
+						doc.root.components.find((c) => c.name === "VTIMEZONE"),
+					)
+				: Option.none(),
+		);
 	});
 
 export const dispatchForInstance = (
@@ -113,7 +117,7 @@ export const dispatchForInstance = (
 		const zone = resolveCalendarZone({
 			collectionTzid: Option.getOrUndefined(collOpt)?.timezoneTzid,
 		});
-		const vtimezone = yield* resolveVtimezoneComponent(zone);
+		const vtimezoneOpt = yield* resolveVtimezoneComponent(zone);
 
 		const { user, principal } = yield* userSvc.findById(organizerUserId);
 		const outcome = yield* dispatch.dispatch({
@@ -123,7 +127,7 @@ export const dispatchForInstance = (
 			organizerEmail: user.email,
 			organizerDisplayName: principal.displayName,
 			zone,
-			vtimezone,
+			vtimezone: Option.getOrNull(vtimezoneOpt),
 			...(onlyRecipients !== undefined ? { onlyRecipients } : {}),
 		});
 		yield* Effect.logDebug("imip.dispatch result", { outcome, instanceId });

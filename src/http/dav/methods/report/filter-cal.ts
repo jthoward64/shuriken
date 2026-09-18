@@ -4,7 +4,7 @@
 // Parses <CALDAV:filter> elements and evaluates them against an IrDocument.
 // ---------------------------------------------------------------------------
 
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import { Temporal } from "temporal-polyfill";
 import {
 	effectiveDtend,
@@ -26,6 +26,10 @@ import { forbidden } from "#src/domain/errors.ts";
 const CALDAV_NS = "urn:ietf:params:xml:ns:caldav";
 const cn = (local: string): string => `{${CALDAV_NS}}${local}`;
 
+/** True when an unknown value is a plain (non-null) object */
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+	typeof value === "object" && value !== null;
+
 // Bounds for an open-ended <time-range> (a missing start or end). Temporal
 // cannot represent Number.MAX_SAFE_INTEGER milliseconds — it exceeds the maximum
 // instant (~year 275760) and throws "Out-of-bounds date" — and expanding a
@@ -38,6 +42,12 @@ const OPEN_RANGE_END = Temporal.Instant.from("9999-12-31T23:59:59Z");
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+
+/** A `<CALDAV:time-range>`; a missing bound is open-ended. */
+export interface TimeRange {
+	readonly start?: Temporal.Instant;
+	readonly end?: Temporal.Instant;
+}
 
 export interface TextMatch {
 	readonly value: string;
@@ -55,7 +65,7 @@ export interface ParamFilter {
 export interface PropFilter {
 	readonly name: string;
 	readonly isNotDefined?: boolean;
-	readonly timeRange?: { start?: Temporal.Instant; end?: Temporal.Instant };
+	readonly timeRange?: TimeRange;
 	readonly textMatch?: TextMatch;
 	readonly paramFilters: ReadonlyArray<ParamFilter>;
 }
@@ -63,7 +73,7 @@ export interface PropFilter {
 export interface CompFilter {
 	readonly name: string;
 	readonly isNotDefined?: boolean;
-	readonly timeRange?: { start?: Temporal.Instant; end?: Temporal.Instant };
+	readonly timeRange?: TimeRange;
 	readonly propFilters: ReadonlyArray<PropFilter>;
 	readonly compFilters: ReadonlyArray<CompFilter>;
 }
@@ -79,15 +89,14 @@ export interface CalFilter {
 export const parseCalFilter = (
 	tree: unknown,
 ): Effect.Effect<CalFilter, DavError> => {
-	if (typeof tree !== "object" || tree === null) {
+	if (!isRecord(tree)) {
 		return Effect.fail(forbidden("CALDAV:valid-filter"));
 	}
-	const obj = tree as Record<string, unknown>;
-	const filterEl = obj[cn("filter")];
-	if (typeof filterEl !== "object" || filterEl === null) {
+	const filterEl = tree[cn("filter")];
+	if (!isRecord(filterEl)) {
 		return Effect.fail(forbidden("CALDAV:valid-filter"));
 	}
-	const compEl = (filterEl as Record<string, unknown>)[cn("comp-filter")];
+	const compEl = filterEl[cn("comp-filter")];
 	if (!compEl) {
 		return Effect.fail(forbidden("CALDAV:valid-filter"));
 	}
@@ -95,41 +104,38 @@ export const parseCalFilter = (
 };
 
 const parseCompFilter = (el: unknown): CompFilter => {
-	if (typeof el !== "object" || el === null) {
+	if (!isRecord(el)) {
 		return { name: "", isNotDefined: false, propFilters: [], compFilters: [] };
 	}
-	const obj = el as Record<string, unknown>;
-	const name = typeof obj["@_name"] === "string" ? obj["@_name"] : "";
-	const isNotDefined = cn("is-not-defined") in obj;
-	const timeRange = parseTimeRange(obj[cn("time-range")]);
+	const name = typeof el["@_name"] === "string" ? el["@_name"] : "";
+	const isNotDefined = cn("is-not-defined") in el;
+	const timeRange = parseTimeRange(el[cn("time-range")]);
 
-	const propFilters = parseChildren(obj[cn("prop-filter")], parsePropFilter);
-	const compFilters = parseChildren(obj[cn("comp-filter")], parseCompFilter);
+	const propFilters = parseChildren(el[cn("prop-filter")], parsePropFilter);
+	const compFilters = parseChildren(el[cn("comp-filter")], parseCompFilter);
 
 	return { name, isNotDefined, timeRange, propFilters, compFilters };
 };
 
 const parsePropFilter = (el: unknown): PropFilter => {
-	if (typeof el !== "object" || el === null) {
+	if (!isRecord(el)) {
 		return { name: "", paramFilters: [] };
 	}
-	const obj = el as Record<string, unknown>;
-	const name = typeof obj["@_name"] === "string" ? obj["@_name"] : "";
-	const isNotDefined = cn("is-not-defined") in obj;
-	const timeRange = parseTimeRange(obj[cn("time-range")]);
-	const textMatch = parseTextMatch(obj[cn("text-match")]);
-	const paramFilters = parseChildren(obj[cn("param-filter")], parseParamFilter);
+	const name = typeof el["@_name"] === "string" ? el["@_name"] : "";
+	const isNotDefined = cn("is-not-defined") in el;
+	const timeRange = parseTimeRange(el[cn("time-range")]);
+	const textMatch = parseTextMatch(el[cn("text-match")]);
+	const paramFilters = parseChildren(el[cn("param-filter")], parseParamFilter);
 	return { name, isNotDefined, timeRange, textMatch, paramFilters };
 };
 
 const parseParamFilter = (el: unknown): ParamFilter => {
-	if (typeof el !== "object" || el === null) {
+	if (!isRecord(el)) {
 		return { name: "" };
 	}
-	const obj = el as Record<string, unknown>;
-	const name = typeof obj["@_name"] === "string" ? obj["@_name"] : "";
-	const isNotDefined = cn("is-not-defined") in obj;
-	const textMatch = parseTextMatch(obj[cn("text-match")]);
+	const name = typeof el["@_name"] === "string" ? el["@_name"] : "";
+	const isNotDefined = cn("is-not-defined") in el;
+	const textMatch = parseTextMatch(el[cn("text-match")]);
 	return { name, isNotDefined, textMatch };
 };
 
@@ -151,58 +157,51 @@ const parseTextMatch = (el: unknown): TextMatch | undefined => {
 			negate: false,
 		};
 	}
-	if (typeof el !== "object") {
+	if (!isRecord(el)) {
 		return undefined;
 	}
-	const obj = el as Record<string, unknown>;
-	const rawText = obj["#text"];
+	const rawText = el["#text"];
 	const value =
 		typeof rawText === "string"
 			? rawText
 			: typeof rawText === "number"
 				? String(rawText)
 				: "";
-	const rawCollation = obj["@_collation"];
-	const collation: TextMatch["collation"] =
-		rawCollation === "i;unicode-casemap"
-			? "i;unicode-casemap"
-			: rawCollation === "i;octet"
-				? "i;octet"
-				: "i;ascii-casemap";
-	const matchType = (
-		["equals", "contains", "starts-with", "ends-with"].includes(
-			obj["@_match-type"] as string,
-		)
-			? obj["@_match-type"]
-			: "contains"
-	) as TextMatch["matchType"];
-	const negate = obj["@_negate-condition"] === "yes";
-	return { value, collation, matchType, negate };
+	return {
+		value,
+		collation: parseCollation(el["@_collation"]),
+		matchType: parseMatchType(el["@_match-type"]),
+		negate: el["@_negate-condition"] === "yes",
+	};
 };
 
-const tryParseInstant = (s: string): Temporal.Instant | undefined => {
-	try {
-		return Temporal.Instant.from(s);
-	} catch {
-		return undefined;
-	}
-};
+/** Read a `collation` attribute, defaulting to the RFC 4791 default collation */
+const parseCollation = (raw: unknown): TextMatch["collation"] =>
+	raw === "i;unicode-casemap" || raw === "i;octet" ? raw : "i;ascii-casemap";
 
-const parseTimeRange = (
-	el: unknown,
-): { start?: Temporal.Instant; end?: Temporal.Instant } | undefined => {
-	if (typeof el !== "object" || el === null) {
+/** Read a `match-type` attribute, defaulting to `contains` */
+const parseMatchType = (raw: unknown): TextMatch["matchType"] =>
+	raw === "equals" || raw === "starts-with" || raw === "ends-with"
+		? raw
+		: "contains";
+
+/** Parse an ISO instant, yielding none for an unparseable value */
+const parseInstant = Option.liftThrowable((s: string) =>
+	Temporal.Instant.from(s),
+);
+
+/** Read one `start`/`end` attribute of a `<time-range>` element */
+const rangeBound = (raw: unknown): Temporal.Instant | undefined =>
+	typeof raw === "string"
+		? Option.getOrUndefined(parseInstant(raw))
+		: undefined;
+
+const parseTimeRange = (el: unknown): TimeRange | undefined => {
+	if (!isRecord(el)) {
 		return undefined;
 	}
-	const obj = el as Record<string, unknown>;
-	const start =
-		typeof obj["@_start"] === "string"
-			? tryParseInstant(obj["@_start"])
-			: undefined;
-	const end =
-		typeof obj["@_end"] === "string"
-			? tryParseInstant(obj["@_end"])
-			: undefined;
+	const start = rangeBound(el["@_start"]);
+	const end = rangeBound(el["@_end"]);
 	if (!(start || end)) {
 		return undefined;
 	}
@@ -223,6 +222,31 @@ const parseChildren = <T>(
 // ---------------------------------------------------------------------------
 // evaluateCalFilter
 // ---------------------------------------------------------------------------
+
+// Range-bound comparisons. A missing bound is open-ended, so every predicate is
+// vacuously true when its bound is absent.
+
+/** `range.start <= t` */
+const startAtOrBefore = (range: TimeRange, t: Temporal.Instant): boolean =>
+	range.start === undefined ||
+	range.start.epochMilliseconds <= t.epochMilliseconds;
+
+/** `range.start < t` */
+const startBefore = (range: TimeRange, t: Temporal.Instant): boolean =>
+	range.start === undefined ||
+	range.start.epochMilliseconds < t.epochMilliseconds;
+
+/** `range.end > t` */
+const endAfter = (range: TimeRange, t: Temporal.Instant): boolean =>
+	range.end === undefined || range.end.epochMilliseconds > t.epochMilliseconds;
+
+/** `range.end >= t` */
+const endAtOrAfter = (range: TimeRange, t: Temporal.Instant): boolean =>
+	range.end === undefined || range.end.epochMilliseconds >= t.epochMilliseconds;
+
+/** True when an instant falls in the range: start inclusive, end exclusive */
+const instantInRange = (t: Temporal.Instant, range: TimeRange): boolean =>
+	startAtOrBefore(range, t) && endAfter(range, t);
 
 /**
  * @param zone Zone that floating and DATE values are read in, per RFC 4791
@@ -313,30 +337,33 @@ const evalPropFilter = (
 		return false;
 	}
 
-	return props.some((prop) => {
-		if (f.timeRange) {
-			const instant = instantFromIrValue(prop, zone);
-			if (!instant) {
-				return false;
-			} // floating time, no timezone → no match
-			const { start, end } = f.timeRange;
-			if (start && instant.epochMilliseconds < start.epochMilliseconds) {
-				return false;
-			}
-			if (end && instant.epochMilliseconds >= end.epochMilliseconds) {
-				return false;
-			}
-		}
-		if (f.textMatch && !evalTextMatch(propValueText(prop), f.textMatch)) {
-			return false;
-		}
-		for (const pf of f.paramFilters) {
-			if (!evalParamFilter(prop, pf)) {
-				return false;
-			}
-		}
-		return true;
-	});
+	return props.some((prop) => propMatchesFilter(prop, f, zone));
+};
+
+/** True when a property's resolved date value falls inside a prop-filter time-range */
+const propInTimeRange = (
+	prop: IrProperty,
+	range: TimeRange,
+	zone: ResolutionZone,
+): boolean => {
+	const instant = instantFromIrValue(prop, zone);
+	// floating time, no timezone → no match
+	return instant !== undefined && instantInRange(instant, range);
+};
+
+/** True when one property satisfies a prop-filter's time-range, text-match and param-filters */
+const propMatchesFilter = (
+	prop: IrProperty,
+	f: PropFilter,
+	zone: ResolutionZone,
+): boolean => {
+	if (f.timeRange && !propInTimeRange(prop, f.timeRange, zone)) {
+		return false;
+	}
+	if (f.textMatch && !evalTextMatch(propValueText(prop), f.textMatch)) {
+		return false;
+	}
+	return f.paramFilters.every((pf) => evalParamFilter(prop, pf));
 };
 
 const evalParamFilter = (prop: IrProperty, f: ParamFilter): boolean => {
@@ -356,38 +383,30 @@ const evalParamFilter = (prop: IrProperty, f: ParamFilter): boolean => {
 	return true;
 };
 
-const evalTextMatch = (text: string, tm: TextMatch): boolean => {
-	// RFC 4791 §7.5.1: i;ascii-casemap and i;octet are mandatory. The casemap
-	// collations fold case; i;octet is an exact byte/codepoint comparison
-	// (case-sensitive), which clients rely on for e.g. an exact CATEGORIES match.
-	const fold = (s: string) => {
-		switch (tm.collation) {
-			case "i;octet":
-				return s;
-			case "i;unicode-casemap":
-				return s.normalize("NFC").toLowerCase();
-			default:
-				return s.toLowerCase();
-		}
-	};
-	const haystack = fold(text);
-	const needle = fold(tm.value);
+// RFC 4791 §7.5.1: i;ascii-casemap and i;octet are mandatory. The casemap
+// collations fold case; i;octet is an exact byte/codepoint comparison
+// (case-sensitive), which clients rely on for e.g. an exact CATEGORIES match.
+const COLLATION_FOLD: Readonly<
+	Record<TextMatch["collation"], (s: string) => string>
+> = {
+	"i;octet": (s) => s,
+	"i;unicode-casemap": (s) => s.normalize("NFC").toLowerCase(),
+	"i;ascii-casemap": (s) => s.toLowerCase(),
+};
 
-	let matches: boolean;
-	switch (tm.matchType) {
-		case "equals":
-			matches = haystack === needle;
-			break;
-		case "contains":
-			matches = haystack.includes(needle);
-			break;
-		case "starts-with":
-			matches = haystack.startsWith(needle);
-			break;
-		case "ends-with":
-			matches = haystack.endsWith(needle);
-			break;
-	}
+/** Comparison performed by each RFC 4791 text-match `match-type` */
+const MATCH_TYPE_TEST: Readonly<
+	Record<TextMatch["matchType"], (haystack: string, needle: string) => boolean>
+> = {
+	equals: (haystack, needle) => haystack === needle,
+	contains: (haystack, needle) => haystack.includes(needle),
+	"starts-with": (haystack, needle) => haystack.startsWith(needle),
+	"ends-with": (haystack, needle) => haystack.endsWith(needle),
+};
+
+const evalTextMatch = (text: string, tm: TextMatch): boolean => {
+	const fold = COLLATION_FOLD[tm.collation];
+	const matches = MATCH_TYPE_TEST[tm.matchType](fold(text), fold(tm.value));
 	return tm.negate ? !matches : matches;
 };
 
@@ -419,103 +438,87 @@ const evalTextMatch = (text: string, tm: TextMatch): boolean => {
  */
 const evalVtodoTimeRange = (
 	comp: IrComponent,
-	range: { start?: Temporal.Instant; end?: Temporal.Instant },
+	range: TimeRange,
 	zone: ResolutionZone,
 ): boolean => {
-	const { start, end } = range;
 	const dtstart = getDtstartInstant(comp, zone);
 	const due = getDtendInstant(comp, zone); // getDtendProp checks DUE for VTODO
 	const hasDuration = comp.properties.some((p) => p.name === "DURATION");
-
-	const completedProp = comp.properties.find((p) => p.name === "COMPLETED");
-	const completed = completedProp
-		? instantFromIrValue(completedProp, zone)
-		: undefined;
-
-	const createdProp = comp.properties.find((p) => p.name === "CREATED");
-	const created = createdProp
-		? instantFromIrValue(createdProp, zone)
-		: undefined;
 
 	// RFC: rows with Y in DTSTART column — COMPLETED/CREATED columns are "*" (irrelevant).
 	if (dtstart !== undefined && hasDuration && due === undefined) {
 		// Y, Y, N: (start <= DTSTART+DURATION) AND ((end > DTSTART) OR (end >= DTSTART+DURATION))
 		const effectiveDue = effectiveDtend(comp, dtstart, zone);
-		const startOk =
-			start === undefined ||
-			start.epochMilliseconds <= effectiveDue.epochMilliseconds;
-		const endOk =
-			end === undefined ||
-			end.epochMilliseconds > dtstart.epochMilliseconds ||
-			end.epochMilliseconds >= effectiveDue.epochMilliseconds;
-		return startOk && endOk;
+		return (
+			startAtOrBefore(range, effectiveDue) &&
+			(endAfter(range, dtstart) || endAtOrAfter(range, effectiveDue))
+		);
 	}
 
 	if (dtstart !== undefined && due !== undefined) {
 		// Y, N, Y: ((start < DUE) OR (start <= DTSTART)) AND ((end > DTSTART) OR (end >= DUE))
-		const startOk =
-			start === undefined ||
-			start.epochMilliseconds < due.epochMilliseconds ||
-			start.epochMilliseconds <= dtstart.epochMilliseconds;
-		const endOk =
-			end === undefined ||
-			end.epochMilliseconds > dtstart.epochMilliseconds ||
-			end.epochMilliseconds >= due.epochMilliseconds;
-		return startOk && endOk;
+		return (
+			(startBefore(range, due) || startAtOrBefore(range, dtstart)) &&
+			(endAfter(range, dtstart) || endAtOrAfter(range, due))
+		);
 	}
 
 	if (dtstart !== undefined) {
 		// Y, N, N: (start <= DTSTART) AND (end > DTSTART)
-		const startOk =
-			start === undefined ||
-			start.epochMilliseconds <= dtstart.epochMilliseconds;
-		const endOk =
-			end === undefined || end.epochMilliseconds > dtstart.epochMilliseconds;
-		return startOk && endOk;
+		return instantInRange(dtstart, range);
 	}
 
 	if (due !== undefined) {
 		// N, N, Y: (start < DUE) AND (end >= DUE)
-		const startOk =
-			start === undefined || start.epochMilliseconds < due.epochMilliseconds;
-		const endOk =
-			end === undefined || end.epochMilliseconds >= due.epochMilliseconds;
-		return startOk && endOk;
+		return startBefore(range, due) && endAtOrAfter(range, due);
 	}
 
 	// N, N, N — dispatch on COMPLETED / CREATED presence.
+	return evalVtodoStamps(comp, range, zone);
+};
+
+/**
+ * RFC 4791 §9.9 VTODO rows with neither DTSTART nor DUE: dispatch on the
+ * COMPLETED / CREATED timestamps, and match everything when neither is present.
+ */
+const evalVtodoStamps = (
+	comp: IrComponent,
+	range: TimeRange,
+	zone: ResolutionZone,
+): boolean => {
+	const completed = propInstant(comp, "COMPLETED", zone);
+	const created = propInstant(comp, "CREATED", zone);
+
 	if (completed !== undefined && created !== undefined) {
 		// ((start <= CREATED) OR (start <= COMPLETED)) AND ((end >= CREATED) OR (end >= COMPLETED))
-		const startOk =
-			start === undefined ||
-			start.epochMilliseconds <= created.epochMilliseconds ||
-			start.epochMilliseconds <= completed.epochMilliseconds;
-		const endOk =
-			end === undefined ||
-			end.epochMilliseconds >= created.epochMilliseconds ||
-			end.epochMilliseconds >= completed.epochMilliseconds;
-		return startOk && endOk;
+		return (
+			(startAtOrBefore(range, created) || startAtOrBefore(range, completed)) &&
+			(endAtOrAfter(range, created) || endAtOrAfter(range, completed))
+		);
 	}
 
 	if (completed !== undefined) {
 		// (start <= COMPLETED) AND (end >= COMPLETED)
-		const startOk =
-			start === undefined ||
-			start.epochMilliseconds <= completed.epochMilliseconds;
-		const endOk =
-			end === undefined || end.epochMilliseconds >= completed.epochMilliseconds;
-		return startOk && endOk;
+		return startAtOrBefore(range, completed) && endAtOrAfter(range, completed);
 	}
 
 	if (created !== undefined) {
 		// (end > CREATED)
-		return (
-			end === undefined || end.epochMilliseconds > created.epochMilliseconds
-		);
+		return endAfter(range, created);
 	}
 
 	// N, N, N, N, N → TRUE
 	return true;
+};
+
+/** Resolve a named property of a component to an instant, if it has one */
+const propInstant = (
+	comp: IrComponent,
+	name: string,
+	zone: ResolutionZone,
+): Temporal.Instant | undefined => {
+	const prop = comp.properties.find((p) => p.name === name);
+	return prop ? instantFromIrValue(prop, zone) : undefined;
 };
 
 /**
@@ -531,7 +534,7 @@ const evalVtodoTimeRange = (
  */
 const evalVjournalTimeRange = (
 	comp: IrComponent,
-	range: { start?: Temporal.Instant; end?: Temporal.Instant },
+	range: TimeRange,
 	zone: ResolutionZone,
 ): boolean => {
 	const dtstartProp = getDtstartProp(comp);
@@ -542,20 +545,13 @@ const evalVjournalTimeRange = (
 	if (dtstart === undefined) {
 		return false; // DTSTART is not a date value
 	}
-	const { start, end } = range;
-
 	const isDateTime =
 		dtstartProp.value.type === "DATE_TIME" ||
 		dtstartProp.value.type === "PLAIN_DATE_TIME";
 
 	if (isDateTime) {
 		// (start <= DTSTART) AND (end > DTSTART)
-		const startOk =
-			start === undefined ||
-			start.epochMilliseconds <= dtstart.epochMilliseconds;
-		const endOk =
-			end === undefined || end.epochMilliseconds > dtstart.epochMilliseconds;
-		return startOk && endOk;
+		return instantInRange(dtstart, range);
 	}
 
 	// DATE value: effective duration is 1 day, counted on the resolution zone's
@@ -564,12 +560,8 @@ const evalVjournalTimeRange = (
 		.toZonedDateTimeISO(zone)
 		.add({ days: 1 })
 		.toInstant();
-	const startOk =
-		start === undefined ||
-		start.epochMilliseconds < dtendPlusOneDay.epochMilliseconds;
-	const endOk =
-		end === undefined || end.epochMilliseconds > dtstart.epochMilliseconds;
-	return startOk && endOk;
+	// (start < DTSTART+P1D) AND (end > DTSTART)
+	return startBefore(range, dtendPlusOneDay) && endAfter(range, dtstart);
 };
 
 /**
@@ -583,7 +575,7 @@ const evalVjournalTimeRange = (
  */
 const evalVfreebusyTimeRange = (
 	comp: IrComponent,
-	range: { start?: Temporal.Instant; end?: Temporal.Instant },
+	range: TimeRange,
 	zone: ResolutionZone,
 ): boolean => {
 	const dtstart = getDtstartInstant(comp, zone);
@@ -591,53 +583,56 @@ const evalVfreebusyTimeRange = (
 
 	if (dtstart && dtend) {
 		// Y | *: (range.start <= DTEND) AND (range.end > DTSTART)
-		const startOk =
-			!range.start || range.start.epochMilliseconds <= dtend.epochMilliseconds;
-		const endOk =
-			!range.end || range.end.epochMilliseconds > dtstart.epochMilliseconds;
-		return startOk && endOk;
+		return startAtOrBefore(range, dtend) && endAfter(range, dtstart);
 	}
 
-	// N | Y: check each FREEBUSY period
-	for (const prop of comp.properties) {
-		if (prop.name !== "FREEBUSY") {
-			continue;
-		}
-		const periodStrings: Array<string> =
-			prop.value.type === "PERIOD"
-				? [prop.value.value]
-				: prop.value.type === "PERIOD_LIST"
-					? (prop.value.value as ReadonlyArray<string>).slice()
-					: [];
-		for (const ps of periodStrings) {
-			const slash = ps.indexOf("/");
-			if (slash === -1) {
-				continue;
-			}
-			try {
-				const pStart = Temporal.Instant.from(ps.slice(0, slash));
-				const endPart = ps.slice(slash + 1);
-				const pEnd =
-					endPart.startsWith("P") || endPart.startsWith("-P")
-						? pStart.add(Temporal.Duration.from(endPart))
-						: Temporal.Instant.from(endPart);
-				const startOk =
-					!range.start ||
-					range.start.epochMilliseconds < pEnd.epochMilliseconds;
-				const endOk =
-					!range.end || range.end.epochMilliseconds > pStart.epochMilliseconds;
-				if (startOk && endOk) {
-					return true;
-				}
-			} catch {
-				// Invalid period — skip
-			}
-		}
-	}
-
-	// N | N: FALSE; N | Y but no period matched: FALSE
-	return false;
+	// N | Y: any FREEBUSY period overlapping the range matches; N | N: FALSE
+	return comp.properties
+		.filter((prop) => prop.name === "FREEBUSY")
+		.flatMap(freebusyPeriods)
+		.flatMap((period) => Option.toArray(parsePeriod(period)))
+		.some((p) => startBefore(range, p.end) && endAfter(range, p.start));
 };
+
+/** The raw PERIOD value(s) carried by a FREEBUSY property */
+const freebusyPeriods = (prop: IrProperty): ReadonlyArray<string> =>
+	prop.value.type === "PERIOD"
+		? [prop.value.value]
+		: prop.value.type === "PERIOD_LIST"
+			? (prop.value.value as ReadonlyArray<string>)
+			: [];
+
+/** Resolve a period's halves, where the second may be an ISO duration */
+const periodBounds = Option.liftThrowable(
+	(startText: string, endText: string) => {
+		const start = Temporal.Instant.from(startText);
+		const end =
+			endText.startsWith("P") || endText.startsWith("-P")
+				? start.add(Temporal.Duration.from(endText))
+				: Temporal.Instant.from(endText);
+		return { start, end };
+	},
+);
+
+/** Parse an iCalendar period ("<start>/<end>" or "<start>/<duration>") */
+const parsePeriod = (
+	period: string,
+): Option.Option<{ start: Temporal.Instant; end: Temporal.Instant }> => {
+	const slash = period.indexOf("/");
+	return slash === -1
+		? Option.none()
+		: periodBounds(period.slice(0, slash), period.slice(slash + 1));
+};
+
+/**
+ * Shift an instant by an ISO duration. Nominal units are counted on the
+ * resolution zone's calendar, so a "one day before" alarm stays at the same wall
+ * time across a DST change. Yields none for an unparseable duration.
+ */
+const shiftByDuration = Option.liftThrowable(
+	(base: Temporal.Instant, iso: string, zone: ResolutionZone) =>
+		base.toZonedDateTimeISO(zone).add(Temporal.Duration.from(iso)).toInstant(),
+);
 
 /**
  * Compute the alarm trigger instant(s) for a VALARM. RFC 4791 §9.10: a relative
@@ -673,18 +668,8 @@ const valarmTriggerInstants = (
 	const addDuration = (
 		base: Temporal.Instant,
 		iso: string,
-	): Temporal.Instant | undefined => {
-		try {
-			// Nominal units are counted on the resolution zone's calendar, so a
-			// "one day before" alarm stays at the same wall time across a DST change
-			return base
-				.toZonedDateTimeISO(zone)
-				.add(Temporal.Duration.from(iso))
-				.toInstant();
-		} catch {
-			return undefined;
-		}
-	};
+	): Temporal.Instant | undefined =>
+		Option.getOrUndefined(shiftByDuration(base, iso, zone));
 	const first = addDuration(anchor, trigger.value.value);
 	if (first === undefined) {
 		return [];
@@ -711,21 +696,15 @@ const valarmTriggerInstants = (
 
 const evalComponentTimeRange = (
 	comp: IrComponent,
-	range: { start?: Temporal.Instant; end?: Temporal.Instant },
+	range: TimeRange,
 	ctx: CompFilterContext,
 ): boolean => {
 	const { vcalRoot, zone, limits, parent } = ctx;
 	// RFC 4791 §9.10: VALARM matches if a computed trigger falls in the range.
 	if (comp.name === "VALARM") {
-		return valarmTriggerInstants(comp, parent, zone).some((t) => {
-			if (range.start && t.epochMilliseconds < range.start.epochMilliseconds) {
-				return false;
-			}
-			if (range.end && t.epochMilliseconds >= range.end.epochMilliseconds) {
-				return false;
-			}
-			return true;
-		});
+		return valarmTriggerInstants(comp, parent, zone).some((t) =>
+			instantInRange(t, range),
+		);
 	}
 
 	const rruleProp = comp.properties.find((p) => p.name === "RRULE");

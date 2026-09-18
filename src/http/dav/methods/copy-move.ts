@@ -63,6 +63,12 @@ export const parseOverwrite = (req: Request): boolean => {
 	return raw.trim().toUpperCase() !== "F";
 };
 
+// Depth values COPY/MOVE accept, keyed by their lowercased header spelling
+const ACCEPTED_DEPTHS: Record<string, "0" | "infinity" | undefined> = {
+	"0": "0",
+	infinity: "infinity",
+};
+
 /**
  * Parse the optional Depth header (RFC 4918 §10.2).
  * Only "0" and "infinity" are accepted for COPY/MOVE; "1" is not valid.
@@ -78,16 +84,16 @@ export const parseDepth = (
 	if (raw === null) {
 		return Effect.succeed(defaultDepth);
 	}
-	const normalised = raw.trim().toLowerCase();
-	if (normalised === "0") {
-		return Effect.succeed("0");
-	}
-	if (normalised === "infinity") {
-		return Effect.succeed("infinity");
-	}
-	return Effect.fail(
-		davError(HTTP_BAD_REQUEST, undefined, `Invalid Depth header value: ${raw}`),
-	);
+	const depth = ACCEPTED_DEPTHS[raw.trim().toLowerCase()];
+	return depth === undefined
+		? Effect.fail(
+				davError(
+					HTTP_BAD_REQUEST,
+					undefined,
+					`Invalid Depth header value: ${raw}`,
+				),
+			)
+		: Effect.succeed(depth);
 };
 
 // ---------------------------------------------------------------------------
@@ -99,6 +105,24 @@ export const parseDepth = (
  * The instance soft-delete fires the DB trigger that creates a tombstone for
  * RFC 6578 sync-collection delta sync.
  */
+// Soft-delete the instance first so the DB tombstone trigger fires while the
+// entity is still logically present
+const softDeleteInstanceTree = (
+	instance: InstanceRow,
+): Effect.Effect<
+	void,
+	DatabaseError,
+	InstanceRepository | EntityRepository | ComponentRepository
+> =>
+	Effect.gen(function* () {
+		const instanceRepo = yield* InstanceRepository;
+		const entityRepo = yield* EntityRepository;
+		const componentRepo = yield* ComponentRepository;
+		yield* instanceRepo.softDelete(InstanceId(instance.id));
+		yield* entityRepo.softDelete(EntityId(instance.entityId));
+		yield* componentRepo.deleteByEntity(EntityId(instance.entityId));
+	});
+
 export const deleteInstance = (
 	instance: InstanceRow,
 ): Effect.Effect<
@@ -108,19 +132,9 @@ export const deleteInstance = (
 > =>
 	Effect.gen(function* () {
 		const db = yield* DatabaseClient;
-		const instanceRepo = yield* InstanceRepository;
-		const entityRepo = yield* EntityRepository;
-		const componentRepo = yield* ComponentRepository;
-
-		// Soft-delete instance first so the DB tombstone trigger fires while the
-		// entity is still logically present.
-		yield* withTransaction(
-			Effect.gen(function* () {
-				yield* instanceRepo.softDelete(InstanceId(instance.id));
-				yield* entityRepo.softDelete(EntityId(instance.entityId));
-				yield* componentRepo.deleteByEntity(EntityId(instance.entityId));
-			}),
-		).pipe(Effect.provideService(DatabaseClient, db));
+		yield* withTransaction(softDeleteInstanceTree(instance)).pipe(
+			Effect.provideService(DatabaseClient, db),
+		);
 	});
 
 /**
@@ -144,9 +158,8 @@ export const deleteCollection = (
 		const instances = yield* instanceRepo.listByCollection(collectionId);
 		const collectionRepo = yield* CollectionRepository;
 		yield* withTransaction(
-			Effect.gen(function* () {
-				yield* Effect.forEach(instances, deleteInstance, { discard: true });
-				yield* collectionRepo.softDelete(collectionId);
-			}),
+			Effect.forEach(instances, deleteInstance, { discard: true }).pipe(
+				Effect.andThen(collectionRepo.softDelete(collectionId)),
+			),
 		).pipe(Effect.provideService(DatabaseClient, db));
 	});

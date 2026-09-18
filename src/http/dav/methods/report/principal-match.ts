@@ -22,11 +22,36 @@ import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import { methodNotAllowed, unauthorized } from "#src/domain/errors.ts";
 import type { ResolvedDavPath } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
+import {
+	type PropfindKind,
+	splitPropstats,
+} from "#src/http/dav/methods/instance-props.ts";
 import { multistatusResponse } from "#src/http/dav/xml/multistatus.ts";
 import type { AclService } from "#src/services/acl/index.ts";
 import { PrincipalRepository } from "#src/services/principal/index.ts";
 
 const DAV_NS = "DAV:";
+
+/** True when an unknown value is a plain (non-null) object */
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+	typeof value === "object" && value !== null;
+
+/** Property names of the request's optional `<D:prop>` element */
+const requestedPropNames = (
+	obj: Record<string, unknown>,
+): Option.Option<ReadonlySet<ClarkName>> => {
+	const propEl = obj[cn(DAV_NS, "prop")];
+	if (!isRecord(propEl)) {
+		return Option.none();
+	}
+	return Option.some(
+		new Set(
+			Object.keys(propEl)
+				.filter((k) => !k.startsWith("@_"))
+				.map((k) => k as ClarkName),
+		),
+	);
+};
 
 // ---------------------------------------------------------------------------
 // Handler
@@ -61,22 +86,14 @@ export const principalMatchHandler = (
 		const origin = ctx.url.origin;
 
 		// Parse request body: does it use <self/> or <principal-property>?
-		const obj =
-			typeof tree === "object" && tree !== null
-				? (tree as Record<string, unknown>)
-				: {};
+		const obj: Record<string, unknown> = isRecord(tree) ? tree : {};
 		const hasSelf = cn(DAV_NS, "self") in obj;
 
-		// Extract requested prop names (optional)
-		const propEl = obj[cn(DAV_NS, "prop")];
-		const requestedProps =
-			typeof propEl === "object" && propEl !== null
-				? new Set<ClarkName>(
-						Object.keys(propEl as Record<string, unknown>)
-							.filter((k) => !k.startsWith("@_"))
-							.map((k) => k as ClarkName),
-					)
-				: null;
+		// An absent <D:prop> means every property, as for allprop
+		const propfind: PropfindKind = Option.match(requestedPropNames(obj), {
+			onNone: (): PropfindKind => ({ type: "allprop" }),
+			onSome: (names): PropfindKind => ({ type: "prop", names }),
+		});
 
 		if (hasSelf || !(cn(DAV_NS, "principal-property") in obj)) {
 			// <self/> mode: return the current user's principal resource.
@@ -100,30 +117,11 @@ export const principalMatchHandler = (
 				},
 			};
 
-			const props = requestedProps
-				? (() => {
-						const found: Record<ClarkName, unknown> = {};
-						const missing: Record<ClarkName, unknown> = {};
-						for (const name of requestedProps) {
-							if (name in allProps) {
-								found[name] = allProps[name];
-							} else {
-								missing[name] = "";
-							}
-						}
-						const stats: Array<{
-							props: Record<ClarkName, unknown>;
-							status: number;
-						}> = [{ props: found, status: 200 }];
-						if (Object.keys(missing).length > 0) {
-							stats.push({ props: missing, status: 404 });
-						}
-						return stats;
-					})()
-				: [{ props: allProps, status: 200 }];
-
 			return yield* multistatusResponse([
-				{ href: principalHref, propstats: props },
+				{
+					href: principalHref,
+					propstats: splitPropstats(allProps, propfind),
+				},
 			]);
 		}
 

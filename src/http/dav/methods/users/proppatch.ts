@@ -12,6 +12,7 @@ import {
 	USERS_VIRTUAL_RESOURCE_ID,
 } from "#src/domain/virtual-resources.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
+import { xmlChild, xmlPath, xmlText } from "#src/http/dav/methods/xml-node.ts";
 import { normalizeClarkNames } from "#src/http/dav/xml/clark.ts";
 import { parseXml, readXmlBody } from "#src/http/dav/xml/parser.ts";
 import { HTTP_NO_CONTENT } from "#src/http/status.ts";
@@ -31,86 +32,61 @@ interface ProppatchUpdates {
 	readonly credential: NewCredential | undefined;
 }
 
-const extractUpdates = (tree: unknown): ProppatchUpdates => {
-	const empty: ProppatchUpdates = {
-		displayName: undefined,
-		email: undefined,
-		credential: undefined,
-	};
-	if (typeof tree !== "object" || tree === null) {
-		return empty;
-	}
-	const root = tree as Record<string, unknown>;
-	const update = root[`{${DAV_NS}}propertyupdate`] as
-		| Record<string, unknown>
-		| undefined;
-	if (typeof update !== "object" || update === null) {
-		return empty;
-	}
-	const set = update[`{${DAV_NS}}set`] as Record<string, unknown> | undefined;
-	if (typeof set !== "object" || set === null) {
-		return empty;
-	}
-	const prop = set[`{${DAV_NS}}prop`] as Record<string, unknown> | undefined;
-	if (typeof prop !== "object" || prop === null) {
-		return empty;
-	}
-
-	const displayName =
-		typeof prop[`{${DAV_NS}}displayname`] === "string"
-			? (prop[`{${DAV_NS}}displayname`] as string)
-			: undefined;
-	const email =
-		typeof prop[`{${SHURIKEN_NS}}email`] === "string"
-			? (prop[`{${SHURIKEN_NS}}email`] as string)
-			: undefined;
-
-	let credential: NewCredential | undefined;
-	const credEl = prop[`{${SHURIKEN_NS}}credential`];
-	if (typeof credEl === "object" && credEl !== null) {
-		const c = credEl as Record<string, unknown>;
-		const source = c[`{${SHURIKEN_NS}}source`];
-		const authId = c[`{${SHURIKEN_NS}}auth-id`];
-		const password = c[`{${SHURIKEN_NS}}password`];
-		if (
-			source === "local" &&
-			typeof authId === "string" &&
-			typeof password === "string"
-		) {
-			credential = {
-				source: "local",
-				authId,
-				password: Redacted.make(password),
-			};
-		} else if (source === "proxy" && typeof authId === "string") {
-			credential = { source: "proxy", authId };
-		}
-	}
-
-	return { displayName, email, credential };
+const NO_UPDATES: ProppatchUpdates = {
+	displayName: undefined,
+	email: undefined,
+	credential: undefined,
 };
+
+/** Reads a `{shuriken}credential` element into a `NewCredential`, if it is complete */
+const extractCredential = (
+	prop: Record<string, unknown>,
+): NewCredential | undefined => {
+	const credEl = xmlChild(prop, `{${SHURIKEN_NS}}credential`);
+	if (credEl === undefined) {
+		return undefined;
+	}
+	const source = credEl[`{${SHURIKEN_NS}}source`];
+	const authId = xmlText(credEl, `{${SHURIKEN_NS}}auth-id`);
+	const password = xmlText(credEl, `{${SHURIKEN_NS}}password`);
+	if (authId === undefined) {
+		return undefined;
+	}
+	if (source === "local" && password !== undefined) {
+		return { source: "local", authId, password: Redacted.make(password) };
+	}
+	return source === "proxy" ? { source: "proxy", authId } : undefined;
+};
+
+const extractUpdates = (tree: unknown): ProppatchUpdates => {
+	const prop = xmlPath(
+		tree,
+		`{${DAV_NS}}propertyupdate`,
+		`{${DAV_NS}}set`,
+		`{${DAV_NS}}prop`,
+	);
+	if (prop === undefined) {
+		return NO_UPDATES;
+	}
+	return {
+		displayName: xmlText(prop, `{${DAV_NS}}displayname`),
+		email: xmlText(prop, `{${SHURIKEN_NS}}email`),
+		credential: extractCredential(prop),
+	};
+};
+
+// Malformed XML is treated as an empty body rather than a hard failure
+const parseUpdates = (body: string): Effect.Effect<ProppatchUpdates> =>
+	parseXml(body).pipe(
+		Effect.map((parsed) => extractUpdates(normalizeClarkNames(parsed))),
+		Effect.catchTag("XmlParseError", () => Effect.succeed(NO_UPDATES)),
+	);
 
 const parseBody = (req: Request): Effect.Effect<ProppatchUpdates, DavError> =>
 	readXmlBody(req).pipe(
-		Effect.flatMap((body) => {
-			if (body.trim() === "") {
-				return Effect.succeed({
-					displayName: undefined,
-					email: undefined,
-					credential: undefined,
-				} satisfies ProppatchUpdates);
-			}
-			return parseXml(body).pipe(
-				Effect.map((parsed) => extractUpdates(normalizeClarkNames(parsed))),
-				Effect.catchTag("XmlParseError", () =>
-					Effect.succeed({
-						displayName: undefined,
-						email: undefined,
-						credential: undefined,
-					} satisfies ProppatchUpdates),
-				),
-			);
-		}),
+		Effect.flatMap((body) =>
+			body.trim() === "" ? Effect.succeed(NO_UPDATES) : parseUpdates(body),
+		),
 	);
 
 // ---------------------------------------------------------------------------

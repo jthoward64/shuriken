@@ -5,9 +5,9 @@ import { AppConfigService } from "#src/config.ts";
 import { OidcError } from "#src/services/oidc/error.ts";
 import {
 	type OidcClaims,
+	type OidcCompleteInput,
 	type OidcLoginStart,
 	OidcService,
-	type OidcServiceShape,
 } from "#src/services/oidc/service.ts";
 
 // ---------------------------------------------------------------------------
@@ -20,6 +20,25 @@ import {
 // ---------------------------------------------------------------------------
 
 const PKCE_METHOD = "S256";
+
+/** The OIDC slice of the app config, read once when the layer is built */
+interface OidcSettings {
+	readonly issuer: Option.Option<string>;
+	readonly clientId: Option.Option<string>;
+	readonly clientSecret: Option.Option<Redacted.Redacted<string>>;
+	readonly scopes: string;
+	readonly groupsClaim: Option.Option<string>;
+}
+
+/** The settings plus the memoized provider Configuration every call shares */
+interface OidcContext {
+	readonly settings: OidcSettings;
+	readonly configRef: SynchronizedRef.SynchronizedRef<
+		Option.Option<client.Configuration>
+	>;
+}
+
+type UserInfo = Awaited<ReturnType<typeof client.fetchUserInfo>>;
 
 const requireConfigValue = (
 	value: Option.Option<string>,
@@ -62,177 +81,241 @@ const groupsClaim = (
 			: Option.some<ReadonlyArray<string>>([]);
 	});
 
+/** Fetch the provider's metadata document */
+const discover = Effect.fn("auth.oidc.discover")(function* (
+	settings: OidcSettings,
+) {
+	const issuer = yield* requireConfigValue(settings.issuer, "OIDC_ISSUER");
+	const clientId = yield* requireConfigValue(
+		settings.clientId,
+		"OIDC_CLIENT_ID",
+	);
+	const server = yield* Effect.try({
+		try: () => new URL(issuer),
+		catch: (e) =>
+			new OidcError({ reason: "OIDC_ISSUER is not a valid URL", cause: e }),
+	});
+	const secret = Option.getOrUndefined(
+		Option.map(settings.clientSecret, Redacted.value),
+	);
+	return yield* Effect.tryPromise({
+		try: () =>
+			secret === undefined
+				? client.discovery(server, clientId)
+				: client.discovery(server, clientId, secret),
+		catch: (e) =>
+			new OidcError({ reason: "provider discovery failed", cause: e }),
+	});
+});
+
+/** The discovered Configuration, memoized after the first success */
+const getConfig = Effect.fn("auth.oidc.getConfig")(function* (
+	ctx: OidcContext,
+) {
+	return yield* SynchronizedRef.modifyEffect(ctx.configRef, (current) =>
+		Effect.map(
+			Option.match(current, {
+				onSome: Effect.succeed,
+				onNone: () => discover(ctx.settings),
+			}),
+			(cfg) => [cfg, Option.some(cfg)] as const,
+		),
+	);
+});
+
+/** Build the provider authorization URL plus the PKCE/nonce/state secrets */
+const beginLogin = Effect.fn("auth.oidc.beginLogin")(function* (
+	ctx: OidcContext,
+	redirectUri: string,
+) {
+	const config = yield* getConfig(ctx);
+	const pkceVerifier = client.randomPKCECodeVerifier();
+	const codeChallenge = yield* Effect.tryPromise({
+		try: () => client.calculatePKCECodeChallenge(pkceVerifier),
+		catch: (e) =>
+			new OidcError({ reason: "failed to derive PKCE challenge", cause: e }),
+	});
+	const state = client.randomState();
+	const nonce = client.randomNonce();
+	const url = yield* Effect.try({
+		try: () =>
+			client.buildAuthorizationUrl(config, {
+				redirect_uri: redirectUri,
+				scope: ctx.settings.scopes,
+				code_challenge: codeChallenge,
+				code_challenge_method: PKCE_METHOD,
+				state,
+				nonce,
+			}),
+		catch: (e) =>
+			new OidcError({ reason: "failed to build authorization URL", cause: e }),
+	});
+	return {
+		authorizationUrl: url.href,
+		state,
+		nonce: Redacted.make(nonce),
+		pkceVerifier: Redacted.make(pkceVerifier),
+	} satisfies OidcLoginStart;
+});
+
+/** Identity claims as read from the ID token, before the userinfo top-up */
+interface PartialClaims {
+	readonly email: Option.Option<string>;
+	readonly emailVerified: boolean;
+	readonly name: Option.Option<string>;
+	readonly groups: Option.Option<ReadonlyArray<string>>;
+}
+
+/** A userinfo failure is logged and ignored rather than blocking login */
+const logUserInfoFailure = Effect.fn("auth.oidc.logUserInfoFailure")(function* (
+	error: OidcError,
+) {
+	yield* Effect.logWarning("auth.oidc: userinfo fetch failed", {
+		reason: error.reason,
+	});
+	return Option.none<UserInfo>();
+});
+
+/** Call the userinfo endpoint, reporting a failure as absence */
+const fetchUserInfo = Effect.fn("auth.oidc.fetchUserInfo")(function* (
+	config: client.Configuration,
+	accessToken: string,
+	subject: string,
+) {
+	return yield* Effect.tryPromise({
+		try: () => client.fetchUserInfo(config, accessToken, subject),
+		catch: (e) => new OidcError({ reason: "userinfo fetch failed", cause: e }),
+	}).pipe(
+		Effect.map(Option.some<UserInfo>),
+		Effect.catchTag("OidcError", logUserInfoFailure),
+	);
+});
+
+/** Overlay the userinfo response onto whatever the ID token left out */
+const mergeUserInfo = (
+	fromIdToken: PartialClaims,
+	userInfo: UserInfo,
+	groupsClaimName: Option.Option<string>,
+	needGroups: boolean,
+): PartialClaims => ({
+	email: Option.isNone(fromIdToken.email)
+		? stringClaim(userInfo.email)
+		: fromIdToken.email,
+	emailVerified: Option.isNone(fromIdToken.email)
+		? fromIdToken.emailVerified || userInfo.email_verified === true
+		: fromIdToken.emailVerified,
+	name: Option.isNone(fromIdToken.name)
+		? stringClaim(userInfo.name)
+		: fromIdToken.name,
+	groups: needGroups
+		? groupsClaim(userInfo, groupsClaimName)
+		: fromIdToken.groups,
+});
+
+/**
+ * Some providers (e.g. Authentik with "Include claims in id_token" off) surface
+ * email / name / groups only via the userinfo endpoint. Fetch it once to fill
+ * anything the ID token omitted.
+ */
+const completeFromUserInfo = Effect.fn("auth.oidc.completeFromUserInfo")(
+	function* (
+		ctx: OidcContext,
+		config: client.Configuration,
+		token: { readonly accessToken: string; readonly subject: string },
+		fromIdToken: PartialClaims,
+	) {
+		const needGroups =
+			Option.isSome(ctx.settings.groupsClaim) &&
+			Option.isNone(fromIdToken.groups);
+		if (
+			Option.isSome(fromIdToken.email) &&
+			Option.isSome(fromIdToken.name) &&
+			!needGroups
+		) {
+			return fromIdToken;
+		}
+		const userInfo = yield* fetchUserInfo(
+			config,
+			token.accessToken,
+			token.subject,
+		);
+		return Option.match(userInfo, {
+			onNone: () => fromIdToken,
+			onSome: (info) =>
+				mergeUserInfo(fromIdToken, info, ctx.settings.groupsClaim, needGroups),
+		});
+	},
+);
+
+/** Exchange the authorization code and return the verified identity claims */
+const completeLogin = Effect.fn("auth.oidc.completeLogin")(function* (
+	ctx: OidcContext,
+	input: OidcCompleteInput,
+) {
+	const config = yield* getConfig(ctx);
+	const tokens = yield* Effect.tryPromise({
+		try: () =>
+			client.authorizationCodeGrant(config, input.currentUrl, {
+				pkceCodeVerifier: Redacted.value(input.pkceVerifier),
+				expectedNonce: Redacted.value(input.nonce),
+				expectedState: input.state,
+				idTokenExpected: true,
+			}),
+		catch: (e) =>
+			new OidcError({
+				reason: "authorization code exchange failed",
+				cause: e,
+			}),
+	});
+	const claims = tokens.claims();
+	if (claims === undefined) {
+		return yield* Effect.fail(
+			new OidcError({ reason: "ID token missing from token response" }),
+		);
+	}
+
+	const resolved = yield* completeFromUserInfo(
+		ctx,
+		config,
+		{ accessToken: tokens.access_token, subject: claims.sub },
+		{
+			email: stringClaim(claims.email),
+			emailVerified: claims.email_verified === true,
+			name: stringClaim(claims.name),
+			groups: groupsClaim(claims, ctx.settings.groupsClaim),
+		},
+	);
+
+	return {
+		issuer: claims.iss,
+		subject: claims.sub,
+		email: resolved.email,
+		emailVerified: resolved.emailVerified,
+		name: resolved.name,
+		groups: resolved.groups,
+	} satisfies OidcClaims;
+});
+
 export const OidcServiceLive = Layer.effect(
 	OidcService,
 	Effect.gen(function* () {
-		const {
-			auth: {
-				oidcIssuer,
-				oidcClientId,
-				oidcClientSecret,
-				oidcScopes,
-				oidcGroupsClaim,
+		const { auth } = yield* AppConfigService;
+		const ctx: OidcContext = {
+			settings: {
+				issuer: auth.oidcIssuer,
+				clientId: auth.oidcClientId,
+				clientSecret: auth.oidcClientSecret,
+				scopes: auth.oidcScopes,
+				groupsClaim: auth.oidcGroupsClaim,
 			},
-		} = yield* AppConfigService;
+			configRef: yield* SynchronizedRef.make(
+				Option.none<client.Configuration>(),
+			),
+		};
 
-		const configRef = yield* SynchronizedRef.make(
-			Option.none<client.Configuration>(),
-		);
-
-		const discover: Effect.Effect<client.Configuration, OidcError> = Effect.gen(
-			function* () {
-				const issuer = yield* requireConfigValue(oidcIssuer, "OIDC_ISSUER");
-				const clientId = yield* requireConfigValue(
-					oidcClientId,
-					"OIDC_CLIENT_ID",
-				);
-				const server = yield* Effect.try({
-					try: () => new URL(issuer),
-					catch: (e) =>
-						new OidcError({
-							reason: "OIDC_ISSUER is not a valid URL",
-							cause: e,
-						}),
-				});
-				const secret = Option.getOrUndefined(
-					Option.map(oidcClientSecret, Redacted.value),
-				);
-				return yield* Effect.tryPromise({
-					try: () =>
-						secret === undefined
-							? client.discovery(server, clientId)
-							: client.discovery(server, clientId, secret),
-					catch: (e) =>
-						new OidcError({ reason: "provider discovery failed", cause: e }),
-				});
-			},
-		);
-
-		// Memoize the discovered Configuration; only successes are stored.
-		const getConfig: Effect.Effect<client.Configuration, OidcError> =
-			SynchronizedRef.modifyEffect(configRef, (current) =>
-				Option.match(current, {
-					onSome: (cfg) => Effect.succeed([cfg, Option.some(cfg)] as const),
-					onNone: () =>
-						discover.pipe(
-							Effect.map((cfg) => [cfg, Option.some(cfg)] as const),
-						),
-				}),
-			);
-
-		const beginLogin: OidcServiceShape["beginLogin"] = ({ redirectUri }) =>
-			Effect.gen(function* () {
-				const config = yield* getConfig;
-				const pkceVerifier = client.randomPKCECodeVerifier();
-				const codeChallenge = yield* Effect.tryPromise({
-					try: () => client.calculatePKCECodeChallenge(pkceVerifier),
-					catch: (e) =>
-						new OidcError({
-							reason: "failed to derive PKCE challenge",
-							cause: e,
-						}),
-				});
-				const state = client.randomState();
-				const nonce = client.randomNonce();
-				const url = yield* Effect.try({
-					try: () =>
-						client.buildAuthorizationUrl(config, {
-							redirect_uri: redirectUri,
-							scope: oidcScopes,
-							code_challenge: codeChallenge,
-							code_challenge_method: PKCE_METHOD,
-							state,
-							nonce,
-						}),
-					catch: (e) =>
-						new OidcError({
-							reason: "failed to build authorization URL",
-							cause: e,
-						}),
-				});
-				return {
-					authorizationUrl: url.href,
-					state,
-					nonce: Redacted.make(nonce),
-					pkceVerifier: Redacted.make(pkceVerifier),
-				} satisfies OidcLoginStart;
-			});
-
-		const completeLogin: OidcServiceShape["completeLogin"] = (input) =>
-			Effect.gen(function* () {
-				const config = yield* getConfig;
-				const tokens = yield* Effect.tryPromise({
-					try: () =>
-						client.authorizationCodeGrant(config, input.currentUrl, {
-							pkceCodeVerifier: Redacted.value(input.pkceVerifier),
-							expectedNonce: Redacted.value(input.nonce),
-							expectedState: input.state,
-							idTokenExpected: true,
-						}),
-					catch: (e) =>
-						new OidcError({
-							reason: "authorization code exchange failed",
-							cause: e,
-						}),
-				});
-				const claims = tokens.claims();
-				if (claims === undefined) {
-					return yield* Effect.fail(
-						new OidcError({ reason: "ID token missing from token response" }),
-					);
-				}
-
-				let email = stringClaim(claims.email);
-				let name = stringClaim(claims.name);
-				let emailVerified = claims.email_verified === true;
-				let groups = groupsClaim(claims, oidcGroupsClaim);
-
-				// Some providers (e.g. Authentik with "Include claims in id_token"
-				// off) surface email / name / groups only via the userinfo endpoint.
-				// Fetch it once to fill anything the ID token omitted; a userinfo
-				// failure is logged and ignored rather than blocking login.
-				const needGroups =
-					Option.isSome(oidcGroupsClaim) && Option.isNone(groups);
-				if (Option.isNone(email) || Option.isNone(name) || needGroups) {
-					const userInfo = yield* Effect.tryPromise({
-						try: () =>
-							client.fetchUserInfo(config, tokens.access_token, claims.sub),
-						catch: (e) =>
-							new OidcError({ reason: "userinfo fetch failed", cause: e }),
-					}).pipe(
-						Effect.catchTag("OidcError", (e) =>
-							Effect.as(
-								Effect.logWarning("auth.oidc: userinfo fetch failed", {
-									reason: e.reason,
-								}),
-								null,
-							),
-						),
-					);
-					if (userInfo !== null) {
-						if (Option.isNone(email)) {
-							email = stringClaim(userInfo.email);
-							emailVerified = emailVerified || userInfo.email_verified === true;
-						}
-						if (Option.isNone(name)) {
-							name = stringClaim(userInfo.name);
-						}
-						if (needGroups) {
-							groups = groupsClaim(userInfo, oidcGroupsClaim);
-						}
-					}
-				}
-
-				return {
-					issuer: claims.iss,
-					subject: claims.sub,
-					email,
-					emailVerified,
-					name,
-					groups,
-				} satisfies OidcClaims;
-			});
-
-		return { beginLogin, completeLogin };
+		return {
+			beginLogin: (input) => beginLogin(ctx, input.redirectUri),
+			completeLogin: (input) => completeLogin(ctx, input),
+		};
 	}),
 );
