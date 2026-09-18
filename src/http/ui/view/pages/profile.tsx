@@ -82,11 +82,11 @@ export const ProfilePage = ({
 				<Field for="email" label="Email">
 					<TextInput type="email" id="email" name="email" value={email} />
 				</Field>
-				{canEditSlug && (
+				{canEditSlug ? (
 					<Field for="slug" label="Username (slug)">
 						<TextInput id="slug" name="slug" value={slug} />
 					</Field>
-				)}
+				) : null}
 				<Button type="submit" variant="primary">
 					Save changes
 				</Button>
@@ -109,7 +109,7 @@ export const ProfilePage = ({
 			</div>
 		</Card>
 
-		{showPasswordForm && (
+		{showPasswordForm ? (
 			<Card title="Change password">
 				<form
 					method="POST"
@@ -132,7 +132,7 @@ export const ProfilePage = ({
 					</Button>
 				</form>
 			</Card>
-		)}
+		) : null}
 
 		<div class="grid gap-3 sm:grid-cols-2">
 			<ManageLink
@@ -149,7 +149,7 @@ export const ProfilePage = ({
 			/>
 		</div>
 
-		{authSettingsUrl && (
+		{authSettingsUrl ? (
 			<Card title="Account settings">
 				<p class="mb-4 text-muted text-sm">
 					Password, recovery email, and MFA are managed by your identity
@@ -164,14 +164,14 @@ export const ProfilePage = ({
 					{authSettingsLabel}
 				</LinkButton>
 			</Card>
-		)}
+		) : null}
 
-		{showSignOut && (
+		{showSignOut ? (
 			<Card title="Session">
 				<form method="POST" action="/ui/auth/logout">
 					<Button type="submit">Sign out</Button>
 				</form>
 			</Card>
-		)}
+		) : null}
 	</div>
 );

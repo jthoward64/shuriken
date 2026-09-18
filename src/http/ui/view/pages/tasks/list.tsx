@@ -161,7 +161,9 @@ const taskColumns = (
 		cell: (t) => (
 			<span class={t.completed ? "text-muted line-through" : undefined}>
 				{t.title}
-				{t.recurring && <span class="ml-1 text-subtle text-xs">(repeats)</span>}
+				{t.recurring ? (
+					<span class="ml-1 text-subtle text-xs">(repeats)</span>
+				) : null}
 			</span>
 		),
 	},

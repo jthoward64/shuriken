@@ -40,7 +40,8 @@
 				"noAstroSetHtmlDirective": "off",
 				"noBaseToString": "error",
 				"noBunModules": "error",
-				"noComponentHookFactories": "error",
+				// reads the PascalCase keys of an Effect.catchTags handler map as components
+				"noComponentHookFactories": "off",
 				// every hit is a TypeScript narrowing guard whose discriminant the line above already asserted
 				"noConditionalExpect": "off",
 				"noDrizzleDeleteWithoutWhere": "error",

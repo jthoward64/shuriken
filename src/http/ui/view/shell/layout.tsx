@@ -123,18 +123,18 @@ export const Layout = ({
 								<a href="/ui/calendar" class="app-brand mr-2">
 									Shuriken
 								</a>
-								{nav && (
+								{nav ? (
 									<nav
 										aria-label="Primary"
 										class="hidden items-center gap-1 md:flex"
 									>
 										<Nav nav={nav} />
 									</nav>
-								)}
+								) : null}
 							</div>
 							<div class="flex items-center gap-1">
 								<ThemeToggle />
-								{nav?.displayName && (
+								{nav?.displayName ? (
 									<a
 										href="/ui/profile"
 										class={cx(
@@ -144,22 +144,22 @@ export const Layout = ({
 									>
 										{nav.displayName}
 									</a>
-								)}
-								{nav?.showLogout && (
+								) : null}
+								{nav?.showLogout ? (
 									<a href="/ui/logout" class="nav-link">
 										Sign out
 									</a>
-								)}
+								) : null}
 							</div>
 						</div>
-						{nav && (
+						{nav ? (
 							<nav
 								aria-label="Primary"
 								class="flex flex-wrap items-center gap-1 pb-2 md:hidden"
 							>
 								<Nav nav={nav} />
 							</nav>
-						)}
+						) : null}
 					</div>
 				</header>
 			)}

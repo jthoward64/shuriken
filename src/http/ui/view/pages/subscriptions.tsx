@@ -50,9 +50,9 @@ const SyncStatus = ({ sub }: { sub: SubscriptionRow }) => {
 				{sub.lastSyncStatus}
 			</Badge>
 			<span class="ml-2 text-subtle text-xs">{sub.lastSyncAt}</span>
-			{sub.lastSyncError && (
+			{sub.lastSyncError ? (
 				<div class="mt-1 text-danger text-xs">{sub.lastSyncError}</div>
-			)}
+			) : null}
 		</div>
 	);
 };

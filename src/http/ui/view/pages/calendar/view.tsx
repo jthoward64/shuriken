@@ -265,7 +265,7 @@ const CalendarList = ({
 								{c.ownerSlug}
 							</Badge>
 						)}
-						{mutable && (
+						{mutable ? (
 							<>
 								<a
 									href={`/ui/collections/${c.id}`}
@@ -305,7 +305,7 @@ const CalendarList = ({
 									<IconChevronDown class="size-3.5" />
 								</button>
 							</>
-						)}
+						) : null}
 					</li>
 				);
 			})}
@@ -547,7 +547,9 @@ const EventList = ({
 								</span>
 								<span class="block text-muted text-sm">{ev.when}</span>
 							</span>
-							{ev.recurrence && <Badge class="shrink-0">{ev.recurrence}</Badge>}
+							{ev.recurrence ? (
+								<Badge class="shrink-0">{ev.recurrence}</Badge>
+							) : null}
 						</a>
 					</li>
 				);
@@ -681,9 +683,9 @@ export const CalendarViewPage = (props: CalendarViewProps) => {
 			    (no nested forms). New is a static blank form for the active
 			    calendar; Edit is filled on demand by an HTMX fragment. Skipped
 			    when there's no writable active calendar to target. */}
-				{hasActiveCalendar && activeWritable && (
-					<NewEventPopover collectionId={activeId} />
-				)}
+				{hasActiveCalendar
+					? activeWritable && <NewEventPopover collectionId={activeId} />
+					: null}
 				<EditEventPopoverContainer />
 				<EventHoverCardContainer />
 			</SidebarShell>

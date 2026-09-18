@@ -12,9 +12,9 @@ export const PageHeader = ({
 	<div class="page-header">
 		<div>
 			<h1 class="page-title">{title}</h1>
-			{subtitle && <p class="page-subtitle">{subtitle}</p>}
+			{subtitle ? <p class="page-subtitle">{subtitle}</p> : null}
 		</div>
-		{actions && <div class="page-actions">{actions}</div>}
+		{actions ? <div class="page-actions">{actions}</div> : null}
 	</div>
 );
 

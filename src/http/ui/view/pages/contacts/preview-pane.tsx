@@ -92,7 +92,7 @@ const TypedValueList = ({
 							<span class="ml-2 text-subtle text-xs">{labels}</span>
 						)}
 					</div>
-					{v.preferred && <PreferredBadge />}
+					{v.preferred ? <PreferredBadge /> : null}
 				</li>
 			);
 		})}
@@ -124,7 +124,7 @@ const AddressList = ({
 						))}
 						{labels !== "" && <div class="text-subtle text-xs">{labels}</div>}
 					</address>
-					{a.preferred && <PreferredBadge />}
+					{a.preferred ? <PreferredBadge /> : null}
 				</li>
 			);
 		})}

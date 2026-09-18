@@ -140,11 +140,11 @@ export const RelationList = ({
 						<span class="ml-2 text-subtle text-xs">{r.relation.relation}</span>
 					)}
 				</div>
-				{r.relation.preferred && (
+				{r.relation.preferred ? (
 					<Badge tone="brand" class="shrink-0">
 						Preferred
 					</Badge>
-				)}
+				) : null}
 			</li>
 		))}
 	</ul>

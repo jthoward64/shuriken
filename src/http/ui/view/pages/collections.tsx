@@ -279,7 +279,7 @@ export const CollectionEditPage = (props: CollectionEditPageProps): VNode => {
 							value={props.description}
 						/>
 					</Field>
-					{props.isCalendar && (
+					{props.isCalendar ? (
 						<>
 							<Field for="timezoneTzid" label="Timezone">
 								<TextInput
@@ -305,7 +305,7 @@ export const CollectionEditPage = (props: CollectionEditPageProps): VNode => {
 								</div>
 							</Field>
 						</>
-					)}
+					) : null}
 					<p class="text-muted text-sm">
 						<span class="font-medium text-fg">Slug:</span>{" "}
 						<span class="font-mono">{props.slug}</span>
@@ -328,24 +328,29 @@ export const CollectionEditPage = (props: CollectionEditPageProps): VNode => {
 						)}
 					</div>
 				</form>
-				{popover && (regenerateBirthdaysButton || deleteButton) && (
-					<div class="mt-4 flex items-center gap-3 border-line border-t pt-4">
-						{regenerateBirthdaysButton}
-						{deleteButton}
-					</div>
-				)}
+				{popover
+					? (regenerateBirthdaysButton || deleteButton) && (
+							<div class="mt-4 flex items-center gap-3 border-line border-t pt-4">
+								{regenerateBirthdaysButton}
+								{deleteButton}
+							</div>
+						)
+					: null}
 			</Card>
 
-			{popover && props.isCalendar && props.feeds && (
-				<Card title="Feeds">
-					<CalendarFeedsSection
-						calendarId={props.id}
-						memberFeeds={props.feeds.member}
-						addableFeeds={props.feeds.addable}
-						addUrl={`${base}/feeds/add`}
-					/>
-				</Card>
-			)}
+			{popover
+				? props.isCalendar &&
+					props.feeds && (
+						<Card title="Feeds">
+							<CalendarFeedsSection
+								calendarId={props.id}
+								memberFeeds={props.feeds.member}
+								addableFeeds={props.feeds.addable}
+								addUrl={`${base}/feeds/add`}
+							/>
+						</Card>
+					)
+				: null}
 
 			<SharePanel data={props.sharePanel} />
 		</div>

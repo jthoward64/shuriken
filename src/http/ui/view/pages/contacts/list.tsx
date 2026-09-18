@@ -383,7 +383,7 @@ const ContactTools = ({
 		</LinkButton>
 		{/* Merge/cleanup write to the address book, so gate them (like the New
 		    contact / Import actions) on the caller's actual privileges. */}
-		{writable && (
+		{writable ? (
 			<>
 				{/* Lazy dialogs: with JS, htmx loads the fragment into the popover body
 				    and contacts.js opens it (data-popover). Without JS, opens in a new
@@ -413,7 +413,7 @@ const ContactTools = ({
 					Clean up
 				</a>
 			</>
-		)}
+		) : null}
 	</div>
 );
 
@@ -437,7 +437,7 @@ const BulkToolbar = ({ writable }: { writable: boolean }): VNode => (
 		>
 			Download .vcf
 		</Button>
-		{writable && (
+		{writable ? (
 			<>
 				<Button
 					type="submit"
@@ -469,7 +469,7 @@ const BulkToolbar = ({ writable }: { writable: boolean }): VNode => (
 					Delete
 				</Button>
 			</>
-		)}
+		) : null}
 		{/* Native reset clears every checkbox in the form — no JS needed; the
 		    :has() rule then hides the bar (and contacts.js resets the count). */}
 		<Button type="reset" variant="ghost" size="sm" class="ml-auto">
@@ -668,7 +668,7 @@ export const ContactsListPage = ({
 					</>
 				}
 			>
-				{notice && <ImportNoticeBanner notice={notice} />}
+				{notice ? <ImportNoticeBanner notice={notice} /> : null}
 				<div id="import-result" class="empty:hidden lg:shrink-0" />
 
 				{/* Integrated search header: the drawer toggle (mobile) sits inline

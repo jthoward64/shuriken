@@ -128,7 +128,7 @@ export const UserNewPage = ({ showPasswordForm }: UserNewPageProps): VNode => (
 				<Field for="email" label="Email" required>
 					<TextInput type="email" id="email" name="email" required />
 				</Field>
-				{showPasswordForm && (
+				{showPasswordForm ? (
 					<Field for="password" label="Password" required>
 						<TextInput
 							type="password"
@@ -137,7 +137,7 @@ export const UserNewPage = ({ showPasswordForm }: UserNewPageProps): VNode => (
 							autocomplete="new-password"
 						/>
 					</Field>
-				)}
+				) : null}
 				<div class="flex gap-3 pt-2">
 					<Button type="submit" variant="primary">
 						Create user
@@ -264,11 +264,11 @@ export const UserEditPage = (props: UserEditPageProps): VNode => {
 							value={props.email}
 						/>
 					</Field>
-					{props.canEditSlug && (
+					{props.canEditSlug ? (
 						<Field for="slug" label="Username (slug)">
 							<TextInput id="slug" name="slug" value={props.slug} />
 						</Field>
-					)}
+					) : null}
 					{props.canEditRole ? (
 						<Field
 							for="role"
@@ -310,7 +310,7 @@ export const UserEditPage = (props: UserEditPageProps): VNode => {
 				</div>
 			</Card>
 
-			{props.showPasswordForm && (
+			{props.showPasswordForm ? (
 				<Card title="Change password">
 					<form
 						method="POST"
@@ -333,7 +333,7 @@ export const UserEditPage = (props: UserEditPageProps): VNode => {
 						</Button>
 					</form>
 				</Card>
-			)}
+			) : null}
 
 			<Card
 				title="Collections"
@@ -371,9 +371,9 @@ export const UserEditPage = (props: UserEditPageProps): VNode => {
 								>
 									<p class="mb-2 flex items-center gap-2 font-medium text-fg text-sm">
 										{g.label}
-										{g.autoAssignedBy && (
+										{g.autoAssignedBy ? (
 											<Badge>Auto-assigned ({g.autoAssignedBy})</Badge>
-										)}
+										) : null}
 									</p>
 									<form
 										method="POST"
@@ -406,12 +406,12 @@ export const UserEditPage = (props: UserEditPageProps): VNode => {
 										}
 									/>
 									{g.label}
-									{g.isMember && (
+									{g.isMember ? (
 										<span class="text-muted text-xs">(member)</span>
-									)}
-									{g.autoAssignedBy && (
+									) : null}
+									{g.autoAssignedBy ? (
 										<Badge>Auto-assigned ({g.autoAssignedBy})</Badge>
-									)}
+									) : null}
 								</div>
 							),
 						)}

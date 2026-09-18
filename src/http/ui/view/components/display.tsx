@@ -147,12 +147,12 @@ export const Card = ({
 	...rest
 }: CardProps) => (
 	<div {...rest} class={cx("card", cls)}>
-		{title && (
+		{title ? (
 			<div class="card-header">
 				<h2 class="card-title">{title}</h2>
 				{actions}
 			</div>
-		)}
+		) : null}
 		<div class={pad ? "card-pad" : undefined}>{children}</div>
 	</div>
 );

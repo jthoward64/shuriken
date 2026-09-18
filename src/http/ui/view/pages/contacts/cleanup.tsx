@@ -126,7 +126,7 @@ export const CleanupSuggestion = ({
 				<input type="hidden" name="region" value={s.region} />
 				<input type="hidden" name="contactFn" value={s.contactFn} />
 
-				{s.needsAreaCode && (
+				{s.needsAreaCode ? (
 					<TextInput
 						name="areaCode"
 						inputmode="numeric"
@@ -134,9 +134,9 @@ export const CleanupSuggestion = ({
 						aria-label="Area code"
 						class="w-24"
 					/>
-				)}
+				) : null}
 
-				{s.needsLabel && (
+				{s.needsLabel ? (
 					<Select
 						name="newType"
 						aria-label="Label"
@@ -146,7 +146,7 @@ export const CleanupSuggestion = ({
 							{ value: "", label: "(remove label)" },
 						]}
 					/>
-				)}
+				) : null}
 
 				<Button type="submit" variant="primary" size="sm">
 					Fix

@@ -56,56 +56,56 @@ export const Nav = ({ nav }: { nav: NavContext }) => {
 	const { currentPath, activeSection } = nav;
 	return (
 		<>
-			{nav.showCalendar && (
+			{nav.showCalendar ? (
 				<a
 					href="/ui/calendar"
 					class={cx("nav-link", activeSection === "calendar" && "is-active")}
 				>
 					Calendar
 				</a>
-			)}
+			) : null}
 
-			{nav.showTasks && (
+			{nav.showTasks ? (
 				<a
 					href="/ui/tasks"
 					class={cx("nav-link", activeSection === "tasks" && "is-active")}
 				>
 					Tasks
 				</a>
-			)}
+			) : null}
 
-			{nav.showContacts && (
+			{nav.showContacts ? (
 				<a
 					href="/ui/contacts"
 					class={cx("nav-link", activeSection === "contacts" && "is-active")}
 				>
 					Contacts
 				</a>
-			)}
+			) : null}
 
-			{nav.showTrash && (
+			{nav.showTrash ? (
 				<a
 					href="/ui/trash"
 					class={cx("nav-link", activeSection === "trash" && "is-active")}
 				>
 					Trash
 				</a>
-			)}
+			) : null}
 
-			{nav.showAdmin && (
+			{nav.showAdmin ? (
 				<Menu label="Admin" active={activeSection === "admin"}>
-					{nav.showUsers && (
+					{nav.showUsers ? (
 						<MenuItem href="/ui/users" current={currentPath === "/ui/users"}>
 							Users
 						</MenuItem>
-					)}
-					{nav.showGroups && (
+					) : null}
+					{nav.showGroups ? (
 						<MenuItem href="/ui/groups" current={currentPath === "/ui/groups"}>
 							Groups
 						</MenuItem>
-					)}
+					) : null}
 				</Menu>
-			)}
+			) : null}
 		</>
 	);
 };

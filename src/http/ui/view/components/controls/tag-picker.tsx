@@ -106,7 +106,7 @@ export const TagPicker = ({
 						]}
 					/>
 
-					{allowCustom && (
+					{allowCustom ? (
 						<>
 							<label for={customId} class="sr-only">
 								New tag
@@ -123,7 +123,7 @@ export const TagPicker = ({
 								data-tag-custom
 							/>
 						</>
-					)}
+					) : null}
 				</div>
 			</div>
 		</div>

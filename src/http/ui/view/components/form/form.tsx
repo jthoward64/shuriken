@@ -41,11 +41,11 @@ export const Field = ({
 		<div class={cx("form-group", cls)}>
 			<label for={htmlFor} class="form-label">
 				{label}
-				{required && (
+				{required ? (
 					<span class="ml-0.5 text-danger" aria-hidden="true">
 						*
 					</span>
-				)}
+				) : null}
 			</label>
 			{children}
 			{message !== undefined && (

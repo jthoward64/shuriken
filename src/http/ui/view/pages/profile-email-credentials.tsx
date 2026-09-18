@@ -83,12 +83,12 @@ export const EmailCredentialsPage = ({
 				<Badge tone={STATUS_TONE[activeKind]}>{activeKind}</Badge>
 				<span class="text-muted text-sm">{STATUS_TEXT[activeKind]}</span>
 			</div>
-			{activeFromAddress && (
+			{activeFromAddress ? (
 				<p class="mt-3 text-sm">
 					<span class="font-medium text-fg">Outgoing From:</span>{" "}
 					<span class="font-mono text-muted">{activeFromAddress}</span>
 				</p>
-			)}
+			) : null}
 			{!mailEnabled && (
 				<p class="mt-3 text-muted text-sm">
 					Set <code class="font-mono">MAIL_ENABLED=true</code> in the server
@@ -191,7 +191,7 @@ export const EmailCredentialsPage = ({
 			</form>
 		</Card>
 
-		{existing && (
+		{existing ? (
 			<Card title="Remove credentials">
 				<p class="mb-4 text-muted text-sm">
 					Fall back to the server profile or default relay.
@@ -206,6 +206,6 @@ export const EmailCredentialsPage = ({
 					</Button>
 				</form>
 			</Card>
-		)}
+		) : null}
 	</div>
 );

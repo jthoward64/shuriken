@@ -62,6 +62,6 @@ export const CopyField = ({ label, value, hint }: CopyFieldProps): VNode => (
 			</code>
 			<CopyButton value={value} label={label} />
 		</div>
-		{hint && <p class="form-hint">{hint}</p>}
+		{hint ? <p class="form-hint">{hint}</p> : null}
 	</div>
 );

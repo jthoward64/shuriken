@@ -55,7 +55,7 @@ export const AppPasswordsPage = ({
 			</p>
 		</Card>
 
-		{generated && (
+		{generated ? (
 			<Alert tone="success" title="New app password created">
 				<p class="mb-4 text-muted">
 					Copy these now — the password is shown only once and cannot be
@@ -66,7 +66,7 @@ export const AppPasswordsPage = ({
 					<CopyField label="Password" value={generated.password} />
 				</div>
 			</Alert>
-		)}
+		) : null}
 
 		<Card title="Create an app password">
 			<form

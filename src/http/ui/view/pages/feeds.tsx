@@ -89,9 +89,9 @@ const FEED_COLUMNS: ReadonlyArray<Column<FeedListRow>> = [
 				<Badge tone={f.enabled ? "success" : "neutral"}>
 					{f.enabled ? "enabled" : "disabled"}
 				</Badge>
-				{f.expiresAt && (
+				{f.expiresAt ? (
 					<span class="ml-2 text-subtle text-xs">expires {f.expiresAt}</span>
-				)}
+				) : null}
 			</>
 		),
 	},

@@ -245,7 +245,7 @@ export const GroupEditPage = (props: GroupEditPageProps): VNode => {
 				</form>
 			</Card>
 
-			{props.oidcSyncEnabled && (
+			{props.oidcSyncEnabled ? (
 				<Card title="OIDC auto-assign">
 					<form
 						method="POST"
@@ -272,7 +272,7 @@ export const GroupEditPage = (props: GroupEditPageProps): VNode => {
 						</Button>
 					</form>
 				</Card>
-			)}
+			) : null}
 
 			<Card
 				title="Collections"
@@ -364,9 +364,9 @@ export const GroupEditPage = (props: GroupEditPageProps): VNode => {
 								>
 									<span class="flex items-center gap-2 text-fg">
 										{m.label}
-										{m.autoAssignedBy && (
+										{m.autoAssignedBy ? (
 											<Badge>Auto-assigned ({m.autoAssignedBy})</Badge>
-										)}
+										) : null}
 									</span>
 									<span class="font-mono text-muted text-xs">{m.slug}</span>
 								</li>
