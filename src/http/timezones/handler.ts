@@ -21,6 +21,8 @@ import {
 } from "#src/services/timezone/index.ts";
 import { HTTP_BAD_REQUEST, HTTP_NOT_FOUND } from "../status.ts";
 
+const LAST_MODIFIED_LINE = /^LAST-MODIFIED:(\S+)/mu;
+
 // ---------------------------------------------------------------------------
 // Response helpers
 // ---------------------------------------------------------------------------
@@ -64,7 +66,7 @@ const handleCapabilities = (origin: string): Effect.Effect<Response, never> =>
  * Returns null if not present.
  */
 const extractLastModified = (vtimezone: string): string | null => {
-	const match = /^LAST-MODIFIED:(\S+)/mu.exec(vtimezone);
+	const match = LAST_MODIFIED_LINE.exec(vtimezone);
 	return match?.[1] ?? null;
 };
 

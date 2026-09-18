@@ -15,6 +15,8 @@ import { AclService } from "#src/services/acl/index.ts";
 import { GroupService } from "#src/services/group/index.ts";
 import { UserService } from "#src/services/user/index.ts";
 
+const USER_HREF = /\/dav\/users\/([^/]+)\/?$/u;
+
 // ---------------------------------------------------------------------------
 // Body parsing
 // ---------------------------------------------------------------------------
@@ -106,7 +108,7 @@ const parseBody = (req: Request): Effect.Effect<ProppatchUpdates, DavError> =>
 
 /** Extracts the user slug from a /dav/users/:slug/ href, returning null if unrecognised. */
 const slugFromUserHref = (href: string): string | null => {
-	const match = /\/dav\/users\/([^/]+)\/?$/u.exec(href);
+	const match = USER_HREF.exec(href);
 	return match?.[1] ?? null;
 };
 

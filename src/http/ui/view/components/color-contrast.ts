@@ -1,3 +1,4 @@
+const HEX_RGB = /^#?([0-9a-fA-F]{6})$/u;
 // Picks a readable text colour (`#000000` or `#ffffff`) for a `#RRGGBB`
 // background colour, via WCAG relative luminance. Calendar colours are
 // user-chosen and arbitrary, so FullCalendar's event pills need a computed
@@ -28,7 +29,7 @@ const linearizeChannel = (value: number, shift: number): number => {
 };
 
 export function contrastTextColor(hexColor: string): "#000000" | "#ffffff" {
-	const match = /^#?([0-9a-fA-F]{6})$/u.exec(hexColor.trim());
+	const match = HEX_RGB.exec(hexColor.trim());
 	const hex = match?.[1];
 	if (hex === undefined) {
 		return "#000000";

@@ -16,6 +16,9 @@ import {
 	restoreEmbeddedAgent,
 } from "./related.ts";
 
+const TEL_SCHEME = /^tel:/iu;
+const URN_UUID_SCHEME = /^urn:uuid:/iu;
+
 // ---------------------------------------------------------------------------
 // vCard 4.0 → 3.0 downgrade (RFC 2426), applied only when a client negotiates
 // version 3.0. The inverse of `upgrade-v4.ts` plus Apple X- mappings for the
@@ -79,7 +82,7 @@ const downgradeUid = (prop: IrProperty): IrProperty => {
 		...prop,
 		value: {
 			type: "TEXT",
-			value: rawStr(prop.value).replace(/^urn:uuid:/iu, ""),
+			value: rawStr(prop.value).replace(URN_UUID_SCHEME, ""),
 		},
 	};
 };
@@ -117,7 +120,7 @@ const stripValueParam = (prop: IrProperty): IrProperty => {
 		return {
 			...prop,
 			parameters: withoutValue,
-			value: { type: "TEXT", value: raw.replace(/^tel:/iu, "") },
+			value: { type: "TEXT", value: raw.replace(TEL_SCHEME, "") },
 		};
 	}
 	if (isProp(prop, "TZ") && token === "utc-offset") {

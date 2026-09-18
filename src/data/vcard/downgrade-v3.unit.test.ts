@@ -5,6 +5,8 @@ import { decodeVCard, encodeVCard } from "./codec.ts";
 import { downgradeToV3 } from "./downgrade-v3.ts";
 import { upgradeToV4 } from "./upgrade-v4.ts";
 
+const LINE_BREAK = /\r?\n/u;
+
 const vcard = (...lines: Array<string>) => `${lines.join("\r\n")}\r\n`;
 
 // decode → downgrade → encode, returning the emitted lines (blank-trimmed)
@@ -16,7 +18,7 @@ const down = (text: string): Promise<Array<string>> =>
 		),
 	).then((out) =>
 		out
-			.split(/\r?\n/u)
+			.split(LINE_BREAK)
 			.map((l) => l.trim())
 			.filter((l) => l !== ""),
 	);
@@ -222,7 +224,7 @@ describe("downgradeToV3", () => {
 			),
 		);
 		const lines = out
-			.split(/\r?\n/u)
+			.split(LINE_BREAK)
 			.map((l) => l.trim())
 			.filter((l) => l !== "");
 		expect(lines[1]).toBe("VERSION:3.0");

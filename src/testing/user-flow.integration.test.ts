@@ -15,6 +15,8 @@ import {
 import { runScript } from "#src/testing/script-runner/runner.ts";
 import type { ScriptStepResult } from "#src/testing/script-runner/types.ts";
 
+const EVENT_UID = /UID:[^@]+@example/u;
+
 // ---------------------------------------------------------------------------
 // User-flow integration tests
 //
@@ -335,13 +337,13 @@ describe("User flow: sync-collection (RFC 6578)", () => {
 			[
 				put(
 					"/dav/principals/alice/cal/primary/a.ics",
-					SIMPLE_EVENT.replace(/UID:[^@]+@example/u, "UID:a@example"),
+					SIMPLE_EVENT.replace(EVENT_UID, "UID:a@example"),
 					"text/calendar",
 					{ as: "alice", expect: { status: 201 } },
 				),
 				put(
 					"/dav/principals/alice/cal/primary/b.ics",
-					SECOND_EVENT.replace(/UID:[^@]+@example/u, "UID:b@example"),
+					SECOND_EVENT.replace(EVENT_UID, "UID:b@example"),
 					"text/calendar",
 					{ as: "alice", expect: { status: 201 } },
 				),
@@ -367,7 +369,7 @@ describe("User flow: sync-collection (RFC 6578)", () => {
 				// covered by separate unit tests).
 				put(
 					"/dav/principals/alice/cal/primary/c.ics",
-					SECOND_EVENT.replace(/UID:[^@]+@example/u, "UID:c@example").replace(
+					SECOND_EVENT.replace(EVENT_UID, "UID:c@example").replace(
 						/standup/gu,
 						"third",
 					),
@@ -486,13 +488,13 @@ describe("User flow: calendar-multiget", () => {
 			[
 				put(
 					"/dav/principals/alice/cal/primary/m1.ics",
-					SIMPLE_EVENT.replace(/UID:[^@]+@example/u, "UID:m1@example"),
+					SIMPLE_EVENT.replace(EVENT_UID, "UID:m1@example"),
 					"text/calendar",
 					{ as: "alice", expect: { status: 201 } },
 				),
 				put(
 					"/dav/principals/alice/cal/primary/m2.ics",
-					SECOND_EVENT.replace(/UID:[^@]+@example/u, "UID:m2@example"),
+					SECOND_EVENT.replace(EVENT_UID, "UID:m2@example"),
 					"text/calendar",
 					{ as: "alice", expect: { status: 201 } },
 				),

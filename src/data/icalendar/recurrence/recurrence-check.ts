@@ -16,6 +16,9 @@ import { Temporal } from "temporal-polyfill";
 import type { IrComponent, IrValue } from "#src/data/ir.ts";
 import type { ResolutionZone } from "../resolve-floating.ts";
 
+const BOUNDED_RRULE = /(?:^|;)(?:COUNT|UNTIL)=/u;
+const RRULE_FREQ = /(?:^|;)FREQ=([A-Z]+)/u;
+
 // ---------------------------------------------------------------------------
 // Helpers: convert temporal-polyfill values → @js-temporal/polyfill via strings
 // ---------------------------------------------------------------------------
@@ -133,12 +136,12 @@ export const normalizeRruleUntil = (
  * up front rather than silently truncating query results against them later.
  */
 export const isUnboundedHighFrequencyRrule = (rruleValue: string): boolean => {
-	const freqMatch = /(?:^|;)FREQ=([A-Z]+)/u.exec(rruleValue);
+	const freqMatch = RRULE_FREQ.exec(rruleValue);
 	const freq = freqMatch?.[1];
 	if (freq !== "SECONDLY" && freq !== "MINUTELY") {
 		return false;
 	}
-	return !/(?:^|;)(?:COUNT|UNTIL)=/u.test(rruleValue);
+	return !BOUNDED_RRULE.test(rruleValue);
 };
 
 export interface RruleExpansionLimits {

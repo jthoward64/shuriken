@@ -21,6 +21,8 @@ import { InstanceService } from "#src/services/instance/index.ts";
 import type { IanaTimezoneService } from "#src/services/timezone/iana.ts";
 import type { UserService } from "#src/services/user/index.ts";
 
+const LIST_SEPARATOR = /[\n,]/u;
+
 // ---------------------------------------------------------------------------
 // Shared form parser for both create and update — event payload is small
 // enough to inline here rather than a separate helper module.
@@ -49,7 +51,7 @@ const parseEventForm = (form: FormLike): EventFormData => ({
 	recurrenceCount: single(form, "recurrenceCount"),
 	recurrenceUntil: single(form, "recurrenceUntil"),
 	attendees: single(form, "attendeesCsv")
-		.split(/[\n,]/u)
+		.split(LIST_SEPARATOR)
 		.map((s) => s.trim())
 		.filter((s) => s !== ""),
 	organizer: single(form, "organizer"),

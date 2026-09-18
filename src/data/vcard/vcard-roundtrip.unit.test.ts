@@ -7,6 +7,8 @@ import { downgradeToV3 } from "./downgrade-v3.ts";
 import { baseName } from "./prop.ts";
 import { upgradeToV4 } from "./upgrade-v4.ts";
 
+const LINE_BREAK = /\r?\n/u;
+
 // ---------------------------------------------------------------------------
 // Adversarial + property-based round-trip safety for the vCard version
 // transforms. The goal is confidence that ingest (upgradeToV4) never loses or
@@ -28,7 +30,7 @@ const down = async (t: string): Promise<string> =>
 
 const toLines = (s: string): Array<string> =>
 	s
-		.split(/\r?\n/u)
+		.split(LINE_BREAK)
 		.map((l) => l.trim())
 		.filter((l) => l !== "");
 

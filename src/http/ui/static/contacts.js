@@ -21,6 +21,8 @@
 // NOTE: contacts-local convention. There is no shared progress/guard helper in
 // the design system (static/ui.js) yet — promote this if another area needs it.
 
+const NUMERIC_SUFFIX = /-\d+$/u;
+
 (() => {
 	const autoHideMs = 2500;
 
@@ -351,7 +353,7 @@
 			if (!(el && old)) {
 				continue;
 			}
-			const next = `${old.replace(/-\d+$/u, "")}-${suffix}`;
+			const next = `${old.replace(NUMERIC_SUFFIX, "")}-${suffix}`;
 			const dl = row.querySelector(`datalist[id="${old}"]`);
 			el.setAttribute(attr, next);
 			dl?.setAttribute("id", next);

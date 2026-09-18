@@ -9,6 +9,10 @@ import {
 import { runScript } from "#src/testing/script-runner/runner.ts";
 import type { ScriptStepResult } from "#src/testing/script-runner/types.ts";
 
+const ICS_HREF = /<[A-Za-z]*:?href>([^<]*\.ics)<\/[A-Za-z]*:?href>/u;
+const LINE_BREAK = /\r?\n/u;
+const PARTSTAT_PARAM = /PARTSTAT=[A-Z-]+/u;
+
 // ---------------------------------------------------------------------------
 // Schedule-Tag stability across an attendee PARTSTAT-only update — RFC 6638
 // §3.2.10 (Organizer rule 1 / Attendee rule 2) and §8.2.
@@ -62,9 +66,7 @@ const PROPFIND_SCHEDULE_TAG = [
  * wants a path). Percent-encoding (e.g. `%40` for `@`) is preserved.
  */
 const firstIcsHref = (body: string): string | undefined => {
-	const href = body.match(
-		/<[A-Za-z]*:?href>([^<]*\.ics)<\/[A-Za-z]*:?href>/u,
-	)?.[1];
+	const href = body.match(ICS_HREF)?.[1];
 	if (href === undefined) {
 		return undefined;
 	}
@@ -74,10 +76,10 @@ const firstIcsHref = (body: string): string | undefined => {
 /** Flip bob's ATTENDEE PARTSTAT to ACCEPTED, leaving everything else intact. */
 const acceptAsBob = (body: string): string =>
 	body
-		.split(/\r?\n/u)
+		.split(LINE_BREAK)
 		.map((line) =>
 			line.includes("bob@example.com") && line.includes("PARTSTAT=")
-				? line.replace(/PARTSTAT=[A-Z-]+/u, "PARTSTAT=ACCEPTED")
+				? line.replace(PARTSTAT_PARAM, "PARTSTAT=ACCEPTED")
 				: line,
 		)
 		.join("\r\n");
@@ -208,7 +210,7 @@ describe("Schedule-Tag stability on attendee PARTSTAT update (RFC 6638 §3.2.10)
 		// Unfold iCalendar continuation lines (RFC 5545 §3.1) before matching.
 		const bobLine = organizerCopy
 			.replace(/\r?\n[ \t]/gu, "")
-			.split(/\r?\n/u)
+			.split(LINE_BREAK)
 			.find((l) => l.includes("bob@example.com"));
 		expect(bobLine, "organizer copy should still list bob").toBeTruthy();
 		expect(bobLine).toContain("PARTSTAT=ACCEPTED");
@@ -286,7 +288,7 @@ describe("Schedule-Tag stability on attendee PARTSTAT update (RFC 6638 §3.2.10)
 
 		// The update must have landed (bob's copy now reflects ACCEPTED)...
 		const bobLine = copyAfter
-			.split(/\r?\n/u)
+			.split(LINE_BREAK)
 			.find((l) => l.includes("bob@example.com"));
 		expect(bobLine).toContain("PARTSTAT=ACCEPTED");
 		// ...but a PARTSTAT-only update must NOT change the Schedule-Tag.

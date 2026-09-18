@@ -1,4 +1,6 @@
 /** biome-ignore-all lint/style/noMagicNumbers: SMTP/LMTP reply codes are protocol-defined */
+
+const ANGLE_BRACKETED = /<([^>]*)>/u;
 // ---------------------------------------------------------------------------
 // LMTP protocol state machine (RFC 2033). Pure — no I/O. The Deno listener
 // glue in `lmtp-server.ts` feeds bytes in, gets back command results +
@@ -64,7 +66,7 @@ export interface LmtpReply {
 const ok = (code: number, text: string): LmtpReply => ({ code, text });
 
 const stripAddress = (raw: string): string | null => {
-	const m = /<([^>]*)>/u.exec(raw);
+	const m = ANGLE_BRACKETED.exec(raw);
 	return m && m[1] !== undefined ? m[1].trim() : null;
 };
 

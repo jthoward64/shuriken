@@ -16,6 +16,8 @@
 
 import type { ClarkName } from "#src/data/ir.ts";
 
+const clarkRe = /^\{([^}]+)\}(.+)$/u;
+
 // Well-known namespace URI → canonical prefix mapping.
 // Order matters: first entry wins if a future conflict arises.
 const WELL_KNOWN: ReadonlyArray<readonly [uri: string, prefix: string]> = [
@@ -81,8 +83,6 @@ export const makeNsRegistry = (): NsRegistry => {
 		prefixToUri.set(prefix, uri);
 		return prefix;
 	};
-
-	const clarkRe = /^\{([^}]+)\}(.+)$/u;
 
 	return {
 		toXmlKey(clark: ClarkKey): string {

@@ -3,6 +3,8 @@ import { DatabaseError } from "#src/domain/errors.ts";
 import { DatabaseClient, type DbClient } from "./client.ts";
 import { getActiveDb } from "./transaction.ts";
 
+const WHITESPACE = /\s+/u;
+
 // ---------------------------------------------------------------------------
 // DrizzleBuilder — structural interface satisfied by every drizzle effect query
 // builder (select, insert, update, delete). With drizzle's native Effect
@@ -36,7 +38,7 @@ export const runDbQuery = <A>(
 		const activeDb = yield* getActiveDb(db);
 		const builder = f(activeDb);
 		const { sql, params } = builder.toSQL();
-		const op = sql.trim().split(/\s+/u)[0]?.toLowerCase() ?? "query";
+		const op = sql.trim().split(WHITESPACE)[0]?.toLowerCase() ?? "query";
 		return yield* Effect.withSpan(`db.${op}`, {
 			attributes: { "db.statement": sql, "db.system": "postgresql" },
 		})(

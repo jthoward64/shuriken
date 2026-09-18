@@ -19,6 +19,11 @@ import { AclService } from "#src/services/acl/service.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
 import { InstanceService } from "#src/services/instance/index.ts";
 
+const WEAK_ETAG_PREFIX = /^W\//u;
+const QUOTED_ETAG = /^"(.*)"$/u;
+const DATA_URI = /^data:([^;,]*)(;base64)?,(.*)$/su;
+const HTTP_URI = /^https?:\/\//iu;
+
 // ---------------------------------------------------------------------------
 // GET /ui/contacts/<instanceId>/photo
 //
@@ -54,10 +59,7 @@ const photoValue = (vcard: IrComponent): Option.Option<string> => {
 
 /** Normalise an ETag for comparison: drop a weak prefix and surrounding quotes. */
 const normalizeEtag = (raw: string): string =>
-	raw
-		.trim()
-		.replace(/^W\//u, "")
-		.replace(/^"(.*)"$/u, "$1");
+	raw.trim().replace(WEAK_ETAG_PREFIX, "").replace(QUOTED_ETAG, "$1");
 
 /** True if `ifNoneMatch` (an If-None-Match header) matches `etag`. */
 const etagMatches = (ifNoneMatch: string | null, etag: string): boolean => {
@@ -84,7 +86,7 @@ interface DecodedPhoto {
  * that aren't a well-formed data URI (e.g. remote URLs, handled separately).
  */
 const decodeDataUri = (value: string): Option.Option<DecodedPhoto> => {
-	const match = /^data:([^;,]*)(;base64)?,(.*)$/su.exec(value);
+	const match = DATA_URI.exec(value);
 	if (match === null) {
 		return Option.none();
 	}
@@ -156,7 +158,7 @@ export const contactsPhotoHandler = (
 		const value = photo.value;
 
 		// Remote URL: redirect the browser to fetch it directly.
-		if (/^https?:\/\//iu.test(value)) {
+		if (HTTP_URI.test(value)) {
 			return new Response(null, {
 				status: HTTP_FOUND,
 				headers: {

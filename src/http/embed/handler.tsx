@@ -26,6 +26,8 @@ import {
 } from "#src/services/share-link/service.ts";
 import { embedCalendarEventsHandler } from "./events.ts";
 
+const EMBED_PATH = /^\/embed\/([^/]+?)(\/events)?$/u;
+
 // ---------------------------------------------------------------------------
 // embedHandler — `GET /embed/<token>` (widget HTML) and
 // `GET /embed/<token>/events` (its JSON event data).
@@ -75,7 +77,7 @@ export const embedHandler = (
 		}
 
 		// Expect /embed/<token> or /embed/<token>/events
-		const match = url.pathname.match(/^\/embed\/([^/]+?)(\/events)?$/u);
+		const match = url.pathname.match(EMBED_PATH);
 		if (match === null) {
 			return NOT_FOUND_RESPONSE();
 		}

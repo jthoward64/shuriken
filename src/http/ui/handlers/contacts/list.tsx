@@ -32,6 +32,8 @@ import { CardIndexRepository } from "#src/services/card-index/repository.ts";
 import type { CollectionRepository } from "#src/services/collection/repository.ts";
 import type { PrincipalRepository } from "#src/services/principal/repository.ts";
 
+const ALPHANUMERIC = /[A-Z0-9]/iu;
+
 // ---------------------------------------------------------------------------
 // GET /ui/contacts?addressbook=<id>&q=<search>
 // ---------------------------------------------------------------------------
@@ -162,7 +164,7 @@ export const contactsListHandler = (
 					fn,
 					subtitle: s.email?.trim() || orgLine,
 					hasPhoto: s.hasPhoto,
-					initial: /[A-Z0-9]/iu.test(first) ? first : "?",
+					initial: ALPHANUMERIC.test(first) ? first : "?",
 				};
 			});
 		}

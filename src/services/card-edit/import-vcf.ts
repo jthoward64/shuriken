@@ -22,6 +22,8 @@ import { EntityRepository } from "#src/services/entity/repository.ts";
 import type { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
 import { InstanceService } from "#src/services/instance/service.ts";
 
+const LINE_BREAK = /\r?\n/u;
+
 // ---------------------------------------------------------------------------
 // importVcf — bulk import a multi-VCARD payload into an addressbook.
 //
@@ -51,7 +53,7 @@ const HEX_PAD_LENGTH = 2;
  * its matching END:VCARD line inclusive.
  */
 const splitVcards = (text: string): ReadonlyArray<string> => {
-	const lines = text.split(/\r?\n/u);
+	const lines = text.split(LINE_BREAK);
 	const chunks: Array<string> = [];
 	let current: Array<string> | null = null;
 	for (const line of lines) {

@@ -9,6 +9,8 @@ import { importIcs } from "#src/services/cal-edit/import-ics.ts";
 import { ProvisioningService } from "#src/services/provisioning/index.ts";
 import { makeScriptRunnerLayer } from "#src/testing/script-runner/layer.ts";
 
+const LINE_BREAK = /\r?\n/u;
+
 // ---------------------------------------------------------------------------
 // Round-trip: import → export should preserve UIDs and SUMMARYs.
 // Property values may be re-normalised (line folding, ordering) so we compare
@@ -37,7 +39,7 @@ END:VCALENDAR
 
 const extractPairs = (body: string): Array<[string, string]> => {
 	const pairs: Array<[string, string]> = [];
-	const lines = body.split(/\r?\n/u);
+	const lines = body.split(LINE_BREAK);
 	let currentUid: string | null = null;
 	let currentSummary: string | null = null;
 	let inVevent = false;

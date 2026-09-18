@@ -1,5 +1,7 @@
 import type { IrProperty } from "#src/data/ir.ts";
 
+const ITEM_GROUP_PREFIX = /^item(\d+)\./iu;
+
 // ---------------------------------------------------------------------------
 // Generic vCard IR property helpers, group- and multi-TYPE-aware.
 //
@@ -36,7 +38,7 @@ export const LABEL_PARAM_PREFIX = "X-SKN-LABEL-PARAM-";
 export const maxItemGroup = (props: ReadonlyArray<IrProperty>): number => {
 	let max = 0;
 	for (const p of props) {
-		const m = /^item(\d+)\./iu.exec(p.name);
+		const m = ITEM_GROUP_PREFIX.exec(p.name);
 		const n = m?.[1];
 		if (n !== undefined) {
 			max = Math.max(max, Number.parseInt(n, 10));

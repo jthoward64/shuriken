@@ -1,6 +1,9 @@
 import { Temporal } from "temporal-polyfill";
 import type { IrComponent } from "#src/data/ir.ts";
 
+const FULL_DATE = /^\d{4}-\d{2}-\d{2}$/u;
+const YEARLESS_DATE = /^--\d{2}-\d{2}$/u;
+
 // ---------------------------------------------------------------------------
 // buildBirthdayVevent — pure mapper from a card's (uid, fn, bday) into the
 // VEVENT IrComponent we want surfaced in the user's Birthdays calendar.
@@ -25,14 +28,14 @@ export const BIRTHDAY_UID_SUFFIX = "-birthday";
 const parseBday = (
 	bday: string,
 ): { readonly date: Temporal.PlainDate; readonly yearless: boolean } | null => {
-	if (/^\d{4}-\d{2}-\d{2}$/u.test(bday)) {
+	if (FULL_DATE.test(bday)) {
 		try {
 			return { date: Temporal.PlainDate.from(bday), yearless: false };
 		} catch {
 			return null;
 		}
 	}
-	if (/^--\d{2}-\d{2}$/u.test(bday)) {
+	if (YEARLESS_DATE.test(bday)) {
 		try {
 			return {
 				date: Temporal.PlainDate.from(

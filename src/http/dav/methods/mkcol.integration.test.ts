@@ -3,6 +3,8 @@ import { describe, it } from "@std/testing/bdd";
 import { mkcol, singleUser } from "#src/testing/script-runner/fixtures.ts";
 import { runScript } from "#src/testing/script-runner/runner.ts";
 
+const LOC_CHECK_PATH = /loc-check\/?$/u;
+
 const MKCALENDAR_WITH_DISPLAY_NAME = `<?xml version="1.0" encoding="utf-8"?>
 <C:mkcalendar xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:D="DAV:">
   <D:set>
@@ -154,7 +156,7 @@ describe("MKCALENDAR — Location header", () => {
 			expect(result.failures, result.step.name).toEqual([]);
 		}
 		// The Location must end with the slug that was used in the request
-		expect(results[0]?.headers.location).toMatch(/loc-check\/?$/u);
+		expect(results[0]?.headers.location).toMatch(LOC_CHECK_PATH);
 	});
 });
 

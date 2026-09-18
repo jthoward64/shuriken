@@ -6,6 +6,8 @@ import { strongEtag } from "../asset-etag.ts";
 import { uiAssetPath } from "../asset-root.ts";
 import { type ClientAsset, ClientJsService } from "./service.ts";
 
+const JS_EXTENSION = /\.js$/u;
+
 // ---------------------------------------------------------------------------
 // ClientJsServiceLive — loads the browser scripts compiled by
 // `deno task ui:js`. Add an entry here to ship a new script; the router maps
@@ -34,7 +36,7 @@ export const ENTRIES: ReadonlyArray<{
 
 /** Served filename of the stylesheet an entry emits, if it imports one. */
 export const cssNameFor = (name: string): string =>
-	name.replace(/\.js$/u, ".css");
+	name.replace(JS_EXTENSION, ".css");
 
 export const ClientJsServiceLive = Layer.effect(
 	ClientJsService,

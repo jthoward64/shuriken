@@ -5,13 +5,17 @@ import { decodeVCard, encodeVCard } from "./codec.ts";
 import { downgradeToV3 } from "./downgrade-v3.ts";
 import { upgradeToV4 } from "./upgrade-v4.ts";
 
+const LINE_BREAK = /\r?\n/u;
+const ITEM_GROUP_PREFIX = /^item\d+\./u;
+const EMPTY_LINE = /^$/u;
+
 const vcard = (...ls: Array<string>) => `${ls.join("\r\n")}\r\n`;
 
 /** Unfold first — a preserved label easily pushes RELATED past the fold width. */
 const lines = (out: string): Array<string> =>
 	out
 		.replace(/\r?\n[ \t]/gu, "")
-		.split(/\r?\n/u)
+		.split(LINE_BREAK)
 		.map((l) => l.trim())
 		.filter((l) => l !== "");
 
@@ -39,7 +43,7 @@ const relatedOf = (ls: Array<string>): string =>
 	ls.find((l) => l.startsWith("RELATED")) ?? "";
 
 const abOf = (ls: Array<string>): Array<string> =>
-	ls.filter((l) => /^item\d+\./u.test(l));
+	ls.filter((l) => ITEM_GROUP_PREFIX.test(l));
 
 /** An Apple 3.0 card carrying one related name with the given label. */
 const appleCard = (label: string, name = "Joshua Tag Howard") =>
@@ -211,7 +215,7 @@ describe("X-ABRELATEDNAMES ↔ RELATED", () => {
 					await upRaw(
 						vcard("BEGIN:VCARD", "VERSION:3.0", "FN:Meghan", line, "END:VCARD"),
 					)
-				).replace(/^$/u, ""),
+				).replace(EMPTY_LINE, ""),
 			);
 			expect(back).toContain(source);
 			expect(back.some((l) => l.startsWith("item"))).toBe(false);

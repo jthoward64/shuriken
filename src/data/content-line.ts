@@ -1,5 +1,8 @@
 import { Effect, Option, Schema, SchemaGetter, SchemaIssue } from "effect";
 
+const NEEDS_ESCAPE = /[\^"\n]/u;
+const NEEDS_QUOTING = /[;:,]/u;
+
 // ---------------------------------------------------------------------------
 // UTF-8 encoding thresholds and byte-widths (RFC 3629)
 // ---------------------------------------------------------------------------
@@ -80,7 +83,7 @@ const encodeParamValue = (v: string): string =>
 	v.replace(/\^/gu, "^^").replace(/\n/gu, "^n").replace(/"/gu, "^'");
 
 /** Return true if a parameter value requires quoting (contains ; : or ,). */
-const needsQuoting = (v: string): boolean => /[;:,]/u.test(v);
+const needsQuoting = (v: string): boolean => NEEDS_QUOTING.test(v);
 
 /**
  * Serialize a single parameter value.
@@ -88,7 +91,7 @@ const needsQuoting = (v: string): boolean => /[;:,]/u.test(v);
  * falls back to double-quoting for values that contain only `;`, `:`, or `,`.
  */
 const serializeParamValue = (v: string): string => {
-	if (/[\^"\n]/u.test(v)) {
+	if (NEEDS_ESCAPE.test(v)) {
 		// RFC 6868 encoding required; still quote if ; : , are also present
 		const encoded = encodeParamValue(v);
 		return needsQuoting(encoded) ? `"${encoded}"` : encoded;

@@ -41,6 +41,8 @@ import type { AclResourceId } from "#src/services/acl/service.ts";
 import { AclService } from "#src/services/acl/service.ts";
 import { PrincipalRepository } from "#src/services/principal/repository.ts";
 
+const TRAILING_SLASH = /\/$/u;
+
 // ---------------------------------------------------------------------------
 // Namespace constants
 // ---------------------------------------------------------------------------
@@ -238,7 +240,11 @@ const resolveHrefPrincipal = (
 		}
 
 		// Last non-empty path segment is the principal slug or UUID
-		const seg = path.replace(/\/$/u, "").split("/").filter(Boolean).at(-1);
+		const seg = path
+			.replace(TRAILING_SLASH, "")
+			.split("/")
+			.filter(Boolean)
+			.at(-1);
 
 		if (seg === undefined) {
 			return yield* Effect.fail(forbidden("DAV:recognized-principal"));

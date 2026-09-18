@@ -14,6 +14,8 @@ import {
 } from "#src/data/icalendar/resolve-floating.ts";
 import type { IrComponent, IrDocument, IrProperty } from "#src/data/ir.ts";
 
+const UTC_DATE_TIME = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/u;
+
 const CALDAV_NS = "urn:ietf:params:xml:ns:caldav";
 const cn = (local: string): string => `{${CALDAV_NS}}${local}`;
 
@@ -95,7 +97,7 @@ const parseExpandSpec = (el: unknown): ExpandSpec | undefined => {
  * as "no expand range supplied" rather than failing the whole REPORT.
  */
 const parseICalDatetime = (s: string): Temporal.Instant | undefined => {
-	const m = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/u.exec(s);
+	const m = UTC_DATE_TIME.exec(s);
 	if (!m) {
 		return undefined;
 	}

@@ -3,6 +3,10 @@ import { lookup } from "node:dns/promises";
 import { Context, Effect, Layer } from "effect";
 import { InternalError } from "#src/domain/errors.ts";
 
+const V4_OCTET = /^\d{1,3}$/u;
+const V4_SUFFIX = /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/u;
+const V6_GROUP = /^[0-9a-f]{1,4}$/iu;
+
 // ---------------------------------------------------------------------------
 // NetworkGuardService — SSRF defense for outbound fetches driven by
 // user-supplied URLs (external calendar subscriptions today). Resolves a
@@ -32,7 +36,7 @@ const ipv4ToInt = (ip: string): number | null => {
 	}
 	let n = 0;
 	for (const part of parts) {
-		if (!/^\d{1,3}$/u.test(part)) {
+		if (!V4_OCTET.test(part)) {
 			return null;
 		}
 		const v = Number(part);
@@ -90,7 +94,7 @@ const HEXTET_BITS = 16n;
 /** Parse a (possibly v4-mapped/compressed) IPv6 literal into a 128-bit integer. */
 const ipv6ToBigInt = (ip: string): bigint | null => {
 	let addr = ip;
-	const v4Embedded = /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/u.exec(addr);
+	const v4Embedded = V4_SUFFIX.exec(addr);
 	if (v4Embedded?.[1]) {
 		const v4 = ipv4ToInt(v4Embedded[1]);
 		if (v4 === null) {
@@ -127,7 +131,7 @@ const ipv6ToBigInt = (ip: string): bigint | null => {
 	}
 	let result = 0n;
 	for (const g of groups) {
-		if (!/^[0-9a-f]{1,4}$/iu.test(g)) {
+		if (!V6_GROUP.test(g)) {
 			return null;
 		}
 		result = (result << HEXTET_BITS) | BigInt(Number.parseInt(g, 16));

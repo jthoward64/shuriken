@@ -10,6 +10,8 @@ import { renderFeed } from "#src/services/feed/render.ts";
 import type { InstanceRepository } from "#src/services/instance/repository.ts";
 import { ShareLinkService } from "#src/services/share-link/service.ts";
 
+const FEED_PATH = /^\/feed\/([^/]+?)\.ics$/u;
+
 // ---------------------------------------------------------------------------
 // feedHandler — `GET /feed/<token>.ics`
 //
@@ -41,7 +43,7 @@ export const feedHandler = (
 		}
 
 		// Expect /feed/<token>.ics
-		const match = url.pathname.match(/^\/feed\/([^/]+?)\.ics$/u);
+		const match = url.pathname.match(FEED_PATH);
 		if (match === null) {
 			return NOT_FOUND_RESPONSE();
 		}

@@ -4,6 +4,8 @@ import { Effect } from "effect";
 import { decodeVCard, encodeVCard } from "./codec.ts";
 import { upgradeToV4 } from "./upgrade-v4.ts";
 
+const LINE_BREAK = /\r?\n/u;
+
 const vcard = (...lines: Array<string>) => `${lines.join("\r\n")}\r\n`;
 
 // decode → upgrade → encode, returning the emitted lines (blank-trimmed)
@@ -15,7 +17,7 @@ const up = (text: string): Promise<Array<string>> =>
 		),
 	).then((out) =>
 		out
-			.split(/\r?\n/u)
+			.split(LINE_BREAK)
 			.map((l) => l.trim())
 			.filter((l) => l !== ""),
 	);

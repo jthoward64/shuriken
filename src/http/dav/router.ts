@@ -74,6 +74,8 @@ import { userMkcolHandler } from "./methods/users/mkcol.ts";
 import { userPropfindHandler } from "./methods/users/propfind.ts";
 import { userProppatchHandler } from "./methods/users/proppatch.ts";
 
+const TRAILING_SLASH = /\/$/u;
+
 // ---------------------------------------------------------------------------
 // DAV error XML body builder — RFC 4918 §8.7 / RFC 4791 §5.3.2
 // ---------------------------------------------------------------------------
@@ -175,7 +177,7 @@ export const parseDavPath = (
 	| CollectionRepository
 	| InstanceRepository
 > => {
-	const path = url.pathname.replace(/\/$/u, ""); // strip trailing slash
+	const path = url.pathname.replace(TRAILING_SLASH, ""); // strip trailing slash
 
 	if (path === "/.well-known/caldav") {
 		return Effect.succeed({ kind: "wellknown", name: "caldav" });
@@ -554,7 +556,7 @@ export const davRouter = (
 
 		// RFC 6764 §5: /.well-known/{cal,card}dav redirects are public — no auth.
 		// They are pure service-discovery and never expose principal-level data.
-		const pathname = ctx.url.pathname.replace(/\/$/u, "");
+		const pathname = ctx.url.pathname.replace(TRAILING_SLASH, "");
 		const isWellKnown =
 			pathname === "/.well-known/caldav" || pathname === "/.well-known/carddav";
 

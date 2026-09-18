@@ -2,6 +2,9 @@ import { Data, Effect } from "effect";
 import type { Slug } from "#src/domain/types/path.ts";
 import type { Email } from "#src/domain/types/strings.ts";
 
+const SLUG = /^[a-z0-9-]+$/u;
+const LIST_SEPARATOR = /[,\n]/u;
+
 // ---------------------------------------------------------------------------
 // FormValidationError — carries field-keyed validation messages
 // ---------------------------------------------------------------------------
@@ -27,7 +30,7 @@ export const parseSlug = (
 	if (!v) {
 		return fail(field, "Slug is required");
 	}
-	if (!/^[a-z0-9-]+$/u.test(v)) {
+	if (!SLUG.test(v)) {
 		return fail(
 			field,
 			"Slug may only contain lowercase letters, digits, and hyphens",
@@ -74,7 +77,7 @@ export const parseNameList = (
 		Array.from(
 			new Set(
 				(value ?? "")
-					.split(/[,\n]/u)
+					.split(LIST_SEPARATOR)
 					.map((v) => v.trim())
 					.filter((v) => v.length > 0),
 			),

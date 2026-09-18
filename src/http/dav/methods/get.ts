@@ -26,6 +26,9 @@ import { parseAcceptVCardVersion } from "./accept-version.ts";
 import { applyVersion } from "./report/address-data.ts";
 import { stripKnownVtimezones } from "./report/calendar-data.ts";
 
+const WEAK_ETAG_PREFIX = /^W\//u;
+const ETAG_QUOTES = /^"|"$/gu;
+
 // ---------------------------------------------------------------------------
 // GET/HEAD handler — RFC 4918 §9.4
 // ---------------------------------------------------------------------------
@@ -206,7 +209,7 @@ export const getHandler = (
 		if (ifNoneMatch !== null) {
 			// Weak comparison: strip quotes and W/ prefix before comparing.
 			const normalize = (tag: string): string =>
-				tag.trim().replace(/^W\//u, "").replace(/^"|"$/gu, "");
+				tag.trim().replace(WEAK_ETAG_PREFIX, "").replace(ETAG_QUOTES, "");
 			const serverTag = normalize(instance.etag);
 			const clientTags = ifNoneMatch
 				.split(",")

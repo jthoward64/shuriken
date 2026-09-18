@@ -4,6 +4,8 @@ import { Effect } from "effect";
 import { decodeVCard, encodeVCard } from "./codec.ts";
 import { upgradeToV4 } from "./upgrade-v4.ts";
 
+const LINE_BREAK = /\r?\n/u;
+
 // ---------------------------------------------------------------------------
 // Lossless round-trip of the Apple/Google vCard 3.0 conventions that clients
 // rely on (see the "sad story of vCard interoperability"): itemN grouping,
@@ -31,7 +33,7 @@ const APPLE_CARD = [
 
 const lineSet = (s: string): ReadonlyArray<string> =>
 	s
-		.split(/\r?\n/u)
+		.split(LINE_BREAK)
 		.map((l) => l.trim())
 		.filter((l) => l !== "")
 		.sort();

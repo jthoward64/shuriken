@@ -5,6 +5,8 @@ import { decodeVCard, encodeVCard } from "./codec.ts";
 import { downgradeToV3 } from "./downgrade-v3.ts";
 import { upgradeToV4 } from "./upgrade-v4.ts";
 
+const LINE_BREAK = /\r?\n/u;
+
 // ---------------------------------------------------------------------------
 // Client parameters must survive every 3.0 ↔ 4.0 mapping.
 //
@@ -23,7 +25,7 @@ const vcard = (...ls: Array<string>) => `${ls.join("\r\n")}\r\n`;
 const lines = (out: string): Array<string> =>
 	out
 		.replace(/\r?\n[ \t]/gu, "")
-		.split(/\r?\n/u)
+		.split(LINE_BREAK)
 		.map((l) => l.trim())
 		.filter((l) => l !== "");
 

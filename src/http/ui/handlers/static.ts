@@ -7,6 +7,8 @@ import { strongEtag } from "#src/http/ui/asset-etag.ts";
 import { uiAssetRoot } from "#src/http/ui/asset-root.ts";
 import { FileService } from "#src/platform/file.ts";
 
+const STATIC_PREFIX = /^\/static\//u;
+
 // ---------------------------------------------------------------------------
 // Static asset handler — serves files from src/http/ui/static/ (plain assets
 // and vendor bundles, as opposed to the startup-compiled CSS/client-JS
@@ -21,7 +23,7 @@ export const staticHandler = (
 	Effect.gen(function* () {
 		const url = new URL(req.url);
 		// Strip the /static/ prefix to get the relative path
-		const relPath = url.pathname.replace(/^\/static\//u, "");
+		const relPath = url.pathname.replace(STATIC_PREFIX, "");
 		if (!relPath) {
 			return new Response(null, { status: 404 });
 		}

@@ -11,12 +11,14 @@
 import { Option } from "effect";
 import { parseZone, type ResolutionZone, UTC } from "./resolve-floating.ts";
 
+const TZID_LINE = /^TZID[;:]([^\r\n]+)/mu;
+
 /**
  * Extract the TZID from a raw VTIMEZONE/VCALENDAR iCalendar text string.
  * Returns null if no TZID line is found.
  */
 export const extractTzidFromVtimezone = (raw: string): string | null => {
-	const match = /^TZID[;:]([^\r\n]+)/mu.exec(raw);
+	const match = TZID_LINE.exec(raw);
 	return match?.[1]?.trim() ?? null;
 };
 

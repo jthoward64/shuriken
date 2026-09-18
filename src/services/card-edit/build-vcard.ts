@@ -21,6 +21,8 @@ import type {
 	ContactTypedValue,
 } from "./types.ts";
 
+const YEARLESS_DATE = /^--(\d{2})-?(\d{2})$/u;
+
 // ---------------------------------------------------------------------------
 // Form → IrComponent VCARD builders. The per-property builders and value
 // helpers are exported so the structural-merge path (merge-vcard.ts) maps a
@@ -134,7 +136,7 @@ export const bdayValue = (raw: string): IrValue | null => {
 	if (!raw) {
 		return null;
 	}
-	const yearless = /^--(\d{2})-?(\d{2})$/u.exec(raw);
+	const yearless = YEARLESS_DATE.exec(raw);
 	if (yearless) {
 		return { type: "TEXT", value: `--${yearless[1]}${yearless[2]}` };
 	}

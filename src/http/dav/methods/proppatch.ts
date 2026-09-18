@@ -38,6 +38,8 @@ import { PrincipalService } from "#src/services/principal/service.ts";
 import { IanaTimezoneService } from "#src/services/timezone/iana.ts";
 import { CalTimezoneRepository } from "#src/services/timezone/index.ts";
 
+const TRAILING_SLASH = /\/$/u;
+
 // ---------------------------------------------------------------------------
 // Namespace constants
 // ---------------------------------------------------------------------------
@@ -459,7 +461,7 @@ export const proppatchHandler = (
 						: null;
 				const hrefStr = hrefObj ? String(hrefObj[`{${DAV_NS}}href`] ?? "") : "";
 				// Extract the last non-empty path segment as the collection UUID/slug.
-				const segments = hrefStr.replace(/\/$/u, "").split("/");
+				const segments = hrefStr.replace(TRAILING_SLASH, "").split("/");
 				const lastSeg = segments.at(-1) ?? "";
 				if (isUuid(lastSeg)) {
 					// Look up the collection to validate it exists and belongs to this principal.

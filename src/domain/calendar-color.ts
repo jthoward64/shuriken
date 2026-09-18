@@ -1,5 +1,7 @@
 import { type ClarkName, cn, type IrDeadProperties } from "#src/data/ir.ts";
 
+const HEX_RGB = /^#[0-9a-fA-F]{6}$/u;
+
 // ---------------------------------------------------------------------------
 // Calendar colour — Apple's `{http://apple.com/ns/ical/}calendar-color` dead
 // property (RFC 4918 §4.1 dead prop). This is the single source of truth for a
@@ -84,7 +86,7 @@ export const toCssHex = (appleColor: string): string =>
  * clear the property.
  */
 export const fromCssHex = (value: string): string | undefined => {
-	if (!/^#[0-9a-fA-F]{6}$/u.test(value)) {
+	if (!HEX_RGB.test(value)) {
 		return undefined;
 	}
 	return `${value.toUpperCase()}FF`;

@@ -2,10 +2,13 @@ import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
 import { generateSessionToken, sha256Hex } from "./token.ts";
 
+const BASE64URL = /^[A-Za-z0-9_-]+$/u;
+const SHA256_HEX = /^[0-9a-f]{64}$/u;
+
 describe("generateSessionToken", () => {
 	it("produces a URL-safe string with no padding", () => {
 		const t = generateSessionToken();
-		expect(t).toMatch(/^[A-Za-z0-9_-]+$/u);
+		expect(t).toMatch(BASE64URL);
 		expect(t).not.toContain("=");
 	});
 
@@ -25,6 +28,6 @@ describe("sha256Hex", () => {
 		const a = await sha256Hex("shuriken");
 		const b = await sha256Hex("shuriken");
 		expect(a).toBe(b);
-		expect(a).toMatch(/^[0-9a-f]{64}$/u);
+		expect(a).toMatch(SHA256_HEX);
 	});
 });

@@ -2,6 +2,9 @@ import type { IrParameter, IrProperty, IrValue } from "../ir.ts";
 import { unwrapAppleLabel, wrapAppleLabel } from "./ab-label.ts";
 import { baseName, getTypeTokens, groupOf } from "./prop.ts";
 
+const URI_SCHEME = /^[a-z][a-z0-9+.-]*:/iu;
+const MAILTO_URI = /^mailto:(.+)$/iu;
+
 // ---------------------------------------------------------------------------
 // Apple `X-ABRELATEDNAMES` ↔ RFC 6350 §6.6.6 `RELATED`.
 //
@@ -175,7 +178,7 @@ const labelFromToken = (token: string): string =>
 const EMBEDDED_VCARD = /^\s*BEGIN:VCARD/iu;
 
 /** A scheme-prefixed value, i.e. a URI rather than a person's name. */
-const URI_LIKE = /^[a-z][a-z0-9+.-]*:/iu;
+const URI_LIKE = URI_SCHEME;
 
 /**
  * Where an `AGENT` carrying a whole nested vCard is parked in 4.0. RELATED
@@ -329,15 +332,13 @@ const displayNameForDowngrade = (prop: IrProperty): string | undefined => {
 	if (valueParam === "text") {
 		return raw;
 	}
-	const mailto = /^mailto:(.+)$/iu.exec(raw);
+	const mailto = MAILTO_URI.exec(raw);
 	if (mailto?.[1] !== undefined) {
 		return mailto[1];
 	}
 	// A TEXT-typed value with no VALUE=text param is still free text (that is
 	// how a 3.0-authored card arrives); only a real URI has no display form.
-	return prop.value.type === "TEXT" && !/^[a-z][a-z0-9+.-]*:/iu.test(raw)
-		? raw
-		: undefined;
+	return prop.value.type === "TEXT" && !URI_SCHEME.test(raw) ? raw : undefined;
 };
 
 /**
