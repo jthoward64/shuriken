@@ -55,11 +55,11 @@ export const ContactHoverCard = ({
 					src={photoSrc}
 					alt=""
 					loading="lazy"
-					class="h-12 w-12 shrink-0 rounded-full bg-surface-2 object-cover"
+					class="size-12 shrink-0 rounded-full bg-surface-2 object-cover"
 				/>
 			) : (
 				<span
-					class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-surface-2 text-base font-medium text-muted"
+					class="flex size-12 shrink-0 items-center justify-center rounded-full bg-surface-2 font-medium text-base text-muted"
 					aria-hidden="true"
 				>
 					{(form.fn.trim().charAt(0) || "?").toUpperCase()}
@@ -78,12 +78,12 @@ export const ContactHoverCard = ({
 						aria-label="Edit contact"
 						class="shrink-0"
 					>
-						<IconEdit class="h-4 w-4" />
+						<IconEdit class="size-4" />
 					</LinkButton>
 				</div>
-				{orgLine !== "" && <p class="truncate text-sm text-muted">{orgLine}</p>}
-				{email !== "" && <p class="mt-2 truncate text-sm text-fg">{email}</p>}
-				{tel !== "" && <p class="truncate text-sm text-fg">{tel}</p>}
+				{orgLine !== "" && <p class="truncate text-muted text-sm">{orgLine}</p>}
+				{email !== "" && <p class="mt-2 truncate text-fg text-sm">{email}</p>}
+				{tel !== "" && <p class="truncate text-fg text-sm">{tel}</p>}
 			</div>
 		</div>
 	);

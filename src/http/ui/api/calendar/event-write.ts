@@ -27,7 +27,7 @@ import type { UserService } from "#src/services/user/index.ts";
 // ---------------------------------------------------------------------------
 
 interface FormLike {
-	get(key: string): unknown;
+	get: (key: string) => unknown;
 }
 
 const single = (form: FormLike, key: string) =>

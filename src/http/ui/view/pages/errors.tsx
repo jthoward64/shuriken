@@ -16,7 +16,7 @@ const ErrorBody = ({
 	message: string;
 }) => (
 	<div class="mx-auto max-w-lg py-8 text-center">
-		<p class="text-5xl font-bold text-subtle">{code}</p>
+		<p class="font-bold text-5xl text-subtle">{code}</p>
 		<div class="mt-4">
 			<PageHeader title={title} />
 		</div>

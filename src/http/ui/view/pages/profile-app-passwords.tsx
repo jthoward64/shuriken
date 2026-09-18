@@ -47,7 +47,7 @@ export const AppPasswordsPage = ({
 		</div>
 
 		<Card>
-			<p class="text-sm text-muted">
+			<p class="text-muted text-sm">
 				App passwords let clients (Thunderbird, iOS, DAVx⁵, …) authenticate
 				without your single-sign-on credentials. Each is a separate, revocable
 				secret. Use your generated username together with the app password when
@@ -94,17 +94,17 @@ export const AppPasswordsPage = ({
 					{appPasswords.map((ap) => (
 						<li class="flex items-center justify-between gap-4 px-5 py-3.5">
 							<div class="min-w-0">
-								<p class="truncate text-sm font-medium text-fg">
+								<p class="truncate font-medium text-fg text-sm">
 									{ap.label ? (
 										ap.label
 									) : (
 										<span class="text-subtle">No label</span>
 									)}
 								</p>
-								<p class="truncate font-mono text-xs text-muted">
+								<p class="truncate font-mono text-muted text-xs">
 									{ap.username}
 								</p>
-								<p class="text-xs text-subtle">
+								<p class="text-subtle text-xs">
 									Created {ap.created}
 									{ap.lastUsed
 										? ` · Last used ${ap.lastUsed}`
@@ -125,7 +125,7 @@ export const AppPasswordsPage = ({
 					))}
 				</ul>
 			) : (
-				<p class="card-pad text-sm text-muted">
+				<p class="card-pad text-muted text-sm">
 					You don't have any app passwords yet.
 				</p>
 			)}

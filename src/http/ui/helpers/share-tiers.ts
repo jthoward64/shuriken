@@ -87,7 +87,7 @@ const groupByPrincipal = (
 ): ReadonlyArray<RawGrant> => {
 	const byPrincipal = new Map<string, Array<DavPrivilege>>();
 	for (const ace of aces) {
-		if (ace.principalType !== "principal" || ace.principalId == null) {
+		if (ace.principalType !== "principal" || ace.principalId === null) {
 			continue;
 		}
 		const list = byPrincipal.get(ace.principalId) ?? [];
@@ -119,7 +119,7 @@ export const isRepresentableInBasicTiers = (
 	}
 	if (
 		nonProtected.some(
-			(a) => a.principalType !== "principal" || a.principalId == null,
+			(a) => a.principalType !== "principal" || a.principalId === null,
 		)
 	) {
 		return false;
@@ -169,7 +169,7 @@ export const collapseToBasicTiers = (
 			!a.protected &&
 			a.grantDeny === "grant" &&
 			a.principalType === "principal" &&
-			a.principalId != null,
+			a.principalId !== null,
 	);
 	const grants = groupByPrincipal(nonProtected);
 	const collapsed: Array<CollapsedGrant> = [];

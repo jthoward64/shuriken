@@ -143,7 +143,7 @@ export const buildSharePanelData = (
 
 		// Resolve every referenced principal in one query instead of one per ACE.
 		const principalIds = rawAces.flatMap((ace) =>
-			ace.principalType === "principal" && ace.principalId != null
+			ace.principalType === "principal" && ace.principalId !== null
 				? [ace.principalId as PrincipalId]
 				: [],
 		);
@@ -154,7 +154,7 @@ export const buildSharePanelData = (
 			let principalLabel: string;
 			let resolvedPrincipalId: string | null = null;
 
-			if (ace.principalType === "principal" && ace.principalId != null) {
+			if (ace.principalType === "principal" && ace.principalId !== null) {
 				const row = principals.get(ace.principalId as PrincipalId);
 				principalLabel = row
 					? (row.displayName ?? row.slug)

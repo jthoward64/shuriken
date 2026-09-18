@@ -136,7 +136,7 @@ export const BulkJobProgress = ({
 		data-bulk-job-events={`/ui/api/contacts/bulk-jobs/${jobId}/events`}
 		data-bulk-job-result={resultUrl ?? ""}
 		data-bulk-job-reload={reloadOnDone === true ? "" : undefined}
-		class="rounded-md border border-subtle bg-surface-2 p-3 text-sm space-y-2"
+		class="space-y-2 rounded-md border border-subtle bg-surface-2 p-3 text-sm"
 	>
 		<div class="flex items-center justify-between">
 			<span data-bulk-job-label>Working…</span>
@@ -144,7 +144,7 @@ export const BulkJobProgress = ({
 				0 / 0
 			</span>
 		</div>
-		<progress data-bulk-job-bar class="w-full h-2" value="0" max="1" />
+		<progress data-bulk-job-bar class="h-2 w-full" value="0" max="1" />
 	</div>
 );
 
@@ -173,12 +173,12 @@ export const ImportResult = ({
 			title={`${conflicts.length} item(s) already exist with these UIDs:`}
 			class="space-y-2"
 		>
-			<ul class="list-disc list-inside text-xs max-h-32 overflow-auto font-mono text-muted">
+			<ul class="max-h-32 list-inside list-disc overflow-auto font-mono text-muted text-xs">
 				{conflicts.map((c) => (
 					<li key={c}>{c}</li>
 				))}
 			</ul>
-			<p class="text-xs text-muted">
+			<p class="text-muted text-xs">
 				Re-select the file with <strong>Skip duplicates</strong> or{" "}
 				<strong>Replace duplicates</strong> to proceed.
 			</p>
@@ -210,7 +210,7 @@ const AddressbookList = ({
 	query: string;
 }): VNode => (
 	<div class="space-y-2">
-		<h2 class="px-1 text-xs font-semibold uppercase tracking-wider text-subtle">
+		<h2 class="px-1 font-semibold text-subtle text-xs uppercase tracking-wider">
 			Address books
 		</h2>
 		<ul
@@ -260,7 +260,7 @@ const AddressbookList = ({
 										aria-label={`Move ${a.displayName} up`}
 										class="shrink-0 rounded p-0.5 text-subtle hover:bg-surface-2 hover:text-fg"
 									>
-										<IconChevronDown class="h-3.5 w-3.5 rotate-180" />
+										<IconChevronDown class="size-3.5 rotate-180" />
 									</button>
 								</form>
 								<form
@@ -274,7 +274,7 @@ const AddressbookList = ({
 										aria-label={`Move ${a.displayName} down`}
 										class="shrink-0 rounded p-0.5 text-subtle hover:bg-surface-2 hover:text-fg"
 									>
-										<IconChevronDown class="h-3.5 w-3.5" />
+										<IconChevronDown class="size-3.5" />
 									</button>
 								</form>
 							</>
@@ -340,7 +340,7 @@ const ImportForm = ({
 				name="mode"
 				disabled={disabled}
 				options={DUPLICATE_MODE_OPTIONS}
-				class="basis-1/3 border-0 bg-transparent px-2 py-2 text-xs focus:outline-none focus-visible:bg-surface-2 focus-visible:ring-0 focus-visible:ring-offset-0"
+				class="basis-1/3 border-0 bg-transparent p-2 text-xs focus:outline-none focus-visible:bg-surface-2 focus-visible:ring-0 focus-visible:ring-offset-0"
 				aria-label="How to handle duplicate contacts"
 				title="How to handle duplicate contacts"
 			/>
@@ -355,8 +355,8 @@ const ImportForm = ({
 		>
 			Upload
 		</Button>
-		<span class="htmx-indicator items-center gap-1 text-sm text-muted">
-			<IconSpinner class="h-4 w-4 animate-spin" />
+		<span class="htmx-indicator items-center gap-1 text-muted text-sm">
+			<IconSpinner class="size-4 animate-spin" />
 			Importing…
 		</span>
 	</form>
@@ -396,7 +396,7 @@ const ContactTools = ({
 					hx-target={`#${CONTACTS_POPOVER_BODY_ID}`}
 					hx-swap="innerHTML"
 					data-popover="contacts-popover"
-					class="block rounded-md px-2 py-1.5 text-sm text-muted hover:bg-surface-2"
+					class="block rounded-md px-2 py-1.5 text-muted text-sm hover:bg-surface-2"
 				>
 					Find duplicates
 				</a>
@@ -408,7 +408,7 @@ const ContactTools = ({
 					hx-target={`#${CONTACTS_POPOVER_BODY_ID}`}
 					hx-swap="innerHTML"
 					data-popover="contacts-popover"
-					class="block rounded-md px-2 py-1.5 text-sm text-muted hover:bg-surface-2"
+					class="block rounded-md px-2 py-1.5 text-muted text-sm hover:bg-surface-2"
 				>
 					Clean up
 				</a>
@@ -421,7 +421,7 @@ const ContactTools = ({
 
 const BulkToolbar = ({ writable }: { writable: boolean }): VNode => (
 	<div data-bulk-bar class="flex flex-wrap items-center gap-2">
-		<span class="text-sm text-muted mr-1">
+		<span class="mr-1 text-muted text-sm">
 			<span data-selected-count>0</span> selected:
 		</span>
 		<Button
@@ -489,7 +489,7 @@ const BulkToolbar = ({ writable }: { writable: boolean }): VNode => (
 //   - the Edit link opens the edit dialog (JS) or the full edit page (no JS).
 const ContactListRow = ({ c }: { c: ContactRow }): VNode => (
 	<li class="flex items-center gap-3 py-2">
-		<label class="contact-avatar-check relative block h-10 w-10 shrink-0">
+		<label class="contact-avatar-check relative block size-10 shrink-0">
 			<input
 				type="checkbox"
 				name="id"
@@ -502,18 +502,18 @@ const ContactListRow = ({ c }: { c: ContactRow }): VNode => (
 					src={`/ui/contacts/${c.instanceId}/photo`}
 					alt=""
 					loading="lazy"
-					class="avatar h-10 w-10 rounded-full bg-surface-2 object-cover"
+					class="avatar size-10 rounded-full bg-surface-2 object-cover"
 				/>
 			) : (
 				<span
-					class="avatar flex h-10 w-10 items-center justify-center rounded-full bg-surface-2 text-sm font-medium text-muted"
+					class="avatar flex size-10 items-center justify-center rounded-full bg-surface-2 font-medium text-muted text-sm"
 					aria-hidden="true"
 				>
 					{c.initial}
 				</span>
 			)}
 			<span class="check-overlay" aria-hidden="true">
-				<IconCheck class="h-5 w-5" />
+				<IconCheck class="size-5" />
 			</span>
 		</label>
 		<a
@@ -526,7 +526,7 @@ const ContactListRow = ({ c }: { c: ContactRow }): VNode => (
 		>
 			<span class="block truncate text-fg">{c.fn}</span>
 			{c.subtitle !== "" && (
-				<span class="block truncate text-sm text-muted">{c.subtitle}</span>
+				<span class="block truncate text-muted text-sm">{c.subtitle}</span>
 			)}
 		</a>
 		<a
@@ -578,7 +578,7 @@ const ContactList = ({
 		hx-target="#contact-list"
 		hx-select="#contact-list"
 		hx-swap="outerHTML"
-		class="contacts-scroll-shadow lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:[scrollbar-gutter:stable] p-2"
+		class="contacts-scroll-shadow p-2 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:[scrollbar-gutter:stable]"
 	>
 		{contacts.length > 0 ? (
 			<form
@@ -587,7 +587,7 @@ const ContactList = ({
 				class="space-y-3"
 			>
 				<input type="hidden" name="addressbook" value={selectedId} />
-				<div class="flex flex-wrap items-center gap-3 ml-1 min-h-8">
+				<div class="ml-1 flex min-h-8 flex-wrap items-center gap-3">
 					<Checkbox
 						id="contacts-check-all"
 						label="Select all"
@@ -655,7 +655,7 @@ export const ContactsListPage = ({
 							disabled={!selectedWritable}
 							title={selectedWritable ? undefined : "Read-only address book"}
 						>
-							<IconPlus class="h-4 w-4" />
+							<IconPlus class="size-4" />
 							New contact
 						</Button>
 						<AddressbookList addressbooks={addressbooks} query={query} />
@@ -673,11 +673,11 @@ export const ContactsListPage = ({
 
 				{/* Integrated search header: the drawer toggle (mobile) sits inline
 				    with the search field. Plain GET form so it works with no JS. */}
-				<div class="flex items-center gap-2 lg:shrink-0 pl-2 pb-2">
+				<div class="flex items-center gap-2 pb-2 pl-2 lg:shrink-0">
 					<ContactsDrawerToggle />
 					<form method="GET" action="/ui/contacts" class="relative flex-1">
 						<input type="hidden" name="addressbook" value={selectedId} />
-						<IconSearch class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" />
+						<IconSearch class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle" />
 						{/* No submit button: a GET form with a single text input submits
 						    on Enter natively, with or without JS. */}
 						<input
@@ -686,7 +686,7 @@ export const ContactsListPage = ({
 							value={query}
 							placeholder="Search contacts…"
 							aria-label="Search contacts"
-							class="w-full border-0 bg-transparent py-2 pl-9 pr-2 text-base text-fg placeholder:text-subtle focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+							class="w-full border-0 bg-transparent py-2 pr-2 pl-9 text-base text-fg placeholder:text-subtle focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
 						/>
 					</form>
 				</div>

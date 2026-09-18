@@ -47,7 +47,7 @@ const ManageLink = ({
 		<span class="shrink-0 text-muted">{icon}</span>
 		<span class="min-w-0 flex-1">
 			<span class="font-medium text-fg">{title}</span>
-			<span class="block text-sm text-muted">{desc}</span>
+			<span class="block text-muted text-sm">{desc}</span>
 		</span>
 	</a>
 );
@@ -94,7 +94,7 @@ export const ProfilePage = ({
 		</Card>
 
 		<Card title="DAV client setup">
-			<p class="mb-4 text-sm text-muted">
+			<p class="mb-4 text-muted text-sm">
 				Point a CalDAV or CardDAV client at these URLs. If you sign in with SSO,
 				use an{" "}
 				<a href="/ui/profile/app-passwords" class="link">
@@ -137,13 +137,13 @@ export const ProfilePage = ({
 		<div class="grid gap-3 sm:grid-cols-2">
 			<ManageLink
 				href="/ui/profile/app-passwords"
-				icon={<IconKey class="h-5 w-5" />}
+				icon={<IconKey class="size-5" />}
 				title="App passwords"
 				desc="Per-device secrets for calendar and contact apps."
 			/>
 			<ManageLink
 				href="/ui/profile/email-credentials"
-				icon={<IconMail class="h-5 w-5" />}
+				icon={<IconMail class="size-5" />}
 				title="Email credentials"
 				desc="How invitation mail is sent on your behalf."
 			/>
@@ -151,7 +151,7 @@ export const ProfilePage = ({
 
 		{authSettingsUrl && (
 			<Card title="Account settings">
-				<p class="mb-4 text-sm text-muted">
+				<p class="mb-4 text-muted text-sm">
 					Password, recovery email, and MFA are managed by your identity
 					provider.
 				</p>
@@ -160,7 +160,7 @@ export const ProfilePage = ({
 					target="_blank"
 					rel="noopener noreferrer"
 				>
-					<IconExternalLink class="h-4 w-4" />
+					<IconExternalLink class="size-4" />
 					{authSettingsLabel}
 				</LinkButton>
 			</Card>

@@ -67,7 +67,7 @@ const groupByUid = (doc: IrDocument): ReadonlyArray<ParsedEvent> => {
 			continue;
 		}
 		const uidProp = c.properties.find((p) => p.name === "UID");
-		if (!uidProp || uidProp.value.type !== "TEXT") {
+		if (uidProp?.value.type !== "TEXT") {
 			continue;
 		}
 		const list = groups.get(uidProp.value.value) ?? [];
@@ -98,7 +98,7 @@ const extractCalProp = (
 	name: string,
 ): string | undefined => {
 	const prop = root.properties.find((p) => p.name === name);
-	if (!prop || prop.value.type !== "TEXT") {
+	if (prop?.value.type !== "TEXT") {
 		return undefined;
 	}
 	const v = prop.value.value;

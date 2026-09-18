@@ -236,7 +236,7 @@ export const getOccurrenceInstantsInRange = (
 	stopAtFirst = false,
 ): ReadonlyArray<Temporal.Instant> => {
 	const rruleProp = vevent.properties.find((p) => p.name === "RRULE");
-	if (!rruleProp || rruleProp.value.type !== "RECUR") {
+	if (rruleProp?.value.type !== "RECUR") {
 		return [];
 	}
 

@@ -123,7 +123,7 @@ export const RelationList = ({
 							class={
 								r.relation.target.kind === "contact"
 									? "break-words text-sm text-subtle"
-									: "break-words text-sm text-fg"
+									: "break-words text-fg text-sm"
 							}
 							// A contact reference we could not resolve is shown as the raw
 							// UID: honest about what is stored, and never a broken link.
@@ -137,7 +137,7 @@ export const RelationList = ({
 						</span>
 					)}
 					{r.relation.relation !== "" && (
-						<span class="ml-2 text-xs text-subtle">{r.relation.relation}</span>
+						<span class="ml-2 text-subtle text-xs">{r.relation.relation}</span>
 					)}
 				</div>
 				{r.relation.preferred && (

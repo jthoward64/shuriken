@@ -95,13 +95,13 @@ const uidOf = (root: IrComponent): Option.Option<string> => {
  * duplicates on every re-import. We fingerprint every property name + value
  * in declaration order and hash the result with SHA-256, so:
  *
- *   * Re-importing the same file dedupes (collision means byte-identical
+ * Re-importing the same file dedupes (collision means byte-identical
  *     property sets — the actual definition of "duplicate").
- *   * Two real distinct contacts can NEVER collide unless every recorded
+ * Two real distinct contacts can NEVER collide unless every recorded
  *     property is identical, eliminating the false-positive risk that an
  *     FN+EMAIL shortcut would carry (e.g. two "Bob Smith" entries without
  *     emails would otherwise overwrite each other on merge).
- *   * The trade-off is a false negative when a card is edited between
+ * The trade-off is a false negative when a card is edited between
  *     exports — it will re-import as a new row rather than updating in
  *     place. This is the honest outcome; the user can clean up duplicates
  *     manually rather than risk silent overwrites.

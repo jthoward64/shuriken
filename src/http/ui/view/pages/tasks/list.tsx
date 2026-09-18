@@ -89,7 +89,7 @@ const CalendarList = ({
 	showCompleted: boolean;
 }): VNode => (
 	<div class="space-y-2">
-		<h2 class="px-1 text-xs font-semibold uppercase tracking-wider text-subtle">
+		<h2 class="px-1 font-semibold text-subtle text-xs uppercase tracking-wider">
 			Calendars
 		</h2>
 		<ul class="space-y-0.5">
@@ -149,7 +149,7 @@ const taskColumns = (
 					type="submit"
 					disabled={!writable}
 					aria-label={t.completed ? "Mark as not done" : "Mark as done"}
-					class="flex h-5 w-5 items-center justify-center rounded border border-line text-xs disabled:opacity-40"
+					class="flex size-5 items-center justify-center rounded border border-line text-xs disabled:opacity-40"
 				>
 					{t.completed ? "✓" : ""}
 				</button>
@@ -161,7 +161,7 @@ const taskColumns = (
 		cell: (t) => (
 			<span class={t.completed ? "text-muted line-through" : undefined}>
 				{t.title}
-				{t.recurring && <span class="ml-1 text-xs text-subtle">(repeats)</span>}
+				{t.recurring && <span class="ml-1 text-subtle text-xs">(repeats)</span>}
 			</span>
 		),
 	},

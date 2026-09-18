@@ -205,7 +205,7 @@ const Section = ({
 	children: ComponentChildren;
 }): VNode => (
 	<section class="space-y-2">
-		<h2 class="text-sm font-semibold text-fg">{title}</h2>
+		<h2 class="font-semibold text-fg text-sm">{title}</h2>
 		{children}
 	</section>
 );
@@ -271,7 +271,7 @@ const PreferredCheckbox = ({
 	field: string;
 	preferred: boolean;
 }): VNode => (
-	<label class="inline-flex items-center gap-1 ml-auto">
+	<label class="ml-auto inline-flex items-center gap-1">
 		<input type="checkbox" checked={preferred} data-preferred-checkbox />
 		Preferred
 		<input
@@ -298,17 +298,17 @@ const TypedValueRow = ({
 	const { checked, other } = splitKnownTypes(value.types, options);
 	return (
 		<div
-			class="border border-line rounded-md p-3 space-y-2"
+			class="space-y-2 rounded-md border border-line p-3"
 			data-row-item
 			data-nojs-only={nojsOnly || undefined}
 		>
-			<div class="flex flex-wrap gap-2 items-start">
+			<div class="flex flex-wrap items-start gap-2">
 				<TextInput
 					type={field === "emails" ? "email" : "tel"}
 					name={`${field}[].value`}
 					value={value.value}
 					placeholder={field === "emails" ? "address@example.com" : ""}
-					class="flex-1 min-w-[12rem]"
+					class="min-w-[12rem] flex-1"
 				/>
 				<TextInput
 					name={`${field}[].label`}
@@ -382,7 +382,7 @@ const ServiceRow = ({
 			name={`${field}[].value`}
 			value={value.value}
 			placeholder={valuePlaceholder}
-			class="flex-1 min-w-[12rem]"
+			class="min-w-[12rem] flex-1"
 		/>
 		<RemoveRowButton />
 	</div>
@@ -405,7 +405,7 @@ const UrlRow = ({
 			name="urls[]"
 			value={value}
 			placeholder="https://example.com"
-			class="flex-1 min-w-[12rem]"
+			class="min-w-[12rem] flex-1"
 		/>
 		<RemoveRowButton />
 	</div>
@@ -419,7 +419,7 @@ const AddressRow = ({
 	nojsOnly?: boolean;
 }): VNode => (
 	<div
-		class="grid grid-cols-1 md:grid-cols-2 gap-2 p-3 border border-line rounded-md"
+		class="grid grid-cols-1 gap-2 rounded-md border border-line p-3 md:grid-cols-2"
 		data-row-item
 		data-nojs-only={nojsOnly || undefined}
 	>
@@ -507,7 +507,7 @@ const RelationRow = ({
 			: value.name;
 	return (
 		<div
-			class="flex flex-wrap gap-2 items-center"
+			class="flex flex-wrap items-center gap-2"
 			data-row-item
 			data-nojs-only={nojsOnly || undefined}
 		>
@@ -523,7 +523,7 @@ const RelationRow = ({
 				hx-swap="outerHTML"
 				hx-vals={JSON.stringify({ addressbook: addressbookId, list: listId })}
 				hx-params="*"
-				class="flex-1 min-w-[12rem]"
+				class="min-w-[12rem] flex-1"
 			/>
 			<datalist id={listId} />
 			<input
@@ -561,7 +561,7 @@ const OtherPropRow = ({
 	nojsOnly?: boolean;
 }): VNode => (
 	<div
-		class="grid grid-cols-1 md:grid-cols-4 gap-2"
+		class="grid grid-cols-1 gap-2 md:grid-cols-4"
 		data-row-item
 		data-nojs-only={nojsOnly || undefined}
 	>
@@ -630,7 +630,7 @@ export const ContactFormPage = ({
 	const photoSrc = photoSrcFor(form.photo, instanceId);
 
 	return (
-		<div class={popover ? "space-y-6" : "space-y-6 max-w-3xl"}>
+		<div class={popover ? "space-y-6" : "max-w-3xl space-y-6"}>
 			{popover ? (
 				<ContactsPopoverHeader title={pageTitle} popoverId={popoverId} />
 			) : (
@@ -639,7 +639,7 @@ export const ContactFormPage = ({
 
 			{errors.length > 0 && (
 				<Alert tone="danger" title="Please correct the following:">
-					<ul class="list-disc list-inside space-y-0.5">
+					<ul class="list-inside list-disc space-y-0.5">
 						{errors.map((e) => (
 							<li key={e}>{e}</li>
 						))}
@@ -656,7 +656,7 @@ export const ContactFormPage = ({
 			>
 				<input type="hidden" name="addressbookId" value={addressbookId} />
 
-				<section class="grid grid-cols-1 md:grid-cols-2 gap-4">
+				<section class="grid grid-cols-1 gap-4 md:grid-cols-2">
 					<label class="form-group block">
 						<span class="form-label flex items-center gap-2">
 							Display name <span class="text-danger">*</span>
@@ -876,7 +876,7 @@ export const ContactFormPage = ({
 					addLabel="+ Add related person"
 				/>
 
-				<section class="grid grid-cols-1 md:grid-cols-3 gap-4">
+				<section class="grid grid-cols-1 gap-4 md:grid-cols-3">
 					<TextField
 						label="Pronouns"
 						name="pronouns"
@@ -904,7 +904,7 @@ export const ContactFormPage = ({
 					<div class="flex items-end">
 						<button
 							type="button"
-							class="text-sm text-muted underline"
+							class="text-muted text-sm underline"
 							data-add-gram-gender
 							hidden={hasGramGender}
 						>
@@ -930,7 +930,7 @@ export const ContactFormPage = ({
 					</div>
 				</section>
 
-				<section class="grid grid-cols-1 md:grid-cols-2 gap-4">
+				<section class="grid grid-cols-1 gap-4 md:grid-cols-2">
 					<TextField label="Organisation" name="org" value={form.org} />
 					<TextField label="Title" name="title" value={form.title} />
 					<TextField
@@ -956,7 +956,7 @@ export const ContactFormPage = ({
 							src={photoSrc}
 							alt="Current contact avatar"
 							loading="lazy"
-							class="w-24 h-24 object-cover rounded-md"
+							class="size-24 rounded-md object-cover"
 						/>
 					)}
 					<label class="form-group block text-sm">
@@ -984,7 +984,7 @@ export const ContactFormPage = ({
 
 				<section>
 					<details class="text-sm" open={form.otherProps.length > 0}>
-						<summary class="cursor-pointer text-sm font-semibold text-fg">
+						<summary class="cursor-pointer font-semibold text-fg text-sm">
 							Other fields ({form.otherProps.length})
 						</summary>
 						<p class="form-hint mt-1 mb-2">
@@ -1032,7 +1032,7 @@ export const ContactFormPage = ({
 						data-guard=""
 						class="card-pad space-y-2"
 					>
-						<h2 class="text-sm font-semibold text-danger">Danger zone</h2>
+						<h2 class="font-semibold text-danger text-sm">Danger zone</h2>
 						<Button type="submit" variant="danger">
 							Delete contact
 						</Button>

@@ -54,7 +54,7 @@ const slugFromUid = (uid: string): Slug => {
 
 const uidOf = (component: IrComponent): Option.Option<string> => {
 	const uid = component.properties.find((p) => p.name.toUpperCase() === "UID");
-	if (!uid || uid.value.type !== "TEXT") {
+	if (uid?.value.type !== "TEXT") {
 		return Option.none();
 	}
 	return Option.some(uid.value.value);

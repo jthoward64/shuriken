@@ -117,7 +117,7 @@ export const TrashPage = ({
 			subtitle="Deleted calendars, address books, events, and contacts. Restore them or delete them forever."
 		/>
 		<div class="space-y-3">
-			<h2 class="text-sm font-semibold text-fg">
+			<h2 class="font-semibold text-fg text-sm">
 				Calendars &amp; address books
 			</h2>
 			<Table
@@ -128,7 +128,7 @@ export const TrashPage = ({
 			/>
 		</div>
 		<div class="space-y-3">
-			<h2 class="text-sm font-semibold text-fg">Events &amp; contacts</h2>
+			<h2 class="font-semibold text-fg text-sm">Events &amp; contacts</h2>
 			<Table
 				columns={INSTANCE_COLUMNS}
 				rows={instances}

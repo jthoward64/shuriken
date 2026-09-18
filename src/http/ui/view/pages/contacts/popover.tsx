@@ -53,7 +53,7 @@ export const ContactsPopoverHeader = ({
 			command="request-close"
 			aria-label="Close"
 		>
-			<IconClose class="h-4 w-4" />
+			<IconClose class="size-4" />
 		</Button>
 	</div>
 );

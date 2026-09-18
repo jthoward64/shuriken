@@ -1,5 +1,5 @@
 import { expect } from "@std/expect";
-import { describe, it, it as test } from "@std/testing/bdd";
+import { describe, it, } from "@std/testing/bdd";
 import { Effect, Option } from "effect";
 import { IanaTimezoneService, IanaTimezoneServiceLive } from "./iana.ts";
 

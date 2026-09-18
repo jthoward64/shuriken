@@ -79,7 +79,7 @@ export const SharePanel = ({
 					</form>
 				) : (
 					<span
-						class="text-xs text-subtle"
+						class="text-subtle text-xs"
 						title="Custom access — edit in Advanced mode"
 					>
 						Custom access
@@ -102,7 +102,7 @@ export const SharePanel = ({
 					<input type="hidden" name="principalId" value={g.principalId} />
 					<button
 						type="submit"
-						class="link text-xs text-danger"
+						class="link text-danger text-xs"
 						title="Remove access"
 					>
 						Remove
@@ -123,7 +123,7 @@ export const SharePanel = ({
 			cell: (ace) =>
 				ace.protected ? (
 					<span
-						class="text-xs text-subtle"
+						class="text-subtle text-xs"
 						title="System-managed, cannot be removed"
 					>
 						🔒
@@ -140,7 +140,7 @@ export const SharePanel = ({
 						<input type="hidden" name="aceId" value={ace.aceId} />
 						<button
 							type="submit"
-							class="link text-xs text-danger"
+							class="link text-danger text-xs"
 							title="Revoke"
 						>
 							Revoke
@@ -156,7 +156,7 @@ export const SharePanel = ({
 				<div class="space-y-4">
 					{/* Basic view */}
 					<details open={data.defaultMode === "basic"} class="space-y-4">
-						<summary class="cursor-pointer text-sm font-medium">Simple</summary>
+						<summary class="cursor-pointer font-medium text-sm">Simple</summary>
 						<div class="space-y-4 pt-2">
 							{!data.representableInBasic && (
 								<Alert tone="warning" class="space-y-2 text-xs">
@@ -192,7 +192,7 @@ export const SharePanel = ({
 								empty={<EmptyState title="Not shared with anyone yet." />}
 							/>
 
-							<div class="border-t border-line pt-4">
+							<div class="border-line border-t pt-4">
 								<p class="form-label mb-2">Share with someone</p>
 								<form
 									method="POST"
@@ -238,7 +238,7 @@ export const SharePanel = ({
 
 					{/* Advanced view */}
 					<details open={data.defaultMode === "advanced"} class="space-y-4">
-						<summary class="cursor-pointer text-sm font-medium">
+						<summary class="cursor-pointer font-medium text-sm">
 							Advanced
 						</summary>
 						<div class="space-y-4 pt-2">
@@ -249,7 +249,7 @@ export const SharePanel = ({
 								empty={<EmptyState title="No access entries yet." />}
 							/>
 
-							<div class="border-t border-line pt-4">
+							<div class="border-line border-t pt-4">
 								<p class="form-label mb-2">Grant access</p>
 								<form
 									method="POST"

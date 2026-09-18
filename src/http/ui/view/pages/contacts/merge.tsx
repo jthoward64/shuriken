@@ -193,7 +193,7 @@ export const ContactsMergePage = ({
 							/>
 						</Field>
 
-						<fieldset class="text-sm text-muted">
+						<fieldset class="text-muted text-sm">
 							<legend class="form-label mb-1">
 								Match when contacts share any of
 							</legend>
@@ -229,7 +229,7 @@ export const ContactsMergePage = ({
 					) : run ? (
 						groups.length > 0 ? (
 							<>
-								<p class="text-sm text-muted">
+								<p class="text-muted text-sm">
 									{groupCount} duplicate group(s) found.
 								</p>
 								<div class="space-y-4">

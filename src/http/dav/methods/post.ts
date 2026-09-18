@@ -97,8 +97,7 @@ export const postHandler = (
 		// Validate METHOD:REQUEST.
 		const methodProp = doc.root.properties.find((p) => p.name === "METHOD");
 		if (
-			!methodProp ||
-			methodProp.value.type !== "TEXT" ||
+			methodProp?.value.type !== "TEXT" ||
 			methodProp.value.value !== "REQUEST"
 		) {
 			return yield* badRequest(

@@ -288,7 +288,7 @@ const insert = Effect.fn("CollectionRepository.insert")(
 		// subscriptions pass 0 explicitly; everything else is a normal collection.
 		const sortOrder =
 			input.sortOrder ??
-			(input.autoManagedKind != null
+			(input.autoManagedKind !== null
 				? DEFAULT_SORT_ORDER.generated
 				: DEFAULT_SORT_ORDER.normal);
 		return yield* runDbQuery((db) =>

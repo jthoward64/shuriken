@@ -260,7 +260,7 @@ export const putHandler = (
 			const componentUids = new Set(
 				nonTzComponents.flatMap((c) => {
 					const uidProp = c.properties.find((p) => p.name === "UID");
-					if (!uidProp || uidProp.value.type !== "TEXT") {
+					if (uidProp?.value.type !== "TEXT") {
 						return [];
 					}
 					return [uidProp.value.value];

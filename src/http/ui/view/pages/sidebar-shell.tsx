@@ -50,7 +50,7 @@ export const SidebarShell = ({
 			<div class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
 				{top}
 			</div>
-			<div class="shrink-0 space-y-2 border-t border-line p-3">{bottom}</div>
+			<div class="shrink-0 space-y-2 border-line border-t p-3">{bottom}</div>
 		</aside>
 		<div
 			class={cx(

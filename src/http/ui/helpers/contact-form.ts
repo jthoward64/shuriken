@@ -13,8 +13,8 @@ import { emptyContactForm } from "#src/services/card-edit/types.ts";
 // depend only on a structural subset (`get`/`getAll`). The helpers below only
 // rely on the subset we actually use.
 interface FormLike {
-	get(key: string): unknown;
-	getAll(key: string): ReadonlyArray<unknown>;
+	get: (key: string) => unknown;
+	getAll: (key: string) => ReadonlyArray<unknown>;
 }
 
 const PHOTO_BYTES_PER_KB = 1024;

@@ -298,7 +298,7 @@ export const CollectionEditPage = (props: CollectionEditPageProps): VNode => {
 										value={props.calendarColor}
 										class="h-9 w-14 cursor-pointer rounded border border-line bg-surface-2 p-1"
 									/>
-									<span class="text-xs text-muted">
+									<span class="text-muted text-xs">
 										Shown as the event colour in the calendar and in CalDAV
 										clients.
 									</span>
@@ -306,14 +306,14 @@ export const CollectionEditPage = (props: CollectionEditPageProps): VNode => {
 							</Field>
 						</>
 					)}
-					<p class="text-sm text-muted">
+					<p class="text-muted text-sm">
 						<span class="font-medium text-fg">Slug:</span>{" "}
 						<span class="font-mono">{props.slug}</span>
-						<span class="ml-2 text-xs text-subtle">
+						<span class="ml-2 text-subtle text-xs">
 							(changing this breaks DAV client sync)
 						</span>
 					</p>
-					<p class="text-sm text-muted">
+					<p class="text-muted text-sm">
 						<span class="font-medium text-fg">Type:</span>{" "}
 						{props.collectionType}
 					</p>
@@ -329,7 +329,7 @@ export const CollectionEditPage = (props: CollectionEditPageProps): VNode => {
 					</div>
 				</form>
 				{popover && (regenerateBirthdaysButton || deleteButton) && (
-					<div class="mt-4 flex items-center gap-3 border-t border-line pt-4">
+					<div class="mt-4 flex items-center gap-3 border-line border-t pt-4">
 						{regenerateBirthdaysButton}
 						{deleteButton}
 					</div>

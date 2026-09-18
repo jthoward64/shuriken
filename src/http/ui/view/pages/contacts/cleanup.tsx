@@ -89,18 +89,18 @@ export const CleanupSuggestion = ({
 		class="card card-pad flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
 	>
 		<div class="min-w-0 space-y-1">
-			<div class="flex items-center gap-2 flex-wrap">
+			<div class="flex flex-wrap items-center gap-2">
 				<Badge>{s.title}</Badge>
 				<a
 					href={`/ui/contacts/${s.instanceId}`}
-					class="text-sm font-medium text-fg hover:underline"
+					class="font-medium text-fg text-sm hover:underline"
 				>
 					{s.contactFn}
 				</a>
 			</div>
 			<p class="form-hint">{s.description}</p>
-			<p class="text-sm text-fg font-mono break-all">
-				<span class="line-through text-subtle">{s.current}</span>
+			<p class="break-all font-mono text-fg text-sm">
+				<span class="text-subtle line-through">{s.current}</span>
 				{s.proposed !== "" && (
 					<>
 						<span class="text-subtle"> → </span>
@@ -110,7 +110,7 @@ export const CleanupSuggestion = ({
 			</p>
 		</div>
 
-		<div class="flex items-center gap-2 shrink-0">
+		<div class="flex shrink-0 items-center gap-2">
 			<form
 				method="POST"
 				action="/ui/api/contacts/cleanup/fix"
@@ -227,7 +227,7 @@ export const ContactsCleanupPage = ({
 					{suggestions.length > 0 ? (
 						<>
 							<div class="flex items-center justify-between gap-4">
-								<p class="text-sm text-muted">
+								<p class="text-muted text-sm">
 									{suggestionCount} suggestion(s) found.
 								</p>
 								{suggestions.some(
@@ -271,7 +271,7 @@ export const ContactsCleanupPage = ({
 					)}
 				</>
 			) : (
-				<p class="text-sm text-muted">
+				<p class="text-muted text-sm">
 					No address book available. Create one from your profile.
 				</p>
 			)}

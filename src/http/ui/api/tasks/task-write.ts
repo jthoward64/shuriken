@@ -22,7 +22,7 @@ import { emptyTaskForm } from "#src/services/task-edit/types.ts";
 // ---------------------------------------------------------------------------
 
 interface FormLike {
-	get(key: string): unknown;
+	get: (key: string) => unknown;
 }
 
 const single = (form: FormLike, key: string) =>

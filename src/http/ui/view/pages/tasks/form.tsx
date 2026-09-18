@@ -207,7 +207,7 @@ export const TaskFormPage = ({
 					action={deleteAction}
 					data-confirm="Delete this task?"
 				>
-					<h2 class="mb-2 text-sm font-semibold text-danger">Danger zone</h2>
+					<h2 class="mb-2 font-semibold text-danger text-sm">Danger zone</h2>
 					<Button type="submit" variant="danger">
 						Delete task
 					</Button>

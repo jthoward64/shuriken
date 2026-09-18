@@ -708,7 +708,7 @@ const makeCollectionRepo = (stores: TestStores): CollectionRepositoryShape => ({
 				autoManagedKind: input.autoManagedKind ?? null,
 				sortOrder:
 					input.sortOrder ??
-					(input.autoManagedKind != null
+					(input.autoManagedKind !== null
 						? DEFAULT_SORT_ORDER.generated
 						: DEFAULT_SORT_ORDER.normal),
 			};
@@ -1554,23 +1554,23 @@ const makeGroupRepo = (stores: TestStores): GroupRepositoryShape => ({
 
 export interface TestEnvBuilder {
 	/** Seed a user principal + user row with smart defaults. */
-	withUser(seed?: Partial<UserSeedData>): TestEnvBuilder;
+	withUser: (seed?: Partial<UserSeedData>) => TestEnvBuilder;
 	/** Seed a collection row. ownerPrincipalId is required. */
-	withCollection(seed: CollectionSeedData): TestEnvBuilder;
+	withCollection: (seed: CollectionSeedData) => TestEnvBuilder;
 	/** Seed a group principal + group row with smart defaults. */
-	withGroup(seed?: Partial<GroupSeedData>): TestEnvBuilder;
+	withGroup: (seed?: Partial<GroupSeedData>) => TestEnvBuilder;
 	/** Seed an instance row. collectionId is required. */
-	withInstance(seed: InstanceSeedData): TestEnvBuilder;
+	withInstance: (seed: InstanceSeedData) => TestEnvBuilder;
 	/** Seed a credential row for an existing user. */
-	withCredential(seed: CredentialSeedData): TestEnvBuilder;
+	withCredential: (seed: CredentialSeedData) => TestEnvBuilder;
 	/** Seed an ACE (Access Control Entry) on a resource. */
-	withAce(seed: AceSeedData): TestEnvBuilder;
+	withAce: (seed: AceSeedData) => TestEnvBuilder;
 	/**
 	 * Build a fully-wired Effect Layer from the current state of the stores.
 	 * Provides UserService, CollectionService, GroupService, InstanceService,
 	 * PrincipalService, AclService, and CryptoService (TestCryptoLayer).
 	 */
-	toLayer(): Layer.Layer<
+	toLayer: () => Layer.Layer<
 		| UserService
 		| CollectionService
 		| GroupService

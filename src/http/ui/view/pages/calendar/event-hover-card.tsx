@@ -102,21 +102,21 @@ export const EventHoverCard = ({
 					aria-label="Edit event"
 					class="shrink-0"
 				>
-					<IconEdit class="h-4 w-4" />
+					<IconEdit class="size-4" />
 				</LinkButton>
 			)}
 		</div>
-		<p class="mt-1 text-sm text-muted">{formatWhen(form)}</p>
+		<p class="mt-1 text-muted text-sm">{formatWhen(form)}</p>
 		{form.location !== "" && (
-			<p class="mt-2 text-sm text-fg">{form.location}</p>
+			<p class="mt-2 text-fg text-sm">{form.location}</p>
 		)}
 		{form.description !== "" && (
-			<p class="mt-2 whitespace-pre-line text-sm text-muted">
+			<p class="mt-2 whitespace-pre-line text-muted text-sm">
 				{form.description}
 			</p>
 		)}
 		{form.organizer !== "" && (
-			<p class="mt-2 text-xs text-subtle">Organizer: {form.organizer}</p>
+			<p class="mt-2 text-subtle text-xs">Organizer: {form.organizer}</p>
 		)}
 	</>
 );

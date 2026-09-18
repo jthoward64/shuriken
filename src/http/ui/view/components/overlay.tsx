@@ -90,7 +90,7 @@ export const Menu = ({
 	<details class={cx("menu", cls)}>
 		<summary class={triggerClass}>
 			{label}
-			<IconChevronDown class="menu-caret w-3.5 h-3.5" />
+			<IconChevronDown class="menu-caret size-3.5" />
 		</summary>
 		<div class={cx("menu-panel", align === "start" && "menu-panel-left")}>
 			{children}

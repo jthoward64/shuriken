@@ -59,9 +59,9 @@ if (chartYamlVersion) {
 		.split(".")
 		.map(Number);
 	if (
-		chartMajor == null ||
-		chartMinor == null ||
-		chartPatch == null ||
+		chartMajor === null ||
+		chartMinor === null ||
+		chartPatch === null ||
 		Number.isNaN(chartMajor) ||
 		Number.isNaN(chartMinor) ||
 		Number.isNaN(chartPatch)

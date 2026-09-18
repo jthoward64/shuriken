@@ -34,11 +34,11 @@ export const CopyButton = ({
 		class={cx("btn btn-secondary btn-sm shrink-0", cls)}
 	>
 		<span class="copy-idle inline-flex items-center gap-1.5">
-			<IconCopy class="h-4 w-4" />
+			<IconCopy class="size-4" />
 			Copy
 		</span>
 		<span class="copy-done inline-flex items-center gap-1.5" hidden>
-			<IconCheck class="h-4 w-4" />
+			<IconCheck class="size-4" />
 			Copied
 		</span>
 	</button>
@@ -57,7 +57,7 @@ export const CopyField = ({ label, value, hint }: CopyFieldProps): VNode => (
 	<div class="form-group">
 		<span class="form-label">{label}</span>
 		<div class="flex items-stretch gap-2">
-			<code class="block flex-1 min-w-0 select-all overflow-x-auto whitespace-nowrap rounded-md border border-line bg-surface-2 px-3 py-2 font-mono text-sm text-fg">
+			<code class="block min-w-0 flex-1 select-all overflow-x-auto whitespace-nowrap rounded-md border border-line bg-surface-2 px-3 py-2 font-mono text-fg text-sm">
 				{value}
 			</code>
 			<CopyButton value={value} label={label} />

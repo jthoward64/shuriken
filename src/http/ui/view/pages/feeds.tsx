@@ -90,7 +90,7 @@ const FEED_COLUMNS: ReadonlyArray<Column<FeedListRow>> = [
 					{f.enabled ? "enabled" : "disabled"}
 				</Badge>
 				{f.expiresAt && (
-					<span class="ml-2 text-xs text-subtle">expires {f.expiresAt}</span>
+					<span class="ml-2 text-subtle text-xs">expires {f.expiresAt}</span>
 				)}
 			</>
 		),
@@ -130,7 +130,7 @@ export const FeedsListPage = ({
 					subtitle="Public read-only iCalendar links, each protected by a random token."
 					actions={
 						<LinkButton href="/ui/feeds/new" variant="primary">
-							<IconPlus class="h-4 w-4" />
+							<IconPlus class="size-4" />
 							New feed
 						</LinkButton>
 					}
@@ -138,7 +138,7 @@ export const FeedsListPage = ({
 			)}
 			{popover && (
 				<LinkButton href="/ui/feeds/new" variant="primary" size="sm">
-					<IconPlus class="h-4 w-4" />
+					<IconPlus class="size-4" />
 					New feed
 				</LinkButton>
 			)}
@@ -152,7 +152,7 @@ export const FeedsListPage = ({
 						title="No feeds yet."
 						action={
 							<LinkButton href="/ui/feeds/new" variant="primary" size="sm">
-								<IconPlus class="h-4 w-4" />
+								<IconPlus class="size-4" />
 								New feed
 							</LinkButton>
 						}
@@ -198,7 +198,7 @@ export const CalendarFeedsSection = ({
 						<a href={`/ui/feeds/${f.feedId}`} class="link">
 							{f.displayName}
 						</a>
-						<span class="text-xs text-subtle">{f.visibility}</span>
+						<span class="text-subtle text-xs">{f.visibility}</span>
 					</li>
 				))}
 			</ul>
@@ -415,8 +415,8 @@ export const FeedEditPage = ({
 
 		{calendars.some((c) => c.embedEnabled) && (
 			<Card class="space-y-3">
-				<h2 class="text-sm font-semibold text-fg">Embed snippet</h2>
-				<p class="text-sm text-muted">
+				<h2 class="font-semibold text-fg text-sm">Embed snippet</h2>
+				<p class="text-muted text-sm">
 					Paste this into any page to show a read-only calendar widget. No login
 					required — anyone with this URL can view it.
 					{!embedFeatureEnabled && (
@@ -432,7 +432,7 @@ export const FeedEditPage = ({
 					<textarea
 						readOnly
 						rows={2}
-						class="block min-w-0 flex-1 select-all resize-none overflow-x-auto rounded-md border border-line bg-surface-2 px-3 py-2 font-mono text-xs text-fg"
+						class="block min-w-0 flex-1 select-all resize-none overflow-x-auto rounded-md border border-line bg-surface-2 px-3 py-2 font-mono text-fg text-xs"
 					>
 						{`<iframe src="${feed.embedWidgetUrl}" title="${feed.displayName || "Calendar"}" style="border:0;width:100%;height:600px" loading="lazy"></iframe>`}
 					</textarea>
@@ -493,7 +493,7 @@ export const FeedEditPage = ({
 								name={`embed:${c.id}`}
 								checked={c.embedEnabled}
 								title="Show this calendar in the public, no-login embed widget"
-								class="text-xs text-muted"
+								class="text-muted text-xs"
 							/>
 						</div>
 					))}

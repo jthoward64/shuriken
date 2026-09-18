@@ -46,7 +46,7 @@ const PaneSection = ({
 	children: ComponentChildren;
 }): VNode => (
 	<section class="space-y-1.5">
-		<h3 class="text-xs font-semibold uppercase tracking-wider text-subtle">
+		<h3 class="font-semibold text-subtle text-xs uppercase tracking-wider">
 			{title}
 		</h3>
 		{children}
@@ -62,8 +62,8 @@ const DetailRow = ({
 	value: string;
 }): VNode => (
 	<div class="flex items-baseline justify-between gap-3">
-		<span class="shrink-0 text-sm text-muted">{label}</span>
-		<span class="min-w-0 break-words text-right text-sm text-fg">{value}</span>
+		<span class="shrink-0 text-muted text-sm">{label}</span>
+		<span class="min-w-0 break-words text-right text-fg text-sm">{value}</span>
 	</div>
 );
 
@@ -86,10 +86,10 @@ const TypedValueList = ({
 								{v.value}
 							</a>
 						) : (
-							<span class="break-words text-sm text-fg">{v.value}</span>
+							<span class="break-words text-fg text-sm">{v.value}</span>
 						)}
 						{labels !== "" && (
-							<span class="ml-2 text-xs text-subtle">{labels}</span>
+							<span class="ml-2 text-subtle text-xs">{labels}</span>
 						)}
 					</div>
 					{v.preferred && <PreferredBadge />}
@@ -116,13 +116,13 @@ const AddressList = ({
 			const labels = typeLabels(a.types) || a.label || "";
 			return (
 				<li key={i} class="flex items-start gap-2">
-					<address class="min-w-0 flex-1 not-italic text-sm text-fg">
+					<address class="min-w-0 flex-1 text-fg text-sm not-italic">
 						{lines.map((line, j) => (
 							<div key={j} class="break-words">
 								{line}
 							</div>
 						))}
-						{labels !== "" && <div class="text-xs text-subtle">{labels}</div>}
+						{labels !== "" && <div class="text-subtle text-xs">{labels}</div>}
 					</address>
 					{a.preferred && <PreferredBadge />}
 				</li>
@@ -205,7 +205,7 @@ export const ContactPreviewPane = ({
 	const backBar = standalone ? (
 		<div class="mb-3">
 			<LinkButton href="/ui/contacts" variant="ghost" size="sm">
-				<IconChevronLeft class="h-4 w-4" />
+				<IconChevronLeft class="size-4" />
 				Back
 			</LinkButton>
 		</div>
@@ -218,7 +218,7 @@ export const ContactPreviewPane = ({
 				popovertargetaction="hide"
 				aria-label="Close preview"
 			>
-				<IconChevronLeft class="h-4 w-4" />
+				<IconChevronLeft class="size-4" />
 				Back
 			</Button>
 		</div>
@@ -234,22 +234,22 @@ export const ContactPreviewPane = ({
 							src={photoSrc}
 							alt=""
 							loading="lazy"
-							class="h-16 w-16 shrink-0 rounded-full bg-surface-2 object-cover"
+							class="size-16 shrink-0 rounded-full bg-surface-2 object-cover"
 						/>
 					) : (
 						<span
-							class="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-surface-2 text-xl font-medium text-muted"
+							class="flex size-16 shrink-0 items-center justify-center rounded-full bg-surface-2 font-medium text-muted text-xl"
 							aria-hidden="true"
 						>
 							{(form.fn.trim().charAt(0) || "?").toUpperCase()}
 						</span>
 					)}
 					<div class="min-w-0 flex-1">
-						<h2 class="break-words text-lg font-semibold text-fg">
+						<h2 class="break-words font-semibold text-fg text-lg">
 							{form.fn || "(no name)"}
 						</h2>
 						{orgLine !== "" && (
-							<p class="break-words text-sm text-muted">{orgLine}</p>
+							<p class="break-words text-muted text-sm">{orgLine}</p>
 						)}
 					</div>
 					<LinkButton
@@ -258,7 +258,7 @@ export const ContactPreviewPane = ({
 						data-edit-contact
 						class="shrink-0"
 					>
-						<IconEdit class="h-4 w-4" />
+						<IconEdit class="size-4" />
 						Edit
 					</LinkButton>
 				</div>
@@ -336,7 +336,7 @@ export const ContactPreviewPane = ({
 				)}
 				{form.note !== "" && (
 					<PaneSection title="Note">
-						<p class="whitespace-pre-wrap break-words text-sm text-fg">
+						<p class="whitespace-pre-wrap break-words text-fg text-sm">
 							{form.note}
 						</p>
 					</PaneSection>
@@ -349,7 +349,7 @@ export const ContactPreviewPane = ({
 									key={`${p.name}-${i}`}
 									class="flex items-baseline gap-2 text-sm"
 								>
-									<span class="shrink-0 font-mono text-xs text-muted">
+									<span class="shrink-0 font-mono text-muted text-xs">
 										{p.name}
 									</span>
 									<span class="min-w-0 break-words text-fg">{p.value}</span>
@@ -384,7 +384,7 @@ export const ContactsPaneContainer = (): VNode => (
 
 // Empty state shown in the desktop pane before a contact is selected.
 export const PanePlaceholder = (): VNode => (
-	<div class="flex h-full items-center justify-center p-6 text-center text-sm text-muted">
+	<div class="flex h-full items-center justify-center p-6 text-center text-muted text-sm">
 		Select a contact to preview.
 	</div>
 );

@@ -39,8 +39,8 @@ const Line = ({
 	children: preact.ComponentChildren;
 }): VNode => (
 	<div class="flex flex-wrap items-baseline gap-2 py-1">
-		<span class="w-40 shrink-0 text-xs font-medium text-muted">{field}</span>
-		<span class="text-sm text-fg">{children}</span>
+		<span class="w-40 shrink-0 font-medium text-muted text-xs">{field}</span>
+		<span class="text-fg text-sm">{children}</span>
 	</div>
 );
 
@@ -107,7 +107,7 @@ export const ComponentEchoPanel = ({
 
 		{data.descriptionHtml !== "" && (
 			<div class="space-y-1">
-				<p class="text-xs font-medium text-muted">Sanitized markup, rendered</p>
+				<p class="font-medium text-muted text-xs">Sanitized markup, rendered</p>
 				<div
 					class="rich-content rounded border border-line p-3 text-sm"
 					dangerouslySetInnerHTML={{

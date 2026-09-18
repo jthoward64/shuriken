@@ -123,7 +123,7 @@ export interface CalendarViewProps {
 
 const Swatch = ({ color }: { color: string }) => (
 	<span
-		class="inline-block h-3 w-3 shrink-0 rounded-full ring-1 ring-line"
+		class="inline-block size-3 shrink-0 rounded-full ring-1 ring-line"
 		style={`background-color:${color}`}
 		aria-hidden="true"
 	/>
@@ -163,7 +163,7 @@ const NewEventButton = ({ disabled }: { disabled: boolean }) => (
 		disabled={disabled}
 		title={disabled ? "Read-only calendar" : undefined}
 	>
-		<IconPlus class="h-4 w-4" />
+		<IconPlus class="size-4" />
 		New event
 	</Button>
 );
@@ -187,7 +187,7 @@ const CalendarList = ({
 		<input type="hidden" name="month" value={monthValue} />
 		<input type="hidden" name="cals" value="1" />
 		<div class="flex items-center justify-between px-1">
-			<h2 class="text-xs font-semibold uppercase tracking-wider text-subtle">
+			<h2 class="font-semibold text-subtle text-xs uppercase tracking-wider">
 				Calendars
 			</h2>
 			{/* No-JS visibility apply; JS toggles sources live instead. */}
@@ -235,7 +235,7 @@ const CalendarList = ({
 						{isSynthetic ? (
 							<span class="flex min-w-0 flex-1 items-center gap-2">
 								<Swatch color={c.color} />
-								<span data-cal-name class="truncate text-sm text-muted">
+								<span data-cal-name class="truncate text-muted text-sm">
 									{c.displayName}
 								</span>
 							</span>
@@ -277,7 +277,7 @@ const CalendarList = ({
 									aria-label={`Edit ${c.displayName}`}
 									class="shrink-0 rounded p-0.5 text-subtle hover:bg-surface hover:text-fg"
 								>
-									<IconEdit class="h-3.5 w-3.5" />
+									<IconEdit class="size-3.5" />
 								</a>
 								{/* No-JS reorder fallback: real form submits (formmethod/formaction
 								    override the enclosing GET form). Hidden once JS marks the
@@ -291,7 +291,7 @@ const CalendarList = ({
 									aria-label={`Move ${c.displayName} up`}
 									class="shrink-0 rounded p-0.5 text-subtle hover:bg-surface hover:text-fg"
 								>
-									<IconChevronDown class="h-3.5 w-3.5 rotate-180" />
+									<IconChevronDown class="size-3.5 rotate-180" />
 								</button>
 								<button
 									type="submit"
@@ -301,7 +301,7 @@ const CalendarList = ({
 									aria-label={`Move ${c.displayName} down`}
 									class="shrink-0 rounded p-0.5 text-subtle hover:bg-surface hover:text-fg"
 								>
-									<IconChevronDown class="h-3.5 w-3.5" />
+									<IconChevronDown class="size-3.5" />
 								</button>
 							</>
 						)}
@@ -309,7 +309,7 @@ const CalendarList = ({
 				);
 			})}
 		</ul>
-		<p class="px-1 text-xs text-subtle">
+		<p class="px-1 text-subtle text-xs">
 			The highlighted calendar is where new events, imports, and exports go.
 		</p>
 	</form>
@@ -332,7 +332,7 @@ const AddCalendarMenu = () => {
 					"w-full cursor-pointer list-none marker:hidden [&::-webkit-details-marker]:hidden",
 				)}
 			>
-				<IconPlus class="h-4 w-4" />
+				<IconPlus class="size-4" />
 				Add calendar
 			</summary>
 			<div class="mb-1 space-y-0.5">
@@ -404,7 +404,7 @@ const ImportForm = ({
 				name="mode"
 				disabled={disabled}
 				options={DUPLICATE_MODE_OPTIONS}
-				class="basis-1/3 border-0 bg-transparent px-2 py-2 text-xs focus:outline-none focus-visible:bg-surface-2 focus-visible:ring-0 focus-visible:ring-offset-0"
+				class="basis-1/3 border-0 bg-transparent p-2 text-xs focus:outline-none focus-visible:bg-surface-2 focus-visible:ring-0 focus-visible:ring-offset-0"
 				aria-label="How to handle duplicate events"
 				title="How to handle duplicate events"
 			/>
@@ -419,8 +419,8 @@ const ImportForm = ({
 		>
 			Upload
 		</Button>
-		<span class="htmx-indicator items-center gap-1 text-sm text-muted">
-			<IconSpinner class="h-4 w-4 animate-spin" />
+		<span class="htmx-indicator items-center gap-1 text-muted text-sm">
+			<IconSpinner class="size-4 animate-spin" />
 			Importing…
 		</span>
 	</form>
@@ -437,9 +437,9 @@ const ExportButton = ({ activeId }: { activeId: string }) => (
 		</LinkButton>
 		<span
 			id="cal-export-indicator"
-			class="hidden items-center [&.is-busy]:inline-flex text-sm text-muted"
+			class="hidden items-center text-muted text-sm [&.is-busy]:inline-flex"
 		>
-			<IconSpinner class="mr-1 h-4 w-4 animate-spin" />
+			<IconSpinner class="mr-1 size-4 animate-spin" />
 			Preparing…
 		</span>
 	</>
@@ -485,10 +485,10 @@ const MonthNav = ({
 			size="sm"
 			data-cal-nav
 		>
-			<IconChevronLeft class="h-4 w-4" />
+			<IconChevronLeft class="size-4" />
 			<span class="sr-only">Previous month</span>
 		</LinkButton>
-		<span class="text-sm font-semibold text-fg">{monthLabel}</span>
+		<span class="font-semibold text-fg text-sm">{monthLabel}</span>
 		<LinkButton
 			href={calHref(activeId, visibleIds, nextMonth)}
 			variant="ghost"
@@ -496,7 +496,7 @@ const MonthNav = ({
 			data-cal-nav
 		>
 			<span class="sr-only">Next month</span>
-			<IconChevronRight class="h-4 w-4" />
+			<IconChevronRight class="size-4" />
 		</LinkButton>
 	</div>
 );
@@ -508,7 +508,7 @@ const EventList = ({
 }) => {
 	if (events.length === 0) {
 		return (
-			<p class="px-1 py-6 text-center text-sm text-muted">
+			<p class="px-1 py-6 text-center text-muted text-sm">
 				No events this month.
 			</p>
 		);
@@ -544,7 +544,7 @@ const EventList = ({
 								<span class="block truncate font-medium text-fg">
 									{ev.title}
 								</span>
-								<span class="block text-sm text-muted">{ev.when}</span>
+								<span class="block text-muted text-sm">{ev.when}</span>
 							</span>
 							{ev.recurrence && <Badge class="shrink-0">{ev.recurrence}</Badge>}
 						</a>
@@ -652,7 +652,7 @@ export const CalendarViewPage = (props: CalendarViewProps) => {
 						nextMonth={nextMonth}
 					/>
 					<EventList events={events} />
-					<p class="text-xs text-subtle">
+					<p class="text-subtle text-xs">
 						Showing each series once. Enable JavaScript for the full interactive
 						calendar with expanded recurrences.
 					</p>
@@ -738,12 +738,12 @@ export const CalendarImportResult = ({
 			title={`${conflicts.length} item(s) already exist with these UIDs:`}
 			class="space-y-2"
 		>
-			<ul class="max-h-32 list-inside list-disc overflow-auto font-mono text-xs text-muted">
+			<ul class="max-h-32 list-inside list-disc overflow-auto font-mono text-muted text-xs">
 				{conflicts.map((c) => (
 					<li key={c}>{c}</li>
 				))}
 			</ul>
-			<p class="text-xs text-muted">
+			<p class="text-muted text-xs">
 				Re-select the file with <strong>Skip duplicates</strong> or{" "}
 				<strong>Replace duplicates</strong> to proceed.
 			</p>

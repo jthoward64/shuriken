@@ -11,7 +11,7 @@ import { getActiveDb } from "./transaction.ts";
 // ---------------------------------------------------------------------------
 
 interface DrizzleBuilder<A> extends Effect.Effect<A, unknown, never> {
-	toSQL(): { sql: string; params: Array<unknown> };
+	toSQL: () => { sql: string; params: Array<unknown> };
 }
 
 // ---------------------------------------------------------------------------

@@ -52,7 +52,7 @@ const PopoverHeader = ({
 			command="request-close"
 			aria-label="Close"
 		>
-			<IconClose class="h-4 w-4" />
+			<IconClose class="size-4" />
 		</Button>
 	</div>
 );
@@ -173,7 +173,7 @@ export const EventEditPopoverForm = ({
 			data-confirm="Delete this event?"
 			class="hidden"
 		/>
-		<div class="border-t border-line mt-4 pt-4">
+		<div class="mt-4 border-line border-t pt-4">
 			<SharePanel data={sharePanel} />
 		</div>
 	</>

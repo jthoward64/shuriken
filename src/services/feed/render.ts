@@ -29,7 +29,7 @@ const tzidOf = (vtimezone: IrComponent): Option.Option<string> => {
 	const tzid = vtimezone.properties.find(
 		(p) => p.name.toUpperCase() === "TZID",
 	);
-	if (!tzid || tzid.value.type !== "TEXT") {
+	if (tzid?.value.type !== "TEXT") {
 		return Option.none();
 	}
 	return Option.some(tzid.value.value);

@@ -174,7 +174,7 @@ export const FormErrors = ({ errors }: { errors: Record<string, string> }) => {
 	return (
 		<div
 			role="alert"
-			class="mb-4 rounded-md border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger"
+			class="mb-4 rounded-md border border-danger/40 bg-danger/10 px-4 py-3 text-danger text-sm"
 		>
 			<p class="mb-1 font-medium">Please correct the following errors:</p>
 			<ul class="list-inside list-disc space-y-0.5">

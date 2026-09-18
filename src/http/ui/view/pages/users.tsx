@@ -66,7 +66,7 @@ export const UsersListPage = ({
 			actions={
 				canCreateUser && (
 					<LinkButton href="/ui/users/new" variant="primary" size="sm">
-						<IconPlus class="h-4 w-4" />
+						<IconPlus class="size-4" />
 						New user
 					</LinkButton>
 				)
@@ -288,7 +288,7 @@ export const UserEditPage = (props: UserEditPageProps): VNode => {
 					) : (
 						<div class="form-group">
 							<span class="form-label">Role</span>
-							<p class="text-sm text-fg">
+							<p class="text-fg text-sm">
 								<span class="font-mono">{props.userRole}</span>
 							</p>
 						</div>
@@ -359,7 +359,7 @@ export const UserEditPage = (props: UserEditPageProps): VNode => {
 			{props.groups.length > 0 && (
 				<Card title="Group memberships">
 					<div class="space-y-3">
-						<p class="text-sm text-muted">
+						<p class="text-muted text-sm">
 							Check the groups this user should belong to, then save each group
 							individually.
 						</p>
@@ -367,9 +367,9 @@ export const UserEditPage = (props: UserEditPageProps): VNode => {
 							g.canManageMembers ? (
 								<div
 									key={g.id}
-									class="border-b border-line pb-3 last:border-0 last:pb-0"
+									class="border-line border-b pb-3 last:border-0 last:pb-0"
 								>
-									<p class="mb-2 flex items-center gap-2 text-sm font-medium text-fg">
+									<p class="mb-2 flex items-center gap-2 font-medium text-fg text-sm">
 										{g.label}
 										{g.autoAssignedBy && (
 											<Badge>Auto-assigned ({g.autoAssignedBy})</Badge>
@@ -397,17 +397,17 @@ export const UserEditPage = (props: UserEditPageProps): VNode => {
 									</form>
 								</div>
 							) : (
-								<div key={g.id} class="flex items-center gap-2 text-sm text-fg">
+								<div key={g.id} class="flex items-center gap-2 text-fg text-sm">
 									<span
 										class={
 											g.isMember
-												? "inline-block h-3 w-3 rounded-full bg-success"
-												: "inline-block h-3 w-3 rounded-full bg-surface-2"
+												? "inline-block size-3 rounded-full bg-success"
+												: "inline-block size-3 rounded-full bg-surface-2"
 										}
 									/>
 									{g.label}
 									{g.isMember && (
-										<span class="text-xs text-muted">(member)</span>
+										<span class="text-muted text-xs">(member)</span>
 									)}
 									{g.autoAssignedBy && (
 										<Badge>Auto-assigned ({g.autoAssignedBy})</Badge>

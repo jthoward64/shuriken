@@ -65,7 +65,7 @@ export const GroupsListPage = ({
 			actions={
 				canCreateGroup && (
 					<LinkButton href="/ui/groups/new" variant="primary" size="sm">
-						<IconPlus class="h-4 w-4" />
+						<IconPlus class="size-4" />
 						New group
 					</LinkButton>
 				)
@@ -235,7 +235,7 @@ export const GroupEditPage = (props: GroupEditPageProps): VNode => {
 							value={props.displayName}
 						/>
 					</Field>
-					<p class="text-sm text-muted">
+					<p class="text-muted text-sm">
 						<span class="font-medium text-fg">Slug:</span>{" "}
 						<span class="font-mono">{props.slug}</span>
 					</p>
@@ -318,7 +318,7 @@ export const GroupEditPage = (props: GroupEditPageProps): VNode => {
 										class="inline"
 									>
 										<input type="hidden" name="aceId" value={a.aceId} />
-										<button type="submit" class="link text-xs text-danger">
+										<button type="submit" class="link text-danger text-xs">
 											Remove
 										</button>
 									</form>
@@ -335,7 +335,7 @@ export const GroupEditPage = (props: GroupEditPageProps): VNode => {
 						hx-post={grantAdmin}
 						hx-target="body"
 						hx-swap="outerHTML"
-						class="flex flex-wrap items-end gap-2 border-t border-line pt-4"
+						class="flex flex-wrap items-end gap-2 border-line border-t pt-4"
 					>
 						<Field for="adminSlug" label="Add admin (user slug)">
 							<TextInput
@@ -368,14 +368,14 @@ export const GroupEditPage = (props: GroupEditPageProps): VNode => {
 											<Badge>Auto-assigned ({m.autoAssignedBy})</Badge>
 										)}
 									</span>
-									<span class="font-mono text-xs text-muted">{m.slug}</span>
+									<span class="font-mono text-muted text-xs">{m.slug}</span>
 								</li>
 							))}
 						</ul>
 					) : (
 						<EmptyState title="No members yet." />
 					)}
-					<p class="text-xs text-subtle">
+					<p class="text-subtle text-xs">
 						Manage membership from individual user edit pages.
 					</p>
 				</div>

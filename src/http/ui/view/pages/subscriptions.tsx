@@ -49,9 +49,9 @@ const SyncStatus = ({ sub }: { sub: SubscriptionRow }) => {
 			<Badge tone={sub.lastSyncStatus === "failure" ? "danger" : "success"}>
 				{sub.lastSyncStatus}
 			</Badge>
-			<span class="ml-2 text-xs text-subtle">{sub.lastSyncAt}</span>
+			<span class="ml-2 text-subtle text-xs">{sub.lastSyncAt}</span>
 			{sub.lastSyncError && (
-				<div class="mt-1 text-xs text-danger">{sub.lastSyncError}</div>
+				<div class="mt-1 text-danger text-xs">{sub.lastSyncError}</div>
 			)}
 		</div>
 	);
@@ -63,7 +63,7 @@ const SUBSCRIPTION_COLUMNS: ReadonlyArray<Column<SubscriptionRow>> = [
 		cell: (sub) => (
 			<span class="inline-flex items-center gap-2">
 				<span
-					class="inline-block h-3 w-3 shrink-0 rounded-full"
+					class="inline-block size-3 shrink-0 rounded-full"
 					style={{ backgroundColor: sub.color ?? "rgb(var(--subtle))" }}
 				/>
 				<span class="font-medium text-fg">{sub.displayName}</span>
@@ -73,7 +73,7 @@ const SUBSCRIPTION_COLUMNS: ReadonlyArray<Column<SubscriptionRow>> = [
 	{
 		header: "Source",
 		cell: (sub) => (
-			<span class="block max-w-md break-all font-mono text-xs text-muted">
+			<span class="block max-w-md break-all font-mono text-muted text-xs">
 				{sub.url}
 			</span>
 		),
@@ -126,7 +126,7 @@ export const SubscriptionsListPage = ({
 					subtitle="Read-only calendars synced from external iCalendar feeds."
 					actions={
 						<LinkButton href="/ui/subscriptions/new" variant="primary">
-							<IconPlus class="h-4 w-4" />
+							<IconPlus class="size-4" />
 							Subscribe
 						</LinkButton>
 					}
@@ -139,7 +139,7 @@ export const SubscriptionsListPage = ({
 					variant="primary"
 					size="sm"
 				>
-					<IconPlus class="h-4 w-4" />
+					<IconPlus class="size-4" />
 					Subscribe
 				</LinkButton>
 			)}
@@ -157,7 +157,7 @@ export const SubscriptionsListPage = ({
 								variant="primary"
 								size="sm"
 							>
-								<IconPlus class="h-4 w-4" />
+								<IconPlus class="size-4" />
 								Subscribe
 							</LinkButton>
 						}
@@ -226,13 +226,13 @@ export const SubscriptionsNewPage = ({
 
 			{!preset && (
 				<Card>
-					<h2 class="mb-3 text-sm font-semibold text-fg">Holiday presets</h2>
+					<h2 class="mb-3 font-semibold text-fg text-sm">Holiday presets</h2>
 					<ul class="grid gap-1 sm:grid-cols-2">
 						{presets.map((p) => (
 							<li>
 								<a
 									href={`/ui/subscriptions/new?preset=${p.id}`}
-									class="block rounded-md px-2 py-1.5 text-sm text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+									class="block rounded-md px-2 py-1.5 text-muted text-sm transition-colors hover:bg-surface-2 hover:text-fg"
 								>
 									{p.displayName}
 								</a>

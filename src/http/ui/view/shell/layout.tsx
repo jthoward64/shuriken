@@ -21,8 +21,8 @@ const ThemeToggle = () => (
 		aria-label="Toggle dark mode"
 		title="Toggle dark mode"
 	>
-		<IconMoon class="theme-icon-light w-5 h-5" />
-		<IconSun class="theme-icon-dark w-5 h-5" />
+		<IconMoon class="theme-icon-light size-5" />
+		<IconSun class="theme-icon-dark size-5" />
 	</button>
 );
 
@@ -105,20 +105,20 @@ export const Layout = ({
 		</head>
 		<body
 			class={cx(
-				"min-h-screen flex flex-col",
+				"flex min-h-screen flex-col",
 				fill && "lg:h-dvh lg:min-h-0 lg:overflow-hidden",
 			)}
 		>
 			<a
 				href="#main"
-				class="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-2 btn btn-primary"
+				class="btn btn-primary sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-2"
 			>
 				Skip to content
 			</a>
 			{chrome === "full" && (
 				<header class="app-nav">
-					<div class="max-w-7xl mx-auto px-4">
-						<div class="flex items-center justify-between h-14 gap-4">
+					<div class="mx-auto max-w-7xl px-4">
+						<div class="flex h-14 items-center justify-between gap-4">
 							<div class="flex items-center gap-2">
 								<a href="/ui/calendar" class="app-brand mr-2">
 									Shuriken
@@ -126,7 +126,7 @@ export const Layout = ({
 								{nav && (
 									<nav
 										aria-label="Primary"
-										class="hidden md:flex items-center gap-1"
+										class="hidden items-center gap-1 md:flex"
 									>
 										<Nav nav={nav} />
 									</nav>
@@ -155,7 +155,7 @@ export const Layout = ({
 						{nav && (
 							<nav
 								aria-label="Primary"
-								class="md:hidden flex items-center gap-1 flex-wrap pb-2"
+								class="flex flex-wrap items-center gap-1 pb-2 md:hidden"
 							>
 								<Nav nav={nav} />
 							</nav>
@@ -167,7 +167,7 @@ export const Layout = ({
 			<main
 				id="main"
 				class={cx(
-					"flex-1 w-full",
+					"w-full flex-1",
 					// Wide pages (calendar/contacts/tasks) go edge-to-edge and manage
 					// their own insets; everything else gets the centered padded column.
 					wide ? "max-w-none" : "mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8",

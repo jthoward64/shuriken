@@ -81,7 +81,7 @@ export const EmailCredentialsPage = ({
 		<Card title="Current status">
 			<div class="flex flex-wrap items-center gap-2">
 				<Badge tone={STATUS_TONE[activeKind]}>{activeKind}</Badge>
-				<span class="text-sm text-muted">{STATUS_TEXT[activeKind]}</span>
+				<span class="text-muted text-sm">{STATUS_TEXT[activeKind]}</span>
 			</div>
 			{activeFromAddress && (
 				<p class="mt-3 text-sm">
@@ -90,13 +90,13 @@ export const EmailCredentialsPage = ({
 				</p>
 			)}
 			{!mailEnabled && (
-				<p class="mt-3 text-sm text-muted">
+				<p class="mt-3 text-muted text-sm">
 					Set <code class="font-mono">MAIL_ENABLED=true</code> in the server
 					config to enable outbound mail.
 				</p>
 			)}
 			{!credsKeyConfigured && (
-				<p class="mt-1 text-sm text-muted">
+				<p class="mt-1 text-muted text-sm">
 					<code class="font-mono">EMAIL_CREDS_KEY</code> is not set, so per-user
 					credentials cannot be saved.
 				</p>
@@ -104,7 +104,7 @@ export const EmailCredentialsPage = ({
 		</Card>
 
 		<Card title="Override with your own SMTP server">
-			<p class="mb-4 text-sm text-muted">
+			<p class="mb-4 text-muted text-sm">
 				If your provider gives you SMTP credentials, enter them here so mail
 				goes out as you.
 			</p>
@@ -193,7 +193,7 @@ export const EmailCredentialsPage = ({
 
 		{existing && (
 			<Card title="Remove credentials">
-				<p class="mb-4 text-sm text-muted">
+				<p class="mb-4 text-muted text-sm">
 					Fall back to the server profile or default relay.
 				</p>
 				<form

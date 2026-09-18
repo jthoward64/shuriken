@@ -39,7 +39,7 @@ export const Pagination = ({
 	return (
 		<nav
 			aria-label={label}
-			class="flex items-center justify-between gap-2 pt-1 text-sm text-muted"
+			class="flex items-center justify-between gap-2 pt-1 text-muted text-sm"
 		>
 			{page > 1 ? (
 				<LinkButton href={hrefFor(page - 1)} size="sm">

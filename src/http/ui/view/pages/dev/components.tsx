@@ -75,7 +75,7 @@ const Section = ({
 	children: ComponentChildren;
 }): VNode => (
 	<Card title={title}>
-		{note !== undefined && <p class="mb-4 text-sm text-muted">{note}</p>}
+		{note !== undefined && <p class="mb-4 text-muted text-sm">{note}</p>}
 		<div class="space-y-4">{children}</div>
 	</Card>
 );
@@ -150,7 +150,7 @@ export const ComponentGalleryPage = (): VNode => (
 		/>
 
 		<Card title="How to read this page">
-			<div class="space-y-2 text-sm text-muted">
+			<div class="space-y-2 text-muted text-sm">
 				<p>
 					Every control here is progressively enhanced. Disable JavaScript and
 					reload: the tag picker becomes a comma-separated text field, the date
@@ -358,7 +358,7 @@ export const ComponentGalleryPage = (): VNode => (
 					</>
 				}
 			>
-				<p class="text-sm text-muted">
+				<p class="text-muted text-sm">
 					Everything in it moves to the trash and can be restored for 30 days.
 				</p>
 			</Modal>

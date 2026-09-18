@@ -33,10 +33,10 @@ export const InstanceAclPage = ({
 
 		<Card>
 			<div class="space-y-2">
-				<p class="text-sm text-muted">
+				<p class="text-muted text-sm">
 					Resource slug: <span class="font-mono text-fg">{slug}</span>
 				</p>
-				<p class="text-sm text-muted">
+				<p class="text-muted text-sm">
 					Parent calendar:{" "}
 					<a href={`/ui/collections/${collectionId}`} class="link">
 						{collectionId}

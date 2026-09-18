@@ -93,7 +93,7 @@ export const effectiveDtend = (
 				.toZonedDateTimeISO(zone)
 				.add(Temporal.Duration.from(durationProp.value.value))
 				.toInstant();
-		} catch (_e) {
+		} catch {
 			// Ambiguous or invalid duration (e.g. months) — fall through
 		}
 	}

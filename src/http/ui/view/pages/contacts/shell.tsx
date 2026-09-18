@@ -51,13 +51,13 @@ export const ContactsShell = ({
 						popovertargetaction="hide"
 						aria-label="Close"
 					>
-						<IconClose class="h-4 w-4" />
+						<IconClose class="size-4" />
 					</Button>
 				</div>
 				<div class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
 					{drawerTop}
 				</div>
-				<div class="shrink-0 space-y-2 border-t border-line p-3">
+				<div class="shrink-0 space-y-2 border-line border-t p-3">
 					{drawerBottom}
 				</div>
 			</div>
@@ -76,7 +76,7 @@ export const ContactsDrawerToggle = (): VNode => (
 		popovertarget={CONTACTS_DRAWER_ID}
 		class="shrink-0 xl:hidden"
 	>
-		<IconMenu class="h-4 w-4" />
+		<IconMenu class="size-4" />
 		Address books
 	</Button>
 );

@@ -20,7 +20,7 @@ import { renderFragment } from "#src/http/ui/view/shell/render.tsx";
 // Request.formData()'s return type varies by runtime/lib config, so depend only
 // on the structural subset actually used (matching helpers/contact-form.ts)
 interface FormLike {
-	get(key: string): unknown;
+	get: (key: string) => unknown;
 }
 
 const field = (form: FormLike, name: string): string =>
