@@ -394,6 +394,10 @@
 			"tailwindDirectives": true
 		}
 	},
+	// no-effect-succeed-variable, no-flatmap-ladder and warn-effect-sync-wrapper
+	// are left out: they declare `severity = "warning"`, which Biome rejects
+	// (it accepts hint/info/warn/error), so they error on every file instead of
+	// running. Fixed upstream in @catenarycloud/linteffect, re-add them then.
 	"plugins": [
 		"./node_modules/@catenarycloud/linteffect/rules/no-arrow-ladder.grit",
 		"./node_modules/@catenarycloud/linteffect/rules/no-atom-registry-effect-sync.grit",
@@ -410,12 +414,10 @@
 		"./node_modules/@catenarycloud/linteffect/rules/no-effect-orElse-ladder.grit",
 		"./node_modules/@catenarycloud/linteffect/rules/no-effect-side-effect-wrapper.grit",
 		"./node_modules/@catenarycloud/linteffect/rules/no-effect-step-const-staging.grit",
-		"./node_modules/@catenarycloud/linteffect/rules/no-effect-succeed-variable.grit",
 		"./node_modules/@catenarycloud/linteffect/rules/no-effect-sync-console.grit",
 		"./node_modules/@catenarycloud/linteffect/rules/no-effect-type-alias.grit",
 		"./node_modules/@catenarycloud/linteffect/rules/no-effect-wrapper-alias.grit",
 		"./node_modules/@catenarycloud/linteffect/rules/no-family-collection-read.grit",
-		"./node_modules/@catenarycloud/linteffect/rules/no-flatmap-ladder.grit",
 		"./node_modules/@catenarycloud/linteffect/rules/no-fragmented-const-assembly.grit",
 		"./node_modules/@catenarycloud/linteffect/rules/no-fromnullable-nullish-coalesce.grit",
 		"./node_modules/@catenarycloud/linteffect/rules/no-iife-wrapper.grit",
@@ -439,10 +441,26 @@
 		"./node_modules/@catenarycloud/linteffect/rules/no-switch-statement.grit",
 		"./node_modules/@catenarycloud/linteffect/rules/no-try-catch.grit",
 		"./node_modules/@catenarycloud/linteffect/rules/no-unknown-boolean-coercion-helper.grit",
-		"./node_modules/@catenarycloud/linteffect/rules/prevent-dynamic-imports.grit",
-		"./node_modules/@catenarycloud/linteffect/rules/warn-effect-sync-wrapper.grit"
+		"./node_modules/@catenarycloud/linteffect/rules/prevent-dynamic-imports.grit"
 	],
 	"overrides": [
+		{
+			// Browser scripts and the plain build/release utilities contain no
+			// Effect, so the Effect-composition plugins have nothing to say about
+			// their try/catch and JSON use. service.live.ts and service.ts under
+			// client/ are server-side Effect code and stay covered.
+			"includes": [
+				"src/http/ui/client/**",
+				"!src/http/ui/client/service.live.ts",
+				"!src/http/ui/client/service.ts",
+				"src/http/ui/static/**",
+				"scripts/build-css.ts",
+				"scripts/build-client-js.ts",
+				"scripts/generate-icons.ts",
+				"scripts/version-bump.ts"
+			],
+			"plugins": []
+		},
 		{
 			"includes": [
 				"src/platform/**",
@@ -566,6 +584,7 @@
 				}
 			}
 		}
+
 	],
 	"assist": {
 		"enabled": true,
