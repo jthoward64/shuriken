@@ -324,11 +324,16 @@ describe("TrashService.restoreInstance / purgeInstanceForever", () => {
 		env.withUser({ principalId });
 
 		const err = await runFailure(
-			TrashService.pipe(
-				Effect.flatMap((s) =>
-					s.purgeInstanceForever(InstanceId(crypto.randomUUID()), principalId),
+			Effect.provide(
+				TrashService.pipe(
+					Effect.flatMap((s) =>
+						s.purgeInstanceForever(
+							InstanceId(crypto.randomUUID()),
+							principalId,
+						),
+					),
 				),
-				Effect.provide(layerFor(env)),
+				layerFor(env),
 			),
 		);
 

@@ -43,11 +43,13 @@ describe("AclServiceAllowAll", () => {
 
 	it("currentUserPrivileges returns all 19 DavPrivilege values", async () => {
 		const privs = await Effect.runPromise(
-			AclService.pipe(
-				Effect.flatMap((svc) =>
-					svc.currentUserPrivileges(PRINCIPAL, COLLECTION, "collection"),
+			Effect.provide(
+				AclService.pipe(
+					Effect.flatMap((svc) =>
+						svc.currentUserPrivileges(PRINCIPAL, COLLECTION, "collection"),
+					),
 				),
-				Effect.provide(AclServiceAllowAll),
+				AclServiceAllowAll,
 			),
 		);
 		expect(privs).toHaveLength(19);

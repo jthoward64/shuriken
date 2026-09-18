@@ -242,23 +242,26 @@ describe("CalTimezoneRepository.upsert — ianaName rules (integration)", () => 
 	it("preserves existing ianaName when Option.none is provided", async () => {
 		const tzid = "US/Central";
 		const result = await runSuccess(
-			Effect.gen(function* () {
-				const repo = yield* CalTimezoneRepository;
-				yield* repo.upsert(
-					tzid,
-					VTIMEZONE_DATA,
-					Option.some("America/Chicago"),
-					Option.none(),
-				);
-				// Second upsert with Option.none() must NOT clear the ianaName
-				yield* repo.upsert(
-					tzid,
-					VTIMEZONE_DATA_V2,
-					Option.none(),
-					Option.none(),
-				);
-				return yield* repo.findByTzid(tzid);
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			Effect.provide(
+				Effect.gen(function* () {
+					const repo = yield* CalTimezoneRepository;
+					yield* repo.upsert(
+						tzid,
+						VTIMEZONE_DATA,
+						Option.some("America/Chicago"),
+						Option.none(),
+					);
+					// Second upsert with Option.none() must NOT clear the ianaName
+					yield* repo.upsert(
+						tzid,
+						VTIMEZONE_DATA_V2,
+						Option.none(),
+						Option.none(),
+					);
+					return yield* repo.findByTzid(tzid);
+				}),
+				layer,
+			).pipe(Effect.orDie),
 		);
 		expect(Option.getOrThrow(result).ianaName).toBe("America/Chicago");
 	});

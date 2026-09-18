@@ -717,22 +717,23 @@ describe("AclService.batchCheckMembers", () => {
 		// No ACEs anywhere — only the role bypass can allow this.
 
 		const allowed = await runSuccess(
-			AclService.pipe(
-				Effect.flatMap((s) =>
-					s.batchCheckMembers(
-						principalId,
-						{
-							parentId: collectionId,
-							parentType: "collection",
-							memberIds: [inst],
-							memberType: "instance",
-						},
-						"DAV:read",
+			Effect.provide(
+				AclService.pipe(
+					Effect.flatMap((s) =>
+						s.batchCheckMembers(
+							principalId,
+							{
+								parentId: collectionId,
+								parentType: "collection",
+								memberIds: [inst],
+								memberType: "instance",
+							},
+							"DAV:read",
+						),
 					),
 				),
-				Effect.provide(env.toLayer()),
-				Effect.orDie,
-			),
+				env.toLayer(),
+			).pipe(Effect.orDie),
 		);
 
 		expect(allowed.has(inst)).toBe(true);

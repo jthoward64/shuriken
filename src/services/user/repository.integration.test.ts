@@ -432,22 +432,24 @@ describe("UserRepository unique constraint violations (integration)", () => {
 	it("two principals with the same slug fails with ConflictError", async () => {
 		const err = asConflictError(
 			await runFailure(
-				UserRepository.pipe(
-					Effect.flatMap((r) =>
-						Effect.gen(function* () {
-							yield* r.create({
-								slug: Slug("dup-slug"),
-								email: Email("dup-slug-a@example.com"),
-								credentials: [],
-							});
-							yield* r.create({
-								slug: Slug("dup-slug"),
-								email: Email("dup-slug-b@example.com"),
-								credentials: [],
-							});
-						}),
+				Effect.provide(
+					UserRepository.pipe(
+						Effect.flatMap((r) =>
+							Effect.gen(function* () {
+								yield* r.create({
+									slug: Slug("dup-slug"),
+									email: Email("dup-slug-a@example.com"),
+									credentials: [],
+								});
+								yield* r.create({
+									slug: Slug("dup-slug"),
+									email: Email("dup-slug-b@example.com"),
+									credentials: [],
+								});
+							}),
+						),
 					),
-					Effect.provide(layer),
+					layer,
 				),
 			),
 		);

@@ -184,16 +184,19 @@ describe("PrincipalRepository.findUserByUserId (integration)", () => {
 
 	it("create then findUserByUserId returns the user row", async () => {
 		const result = await runSuccess(
-			Effect.gen(function* () {
-				const userRepo = yield* UserRepository;
-				const principalRepo = yield* PrincipalRepository;
-				const { user } = yield* userRepo.create({
-					slug: Slug("dave"),
-					email: Email("dave@example.com"),
-					credentials: [],
-				});
-				return yield* principalRepo.findUserByUserId(UserId(user.id));
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			Effect.provide(
+				Effect.gen(function* () {
+					const userRepo = yield* UserRepository;
+					const principalRepo = yield* PrincipalRepository;
+					const { user } = yield* userRepo.create({
+						slug: Slug("dave"),
+						email: Email("dave@example.com"),
+						credentials: [],
+					});
+					return yield* principalRepo.findUserByUserId(UserId(user.id));
+				}),
+				layer,
+			).pipe(Effect.orDie),
 		);
 
 		expect(Option.isSome(result)).toBe(true);

@@ -303,11 +303,12 @@ describe("CollectionService.listByOwner", () => {
 		);
 
 		const result = await runSuccess(
-			CollectionService.pipe(
-				Effect.flatMap((s) => s.listByOwner(principalId)),
-				Effect.provide(env.toLayer()),
-				Effect.orDie,
-			),
+			Effect.provide(
+				CollectionService.pipe(
+					Effect.flatMap((s) => s.listByOwner(principalId)),
+				),
+				env.toLayer(),
+			).pipe(Effect.orDie),
 		);
 
 		expect(result).toHaveLength(1);

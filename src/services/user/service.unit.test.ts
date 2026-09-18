@@ -316,11 +316,17 @@ describe("UserService.removeCredential", () => {
 		const env = makeTestEnv();
 		const err = asDavError(
 			await runFailure(
-				UserService.pipe(
-					Effect.flatMap((s) =>
-						s.removeCredential(UserId(crypto.randomUUID()), "local", "nobody"),
+				Effect.provide(
+					UserService.pipe(
+						Effect.flatMap((s) =>
+							s.removeCredential(
+								UserId(crypto.randomUUID()),
+								"local",
+								"nobody",
+							),
+						),
 					),
-					Effect.provide(env.toLayer()),
+					env.toLayer(),
 				),
 			),
 		);

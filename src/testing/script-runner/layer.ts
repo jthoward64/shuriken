@@ -48,7 +48,7 @@ import { TombstoneRepositoryLive } from "#src/services/tombstone/index.ts";
 import { TrashServiceLive } from "#src/services/trash/service.live.ts";
 import { UserDomainLayer } from "#src/services/user/index.ts";
 import { makeTestConfig, testAppConfig } from "#src/testing/config.ts";
-import { TestCryptoLayer } from "#src/testing/env.ts";
+import { TestCryptoLayer } from "#src/testing/env/crypto.ts";
 import { makePgliteDatabaseLayer } from "#src/testing/pglite.ts";
 
 // ---------------------------------------------------------------------------
