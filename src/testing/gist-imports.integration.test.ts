@@ -29,7 +29,7 @@ import { makeScriptRunnerLayer } from "#src/testing/script-runner/layer.ts";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FIXTURES_DIR = resolve(HERE, "__fixtures__/dav-gists");
 
-const setupAlice = Effect.gen(function* () {
+const setupAlice = Effect.fn("gistImports.setupAlice")(function* () {
 	const prov = yield* ProvisioningService;
 	const alice = yield* prov
 		.provisionUser({
@@ -63,7 +63,7 @@ describe("Real-world gist .ics import (all 3 modes)", () => {
 		it(`${file} (${expectedEvents} VEVENTs, ${uniqueUids} unique UIDs)`, async () => {
 			const runtime = ManagedRuntime.make(makeScriptRunnerLayer());
 			try {
-				const { calendarId } = await runtime.runPromise(setupAlice);
+				const { calendarId } = await runtime.runPromise(setupAlice());
 
 				// Skip mode on a fresh calendar inserts every unique-UID group.
 				const first = await runtime.runPromise(
@@ -124,7 +124,7 @@ describe("Real-world gist .vcf import (all 3 modes)", () => {
 		it(`${file} (${expectedCards} VCARDs, ${stableUidCount} with UID)`, async () => {
 			const runtime = ManagedRuntime.make(makeScriptRunnerLayer());
 			try {
-				const { bookId } = await runtime.runPromise(setupAlice);
+				const { bookId } = await runtime.runPromise(setupAlice());
 
 				// First import inserts everything: UID cards by their UID, UID-less
 				// cards by a generated random UUID per row.

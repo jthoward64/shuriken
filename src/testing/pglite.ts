@@ -70,6 +70,16 @@ async function acquireClonedInstance(): Promise<PGliteInterface> {
 	return pg;
 }
 
+/** Clone and open a migrated PGlite instance for one test layer */
+const openClonedInstance = Effect.fn("pglite.openClonedInstance")(function* () {
+	// @effect-diagnostics-next-line globalErrorInEffectFailure:off
+	return yield* Effect.tryPromise({
+		try: () => acquireClonedInstance(),
+		// @effect-diagnostics-next-line globalErrorInEffectFailure:off
+		catch: (e) => new Error(`PGlite setup failed: ${String(e)}`),
+	});
+});
+
 // ---------------------------------------------------------------------------
 // makePgliteDatabaseLayer — provides DatabaseClient backed by an in-memory
 // PGlite database, via drizzle's native Effect integration.
@@ -86,12 +96,7 @@ export const makePgliteDatabaseLayer = (): Layer.Layer<
 	const pgliteClientLayer = Layer.unwrap(
 		Effect.gen(function* () {
 			const pg = yield* Effect.acquireRelease(
-				// @effect-diagnostics-next-line globalErrorInEffectFailure:off
-				Effect.tryPromise({
-					try: () => acquireClonedInstance(),
-					// @effect-diagnostics-next-line globalErrorInEffectFailure:off
-					catch: (e) => new Error(`PGlite setup failed: ${String(e)}`),
-				}),
+				openClonedInstance(),
 				(instance) => Effect.promise(() => instance.close()),
 			);
 			return PgliteClient.layer({ liveClient: pg as PGliteInterface });
@@ -101,15 +106,17 @@ export const makePgliteDatabaseLayer = (): Layer.Layer<
 	// Expose the PGlite-backed client under the PgClient tag that
 	// effect-postgres resolves. The two clients share the SqlClient surface
 	// effect-postgres uses; the cast bridges the nominal tag types.
-	const pgClientLayer = Layer.effect(
-		PgClient.PgClient,
-		PgliteClient.PgliteClient.pipe(
+	const pgClientLayer = Layer.provide(
+		Layer.effect(
+			PgClient.PgClient,
 			Effect.map(
+				PgliteClient.PgliteClient,
 				(client) =>
 					client as unknown as Context.Service.Shape<typeof PgClient.PgClient>,
 			),
 		),
-	).pipe(Layer.provide(pgliteClientLayer));
+		pgliteClientLayer,
+	);
 
 	return Layer.effect(DatabaseClient, makeWithDefaults({ relations })).pipe(
 		Layer.provide(pgClientLayer),

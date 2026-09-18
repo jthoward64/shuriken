@@ -139,6 +139,10 @@ const buildRequest = (
 // checkExpectations — compare response against step.expect
 // ---------------------------------------------------------------------------
 
+/** A string rendered with quotes and escapes, for a readable failure message */
+const quoted = (value: string): string =>
+	`"${value.replace(/\\/gu, "\\\\").replace(/"/gu, '\\"').replace(/\n/gu, "\\n")}"`;
+
 const checkExpectations = (
 	step: ScriptStep,
 	status: number,
@@ -165,7 +169,7 @@ const checkExpectations = (
 	for (const substr of contains) {
 		if (!body.includes(substr)) {
 			failures.push(
-				`expected body to contain ${JSON.stringify(substr)}, got ${JSON.stringify(body)}`,
+				`expected body to contain ${quoted(substr)}, got ${quoted(body)}`,
 			);
 		}
 	}
@@ -180,7 +184,7 @@ const checkExpectations = (
 	for (const substr of notContains) {
 		if (body.includes(substr)) {
 			failures.push(
-				`expected body NOT to contain ${JSON.stringify(substr)}, got ${JSON.stringify(body)}`,
+				`expected body NOT to contain ${quoted(substr)}, got ${quoted(body)}`,
 			);
 		}
 	}

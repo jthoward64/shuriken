@@ -89,6 +89,19 @@ export const makeScriptRunnerLayer = (overrides?: Partial<AppConfigType>) => {
 		layer: Layer.Layer<A, E, DatabaseClient | CryptoService>,
 	) => layer.pipe(Layer.provide(testInfraLayer));
 
+	// Services whose own repository also needs the test infrastructure: name the
+	// repository layer so the service composes in one flat step.
+	const sessionServiceLayer = SessionServiceLive.pipe(
+		Layer.provide(
+			Layer.mergeAll(testInfraLayer, withTestInfra(SessionRepositoryLive)),
+		),
+	);
+	const appPasswordServiceLayer = AppPasswordServiceLive.pipe(
+		Layer.provide(
+			Layer.mergeAll(testInfraLayer, withTestInfra(AppPasswordRepositoryLive)),
+		),
+	);
+
 	const testBaseLayer = Layer.mergeAll(
 		testInfraLayer,
 		Layer.succeed(References.MinimumLogLevel, "None"),
@@ -112,25 +125,22 @@ export const makeScriptRunnerLayer = (overrides?: Partial<AppConfigType>) => {
 		withTestInfra(ExternalCalendarRepositoryLive),
 		withTestInfra(ShareLinkRepositoryLive),
 		withTestInfra(SessionRepositoryLive),
-		SessionServiceLive.pipe(
-			Layer.provide(
-				Layer.mergeAll(
-					testInfraLayer,
-					SessionRepositoryLive.pipe(Layer.provide(testInfraLayer)),
-				),
-			),
-		),
+		sessionServiceLayer,
 		withTestInfra(OidcLoginRepositoryLive),
 		OidcServiceLive.pipe(Layer.provide(testInfraLayer)),
 		withTestInfra(AppPasswordRepositoryLive),
-		AppPasswordServiceLive.pipe(
-			Layer.provide(
-				Layer.mergeAll(
-					testInfraLayer,
-					AppPasswordRepositoryLive.pipe(Layer.provide(testInfraLayer)),
-				),
-			),
-		),
+		appPasswordServiceLayer,
+	);
+
+	// Domain services over the base layer. The ones other services depend on are
+	// named so nothing has to re-derive them inside a nested provide.
+	const withTestBase = <A, E, R>(layer: Layer.Layer<A, E, R>) =>
+		Layer.provide(layer, testBaseLayer);
+	const birthdayServiceLayer = withTestBase(BirthdayServiceLive);
+	const calEditServiceLayer = withTestBase(CalEditServiceLive);
+	const emailCredentialServiceLayer = withTestBase(EmailCredentialServiceLive);
+	const mailerServiceLayer = MailerServiceLive.pipe(
+		Layer.provide(Layer.mergeAll(testBaseLayer, emailCredentialServiceLayer)),
 	);
 
 	const testStubsLayer = Layer.mergeAll(
@@ -152,51 +162,27 @@ export const makeScriptRunnerLayer = (overrides?: Partial<AppConfigType>) => {
 		SubscriptionServiceLive.pipe(
 			Layer.provide(Layer.mergeAll(testBaseLayer, NetworkGuardServiceLive)),
 		),
-		BirthdayServiceLive.pipe(Layer.provide(testBaseLayer)),
+		birthdayServiceLayer,
 		CardEditServiceLive.pipe(
-			Layer.provide(
-				Layer.mergeAll(
-					testBaseLayer,
-					BirthdayServiceLive.pipe(Layer.provide(testBaseLayer)),
-				),
-			),
+			Layer.provide(Layer.mergeAll(testBaseLayer, birthdayServiceLayer)),
 		),
-		ContactCleanupServiceLive.pipe(Layer.provide(testBaseLayer)),
-		ContactMergeServiceLive.pipe(Layer.provide(testBaseLayer)),
-		CalEditServiceLive.pipe(Layer.provide(testBaseLayer)),
-		TaskEditServiceLive.pipe(Layer.provide(testBaseLayer)),
-		ShareLinkServiceLive.pipe(Layer.provide(testBaseLayer)),
-		TrashServiceLive.pipe(Layer.provide(testBaseLayer)),
-		EmailCredentialServiceLive.pipe(Layer.provide(testBaseLayer)),
-		MailerServiceLive.pipe(
-			Layer.provide(
-				Layer.mergeAll(
-					testBaseLayer,
-					EmailCredentialServiceLive.pipe(Layer.provide(testBaseLayer)),
-				),
-			),
-		),
+		withTestBase(ContactCleanupServiceLive),
+		withTestBase(ContactMergeServiceLive),
+		calEditServiceLayer,
+		withTestBase(TaskEditServiceLive),
+		withTestBase(ShareLinkServiceLive),
+		withTestBase(TrashServiceLive),
+		emailCredentialServiceLayer,
+		mailerServiceLayer,
 		ImipInboundServiceLive.pipe(
-			Layer.provide(
-				Layer.mergeAll(
-					testBaseLayer,
-					CalEditServiceLive.pipe(Layer.provide(testBaseLayer)),
-				),
-			),
+			Layer.provide(Layer.mergeAll(testBaseLayer, calEditServiceLayer)),
 		),
 		ImipDispatchServiceLive.pipe(
 			Layer.provide(
 				Layer.mergeAll(
 					testBaseLayer,
-					EmailCredentialServiceLive.pipe(Layer.provide(testBaseLayer)),
-					MailerServiceLive.pipe(
-						Layer.provide(
-							Layer.mergeAll(
-								testBaseLayer,
-								EmailCredentialServiceLive.pipe(Layer.provide(testBaseLayer)),
-							),
-						),
-					),
+					emailCredentialServiceLayer,
+					mailerServiceLayer,
 				),
 			),
 		),
