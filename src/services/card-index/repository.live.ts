@@ -6,7 +6,6 @@ import { runDbQuery } from "#src/db/query.ts";
 import type { CollectionId, EntityId } from "#src/domain/ids.ts";
 import {
 	type CardCollation,
-	type CardIndexField,
 	CardIndexRepository,
 	type CardMatchType,
 	type CardTextMatch,

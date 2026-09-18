@@ -1,6 +1,5 @@
 import { Effect, Layer, Option } from "effect";
 import { Temporal } from "temporal-polyfill";
-import type { ShareLinkVisibility } from "#src/db/drizzle/schema/index.ts";
 import {
 	type DatabaseError,
 	type DavError,
