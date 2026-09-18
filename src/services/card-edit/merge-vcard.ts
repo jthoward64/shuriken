@@ -127,18 +127,20 @@ const withValue = (prop: IrProperty, value: IrValue): IrProperty => ({
 const withTypedValue = (
 	prop: IrProperty,
 	value: string,
-	types: ReadonlyArray<string>,
-	label: string | undefined,
-	preferred: boolean,
+	channel: {
+		readonly types: ReadonlyArray<string>;
+		readonly label?: string;
+		readonly preferred: boolean;
+	},
 ): IrProperty => ({
 	...prop,
 	parameters: [
 		...prop.parameters.filter(
 			(p) => p.name !== "TYPE" && p.name !== "LABEL" && p.name !== "PREF",
 		),
-		...typeParams(types),
-		...labelParams(label),
-		...prefParams(preferred),
+		...typeParams(channel.types),
+		...labelParams(channel.label),
+		...prefParams(channel.preferred),
 	],
 	value: { type: "TEXT", value },
 });
@@ -221,7 +223,7 @@ const updateMulti = (
 		case "EMAIL":
 		case "TEL": {
 			const tv = row as ContactFormData["emails"][number];
-			return withTypedValue(prop, tv.value, tv.types, tv.label, tv.preferred);
+			return withTypedValue(prop, tv.value, tv);
 		}
 		case "URL":
 			return withValue(prop, {
@@ -230,13 +232,7 @@ const updateMulti = (
 			});
 		case "ADR": {
 			const addr = row as ContactFormData["addresses"][number];
-			return withTypedValue(
-				prop,
-				addressJoined(addr),
-				addr.types,
-				addr.label,
-				addr.preferred,
-			);
+			return withTypedValue(prop, addressJoined(addr), addr);
 		}
 		case "SOCIALPROFILE":
 		case "IMPP":
@@ -327,15 +323,7 @@ const singleValue = (base: Single, form: ContactFormData): IrValue => {
 		case "PRONOUNS":
 			return text(form.pronouns);
 		case "N":
-			return text(
-				nValue(
-					form.familyName,
-					form.givenName,
-					form.middleName,
-					form.prefix,
-					form.suffix,
-				),
-			);
+			return text(nValue(form));
 		case "BDAY":
 			return bdayValue(form.bday) ?? text(form.bday);
 		case "ANNIVERSARY":

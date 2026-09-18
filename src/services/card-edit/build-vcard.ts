@@ -99,13 +99,14 @@ export const telProp = (tv: ContactTypedValue): IrProperty => ({
 export const urlProp = (value: string): IrProperty => uriProp("URL", value);
 
 /** `Family;Given;Additional;Prefix;Suffix` from the form's five N components. */
-export const nValue = (
-	family: string,
-	given: string,
-	middle: string,
-	prefix: string,
-	suffix: string,
-): string => `${family};${given};${middle};${prefix};${suffix}`;
+export const nValue = (name: {
+	readonly familyName: string;
+	readonly givenName: string;
+	readonly middleName: string;
+	readonly prefix: string;
+	readonly suffix: string;
+}): string =>
+	`${name.familyName};${name.givenName};${name.middleName};${name.prefix};${name.suffix}`;
 
 export const addressJoined = (addr: ContactAddress): string =>
 	[
@@ -294,18 +295,7 @@ export const buildVcardComponent = (
 		form.prefix !== "" ||
 		form.suffix !== ""
 	) {
-		props.push(
-			textProp(
-				"N",
-				nValue(
-					form.familyName,
-					form.givenName,
-					form.middleName,
-					form.prefix,
-					form.suffix,
-				),
-			),
-		);
+		props.push(textProp("N", nValue(form)));
 	}
 	if (form.nickname !== "") {
 		props.push(textProp("NICKNAME", form.nickname));

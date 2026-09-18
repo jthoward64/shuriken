@@ -162,10 +162,24 @@ describe("buildVcardComponent / parseVcardToForm round-trip", () => {
 
 describe("build-vcard exported helpers", () => {
 	it("nValue lays out Family;Given;Additional;Prefix;Suffix", () => {
-		expect(nValue("Smith", "John", "", "", "")).toBe("Smith;John;;;");
-		expect(nValue("Smith", "John", "Q", "Dr.", "Jr.")).toBe(
-			"Smith;John;Q;Dr.;Jr.",
-		);
+		expect(
+			nValue({
+				familyName: "Smith",
+				givenName: "John",
+				middleName: "",
+				prefix: "",
+				suffix: "",
+			}),
+		).toBe("Smith;John;;;");
+		expect(
+			nValue({
+				familyName: "Smith",
+				givenName: "John",
+				middleName: "Q",
+				prefix: "Dr.",
+				suffix: "Jr.",
+			}),
+		).toBe("Smith;John;Q;Dr.;Jr.");
 	});
 
 	it("typeParams emits one comma-joined TYPE or none", () => {
