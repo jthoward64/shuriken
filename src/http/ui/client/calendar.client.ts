@@ -1,3 +1,4 @@
+// biome-ignore-all lint/nursery/noLoopFunc: every loop here binds its subject with `const`, so each closure captures its own
 // Shuriken calendar page enhancement. Authored in TypeScript, bundled to
 // /static/calendar.js at startup by ClientJsService, and loaded `defer` only on
 // the calendar viewer.

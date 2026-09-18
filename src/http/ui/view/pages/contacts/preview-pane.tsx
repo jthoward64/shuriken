@@ -1,3 +1,4 @@
+// biome-ignore-all lint/suspicious/noArrayIndexKey: these repeated vCard properties have no id, and the markup is rendered once server-side with nothing to reconcile
 import type { ComponentChildren, VNode } from "preact";
 import { photoSrcFor } from "#src/http/ui/helpers/contact-photo.ts";
 import type {

@@ -1,3 +1,4 @@
+// biome-ignore-all lint/suspicious/noArrayIndexKey: these repeated vCard properties have no id, and the markup is rendered once server-side with nothing to reconcile
 import type { VNode } from "preact";
 import { RELATED_TYPE_VALUES } from "#src/data/vcard/related.ts";
 import type { ContactRelation } from "#src/services/card-edit/types.ts";

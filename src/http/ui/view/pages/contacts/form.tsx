@@ -1,3 +1,4 @@
+// biome-ignore-all lint/suspicious/noArrayIndexKey: these repeated vCard properties have no id, and the markup is rendered once server-side with nothing to reconcile
 import type { ComponentChildren, VNode } from "preact";
 import {
 	isInlinePhoto,

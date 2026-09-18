@@ -544,6 +544,21 @@
 				"rules": {
 					"style": {
 						"noMagicNumbers": "off"
+					},
+					// test steps and build steps run in a deliberate order
+					"performance": {
+						"noAwaitInLoops": "off"
+					}
+				}
+			}
+		},
+		{
+			"includes": ["scripts/**"],
+			"linter": {
+				"rules": {
+					// build steps write their outputs one at a time on purpose
+					"performance": {
+						"noAwaitInLoops": "off"
 					}
 				}
 			}

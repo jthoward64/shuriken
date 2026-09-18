@@ -1,3 +1,4 @@
+// biome-ignore-all lint/nursery/noLoopFunc: every loop here binds its subject with `const`, so each closure captures its own
 import { Effect, Layer, Option } from "effect";
 import { Temporal } from "temporal-polyfill";
 import { AppConfigService } from "#src/config.ts";
@@ -292,6 +293,7 @@ const readCapped = async (
 	const chunks: Array<Uint8Array> = [];
 	let total = 0;
 	for (;;) {
+		// biome-ignore lint/performance/noAwaitInLoops: a stream is read one chunk at a time
 		const { done, value } = await reader.read();
 		if (done) {
 			break;

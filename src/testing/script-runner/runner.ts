@@ -231,6 +231,7 @@ export const runScript = async (
 					: stepOrFactory;
 
 			const req = buildRequest(step, userMap);
+			// biome-ignore lint/performance/noAwaitInLoops: each step may depend on what the previous one created
 			const response = await runtime.runPromise(
 				handleRequest(req, mockClientAddress),
 			);
