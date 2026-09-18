@@ -59,9 +59,9 @@ describe("CollectionRepository.findBySlug (integration)", () => {
 				Effect.flatMap((r) =>
 					r.findBySlug(ownerId, "calendar", Slug("no-such-calendar")),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 		expect(Option.isNone(result)).toBe(true);
 	});
@@ -90,7 +90,8 @@ describe("CollectionRepository.findBySlug (integration)", () => {
 					Slug("my-calendar"),
 				);
 				return { inserted, found };
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		expect(Option.isSome(result.found)).toBe(true);
@@ -130,7 +131,8 @@ describe("CollectionRepository.findBySlug (integration)", () => {
 					"calendar",
 					Slug("shared-slug"),
 				);
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		expect(Option.isNone(result)).toBe(true);
@@ -160,7 +162,8 @@ describe("CollectionRepository.listByOwner (integration)", () => {
 					credentials: [],
 				});
 				return yield* col.listByOwner(PrincipalId(principal.id));
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 		expect(result).toHaveLength(0);
 	});
@@ -188,7 +191,8 @@ describe("CollectionRepository.listByOwner (integration)", () => {
 					slug: Slug("ab-b"),
 				});
 				return yield* col.listByOwner(ownerId);
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 		expect(result).toHaveLength(2);
 		const slugs = [...result]
@@ -225,7 +229,8 @@ describe("CollectionRepository.listByOwner (integration)", () => {
 					slug: Slug("p2-ab"),
 				});
 				return yield* col.listByOwner(PrincipalId(p1.id));
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 		expect(result).toHaveLength(1);
 		expect(result[0]?.slug).toBe("p1-cal");
@@ -256,7 +261,8 @@ describe("CollectionRepository.listByOwner (integration)", () => {
 				yield* col.softDelete(CollectionId(deleted.id));
 				const list = yield* col.listByOwner(ownerId);
 				return { kept, list };
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 		expect(result.list).toHaveLength(1);
 		expect(result.list[0]?.id).toBe(result.kept.id);
@@ -297,7 +303,8 @@ describe("CollectionRepository unique slug constraint (integration)", () => {
 						collectionType: "calendar",
 						slug: Slug("duplicate"),
 					});
-				}).pipe(Effect.provide(layer)),
+				}),
+				layer,
 			),
 		);
 
@@ -333,7 +340,8 @@ describe("CollectionRepository.softDelete (integration)", () => {
 					slug: Slug("active"),
 				});
 				return yield* col.findById(CollectionId(inserted.id));
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 		expect(Option.isSome(result)).toBe(true);
 	});
@@ -357,7 +365,8 @@ describe("CollectionRepository.softDelete (integration)", () => {
 				const id = CollectionId(inserted.id);
 				yield* col.softDelete(id);
 				return yield* col.findById(id);
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 		expect(Option.isNone(result)).toBe(true);
 	});
@@ -366,9 +375,9 @@ describe("CollectionRepository.softDelete (integration)", () => {
 		const result = await runSuccess(
 			CollectionRepository.pipe(
 				Effect.flatMap((r) => r.findById(CollectionId(crypto.randomUUID()))),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 		expect(Option.isNone(result)).toBe(true);
 	});

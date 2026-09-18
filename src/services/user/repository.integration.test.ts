@@ -47,9 +47,9 @@ describe("UserRepository.findByEmail (integration)", () => {
 		const result = await runSuccess(
 			UserRepository.pipe(
 				Effect.flatMap((r) => r.findByEmail(Email("nobody@example.com"))),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 		expect(Option.isNone(result)).toBe(true);
 	});
@@ -80,9 +80,9 @@ describe("UserRepository.create (integration)", () => {
 						return { created, found };
 					}),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 
 		expect(Option.isSome(result.found)).toBe(true);
@@ -107,9 +107,9 @@ describe("UserRepository.create (integration)", () => {
 						return { created, found };
 					}),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 
 		expect(Option.isSome(result.found)).toBe(true);
@@ -137,9 +137,9 @@ describe("UserRepository.create (integration)", () => {
 						return yield* r.findCredential("local", "carol-local");
 					}),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 
 		expect(Option.isSome(result)).toBe(true);
@@ -178,9 +178,9 @@ describe("UserRepository.update (integration)", () => {
 						});
 					}),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 
 		expect(result.principal.displayName).toBe("Alice Smith");
@@ -203,9 +203,9 @@ describe("UserRepository.update (integration)", () => {
 						});
 					}),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 
 		expect(result.principal.displayName).toBe("Robert");
@@ -236,9 +236,9 @@ describe("UserRepository soft delete (integration)", () => {
 						return yield* r.findById(UserId(created.user.id));
 					}),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 		expect(Option.isSome(result)).toBe(true);
 	});
@@ -259,9 +259,9 @@ describe("UserRepository credential lifecycle (integration)", () => {
 		const result = await runSuccess(
 			UserRepository.pipe(
 				Effect.flatMap((r) => r.findCredential("local", "nobody")),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 		expect(Option.isNone(result)).toBe(true);
 	});
@@ -285,9 +285,9 @@ describe("UserRepository credential lifecycle (integration)", () => {
 						return yield* r.findCredential("local", "alice-local");
 					}),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 
 		expect(Option.isSome(result)).toBe(true);
@@ -322,9 +322,9 @@ describe("UserRepository credential lifecycle (integration)", () => {
 						return { before, after };
 					}),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 
 		expect(Option.isSome(result.before)).toBe(true);
@@ -347,9 +347,9 @@ describe("UserRepository.findById — not found (integration)", () => {
 		const result = await runSuccess(
 			UserRepository.pipe(
 				Effect.flatMap((r) => r.findById(UserId(crypto.randomUUID()))),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 		expect(Option.isNone(result)).toBe(true);
 	});
@@ -382,9 +382,9 @@ describe("UserRepository.update — email branch (integration)", () => {
 						});
 					}),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 
 		expect(result.user.email).toBe("new@example.com");
@@ -421,8 +421,8 @@ describe("UserRepository unique constraint violations (integration)", () => {
 							});
 						}),
 					),
-					Effect.provide(layer),
 				),
+				layer,
 			),
 		);
 

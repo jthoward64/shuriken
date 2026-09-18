@@ -182,9 +182,9 @@ describe("DomainEntityService.create", () => {
 						document: minimalIcalDocument(),
 					}),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 
 		expect(typeof entityId).toBe("string");
@@ -205,9 +205,9 @@ describe("DomainEntityService.create", () => {
 						document: minimalIcalDocument("test-uid-123"),
 					}),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 
 		expect(entityStore.get(entityId)?.logicalUid).toBe("test-uid-123");
@@ -227,9 +227,9 @@ describe("DomainEntityService.create", () => {
 						document: minimalVcardDocument(uid),
 					}),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 
 		expect(entityStore.get(entityId)?.logicalUid).toBe(`urn:uuid:${uid}`);
@@ -248,9 +248,9 @@ describe("DomainEntityService.create", () => {
 						document: minimalIcalDocument(),
 					}),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 
 		expect(entityStore.get(entityId)?.logicalUid).toBeNull();
@@ -276,7 +276,8 @@ describe("DomainEntityService.load", () => {
 					document: doc,
 				});
 				return yield* svc.load(entityId);
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		expect(Option.isSome(result)).toBe(true);
@@ -291,9 +292,9 @@ describe("DomainEntityService.load", () => {
 		const result = await runSuccess(
 			DomainEntityService.pipe(
 				Effect.flatMap((s) => s.load(EntityId(crypto.randomUUID()))),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 
 		expect(Option.isNone(result)).toBe(true);
@@ -317,7 +318,8 @@ describe("DomainEntityService.load", () => {
 					document: minimalIcalDocument(),
 				});
 				return yield* svc.load(entityId);
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		expect(Option.isNone(result)).toBe(true);
@@ -343,7 +345,8 @@ describe("DomainEntityService.replace", () => {
 				});
 				yield* svc.replace(entityId, minimalIcalDocument("uid-v2"));
 				return yield* svc.load(entityId);
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		const doc = Option.getOrThrow(loaded);
@@ -367,7 +370,8 @@ describe("DomainEntityService.replace", () => {
 				});
 				yield* svc.replace(id, minimalIcalDocument("uid-updated"));
 				return id;
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		expect(entityStore.get(entityId)?.logicalUid).toBe("uid-updated");
@@ -387,7 +391,8 @@ describe("DomainEntityService.replace", () => {
 				});
 				yield* svc.replace(id, minimalIcalDocument());
 				return id;
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		expect(entityStore.get(entityId)?.logicalUid).toBeNull();

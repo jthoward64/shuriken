@@ -41,9 +41,9 @@ describe("UserService.create", () => {
 		const created = await runSuccess(
 			UserService.pipe(
 				Effect.flatMap((s) => s.create(newUser())),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 		expect(env.stores.users.get(created.user.id)?.email).toBe(
 			"alice@example.com",
@@ -71,9 +71,9 @@ describe("UserService.create", () => {
 						}),
 					),
 				),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 		const cred = env.stores.credentials.get("local:alice-local");
 		expect(cred).toBeDefined();
@@ -97,9 +97,9 @@ describe("UserService.create", () => {
 						}),
 					),
 				),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 		const cred = env.stores.credentials.get("proxy:alice@sso.corp");
 		expect(cred).toBeDefined();
@@ -126,9 +126,9 @@ describe("UserService.update", () => {
 				Effect.flatMap((s) =>
 					s.update(UserId(userId), { displayName: "Alice Smith" }),
 				),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 		expect(result.principal.displayName).toBe("Alice Smith");
 		// Email was not in the update payload — must be unchanged
@@ -149,9 +149,9 @@ describe("UserService.update", () => {
 				Effect.flatMap((s) =>
 					s.update(UserId(userId), { email: Email("alice@example.com") }),
 				),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 		expect(result.user.email).toBe("alice@example.com");
 	});
@@ -164,8 +164,8 @@ describe("UserService.update", () => {
 					Effect.flatMap((s) =>
 						s.update(UserId(crypto.randomUUID()), { displayName: "Ghost" }),
 					),
-					Effect.provide(env.toLayer()),
 				),
+				env.toLayer(),
 			),
 		);
 		expect(err._tag).toBe("DavError");
@@ -184,8 +184,8 @@ describe("UserService.update", () => {
 					Effect.flatMap((s) =>
 						s.update(UserId(aliceId), { email: Email("bob@example.com") }),
 					),
-					Effect.provide(env.toLayer()),
 				),
+				env.toLayer(),
 			),
 		);
 		expect(err._tag).toBe("DavError");
@@ -209,8 +209,8 @@ describe("UserService.addCredential", () => {
 							authId: "nobody",
 						}),
 					),
-					Effect.provide(env.toLayer()),
 				),
+				env.toLayer(),
 			),
 		);
 		expect(err._tag).toBe("DavError");
@@ -233,8 +233,8 @@ describe("UserService.addCredential", () => {
 							password: Redacted.make("newpass"),
 						}),
 					),
-					Effect.provide(env.toLayer()),
 				),
+				env.toLayer(),
 			),
 		);
 		expect(err._tag).toBe("DavError");
@@ -262,8 +262,8 @@ describe("UserService.addCredential", () => {
 					}),
 				),
 				Effect.orDie,
-				Effect.provide(layer),
 			),
+			layer,
 		);
 
 		// Duplicate add must conflict
@@ -277,8 +277,8 @@ describe("UserService.addCredential", () => {
 							password: Redacted.make("pass2"),
 						}),
 					),
-					Effect.provide(layer),
 				),
+				layer,
 			),
 		);
 		expect(addErr.status).toBe(HTTP_CONFLICT);
@@ -290,8 +290,8 @@ describe("UserService.addCredential", () => {
 					s.removeCredential(UserId(userId), "local", "alice-tmp"),
 				),
 				Effect.orDie,
-				Effect.provide(layer),
 			),
+			layer,
 		);
 
 		// Add again must succeed now that the credential is gone
@@ -305,8 +305,8 @@ describe("UserService.addCredential", () => {
 					}),
 				),
 				Effect.orDie,
-				Effect.provide(layer),
 			),
+			layer,
 		);
 	});
 });

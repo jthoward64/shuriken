@@ -61,9 +61,9 @@ describe("GroupRepository.create (integration)", () => {
 						return { created, found };
 					}),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 
 		expect(Option.isSome(result.found)).toBe(true);
@@ -79,9 +79,9 @@ describe("GroupRepository.create (integration)", () => {
 				Effect.flatMap((r) =>
 					r.create({ slug: Slug("design"), displayName: "Design Team" }),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 
 		expect(result.principal.displayName).toBe("Design Team");
@@ -91,9 +91,9 @@ describe("GroupRepository.create (integration)", () => {
 		const result = await runSuccess(
 			GroupRepository.pipe(
 				Effect.flatMap((r) => r.findById(GroupId(crypto.randomUUID()))),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 		expect(Option.isNone(result)).toBe(true);
 	});
@@ -121,9 +121,9 @@ describe("GroupRepository.update (integration)", () => {
 						});
 					}),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 
 		expect(result.principal.displayName).toBe("Operations");
@@ -146,9 +146,9 @@ describe("GroupRepository.update (integration)", () => {
 						return { created, updated, found };
 					}),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 
 		expect(result.created.group.oidcGroups).toEqual(["sre", "on-call"]);
@@ -182,7 +182,8 @@ describe("GroupRepository membership (integration)", () => {
 				});
 				const { group } = yield* groupRepo.create({ slug: Slug("team") });
 				return yield* groupRepo.hasMember(GroupId(group.id), UserId(user.id));
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 		expect(result).toBe(false);
 	});
@@ -203,7 +204,8 @@ describe("GroupRepository membership (integration)", () => {
 				const userId = UserId(user.id);
 				yield* groupRepo.addMember(groupId, userId);
 				return yield* groupRepo.hasMember(groupId, userId);
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 		expect(result).toBe(true);
 	});
@@ -225,7 +227,8 @@ describe("GroupRepository membership (integration)", () => {
 				yield* groupRepo.addMember(groupId, userId);
 				yield* groupRepo.removeMember(groupId, userId);
 				return yield* groupRepo.hasMember(groupId, userId);
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 		expect(result).toBe(false);
 	});
@@ -247,7 +250,8 @@ describe("GroupRepository membership (integration)", () => {
 				yield* groupRepo.addMember(groupId, userId);
 				yield* groupRepo.addMember(groupId, userId); // second add must not throw
 				return yield* groupRepo.hasMember(groupId, userId);
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 		expect(result).toBe(true);
 	});
@@ -273,7 +277,8 @@ describe("GroupRepository membership (integration)", () => {
 					"oidc",
 				);
 				return { members, autoAssignedGroupIds };
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 		expect(result.members).toHaveLength(1);
 		expect(result.members[0]?.autoAssignedBy).toBe("oidc");

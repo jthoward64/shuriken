@@ -48,9 +48,9 @@ describe("CalTimezoneRepository.findByTzid (integration)", () => {
 		const result = await runSuccess(
 			CalTimezoneRepository.pipe(
 				Effect.flatMap((r) => r.findByTzid("Does/Not/Exist")),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 		expect(Option.isNone(result)).toBe(true);
 	});
@@ -61,7 +61,8 @@ describe("CalTimezoneRepository.findByTzid (integration)", () => {
 				const repo = yield* CalTimezoneRepository;
 				yield* repo.upsert(TZID, VTIMEZONE_DATA, Option.none(), Option.none());
 				return yield* repo.findByTzid(TZID);
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 		expect(Option.isSome(result)).toBe(true);
 		expect(Option.getOrThrow(result).tzid).toBe(TZID);
@@ -91,9 +92,9 @@ describe("CalTimezoneRepository.upsert — insert (integration)", () => {
 				Effect.flatMap((r) =>
 					r.upsert("Europe/Berlin", VTIMEZONE_DATA, ianaName, lastModified),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 
 		expect(row.tzid).toBe("Europe/Berlin");
@@ -113,9 +114,9 @@ describe("CalTimezoneRepository.upsert — insert (integration)", () => {
 						Option.none(),
 					),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 		expect(row.ianaName).toBeNull();
 		expect(row.lastModifiedAt).toBeNull();
@@ -153,7 +154,8 @@ describe("CalTimezoneRepository.upsert — conflict resolution (integration)", (
 					Option.none(),
 				);
 				return yield* repo.findByTzid(TZID);
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 		expect(Option.getOrThrow(result).vtimezoneData).toBe(VTIMEZONE_DATA_V2);
 	});
@@ -178,7 +180,8 @@ describe("CalTimezoneRepository.upsert — conflict resolution (integration)", (
 					Option.some(newer),
 				);
 				return yield* repo.findByTzid(tzid);
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 		expect(Option.getOrThrow(result).vtimezoneData).toBe(VTIMEZONE_DATA_V2);
 	});
@@ -203,7 +206,8 @@ describe("CalTimezoneRepository.upsert — conflict resolution (integration)", (
 					Option.some(older),
 				);
 				return yield* repo.findByTzid(tzid);
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 		// Original data must be preserved — stale client sent an older definition
 		expect(Option.getOrThrow(result).vtimezoneData).toBe(VTIMEZONE_DATA);
@@ -234,7 +238,8 @@ describe("CalTimezoneRepository.upsert — ianaName rules (integration)", () => 
 					Option.none(),
 				);
 				return yield* repo.findByTzid(tzid);
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 		expect(Option.getOrThrow(result).ianaName).toBe("America/New_York");
 	});

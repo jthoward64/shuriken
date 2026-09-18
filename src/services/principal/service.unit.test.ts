@@ -36,9 +36,9 @@ describe("PrincipalService.findById", () => {
 		const result = await runSuccess(
 			PrincipalService.pipe(
 				Effect.flatMap((s) => s.findById(PrincipalId(principalId))),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(result.principal.id).toBe(principalId);
@@ -53,8 +53,8 @@ describe("PrincipalService.findById", () => {
 			await runFailure(
 				PrincipalService.pipe(
 					Effect.flatMap((s) => s.findById(PrincipalId(crypto.randomUUID()))),
-					Effect.provide(env.toLayer()),
 				),
+				env.toLayer(),
 			),
 		);
 
@@ -75,9 +75,9 @@ describe("PrincipalService.findBySlug", () => {
 		const result = await runSuccess(
 			PrincipalService.pipe(
 				Effect.flatMap((s) => s.findBySlug(Slug("bob"))),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(result.principal.slug).toBe("bob");
@@ -91,8 +91,8 @@ describe("PrincipalService.findBySlug", () => {
 			await runFailure(
 				PrincipalService.pipe(
 					Effect.flatMap((s) => s.findBySlug(Slug("nobody"))),
-					Effect.provide(env.toLayer()),
 				),
+				env.toLayer(),
 			),
 		);
 
@@ -113,9 +113,9 @@ describe("PrincipalService.findByEmail", () => {
 		const result = await runSuccess(
 			PrincipalService.pipe(
 				Effect.flatMap((s) => s.findByEmail(Email("carol@example.com"))),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(result.user.email).toBe("carol@example.com");

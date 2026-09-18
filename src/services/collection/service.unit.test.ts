@@ -37,9 +37,9 @@ describe("CollectionService.create", () => {
 						displayName: "My Calendar",
 					}),
 				),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(result.slug).toBe("my-cal");
@@ -67,8 +67,8 @@ describe("CollectionService.create", () => {
 							slug: Slug("existing"),
 						}),
 					),
-					Effect.provide(env.toLayer()),
 				),
+				env.toLayer(),
 			),
 		);
 
@@ -93,9 +93,9 @@ describe("CollectionService.create", () => {
 						slug: Slug("second"),
 					}),
 				),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(env.stores.collections.size).toBe(2);
@@ -119,9 +119,9 @@ describe("CollectionService.delete", () => {
 		await runSuccess(
 			CollectionService.pipe(
 				Effect.flatMap((s) => s.delete(CollectionId(collectionId))),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(env.stores.collections.get(collectionId)?.deletedAt).not.toBeNull();
@@ -134,8 +134,8 @@ describe("CollectionService.delete", () => {
 			await runFailure(
 				CollectionService.pipe(
 					Effect.flatMap((s) => s.delete(CollectionId(crypto.randomUUID()))),
-					Effect.provide(env.toLayer()),
 				),
+				env.toLayer(),
 			),
 		);
 
@@ -162,9 +162,9 @@ describe("CollectionService.findById", () => {
 		const result = await runSuccess(
 			CollectionService.pipe(
 				Effect.flatMap((s) => s.findById(CollectionId(collectionId))),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(result.id).toBe(collectionId);
@@ -178,8 +178,8 @@ describe("CollectionService.findById", () => {
 			await runFailure(
 				CollectionService.pipe(
 					Effect.flatMap((s) => s.findById(CollectionId(crypto.randomUUID()))),
-					Effect.provide(env.toLayer()),
 				),
+				env.toLayer(),
 			),
 		);
 
@@ -207,9 +207,9 @@ describe("CollectionService.findBySlug", () => {
 				Effect.flatMap((s) =>
 					s.findBySlug(principalId, "calendar", Slug("my-cal")),
 				),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(result.slug).toBe("my-cal");
@@ -227,8 +227,8 @@ describe("CollectionService.findBySlug", () => {
 					Effect.flatMap((s) =>
 						s.findBySlug(principalId, "calendar", Slug("no-such-cal")),
 					),
-					Effect.provide(env.toLayer()),
 				),
+				env.toLayer(),
 			),
 		);
 
@@ -250,9 +250,9 @@ describe("CollectionService.listByOwner", () => {
 		const result = await runSuccess(
 			CollectionService.pipe(
 				Effect.flatMap((s) => s.listByOwner(principalId)),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(result).toHaveLength(0);
@@ -271,9 +271,9 @@ describe("CollectionService.listByOwner", () => {
 		const aliceResult = await runSuccess(
 			CollectionService.pipe(
 				Effect.flatMap((s) => s.listByOwner(alicePrincipalId)),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(aliceResult).toHaveLength(1);
@@ -297,9 +297,9 @@ describe("CollectionService.listByOwner", () => {
 		await runSuccess(
 			CollectionService.pipe(
 				Effect.flatMap((s) => s.delete(CollectionId(deletedId))),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		const result = await runSuccess(

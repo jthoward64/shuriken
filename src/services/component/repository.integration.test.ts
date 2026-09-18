@@ -94,7 +94,8 @@ describe("ComponentRepository insertTree + loadTree (integration)", () => {
 				const comp = yield* ComponentRepository;
 				yield* comp.insertTree(entityId, tree);
 				return yield* comp.loadTree(entityId, "icalendar");
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		expect(Option.isSome(result)).toBe(true);
@@ -115,9 +116,9 @@ describe("ComponentRepository insertTree + loadTree (integration)", () => {
 				Effect.flatMap((r) =>
 					r.loadTree(EntityId(crypto.randomUUID()), "icalendar"),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 
 		expect(Option.isNone(result)).toBe(true);
@@ -136,7 +137,8 @@ describe("ComponentRepository insertTree + loadTree (integration)", () => {
 				});
 				yield* comp.deleteByEntity(entityId);
 				return yield* comp.loadTree(entityId, "icalendar");
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		expect(Option.isNone(result)).toBe(true);
@@ -148,7 +150,8 @@ describe("ComponentRepository insertTree + loadTree (integration)", () => {
 				const entity = yield* makeEntity();
 				const comp = yield* ComponentRepository;
 				yield* comp.deleteByEntity(EntityId(entity.id));
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 	});
 });
@@ -183,7 +186,8 @@ describe("ComponentRepository value type round-trips (integration)", () => {
 					components: [],
 				});
 				return yield* comp.loadTree(entityId, "icalendar");
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		const root = Option.getOrThrow(result);
@@ -213,7 +217,8 @@ describe("ComponentRepository value type round-trips (integration)", () => {
 					components: [],
 				});
 				return yield* comp.loadTree(entityId, "icalendar");
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		const root = Option.getOrThrow(result);
@@ -246,7 +251,8 @@ describe("ComponentRepository value type round-trips (integration)", () => {
 					components: [],
 				});
 				return yield* comp.loadTree(entityId, "icalendar");
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		const root = Option.getOrThrow(result);
@@ -279,7 +285,8 @@ describe("ComponentRepository value type round-trips (integration)", () => {
 					components: [],
 				});
 				return yield* comp.loadTree(entityId, "icalendar");
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		const root = Option.getOrThrow(result);
@@ -314,7 +321,8 @@ describe("ComponentRepository value type round-trips (integration)", () => {
 					components: [],
 				});
 				return yield* comp.loadTree(entityId, "icalendar");
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		const root = Option.getOrThrow(result);
@@ -353,7 +361,8 @@ describe("ComponentRepository value type round-trips (integration)", () => {
 					components: [],
 				});
 				return yield* comp.loadTree(entityId, "icalendar");
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		const root = Option.getOrThrow(result);
@@ -383,7 +392,8 @@ describe("ComponentRepository value type round-trips (integration)", () => {
 					components: [],
 				});
 				return yield* comp.loadTree(entityId, "icalendar");
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		const root = Option.getOrThrow(result);
@@ -425,7 +435,8 @@ describe("ComponentRepository isKnown round-trips (integration)", () => {
 					components: [],
 				});
 				return yield* comp.loadTree(entityId, "icalendar");
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		const root = Option.getOrThrow(result);
@@ -451,7 +462,8 @@ describe("ComponentRepository isKnown round-trips (integration)", () => {
 					components: [],
 				});
 				return yield* comp.loadTree(entityId, "icalendar");
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		const root = Option.getOrThrow(result);
@@ -477,7 +489,8 @@ describe("ComponentRepository isKnown round-trips (integration)", () => {
 					components: [],
 				});
 				return yield* comp.loadTree(entityId, "icalendar");
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		const root = Option.getOrThrow(result);
@@ -514,7 +527,8 @@ describe("ComponentRepository ordinal and structural invariants (integration)", 
 					components: [],
 				});
 				return yield* comp.loadTree(entityId, "icalendar");
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		const root = Option.getOrThrow(result);
@@ -558,7 +572,8 @@ describe("ComponentRepository ordinal and structural invariants (integration)", 
 					],
 				});
 				return yield* comp.loadTree(entityId, "icalendar");
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		const root = Option.getOrThrow(result);
@@ -585,7 +600,8 @@ describe("ComponentRepository ordinal and structural invariants (integration)", 
 					components: [],
 				});
 				return yield* comp.loadTree(entityId, "icalendar");
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		const root = Option.getOrThrow(result);
@@ -621,7 +637,8 @@ describe("ComponentRepository ordinal and structural invariants (integration)", 
 					components: [],
 				});
 				return yield* comp.loadTree(entityId, "icalendar");
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		const root = Option.getOrThrow(result);
@@ -675,7 +692,8 @@ describe("ComponentRepository loadTreesByIds (integration)", () => {
 				}
 				const result = yield* comp.loadTreesByIds(idList, "icalendar");
 				return { ids: idList, map: result };
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		expect(map.size).toBe(3);

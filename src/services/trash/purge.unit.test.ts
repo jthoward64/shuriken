@@ -61,18 +61,18 @@ describe("trash purge sweep", () => {
 		const expired = await runSuccess(
 			CollectionRepository.pipe(
 				Effect.flatMap((repo) => repo.listDeletedOlderThan(cutoff)),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 		expect(expired.map((c) => c.id)).toEqual([oldId]);
 
 		await runSuccess(
 			CollectionRepository.pipe(
 				Effect.flatMap((repo) => repo.hardDelete(CollectionId(oldId))),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(env.stores.collections.has(oldId)).toBe(false);
@@ -100,9 +100,9 @@ describe("trash purge sweep", () => {
 		const expired = await runSuccess(
 			InstanceRepository.pipe(
 				Effect.flatMap((repo) => repo.listDeletedOlderThan(cutoff)),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 		expect(expired.map((i) => i.id)).toEqual([oldId]);
 

@@ -77,9 +77,9 @@ describe("InstanceRepository.insert and findById (integration)", () => {
 		const result = await runSuccess(
 			InstanceRepository.pipe(
 				Effect.flatMap((r) => r.findById(InstanceId(crypto.randomUUID()))),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 		expect(Option.isNone(result)).toBe(true);
 	});
@@ -113,7 +113,8 @@ describe("InstanceRepository.insert and findById (integration)", () => {
 				});
 				const found = yield* instanceRepo.findById(InstanceId(inserted.id));
 				return { inserted, found };
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		expect(Option.isSome(result.found)).toBe(true);
@@ -142,9 +143,9 @@ describe("InstanceRepository.findBySlug (integration)", () => {
 				Effect.flatMap((r) =>
 					r.findBySlug(CollectionId(crypto.randomUUID()), Slug("no-such.ics")),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 		expect(Option.isNone(result)).toBe(true);
 	});
@@ -182,7 +183,8 @@ describe("InstanceRepository.findBySlug (integration)", () => {
 					collectionId,
 					Slug("meeting.ics"),
 				);
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		expect(Option.isSome(result)).toBe(true);
@@ -234,7 +236,8 @@ describe("InstanceRepository.findBySlug (integration)", () => {
 					CollectionId(col2.id),
 					Slug("shared.ics"),
 				);
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 		expect(Option.isNone(result)).toBe(true);
 	});
@@ -257,9 +260,9 @@ describe("InstanceRepository.listByCollection (integration)", () => {
 				Effect.flatMap((r) =>
 					r.listByCollection(CollectionId(crypto.randomUUID())),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 		expect(result).toHaveLength(0);
 	});
@@ -302,7 +305,8 @@ describe("InstanceRepository.listByCollection (integration)", () => {
 				});
 
 				return yield* instanceRepo.listByCollection(collectionId);
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 		expect(result).toHaveLength(2);
 		const slugs = [...result]
@@ -352,7 +356,8 @@ describe("InstanceRepository.listByCollection (integration)", () => {
 
 				const list = yield* instanceRepo.listByCollection(collectionId);
 				return { kept, list };
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 		expect(result.list).toHaveLength(1);
 		expect(result.list[0]?.id).toBe(result.kept.id);
@@ -400,7 +405,8 @@ describe("InstanceRepository.updateEtag (integration)", () => {
 				yield* instanceRepo.updateEtag(InstanceId(inserted.id), ETag('"v2"'));
 				const refetched = yield* instanceRepo.findById(InstanceId(inserted.id));
 				return { insertedRevision: inserted.syncRevision, found: refetched };
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		expect(Option.isSome(found)).toBe(true);

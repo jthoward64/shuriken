@@ -42,9 +42,9 @@ describe("AclService.check", () => {
 		await runSuccess(
 			AclService.pipe(
 				Effect.flatMap((s) => s.check(principalId, RID, RTYPE, "DAV:read")),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 	});
 
@@ -65,9 +65,9 @@ describe("AclService.check", () => {
 				Effect.flatMap((s) =>
 					s.check(principalId, RID, RTYPE, "DAV:write-content"),
 				),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 	});
 
@@ -84,9 +84,9 @@ describe("AclService.check", () => {
 		await runSuccess(
 			AclService.pipe(
 				Effect.flatMap((s) => s.check(principalId, RID, RTYPE, "DAV:read-acl")),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 	});
 
@@ -97,8 +97,8 @@ describe("AclService.check", () => {
 			await runFailure(
 				AclService.pipe(
 					Effect.flatMap((s) => s.check(principalId, RID, RTYPE, "DAV:read")),
-					Effect.provide(env.toLayer()),
 				),
+				env.toLayer(),
 			),
 		);
 		expect(err._tag).toBe("DavError");
@@ -121,8 +121,8 @@ describe("AclService.check", () => {
 			await runFailure(
 				AclService.pipe(
 					Effect.flatMap((s) => s.check(principalId, RID, RTYPE, "DAV:read")),
-					Effect.provide(env.toLayer()),
 				),
+				env.toLayer(),
 			),
 		);
 		expect(err.status).toBe(HTTP_FORBIDDEN);
@@ -161,9 +161,9 @@ describe("AclService.check", () => {
 		await runSuccess(
 			AclService.pipe(
 				Effect.flatMap((s) => s.check(userPrincipalId, RID, RTYPE, "DAV:read")),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 	});
 
@@ -179,9 +179,9 @@ describe("AclService.check", () => {
 		await runSuccess(
 			AclService.pipe(
 				Effect.flatMap((s) => s.check(principalId, RID, RTYPE, "DAV:read")),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 	});
 });
@@ -203,9 +203,9 @@ describe("AclService.currentUserPrivileges", () => {
 		const result = await runSuccess(
 			AclService.pipe(
 				Effect.flatMap((s) => s.currentUserPrivileges(principalId, RID, RTYPE)),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 		expect(result).toContain("DAV:read");
 		expect(result).toContain("DAV:read-current-user-privilege-set");
@@ -224,9 +224,9 @@ describe("AclService.currentUserPrivileges", () => {
 		const result = await runSuccess(
 			AclService.pipe(
 				Effect.flatMap((s) => s.currentUserPrivileges(principalId, RID, RTYPE)),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 		expect(result).toContain("DAV:write");
 		expect(result).toContain("DAV:write-properties");
@@ -273,9 +273,9 @@ describe("AclService.currentUserPrivileges", () => {
 		const result = await runSuccess(
 			AclService.pipe(
 				Effect.flatMap((s) => s.currentUserPrivileges(principalId, RID, RTYPE)),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 		expect(result).toHaveLength(expectedPrivileges.length);
 		for (const p of expectedPrivileges) {
@@ -295,9 +295,9 @@ describe("AclService.currentUserPrivileges", () => {
 		const result = await runSuccess(
 			AclService.pipe(
 				Effect.flatMap((s) => s.currentUserPrivileges(principalId, RID, RTYPE)),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 		expect(result).toContain("CALDAV:schedule-deliver");
 		expect(result).toContain("CALDAV:schedule-deliver-invite");
@@ -310,9 +310,9 @@ describe("AclService.currentUserPrivileges", () => {
 		const result = await runSuccess(
 			AclService.pipe(
 				Effect.flatMap((s) => s.currentUserPrivileges(principalId, RID, RTYPE)),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 		expect(Array.isArray(result)).toBe(true);
 		expect(result).toHaveLength(0);
@@ -347,9 +347,9 @@ describe("AclService.check — inheritance", () => {
 				Effect.flatMap((s) =>
 					s.check(principalId, instanceId, "instance", "DAV:read"),
 				),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 	});
 
@@ -375,9 +375,9 @@ describe("AclService.check — inheritance", () => {
 				Effect.flatMap((s) =>
 					s.check(principalId, collectionId, "collection", "DAV:write-content"),
 				),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 	});
 
@@ -398,8 +398,8 @@ describe("AclService.check — inheritance", () => {
 					Effect.flatMap((s) =>
 						s.check(principalId, instanceId, "instance", "DAV:read"),
 					),
-					Effect.provide(env.toLayer()),
 				),
+				env.toLayer(),
 			),
 		);
 
@@ -432,8 +432,8 @@ describe("AclService.check — inheritance", () => {
 					Effect.flatMap((s) =>
 						s.check(principalId, instanceId, "instance", "DAV:write-content"),
 					),
-					Effect.provide(env.toLayer()),
 				),
+				env.toLayer(),
 			),
 		);
 
@@ -469,9 +469,9 @@ describe("AclService.currentUserPrivileges — inheritance", () => {
 				Effect.flatMap((s) =>
 					s.currentUserPrivileges(principalId, instanceId, "instance"),
 				),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(result).toContain("DAV:read");
@@ -510,9 +510,9 @@ describe("AclService.currentUserPrivileges — inheritance", () => {
 				Effect.flatMap((s) =>
 					s.currentUserPrivileges(principalId, instanceId, "instance"),
 				),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(result).toContain("DAV:read");
@@ -570,9 +570,9 @@ describe("AclService.batchMemberPrivileges", () => {
 						singleB: s.currentUserPrivileges(principalId, instB, "instance"),
 					}),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 
 		// instA: inherited read + direct write-content; instB: inherited read only.
@@ -603,9 +603,9 @@ describe("AclService.batchMemberPrivileges", () => {
 						memberType: "instance",
 					}),
 				),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(batch.size).toBe(0);
@@ -652,9 +652,9 @@ describe("AclService.batchCheckMembers", () => {
 						"DAV:read",
 					),
 				),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(allowed.has(granted)).toBe(true);
@@ -696,9 +696,9 @@ describe("AclService.batchCheckMembers", () => {
 						"DAV:read",
 					),
 				),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(allowed.has(instA)).toBe(true);

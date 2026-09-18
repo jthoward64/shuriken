@@ -50,9 +50,9 @@ describe("AclRepository.grantAce and getAces (integration)", () => {
 		const result = await runSuccess(
 			AclRepository.pipe(
 				Effect.flatMap((r) => r.getAces(crypto.randomUUID(), "collection")),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 		expect(result).toHaveLength(0);
 	});
@@ -76,9 +76,9 @@ describe("AclRepository.grantAce and getAces (integration)", () => {
 						return yield* r.getAces(resourceId, "collection");
 					}),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 
 		expect(result).toHaveLength(1);
@@ -106,9 +106,9 @@ describe("AclRepository.grantAce and getAces (integration)", () => {
 						return yield* r.getAces(resourceId, "instance");
 					}),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 
 		expect(result).toHaveLength(0);
@@ -137,9 +137,9 @@ describe("AclRepository.hasPrivilege (integration)", () => {
 						true,
 					),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 		expect(result).toBe(false);
 	});
@@ -168,9 +168,9 @@ describe("AclRepository.hasPrivilege (integration)", () => {
 						);
 					}),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 		expect(result).toBe(true);
 	});
@@ -199,9 +199,9 @@ describe("AclRepository.hasPrivilege (integration)", () => {
 						);
 					}),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 		expect(result).toBe(true);
 	});
@@ -230,9 +230,9 @@ describe("AclRepository.hasPrivilege (integration)", () => {
 						);
 					}),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 		expect(result).toBe(false);
 	});
@@ -261,9 +261,9 @@ describe("AclRepository.getGrantedPrivileges (integration)", () => {
 				Effect.flatMap((r) =>
 					r.getGrantedPrivileges([], crypto.randomUUID(), "collection", true),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 		expect(result).toHaveLength(0);
 	});
@@ -301,9 +301,9 @@ describe("AclRepository.getGrantedPrivileges (integration)", () => {
 						);
 					}),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 
 		const sorted = [...result].sort();
@@ -363,9 +363,9 @@ describe("AclRepository.setAces (integration)", () => {
 						return yield* r.getAces(resourceId, "collection");
 					}),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 
 		expect(result).toHaveLength(1);
@@ -394,9 +394,9 @@ describe("AclRepository.setAces (integration)", () => {
 						return yield* r.getAces(resourceId, "collection");
 					}),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 
 		expect(result).toHaveLength(1);
@@ -426,7 +426,8 @@ describe("AclRepository.getGroupPrincipalIds (integration)", () => {
 					credentials: [],
 				});
 				return yield* aclRepo.getGroupPrincipalIds(PrincipalId(principal.id));
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 		expect(result).toHaveLength(0);
 	});
@@ -464,9 +465,9 @@ describe("AclRepository.getResourceParent (integration)", () => {
 				Effect.flatMap((r) =>
 					r.getResourceParent(crypto.randomUUID(), "principal"),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 		expect(Option.isNone(result)).toBe(true);
 	});
@@ -490,7 +491,8 @@ describe("AclRepository.getResourceParent (integration)", () => {
 					slug: Slug("rp-root-cal"),
 				});
 				return yield* aclRepo.getResourceParent(collection.id, "collection");
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 		expect(Option.isSome(result)).toBe(true);
 		if (Option.isSome(result)) {
@@ -523,7 +525,8 @@ describe("AclRepository.getResourceParent (integration)", () => {
 					parentCollectionId: CollectionId(parent.id),
 				});
 				return yield* aclRepo.getResourceParent(child.id, "collection");
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 		expect(Option.isSome(result)).toBe(true);
 		if (Option.isSome(result)) {

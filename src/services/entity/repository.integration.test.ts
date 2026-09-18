@@ -38,9 +38,9 @@ describe("EntityRepository.insert (integration)", () => {
 				Effect.flatMap((r) =>
 					r.insert({ entityType: "icalendar", logicalUid: null }),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 
 		expect(result.entityType).toBe("icalendar");
@@ -55,9 +55,9 @@ describe("EntityRepository.insert (integration)", () => {
 				Effect.flatMap((r) =>
 					r.insert({ entityType: "vcard", logicalUid: "urn:uuid:abc-123" }),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 
 		expect(result.entityType).toBe("vcard");
@@ -85,7 +85,8 @@ describe("EntityRepository.findById (integration)", () => {
 					logicalUid: null,
 				});
 				return yield* repo.findById(EntityId(inserted.id));
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		expect(Option.isSome(result)).toBe(true);
@@ -95,9 +96,9 @@ describe("EntityRepository.findById (integration)", () => {
 		const result = await runSuccess(
 			EntityRepository.pipe(
 				Effect.flatMap((r) => r.findById(EntityId(crypto.randomUUID()))),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 
 		expect(Option.isNone(result)).toBe(true);
@@ -114,7 +115,8 @@ describe("EntityRepository.findById (integration)", () => {
 				const id = EntityId(inserted.id);
 				yield* repo.softDelete(id);
 				return yield* repo.findById(id);
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		expect(Option.isNone(result)).toBe(true);
@@ -143,7 +145,8 @@ describe("EntityRepository.updateLogicalUid (integration)", () => {
 				const id = EntityId(inserted.id);
 				yield* repo.updateLogicalUid(id, "new-uid-value");
 				return yield* repo.findById(id);
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		expect(Option.isSome(result)).toBe(true);
@@ -161,7 +164,8 @@ describe("EntityRepository.updateLogicalUid (integration)", () => {
 				const id = EntityId(inserted.id);
 				yield* repo.updateLogicalUid(id, null);
 				return yield* repo.findById(id);
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		expect(Option.isSome(result)).toBe(true);

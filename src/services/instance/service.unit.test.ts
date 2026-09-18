@@ -46,9 +46,9 @@ describe("InstanceService.put — create path", () => {
 		const result = await runSuccess(
 			InstanceService.pipe(
 				Effect.flatMap((s) => s.put(makeInput(collectionId))),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(result.syncRevision).toBe(1);
@@ -64,9 +64,9 @@ describe("InstanceService.put — create path", () => {
 		const result = await runSuccess(
 			InstanceService.pipe(
 				Effect.flatMap((s) => s.put(makeInput(collectionId, '"abc-123"'))),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(result.etag).toBe('"abc-123"');
@@ -93,9 +93,9 @@ describe("InstanceService.put — update path", () => {
 				Effect.flatMap((s) =>
 					s.put(makeInput(collectionId, '"v2"'), InstanceId(instanceId)),
 				),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(result.syncRevision).toBe(1);
@@ -115,9 +115,9 @@ describe("InstanceService.put — update path", () => {
 				Effect.flatMap((s) =>
 					s.put(makeInput(collectionId, '"v2"'), InstanceId(instanceId)),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 
 		// Second update: 1 → 2
@@ -126,9 +126,9 @@ describe("InstanceService.put — update path", () => {
 				Effect.flatMap((s) =>
 					s.put(makeInput(collectionId, '"v3"'), InstanceId(instanceId)),
 				),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 
 		expect(result.syncRevision).toBe(2);
@@ -145,8 +145,8 @@ describe("InstanceService.put — update path", () => {
 					Effect.flatMap((s) =>
 						s.put(makeInput(collectionId), InstanceId(crypto.randomUUID())),
 					),
-					Effect.provide(env.toLayer()),
 				),
+				env.toLayer(),
 			),
 		);
 
@@ -171,9 +171,9 @@ describe("InstanceService.delete", () => {
 		await runSuccess(
 			InstanceService.pipe(
 				Effect.flatMap((s) => s.delete(InstanceId(instanceId))),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(env.stores.instances.get(instanceId)?.deletedAt).not.toBeNull();
@@ -186,8 +186,8 @@ describe("InstanceService.delete", () => {
 			await runFailure(
 				InstanceService.pipe(
 					Effect.flatMap((s) => s.delete(InstanceId(crypto.randomUUID()))),
-					Effect.provide(env.toLayer()),
 				),
+				env.toLayer(),
 			),
 		);
 
@@ -213,9 +213,9 @@ describe("InstanceService.findById", () => {
 		const result = await runSuccess(
 			InstanceService.pipe(
 				Effect.flatMap((s) => s.findById(InstanceId(instanceId))),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(result.id).toBe(instanceId);
@@ -229,8 +229,8 @@ describe("InstanceService.findById", () => {
 			await runFailure(
 				InstanceService.pipe(
 					Effect.flatMap((s) => s.findById(InstanceId(crypto.randomUUID()))),
-					Effect.provide(env.toLayer()),
 				),
+				env.toLayer(),
 			),
 		);
 
@@ -252,9 +252,9 @@ describe("InstanceService.findBySlug", () => {
 		const result = await runSuccess(
 			InstanceService.pipe(
 				Effect.flatMap((s) => s.findBySlug(collectionId, Slug("contact.vcf"))),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(result.slug).toBe("contact.vcf");
@@ -270,8 +270,8 @@ describe("InstanceService.findBySlug", () => {
 					Effect.flatMap((s) =>
 						s.findBySlug(collectionId, Slug("missing.ics")),
 					),
-					Effect.provide(env.toLayer()),
 				),
+				env.toLayer(),
 			),
 		);
 
@@ -295,9 +295,9 @@ describe("InstanceService.listByCollection", () => {
 		const result = await runSuccess(
 			InstanceService.pipe(
 				Effect.flatMap((s) => s.listByCollection(collectionId)),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(result).toHaveLength(2);
@@ -314,9 +314,9 @@ describe("InstanceService.listByCollection", () => {
 		const result = await runSuccess(
 			InstanceService.pipe(
 				Effect.flatMap((s) => s.listByCollection(collectionId)),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(result).toHaveLength(0);

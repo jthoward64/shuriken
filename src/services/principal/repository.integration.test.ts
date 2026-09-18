@@ -43,9 +43,9 @@ describe("PrincipalRepository.findById (integration)", () => {
 		const result = await runSuccess(
 			PrincipalRepository.pipe(
 				Effect.flatMap((r) => r.findById(PrincipalId(crypto.randomUUID()))),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 		expect(Option.isNone(result)).toBe(true);
 	});
@@ -62,7 +62,8 @@ describe("PrincipalRepository.findById (integration)", () => {
 				});
 				const found = yield* principalRepo.findById(PrincipalId(principal.id));
 				return { user, found };
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		expect(Option.isSome(result.found)).toBe(true);
@@ -89,9 +90,9 @@ describe("PrincipalRepository.findBySlug (integration)", () => {
 		const result = await runSuccess(
 			PrincipalRepository.pipe(
 				Effect.flatMap((r) => r.findBySlug(Slug("nobody"))),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 		expect(Option.isNone(result)).toBe(true);
 	});
@@ -107,7 +108,8 @@ describe("PrincipalRepository.findBySlug (integration)", () => {
 					credentials: [],
 				});
 				return yield* principalRepo.findBySlug(Slug("bob"));
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		expect(Option.isSome(result)).toBe(true);
@@ -132,9 +134,9 @@ describe("PrincipalRepository.findByEmail (integration)", () => {
 		const result = await runSuccess(
 			PrincipalRepository.pipe(
 				Effect.flatMap((r) => r.findByEmail(Email("nobody@example.com"))),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 		expect(Option.isNone(result)).toBe(true);
 	});
@@ -150,7 +152,8 @@ describe("PrincipalRepository.findByEmail (integration)", () => {
 					credentials: [],
 				});
 				return yield* principalRepo.findByEmail(Email("carol@example.com"));
-			}).pipe(Effect.provide(layer), Effect.orDie),
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		expect(Option.isSome(result)).toBe(true);
@@ -175,9 +178,9 @@ describe("PrincipalRepository.findUserByUserId (integration)", () => {
 		const result = await runSuccess(
 			PrincipalRepository.pipe(
 				Effect.flatMap((r) => r.findUserByUserId(UserId(crypto.randomUUID()))),
-				Effect.provide(layer),
 				Effect.orDie,
 			),
+			layer,
 		);
 		expect(Option.isNone(result)).toBe(true);
 	});

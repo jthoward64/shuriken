@@ -42,9 +42,9 @@ describe("TrashService.listTrash", () => {
 		const result = await runSuccess(
 			TrashService.pipe(
 				Effect.flatMap((s) => s.listTrash(principalId)),
-				Effect.provide(layerFor(env)),
 				Effect.orDie,
 			),
+			layerFor(env),
 		);
 
 		expect(result.collections).toHaveLength(1);
@@ -106,9 +106,9 @@ describe("TrashService.listTrash", () => {
 		const result = await runSuccess(
 			TrashService.pipe(
 				Effect.flatMap((s) => s.listTrash(principalId)),
-				Effect.provide(layerFor(env)),
 				Effect.orDie,
 			),
+			layerFor(env),
 		);
 
 		const instanceIds = result.instances.map((i) => i.id).sort();
@@ -140,9 +140,9 @@ describe("TrashService.restoreCollection", () => {
 				Effect.flatMap((s) =>
 					s.restoreCollection(CollectionId(collectionId), principalId),
 				),
-				Effect.provide(layerFor(env)),
 				Effect.orDie,
 			),
+			layerFor(env),
 		);
 
 		expect(env.stores.collections.get(collectionId)?.deletedAt).toBeNull();
@@ -170,8 +170,8 @@ describe("TrashService.restoreCollection", () => {
 				Effect.flatMap((s) =>
 					s.restoreCollection(CollectionId(collectionId), otherId),
 				),
-				Effect.provide(layerFor(env)),
 			),
+			layerFor(env),
 		);
 
 		expect(err).toBeInstanceOf(TrashNotOwner);
@@ -187,8 +187,8 @@ describe("TrashService.restoreCollection", () => {
 				Effect.flatMap((s) =>
 					s.restoreCollection(CollectionId(crypto.randomUUID()), principalId),
 				),
-				Effect.provide(layerFor(env)),
 			),
+			layerFor(env),
 		);
 
 		expect(err).toBeInstanceOf(TrashNotFound);
@@ -217,9 +217,9 @@ describe("TrashService.purgeCollectionForever", () => {
 				Effect.flatMap((s) =>
 					s.purgeCollectionForever(CollectionId(collectionId), principalId),
 				),
-				Effect.provide(layerFor(env)),
 				Effect.orDie,
 			),
+			layerFor(env),
 		);
 
 		expect(env.stores.collections.has(collectionId)).toBe(false);
@@ -247,8 +247,8 @@ describe("TrashService.purgeCollectionForever", () => {
 				Effect.flatMap((s) =>
 					s.purgeCollectionForever(CollectionId(collectionId), otherId),
 				),
-				Effect.provide(layerFor(env)),
 			),
+			layerFor(env),
 		);
 
 		expect(err).toBeInstanceOf(TrashNotOwner);
@@ -279,9 +279,9 @@ describe("TrashService.restoreInstance / purgeInstanceForever", () => {
 				Effect.flatMap((s) =>
 					s.restoreInstance(InstanceId(instanceId), principalId),
 				),
-				Effect.provide(layerFor(env)),
 				Effect.orDie,
 			),
+			layerFor(env),
 		);
 
 		expect(env.stores.instances.get(instanceId)?.deletedAt).toBeNull();
@@ -311,8 +311,8 @@ describe("TrashService.restoreInstance / purgeInstanceForever", () => {
 				Effect.flatMap((s) =>
 					s.purgeInstanceForever(InstanceId(instanceId), otherId),
 				),
-				Effect.provide(layerFor(env)),
 			),
+			layerFor(env),
 		);
 
 		expect(err).toBeInstanceOf(TrashNotOwner);

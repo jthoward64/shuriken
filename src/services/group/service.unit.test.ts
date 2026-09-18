@@ -28,9 +28,9 @@ describe("GroupService.create", () => {
 		const result = await runSuccess(
 			GroupService.pipe(
 				Effect.flatMap((s) => s.create({ slug: Slug("admins") })),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(result.principal.principalType).toBe("group");
@@ -46,9 +46,9 @@ describe("GroupService.create", () => {
 				Effect.flatMap((s) =>
 					s.create({ slug: Slug("editors"), displayName: "Editors" }),
 				),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(result.principal.displayName).toBe("Editors");
@@ -70,9 +70,9 @@ describe("GroupService.update", () => {
 				Effect.flatMap((s) =>
 					s.update(GroupId(groupId), { displayName: "New Name" }),
 				),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(result.principal.displayName).toBe("New Name");
@@ -87,8 +87,8 @@ describe("GroupService.update", () => {
 					Effect.flatMap((s) =>
 						s.update(GroupId(crypto.randomUUID()), { displayName: "X" }),
 					),
-					Effect.provide(env.toLayer()),
 				),
+				env.toLayer(),
 			),
 		);
 
@@ -111,9 +111,9 @@ describe("GroupService.addMember", () => {
 		await runSuccess(
 			GroupService.pipe(
 				Effect.flatMap((s) => s.addMember(GroupId(groupId), UserId(userId))),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(env.stores.memberships.get(groupId)?.has(userId)).toBe(true);
@@ -131,8 +131,8 @@ describe("GroupService.addMember", () => {
 							UserId(crypto.randomUUID()),
 						),
 					),
-					Effect.provide(env.toLayer()),
 				),
+				env.toLayer(),
 			),
 		);
 
@@ -156,9 +156,9 @@ describe("GroupService.removeMember", () => {
 		await runSuccess(
 			GroupService.pipe(
 				Effect.flatMap((s) => s.removeMember(GroupId(groupId), UserId(userId))),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(env.stores.memberships.get(groupId)?.has(userId)).toBe(false);
@@ -176,8 +176,8 @@ describe("GroupService.removeMember", () => {
 							UserId(crypto.randomUUID()),
 						),
 					),
-					Effect.provide(env.toLayer()),
 				),
+				env.toLayer(),
 			),
 		);
 
@@ -199,9 +199,9 @@ describe("GroupService.findById", () => {
 		const result = await runSuccess(
 			GroupService.pipe(
 				Effect.flatMap((s) => s.findById(GroupId(groupId))),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		// result.group.id is the groupId; result.principal.id is the principalId (different)
@@ -216,8 +216,8 @@ describe("GroupService.findById", () => {
 			await runFailure(
 				GroupService.pipe(
 					Effect.flatMap((s) => s.findById(GroupId(crypto.randomUUID()))),
-					Effect.provide(env.toLayer()),
 				),
+				env.toLayer(),
 			),
 		);
 
@@ -237,9 +237,9 @@ describe("GroupService.list", () => {
 		const result = await runSuccess(
 			GroupService.pipe(
 				Effect.flatMap((s) => s.list()),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(result).toEqual([]);
@@ -253,9 +253,9 @@ describe("GroupService.list", () => {
 		const result = await runSuccess(
 			GroupService.pipe(
 				Effect.flatMap((s) => s.list()),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(result).toHaveLength(2);
@@ -277,9 +277,9 @@ describe("GroupService.listMembers", () => {
 		const result = await runSuccess(
 			GroupService.pipe(
 				Effect.flatMap((s) => s.listMembers(GroupId(groupId))),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(result.length).toBeGreaterThan(0);
@@ -293,9 +293,9 @@ describe("GroupService.listMembers", () => {
 		const result = await runSuccess(
 			GroupService.pipe(
 				Effect.flatMap((s) => s.listMembers(GroupId(groupId))),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(result).toEqual([]);
@@ -308,8 +308,8 @@ describe("GroupService.listMembers", () => {
 			await runFailure(
 				GroupService.pipe(
 					Effect.flatMap((s) => s.listMembers(GroupId(crypto.randomUUID()))),
-					Effect.provide(env.toLayer()),
 				),
+				env.toLayer(),
 			),
 		);
 
@@ -333,9 +333,9 @@ describe("GroupService.listByMember", () => {
 		const result = await runSuccess(
 			GroupService.pipe(
 				Effect.flatMap((s) => s.listByMember(UserId(userId))),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(result.length).toBeGreaterThan(0);
@@ -349,9 +349,9 @@ describe("GroupService.listByMember", () => {
 		const result = await runSuccess(
 			GroupService.pipe(
 				Effect.flatMap((s) => s.listByMember(UserId(userId))),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(result).toEqual([]);
@@ -371,9 +371,9 @@ describe("GroupService.delete", () => {
 		await runSuccess(
 			GroupService.pipe(
 				Effect.flatMap((s) => s.delete(GroupId(groupId))),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		// softDelete sets deletedAt on the principal (in groupPrincipals), not on the group row
@@ -392,8 +392,8 @@ describe("GroupService.delete", () => {
 			await runFailure(
 				GroupService.pipe(
 					Effect.flatMap((s) => s.delete(GroupId(crypto.randomUUID()))),
-					Effect.provide(env.toLayer()),
 				),
+				env.toLayer(),
 			),
 		);
 
@@ -423,9 +423,9 @@ describe("GroupService.setMembers", () => {
 				Effect.flatMap((s) =>
 					s.setMembers(GroupId(groupId), [UserId(userId2)]),
 				),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		const members = env.stores.memberships.get(groupId);
@@ -444,9 +444,9 @@ describe("GroupService.setMembers", () => {
 		await runSuccess(
 			GroupService.pipe(
 				Effect.flatMap((s) => s.setMembers(GroupId(groupId), [])),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(env.stores.memberships.get(groupId)?.size ?? 0).toBe(0);
@@ -459,8 +459,8 @@ describe("GroupService.setMembers", () => {
 			await runFailure(
 				GroupService.pipe(
 					Effect.flatMap((s) => s.setMembers(GroupId(crypto.randomUUID()), [])),
-					Effect.provide(env.toLayer()),
 				),
+				env.toLayer(),
 			),
 		);
 
@@ -487,9 +487,9 @@ describe("GroupService.syncOidcMembership", () => {
 				Effect.flatMap((s) =>
 					s.syncOidcMembership(UserId(userId), ["engineering", "other"]),
 				),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(env.stores.memberships.get(groupId)?.has(userId)).toBe(true);
@@ -511,9 +511,9 @@ describe("GroupService.syncOidcMembership", () => {
 		await runSuccess(
 			GroupService.pipe(
 				Effect.flatMap((s) => s.syncOidcMembership(UserId(userId), ["other"])),
-				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
+			env.toLayer(),
 		);
 
 		expect(env.stores.memberships.get(groupId)?.has(userId)).toBe(false);
