@@ -302,7 +302,9 @@ const showHoverCardNow = (url: string, anchor: Element): void => {
 			positionHoverCard(card, anchor);
 		})
 		// A failed fetch just leaves the hover card closed
-		.catch(() => {});
+		.catch((error: unknown) => {
+			console.error("hover card fetch failed", error);
+		});
 };
 
 const scheduleHoverCardOpen = (url: string, anchor: Element): void => {
@@ -333,7 +335,9 @@ const openEditDialog = (url: string): void => {
 	htmx
 		.ajax("GET", url, { target: `#${EDIT_BODY_ID}`, swap: "innerHTML" })
 		// A failed fetch leaves the dialog showing its loading state
-		.catch(() => {});
+		.catch((error: unknown) => {
+			console.error("edit dialog fetch failed", error);
+		});
 };
 
 (() => {

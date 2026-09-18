@@ -578,7 +578,7 @@ const ContactList = ({
 		hx-target="#contact-list"
 		hx-select="#contact-list"
 		hx-swap="outerHTML"
-		class="contacts-scroll-shadow p-2 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:scrollbar-gutter-stable"
+		class="contacts-scroll-shadow lg:scrollbar-gutter-stable p-2 lg:min-h-0 lg:flex-1 lg:overflow-y-auto"
 	>
 		{contacts.length > 0 ? (
 			<form
