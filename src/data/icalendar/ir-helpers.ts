@@ -8,6 +8,7 @@
 // caller's, so it is a required parameter rather than a default.
 // ---------------------------------------------------------------------------
 
+import { Option } from "effect";
 import { Temporal } from "temporal-polyfill";
 import type { IrComponent, IrProperty } from "#src/data/ir.ts";
 import {
@@ -68,6 +69,30 @@ export const getDtendInstant = (
 	return prop ? instantFromIrValue(prop, zone) : undefined;
 };
 
+// Nominal units (days and up) are counted on the zone's calendar, so a P1D event
+// spanning a DST change stays one wall-clock day. An ambiguous or invalid
+// duration (e.g. months) throws, and surfaces as None.
+const shiftByDuration = Option.liftThrowable(
+	(start: Temporal.Instant, duration: string, zone: ResolutionZone) =>
+		start
+			.toZonedDateTimeISO(zone)
+			.add(Temporal.Duration.from(duration))
+			.toInstant(),
+);
+
+/** DTSTART + DURATION, when the component carries a usable DURATION. */
+const durationDtend = (
+	comp: IrComponent,
+	dtstart: Temporal.Instant,
+	zone: ResolutionZone,
+): Option.Option<Temporal.Instant> => {
+	const durationProp = comp.properties.find((p) => p.name === "DURATION");
+	if (durationProp?.value.type !== "DURATION") {
+		return Option.none();
+	}
+	return shiftByDuration(dtstart, durationProp.value.value, zone);
+};
+
 /**
  * Effective DTEND per RFC 4791 section 9.9:
  *   - DTEND/DUE if present
@@ -84,27 +109,15 @@ export const effectiveDtend = (
 	if (explicit) {
 		return explicit;
 	}
-	const durationProp = comp.properties.find((p) => p.name === "DURATION");
-	if (durationProp && durationProp.value.type === "DURATION") {
-		try {
-			// Nominal units (days and up) are counted on the zone's calendar, so a
-			// P1D event spanning a DST change stays one wall-clock day
-			return dtstart
-				.toZonedDateTimeISO(zone)
-				.add(Temporal.Duration.from(durationProp.value.value))
-				.toInstant();
-		} catch {
-			// Ambiguous or invalid duration (e.g. months) — fall through
-		}
-	}
 	// RFC 5545 section 3.6.1: a DATE-valued DTSTART with neither DTEND nor
 	// DURATION lasts one day, and RFC 4791 section 9.9's VEVENT table matches it
 	// as `start < DTSTART+P1D`. Treating it as an instant instead would hide an
 	// all-day event from any query whose window opens at or after its midnight,
 	// including a query for its own day. Counted on the zone's calendar so a day
 	// carrying a DST change is still one day.
-	if (getDtstartProp(comp)?.value.type === "DATE") {
-		return dtstart.toZonedDateTimeISO(zone).add({ days: 1 }).toInstant();
-	}
-	return dtstart;
+	return Option.getOrElse(durationDtend(comp, dtstart, zone), () =>
+		getDtstartProp(comp)?.value.type === "DATE"
+			? dtstart.toZonedDateTimeISO(zone).add({ days: 1 }).toInstant()
+			: dtstart,
+	);
 };

@@ -59,7 +59,7 @@ export const embedCalendarEventsHandler = (
 			.flat()
 			.map((ev) => toFullCalendarEvent(ev, false));
 
-		return new Response(JSON.stringify(events), {
+		return Response.json(events, {
 			status: HTTP_OK,
 			headers: { "Content-Type": "application/json; charset=utf-8" },
 		});

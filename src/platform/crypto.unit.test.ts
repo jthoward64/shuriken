@@ -1,25 +1,33 @@
 import { expect } from "@std/expect";
-import { describe, it } from "@std/testing/bdd";
+import { beforeAll, describe, it } from "@std/testing/bdd";
 import { Effect, Redacted } from "effect";
-import { CryptoService, CryptoServiceLive } from "./crypto.ts";
+import {
+	CryptoService,
+	CryptoServiceLive,
+	type CryptoServiceShape,
+} from "./crypto.ts";
 
 // ---------------------------------------------------------------------------
 // CryptoServiceLive — smoke tests for the real argon2id delegation
 // ---------------------------------------------------------------------------
 
 describe("CryptoServiceLive", () => {
+	// The live layer is provided once here, so the tests below hold the service
+	// itself rather than re-assembling dependencies per case.
+	let service: CryptoServiceShape;
+
+	beforeAll(async () => {
+		service = await Effect.provide(CryptoService, CryptoServiceLive).pipe(
+			Effect.runPromise,
+		);
+	});
+
 	it("hash + verify roundtrip: correct password returns true", async () => {
 		const result = await Effect.runPromise(
-			CryptoService.pipe(
-				Effect.flatMap((c) =>
-					Effect.gen(function* () {
-						const hash = yield* c.hashPassword(Redacted.make("secret"));
-						return yield* c.verifyPassword(Redacted.make("secret"), hash);
-					}),
-				),
-				Effect.provide(CryptoServiceLive),
-				Effect.orDie,
-			),
+			Effect.gen(function* () {
+				const hash = yield* service.hashPassword(Redacted.make("secret"));
+				return yield* service.verifyPassword(Redacted.make("secret"), hash);
+			}).pipe(Effect.orDie),
 		);
 
 		expect(result).toBe(true);
@@ -27,16 +35,10 @@ describe("CryptoServiceLive", () => {
 
 	it("wrong password returns false", async () => {
 		const result = await Effect.runPromise(
-			CryptoService.pipe(
-				Effect.flatMap((c) =>
-					Effect.gen(function* () {
-						const hash = yield* c.hashPassword(Redacted.make("secret"));
-						return yield* c.verifyPassword(Redacted.make("wrong"), hash);
-					}),
-				),
-				Effect.provide(CryptoServiceLive),
-				Effect.orDie,
-			),
+			Effect.gen(function* () {
+				const hash = yield* service.hashPassword(Redacted.make("secret"));
+				return yield* service.verifyPassword(Redacted.make("wrong"), hash);
+			}).pipe(Effect.orDie),
 		);
 
 		expect(result).toBe(false);
@@ -50,25 +52,19 @@ describe("CryptoServiceLive", () => {
 	it("concurrent verifications stay correct", async () => {
 		const attempts = 24;
 		const results = await Effect.runPromise(
-			CryptoService.pipe(
-				Effect.flatMap((c) =>
-					Effect.gen(function* () {
-						const hash = yield* c.hashPassword(Redacted.make("secret"));
-						// Alternate correct/incorrect guesses run concurrently.
-						return yield* Effect.all(
-							Array.from({ length: attempts }, (_, i) =>
-								c.verifyPassword(
-									Redacted.make(i % 2 === 0 ? "secret" : "wrong"),
-									hash,
-								),
-							),
-							{ concurrency: "unbounded" },
-						);
-					}),
-				),
-				Effect.provide(CryptoServiceLive),
-				Effect.orDie,
-			),
+			Effect.gen(function* () {
+				const hash = yield* service.hashPassword(Redacted.make("secret"));
+				// Alternate correct/incorrect guesses run concurrently.
+				return yield* Effect.all(
+					Array.from({ length: attempts }, (_, i) =>
+						service.verifyPassword(
+							Redacted.make(i % 2 === 0 ? "secret" : "wrong"),
+							hash,
+						),
+					),
+					{ concurrency: "unbounded" },
+				);
+			}).pipe(Effect.orDie),
 		);
 
 		const expected = Array.from({ length: attempts }, (_, i) => i % 2 === 0);
@@ -79,19 +75,13 @@ describe("CryptoServiceLive", () => {
 	// successful hit cached for the correct one.
 	it("cache does not let a wrong password reuse a cached success", async () => {
 		const [first, cachedHit, wrong] = await Effect.runPromise(
-			CryptoService.pipe(
-				Effect.flatMap((c) =>
-					Effect.gen(function* () {
-						const hash = yield* c.hashPassword(Redacted.make("secret"));
-						const a = yield* c.verifyPassword(Redacted.make("secret"), hash);
-						const b = yield* c.verifyPassword(Redacted.make("secret"), hash);
-						const d = yield* c.verifyPassword(Redacted.make("wrong"), hash);
-						return [a, b, d] as const;
-					}),
-				),
-				Effect.provide(CryptoServiceLive),
-				Effect.orDie,
-			),
+			Effect.gen(function* () {
+				const hash = yield* service.hashPassword(Redacted.make("secret"));
+				const a = yield* service.verifyPassword(Redacted.make("secret"), hash);
+				const b = yield* service.verifyPassword(Redacted.make("secret"), hash);
+				const d = yield* service.verifyPassword(Redacted.make("wrong"), hash);
+				return [a, b, d] as const;
+			}).pipe(Effect.orDie),
 		);
 
 		expect(first).toBe(true);

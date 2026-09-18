@@ -39,13 +39,11 @@ export const runDbQuery = <A>(
 		const builder = f(activeDb);
 		const { sql, params } = builder.toSQL();
 		const op = sql.trim().split(WHITESPACE)[0]?.toLowerCase() ?? "query";
-		return yield* Effect.withSpan(`db.${op}`, {
-			attributes: { "db.statement": sql, "db.system": "postgresql" },
-		})(
-			Effect.logDebug("db.query", { sql, params }).pipe(
-				Effect.andThen(
-					builder.pipe(Effect.mapError((e) => new DatabaseError({ cause: e }))),
-				),
-			),
+		return yield* Effect.logDebug("db.query", { sql, params }).pipe(
+			Effect.andThen(builder),
+			Effect.mapError((e) => new DatabaseError({ cause: e })),
+			Effect.withSpan(`db.${op}`, {
+				attributes: { "db.statement": sql, "db.system": "postgresql" },
+			}),
 		);
 	});

@@ -10,9 +10,8 @@ const snapshotAfter = (
 	...records: ReadonlyArray<Effect.Effect<unknown>>
 ): ReadonlyArray<Metric.Metric.Snapshot> =>
 	Effect.runSync(
-		Effect.flatMap(
-			Effect.all(records, { discard: true }),
-			() => Metric.snapshot,
+		Effect.all(records, { discard: true }).pipe(
+			Effect.flatMap(() => Metric.snapshot),
 		),
 	);
 

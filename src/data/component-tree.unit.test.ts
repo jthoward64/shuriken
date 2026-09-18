@@ -1,7 +1,7 @@
 // biome-ignore-all lint/nursery/useBetterDomTraversing: RawComponent.children is a domain array, not a DOM NodeList
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
-import { Effect, Schema } from "effect";
+import { Schema } from "effect";
 import { runFailure } from "#src/testing/effect.ts";
 import {
 	RawComponentCodec,
@@ -14,14 +14,10 @@ import type { ContentLine } from "./content-line.ts";
 // ---------------------------------------------------------------------------
 
 const decodeLines = Schema.decodeEffect(RawComponentCodec);
-const encodeLines = Schema.encodeEffect(RawComponentCodec);
-const decodeText = Schema.decodeEffect(TextToRawComponentCodec);
 
-const dec = (lines: ReadonlyArray<ContentLine>) =>
-	Effect.runPromise(decodeLines(lines));
-const enc = (component: Parameters<typeof encodeLines>[0]) =>
-	Effect.runPromise(encodeLines(component));
-const decText = (text: string) => Effect.runPromise(decodeText(text));
+const dec = Schema.decodePromise(RawComponentCodec);
+const enc = Schema.encodePromise(RawComponentCodec);
+const decText = Schema.decodePromise(TextToRawComponentCodec);
 
 // ---------------------------------------------------------------------------
 // Decoding

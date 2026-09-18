@@ -148,18 +148,17 @@ const splitAdrLabel = (prop: IrProperty): ReadonlyArray<IrProperty> => {
 			(p) => p.name !== "LABEL" && !isParked(p.name),
 		),
 	};
+	// TYPE is mirrored from the ADR so upgrade can correlate the two again;
+	// anything parked on the ADR by that upgrade goes back on the LABEL.
+	const typeParams = prop.parameters.filter((p) => p.name === "TYPE");
+	const unparkedParams = prop.parameters
+		.filter((p) => isParked(p.name))
+		.map((p) => ({
+			name: p.name.slice(LABEL_PARAM_PREFIX.length),
+			value: p.value,
+		}));
 	const label: IrProperty = {
-		// TYPE is mirrored from the ADR so upgrade can correlate the two again;
-		// anything parked on the ADR by that upgrade goes back on the LABEL.
-		parameters: [
-			...prop.parameters.filter((p) => p.name === "TYPE"),
-			...prop.parameters
-				.filter((p) => isParked(p.name))
-				.map((p) => ({
-					name: p.name.slice(LABEL_PARAM_PREFIX.length),
-					value: p.value,
-				})),
-		],
+		parameters: typeParams.concat(unparkedParams),
 		name: replaceBase(prop.name, "LABEL"),
 		value: { type: "TEXT", value: labelParam.value },
 		isKnown: false,
@@ -233,6 +232,56 @@ const ensureN = (
 	return [...props, n];
 };
 
+// 4.0 properties 3.0 knows only under an Apple X- name
+const X_RENAMES: ReadonlyMap<string, string> = new Map([
+	["KIND", "X-ADDRESSBOOKSERVER-KIND"],
+	["MEMBER", "X-ADDRESSBOOKSERVER-MEMBER"],
+]);
+
+// One property's 3.0 form, plus the number of fresh itemN groups it claimed
+// (ANNIVERSARY and RELATED correlate their pieces through one)
+interface Downgraded {
+	readonly props: ReadonlyArray<IrProperty>;
+	readonly groupsUsed: number;
+}
+
+const downgradeProperty = (prop: IrProperty, group: number): Downgraded => {
+	const base = baseName(prop.name);
+	if (base === "VERSION") {
+		return { props: [], groupsUsed: 0 };
+	}
+	const xName = X_RENAMES.get(base);
+	if (xName !== undefined) {
+		return { props: [renameToX(prop, xName)], groupsUsed: 0 };
+	}
+	if (base === "ANNIVERSARY") {
+		return { props: anniversaryToAb(prop, group + 1), groupsUsed: 1 };
+	}
+	if (base === EMBEDDED_AGENT_PROP) {
+		// Hand back the nested vCard 4.0 had nowhere to put. Only a property we
+		// parked is renamed; a client's own X-AGENT falls through untouched.
+		const restored = restoreEmbeddedAgent(prop);
+		if (restored !== undefined) {
+			return { props: [restored], groupsUsed: 0 };
+		}
+	}
+	if (base === "RELATED") {
+		const downgraded = downgradeRelated(prop, group + 1);
+		// Identity means there was no display name to write; no group consumed.
+		return { props: downgraded, groupsUsed: downgraded[0] === prop ? 0 : 1 };
+	}
+	if (base === "GENDER") {
+		// Preserve the full structured value (sex;identity) so upgrade can
+		// restore GENDER exactly; drop only a wholly-empty GENDER.
+		const kept = rawStr(prop.value) !== "";
+		return { props: kept ? [renameToX(prop, "X-GENDER")] : [], groupsUsed: 0 };
+	}
+	const transformed = downgradeInlineMedia(
+		stripValueParam(downgradeGeo(downgradeUid(downgradePref(prop)))),
+	);
+	return { props: splitAdrLabel(transformed), groupsUsed: 0 };
+};
+
 /** Downgrade a canonical 4.0 vCard IrDocument to 3.0. Non-vcard documents pass through. */
 export const downgradeToV3 = (doc: IrDocument): IrDocument => {
 	if (doc.kind !== "vcard") {
@@ -241,53 +290,9 @@ export const downgradeToV3 = (doc: IrDocument): IrDocument => {
 	let group = maxItemGroup(doc.root.properties);
 	const out: Array<IrProperty> = [];
 	for (const prop of doc.root.properties) {
-		const base = baseName(prop.name);
-		if (base === "VERSION") {
-			continue;
-		}
-		if (base === "KIND") {
-			out.push(renameToX(prop, "X-ADDRESSBOOKSERVER-KIND"));
-			continue;
-		}
-		if (base === "MEMBER") {
-			out.push(renameToX(prop, "X-ADDRESSBOOKSERVER-MEMBER"));
-			continue;
-		}
-		if (base === "ANNIVERSARY") {
-			group += 1;
-			out.push(...anniversaryToAb(prop, group));
-			continue;
-		}
-		if (base === EMBEDDED_AGENT_PROP) {
-			// Hand back the nested vCard 4.0 had nowhere to put. Only a property we
-			// parked is renamed; a client's own X-AGENT falls through untouched.
-			const restored = restoreEmbeddedAgent(prop);
-			if (restored !== undefined) {
-				out.push(restored);
-				continue;
-			}
-		}
-		if (base === "RELATED") {
-			const downgraded = downgradeRelated(prop, group + 1);
-			// Identity means there was no display name to write; no group consumed.
-			if (downgraded[0] !== prop) {
-				group += 1;
-			}
-			out.push(...downgraded);
-			continue;
-		}
-		if (base === "GENDER") {
-			// Preserve the full structured value (sex;identity) so upgrade can
-			// restore GENDER exactly; drop only a wholly-empty GENDER.
-			if (rawStr(prop.value) !== "") {
-				out.push(renameToX(prop, "X-GENDER"));
-			}
-			continue;
-		}
-		const transformed = downgradeInlineMedia(
-			stripValueParam(downgradeGeo(downgradeUid(downgradePref(prop)))),
-		);
-		out.push(...splitAdrLabel(transformed));
+		const { props, groupsUsed } = downgradeProperty(prop, group);
+		group += groupsUsed;
+		out.push(...props);
 	}
 	const props = ensureN(ensureVersion(out, "3.0"));
 	return { ...doc, root: { ...doc.root, properties: props } };

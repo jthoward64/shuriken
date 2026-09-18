@@ -42,6 +42,14 @@ const toLines = (s: string): Array<string> =>
 		.map((l) => l.trim())
 		.filter((l) => l !== "" && l !== "BEGIN:VCARD" && l !== "END:VCARD");
 
+// Lexicographic comparator, so every sort below orders the same way
+const byString = (a: string, b: string): number => {
+	if (a < b) {
+		return -1;
+	}
+	return a > b ? 1 : 0;
+};
+
 // Split on `sep`, honoring RFC 6350 double-quoted param values.
 const splitUnquoted = (s: string, sep: string): Array<string> => {
 	const out: Array<string> = [];
@@ -67,9 +75,19 @@ interface ParsedLine {
 	readonly body: string;
 }
 
-// Canonicalize a line's parameters: merge ALL TYPE tokens (across repeated and
-// comma-joined params — semantically equivalent per RFC 6350 §5.6) into one
-// sorted set, uppercase param names, and sort the resulting params.
+// Merge one TYPE parameter's tokens into `into`; repeated and comma-joined TYPE
+// params are semantically equivalent per RFC 6350 §5.6
+const addTypeTokens = (value: string, into: Set<string>): void => {
+	for (const t of splitUnquoted(value, ",")) {
+		const tok = t.trim().toLowerCase();
+		if (tok !== "") {
+			into.add(tok);
+		}
+	}
+};
+
+// Canonicalize a line's parameters: merge ALL TYPE tokens into one sorted set,
+// uppercase param names, and sort the resulting params.
 const canonParams = (segs: ReadonlyArray<string>): string => {
 	const typeTokens = new Set<string>();
 	const other: Array<string> = [];
@@ -78,22 +96,16 @@ const canonParams = (segs: ReadonlyArray<string>): string => {
 		const name = (eq === -1 ? seg : seg.slice(0, eq)).toUpperCase();
 		const value = eq === -1 ? "" : seg.slice(eq + 1);
 		if (name === "TYPE") {
-			for (const t of splitUnquoted(value, ",")) {
-				const tok = t.trim().toLowerCase();
-				if (tok !== "") {
-					typeTokens.add(tok);
-				}
-			}
+			addTypeTokens(value, typeTokens);
 		} else {
 			other.push(eq === -1 ? name : `${name}=${value}`);
 		}
 	}
-	const params: Array<string> = [];
-	if (typeTokens.size > 0) {
-		params.push(`TYPE=${[...typeTokens].sort().join(",")}`);
-	}
-	params.push(...other);
-	return params.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)).join(";");
+	const params =
+		typeTokens.size > 0
+			? [`TYPE=${[...typeTokens].sort(byString).join(",")}`, ...other]
+			: other;
+	return params.sort(byString).join(";");
 };
 
 const parseLine = (line: string): ParsedLine => {
@@ -124,16 +136,13 @@ const normalize = (text: string): Array<string> => {
 	}
 	const sig = new Map<string, string>();
 	for (const [g, bodies] of groupBodies) {
-		sig.set(
-			g,
-			[...bodies].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)).join("¦"),
-		);
+		sig.set(g, [...bodies].sort(byString).join("¦"));
 	}
 	return parsed
 		.map(({ group, body }) =>
 			group === "" ? `·${body}` : `G[${sig.get(group)}]·${body}`,
 		)
-		.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+		.sort(byString);
 };
 
 const expectEquivalent = (a: string, b: string): void => {

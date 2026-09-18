@@ -36,16 +36,14 @@ const validated = new Map<string, ResolutionZone>([["UTC", UTC]]);
 // `Area/Location` is the zone they mean.
 const PREFIXED_TZID = /^\/[^/]*\/[^/]*\/(?<iana>[^/]+\/[^/]+)$/u;
 
-const isKnownZone = (tzid: string): boolean => {
-	// temporal-polyfill exposes no standalone validator, so project a fixed
-	// instant into the zone: cheap, and throws on an unknown id
-	try {
-		Temporal.Instant.fromEpochMilliseconds(0).toZonedDateTimeISO(tzid);
-		return true;
-	} catch {
-		return false;
-	}
-};
+// temporal-polyfill exposes no standalone validator, so project a fixed instant
+// into the zone: cheap, and throws on an unknown id
+const projectIntoZone = Option.liftThrowable((tzid: string) =>
+	Temporal.Instant.fromEpochMilliseconds(0).toZonedDateTimeISO(tzid),
+);
+
+const isKnownZone = (tzid: string): boolean =>
+	Option.isSome(projectIntoZone(tzid));
 
 /**
  * Validates a TZID for use as a resolution zone.

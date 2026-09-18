@@ -14,9 +14,15 @@ import { isVCard21, normalizeVCard21 } from "./vcard21.ts";
 
 const vcard = (...lines: Array<string>) => `${lines.join("\r\n")}\r\n`;
 
-const run = (text: string) => Effect.runPromise(decodeVCard(text));
-const enc = (doc: Parameters<typeof encodeVCard>[0]) =>
-	Effect.runPromise(encodeVCard(doc));
+// Decode to a plain IrDocument so assertions read against data, not an effect
+async function run(text: string): Promise<IrDocument> {
+	return await Effect.runPromise(decodeVCard(text));
+}
+
+// Encode an IrDocument back to vCard text
+async function enc(doc: IrDocument): Promise<string> {
+	return await Effect.runPromise(encodeVCard(doc));
+}
 
 const minimalVCard = vcard(
 	"BEGIN:VCARD",

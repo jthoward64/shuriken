@@ -1,6 +1,6 @@
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
-import { Effect, Schema } from "effect";
+import { Schema } from "effect";
 import { runFailure } from "#src/testing/effect.ts";
 import { type ContentLine, ContentLinesCodec } from "./content-line.ts";
 
@@ -9,11 +9,9 @@ import { type ContentLine, ContentLinesCodec } from "./content-line.ts";
 // ---------------------------------------------------------------------------
 
 const decodeEffect = Schema.decodeEffect(ContentLinesCodec);
-const encodeEffect = Schema.encodeEffect(ContentLinesCodec);
 
-const dec = (text: string) => Effect.runPromise(decodeEffect(text));
-const enc = (lines: ReadonlyArray<ContentLine>) =>
-	Effect.runPromise(encodeEffect(lines));
+const dec = Schema.decodePromise(ContentLinesCodec);
+const enc = Schema.encodePromise(ContentLinesCodec);
 
 // ---------------------------------------------------------------------------
 // Decoding

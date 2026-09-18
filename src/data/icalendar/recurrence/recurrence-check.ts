@@ -235,6 +235,56 @@ const boundedOccurrencesInRange = (
 // hasOccurrenceInRange
 // ---------------------------------------------------------------------------
 
+// Every value of a repeated date-list property (EXDATE / RDATE), in the
+// @js-temporal form rrule-temporal expects
+const dateListValues = (
+	vevent: IrComponent,
+	name: string,
+	zone: ResolutionZone,
+): Array<JSTemporal.ZonedDateTime> => {
+	const out: Array<JSTemporal.ZonedDateTime> = [];
+	for (const prop of vevent.properties) {
+		if (prop.name === name) {
+			out.push(...irDateListToJsZdts(prop.value, zone));
+		}
+	}
+	return out;
+};
+
+// RECURRENCE-ID slots taken over by a sibling override of the same UID. They
+// join exDate so the master rule stops emitting them.
+const overriddenInstants = (
+	vcalRoot: IrComponent,
+	vevent: IrComponent,
+	zone: ResolutionZone,
+): Array<JSTemporal.ZonedDateTime> => {
+	const uidValue = vevent.properties.find((p) => p.name === "UID")?.value;
+	if (uidValue?.type !== "TEXT") {
+		return [];
+	}
+	const out: Array<JSTemporal.ZonedDateTime> = [];
+	for (const sibling of vcalRoot.components) {
+		if (sibling === vevent || sibling.name !== vevent.name) {
+			continue;
+		}
+		const sibUid = sibling.properties.find((p) => p.name === "UID")?.value;
+		if (sibUid?.type !== "TEXT" || sibUid.value !== uidValue.value) {
+			continue;
+		}
+		const recIdProp = sibling.properties.find(
+			(p) => p.name === "RECURRENCE-ID",
+		);
+		if (!recIdProp) {
+			continue;
+		}
+		const jsZdt = irSingleValueToJsZdt(recIdProp.value, zone);
+		if (jsZdt) {
+			out.push(jsZdt);
+		}
+	}
+	return out;
+};
+
 /**
  * Returns the DTSTART instants of all master RRULE occurrences in
  * [queryStart, queryEnd).
@@ -270,43 +320,10 @@ export const getOccurrenceInstantsInRange = (
 
 	const rruleString = normalizeRruleUntil(rruleProp.value.value, zone, dtstart);
 
-	const exDate: Array<JSTemporal.ZonedDateTime> = [];
-	for (const prop of vevent.properties) {
-		if (prop.name === "EXDATE") {
-			exDate.push(...irDateListToJsZdts(prop.value, zone));
-		}
-	}
-
-	const uidValue = vevent.properties.find((p) => p.name === "UID")?.value;
-	const uid = uidValue?.type === "TEXT" ? uidValue.value : undefined;
-	if (uid !== undefined) {
-		for (const sibling of vcalRoot.components) {
-			if (sibling === vevent || sibling.name !== vevent.name) {
-				continue;
-			}
-			const sibUid = sibling.properties.find((p) => p.name === "UID")?.value;
-			if (sibUid?.type !== "TEXT" || sibUid.value !== uid) {
-				continue;
-			}
-			const recIdProp = sibling.properties.find(
-				(p) => p.name === "RECURRENCE-ID",
-			);
-			if (!recIdProp) {
-				continue;
-			}
-			const jsZdt = irSingleValueToJsZdt(recIdProp.value, zone);
-			if (jsZdt) {
-				exDate.push(jsZdt);
-			}
-		}
-	}
-
-	const rDate: Array<JSTemporal.ZonedDateTime> = [];
-	for (const prop of vevent.properties) {
-		if (prop.name === "RDATE") {
-			rDate.push(...irDateListToJsZdts(prop.value, zone));
-		}
-	}
+	const exDate = dateListValues(vevent, "EXDATE", zone).concat(
+		overriddenInstants(vcalRoot, vevent, zone),
+	);
+	const rDate = dateListValues(vevent, "RDATE", zone);
 
 	const baseRule = new RRuleTemporal({
 		rruleString,

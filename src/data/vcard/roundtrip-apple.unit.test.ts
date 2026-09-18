@@ -41,7 +41,7 @@ const lineSet = (s: string): ReadonlyArray<string> =>
 describe("vCard Apple 3.0 round-trip", () => {
 	it("decode → encode preserves every line", async () => {
 		const out = await Effect.runPromise(
-			Effect.flatMap(decodeVCard(APPLE_CARD), encodeVCard),
+			decodeVCard(APPLE_CARD).pipe(Effect.flatMap(encodeVCard)),
 		);
 		expect(lineSet(out)).toEqual(lineSet(APPLE_CARD));
 	});

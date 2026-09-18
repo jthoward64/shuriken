@@ -1,4 +1,12 @@
-import { Effect, Option, Schema, SchemaGetter, SchemaIssue } from "effect";
+import {
+	Effect,
+	Match,
+	Option,
+	Schema,
+	SchemaGetter,
+	SchemaIssue,
+} from "effect";
+import type { Temporal } from "temporal-polyfill";
 import { type DavError, validAddressData } from "../../domain/errors.ts";
 import {
 	type RawComponent,
@@ -79,65 +87,128 @@ const VCARD_VALUE_OVERRIDES = new Map<string, VcardValueOverride>([
 // IrValue encoding (vCard-specific, delegates to format-utils)
 // ---------------------------------------------------------------------------
 
-const encodeIrValue = (value: IrValue): string => {
-	switch (value.type) {
-		case "TEXT":
-			return escapeText(value.value);
-		case "TEXT_LIST":
-			return serializeTextList(value.value);
-		case "INTEGER":
-		case "FLOAT":
-			return String(value.value);
-		case "BOOLEAN":
-			return value.value ? "TRUE" : "FALSE";
-		case "DATE":
-			return formatPlainDate(value.value);
-		case "DATE_TIME":
-			return formatZonedDateTime(value.value);
-		case "PLAIN_DATE_TIME":
-			return formatPlainDateTime(value.value);
-		case "DATE_LIST":
-			return value.value.map(formatPlainDate).join(",");
-		case "DATE_TIME_LIST":
-			return value.value
-				.map((item) =>
-					"timeZoneId" in item
-						? formatZonedDateTime(item)
-						: formatPlainDateTime(item),
-				)
-				.join(",");
-		case "PERIOD_LIST":
-			return value.value.join(",");
-		case "BINARY":
-			return btoa(String.fromCodePoint(...value.value));
-		case "JSON":
-			return JSON.stringify(value.value);
-		case "URI":
-		case "DATE_AND_OR_TIME":
-		case "TIME":
-		case "UTC_OFFSET":
-		case "UTC_OFFSET_INTERVAL":
-		case "DURATION":
-		case "DURATION_INTERVAL":
-		case "CAL_ADDRESS":
-		case "RECUR":
-		case "PERIOD":
-			return value.value;
-	}
-};
+// A JSON-typed value is serialized through the schema rather than raw JSON
+const encodeJson = Schema.encodeSync(Schema.UnknownFromJsonString);
+
+// Every date-time list item is independently anchored or floating, so each is
+// formatted by its own shape
+const encodeDateTimeListItem = (
+	item: Temporal.ZonedDateTime | Temporal.PlainDateTime,
+): string =>
+	"timeZoneId" in item ? formatZonedDateTime(item) : formatPlainDateTime(item);
+
+const encodeIrValue = (value: IrValue): string =>
+	Match.value(value).pipe(
+		Match.discriminatorsExhaustive("type")({
+			TEXT: (v) => escapeText(v.value),
+			TEXT_LIST: (v) => serializeTextList(v.value),
+			INTEGER: (v) => String(v.value),
+			FLOAT: (v) => String(v.value),
+			BOOLEAN: (v) => (v.value ? "TRUE" : "FALSE"),
+			DATE: (v) => formatPlainDate(v.value),
+			DATE_TIME: (v) => formatZonedDateTime(v.value),
+			PLAIN_DATE_TIME: (v) => formatPlainDateTime(v.value),
+			DATE_LIST: (v) => v.value.map(formatPlainDate).join(","),
+			DATE_TIME_LIST: (v) => v.value.map(encodeDateTimeListItem).join(","),
+			PERIOD_LIST: (v) => v.value.join(","),
+			BINARY: (v) => btoa(String.fromCodePoint(...v.value)),
+			JSON: (v) => encodeJson(v.value),
+			URI: (v) => v.value,
+			DATE_AND_OR_TIME: (v) => v.value,
+			TIME: (v) => v.value,
+			UTC_OFFSET: (v) => v.value,
+			UTC_OFFSET_INTERVAL: (v) => v.value,
+			DURATION: (v) => v.value,
+			DURATION_INTERVAL: (v) => v.value,
+			CAL_ADDRESS: (v) => v.value,
+			RECUR: (v) => v.value,
+			PERIOD: (v) => v.value,
+		}),
+	);
 
 // ---------------------------------------------------------------------------
 // Single ContentLine → IrProperty (decode direction)
 // ---------------------------------------------------------------------------
 
+// An explicit VALUE=date must yield a DATE; parseDateAndOrTime returns
+// DATE_AND_OR_TIME for partial dates, which is not a date value here
+const decodeVCardDate = (raw: string): IrValue => {
+	const parsed = parseDateAndOrTime(raw);
+	return parsed.type === "DATE" ? parsed : { type: "TEXT", value: raw };
+};
+
+// RFC 6350 §3.4: for a structured property, split on unescaped `;`, unescape each
+// field, then rejoin with literal `;` so the IR retains the structure
+const decodeVCardText = (raw: string, name: string): IrValue => ({
+	type: "TEXT",
+	value: VCARD_STRUCTURED_PROPS.has(name)
+		? parseStructuredText(raw).join(";")
+		: unescapeText(raw),
+});
+
+// Decode a content line's raw value into the IrValue named by its effective
+// type. Types not listed here carry their raw string through unchanged.
+const decodeIrValue = (
+	effectiveType: VcardValueOverride,
+	line: ContentLine,
+): IrValue => {
+	const raw = line.rawValue;
+	return Match.value(effectiveType).pipe(
+		Match.withReturnType<IrValue>(),
+		// TZID param is not common in vCard but handle it for completeness
+		Match.whenOr("DATE_TIME_DYNAMIC", "DATE_TIME", () =>
+			parseDateTimeString(
+				raw,
+				line.params.find((p) => p.name.toUpperCase() === "TZID")?.values[0],
+			),
+		),
+		// Parse what Temporal can represent; a partial date stays an opaque string
+		Match.when("DATE_AND_OR_TIME", () => parseDateAndOrTime(raw)),
+		Match.when("DATE", () => decodeVCardDate(raw)),
+		Match.when("TEXT", () => decodeVCardText(raw, line.name)),
+		Match.when("TEXT_LIST", () => ({
+			type: "TEXT_LIST",
+			value: parseTextList(raw),
+		})),
+		Match.when("INTEGER", () => ({
+			type: "INTEGER",
+			value: Number.parseInt(raw, 10),
+		})),
+		Match.when("FLOAT", () => ({
+			type: "FLOAT",
+			value: Number.parseFloat(raw),
+		})),
+		Match.when("BOOLEAN", () => ({
+			type: "BOOLEAN",
+			value: raw.toUpperCase() === "TRUE",
+		})),
+		Match.when("BINARY", () => ({
+			type: "BINARY",
+			value: Uint8Array.from(atob(raw), (c) => c.codePointAt(0) ?? 0),
+		})),
+		Match.whenOr(
+			"URI",
+			"TIME",
+			"UTC_OFFSET",
+			"DURATION",
+			"CAL_ADDRESS",
+			"RECUR",
+			"PERIOD",
+			(type) => ({ type, value: raw }),
+		),
+		Match.orElse(() => ({ type: "TEXT", value: raw })),
+	);
+};
+
 const decodeVCardProperty = (line: ContentLine): IrProperty => {
-	const isKnown = VCARD_DEFAULT_TYPES.has(line.name);
+	const parameters = paramsToIr(line.params);
+	const defaultType = VCARD_DEFAULT_TYPES.get(line.name);
 
 	// Unknown / X- properties: store rawValue verbatim as TEXT, no unescaping
-	if (!isKnown) {
+	if (defaultType === undefined) {
 		return {
 			name: line.name,
-			parameters: paramsToIr(line.params),
+			parameters,
 			value: { type: "TEXT", value: line.rawValue },
 			isKnown: false,
 		};
@@ -149,78 +220,12 @@ const decodeVCardProperty = (line: ContentLine): IrProperty => {
 		valueParamRaw !== undefined
 			? VCARD_VALUE_OVERRIDES.get(valueParamRaw.toLowerCase())
 			: undefined;
-	const defaultType = VCARD_DEFAULT_TYPES.get(line.name) as IrValueType;
 	const effectiveType: VcardValueOverride = override ?? defaultType;
-
-	const raw = line.rawValue;
-	let value: IrValue;
-
-	if (effectiveType === "DATE_TIME_DYNAMIC" || effectiveType === "DATE_TIME") {
-		// TZID param is not common in vCard but handle it for completeness
-		const tzid = line.params.find((p) => p.name.toUpperCase() === "TZID")
-			?.values[0];
-		value = parseDateTimeString(raw, tzid);
-	} else if (effectiveType === "DATE_AND_OR_TIME") {
-		// Parse what Temporal can represent; fall back to opaque string for partial dates
-		value = parseDateAndOrTime(raw);
-	} else {
-		switch (effectiveType) {
-			case "DATE":
-				value = parseDateAndOrTime(raw);
-				// parseDateAndOrTime may return DATE_AND_OR_TIME for edge cases;
-				// ensure we got a DATE when explicitly requested
-				if (value.type !== "DATE") {
-					value = { type: "TEXT", value: raw };
-				}
-				break;
-			case "TEXT":
-				if (VCARD_STRUCTURED_PROPS.has(line.name)) {
-					// RFC 6350 §3.4: split on unescaped `;`, unescape each field,
-					// then rejoin with literal `;` so the IR retains the structure.
-					value = {
-						type: "TEXT",
-						value: parseStructuredText(raw).join(";"),
-					};
-				} else {
-					value = { type: "TEXT", value: unescapeText(raw) };
-				}
-				break;
-			case "TEXT_LIST":
-				value = { type: "TEXT_LIST", value: parseTextList(raw) };
-				break;
-			case "INTEGER":
-				value = { type: "INTEGER", value: Number.parseInt(raw, 10) };
-				break;
-			case "FLOAT":
-				value = { type: "FLOAT", value: Number.parseFloat(raw) };
-				break;
-			case "BOOLEAN":
-				value = { type: "BOOLEAN", value: raw.toUpperCase() === "TRUE" };
-				break;
-			case "BINARY":
-				value = {
-					type: "BINARY",
-					value: Uint8Array.from(atob(raw), (c) => c.codePointAt(0) ?? 0),
-				};
-				break;
-			case "URI":
-			case "TIME":
-			case "UTC_OFFSET":
-			case "DURATION":
-			case "CAL_ADDRESS":
-			case "RECUR":
-			case "PERIOD":
-				value = { type: effectiveType, value: raw };
-				break;
-			default:
-				value = { type: "TEXT", value: raw };
-		}
-	}
 
 	return {
 		name: line.name,
-		parameters: paramsToIr(line.params),
-		value,
+		parameters,
+		value: decodeIrValue(effectiveType, line),
 		isKnown: true,
 	};
 };
@@ -289,26 +294,31 @@ const convertIrToRawComponent = (ir: IrComponent): RawComponent => ({
 const IrComponentCodec = Schema.toType(IrComponentSchema);
 const IrDocumentCodec = Schema.toType(IrDocumentSchema);
 
+// Property decoding throws on malformed values; surface that as a schema issue
+const rawToIr = (
+	raw: RawComponent,
+): Effect.Effect<IrComponent, SchemaIssue.InvalidValue> =>
+	Effect.try({
+		try: () => convertRawToIrComponent(raw),
+		catch: (e) =>
+			new SchemaIssue.InvalidValue(Option.some(raw), { message: String(e) }),
+	});
+
+// Property encoding throws on values it cannot represent (e.g. a named-zone
+// DATE_TIME with no TZID parameter); surface that as a schema issue
+const irToRaw = (
+	ir: IrComponent,
+): Effect.Effect<RawComponent, SchemaIssue.InvalidValue> =>
+	Effect.try({
+		try: () => convertIrToRawComponent(ir),
+		catch: (e) =>
+			new SchemaIssue.InvalidValue(Option.some(ir), { message: String(e) }),
+	});
+
 const VCardPropertyInferrer = RawComponentSchema.pipe(
 	Schema.decodeTo(IrComponentCodec, {
-		decode: SchemaGetter.transformOrFail((raw: RawComponent) =>
-			Effect.try({
-				try: () => convertRawToIrComponent(raw),
-				catch: (e) =>
-					new SchemaIssue.InvalidValue(Option.some(raw), {
-						message: String(e),
-					}),
-			}),
-		),
-		encode: SchemaGetter.transformOrFail((ir: IrComponent) =>
-			Effect.try({
-				try: () => convertIrToRawComponent(ir),
-				catch: (e) =>
-					new SchemaIssue.InvalidValue(Option.some(ir), {
-						message: String(e),
-					}),
-			}),
-		),
+		decode: SchemaGetter.transformOrFail(rawToIr),
+		encode: SchemaGetter.transformOrFail(irToRaw),
 	}),
 );
 
@@ -316,31 +326,34 @@ const VCardPropertyInferrer = RawComponentSchema.pipe(
 // VCardDocumentCodec: Schema<IrDocument, IrComponent>
 // ---------------------------------------------------------------------------
 
+// Only a VCARD root makes a vCard document
+const componentToDocument = (component: IrComponent) => {
+	if (component.name !== "VCARD") {
+		return Effect.fail(
+			new SchemaIssue.InvalidValue(Option.some(component), {
+				message: `Expected VCARD root component, got "${component.name}"`,
+			}),
+		);
+	}
+	return Effect.succeed({ kind: "vcard" as const, root: component });
+};
+
+// The shared IrDocument also covers iCalendar, so reject the wrong kind here
+const documentToComponent = (doc: IrDocument) => {
+	if (doc.kind !== "vcard") {
+		return Effect.fail(
+			new SchemaIssue.InvalidValue(Option.some(doc), {
+				message: `Expected vcard document, got kind "${doc.kind}"`,
+			}),
+		);
+	}
+	return Effect.succeed(doc.root);
+};
+
 const VCardDocumentCodec = IrComponentCodec.pipe(
 	Schema.decodeTo(IrDocumentCodec, {
-		decode: SchemaGetter.transformOrFail((component: IrComponent) => {
-			if (component.name !== "VCARD") {
-				return Effect.fail(
-					new SchemaIssue.InvalidValue(Option.some(component), {
-						message: `Expected VCARD root component, got "${component.name}"`,
-					}),
-				);
-			}
-			return Effect.succeed({
-				kind: "vcard" as const,
-				root: component,
-			});
-		}),
-		encode: SchemaGetter.transformOrFail((doc: IrDocument) => {
-			if (doc.kind !== "vcard") {
-				return Effect.fail(
-					new SchemaIssue.InvalidValue(Option.some(doc), {
-						message: `Expected vcard document, got kind "${doc.kind}"`,
-					}),
-				);
-			}
-			return Effect.succeed(doc.root);
-		}),
+		decode: SchemaGetter.transformOrFail(componentToDocument),
+		encode: SchemaGetter.transformOrFail(documentToComponent),
 	}),
 );
 

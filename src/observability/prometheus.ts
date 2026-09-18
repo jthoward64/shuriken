@@ -1,4 +1,4 @@
-import { Effect, Metric } from "effect";
+import { Effect, Match, Metric } from "effect";
 
 // ---------------------------------------------------------------------------
 // Prometheus exposition encoder.
@@ -78,21 +78,14 @@ const renderLabels = (
 	return pairs.length === 0 ? "" : `{${pairs.join(",")}}`;
 };
 
-/** The Prometheus metric type keyword for an Effect snapshot type. */
-const prometheusType = (type: Snapshot["type"]): string => {
-	switch (type) {
-		case "Counter":
-			return "counter";
-		case "Gauge":
-			return "gauge";
-		case "Histogram":
-			return "histogram";
-		case "Summary":
-			return "summary";
-		case "Frequency":
-			// Frequencies are exposed as a set of labelled counts.
-			return "gauge";
-	}
+/** The Prometheus metric type keyword for each Effect snapshot type. */
+const PROMETHEUS_TYPES: Readonly<Record<Snapshot["type"], string>> = {
+	Counter: "counter",
+	Gauge: "gauge",
+	Histogram: "histogram",
+	Summary: "summary",
+	// Frequencies are exposed as a set of labelled counts
+	Frequency: "gauge",
 };
 
 /**
@@ -107,63 +100,81 @@ const familyName = (snapshot: Snapshot): string => {
 	return base;
 };
 
-/** Render every sample line for a single snapshot (one attribute set). */
-const renderSamples = (name: string, snapshot: Snapshot): Array<string> => {
+/** Render the `_bucket`/`_sum`/`_count` lines of a histogram snapshot. */
+const renderHistogramSamples = (
+	name: string,
+	snapshot: Extract<Snapshot, { readonly type: "Histogram" }>,
+): Array<string> => {
 	const labels = renderLabels(snapshot.attributes);
-	switch (snapshot.type) {
-		case "Counter":
-		case "Gauge": {
-			const value =
-				snapshot.type === "Counter"
-					? snapshot.state.count
-					: snapshot.state.value;
-			return [`${name}${labels} ${formatNumber(value)}`];
+	const { buckets, count, sum } = snapshot.state;
+	const lines: Array<string> = [];
+	for (const [boundary, cumulative] of buckets) {
+		// Effect's boundary lists end with Infinity; the overflow bucket is
+		// emitted below, so rendering it here too would duplicate le="+Inf"
+		if (!Number.isFinite(boundary)) {
+			continue;
 		}
-		case "Histogram": {
-			const { buckets, count, sum } = snapshot.state;
-			const lines: Array<string> = [];
-			for (const [boundary, cumulative] of buckets) {
-				// Effect's boundary lists end with Infinity; the overflow bucket is
-				// emitted below, so rendering it here too would duplicate le="+Inf"
-				if (!Number.isFinite(boundary)) {
-					continue;
-				}
-				const le = renderLabels(snapshot.attributes, [
-					["le", formatNumber(boundary)],
-				]);
-				lines.push(`${name}_bucket${le} ${formatNumber(cumulative)}`);
-			}
-			const inf = renderLabels(snapshot.attributes, [["le", "+Inf"]]);
-			lines.push(`${name}_bucket${inf} ${formatNumber(count)}`);
-			lines.push(`${name}_sum${labels} ${formatNumber(sum)}`);
-			lines.push(`${name}_count${labels} ${formatNumber(count)}`);
-			return lines;
-		}
-		case "Summary": {
-			const { quantiles, count, sum } = snapshot.state;
-			const lines: Array<string> = [];
-			for (const [quantile, value] of quantiles) {
-				if (value !== undefined) {
-					const q = renderLabels(snapshot.attributes, [
-						["quantile", formatNumber(quantile)],
-					]);
-					lines.push(`${name}${q} ${formatNumber(value)}`);
-				}
-			}
-			lines.push(`${name}_sum${labels} ${formatNumber(sum)}`);
-			lines.push(`${name}_count${labels} ${formatNumber(count)}`);
-			return lines;
-		}
-		case "Frequency": {
-			const lines: Array<string> = [];
-			for (const [key, value] of snapshot.state.occurrences) {
-				const labelled = renderLabels(snapshot.attributes, [["key", key]]);
-				lines.push(`${name}${labelled} ${formatNumber(value)}`);
-			}
-			return lines;
+		const le = renderLabels(snapshot.attributes, [
+			["le", formatNumber(boundary)],
+		]);
+		lines.push(`${name}_bucket${le} ${formatNumber(cumulative)}`);
+	}
+	const inf = renderLabels(snapshot.attributes, [["le", "+Inf"]]);
+	lines.push(`${name}_bucket${inf} ${formatNumber(count)}`);
+	lines.push(`${name}_sum${labels} ${formatNumber(sum)}`);
+	lines.push(`${name}_count${labels} ${formatNumber(count)}`);
+	return lines;
+};
+
+/** Render the quantile, `_sum` and `_count` lines of a summary snapshot. */
+const renderSummarySamples = (
+	name: string,
+	snapshot: Extract<Snapshot, { readonly type: "Summary" }>,
+): Array<string> => {
+	const labels = renderLabels(snapshot.attributes);
+	const { quantiles, count, sum } = snapshot.state;
+	const lines: Array<string> = [];
+	for (const [quantile, value] of quantiles) {
+		if (value !== undefined) {
+			const q = renderLabels(snapshot.attributes, [
+				["quantile", formatNumber(quantile)],
+			]);
+			lines.push(`${name}${q} ${formatNumber(value)}`);
 		}
 	}
+	lines.push(`${name}_sum${labels} ${formatNumber(sum)}`);
+	lines.push(`${name}_count${labels} ${formatNumber(count)}`);
+	return lines;
 };
+
+/** Render one labelled count line per observed key of a frequency snapshot. */
+const renderFrequencySamples = (
+	name: string,
+	snapshot: Extract<Snapshot, { readonly type: "Frequency" }>,
+): Array<string> => {
+	const lines: Array<string> = [];
+	for (const [key, value] of snapshot.state.occurrences) {
+		const labelled = renderLabels(snapshot.attributes, [["key", key]]);
+		lines.push(`${name}${labelled} ${formatNumber(value)}`);
+	}
+	return lines;
+};
+
+/** Render every sample line for a single snapshot (one attribute set). */
+const renderSamples = (name: string, snapshot: Snapshot): Array<string> =>
+	Match.value(snapshot).pipe(
+		Match.discriminatorsExhaustive("type")({
+			Counter: (s) => [
+				`${name}${renderLabels(s.attributes)} ${formatNumber(s.state.count)}`,
+			],
+			Gauge: (s) => [
+				`${name}${renderLabels(s.attributes)} ${formatNumber(s.state.value)}`,
+			],
+			Histogram: (s) => renderHistogramSamples(name, s),
+			Summary: (s) => renderSummarySamples(name, s),
+			Frequency: (s) => renderFrequencySamples(name, s),
+		}),
+	);
 
 interface Family {
 	readonly type: string;
@@ -186,7 +197,7 @@ export const encodePrometheus = (
 		let family = families.get(name);
 		if (family === undefined) {
 			family = {
-				type: prometheusType(snapshot.type),
+				type: PROMETHEUS_TYPES[snapshot.type],
 				help: snapshot.description ?? name,
 				samples: [],
 			};

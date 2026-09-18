@@ -2,13 +2,9 @@ import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
 import { Effect, Option } from "effect";
 import { Temporal } from "temporal-polyfill";
-import type { IrComponent } from "#src/data/ir.ts";
+import type { IrDocument } from "#src/data/ir.ts";
 import { runFailure } from "#src/testing/effect.ts";
-import {
-	decodeICalendar,
-	encodeICalComponent,
-	encodeICalendar,
-} from "./codec.ts";
+import { decodeICalendar, encodeICalendar } from "./codec.ts";
 import { extractUid } from "./uid.ts";
 
 // ---------------------------------------------------------------------------
@@ -17,9 +13,15 @@ import { extractUid } from "./uid.ts";
 
 const ical = (...lines: Array<string>) => `${lines.join("\r\n")}\r\n`;
 
-const run = (text: string) => Effect.runPromise(decodeICalendar(text));
-const enc = (doc: Parameters<typeof encodeICalendar>[0]) =>
-	Effect.runPromise(encodeICalendar(doc));
+// Decode to a plain IrDocument so assertions read against data, not an effect
+async function run(text: string): Promise<IrDocument> {
+	return await Effect.runPromise(decodeICalendar(text));
+}
+
+// Encode an IrDocument back to iCalendar text
+async function enc(doc: IrDocument): Promise<string> {
+	return await Effect.runPromise(encodeICalendar(doc));
+}
 
 const minimalVevent = ical(
 	"BEGIN:VCALENDAR",
@@ -312,9 +314,7 @@ describe("ICalendarCodec round-trip", () => {
 	it("decode → encode → decode yields structurally equal IrDocument", async () => {
 		const doc1 = await run(minimalVevent);
 		const encoded = await enc(doc1);
-		const doc2 = await Effect.runPromise(
-			Effect.andThen(Effect.succeed(encoded), (t) => decodeICalendar(t)),
-		);
+		const doc2 = await run(encoded);
 		expect(doc2).toEqual(doc1);
 	});
 });

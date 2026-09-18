@@ -37,19 +37,23 @@ const vtimezone = (): IrComponent => ({
 	components: [],
 });
 
-const veventWithAlarm = (): IrComponent => ({
-	...vevent(),
-	components: [
-		{
-			name: "VALARM",
-			properties: [
-				textProp("ACTION", "DISPLAY"),
-				textProp("DESCRIPTION", "Reminder: confidential board meeting"),
-			],
-			components: [],
-		},
-	],
-});
+const veventWithAlarm = (): IrComponent => {
+	const base = vevent();
+	return {
+		name: base.name,
+		properties: base.properties,
+		components: [
+			{
+				name: "VALARM",
+				properties: [
+					textProp("ACTION", "DISPLAY"),
+					textProp("DESCRIPTION", "Reminder: confidential board meeting"),
+				],
+				components: [],
+			},
+		],
+	};
+};
 
 describe("applyFieldVisibility", () => {
 	it("returns the component unchanged for 'full'", () => {

@@ -21,8 +21,9 @@ const durBoundaries = Metric.exponentialBoundaries({
 export const trackDuration =
 	(metric: Metric.Metric<Duration.Duration, unknown>) =>
 	<A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
-		Effect.flatMap(Effect.timed(effect), ([duration, value]) =>
-			Effect.as(Metric.update(metric, duration), value),
+		Effect.timed(effect).pipe(
+			Effect.tap(([duration]) => Metric.update(metric, duration)),
+			Effect.map(([, value]) => value),
 		);
 
 // ---------------------------------------------------------------------------

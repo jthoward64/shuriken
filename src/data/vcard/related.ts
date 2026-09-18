@@ -202,29 +202,28 @@ const upgradeSourceProp = (prop: IrProperty, base: string): IrProperty => {
 	const raw = rawStr(prop.value);
 	const isUri =
 		paramValue(prop, "VALUE")?.toLowerCase() === "uri" || URI_LIKE.test(raw);
+	const parameters: ReadonlyArray<IrParameter> = [
+		{ name: "VALUE", value: isUri ? "uri" : "text" },
+		...withoutParams(prop, ["VALUE", "TYPE"]),
+		...relationParams(wording),
+		{ name: RELATION_SOURCE_PARAM, value: base },
+	];
 	return {
 		name: RELATED_PROP,
-		parameters: [
-			{ name: "VALUE", value: isUri ? "uri" : "text" },
-			...withoutParams(prop, ["VALUE", "TYPE"]),
-			...relationParams(wording),
-			{ name: RELATION_SOURCE_PARAM, value: base },
-		],
+		parameters,
 		value: { type: isUri ? "URI" : "TEXT", value: raw },
 		isKnown: true,
 	};
 };
 
-/**
- * Fold every relation statement into a canonical `RELATED`: Apple's grouped
- * `X-ABRELATEDNAMES` (+ its sibling `X-ABLABEL`, dropped with it), and the
- * single-property `AGENT` / `X-SPOUSE` / `X-MANAGER` / `X-ASSISTANT` forms. A
- * group that also holds other properties keeps its label, since something else
- * still needs it.
- */
-export const upgradeRelated = (
-	props: ReadonlyArray<IrProperty>,
-): ReadonlyArray<IrProperty> => {
+interface RelationScan {
+	readonly relatedGroups: ReadonlySet<string>;
+	readonly sawSourceProp: boolean;
+}
+
+// Which itemN groups hold an Apple related-names property, and whether any
+// single-property relation form is present at all
+const scanRelations = (props: ReadonlyArray<IrProperty>): RelationScan => {
 	const relatedGroups = new Set<string>();
 	let sawSourceProp = false;
 	for (const p of props) {
@@ -235,10 +234,20 @@ export const upgradeRelated = (
 			sawSourceProp = true;
 		}
 	}
-	if (relatedGroups.size === 0 && !sawSourceProp) {
-		return props;
-	}
+	return { relatedGroups, sawSourceProp };
+};
 
+interface GroupLabels {
+	readonly labels: ReadonlyMap<string, string>;
+	readonly sharedGroups: ReadonlySet<string>;
+}
+
+// The X-ABLABEL text of each related group, plus the groups whose label some
+// other property in the same group still needs
+const collectGroupLabels = (
+	props: ReadonlyArray<IrProperty>,
+	relatedGroups: ReadonlySet<string>,
+): GroupLabels => {
 	const sharedGroups = new Set<string>();
 	const labels = new Map<string, string>();
 	for (const p of props) {
@@ -253,31 +262,67 @@ export const upgradeRelated = (
 			sharedGroups.add(g);
 		}
 	}
+	return { labels, sharedGroups };
+};
+
+// Apple's grouped related-names property → canonical RELATED, preserving a
+// label the TYPE token alone would not reproduce
+const upgradeAbRelated = (p: IrProperty, rawLabel: string): IrProperty => {
+	const relation = unwrapAppleLabel(rawLabel);
+	const token = relation === "" ? GENERIC_TYPE : typeForRelation(relation);
+	const needsLabel = rawLabel !== "" && rawLabel !== labelFromToken(token);
+	const parameters: ReadonlyArray<IrParameter> = [
+		{ name: "VALUE", value: "text" },
+		...withoutParams(p, ["VALUE", "TYPE"]),
+		{ name: "TYPE", value: token },
+		...(needsLabel ? [{ name: RELATION_LABEL_PARAM, value: rawLabel }] : []),
+	];
+	return {
+		name: RELATED_PROP,
+		parameters,
+		value: { type: "TEXT", value: rawStr(p.value) },
+		isKnown: true,
+	};
+};
+
+// An AGENT holding a nested vCard has no RELATED equivalent; park it under
+// X-AGENT so 4.0 keeps it and downgrade can hand it back. The provenance marker
+// is what makes that reversible: a client's own X-AGENT, which we never parked,
+// must not be renamed to AGENT.
+const parkEmbeddedAgent = (p: IrProperty): IrProperty => ({
+	...p,
+	name: replaceBase(p.name, EMBEDDED_AGENT_PROP),
+	parameters: [
+		...p.parameters,
+		{ name: RELATION_SOURCE_PARAM, value: "AGENT" },
+	],
+});
+
+/**
+ * Fold every relation statement into a canonical `RELATED`: Apple's grouped
+ * `X-ABRELATEDNAMES` (+ its sibling `X-ABLABEL`, dropped with it), and the
+ * single-property `AGENT` / `X-SPOUSE` / `X-MANAGER` / `X-ASSISTANT` forms. A
+ * group that also holds other properties keeps its label, since something else
+ * still needs it.
+ */
+export const upgradeRelated = (
+	props: ReadonlyArray<IrProperty>,
+): ReadonlyArray<IrProperty> => {
+	const { relatedGroups, sawSourceProp } = scanRelations(props);
+	if (relatedGroups.size === 0 && !sawSourceProp) {
+		return props;
+	}
+	const { labels, sharedGroups } = collectGroupLabels(props, relatedGroups);
 
 	const out: Array<IrProperty> = [];
 	for (const p of props) {
 		const g = groupOf(p.name);
 		const base = baseName(p.name);
 		if (base === AB_RELATED_PROP) {
-			const rawLabel = labels.get(g) ?? "";
-			const relation = unwrapAppleLabel(rawLabel);
-			const token = relation === "" ? GENERIC_TYPE : typeForRelation(relation);
-			const needsLabel = rawLabel !== "" && rawLabel !== labelFromToken(token);
-			out.push({
-				name: RELATED_PROP,
-				parameters: [
-					{ name: "VALUE", value: "text" },
-					...withoutParams(p, ["VALUE", "TYPE"]),
-					{ name: "TYPE", value: token },
-					...(needsLabel
-						? [{ name: RELATION_LABEL_PARAM, value: rawLabel }]
-						: []),
-				],
-				value: { type: "TEXT", value: rawStr(p.value) },
-				isKnown: true,
-			});
+			out.push(upgradeAbRelated(p, labels.get(g) ?? ""));
 			continue;
 		}
+		// The label moved into the RELATED parameters, so it goes with its pair
 		if (
 			base === AB_LABEL_PROP &&
 			relatedGroups.has(g) &&
@@ -286,22 +331,11 @@ export const upgradeRelated = (
 			continue;
 		}
 		if (RELATION_SOURCE_PROPS.has(base)) {
-			// An AGENT holding a nested vCard has no RELATED equivalent; park it
-			// under X-AGENT so 4.0 keeps it and downgrade can hand it back. The
-			// provenance marker is what makes that reversible: a client's own
-			// X-AGENT, which we never parked, must not be renamed to AGENT.
-			if (base === "AGENT" && EMBEDDED_VCARD.test(rawStr(p.value))) {
-				out.push({
-					...p,
-					name: replaceBase(p.name, EMBEDDED_AGENT_PROP),
-					parameters: [
-						...p.parameters,
-						{ name: RELATION_SOURCE_PARAM, value: "AGENT" },
-					],
-				});
-				continue;
-			}
-			out.push(upgradeSourceProp(p, base));
+			out.push(
+				base === "AGENT" && EMBEDDED_VCARD.test(rawStr(p.value))
+					? parkEmbeddedAgent(p)
+					: upgradeSourceProp(p, base),
+			);
 			continue;
 		}
 		out.push(p);
@@ -417,21 +451,22 @@ export const downgradeRelated = (
 	const preferred = prop.parameters.some(
 		(p) => p.name.toUpperCase() === "PREF",
 	);
+	const parameters: ReadonlyArray<IrParameter> = [
+		...withoutParams(prop, [
+			"VALUE",
+			"TYPE",
+			"PREF",
+			RELATION_LABEL_PARAM,
+			RELATION_NAME_PARAM,
+			// Provenance for a form we are not writing here would be a lie.
+			RELATION_SOURCE_PARAM,
+		]),
+		...(preferred ? [{ name: "TYPE", value: "pref" }] : []),
+	];
 	return [
 		{
 			name: `${group}.${AB_RELATED_PROP}`,
-			parameters: [
-				...withoutParams(prop, [
-					"VALUE",
-					"TYPE",
-					"PREF",
-					RELATION_LABEL_PARAM,
-					RELATION_NAME_PARAM,
-					// Provenance for a form we are not writing here would be a lie.
-					RELATION_SOURCE_PARAM,
-				]),
-				...(preferred ? [{ name: "TYPE", value: "pref" }] : []),
-			],
+			parameters,
 			value: { type: "TEXT", value: name },
 			isKnown: false,
 		},

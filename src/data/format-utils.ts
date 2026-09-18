@@ -1,3 +1,4 @@
+import { Option } from "effect";
 import { Temporal } from "temporal-polyfill";
 import type { ContentLineParam } from "./content-line.ts";
 import type { IrParameter, IrValue } from "./ir.ts";
@@ -223,6 +224,11 @@ export const parseDateTimeString = (
 	};
 };
 
+// Both parsers throw on input they cannot type; lift them so the fallback to an
+// opaque value is an explicit None rather than a caught exception
+const tryParseDateTimeString = Option.liftThrowable(parseDateTimeString);
+const tryParsePlainDate = Option.liftThrowable(parsePlainDate);
+
 /**
  * Parse a vCard "date-and-or-time" value (RFC 6350 §4.3.4).
  *
@@ -232,29 +238,31 @@ export const parseDateTimeString = (
  *   Partial (--MMDD, --MM-DD, time-only, etc.) → { type: "DATE_AND_OR_TIME", value: raw }
  */
 export const parseDateAndOrTime = (raw: string): IrValue => {
+	const opaque: IrValue = { type: "DATE_AND_OR_TIME", value: raw };
 	// Partial date: starts with "--"
 	if (raw.startsWith("--")) {
-		return { type: "DATE_AND_OR_TIME", value: raw };
+		return opaque;
 	}
 	// Time-only: starts with "T"
 	if (raw.startsWith("T")) {
-		return { type: "DATE_AND_OR_TIME", value: raw };
+		return opaque;
 	}
 	// Datetime: contains "T"
 	if (raw.includes("T")) {
-		try {
-			return parseDateTimeString(raw, undefined);
-		} catch {
-			return { type: "DATE_AND_OR_TIME", value: raw };
-		}
+		return Option.getOrElse(
+			tryParseDateTimeString(raw, undefined),
+			() => opaque,
+		);
 	}
-	// Attempt to parse as a full date (YYYYMMDD or YYYY-MM-DD).
-	// parsePlainDate throws on any non-matching input (year-month, etc.) → fall back to opaque.
-	try {
-		return { type: "DATE", value: parsePlainDate(raw) };
-	} catch {
-		return { type: "DATE_AND_OR_TIME", value: raw };
-	}
+	// Attempt to parse as a full date (YYYYMMDD or YYYY-MM-DD); anything else
+	// (year-month, etc.) has no typed form and stays opaque.
+	return Option.getOrElse(
+		Option.map(
+			tryParsePlainDate(raw),
+			(value): IrValue => ({ type: "DATE", value }),
+		),
+		() => opaque,
+	);
 };
 
 // ---------------------------------------------------------------------------

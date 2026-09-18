@@ -13,7 +13,7 @@
 // References: RFC 7808 §4 (actions), RFC 7809 §3.1.2 (server requirements)
 // ---------------------------------------------------------------------------
 
-import { Effect, Option } from "effect";
+import { Effect, Match, Option } from "effect";
 import type { DatabaseError } from "#src/domain/errors.ts";
 import {
 	CalTimezoneRepository,
@@ -32,7 +32,7 @@ const jsonResponse = (
 	status = 200,
 ): Effect.Effect<Response, never> =>
 	Effect.succeed(
-		new Response(JSON.stringify(body), {
+		Response.json(body, {
 			status,
 			headers: { "Content-Type": "application/json; charset=utf-8" },
 		}),
@@ -105,7 +105,7 @@ const handleList = (): Effect.Effect<Response, never, IanaTimezoneService> =>
 const wrapInVcalendar = (vtimezone: string): string =>
 	`BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//shuriken-ts//RFC 7808 Timezone Service//EN\r\n${vtimezone}\r\nEND:VCALENDAR\r\n`;
 
-const handleGet = (
+const fetchTimezone = (
 	tzid: string,
 ): Effect.Effect<
 	Response,
@@ -148,6 +148,23 @@ const handleGet = (
 		Effect.withSpan("timezones.get", { attributes: { "tz.tzid": tzid } }),
 	);
 
+// Resolve the required `tzid` parameter, then serve it; a lookup failure is a 404
+const handleGet = (
+	url: URL,
+): Effect.Effect<
+	Response,
+	never,
+	IanaTimezoneService | CalTimezoneRepository
+> => {
+	const tzid = url.searchParams.get("tzid");
+	if (!tzid) {
+		return badRequest("Missing required parameter: tzid");
+	}
+	return fetchTimezone(tzid).pipe(
+		Effect.catchTag("DatabaseError", () => notFound()),
+	);
+};
+
 // ---------------------------------------------------------------------------
 // Main handler
 // ---------------------------------------------------------------------------
@@ -175,26 +192,11 @@ export const timezonesHandler = (
 	}
 
 	const action = url.searchParams.get("action") ?? "capabilities";
-	const origin = url.origin;
 
-	switch (action) {
-		case "capabilities":
-			return handleCapabilities(origin);
-
-		case "list":
-			return handleList();
-
-		case "get": {
-			const tzid = url.searchParams.get("tzid");
-			if (!tzid) {
-				return badRequest("Missing required parameter: tzid");
-			}
-			return handleGet(tzid).pipe(
-				Effect.catchTag("DatabaseError", () => notFound()),
-			);
-		}
-
-		default:
-			return badRequest(`Unknown action: ${action}`);
-	}
+	return Match.value(action).pipe(
+		Match.when("capabilities", () => handleCapabilities(url.origin)),
+		Match.when("list", () => handleList()),
+		Match.when("get", () => handleGet(url)),
+		Match.orElse(() => badRequest(`Unknown action: ${action}`)),
+	);
 };

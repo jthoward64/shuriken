@@ -4,6 +4,7 @@
 //   - Scheduling outbox POST free-busy request (RFC 6638 §5)
 // ---------------------------------------------------------------------------
 
+import { Option } from "effect";
 import { Temporal } from "temporal-polyfill";
 import type { IrComponent } from "#src/data/ir.ts";
 
@@ -19,14 +20,14 @@ const PAD4 = 4;
 
 export type FbType = "BUSY" | "BUSY-TENTATIVE";
 
-/** Returns null if the VEVENT should be considered FREE (transparent or cancelled). */
-export const deriveFbType = (comp: IrComponent): FbType | null => {
+/** None if the VEVENT should be considered FREE (transparent or cancelled). */
+const fbTypeOf = (comp: IrComponent): Option.Option<FbType> => {
 	const transpProp = comp.properties.find((p) => p.name === "TRANSP");
 	const transp =
 		transpProp?.value.type === "TEXT" ? transpProp.value.value : "OPAQUE";
 
 	if (transp === "TRANSPARENT") {
-		return null;
+		return Option.none();
 	}
 
 	const statusProp = comp.properties.find((p) => p.name === "STATUS");
@@ -34,13 +35,14 @@ export const deriveFbType = (comp: IrComponent): FbType | null => {
 		statusProp?.value.type === "TEXT" ? statusProp.value.value : "CONFIRMED";
 
 	if (status === "CANCELLED") {
-		return null;
+		return Option.none();
 	}
-	if (status === "TENTATIVE") {
-		return "BUSY-TENTATIVE";
-	}
-	return "BUSY";
+	return Option.some(status === "TENTATIVE" ? "BUSY-TENTATIVE" : "BUSY");
 };
+
+/** Returns null if the VEVENT should be considered FREE (transparent or cancelled). */
+export const deriveFbType = (comp: IrComponent): FbType | null =>
+	Option.getOrNull(fbTypeOf(comp));
 
 // ---------------------------------------------------------------------------
 // Period — a time interval with a free-busy classification
@@ -166,6 +168,19 @@ export const buildVfreebusyText = (
 // Returns undefined for floating times or parse failures.
 // ---------------------------------------------------------------------------
 
+// Temporal throws on anything it cannot parse or on an out-of-range sum, so the
+// whole conversion is lifted: an unusable period surfaces as None
+const periodFromParts = Option.liftThrowable(
+	(startStr: string, endStr: string) => {
+		const start = Temporal.Instant.from(startStr);
+		const end =
+			endStr.startsWith("P") || endStr.startsWith("-P")
+				? start.add(Temporal.Duration.from(endStr))
+				: Temporal.Instant.from(endStr);
+		return { start, end };
+	},
+);
+
 export const parsePeriodString = (
 	s: string,
 ): { start: Temporal.Instant; end: Temporal.Instant } | undefined => {
@@ -173,17 +188,7 @@ export const parsePeriodString = (
 	if (slash === -1) {
 		return undefined;
 	}
-	const startStr = s.slice(0, slash);
-	const endStr = s.slice(slash + 1);
-	try {
-		const start = Temporal.Instant.from(startStr);
-		if (endStr.startsWith("P") || endStr.startsWith("-P")) {
-			const end = start.add(Temporal.Duration.from(endStr));
-			return { start, end };
-		}
-		const end = Temporal.Instant.from(endStr);
-		return { start, end };
-	} catch {
-		return undefined;
-	}
+	return Option.getOrUndefined(
+		periodFromParts(s.slice(0, slash), s.slice(slash + 1)),
+	);
 };

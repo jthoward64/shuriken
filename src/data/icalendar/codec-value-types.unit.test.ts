@@ -1,7 +1,7 @@
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
 import { Effect } from "effect";
-import type { IrComponent } from "#src/data/ir.ts";
+import type { IrComponent, IrDocument } from "#src/data/ir.ts";
 import {
 	decodeICalendar,
 	encodeICalComponent,
@@ -14,9 +14,15 @@ import {
 
 const ical = (...lines: Array<string>) => `${lines.join("\r\n")}\r\n`;
 
-const run = (text: string) => Effect.runPromise(decodeICalendar(text));
-const enc = (doc: Parameters<typeof encodeICalendar>[0]) =>
-	Effect.runPromise(encodeICalendar(doc));
+// Decode to a plain IrDocument so assertions read against data, not an effect
+async function run(text: string): Promise<IrDocument> {
+	return await Effect.runPromise(decodeICalendar(text));
+}
+
+// Encode an IrDocument back to iCalendar text
+async function enc(doc: IrDocument): Promise<string> {
+	return await Effect.runPromise(encodeICalendar(doc));
+}
 
 // ---------------------------------------------------------------------------
 // Default value types — properties whose type is not DATE_TIME

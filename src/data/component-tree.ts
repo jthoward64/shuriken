@@ -36,6 +36,38 @@ interface MutableComponent {
 }
 
 /**
+ * Pop the innermost open component, attaching it to its parent or adopting it
+ * as the tree's single root. Returns the root as it stands after the close.
+ */
+const closeComponent = (
+	stack: Array<MutableComponent>,
+	root: RawComponent | null,
+	componentName: string,
+): RawComponent | null => {
+	const top = stack.pop();
+	if (top === undefined) {
+		throw new Error(`Unexpected END:${componentName} — no open component`);
+	}
+	if (top.name !== componentName) {
+		throw new Error(
+			`Mismatched END: expected END:${top.name} but got END:${componentName}`,
+		);
+	}
+	const parent = stack.at(-1);
+	if (parent !== undefined) {
+		parent.children.push(top);
+		// A nested close only fills in a child; the root is decided at depth 0
+		return root;
+	}
+	if (root !== null) {
+		throw new Error(
+			`Multiple root components: found a second root "${componentName}" after "${root.name}"`,
+		);
+	}
+	return top;
+};
+
+/**
  * Drive a stack to convert a flat ContentLine sequence into a RawComponent tree.
  * BEGIN:X pushes a new frame; END:X pops and attaches it to the parent.
  * Throws a descriptive string on structural errors.
@@ -48,36 +80,17 @@ const buildTree = (lines: ReadonlyArray<ContentLine>): RawComponent => {
 		if (line.name === "BEGIN") {
 			const componentName = line.rawValue.toUpperCase();
 			stack.push({ name: componentName, contentLines: [], children: [] });
-		} else if (line.name === "END") {
-			const componentName = line.rawValue.toUpperCase();
-			const top = stack.pop();
-			if (top === undefined) {
-				throw new Error(`Unexpected END:${componentName} — no open component`);
-			}
-			if (top.name !== componentName) {
-				throw new Error(
-					`Mismatched END: expected END:${top.name} but got END:${componentName}`,
-				);
-			}
-			if (stack.length === 0) {
-				if (root !== null) {
-					throw new Error(
-						`Multiple root components: found a second root "${componentName}" after "${root.name}"`,
-					);
-				}
-				root = top;
-			} else {
-				(stack.at(-1) as MutableComponent).children.push(top);
-			}
-		} else {
-			const current = stack.at(-1);
-			if (current === undefined) {
-				throw new Error(
-					`Property "${line.name}" appears outside any component`,
-				);
-			}
-			current.contentLines.push(line);
+			continue;
 		}
+		if (line.name === "END") {
+			root = closeComponent(stack, root, line.rawValue.toUpperCase());
+			continue;
+		}
+		const current = stack.at(-1);
+		if (current === undefined) {
+			throw new Error(`Property "${line.name}" appears outside any component`);
+		}
+		current.contentLines.push(line);
 	}
 
 	if (stack.length > 0) {

@@ -1,6 +1,6 @@
 /** biome-ignore-all lint/style/noMagicNumbers: CIDR prefix lengths and hextet widths are IANA/RFC-defined */
 import { lookup } from "node:dns/promises";
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, Layer, Option } from "effect";
 import { InternalError } from "#src/domain/errors.ts";
 
 const V4_OCTET = /^\d{1,3}$/u;
@@ -29,36 +29,37 @@ export class NetworkGuardService extends Context.Service<
 	NetworkGuardServiceShape
 >()("NetworkGuardService") {}
 
-const ipv4ToInt = (ip: string): number | null => {
+/** Parse a dotted-quad IPv4 literal into a 32-bit unsigned integer. */
+const ipv4ToInt = (ip: string): Option.Option<number> => {
 	const parts = ip.split(".");
 	if (parts.length !== 4) {
-		return null;
+		return Option.none();
 	}
 	let n = 0;
 	for (const part of parts) {
 		if (!V4_OCTET.test(part)) {
-			return null;
+			return Option.none();
 		}
 		const v = Number(part);
 		if (v > 255) {
-			return null;
+			return Option.none();
 		}
 		n = (n << 8) | v;
 	}
-	return n >>> 0;
+	return Option.some(n >>> 0);
 };
 
 const IPV4_MASK_BITS = 32;
 
-const inCidr4 = (ip: number, base: string, prefixBits: number): boolean => {
-	const baseInt = ipv4ToInt(base);
-	if (baseInt === null) {
-		return false;
-	}
-	const mask =
-		prefixBits === 0 ? 0 : (~0 << (IPV4_MASK_BITS - prefixBits)) >>> 0;
-	return (ip & mask) >>> 0 === (baseInt & mask) >>> 0;
-};
+const inCidr4 = (ip: number, base: string, prefixBits: number): boolean =>
+	Option.match(ipv4ToInt(base), {
+		onNone: () => false,
+		onSome: (baseInt) => {
+			const mask =
+				prefixBits === 0 ? 0 : (~0 << (IPV4_MASK_BITS - prefixBits)) >>> 0;
+			return (ip & mask) >>> 0 === (baseInt & mask) >>> 0;
+		},
+	});
 
 // RFC 1918 private ranges, loopback, link-local (incl. the 169.254.169.254
 // cloud metadata address), CGNAT, "this network," benchmarking, multicast,
@@ -80,33 +81,34 @@ const IPV4_BLOCKED_RANGES: ReadonlyArray<readonly [string, number]> = [
 	["240.0.0.0", 4],
 ];
 
-const isBlockedIpv4 = (ip: string): boolean => {
-	const n = ipv4ToInt(ip);
-	if (n === null) {
-		return true;
-	}
-	return IPV4_BLOCKED_RANGES.some(([base, bits]) => inCidr4(n, base, bits));
-};
+const isBlockedIpv4 = (ip: string): boolean =>
+	Option.match(ipv4ToInt(ip), {
+		// An unparseable literal is never clearly public, so fail closed
+		onNone: () => true,
+		onSome: (n) =>
+			IPV4_BLOCKED_RANGES.some(([base, bits]) => inCidr4(n, base, bits)),
+	});
 
 const HEXTET_GROUPS = 8;
 const HEXTET_BITS = 16n;
 
-/** Parse a (possibly v4-mapped/compressed) IPv6 literal into a 128-bit integer. */
-const ipv6ToBigInt = (ip: string): bigint | null => {
-	let addr = ip;
-	const v4Embedded = V4_SUFFIX.exec(addr);
-	if (v4Embedded?.[1]) {
-		const v4 = ipv4ToInt(v4Embedded[1]);
-		if (v4 === null) {
-			return null;
-		}
-		const hex = v4.toString(16).padStart(8, "0");
-		addr = `${addr.slice(0, -v4Embedded[1].length)}${hex.slice(0, 4)}:${hex.slice(4)}`;
+/** Rewrite a trailing dotted-quad in an IPv6 literal as two hex hextets. */
+const expandV4Suffix = (addr: string): Option.Option<string> => {
+	const embedded = V4_SUFFIX.exec(addr)?.[1];
+	if (!embedded) {
+		return Option.some(addr);
 	}
+	return Option.map(ipv4ToInt(embedded), (v4) => {
+		const hex = v4.toString(16).padStart(8, "0");
+		return `${addr.slice(0, -embedded.length)}${hex.slice(0, 4)}:${hex.slice(4)}`;
+	});
+};
 
+/** Split an expanded IPv6 literal into exactly eight hextet groups. */
+const hextetGroups = (addr: string): Option.Option<ReadonlyArray<string>> => {
 	const halves = addr.split("::");
 	if (halves.length > 2) {
-		return null;
+		return Option.none();
 	}
 	const head = halves[0] ? halves[0].split(":").filter((g) => g !== "") : [];
 	const tail =
@@ -114,43 +116,49 @@ const ipv6ToBigInt = (ip: string): bigint | null => {
 			? halves[1].split(":").filter((g) => g !== "")
 			: [];
 	const missing = HEXTET_GROUPS - head.length - tail.length;
-	if (halves.length === 1) {
-		if (missing !== 0) {
-			return null;
-		}
-	} else if (missing < 0) {
-		return null;
+	// "::" absorbs the missing groups; without it every group must be spelled out
+	if (halves.length === 1 ? missing !== 0 : missing < 0) {
+		return Option.none();
 	}
 	const groups = [
 		...head,
 		...new Array(halves.length === 2 ? missing : 0).fill("0"),
 		...tail,
 	];
-	if (groups.length !== HEXTET_GROUPS) {
-		return null;
-	}
+	return groups.length === HEXTET_GROUPS ? Option.some(groups) : Option.none();
+};
+
+/** Fold eight hextet groups into a 128-bit integer, rejecting non-hex groups. */
+const packHextets = (groups: ReadonlyArray<string>): Option.Option<bigint> => {
 	let result = 0n;
 	for (const g of groups) {
 		if (!V6_GROUP.test(g)) {
-			return null;
+			return Option.none();
 		}
 		result = (result << HEXTET_BITS) | BigInt(Number.parseInt(g, 16));
 	}
-	return result;
+	return Option.some(result);
 };
+
+/** Parse a (possibly v4-mapped/compressed) IPv6 literal into a 128-bit integer. */
+const ipv6ToBigInt = (ip: string): Option.Option<bigint> =>
+	expandV4Suffix(ip).pipe(
+		Option.flatMap(hextetGroups),
+		Option.flatMap(packHextets),
+	);
 
 const IPV6_BITS = 128n;
 
-const inCidr6 = (addr: bigint, base: string, prefixBits: number): boolean => {
-	const baseInt = ipv6ToBigInt(base);
-	if (baseInt === null) {
-		return false;
-	}
-	const shift = IPV6_BITS - BigInt(prefixBits);
-	const mask =
-		prefixBits === 0 ? 0n : ((1n << BigInt(prefixBits)) - 1n) << shift;
-	return (addr & mask) === (baseInt & mask);
-};
+const inCidr6 = (addr: bigint, base: string, prefixBits: number): boolean =>
+	Option.match(ipv6ToBigInt(base), {
+		onNone: () => false,
+		onSome: (baseInt) => {
+			const shift = IPV6_BITS - BigInt(prefixBits);
+			const mask =
+				prefixBits === 0 ? 0n : ((1n << BigInt(prefixBits)) - 1n) << shift;
+			return (addr & mask) === (baseInt & mask);
+		},
+	});
 
 // Loopback, unspecified, link-local, unique-local (fc00::/7), v4-mapped
 // (re-checked against the embedded v4 above via ipv6ToBigInt), NAT64, IPv4
@@ -167,13 +175,13 @@ const IPV6_BLOCKED_RANGES: ReadonlyArray<readonly [string, number]> = [
 	["ff00::", 8],
 ];
 
-const isBlockedIpv6 = (ip: string): boolean => {
-	const addr = ipv6ToBigInt(ip);
-	if (addr === null) {
-		return true;
-	}
-	return IPV6_BLOCKED_RANGES.some(([base, bits]) => inCidr6(addr, base, bits));
-};
+const isBlockedIpv6 = (ip: string): boolean =>
+	Option.match(ipv6ToBigInt(ip), {
+		// An unparseable literal is never clearly public, so fail closed
+		onNone: () => true,
+		onSome: (addr) =>
+			IPV6_BLOCKED_RANGES.some(([base, bits]) => inCidr6(addr, base, bits)),
+	});
 
 /** True if `ip` (already a resolved literal, no hostname) must not be fetched. */
 export const isBlockedAddress = (ip: string): boolean =>

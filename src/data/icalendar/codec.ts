@@ -1,4 +1,12 @@
-import { Effect, Option, Schema, SchemaGetter, SchemaIssue } from "effect";
+import {
+	Effect,
+	Match,
+	Option,
+	Schema,
+	SchemaGetter,
+	SchemaIssue,
+} from "effect";
+import type { Temporal } from "temporal-polyfill";
 import { type DavError, validCalendarData } from "../../domain/errors.ts";
 import {
 	type RawComponent,
@@ -62,82 +70,137 @@ const ICAL_VALUE_OVERRIDES = new Map<string, IcalValueOverride>([
 // IrValue encoding (iCal-specific, delegates to format-utils for date/time)
 // ---------------------------------------------------------------------------
 
-const encodeIrValue = (value: IrValue): string => {
-	switch (value.type) {
-		case "TEXT":
-			return escapeText(value.value);
-		case "TEXT_LIST":
-			return serializeTextList(value.value);
-		case "INTEGER":
-		case "FLOAT":
-			return String(value.value);
-		case "BOOLEAN":
-			return value.value ? "TRUE" : "FALSE";
-		case "DATE":
-			return formatPlainDate(value.value);
-		case "DATE_TIME":
-			return formatZonedDateTime(value.value);
-		case "PLAIN_DATE_TIME":
-			return formatPlainDateTime(value.value);
-		case "DATE_LIST":
-			return value.value.map(formatPlainDate).join(",");
-		case "DATE_TIME_LIST":
-			return value.value
-				.map((item) =>
-					"timeZoneId" in item
-						? formatZonedDateTime(item)
-						: formatPlainDateTime(item),
-				)
-				.join(",");
-		case "PERIOD_LIST":
-			return value.value.join(",");
-		case "BINARY":
-			return btoa(String.fromCodePoint(...value.value));
-		case "JSON":
-			return JSON.stringify(value.value);
-		case "DURATION":
-		case "URI":
-		case "CAL_ADDRESS":
-		case "RECUR":
-		case "UTC_OFFSET":
-		case "UTC_OFFSET_INTERVAL":
-		case "DURATION_INTERVAL":
-		case "PERIOD":
-		case "TIME":
-		case "DATE_AND_OR_TIME":
-			return value.value;
-	}
-};
+// A JSON-typed value is serialized through the schema rather than raw JSON
+const encodeJson = Schema.encodeSync(Schema.UnknownFromJsonString);
+
+// Every date-time list item is independently anchored or floating, so each is
+// formatted by its own shape
+const encodeDateTimeListItem = (
+	item: Temporal.ZonedDateTime | Temporal.PlainDateTime,
+): string =>
+	"timeZoneId" in item ? formatZonedDateTime(item) : formatPlainDateTime(item);
+
+const encodeIrValue = (value: IrValue): string =>
+	Match.value(value).pipe(
+		Match.discriminatorsExhaustive("type")({
+			TEXT: (v) => escapeText(v.value),
+			TEXT_LIST: (v) => serializeTextList(v.value),
+			INTEGER: (v) => String(v.value),
+			FLOAT: (v) => String(v.value),
+			BOOLEAN: (v) => (v.value ? "TRUE" : "FALSE"),
+			DATE: (v) => formatPlainDate(v.value),
+			DATE_TIME: (v) => formatZonedDateTime(v.value),
+			PLAIN_DATE_TIME: (v) => formatPlainDateTime(v.value),
+			DATE_LIST: (v) => v.value.map(formatPlainDate).join(","),
+			DATE_TIME_LIST: (v) => v.value.map(encodeDateTimeListItem).join(","),
+			PERIOD_LIST: (v) => v.value.join(","),
+			BINARY: (v) => btoa(String.fromCodePoint(...v.value)),
+			JSON: (v) => encodeJson(v.value),
+			DURATION: (v) => v.value,
+			URI: (v) => v.value,
+			CAL_ADDRESS: (v) => v.value,
+			RECUR: (v) => v.value,
+			UTC_OFFSET: (v) => v.value,
+			UTC_OFFSET_INTERVAL: (v) => v.value,
+			DURATION_INTERVAL: (v) => v.value,
+			PERIOD: (v) => v.value,
+			TIME: (v) => v.value,
+			DATE_AND_OR_TIME: (v) => v.value,
+		}),
+	);
 
 // ---------------------------------------------------------------------------
 // Single ContentLine → IrProperty (decode direction)
 // ---------------------------------------------------------------------------
 
+// Decode a raw content-line value into the IrValue named by its resolved type.
+// Types not listed here carry their raw string through unchanged.
+const decodeIrValue = (
+	resolvedType: IcalValueOverride,
+	raw: string,
+	tzid: string | undefined,
+): IrValue =>
+	Match.value(resolvedType).pipe(
+		Match.withReturnType<IrValue>(),
+		// Determine DATE_TIME vs PLAIN_DATE_TIME from rawValue shape and TZID param
+		Match.whenOr("DATE_TIME_DYNAMIC", "DATE_TIME", () =>
+			parseDateTimeString(raw, tzid),
+		),
+		Match.when("DATE", () => ({ type: "DATE", value: parsePlainDate(raw) })),
+		// Each item is independently anchored (UTC "Z", numeric offset, or the
+		// property-level TZID) or floating (RFC 5545 Form 1). Floating is valid
+		// here — required for RDATE inside a VTIMEZONE observance.
+		Match.when("DATE_TIME_LIST", () => ({
+			type: "DATE_TIME_LIST",
+			value: raw
+				.split(",")
+				.map((item) => parseDateTimeString(item.trim(), tzid).value),
+		})),
+		Match.when("DATE_LIST", () => ({
+			type: "DATE_LIST",
+			value: raw.split(",").map((item) => parsePlainDate(item.trim())),
+		})),
+		Match.when("TEXT", () => ({ type: "TEXT", value: unescapeText(raw) })),
+		Match.when("TEXT_LIST", () => ({
+			type: "TEXT_LIST",
+			value: parseTextList(raw),
+		})),
+		Match.when("INTEGER", () => ({
+			type: "INTEGER",
+			value: Number.parseInt(raw, 10),
+		})),
+		Match.when("FLOAT", () => ({
+			type: "FLOAT",
+			value: Number.parseFloat(raw),
+		})),
+		Match.when("BOOLEAN", () => ({
+			type: "BOOLEAN",
+			value: raw.toUpperCase() === "TRUE",
+		})),
+		Match.when("BINARY", () => ({
+			type: "BINARY",
+			value: Uint8Array.from(atob(raw), (c) => c.codePointAt(0) ?? 0),
+		})),
+		Match.when("PERIOD_LIST", () => ({
+			type: "PERIOD_LIST",
+			value: raw.split(","),
+		})),
+		Match.whenOr(
+			"DURATION",
+			"URI",
+			"CAL_ADDRESS",
+			"RECUR",
+			"UTC_OFFSET",
+			"PERIOD",
+			"TIME",
+			"UTC_OFFSET_INTERVAL",
+			"DURATION_INTERVAL",
+			(type) => ({ type, value: raw }),
+		),
+		Match.orElse(() => ({ type: "TEXT", value: raw })),
+	);
+
 const decodeICalProperty = (line: ContentLine): IrProperty => {
-	const isKnown = ICAL_DEFAULT_TYPES.has(line.name);
+	const parameters = paramsToIr(line.params);
+	const defaultType = ICAL_DEFAULT_TYPES.get(line.name);
 
 	// Unknown / X- properties: store rawValue verbatim as TEXT, no unescaping
-	if (!isKnown) {
+	if (defaultType === undefined) {
 		return {
 			name: line.name,
-			parameters: paramsToIr(line.params),
+			parameters,
 			value: { type: "TEXT", value: line.rawValue },
 			isKnown: false,
 		};
 	}
 
 	// Resolve effective value type, checking VALUE= override first
-	const valueParamRaw = getValueParam(line.params);
-	const overrideKey = valueParamRaw?.toUpperCase();
+	const overrideKey = getValueParam(line.params)?.toUpperCase();
 	const override =
 		overrideKey !== undefined
 			? ICAL_VALUE_OVERRIDES.get(overrideKey)
 			: undefined;
-	const defaultType = ICAL_DEFAULT_TYPES.get(line.name) as IrValueType;
 	const effectiveType: IcalValueOverride = override ?? defaultType;
-
-	const tzid = getTzidParam(line.params);
-	const raw = line.rawValue;
 
 	// Promote singular-type overrides to their list equivalents when the property's
 	// default type is a list. This handles EXDATE;VALUE=DATE:20060102,20060103
@@ -147,76 +210,14 @@ const decodeICalProperty = (line: ContentLine): IrProperty => {
 			? "DATE_LIST"
 			: effectiveType;
 
-	let value: IrValue;
-
-	if (resolvedType === "DATE_TIME_DYNAMIC" || resolvedType === "DATE_TIME") {
-		// Determine DATE_TIME vs PLAIN_DATE_TIME from rawValue shape and TZID param
-		value = parseDateTimeString(raw, tzid);
-	} else {
-		switch (resolvedType) {
-			case "DATE":
-				value = { type: "DATE", value: parsePlainDate(raw) };
-				break;
-			case "DATE_TIME_LIST": {
-				// Each item is independently anchored (UTC "Z", numeric offset, or
-				// the property-level TZID) or floating (RFC 5545 Form 1). Floating is
-				// valid here — required for RDATE inside a VTIMEZONE observance.
-				const parsed = raw
-					.split(",")
-					.map((item) => parseDateTimeString(item.trim(), tzid).value);
-				value = { type: "DATE_TIME_LIST", value: parsed };
-				break;
-			}
-			case "DATE_LIST":
-				value = {
-					type: "DATE_LIST",
-					value: raw.split(",").map((item) => parsePlainDate(item.trim())),
-				};
-				break;
-			case "TEXT":
-				value = { type: "TEXT", value: unescapeText(raw) };
-				break;
-			case "TEXT_LIST":
-				value = { type: "TEXT_LIST", value: parseTextList(raw) };
-				break;
-			case "INTEGER":
-				value = { type: "INTEGER", value: Number.parseInt(raw, 10) };
-				break;
-			case "FLOAT":
-				value = { type: "FLOAT", value: Number.parseFloat(raw) };
-				break;
-			case "BOOLEAN":
-				value = { type: "BOOLEAN", value: raw.toUpperCase() === "TRUE" };
-				break;
-			case "BINARY":
-				value = {
-					type: "BINARY",
-					value: Uint8Array.from(atob(raw), (c) => c.codePointAt(0) ?? 0),
-				};
-				break;
-			case "PERIOD_LIST":
-				value = { type: "PERIOD_LIST", value: raw.split(",") };
-				break;
-			case "DURATION":
-			case "URI":
-			case "CAL_ADDRESS":
-			case "RECUR":
-			case "UTC_OFFSET":
-			case "PERIOD":
-			case "TIME":
-			case "UTC_OFFSET_INTERVAL":
-			case "DURATION_INTERVAL":
-				value = { type: resolvedType, value: raw };
-				break;
-			default:
-				value = { type: "TEXT", value: raw };
-		}
-	}
-
 	return {
 		name: line.name,
-		parameters: paramsToIr(line.params),
-		value,
+		parameters,
+		value: decodeIrValue(
+			resolvedType,
+			line.rawValue,
+			getTzidParam(line.params),
+		),
 		isKnown: true,
 	};
 };
@@ -284,26 +285,31 @@ const convertIrToRawComponent = (ir: IrComponent): RawComponent => ({
 // ICalPropertyInferrer: Schema<IrComponent, RawComponent>
 // ---------------------------------------------------------------------------
 
+// Property decoding throws on malformed values; surface that as a schema issue
+const rawToIr = (
+	raw: RawComponent,
+): Effect.Effect<IrComponent, SchemaIssue.InvalidValue> =>
+	Effect.try({
+		try: () => convertRawToIrComponent(raw),
+		catch: (e) =>
+			new SchemaIssue.InvalidValue(Option.some(raw), { message: String(e) }),
+	});
+
+// Property encoding throws on values it cannot represent (e.g. a named-zone
+// DATE_TIME with no TZID parameter); surface that as a schema issue
+const irToRaw = (
+	ir: IrComponent,
+): Effect.Effect<RawComponent, SchemaIssue.InvalidValue> =>
+	Effect.try({
+		try: () => convertIrToRawComponent(ir),
+		catch: (e) =>
+			new SchemaIssue.InvalidValue(Option.some(ir), { message: String(e) }),
+	});
+
 const ICalPropertyInferrer = RawComponentSchema.pipe(
 	Schema.decodeTo(Schema.toType(IrComponentSchema), {
-		decode: SchemaGetter.transformOrFail((raw: RawComponent) =>
-			Effect.try({
-				try: () => convertRawToIrComponent(raw),
-				catch: (e) =>
-					new SchemaIssue.InvalidValue(Option.some(raw), {
-						message: String(e),
-					}),
-			}),
-		),
-		encode: SchemaGetter.transformOrFail((ir: IrComponent) =>
-			Effect.try({
-				try: () => convertIrToRawComponent(ir),
-				catch: (e) =>
-					new SchemaIssue.InvalidValue(Option.some(ir), {
-						message: String(e),
-					}),
-			}),
-		),
+		decode: SchemaGetter.transformOrFail(rawToIr),
+		encode: SchemaGetter.transformOrFail(irToRaw),
 	}),
 );
 
@@ -311,31 +317,34 @@ const ICalPropertyInferrer = RawComponentSchema.pipe(
 // ICalDocumentCodec: Schema<IrDocument, IrComponent>
 // ---------------------------------------------------------------------------
 
+// Only a VCALENDAR root makes an iCalendar document
+const componentToDocument = (component: IrComponent) => {
+	if (component.name !== "VCALENDAR") {
+		return Effect.fail(
+			new SchemaIssue.InvalidValue(Option.some(component), {
+				message: `Expected VCALENDAR root component, got "${component.name}"`,
+			}),
+		);
+	}
+	return Effect.succeed({ kind: "icalendar" as const, root: component });
+};
+
+// The shared IrDocument also covers vCard, so reject the wrong kind here
+const documentToComponent = (doc: IrDocument) => {
+	if (doc.kind !== "icalendar") {
+		return Effect.fail(
+			new SchemaIssue.InvalidValue(Option.some(doc), {
+				message: `Expected icalendar document, got kind "${doc.kind}"`,
+			}),
+		);
+	}
+	return Effect.succeed(doc.root);
+};
+
 const ICalDocumentCodec = Schema.toType(IrComponentSchema).pipe(
 	Schema.decodeTo(Schema.toType(IrDocumentSchema), {
-		decode: SchemaGetter.transformOrFail((component: IrComponent) => {
-			if (component.name !== "VCALENDAR") {
-				return Effect.fail(
-					new SchemaIssue.InvalidValue(Option.some(component), {
-						message: `Expected VCALENDAR root component, got "${component.name}"`,
-					}),
-				);
-			}
-			return Effect.succeed({
-				kind: "icalendar" as const,
-				root: component,
-			});
-		}),
-		encode: SchemaGetter.transformOrFail((doc: IrDocument) => {
-			if (doc.kind !== "icalendar") {
-				return Effect.fail(
-					new SchemaIssue.InvalidValue(Option.some(doc), {
-						message: `Expected icalendar document, got kind "${doc.kind}"`,
-					}),
-				);
-			}
-			return Effect.succeed(doc.root);
-		}),
+		decode: SchemaGetter.transformOrFail(componentToDocument),
+		encode: SchemaGetter.transformOrFail(documentToComponent),
 	}),
 );
 
