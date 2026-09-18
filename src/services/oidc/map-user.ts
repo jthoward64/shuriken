@@ -58,8 +58,8 @@ const randomSlugSuffix = (): string => {
 const slugFromEmail = (email: string): string => {
 	const local = email.split("@")[0]?.toLowerCase() ?? "";
 	const sanitized = local
-		.replace(/[^a-z0-9._-]/g, "-")
-		.replace(/^[-.]+|[-.]+$/g, "");
+		.replace(/[^a-z0-9._-]/gu, "-")
+		.replace(/^[-.]+|[-.]+$/gu, "");
 	return sanitized.length > 0 && isValidSlug(sanitized)
 		? sanitized
 		: `user-${randomSlugSuffix()}`;

@@ -34,7 +34,7 @@ export const ENTRIES: ReadonlyArray<{
 
 /** Served filename of the stylesheet an entry emits, if it imports one. */
 export const cssNameFor = (name: string): string =>
-	name.replace(/\.js$/, ".css");
+	name.replace(/\.js$/u, ".css");
 
 export const ClientJsServiceLive = Layer.effect(
 	ClientJsService,

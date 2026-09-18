@@ -98,7 +98,7 @@ export const freeBusyQueryHandler = (
 		const startStr =
 			typeof trObj["@_start"] === "string" ? trObj["@_start"] : null;
 		const endStr = typeof trObj["@_end"] === "string" ? trObj["@_end"] : null;
-		if (!startStr || !endStr) {
+		if (!(startStr && endStr)) {
 			return yield* badRequest(
 				"CALDAV:free-busy-query time-range requires start and end attributes",
 			);

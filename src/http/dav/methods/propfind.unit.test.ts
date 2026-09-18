@@ -214,7 +214,7 @@ describe("propfindHandler — collection, Depth: 0", () => {
 
 		const body = await res.text();
 		// Collection UUID appears exactly once as href
-		const hrefMatches = body.match(new RegExp(TEST_COLLECTION_ID, "g")) ?? [];
+		const hrefMatches = body.match(new RegExp(TEST_COLLECTION_ID, "gu")) ?? [];
 		expect(hrefMatches.length).toBeGreaterThanOrEqual(1);
 		// Instance UUID must not appear
 		expect(body).not.toContain(TEST_INSTANCE_ID);

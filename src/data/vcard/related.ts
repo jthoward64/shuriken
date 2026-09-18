@@ -172,10 +172,10 @@ const labelFromToken = (token: string): string =>
 		: titleCase(token);
 
 /** Anything that begins a nested vCard — 3.0 AGENT's third value form. */
-const EMBEDDED_VCARD = /^\s*BEGIN:VCARD/i;
+const EMBEDDED_VCARD = /^\s*BEGIN:VCARD/iu;
 
 /** A scheme-prefixed value, i.e. a URI rather than a person's name. */
-const URI_LIKE = /^[a-z][a-z0-9+.-]*:/i;
+const URI_LIKE = /^[a-z][a-z0-9+.-]*:/iu;
 
 /**
  * Where an `AGENT` carrying a whole nested vCard is parked in 4.0. RELATED
@@ -329,13 +329,13 @@ const displayNameForDowngrade = (prop: IrProperty): string | undefined => {
 	if (valueParam === "text") {
 		return raw;
 	}
-	const mailto = /^mailto:(.+)$/i.exec(raw);
+	const mailto = /^mailto:(.+)$/iu.exec(raw);
 	if (mailto?.[1] !== undefined) {
 		return mailto[1];
 	}
 	// A TEXT-typed value with no VALUE=text param is still free text (that is
 	// how a 3.0-authored card arrives); only a real URI has no display form.
-	return prop.value.type === "TEXT" && !/^[a-z][a-z0-9+.-]*:/i.test(raw)
+	return prop.value.type === "TEXT" && !/^[a-z][a-z0-9+.-]*:/iu.test(raw)
 		? raw
 		: undefined;
 };

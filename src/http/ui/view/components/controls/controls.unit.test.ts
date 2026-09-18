@@ -226,7 +226,7 @@ describe("RichTextField", () => {
 		// Otherwise two controls named "description" would submit at once.
 		// Rendered without values so escaped markup cannot confuse the match.
 		const bare = render(h(RichTextField, { id: "r", name: "description" }));
-		const hidden = bare.match(/<input type="hidden"[^>]*>/g) ?? [];
+		const hidden = bare.match(/<input type="hidden"[^>]*>/gu) ?? [];
 		expect(hidden.length).toBe(2);
 		for (const input of hidden) {
 			expect(input).toContain("disabled");

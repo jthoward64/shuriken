@@ -31,7 +31,7 @@ import { upgradeRelated } from "./related.ts";
 // ---------------------------------------------------------------------------
 
 const UUID_RE =
-	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 
 const ANNIVERSARY_LABEL = "_$!<Anniversary>!$_";
 
@@ -113,7 +113,7 @@ const upgradeGeo = (prop: IrProperty): IrProperty => {
 /** 3.0 bare-UUID UID → 4.0 `urn:uuid:` URI. Non-UUID UIDs are left untouched. */
 const upgradeUid = (prop: IrProperty): IrProperty => {
 	const raw = rawStr(prop.value);
-	if (!isProp(prop, "UID") || !UUID_RE.test(raw)) {
+	if (!(isProp(prop, "UID") && UUID_RE.test(raw))) {
 		return prop;
 	}
 	return { ...prop, value: { type: "URI", value: `urn:uuid:${raw}` } };

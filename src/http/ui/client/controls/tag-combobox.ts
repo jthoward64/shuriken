@@ -63,7 +63,7 @@ const initCombobox = (root: HTMLElement): void => {
 	const entry = one<HTMLInputElement>(root, "[data-tag-entry]");
 	const listboxEl = one<HTMLUListElement>(root, "[data-tag-listbox]");
 	const status = one<HTMLElement>(root, "[data-tag-status]");
-	if (!valueInput || !box || !entry || !listboxEl) {
+	if (!(valueInput && box && entry && listboxEl)) {
 		return;
 	}
 

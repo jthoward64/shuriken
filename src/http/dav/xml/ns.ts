@@ -82,7 +82,7 @@ export const makeNsRegistry = (): NsRegistry => {
 		return prefix;
 	};
 
-	const clarkRe = /^\{([^}]+)\}(.+)$/;
+	const clarkRe = /^\{([^}]+)\}(.+)$/u;
 
 	return {
 		toXmlKey(clark: ClarkKey): string {

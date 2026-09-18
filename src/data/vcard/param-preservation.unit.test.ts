@@ -22,8 +22,8 @@ const vcard = (...ls: Array<string>) => `${ls.join("\r\n")}\r\n`;
 
 const lines = (out: string): Array<string> =>
 	out
-		.replace(/\r?\n[ \t]/g, "")
-		.split(/\r?\n/)
+		.replace(/\r?\n[ \t]/gu, "")
+		.split(/\r?\n/u)
 		.map((l) => l.trim())
 		.filter((l) => l !== "");
 

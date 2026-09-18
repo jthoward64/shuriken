@@ -16,7 +16,7 @@ import { parseZone, type ResolutionZone, UTC } from "./resolve-floating.ts";
  * Returns null if no TZID line is found.
  */
 export const extractTzidFromVtimezone = (raw: string): string | null => {
-	const match = /^TZID[;:]([^\r\n]+)/m.exec(raw);
+	const match = /^TZID[;:]([^\r\n]+)/mu.exec(raw);
 	return match?.[1]?.trim() ?? null;
 };
 

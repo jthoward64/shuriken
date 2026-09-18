@@ -21,7 +21,7 @@ import type { InstanceRepository } from "#src/services/instance/repository.ts";
 // ---------------------------------------------------------------------------
 
 const sanitize = (raw: string): string =>
-	raw.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "calendar";
+	raw.replace(/[^A-Za-z0-9._-]+/gu, "-").replace(/^-+|-+$/gu, "") || "calendar";
 
 export const calendarExportHandler = (
 	_req: Request,

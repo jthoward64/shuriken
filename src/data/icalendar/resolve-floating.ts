@@ -34,7 +34,7 @@ const validated = new Map<string, ResolutionZone>([["UTC", UTC]]);
 // Clients from the Mozilla/Oracle lineage prefix a real IANA name with a
 // versioned path, e.g. `/mozilla.org/20050126_1/Europe/Berlin`. The trailing
 // `Area/Location` is the zone they mean.
-const PREFIXED_TZID = /^\/[^/]*\/[^/]*\/(?<iana>[^/]+\/[^/]+)$/;
+const PREFIXED_TZID = /^\/[^/]*\/[^/]*\/(?<iana>[^/]+\/[^/]+)$/u;
 
 const isKnownZone = (tzid: string): boolean => {
 	// temporal-polyfill exposes no standalone validator, so project a fixed

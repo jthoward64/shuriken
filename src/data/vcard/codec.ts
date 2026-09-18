@@ -238,7 +238,7 @@ const encodeVCardProperty = (prop: IrProperty): ContentLine => {
 		const tzId = prop.value.value.timeZoneId;
 		const isSelfDescribing =
 			tzId === "UTC" || tzId.startsWith("+") || tzId.startsWith("-");
-		if (!isSelfDescribing && !prop.parameters.some((p) => p.name === "TZID")) {
+		if (!(isSelfDescribing || prop.parameters.some((p) => p.name === "TZID"))) {
 			throw new Error(
 				`Property "${prop.name}" has a non-UTC ZonedDateTime but no TZID parameter`,
 			);

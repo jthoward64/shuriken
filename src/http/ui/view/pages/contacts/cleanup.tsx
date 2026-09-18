@@ -230,7 +230,9 @@ export const ContactsCleanupPage = ({
 								<p class="text-sm text-muted">
 									{suggestionCount} suggestion(s) found.
 								</p>
-								{suggestions.some((s) => !s.needsAreaCode && !s.needsLabel) && (
+								{suggestions.some(
+									(s) => !(s.needsAreaCode || s.needsLabel),
+								) && (
 									<form
 										method="POST"
 										action="/ui/api/contacts/cleanup/fix-all"

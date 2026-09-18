@@ -15,7 +15,10 @@ const toBase64Url = (bytes: Uint8Array): string => {
 	for (const b of bytes) {
 		binary += String.fromCharCode(b);
 	}
-	return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+	return btoa(binary)
+		.replace(/\+/gu, "-")
+		.replace(/\//gu, "_")
+		.replace(/[=]/gu, "");
 };
 
 export const generateSessionToken = (): string => {

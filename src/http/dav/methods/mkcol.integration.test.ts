@@ -154,7 +154,7 @@ describe("MKCALENDAR — Location header", () => {
 			expect(result.failures, result.step.name).toEqual([]);
 		}
 		// The Location must end with the slug that was used in the request
-		expect(results[0]?.headers.location).toMatch(/loc-check\/?$/);
+		expect(results[0]?.headers.location).toMatch(/loc-check\/?$/u);
 	});
 });
 

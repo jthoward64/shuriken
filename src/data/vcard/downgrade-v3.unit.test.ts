@@ -16,7 +16,7 @@ const down = (text: string): Promise<Array<string>> =>
 		),
 	).then((out) =>
 		out
-			.split(/\r?\n/)
+			.split(/\r?\n/u)
 			.map((l) => l.trim())
 			.filter((l) => l !== ""),
 	);
@@ -222,7 +222,7 @@ describe("downgradeToV3", () => {
 			),
 		);
 		const lines = out
-			.split(/\r?\n/)
+			.split(/\r?\n/u)
 			.map((l) => l.trim())
 			.filter((l) => l !== "");
 		expect(lines[1]).toBe("VERSION:3.0");

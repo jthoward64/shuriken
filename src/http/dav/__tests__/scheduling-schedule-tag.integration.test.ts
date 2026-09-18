@@ -63,7 +63,7 @@ const PROPFIND_SCHEDULE_TAG = [
  */
 const firstIcsHref = (body: string): string | undefined => {
 	const href = body.match(
-		/<[A-Za-z]*:?href>([^<]*\.ics)<\/[A-Za-z]*:?href>/,
+		/<[A-Za-z]*:?href>([^<]*\.ics)<\/[A-Za-z]*:?href>/u,
 	)?.[1];
 	if (href === undefined) {
 		return undefined;
@@ -74,10 +74,10 @@ const firstIcsHref = (body: string): string | undefined => {
 /** Flip bob's ATTENDEE PARTSTAT to ACCEPTED, leaving everything else intact. */
 const acceptAsBob = (body: string): string =>
 	body
-		.split(/\r?\n/)
+		.split(/\r?\n/u)
 		.map((line) =>
 			line.includes("bob@example.com") && line.includes("PARTSTAT=")
-				? line.replace(/PARTSTAT=[A-Z-]+/, "PARTSTAT=ACCEPTED")
+				? line.replace(/PARTSTAT=[A-Z-]+/u, "PARTSTAT=ACCEPTED")
 				: line,
 		)
 		.join("\r\n");
@@ -207,8 +207,8 @@ describe("Schedule-Tag stability on attendee PARTSTAT update (RFC 6638 §3.2.10)
 		// The organizer's copy must now carry bob's accepted status (RFC 6638 §4.2).
 		// Unfold iCalendar continuation lines (RFC 5545 §3.1) before matching.
 		const bobLine = organizerCopy
-			.replace(/\r?\n[ \t]/g, "")
-			.split(/\r?\n/)
+			.replace(/\r?\n[ \t]/gu, "")
+			.split(/\r?\n/u)
 			.find((l) => l.includes("bob@example.com"));
 		expect(bobLine, "organizer copy should still list bob").toBeTruthy();
 		expect(bobLine).toContain("PARTSTAT=ACCEPTED");
@@ -282,11 +282,11 @@ describe("Schedule-Tag stability on attendee PARTSTAT update (RFC 6638 §3.2.10)
 
 		const tagBefore = results[2]?.headers["schedule-tag"];
 		const tagAfter = results[4]?.headers["schedule-tag"];
-		const copyAfter = (results[4]?.body ?? "").replace(/\r?\n[ \t]/g, "");
+		const copyAfter = (results[4]?.body ?? "").replace(/\r?\n[ \t]/gu, "");
 
 		// The update must have landed (bob's copy now reflects ACCEPTED)...
 		const bobLine = copyAfter
-			.split(/\r?\n/)
+			.split(/\r?\n/u)
 			.find((l) => l.includes("bob@example.com"));
 		expect(bobLine).toContain("PARTSTAT=ACCEPTED");
 		// ...but a PARTSTAT-only update must NOT change the Schedule-Tag.

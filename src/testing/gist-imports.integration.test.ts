@@ -55,9 +55,9 @@ describe("Real-world gist .ics import (all 3 modes)", () => {
 	for (const file of icsFiles) {
 		const path = resolve(FIXTURES_DIR, file);
 		const body = readFileSync(path, "utf8");
-		const expectedEvents = (body.match(/^BEGIN:VEVENT/gm) ?? []).length;
+		const expectedEvents = (body.match(/^BEGIN:VEVENT/gmu) ?? []).length;
 		const uniqueUids = new Set(
-			(body.match(/^UID:.+$/gm) ?? []).map((l) => l.slice(4).trim()),
+			(body.match(/^UID:.+$/gmu) ?? []).map((l) => l.slice(4).trim()),
 		).size;
 
 		it(`${file} (${expectedEvents} VEVENTs, ${uniqueUids} unique UIDs)`, async () => {
@@ -95,12 +95,12 @@ describe("Real-world gist .ics import (all 3 modes)", () => {
 					exportCalendarToIcs(calendarId),
 				);
 				const exportedUids = new Set(
-					(exported.match(/^UID:.+$/gm) ?? []).map((l) => l.slice(4).trim()),
+					(exported.match(/^UID:.+$/gmu) ?? []).map((l) => l.slice(4).trim()),
 				);
 				expect(exportedUids.size).toBe(uniqueUids);
 
-				const sourceTzids = (body.match(/TZID=[^:;]+/g) ?? []).length;
-				const exportedTzids = (exported.match(/TZID=[^:;]+/g) ?? []).length;
+				const sourceTzids = (body.match(/TZID=[^:;]+/gu) ?? []).length;
+				const exportedTzids = (exported.match(/TZID=[^:;]+/gu) ?? []).length;
 				if (sourceTzids > 0) {
 					expect(exportedTzids).toBeGreaterThanOrEqual(sourceTzids);
 				}
@@ -115,9 +115,9 @@ describe("Real-world gist .vcf import (all 3 modes)", () => {
 	for (const file of vcfFiles) {
 		const path = resolve(FIXTURES_DIR, file);
 		const body = readFileSync(path, "utf8");
-		const expectedCards = (body.match(/^BEGIN:VCARD/gm) ?? []).length;
+		const expectedCards = (body.match(/^BEGIN:VCARD/gmu) ?? []).length;
 		const stableUidCount = new Set(
-			(body.match(/^UID:.+$/gm) ?? []).map((l) => l.slice(4).trim()),
+			(body.match(/^UID:.+$/gmu) ?? []).map((l) => l.slice(4).trim()),
 		).size;
 		const uidlessCards = expectedCards - stableUidCount;
 
@@ -159,7 +159,7 @@ describe("Real-world gist .vcf import (all 3 modes)", () => {
 				const exported = await runtime.runPromise(
 					exportAddressBookToVcf(bookId),
 				);
-				const exportedCards = (exported.match(/^BEGIN:VCARD/gm) ?? []).length;
+				const exportedCards = (exported.match(/^BEGIN:VCARD/gmu) ?? []).length;
 				expect(exportedCards).toBe(expectedCards);
 			} finally {
 				await runtime.dispose();

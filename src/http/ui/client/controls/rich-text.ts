@@ -51,7 +51,7 @@ const ALLOWED_ATTRS: Readonly<Record<string, ReadonlyArray<string>>> = {
 	A: ["href", "title"],
 };
 
-const SAFE_SCHEME = /^(https?:|mailto:|tel:)/i;
+const SAFE_SCHEME = /^(https?:|mailto:|tel:)/iu;
 
 const rename = (el: Element, tag: string): Element => {
 	const replacement = document.createElement(tag);
@@ -166,7 +166,7 @@ const initEditor = (root: HTMLElement): void => {
 	const plainField = one<HTMLInputElement>(root, "[data-rich-plain]");
 	const fallback = one<HTMLTextAreaElement>(root, "[data-rich-fallback]");
 	const toolbar = one<HTMLElement>(root, "[data-rich-toolbar]");
-	if (!surface || !htmlField || !plainField || !fallback) {
+	if (!(surface && htmlField && plainField && fallback)) {
 		return;
 	}
 
@@ -189,8 +189,9 @@ const initEditor = (root: HTMLElement): void => {
 
 	const refreshToolbar = (): void => {
 		if (
-			!toolbar ||
-			!surface.contains(document.getSelection()?.anchorNode ?? null)
+			!(
+				toolbar && surface.contains(document.getSelection()?.anchorNode ?? null)
+			)
 		) {
 			return;
 		}

@@ -22,7 +22,7 @@
 
 /** Return true if the text contains a VERSION:2.1 line (case-insensitive). */
 export const isVCard21 = (text: string): boolean =>
-	/(?:^|\r?\n)VERSION:2\.1(?:\r?\n|$)/i.test(text);
+	/(?:^|\r?\n)VERSION:2\.1(?:\r?\n|$)/iu.test(text);
 
 // ---------------------------------------------------------------------------
 // QUOTED-PRINTABLE decoding
@@ -34,9 +34,9 @@ export const isVCard21 = (text: string): boolean =>
  */
 const decodeQp = (raw: string): string => {
 	// Remove soft line breaks (= at end of line)
-	const joined = raw.replace(/=\r?\n/g, "");
+	const joined = raw.replace(/[=]\r?\n/gu, "");
 	// Decode =XX hex pairs
-	return joined.replace(/=([0-9A-Fa-f]{2})/g, (_, hex: string) =>
+	return joined.replace(/[=]([0-9A-Fa-f]{2})/gu, (_, hex: string) =>
 		String.fromCodePoint(Number.parseInt(hex, 16)),
 	);
 };
@@ -118,7 +118,7 @@ const joinQpLines = (lines: Array<string>): Array<string> => {
 		// before the first unquoted colon.
 		const colonIdx = line.indexOf(":");
 		const paramPart = colonIdx !== -1 ? line.slice(0, colonIdx) : line;
-		const isQp = /ENCODING\s*=\s*(QUOTED-PRINTABLE|QP)/i.test(paramPart);
+		const isQp = /ENCODING\s*=\s*(QUOTED-PRINTABLE|QP)/iu.test(paramPart);
 
 		if (isQp) {
 			// Consume continuation lines while the current accumulated line ends with =
@@ -212,7 +212,7 @@ const normalizeLine = (line: string): string => {
  */
 export const normalizeVCard21 = (text: string): string => {
 	// Split preserving CRLF vs LF structure (we'll rejoin with CRLF)
-	const lines = text.split(/\r?\n/);
+	const lines = text.split(/\r?\n/u);
 	const qpJoined = joinQpLines(lines);
 	const normalized = qpJoined.map(normalizeLine);
 	return normalized.join("\r\n");

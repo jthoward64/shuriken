@@ -98,7 +98,7 @@ describe("Contacts CRUD (integration)", () => {
 			);
 			expect(propfindRes.status).toBe(207);
 			const body1 = await propfindRes.text();
-			expect((body1.match(/<D:response>/g) ?? []).length).toBe(2);
+			expect((body1.match(/<D:response>/gu) ?? []).length).toBe(2);
 
 			// 3. Update — change FN + add second email.
 			const updated = await runtime.runPromise(
@@ -154,7 +154,7 @@ describe("Contacts CRUD (integration)", () => {
 				),
 			);
 			const body2 = await propfindAfter.text();
-			expect((body2.match(/<D:response>/g) ?? []).length).toBe(1);
+			expect((body2.match(/<D:response>/gu) ?? []).length).toBe(1);
 
 			// Sentinel — unused-var guard.
 			expect(aliceId).toBeTruthy();

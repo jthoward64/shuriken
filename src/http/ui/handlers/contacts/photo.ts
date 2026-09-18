@@ -56,8 +56,8 @@ const photoValue = (vcard: IrComponent): Option.Option<string> => {
 const normalizeEtag = (raw: string): string =>
 	raw
 		.trim()
-		.replace(/^W\//, "")
-		.replace(/^"(.*)"$/, "$1");
+		.replace(/^W\//u, "")
+		.replace(/^"(.*)"$/u, "$1");
 
 /** True if `ifNoneMatch` (an If-None-Match header) matches `etag`. */
 const etagMatches = (ifNoneMatch: string | null, etag: string): boolean => {
@@ -84,7 +84,7 @@ interface DecodedPhoto {
  * that aren't a well-formed data URI (e.g. remote URLs, handled separately).
  */
 const decodeDataUri = (value: string): Option.Option<DecodedPhoto> => {
-	const match = /^data:([^;,]*)(;base64)?,(.*)$/s.exec(value);
+	const match = /^data:([^;,]*)(;base64)?,(.*)$/su.exec(value);
 	if (match === null) {
 		return Option.none();
 	}
@@ -156,7 +156,7 @@ export const contactsPhotoHandler = (
 		const value = photo.value;
 
 		// Remote URL: redirect the browser to fetch it directly.
-		if (/^https?:\/\//i.test(value)) {
+		if (/^https?:\/\//iu.test(value)) {
 			return new Response(null, {
 				status: HTTP_FOUND,
 				headers: {

@@ -203,7 +203,7 @@ const parseTimeRange = (
 		typeof obj["@_end"] === "string"
 			? tryParseInstant(obj["@_end"])
 			: undefined;
-	if (!start && !end) {
+	if (!(start || end)) {
 		return undefined;
 	}
 	return { start, end };

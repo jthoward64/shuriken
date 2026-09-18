@@ -162,7 +162,7 @@ export const contactsListHandler = (
 					fn,
 					subtitle: s.email?.trim() || orgLine,
 					hasPhoto: s.hasPhoto,
-					initial: /[A-Z0-9]/i.test(first) ? first : "?",
+					initial: /[A-Z0-9]/iu.test(first) ? first : "?",
 				};
 			});
 		}

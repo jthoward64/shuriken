@@ -382,7 +382,7 @@ describe("PROPFIND CalDAV/CardDAV discovery properties", () => {
 		// Must appear in a 200 propstat, not a 404 propstat
 		expect(results[0]?.body).toContain("calendar-home-set");
 		expect(results[0]?.body).not.toContain(
-			`<D:status>HTTP/1.1 404 Not Found</D:status>`,
+			"<D:status>HTTP/1.1 404 Not Found</D:status>",
 		);
 		// RFC 4918 §5.2: the home must be a real, addressable collection so that
 		// the universal `MKCALENDAR <home>/<name>/` convention works. It points at
@@ -408,7 +408,7 @@ describe("PROPFIND CalDAV/CardDAV discovery properties", () => {
 		}
 		expect(results[0]?.body).toContain("addressbook-home-set");
 		expect(results[0]?.body).not.toContain(
-			`<D:status>HTTP/1.1 404 Not Found</D:status>`,
+			"<D:status>HTTP/1.1 404 Not Found</D:status>",
 		);
 		// Points at the `/card/` namespace level (see calendar-home-set above).
 		expect(results[0]?.body).toContain("/dav/principals/test/card/");
@@ -436,7 +436,7 @@ describe("PROPFIND CalDAV/CardDAV discovery properties", () => {
 		}
 		expect(results[0]?.body).toContain("current-user-principal");
 		expect(results[0]?.body).not.toContain(
-			`<D:status>HTTP/1.1 404 Not Found</D:status>`,
+			"<D:status>HTTP/1.1 404 Not Found</D:status>",
 		);
 	});
 
@@ -465,7 +465,7 @@ describe("PROPFIND CalDAV/CardDAV discovery properties", () => {
 		expect(body).toContain("current-user-privilege-set");
 		expect(body).toContain("<D:privilege>");
 		// ...and no requested property may land in a 404 propstat.
-		expect(body).not.toContain(`<D:status>HTTP/1.1 404 Not Found</D:status>`);
+		expect(body).not.toContain("<D:status>HTTP/1.1 404 Not Found</D:status>");
 	});
 });
 

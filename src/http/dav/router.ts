@@ -175,7 +175,7 @@ export const parseDavPath = (
 	| CollectionRepository
 	| InstanceRepository
 > => {
-	const path = url.pathname.replace(/\/$/, ""); // strip trailing slash
+	const path = url.pathname.replace(/\/$/u, ""); // strip trailing slash
 
 	if (path === "/.well-known/caldav") {
 		return Effect.succeed({ kind: "wellknown", name: "caldav" });
@@ -554,7 +554,7 @@ export const davRouter = (
 
 		// RFC 6764 §5: /.well-known/{cal,card}dav redirects are public — no auth.
 		// They are pure service-discovery and never expose principal-level data.
-		const pathname = ctx.url.pathname.replace(/\/$/, "");
+		const pathname = ctx.url.pathname.replace(/\/$/u, "");
 		const isWellKnown =
 			pathname === "/.well-known/caldav" || pathname === "/.well-known/carddav";
 

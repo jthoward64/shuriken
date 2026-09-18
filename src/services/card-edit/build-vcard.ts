@@ -117,7 +117,7 @@ export const addressJoined = (addr: ContactAddress): string =>
 	].join(";");
 
 export const isBlankAddress = (addr: ContactAddress): boolean =>
-	addressJoined(addr).replace(/;/g, "") === "";
+	addressJoined(addr).replace(/;/gu, "") === "";
 
 export const adrProp = (addr: ContactAddress): IrProperty => ({
 	name: "ADR",
@@ -134,7 +134,7 @@ export const bdayValue = (raw: string): IrValue | null => {
 	if (!raw) {
 		return null;
 	}
-	const yearless = raw.match(/^--(\d{2})-?(\d{2})$/);
+	const yearless = raw.match(/^--(\d{2})-?(\d{2})$/u);
 	if (yearless) {
 		return { type: "TEXT", value: `--${yearless[1]}${yearless[2]}` };
 	}

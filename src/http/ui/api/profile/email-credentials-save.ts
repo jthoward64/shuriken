@@ -23,7 +23,7 @@ import { EmailCredentialService } from "#src/services/email-credential/service.t
 const ALLOWED_SECURITY = new Set<SmtpSecurity>(["none", "starttls", "tls"]);
 
 const PORT_MIN = 1;
-const PORT_MAX = 65535;
+const PORT_MAX = 65_535;
 
 export const emailCredentialsSaveHandler = (
 	req: Request,

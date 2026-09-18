@@ -36,7 +36,7 @@ export const runDbQuery = <A>(
 		const activeDb = yield* getActiveDb(db);
 		const builder = f(activeDb);
 		const { sql, params } = builder.toSQL();
-		const op = sql.trim().split(/\s+/)[0]?.toLowerCase() ?? "query";
+		const op = sql.trim().split(/\s+/u)[0]?.toLowerCase() ?? "query";
 		return yield* Effect.withSpan(`db.${op}`, {
 			attributes: { "db.statement": sql, "db.system": "postgresql" },
 		})(

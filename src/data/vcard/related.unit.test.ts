@@ -10,8 +10,8 @@ const vcard = (...ls: Array<string>) => `${ls.join("\r\n")}\r\n`;
 /** Unfold first — a preserved label easily pushes RELATED past the fold width. */
 const lines = (out: string): Array<string> =>
 	out
-		.replace(/\r?\n[ \t]/g, "")
-		.split(/\r?\n/)
+		.replace(/\r?\n[ \t]/gu, "")
+		.split(/\r?\n/u)
 		.map((l) => l.trim())
 		.filter((l) => l !== "");
 
@@ -39,7 +39,7 @@ const relatedOf = (ls: Array<string>): string =>
 	ls.find((l) => l.startsWith("RELATED")) ?? "";
 
 const abOf = (ls: Array<string>): Array<string> =>
-	ls.filter((l) => /^item\d+\./.test(l));
+	ls.filter((l) => /^item\d+\./u.test(l));
 
 /** An Apple 3.0 card carrying one related name with the given label. */
 const appleCard = (label: string, name = "Joshua Tag Howard") =>
@@ -211,7 +211,7 @@ describe("X-ABRELATEDNAMES ↔ RELATED", () => {
 					await upRaw(
 						vcard("BEGIN:VCARD", "VERSION:3.0", "FN:Meghan", line, "END:VCARD"),
 					)
-				).replace(/^$/, ""),
+				).replace(/^$/u, ""),
 			);
 			expect(back).toContain(source);
 			expect(back.some((l) => l.startsWith("item"))).toBe(false);

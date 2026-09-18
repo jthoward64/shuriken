@@ -36,7 +36,7 @@ const buildTransport = (creds: ResolvedSmtpCreds) =>
 
 const fromHeader = (creds: ResolvedSmtpCreds): string =>
 	creds.fromName !== null && creds.fromName !== ""
-		? `"${creds.fromName.replace(/"/g, '\\"')}" <${creds.fromAddress}>`
+		? `"${creds.fromName.replace(/"/gu, '\\"')}" <${creds.fromAddress}>`
 		: creds.fromAddress;
 
 const headersFor = (

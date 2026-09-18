@@ -115,8 +115,8 @@ export const richTextToPlainText = (
 // count as content or every untouched form would store an empty rich value
 const isBlankHtml = (html: string): boolean =>
 	html
-		.replace(/<[^>]*>/g, "")
-		.replace(/&nbsp;/g, " ")
+		.replace(/<[^>]*>/gu, "")
+		.replace(/&nbsp;/gu, " ")
 		.trim() === "";
 
 /**

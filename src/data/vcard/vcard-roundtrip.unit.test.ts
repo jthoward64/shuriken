@@ -28,7 +28,7 @@ const down = async (t: string): Promise<string> =>
 
 const toLines = (s: string): Array<string> =>
 	s
-		.split(/\r?\n/)
+		.split(/\r?\n/u)
 		.map((l) => l.trim())
 		.filter((l) => l !== "");
 
@@ -140,7 +140,7 @@ describe("upgradeToV4 — adversarial preference handling", () => {
 				"END:VCARD",
 			),
 		);
-		expect(line.match(/PREF=/g)?.length).toBe(1);
+		expect(line.match(/PREF=/gu)?.length).toBe(1);
 		// an explicit numeric PREF is kept, not clobbered to 1
 		expect(line).toContain("PREF=2");
 	});

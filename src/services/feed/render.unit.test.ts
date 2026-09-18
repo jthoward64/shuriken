@@ -258,7 +258,7 @@ describe("renderFeed", () => {
 				["ent2", tree2],
 			]),
 		);
-		const tzidMatches = ics.match(/TZID:America\/New_York/g) ?? [];
+		const tzidMatches = ics.match(/TZID:America\/New_York/gu) ?? [];
 		expect(tzidMatches.length).toBe(1);
 	});
 });

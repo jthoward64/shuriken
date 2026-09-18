@@ -39,4 +39,4 @@ export const nthPropIndex = (
 };
 
 /** Digits only, dropping formatting, spaces, and punctuation. */
-export const digitsOf = (s: string): string => s.replace(/\D/g, "");
+export const digitsOf = (s: string): string => s.replace(/\D/gu, "");

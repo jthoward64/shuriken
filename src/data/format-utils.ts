@@ -10,7 +10,7 @@ import type { IrParameter, IrValue } from "./ir.ts";
 // ---------------------------------------------------------------------------
 
 export const unescapeText = (raw: string): string =>
-	raw.replace(/\\(\\|,|;|[nN])/g, (_, ch: string) => {
+	raw.replace(/\\(\\|,|;|[nN])/gu, (_, ch: string) => {
 		if (ch === "n" || ch === "N") {
 			return "\n";
 		}
@@ -19,10 +19,10 @@ export const unescapeText = (raw: string): string =>
 
 export const escapeText = (value: string): string =>
 	value
-		.replace(/\\/g, "\\\\")
-		.replace(/,/g, "\\,")
-		.replace(/;/g, "\\;")
-		.replace(/\n/g, "\\n");
+		.replace(/\\/gu, "\\\\")
+		.replace(/,/gu, "\\,")
+		.replace(/;/gu, "\\;")
+		.replace(/\n/gu, "\\n");
 
 /**
  * Escape a vCard structured-value FIELD (RFC 6350 §3.4). Field separators
@@ -35,7 +35,7 @@ export const escapeText = (value: string): string =>
  * fully escaped before being joined with literal commas.
  */
 export const escapeStructuredField = (value: string): string =>
-	value.replace(/\\/g, "\\\\").replace(/\n/g, "\\n");
+	value.replace(/\\/gu, "\\\\").replace(/\n/gu, "\\n");
 
 /**
  * Split a structured vCard value on unescaped `;` separators (RFC 6350 §3.4),
@@ -114,7 +114,7 @@ const pad2 = (n: number): string => String(n).padStart(2, "0");
 const pad4 = (n: number): string => String(n).padStart(4, "0");
 
 // Regex for basic-format date "YYYYMMDD" or extended "YYYY-MM-DD"
-const PLAIN_DATE_RE = /^(\d{4})-?(\d{2})-?(\d{2})$/;
+const PLAIN_DATE_RE = /^(\d{4})-?(\d{2})-?(\d{2})$/u;
 
 /**
  * Parse "YYYYMMDD" or "YYYY-MM-DD" → Temporal.PlainDate.
@@ -138,7 +138,7 @@ export const parsePlainDate = (raw: string): Temporal.PlainDate => {
 // Groups: 1=year, 2=month, 3=day, 4=hour, 5=minute, 6=second,
 //         7=suffix: "Z", "+HH:?MM", or "-HH:?MM" (optional — absent means floating)
 const DATE_TIME_RE =
-	/^(\d{4})-?(\d{2})-?(\d{2})T(\d{2}):?(\d{2}):?(\d{2})(Z|[+-]\d{2}:?\d{2})?$/;
+	/^(\d{4})-?(\d{2})-?(\d{2})T(\d{2}):?(\d{2}):?(\d{2})(Z|[+-]\d{2}:?\d{2})?$/u;
 
 // "+HHMM" has sign + 4 digits = 5 chars; "+HH:MM" has 6 chars (already normalized)
 const OFFSET_NO_COLON_LEN = 5;

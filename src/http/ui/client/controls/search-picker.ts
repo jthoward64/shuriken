@@ -26,7 +26,7 @@ const initPicker = (root: HTMLElement): void => {
 	const listboxEl = one<HTMLUListElement>(root, "[data-search-listbox]");
 	const status = one<HTMLElement>(root, "[data-search-status]");
 	const endpoint = root.dataset.endpoint;
-	if (!input || !listboxEl || endpoint === undefined) {
+	if (!(input && listboxEl) || endpoint === undefined) {
 		return;
 	}
 	const queryParam = root.dataset.queryParam ?? "q";

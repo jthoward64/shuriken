@@ -36,7 +36,7 @@ export const Slug = Brand.nominal<Slug>();
  * new-resource creation; existing rows are not re-validated.
  */
 const SLUG_RE =
-	/^[A-Za-z0-9_-][A-Za-z0-9._-]{0,126}[A-Za-z0-9_-]$|^[A-Za-z0-9_-]$/;
+	/^[A-Za-z0-9_-][A-Za-z0-9._-]{0,126}[A-Za-z0-9_-]$|^[A-Za-z0-9_-]$/u;
 
 export const isValidSlug = (s: string): boolean => SLUG_RE.test(s);
 
@@ -56,7 +56,7 @@ export const isValidSlug = (s: string): boolean => SLUG_RE.test(s);
  * special meaning in a URL path); `/` and control characters are excluded by
  * the character class.
  */
-const INSTANCE_SLUG_RE = /^[A-Za-z0-9._~!$&'()*+,;=:@-]{1,128}$/;
+const INSTANCE_SLUG_RE = /^[A-Za-z0-9._~!$&'()*+,;=:@-]{1,128}$/u;
 
 export const isValidInstanceSlug = (s: string): boolean =>
 	s !== "." && s !== ".." && INSTANCE_SLUG_RE.test(s);

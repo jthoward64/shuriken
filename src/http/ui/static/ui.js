@@ -142,7 +142,7 @@
 	const copyFeedbackMs = 1500;
 	document.addEventListener("click", (e) => {
 		const btn = e.target.closest("[data-copy]");
-		if (!btn || !navigator.clipboard) {
+		if (!(btn && navigator.clipboard)) {
 			return;
 		}
 		navigator.clipboard
@@ -150,7 +150,7 @@
 			.then(() => {
 				const idle = btn.querySelector(".copy-idle");
 				const done = btn.querySelector(".copy-done");
-				if (!idle || !done) {
+				if (!(idle && done)) {
 					return;
 				}
 				idle.hidden = true;

@@ -22,7 +22,7 @@ const NOT_FOUND_RESPONSE = (): Response =>
 	new Response("Not Found", { status: HTTP_NOT_FOUND });
 
 const sanitizeFilename = (raw: string): string =>
-	raw.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "feed";
+	raw.replace(/[^A-Za-z0-9._-]+/gu, "-").replace(/^-+|-+$/gu, "") || "feed";
 
 export const feedHandler = (
 	req: Request,
@@ -41,7 +41,7 @@ export const feedHandler = (
 		}
 
 		// Expect /feed/<token>.ics
-		const match = url.pathname.match(/^\/feed\/([^/]+?)\.ics$/);
+		const match = url.pathname.match(/^\/feed\/([^/]+?)\.ics$/u);
 		if (match === null) {
 			return NOT_FOUND_RESPONSE();
 		}

@@ -117,8 +117,8 @@ const U32_MASK = 0xff_ff_ff_ff;
 const sanitizeSlug = (uid: string): Slug => {
 	// Map any character outside our slug regex into `_`. Keeps the slug
 	// deterministic so subsequent syncs find the same row.
-	const replaced = uid.replace(/[^A-Za-z0-9._-]/g, "_");
-	const trimmed = replaced.replace(/^[.]+|[.]+$/g, "");
+	const replaced = uid.replace(/[^A-Za-z0-9._-]/gu, "_");
+	const trimmed = replaced.replace(/^[.]+|[.]+$/gu, "");
 	const truncated =
 		trimmed.length > SLUG_MAX_BODY ? trimmed.slice(0, SLUG_MAX_BODY) : trimmed;
 	if (truncated.length === 0) {
@@ -161,7 +161,7 @@ const applyClaimMetadata = (
 				: null;
 		const displaynameChanged = row.displayName !== displayname;
 		const colorChanged = currentColor !== color;
-		if (!displaynameChanged && !colorChanged) {
+		if (!(displaynameChanged || colorChanged)) {
 			return;
 		}
 		const nextDead: Record<string, unknown> = { ...currentDead };

@@ -9,7 +9,7 @@ import type { VCardVersion } from "./report/address-data.ts";
 // (server default, 4.0).
 // ---------------------------------------------------------------------------
 
-const stripQuotes = (s: string): string => s.replace(/^["']|["']$/g, "");
+const stripQuotes = (s: string): string => s.replace(/^["']|["']$/gu, "");
 
 export const parseAcceptVCardVersion = (
 	accept: string | null,

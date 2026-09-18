@@ -10,8 +10,8 @@ const vcard = (...lines: Array<string>) => `${lines.join("\r\n")}\r\n`;
 // Unfold before splitting: a base64 photo is always folded across many lines.
 const lines = (out: string): Array<string> =>
 	out
-		.replace(/\r?\n[ \t]/g, "")
-		.split(/\r?\n/)
+		.replace(/\r?\n[ \t]/gu, "")
+		.split(/\r?\n/u)
 		.map((l) => l.trim())
 		.filter((l) => l !== "");
 

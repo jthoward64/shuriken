@@ -74,7 +74,7 @@ export const aclSetTierHandler = (
 				status: 400,
 			});
 		}
-		if (!principalSlug && !targetPrincipalIdRaw) {
+		if (!(principalSlug || targetPrincipalIdRaw)) {
 			return new Response("Missing principalSlug or principalId", {
 				status: 400,
 			});

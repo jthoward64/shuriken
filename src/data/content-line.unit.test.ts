@@ -170,7 +170,7 @@ describe("ContentLinesCodec encode", () => {
 		expect(text).not.toContain("\n\n");
 		expect(text.endsWith("\r\n")).toBe(true);
 		// No bare \n
-		expect(text.replace(/\r\n/g, "")).not.toContain("\n");
+		expect(text.replace(/\r\n/gu, "")).not.toContain("\n");
 	});
 
 	it("appends a trailing CRLF", async () => {

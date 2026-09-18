@@ -41,7 +41,7 @@ const foldText = (text: string, collation: CardCollation): string => {
 
 /** Build a SQL LIKE pattern based on the match type. */
 const likePattern = (foldedText: string, matchType: CardMatchType): string => {
-	const escaped = foldedText.replace(/[%_\\]/g, (c) => `\\${c}`);
+	const escaped = foldedText.replace(/[%_\\]/gu, (c) => `\\${c}`);
 	switch (matchType) {
 		case "equals":
 			return foldedText;

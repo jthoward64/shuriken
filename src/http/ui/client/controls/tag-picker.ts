@@ -43,7 +43,7 @@ const chip = (tag: string): HTMLLIElement => {
 const initPicker = (root: HTMLElement): void => {
 	const valueInput = one<HTMLInputElement>(root, "[data-tag-value]");
 	const list = one<HTMLUListElement>(root, "[data-tag-list]");
-	if (!valueInput || !list) {
+	if (!(valueInput && list)) {
 		return;
 	}
 	const addSelect = one<HTMLSelectElement>(root, "[data-tag-add]");

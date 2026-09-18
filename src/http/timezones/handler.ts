@@ -64,7 +64,7 @@ const handleCapabilities = (origin: string): Effect.Effect<Response, never> =>
  * Returns null if not present.
  */
 const extractLastModified = (vtimezone: string): string | null => {
-	const match = /^LAST-MODIFIED:(\S+)/m.exec(vtimezone);
+	const match = /^LAST-MODIFIED:(\S+)/mu.exec(vtimezone);
 	return match?.[1] ?? null;
 };
 

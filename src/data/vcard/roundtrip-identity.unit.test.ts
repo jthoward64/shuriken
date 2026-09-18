@@ -36,7 +36,7 @@ const down = async (t: string): Promise<string> =>
 
 const toLines = (s: string): Array<string> =>
 	s
-		.split(/\r?\n/)
+		.split(/\r?\n/u)
 		.map((l) => l.trim())
 		.filter((l) => l !== "" && l !== "BEGIN:VCARD" && l !== "END:VCARD");
 

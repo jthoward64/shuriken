@@ -107,7 +107,7 @@ describe("buildMultistatus", () => {
 		);
 		expect(xml).toContain("/a/");
 		expect(xml).toContain("/b/");
-		const matches = xml.match(/<[A-Z]+:response/g);
+		const matches = xml.match(/<[A-Z]+:response/gu);
 		expect(matches?.length).toBeGreaterThanOrEqual(2);
 	});
 
@@ -153,7 +153,7 @@ describe("buildMultistatus", () => {
 			]),
 		);
 		// xmlns:D appears exactly once
-		const count = (xml.match(/xmlns:D=/g) ?? []).length;
+		const count = (xml.match(/xmlns:D=/gu) ?? []).length;
 		expect(count).toBe(1);
 	});
 

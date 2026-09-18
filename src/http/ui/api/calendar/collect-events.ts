@@ -202,7 +202,7 @@ export interface FullCalendarEvent {
 /** ISO local (`YYYY-MM-DD` / `YYYY-MM-DDTHH:mm`) → iCalendar basic form
  * (`YYYYMMDD` / `YYYYMMDDTHHMMSS`). */
 const toICalBasic = (iso: string, allDay: boolean): string => {
-	const compact = iso.replace(/[-:]/g, "");
+	const compact = iso.replace(/[-:]/gu, "");
 	return allDay ? compact : `${compact}00`;
 };
 

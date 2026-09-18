@@ -206,7 +206,7 @@ export const getHandler = (
 		if (ifNoneMatch !== null) {
 			// Weak comparison: strip quotes and W/ prefix before comparing.
 			const normalize = (tag: string): string =>
-				tag.trim().replace(/^W\//, "").replace(/^"|"$/g, "");
+				tag.trim().replace(/^W\//u, "").replace(/^"|"$/gu, "");
 			const serverTag = normalize(instance.etag);
 			const clientTags = ifNoneMatch
 				.split(",")

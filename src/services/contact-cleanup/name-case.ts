@@ -30,7 +30,7 @@ const PARTICLES = new Set([
 	"e",
 ]);
 
-const ROMAN = /^(?:i{1,3}|iv|v|vi{1,3}|ix|x)$/;
+const ROMAN = /^(?:i{1,3}|iv|v|vi{1,3}|ix|x)$/u;
 const SUFFIXES = new Set(["jr", "sr"]);
 
 // "mc"/"mac" prefix handling only kicks in past these stem lengths.

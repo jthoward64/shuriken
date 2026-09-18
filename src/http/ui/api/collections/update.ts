@@ -60,7 +60,7 @@ export const collectionsUpdateHandler = (
 			usersPrivs.includes("DAV:write-properties") ||
 			groupsPrivs.includes("DAV:write-properties");
 
-		if (!collPrivs.includes("DAV:write-properties") && !isAdmin) {
+		if (!(collPrivs.includes("DAV:write-properties") || isAdmin)) {
 			yield* acl.check(
 				principal.principalId,
 				collection.id as CollectionId,

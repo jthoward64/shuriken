@@ -27,7 +27,7 @@ export const parseSlug = (
 	if (!v) {
 		return fail(field, "Slug is required");
 	}
-	if (!/^[a-z0-9-]+$/.test(v)) {
+	if (!/^[a-z0-9-]+$/u.test(v)) {
 		return fail(
 			field,
 			"Slug may only contain lowercase letters, digits, and hyphens",
@@ -74,7 +74,7 @@ export const parseNameList = (
 		Array.from(
 			new Set(
 				(value ?? "")
-					.split(/[,\n]/)
+					.split(/[,\n]/u)
 					.map((v) => v.trim())
 					.filter((v) => v.length > 0),
 			),

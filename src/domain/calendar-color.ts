@@ -59,7 +59,7 @@ export const defaultCalendarColor = (id: string): string => {
  * id. Mirrors PROPFIND so the web UI and DAV clients agree.
  */
 // `#RRGGBB` or `#RRGGBBAA`.
-const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/;
+const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/u;
 // Length of a `#RRGGBB` string — used to trim an Apple `#RRGGBBAA` value.
 const CSS_HEX_LENGTH = 7;
 
@@ -84,7 +84,7 @@ export const toCssHex = (appleColor: string): string =>
  * clear the property.
  */
 export const fromCssHex = (value: string): string | undefined => {
-	if (!/^#[0-9a-fA-F]{6}$/.test(value)) {
+	if (!/^#[0-9a-fA-F]{6}$/u.test(value)) {
 		return undefined;
 	}
 	return `${value.toUpperCase()}FF`;

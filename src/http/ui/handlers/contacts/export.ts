@@ -21,7 +21,7 @@ import type { InstanceRepository } from "#src/services/instance/repository.ts";
 // ---------------------------------------------------------------------------
 
 const sanitize = (raw: string): string =>
-	raw.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "contacts";
+	raw.replace(/[^A-Za-z0-9._-]+/gu, "-").replace(/^-+|-+$/gu, "") || "contacts";
 
 export const contactsExportHandler = (
 	_req: Request,

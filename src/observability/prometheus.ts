@@ -31,15 +31,15 @@ export const PROMETHEUS_CONTENT_TYPE = `text/plain; version=${PROMETHEUS_VERSION
 
 /** Coerce an Effect metric id into a valid Prometheus metric name. */
 const sanitizeMetricName = (name: string): string =>
-	name.replace(/[^a-zA-Z0-9_:]/g, "_");
+	name.replace(/[^a-zA-Z0-9_:]/gu, "_");
 
 /** Coerce an attribute key into a valid Prometheus label name. */
 const sanitizeLabelName = (name: string): string =>
-	name.replace(/[^a-zA-Z0-9_]/g, "_");
+	name.replace(/[^a-zA-Z0-9_]/gu, "_");
 
 /** Escape a label value per the exposition format (backslash, newline, quote). */
 const escapeLabelValue = (value: string): string =>
-	value.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/"/g, '\\"');
+	value.replace(/\\/gu, "\\\\").replace(/\n/gu, "\\n").replace(/"/gu, '\\"');
 
 /** Render a numeric sample value; `+Inf`/`-Inf`/`NaN` use Prometheus spellings. */
 const formatNumber = (value: number | bigint): string => {
@@ -198,7 +198,7 @@ export const encodePrometheus = (
 	const blocks: Array<string> = [];
 	for (const [name, family] of families) {
 		const lines = [
-			`# HELP ${name} ${family.help.replace(/\\/g, "\\\\").replace(/\n/g, "\\n")}`,
+			`# HELP ${name} ${family.help.replace(/\\/gu, "\\\\").replace(/\n/gu, "\\n")}`,
 			`# TYPE ${name} ${family.type}`,
 			...family.samples,
 		];

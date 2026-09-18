@@ -56,9 +56,9 @@ export const profileHandler = (
 			onNone: () => undefined,
 			onSome: (raw) =>
 				raw
-					.replace(/\{email\}/g, encodeURIComponent(user.email))
-					.replace(/\{slug\}/g, encodeURIComponent(principalRow.slug))
-					.replace(/\{userId\}/g, encodeURIComponent(user.id)),
+					.replace(/\{email\}/gu, encodeURIComponent(user.email))
+					.replace(/\{slug\}/gu, encodeURIComponent(principalRow.slug))
+					.replace(/\{userId\}/gu, encodeURIComponent(user.id)),
 		});
 		const authSettingsLabel = Option.getOrElse(
 			config.auth.authSettingsLabel,

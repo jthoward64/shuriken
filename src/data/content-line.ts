@@ -5,14 +5,14 @@ import { Effect, Option, Schema, SchemaGetter, SchemaIssue } from "effect";
 // ---------------------------------------------------------------------------
 
 const Utf8Max1Byte = 0x80; // code points < 0x80 encode as 1 byte
-const Utf8Max2Byte = 0x800; // code points < 0x800 encode as 2 bytes
-const Utf8Max3Byte = 0x10000; // code points < 0x10000 encode as 3 bytes
+const Utf8Max2Byte = 0x8_00; // code points < 0x800 encode as 2 bytes
+const Utf8Max3Byte = 0x1_00_00; // code points < 0x10000 encode as 3 bytes
 const Utf8Width1 = 1;
 const Utf8Width2 = 2;
 const Utf8Width3 = 3;
 const Utf8Width4 = 4;
 // Smallest code point that requires a surrogate pair in UTF-16 (U+10000)
-const SurrogatePairMin = 0x10000;
+const SurrogatePairMin = 0x1_00_00;
 
 // ---------------------------------------------------------------------------
 // ContentLine — a single logical RFC 5545 / RFC 6350 content line
@@ -61,7 +61,7 @@ const stripQuotes = (v: string): string =>
  *   `^^` → `^`    `^'` → `"`    `^n` / `^N` → newline
  */
 const decodeParamValue = (v: string): string =>
-	v.replace(/\^(\^|'|n|N)/g, (_, ch: string) => {
+	v.replace(/\^(\^|'|n|N)/gu, (_, ch: string) => {
 		if (ch === "'") {
 			return '"';
 		}
@@ -77,10 +77,10 @@ const decodeParamValue = (v: string): string =>
  * Applied before quoting so the encoded value never contains bare `"`.
  */
 const encodeParamValue = (v: string): string =>
-	v.replace(/\^/g, "^^").replace(/\n/g, "^n").replace(/"/g, "^'");
+	v.replace(/\^/gu, "^^").replace(/\n/gu, "^n").replace(/"/gu, "^'");
 
 /** Return true if a parameter value requires quoting (contains ; : or ,). */
-const needsQuoting = (v: string): boolean => /[;:,]/.test(v);
+const needsQuoting = (v: string): boolean => /[;:,]/u.test(v);
 
 /**
  * Serialize a single parameter value.
@@ -88,7 +88,7 @@ const needsQuoting = (v: string): boolean => /[;:,]/.test(v);
  * falls back to double-quoting for values that contain only `;`, `:`, or `,`.
  */
 const serializeParamValue = (v: string): string => {
-	if (/[\^"\n]/.test(v)) {
+	if (/[\^"\n]/u.test(v)) {
 		// RFC 6868 encoding required; still quote if ; : , are also present
 		const encoded = encodeParamValue(v);
 		return needsQuoting(encoded) ? `"${encoded}"` : encoded;
@@ -172,9 +172,9 @@ const foldLogicalLine = (line: string): string => {
  */
 const splitAndUnfold = (text: string): Array<string> => {
 	// Normalize to CRLF
-	const crlf = text.replace(/\r\n|\r|\n/g, "\r\n");
+	const crlf = text.replace(/\r\n|\r|\n/gu, "\r\n");
 	// Unfold: remove CRLF followed by a single SPACE or TAB
-	const unfolded = crlf.replace(/\r\n[ \t]/g, "");
+	const unfolded = crlf.replace(/\r\n[ \t]/gu, "");
 	return unfolded.split("\r\n").filter((l) => l.length > 0);
 };
 

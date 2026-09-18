@@ -80,7 +80,7 @@ const syncFutureToken = `<?xml version="1.0" encoding="utf-8"?>
 
 // Helper to extract sync-token value from a multistatus XML body
 const extractSyncToken = (body: string): string => {
-	const match = body.match(/urn:ietf:params:xml:ns:sync:\d+/);
+	const match = body.match(/urn:ietf:params:xml:ns:sync:\d+/u);
 	return match?.[0] ?? "";
 };
 
@@ -147,7 +147,7 @@ describe("sync-collection REPORT — initial sync", () => {
 		}
 		// Both instances should appear as separate <D:href> entries
 		const syncBody = results[3]?.body ?? "";
-		const hrefCount = (syncBody.match(/<D:href>/g) ?? []).length;
+		const hrefCount = (syncBody.match(/<D:href>/gu) ?? []).length;
 		expect(hrefCount).toBe(2);
 	});
 });
@@ -253,7 +253,7 @@ describe("sync-collection REPORT — delta sync", () => {
 		}
 		// Delta response should contain exactly 1 href (event3 only)
 		const deltaBody = results[5]?.body ?? "";
-		const hrefCount = (deltaBody.match(/<D:href>/g) ?? []).length;
+		const hrefCount = (deltaBody.match(/<D:href>/gu) ?? []).length;
 		expect(hrefCount).toBe(1);
 	});
 });
@@ -419,7 +419,7 @@ describe("sync-collection REPORT — addressbook", () => {
 			expect(result.failures, result.step.name).toEqual([]);
 		}
 		const syncBody = results[2]?.body ?? "";
-		const hrefCount = (syncBody.match(/<D:href>/g) ?? []).length;
+		const hrefCount = (syncBody.match(/<D:href>/gu) ?? []).length;
 		expect(hrefCount).toBe(2);
 	});
 
@@ -463,7 +463,7 @@ describe("sync-collection REPORT — addressbook", () => {
 			expect(result.failures, result.step.name).toEqual([]);
 		}
 		const deltaBody = results[3]?.body ?? "";
-		const hrefCount = (deltaBody.match(/<D:href>/g) ?? []).length;
+		const hrefCount = (deltaBody.match(/<D:href>/gu) ?? []).length;
 		expect(hrefCount).toBe(1);
 		// sync-collection member hrefs use the resource's slug so the href matches
 		// the URL the client created the object at (the c2 PUT above).

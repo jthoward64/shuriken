@@ -95,7 +95,7 @@ const parseExpandSpec = (el: unknown): ExpandSpec | undefined => {
  * as "no expand range supplied" rather than failing the whole REPORT.
  */
 const parseICalDatetime = (s: string): Temporal.Instant | undefined => {
-	const m = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/.exec(s);
+	const m = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/u.exec(s);
 	if (!m) {
 		return undefined;
 	}

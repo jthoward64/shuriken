@@ -446,11 +446,11 @@ const openEditDialog = (url: string): void => {
 	// don't bubble) delegated + relatedTarget-checked so re-entering the same
 	// trigger doesn't re-fire.
 	document.addEventListener("mouseover", (e: Event) => {
-		if (!(e instanceof MouseEvent) || !(e.target instanceof Element)) {
+		if (!(e instanceof MouseEvent && e.target instanceof Element)) {
 			return;
 		}
 		const trigger = e.target.closest("[data-hover-preview]");
-		if (!(trigger instanceof HTMLElement) || !trigger.dataset.hoverPreview) {
+		if (!(trigger instanceof HTMLElement && trigger.dataset.hoverPreview)) {
 			return;
 		}
 		if (e.relatedTarget instanceof Node && trigger.contains(e.relatedTarget)) {
@@ -459,7 +459,7 @@ const openEditDialog = (url: string): void => {
 		scheduleHoverCardOpen(trigger.dataset.hoverPreview, trigger);
 	});
 	document.addEventListener("mouseout", (e: Event) => {
-		if (!(e instanceof MouseEvent) || !(e.target instanceof Element)) {
+		if (!(e instanceof MouseEvent && e.target instanceof Element)) {
 			return;
 		}
 		const trigger = e.target.closest("[data-hover-preview]");
@@ -822,7 +822,7 @@ const openEditDialog = (url: string): void => {
 		)) {
 			link.addEventListener("click", (e) => {
 				const cal = calendar;
-				if (!cal || !(link instanceof HTMLElement)) {
+				if (!(cal && link instanceof HTMLElement)) {
 					return; // no interactive calendar → let the link navigate
 				}
 				e.preventDefault();

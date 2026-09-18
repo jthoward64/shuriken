@@ -75,7 +75,7 @@ export const embedHandler = (
 		}
 
 		// Expect /embed/<token> or /embed/<token>/events
-		const match = url.pathname.match(/^\/embed\/([^/]+?)(\/events)?$/);
+		const match = url.pathname.match(/^\/embed\/([^/]+?)(\/events)?$/u);
 		if (match === null) {
 			return NOT_FOUND_RESPONSE();
 		}

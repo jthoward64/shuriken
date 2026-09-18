@@ -79,7 +79,7 @@ const downgradeUid = (prop: IrProperty): IrProperty => {
 		...prop,
 		value: {
 			type: "TEXT",
-			value: rawStr(prop.value).replace(/^urn:uuid:/i, ""),
+			value: rawStr(prop.value).replace(/^urn:uuid:/iu, ""),
 		},
 	};
 };
@@ -117,7 +117,7 @@ const stripValueParam = (prop: IrProperty): IrProperty => {
 		return {
 			...prop,
 			parameters: withoutValue,
-			value: { type: "TEXT", value: raw.replace(/^tel:/i, "") },
+			value: { type: "TEXT", value: raw.replace(/^tel:/iu, "") },
 		};
 	}
 	if (isProp(prop, "TZ") && token === "utc-offset") {

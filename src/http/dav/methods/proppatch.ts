@@ -459,7 +459,7 @@ export const proppatchHandler = (
 						: null;
 				const hrefStr = hrefObj ? String(hrefObj[`{${DAV_NS}}href`] ?? "") : "";
 				// Extract the last non-empty path segment as the collection UUID/slug.
-				const segments = hrefStr.replace(/\/$/, "").split("/");
+				const segments = hrefStr.replace(/\/$/u, "").split("/");
 				const lastSeg = segments.at(-1) ?? "";
 				if (isUuid(lastSeg)) {
 					// Look up the collection to validate it exists and belongs to this principal.

@@ -82,8 +82,8 @@ const slugSafe = (raw: string): string =>
 	raw
 		.normalize("NFKD")
 		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, "-")
-		.replace(/^-+|-+$/g, "");
+		.replace(/[^a-z0-9]+/gu, "-")
+		.replace(/^-+|-+$/gu, "");
 
 /** Kebab-case a display name and append a numeric suffix for uniqueness. */
 export const slugify = (name: string, uniqueSuffix: number): string => {

@@ -335,13 +335,13 @@ describe("User flow: sync-collection (RFC 6578)", () => {
 			[
 				put(
 					"/dav/principals/alice/cal/primary/a.ics",
-					SIMPLE_EVENT.replace(/UID:[^@]+@example/, "UID:a@example"),
+					SIMPLE_EVENT.replace(/UID:[^@]+@example/u, "UID:a@example"),
 					"text/calendar",
 					{ as: "alice", expect: { status: 201 } },
 				),
 				put(
 					"/dav/principals/alice/cal/primary/b.ics",
-					SECOND_EVENT.replace(/UID:[^@]+@example/, "UID:b@example"),
+					SECOND_EVENT.replace(/UID:[^@]+@example/u, "UID:b@example"),
 					"text/calendar",
 					{ as: "alice", expect: { status: 201 } },
 				),
@@ -367,8 +367,8 @@ describe("User flow: sync-collection (RFC 6578)", () => {
 				// covered by separate unit tests).
 				put(
 					"/dav/principals/alice/cal/primary/c.ics",
-					SECOND_EVENT.replace(/UID:[^@]+@example/, "UID:c@example").replace(
-						/standup/g,
+					SECOND_EVENT.replace(/UID:[^@]+@example/u, "UID:c@example").replace(
+						/standup/gu,
 						"third",
 					),
 					"text/calendar",
@@ -394,7 +394,7 @@ describe("User flow: sync-collection (RFC 6578)", () => {
 		);
 		expectAllPassed(results);
 		// Three responses (a, b, c) in the calendar-query body.
-		const responses = (results[4]?.body.match(/<D:response>/g) ?? []).length;
+		const responses = (results[4]?.body.match(/<D:response>/gu) ?? []).length;
 		expect(responses).toBe(3);
 	});
 });
@@ -486,13 +486,13 @@ describe("User flow: calendar-multiget", () => {
 			[
 				put(
 					"/dav/principals/alice/cal/primary/m1.ics",
-					SIMPLE_EVENT.replace(/UID:[^@]+@example/, "UID:m1@example"),
+					SIMPLE_EVENT.replace(/UID:[^@]+@example/u, "UID:m1@example"),
 					"text/calendar",
 					{ as: "alice", expect: { status: 201 } },
 				),
 				put(
 					"/dav/principals/alice/cal/primary/m2.ics",
-					SECOND_EVENT.replace(/UID:[^@]+@example/, "UID:m2@example"),
+					SECOND_EVENT.replace(/UID:[^@]+@example/u, "UID:m2@example"),
 					"text/calendar",
 					{ as: "alice", expect: { status: 201 } },
 				),

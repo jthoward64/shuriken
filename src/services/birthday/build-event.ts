@@ -25,14 +25,14 @@ export const BIRTHDAY_UID_SUFFIX = "-birthday";
 const parseBday = (
 	bday: string,
 ): { readonly date: Temporal.PlainDate; readonly yearless: boolean } | null => {
-	if (/^\d{4}-\d{2}-\d{2}$/.test(bday)) {
+	if (/^\d{4}-\d{2}-\d{2}$/u.test(bday)) {
 		try {
 			return { date: Temporal.PlainDate.from(bday), yearless: false };
 		} catch {
 			return null;
 		}
 	}
-	if (/^--\d{2}-\d{2}$/.test(bday)) {
+	if (/^--\d{2}-\d{2}$/u.test(bday)) {
 		try {
 			return {
 				date: Temporal.PlainDate.from(

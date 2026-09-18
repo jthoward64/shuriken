@@ -31,7 +31,7 @@ const APPLE_CARD = [
 
 const lineSet = (s: string): ReadonlyArray<string> =>
 	s
-		.split(/\r?\n/)
+		.split(/\r?\n/u)
 		.map((l) => l.trim())
 		.filter((l) => l !== "")
 		.sort();

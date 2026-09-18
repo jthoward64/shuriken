@@ -62,7 +62,7 @@ export const aclGrantHandler = (
 		const principalSlug = form.get("principalSlug")?.toString()?.trim() ?? "";
 		const privilege = form.get("privilege")?.toString() ?? "";
 
-		if (!principalSlug || !VALID_PRIVILEGES.has(privilege)) {
+		if (!(principalSlug && VALID_PRIVILEGES.has(privilege))) {
 			return new Response("Missing or invalid fields", { status: 400 });
 		}
 

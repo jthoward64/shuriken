@@ -5,7 +5,7 @@ import { generateSessionToken, sha256Hex } from "./token.ts";
 describe("generateSessionToken", () => {
 	it("produces a URL-safe string with no padding", () => {
 		const t = generateSessionToken();
-		expect(t).toMatch(/^[A-Za-z0-9_-]+$/);
+		expect(t).toMatch(/^[A-Za-z0-9_-]+$/u);
 		expect(t).not.toContain("=");
 	});
 
@@ -25,6 +25,6 @@ describe("sha256Hex", () => {
 		const a = await sha256Hex("shuriken");
 		const b = await sha256Hex("shuriken");
 		expect(a).toBe(b);
-		expect(a).toMatch(/^[0-9a-f]{64}$/);
+		expect(a).toMatch(/^[0-9a-f]{64}$/u);
 	});
 });

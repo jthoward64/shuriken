@@ -12,7 +12,7 @@ import { Breadcrumb, PageHeader } from "../components/page-header.tsx";
 // ---------------------------------------------------------------------------
 
 const DEFAULT_SMTP_PORT = 587;
-const MAX_TCP_PORT = 65535;
+const MAX_TCP_PORT = 65_535;
 
 export type ActiveKind = "user" | "profile" | "default" | "disabled";
 

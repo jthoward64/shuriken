@@ -37,7 +37,7 @@ END:VCALENDAR
 
 const extractPairs = (body: string): Array<[string, string]> => {
 	const pairs: Array<[string, string]> = [];
-	const lines = body.split(/\r?\n/);
+	const lines = body.split(/\r?\n/u);
 	let currentUid: string | null = null;
 	let currentSummary: string | null = null;
 	let inVevent = false;

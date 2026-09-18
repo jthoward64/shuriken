@@ -6,7 +6,7 @@
 
 const HEX_BYTE_MASK = 0xff;
 const BYTE_MAX = 255;
-const SRGB_LINEAR_THRESHOLD = 0.03928;
+const SRGB_LINEAR_THRESHOLD = 0.039_28;
 const SRGB_LINEAR_DIVISOR = 12.92;
 const SRGB_GAMMA_OFFSET = 0.055;
 const SRGB_GAMMA_DIVISOR = 1.055;
@@ -28,7 +28,7 @@ const linearizeChannel = (value: number, shift: number): number => {
 };
 
 export function contrastTextColor(hexColor: string): "#000000" | "#ffffff" {
-	const match = /^#?([0-9a-fA-F]{6})$/.exec(hexColor.trim());
+	const match = /^#?([0-9a-fA-F]{6})$/u.exec(hexColor.trim());
 	const hex = match?.[1];
 	if (hex === undefined) {
 		return "#000000";

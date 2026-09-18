@@ -59,7 +59,7 @@ describe("staticHandler", () => {
 	it("sets a strong ETag and Cache-Control on a served file", async () => {
 		const res = await run("/static/vendor/htmx.min.js", oneFileLayer);
 		expect(res.status).toBe(200);
-		expect(res.headers.get("ETag")).toMatch(/^"[0-9a-f]{16}"$/);
+		expect(res.headers.get("ETag")).toMatch(/^"[0-9a-f]{16}"$/u);
 		expect(res.headers.get("Cache-Control")).toBe(
 			"public, max-age=300, must-revalidate",
 		);

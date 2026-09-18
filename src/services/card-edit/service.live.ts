@@ -36,7 +36,7 @@ import type { ContactFormData } from "./types.ts";
 const SLUG_MAX_BODY = 120;
 
 const slugFromUid = (uid: string): Slug => {
-	const safe = uid.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, SLUG_MAX_BODY);
+	const safe = uid.replace(/[^A-Za-z0-9._-]/gu, "_").slice(0, SLUG_MAX_BODY);
 	return Slug(`${safe || "contact"}.vcf`);
 };
 

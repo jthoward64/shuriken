@@ -11,7 +11,7 @@
 // relations a UI offers, are policy decisions that live with their callers.
 // ---------------------------------------------------------------------------
 
-const APPLE_STD_LABEL = /^_\$!<(.+)>!\$_$/;
+const APPLE_STD_LABEL = /^_\$!<(.+)>!\$_$/u;
 
 /** True when a label is one of Apple's wrapped built-in labels. */
 export const isWrappedAppleLabel = (value: string): boolean =>

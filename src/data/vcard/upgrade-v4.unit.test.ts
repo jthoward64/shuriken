@@ -15,7 +15,7 @@ const up = (text: string): Promise<Array<string>> =>
 		),
 	).then((out) =>
 		out
-			.split(/\r?\n/)
+			.split(/\r?\n/u)
 			.map((l) => l.trim())
 			.filter((l) => l !== ""),
 	);
@@ -61,7 +61,7 @@ describe("upgradeToV4", () => {
 		const email = once.find((l) => l.startsWith("EMAIL"));
 		expect(email).toContain("PREF=1");
 		// exactly one PREF, not duplicated
-		expect(email?.match(/PREF=/g)?.length).toBe(1);
+		expect(email?.match(/PREF=/gu)?.length).toBe(1);
 	});
 
 	it("leaves item-grouped and X- extension properties untouched", async () => {

@@ -42,7 +42,7 @@ const fromWallZone = ({ wall, zone }: WallZone): DatetimeListItem => {
 
 /** Quote a composite record field (doubled-quote escaping). */
 const quoteRecordField = (s: string): string =>
-	`"${s.replace(/\\/g, "\\\\").replace(/"/g, '""')}"`;
+	`"${s.replace(/\\/gu, "\\\\").replace(/"/gu, '""')}"`;
 
 /** A `(wall,zone)` record; a NULL zone is an empty (unquoted) trailing field. */
 const serializeRecord = ({ wall, zone }: WallZone): string =>
@@ -50,7 +50,7 @@ const serializeRecord = ({ wall, zone }: WallZone): string =>
 
 /** Quote an array element (backslash escaping). */
 const quoteArrayElement = (record: string): string =>
-	`"${record.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+	`"${record.replace(/\\/gu, "\\\\").replace(/"/gu, '\\"')}"`;
 
 export const serializeDatetimeArray = (
 	items: ReadonlyArray<DatetimeListItem>,
@@ -151,7 +151,7 @@ const splitRecordFields = (inner: string): Array<string> => {
 /** Strip a record field's outer quotes and collapse doubled quotes. */
 const unquoteRecordField = (f: string): string =>
 	f.startsWith('"') && f.endsWith('"') && f.length >= 2
-		? f.slice(1, -1).replace(/""/g, '"')
+		? f.slice(1, -1).replace(/""/gu, '"')
 		: f;
 
 const parseRecord = (record: string): WallZone => {

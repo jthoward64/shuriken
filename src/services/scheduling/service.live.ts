@@ -1071,7 +1071,7 @@ export const SchedulingServiceLive = Layer.effect(
 				actingPrincipalId,
 			});
 
-			if (!isSor(oldDoc) && !isSor(newDoc)) {
+			if (!(isSor(oldDoc) || isSor(newDoc))) {
 				return;
 			}
 
@@ -1120,7 +1120,7 @@ export const SchedulingServiceLive = Layer.effect(
 			for (let i = 0; i < newDoc.root.components.length; i++) {
 				const newComp = newDoc.root.components[i];
 				const oldComp = oldDoc.root.components[i];
-				if (!newComp || !oldComp) {
+				if (!(newComp && oldComp)) {
 					continue;
 				}
 				if (newComp.name !== "VEVENT" && newComp.name !== "VTODO") {
@@ -1262,8 +1262,7 @@ export const SchedulingServiceLive = Layer.effect(
 				const dtstartProp = vfb.properties.find((p) => p.name === "DTSTART");
 				const dtendProp = vfb.properties.find((p) => p.name === "DTEND");
 				if (
-					!dtstartProp ||
-					!dtendProp ||
+					!(dtstartProp && dtendProp) ||
 					dtstartProp.value.type !== "DATE_TIME" ||
 					dtendProp.value.type !== "DATE_TIME"
 				) {

@@ -616,7 +616,7 @@ export const ContactFormPage = ({
 		: {};
 
 	const computedFn = `${form.givenName} ${form.middleName} ${form.familyName}`
-		.replace(/\s+/g, " ")
+		.replace(/\s+/gu, " ")
 		.trim();
 	const isAutoFn = form.fn === "" || form.fn === computedFn;
 

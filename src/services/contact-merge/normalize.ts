@@ -17,8 +17,8 @@ export const normalizeEmail = (raw: string): string => raw.trim().toLowerCase();
  * number collapse together. Returns "" if no digits remain. Note that this is
  * deliberately not country-code aware: "5551234" and "15551234" stay distinct.
  */
-export const normalizePhone = (raw: string): string => raw.replace(/\D/g, "");
+export const normalizePhone = (raw: string): string => raw.replace(/\D/gu, "");
 
 /** NFC-normalized, case-folded, whitespace-collapsed display name. */
 export const normalizeName = (raw: string): string =>
-	raw.normalize("NFC").trim().replace(/\s+/g, " ").toLowerCase();
+	raw.normalize("NFC").trim().replace(/\s+/gu, " ").toLowerCase();

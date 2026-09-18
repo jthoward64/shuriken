@@ -183,7 +183,7 @@
 	const openEditDialog = (url) => {
 		const htmx = getHtmx();
 		const dialog = document.getElementById(editContactPopoverId);
-		if (!htmx || !(dialog instanceof HTMLDialogElement)) {
+		if (!(htmx && dialog instanceof HTMLDialogElement)) {
 			window.location.href = url;
 			return;
 		}
@@ -234,7 +234,7 @@
 	const openPane = (url) => {
 		const htmx = getHtmx();
 		const pane = document.getElementById(paneId);
-		if (!htmx || !pane || typeof pane.showPopover !== "function") {
+		if (!(htmx && pane) || typeof pane.showPopover !== "function") {
 			window.open(url, "_blank");
 			return;
 		}
@@ -311,7 +311,7 @@
 		const scope = btn.closest("form") ?? document;
 		const list = scope.querySelector(`[data-row-list="${field}"]`);
 		const tpl = scope.querySelector(`template[data-row-template="${field}"]`);
-		if (!list || !(tpl instanceof HTMLTemplateElement)) {
+		if (!(list && tpl instanceof HTMLTemplateElement)) {
 			return;
 		}
 		const clone = tpl.content.cloneNode(true);
@@ -345,10 +345,10 @@
 		]) {
 			const el = row.querySelector(selector);
 			const old = el?.getAttribute(attr);
-			if (!el || !old) {
+			if (!(el && old)) {
 				continue;
 			}
-			const next = `${old.replace(/-\d+$/, "")}-${suffix}`;
+			const next = `${old.replace(/-\d+$/u, "")}-${suffix}`;
 			const dl = row.querySelector(`datalist[id="${old}"]`);
 			el.setAttribute(attr, next);
 			dl?.setAttribute("id", next);
@@ -471,13 +471,13 @@
 		const val = (name) => form.querySelector(`[name="${name}"]`)?.value ?? "";
 		return [val("givenName"), val("middleName"), val("familyName")]
 			.join(" ")
-			.replace(/\s+/g, " ")
+			.replace(/\s+/gu, " ")
 			.trim();
 	};
 	const setFnAutoMode = (form, auto) => {
 		const fnInput = form.querySelector('[name="fn"]');
 		const toggle = form.querySelector("[data-fn-mode-toggle]");
-		if (!fnInput || !toggle) {
+		if (!(fnInput && toggle)) {
 			return;
 		}
 		fnInput.readOnly = auto;

@@ -36,7 +36,7 @@ export const LABEL_PARAM_PREFIX = "X-SKN-LABEL-PARAM-";
 export const maxItemGroup = (props: ReadonlyArray<IrProperty>): number => {
 	let max = 0;
 	for (const p of props) {
-		const m = /^item(\d+)\./i.exec(p.name);
+		const m = /^item(\d+)\./iu.exec(p.name);
 		const n = m?.[1];
 		if (n !== undefined) {
 			max = Math.max(max, Number.parseInt(n, 10));

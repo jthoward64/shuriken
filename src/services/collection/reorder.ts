@@ -58,7 +58,7 @@ export const reorderCollections = (
 			params.desiredIds.length === rows.length &&
 			desiredSet.size === rows.length &&
 			params.desiredIds.every((id) => byId.has(id));
-		if (!isPermutation || !byId.has(params.movedId)) {
+		if (!(isPermutation && byId.has(params.movedId))) {
 			return yield* Effect.fail(
 				new InvalidReorder({
 					message:

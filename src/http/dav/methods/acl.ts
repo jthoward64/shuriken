@@ -238,7 +238,7 @@ const resolveHrefPrincipal = (
 		}
 
 		// Last non-empty path segment is the principal slug or UUID
-		const seg = path.replace(/\/$/, "").split("/").filter(Boolean).at(-1);
+		const seg = path.replace(/\/$/u, "").split("/").filter(Boolean).at(-1);
 
 		if (seg === undefined) {
 			return yield* Effect.fail(forbidden("DAV:recognized-principal"));

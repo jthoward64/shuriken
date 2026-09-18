@@ -1,5 +1,5 @@
 import { expect } from "@std/expect";
-import { describe, it as test } from "@std/testing/bdd";
+import { describe, it, it as test } from "@std/testing/bdd";
 import { Effect, Option } from "effect";
 import { IanaTimezoneService, IanaTimezoneServiceLive } from "./iana.ts";
 
@@ -8,7 +8,7 @@ describe("IanaTimezoneService", () => {
 		Effect.runSync(Effect.provide(eff, IanaTimezoneServiceLive));
 
 	describe("isKnownTzid", () => {
-		test("returns true for a well-known IANA timezone", () => {
+		it("returns true for a well-known IANA timezone", () => {
 			const result = runWith(
 				Effect.gen(function* () {
 					const svc = yield* IanaTimezoneService;
@@ -18,7 +18,7 @@ describe("IanaTimezoneService", () => {
 			expect(result).toBe(true);
 		});
 
-		test("returns true for UTC", () => {
+		it("returns true for UTC", () => {
 			const result = runWith(
 				Effect.gen(function* () {
 					const svc = yield* IanaTimezoneService;
@@ -28,7 +28,7 @@ describe("IanaTimezoneService", () => {
 			expect(result).toBe(true);
 		});
 
-		test("returns false for an unknown timezone", () => {
+		it("returns false for an unknown timezone", () => {
 			const result = runWith(
 				Effect.gen(function* () {
 					const svc = yield* IanaTimezoneService;
@@ -40,7 +40,7 @@ describe("IanaTimezoneService", () => {
 	});
 
 	describe("listTzids", () => {
-		test("returns a non-empty array of timezone IDs", () => {
+		it("returns a non-empty array of timezone IDs", () => {
 			const result = runWith(
 				Effect.gen(function* () {
 					const svc = yield* IanaTimezoneService;
@@ -55,7 +55,7 @@ describe("IanaTimezoneService", () => {
 	});
 
 	describe("getVtimezone", () => {
-		test("returns Some with VTIMEZONE block for a known IANA timezone", () => {
+		it("returns Some with VTIMEZONE block for a known IANA timezone", () => {
 			const result = runWith(
 				Effect.gen(function* () {
 					const svc = yield* IanaTimezoneService;
@@ -69,7 +69,7 @@ describe("IanaTimezoneService", () => {
 			expect(block).toContain("END:VTIMEZONE");
 		});
 
-		test("returns None for an unknown timezone", () => {
+		it("returns None for an unknown timezone", () => {
 			const result = runWith(
 				Effect.gen(function* () {
 					const svc = yield* IanaTimezoneService;

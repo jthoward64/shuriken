@@ -101,7 +101,7 @@ export const upgradeInlineMedia = (prop: IrProperty): IrProperty => {
 		return prop;
 	}
 	// Whitespace can survive folding/continuation lines in hand-written 2.1.
-	const payload = rawStr(prop.value).replace(/\s+/g, "");
+	const payload = rawStr(prop.value).replace(/\s+/gu, "");
 	if (payload === "") {
 		return prop;
 	}
@@ -124,7 +124,7 @@ export const upgradeInlineMedia = (prop: IrProperty): IrProperty => {
 };
 
 /** Matches a base64 `data:` URI, capturing its media type and payload. */
-const DATA_URI_BASE64 = /^data:([^;,]*);base64,(.*)$/s;
+const DATA_URI_BASE64 = /^data:([^;,]*);base64,(.*)$/su;
 
 /**
  * A 4.0 base64 `data:` URI → 3.0 `ENCODING=b` with the format as a TYPE token.

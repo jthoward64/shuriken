@@ -609,7 +609,7 @@ export const CalendarViewPage = (props: CalendarViewProps) => {
 				gap={false}
 				top={
 					<>
-						<NewEventButton disabled={!hasActiveCalendar || !activeWritable} />
+						<NewEventButton disabled={!(hasActiveCalendar && activeWritable)} />
 						<CalendarList
 							calendars={calendars}
 							activeId={activeId}

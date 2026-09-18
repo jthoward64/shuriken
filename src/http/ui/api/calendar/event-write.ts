@@ -49,7 +49,7 @@ const parseEventForm = (form: FormLike): EventFormData => ({
 	recurrenceCount: single(form, "recurrenceCount"),
 	recurrenceUntil: single(form, "recurrenceUntil"),
 	attendees: single(form, "attendeesCsv")
-		.split(/[\n,]/)
+		.split(/[\n,]/u)
 		.map((s) => s.trim())
 		.filter((s) => s !== ""),
 	organizer: single(form, "organizer"),

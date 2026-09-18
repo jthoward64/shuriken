@@ -43,7 +43,7 @@ import { ImipInboundService } from "./inbound.ts";
 const findVCalendarPart = (
 	parsed: Awaited<ReturnType<typeof simpleParser>>,
 ): string | null => {
-	if (parsed.text && /BEGIN:VCALENDAR/i.test(parsed.text)) {
+	if (parsed.text && /BEGIN:VCALENDAR/iu.test(parsed.text)) {
 		// `simpleParser` puts a text/calendar body into .text when it's the only
 		// body part — happy path for our own outbound messages.
 		return parsed.text;

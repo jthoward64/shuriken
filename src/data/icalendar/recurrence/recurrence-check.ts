@@ -95,7 +95,7 @@ export const normalizeRruleUntil = (
 ): string => {
 	const timeZone = dtstart?.timeZoneId ?? zone;
 	return rruleString.replace(
-		/UNTIL=(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(?![\dZ])/g,
+		/UNTIL=(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(?![\dZ])/gu,
 		(_match, y, mo, d, h, mi, s) => {
 			const utc = JSTemporal.PlainDateTime.from({
 				year: Number(y),
@@ -133,12 +133,12 @@ export const normalizeRruleUntil = (
  * up front rather than silently truncating query results against them later.
  */
 export const isUnboundedHighFrequencyRrule = (rruleValue: string): boolean => {
-	const freqMatch = /(?:^|;)FREQ=([A-Z]+)/.exec(rruleValue);
+	const freqMatch = /(?:^|;)FREQ=([A-Z]+)/u.exec(rruleValue);
 	const freq = freqMatch?.[1];
 	if (freq !== "SECONDLY" && freq !== "MINUTELY") {
 		return false;
 	}
-	return !/(?:^|;)(?:COUNT|UNTIL)=/.test(rruleValue);
+	return !/(?:^|;)(?:COUNT|UNTIL)=/u.test(rruleValue);
 };
 
 export interface RruleExpansionLimits {

@@ -32,7 +32,7 @@ const ipv4ToInt = (ip: string): number | null => {
 	}
 	let n = 0;
 	for (const part of parts) {
-		if (!/^\d{1,3}$/.test(part)) {
+		if (!/^\d{1,3}$/u.test(part)) {
 			return null;
 		}
 		const v = Number(part);
@@ -90,7 +90,7 @@ const HEXTET_BITS = 16n;
 /** Parse a (possibly v4-mapped/compressed) IPv6 literal into a 128-bit integer. */
 const ipv6ToBigInt = (ip: string): bigint | null => {
 	let addr = ip;
-	const v4Embedded = /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.exec(addr);
+	const v4Embedded = /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/u.exec(addr);
 	if (v4Embedded?.[1]) {
 		const v4 = ipv4ToInt(v4Embedded[1]);
 		if (v4 === null) {
@@ -127,7 +127,7 @@ const ipv6ToBigInt = (ip: string): bigint | null => {
 	}
 	let result = 0n;
 	for (const g of groups) {
-		if (!/^[0-9a-f]{1,4}$/i.test(g)) {
+		if (!/^[0-9a-f]{1,4}$/iu.test(g)) {
 			return null;
 		}
 		result = (result << HEXTET_BITS) | BigInt(Number.parseInt(g, 16));
@@ -179,7 +179,7 @@ export const NetworkGuardServiceLive = Layer.succeed(NetworkGuardService, {
 	resolveAddresses: (hostname) =>
 		Effect.tryPromise({
 			try: async () => {
-				const bare = hostname.replace(/^\[|\]$/g, "");
+				const bare = hostname.replace(/^\[|\]$/gu, "");
 				const results = await lookup(bare, { all: true });
 				return results.map((r) => r.address);
 			},

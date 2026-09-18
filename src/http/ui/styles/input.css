@@ -168,18 +168,18 @@
 	select,
 	textarea,
 	input:where(
-			:not(
-					[type="checkbox"],
-					[type="radio"],
-					[type="file"],
-					[type="range"],
-					[type="color"],
-					[type="submit"],
-					[type="button"],
-					[type="reset"],
-					[type="image"]
-				)
-		) {
+		:not(
+			[type="checkbox"],
+			[type="radio"],
+			[type="file"],
+			[type="range"],
+			[type="color"],
+			[type="submit"],
+			[type="button"],
+			[type="reset"],
+			[type="image"]
+		)
+	) {
 		background-color: rgb(var(--surface));
 		color: rgb(var(--fg));
 	}

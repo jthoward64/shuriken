@@ -41,7 +41,7 @@ export const RequestId = Brand.nominal<RequestId>();
 const UUIDV7_TIMESTAMP_HEX_LENGTH = 12;
 
 const UUID_RE =
-	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 
 /** Returns true if the string is a valid UUID (any version, case-insensitive). */
 export const isUuid = (s: string): s is UuidString => UUID_RE.test(s);

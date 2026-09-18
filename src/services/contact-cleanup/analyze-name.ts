@@ -42,7 +42,7 @@ export const analyzeNames = (
 
 	const n = vcard.properties.find((p) => isProp(p, "N"));
 	const nValue = getText(n);
-	if (nValue.replace(/;/g, "").trim() !== "" && looksMiscased(nValue)) {
+	if (nValue.replace(/;/gu, "").trim() !== "" && looksMiscased(nValue)) {
 		const next = smartStructuredNameCase(nValue);
 		if (next !== nValue) {
 			out.push(nameSuggestion("N", nValue, next));

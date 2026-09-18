@@ -829,7 +829,8 @@ describe("calendar-query REPORT — VTODO time-range §9.9", () => {
 });
 
 describe("calendar-query REPORT — VALARM time-range §9.10", () => {
-	const alarmEvent = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//t//EN\r\nBEGIN:VEVENT\r\nUID:alm@x\r\nDTSTAMP:20151001T000000Z\r\nDTSTART:20151010T080000Z\r\nDTEND:20151010T090000Z\r\nSUMMARY:alarm\r\nBEGIN:VALARM\r\nACTION:AUDIO\r\nTRIGGER:-PT15M\r\nEND:VALARM\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`;
+	const alarmEvent =
+		"BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//t//EN\r\nBEGIN:VEVENT\r\nUID:alm@x\r\nDTSTAMP:20151001T000000Z\r\nDTSTART:20151010T080000Z\r\nDTEND:20151010T090000Z\r\nSUMMARY:alarm\r\nBEGIN:VALARM\r\nACTION:AUDIO\r\nTRIGGER:-PT15M\r\nEND:VALARM\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
 	const alarmQuery = (start: string, end: string): string =>
 		`<?xml version="1.0" encoding="utf-8"?>
 <C:calendar-query xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:D="DAV:">
@@ -898,7 +899,8 @@ describe("calendar-query REPORT — VALARM time-range §9.10", () => {
 
 describe("calendar-query REPORT — expand DATE-valued recurrence §9.6.5", () => {
 	it("keeps VALUE=DATE on expanded all-day occurrences", async () => {
-		const yearly = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//t//EN\r\nBEGIN:VEVENT\r\nUID:anniv@x\r\nDTSTAMP:19970901T130000Z\r\nDTSTART;VALUE=DATE:19971102\r\nSUMMARY:Anniversary\r\nRRULE:FREQ=YEARLY\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`;
+		const yearly =
+			"BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//t//EN\r\nBEGIN:VEVENT\r\nUID:anniv@x\r\nDTSTAMP:19970901T130000Z\r\nDTSTART;VALUE=DATE:19971102\r\nSUMMARY:Anniversary\r\nRRULE:FREQ=YEARLY\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
 		const expandQuery = `<?xml version="1.0" encoding="utf-8"?>
 <C:calendar-query xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:D="DAV:">
   <D:prop><C:calendar-data><C:expand start="20081101T000000Z" end="20081103T000000Z"/></C:calendar-data></D:prop>
@@ -938,7 +940,8 @@ describe("calendar-query REPORT — expand DATE-valued recurrence §9.6.5", () =
 // which is out of Temporal's range and threw "Out-of-bounds date" → 500.
 describe("calendar-query REPORT — open-ended time-range over a recurrence", () => {
 	it("matches a yearly event with a start-only time-range (no 500)", async () => {
-		const yearly = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//t//EN\r\nBEGIN:VEVENT\r\nUID:rec@x\r\nDTSTAMP:19970901T130000Z\r\nDTSTART:19971102T120000Z\r\nDTEND:19971102T130000Z\r\nSUMMARY:Yearly\r\nRRULE:FREQ=YEARLY\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`;
+		const yearly =
+			"BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//t//EN\r\nBEGIN:VEVENT\r\nUID:rec@x\r\nDTSTAMP:19970901T130000Z\r\nDTSTART:19971102T120000Z\r\nDTEND:19971102T130000Z\r\nSUMMARY:Yearly\r\nRRULE:FREQ=YEARLY\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
 		const openEndedQuery = `<?xml version="1.0" encoding="utf-8"?>
 <C:calendar-query xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:D="DAV:">
   <D:prop><D:getetag/></D:prop>

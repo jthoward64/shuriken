@@ -74,7 +74,7 @@ describe("buildXml", () => {
 		expect(xml).toContain("/a/");
 		expect(xml).toContain("/b/");
 		// Two D:response opening tags
-		const matches = xml.match(/<D:response/g);
+		const matches = xml.match(/<D:response/gu);
 		expect(matches?.length).toBe(2);
 	});
 

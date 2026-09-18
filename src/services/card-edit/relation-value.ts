@@ -18,7 +18,7 @@ const MAILTO_PREFIX = "mailto:";
 
 // Deliberately loose: enough to tell "the user typed an address" from "the user
 // typed a name", not a validity check on the address itself.
-const LOOKS_LIKE_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const LOOKS_LIKE_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
 
 /** Classify a stored RELATED value. */
 export const relationTargetFromValue = (

@@ -518,12 +518,12 @@ const buildPicker = (opts: PickerOptions): void => {
 const initRange = (root: HTMLElement): void => {
 	const fields = all<HTMLElement>(root, "[data-date-field]");
 	const [startEl, endEl] = fields;
-	if (!startEl || !endEl) {
+	if (!(startEl && endEl)) {
 		return;
 	}
 	const start = fieldRefs(startEl);
 	const end = fieldRefs(endEl);
-	if (!start || !end) {
+	if (!(start && end)) {
 		return;
 	}
 	buildPicker({

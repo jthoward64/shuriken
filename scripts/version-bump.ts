@@ -10,7 +10,7 @@ const chartYaml = await readTextFile(
 );
 
 const denoJsonVersion = JSON.parse(denoJson).version;
-const chartYamlVersion = chartYaml.match(/version:\s*(\d+\.\d+\.\d+)/)?.[1];
+const chartYamlVersion = chartYaml.match(/version:\s*(\d+\.\d+\.\d+)/u)?.[1];
 
 const bumpType = prompt(
 	"Bump type (major = 1, minor = 2, patch = 3, custom = 4): ",
@@ -31,7 +31,7 @@ switch (bumpType) {
 		break;
 	case "4": {
 		const response = prompt("Enter custom version (format: x.y.z): ");
-		if (response && /^\d+\.\d+\.\d+$/.test(response)) {
+		if (response && /^\d+\.\d+\.\d+$/u.test(response)) {
 			newVersion = response;
 		} else {
 			console.error("Invalid custom version format. Expected format: x.y.z");
@@ -45,11 +45,11 @@ switch (bumpType) {
 }
 
 const newDenoJson = denoJson.replace(
-	/version":\s*"\d+\.\d+\.\d+"/,
+	/version":\s*"\d+\.\d+\.\d+"/u,
 	`version": "${newVersion}"`,
 );
 let newChartYaml = chartYaml.replace(
-	/appVersion:\s*\d+\.\d+\.\d+/,
+	/appVersion:\s*\d+\.\d+\.\d+/u,
 	`appVersion: ${newVersion}`,
 );
 
@@ -72,7 +72,7 @@ if (chartYamlVersion) {
 
 	const newChartVersion = `${chartMajor}.${chartMinor}.${chartPatch + 1}`;
 	newChartYaml = newChartYaml.replace(
-		/version:\s*\d+\.\d+\.\d+/,
+		/version:\s*\d+\.\d+\.\d+/u,
 		`version: ${newChartVersion}`,
 	);
 

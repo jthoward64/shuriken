@@ -18,7 +18,7 @@ const MIGRATIONS_FOLDER = resolve(HERE, "../db/drizzle/migrations");
 // PGlite's WASM declares an initial memory of 2048 pages (128 MiB); the
 // imported memory must be at least that large or V8 rejects instantiation
 // with a LinkError.
-const INITIAL_MEMORY = 134217728; // 128 MiB
+const INITIAL_MEMORY = 134_217_728; // 128 MiB
 const DUMP_PATH = resolve(HERE, "test-db-cache.tar.gz");
 
 let needGenerateDump = false;
@@ -26,8 +26,9 @@ async function makePgLiteInstance(): Promise<PGlite> {
 	const memoryFs = new MemoryFS();
 	const dumpData = await readFile(DUMP_PATH)
 		.then((buf) => new Blob([new Uint8Array(buf)]))
-		.catch(() => {
+		.catch((): Blob | undefined => {
 			needGenerateDump = true;
+			// biome-ignore lint/complexity/noUselessUndefined: keeps the catch branch typed as Blob | undefined rather than void
 			return undefined;
 		});
 	const pg = new PGlite({

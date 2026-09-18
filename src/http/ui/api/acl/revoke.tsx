@@ -57,7 +57,7 @@ export const aclRevokeHandler = (
 
 		const aceId = form.get("aceId")?.toString()?.trim() ?? "";
 		const principalId = form.get("principalId")?.toString()?.trim() ?? "";
-		if (!aceId && !principalId) {
+		if (!(aceId || principalId)) {
 			return new Response("Missing aceId or principalId", { status: 400 });
 		}
 

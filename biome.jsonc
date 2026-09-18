@@ -117,12 +117,7 @@
 							"appearance": ["base-select"],
 							"font-family": ["ui-sans-serif"]
 						},
-						"allowSelectors": [
-							"open",
-							"checkmark",
-							"picker-icon",
-							"selection"
-						]
+						"allowSelectors": ["open", "checkmark", "picker-icon", "selection"]
 					}
 				},
 				"useBetterDomTraversing": "error",
@@ -350,12 +345,7 @@
 				"noLabelWithoutControl": {
 					"level": "error",
 					"options": {
-						"inputComponents": [
-							"TextInput",
-							"Textarea",
-							"Select",
-							"FileInput"
-						]
+						"inputComponents": ["TextInput", "Textarea", "Select", "FileInput"]
 					}
 				}
 			}
@@ -375,9 +365,7 @@
 			"quoteStyle": "double",
 			"semicolons": "always"
 		},
-		"globals": [
-			"Deno"
-		]
+		"globals": ["Deno"]
 	},
 	"css": {
 		"parser": {
@@ -483,10 +471,7 @@
 			}
 		},
 		{
-			"includes": [
-				"drizzle.config.ts",
-				"docs-site/**"
-			],
+			"includes": ["drizzle.config.ts", "docs-site/**"],
 			"linter": {
 				"rules": {
 					"style": {
@@ -524,9 +509,7 @@
 			}
 		},
 		{
-			"includes": [
-				"docs-site/**"
-			],
+			"includes": ["docs-site/**"],
 			"linter": {
 				"rules": {
 					"style": {
@@ -536,10 +519,7 @@
 			}
 		},
 		{
-			"includes": [
-				"**/*.test.ts",
-				"**/*.test.tsx"
-			],
+			"includes": ["**/*.test.ts", "**/*.test.tsx"],
 			"linter": {
 				"rules": {
 					"style": {

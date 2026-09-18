@@ -21,7 +21,7 @@ export const staticHandler = (
 	Effect.gen(function* () {
 		const url = new URL(req.url);
 		// Strip the /static/ prefix to get the relative path
-		const relPath = url.pathname.replace(/^\/static\//, "");
+		const relPath = url.pathname.replace(/^\/static\//u, "");
 		if (!relPath) {
 			return new Response(null, { status: 404 });
 		}

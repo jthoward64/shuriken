@@ -8,9 +8,9 @@ import { extractInstantFromUuidV7 } from "./ids.ts";
 // ---------------------------------------------------------------------------
 
 // Known UUIDv7 timestamp: 0x018e5b0d1234 = 1710000000564 ms since Unix epoch
-const KNOWN_UUID_MS = 0x018e5b0d1234;
+const KNOWN_UUID_MS = 0x01_8e_5b_0d_12_34;
 // Max 48-bit value: all f's = 281474976710655
-const MAX_TIMESTAMP_MS = 0xffffffffffff;
+const MAX_TIMESTAMP_MS = 0xff_ff_ff_ff_ff_ff;
 
 describe("extractInstantFromUuidV7", () => {
 	it("extracts the correct timestamp from a known UUIDv7", () => {

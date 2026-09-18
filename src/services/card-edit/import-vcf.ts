@@ -39,8 +39,8 @@ export interface ImportVcfResult {
 	readonly conflicts: ReadonlyArray<string>;
 }
 
-const VCARD_BEGIN = /^BEGIN:VCARD\s*$/im;
-const VCARD_END = /^END:VCARD\s*$/im;
+const VCARD_BEGIN = /^BEGIN:VCARD\s*$/imu;
+const VCARD_END = /^END:VCARD\s*$/imu;
 
 const HEX_RADIX = 16;
 const HEX_PAD_LENGTH = 2;
@@ -51,7 +51,7 @@ const HEX_PAD_LENGTH = 2;
  * its matching END:VCARD line inclusive.
  */
 const splitVcards = (text: string): ReadonlyArray<string> => {
-	const lines = text.split(/\r?\n/);
+	const lines = text.split(/\r?\n/u);
 	const chunks: Array<string> = [];
 	let current: Array<string> | null = null;
 	for (const line of lines) {
@@ -73,7 +73,7 @@ const splitVcards = (text: string): ReadonlyArray<string> => {
 
 const SLUG_MAX_BODY = 120;
 const slugFromUid = (uid: string): Slug => {
-	const safe = uid.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, SLUG_MAX_BODY);
+	const safe = uid.replace(/[^A-Za-z0-9._-]/gu, "_").slice(0, SLUG_MAX_BODY);
 	return Slug(`${safe || "card"}.vcf`);
 };
 

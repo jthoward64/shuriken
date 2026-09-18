@@ -106,7 +106,7 @@ const parseBody = (req: Request): Effect.Effect<ProppatchUpdates, DavError> =>
 
 /** Extracts the user slug from a /dav/users/:slug/ href, returning null if unrecognised. */
 const slugFromUserHref = (href: string): string | null => {
-	const match = /\/dav\/users\/([^/]+)\/?$/.exec(href);
+	const match = /\/dav\/users\/([^/]+)\/?$/u.exec(href);
 	return match?.[1] ?? null;
 };
 
