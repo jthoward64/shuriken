@@ -1,4 +1,4 @@
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Option } from "effect";
 import { makeEtag } from "#src/data/etag.ts";
 import { encodeICalendar } from "#src/data/icalendar/codec.ts";
 import type { IrComponent, IrDocument } from "#src/data/ir.ts";
@@ -80,6 +80,67 @@ const wrapInDoc = (vevent: IrComponent): IrDocument => ({
 
 const newUid = (): string => `${crypto.randomUUID()}@shuriken`;
 
+/** Persists a new event: entity row, VCALENDAR tree and collection instance. */
+const insertEvent = Effect.fn("CalEditService.insertEvent")(function* (input: {
+	readonly calendarId: CollectionId;
+	readonly uid: string;
+	readonly root: IrComponent;
+	readonly etag: ETag;
+	readonly slug: Slug;
+	readonly contentLength: number;
+}) {
+	const componentRepo = yield* ComponentRepository;
+	const entityRepo = yield* EntityRepository;
+	const instanceSvc = yield* InstanceService;
+	const entityRow = yield* entityRepo.insert({
+		entityType: "icalendar",
+		logicalUid: input.uid,
+	});
+	const eid = EntityId(entityRow.id);
+	// Match DAV PUT convention: store the VCALENDAR root, not the bare
+	// VEVENT, so readers (REPORT, the events feed) find the event under
+	// tree.components.
+	yield* componentRepo.insertTree(eid, input.root);
+	const instance = yield* instanceSvc.put({
+		collectionId: input.calendarId,
+		entityId: eid,
+		contentType: "text/calendar",
+		etag: input.etag,
+		slug: input.slug,
+		contentLength: input.contentLength,
+	});
+	return { entityId: eid, instanceId: instance.id as InstanceId };
+});
+
+/** Rewrites an existing event's tree and bumps its instance etag. */
+const rewriteEvent = Effect.fn("CalEditService.rewriteEvent")(
+	function* (input: {
+		readonly collectionId: CollectionId;
+		readonly entityId: EntityId;
+		readonly instanceId: InstanceId;
+		readonly root: IrComponent;
+		readonly etag: ETag;
+		readonly slug: Slug;
+		readonly contentLength: number;
+	}) {
+		const componentRepo = yield* ComponentRepository;
+		const instanceSvc = yield* InstanceService;
+		yield* componentRepo.deleteByEntity(input.entityId);
+		yield* componentRepo.insertTree(input.entityId, input.root);
+		yield* instanceSvc.put(
+			{
+				collectionId: input.collectionId,
+				entityId: input.entityId,
+				contentType: "text/calendar",
+				etag: input.etag,
+				slug: input.slug,
+				contentLength: input.contentLength,
+			},
+			input.instanceId,
+		);
+	},
+);
+
 const create = (
 	calendarId: CollectionId,
 	form: EventFormData,
@@ -100,9 +161,6 @@ const create = (
 	| InstanceService
 > =>
 	Effect.gen(function* () {
-		const componentRepo = yield* ComponentRepository;
-		const entityRepo = yield* EntityRepository;
-		const instanceSvc = yield* InstanceService;
 		const db = yield* DatabaseClient;
 
 		// Mirrors the DAV-layer read-only-guard check: the birthdays generator /
@@ -115,12 +173,13 @@ const create = (
 		}
 
 		const uid = uidOverride ?? newUid();
-		const vevent = buildVeventComponent(uid, form);
-		if (!vevent) {
-			return yield* Effect.fail(
-				new InternalError({ cause: new Error("invalid event form") }),
-			);
-		}
+		const vevent = yield* Option.match(buildVeventComponent(uid, form), {
+			onNone: () =>
+				Effect.fail(
+					new InternalError({ cause: new Error("invalid event form") }),
+				),
+			onSome: Effect.succeed,
+		});
 		const doc = wrapInDoc(vevent);
 		const canonical = yield* encodeICalendar(doc);
 		const etag = ETag(yield* makeEtag(canonical));
@@ -128,25 +187,13 @@ const create = (
 		const contentLength = new TextEncoder().encode(canonical).byteLength;
 
 		const result = yield* withTransaction(
-			Effect.gen(function* () {
-				const entityRow = yield* entityRepo.insert({
-					entityType: "icalendar",
-					logicalUid: uid,
-				});
-				const eid = EntityId(entityRow.id);
-				// Match DAV PUT convention: store the VCALENDAR root, not the
-				// bare VEVENT, so readers (REPORT, the events feed) find the
-				// event under tree.components.
-				yield* componentRepo.insertTree(eid, doc.root);
-				const instance = yield* instanceSvc.put({
-					collectionId: calendarId,
-					entityId: eid,
-					contentType: "text/calendar",
-					etag,
-					slug,
-					contentLength,
-				});
-				return { entityId: eid, instanceId: instance.id as InstanceId };
+			insertEvent({
+				calendarId,
+				uid,
+				root: doc.root,
+				etag,
+				slug,
+				contentLength,
 			}),
 		).pipe(Effect.provideService(DatabaseClient, db));
 
@@ -219,12 +266,13 @@ const update = (
 				?.value.value?.toString() ?? null;
 		const finalUid = uidFromTree ?? `${existing.entityId}@shuriken`;
 
-		const rebuilt = buildVeventComponent(finalUid, form);
-		if (!rebuilt) {
-			return yield* Effect.fail(
-				new InternalError({ cause: new Error("invalid event form") }),
-			);
-		}
+		const rebuilt = yield* Option.match(buildVeventComponent(finalUid, form), {
+			onNone: () =>
+				Effect.fail(
+					new InternalError({ cause: new Error("invalid event form") }),
+				),
+			onSome: Effect.succeed,
+		});
 		const merged = mergePreservedProps(existingVevent, rebuilt);
 		const doc = wrapInDoc(merged);
 		const canonical = yield* encodeICalendar(doc);
@@ -232,20 +280,14 @@ const update = (
 		const contentLength = new TextEncoder().encode(canonical).byteLength;
 
 		yield* withTransaction(
-			Effect.gen(function* () {
-				yield* componentRepo.deleteByEntity(entityId);
-				yield* componentRepo.insertTree(entityId, doc.root);
-				yield* instanceSvc.put(
-					{
-						collectionId: CollectionId(existing.collectionId),
-						entityId,
-						contentType: "text/calendar",
-						etag,
-						slug: Slug(existing.slug),
-						contentLength,
-					},
-					instanceId,
-				);
+			rewriteEvent({
+				collectionId: CollectionId(existing.collectionId),
+				entityId,
+				instanceId,
+				root: doc.root,
+				etag,
+				slug: Slug(existing.slug),
+				contentLength,
 			}),
 		).pipe(Effect.provideService(DatabaseClient, db));
 

@@ -1,6 +1,6 @@
 import type { InferSelectModel } from "drizzle-orm";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
-import { Effect, Layer, Metric, Option } from "effect";
+import { Effect, Layer, Match, Metric, Option } from "effect";
 import type { Temporal } from "temporal-polyfill";
 import { isKnownIcalProperty } from "#src/data/icalendar/known.ts";
 import type {
@@ -62,48 +62,58 @@ interface PropertyValueColumns {
 	readonly valueInterval?: string | null;
 }
 
-const irValueToDbColumns = (value: IrValue): PropertyValueColumns => {
-	switch (value.type) {
-		case "TEXT":
-		case "DURATION":
-		case "URI":
-		case "UTC_OFFSET":
-		case "TIME":
-		case "DATE_AND_OR_TIME":
-		case "RECUR":
-		case "CAL_ADDRESS":
-		case "PERIOD":
-			return { valueText: value.value };
-		case "INTEGER":
-			return { valueInt: value.value };
-		case "FLOAT":
-			return { valueFloat: value.value };
-		case "BOOLEAN":
-			return { valueBool: value.value };
-		case "DATE":
-			return { valueDate: value.value };
-		case "DATE_TIME":
-			return { valueTstz: value.value.toInstant() };
-		case "PLAIN_DATE_TIME":
-			return { valuePlainDatetime: value.value };
-		case "BINARY":
-			return { valueBytes: Buffer.from(value.value) };
-		case "JSON":
-			return { valueJson: value.value };
-		case "TEXT_LIST":
-		case "PERIOD_LIST":
-			return { valueTextArray: value.value as Array<string> };
-		case "DATE_LIST":
-			return { valueDateArray: value.value as Array<Temporal.PlainDate> };
-		case "DATE_TIME_LIST":
-			// The datetimeList customType serializes each ZonedDateTime/PlainDateTime
-			// to the composite wire form (wall + nullable zone).
-			return { valueDatetimeList: value.value };
-		case "DURATION_INTERVAL":
-		case "UTC_OFFSET_INTERVAL":
-			return { valueInterval: value.value };
-	}
-};
+const irValueToDbColumns = (value: IrValue): PropertyValueColumns =>
+	Match.value(value).pipe(
+		Match.when(
+			{
+				type: Match.is(
+					"TEXT",
+					"DURATION",
+					"URI",
+					"UTC_OFFSET",
+					"TIME",
+					"DATE_AND_OR_TIME",
+					"RECUR",
+					"CAL_ADDRESS",
+					"PERIOD",
+				),
+			},
+			(v): PropertyValueColumns => ({ valueText: v.value }),
+		),
+		Match.when({ type: "INTEGER" }, (v) => ({ valueInt: v.value })),
+		Match.when({ type: "FLOAT" }, (v) => ({ valueFloat: v.value })),
+		Match.when({ type: "BOOLEAN" }, (v) => ({ valueBool: v.value })),
+		Match.when({ type: "DATE" }, (v) => ({ valueDate: v.value })),
+		Match.when({ type: "DATE_TIME" }, (v) => ({
+			valueTstz: v.value.toInstant(),
+		})),
+		Match.when({ type: "PLAIN_DATE_TIME" }, (v) => ({
+			valuePlainDatetime: v.value,
+		})),
+		Match.when({ type: "BINARY" }, (v) => ({
+			valueBytes: Buffer.from(v.value),
+		})),
+		Match.when({ type: "JSON" }, (v) => ({ valueJson: v.value })),
+		Match.when(
+			{ type: Match.is("TEXT_LIST", "PERIOD_LIST") },
+			(v): PropertyValueColumns => ({
+				valueTextArray: v.value as Array<string>,
+			}),
+		),
+		Match.when({ type: "DATE_LIST" }, (v) => ({
+			valueDateArray: v.value as Array<Temporal.PlainDate>,
+		})),
+		// The datetimeList customType serializes each ZonedDateTime/PlainDateTime
+		// to the composite wire form (wall + nullable zone).
+		Match.when({ type: "DATE_TIME_LIST" }, (v) => ({
+			valueDatetimeList: v.value,
+		})),
+		Match.when(
+			{ type: Match.is("DURATION_INTERVAL", "UTC_OFFSET_INTERVAL") },
+			(v): PropertyValueColumns => ({ valueInterval: v.value }),
+		),
+		Match.exhaustive,
+	);
 
 // ---------------------------------------------------------------------------
 // dbColumnsToIrValue — reconstructs an IrValue from a loaded property row.
@@ -111,91 +121,88 @@ const irValueToDbColumns = (value: IrValue): PropertyValueColumns => {
 // reconstruct the correct ZonedDateTime timezone.
 // ---------------------------------------------------------------------------
 
+/** Text-backed value types all read from the same column. */
+const TEXT_BACKED = Match.is(
+	"TEXT",
+	"DURATION",
+	"URI",
+	"UTC_OFFSET",
+	"TIME",
+	"DATE_AND_OR_TIME",
+	"RECUR",
+	"CAL_ADDRESS",
+	"PERIOD",
+);
+
+/** Fails loudly rather than silently substituting a value the row never held. */
+const requireColumn = <A>(value: A | null | undefined, what: string): A => {
+	if (value === null || value === undefined) {
+		throw new Error(`${what}`);
+	}
+	return value;
+};
+
 const dbColumnsToIrValue = (
 	row: PropertyRow,
 	parameters: ReadonlyArray<IrParameter>,
 ): IrValue => {
 	const tzid = parameters.find((p) => p.name === "TZID")?.value;
 
-	switch (row.valueType) {
-		case "TEXT":
-			return { type: "TEXT", value: row.valueText ?? "" };
-		case "DURATION":
-			return { type: "DURATION", value: row.valueText ?? "" };
-		case "URI":
-			return { type: "URI", value: row.valueText ?? "" };
-		case "UTC_OFFSET":
-			return { type: "UTC_OFFSET", value: row.valueText ?? "" };
-		case "TIME":
-			return { type: "TIME", value: row.valueText ?? "" };
-		case "DATE_AND_OR_TIME":
-			return { type: "DATE_AND_OR_TIME", value: row.valueText ?? "" };
-		case "RECUR":
-			return { type: "RECUR", value: row.valueText ?? "" };
-		case "CAL_ADDRESS":
-			return { type: "CAL_ADDRESS", value: row.valueText ?? "" };
-		case "PERIOD":
-			return { type: "PERIOD", value: row.valueText ?? "" };
-		case "INTEGER":
-			return { type: "INTEGER", value: row.valueInt ?? 0 };
-		case "FLOAT":
-			return { type: "FLOAT", value: row.valueFloat ?? 0 };
-		case "BOOLEAN":
-			return { type: "BOOLEAN", value: row.valueBool ?? false };
-		case "DATE": {
-			if (!row.valueDate) {
-				throw new Error("DATE property missing valueDate");
-			}
-			return { type: "DATE", value: row.valueDate };
-		}
-		case "DATE_TIME": {
-			if (!row.valueTstz) {
-				throw new Error("DATE_TIME property missing valueTstz");
-			}
-			return {
-				type: "DATE_TIME",
-				value: row.valueTstz.toZonedDateTimeISO(tzid ?? "UTC"),
-			};
-		}
-		case "PLAIN_DATE_TIME": {
-			if (!row.valuePlainDatetime) {
-				throw new Error("PLAIN_DATE_TIME property missing valuePlainDatetime");
-			}
-			return { type: "PLAIN_DATE_TIME", value: row.valuePlainDatetime };
-		}
-		case "BINARY": {
-			if (!row.valueBytes) {
-				throw new Error("BINARY property missing valueBytes");
-			}
-			return {
-				type: "BINARY",
-				value: new Uint8Array(
-					row.valueBytes,
-				).slice() as Uint8Array<ArrayBuffer>,
-			};
-		}
-		case "JSON":
-			return { type: "JSON", value: row.valueJson };
-		case "TEXT_LIST":
-			return { type: "TEXT_LIST", value: row.valueTextArray ?? [] };
-		case "PERIOD_LIST":
-			return { type: "PERIOD_LIST", value: row.valueTextArray ?? [] };
-		case "DATE_LIST":
-			return { type: "DATE_LIST", value: row.valueDateArray ?? [] };
-		case "DATE_TIME_LIST":
-			// The customType already mapped the composite array back to
-			// ZonedDateTime/PlainDateTime items.
-			return {
-				type: "DATE_TIME_LIST",
-				value: row.valueDatetimeList ?? [],
-			};
-		case "DURATION_INTERVAL":
-			return { type: "DURATION_INTERVAL", value: row.valueInterval ?? "" };
-		case "UTC_OFFSET_INTERVAL":
-			return { type: "UTC_OFFSET_INTERVAL", value: row.valueInterval ?? "" };
-		default:
-			throw new Error(`Unknown valueType: ${row.valueType}`);
-	}
+	return Match.value(row.valueType).pipe(
+		Match.when(
+			TEXT_BACKED,
+			(type): IrValue => ({ type, value: row.valueText ?? "" }),
+		),
+		Match.when("INTEGER", (type) => ({ type, value: row.valueInt ?? 0 })),
+		Match.when("FLOAT", (type) => ({ type, value: row.valueFloat ?? 0 })),
+		Match.when("BOOLEAN", (type) => ({ type, value: row.valueBool ?? false })),
+		Match.when("DATE", (type) => ({
+			type,
+			value: requireColumn(row.valueDate, "DATE property missing valueDate"),
+		})),
+		Match.when("DATE_TIME", (type) => ({
+			type,
+			value: requireColumn(
+				row.valueTstz,
+				"DATE_TIME property missing valueTstz",
+			).toZonedDateTimeISO(tzid ?? "UTC"),
+		})),
+		Match.when("PLAIN_DATE_TIME", (type) => ({
+			type,
+			value: requireColumn(
+				row.valuePlainDatetime,
+				"PLAIN_DATE_TIME property missing valuePlainDatetime",
+			),
+		})),
+		Match.when("BINARY", (type) => ({
+			type,
+			value: new Uint8Array(
+				requireColumn(row.valueBytes, "BINARY property missing valueBytes"),
+			).slice() as Uint8Array<ArrayBuffer>,
+		})),
+		Match.when("JSON", (type) => ({ type, value: row.valueJson })),
+		Match.when(
+			Match.is("TEXT_LIST", "PERIOD_LIST"),
+			(type): IrValue => ({ type, value: row.valueTextArray ?? [] }),
+		),
+		Match.when("DATE_LIST", (type) => ({
+			type,
+			value: row.valueDateArray ?? [],
+		})),
+		// The customType already mapped the composite array back to
+		// ZonedDateTime/PlainDateTime items.
+		Match.when("DATE_TIME_LIST", (type) => ({
+			type,
+			value: row.valueDatetimeList ?? [],
+		})),
+		Match.when(
+			Match.is("DURATION_INTERVAL", "UTC_OFFSET_INTERVAL"),
+			(type): IrValue => ({ type, value: row.valueInterval ?? "" }),
+		),
+		Match.orElse((type: string) => {
+			throw new Error(`Unknown valueType: ${type}`);
+		}),
+	);
 };
 
 // ---------------------------------------------------------------------------
@@ -204,6 +211,46 @@ const dbColumnsToIrValue = (
 // Each insert gets its own db.insert span. getActiveDb is cheap (a FiberRef
 // read) so calling it per-insert via runDbQuery is fine.
 // ---------------------------------------------------------------------------
+
+/** Inserts one property plus its parameters under a component. */
+const insertPropertyEffect = Effect.fn("ComponentRepository.insertProperty")(
+	function* (componentId: UuidString, prop: IrProperty, ordinal: number) {
+		const valueColumns = irValueToDbColumns(prop.value);
+		const propRows = yield* runDbQuery((db) =>
+			db
+				.insert(davProperty)
+				.values({
+					componentId,
+					name: prop.name,
+					valueType: prop.value.type,
+					ordinal,
+					...valueColumns,
+				})
+				.returning(),
+		);
+		const propRow = propRows[0];
+		if (!propRow) {
+			return yield* Effect.fail(
+				new DatabaseError({
+					cause: new Error("Property insert returned no rows"),
+				}),
+			);
+		}
+		for (let j = 0; j < prop.parameters.length; j++) {
+			const param = prop.parameters[j];
+			if (param !== undefined) {
+				yield* runDbQuery((db) =>
+					db.insert(davParameter).values({
+						propertyId: propRow.id,
+						name: param.name,
+						value: param.value,
+						ordinal: j,
+					}),
+				).pipe(Effect.asVoid);
+			}
+		}
+	},
+);
 
 const insertComponentEffect = (
 	entityId: EntityId,
@@ -226,58 +273,20 @@ const insertComponentEffect = (
 				}),
 			);
 		}
-		const componentId = compRow.id as UuidString;
+		const componentId = compRow.id;
 
 		for (let i = 0; i < component.properties.length; i++) {
 			const prop = component.properties[i];
-			if (!prop) {
-				continue;
-			}
-			const valueColumns = irValueToDbColumns(prop.value);
-			const propRows = yield* runDbQuery((db) =>
-				db
-					.insert(davProperty)
-					.values({
-						componentId,
-						name: prop.name,
-						valueType: prop.value.type,
-						ordinal: i,
-						...valueColumns,
-					})
-					.returning(),
-			);
-			const propRow = propRows[0];
-			if (!propRow) {
-				return yield* Effect.fail(
-					new DatabaseError({
-						cause: new Error("Property insert returned no rows"),
-					}),
-				);
-			}
-			const propertyId = propRow.id;
-
-			for (let j = 0; j < prop.parameters.length; j++) {
-				const param = prop.parameters[j];
-				if (!param) {
-					continue;
-				}
-				yield* runDbQuery((db) =>
-					db.insert(davParameter).values({
-						propertyId,
-						name: param.name,
-						value: param.value,
-						ordinal: j,
-					}),
-				).pipe(Effect.asVoid);
+			if (prop !== undefined) {
+				yield* insertPropertyEffect(componentId, prop, i);
 			}
 		}
 
 		for (let i = 0; i < component.components.length; i++) {
 			const child = component.components[i];
-			if (!child) {
-				continue;
+			if (child !== undefined) {
+				yield* insertComponentEffect(entityId, child, componentId, i);
 			}
-			yield* insertComponentEffect(entityId, child, componentId, i);
 		}
 
 		return componentId;
@@ -287,17 +296,17 @@ const compDuration = repoQueryDurationMs.pipe(
 	Metric.withAttributes({ "repo.entity": "component" }),
 );
 
+/** The component-repository timer, tagged with the operation being measured. */
+const opDuration = (operation: string) =>
+	compDuration.pipe(Metric.withAttributes({ "repo.operation": operation }));
+
 const insertTree = Effect.fn("ComponentRepository.insertTree")(
 	function* (entityId: EntityId, root: IrComponent) {
 		yield* Effect.annotateCurrentSpan({ "entity.id": entityId });
 		yield* Effect.logTrace("repo.component.insertTree", { entityId });
 		return yield* insertComponentEffect(entityId, root, null, 0).pipe(
 			Effect.map(ComponentId),
-			trackDuration(
-				compDuration.pipe(
-					Metric.withAttributes({ "repo.operation": "insertTree" }),
-				),
-			),
+			trackDuration(opDuration("insertTree")),
 		);
 	},
 	Effect.tapError((e) =>
@@ -555,14 +564,7 @@ const deleteByEntity = Effect.fn("ComponentRepository.deleteByEntity")(
 						isNull(davComponent.deletedAt),
 					),
 				),
-		).pipe(
-			Effect.asVoid,
-			trackDuration(
-				compDuration.pipe(
-					Metric.withAttributes({ "repo.operation": "deleteByEntity" }),
-				),
-			),
-		);
+		).pipe(Effect.asVoid, trackDuration(opDuration("deleteByEntity")));
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.component.deleteByEntity failed", e.cause),

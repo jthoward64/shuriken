@@ -1,5 +1,6 @@
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
+import { Option } from "effect";
 import { buildVeventComponent } from "./build-vevent.ts";
 import { parseVeventToForm } from "./parse-vevent.ts";
 import { emptyEventForm } from "./types.ts";
@@ -20,8 +21,8 @@ describe("buildVeventComponent / parseVeventToForm round-trip", () => {
 			recurrenceUntil: "",
 		};
 		const vevent = buildVeventComponent("evt-1", form);
-		expect(vevent).not.toBeNull();
-		const back = parseVeventToForm(vevent as NonNullable<typeof vevent>);
+		expect(Option.isSome(vevent)).toBe(true);
+		const back = parseVeventToForm(Option.getOrThrow(vevent));
 		expect(back.summary).toBe(form.summary);
 		expect(back.description).toBe(form.description);
 		expect(back.location).toBe(form.location);
@@ -42,22 +43,24 @@ describe("buildVeventComponent / parseVeventToForm round-trip", () => {
 			end: "2026-06-01T13:30",
 		};
 		const vevent = buildVeventComponent("evt-2", form);
-		expect(vevent).not.toBeNull();
-		const back = parseVeventToForm(vevent as NonNullable<typeof vevent>);
+		expect(Option.isSome(vevent)).toBe(true);
+		const back = parseVeventToForm(Option.getOrThrow(vevent));
 		expect(back.allDay).toBe(false);
 		expect(back.start).toBe(form.start);
 		expect(back.end).toBe(form.end);
 		expect(back.recurrenceFreq).toBe("");
 	});
 
-	it("returns null when DTSTART is malformed", () => {
+	it("returns none when DTSTART is malformed", () => {
 		expect(
-			buildVeventComponent("evt-3", {
-				...emptyEventForm,
-				summary: "X",
-				start: "garbage",
-			}),
-		).toBeNull();
+			Option.isNone(
+				buildVeventComponent("evt-3", {
+					...emptyEventForm,
+					summary: "X",
+					start: "garbage",
+				}),
+			),
+		).toBe(true);
 	});
 
 	it("encodes RRULE UNTIL for date-only events", () => {
@@ -69,7 +72,9 @@ describe("buildVeventComponent / parseVeventToForm round-trip", () => {
 			recurrenceFreq: "DAILY",
 			recurrenceUntil: "2026-07-01",
 		});
-		const rrule = v?.properties.find((p) => p.name === "RRULE");
+		const rrule = Option.getOrThrow(v).properties.find(
+			(p) => p.name === "RRULE",
+		);
 		expect(rrule?.value).toMatchObject({
 			type: "RECUR",
 			value: "FREQ=DAILY;UNTIL=20260701",
@@ -87,7 +92,9 @@ describe("buildVeventComponent / parseVeventToForm round-trip", () => {
 			recurrenceFreq: "WEEKLY",
 			recurrenceUntil: "2026-07-01T17:30",
 		});
-		const rrule = v?.properties.find((p) => p.name === "RRULE");
+		const rrule = Option.getOrThrow(v).properties.find(
+			(p) => p.name === "RRULE",
+		);
 		expect(rrule?.value).toMatchObject({
 			type: "RECUR",
 			value: "FREQ=WEEKLY;UNTIL=20260701T173000",
@@ -104,7 +111,9 @@ describe("buildVeventComponent / parseVeventToForm round-trip", () => {
 			recurrenceFreq: "DAILY",
 			recurrenceUntil: "2026-07-01",
 		});
-		const rrule = v?.properties.find((p) => p.name === "RRULE");
+		const rrule = Option.getOrThrow(v).properties.find(
+			(p) => p.name === "RRULE",
+		);
 		expect(rrule?.value).toMatchObject({
 			type: "RECUR",
 			value: "FREQ=DAILY;UNTIL=20260701T000000",
@@ -120,7 +129,9 @@ describe("buildVeventComponent / parseVeventToForm round-trip", () => {
 			recurrenceFreq: "DAILY",
 			recurrenceUntil: "not-a-date",
 		});
-		const rrule = v?.properties.find((p) => p.name === "RRULE");
+		const rrule = Option.getOrThrow(v).properties.find(
+			(p) => p.name === "RRULE",
+		);
 		expect(rrule?.value).toMatchObject({ type: "RECUR", value: "FREQ=DAILY" });
 	});
 });

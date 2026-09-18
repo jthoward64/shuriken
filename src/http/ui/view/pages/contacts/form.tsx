@@ -4,6 +4,7 @@ import {
 	isInlinePhoto,
 	photoSrcFor,
 } from "#src/http/ui/helpers/contact-photo.ts";
+import { encodeJson } from "#src/http/ui/helpers/json.ts";
 import type {
 	ContactAddress,
 	ContactFormData,
@@ -22,7 +23,6 @@ import {
 	type TextInputType,
 } from "../../components/form/form.tsx";
 import { Select } from "../../components/form/select.tsx";
-
 import { CONTACTS_POPOVER_ID, ContactsPopoverHeader } from "./popover.tsx";
 import { RELATION_NAME_FIELD, relationOptionsFor } from "./relations.tsx";
 import { ContactsCrumb } from "./shared.tsx";
@@ -522,7 +522,7 @@ const RelationRow = ({
 				hx-trigger="input changed delay:200ms"
 				hx-target={`#${listId}`}
 				hx-swap="outerHTML"
-				hx-vals={JSON.stringify({ addressbook: addressbookId, list: listId })}
+				hx-vals={encodeJson({ addressbook: addressbookId, list: listId })}
 				hx-params="*"
 				class="min-w-48 flex-1"
 			/>
@@ -591,6 +591,120 @@ const OtherPropRow = ({
 	</div>
 );
 
+// Pronouns, GENDER (with its custom-value escape hatch) and the optional
+// grammatical gender, which starts hidden until asked for
+const GenderSection = ({
+	pronouns,
+	gender,
+	gramGender,
+}: {
+	pronouns: string;
+	gender: string;
+	gramGender: string;
+}): VNode => {
+	const isCustomGender = !STANDARD_GENDER_VALUES.has(gender);
+	const hasGramGender = gramGender !== "";
+	return (
+		<section class="grid grid-cols-1 gap-4 md:grid-cols-3">
+			<TextField
+				label="Pronouns"
+				name="pronouns"
+				value={pronouns}
+				placeholder="they/them"
+			/>
+			<div class="form-group block" data-gender-field>
+				<span class="form-label">Gender</span>
+				<Select
+					{...(isCustomGender ? {} : { name: "gender" })}
+					options={GENDER_OPTIONS}
+					value={isCustomGender ? GENDER_CUSTOM_SENTINEL : gender}
+					class="mt-1"
+					data-gender-select
+				/>
+				<TextInput
+					{...(isCustomGender ? { name: "gender" } : {})}
+					value={isCustomGender ? gender : ""}
+					placeholder="Custom GENDER value"
+					class="mt-2"
+					hidden={!isCustomGender}
+					data-gender-custom
+				/>
+			</div>
+			<div class="flex items-end">
+				<button
+					type="button"
+					class="text-muted text-sm underline"
+					data-add-gram-gender
+					hidden={hasGramGender}
+				>
+					+ Add grammatical gender
+				</button>
+			</div>
+			<div
+				class="form-group block md:col-span-3"
+				data-gram-gender-field
+				hidden={!hasGramGender}
+			>
+				<span class="form-label">Grammatical gender</span>
+				<Select
+					name="gramGender"
+					options={GRAM_GENDER_OPTIONS}
+					value={gramGender}
+					class="mt-1 max-w-sm"
+				/>
+				<p class="form-hint mt-1">
+					Used by some address book apps for grammatical agreement (e.g. in
+					translated salutations) — usually safe to leave unspecified.
+				</p>
+			</div>
+		</section>
+	);
+};
+
+// The contact's photo: a streamed preview of the embedded one (or a remote URL),
+// an upload box, and a URL box. An embedded photo round-trips in a hidden field.
+const PhotoSection = ({
+	photoSrc,
+	inlinePhoto,
+	photoUrl,
+}: {
+	photoSrc: string;
+	inlinePhoto: string;
+	photoUrl: string;
+}): VNode => (
+	<Section title="Photo">
+		{photoSrc !== "" && (
+			<img
+				src={photoSrc}
+				alt="Current contact avatar"
+				loading="lazy"
+				class="size-24 rounded-md object-cover"
+			/>
+		)}
+		<label class="form-group block text-sm">
+			<span class="form-hint">Upload (max 512 KB)</span>
+			<FileInput name="photoFile" accept="image/*" class="mt-1 block" />
+		</label>
+		<label class="form-group block text-sm">
+			<span class="form-hint">…or paste a URL</span>
+			<TextInput
+				type="url"
+				name="photo"
+				value={inlinePhoto === "" ? photoUrl : ""}
+				placeholder={inlinePhoto === "" ? "" : "Replaces the photo above"}
+				class="mt-1"
+			/>
+		</label>
+		{/* An embedded photo is hundreds of KB of base64 — kept out of the
+					    visible box (and off the page, since the preview streams from
+					    the photo endpoint) but still round-tripped, so saving an
+					    unrelated field does not drop it. A pasted URL wins over it. */}
+		{inlinePhoto !== "" && (
+			<input type="hidden" name="photoInline" value={inlinePhoto} />
+		)}
+	</Section>
+);
+
 export const ContactFormPage = ({
 	pageTitle,
 	mode,
@@ -620,9 +734,6 @@ export const ContactFormPage = ({
 		.replace(/\s+/gu, " ")
 		.trim();
 	const isAutoFn = form.fn === "" || form.fn === computedFn;
-
-	const isCustomGender = !STANDARD_GENDER_VALUES.has(form.gender);
-	const hasGramGender = form.gramGender !== "";
 
 	// An embedded photo is streamed from the photo endpoint rather than inlined
 	// into the page; a remote URL is used directly. A brand-new contact has no
@@ -877,59 +988,11 @@ export const ContactFormPage = ({
 					addLabel="+ Add related person"
 				/>
 
-				<section class="grid grid-cols-1 gap-4 md:grid-cols-3">
-					<TextField
-						label="Pronouns"
-						name="pronouns"
-						value={form.pronouns}
-						placeholder="they/them"
-					/>
-					<div class="form-group block" data-gender-field>
-						<span class="form-label">Gender</span>
-						<Select
-							{...(isCustomGender ? {} : { name: "gender" })}
-							options={GENDER_OPTIONS}
-							value={isCustomGender ? GENDER_CUSTOM_SENTINEL : form.gender}
-							class="mt-1"
-							data-gender-select
-						/>
-						<TextInput
-							{...(isCustomGender ? { name: "gender" } : {})}
-							value={isCustomGender ? form.gender : ""}
-							placeholder="Custom GENDER value"
-							class="mt-2"
-							hidden={!isCustomGender}
-							data-gender-custom
-						/>
-					</div>
-					<div class="flex items-end">
-						<button
-							type="button"
-							class="text-muted text-sm underline"
-							data-add-gram-gender
-							hidden={hasGramGender}
-						>
-							+ Add grammatical gender
-						</button>
-					</div>
-					<div
-						class="form-group block md:col-span-3"
-						data-gram-gender-field
-						hidden={!hasGramGender}
-					>
-						<span class="form-label">Grammatical gender</span>
-						<Select
-							name="gramGender"
-							options={GRAM_GENDER_OPTIONS}
-							value={form.gramGender}
-							class="mt-1 max-w-sm"
-						/>
-						<p class="form-hint mt-1">
-							Used by some address book apps for grammatical agreement (e.g. in
-							translated salutations) — usually safe to leave unspecified.
-						</p>
-					</div>
-				</section>
+				<GenderSection
+					pronouns={form.pronouns}
+					gender={form.gender}
+					gramGender={form.gramGender}
+				/>
 
 				<section class="grid grid-cols-1 gap-4 md:grid-cols-2">
 					<TextField label="Organisation" name="org" value={form.org} />
@@ -951,37 +1014,11 @@ export const ContactFormPage = ({
 					</label>
 				</section>
 
-				<Section title="Photo">
-					{photoSrc !== "" && (
-						<img
-							src={photoSrc}
-							alt="Current contact avatar"
-							loading="lazy"
-							class="size-24 rounded-md object-cover"
-						/>
-					)}
-					<label class="form-group block text-sm">
-						<span class="form-hint">Upload (max 512 KB)</span>
-						<FileInput name="photoFile" accept="image/*" class="mt-1 block" />
-					</label>
-					<label class="form-group block text-sm">
-						<span class="form-hint">…or paste a URL</span>
-						<TextInput
-							type="url"
-							name="photo"
-							value={inlinePhoto === "" ? form.photo : ""}
-							placeholder={inlinePhoto === "" ? "" : "Replaces the photo above"}
-							class="mt-1"
-						/>
-					</label>
-					{/* An embedded photo is hundreds of KB of base64 — kept out of the
-					    visible box (and off the page, since the preview streams from
-					    the photo endpoint) but still round-tripped, so saving an
-					    unrelated field does not drop it. A pasted URL wins over it. */}
-					{inlinePhoto !== "" && (
-						<input type="hidden" name="photoInline" value={inlinePhoto} />
-					)}
-				</Section>
+				<PhotoSection
+					photoSrc={photoSrc}
+					inlinePhoto={inlinePhoto}
+					photoUrl={form.photo}
+				/>
 
 				<section>
 					<details class="text-sm" open={form.otherProps.length > 0}>

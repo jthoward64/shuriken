@@ -1,4 +1,4 @@
-import type { Effect, Redacted } from "effect";
+import type { Effect, Option, Redacted } from "effect";
 import { Context } from "effect";
 import type { SmtpSecurity } from "#src/db/drizzle/schema/index.ts";
 import type { DatabaseError, InternalError } from "#src/domain/errors.ts";
@@ -42,12 +42,15 @@ export interface ResolvedSmtpCreds {
 }
 
 export interface EmailCredentialServiceShape {
-	/** Returns null when mail is disabled or no usable creds resolve. */
+	/** Absent when mail is disabled or no usable creds resolve. */
 	readonly resolveForUser: (
 		userId: UserId,
 		userEmail: string,
 		userDisplayName: string | null,
-	) => Effect.Effect<ResolvedSmtpCreds | null, DatabaseError | InternalError>;
+	) => Effect.Effect<
+		Option.Option<ResolvedSmtpCreds>,
+		DatabaseError | InternalError
+	>;
 	/**
 	 * Persist per-user creds, encrypting the password with EMAIL_CREDS_KEY.
 	 * Returns InternalError if the env key is unset.

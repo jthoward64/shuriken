@@ -1,10 +1,9 @@
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
-import { Effect, Layer, Option } from "effect";
+import { Effect, Layer, ManagedRuntime, Option, References } from "effect";
 import { Temporal } from "temporal-polyfill";
 import { DatabaseError } from "#src/domain/errors.ts";
 import { PrincipalId, type UuidString } from "#src/domain/ids.ts";
-import { runSuccess } from "#src/testing/effect.ts";
 import {
 	type BulkJobCompletion,
 	type BulkJobProgress,
@@ -33,8 +32,7 @@ const makeTestRepoLayer = (): {
 		create: (input: NewBulkJob) =>
 			Effect.sync(() => {
 				counter += 1;
-				const id =
-					`00000000-0000-7000-8000-${String(counter).padStart(12, "0")}` as UuidString;
+				const id: UuidString = `00000000-0000-7000-8000-${String(counter).padStart(12, "0")}`;
 				const row: BulkJobRow = {
 					id,
 					ownerPrincipalId: input.ownerPrincipalId,
@@ -118,45 +116,61 @@ describe("runChunkedJob", () => {
 		const { layer, rows } = makeTestRepoLayer();
 		const ownerPrincipalId = PrincipalId(crypto.randomUUID());
 
-		const row = await runSuccess(
-			runChunkedJob({
-				kind: "bulk_delete",
-				ownerPrincipalId,
-				items: [1, 2, 3, 4, 5],
-				input: {},
-				perItem: (n) => Effect.succeed({ ok: n % 2 === 0 }),
-				onDone: (outcome) => Effect.succeed({ result: outcome }),
-			}).pipe(Effect.provide(layer), Effect.orDie),
-		);
+		const runtime = ManagedRuntime.make(layer);
+		try {
+			const row = await runtime.runPromise(
+				runChunkedJob({
+					kind: "bulk_delete",
+					ownerPrincipalId,
+					items: [1, 2, 3, 4, 5],
+					input: {},
+					perItem: (n) => Effect.succeed({ ok: n % 2 === 0 }),
+					onDone: (outcome) => Effect.succeed({ result: outcome }),
+				}).pipe(
+					Effect.orDie,
+					Effect.provideService(References.MinimumLogLevel, "None"),
+				),
+			);
 
-		const final = await waitForTerminal(rows, row.id);
-		expect(final.status).toBe("succeeded");
-		expect(final.done).toBe(5);
-		expect(final.succeeded).toBe(2);
-		expect(final.failed).toBe(3);
-		expect(final.result).toEqual({ succeeded: 2, failed: 3 });
+			const final = await waitForTerminal(rows, row.id);
+			expect(final.status).toBe("succeeded");
+			expect(final.done).toBe(5);
+			expect(final.succeeded).toBe(2);
+			expect(final.failed).toBe(3);
+			expect(final.result).toEqual({ succeeded: 2, failed: 3 });
+		} finally {
+			await runtime.dispose();
+		}
 	});
 
 	it("marks the job failed when an item's effect fails (e.g. an ACL denial)", async () => {
 		const { layer, rows } = makeTestRepoLayer();
 		const ownerPrincipalId = PrincipalId(crypto.randomUUID());
 
-		const row = await runSuccess(
-			runChunkedJob({
-				kind: "bulk_delete",
-				ownerPrincipalId,
-				items: [1, 2, 3],
-				input: {},
-				perItem: (n) =>
-					n === 2
-						? Effect.fail(new DatabaseError({ cause: "denied" }))
-						: Effect.succeed({ ok: true }),
-				onDone: () => Effect.succeed({}),
-			}).pipe(Effect.provide(layer), Effect.orDie),
-		);
+		const runtime = ManagedRuntime.make(layer);
+		try {
+			const row = await runtime.runPromise(
+				runChunkedJob({
+					kind: "bulk_delete",
+					ownerPrincipalId,
+					items: [1, 2, 3],
+					input: {},
+					perItem: (n) =>
+						n === 2
+							? Effect.fail(new DatabaseError({ cause: "denied" }))
+							: Effect.succeed({ ok: true }),
+					onDone: () => Effect.succeed({}),
+				}).pipe(
+					Effect.orDie,
+					Effect.provideService(References.MinimumLogLevel, "None"),
+				),
+			);
 
-		const final = await waitForTerminal(rows, row.id);
-		expect(final.status).toBe("failed");
-		expect(final.errorMessage).toBeDefined();
+			const final = await waitForTerminal(rows, row.id);
+			expect(final.status).toBe("failed");
+			expect(final.errorMessage).toBeDefined();
+		} finally {
+			await runtime.dispose();
+		}
 	});
 });

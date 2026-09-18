@@ -1,7 +1,7 @@
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
 import { Effect } from "effect";
-import type { DavError } from "#src/domain/errors.ts";
+import { DavError } from "#src/domain/errors.ts";
 import { CollectionId, EntityId, InstanceId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import { ETag } from "#src/domain/types/strings.ts";
@@ -10,15 +10,27 @@ import { runFailure, runSuccess } from "#src/testing/effect.ts";
 import { makeTestEnv } from "#src/testing/env.ts";
 import { InstanceService } from "./service.ts";
 
+/** Narrows a test failure to a DavError so its status can be asserted. */
+const asDavError = (err: unknown): DavError => {
+	if (err instanceof DavError) {
+		return err;
+	}
+	throw new Error(`expected a DavError, got ${String(err)}`);
+};
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-const makeInput = (collectionId: CollectionId, slug = "event.ics") => ({
+const makeInput = (
+	collectionId: CollectionId,
+	etag = '"initial"',
+	slug = "event.ics",
+) => ({
 	collectionId,
 	entityId: EntityId(crypto.randomUUID()),
 	contentType: "text/calendar" as const,
-	etag: ETag('"initial"'),
+	etag: ETag(etag),
 	slug: Slug(slug),
 });
 
@@ -51,9 +63,7 @@ describe("InstanceService.put — create path", () => {
 
 		const result = await runSuccess(
 			InstanceService.pipe(
-				Effect.flatMap((s) =>
-					s.put({ ...makeInput(collectionId), etag: ETag('"abc-123"') }),
-				),
+				Effect.flatMap((s) => s.put(makeInput(collectionId, '"abc-123"'))),
 				Effect.provide(env.toLayer()),
 				Effect.orDie,
 			),
@@ -81,10 +91,7 @@ describe("InstanceService.put — update path", () => {
 		const result = await runSuccess(
 			InstanceService.pipe(
 				Effect.flatMap((s) =>
-					s.put(
-						{ ...makeInput(collectionId), etag: ETag('"v2"') },
-						InstanceId(instanceId),
-					),
+					s.put(makeInput(collectionId, '"v2"'), InstanceId(instanceId)),
 				),
 				Effect.provide(env.toLayer()),
 				Effect.orDie,
@@ -106,10 +113,7 @@ describe("InstanceService.put — update path", () => {
 		await runSuccess(
 			InstanceService.pipe(
 				Effect.flatMap((s) =>
-					s.put(
-						{ ...makeInput(collectionId), etag: ETag('"v2"') },
-						InstanceId(instanceId),
-					),
+					s.put(makeInput(collectionId, '"v2"'), InstanceId(instanceId)),
 				),
 				Effect.provide(layer),
 				Effect.orDie,
@@ -120,10 +124,7 @@ describe("InstanceService.put — update path", () => {
 		const result = await runSuccess(
 			InstanceService.pipe(
 				Effect.flatMap((s) =>
-					s.put(
-						{ ...makeInput(collectionId), etag: ETag('"v3"') },
-						InstanceId(instanceId),
-					),
+					s.put(makeInput(collectionId, '"v3"'), InstanceId(instanceId)),
 				),
 				Effect.provide(layer),
 				Effect.orDie,
@@ -138,14 +139,16 @@ describe("InstanceService.put — update path", () => {
 		const env = makeTestEnv();
 		const collectionId = CollectionId(crypto.randomUUID());
 
-		const err = (await runFailure(
-			InstanceService.pipe(
-				Effect.flatMap((s) =>
-					s.put(makeInput(collectionId), InstanceId(crypto.randomUUID())),
+		const err = asDavError(
+			await runFailure(
+				InstanceService.pipe(
+					Effect.flatMap((s) =>
+						s.put(makeInput(collectionId), InstanceId(crypto.randomUUID())),
+					),
+					Effect.provide(env.toLayer()),
 				),
-				Effect.provide(env.toLayer()),
 			),
-		)) as DavError;
+		);
 
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_NOT_FOUND);
@@ -179,12 +182,14 @@ describe("InstanceService.delete", () => {
 	it("fails with 404 when the instance does not exist", async () => {
 		const env = makeTestEnv();
 
-		const err = (await runFailure(
-			InstanceService.pipe(
-				Effect.flatMap((s) => s.delete(InstanceId(crypto.randomUUID()))),
-				Effect.provide(env.toLayer()),
+		const err = asDavError(
+			await runFailure(
+				InstanceService.pipe(
+					Effect.flatMap((s) => s.delete(InstanceId(crypto.randomUUID()))),
+					Effect.provide(env.toLayer()),
+				),
 			),
-		)) as DavError;
+		);
 
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_NOT_FOUND);
@@ -220,12 +225,14 @@ describe("InstanceService.findById", () => {
 	it("fails with 404 for an unknown id", async () => {
 		const env = makeTestEnv();
 
-		const err = (await runFailure(
-			InstanceService.pipe(
-				Effect.flatMap((s) => s.findById(InstanceId(crypto.randomUUID()))),
-				Effect.provide(env.toLayer()),
+		const err = asDavError(
+			await runFailure(
+				InstanceService.pipe(
+					Effect.flatMap((s) => s.findById(InstanceId(crypto.randomUUID()))),
+					Effect.provide(env.toLayer()),
+				),
 			),
-		)) as DavError;
+		);
 
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_NOT_FOUND);
@@ -257,12 +264,16 @@ describe("InstanceService.findBySlug", () => {
 		const env = makeTestEnv();
 		const collectionId = CollectionId(crypto.randomUUID());
 
-		const err = (await runFailure(
-			InstanceService.pipe(
-				Effect.flatMap((s) => s.findBySlug(collectionId, Slug("missing.ics"))),
-				Effect.provide(env.toLayer()),
+		const err = asDavError(
+			await runFailure(
+				InstanceService.pipe(
+					Effect.flatMap((s) =>
+						s.findBySlug(collectionId, Slug("missing.ics")),
+					),
+					Effect.provide(env.toLayer()),
+				),
 			),
-		)) as DavError;
+		);
 
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_NOT_FOUND);

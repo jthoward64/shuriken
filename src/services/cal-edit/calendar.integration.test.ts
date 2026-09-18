@@ -1,6 +1,6 @@
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
-import { Effect, ManagedRuntime, Redacted } from "effect";
+import { Effect, ManagedRuntime, Redacted, Schema } from "effect";
 import {
 	type CollectionId,
 	EntityId,
@@ -18,6 +18,19 @@ import { ProvisioningService } from "#src/services/provisioning/index.ts";
 import { UserService } from "#src/services/user/index.ts";
 import { makeScriptRunnerLayer } from "#src/testing/script-runner/layer.ts";
 import { mockClientAddress } from "#src/testing/script-runner/runner.ts";
+
+/** The subset of the events feed payload this test asserts on. */
+const FeedEventsSchema = Schema.fromJsonString(
+	Schema.Array(
+		Schema.Struct({
+			title: Schema.String,
+			allDay: Schema.Boolean,
+			rrule: Schema.optional(Schema.String),
+		}),
+	),
+);
+
+const decodeFeedEvents = Schema.decodeSync(FeedEventsSchema);
 
 // ---------------------------------------------------------------------------
 // End-to-end exercise for CalEditService + the events JSON endpoint:
@@ -104,12 +117,7 @@ describe("Calendar CRUD + events feed (integration)", () => {
 				),
 			);
 			expect(feedRes.status).toBe(200);
-			const feedRaw = await feedRes.text();
-			const feed = JSON.parse(feedRaw) as ReadonlyArray<{
-				title: string;
-				allDay: boolean;
-				rrule?: string;
-			}>;
+			const feed = decodeFeedEvents(await feedRes.text());
 			expect(feed.length).toBe(2);
 			const lunch = feed.find((e) => e.title === "Lunch");
 			const anniversary = feed.find((e) => e.title === "Anniversary");
@@ -159,7 +167,7 @@ describe("Calendar CRUD + events feed (integration)", () => {
 					mockClientAddress,
 				),
 			);
-			const feed2 = (await feedAfter.json()) as ReadonlyArray<unknown>;
+			const feed2 = decodeFeedEvents(await feedAfter.text());
 			expect(feed2.length).toBe(1);
 		} finally {
 			await runtime.dispose();

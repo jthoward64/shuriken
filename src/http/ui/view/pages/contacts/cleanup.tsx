@@ -1,4 +1,5 @@
 import type { VNode } from "preact";
+import { encodeJson } from "#src/http/ui/helpers/json.ts";
 import { Button } from "../../components/button.tsx";
 import { Alert, Badge, EmptyState } from "../../components/display.tsx";
 import { Field, TextInput } from "../../components/form/form.tsx";
@@ -122,7 +123,7 @@ export const CleanupSuggestion = ({
 				class="flex items-center gap-2"
 			>
 				<input type="hidden" name="instanceId" value={s.instanceId} />
-				<input type="hidden" name="fix" value={JSON.stringify(s.fix)} />
+				<input type="hidden" name="fix" value={encodeJson(s.fix)} />
 				<input type="hidden" name="region" value={s.region} />
 				<input type="hidden" name="contactFn" value={s.contactFn} />
 

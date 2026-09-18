@@ -186,6 +186,72 @@ export interface CollectionEditPageProps {
 	readonly isBirthdaysCollection?: boolean;
 }
 
+// The timezone and colour fields, which only a calendar collection carries
+const CalendarOnlyFields = ({
+	timezoneTzid,
+	calendarColor,
+}: {
+	timezoneTzid: string;
+	calendarColor: string;
+}): VNode => (
+	<>
+		<Field for="timezoneTzid" label="Timezone">
+			<TextInput
+				id="timezoneTzid"
+				name="timezoneTzid"
+				value={timezoneTzid}
+				placeholder="e.g. America/New_York"
+			/>
+		</Field>
+		<Field for="color" label="Color">
+			<div class="flex items-center gap-3">
+				<input
+					type="color"
+					id="color"
+					name="color"
+					value={calendarColor}
+					class="h-9 w-14 cursor-pointer rounded border border-line bg-surface-2 p-1"
+				/>
+				<span class="text-muted text-xs">
+					Shown as the event colour in the calendar and in CalDAV clients.
+				</span>
+			</div>
+		</Field>
+	</>
+);
+
+// Breadcrumb + title for the full-page variant (the popover has its own header)
+const CollectionPageHeader = ({
+	title,
+	ownerType,
+	ownerDisplayName,
+	ownerHref,
+	actions,
+}: {
+	title: string;
+	ownerType: "user" | "group";
+	ownerDisplayName: string;
+	ownerHref: string;
+	actions: VNode | null;
+}): VNode => (
+	<div>
+		<Breadcrumb
+			items={[
+				...ownerCrumb(ownerType, ownerDisplayName, ownerHref),
+				{ label: title },
+			]}
+		/>
+		<PageHeader
+			title={title}
+			actions={
+				actions === null ? undefined : (
+					<div class="flex items-center gap-2">{actions}</div>
+				)
+			}
+		/>
+	</div>
+);
+
 export const CollectionEditPage = (props: CollectionEditPageProps): VNode => {
 	const popover = (props.variant ?? "page") === "popover";
 	const popoverId = props.popoverId ?? CALENDAR_POPOVER_ID;
@@ -225,30 +291,25 @@ export const CollectionEditPage = (props: CollectionEditPageProps): VNode => {
 			</Button>
 		</form>
 	);
+	const actions =
+		regenerateBirthdaysButton || deleteButton ? (
+			<>
+				{regenerateBirthdaysButton}
+				{deleteButton}
+			</>
+		) : null;
 	return (
 		<div class={popover ? "space-y-6" : "mx-auto max-w-2xl space-y-6"}>
 			{popover ? (
 				<CalendarPopoverHeader title={props.title} popoverId={popoverId} />
 			) : (
-				<div>
-					<Breadcrumb
-						items={[
-							...ownerCrumb(props.ownerType, props.ownerDisplayName, ownerHref),
-							{ label: props.title },
-						]}
-					/>
-					<PageHeader
-						title={props.title}
-						actions={
-							(regenerateBirthdaysButton || deleteButton) && (
-								<div class="flex items-center gap-2">
-									{regenerateBirthdaysButton}
-									{deleteButton}
-								</div>
-							)
-						}
-					/>
-				</div>
+				<CollectionPageHeader
+					title={props.title}
+					ownerType={props.ownerType}
+					ownerDisplayName={props.ownerDisplayName}
+					ownerHref={ownerHref}
+					actions={actions}
+				/>
 			)}
 
 			<Card title={popover ? undefined : "Details"}>
@@ -280,31 +341,10 @@ export const CollectionEditPage = (props: CollectionEditPageProps): VNode => {
 						/>
 					</Field>
 					{props.isCalendar ? (
-						<>
-							<Field for="timezoneTzid" label="Timezone">
-								<TextInput
-									id="timezoneTzid"
-									name="timezoneTzid"
-									value={props.timezoneTzid}
-									placeholder="e.g. America/New_York"
-								/>
-							</Field>
-							<Field for="color" label="Color">
-								<div class="flex items-center gap-3">
-									<input
-										type="color"
-										id="color"
-										name="color"
-										value={props.calendarColor}
-										class="h-9 w-14 cursor-pointer rounded border border-line bg-surface-2 p-1"
-									/>
-									<span class="text-muted text-xs">
-										Shown as the event colour in the calendar and in CalDAV
-										clients.
-									</span>
-								</div>
-							</Field>
-						</>
+						<CalendarOnlyFields
+							timezoneTzid={props.timezoneTzid}
+							calendarColor={props.calendarColor}
+						/>
 					) : null}
 					<p class="text-muted text-sm">
 						<span class="font-medium text-fg">Slug:</span>{" "}
@@ -328,29 +368,23 @@ export const CollectionEditPage = (props: CollectionEditPageProps): VNode => {
 						)}
 					</div>
 				</form>
-				{popover
-					? (regenerateBirthdaysButton || deleteButton) && (
-							<div class="mt-4 flex items-center gap-3 border-line border-t pt-4">
-								{regenerateBirthdaysButton}
-								{deleteButton}
-							</div>
-						)
-					: null}
+				{popover && actions !== null && (
+					<div class="mt-4 flex items-center gap-3 border-line border-t pt-4">
+						{actions}
+					</div>
+				)}
 			</Card>
 
-			{popover
-				? props.isCalendar &&
-					props.feeds && (
-						<Card title="Feeds">
-							<CalendarFeedsSection
-								calendarId={props.id}
-								memberFeeds={props.feeds.member}
-								addableFeeds={props.feeds.addable}
-								addUrl={`${base}/feeds/add`}
-							/>
-						</Card>
-					)
-				: null}
+			{popover && props.isCalendar && props.feeds !== undefined ? (
+				<Card title="Feeds">
+					<CalendarFeedsSection
+						calendarId={props.id}
+						memberFeeds={props.feeds.member}
+						addableFeeds={props.feeds.addable}
+						addUrl={`${base}/feeds/add`}
+					/>
+				</Card>
+			) : null}
 
 			<SharePanel data={props.sharePanel} />
 		</div>

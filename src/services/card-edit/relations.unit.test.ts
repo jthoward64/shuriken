@@ -291,11 +291,8 @@ describe("photo metadata reconciliation", () => {
 
 	it("drops the stale hash and crop when the photo changes", () => {
 		const existing = withPhoto(Old);
-		const merged = mergeFormIntoVcard(
-			existing,
-			{ ...parseVcardToForm(existing), photo: New },
-			UID,
-		);
+		const parsed = parseVcardToForm(existing);
+		const merged = mergeFormIntoVcard(existing, { ...parsed, photo: New }, UID);
 		const names = merged.properties.map((p) => p.name);
 		expect(names).not.toContain("X-IMAGEHASH");
 		expect(
@@ -309,11 +306,8 @@ describe("photo metadata reconciliation", () => {
 
 	it("removes X-IMAGETYPE when the photo is cleared", () => {
 		const existing = withPhoto(Old);
-		const merged = mergeFormIntoVcard(
-			existing,
-			{ ...parseVcardToForm(existing), photo: "" },
-			UID,
-		);
+		const parsed = parseVcardToForm(existing);
+		const merged = mergeFormIntoVcard(existing, { ...parsed, photo: "" }, UID);
 		const names = merged.properties.map((p) => p.name);
 		expect(names).not.toContain("PHOTO");
 		expect(names).not.toContain("X-IMAGETYPE");

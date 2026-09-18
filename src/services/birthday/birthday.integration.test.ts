@@ -1,7 +1,7 @@
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
 import { Effect, ManagedRuntime, Redacted } from "effect";
-import { CollectionId, type PrincipalId, UserId } from "#src/domain/ids.ts";
+import { CollectionId, PrincipalId, UserId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import { Email } from "#src/domain/types/strings.ts";
 import { handleRequest } from "#src/http/router.ts";
@@ -68,7 +68,7 @@ describe("Birthday calendar (integration)", () => {
 					return p;
 				}),
 			);
-			const principalId = provisioned.user.principal.id as PrincipalId;
+			const principalId = PrincipalId(provisioned.user.principal.id);
 
 			// 2. PUT a vCard with BDAY into the primary addressbook.
 			const auth = basicAuthHeader("alice@example.com", "alice");

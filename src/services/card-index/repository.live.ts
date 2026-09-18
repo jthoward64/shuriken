@@ -1,5 +1,5 @@
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Match } from "effect";
 import { DatabaseClient } from "#src/db/client.ts";
 import { cardIndex, davInstance } from "#src/db/drizzle/schema/index.ts";
 import { runDbQuery } from "#src/db/query.ts";
@@ -41,17 +41,15 @@ const foldText = (text: string, collation: CardCollation): string => {
 
 /** Build a SQL LIKE pattern based on the match type. */
 const likePattern = (foldedText: string, matchType: CardMatchType): string => {
+	// `equals` compares literally, so it keeps the unescaped text
 	const escaped = foldedText.replace(/[%_\\]/gu, (c) => `\\${c}`);
-	switch (matchType) {
-		case "equals":
-			return foldedText;
-		case "contains":
-			return `%${escaped}%`;
-		case "starts-with":
-			return `${escaped}%`;
-		case "ends-with":
-			return `%${escaped}`;
-	}
+	return Match.value(matchType).pipe(
+		Match.when("equals", () => foldedText),
+		Match.when("contains", () => `%${escaped}%`),
+		Match.when("starts-with", () => `${escaped}%`),
+		Match.when("ends-with", () => `%${escaped}`),
+		Match.exhaustive,
+	);
 };
 
 const findByText = Effect.fn("CardIndexRepository.findByText")(

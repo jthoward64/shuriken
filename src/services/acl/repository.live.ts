@@ -366,9 +366,8 @@ const batchGetGrantedPrivileges = Effect.fn(
 		);
 		const result = new Map<UuidString, ReadonlyArray<DavPrivilege>>();
 		for (const row of rows) {
-			const id = row.resourceId as UuidString;
-			const existing = result.get(id) ?? [];
-			result.set(id, [...existing, row.privilege as DavPrivilege]);
+			const existing = result.get(row.resourceId) ?? [];
+			result.set(row.resourceId, [...existing, row.privilege as DavPrivilege]);
 		}
 		return result;
 	},

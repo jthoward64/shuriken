@@ -29,6 +29,10 @@ const entityDuration = repoQueryDurationMs.pipe(
 	Metric.withAttributes({ "repo.entity": "entity" }),
 );
 
+/** The entity-repository timer, tagged with the operation being measured. */
+const opDuration = (operation: string) =>
+	entityDuration.pipe(Metric.withAttributes({ "repo.operation": operation }));
+
 const insertEntity = Effect.fn("EntityRepository.insert")(
 	function* (input: { entityType: EntityType; logicalUid: string | null }) {
 		yield* Effect.annotateCurrentSpan({ "entity.type": input.entityType });
@@ -56,11 +60,7 @@ const insertEntity = Effect.fn("EntityRepository.insert")(
 				}
 				return Effect.succeed(row);
 			}),
-			trackDuration(
-				entityDuration.pipe(
-					Metric.withAttributes({ "repo.operation": "insert" }),
-				),
-			),
+			trackDuration(opDuration("insert")),
 		);
 	},
 	Effect.tapError((e) =>
@@ -80,11 +80,7 @@ const findById = Effect.fn("EntityRepository.findById")(
 				.limit(1),
 		).pipe(
 			Effect.map((r) => Option.fromNullishOr(r[0])),
-			trackDuration(
-				entityDuration.pipe(
-					Metric.withAttributes({ "repo.operation": "findById" }),
-				),
-			),
+			trackDuration(opDuration("findById")),
 		);
 	},
 	Effect.tapError((e) =>
@@ -107,14 +103,7 @@ const updateLogicalUid = Effect.fn("EntityRepository.updateLogicalUid")(
 				.update(davEntity)
 				.set({ logicalUid, updatedAt: sql`now()` })
 				.where(eq(davEntity.id, id)),
-		).pipe(
-			Effect.asVoid,
-			trackDuration(
-				entityDuration.pipe(
-					Metric.withAttributes({ "repo.operation": "updateLogicalUid" }),
-				),
-			),
-		);
+		).pipe(Effect.asVoid, trackDuration(opDuration("updateLogicalUid")));
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.entity.updateLogicalUid failed", e.cause),
@@ -130,14 +119,7 @@ const softDelete = Effect.fn("EntityRepository.softDelete")(
 				.update(davEntity)
 				.set({ deletedAt: sql`now()` })
 				.where(eq(davEntity.id, id)),
-		).pipe(
-			Effect.asVoid,
-			trackDuration(
-				entityDuration.pipe(
-					Metric.withAttributes({ "repo.operation": "softDelete" }),
-				),
-			),
-		);
+		).pipe(Effect.asVoid, trackDuration(opDuration("softDelete")));
 	},
 	Effect.tapError((e) =>
 		Effect.logWarning("repo.entity.softDelete failed", e.cause),
@@ -170,11 +152,7 @@ const existsByUid = Effect.fn("EntityRepository.existsByUid")(
 				.limit(1),
 		).pipe(
 			Effect.map((r) => r.length > 0),
-			trackDuration(
-				entityDuration.pipe(
-					Metric.withAttributes({ "repo.operation": "existsByUid" }),
-				),
-			),
+			trackDuration(opDuration("existsByUid")),
 		);
 	},
 	Effect.tapError((e) =>
@@ -216,13 +194,7 @@ const existsByUidForPrincipal = Effect.fn(
 				.limit(1),
 		).pipe(
 			Effect.map((r) => r.length > 0),
-			trackDuration(
-				entityDuration.pipe(
-					Metric.withAttributes({
-						"repo.operation": "existsByUidForPrincipal",
-					}),
-				),
-			),
+			trackDuration(opDuration("existsByUidForPrincipal")),
 		);
 	},
 	Effect.tapError((e) =>
@@ -266,13 +238,7 @@ const listActiveInstancesWithUid = Effect.fn(
 					slug: r.slug,
 				})),
 			),
-			trackDuration(
-				entityDuration.pipe(
-					Metric.withAttributes({
-						"repo.operation": "listActiveInstancesWithUid",
-					}),
-				),
-			),
+			trackDuration(opDuration("listActiveInstancesWithUid")),
 		);
 	},
 	Effect.tapError((e) =>

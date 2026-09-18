@@ -1,7 +1,7 @@
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
 import { Effect, ManagedRuntime, Option } from "effect";
-import { type CollectionId, EntityId } from "#src/domain/ids.ts";
+import { CollectionId, EntityId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import { Email } from "#src/domain/types/strings.ts";
 import { CardEditService } from "#src/services/card-edit/service.ts";
@@ -40,7 +40,7 @@ describe("Contact photo support (integration)", () => {
 							slug: Slug("alice-photo"),
 						})
 						.pipe(Effect.orDie);
-					const ab = alice.addressBook.id as CollectionId;
+					const ab = CollectionId(alice.addressBook.id);
 
 					const withPhoto = yield* cardEdit.create(ab, {
 						...emptyContactForm,

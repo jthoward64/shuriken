@@ -54,7 +54,7 @@ export class IanaTimezoneService extends Context.Service<IanaTimezoneService>()(
 				if (typeof result === "string" || result.length === 0) {
 					return Option.none();
 				}
-				const [vtimezoneBlock] = result as [string, string];
+				const [vtimezoneBlock] = result;
 				return vtimezoneBlock ? Option.some(vtimezoneBlock) : Option.none();
 			};
 

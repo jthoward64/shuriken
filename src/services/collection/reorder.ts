@@ -1,7 +1,14 @@
 import { Data, Effect, Option } from "effect";
 import type { DatabaseError } from "#src/domain/errors.ts";
-import { CollectionId, type PrincipalId } from "#src/domain/ids.ts";
-import { ExternalCalendarRepository } from "#src/services/external-calendar/repository.ts";
+import {
+	CollectionId,
+	type PrincipalId,
+	type UuidString,
+} from "#src/domain/ids.ts";
+import {
+	ExternalCalendarRepository,
+	type ExternalCalendarRepositoryShape,
+} from "#src/services/external-calendar/repository.ts";
 import { CollectionRepository, type CollectionType } from "./repository.ts";
 import {
 	type CollectionSortKind,
@@ -34,6 +41,21 @@ export interface ReorderParams {
 	/** The single collection the user dragged. Must be present in desiredIds. */
 	readonly movedId: CollectionId;
 }
+
+/** Pairs a collection with the sort kind its origin implies. */
+const classifyCollection = Effect.fn("collection.reorder.classify")(function* (
+	extRepo: ExternalCalendarRepositoryShape,
+	row: { readonly id: UuidString; readonly autoManagedKind: string | null },
+) {
+	if (row.autoManagedKind !== null) {
+		return [row.id, "generated"] as const;
+	}
+	const claim = yield* extRepo.findClaimByCollection(CollectionId(row.id));
+	const kind: CollectionSortKind = Option.isSome(claim)
+		? "subscribed"
+		: "normal";
+	return [row.id, kind] as const;
+});
 
 export const reorderCollections = (
 	params: ReorderParams,
@@ -69,19 +91,7 @@ export const reorderCollections = (
 
 		// Classify each collection so the algorithm knows its type-default.
 		const kindEntries = yield* Effect.all(
-			rows.map((r) =>
-				Effect.gen(function* () {
-					const kind: CollectionSortKind =
-						r.autoManagedKind !== null
-							? "generated"
-							: Option.isSome(
-										yield* extRepo.findClaimByCollection(CollectionId(r.id)),
-									)
-								? "subscribed"
-								: "normal";
-					return [r.id, kind] as const;
-				}),
-			),
+			rows.map((r) => classifyCollection(extRepo, r)),
 			{ concurrency: "unbounded" },
 		);
 		const kindOf = new Map<string, CollectionSortKind>(kindEntries);

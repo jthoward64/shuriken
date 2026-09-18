@@ -1,4 +1,4 @@
-import { Effect, Layer, Semaphore } from "effect";
+import { Effect, Layer, Option, Semaphore } from "effect";
 import { makeEtag } from "#src/data/etag.ts";
 import { encodeICalendar } from "#src/data/icalendar/codec.ts";
 import type { IrComponent, IrDocument } from "#src/data/ir.ts";
@@ -12,6 +12,7 @@ import type {
 import {
 	type CollectionId,
 	EntityId,
+	type InstanceId,
 	type PrincipalId,
 } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
@@ -75,17 +76,132 @@ const slugFromUid = (uid: string): Slug => {
 // both snapshot the same "missing" birthday and race to insert it, tripping
 // `unique_instance_slug_per_collection`. Serialize per collection so callers
 // queue instead of racing; different collections still run concurrently.
-const collectionLocks = new Map<string, Semaphore.Semaphore>();
+const collectionLocks = new Map<CollectionId, Semaphore.Semaphore>();
 const lockFor = (collectionId: CollectionId): Semaphore.Semaphore => {
-	const key = collectionId as string;
-	const existing = collectionLocks.get(key);
+	const existing = collectionLocks.get(collectionId);
 	if (existing !== undefined) {
 		return existing;
 	}
 	const lock = Semaphore.makeUnsafe(1);
-	collectionLocks.set(key, lock);
+	collectionLocks.set(collectionId, lock);
 	return lock;
 };
+
+/** The birthday event a card should produce, keyed by its birthday UID. */
+interface DesiredBirthday {
+	readonly fn: string;
+	readonly bday: string;
+	readonly component: IrComponent;
+}
+
+/** A birthday instance already present in the target collection. */
+interface ExistingBirthday {
+	readonly instanceId: InstanceId;
+	readonly entityId: EntityId;
+	readonly etag: string;
+	readonly slug: string;
+}
+
+/** The encoded form of one desired birthday, ready to store. */
+interface BirthdayPayload {
+	readonly uid: string;
+	readonly component: IrComponent;
+	readonly etag: ETag;
+	readonly contentLength: number;
+}
+
+/** Collects the birthday event every card in the principal's addressbooks should have. */
+const collectDesiredBirthdays = Effect.fn("BirthdayService.collectDesired")(
+	function* (principalId: PrincipalId) {
+		const cardRepo = yield* CardIndexRepository;
+		const collSvc = yield* CollectionService;
+		const collections = yield* collSvc.listByOwner(principalId);
+		const desired = new Map<string, DesiredBirthday>();
+		for (const book of collections) {
+			if (book.collectionType !== "addressbook" || book.deletedAt !== null) {
+				continue;
+			}
+			const cards = yield* cardRepo.listWithBday(book.id as CollectionId);
+			for (const card of cards) {
+				const built = buildBirthdayVevent({
+					cardUid: card.uid,
+					fn: card.fn,
+					bday: card.bday,
+				});
+				Option.match(built, {
+					onNone: () => undefined,
+					onSome: (event) =>
+						desired.set(event.uid, {
+							fn: card.fn,
+							bday: card.bday,
+							component: event.component,
+						}),
+				});
+			}
+		}
+		return desired;
+	},
+);
+
+/** Encodes a desired birthday into the canonical iCalendar payload plus its etag. */
+const encodeBirthday = Effect.fn("BirthdayService.encode")(function* (
+	uid: string,
+	component: IrComponent,
+) {
+	const canonical = yield* encodeICalendar(wrapInVcalendar(component));
+	return {
+		uid,
+		component,
+		etag: ETag(yield* makeEtag(canonical)),
+		contentLength: new TextEncoder().encode(canonical).byteLength,
+	} satisfies BirthdayPayload;
+});
+
+/** Creates the entity, component tree and instance for a new birthday event. */
+const insertBirthday = Effect.fn("BirthdayService.insert")(function* (
+	targetCollectionId: CollectionId,
+	payload: BirthdayPayload,
+) {
+	const componentRepo = yield* ComponentRepository;
+	const entityRepo = yield* EntityRepository;
+	const instanceSvc = yield* InstanceService;
+	const entityRow = yield* entityRepo.insert({
+		entityType: "icalendar",
+		logicalUid: payload.uid,
+	});
+	yield* componentRepo.insertTree(EntityId(entityRow.id), payload.component);
+	yield* instanceSvc.put({
+		collectionId: targetCollectionId,
+		entityId: EntityId(entityRow.id),
+		contentType: "text/calendar",
+		etag: payload.etag,
+		slug: slugFromUid(payload.uid),
+		contentLength: payload.contentLength,
+	});
+});
+
+/** Rewrites an existing birthday instance's component tree and bumps its etag. */
+const replaceBirthday = Effect.fn("BirthdayService.replace")(function* (
+	targetCollectionId: CollectionId,
+	payload: BirthdayPayload,
+	prev: ExistingBirthday,
+) {
+	const componentRepo = yield* ComponentRepository;
+	const instanceSvc = yield* InstanceService;
+	yield* componentRepo.deleteByEntity(prev.entityId);
+	yield* componentRepo.insertTree(prev.entityId, payload.component);
+	yield* instanceSvc.put(
+		{
+			collectionId: targetCollectionId,
+			entityId: prev.entityId,
+			contentType: "text/calendar",
+			etag: payload.etag,
+			slug: Slug(prev.slug),
+			contentLength: payload.contentLength,
+		},
+		prev.instanceId,
+	);
+});
 
 const regenerate = (
 	principalId: PrincipalId,
@@ -106,9 +222,6 @@ const regenerate = (
 > =>
 	lockFor(targetCollectionId).withPermit(
 		Effect.gen(function* () {
-			const cardRepo = yield* CardIndexRepository;
-			const collSvc = yield* CollectionService;
-			const componentRepo = yield* ComponentRepository;
 			const db = yield* DatabaseClient;
 			const entityRepo = yield* EntityRepository;
 			const instanceSvc = yield* InstanceService;
@@ -118,47 +231,18 @@ const regenerate = (
 				"collection.id": targetCollectionId,
 			});
 
-			// 1. Discover addressbooks owned by this principal.
-			const collections = yield* collSvc.listByOwner(principalId);
-			const addressbooks = collections.filter(
-				(c) => c.collectionType === "addressbook" && c.deletedAt === null,
-			);
-
-			// 2-3. Build the desired birthday map.
-			const desired = new Map<
-				string,
-				{
-					readonly fn: string;
-					readonly bday: string;
-					readonly component: IrComponent;
-				}
-			>();
-			for (const book of addressbooks) {
-				const cards = yield* cardRepo.listWithBday(book.id as CollectionId);
-				for (const card of cards) {
-					const built = buildBirthdayVevent({
-						cardUid: card.uid,
-						fn: card.fn,
-						bday: card.bday,
-					});
-					if (built !== null) {
-						desired.set(built.uid, {
-							fn: card.fn,
-							bday: card.bday,
-							component: built.component,
-						});
-					}
-				}
-			}
+			// 1-3. Discover the principal's addressbooks and the events they imply.
+			const desired = yield* collectDesiredBirthdays(principalId);
 
 			// 4. Snapshot existing birthday-UID instances in the target collection.
-			const existing =
+			const rows =
 				yield* entityRepo.listActiveInstancesWithUid(targetCollectionId);
-			const existingBirthdays = new Map(
-				existing
-					.filter((r) => r.logicalUid?.endsWith(BIRTHDAY_UID_SUFFIX) ?? false)
-					.map((r) => [r.logicalUid as string, r] as const),
-			);
+			const existingBirthdays = new Map<string, ExistingBirthday>();
+			for (const row of rows) {
+				if (row.logicalUid?.endsWith(BIRTHDAY_UID_SUFFIX) === true) {
+					existingBirthdays.set(row.logicalUid, row);
+				}
+			}
 
 			let inserted = 0;
 			let updated = 0;
@@ -166,59 +250,19 @@ const regenerate = (
 
 			// 5a. Insert/update.
 			for (const [uid, want] of desired) {
-				const canonical = yield* encodeICalendar(
-					wrapInVcalendar(want.component),
-				);
-				const etag = ETag(yield* makeEtag(canonical));
-				const contentLength = new TextEncoder().encode(canonical).byteLength;
+				const payload = yield* encodeBirthday(uid, want.component);
 				const prev = existingBirthdays.get(uid);
-
 				if (prev === undefined) {
 					yield* withTransaction(
-						Effect.gen(function* () {
-							const entityRow = yield* entityRepo.insert({
-								entityType: "icalendar",
-								logicalUid: uid,
-							});
-							yield* componentRepo.insertTree(
-								EntityId(entityRow.id),
-								want.component,
-							);
-							yield* instanceSvc.put({
-								collectionId: targetCollectionId,
-								entityId: EntityId(entityRow.id),
-								contentType: "text/calendar",
-								etag,
-								slug: slugFromUid(uid),
-								contentLength,
-							});
-						}),
+						insertBirthday(targetCollectionId, payload),
 					).pipe(Effect.provideService(DatabaseClient, db));
 					inserted += 1;
-					continue;
+				} else if (prev.etag !== payload.etag) {
+					yield* withTransaction(
+						replaceBirthday(targetCollectionId, payload, prev),
+					).pipe(Effect.provideService(DatabaseClient, db));
+					updated += 1;
 				}
-
-				if (prev.etag === etag) {
-					continue;
-				}
-				yield* withTransaction(
-					Effect.gen(function* () {
-						yield* componentRepo.deleteByEntity(prev.entityId);
-						yield* componentRepo.insertTree(prev.entityId, want.component);
-						yield* instanceSvc.put(
-							{
-								collectionId: targetCollectionId,
-								entityId: prev.entityId,
-								contentType: "text/calendar",
-								etag,
-								slug: Slug(prev.slug),
-								contentLength,
-							},
-							prev.instanceId,
-						);
-					}),
-				).pipe(Effect.provideService(DatabaseClient, db));
-				updated += 1;
 			}
 
 			// 5b. Delete birthdays whose source card lost its BDAY.

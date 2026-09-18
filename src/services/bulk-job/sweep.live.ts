@@ -1,6 +1,9 @@
 import { Duration, Effect, Layer, Schedule } from "effect";
 import { Temporal } from "temporal-polyfill";
-import { BulkJobRepository } from "./repository.ts";
+import {
+	BulkJobRepository,
+	type BulkJobRepositoryShape,
+} from "./repository.ts";
 
 // ---------------------------------------------------------------------------
 // BulkJobSweepLayer — periodic sweep fiber (first tick fires immediately at
@@ -17,26 +20,29 @@ import { BulkJobRepository } from "./repository.ts";
 const SWEEP_INTERVAL_MINUTES = 5;
 const STALE_AFTER_HOURS = 1;
 
+/** One sweep tick: fail abandoned jobs and drop result blobs past their TTL. */
+const sweepOnce = Effect.fn("scheduler.bulk-job-sweep.tick")(function* (
+	jobRepo: BulkJobRepositoryShape,
+) {
+	const now = Temporal.Now.instant();
+	yield* jobRepo.failStaleRunning(
+		now.subtract(Temporal.Duration.from({ hours: STALE_AFTER_HOURS })),
+	);
+	const expired = yield* jobRepo.listExpiredBlobs(now);
+	yield* Effect.forEach(expired, (job) => jobRepo.clearBlob(job.id), {
+		discard: true,
+	});
+});
+
 export const BulkJobSweepLayer = Layer.effectDiscard(
 	Effect.gen(function* () {
 		const jobRepo = yield* BulkJobRepository;
-
-		const sweep = Effect.gen(function* () {
-			const now = Temporal.Now.instant();
-			yield* jobRepo.failStaleRunning(
-				now.subtract(Temporal.Duration.from({ hours: STALE_AFTER_HOURS })),
-			);
-			const expired = yield* jobRepo.listExpiredBlobs(now);
-			yield* Effect.forEach(expired, (job) => jobRepo.clearBlob(job.id), {
-				discard: true,
-			});
-		});
 
 		yield* Effect.logInfo("scheduler.bulk-job-sweep: starting sweep fiber", {
 			intervalMinutes: SWEEP_INTERVAL_MINUTES,
 			staleAfterHours: STALE_AFTER_HOURS,
 		});
-		yield* sweep.pipe(
+		yield* sweepOnce(jobRepo).pipe(
 			Effect.catchCause((cause) =>
 				Effect.logWarning("scheduler.bulk-job-sweep: tick failed", { cause }),
 			),

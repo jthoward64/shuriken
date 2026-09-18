@@ -49,6 +49,62 @@ const wrapInDoc = (
 
 const newUid = (): string => `urn:uuid:${crypto.randomUUID()}`;
 
+/** Persists a new contact: entity row, VCARD tree and collection instance. */
+const insertCard = Effect.fn("CardEditService.insertCard")(function* (input: {
+	readonly addressbookId: CollectionId;
+	readonly uid: string;
+	readonly vcard: IrComponent;
+	readonly etag: ETag;
+	readonly slug: Slug;
+	readonly contentLength: number;
+}) {
+	const componentRepo = yield* ComponentRepository;
+	const entityRepo = yield* EntityRepository;
+	const instanceSvc = yield* InstanceService;
+	const entityRow = yield* entityRepo.insert({
+		entityType: "vcard",
+		logicalUid: input.uid,
+	});
+	const eid = EntityId(entityRow.id);
+	yield* componentRepo.insertTree(eid, input.vcard);
+	const instance = yield* instanceSvc.put({
+		collectionId: input.addressbookId,
+		entityId: eid,
+		contentType: "text/vcard",
+		etag: input.etag,
+		slug: input.slug,
+		contentLength: input.contentLength,
+	});
+	return { entityId: eid, instanceId: instance.id as InstanceId };
+});
+
+/** Rewrites an existing contact's tree and bumps its instance etag. */
+const rewriteCard = Effect.fn("CardEditService.rewriteCard")(function* (input: {
+	readonly collectionId: CollectionId;
+	readonly entityId: EntityId;
+	readonly instanceId: InstanceId;
+	readonly vcard: IrComponent;
+	readonly etag: ETag;
+	readonly slug: Slug;
+	readonly contentLength: number;
+}) {
+	const componentRepo = yield* ComponentRepository;
+	const instanceSvc = yield* InstanceService;
+	yield* componentRepo.deleteByEntity(input.entityId);
+	yield* componentRepo.insertTree(input.entityId, input.vcard);
+	yield* instanceSvc.put(
+		{
+			collectionId: input.collectionId,
+			entityId: input.entityId,
+			contentType: "text/vcard",
+			etag: input.etag,
+			slug: input.slug,
+			contentLength: input.contentLength,
+		},
+		input.instanceId,
+	);
+});
+
 const create = (
 	addressbookId: CollectionId,
 	form: ContactFormData,
@@ -68,9 +124,6 @@ const create = (
 	| InstanceService
 > =>
 	Effect.gen(function* () {
-		const componentRepo = yield* ComponentRepository;
-		const entityRepo = yield* EntityRepository;
-		const instanceSvc = yield* InstanceService;
 		const db = yield* DatabaseClient;
 
 		const uid = newUid();
@@ -81,23 +134,7 @@ const create = (
 		const contentLength = new TextEncoder().encode(canonical).byteLength;
 
 		const { entityId, instanceId } = yield* withTransaction(
-			Effect.gen(function* () {
-				const entityRow = yield* entityRepo.insert({
-					entityType: "vcard",
-					logicalUid: uid,
-				});
-				const eid = EntityId(entityRow.id);
-				yield* componentRepo.insertTree(eid, vcard);
-				const instance = yield* instanceSvc.put({
-					collectionId: addressbookId,
-					entityId: eid,
-					contentType: "text/vcard",
-					etag,
-					slug,
-					contentLength,
-				});
-				return { entityId: eid, instanceId: instance.id as InstanceId };
-			}),
+			insertCard({ addressbookId, uid, vcard, etag, slug, contentLength }),
 		).pipe(Effect.provideService(DatabaseClient, db));
 
 		yield* fireAndForgetBirthdayRegenerate(addressbookId);
@@ -154,20 +191,14 @@ const update = (
 		const contentLength = new TextEncoder().encode(canonical).byteLength;
 
 		yield* withTransaction(
-			Effect.gen(function* () {
-				yield* componentRepo.deleteByEntity(existingEntityId);
-				yield* componentRepo.insertTree(existingEntityId, vcard);
-				yield* instanceSvc.put(
-					{
-						collectionId: existingCollectionId,
-						entityId: existingEntityId,
-						contentType: "text/vcard",
-						etag,
-						slug: Slug(existing.slug),
-						contentLength,
-					},
-					instanceId,
-				);
+			rewriteCard({
+				collectionId: existingCollectionId,
+				entityId: existingEntityId,
+				instanceId,
+				vcard,
+				etag,
+				slug: Slug(existing.slug),
+				contentLength,
 			}),
 		).pipe(Effect.provideService(DatabaseClient, db));
 
@@ -240,20 +271,14 @@ const removePhoto = (
 		const contentLength = new TextEncoder().encode(canonical).byteLength;
 
 		yield* withTransaction(
-			Effect.gen(function* () {
-				yield* componentRepo.deleteByEntity(entityId);
-				yield* componentRepo.insertTree(entityId, stripped);
-				yield* instanceSvc.put(
-					{
-						collectionId: CollectionId(existing.collectionId),
-						entityId,
-						contentType: "text/vcard",
-						etag,
-						slug: Slug(existing.slug),
-						contentLength,
-					},
-					instanceId,
-				);
+			rewriteCard({
+				collectionId: CollectionId(existing.collectionId),
+				entityId,
+				instanceId,
+				vcard: stripped,
+				etag,
+				slug: Slug(existing.slug),
+				contentLength,
 			}),
 		).pipe(Effect.provideService(DatabaseClient, db));
 

@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import { Temporal } from "temporal-polyfill";
 import { AppConfigService } from "#src/config.ts";
 import type {
@@ -17,6 +17,11 @@ import { isHtmxRequest } from "#src/http/ui/helpers/htmx.ts";
 import { buildNavContext } from "#src/http/ui/helpers/nav-context.ts";
 import type { UiPageOpts } from "#src/http/ui/helpers/page-opts.ts";
 import { listOwnedAndShared } from "#src/http/ui/helpers/shared-collections.ts";
+import {
+	parseFloatingInstant,
+	parsePlainDate,
+	parsePlainDateTime,
+} from "#src/http/ui/helpers/temporal-parse.ts";
 import {
 	notModifiedPageResponse,
 	PageCacheService,
@@ -67,69 +72,68 @@ const STATUS_LABELS: Record<string, string> = {
 	CANCELLED: "Cancelled",
 };
 
-const dueInstant = (task: TaskView): Temporal.Instant | null => {
-	if (task.due === null) {
-		return null;
-	}
-	try {
-		return task.allDay
-			? Temporal.PlainDate.from(task.due).toZonedDateTime("UTC").toInstant()
-			: Temporal.PlainDateTime.from(task.due)
-					.toZonedDateTime("UTC")
-					.toInstant();
-	} catch {
-		return null;
-	}
-};
+// The due date as an instant; due dates are stored floating and read as UTC here
+const dueInstant = (task: TaskView): Option.Option<Temporal.Instant> =>
+	task.due === null
+		? Option.none()
+		: parseFloatingInstant(task.due, task.allDay, "UTC");
 
+const pad2 = (n: number): string => String(n).padStart(2, "0");
+
+// Human due-date label; an unparseable value falls back to the raw string
 const dueLabel = (task: TaskView): string => {
 	if (task.due === null) {
 		return "No due date";
 	}
-	try {
-		if (task.allDay) {
-			const d = Temporal.PlainDate.from(task.due);
-			return `Due ${MONTH_NAMES[d.month - 1]} ${d.day}, ${d.year}`;
-		}
-		const dt = Temporal.PlainDateTime.from(task.due);
-		const pad = (n: number) => String(n).padStart(2, "0");
-		return `Due ${MONTH_NAMES[dt.month - 1]} ${dt.day}, ${dt.year} ${pad(dt.hour)}:${pad(dt.minute)}`;
-	} catch {
-		return `Due ${task.due}`;
+	const raw = `Due ${task.due}`;
+	if (task.allDay) {
+		return Option.match(parsePlainDate(task.due), {
+			onNone: () => raw,
+			onSome: (d) => `Due ${MONTH_NAMES[d.month - 1]} ${d.day}, ${d.year}`,
+		});
 	}
+	return Option.match(parsePlainDateTime(task.due), {
+		onNone: () => raw,
+		onSome: (dt) =>
+			`Due ${MONTH_NAMES[dt.month - 1]} ${dt.day}, ${dt.year} ${pad2(dt.hour)}:${pad2(dt.minute)}`,
+	});
 };
 
-const priorityLabel = (priority: number | null): string | null => {
+const priorityLabel = (priority: number | null): Option.Option<string> => {
 	if (priority === null) {
-		return null;
+		return Option.none();
 	}
 	if (priority === 0) {
-		return "None";
+		return Option.some("None");
 	}
 	const highMax = 4;
 	const mediumMax = 5;
 	if (priority <= highMax) {
-		return `High (${priority})`;
+		return Option.some(`High (${priority})`);
 	}
 	if (priority === mediumMax) {
-		return `Medium (${priority})`;
+		return Option.some(`Medium (${priority})`);
 	}
-	return `Low (${priority})`;
+	return Option.some(`Low (${priority})`);
 };
 
 const toRow = (task: TaskView, now: Temporal.Instant): TaskRow => {
 	const completed = task.status === "COMPLETED";
-	const due = dueInstant(task);
+	const overdue =
+		!completed &&
+		Option.exists(
+			dueInstant(task),
+			(due) => Temporal.Instant.compare(due, now) < 0,
+		);
 	return {
 		id: task.id,
 		title: task.title,
 		dueLabel: dueLabel(task),
-		overdue:
-			!completed && due !== null && Temporal.Instant.compare(due, now) < 0,
+		overdue,
 		status: task.status,
 		statusLabel: STATUS_LABELS[task.status] ?? task.status,
 		completed,
-		priorityLabel: priorityLabel(task.priority),
+		priorityLabel: Option.getOrNull(priorityLabel(task.priority)),
 		recurring: task.recurring,
 	};
 };

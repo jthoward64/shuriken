@@ -48,7 +48,7 @@ END:VEVENT
 END:VCALENDAR
 `;
 
-const setupAlice = Effect.gen(function* () {
+const setupAlice = Effect.fn("import-ics.test.setupAlice")(function* () {
 	const prov = yield* ProvisioningService;
 	const alice = yield* prov
 		.provisionUser({
@@ -64,7 +64,7 @@ describe("importIcs (integration)", () => {
 	it("inserts new events on first import", async () => {
 		const runtime = ManagedRuntime.make(makeScriptRunnerLayer());
 		try {
-			const calendarId = await runtime.runPromise(setupAlice);
+			const calendarId = await runtime.runPromise(setupAlice());
 			const result = await runtime.runPromise(
 				importIcs(calendarId, SAMPLE_ICS, "skip"),
 			);
@@ -79,7 +79,7 @@ describe("importIcs (integration)", () => {
 	it("error mode aborts on conflict, no rows written", async () => {
 		const runtime = ManagedRuntime.make(makeScriptRunnerLayer());
 		try {
-			const calendarId = await runtime.runPromise(setupAlice);
+			const calendarId = await runtime.runPromise(setupAlice());
 			await runtime.runPromise(importIcs(calendarId, SAMPLE_ICS, "skip"));
 			const result = await runtime.runPromise(
 				importIcs(calendarId, REIMPORT_ICS, "error"),
@@ -95,7 +95,7 @@ describe("importIcs (integration)", () => {
 	it("skip mode imports new events only", async () => {
 		const runtime = ManagedRuntime.make(makeScriptRunnerLayer());
 		try {
-			const calendarId = await runtime.runPromise(setupAlice);
+			const calendarId = await runtime.runPromise(setupAlice());
 			await runtime.runPromise(importIcs(calendarId, SAMPLE_ICS, "skip"));
 			const result = await runtime.runPromise(
 				importIcs(calendarId, REIMPORT_ICS, "skip"),
@@ -111,7 +111,7 @@ describe("importIcs (integration)", () => {
 	it("merge mode replaces existing events by UID", async () => {
 		const runtime = ManagedRuntime.make(makeScriptRunnerLayer());
 		try {
-			const calendarId = await runtime.runPromise(setupAlice);
+			const calendarId = await runtime.runPromise(setupAlice());
 			await runtime.runPromise(importIcs(calendarId, SAMPLE_ICS, "skip"));
 			const result = await runtime.runPromise(
 				importIcs(calendarId, REIMPORT_ICS, "merge"),

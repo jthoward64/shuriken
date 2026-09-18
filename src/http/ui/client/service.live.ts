@@ -38,6 +38,34 @@ export const ENTRIES: ReadonlyArray<{
 export const cssNameFor = (name: string): string =>
 	name.replace(JS_EXTENSION, ".css");
 
+// Read one compiled asset off disk and record it with a strong ETag
+const loadAsset = Effect.fn("ui.clientJs.loadAsset")(function* (
+	assets: Map<string, ClientAsset>,
+	assetPath: string,
+	name: string,
+) {
+	const files = yield* FileService;
+	const code = yield* files.readText(assetPath).pipe(
+		Effect.catch((cause: InternalError) =>
+			Effect.fail(
+				new InternalError({
+					cause: new Error(
+						`missing compiled client asset at ${assetPath} - run \`deno task ui:js\``,
+						{ cause },
+					),
+				}),
+			),
+		),
+	);
+	const etag = yield* strongEtag(code);
+	assets.set(name, { code, etag });
+	yield* Effect.logInfo("loaded client asset", {
+		name,
+		bytes: code.length,
+		etag,
+	});
+});
+
 export const ClientJsServiceLive = Layer.effect(
 	ClientJsService,
 	Effect.gen(function* () {
@@ -45,37 +73,14 @@ export const ClientJsServiceLive = Layer.effect(
 		const config = yield* AppConfigService;
 		const assets = new Map<string, ClientAsset>();
 
-		const load = (name: string) =>
-			Effect.gen(function* () {
-				const assetPath = uiAssetPath(config, name);
-				const code = yield* files.readText(assetPath).pipe(
-					Effect.catch((cause: InternalError) =>
-						Effect.fail(
-							new InternalError({
-								cause: new Error(
-									`missing compiled client asset at ${assetPath} — run \`deno task ui:js\``,
-									{ cause },
-								),
-							}),
-						),
-					),
-				);
-				const etag = yield* strongEtag(code);
-				assets.set(name, { code, etag });
-				yield* Effect.logInfo("loaded client asset", {
-					name,
-					bytes: code.length,
-					etag,
-				});
-			});
-
 		for (const { name } of ENTRIES) {
-			yield* load(name);
+			yield* loadAsset(assets, uiAssetPath(config, name), name);
 			// Only entries importing a stylesheet for side effect emit one, so a
 			// missing .css is expected rather than a misconfigured build.
 			const cssName = cssNameFor(name);
-			if (yield* files.exists(uiAssetPath(config, cssName))) {
-				yield* load(cssName);
+			const cssPath = uiAssetPath(config, cssName);
+			if (yield* files.exists(cssPath)) {
+				yield* loadAsset(assets, cssPath, cssName);
 			}
 		}
 

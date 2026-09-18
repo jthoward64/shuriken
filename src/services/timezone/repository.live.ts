@@ -19,6 +19,10 @@ const tzDuration = repoQueryDurationMs.pipe(
 	Metric.withAttributes({ "repo.entity": "timezone" }),
 );
 
+/** The timezone-repository timer, tagged with the operation being measured. */
+const opDuration = (operation: string) =>
+	tzDuration.pipe(Metric.withAttributes({ "repo.operation": operation }));
+
 const findByTzid = Effect.fn("CalTimezoneRepository.findByTzid")(
 	function* (tzid: string) {
 		yield* Effect.annotateCurrentSpan({ "tz.tzid": tzid });
@@ -27,11 +31,7 @@ const findByTzid = Effect.fn("CalTimezoneRepository.findByTzid")(
 			db.select().from(calTimezone).where(eq(calTimezone.tzid, tzid)).limit(1),
 		).pipe(
 			Effect.map((r) => Option.fromNullishOr(r[0])),
-			trackDuration(
-				tzDuration.pipe(
-					Metric.withAttributes({ "repo.operation": "findByTzid" }),
-				),
-			),
+			trackDuration(opDuration("findByTzid")),
 		);
 	},
 	Effect.tapError((e) =>
@@ -52,6 +52,13 @@ const upsert = Effect.fn("CalTimezoneRepository.upsert")(
 			hasIanaName: Option.isSome(ianaName),
 			hasLastModified: Option.isSome(lastModified),
 		});
+		// Use sql cast to avoid temporal-polyfill vs temporal-spec type conflict.
+		// The custom type's toDriver (Instant → ISO string) is bypassed here;
+		// we perform the same conversion manually and let PG parse it.
+		const lastModifiedAt = Option.match(lastModified, {
+			onNone: () => null,
+			onSome: (inst) => sql`${inst.toString()}::timestamptz`,
+		});
 		return yield* runDbQuery((db) =>
 			db
 				.insert(calTimezone)
@@ -59,13 +66,7 @@ const upsert = Effect.fn("CalTimezoneRepository.upsert")(
 					tzid,
 					vtimezoneData,
 					ianaName: Option.getOrNull(ianaName),
-					// Use sql cast to avoid temporal-polyfill vs temporal-spec type conflict.
-					// The custom type's toDriver (Instant → ISO string) is bypassed here;
-					// we perform the same conversion manually and let PG parse it.
-					lastModifiedAt: Option.match(lastModified, {
-						onNone: () => null,
-						onSome: (inst) => sql`${inst.toString()}::timestamptz`,
-					}),
+					lastModifiedAt,
 				})
 				.onConflictDoUpdate({
 					target: calTimezone.tzid,
@@ -103,9 +104,7 @@ const upsert = Effect.fn("CalTimezoneRepository.upsert")(
 				}
 				return Effect.succeed(row);
 			}),
-			trackDuration(
-				tzDuration.pipe(Metric.withAttributes({ "repo.operation": "upsert" })),
-			),
+			trackDuration(opDuration("upsert")),
 		);
 	},
 	Effect.tapError((e) =>

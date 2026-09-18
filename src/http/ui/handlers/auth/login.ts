@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import { Temporal } from "temporal-polyfill";
 import { AppConfigService } from "#src/config.ts";
 import type { DatabaseError } from "#src/domain/errors.ts";
@@ -10,6 +10,7 @@ import {
 } from "#src/http/status.ts";
 import {
 	oidcRedirectUri,
+	oidcStepFailed,
 	sanitizeReturnTo,
 } from "#src/http/ui/handlers/auth/helpers.ts";
 import { OidcService } from "#src/services/oidc/service.ts";
@@ -47,21 +48,18 @@ export const loginHandler = (
 		const redirectUri = oidcRedirectUri(ctx.url.origin, cfg);
 		const returnTo = sanitizeReturnTo(ctx.url.searchParams.get("returnTo"));
 
-		const start = yield* oidc.beginLogin({ redirectUri }).pipe(
+		const startOpt = yield* oidc.beginLogin({ redirectUri }).pipe(
+			Effect.map(Option.some),
 			Effect.catchTag("OidcError", (e) =>
-				Effect.as(
-					Effect.logWarning("auth.oidc: beginLogin failed", {
-						reason: e.reason,
-					}),
-					null,
-				),
+				oidcStepFailed("beginLogin", e.reason),
 			),
 		);
-		if (start === null) {
+		if (Option.isNone(startOpt)) {
 			return new Response("Sign-in is temporarily unavailable", {
 				status: HTTP_BAD_GATEWAY,
 			});
 		}
+		const start = startOpt.value;
 
 		yield* loginRepo.create({
 			state: start.state,

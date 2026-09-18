@@ -4,11 +4,7 @@ import { Effect, ManagedRuntime, Option } from "effect";
 import { makeEtag } from "#src/data/etag.ts";
 import { decodeVCard, encodeVCard } from "#src/data/vcard/codec.ts";
 import { baseName, getText } from "#src/data/vcard/prop.ts";
-import {
-	type CollectionId,
-	EntityId,
-	type InstanceId,
-} from "#src/domain/ids.ts";
+import { CollectionId, EntityId, type InstanceId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import { Email, ETag } from "#src/domain/types/strings.ts";
 import { CardEditService } from "#src/services/card-edit/service.ts";
@@ -58,7 +54,7 @@ describe("CardEditService.update (non-destructive)", () => {
 							slug: Slug("edit-preserve"),
 						})
 						.pipe(Effect.orDie);
-					const ab = alice.addressBook.id as CollectionId;
+					const ab = CollectionId(alice.addressBook.id);
 
 					const doc = yield* decodeVCard(APPLE_CARD);
 					const canonical = yield* encodeVCard(doc);

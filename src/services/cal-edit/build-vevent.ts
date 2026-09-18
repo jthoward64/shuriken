@@ -1,4 +1,5 @@
 /** biome-ignore-all lint/style/noMagicNumbers: date/time padding lengths */
+import { Option } from "effect";
 import { Temporal } from "temporal-polyfill";
 import type { IrComponent, IrProperty } from "#src/data/ir.ts";
 import type { EventFormData } from "./types.ts";
@@ -24,21 +25,15 @@ const textProp = (name: string, value: string): IrProperty => ({
 	isKnown: true,
 });
 
-const tryPlainDate = (raw: string): Temporal.PlainDate | null => {
-	try {
-		return Temporal.PlainDate.from(raw);
-	} catch {
-		return null;
-	}
-};
+/** Parses an ISO date, absent when the value is not a valid calendar date */
+const plainDateFrom = Option.liftThrowable((raw: string) =>
+	Temporal.PlainDate.from(raw),
+);
 
-const tryPlainDateTime = (raw: string): Temporal.PlainDateTime | null => {
-	try {
-		return Temporal.PlainDateTime.from(raw);
-	} catch {
-		return null;
-	}
-};
+/** Parses a floating ISO date-time, absent when the value is not a valid one */
+const plainDateTimeFrom = Option.liftThrowable((raw: string) =>
+	Temporal.PlainDateTime.from(raw),
+);
 
 /**
  * Formats the RRULE UNTIL value to match DTSTART's form.
@@ -53,67 +48,66 @@ const tryPlainDateTime = (raw: string): Temporal.PlainDateTime | null => {
  * which shifts the end of the series by each reader's UTC offset and can add or
  * drop the final occurrence.
  */
-const formatRruleUntil = (raw: string, allDay: boolean): string | null => {
+const pad = (n: number, width = 2): string => String(n).padStart(width, "0");
+
+const formatRruleUntil = (
+	raw: string,
+	allDay: boolean,
+): Option.Option<string> => {
 	if (raw === "") {
-		return null;
+		return Option.none();
 	}
-	const pad = (n: number, width = 2): string => String(n).padStart(width, "0");
 	if (allDay) {
-		const d = tryPlainDate(raw);
-		if (!d) {
-			return null;
-		}
-		return `${pad(d.year, 4)}${pad(d.month)}${pad(d.day)}`;
+		return Option.map(
+			plainDateFrom(raw),
+			(d) => `${pad(d.year, 4)}${pad(d.month)}${pad(d.day)}`,
+		);
 	}
-	const dt = tryPlainDateTime(raw);
-	if (!dt) {
-		return null;
-	}
-	const date = `${pad(dt.year, 4)}${pad(dt.month)}${pad(dt.day)}`;
-	const time = `${pad(dt.hour)}${pad(dt.minute)}${pad(dt.second)}`;
-	return `${date}T${time}`;
+	return Option.map(
+		plainDateTimeFrom(raw),
+		(dt) =>
+			`${pad(dt.year, 4)}${pad(dt.month)}${pad(dt.day)}T${pad(dt.hour)}${pad(dt.minute)}${pad(dt.second)}`,
+	);
 };
 
 const buildDtProp = (
 	name: "DTSTART" | "DTEND",
 	raw: string,
 	allDay: boolean,
-): IrProperty | null => {
+): Option.Option<IrProperty> => {
 	if (raw === "") {
-		return null;
+		return Option.none();
 	}
 	if (allDay) {
-		const d = tryPlainDate(raw);
-		if (!d) {
-			return null;
-		}
-		return {
+		return Option.map(plainDateFrom(raw), (d) => ({
 			name,
 			parameters: [{ name: "VALUE", value: "DATE" }],
-			value: { type: "DATE", value: d },
+			value: { type: "DATE" as const, value: d },
 			isKnown: true,
-		};
+		}));
 	}
-	const dt = tryPlainDateTime(raw);
-	if (!dt) {
-		return null;
-	}
-	return {
+	return Option.map(plainDateTimeFrom(raw), (dt) => ({
 		name,
 		parameters: [],
-		value: { type: "PLAIN_DATE_TIME", value: dt },
+		value: { type: "PLAIN_DATE_TIME" as const, value: dt },
 		isKnown: true,
-	};
+	}));
 };
 
 export const buildVeventComponent = (
 	uid: string,
 	form: EventFormData,
-): IrComponent | null => {
-	const dtstart = buildDtProp("DTSTART", form.start, form.allDay);
-	if (!dtstart) {
-		return null;
-	}
+): Option.Option<IrComponent> =>
+	Option.map(buildDtProp("DTSTART", form.start, form.allDay), (dtstart) =>
+		assembleVevent(uid, form, dtstart),
+	);
+
+/** Assembles the VEVENT body once DTSTART has been accepted. */
+const assembleVevent = (
+	uid: string,
+	form: EventFormData,
+	dtstart: IrProperty,
+): IrComponent => {
 	const props: Array<IrProperty> = [
 		{
 			name: "UID",
@@ -124,10 +118,7 @@ export const buildVeventComponent = (
 		textProp("SUMMARY", form.summary),
 		dtstart,
 	];
-	const dtend = buildDtProp("DTEND", form.end, form.allDay);
-	if (dtend) {
-		props.push(dtend);
-	}
+	props.push(...Option.toArray(buildDtProp("DTEND", form.end, form.allDay)));
 	if (form.description !== "") {
 		props.push(textProp("DESCRIPTION", form.description));
 	}
@@ -177,10 +168,14 @@ export const buildVeventComponent = (
 		if (Number.isFinite(count) && count > 0) {
 			parts.push(`COUNT=${count}`);
 		} else {
-			const until = formatRruleUntil(form.recurrenceUntil, form.allDay);
-			if (until !== null) {
-				parts.push(`UNTIL=${until}`);
-			}
+			parts.push(
+				...Option.toArray(
+					Option.map(
+						formatRruleUntil(form.recurrenceUntil, form.allDay),
+						(until) => `UNTIL=${until}`,
+					),
+				),
+			);
 		}
 		props.push({
 			name: "RRULE",

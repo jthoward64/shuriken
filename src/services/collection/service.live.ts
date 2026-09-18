@@ -4,10 +4,14 @@ import { withTransaction } from "#src/db/transaction.ts";
 import { noneOrConflict, someOrNotFound } from "#src/domain/errors.ts";
 import type { CollectionId, PrincipalId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
-import { AclRepository } from "#src/services/acl/repository.ts";
+import {
+	AclRepository,
+	type AclRepositoryShape,
+} from "#src/services/acl/repository.ts";
 import {
 	type CollectionPropertyChanges,
 	CollectionRepository,
+	type CollectionRepositoryShape,
 	type CollectionType,
 	type NewCollection,
 } from "./repository.ts";
@@ -16,6 +20,28 @@ import { CollectionService } from "./service.ts";
 // ---------------------------------------------------------------------------
 // CollectionService — live implementation
 // ---------------------------------------------------------------------------
+
+/** Inserts a collection and grants its owner the protected DAV:all ACE. */
+const insertOwnedCollection = Effect.fn("CollectionService.insertOwned")(
+	function* (
+		repo: CollectionRepositoryShape,
+		aclRepo: AclRepositoryShape,
+		input: NewCollection,
+	) {
+		const collection = yield* repo.insert(input);
+		yield* aclRepo.grantAce({
+			resourceType: "collection",
+			resourceId: collection.id,
+			principalType: "principal",
+			principalId: input.ownerPrincipalId,
+			privilege: "DAV:all",
+			grantDeny: "grant",
+			protected: true,
+			ordinal: 0,
+		});
+		return collection;
+	},
+);
 
 export const CollectionServiceLive = Layer.effect(
 	CollectionService,
@@ -104,20 +130,7 @@ export const CollectionServiceLive = Layer.effect(
 						),
 					);
 				const collection = yield* withTransaction(
-					Effect.gen(function* () {
-						const c = yield* repo.insert(input);
-						yield* aclRepo.grantAce({
-							resourceType: "collection",
-							resourceId: c.id,
-							principalType: "principal",
-							principalId: input.ownerPrincipalId,
-							privilege: "DAV:all",
-							grantDeny: "grant",
-							protected: true,
-							ordinal: 0,
-						});
-						return c;
-					}),
+					insertOwnedCollection(repo, aclRepo, input),
 				).pipe(Effect.provideService(DatabaseClient, db));
 				yield* Effect.logDebug("collection.create: created", {
 					collectionId: collection.id,

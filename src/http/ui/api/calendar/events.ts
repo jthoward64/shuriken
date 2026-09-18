@@ -1,5 +1,5 @@
 import { Effect, Option } from "effect";
-import { Temporal } from "temporal-polyfill";
+import type { Temporal } from "temporal-polyfill";
 import type {
 	DatabaseError,
 	DavError,
@@ -8,6 +8,8 @@ import type {
 import type { CollectionId } from "#src/domain/ids.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
+import { encodeJson } from "#src/http/ui/helpers/json.ts";
+import { parseInstant } from "#src/http/ui/helpers/temporal-parse.ts";
 import {
 	notModifiedPageResponse,
 	PageCacheService,
@@ -25,21 +27,16 @@ import {
 	toFullCalendarEvent,
 } from "./collect-events.ts";
 
-/** Parse a FullCalendar `start`/`end` query param to an Instant, or null. */
+/**
+ * Parse a FullCalendar `start`/`end` query param to an Instant.
+ *
+ * Lenient: a missing or unparseable bound leaves that side open-ended (null)
+ * rather than erroring the feed.
+ */
 export const parseInstantParam = (
 	raw: string | null,
-): Temporal.Instant | null => {
-	if (raw === null || raw === "") {
-		return null;
-	}
-	try {
-		return Temporal.Instant.from(raw);
-	} catch {
-		// Lenient: an unparseable bound leaves that side open-ended rather than
-		// erroring the feed.
-		return null;
-	}
-};
+): Temporal.Instant | null =>
+	raw === null || raw === "" ? null : Option.getOrNull(parseInstant(raw));
 
 // ---------------------------------------------------------------------------
 // GET /ui/api/calendar/:collectionId/events?start=…&end=…
@@ -129,7 +126,7 @@ export const calendarEventsHandler = (
 		);
 
 		return withPageCacheHeaders(
-			new Response(JSON.stringify(events), {
+			new Response(encodeJson(events), {
 				status: 200,
 				headers: { "Content-Type": "application/json; charset=utf-8" },
 			}),

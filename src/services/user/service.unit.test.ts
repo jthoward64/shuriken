@@ -1,7 +1,7 @@
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
 import { Effect, Redacted } from "effect";
-import type { DavError } from "#src/domain/errors.ts";
+import { DavError } from "#src/domain/errors.ts";
 import { UserId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import { Email } from "#src/domain/types/strings.ts";
@@ -10,6 +10,14 @@ import { runFailure, runSuccess } from "#src/testing/effect.ts";
 import { makeTestEnv } from "#src/testing/env.ts";
 import type { NewUser } from "./service.ts";
 import { UserService } from "./service.ts";
+
+/** Narrows a test failure to a DavError so its status can be asserted. */
+const asDavError = (err: unknown): DavError => {
+	if (err instanceof DavError) {
+		return err;
+	}
+	throw new Error(`expected a DavError, got ${String(err)}`);
+};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -150,14 +158,16 @@ describe("UserService.update", () => {
 
 	it("fails with 404 for an unknown user id", async () => {
 		const env = makeTestEnv();
-		const err = (await runFailure(
-			UserService.pipe(
-				Effect.flatMap((s) =>
-					s.update(UserId(crypto.randomUUID()), { displayName: "Ghost" }),
+		const err = asDavError(
+			await runFailure(
+				UserService.pipe(
+					Effect.flatMap((s) =>
+						s.update(UserId(crypto.randomUUID()), { displayName: "Ghost" }),
+					),
+					Effect.provide(env.toLayer()),
 				),
-				Effect.provide(env.toLayer()),
 			),
-		)) as DavError;
+		);
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_NOT_FOUND);
 	});
@@ -168,14 +178,16 @@ describe("UserService.update", () => {
 			.withUser({ id: aliceId, email: "alice@example.com", slug: "alice" })
 			.withUser({ email: "bob@example.com", slug: "bob" });
 
-		const err = (await runFailure(
-			UserService.pipe(
-				Effect.flatMap((s) =>
-					s.update(UserId(aliceId), { email: Email("bob@example.com") }),
+		const err = asDavError(
+			await runFailure(
+				UserService.pipe(
+					Effect.flatMap((s) =>
+						s.update(UserId(aliceId), { email: Email("bob@example.com") }),
+					),
+					Effect.provide(env.toLayer()),
 				),
-				Effect.provide(env.toLayer()),
 			),
-		)) as DavError;
+		);
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_CONFLICT);
 	});
@@ -188,17 +200,19 @@ describe("UserService.update", () => {
 describe("UserService.addCredential", () => {
 	it("fails with 404 when the user does not exist", async () => {
 		const env = makeTestEnv();
-		const err = (await runFailure(
-			UserService.pipe(
-				Effect.flatMap((s) =>
-					s.addCredential(UserId(crypto.randomUUID()), {
-						source: "proxy",
-						authId: "nobody",
-					}),
+		const err = asDavError(
+			await runFailure(
+				UserService.pipe(
+					Effect.flatMap((s) =>
+						s.addCredential(UserId(crypto.randomUUID()), {
+							source: "proxy",
+							authId: "nobody",
+						}),
+					),
+					Effect.provide(env.toLayer()),
 				),
-				Effect.provide(env.toLayer()),
 			),
-		)) as DavError;
+		);
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_NOT_FOUND);
 	});
@@ -209,18 +223,20 @@ describe("UserService.addCredential", () => {
 			.withUser({ id: userId, email: "alice@example.com", slug: "alice" })
 			.withCredential({ userId, authSource: "local", authId: "alice" });
 
-		const err = (await runFailure(
-			UserService.pipe(
-				Effect.flatMap((s) =>
-					s.addCredential(UserId(userId), {
-						source: "local",
-						authId: "alice",
-						password: Redacted.make("newpass"),
-					}),
+		const err = asDavError(
+			await runFailure(
+				UserService.pipe(
+					Effect.flatMap((s) =>
+						s.addCredential(UserId(userId), {
+							source: "local",
+							authId: "alice",
+							password: Redacted.make("newpass"),
+						}),
+					),
+					Effect.provide(env.toLayer()),
 				),
-				Effect.provide(env.toLayer()),
 			),
-		)) as DavError;
+		);
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_CONFLICT);
 	});
@@ -251,18 +267,20 @@ describe("UserService.addCredential", () => {
 		);
 
 		// Duplicate add must conflict
-		const addErr = (await runFailure(
-			UserService.pipe(
-				Effect.flatMap((s) =>
-					s.addCredential(UserId(userId), {
-						source: "local",
-						authId: "alice-tmp",
-						password: Redacted.make("pass2"),
-					}),
+		const addErr = asDavError(
+			await runFailure(
+				UserService.pipe(
+					Effect.flatMap((s) =>
+						s.addCredential(UserId(userId), {
+							source: "local",
+							authId: "alice-tmp",
+							password: Redacted.make("pass2"),
+						}),
+					),
+					Effect.provide(layer),
 				),
-				Effect.provide(layer),
 			),
-		)) as DavError;
+		);
 		expect(addErr.status).toBe(HTTP_CONFLICT);
 
 		// Remove clears the credential
@@ -296,14 +314,16 @@ describe("UserService.addCredential", () => {
 describe("UserService.removeCredential", () => {
 	it("fails with 404 when the user does not exist", async () => {
 		const env = makeTestEnv();
-		const err = (await runFailure(
-			UserService.pipe(
-				Effect.flatMap((s) =>
-					s.removeCredential(UserId(crypto.randomUUID()), "local", "nobody"),
+		const err = asDavError(
+			await runFailure(
+				UserService.pipe(
+					Effect.flatMap((s) =>
+						s.removeCredential(UserId(crypto.randomUUID()), "local", "nobody"),
+					),
+					Effect.provide(env.toLayer()),
 				),
-				Effect.provide(env.toLayer()),
 			),
-		)) as DavError;
+		);
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_NOT_FOUND);
 	});

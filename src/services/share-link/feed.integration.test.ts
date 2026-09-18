@@ -2,11 +2,7 @@ import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
 import { Effect, ManagedRuntime } from "effect";
 import { Temporal } from "temporal-polyfill";
-import {
-	type CollectionId,
-	type PrincipalId,
-	UserId,
-} from "#src/domain/ids.ts";
+import { CollectionId, PrincipalId, UserId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import { Email } from "#src/domain/types/strings.ts";
 import { handleRequest } from "#src/http/router.ts";
@@ -30,48 +26,47 @@ END:VEVENT
 END:VCALENDAR
 `;
 
-const setup = (
+const setup = Effect.fn("share-link.test.setup")(function* (
 	visibility: "all" | "limited" | "free_busy",
 	overrides?: { readonly enabled?: boolean; readonly expired?: boolean },
-) =>
-	Effect.gen(function* () {
-		const prov = yield* ProvisioningService;
-		const alice = yield* prov
-			.provisionUser({
-				email: Email("alice@example.com"),
-				name: "Alice",
-				slug: Slug("alice"),
-			})
+) {
+	const prov = yield* ProvisioningService;
+	const alice = yield* prov
+		.provisionUser({
+			email: Email("alice@example.com"),
+			name: "Alice",
+			slug: Slug("alice"),
+		})
+		.pipe(Effect.orDie);
+	const calendarId = CollectionId(alice.calendar.id);
+	const userId = UserId(alice.user.user.id);
+	const principalId = PrincipalId(alice.user.principal.id);
+
+	yield* importIcs(calendarId, ICS, "skip").pipe(Effect.orDie);
+
+	const svc = yield* ShareLinkService;
+	const expiresAt = overrides?.expired
+		? Temporal.Now.instant().subtract({ hours: 1 })
+		: null;
+	const summary = yield* svc
+		.create(
+			{ userId, principalId },
+			{
+				displayName: "test",
+				expiresAt,
+				calendars: [{ calendarId, visibility }],
+			},
+		)
+		.pipe(Effect.orDie);
+	const token = summary.link.token;
+
+	if (overrides?.enabled === false) {
+		yield* svc
+			.update(summary.link.id, { userId, principalId }, { enabled: false })
 			.pipe(Effect.orDie);
-		const calendarId = alice.calendar.id as CollectionId;
-		const userId = UserId(alice.user.user.id);
-		const principalId = alice.user.principal.id as PrincipalId;
-
-		yield* importIcs(calendarId, ICS, "skip").pipe(Effect.orDie);
-
-		const svc = yield* ShareLinkService;
-		const expiresAt = overrides?.expired
-			? Temporal.Now.instant().subtract({ hours: 1 })
-			: null;
-		const summary = yield* svc
-			.create(
-				{ userId, principalId },
-				{
-					displayName: "test",
-					expiresAt,
-					calendars: [{ calendarId, visibility }],
-				},
-			)
-			.pipe(Effect.orDie);
-		const token = summary.link.token;
-
-		if (overrides?.enabled === false) {
-			yield* svc
-				.update(summary.link.id, { userId, principalId }, { enabled: false })
-				.pipe(Effect.orDie);
-		}
-		return token;
-	});
+	}
+	return token;
+});
 
 const fetchFeed = (token: string) =>
 	handleRequest(

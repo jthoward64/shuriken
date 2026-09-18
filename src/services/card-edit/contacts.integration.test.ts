@@ -2,7 +2,7 @@ import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
 import { Effect, ManagedRuntime, Option, Redacted } from "effect";
 import {
-	type CollectionId,
+	CollectionId,
 	EntityId,
 	type PrincipalId,
 	UserId,
@@ -101,10 +101,11 @@ describe("Contacts CRUD (integration)", () => {
 			expect((body1.match(/<D:response>/gu) ?? []).length).toBe(2);
 
 			// 3. Update — change FN + add second email.
+			const baseForm = sampleForm();
 			const updated = await runtime.runPromise(
 				Effect.flatMap(CardEditService, (s) =>
 					s.update(created.instanceId, {
-						...sampleForm(),
+						...baseForm,
 						fn: "Robert Builder",
 						emails: [
 							{
@@ -233,7 +234,7 @@ describe("Contacts CRUD (integration)", () => {
 							slug: Slug("alice"),
 						})
 						.pipe(Effect.orDie);
-					const ab = alice.addressBook.id as CollectionId;
+					const ab = CollectionId(alice.addressBook.id);
 					const svc = yield* CardEditService;
 					yield* svc.create(ab, sampleForm());
 					yield* svc.create(ab, {

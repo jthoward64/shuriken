@@ -15,8 +15,9 @@ export class FormValidationError extends Data.TaggedError(
 	readonly fields: ReadonlyMap<string, string>;
 }> {}
 
-const fail = (field: string, message: string) =>
-	Effect.fail(new FormValidationError({ fields: new Map([[field, message]]) }));
+// A validation failure carrying one field's message
+const fieldError = (field: string, message: string): FormValidationError =>
+	new FormValidationError({ fields: new Map([[field, message]]) });
 
 // ---------------------------------------------------------------------------
 // Field parsers
@@ -28,12 +29,14 @@ export const parseSlug = (
 ): Effect.Effect<Slug, FormValidationError> => {
 	const v = value?.trim();
 	if (!v) {
-		return fail(field, "Slug is required");
+		return Effect.fail(fieldError(field, "Slug is required"));
 	}
 	if (!SLUG.test(v)) {
-		return fail(
-			field,
-			"Slug may only contain lowercase letters, digits, and hyphens",
+		return Effect.fail(
+			fieldError(
+				field,
+				"Slug may only contain lowercase letters, digits, and hyphens",
+			),
 		);
 	}
 	return Effect.succeed(v as Slug);
@@ -45,10 +48,10 @@ export const parseEmail = (
 ): Effect.Effect<Email, FormValidationError> => {
 	const v = value?.trim();
 	if (!v) {
-		return fail(field, "Email is required");
+		return Effect.fail(fieldError(field, "Email is required"));
 	}
 	if (!v.includes("@")) {
-		return fail(field, "Invalid email address");
+		return Effect.fail(fieldError(field, "Invalid email address"));
 	}
 	return Effect.succeed(v as Email);
 };
@@ -59,7 +62,7 @@ export const parseDisplayName = (
 ): Effect.Effect<string, FormValidationError> => {
 	const v = value?.trim();
 	if (!v) {
-		return fail(field, "Display name is required");
+		return Effect.fail(fieldError(field, "Display name is required"));
 	}
 	return Effect.succeed(v);
 };
@@ -92,7 +95,9 @@ export const parsePassword = (
 ): Effect.Effect<string, FormValidationError> => {
 	const v = value;
 	if (!v || v.length < MIN_PASSWORD_LENGTH) {
-		return fail(field, "Password must be at least 8 characters");
+		return Effect.fail(
+			fieldError(field, "Password must be at least 8 characters"),
+		);
 	}
 	return Effect.succeed(v);
 };

@@ -1,5 +1,6 @@
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
+import { Option } from "effect";
 import { buildBirthdayVevent } from "./build-event.ts";
 
 describe("buildBirthdayVevent", () => {
@@ -9,11 +10,12 @@ describe("buildBirthdayVevent", () => {
 			fn: "Alice",
 			bday: "1985-04-12",
 		});
-		expect(result).not.toBeNull();
-		expect(result?.uid).toBe("alice-uid-birthday");
-		expect(result?.yearless).toBe(false);
+		expect(Option.isSome(result)).toBe(true);
+		const built = Option.getOrThrow(result);
+		expect(built.uid).toBe("alice-uid-birthday");
+		expect(built.yearless).toBe(false);
 
-		const props = result?.component.properties ?? [];
+		const props = built.component.properties;
 		const summary = props.find((p) => p.name === "SUMMARY");
 		expect(summary?.value).toMatchObject({
 			type: "TEXT",
@@ -34,10 +36,11 @@ describe("buildBirthdayVevent", () => {
 			fn: "Bob",
 			bday: "--12-25",
 		});
-		expect(result).not.toBeNull();
-		expect(result?.yearless).toBe(true);
+		expect(Option.isSome(result)).toBe(true);
+		const built = Option.getOrThrow(result);
+		expect(built.yearless).toBe(true);
 
-		const dtstart = result?.component.properties.find(
+		const dtstart = built.component.properties.find(
 			(p) => p.name === "DTSTART",
 		);
 		expect(dtstart?.value.type).toBe("DATE");
@@ -47,24 +50,34 @@ describe("buildBirthdayVevent", () => {
 			expect(dtstart.value.value.day).toBe(25);
 		}
 
-		const omit = result?.component.properties.find(
+		const omit = built.component.properties.find(
 			(p) => p.name === "X-APPLE-OMIT-YEAR",
 		);
 		expect(omit?.value).toMatchObject({ type: "TEXT", value: "1604" });
 	});
 
-	it("returns null for unrecognised BDAY shapes", () => {
+	it("returns none for unrecognised BDAY shapes", () => {
 		expect(
-			buildBirthdayVevent({ cardUid: "x", fn: "X", bday: "not-a-date" }),
-		).toBeNull();
+			Option.isNone(
+				buildBirthdayVevent({ cardUid: "x", fn: "X", bday: "not-a-date" }),
+			),
+		).toBe(true);
 		expect(
-			buildBirthdayVevent({ cardUid: "x", fn: "X", bday: "19850412T120000Z" }),
-		).toBeNull();
+			Option.isNone(
+				buildBirthdayVevent({
+					cardUid: "x",
+					fn: "X",
+					bday: "19850412T120000Z",
+				}),
+			),
+		).toBe(true);
 	});
 
-	it("returns null for impossible dates (Feb 30)", () => {
+	it("returns none for impossible dates (Feb 30)", () => {
 		expect(
-			buildBirthdayVevent({ cardUid: "x", fn: "X", bday: "1990-02-30" }),
-		).toBeNull();
+			Option.isNone(
+				buildBirthdayVevent({ cardUid: "x", fn: "X", bday: "1990-02-30" }),
+			),
+		).toBe(true);
 	});
 });

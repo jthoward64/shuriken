@@ -1,7 +1,7 @@
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
 import { Effect, Layer, Option } from "effect";
-import type { IrComponent } from "#src/data/ir.ts";
+import type { IrComponent, IrProperty } from "#src/data/ir.ts";
 import {
 	ComponentId,
 	type EntityId,
@@ -25,46 +25,28 @@ import { renderFeed } from "./render.ts";
 // In-memory test doubles
 // ---------------------------------------------------------------------------
 
+/** A TEXT-valued property, the only shape these fixtures need. */
+const textProp = (name: string, value: string): IrProperty => ({
+	name,
+	parameters: [],
+	value: { type: "TEXT", value },
+	isKnown: true,
+});
+
 const makeVevent = (
 	uid: string,
 	summaryText: string,
 	props: ReadonlyArray<{ name: string; value: string }> = [],
-): IrComponent => ({
-	name: "VEVENT",
-	properties: [
-		{
-			name: "UID",
-			parameters: [],
-			value: { type: "TEXT", value: uid },
-			isKnown: true,
-		},
-		{
-			name: "DTSTAMP",
-			parameters: [],
-			value: { type: "TEXT", value: "20260101T000000Z" },
-			isKnown: true,
-		},
-		{
-			name: "DTSTART",
-			parameters: [],
-			value: { type: "TEXT", value: "20260101T100000Z" },
-			isKnown: true,
-		},
-		{
-			name: "SUMMARY",
-			parameters: [],
-			value: { type: "TEXT", value: summaryText },
-			isKnown: true,
-		},
-		...props.map((p) => ({
-			name: p.name,
-			parameters: [],
-			value: { type: "TEXT" as const, value: p.value },
-			isKnown: true,
-		})),
-	],
-	components: [],
-});
+): IrComponent => {
+	const properties: ReadonlyArray<IrProperty> = [
+		textProp("UID", uid),
+		textProp("DTSTAMP", "20260101T000000Z"),
+		textProp("DTSTART", "20260101T100000Z"),
+		textProp("SUMMARY", summaryText),
+		...props.map((p) => textProp(p.name, p.value)),
+	];
+	return { name: "VEVENT", properties, components: [] };
+};
 
 const makeVcalendar = (events: ReadonlyArray<IrComponent>): IrComponent => ({
 	name: "VCALENDAR",

@@ -11,7 +11,7 @@ const render = (opts: {
 	headers: Headers;
 	title: string;
 	preload?: typeof CALENDAR_ASSETS;
-}) => Effect.runPromise(renderPage(h("p", null, "hi"), opts));
+}) => renderPage(h("p", null, "hi"), opts).pipe(Effect.runPromise);
 
 describe("renderPage preload Link header", () => {
 	it("advertises the always-present base assets on a full-page render", async () => {

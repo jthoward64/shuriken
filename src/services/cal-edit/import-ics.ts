@@ -115,6 +115,72 @@ const groupByUid = (
 	return { groups: Array.from(groups.values()), timezones };
 };
 
+/** Soft-deletes any live instance/entity carrying this UID so the import can replace it. */
+const removeExistingForUid = Effect.fn("cal-edit.import.removeExisting")(
+	function* (calendarId: CollectionId, uid: string) {
+		const entityRepo = yield* EntityRepository;
+		const instanceSvc = yield* InstanceService;
+		const existingInstances =
+			yield* entityRepo.listActiveInstancesWithUid(calendarId);
+		for (const ex of existingInstances) {
+			if (ex.logicalUid === uid) {
+				yield* instanceSvc.delete(ex.instanceId);
+				yield* entityRepo.softDelete(ex.entityId);
+			}
+		}
+	},
+);
+
+/** Writes one UID group as a fresh entity plus instance, replacing prior rows on request. */
+const writeEventGroup = Effect.fn("cal-edit.import.writeGroup")(
+	function* (input: {
+		readonly calendarId: CollectionId;
+		readonly group: EventGroup;
+		readonly timezones: ReadonlyArray<IrComponent>;
+		readonly replaceExisting: boolean;
+	}) {
+		const componentRepo = yield* ComponentRepository;
+		const entityRepo = yield* EntityRepository;
+		const instanceSvc = yield* InstanceService;
+		if (input.replaceExisting) {
+			yield* removeExistingForUid(input.calendarId, input.group.uid);
+		}
+		const subDoc = wrap([...input.timezones, ...input.group.components]);
+		const canonical = yield* encodeICalendar(subDoc);
+		const etag = ETag(yield* makeEtag(canonical));
+		const contentLength = new TextEncoder().encode(canonical).byteLength;
+		const entityRow = yield* entityRepo.insert({
+			entityType: "icalendar",
+			logicalUid: input.group.uid,
+		});
+		const eid = EntityId(entityRow.id);
+		yield* componentRepo.insertTree(eid, subDoc.root);
+		yield* instanceSvc.put({
+			collectionId: input.calendarId,
+			entityId: eid,
+			contentType: "text/calendar",
+			etag,
+			slug: slugFromUid(input.group.uid),
+			contentLength,
+		});
+	},
+);
+
+/** The payload UIDs that already exist in the collection. */
+const findConflictingUids = Effect.fn("cal-edit.import.findConflicts")(
+	function* (calendarId: CollectionId, groups: ReadonlyArray<EventGroup>) {
+		const entityRepo = yield* EntityRepository;
+		const conflicts: Array<string> = [];
+		for (const g of groups) {
+			const exists = yield* entityRepo.existsByUid(calendarId, g.uid);
+			if (exists) {
+				conflicts.push(g.uid);
+			}
+		}
+		return conflicts as ReadonlyArray<string>;
+	},
+);
+
 export const importIcs = (
 	calendarId: CollectionId,
 	body: string,
@@ -130,9 +196,6 @@ export const importIcs = (
 	| InstanceService
 > =>
 	Effect.gen(function* () {
-		const componentRepo = yield* ComponentRepository;
-		const entityRepo = yield* EntityRepository;
-		const instanceSvc = yield* InstanceService;
 		const db = yield* DatabaseClient;
 
 		// The birthdays generator / subscription sync own these collections'
@@ -154,13 +217,7 @@ export const importIcs = (
 		const { groups, timezones } = groupByUid(doc.root);
 
 		// Conflict detection up-front so error-mode can abort cleanly.
-		const conflicts: Array<string> = [];
-		for (const g of groups) {
-			const exists = yield* entityRepo.existsByUid(calendarId, g.uid);
-			if (exists) {
-				conflicts.push(g.uid);
-			}
-		}
+		const conflicts = yield* findConflictingUids(calendarId, groups);
 
 		if (mode === "error" && conflicts.length > 0) {
 			return {
@@ -179,36 +236,11 @@ export const importIcs = (
 
 		const writeGroup = (g: EventGroup, replaceExisting: boolean) =>
 			withTransaction(
-				Effect.gen(function* () {
-					if (replaceExisting) {
-						const existingInstances =
-							yield* entityRepo.listActiveInstancesWithUid(calendarId);
-						for (const ex of existingInstances) {
-							if (ex.logicalUid === g.uid) {
-								yield* instanceSvc.delete(ex.instanceId);
-								yield* entityRepo.softDelete(ex.entityId);
-							}
-						}
-					}
-					const subDoc = wrap([...timezones, ...g.components]);
-					const canonical = yield* encodeICalendar(subDoc);
-					const etag = ETag(yield* makeEtag(canonical));
-					const contentLength = new TextEncoder().encode(canonical).byteLength;
-					const slug = slugFromUid(g.uid);
-					const entityRow = yield* entityRepo.insert({
-						entityType: "icalendar",
-						logicalUid: g.uid,
-					});
-					const eid = EntityId(entityRow.id);
-					yield* componentRepo.insertTree(eid, subDoc.root);
-					yield* instanceSvc.put({
-						collectionId: calendarId,
-						entityId: eid,
-						contentType: "text/calendar",
-						etag,
-						slug,
-						contentLength,
-					});
+				writeEventGroup({
+					calendarId,
+					group: g,
+					timezones,
+					replaceExisting,
 				}),
 			).pipe(Effect.provideService(DatabaseClient, db));
 

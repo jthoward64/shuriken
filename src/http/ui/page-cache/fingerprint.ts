@@ -2,6 +2,7 @@ import type { Effect } from "effect";
 import type { InternalError } from "#src/domain/errors.ts";
 import { HTTP_NOT_MODIFIED } from "#src/http/status.ts";
 import { strongEtag } from "#src/http/ui/asset-etag.ts";
+import { encodeJson } from "#src/http/ui/helpers/json.ts";
 
 // ---------------------------------------------------------------------------
 // Page-level conditional GET for expensive rendered pages (calendar, contacts,
@@ -28,7 +29,7 @@ export const pageEtag = (
 	startupToken: string,
 	parts: unknown,
 ): Effect.Effect<string, InternalError> =>
-	strongEtag(`${startupToken}|${JSON.stringify(parts)}`);
+	strongEtag(`${startupToken}|${encodeJson(parts)}`);
 
 /** 304 short-circuit for a conditional GET against a page fingerprint; returns
  * `undefined` when the page must be (re)rendered. */

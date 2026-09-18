@@ -30,42 +30,46 @@ const emailLocalPart = (email: string): string => email.split("@")[0] ?? email;
 
 // Find a user principal by email, treating "no such user" as None rather than
 // a failure, since startup provisioning expects it on first boot
-const findUserByEmail = (email: Email) =>
-	Effect.gen(function* () {
-		const principals = yield* PrincipalService;
-		return yield* principals.findByEmail(email).pipe(
-			Effect.asSome,
-			Effect.catchTag("DavError", (e) =>
-				e.status === HTTP_NOT_FOUND
-					? Effect.succeed(Option.none())
-					: Effect.fail(e),
-			),
-		);
-	});
+const findUserByEmail = Effect.fn("startup.findUserByEmail")(function* (
+	email: Email,
+) {
+	const principals = yield* PrincipalService;
+	return yield* principals.findByEmail(email).pipe(
+		Effect.asSome,
+		Effect.catchTag("DavError", (e) =>
+			e.status === HTTP_NOT_FOUND
+				? Effect.succeed(Option.none())
+				: Effect.fail(e),
+		),
+	);
+});
 
 // Whether a live user principal already holds this slug. Startup looks the
 // user up by email but provisions by slug, so a mismatch between the two (a
 // renamed account, a stale config value) would otherwise only surface as a
 // unique-index violation on `unique_principal_slug_per_type`
-const slugTaken = (slug: Slug) =>
-	Effect.gen(function* () {
-		const principals = yield* PrincipalService;
-		return yield* principals.findBySlug(slug).pipe(
-			Effect.as(true),
-			Effect.catchTag("DavError", (e) =>
-				e.status === HTTP_NOT_FOUND ? Effect.succeed(false) : Effect.fail(e),
-			),
-		);
-	});
+const slugTaken = Effect.fn("startup.slugTaken")(function* (slug: Slug) {
+	const principals = yield* PrincipalService;
+	return yield* principals.findBySlug(slug).pipe(
+		Effect.map(() => true),
+		Effect.catchTag("DavError", (e) =>
+			e.status === HTTP_NOT_FOUND ? Effect.succeed(false) : Effect.fail(e),
+		),
+	);
+});
 
 // A conflict at this point means the email and slug pre-checks disagreed with
 // the database (a concurrent boot, or an email collision). Provisioning is a
 // convenience, so warn and let the server come up rather than aborting startup
-const warnOnConflict = (context: string, field: string) =>
-	Effect.logWarning(
+const warnOnConflict = Effect.fn("startup.warnOnConflict")(function* (
+	context: string,
+	field: string,
+) {
+	yield* Effect.logWarning(
 		`${context}: user provisioning conflicted with an existing user; skipping`,
 		{ field },
 	);
+});
 
 // ---------------------------------------------------------------------------
 // autoLoginStartup — runs at application boot when AUTO_LOGIN is set.
@@ -84,35 +88,37 @@ const warnOnConflict = (context: string, field: string) =>
 // falls back to the first user in that case (see `resolveAutoLoginPrincipal`).
 // ---------------------------------------------------------------------------
 
-const autoLoginBootstrap = (configuredEmail: string) =>
-	Effect.gen(function* () {
+// Provision the AUTO_LOGIN user and grant it the admin ACEs, unless the derived
+// slug already belongs to someone else
+const provisionAutoLoginUser = Effect.fn("startup.provisionAutoLoginUser")(
+	function* (email: Email, name: string, slug: Slug) {
+		if (yield* slugTaken(slug)) {
+			return yield* Effect.logWarning(
+				"auto-login: AUTO_LOGIN matches no user and its derived slug belongs to another user; skipping provisioning",
+				{ email, slug },
+			);
+		}
 		const provisioning = yield* ProvisioningService;
-		const email = parseEmail(configuredEmail);
-		const name = emailLocalPart(configuredEmail);
-		const slug = Slug(name);
+		const result = yield* provisioning.provisionUser({ email, name, slug });
+		yield* provisioning.ensureAdminAces(
+			result.user.principal.id as PrincipalId,
+		);
+	},
+);
 
-		yield* Option.match(yield* findUserByEmail(email), {
-			onSome: () =>
-				Effect.logDebug("auto-login user already provisioned", { email }),
-			onNone: () =>
-				Effect.gen(function* () {
-					if (yield* slugTaken(slug)) {
-						return yield* Effect.logWarning(
-							"auto-login: AUTO_LOGIN matches no user and its derived slug belongs to another user; skipping provisioning",
-							{ email, slug },
-						);
-					}
-					const result = yield* provisioning.provisionUser({
-						email,
-						name,
-						slug,
-					});
-					yield* provisioning.ensureAdminAces(
-						result.user.principal.id as PrincipalId,
-					);
-				}),
-		});
+const autoLoginBootstrap = Effect.fn("startup.autoLoginBootstrap")(function* (
+	configuredEmail: string,
+) {
+	const email = parseEmail(configuredEmail);
+	const name = emailLocalPart(configuredEmail);
+	const slug = Slug(name);
+
+	yield* Option.match(yield* findUserByEmail(email), {
+		onSome: () =>
+			Effect.logDebug("auto-login user already provisioned", { email }),
+		onNone: () => provisionAutoLoginUser(email, name, slug),
 	});
+});
 
 export const autoLoginStartup: Effect.Effect<
 	void,
@@ -174,99 +180,117 @@ export const oidcStartup: Effect.Effect<void, never, AppConfigService> =
 // than being handed the admin ACEs.
 // ---------------------------------------------------------------------------
 
-const provisionAdminUser = (
+const provisionAdminUser = Effect.fn("startup.provisionAdminUser")(function* (
 	configuredEmail: string,
 	slug: Slug,
 	configuredPassword: Option.Option<Redacted.Redacted<string>>,
-) =>
-	Effect.gen(function* () {
-		const provisioning = yield* ProvisioningService;
-		const email = parseEmail(configuredEmail);
+) {
+	const provisioning = yield* ProvisioningService;
+	const email = parseEmail(configuredEmail);
 
-		// A generated password is the operator's only copy, so keep the plaintext
-		// around to print; a configured one is never echoed
-		const credential = Option.match(configuredPassword, {
-			onSome: (password) => ({ password, generated: Option.none<string>() }),
-			onNone: () => {
-				const plain = generateRandomPassword();
-				return {
-					password: Redacted.make(plain),
-					generated: Option.some(plain),
-				};
-			},
-		});
-
-		const result = yield* provisioning.provisionUser({
-			email,
-			name: emailLocalPart(configuredEmail),
-			slug,
-			credentials: [
-				{
-					source: "local",
-					authId: configuredEmail,
-					password: credential.password,
-				},
-			],
-			// Preserve the pre-roles "admin = full power" expectation.
-			// Operators who want a less-privileged admin can demote later via UI.
-			role: "super_admin",
-		});
-
-		yield* Effect.logInfo("basic-auth: admin user provisioned", { email });
-
-		Option.match(credential.generated, {
-			onSome: (p) => {
-				// biome-ignore lint/suspicious/noConsole: the generated password must reach the operator's terminal, not the log sink
-				console.log(
-					`\n*** shuriken-ts: default admin credentials ***\n  Email:    ${email}\n  Password: ${p}\n  Save this password — it will not be shown again.\n`,
-				);
-			},
-			onNone: () => {
-				/* the password was set by the operator, so there is nothing to print */
-			},
-		});
-
-		return Option.some(result.user.principal.id as PrincipalId);
+	// A generated password is the operator's only copy, so keep the plaintext
+	// around to print; a configured one is never echoed
+	const credential = Option.match(configuredPassword, {
+		onSome: (password) => ({ password, generated: Option.none<string>() }),
+		onNone: () => {
+			const plain = generateRandomPassword();
+			return {
+				password: Redacted.make(plain),
+				generated: Option.some(plain),
+			};
+		},
 	});
 
-const basicAuthBootstrap = (configuredEmail: string) =>
-	Effect.gen(function* () {
-		const config = yield* AppConfigService;
-		const provisioning = yield* ProvisioningService;
-		const email = parseEmail(configuredEmail);
-		const slug = Slug(
-			Option.getOrElse(config.auth.adminSlug, () =>
-				emailLocalPart(configuredEmail),
+	const result = yield* provisioning.provisionUser({
+		email,
+		name: emailLocalPart(configuredEmail),
+		slug,
+		credentials: [
+			{
+				source: "local",
+				authId: configuredEmail,
+				password: credential.password,
+			},
+		],
+		// Preserve the pre-roles "admin = full power" expectation.
+		// Operators who want a less-privileged admin can demote later via UI.
+		role: "super_admin",
+	});
+
+	yield* Effect.logInfo("basic-auth: admin user provisioned", { email });
+
+	Option.match(credential.generated, {
+		onSome: (p) => {
+			// biome-ignore lint/suspicious/noConsole: the generated password must reach the operator's terminal, not the log sink
+			console.log(
+				`\n*** shuriken-ts: default admin credentials ***\n  Email:    ${email}\n  Password: ${p}\n  Save this password — it will not be shown again.\n`,
+			);
+		},
+		onNone: () => {
+			/* the password was set by the operator, so there is nothing to print */
+		},
+	});
+
+	return Option.some(result.user.principal.id as PrincipalId);
+});
+
+// Provision the ADMIN_EMAIL user, unless the admin slug already belongs to
+// someone else, in which case the slug owner is left alone
+const provisionAdminIfSlugFree = Effect.fn("startup.provisionAdminIfSlugFree")(
+	function* (
+		configuredEmail: string,
+		email: Email,
+		slug: Slug,
+		configuredPassword: Option.Option<Redacted.Redacted<string>>,
+	) {
+		if (yield* slugTaken(slug)) {
+			yield* Effect.logWarning(
+				"basic-auth: ADMIN_EMAIL matches no user and the admin slug belongs to another user; skipping provisioning",
+				{ email, slug },
+			);
+			return Option.none<PrincipalId>();
+		}
+		return yield* provisionAdminUser(configuredEmail, slug, configuredPassword);
+	},
+);
+
+// Note the admin user was already provisioned and carry its principal forward
+const existingAdminPrincipal = Effect.fn("startup.existingAdminPrincipal")(
+	function* (email: Email, principalId: PrincipalId) {
+		yield* Effect.logDebug("basic-auth: admin user already exists", { email });
+		return Option.some(principalId);
+	},
+);
+
+const basicAuthBootstrap = Effect.fn("startup.basicAuthBootstrap")(function* (
+	configuredEmail: string,
+) {
+	const config = yield* AppConfigService;
+	const provisioning = yield* ProvisioningService;
+	const email = parseEmail(configuredEmail);
+	const slug = Slug(
+		Option.getOrElse(config.auth.adminSlug, () =>
+			emailLocalPart(configuredEmail),
+		),
+	);
+
+	const principalId = yield* Option.match(yield* findUserByEmail(email), {
+		onSome: (existing) =>
+			existingAdminPrincipal(email, existing.principal.id as PrincipalId),
+		onNone: () =>
+			provisionAdminIfSlugFree(
+				configuredEmail,
+				email,
+				slug,
+				config.auth.adminPassword,
 			),
-		);
-
-		const principalId = yield* Option.match(yield* findUserByEmail(email), {
-			onSome: (existing) =>
-				Effect.logDebug("basic-auth: admin user already exists", {
-					email,
-				}).pipe(Effect.as(Option.some(existing.principal.id as PrincipalId))),
-			onNone: () =>
-				Effect.gen(function* () {
-					if (yield* slugTaken(slug)) {
-						yield* Effect.logWarning(
-							"basic-auth: ADMIN_EMAIL matches no user and the admin slug belongs to another user; skipping provisioning",
-							{ email, slug },
-						);
-						return Option.none<PrincipalId>();
-					}
-					return yield* provisionAdminUser(
-						configuredEmail,
-						slug,
-						config.auth.adminPassword,
-					);
-				}),
-		});
-
-		yield* Option.match(principalId, {
-			onSome: (id) => provisioning.ensureAdminAces(id),
-			onNone: () => Effect.void,
-		});
 	});
+
+	yield* Option.match(principalId, {
+		onSome: (id) => provisioning.ensureAdminAces(id),
+		onNone: () => Effect.void,
+	});
+});
 
 export const basicAuthStartup: Effect.Effect<
 	void,

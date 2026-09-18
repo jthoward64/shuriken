@@ -1,13 +1,21 @@
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
 import { Effect } from "effect";
-import type { DavError } from "#src/domain/errors.ts";
+import { DavError } from "#src/domain/errors.ts";
 import { GroupId, UserId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import { HTTP_NOT_FOUND } from "#src/http/status.ts";
 import { runFailure, runSuccess } from "#src/testing/effect.ts";
 import { makeTestEnv } from "#src/testing/env.ts";
 import { GroupService } from "./service.ts";
+
+/** Narrows a test failure to a DavError so its status can be asserted. */
+const asDavError = (err: unknown): DavError => {
+	if (err instanceof DavError) {
+		return err;
+	}
+	throw new Error(`expected a DavError, got ${String(err)}`);
+};
 
 // ---------------------------------------------------------------------------
 // GroupService.create
@@ -73,14 +81,16 @@ describe("GroupService.update", () => {
 	it("fails with 404 when the group does not exist", async () => {
 		const env = makeTestEnv();
 
-		const err = (await runFailure(
-			GroupService.pipe(
-				Effect.flatMap((s) =>
-					s.update(GroupId(crypto.randomUUID()), { displayName: "X" }),
+		const err = asDavError(
+			await runFailure(
+				GroupService.pipe(
+					Effect.flatMap((s) =>
+						s.update(GroupId(crypto.randomUUID()), { displayName: "X" }),
+					),
+					Effect.provide(env.toLayer()),
 				),
-				Effect.provide(env.toLayer()),
 			),
-		)) as DavError;
+		);
 
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_NOT_FOUND);
@@ -112,17 +122,19 @@ describe("GroupService.addMember", () => {
 	it("fails with 404 when the group does not exist", async () => {
 		const env = makeTestEnv();
 
-		const err = (await runFailure(
-			GroupService.pipe(
-				Effect.flatMap((s) =>
-					s.addMember(
-						GroupId(crypto.randomUUID()),
-						UserId(crypto.randomUUID()),
+		const err = asDavError(
+			await runFailure(
+				GroupService.pipe(
+					Effect.flatMap((s) =>
+						s.addMember(
+							GroupId(crypto.randomUUID()),
+							UserId(crypto.randomUUID()),
+						),
 					),
+					Effect.provide(env.toLayer()),
 				),
-				Effect.provide(env.toLayer()),
 			),
-		)) as DavError;
+		);
 
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_NOT_FOUND);
@@ -155,17 +167,19 @@ describe("GroupService.removeMember", () => {
 	it("fails with 404 when the group does not exist", async () => {
 		const env = makeTestEnv();
 
-		const err = (await runFailure(
-			GroupService.pipe(
-				Effect.flatMap((s) =>
-					s.removeMember(
-						GroupId(crypto.randomUUID()),
-						UserId(crypto.randomUUID()),
+		const err = asDavError(
+			await runFailure(
+				GroupService.pipe(
+					Effect.flatMap((s) =>
+						s.removeMember(
+							GroupId(crypto.randomUUID()),
+							UserId(crypto.randomUUID()),
+						),
 					),
+					Effect.provide(env.toLayer()),
 				),
-				Effect.provide(env.toLayer()),
 			),
-		)) as DavError;
+		);
 
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_NOT_FOUND);
@@ -198,12 +212,14 @@ describe("GroupService.findById", () => {
 	it("fails with 404 when the group does not exist", async () => {
 		const env = makeTestEnv();
 
-		const err = (await runFailure(
-			GroupService.pipe(
-				Effect.flatMap((s) => s.findById(GroupId(crypto.randomUUID()))),
-				Effect.provide(env.toLayer()),
+		const err = asDavError(
+			await runFailure(
+				GroupService.pipe(
+					Effect.flatMap((s) => s.findById(GroupId(crypto.randomUUID()))),
+					Effect.provide(env.toLayer()),
+				),
 			),
-		)) as DavError;
+		);
 
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_NOT_FOUND);
@@ -288,12 +304,14 @@ describe("GroupService.listMembers", () => {
 	it("fails with 404 when the group does not exist", async () => {
 		const env = makeTestEnv();
 
-		const err = (await runFailure(
-			GroupService.pipe(
-				Effect.flatMap((s) => s.listMembers(GroupId(crypto.randomUUID()))),
-				Effect.provide(env.toLayer()),
+		const err = asDavError(
+			await runFailure(
+				GroupService.pipe(
+					Effect.flatMap((s) => s.listMembers(GroupId(crypto.randomUUID()))),
+					Effect.provide(env.toLayer()),
+				),
 			),
-		)) as DavError;
+		);
 
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_NOT_FOUND);
@@ -370,12 +388,14 @@ describe("GroupService.delete", () => {
 	it("fails with 404 when the group does not exist", async () => {
 		const env = makeTestEnv();
 
-		const err = (await runFailure(
-			GroupService.pipe(
-				Effect.flatMap((s) => s.delete(GroupId(crypto.randomUUID()))),
-				Effect.provide(env.toLayer()),
+		const err = asDavError(
+			await runFailure(
+				GroupService.pipe(
+					Effect.flatMap((s) => s.delete(GroupId(crypto.randomUUID()))),
+					Effect.provide(env.toLayer()),
+				),
 			),
-		)) as DavError;
+		);
 
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_NOT_FOUND);
@@ -435,12 +455,14 @@ describe("GroupService.setMembers", () => {
 	it("fails with 404 when the group does not exist", async () => {
 		const env = makeTestEnv();
 
-		const err = (await runFailure(
-			GroupService.pipe(
-				Effect.flatMap((s) => s.setMembers(GroupId(crypto.randomUUID()), [])),
-				Effect.provide(env.toLayer()),
+		const err = asDavError(
+			await runFailure(
+				GroupService.pipe(
+					Effect.flatMap((s) => s.setMembers(GroupId(crypto.randomUUID()), [])),
+					Effect.provide(env.toLayer()),
+				),
 			),
-		)) as DavError;
+		);
 
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_NOT_FOUND);

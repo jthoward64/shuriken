@@ -1,12 +1,20 @@
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
 import { Effect } from "effect";
-import type { DavError } from "#src/domain/errors.ts";
+import { DavError } from "#src/domain/errors.ts";
 import { CollectionId, InstanceId, PrincipalId } from "#src/domain/ids.ts";
 import { HTTP_FORBIDDEN } from "#src/http/status.ts";
 import { runFailure, runSuccess } from "#src/testing/effect.ts";
 import { makeTestEnv } from "#src/testing/env.ts";
 import { AclService } from "./service.ts";
+
+/** Narrows a test failure to a DavError so its status can be asserted. */
+const asDavError = (err: unknown): DavError => {
+	if (err instanceof DavError) {
+		return err;
+	}
+	throw new Error(`expected a DavError, got ${String(err)}`);
+};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -85,12 +93,14 @@ describe("AclService.check", () => {
 	it("fails with 403 DAV:need-privileges when no matching ACE exists", async () => {
 		const principalId = PrincipalId(crypto.randomUUID());
 		const env = makeTestEnv(); // no ACEs
-		const err = (await runFailure(
-			AclService.pipe(
-				Effect.flatMap((s) => s.check(principalId, RID, RTYPE, "DAV:read")),
-				Effect.provide(env.toLayer()),
+		const err = asDavError(
+			await runFailure(
+				AclService.pipe(
+					Effect.flatMap((s) => s.check(principalId, RID, RTYPE, "DAV:read")),
+					Effect.provide(env.toLayer()),
+				),
 			),
-		)) as DavError;
+		);
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_FORBIDDEN);
 		expect(err.precondition).toBe("DAV:need-privileges");
@@ -107,12 +117,14 @@ describe("AclService.check", () => {
 			privilege: "DAV:read-acl",
 			grantDeny: "grant",
 		});
-		const err = (await runFailure(
-			AclService.pipe(
-				Effect.flatMap((s) => s.check(principalId, RID, RTYPE, "DAV:read")),
-				Effect.provide(env.toLayer()),
+		const err = asDavError(
+			await runFailure(
+				AclService.pipe(
+					Effect.flatMap((s) => s.check(principalId, RID, RTYPE, "DAV:read")),
+					Effect.provide(env.toLayer()),
+				),
 			),
-		)) as DavError;
+		);
 		expect(err.status).toBe(HTTP_FORBIDDEN);
 	});
 
@@ -380,14 +392,16 @@ describe("AclService.check — inheritance", () => {
 		env.withInstance({ id: instanceId, collectionId });
 		// No ACEs anywhere
 
-		const err = (await runFailure(
-			AclService.pipe(
-				Effect.flatMap((s) =>
-					s.check(principalId, instanceId, "instance", "DAV:read"),
+		const err = asDavError(
+			await runFailure(
+				AclService.pipe(
+					Effect.flatMap((s) =>
+						s.check(principalId, instanceId, "instance", "DAV:read"),
+					),
+					Effect.provide(env.toLayer()),
 				),
-				Effect.provide(env.toLayer()),
 			),
-		)) as DavError;
+		);
 
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_FORBIDDEN);
@@ -412,14 +426,16 @@ describe("AclService.check — inheritance", () => {
 			grantDeny: "grant",
 		});
 
-		const err = (await runFailure(
-			AclService.pipe(
-				Effect.flatMap((s) =>
-					s.check(principalId, instanceId, "instance", "DAV:write-content"),
+		const err = asDavError(
+			await runFailure(
+				AclService.pipe(
+					Effect.flatMap((s) =>
+						s.check(principalId, instanceId, "instance", "DAV:write-content"),
+					),
+					Effect.provide(env.toLayer()),
 				),
-				Effect.provide(env.toLayer()),
 			),
-		)) as DavError;
+		);
 
 		expect(err.status).toBe(HTTP_FORBIDDEN);
 	});

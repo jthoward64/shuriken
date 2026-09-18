@@ -1,4 +1,4 @@
-import { Option } from "effect";
+import { Effect, Option } from "effect";
 import type { AppConfigType } from "#src/config.ts";
 
 // ---------------------------------------------------------------------------
@@ -27,3 +27,17 @@ export const sanitizeReturnTo = (
 
 /** Whether cookies for this request should carry the Secure attribute. */
 export const isSecureRequest = (url: URL): boolean => url.protocol === "https:";
+
+/**
+ * Log a failed OIDC step and report it as an empty result.
+ *
+ * The provider's own failure detail stays in the log; the route turns the empty
+ * result into the user-facing response.
+ */
+export const oidcStepFailed = Effect.fn("ui.auth.oidcStepFailed")(function* (
+	step: string,
+	reason: string,
+) {
+	yield* Effect.logWarning(`auth.oidc: ${step} failed`, { reason });
+	return Option.none();
+});

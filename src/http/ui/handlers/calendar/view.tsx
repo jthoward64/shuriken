@@ -1,5 +1,5 @@
 /** biome-ignore-all lint/style/noMagicNumbers: date/time component arithmetic */
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import { Temporal } from "temporal-polyfill";
 import { AppConfigService } from "#src/config.ts";
 import type { IrDeadProperties } from "#src/data/ir.ts";
@@ -26,6 +26,11 @@ import { isHtmxRequest } from "#src/http/ui/helpers/htmx.ts";
 import { buildNavContext } from "#src/http/ui/helpers/nav-context.ts";
 import type { UiPageOpts } from "#src/http/ui/helpers/page-opts.ts";
 import { listOwnedAndShared } from "#src/http/ui/helpers/shared-collections.ts";
+import {
+	parsePlainDate,
+	parsePlainDateTime,
+	parsePlainYearMonth,
+} from "#src/http/ui/helpers/temporal-parse.ts";
 import {
 	notModifiedPageResponse,
 	PageCacheService,
@@ -98,16 +103,10 @@ const WEEKDAY_NAMES = [
 
 /** Parse a `YYYY-MM` param to a PlainYearMonth; fall back to the current month
  * on absence or malformed input. */
-const resolveYearMonth = (raw: string | null): Temporal.PlainYearMonth => {
-	if (raw !== null && raw !== "") {
-		try {
-			return Temporal.PlainYearMonth.from(raw);
-		} catch {
-			// fall through to current month
-		}
-	}
-	return Temporal.Now.plainDateISO().toPlainYearMonth();
-};
+const resolveYearMonth = (raw: string | null): Temporal.PlainYearMonth =>
+	Option.getOrElse(parsePlainYearMonth(raw ?? ""), () =>
+		Temporal.Now.plainDateISO().toPlainYearMonth(),
+	);
 
 const pad2 = (n: number): string => String(n).padStart(2, "0");
 
@@ -117,24 +116,28 @@ const to12Hour = (hour: number, minute: number): string => {
 	return `${h12}:${pad2(minute)} ${period}`;
 };
 
-/** Human date/time label for the fallback list. */
+/** Weekday and date, e.g. "Mon, Apr 7" */
+const dayLabel = (date: Temporal.PlainDate | Temporal.PlainDateTime): string =>
+	`${WEEKDAY_NAMES[date.dayOfWeek - 1]}, ${MONTH_NAMES[date.month - 1]} ${date.day}`;
+
+/** Human date/time label for the fallback list; unparseable values show raw. */
 const formatWhen = (ev: CalendarEventView): string => {
-	try {
-		if (ev.allDay) {
-			const d = Temporal.PlainDate.from(ev.start);
-			return `${WEEKDAY_NAMES[d.dayOfWeek - 1]}, ${MONTH_NAMES[d.month - 1]} ${d.day}`;
-		}
-		const dt = Temporal.PlainDateTime.from(ev.start);
-		return `${WEEKDAY_NAMES[dt.dayOfWeek - 1]}, ${MONTH_NAMES[dt.month - 1]} ${dt.day} · ${to12Hour(dt.hour, dt.minute)}`;
-	} catch {
-		return ev.start;
+	if (ev.allDay) {
+		return Option.match(parsePlainDate(ev.start), {
+			onNone: () => ev.start,
+			onSome: dayLabel,
+		});
 	}
+	return Option.match(parsePlainDateTime(ev.start), {
+		onNone: () => ev.start,
+		onSome: (dt) => `${dayLabel(dt)} · ${to12Hour(dt.hour, dt.minute)}`,
+	});
 };
 
 /** Human recurrence label from the raw RRULE (FREQ + INTERVAL). */
-const recurrenceLabel = (rruleRaw: string | null): string | null => {
+const recurrenceLabel = (rruleRaw: string | null): Option.Option<string> => {
 	if (rruleRaw === null) {
-		return null;
+		return Option.none();
 	}
 	let freq = "";
 	let interval = 1;
@@ -157,9 +160,11 @@ const recurrenceLabel = (rruleRaw: string | null): string | null => {
 	};
 	const u = unit[freq];
 	if (u === undefined) {
-		return "Repeats";
+		return Option.some("Repeats");
 	}
-	return interval === 1 ? `Repeats ${u}ly` : `Every ${interval} ${u}s`;
+	return Option.some(
+		interval === 1 ? `Repeats ${u}ly` : `Every ${interval} ${u}s`,
+	);
 };
 
 const utcInstant = (date: Temporal.PlainDate): Temporal.Instant =>
@@ -352,7 +357,7 @@ export const calendarViewHandler = (
 					title: ev.title,
 					color,
 					when: formatWhen(ev),
-					recurrence: recurrenceLabel(ev.rruleRaw),
+					recurrence: Option.getOrNull(recurrenceLabel(ev.rruleRaw)),
 					readable,
 				}));
 		}

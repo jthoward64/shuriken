@@ -13,7 +13,7 @@ import {
 	type CryptoServiceShape,
 } from "#src/platform/crypto.ts";
 import { AclRepository } from "#src/services/acl/repository.ts";
-import { UserRepository } from "./repository.ts";
+import { UserRepository, type UserRepositoryShape } from "./repository.ts";
 import {
 	type NewCredential,
 	type NewUser,
@@ -51,6 +51,23 @@ const hashCredential = (
 		authCredential: Option.some(Redacted.make(cred.authId)),
 	});
 };
+
+/** A credential ready to store: the source, its id and the hashed secret. */
+interface HashedCredential {
+	readonly authSource: string;
+	readonly authId: string;
+	readonly authCredential: Option.Option<Redacted.Redacted<string>>;
+}
+
+/** Swaps a user's credential for one source in a single transaction. */
+const replaceCredential = Effect.fn("UserService.replaceCredential")(function* (
+	repo: UserRepositoryShape,
+	userId: UserId,
+	hashed: HashedCredential,
+) {
+	yield* repo.deleteCredential(userId, hashed.authSource, hashed.authId);
+	yield* repo.insertCredential({ userId, ...hashed });
+});
 
 export const UserServiceLive = Layer.effect(
 	UserService,
@@ -233,16 +250,9 @@ export const UserServiceLive = Layer.effect(
 					.pipe(Effect.flatMap(someOrNotFound(`User not found: ${userId}`)));
 				// Delete any existing credential for this source+authId, then insert fresh
 				const hashed = yield* hashCredential(crypto, credential);
-				yield* withTransaction(
-					Effect.gen(function* () {
-						yield* repo.deleteCredential(
-							userId,
-							credential.source,
-							credential.authId,
-						);
-						yield* repo.insertCredential({ userId, ...hashed });
-					}),
-				).pipe(Effect.provideService(DatabaseClient, db));
+				yield* withTransaction(replaceCredential(repo, userId, hashed)).pipe(
+					Effect.provideService(DatabaseClient, db),
+				);
 				yield* Effect.logTrace("user.setCredential done", { userId });
 			}),
 		};

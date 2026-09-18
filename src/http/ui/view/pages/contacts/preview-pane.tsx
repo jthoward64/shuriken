@@ -156,6 +156,130 @@ const fullName = (form: ContactFormData): string =>
 		.filter((s) => s !== "")
 		.join(" ");
 
+interface DetailEntry {
+	readonly label: string;
+	readonly value: string;
+}
+
+// Ways to reach the contact, each section shown only when it has values
+const ContactMethods = ({ form }: { form: ContactFormData }): VNode => (
+	<>
+		{form.emails.length > 0 && (
+			<PaneSection title="Email">
+				<TypedValueList values={form.emails} href={(v) => `mailto:${v}`} />
+			</PaneSection>
+		)}
+		{form.tels.length > 0 && (
+			<PaneSection title="Phone">
+				<TypedValueList values={form.tels} href={(v) => `tel:${v}`} />
+			</PaneSection>
+		)}
+		{form.addresses.length > 0 && (
+			<PaneSection title="Address">
+				<AddressList addresses={form.addresses} />
+			</PaneSection>
+		)}
+		{form.urls.length > 0 && (
+			<PaneSection title="Websites">
+				<ul class="space-y-1.5">
+					{form.urls.map((u, i) => (
+						<li key={`${u}-${i}`}>
+							<a
+								href={u}
+								target="_blank"
+								rel="noopener"
+								class="link break-words text-sm"
+							>
+								{u}
+							</a>
+						</li>
+					))}
+				</ul>
+			</PaneSection>
+		)}
+		{form.socialProfiles.length > 0 && (
+			<PaneSection title="Social">
+				<ServiceList values={form.socialProfiles} />
+			</PaneSection>
+		)}
+		{form.impps.length > 0 && (
+			<PaneSection title="Instant messaging">
+				<ServiceList values={form.impps} />
+			</PaneSection>
+		)}
+	</>
+);
+
+// Everything else worth showing about the contact, in the pane's reading order
+const ContactDetails = ({
+	form,
+	relations,
+	dates,
+	identity,
+	categories,
+}: {
+	form: ContactFormData;
+	relations: ReadonlyArray<ResolvedRelation>;
+	dates: ReadonlyArray<DetailEntry>;
+	identity: ReadonlyArray<DetailEntry>;
+	categories: ReadonlyArray<string>;
+}): VNode => (
+	<>
+		{relations.length > 0 && (
+			<PaneSection title="Related people">
+				<RelationList relations={relations} />
+			</PaneSection>
+		)}
+		{dates.length > 0 && (
+			<PaneSection title="Dates">
+				{dates.map((d) => (
+					<DetailRow key={d.label} label={d.label} value={d.value} />
+				))}
+			</PaneSection>
+		)}
+		{identity.length > 0 && (
+			<PaneSection title="Details">
+				{identity.map((d) => (
+					<DetailRow key={d.label} label={d.label} value={d.value} />
+				))}
+			</PaneSection>
+		)}
+		{categories.length > 0 && (
+			<PaneSection title="Categories">
+				<div class="flex flex-wrap gap-1.5">
+					{categories.map((c) => (
+						<Badge key={c}>{c}</Badge>
+					))}
+				</div>
+			</PaneSection>
+		)}
+		{form.note !== "" && (
+			<PaneSection title="Note">
+				<p class="whitespace-pre-wrap break-words text-fg text-sm">
+					{form.note}
+				</p>
+			</PaneSection>
+		)}
+		{form.otherProps.length > 0 && (
+			<PaneSection title="Other">
+				<ul class="space-y-1.5">
+					{form.otherProps.map((p, i) => (
+						<li
+							key={`${p.name}-${i}`}
+							class="flex items-baseline gap-2 text-sm"
+						>
+							<span class="shrink-0 font-mono text-muted text-xs">
+								{p.name}
+							</span>
+							<span class="min-w-0 break-words text-fg">{p.value}</span>
+						</li>
+					))}
+				</ul>
+			</PaneSection>
+		)}
+	</>
+);
+
 export const ContactPreviewPane = ({
 	form,
 	instanceId,
@@ -181,7 +305,7 @@ export const ContactPreviewPane = ({
 		form.anniversary !== ""
 			? { label: "Anniversary", value: form.anniversary }
 			: undefined,
-	].filter((d): d is { label: string; value: string } => d !== undefined);
+	].filter((d): d is DetailEntry => d !== undefined);
 	const identity = [
 		form.nickname !== ""
 			? { label: "Nickname", value: form.nickname }
@@ -194,7 +318,7 @@ export const ContactPreviewPane = ({
 			: undefined,
 		form.gender !== "" ? { label: "Gender", value: form.gender } : undefined,
 		form.kind !== "" ? { label: "Kind", value: form.kind } : undefined,
-	].filter((d): d is { label: string; value: string } => d !== undefined);
+	].filter((d): d is DetailEntry => d !== undefined);
 	const categories = form.categoriesCsv
 		.split(",")
 		.map((s) => s.trim())
@@ -264,101 +388,14 @@ export const ContactPreviewPane = ({
 					</LinkButton>
 				</div>
 
-				{form.emails.length > 0 && (
-					<PaneSection title="Email">
-						<TypedValueList values={form.emails} href={(v) => `mailto:${v}`} />
-					</PaneSection>
-				)}
-				{form.tels.length > 0 && (
-					<PaneSection title="Phone">
-						<TypedValueList values={form.tels} href={(v) => `tel:${v}`} />
-					</PaneSection>
-				)}
-				{form.addresses.length > 0 && (
-					<PaneSection title="Address">
-						<AddressList addresses={form.addresses} />
-					</PaneSection>
-				)}
-				{form.urls.length > 0 && (
-					<PaneSection title="Websites">
-						<ul class="space-y-1.5">
-							{form.urls.map((u, i) => (
-								<li key={`${u}-${i}`}>
-									<a
-										href={u}
-										target="_blank"
-										rel="noopener"
-										class="link break-words text-sm"
-									>
-										{u}
-									</a>
-								</li>
-							))}
-						</ul>
-					</PaneSection>
-				)}
-				{form.socialProfiles.length > 0 && (
-					<PaneSection title="Social">
-						<ServiceList values={form.socialProfiles} />
-					</PaneSection>
-				)}
-				{form.impps.length > 0 && (
-					<PaneSection title="Instant messaging">
-						<ServiceList values={form.impps} />
-					</PaneSection>
-				)}
-				{relations.length > 0 && (
-					<PaneSection title="Related people">
-						<RelationList relations={relations} />
-					</PaneSection>
-				)}
-				{dates.length > 0 && (
-					<PaneSection title="Dates">
-						{dates.map((d) => (
-							<DetailRow key={d.label} label={d.label} value={d.value} />
-						))}
-					</PaneSection>
-				)}
-				{identity.length > 0 && (
-					<PaneSection title="Details">
-						{identity.map((d) => (
-							<DetailRow key={d.label} label={d.label} value={d.value} />
-						))}
-					</PaneSection>
-				)}
-				{categories.length > 0 && (
-					<PaneSection title="Categories">
-						<div class="flex flex-wrap gap-1.5">
-							{categories.map((c) => (
-								<Badge key={c}>{c}</Badge>
-							))}
-						</div>
-					</PaneSection>
-				)}
-				{form.note !== "" && (
-					<PaneSection title="Note">
-						<p class="whitespace-pre-wrap break-words text-fg text-sm">
-							{form.note}
-						</p>
-					</PaneSection>
-				)}
-				{form.otherProps.length > 0 && (
-					<PaneSection title="Other">
-						<ul class="space-y-1.5">
-							{form.otherProps.map((p, i) => (
-								<li
-									key={`${p.name}-${i}`}
-									class="flex items-baseline gap-2 text-sm"
-								>
-									<span class="shrink-0 font-mono text-muted text-xs">
-										{p.name}
-									</span>
-									<span class="min-w-0 break-words text-fg">{p.value}</span>
-								</li>
-							))}
-						</ul>
-					</PaneSection>
-				)}
+				<ContactMethods form={form} />
+				<ContactDetails
+					form={form}
+					relations={relations}
+					dates={dates}
+					identity={identity}
+					categories={categories}
+				/>
 			</div>
 		</div>
 	);

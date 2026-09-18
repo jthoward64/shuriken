@@ -7,7 +7,7 @@ import type {
 	DavError,
 	InternalError,
 } from "#src/domain/errors.ts";
-import type { CollectionId, PrincipalId } from "#src/domain/ids.ts";
+import { type CollectionId, PrincipalId } from "#src/domain/ids.ts";
 import {
 	GROUPS_VIRTUAL_RESOURCE_ID,
 	USERS_VIRTUAL_RESOURCE_ID,
@@ -30,6 +30,33 @@ import type { ShareLinkService } from "#src/services/share-link/service.ts";
 // GET /ui/collections/:collectionId
 // ---------------------------------------------------------------------------
 
+// The owner's label: a user principal when the id names one, else the group principal
+const resolveOwner = Effect.fn("ui.collections.edit.owner")(function* (
+	ownerPrincipalId: PrincipalId,
+) {
+	const principalService = yield* PrincipalService;
+	const asUser = yield* principalService.findById(ownerPrincipalId).pipe(
+		Effect.map(Option.some),
+		Effect.catchTag("DavError", (e) =>
+			e.status === HTTP_NOT_FOUND
+				? Effect.succeed(Option.none())
+				: Effect.fail(e),
+		),
+	);
+	if (Option.isSome(asUser)) {
+		const { principal } = asUser.value;
+		return {
+			displayName: principal.displayName ?? principal.slug,
+			type: "user" as const,
+		};
+	}
+	const group = yield* principalService.findPrincipalById(ownerPrincipalId);
+	return {
+		displayName: group.displayName ?? group.slug,
+		type: "group" as const,
+	};
+});
+
 export const collectionsEditHandler = (
 	_req: Request,
 	ctx: HttpRequestContext,
@@ -48,7 +75,6 @@ export const collectionsEditHandler = (
 		const config = yield* AppConfigService;
 		const acl = yield* AclService;
 		const collectionService = yield* CollectionService;
-		const principalService = yield* PrincipalService;
 
 		// The calendar sidebar's Edit trigger loads this as a popover fragment;
 		// the shared helper does its own (cheaper) ACL check and owner-free
@@ -62,7 +88,7 @@ export const collectionsEditHandler = (
 		}
 
 		const collection = yield* collectionService.findById(collectionId);
-		const ownerPrincipalId = collection.ownerPrincipalId as PrincipalId;
+		const ownerPrincipalId = PrincipalId(collection.ownerPrincipalId);
 
 		const [collPrivs, usersPrivs, groupsPrivs] = yield* Effect.all([
 			acl.currentUserPrivileges(
@@ -100,23 +126,7 @@ export const collectionsEditHandler = (
 			usersPrivs.includes("DAV:unbind") ||
 			groupsPrivs.includes("DAV:unbind");
 
-		// Resolve owner: try user principal first, fall back to group
-		const ownerResult = yield* principalService.findById(ownerPrincipalId).pipe(
-			Effect.map((pwu) => ({
-				displayName: pwu.principal.displayName ?? pwu.principal.slug,
-				type: "user" as const,
-			})),
-			Effect.catchTag("DavError", (e) =>
-				e.status === HTTP_NOT_FOUND
-					? principalService.findPrincipalById(ownerPrincipalId).pipe(
-							Effect.map((p) => ({
-								displayName: p.displayName ?? p.slug,
-								type: "group" as const,
-							})),
-						)
-					: Effect.fail(e),
-			),
-		);
+		const ownerResult = yield* resolveOwner(ownerPrincipalId);
 
 		const calendarColor = toCssHex(
 			resolveCalendarColor(

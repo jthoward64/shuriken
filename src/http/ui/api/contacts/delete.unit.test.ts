@@ -71,11 +71,14 @@ describe("contactsDeleteHandler", () => {
 		);
 
 		const res = await Effect.runPromise(
-			contactsDeleteHandler(
-				new Request("http://localhost"),
-				makeCtx(principalId),
-				InstanceId(instanceId),
-			).pipe(Effect.provide(layer), Effect.orDie),
+			Effect.provide(
+				contactsDeleteHandler(
+					new Request("http://localhost"),
+					makeCtx(principalId),
+					InstanceId(instanceId),
+				),
+				layer,
+			).pipe(Effect.orDie),
 		);
 
 		expect(res.status).toBe(303);
@@ -116,11 +119,14 @@ describe("contactsDeleteHandler", () => {
 		);
 
 		const res = await Effect.runPromise(
-			contactsDeleteHandler(
-				new Request("http://localhost"),
-				makeCtx(principalId),
-				InstanceId(instanceId),
-			).pipe(Effect.provide(layer), Effect.orDie),
+			Effect.provide(
+				contactsDeleteHandler(
+					new Request("http://localhost"),
+					makeCtx(principalId),
+					InstanceId(instanceId),
+				),
+				layer,
+			).pipe(Effect.orDie),
 		);
 
 		expect(res.status).toBe(303);

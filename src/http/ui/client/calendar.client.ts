@@ -200,26 +200,18 @@ const getHtmx = (): { ajax: HtmxAjax } | undefined => {
 };
 
 // --- Dialog helpers ----------------------------------------------------------
-// Focus return to the invoker on close is automatic for <dialog>. Swallow the
-// InvalidStateError thrown when the dialog is already open/closed.
+// Focus return to the invoker on close is automatic for <dialog>. The `open`
+// check keeps showModal/close from throwing InvalidStateError on a dialog that
+// is already in that state.
 const openDialog = (el: HTMLElement | null): void => {
-	if (!(el instanceof HTMLDialogElement)) {
-		return;
-	}
-	try {
+	if (el instanceof HTMLDialogElement && !el.open) {
 		el.showModal();
-	} catch {
-		/* already open */
 	}
 };
 const closeDialogById = (id: string): void => {
 	const el = byId(id);
-	if (el instanceof HTMLDialogElement) {
-		try {
-			el.close();
-		} catch {
-			/* not currently open */
-		}
+	if (el instanceof HTMLDialogElement && el.open) {
+		el.close();
 	}
 };
 
@@ -265,12 +257,10 @@ const hideHoverCard = (): void => {
 	clearHoverOpenTimer();
 	clearHoverCloseTimer();
 	const card = byId(HOVER_CARD_ID);
-	if (card instanceof HTMLElement && typeof card.hidePopover === "function") {
-		try {
-			card.hidePopover();
-		} catch {
-			/* not currently open */
-		}
+	// togglePopover(false) is a no-op on a card that is not showing, where
+	// hidePopover() would throw InvalidStateError
+	if (card instanceof HTMLElement && typeof card.togglePopover === "function") {
+		card.togglePopover(false);
 	}
 };
 
@@ -282,7 +272,7 @@ const showHoverCardNow = (url: string, anchor: Element): void => {
 	const htmx = getHtmx();
 	if (
 		!(card instanceof HTMLElement) ||
-		typeof card.showPopover !== "function" ||
+		typeof card.togglePopover !== "function" ||
 		!htmx
 	) {
 		window.location.href = url;
@@ -295,11 +285,7 @@ const showHoverCardNow = (url: string, anchor: Element): void => {
 			if (token !== hoverCardToken) {
 				return;
 			}
-			try {
-				card.showPopover();
-			} catch {
-				/* already open */
-			}
+			card.togglePopover(true);
 			positionHoverCard(card, anchor);
 		})
 		// A failed fetch just leaves the hover card closed
@@ -794,75 +780,82 @@ const openEditDialog = (url: string): void => {
 		});
 	});
 
+	// Visibility checkbox: add or remove that calendar's event source live, or
+	// fall back to a form submit when FullCalendar is not loaded
+	const wireVisibilityToggle = (toggle: HTMLInputElement): void => {
+		toggle.addEventListener("change", () => {
+			const cal = calendar;
+			if (!cal) {
+				toggle.form?.requestSubmit();
+				return;
+			}
+			const id = toggle.dataset.calId ?? "";
+			if (toggle.checked) {
+				cal.addEventSource(
+					toFcEventSource({
+						id,
+						url: toggle.dataset.calUrl ?? "",
+						color: toggle.dataset.calColor || undefined,
+						textColor: toggle.dataset.calTextColor || undefined,
+					}),
+				);
+				syncLinks();
+				return;
+			}
+			cal.getEventSourceById(id)?.remove();
+			// Hiding the active calendar hands "active" to the first calendar
+			// still shown (mirrors the server). If none remain, it stays active
+			// but hidden — new/import/export still have a target.
+			const next = id === activeId ? checkedCalIds()[0] : undefined;
+			if (next !== undefined) {
+				setActive(next);
+			}
+			syncLinks();
+		});
+	};
+
+	// Calendar name link: switch the active calendar, making sure it is shown
+	const wireSwitchLink = (link: Element): void => {
+		link.addEventListener("click", (e) => {
+			const cal = calendar;
+			if (!(cal && link instanceof HTMLElement)) {
+				return; // no interactive calendar → let the link navigate
+			}
+			e.preventDefault();
+			const id = link.dataset.switchId ?? "";
+			if (id === "") {
+				return;
+			}
+			const toggle = toggleFor(id);
+			if (toggle && !toggle.checked) {
+				toggle.checked = true;
+				cal.addEventSource(
+					toFcEventSource({
+						id,
+						url: toggle.dataset.calUrl ?? "",
+						color: toggle.dataset.calColor || undefined,
+						textColor: toggle.dataset.calTextColor || undefined,
+					}),
+				);
+			}
+			setActive(id);
+			syncLinks();
+		});
+	};
+
 	// Wire the sidebar calendar list. Always attached (the no-JS Apply button and
 	// link navigation are hidden/replaced once JS runs). When FullCalendar is
 	// loaded, visibility toggles add/remove event sources and name clicks switch
 	// the active calendar — all live; otherwise we fall back to a form submit /
 	// plain navigation so the server re-renders.
 	document.addEventListener("DOMContentLoaded", () => {
-		// Visibility checkboxes.
 		for (const toggle of toggles()) {
-			toggle.addEventListener("change", () => {
-				const cal = calendar;
-				if (!cal) {
-					toggle.form?.requestSubmit();
-					return;
-				}
-				const id = toggle.dataset.calId ?? "";
-				if (toggle.checked) {
-					cal.addEventSource(
-						toFcEventSource({
-							id,
-							url: toggle.dataset.calUrl ?? "",
-							color: toggle.dataset.calColor || undefined,
-							textColor: toggle.dataset.calTextColor || undefined,
-						}),
-					);
-				} else {
-					cal.getEventSourceById(id)?.remove();
-					// Hiding the active calendar hands "active" to the first calendar
-					// still shown (mirrors the server). If none remain, it stays active
-					// but hidden — new/import/export still have a target.
-					if (id === activeId) {
-						const next = checkedCalIds()[0];
-						if (next !== undefined) {
-							setActive(next);
-						}
-					}
-				}
-				syncLinks();
-			});
+			wireVisibilityToggle(toggle);
 		}
-
-		// Calendar name links — switch the active calendar (and ensure it's shown).
 		for (const link of Array.from(
 			document.querySelectorAll("[data-cal-switch]"),
 		)) {
-			link.addEventListener("click", (e) => {
-				const cal = calendar;
-				if (!(cal && link instanceof HTMLElement)) {
-					return; // no interactive calendar → let the link navigate
-				}
-				e.preventDefault();
-				const id = link.dataset.switchId ?? "";
-				if (id === "") {
-					return;
-				}
-				const toggle = toggleFor(id);
-				if (toggle && !toggle.checked) {
-					toggle.checked = true;
-					cal.addEventSource(
-						toFcEventSource({
-							id,
-							url: toggle.dataset.calUrl ?? "",
-							color: toggle.dataset.calColor || undefined,
-							textColor: toggle.dataset.calTextColor || undefined,
-						}),
-					);
-				}
-				setActive(id);
-				syncLinks();
-			});
+			wireSwitchLink(link);
 		}
 	});
 })();

@@ -45,7 +45,8 @@ describe("mergeFormIntoVcard", () => {
 			prop("REV", "20240101T000000Z"),
 		]);
 		// Real flow: parse pre-populates the form (incl. generic otherProps).
-		const edited = { ...parseVcardToForm(existing), fn: "New Name" };
+		const parsed = parseVcardToForm(existing);
+		const edited = { ...parsed, fn: "New Name" };
 		const out = mergeFormIntoVcard(existing, edited, UID);
 		expect(getText(find(out, "FN"))).toBe("New Name");
 		expect(getText(find(out, "ROLE"))).toBe("Engineer"); // generic-editable, preserved
@@ -179,8 +180,9 @@ describe("mergeFormIntoVcard", () => {
 		]);
 		// Real flow: parse pre-populates all 5 N components onto the form, so
 		// editing just family/given still round-trips the rest.
+		const parsed = parseVcardToForm(existing);
 		const edited = {
-			...parseVcardToForm(existing),
+			...parsed,
 			familyName: "Jones",
 			givenName: "Jane",
 		};

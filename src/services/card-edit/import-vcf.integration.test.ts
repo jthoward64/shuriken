@@ -32,7 +32,7 @@ FN:Carol
 END:VCARD
 `;
 
-const setupAlice = Effect.gen(function* () {
+const setupAlice = Effect.fn("import-vcf.test.setupAlice")(function* () {
 	const prov = yield* ProvisioningService;
 	const alice = yield* prov
 		.provisionUser({
@@ -48,7 +48,7 @@ describe("importVcf (integration)", () => {
 	it("inserts new cards on first import", async () => {
 		const runtime = ManagedRuntime.make(makeScriptRunnerLayer());
 		try {
-			const bookId = await runtime.runPromise(setupAlice);
+			const bookId = await runtime.runPromise(setupAlice());
 			const result = await runtime.runPromise(
 				importVcf(bookId, SAMPLE_VCF, "skip"),
 			);
@@ -61,7 +61,7 @@ describe("importVcf (integration)", () => {
 	it("error mode reports conflicts without writes", async () => {
 		const runtime = ManagedRuntime.make(makeScriptRunnerLayer());
 		try {
-			const bookId = await runtime.runPromise(setupAlice);
+			const bookId = await runtime.runPromise(setupAlice());
 			await runtime.runPromise(importVcf(bookId, SAMPLE_VCF, "skip"));
 			const result = await runtime.runPromise(
 				importVcf(bookId, REIMPORT_VCF, "error"),
@@ -76,7 +76,7 @@ describe("importVcf (integration)", () => {
 	it("skip mode imports only new cards", async () => {
 		const runtime = ManagedRuntime.make(makeScriptRunnerLayer());
 		try {
-			const bookId = await runtime.runPromise(setupAlice);
+			const bookId = await runtime.runPromise(setupAlice());
 			await runtime.runPromise(importVcf(bookId, SAMPLE_VCF, "skip"));
 			const result = await runtime.runPromise(
 				importVcf(bookId, REIMPORT_VCF, "skip"),
@@ -97,7 +97,7 @@ EMAIL:carol@example.com
 END:VCARD
 `;
 		try {
-			const bookId = await runtime.runPromise(setupAlice);
+			const bookId = await runtime.runPromise(setupAlice());
 			const first = await runtime.runPromise(importVcf(bookId, noUid, "skip"));
 			expect(first.inserted).toBe(1);
 			// Second import detects the synthetic key as a conflict instead of
@@ -119,7 +119,7 @@ END:VCARD
 	it("merge mode replaces existing cards by UID", async () => {
 		const runtime = ManagedRuntime.make(makeScriptRunnerLayer());
 		try {
-			const bookId = await runtime.runPromise(setupAlice);
+			const bookId = await runtime.runPromise(setupAlice());
 			await runtime.runPromise(importVcf(bookId, SAMPLE_VCF, "skip"));
 			const result = await runtime.runPromise(
 				importVcf(bookId, REIMPORT_VCF, "merge"),

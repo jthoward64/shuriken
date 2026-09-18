@@ -133,12 +133,10 @@ const NUMERIC_SUFFIX = /-\d+$/u;
 		clearHoverOpenTimer();
 		clearHoverCloseTimer();
 		const card = byId(hoverCardId);
-		if (card && typeof card.hidePopover === "function") {
-			try {
-				card.hidePopover();
-			} catch {
-				/* not currently open */
-			}
+		// togglePopover(false) is a no-op on a card that is not showing, where
+		// hidePopover() would throw InvalidStateError
+		if (card && typeof card.togglePopover === "function") {
+			card.togglePopover(false);
 		}
 	};
 
@@ -159,11 +157,7 @@ const NUMERIC_SUFFIX = /-\d+$/u;
 				if (token !== hoverCardToken) {
 					return;
 				}
-				try {
-					card.showPopover();
-				} catch {
-					/* already open */
-				}
+				card.togglePopover(true);
 				positionHoverCard(card, anchor);
 			});
 	};
@@ -192,10 +186,8 @@ const NUMERIC_SUFFIX = /-\d+$/u;
 			window.location.href = url;
 			return;
 		}
-		try {
+		if (!dialog.open) {
 			dialog.showModal();
-		} catch {
-			/* already open */
 		}
 		htmx.ajax("GET", url, {
 			target: `#${editContactPopoverBodyId}`,
@@ -214,22 +206,20 @@ const NUMERIC_SUFFIX = /-\d+$/u;
 	const paneBodyId = "contacts-pane-body";
 	let paneToken = 0;
 
-	const isPopoverOpen = (el) => {
-		try {
-			return el.matches(":popover-open");
-		} catch {
-			return false;
-		}
-	};
+	// `:popover-open` is a syntax error in browsers without popover support, so
+	// the selector is feature-checked once rather than probed per call
+	const popoverOpenSupported =
+		typeof CSS !== "undefined" &&
+		typeof CSS.supports === "function" &&
+		CSS.supports("selector(:popover-open)");
+
+	const isPopoverOpen = (el) =>
+		popoverOpenSupported && el.matches(":popover-open");
 
 	const closePane = () => {
 		const pane = byId(paneId);
-		if (pane && typeof pane.hidePopover === "function" && isPopoverOpen(pane)) {
-			try {
-				pane.hidePopover();
-			} catch {
-				/* not currently open */
-			}
+		if (pane && typeof pane.togglePopover === "function") {
+			pane.togglePopover(false);
 		}
 	};
 
@@ -245,11 +235,7 @@ const NUMERIC_SUFFIX = /-\d+$/u;
 		}
 		const token = ++paneToken;
 		if (!isPopoverOpen(pane)) {
-			try {
-				pane.showPopover();
-			} catch {
-				/* already open */
-			}
+			pane.showPopover();
 		}
 		htmx
 			.ajax("GET", url, { target: `#${paneBodyId}`, swap: "innerHTML" })
@@ -359,13 +345,9 @@ const NUMERIC_SUFFIX = /-\d+$/u;
 			dl?.setAttribute("id", next);
 			if (attr === "list" && el === input) {
 				el.setAttribute("hx-target", `#${next}`);
-				el.setAttribute(
-					"hx-vals",
-					JSON.stringify({
-						...JSON.parse(el.getAttribute("hx-vals") ?? "{}"),
-						list: next,
-					}),
-				);
+				const vals = JSON.parse(el.getAttribute("hx-vals") ?? "{}");
+				vals.list = next;
+				el.setAttribute("hx-vals", JSON.stringify(vals));
 			}
 		}
 	};
@@ -524,6 +506,41 @@ const NUMERIC_SUFFIX = /-\d+$/u;
 		}
 	});
 
+	// Mirror the "select all" box onto every row of its own bulk <form> (the
+	// table is gone in the list redesign, so the form is the scope)
+	const setAllChecked = (t) => {
+		const form = t.closest("form");
+		if (!form) {
+			return;
+		}
+		for (const c of form.querySelectorAll("input[name=id]")) {
+			c.checked = t.checked;
+		}
+		updateSelectedCount(form);
+	};
+
+	// Refresh the bulk bar's count for the form the control belongs to
+	const refreshSelectedCount = (t) => {
+		const form = t.closest("form");
+		if (form) {
+			updateSelectedCount(form);
+		}
+	};
+
+	// Submit the control's own form, preferring requestSubmit so validation and
+	// the submit event still run
+	const submitOwningForm = (t) => {
+		const form = t.form || t.closest("form");
+		if (!form) {
+			return;
+		}
+		if (typeof form.requestSubmit === "function") {
+			form.requestSubmit();
+			return;
+		}
+		form.submit();
+	};
+
 	// --- Delegated change behaviours -----------------------------------------
 	document.addEventListener("change", (e) => {
 		const t = e.target;
@@ -531,32 +548,15 @@ const NUMERIC_SUFFIX = /-\d+$/u;
 			return;
 		}
 		if (t.matches("[data-check-all]")) {
-			// Scope to the bulk <form> (the table is gone in the list redesign).
-			const form = t.closest("form");
-			if (form) {
-				for (const c of form.querySelectorAll("input[name=id]")) {
-					c.checked = t.checked;
-				}
-				updateSelectedCount(form);
-			}
+			setAllChecked(t);
 			return;
 		}
 		if (t.matches("input[name=id]")) {
-			const form = t.closest("form");
-			if (form) {
-				updateSelectedCount(form);
-			}
+			refreshSelectedCount(t);
 			return;
 		}
 		if (t.matches("[data-autosubmit]")) {
-			const form = t.form || t.closest("form");
-			if (form) {
-				if (typeof form.requestSubmit === "function") {
-					form.requestSubmit();
-				} else {
-					form.submit();
-				}
-			}
+			submitOwningForm(t);
 			return;
 		}
 		if (t.matches("[data-type-checkbox]")) {
@@ -582,62 +582,70 @@ const NUMERIC_SUFFIX = /-\d+$/u;
 	});
 
 	// --- Delegated click behaviours ------------------------------------------
-	document.addEventListener("click", (e) => {
-		const t = e.target;
-		if (!t || typeof t.closest !== "function") {
-			return;
-		}
-
+	// Row-editing controls inside a contact form. Returns true once it has
+	// handled the click.
+	const handleRowEditClick = (t) => {
 		const addRowBtn = t.closest("[data-add-row]");
 		if (addRowBtn) {
 			addRow(addRowBtn);
-			return;
+			return true;
 		}
 		const removeRowBtn = t.closest("[data-remove-row]");
 		if (removeRowBtn) {
 			removeRowBtn.closest("[data-row-item]")?.remove();
-			return;
+			return true;
 		}
 		const gramGenderToggle = t.closest("[data-add-gram-gender]");
 		if (gramGenderToggle) {
-			gramGenderToggle.hidden = true;
-			// Scoped to this button's own <form> — see the addRow() comment above
-			// for why an unscoped document.querySelector is unsafe on this page.
-			const field = gramGenderToggle
-				.closest("form")
-				?.querySelector("[data-gram-gender-field]");
-			if (field) {
-				field.hidden = false;
-				field.querySelector("select")?.focus();
-			}
-			return;
+			revealGramGender(gramGenderToggle);
+			return true;
 		}
 		const fnToggle = t.closest("[data-fn-mode-toggle]");
 		if (fnToggle) {
-			const form = fnToggle.closest("form");
-			if (form) {
-				setFnAutoMode(form, fnToggle.getAttribute("aria-pressed") !== "true");
-			}
+			toggleFnMode(fnToggle);
+			return true;
+		}
+		return false;
+	};
+
+	// Reveal the grammatical-gender field, scoped to this button's own <form> -
+	// see the addRow() comment above for why an unscoped query is unsafe here
+	const revealGramGender = (toggle) => {
+		toggle.hidden = true;
+		const field = toggle
+			.closest("form")
+			?.querySelector("[data-gram-gender-field]");
+		if (!field) {
 			return;
 		}
+		field.hidden = false;
+		field.querySelector("select")?.focus();
+	};
 
-		// Lazily-loaded dialogs: the trigger is a real link (no-JS follows it to a
-		// full page); with JS, htmx loads the fragment into the dialog body and we
-		// open the dialog here. Native `commandfor`/`command="show-modal"` handles
-		// the inline dialogs.
-		const popTrigger = t.closest("[data-popover]");
-		if (popTrigger) {
-			const pop = byId(popTrigger.getAttribute("data-popover"));
-			if (pop instanceof HTMLDialogElement) {
-				try {
-					pop.showModal();
-				} catch {
-					/* already open */
-				}
-			}
+	// Flip the display-name field between following Given/Middle/Family and manual
+	const toggleFnMode = (toggle) => {
+		const form = toggle.closest("form");
+		if (form) {
+			setFnAutoMode(form, toggle.getAttribute("aria-pressed") !== "true");
 		}
+	};
 
-		// The hover card's Edit button — a real link to the full edit page (no-JS
+	// Lazily-loaded dialogs: the trigger is a real link (no-JS follows it to a
+	// full page); with JS, htmx loads the fragment into the dialog body and we
+	// open the dialog here. Native `commandfor`/`command="show-modal"` handles
+	// the inline dialogs.
+	const openLazyDialog = (trigger) => {
+		const pop = byId(trigger.getAttribute("data-popover"));
+		if (pop instanceof HTMLDialogElement && !pop.open) {
+			pop.showModal();
+		}
+	};
+
+	// Navigation-ish controls: each has a real link/behaviour without JS, which
+	// this replaces with an in-page dialog, pane or refresh. Returns true once it
+	// has handled the click.
+	const handleNavClick = (t, e) => {
+		// The hover card's Edit button - a real link to the full edit page (no-JS
 		// fallback); with JS, hide the hover card and open the real edit dialog
 		// instead of navigating.
 		const editTrigger = t.closest("[data-edit-contact]");
@@ -645,43 +653,60 @@ const NUMERIC_SUFFIX = /-\d+$/u;
 			e.preventDefault();
 			hideHoverCard();
 			openEditDialog(editTrigger.href);
-			return;
+			return true;
 		}
-
-		// Contact row body — a real link to the full preview page (no-JS opens it
+		// Contact row body - a real link to the full preview page (no-JS opens it
 		// in a new tab); with JS, load it into the preview pane instead.
 		const openPaneTrigger = t.closest("[data-open-pane]");
 		if (openPaneTrigger instanceof HTMLAnchorElement) {
 			e.preventDefault();
 			hideHoverCard();
 			openPane(openPaneTrigger.href);
-			return;
+			return true;
 		}
-
 		const dismiss = t.closest("[data-dismiss-suggestion]");
 		if (dismiss) {
-			const item = dismiss.closest("[data-suggestion]");
-			if (item) {
-				item.remove();
-			}
-			return;
+			dismiss.closest("[data-suggestion]")?.remove();
+			return true;
 		}
-
 		if (t.closest("[data-reload]")) {
 			location.reload();
+			return true;
+		}
+		return false;
+	};
+
+	// The download bar is shown optimistically and hidden again once nothing is
+	// in flight, since a download gives no completion event
+	const onDownloadClick = () => {
+		showBar();
+		if (downloadTimer) {
+			clearTimeout(downloadTimer);
+		}
+		downloadTimer = setTimeout(() => {
+			if (inFlight === 0) {
+				hideBar();
+			}
+		}, autoHideMs);
+	};
+
+	document.addEventListener("click", (e) => {
+		const t = e.target;
+		if (!t || typeof t.closest !== "function") {
 			return;
 		}
-
+		if (handleRowEditClick(t)) {
+			return;
+		}
+		const popTrigger = t.closest("[data-popover]");
+		if (popTrigger) {
+			openLazyDialog(popTrigger);
+		}
+		if (handleNavClick(t, e)) {
+			return;
+		}
 		if (t.closest("[data-download]")) {
-			showBar();
-			if (downloadTimer) {
-				clearTimeout(downloadTimer);
-			}
-			downloadTimer = setTimeout(() => {
-				if (inFlight === 0) {
-					hideBar();
-				}
-			}, autoHideMs);
+			onDownloadClick();
 		}
 	});
 
@@ -812,12 +837,8 @@ const NUMERIC_SUFFIX = /-\d+$/u;
 			editContactPopoverId,
 		]) {
 			const pop = byId(id);
-			if (pop instanceof HTMLDialogElement) {
-				try {
-					pop.close();
-				} catch {
-					/* not currently open */
-				}
+			if (pop instanceof HTMLDialogElement && pop.open) {
+				pop.close();
 			}
 		}
 		hideHoverCard();

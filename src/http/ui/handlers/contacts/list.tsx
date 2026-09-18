@@ -28,7 +28,10 @@ import { CONTACTS_ASSETS } from "#src/http/ui/view/shell/assets.tsx";
 import { renderPage } from "#src/http/ui/view/shell/render.tsx";
 import type { AclRepository } from "#src/services/acl/repository.ts";
 import type { AclService } from "#src/services/acl/service.ts";
-import { CardIndexRepository } from "#src/services/card-index/repository.ts";
+import {
+	CardIndexRepository,
+	type CardSummaryRow,
+} from "#src/services/card-index/repository.ts";
 import type { CollectionRepository } from "#src/services/collection/repository.ts";
 import type { PrincipalRepository } from "#src/services/principal/repository.ts";
 
@@ -59,6 +62,32 @@ const parseNotice = (params: URLSearchParams): ImportNotice | undefined => {
 		merged: num("merged"),
 		conflicts: num("conflicts"),
 	};
+};
+
+// One card_index summary projected into a list row
+const toContactRow = (summary: CardSummaryRow): ContactRow => {
+	const fn = summary.fn || "(no name)";
+	const first = fn.trim().charAt(0).toUpperCase();
+	// Subtitle prefers the primary email; falls back to "Title, Org".
+	const orgLine = [summary.title, summary.org]
+		.map((v) => (v ?? "").trim())
+		.filter((v) => v !== "")
+		.join(", ");
+	return {
+		instanceId: summary.instanceId,
+		fn,
+		subtitle: summary.email?.trim() || orgLine,
+		hasPhoto: summary.hasPhoto,
+		initial: ALPHANUMERIC.test(first) ? first : "?",
+	};
+};
+
+// The requested page number, clamped into the available range
+const clampPage = (raw: string | null, totalPages: number): number => {
+	const requested = Number.parseInt(raw ?? "", DECIMAL);
+	return Number.isFinite(requested)
+		? Math.min(Math.max(requested, 1), totalPages)
+		: 1;
 };
 
 export const contactsListHandler = (
@@ -134,13 +163,7 @@ export const contactsListHandler = (
 			const total = yield* cardIndex.countForCollection(collectionId, fnFilter);
 			totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-			const requestedPage = Number.parseInt(
-				ctx.url.searchParams.get("page") ?? "",
-				DECIMAL,
-			);
-			page = Number.isFinite(requestedPage)
-				? Math.min(Math.max(requestedPage, 1), totalPages)
-				: 1;
+			page = clampPage(ctx.url.searchParams.get("page"), totalPages);
 
 			// Project contact rows straight out of the card_index (kept in sync by
 			// a DB trigger). FN search is applied in SQL via the fold column, so
@@ -151,22 +174,7 @@ export const contactsListHandler = (
 				fnFilter,
 				{ limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE },
 			);
-			contacts = summaries.map((s) => {
-				const fn = s.fn || "(no name)";
-				const first = fn.trim().charAt(0).toUpperCase();
-				// Subtitle prefers the primary email; falls back to "Title, Org".
-				const orgLine = [s.title, s.org]
-					.map((v) => (v ?? "").trim())
-					.filter((v) => v !== "")
-					.join(", ");
-				return {
-					instanceId: s.instanceId,
-					fn,
-					subtitle: s.email?.trim() || orgLine,
-					hasPhoto: s.hasPhoto,
-					initial: ALPHANUMERIC.test(first) ? first : "?",
-				};
-			});
+			contacts = summaries.map(toContactRow);
 		}
 
 		const nav = yield* buildNavContext(

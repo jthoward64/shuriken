@@ -75,7 +75,7 @@ export const groupsCollectionsCreateHandler = (
 				/>,
 			);
 		}
-		const collectionType = collectionTypeRaw as CollectionType;
+		const collectionType: CollectionType = collectionTypeRaw;
 
 		const parseResult = yield* Effect.all({
 			slug: parseSlug(form.get("slug")?.toString()),

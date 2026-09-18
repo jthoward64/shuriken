@@ -55,51 +55,49 @@ const before = (
 	bId: string,
 ): boolean => aSort < bSort || (aSort === bSort && aId < bId);
 
-/**
- * Compute the minimal set of sortOrder changes to realise `desired` (the target
- * top-to-bottom order) given that `movedId` is the item the user dragged.
- *
- * Returns a map of collection id -> new sortOrder containing ONLY the
- * collections whose value actually changed (often just one). An empty map means
- * no change is needed.
- */
-export const computeReorder = (
-	desired: ReadonlyArray<SortableCollection>,
-	movedId: string,
-): ReadonlyMap<string, number> => {
-	const n = desired.length;
-	const idx = desired.findIndex((c) => c.id === movedId);
-	if (idx < 0 || n === 0) {
-		return new Map();
-	}
+/** The working state of one reorder pass. */
+interface ReorderCtx {
+	readonly desired: ReadonlyArray<SortableCollection>;
+	readonly n: number;
+	/** Current working sortOrder per id. */
+	readonly so: Map<string, number>;
+	readonly idAt: (i: number) => string;
+	readonly soOf: (id: string) => number;
+	readonly dfltOf: (id: string) => number;
+}
 
+const makeCtx = (desired: ReadonlyArray<SortableCollection>): ReorderCtx => {
 	const so = new Map<string, number>(desired.map((c) => [c.id, c.sortOrder]));
 	const kindOf = new Map<string, CollectionSortKind>(
 		desired.map((c) => [c.id, c.kind]),
 	);
-
-	const idAt = (i: number): string => {
-		const c = desired[i];
-		if (c === undefined) {
-			throw new Error("index out of range");
-		}
-		return c.id;
+	return {
+		desired,
+		n: desired.length,
+		so,
+		idAt: (i) => {
+			const c = desired[i];
+			if (c === undefined) {
+				throw new Error("index out of range");
+			}
+			return c.id;
+		},
+		soOf: (id) => so.get(id) ?? 0,
+		dfltOf: (id) => DEFAULT_SORT_ORDER[kindOf.get(id) ?? "normal"],
 	};
-	const soOf = (id: string): number => so.get(id) ?? 0;
-	const dfltOf = (id: string): number =>
-		DEFAULT_SORT_ORDER[kindOf.get(id) ?? "normal"];
+};
 
-	// Direction of the drag: compare M's position in the current stored order
-	// against its position in the desired order.
-	const currentOrder = [...desired].sort((a, b) =>
-		before(a.sortOrder, a.id, b.sortOrder, b.id) ? -1 : 1,
-	);
-	const curIdx = currentOrder.findIndex((c) => c.id === movedId);
-	if (idx === curIdx) {
-		return new Map();
-	}
-	const draggedDown = idx > curIdx;
-
+/**
+ * Step 1 — place the moved item between its new neighbours, cascading the
+ * items on the far side with strict ±1 gaps when its type-default cannot fit.
+ */
+const placeMoved = (
+	ctx: ReorderCtx,
+	idx: number,
+	movedId: string,
+	draggedDown: boolean,
+): void => {
+	const { n, so, idAt, soOf, dfltOf } = ctx;
 	const P = idx > 0 ? idAt(idx - 1) : null;
 	const N = idx < n - 1 ? idAt(idx + 1) : null;
 	const dM = dfltOf(movedId);
@@ -110,7 +108,9 @@ export const computeReorder = (
 	if (okAboveP && okBelowN) {
 		// M's type-default already slots in cleanly.
 		so.set(movedId, dM);
-	} else if (draggedDown) {
+		return;
+	}
+	if (draggedDown) {
 		// Anchor on P (guaranteed non-null when dragged down): place M minimally
 		// above P, tie on creation order where possible, then push N and below up
 		// with strict +1 gaps until the order holds.
@@ -124,23 +124,28 @@ export const computeReorder = (
 			}
 			so.set(cur, soOf(prev) + 1);
 		}
-	} else {
-		// Dragged up. Anchor on N (guaranteed non-null): place M minimally below
-		// N, then push P and above down with strict -1 gaps.
-		const nSo = soOf(N as string);
-		so.set(movedId, movedId < (N as string) ? nSo : nSo - 1);
-		for (let j = idx - 1; j >= 0; j--) {
-			const cur = idAt(j);
-			const below = idAt(j + 1);
-			if (before(soOf(cur), cur, soOf(below), below)) {
-				break;
-			}
-			so.set(cur, soOf(below) - 1);
-		}
+		return;
 	}
+	// Dragged up. Anchor on N (guaranteed non-null): place M minimally below
+	// N, then push P and above down with strict -1 gaps.
+	const nSo = soOf(N as string);
+	so.set(movedId, movedId < (N as string) ? nSo : nSo - 1);
+	for (let j = idx - 1; j >= 0; j--) {
+		const cur = idAt(j);
+		const below = idAt(j + 1);
+		if (before(soOf(cur), cur, soOf(below), below)) {
+			break;
+		}
+		so.set(cur, soOf(below) - 1);
+	}
+};
 
-	// Snap-to-default: reset any collection to exactly its type-default when that
-	// keeps the order valid. Loop to a fixpoint since one snap can unblock another.
+/**
+ * Step 2 — reset any collection to exactly its type-default when that keeps the
+ * order valid. Looped to a fixpoint since one snap can unblock another.
+ */
+const snapToDefaults = (ctx: ReorderCtx): void => {
+	const { n, so, idAt, soOf, dfltOf } = ctx;
 	let changed = true;
 	while (changed) {
 		changed = false;
@@ -159,26 +164,74 @@ export const computeReorder = (
 			}
 		}
 	}
+};
 
-	// Safety net: for a single drag from a valid state the steps above always
-	// realise the order, but guard against unexpected input (e.g. a multi-item
-	// move) by rebuilding strictly if any consecutive pair is out of order.
-	for (let i = 1; i < n; i++) {
-		const prev = idAt(i - 1);
-		const cur = idAt(i);
-		if (!before(soOf(prev), prev, soOf(cur), cur)) {
-			return rebuildStrict(desired, dfltOf);
+/** True when every consecutive pair of the desired order sorts correctly. */
+const isStrictlyOrdered = (ctx: ReorderCtx): boolean => {
+	for (let i = 1; i < ctx.n; i++) {
+		const prev = ctx.idAt(i - 1);
+		const cur = ctx.idAt(i);
+		if (!before(ctx.soOf(prev), prev, ctx.soOf(cur), cur)) {
+			return false;
 		}
 	}
+	return true;
+};
 
+/** Only the collections whose working sortOrder differs from the stored one. */
+const changedOrders = (ctx: ReorderCtx): ReadonlyMap<string, number> => {
 	const changes = new Map<string, number>();
-	for (const c of desired) {
-		const next = soOf(c.id);
+	for (const c of ctx.desired) {
+		const next = ctx.soOf(c.id);
 		if (next !== c.sortOrder) {
 			changes.set(c.id, next);
 		}
 	}
 	return changes;
+};
+
+/** The index the moved item currently occupies in the stored order. */
+const currentIndexOf = (
+	desired: ReadonlyArray<SortableCollection>,
+	movedId: string,
+): number =>
+	[...desired]
+		.sort((a, b) => (before(a.sortOrder, a.id, b.sortOrder, b.id) ? -1 : 1))
+		.findIndex((c) => c.id === movedId);
+
+/**
+ * Compute the minimal set of sortOrder changes to realise `desired` (the target
+ * top-to-bottom order) given that `movedId` is the item the user dragged.
+ *
+ * Returns a map of collection id -> new sortOrder containing ONLY the
+ * collections whose value actually changed (often just one). An empty map means
+ * no change is needed.
+ */
+export const computeReorder = (
+	desired: ReadonlyArray<SortableCollection>,
+	movedId: string,
+): ReadonlyMap<string, number> => {
+	const idx = desired.findIndex((c) => c.id === movedId);
+	if (idx < 0 || desired.length === 0) {
+		return new Map();
+	}
+	// Direction of the drag: compare M's position in the current stored order
+	// against its position in the desired order.
+	const curIdx = currentIndexOf(desired, movedId);
+	if (idx === curIdx) {
+		return new Map();
+	}
+
+	const ctx = makeCtx(desired);
+	placeMoved(ctx, idx, movedId, idx > curIdx);
+	snapToDefaults(ctx);
+
+	// Safety net: for a single drag from a valid state the steps above always
+	// realise the order, but guard against unexpected input (e.g. a multi-item
+	// move) by rebuilding strictly if any consecutive pair is out of order.
+	return isStrictlyOrdered(ctx)
+		? changedOrders(ctx)
+		: rebuildStrict(desired, ctx.dfltOf);
 };
 
 /** Fallback: assign values forward so `desired` is guaranteed to sort correctly,

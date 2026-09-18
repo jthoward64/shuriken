@@ -1,6 +1,6 @@
 import { Temporal as JSTemporal } from "@js-temporal/polyfill";
 import { and, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
-import { Effect, Layer } from "effect";
+import { type Cause, Effect, Layer, Option } from "effect";
 import { RRuleTemporal } from "rrule-temporal";
 import type { Temporal } from "temporal-polyfill";
 import { normalizeRruleUntil } from "#src/data/icalendar/recurrence/recurrence-check.ts";
@@ -23,6 +23,8 @@ import {
 // ---------------------------------------------------------------------------
 
 const MS_PER_DAY = 86_400_000;
+// Enough occurrences to determine a MONTHLY (2 years) or YEARLY (24 years) pattern
+const RRULE_SAMPLE_SIZE = 24;
 // UTC offsets run from -12:00 to +14:00, so a wall time indexed at UTC sits at
 // most 14 hours from the instant it names in some other zone.
 const MAX_ZONE_OFFSET_HOURS = 14;
@@ -55,17 +57,56 @@ const zonePaddedRange = (
 const SPAN_DAYS_COVERING_ALL_DAYS = 28;
 const SPAN_DAYS_COVERING_ALL_MONTHS = 365;
 
+interface DayRange {
+	readonly min: number;
+	readonly max: number;
+}
+
+/** Day-of-month range covered by the window, absent when every day is covered */
+const coveredDays = (
+	zs: Temporal.ZonedDateTime,
+	ze: Temporal.ZonedDateTime,
+	spanDays: number,
+): Option.Option<DayRange> => {
+	if (spanDays >= SPAN_DAYS_COVERING_ALL_DAYS) {
+		return Option.none(); // covers every day-of-month
+	}
+	if (zs.year !== ze.year || zs.month !== ze.month) {
+		return Option.none(); // crosses a month boundary; min/max would be 1..31
+	}
+	return Option.some({ min: zs.day, max: ze.day });
+};
+
+/** Months touched by the window, absent when every month is covered */
+const coveredMonths = (
+	zs: Temporal.ZonedDateTime,
+	ze: Temporal.ZonedDateTime,
+	spanDays: number,
+): Option.Option<ReadonlyArray<number>> => {
+	if (spanDays >= SPAN_DAYS_COVERING_ALL_MONTHS) {
+		return Option.none(); // covers every month
+	}
+	const out: Array<number> = [];
+	let cursor = zs.with({ day: 1 });
+	const limit = ze.with({ day: 1 });
+	while (cursor.epochMilliseconds <= limit.epochMilliseconds) {
+		out.push(cursor.month);
+		cursor = cursor.add({ months: 1 });
+	}
+	return out.length > 0 ? Option.some(out) : Option.none();
+};
+
 /**
  * Day-of-month and month spans covered by [start, end), used to narrow MONTHLY
- * and YEARLY series. Returns null for a span long enough to cover every value,
- * in which case the corresponding check is skipped.
+ * and YEARLY series. Each is absent for a span long enough to cover every
+ * value, in which case the corresponding check is skipped.
  */
 const coveredSpans = (
 	start: Temporal.Instant,
 	end: Temporal.Instant,
 ): {
-	days: { min: number; max: number } | null;
-	months: Array<number> | null;
+	readonly days: Option.Option<DayRange>;
+	readonly months: Option.Option<ReadonlyArray<number>>;
 } => {
 	const spanDays =
 		end.epochMilliseconds - start.epochMilliseconds < 0
@@ -73,32 +114,10 @@ const coveredSpans = (
 			: (end.epochMilliseconds - start.epochMilliseconds) / MS_PER_DAY;
 	const zs = start.toZonedDateTimeISO("UTC");
 	const ze = end.toZonedDateTimeISO("UTC");
-
-	const days = (() => {
-		if (spanDays >= SPAN_DAYS_COVERING_ALL_DAYS) {
-			return null; // covers every day-of-month
-		}
-		if (zs.year !== ze.year || zs.month !== ze.month) {
-			return null; // crosses a month boundary; min/max would be 1..31
-		}
-		return { min: zs.day, max: ze.day };
-	})();
-
-	const months = (() => {
-		if (spanDays >= SPAN_DAYS_COVERING_ALL_MONTHS) {
-			return null; // covers every month
-		}
-		const out: Array<number> = [];
-		let cursor = zs.with({ day: 1 });
-		const limit = ze.with({ day: 1 });
-		while (cursor.epochMilliseconds <= limit.epochMilliseconds) {
-			out.push(cursor.month);
-			cursor = cursor.add({ months: 1 });
-		}
-		return out.length > 0 ? out : null;
-	})();
-
-	return { days, months };
+	return {
+		days: coveredDays(zs, ze, spanDays),
+		months: coveredMonths(zs, ze, spanDays),
+	};
 };
 
 /**
@@ -159,30 +178,34 @@ const rruleBucketClause = (
 			and(
 				sql`${calIndex.rruleFreq} = 'MONTHLY'`,
 				firesInSpan(monthIdx(s), monthIdx(e)),
-				days === null
-					? undefined
-					: or(
+				Option.match(days, {
+					onNone: () => undefined,
+					onSome: (range) =>
+						or(
 							isNull(calIndex.rruleOccurrenceDayMin),
 							and(
-								sql`${calIndex.rruleOccurrenceDayMin} <= ${days.max}`,
-								sql`${calIndex.rruleOccurrenceDayMax} >= ${days.min}`,
+								sql`${calIndex.rruleOccurrenceDayMin} <= ${range.max}`,
+								sql`${calIndex.rruleOccurrenceDayMax} >= ${range.min}`,
 							),
 						),
+				}),
 			),
 
 			// Pass conservatively when the month set is not yet indexed
 			and(
 				sql`${calIndex.rruleFreq} = 'YEARLY'`,
 				firesInSpan(yearIdx(s), yearIdx(e)),
-				months === null
-					? undefined
-					: or(
+				Option.match(months, {
+					onNone: () => undefined,
+					onSome: (list) =>
+						or(
 							isNull(calIndex.rruleOccurrenceMonths),
 							sql`${calIndex.rruleOccurrenceMonths} && ARRAY[${sql.join(
-								months.map((m) => sql`${m}`),
+								list.map((m) => sql`${m}`),
 								sql`, `,
 							)}]::smallint[]`,
 						),
+				}),
 			),
 
 			// Unknown / unrecognised freq: pass conservatively
@@ -193,6 +216,44 @@ const rruleBucketClause = (
 		),
 	);
 };
+
+type RruleSample = ReturnType<RRuleTemporal["all"]>;
+
+/**
+ * First occurrences of a series, used to derive the month/day occurrence hints.
+ *
+ * A malformed RRULE (beyond the naive-UNTIL case normalizeRruleUntil handles)
+ * must not fail the whole write/index pass. On a residual expansion error the
+ * sample is absent, the hints stay NULL, and the week-bucket pre-filter passes
+ * the row conservatively (correct, just less selective).
+ */
+const sampleOccurrences = Effect.fn("repo.cal-index.sampleOccurrences")(
+	function* (rruleText: string, dtstart: JSTemporal.ZonedDateTime) {
+		return yield* Effect.try(() =>
+			new RRuleTemporal({
+				rruleString: normalizeRruleUntil(rruleText, UTC, dtstart),
+				dtstart,
+				// Sample 24 occurrences — sufficient to determine the pattern:
+				//   MONTHLY → covers 24 months (2 years)
+				//   YEARLY  → covers 24 years
+			}).all((_, i) => i < RRULE_SAMPLE_SIZE),
+		).pipe(
+			Effect.map(Option.some<RruleSample>),
+			Effect.catchCause((cause) => logMalformedRrule(rruleText, cause)),
+		);
+	},
+);
+
+/** Records a skipped occurrence-hint pass so the drop is never silent. */
+const logMalformedRrule = Effect.fn("repo.cal-index.logMalformedRrule")(
+	function* (rruleText: string, cause: Cause.Cause<unknown>) {
+		yield* Effect.logWarning(
+			"repo.cal-index: skipping occurrence-hint indexing for a malformed RRULE",
+			{ rruleText, cause },
+		);
+		return Option.none<RruleSample>();
+	},
+);
 
 /**
  * Exact dtstart/dtend overlap clause for non-recurring (no RRULE) rows.
@@ -408,31 +469,11 @@ const indexRruleOccurrences = Effect.fn(
 				row.dtstartUtc.epochMilliseconds,
 			).toZonedDateTimeISO("UTC");
 
-			// A malformed RRULE (beyond the naive-UNTIL case normalizeRruleUntil
-			// handles) must not fail the whole write/index pass. On a residual
-			// expansion error, log and skip THIS row's occurrence hints — they stay
-			// NULL, so the week-bucket pre-filter passes the row conservatively
-			// (correct, just less selective). The skip is logged, never silent.
-			let sample: ReturnType<RRuleTemporal["all"]>;
-			try {
-				const rule = new RRuleTemporal({
-					rruleString: normalizeRruleUntil(row.rruleText, UTC, dtstart),
-					dtstart,
-				});
-				// Sample 24 occurrences — sufficient to determine the pattern:
-				//   MONTHLY → covers 24 months (2 years)
-				//   YEARLY  → covers 24 years
-				sample = rule.all((_, i) => i < 24);
-			} catch (cause) {
-				yield* Effect.logWarning(
-					"repo.cal-index: skipping occurrence-hint indexing for a malformed RRULE",
-					{ rruleText: row.rruleText, cause },
-				);
+			const sampled = yield* sampleOccurrences(row.rruleText, dtstart);
+			if (Option.isNone(sampled) || sampled.value.length === 0) {
 				continue;
 			}
-			if (sample.length === 0) {
-				continue;
-			}
+			const sample = sampled.value;
 
 			const months = [...new Set(sample.map((d) => d.month))].sort(
 				(a, b) => a - b,

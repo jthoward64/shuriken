@@ -1,7 +1,7 @@
 import { expect } from "@std/expect";
 import { beforeAll, describe, it } from "@std/testing/bdd";
 import { Effect, Layer, Option } from "effect";
-import type { DatabaseError } from "#src/domain/errors.ts";
+import { DatabaseError } from "#src/domain/errors.ts";
 import { CollectionId, PrincipalId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import { Email } from "#src/domain/types/strings.ts";
@@ -11,6 +11,14 @@ import { runFailure, runSuccess } from "#src/testing/effect.ts";
 import { makePgliteDatabaseLayer } from "#src/testing/pglite.ts";
 import { CollectionRepositoryLive } from "./repository.live.ts";
 import { CollectionRepository } from "./repository.ts";
+
+/** Narrows a test failure to a DatabaseError. */
+const asDatabaseError = (err: unknown): DatabaseError => {
+	if (err instanceof DatabaseError) {
+		return err;
+	}
+	throw new Error(`expected a DatabaseError, got ${String(err)}`);
+};
 
 // ---------------------------------------------------------------------------
 // Integration tests for CollectionRepositoryLive
@@ -267,29 +275,31 @@ describe("CollectionRepository unique slug constraint (integration)", () => {
 	});
 
 	it("inserting two collections with the same owner + slug fails with DatabaseError", async () => {
-		const err = (await runFailure(
-			Effect.gen(function* () {
-				const user = yield* UserRepository;
-				const col = yield* CollectionRepository;
-				const { principal } = yield* user.create({
-					slug: Slug("dup-owner"),
-					displayName: "Dup",
-					email: Email("dup@example.com"),
-					credentials: [],
-				});
-				const ownerId = PrincipalId(principal.id);
-				yield* col.insert({
-					ownerPrincipalId: ownerId,
-					collectionType: "calendar",
-					slug: Slug("duplicate"),
-				});
-				yield* col.insert({
-					ownerPrincipalId: ownerId,
-					collectionType: "calendar",
-					slug: Slug("duplicate"),
-				});
-			}).pipe(Effect.provide(layer)),
-		)) as DatabaseError;
+		const err = asDatabaseError(
+			await runFailure(
+				Effect.gen(function* () {
+					const user = yield* UserRepository;
+					const col = yield* CollectionRepository;
+					const { principal } = yield* user.create({
+						slug: Slug("dup-owner"),
+						displayName: "Dup",
+						email: Email("dup@example.com"),
+						credentials: [],
+					});
+					const ownerId = PrincipalId(principal.id);
+					yield* col.insert({
+						ownerPrincipalId: ownerId,
+						collectionType: "calendar",
+						slug: Slug("duplicate"),
+					});
+					yield* col.insert({
+						ownerPrincipalId: ownerId,
+						collectionType: "calendar",
+						slug: Slug("duplicate"),
+					});
+				}).pipe(Effect.provide(layer)),
+			),
+		);
 
 		expect(err._tag).toBe("DatabaseError");
 	});

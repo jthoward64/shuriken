@@ -1,3 +1,4 @@
+import { encodeJson } from "#src/http/ui/helpers/json.ts";
 // ---------------------------------------------------------------------------
 // SearchPicker wire contract - shared by the control (view/search-picker.tsx),
 // its browser script, and any endpoint that feeds one.
@@ -27,7 +28,7 @@ export const searchPickerResponse = (
 	truncated = false,
 ): Response =>
 	new Response(
-		JSON.stringify({ items, truncated } satisfies SearchPickerResponse),
+		encodeJson({ items, truncated } satisfies SearchPickerResponse),
 		{
 			headers: { "Content-Type": "application/json; charset=utf-8" },
 		},

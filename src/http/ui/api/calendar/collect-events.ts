@@ -1,6 +1,7 @@
 import { Effect, Option } from "effect";
-import { Temporal } from "temporal-polyfill";
+import type { Temporal } from "temporal-polyfill";
 import { resolveCalendarZone } from "#src/data/icalendar/calendar-zone.ts";
+import type { IrComponent } from "#src/data/ir.ts";
 import type { ShareLinkVisibility } from "#src/db/drizzle/schema/index.ts";
 import type {
 	DatabaseError,
@@ -13,6 +14,10 @@ import {
 	InstanceId,
 	type UuidString,
 } from "#src/domain/ids.ts";
+import {
+	parsePlainDate,
+	parsePlainDateTime,
+} from "#src/http/ui/helpers/temporal-parse.ts";
 import { parseVeventToForm } from "#src/services/cal-edit/parse-vevent.ts";
 import { CalIndexRepository } from "#src/services/cal-index/index.ts";
 import { CollectionRepository } from "#src/services/collection/index.ts";
@@ -76,6 +81,41 @@ export const applyVisibilityToEventView = (
 	};
 };
 
+// The RRULE straight from the IR so INTERVAL/BYDAY/BYMONTHDAY etc. survive
+// verbatim - the form parser only keeps FREQ/COUNT/UNTIL
+const rawRrule = (vevent: IrComponent): string | null => {
+	const rruleProp = vevent.properties.find((p) => p.name === "RRULE");
+	return rruleProp && rruleProp.value.type === "RECUR"
+		? rruleProp.value.value
+		: null;
+};
+
+// Project one instance's VEVENT into a view row, or none when it carries no usable one
+const toEventView = (
+	inst: InstanceRow,
+	tree: IrComponent,
+): Option.Option<CalendarEventView> => {
+	const vevent = tree.components.find((c) => c.name === "VEVENT");
+	if (!vevent) {
+		return Option.none();
+	}
+	const form = parseVeventToForm(vevent);
+	if (form.start === "") {
+		return Option.none();
+	}
+	return Option.some({
+		id: inst.id,
+		title: form.summary || "(no title)",
+		allDay: form.allDay,
+		start: form.start,
+		end: form.end !== "" ? form.end : null,
+		rruleRaw: rawRrule(vevent),
+		description: form.description,
+		location: form.location,
+		categoriesCsv: form.categoriesCsv,
+	});
+};
+
 /** Load component trees for the given instance rows and project each VEVENT
  * into a {@link CalendarEventView}. The shared tail of both `collectCalendarEvents`
  * (per-collection) and the individually-shared-instance path (no owning
@@ -97,41 +137,10 @@ export const collectCalendarEventsForInstances = (
 			"icalendar",
 		);
 
-		const events: Array<CalendarEventView> = [];
-		for (const inst of instances) {
+		return instances.flatMap((inst) => {
 			const tree = trees.get(EntityId(inst.entityId));
-			if (tree === undefined) {
-				continue;
-			}
-			const vevent = tree.components.find((c) => c.name === "VEVENT");
-			if (!vevent) {
-				continue;
-			}
-			const form = parseVeventToForm(vevent);
-			if (form.start === "") {
-				continue;
-			}
-			// Read the RRULE straight from the IR so INTERVAL/BYDAY/BYMONTHDAY etc.
-			// survive verbatim — the form parser only keeps FREQ/COUNT/UNTIL.
-			const rruleProp = vevent.properties.find((p) => p.name === "RRULE");
-			const rruleRaw =
-				rruleProp && rruleProp.value.type === "RECUR"
-					? rruleProp.value.value
-					: null;
-
-			events.push({
-				id: inst.id,
-				title: form.summary || "(no title)",
-				allDay: form.allDay,
-				start: form.start,
-				end: form.end !== "" ? form.end : null,
-				rruleRaw,
-				description: form.description,
-				location: form.location,
-				categoriesCsv: form.categoriesCsv,
-			});
-		}
-		return events;
+			return tree === undefined ? [] : Option.toArray(toEventView(inst, tree));
+		});
 	});
 
 export const collectCalendarEvents = (
@@ -205,7 +214,8 @@ const toICalBasic = (iso: string, allDay: boolean): string => {
 };
 
 /** ISO 8601 duration between DTSTART and DTEND, or undefined when there's no
- * DTEND (FullCalendar then falls back to its default event length). */
+ * DTEND, an unparseable bound, or a non-positive span (FullCalendar then falls
+ * back to its default event length). */
 const durationBetween = (
 	start: string,
 	end: string | null,
@@ -214,22 +224,20 @@ const durationBetween = (
 	if (end === null) {
 		return undefined;
 	}
-	try {
-		if (allDay) {
-			const d = Temporal.PlainDate.from(end).since(
-				Temporal.PlainDate.from(start),
-				{ largestUnit: "day" },
+	const span = allDay
+		? Option.map(
+				Option.all([parsePlainDate(start), parsePlainDate(end)]),
+				([from, to]) => to.since(from, { largestUnit: "day" }),
+			)
+		: Option.map(
+				Option.all([parsePlainDateTime(start), parsePlainDateTime(end)]),
+				([from, to]) => to.since(from, { largestUnit: "hour" }),
 			);
-			return d.sign > 0 ? d.toString() : undefined;
-		}
-		const d = Temporal.PlainDateTime.from(end).since(
-			Temporal.PlainDateTime.from(start),
-			{ largestUnit: "hour" },
-		);
-		return d.sign > 0 ? d.toString() : undefined;
-	} catch {
-		return undefined;
-	}
+	return Option.getOrUndefined(
+		Option.flatMap(span, (d) =>
+			d.sign > 0 ? Option.some(d.toString()) : Option.none(),
+		),
+	);
 };
 
 export const toFullCalendarEvent = (

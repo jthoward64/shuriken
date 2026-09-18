@@ -1,4 +1,4 @@
-import { Effect, Result } from "effect";
+import { Effect, Option, Result } from "effect";
 import type { AppConfigService } from "#src/config.ts";
 import {
 	type ConflictError,
@@ -33,14 +33,11 @@ import { SubscriptionService } from "#src/services/external-calendar/subscriptio
 //   syncIntervalS     required, parsed as int
 // ---------------------------------------------------------------------------
 
-// Returns null on rejected values; the caller surfaces a 400 form-error
-// response so the operator sees the validation message instead of a 500.
-const parsePositiveInt = (value: string | undefined): number | null => {
+// None on rejected values; the caller surfaces a 400 form-error response so the
+// operator sees the validation message instead of a 500.
+const parsePositiveInt = (value: string | undefined): Option.Option<number> => {
 	const n = value ? Number.parseInt(value, 10) : Number.NaN;
-	if (!Number.isFinite(n) || n <= 0) {
-		return null;
-	}
-	return n;
+	return Number.isFinite(n) && n > 0 ? Option.some(n) : Option.none();
 };
 
 export const subscriptionsCreateHandler = (
@@ -81,7 +78,7 @@ export const subscriptionsCreateHandler = (
 		}
 		const slug = parseResult.success;
 
-		const syncIntervalS = parsePositiveInt(
+		const syncIntervalOpt = parsePositiveInt(
 			form.get("syncIntervalS")?.toString(),
 		);
 
@@ -97,7 +94,7 @@ export const subscriptionsCreateHandler = (
 			);
 		}
 
-		if (syncIntervalS === null) {
+		if (Option.isNone(syncIntervalOpt)) {
 			return yield* renderFragment(
 				<FormErrors
 					errors={validationErrorToContext(
@@ -115,7 +112,7 @@ export const subscriptionsCreateHandler = (
 			principalId: principal.principalId,
 			url,
 			slug,
-			syncIntervalS,
+			syncIntervalS: syncIntervalOpt.value,
 			...(displayName !== undefined
 				? { displaynameOverride: displayName }
 				: {}),

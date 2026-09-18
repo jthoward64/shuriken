@@ -1,4 +1,5 @@
 import type { VNode } from "preact";
+import { encodeJson } from "#src/http/ui/helpers/json.ts";
 import { cx } from "../cx.ts";
 
 // ---------------------------------------------------------------------------
@@ -59,7 +60,7 @@ export const TagCombobox = ({
 		class={cx("tag-combobox", cls)}
 		data-tag-combobox
 		data-allow-custom={allowCustom ? "" : undefined}
-		data-suggestions={JSON.stringify(suggestions)}
+		data-suggestions={encodeJson(suggestions)}
 	>
 		<input
 			type="text"

@@ -8,6 +8,7 @@ import {
 import { CollectionId, InstanceId, isUuid } from "#src/domain/ids.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
+import { decodeJson } from "#src/http/ui/helpers/json.ts";
 import {
 	CleanupDone,
 	CleanupError,
@@ -62,11 +63,8 @@ export const contactsCleanupFixHandler = (
 		}
 		const instanceId = InstanceId(instanceIdRaw);
 
-		const parsed = yield* Effect.try({
-			try: () => JSON.parse(form.get("fix")?.toString() ?? ""),
-			catch: () => badRequest("invalid fix payload"),
-		});
-		const baseFix = yield* Option.match(decodeFix(parsed), {
+		const parsed = decodeJson(form.get("fix")?.toString() ?? "");
+		const baseFix = yield* Option.match(Option.flatMap(parsed, decodeFix), {
 			onNone: () => Effect.fail(badRequest("invalid fix payload")),
 			onSome: Effect.succeed,
 		});

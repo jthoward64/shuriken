@@ -76,12 +76,15 @@ export const InfraLayer = Layer.mergeAll(
 // DevTools layer — only active when NODE_ENV=development
 // ---------------------------------------------------------------------------
 
-const DevToolsLayer = Layer.unwrap(
-	Effect.gen(function* () {
-		const { nodeEnv } = yield* AppConfigService;
-		return nodeEnv === "development" ? DevTools.layer() : Layer.empty;
-	}),
-).pipe(Layer.provide(InfraLayer));
+const DevToolsLayer = Layer.provide(
+	Layer.unwrap(
+		Effect.gen(function* () {
+			const { nodeEnv } = yield* AppConfigService;
+			return nodeEnv === "development" ? DevTools.layer() : Layer.empty;
+		}),
+	),
+	InfraLayer,
+);
 
 // ---------------------------------------------------------------------------
 // Session / OIDC / app-password layers — built over InfraLayer.
@@ -186,6 +189,10 @@ const MailerFull = MailerServiceLive.pipe(
 	Layer.provide(Layer.mergeAll(BaseAppLayer, EmailCredentialFull)),
 );
 const TrashServiceFull = TrashServiceLive.pipe(Layer.provide(BaseAppLayer));
+const CalEditServiceFull = CalEditServiceLive.pipe(Layer.provide(BaseAppLayer));
+const ImipInboundFull = ImipInboundServiceLive.pipe(
+	Layer.provide(Layer.mergeAll(BaseAppLayer, CalEditServiceFull)),
+);
 
 export const AppLayer = Layer.mergeAll(
 	BaseAppLayer,
@@ -204,7 +211,7 @@ export const AppLayer = Layer.mergeAll(
 	),
 	ContactCleanupServiceLive.pipe(Layer.provide(BaseAppLayer)),
 	ContactMergeServiceLive.pipe(Layer.provide(BaseAppLayer)),
-	CalEditServiceLive.pipe(Layer.provide(BaseAppLayer)),
+	CalEditServiceFull,
 	TaskEditServiceLive.pipe(Layer.provide(BaseAppLayer)),
 	ShareLinkServiceLive.pipe(Layer.provide(BaseAppLayer)),
 	EmailCredentialFull,
@@ -212,28 +219,9 @@ export const AppLayer = Layer.mergeAll(
 	ImipDispatchServiceLive.pipe(
 		Layer.provide(Layer.mergeAll(BaseAppLayer, MailerFull)),
 	),
-	ImipInboundServiceLive.pipe(
-		Layer.provide(
-			Layer.mergeAll(
-				BaseAppLayer,
-				CalEditServiceLive.pipe(Layer.provide(BaseAppLayer)),
-			),
-		),
-	),
+	ImipInboundFull,
 	LmtpServerLayer.pipe(
-		Layer.provide(
-			Layer.mergeAll(
-				BaseAppLayer,
-				ImipInboundServiceLive.pipe(
-					Layer.provide(
-						Layer.mergeAll(
-							BaseAppLayer,
-							CalEditServiceLive.pipe(Layer.provide(BaseAppLayer)),
-						),
-					),
-				),
-			),
-		),
+		Layer.provide(Layer.mergeAll(BaseAppLayer, ImipInboundFull)),
 	),
 	BirthdayServiceFull,
 	ExternalCalendarSchedulerLayer.pipe(

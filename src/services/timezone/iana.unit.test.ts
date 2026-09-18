@@ -1,11 +1,12 @@
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
-import { Effect, Option } from "effect";
+import { Effect, ManagedRuntime, Option } from "effect";
 import { IanaTimezoneService, IanaTimezoneServiceLive } from "./iana.ts";
 
 describe("IanaTimezoneService", () => {
-	const runWith = <A>(eff: Effect.Effect<A, never, IanaTimezoneService>) =>
-		Effect.runSync(Effect.provide(eff, IanaTimezoneServiceLive));
+	const runtime = ManagedRuntime.make(IanaTimezoneServiceLive);
+	const runWith = <A>(eff: Effect.Effect<A, never, IanaTimezoneService>): A =>
+		runtime.runSync(eff);
 
 	describe("isKnownTzid", () => {
 		it("returns true for a well-known IANA timezone", () => {

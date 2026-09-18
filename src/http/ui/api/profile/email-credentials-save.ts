@@ -20,7 +20,11 @@ import { EmailCredentialService } from "#src/services/email-credential/service.t
 // it round-trip.
 // ---------------------------------------------------------------------------
 
-const ALLOWED_SECURITY = new Set<SmtpSecurity>(["none", "starttls", "tls"]);
+const ALLOWED_SECURITY: ReadonlyArray<SmtpSecurity> = [
+	"none",
+	"starttls",
+	"tls",
+];
 
 const PORT_MIN = 1;
 const PORT_MAX = 65_535;
@@ -52,7 +56,7 @@ export const emailCredentialsSaveHandler = (
 		const securityRaw = single("security");
 
 		const port = Number.parseInt(portRaw, 10);
-		const security = securityRaw as SmtpSecurity;
+		const security = ALLOWED_SECURITY.find((mode) => mode === securityRaw);
 
 		if (
 			fromAddress === "" ||
@@ -62,7 +66,7 @@ export const emailCredentialsSaveHandler = (
 			!Number.isFinite(port) ||
 			port < PORT_MIN ||
 			port > PORT_MAX ||
-			!ALLOWED_SECURITY.has(security)
+			security === undefined
 		) {
 			return new Response("Invalid form", { status: 400 });
 		}

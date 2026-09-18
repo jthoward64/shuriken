@@ -1,10 +1,10 @@
-import { Effect, Result } from "effect";
+import { Effect, Option, Result } from "effect";
 import {
 	type DatabaseError,
 	type DavError,
 	InternalError,
 } from "#src/domain/errors.ts";
-import type { PrincipalId, UserId } from "#src/domain/ids.ts";
+import { PrincipalId, UserId } from "#src/domain/ids.ts";
 import type { Slug } from "#src/domain/types/path.ts";
 import { USERS_VIRTUAL_RESOURCE_ID } from "#src/domain/virtual-resources.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
@@ -29,6 +29,66 @@ import { UserService } from "#src/services/user/index.ts";
 // POST /ui/api/users/:principalId/update
 // ---------------------------------------------------------------------------
 
+// Editing someone else needs write-properties, on the users directory or on that principal
+const authorizeEdit = Effect.fn("ui.users.update.authorize")(function* (
+	callerPrincipalId: PrincipalId,
+	targetPrincipalId: PrincipalId,
+) {
+	const acl = yield* AclService;
+	const usersVirtualPrivs = yield* acl.currentUserPrivileges(
+		callerPrincipalId,
+		USERS_VIRTUAL_RESOURCE_ID,
+		"virtual",
+	);
+	if (usersVirtualPrivs.includes("DAV:write-properties")) {
+		return;
+	}
+	yield* acl.check(
+		callerPrincipalId,
+		targetPrincipalId,
+		"principal",
+		"DAV:write-properties",
+	);
+});
+
+// The submitted role, honoured only when a super_admin changes someone's current
+// one. Anyone else's submission is silently ignored to keep the form failure mode
+// quiet for non-priv users.
+const roleChange = Effect.fn("ui.users.update.roleChange")(function* (
+	callerPrincipalId: PrincipalId,
+	currentRole: string,
+	submitted: string | undefined,
+) {
+	if (submitted === undefined || submitted === currentRole) {
+		return Option.none();
+	}
+	const aclRepo = yield* AclRepository;
+	const callerRole = yield* aclRepo.getRoleForPrincipal(callerPrincipalId);
+	return callerRole === "super_admin" ? Option.some(submitted) : Option.none();
+});
+
+// Renaming is a directory-level change, so it needs DAV:unbind on the users directory
+const renameSlug = Effect.fn("ui.users.update.renameSlug")(function* (
+	callerPrincipalId: PrincipalId,
+	targetPrincipalId: PrincipalId,
+	slug: Slug,
+) {
+	const acl = yield* AclService;
+	const usersPrivs = yield* acl.currentUserPrivileges(
+		callerPrincipalId,
+		USERS_VIRTUAL_RESOURCE_ID,
+		"virtual",
+	);
+	if (!usersPrivs.includes("DAV:unbind")) {
+		return;
+	}
+	const principalService = yield* PrincipalService;
+	yield* principalService.updateProperties(targetPrincipalId, {
+		clientProperties: {},
+		slug,
+	});
+});
+
 export const usersUpdateHandler = (
 	req: Request,
 	ctx: HttpRequestContext,
@@ -40,7 +100,6 @@ export const usersUpdateHandler = (
 > =>
 	Effect.gen(function* () {
 		const principal = yield* requireAuthenticated(ctx.auth);
-		const acl = yield* AclService;
 		const userService = yield* UserService;
 		const principalService = yield* PrincipalService;
 
@@ -49,19 +108,7 @@ export const usersUpdateHandler = (
 		const isSelf = user.id === principal.userId;
 
 		if (!isSelf) {
-			const usersVirtualPrivs = yield* acl.currentUserPrivileges(
-				principal.principalId,
-				USERS_VIRTUAL_RESOURCE_ID,
-				"virtual",
-			);
-			if (!usersVirtualPrivs.includes("DAV:write-properties")) {
-				yield* acl.check(
-					principal.principalId,
-					principalRow.id as PrincipalId,
-					"principal",
-					"DAV:write-properties",
-				);
-			}
+			yield* authorizeEdit(principal.principalId, PrincipalId(principalRow.id));
 		}
 
 		const form = yield* Effect.tryPromise({
@@ -89,48 +136,30 @@ export const usersUpdateHandler = (
 		}
 		const parsed = parseResult.success;
 
-		// Role edits are only honoured when the caller is super_admin.
-		// Anyone else's submission of `role` is silently ignored to keep
-		// the form failure mode quiet for non-priv users.
-		const submittedRole = form.get("role")?.toString();
-		const aclRepo = yield* AclRepository;
-		const callerRole = yield* aclRepo.getRoleForPrincipal(
+		const nextRole = yield* roleChange(
 			principal.principalId,
+			user.role,
+			form.get("role")?.toString(),
 		);
-		const roleChange =
-			submittedRole !== undefined &&
-			submittedRole !== user.role &&
-			callerRole === "super_admin"
-				? submittedRole
-				: undefined;
 
 		if (
 			parsed.displayName !== (principalRow.displayName ?? undefined) ||
 			parsed.email !== user.email ||
-			roleChange !== undefined
+			Option.isSome(nextRole)
 		) {
-			yield* userService.update(user.id as UserId, {
+			yield* userService.update(UserId(user.id), {
 				displayName: parsed.displayName,
 				email: parsed.email,
-				...(roleChange !== undefined ? { role: roleChange } : {}),
+				...(Option.isSome(nextRole) ? { role: nextRole.value } : {}),
 			});
 		}
 
 		if (parsed.slug !== principalRow.slug) {
-			const usersPrivs = yield* acl.currentUserPrivileges(
+			yield* renameSlug(
 				principal.principalId,
-				USERS_VIRTUAL_RESOURCE_ID,
-				"virtual",
+				PrincipalId(principalRow.id),
+				parsed.slug as Slug,
 			);
-			if (usersPrivs.includes("DAV:unbind")) {
-				yield* principalService.updateProperties(
-					principalRow.id as PrincipalId,
-					{
-						clientProperties: {},
-						slug: parsed.slug as Slug,
-					},
-				);
-			}
 		}
 
 		const redirectTo = isSelf ? "/ui/profile" : `/ui/users/${principalId}`;

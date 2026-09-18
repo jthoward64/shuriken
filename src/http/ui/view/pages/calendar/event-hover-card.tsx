@@ -1,5 +1,10 @@
+import { Option } from "effect";
 import type { VNode } from "preact";
-import { Temporal } from "temporal-polyfill";
+import type { Temporal } from "temporal-polyfill";
+import {
+	parsePlainDate,
+	parsePlainDateTime,
+} from "#src/http/ui/helpers/temporal-parse.ts";
 import type { EventFormData } from "#src/services/cal-edit/types.ts";
 import { LinkButton } from "../../components/button.tsx";
 import { IconEdit } from "../../components/icons.tsx";
@@ -59,25 +64,38 @@ const to12Hour = (hour: number, minute: number): string => {
 const dateLabel = (d: Temporal.PlainDate | Temporal.PlainDateTime): string =>
 	`${MONTH_NAMES[d.month - 1]} ${d.day}, ${d.year}`;
 
-/** Human date/time range for the hover card (start–end, folding the end date
- * in only when it differs from the start date). */
+// The end half of the range, folding the end date in only when it differs from the start
+const endLabel = (
+	start: Temporal.PlainDateTime,
+	rawEnd: string,
+): Option.Option<string> =>
+	Option.map(parsePlainDateTime(rawEnd), (end) =>
+		end.toPlainDate().equals(start.toPlainDate())
+			? to12Hour(end.hour, end.minute)
+			: `${dateLabel(end)} · ${to12Hour(end.hour, end.minute)}`,
+	);
+
+/** Human date/time range for the hover card; unparseable values show raw. */
 const formatWhen = (form: EventFormData): string => {
-	try {
-		if (form.allDay) {
-			return dateLabel(Temporal.PlainDate.from(form.start));
-		}
-		const start = Temporal.PlainDateTime.from(form.start);
-		const startLabel = `${dateLabel(start)} · ${to12Hour(start.hour, start.minute)}`;
-		if (form.end === "") {
-			return startLabel;
-		}
-		const end = Temporal.PlainDateTime.from(form.end);
-		return end.toPlainDate().equals(start.toPlainDate())
-			? `${startLabel} – ${to12Hour(end.hour, end.minute)}`
-			: `${startLabel} – ${dateLabel(end)} · ${to12Hour(end.hour, end.minute)}`;
-	} catch {
-		return form.start;
+	if (form.allDay) {
+		return Option.match(parsePlainDate(form.start), {
+			onNone: () => form.start,
+			onSome: dateLabel,
+		});
 	}
+	return Option.match(parsePlainDateTime(form.start), {
+		onNone: () => form.start,
+		onSome: (start) => {
+			const startLabel = `${dateLabel(start)} · ${to12Hour(start.hour, start.minute)}`;
+			if (form.end === "") {
+				return startLabel;
+			}
+			return Option.match(endLabel(start, form.end), {
+				onNone: () => form.start,
+				onSome: (label) => `${startLabel} – ${label}`,
+			});
+		},
+	});
 };
 
 export const EventHoverCard = ({

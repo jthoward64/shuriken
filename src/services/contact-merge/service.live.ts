@@ -1,4 +1,4 @@
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Option } from "effect";
 import { makeEtag } from "#src/data/etag.ts";
 import type { IrComponent, IrDocument } from "#src/data/ir.ts";
 import { encodeVCard } from "#src/data/vcard/codec.ts";
@@ -10,7 +10,7 @@ import {
 	type DavError,
 	InternalError,
 } from "#src/domain/errors.ts";
-import { CollectionId, EntityId, type InstanceId } from "#src/domain/ids.ts";
+import { CollectionId, EntityId, InstanceId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import { ETag } from "#src/domain/types/strings.ts";
 import { ComponentRepository } from "#src/services/component/index.ts";
@@ -27,17 +27,48 @@ import { type ContactMergeResult, ContactMergeService } from "./service.ts";
 // (mirroring CardEditService.delete, so sync tombstones are produced).
 // ---------------------------------------------------------------------------
 
-const fnOf = (vcard: IrComponent): string | null => {
+/** The FN text value, absent when the card has none or it is not TEXT. */
+const fnOf = (vcard: IrComponent): Option.Option<string> => {
 	const fn = vcard.properties.find((p) => p.name.toUpperCase() === "FN");
-	if (fn === undefined) {
-		return null;
-	}
-	return fn.value.type === "TEXT" ? fn.value.value : null;
+	return fn?.value.type === "TEXT"
+		? Option.some(fn.value.value)
+		: Option.none();
 };
 
 const wrapInDoc = (vcard: IrComponent): IrDocument => ({
 	kind: "vcard",
 	root: vcard,
+});
+
+/** Replaces the primary card's tree and soft-deletes the cards merged into it. */
+const commitMerge = Effect.fn("ContactMergeService.commit")(function* (input: {
+	readonly collectionId: CollectionId;
+	readonly entityId: EntityId;
+	readonly instanceId: InstanceId;
+	readonly vcard: IrComponent;
+	readonly etag: ETag;
+	readonly slug: Slug;
+	readonly contentLength: number;
+	readonly absorbedInstanceIds: ReadonlyArray<InstanceId>;
+}) {
+	const componentRepo = yield* ComponentRepository;
+	const instanceSvc = yield* InstanceService;
+	yield* componentRepo.deleteByEntity(input.entityId);
+	yield* componentRepo.insertTree(input.entityId, input.vcard);
+	yield* instanceSvc.put(
+		{
+			collectionId: input.collectionId,
+			entityId: input.entityId,
+			contentType: "text/vcard",
+			etag: input.etag,
+			slug: input.slug,
+			contentLength: input.contentLength,
+		},
+		input.instanceId,
+	);
+	yield* Effect.forEach(input.absorbedInstanceIds, (id) =>
+		instanceSvc.delete(id),
+	);
 });
 
 const merge = (
@@ -112,33 +143,25 @@ const merge = (
 		const contentLength = new TextEncoder().encode(canonical).byteLength;
 
 		const primaryEntityId = EntityId(primary.row.entityId);
-		const primaryInstanceId = primary.row.id as InstanceId;
+		const primaryInstanceId = InstanceId(primary.row.id);
 
 		yield* withTransaction(
-			Effect.gen(function* () {
-				yield* componentRepo.deleteByEntity(primaryEntityId);
-				yield* componentRepo.insertTree(primaryEntityId, mergedVcard);
-				yield* instanceSvc.put(
-					{
-						collectionId: CollectionId(primary.row.collectionId),
-						entityId: primaryEntityId,
-						contentType: "text/vcard",
-						etag,
-						slug: Slug(primary.row.slug),
-						contentLength,
-					},
-					primaryInstanceId,
-				);
-				yield* Effect.forEach(others, (e) =>
-					instanceSvc.delete(e.row.id as InstanceId),
-				);
+			commitMerge({
+				collectionId: CollectionId(primary.row.collectionId),
+				entityId: primaryEntityId,
+				instanceId: primaryInstanceId,
+				vcard: mergedVcard,
+				etag,
+				slug: Slug(primary.row.slug),
+				contentLength,
+				absorbedInstanceIds: others.map((e) => InstanceId(e.row.id)),
 			}),
 		).pipe(Effect.provideService(DatabaseClient, db));
 
 		return {
 			primaryInstanceId,
 			primaryEntityId,
-			fn: fnOf(mergedVcard),
+			fn: Option.getOrNull(fnOf(mergedVcard)),
 			mergedCount: others.length,
 		};
 	});

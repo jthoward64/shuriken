@@ -6,6 +6,7 @@ import type {
 } from "#src/domain/errors.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
+import { encodeJson } from "#src/http/ui/helpers/json.ts";
 import {
 	notModifiedPageResponse,
 	PageCacheService,
@@ -94,7 +95,7 @@ export const sharedCalendarEventsHandler = (
 		);
 
 		return withPageCacheHeaders(
-			new Response(JSON.stringify(events), {
+			new Response(encodeJson(events), {
 				status: 200,
 				headers: { "Content-Type": "application/json; charset=utf-8" },
 			}),

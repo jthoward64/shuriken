@@ -24,28 +24,25 @@ interface MailProfile {
 	readonly security?: SmtpSecurity;
 }
 
-const compileProfile = (
-	profile: MailProfile,
-): { readonly regex: RegExp; readonly profile: MailProfile } | null => {
-	try {
-		// biome-ignore lint/nursery/useUnicodeRegex: the pattern comes from operator config, and the u flag would reject patterns that work today
-		return { regex: new RegExp(profile.pattern), profile };
-	} catch {
-		return null;
-	}
-};
+/** Compiles a profile pattern, absent when the operator wrote an invalid regex. */
+const compileProfile = Option.liftThrowable((profile: MailProfile) => ({
+	// biome-ignore lint/nursery/useUnicodeRegex: the pattern comes from operator config, and the u flag would reject patterns that work today
+	regex: new RegExp(profile.pattern),
+	profile,
+}));
 
+/** The first profile whose pattern matches the address, in declaration order. */
 const matchProfile = (
 	profiles: ReadonlyArray<MailProfile>,
 	email: string,
-): MailProfile | null => {
+): Option.Option<MailProfile> => {
 	for (const p of profiles) {
 		const compiled = compileProfile(p);
-		if (compiled?.regex.test(email)) {
-			return compiled.profile;
+		if (Option.isSome(compiled) && compiled.value.regex.test(email)) {
+			return Option.some(compiled.value.profile);
 		}
 	}
-	return null;
+	return Option.none();
 };
 
 const fromUserCreds = (
@@ -97,11 +94,11 @@ const fromDefault = (
 		readonly defaultFromName: string;
 	},
 	userEmail: string,
-): ResolvedSmtpCreds | null => {
+): Option.Option<ResolvedSmtpCreds> => {
 	if (conf.defaultHost === "" || conf.defaultFromAddress === "") {
-		return null;
+		return Option.none();
 	}
-	return {
+	return Option.some({
 		kind: "default",
 		host: conf.defaultHost,
 		port: conf.defaultPort,
@@ -113,7 +110,7 @@ const fromDefault = (
 		// Default mailer sends as a generic system address → preserve user's
 		// reachability via Reply-To.
 		replyTo: userEmail,
-	};
+	});
 };
 
 const resolveForUser = (
@@ -121,7 +118,7 @@ const resolveForUser = (
 	userEmail: string,
 	userDisplayName: string | null,
 ): Effect.Effect<
-	ResolvedSmtpCreds | null,
+	Option.Option<ResolvedSmtpCreds>,
 	DatabaseError | InternalError,
 	AppConfigService | UserEmailCredentialRepository
 > =>
@@ -130,7 +127,7 @@ const resolveForUser = (
 		const repo = yield* UserEmailCredentialRepository;
 
 		if (!config.mail.enabled) {
-			return null;
+			return Option.none();
 		}
 
 		// 1. Per-user creds.
@@ -142,18 +139,17 @@ const resolveForUser = (
 					ciphertext: row.passwordEncrypted,
 					iv: row.passwordIv,
 				});
-				return fromUserCreds(row, password);
+				return Option.some(fromUserCreds(row, password));
 			}
 		}
 
-		// 2. Server-wide profile match.
-		const profileMatch = matchProfile(config.mail.profiles, userEmail);
-		if (profileMatch !== null) {
-			return fromProfile(profileMatch, userEmail, userDisplayName);
-		}
-
-		// 3. Default fallback.
-		return fromDefault(config.mail, userEmail);
+		// 2. Server-wide profile match, else the default fallback.
+		return Option.orElse(
+			Option.map(matchProfile(config.mail.profiles, userEmail), (profile) =>
+				fromProfile(profile, userEmail, userDisplayName),
+			),
+			() => fromDefault(config.mail, userEmail),
+		);
 	});
 
 const storeForUser = (input: {

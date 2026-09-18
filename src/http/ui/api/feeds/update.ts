@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import { Temporal } from "temporal-polyfill";
 import type { ShareLinkVisibility } from "#src/db/drizzle/schema/index.ts";
 import {
@@ -11,7 +11,11 @@ import type { HttpRequestContext } from "#src/http/context.ts";
 import { HTTP_SEE_OTHER } from "#src/http/status.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
 import type { AclService } from "#src/services/acl/index.ts";
-import { ShareLinkService } from "#src/services/share-link/service.ts";
+import {
+	type ShareLinkCaller,
+	ShareLinkService,
+	type ShareLinkSummary,
+} from "#src/services/share-link/service.ts";
 
 // ---------------------------------------------------------------------------
 // POST /ui/api/feeds/:id/update
@@ -21,6 +25,84 @@ import { ShareLinkService } from "#src/services/share-link/service.ts";
 
 const isVisibility = (raw: string): raw is ShareLinkVisibility =>
 	raw === "all" || raw === "limited" || raw === "free_busy";
+
+interface FeedCalendarState {
+	readonly visibility: ShareLinkVisibility;
+	readonly embedEnabled: boolean;
+}
+
+// The per-calendar entries the form describes: `calendar` names each desired
+// entry, `visibility:<id>` and `embed:<id>` carry its settings
+const desiredCalendars = (
+	form: FormData,
+): ReadonlyMap<UuidString, FeedCalendarState> => {
+	const desired = new Map<UuidString, FeedCalendarState>();
+	for (const raw of form.getAll("calendar")) {
+		const calId = raw.toString();
+		if (!isUuid(calId)) {
+			continue;
+		}
+		const visRaw = form.get(`visibility:${calId}`)?.toString() ?? "all";
+		desired.set(calId, {
+			visibility: isVisibility(visRaw) ? visRaw : "all",
+			embedEnabled: form.has(`embed:${calId}`),
+		});
+	}
+	return desired;
+};
+
+// The feed's current per-calendar entries, keyed for diffing against the form
+const currentCalendars = (
+	summary: ShareLinkSummary,
+): ReadonlyMap<UuidString, FeedCalendarState> =>
+	new Map(
+		summary.calendars.map((c) => [
+			c.calendarId,
+			{ visibility: c.visibility, embedEnabled: c.embedEnabled },
+		]),
+	);
+
+// Add, update, and remove entries so the feed matches what the form asked for
+const reconcileCalendars = Effect.fn("ui.feeds.update.reconcile")(function* (
+	id: UuidString,
+	caller: ShareLinkCaller,
+	desired: ReadonlyMap<UuidString, FeedCalendarState>,
+	current: ReadonlyMap<UuidString, FeedCalendarState>,
+) {
+	const svc = yield* ShareLinkService;
+	for (const [calendarId, wanted] of desired) {
+		const existing = current.get(calendarId);
+		const unchanged =
+			existing !== undefined &&
+			existing.visibility === wanted.visibility &&
+			existing.embedEnabled === wanted.embedEnabled;
+		if (unchanged) {
+			continue;
+		}
+		const entry = {
+			calendarId,
+			visibility: wanted.visibility,
+			embedEnabled: wanted.embedEnabled,
+		};
+		yield* existing === undefined
+			? svc.addCalendar(id, caller, entry)
+			: svc.setVisibility(id, caller, entry);
+	}
+	for (const calendarId of current.keys()) {
+		if (!desired.has(calendarId)) {
+			yield* svc.removeCalendar(id, caller, calendarId);
+		}
+	}
+});
+
+// The feed's expiry, or none when the form leaves it blank
+const parseExpiry = (raw: string) =>
+	raw === ""
+		? Effect.succeed(null)
+		: Effect.try({
+				try: () => Temporal.Instant.from(raw),
+				catch: (e) => new InternalError({ cause: e }),
+			});
 
 export const feedsUpdateHandler = (
 	req: Request,
@@ -45,71 +127,28 @@ export const feedsUpdateHandler = (
 		});
 
 		const displayNameRaw = form.get("displayName")?.toString().trim() ?? "";
-		const displayName = displayNameRaw === "" ? null : displayNameRaw;
-		const expiresRaw = form.get("expiresAt")?.toString().trim() ?? "";
-		const expiresAt =
-			expiresRaw === ""
-				? null
-				: yield* Effect.try({
-						try: () => Temporal.Instant.from(expiresRaw),
-						catch: (e) => new InternalError({ cause: e }),
-					});
-		const enabled = form.get("enabled")?.toString() === "on";
+		const expiresAt = yield* parseExpiry(
+			form.get("expiresAt")?.toString().trim() ?? "",
+		);
 
-		yield* svc.update(id, caller, { displayName, expiresAt, enabled });
-
-		// Reconcile calendars: form sends `calendar` for each desired entry +
-		// `visibility:<id>` and `embed:<id>` (checkbox, presence = true) for each.
-		const desired = new Map<
-			UuidString,
-			{ visibility: ShareLinkVisibility; embedEnabled: boolean }
-		>();
-		for (const raw of form.getAll("calendar")) {
-			const calId = raw.toString();
-			if (!isUuid(calId)) {
-				continue;
-			}
-			const visRaw = form.get(`visibility:${calId}`)?.toString() ?? "all";
-			desired.set(calId as UuidString, {
-				visibility: isVisibility(visRaw) ? visRaw : "all",
-				embedEnabled: form.has(`embed:${calId}`),
-			});
-		}
+		yield* svc.update(id, caller, {
+			displayName: displayNameRaw === "" ? null : displayNameRaw,
+			expiresAt,
+			enabled: form.get("enabled")?.toString() === "on",
+		});
 
 		// Re-fetch existing state to compute the diff.
 		const summaryOpt = yield* svc.getById(id, caller);
-		if (summaryOpt._tag === "Some") {
-			const current = new Map(
-				summaryOpt.value.calendars.map((c) => [
-					c.calendarId,
-					{ visibility: c.visibility, embedEnabled: c.embedEnabled },
-				]),
-			);
-			for (const [calId, wanted] of desired) {
-				const existing = current.get(calId);
-				if (existing === undefined) {
-					yield* svc.addCalendar(id, caller, {
-						calendarId: calId,
-						visibility: wanted.visibility,
-						embedEnabled: wanted.embedEnabled,
-					});
-				} else if (
-					existing.visibility !== wanted.visibility ||
-					existing.embedEnabled !== wanted.embedEnabled
-				) {
-					yield* svc.setVisibility(id, caller, {
-						calendarId: calId,
-						visibility: wanted.visibility,
-						embedEnabled: wanted.embedEnabled,
-					});
-				}
-			}
-			for (const calId of current.keys()) {
-				if (!desired.has(calId)) {
-					yield* svc.removeCalendar(id, caller, calId);
-				}
-			}
-		}
+		yield* Option.match(summaryOpt, {
+			onNone: () => Effect.void,
+			onSome: (summary) =>
+				reconcileCalendars(
+					id,
+					caller,
+					desiredCalendars(form),
+					currentCalendars(summary),
+				),
+		});
 
 		return new Response(null, {
 			status: HTTP_SEE_OTHER,

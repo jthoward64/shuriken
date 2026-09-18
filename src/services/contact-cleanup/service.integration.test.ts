@@ -4,11 +4,7 @@ import { describe, it } from "@std/testing/bdd";
 import { Effect, ManagedRuntime, Option } from "effect";
 import { makeEtag } from "#src/data/etag.ts";
 import { decodeVCard, encodeVCard } from "#src/data/vcard/codec.ts";
-import {
-	type CollectionId,
-	EntityId,
-	type InstanceId,
-} from "#src/domain/ids.ts";
+import { CollectionId, EntityId, type InstanceId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import { Email, ETag } from "#src/domain/types/strings.ts";
 import { CardEditService } from "#src/services/card-edit/service.ts";
@@ -82,11 +78,13 @@ describe("ContactCleanupService (integration)", () => {
 			}
 
 			// 2. Apply the email-lowercasing fix.
-			const emailFix = suggestions.find((x) => x.category === "email")
-				?.fix as CleanupFix;
+			const emailSuggestion = suggestions.find((x) => x.category === "email");
+			if (emailSuggestion === undefined) {
+				throw new Error("expected an email-lowercasing suggestion");
+			}
 			await runtime.runPromise(
 				Effect.flatMap(ContactCleanupService, (s) =>
-					s.applyFix(created.instanceId, emailFix),
+					s.applyFix(created.instanceId, emailSuggestion.fix),
 				),
 			);
 
@@ -114,15 +112,15 @@ describe("ContactCleanupService (integration)", () => {
 				current: "John@X.COM", // already lowercased above
 				next: "john@x.com",
 			};
-			const outcome = await runtime.runPromise(
+			const rejected = await runtime.runPromise(
 				Effect.flatMap(ContactCleanupService, (s) =>
 					s.applyFix(created.instanceId, stale).pipe(
-						Effect.as("applied"),
-						Effect.catchTag("DavError", () => Effect.succeed("rejected")),
+						Effect.map(() => false),
+						Effect.catchTag("DavError", () => Effect.succeed(true)),
 					),
 				),
 			);
-			expect(outcome).toBe("rejected");
+			expect(rejected).toBe(true);
 		} finally {
 			await runtime.dispose();
 		}
@@ -157,7 +155,7 @@ describe("ContactCleanupService (integration)", () => {
 							slug: Slug("cleanup-apple"),
 						})
 						.pipe(Effect.orDie);
-					const ab = alice.addressBook.id as CollectionId;
+					const ab = CollectionId(alice.addressBook.id);
 
 					// Seed the raw Apple card straight into the store (mirrors the PUT
 					// path: decode → persist entity + tree + instance).

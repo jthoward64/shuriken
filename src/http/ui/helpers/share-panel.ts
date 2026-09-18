@@ -3,9 +3,11 @@ import type { DatabaseError, DavError } from "#src/domain/errors.ts";
 import type { CollectionId, PrincipalId } from "#src/domain/ids.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
 import type { ResourceType } from "#src/services/acl/index.ts";
+import type { AceRow } from "#src/services/acl/repository.ts";
 import { type AclResourceId, AclService } from "#src/services/acl/service.ts";
 import { CollectionService } from "#src/services/collection/index.ts";
 import { PrincipalService } from "#src/services/principal/index.ts";
+import type { PrincipalRow } from "#src/services/principal/repository.ts";
 import {
 	basicTierForGrant,
 	isRepresentableInBasicTiers,
@@ -116,6 +118,60 @@ export const COMMON_PRIVILEGE_OPTIONS: ReadonlyArray<{
 // buildSharePanelData — returns None if the caller lacks DAV:write-acl
 // ---------------------------------------------------------------------------
 
+// One stored ACE with its principal resolved to a display label
+const enrichAce = (
+	ace: AceRow,
+	principals: ReadonlyMap<PrincipalId, PrincipalRow>,
+): AclPanelAce => {
+	const named =
+		ace.principalType === "principal" && ace.principalId != null
+			? principals.get(ace.principalId as PrincipalId)
+			: undefined;
+	const isNamedPrincipal =
+		ace.principalType === "principal" && ace.principalId != null;
+	return {
+		aceId: ace.id,
+		principalLabel: isNamedPrincipal
+			? (named?.displayName ?? named?.slug ?? ace.principalId ?? "Unknown")
+			: (PSEUDO_PRINCIPAL_LABELS[ace.principalType] ?? ace.principalType),
+		principalId: isNamedPrincipal ? ace.principalId : null,
+		principalType: ace.principalType,
+		privilege: ace.privilege,
+		privilegeLabel: PRIVILEGE_LABELS[ace.privilege] ?? ace.privilege,
+		protected: ace.protected,
+	};
+};
+
+// The editable grants grouped per principal, each mapped onto its Basic-mode tier
+const basicGrantsFor = (
+	aces: ReadonlyArray<AclPanelAce>,
+	resourceType: ResourceType,
+	isCalendar: boolean,
+): ReadonlyArray<BasicGrant> => {
+	const byPrincipal = new Map<string, Array<AclPanelAce>>();
+	for (const ace of aces) {
+		if (
+			ace.protected ||
+			ace.principalType !== "principal" ||
+			!ace.principalId
+		) {
+			continue;
+		}
+		const list = byPrincipal.get(ace.principalId) ?? [];
+		list.push(ace);
+		byPrincipal.set(ace.principalId, list);
+	}
+	return [...byPrincipal.entries()].map(([principalId, group]) => ({
+		principalId,
+		principalLabel: group[0]?.principalLabel ?? principalId,
+		tier: basicTierForGrant(
+			group.map((a) => a.privilege as DavPrivilege),
+			resourceType,
+			isCalendar,
+		),
+	}));
+};
+
 export const buildSharePanelData = (
 	actingPrincipalId: PrincipalId,
 	resourceId: AclResourceId,
@@ -149,63 +205,14 @@ export const buildSharePanelData = (
 		);
 		const principals = yield* principalService.findPrincipalByIds(principalIds);
 
-		const enrichedAces: Array<AclPanelAce> = [];
-		for (const ace of rawAces) {
-			let principalLabel: string;
-			let resolvedPrincipalId: string | null = null;
-
-			if (ace.principalType === "principal" && ace.principalId != null) {
-				const row = principals.get(ace.principalId as PrincipalId);
-				principalLabel = row
-					? (row.displayName ?? row.slug)
-					: (ace.principalId ?? "Unknown");
-				resolvedPrincipalId = ace.principalId;
-			} else {
-				principalLabel =
-					PSEUDO_PRINCIPAL_LABELS[ace.principalType] ?? ace.principalType;
-			}
-
-			enrichedAces.push({
-				aceId: ace.id,
-				principalLabel,
-				principalId: resolvedPrincipalId,
-				principalType: ace.principalType,
-				privilege: ace.privilege,
-				privilegeLabel: PRIVILEGE_LABELS[ace.privilege] ?? ace.privilege,
-				protected: ace.protected,
-			});
-		}
+		const enrichedAces = rawAces.map((ace) => enrichAce(ace, principals));
 
 		const representable = isRepresentableInBasicTiers(
 			rawAces,
 			resourceType,
 			isCalendar,
 		);
-
-		const byPrincipal = new Map<string, Array<AclPanelAce>>();
-		for (const ace of enrichedAces) {
-			if (
-				ace.protected ||
-				ace.principalType !== "principal" ||
-				!ace.principalId
-			) {
-				continue;
-			}
-			const list = byPrincipal.get(ace.principalId) ?? [];
-			list.push(ace);
-			byPrincipal.set(ace.principalId, list);
-		}
-		const basicGrants: Array<BasicGrant> = [...byPrincipal.entries()].map(
-			([principalId, group]) => ({
-				principalId,
-				principalLabel: group[0]?.principalLabel ?? principalId,
-				tier: basicTierForGrant(
-					group.map((a) => a.privilege as DavPrivilege),
-					resourceType,
-					isCalendar,
-				),
-			}),
-		);
+		const basicGrants = basicGrantsFor(enrichedAces, resourceType, isCalendar);
 
 		return Option.some<SharePanelData>({
 			resourceType,

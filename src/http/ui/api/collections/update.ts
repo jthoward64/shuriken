@@ -6,7 +6,7 @@ import {
 	type DavError,
 	InternalError,
 } from "#src/domain/errors.ts";
-import type { CollectionId } from "#src/domain/ids.ts";
+import type { CollectionId, PrincipalId } from "#src/domain/ids.ts";
 import {
 	GROUPS_VIRTUAL_RESOURCE_ID,
 	USERS_VIRTUAL_RESOURCE_ID,
@@ -22,6 +22,60 @@ import { CollectionService } from "#src/services/collection/index.ts";
 // POST /ui/api/collections/:collectionId/update
 // ---------------------------------------------------------------------------
 
+// Editing a collection's properties needs write-properties on it, or admin
+// rights on either virtual directory
+const authorizeEdit = Effect.fn("ui.collections.update.authorize")(function* (
+	callerPrincipalId: PrincipalId,
+	collectionId: CollectionId,
+) {
+	const acl = yield* AclService;
+	const [collPrivs, usersPrivs, groupsPrivs] = yield* Effect.all([
+		acl.currentUserPrivileges(callerPrincipalId, collectionId, "collection"),
+		acl.currentUserPrivileges(
+			callerPrincipalId,
+			USERS_VIRTUAL_RESOURCE_ID,
+			"virtual",
+		),
+		acl.currentUserPrivileges(
+			callerPrincipalId,
+			GROUPS_VIRTUAL_RESOURCE_ID,
+			"virtual",
+		),
+	]);
+	const isAdmin =
+		usersPrivs.includes("DAV:write-properties") ||
+		groupsPrivs.includes("DAV:write-properties");
+	if (collPrivs.includes("DAV:write-properties") || isAdmin) {
+		return;
+	}
+	yield* acl.check(
+		callerPrincipalId,
+		collectionId,
+		"collection",
+		"DAV:write-properties",
+	);
+});
+
+// Preserve existing dead properties - updateProperties replaces the whole
+// clientProperties JSONB, so they are merged rather than wiped (which would lose
+// calendar-color and any other DAV-client-set dead prop)
+const mergedClientProperties = (
+	existing: IrDeadProperties | null,
+	form: FormData,
+): Record<ClarkName, unknown> => {
+	const merged: Record<ClarkName, unknown> = { ...(existing ?? {}) };
+	if (!form.has("color")) {
+		return merged;
+	}
+	const appleColor = fromCssHex(form.get("color")?.toString() ?? "");
+	if (appleColor === undefined) {
+		delete merged[CALENDAR_COLOR];
+		return merged;
+	}
+	merged[CALENDAR_COLOR] = appleColor;
+	return merged;
+};
+
 export const collectionsUpdateHandler = (
 	req: Request,
 	ctx: HttpRequestContext,
@@ -33,41 +87,10 @@ export const collectionsUpdateHandler = (
 > =>
 	Effect.gen(function* () {
 		const principal = yield* requireAuthenticated(ctx.auth);
-		const acl = yield* AclService;
 		const collectionService = yield* CollectionService;
 
 		const collection = yield* collectionService.findById(collectionId);
-
-		const [collPrivs, usersPrivs, groupsPrivs] = yield* Effect.all([
-			acl.currentUserPrivileges(
-				principal.principalId,
-				collection.id as CollectionId,
-				"collection",
-			),
-			acl.currentUserPrivileges(
-				principal.principalId,
-				USERS_VIRTUAL_RESOURCE_ID,
-				"virtual",
-			),
-			acl.currentUserPrivileges(
-				principal.principalId,
-				GROUPS_VIRTUAL_RESOURCE_ID,
-				"virtual",
-			),
-		]);
-
-		const isAdmin =
-			usersPrivs.includes("DAV:write-properties") ||
-			groupsPrivs.includes("DAV:write-properties");
-
-		if (!(collPrivs.includes("DAV:write-properties") || isAdmin)) {
-			yield* acl.check(
-				principal.principalId,
-				collection.id as CollectionId,
-				"collection",
-				"DAV:write-properties",
-			);
-		}
+		yield* authorizeEdit(principal.principalId, collectionId);
 
 		const form = yield* Effect.tryPromise({
 			try: () => req.formData(),
@@ -78,21 +101,10 @@ export const collectionsUpdateHandler = (
 		const description = form.get("description")?.toString().trim() || undefined;
 		const timezoneTzid =
 			form.get("timezoneTzid")?.toString().trim() || undefined;
-
-		// Preserve existing dead properties — updateProperties replaces the whole
-		// clientProperties JSONB, so we must merge rather than pass `{}` (which
-		// would wipe calendar-color and any other DAV-client-set dead props).
-		const clientProperties: Record<ClarkName, unknown> = {
-			...((collection.clientProperties as IrDeadProperties | null) ?? {}),
-		};
-		if (form.has("color")) {
-			const appleColor = fromCssHex(form.get("color")?.toString() ?? "");
-			if (appleColor !== undefined) {
-				clientProperties[CALENDAR_COLOR] = appleColor;
-			} else {
-				delete clientProperties[CALENDAR_COLOR];
-			}
-		}
+		const clientProperties = mergedClientProperties(
+			collection.clientProperties as IrDeadProperties | null,
+			form,
+		);
 
 		yield* collectionService.updateProperties(collectionId, {
 			clientProperties,

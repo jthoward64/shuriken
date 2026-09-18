@@ -10,6 +10,7 @@ import {
 import { CollectionId, type UserId, type UuidString } from "#src/domain/ids.ts";
 import { USERS_VIRTUAL_RESOURCE_ID } from "#src/domain/virtual-resources.ts";
 import { AclService } from "#src/services/acl/index.ts";
+import type { AclServiceShape } from "#src/services/acl/service.ts";
 import {
 	ShareLinkRepository,
 	type ShareLinkRepositoryShape,
@@ -53,40 +54,56 @@ const summarize = (
 		.listCalendars(row.id)
 		.pipe(Effect.map((calendars) => ({ link: row, calendars })));
 
+/** True when the caller holds DAV:all on the users virtual resource. */
+const isAdmin = Effect.fn("ShareLinkService.isAdmin")(function* (
+	acl: AclServiceShape,
+	caller: ShareLinkCaller,
+) {
+	return yield* acl
+		.check(caller.principalId, USERS_VIRTUAL_RESOURCE_ID, "virtual", "DAV:all")
+		.pipe(
+			Effect.map(() => true),
+			Effect.catchTag("DavError", () => Effect.succeed(false)),
+		);
+});
+
+/** Fails unless the caller owns the share link or is an admin. */
+const requireOwnership = Effect.fn("ShareLinkService.requireOwnership")(
+	function* (acl: AclServiceShape, row: ShareLinkRow, caller: ShareLinkCaller) {
+		if (row.userId === caller.userId) {
+			return;
+		}
+		const admin = yield* isAdmin(acl, caller);
+		if (!admin) {
+			return yield* Effect.fail(
+				needPrivileges("share link is owned by another user"),
+			);
+		}
+	},
+);
+
+/** The share link with that id, failing unless the caller may act on it. */
+const loadOwnedLink = Effect.fn("ShareLinkService.loadOwned")(function* (
+	deps: {
+		readonly repo: ShareLinkRepositoryShape;
+		readonly acl: AclServiceShape;
+	},
+	id: UuidString,
+	caller: ShareLinkCaller,
+) {
+	const opt = yield* deps.repo.findById(id);
+	if (Option.isNone(opt)) {
+		return yield* Effect.fail(notFound("share link not found"));
+	}
+	yield* requireOwnership(deps.acl, opt.value, caller);
+	return opt.value;
+});
+
 export const ShareLinkServiceLive = Layer.effect(
 	ShareLinkService,
 	Effect.gen(function* () {
 		const repo = yield* ShareLinkRepository;
 		const acl = yield* AclService;
-
-		const isAdmin = (caller: ShareLinkCaller) =>
-			acl
-				.check(
-					caller.principalId,
-					USERS_VIRTUAL_RESOURCE_ID,
-					"virtual",
-					"DAV:all",
-				)
-				.pipe(
-					Effect.as(true),
-					Effect.catchTag("DavError", () => Effect.succeed(false)),
-				);
-
-		const requireOwnership = (
-			row: ShareLinkRow,
-			caller: ShareLinkCaller,
-		): Effect.Effect<void, DavError | DatabaseError> =>
-			Effect.gen(function* () {
-				if (row.userId === caller.userId) {
-					return;
-				}
-				const admin = yield* isAdmin(caller);
-				if (!admin) {
-					return yield* Effect.fail(
-						needPrivileges("share link is owned by another user"),
-					);
-				}
-			});
 
 		const requireCalendarReadable = (
 			caller: ShareLinkCaller,
@@ -99,122 +116,115 @@ export const ShareLinkServiceLive = Layer.effect(
 				"DAV:read",
 			);
 
-		const loadOwned = (id: UuidString, caller: ShareLinkCaller) =>
-			Effect.gen(function* () {
+		return {
+			listForUser: Effect.fn("ShareLinkService.listForUser")(function* (
+				userId: UserId,
+			) {
+				const rows = yield* repo.findByUser(userId);
+				return yield* Effect.forEach(rows, (r) => summarize(repo, r));
+			}),
+
+			getById: Effect.fn("ShareLinkService.getById")(function* (id, caller) {
 				const opt = yield* repo.findById(id);
 				if (Option.isNone(opt)) {
-					return yield* Effect.fail(notFound("share link not found"));
+					return Option.none<ShareLinkSummary>();
 				}
-				yield* requireOwnership(opt.value, caller);
-				return opt.value;
-			});
+				yield* requireOwnership(acl, opt.value, caller);
+				return Option.some(yield* summarize(repo, opt.value));
+			}),
 
-		return {
-			listForUser: (userId: UserId) =>
-				Effect.gen(function* () {
-					const rows = yield* repo.findByUser(userId);
-					return yield* Effect.forEach(rows, (r) => summarize(repo, r));
-				}),
-
-			getById: (id, caller) =>
-				Effect.gen(function* () {
-					const opt = yield* repo.findById(id);
-					if (Option.isNone(opt)) {
-						return Option.none<ShareLinkSummary>();
-					}
-					yield* requireOwnership(opt.value, caller);
-					return Option.some(yield* summarize(repo, opt.value));
-				}),
-
-			getActiveByToken: (token) =>
-				Effect.gen(function* () {
+			getActiveByToken: Effect.fn("ShareLinkService.getActiveByToken")(
+				function* (token) {
 					const opt = yield* repo.findByToken(token);
-					if (Option.isNone(opt)) {
-						return Option.none<ShareLinkSummary>();
-					}
-					if (!isActive(opt.value)) {
+					if (Option.isNone(opt) || !isActive(opt.value)) {
 						return Option.none<ShareLinkSummary>();
 					}
 					return Option.some(yield* summarize(repo, opt.value));
-				}),
+				},
+			),
 
-			create: (
+			create: Effect.fn("ShareLinkService.create")(function* (
 				caller: ShareLinkCaller,
 				input: CreateShareLinkInput,
-			): Effect.Effect<
-				ShareLinkSummary,
-				DatabaseError | DavError | InternalError
-			> =>
-				Effect.gen(function* () {
-					yield* Effect.forEach(input.calendars, (c) =>
-						requireCalendarReadable(caller, c.calendarId),
-					);
-					const token = generateShareToken();
-					const row = yield* repo.insert({
-						userId: caller.userId,
-						token,
-						displayName: input.displayName ?? null,
-						expiresAt: input.expiresAt ?? null,
-					});
-					yield* Effect.forEach(input.calendars, (c) =>
-						repo.addCalendar(
-							row.id,
-							c.calendarId,
-							c.visibility,
-							c.embedEnabled,
-						),
-					);
-					return yield* summarize(repo, row);
-				}),
+			): Generator<
+				Effect.Effect<unknown, DatabaseError | DavError | InternalError>,
+				ShareLinkSummary
+			> {
+				yield* Effect.forEach(input.calendars, (c) =>
+					requireCalendarReadable(caller, c.calendarId),
+				);
+				const row = yield* repo.insert({
+					userId: caller.userId,
+					token: generateShareToken(),
+					displayName: input.displayName ?? null,
+					expiresAt: input.expiresAt ?? null,
+				});
+				yield* Effect.forEach(input.calendars, (c) =>
+					repo.addCalendar(row.id, c.calendarId, c.visibility, c.embedEnabled),
+				);
+				return yield* summarize(repo, row);
+			}),
 
-			update: (id, caller, input: UpdateShareLinkInput) =>
-				Effect.gen(function* () {
-					yield* loadOwned(id, caller);
-					const row = yield* repo.update(id, {
-						enabled: input.enabled,
-						displayName: input.displayName,
-						expiresAt: input.expiresAt,
-					});
-					return yield* summarize(repo, row);
-				}),
+			update: Effect.fn("ShareLinkService.update")(function* (
+				id,
+				caller,
+				input: UpdateShareLinkInput,
+			) {
+				yield* loadOwnedLink({ repo, acl }, id, caller);
+				const row = yield* repo.update(id, {
+					enabled: input.enabled,
+					displayName: input.displayName,
+					expiresAt: input.expiresAt,
+				});
+				return yield* summarize(repo, row);
+			}),
 
-			regenerateToken: (id, caller) =>
-				Effect.gen(function* () {
-					yield* loadOwned(id, caller);
+			regenerateToken: Effect.fn("ShareLinkService.regenerateToken")(
+				function* (id, caller) {
+					yield* loadOwnedLink({ repo, acl }, id, caller);
 					const token = generateShareToken();
 					yield* repo.update(id, { token });
 					return token;
-				}),
+				},
+			),
 
-			setVisibility: (id, caller, { calendarId, visibility, embedEnabled }) =>
-				Effect.gen(function* () {
-					yield* loadOwned(id, caller);
-					yield* repo.setCalendarVisibility(
-						id,
-						calendarId,
-						visibility,
-						embedEnabled,
-					);
-				}),
+			setVisibility: Effect.fn("ShareLinkService.setVisibility")(function* (
+				id,
+				caller,
+				{ calendarId, visibility, embedEnabled },
+			) {
+				yield* loadOwnedLink({ repo, acl }, id, caller);
+				yield* repo.setCalendarVisibility(
+					id,
+					calendarId,
+					visibility,
+					embedEnabled,
+				);
+			}),
 
-			addCalendar: (id, caller, { calendarId, visibility, embedEnabled }) =>
-				Effect.gen(function* () {
-					yield* loadOwned(id, caller);
-					yield* requireCalendarReadable(caller, calendarId);
-					yield* repo.addCalendar(id, calendarId, visibility, embedEnabled);
-				}),
+			addCalendar: Effect.fn("ShareLinkService.addCalendar")(function* (
+				id,
+				caller,
+				{ calendarId, visibility, embedEnabled },
+			) {
+				yield* loadOwnedLink({ repo, acl }, id, caller);
+				yield* requireCalendarReadable(caller, calendarId);
+				yield* repo.addCalendar(id, calendarId, visibility, embedEnabled);
+			}),
 
-			removeCalendar: (id, caller, calendarId: UuidString) =>
-				Effect.gen(function* () {
-					yield* loadOwned(id, caller);
-					yield* repo.removeCalendar(id, calendarId);
-				}),
+			removeCalendar: Effect.fn("ShareLinkService.removeCalendar")(function* (
+				id,
+				caller,
+				calendarId: UuidString,
+			) {
+				yield* loadOwnedLink({ repo, acl }, id, caller);
+				yield* repo.removeCalendar(id, calendarId);
+			}),
 
-			delete: (id, caller) =>
-				Effect.gen(function* () {
-					yield* loadOwned(id, caller);
-					yield* repo.softDelete(id);
-				}),
+			delete: Effect.fn("ShareLinkService.delete")(function* (id, caller) {
+				yield* loadOwnedLink({ repo, acl }, id, caller);
+				yield* repo.softDelete(id);
+			}),
 		};
 	}),
 );

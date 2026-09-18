@@ -1,5 +1,6 @@
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
+import { Option } from "effect";
 import {
 	adrProp,
 	bdayValue,
@@ -205,11 +206,16 @@ describe("build-vcard exported helpers", () => {
 		).toEqual({ type: "TEXT", value: ";;1 St;Town;;ZZ1;UK" });
 	});
 
-	it("bdayValue: full → DATE, yearless → TEXT, junk → null", () => {
-		expect(bdayValue("1990-07-04")).toMatchObject({ type: "DATE" });
-		expect(bdayValue("--07-04")).toEqual({ type: "TEXT", value: "--0704" });
-		expect(bdayValue("nonsense")).toBeNull();
-		expect(bdayValue("")).toBeNull();
+	it("bdayValue: full → DATE, yearless → TEXT, junk → none", () => {
+		expect(Option.getOrThrow(bdayValue("1990-07-04"))).toMatchObject({
+			type: "DATE",
+		});
+		expect(Option.getOrThrow(bdayValue("--07-04"))).toEqual({
+			type: "TEXT",
+			value: "--0704",
+		});
+		expect(Option.isNone(bdayValue("nonsense"))).toBe(true);
+		expect(Option.isNone(bdayValue(""))).toBe(true);
 	});
 
 	it("categoriesValue trims and drops blanks", () => {

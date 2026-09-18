@@ -1,7 +1,7 @@
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
 import { Effect, ManagedRuntime, Option } from "effect";
-import { type CollectionId, EntityId } from "#src/domain/ids.ts";
+import { CollectionId, EntityId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import { Email } from "#src/domain/types/strings.ts";
 import { CardEditService } from "#src/services/card-edit/service.ts";
@@ -37,7 +37,7 @@ describe("ContactMergeService (integration)", () => {
 								slug: Slug("alice"),
 							})
 							.pipe(Effect.orDie);
-						const ab = alice.addressBook.id as CollectionId;
+						const ab = CollectionId(alice.addressBook.id);
 						const svc = yield* CardEditService;
 
 						// Rich contact — many fields ⇒ chosen as the merge primary.

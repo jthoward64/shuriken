@@ -5,7 +5,11 @@ import type { PrincipalId, UuidString } from "#src/domain/ids.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
 import { aclChecksTotal } from "#src/observability/metrics.ts";
 import { bypassesAclCheck } from "#src/services/role/policy.ts";
-import { AclRepository } from "./repository.ts";
+import {
+	AclRepository,
+	type AclRepositoryShape,
+	type AclResourceRef,
+} from "./repository.ts";
 import {
 	type AclMemberBatch,
 	type AclResourceId,
@@ -103,6 +107,146 @@ function expandContained(p: DavPrivilege): ReadonlyArray<DavPrivilege> {
 	return [p, ...(PRIVILEGE_CONTAINED[p] ?? [])];
 }
 
+/** Returns every privilege implied by the granted set, deduplicated. */
+function expandAllContained(
+	granted: Iterable<DavPrivilege>,
+): Set<DavPrivilege> {
+	const expanded = new Set<DavPrivilege>();
+	for (const p of granted) {
+		for (const contained of expandContained(p)) {
+			expanded.add(contained);
+		}
+	}
+	return expanded;
+}
+
+// ---------------------------------------------------------------------------
+// Principal and ancestor-chain helpers
+// ---------------------------------------------------------------------------
+
+/** The principal itself plus every group it belongs to, for ACE matching. */
+const resolvePrincipalIds = Effect.fn("AclService.resolvePrincipalIds")(
+	function* (repo: AclRepositoryShape, principalId: PrincipalId) {
+		const groupIds = yield* Effect.orElseSucceed(
+			repo.getGroupPrincipalIds(principalId),
+			(): ReadonlyArray<PrincipalId> => [],
+		);
+		return [principalId, ...groupIds] as ReadonlyArray<PrincipalId>;
+	},
+);
+
+/** Walks up the resource hierarchy looking for an inherited grant. */
+const checkAncestors = Effect.fn("AclService.checkAncestors")(function* (
+	repo: AclRepositoryShape,
+	principalIds: ReadonlyArray<PrincipalId>,
+	privileges: ReadonlyArray<DavPrivilege>,
+	resource: AclResourceRef,
+): Generator<Effect.Effect<unknown, DatabaseError>, boolean> {
+	const parent = yield* repo.getResourceParent(
+		resource.resourceId,
+		resource.resourceType,
+	);
+	if (Option.isNone(parent)) {
+		return false;
+	}
+	const parentRef: AclResourceRef = {
+		resourceId: parent.value.id,
+		resourceType: parent.value.type,
+	};
+	const allowed = yield* repo.hasPrivilege(
+		principalIds,
+		parentRef,
+		privileges,
+		true,
+	);
+	return (
+		allowed ||
+		(yield* checkAncestors(repo, principalIds, privileges, parentRef))
+	);
+});
+
+/** Collects every privilege granted anywhere above the resource in the hierarchy. */
+const collectAncestorPrivileges = Effect.fn(
+	"AclService.collectAncestorPrivileges",
+)(function* (
+	repo: AclRepositoryShape,
+	principalIds: ReadonlyArray<PrincipalId>,
+	resourceId: UuidString,
+	resourceType: ResourceType,
+): Generator<
+	Effect.Effect<unknown, DatabaseError>,
+	ReadonlyArray<DavPrivilege>
+> {
+	const parent = yield* repo.getResourceParent(resourceId, resourceType);
+	if (Option.isNone(parent)) {
+		return [];
+	}
+	const { id, type } = parent.value;
+	const direct = yield* repo.getGrantedPrivileges(principalIds, id, type, true);
+	const inherited = yield* collectAncestorPrivileges(
+		repo,
+		principalIds,
+		id,
+		type,
+	);
+	return [...direct, ...inherited];
+});
+
+// Effective privileges for sibling members sharing one parent, computed
+// with a single parent resolution + one batched direct-ACE query. A
+// member's effective set = its direct ACEs ∪ the parent's effective set
+// (which already includes the parent's own ancestors). Does not apply the
+// role-based bypass — matches currentUserPrivileges. Shared by
+// batchMemberPrivileges and batchCheckMembers.
+const computeMemberPrivileges = Effect.fn("AclService.computeMemberPrivileges")(
+	function* (
+		repo: AclRepositoryShape,
+		principalId: PrincipalId,
+		batch: AclMemberBatch,
+	) {
+		const { parentId, parentType, memberIds, memberType } = batch;
+		const result = new Map<AclResourceId, ReadonlyArray<DavPrivilege>>();
+		if (memberIds.length === 0) {
+			return result as ReadonlyMap<AclResourceId, ReadonlyArray<DavPrivilege>>;
+		}
+		const principalIds = yield* resolvePrincipalIds(repo, principalId);
+
+		const parentDirect = yield* repo.getGrantedPrivileges(
+			principalIds,
+			parentId,
+			parentType,
+			true,
+		);
+		const parentInherited = yield* collectAncestorPrivileges(
+			repo,
+			principalIds,
+			parentId,
+			parentType,
+		);
+		const inheritedExpanded = expandAllContained([
+			...parentDirect,
+			...parentInherited,
+		]);
+
+		const directRaw = yield* repo.batchGetGrantedPrivileges(
+			principalIds,
+			memberIds as ReadonlyArray<UuidString>,
+			memberType,
+		);
+
+		for (const memberId of memberIds) {
+			const direct = directRaw.get(memberId as UuidString) ?? [];
+			result.set(
+				memberId,
+				Arr.fromIterable(
+					new Set([...inheritedExpanded, ...expandAllContained(direct)]),
+				),
+			);
+		}
+		return result as ReadonlyMap<AclResourceId, ReadonlyArray<DavPrivilege>>;
+	},
+);
+
 // ---------------------------------------------------------------------------
 // AclServiceLive
 // ---------------------------------------------------------------------------
@@ -111,124 +255,6 @@ export const AclServiceLive = Layer.effect(
 	AclService,
 	Effect.gen(function* () {
 		const repo = yield* AclRepository;
-
-		const resolvePrincipalIds = (
-			principalId: PrincipalId,
-		): Effect.Effect<ReadonlyArray<PrincipalId>, never> =>
-			repo.getGroupPrincipalIds(principalId).pipe(
-				Effect.map((groupIds) => [principalId, ...groupIds]),
-				Effect.orElseSucceed(() => [principalId]),
-			);
-
-		// ---------------------------------------------------------------------------
-		// Ancestor-chain walking helpers
-		// ---------------------------------------------------------------------------
-
-		const checkAncestors = (
-			principalIds: ReadonlyArray<PrincipalId>,
-			privileges: ReadonlyArray<DavPrivilege>,
-			resourceId: UuidString,
-			resourceType: ResourceType,
-		): Effect.Effect<boolean, DatabaseError> =>
-			repo.getResourceParent(resourceId, resourceType).pipe(
-				Effect.flatMap(
-					Option.match({
-						onNone: () => Effect.succeed(false),
-						onSome: ({ id, type }) =>
-							repo
-								.hasPrivilege(
-									principalIds,
-									{ resourceId: id, resourceType: type },
-									privileges,
-									true,
-								)
-								.pipe(
-									Effect.flatMap((ok) =>
-										ok
-											? Effect.succeed(true)
-											: checkAncestors(principalIds, privileges, id, type),
-									),
-								),
-					}),
-				),
-			);
-
-		const collectAncestorPrivileges = (
-			principalIds: ReadonlyArray<PrincipalId>,
-			resourceId: UuidString,
-			resourceType: ResourceType,
-		): Effect.Effect<ReadonlyArray<DavPrivilege>, DatabaseError> =>
-			repo.getResourceParent(resourceId, resourceType).pipe(
-				Effect.flatMap(
-					Option.match({
-						onNone: () => Effect.succeed<ReadonlyArray<DavPrivilege>>([]),
-						onSome: ({ id, type }) =>
-							Effect.zipWith(
-								repo.getGrantedPrivileges(principalIds, id, type, true),
-								collectAncestorPrivileges(principalIds, id, type),
-								(direct, inherited) => [...direct, ...inherited],
-							),
-					}),
-				),
-			);
-
-		// Effective privileges for sibling members sharing one parent, computed
-		// with a single parent resolution + one batched direct-ACE query. A
-		// member's effective set = its direct ACEs ∪ the parent's effective set
-		// (which already includes the parent's own ancestors). Does not apply the
-		// role-based bypass — matches currentUserPrivileges. Shared by
-		// batchMemberPrivileges and batchCheckMembers.
-		const computeMemberPrivileges = (
-			principalId: PrincipalId,
-			batch: AclMemberBatch,
-		): Effect.Effect<
-			ReadonlyMap<AclResourceId, ReadonlyArray<DavPrivilege>>,
-			DatabaseError
-		> =>
-			Effect.gen(function* () {
-				const { parentId, parentType, memberIds, memberType } = batch;
-				const result = new Map<AclResourceId, ReadonlyArray<DavPrivilege>>();
-				if (memberIds.length === 0) {
-					return result;
-				}
-				const principalIds = yield* resolvePrincipalIds(principalId);
-
-				const parentDirect = yield* repo.getGrantedPrivileges(
-					principalIds,
-					parentId,
-					parentType,
-					true,
-				);
-				const parentInherited = yield* collectAncestorPrivileges(
-					principalIds,
-					parentId,
-					parentType,
-				);
-				const inheritedExpanded = new Set<DavPrivilege>();
-				for (const p of [...parentDirect, ...parentInherited]) {
-					for (const contained of expandContained(p)) {
-						inheritedExpanded.add(contained);
-					}
-				}
-
-				const directRaw = yield* repo.batchGetGrantedPrivileges(
-					principalIds,
-					memberIds as ReadonlyArray<UuidString>,
-					memberType,
-				);
-
-				for (const memberId of memberIds) {
-					const expanded = new Set<DavPrivilege>(inheritedExpanded);
-					const direct = directRaw.get(memberId as UuidString) ?? [];
-					for (const p of direct) {
-						for (const contained of expandContained(p)) {
-							expanded.add(contained);
-						}
-					}
-					result.set(memberId, Arr.fromIterable(expanded));
-				}
-				return result;
-			});
 
 		return {
 			getAces: Effect.fn("AclService.getAces")(
@@ -286,7 +312,7 @@ export const AclServiceLive = Layer.effect(
 						);
 						return;
 					}
-					const principalIds = yield* resolvePrincipalIds(principalId);
+					const principalIds = yield* resolvePrincipalIds(repo, principalId);
 					const privileges = expandContainers(privilege);
 					const allowed = yield* repo.hasPrivilege(
 						principalIds,
@@ -305,10 +331,10 @@ export const AclServiceLive = Layer.effect(
 					}
 					// Walk ancestor chain before giving up
 					const inheritedAllowed = yield* checkAncestors(
+						repo,
 						principalIds,
 						privileges,
-						resourceId,
-						resourceType,
+						{ resourceId, resourceType },
 					);
 					if (!inheritedAllowed) {
 						yield* Effect.logDebug("acl.check: denied", {
@@ -343,7 +369,7 @@ export const AclServiceLive = Layer.effect(
 						resourceId,
 						resourceType,
 					});
-					const principalIds = yield* resolvePrincipalIds(principalId);
+					const principalIds = yield* resolvePrincipalIds(repo, principalId);
 					const direct = yield* repo.getGrantedPrivileges(
 						principalIds,
 						resourceId,
@@ -351,18 +377,15 @@ export const AclServiceLive = Layer.effect(
 						true,
 					);
 					const inherited = yield* collectAncestorPrivileges(
+						repo,
 						principalIds,
 						resourceId,
 						resourceType,
 					);
 					// Expand each granted privilege to all privileges it implies
-					const expanded = new Set<DavPrivilege>();
-					for (const p of [...direct, ...inherited]) {
-						for (const contained of expandContained(p)) {
-							expanded.add(contained);
-						}
-					}
-					const result = Arr.fromIterable(expanded);
+					const result = Arr.fromIterable(
+						expandAllContained([...direct, ...inherited]),
+					);
 					yield* Effect.logTrace("acl.currentUserPrivileges result", {
 						count: result.length,
 					});
@@ -378,7 +401,7 @@ export const AclServiceLive = Layer.effect(
 					resourceCount: resourceIds.length,
 					resourceType,
 				});
-				const principalIds = yield* resolvePrincipalIds(principalId);
+				const principalIds = yield* resolvePrincipalIds(repo, principalId);
 				const raw = yield* repo.batchGetGrantedPrivileges(
 					principalIds,
 					resourceIds as ReadonlyArray<UuidString>,
@@ -386,13 +409,10 @@ export const AclServiceLive = Layer.effect(
 				);
 				const result = new Map<AclResourceId, ReadonlyArray<DavPrivilege>>();
 				for (const [id, privileges] of raw) {
-					const expanded = new Set<DavPrivilege>();
-					for (const p of privileges) {
-						for (const contained of expandContained(p)) {
-							expanded.add(contained);
-						}
-					}
-					result.set(id as AclResourceId, Arr.fromIterable(expanded));
+					result.set(
+						id as AclResourceId,
+						Arr.fromIterable(expandAllContained(privileges)),
+					);
 				}
 				return result;
 			}),
@@ -406,7 +426,7 @@ export const AclServiceLive = Layer.effect(
 						memberType: batch.memberType,
 						memberCount: batch.memberIds.length,
 					});
-					return yield* computeMemberPrivileges(principalId, batch);
+					return yield* computeMemberPrivileges(repo, principalId, batch);
 				},
 			),
 
@@ -440,7 +460,11 @@ export const AclServiceLive = Layer.effect(
 					// Otherwise a member passes iff its effective privilege set
 					// contains the requested privilege — equivalent to check() but
 					// computed for every member in a bounded number of queries.
-					const privMap = yield* computeMemberPrivileges(principalId, batch);
+					const privMap = yield* computeMemberPrivileges(
+						repo,
+						principalId,
+						batch,
+					);
 					for (const id of memberIds) {
 						const privs = privMap.get(id) ?? [];
 						if ((privs as ReadonlyArray<string>).includes(privilege)) {

@@ -38,6 +38,7 @@ import { OidcService } from "#src/services/oidc/service.ts";
 import { PrincipalService } from "#src/services/principal/index.ts";
 import { PrincipalRepository } from "#src/services/principal/repository.ts";
 import { ProvisioningService } from "#src/services/provisioning/service.ts";
+import { DEFAULT_ROLE } from "#src/services/role/policy.ts";
 import { OidcLoginRepository } from "#src/services/session/oidc-login-repository.ts";
 import { SessionService } from "#src/services/session/service.ts";
 import { ShareLinkService } from "#src/services/share-link/service.ts";
@@ -55,7 +56,11 @@ import { uiRouter } from "./router.ts";
 // Helpers
 // ---------------------------------------------------------------------------
 
-const die = () => Effect.die("stub");
+// Stub for every service method these routing tests never exercise: dying loudly
+// beats a fake value that could mask a wrong route
+const die = Effect.fn("router.test.stub")(function* () {
+	return yield* Effect.die("stub");
+});
 
 const authenticated = new Authenticated({
 	principal: {
@@ -208,7 +213,7 @@ const stubLayers = Layer.mergeAll(
 		getGroupPrincipalIds: () => Effect.succeed([]),
 		batchGetGrantedPrivileges: die,
 		getResourceParent: die,
-		getRoleForPrincipal: () => Effect.succeed("normal"),
+		getRoleForPrincipal: () => Effect.succeed(DEFAULT_ROLE),
 	}),
 	Layer.succeed(CollectionRepoTag, {
 		findById: die,
@@ -402,7 +407,7 @@ const stubLayers = Layer.mergeAll(
 const run = (path: string, method = "GET"): Promise<Response> => {
 	const req = new Request(`http://localhost${path}`, { method });
 	const ctx = makeCtx(path, method);
-	return Effect.runPromise(Effect.provide(uiRouter(req, ctx), stubLayers));
+	return Effect.provide(uiRouter(req, ctx), stubLayers).pipe(Effect.runPromise);
 };
 
 describe("uiRouter", () => {

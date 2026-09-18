@@ -39,6 +39,21 @@ import type { InstanceService } from "#src/services/instance/service.ts";
 const isImportMode = (raw: string): raw is ImportMode =>
 	raw === "error" || raw === "skip" || raw === "merge";
 
+// Close out a chunked import: refresh generated birthdays only when something landed
+const finishImportJob = Effect.fn("ui.contacts.import.finish")(function* (
+	collectionId: CollectionId,
+	counts: {
+		readonly inserted: number;
+		readonly skipped: number;
+		readonly merged: number;
+	},
+) {
+	if (counts.inserted > 0 || counts.merged > 0) {
+		yield* fireAndForgetBirthdayRegenerate(collectionId);
+	}
+	return { result: counts };
+});
+
 export const contactsImportHandler = (
 	req: Request,
 	ctx: HttpRequestContext,
@@ -143,12 +158,7 @@ export const contactsImportHandler = (
 					);
 				},
 				onDone: () =>
-					Effect.gen(function* () {
-						if (inserted > 0 || merged > 0) {
-							yield* fireAndForgetBirthdayRegenerate(collectionId);
-						}
-						return { result: { inserted, skipped, merged } };
-					}),
+					finishImportJob(collectionId, { inserted, skipped, merged }),
 			});
 			return yield* renderFragment(<BulkJobProgress jobId={job.id} />);
 		}

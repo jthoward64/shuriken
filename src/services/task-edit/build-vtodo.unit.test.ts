@@ -1,5 +1,6 @@
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
+import { Option } from "effect";
 import { Temporal } from "temporal-polyfill";
 import { buildVtodoComponent } from "./build-vtodo.ts";
 import { parseVtodoToForm } from "./parse-vtodo.ts";
@@ -21,9 +22,9 @@ describe("buildVtodoComponent / parseVtodoToForm round-trip", () => {
 			recurrenceCount: "10",
 			recurrenceUntil: "",
 		};
-		const vtodo = buildVtodoComponent("task-1", form, null);
-		expect(vtodo).not.toBeNull();
-		const back = parseVtodoToForm(vtodo as NonNullable<typeof vtodo>);
+		const vtodo = buildVtodoComponent("task-1", form, Option.none());
+		expect(Option.isSome(vtodo)).toBe(true);
+		const back = parseVtodoToForm(Option.getOrThrow(vtodo));
 		expect(back.summary).toBe(form.summary);
 		expect(back.description).toBe(form.description);
 		expect(back.location).toBe(form.location);
@@ -41,15 +42,19 @@ describe("buildVtodoComponent / parseVtodoToForm round-trip", () => {
 			...emptyTaskForm,
 			summary: "Someday task",
 		};
-		const vtodo = buildVtodoComponent("task-2", form, null);
-		expect(vtodo).not.toBeNull();
-		const back = parseVtodoToForm(vtodo as NonNullable<typeof vtodo>);
+		const vtodo = buildVtodoComponent("task-2", form, Option.none());
+		expect(Option.isSome(vtodo)).toBe(true);
+		const back = parseVtodoToForm(Option.getOrThrow(vtodo));
 		expect(back.start).toBe("");
 		expect(back.due).toBe("");
 	});
 
-	it("returns null when SUMMARY is empty", () => {
-		expect(buildVtodoComponent("task-3", emptyTaskForm, null)).toBeNull();
+	it("returns none when SUMMARY is empty", () => {
+		expect(
+			Option.isNone(
+				buildVtodoComponent("task-3", emptyTaskForm, Option.none()),
+			),
+		).toBe(true);
 	});
 
 	it("stamps COMPLETED when completedAt is provided", () => {
@@ -59,23 +64,25 @@ describe("buildVtodoComponent / parseVtodoToForm round-trip", () => {
 		const vtodo = buildVtodoComponent(
 			"task-4",
 			{ ...emptyTaskForm, summary: "Done thing", status: "COMPLETED" },
-			completedAt,
+			Option.some(completedAt),
 		);
-		const completed = vtodo?.properties.find((p) => p.name === "COMPLETED");
+		const completed = Option.getOrThrow(vtodo).properties.find(
+			(p) => p.name === "COMPLETED",
+		);
 		expect(completed?.value).toMatchObject({
 			type: "DATE_TIME",
 			value: completedAt,
 		});
 	});
 
-	it("omits COMPLETED when completedAt is null", () => {
+	it("omits COMPLETED when completedAt is absent", () => {
 		const vtodo = buildVtodoComponent(
 			"task-5",
 			{ ...emptyTaskForm, summary: "Not done", status: "NEEDS-ACTION" },
-			null,
+			Option.none(),
 		);
 		expect(
-			vtodo?.properties.find((p) => p.name === "COMPLETED"),
+			Option.getOrThrow(vtodo).properties.find((p) => p.name === "COMPLETED"),
 		).toBeUndefined();
 	});
 
@@ -90,9 +97,11 @@ describe("buildVtodoComponent / parseVtodoToForm round-trip", () => {
 				recurrenceFreq: "DAILY",
 				recurrenceUntil: "2026-07-01",
 			},
-			null,
+			Option.none(),
 		);
-		const rrule = v?.properties.find((p) => p.name === "RRULE");
+		const rrule = Option.getOrThrow(v).properties.find(
+			(p) => p.name === "RRULE",
+		);
 		expect(rrule?.value).toMatchObject({
 			type: "RECUR",
 			value: "FREQ=DAILY;UNTIL=20260701",

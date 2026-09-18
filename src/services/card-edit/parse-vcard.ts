@@ -41,21 +41,19 @@ const serviceOf = (p: IrProperty): string => {
 	return getTypeTokens(p)[0] ?? "";
 };
 
-// Include `label` only when present, so label-free values stay `{value, types}`.
-const labelPart = (p: IrProperty): { label?: string } => {
-	const v = p.parameters.find((x) => x.name === "LABEL")?.value ?? "";
-	return v === "" ? {} : { label: v };
-};
+// The LABEL parameter, empty when the row carries none.
+const labelOf = (p: IrProperty): string =>
+	p.parameters.find((x) => x.name === "LABEL")?.value ?? "";
 
 // Canonical preference read: numeric PREF is authoritative, but honor a legacy
-// `TYPE=pref` token for any card not yet upgraded on ingest. The `pref` token is
-// stripped from `types` so preference lives on exactly one channel (`preferred`).
-const prefAndTypes = (
-	p: IrProperty,
-): { types: ReadonlyArray<string>; preferred: boolean } => ({
-	types: stripPrefToken(getTypeTokens(p)),
-	preferred: isPreferred(p) || hasPrefTypeToken(p),
-});
+// `TYPE=pref` token for any card not yet upgraded on ingest.
+const isPreferredRow = (p: IrProperty): boolean =>
+	isPreferred(p) || hasPrefTypeToken(p);
+
+// The `pref` token is stripped from `types` so preference lives on exactly one
+// channel (`preferred`).
+const typesOf = (p: IrProperty): ReadonlyArray<string> =>
+	stripPrefToken(getTypeTokens(p));
 
 // ---------------------------------------------------------------------------
 // parseVcardToForm — pre-populates the edit form from a vCard. It surfaces only
@@ -64,21 +62,6 @@ const prefAndTypes = (
 // through verbatim. Matching is group-aware (`item1.EMAIL` → EMAIL) and reads
 // repeated TYPE params, so Apple/Google vCard 3.0 populates correctly.
 // ---------------------------------------------------------------------------
-
-const splitAddress = (
-	raw: string,
-): Omit<ContactAddress, "types" | "preferred"> => {
-	const parts = raw.split(";");
-	return {
-		poBox: parts[0] ?? "",
-		extended: parts[1] ?? "",
-		street: parts[2] ?? "",
-		locality: parts[3] ?? "",
-		region: parts[4] ?? "",
-		postalCode: parts[5] ?? "",
-		country: parts[6] ?? "",
-	};
-};
 
 const dateStr = (p: IrProperty): string => {
 	if (p.value.type === "DATE") {
@@ -113,8 +96,84 @@ const relationFromProp = (p: IrProperty): ContactRelation => {
 		target,
 		name: target.kind === "text" ? value : preservedName,
 		relation: relationOf(p),
-		preferred: isPreferred(p) || hasPrefTypeToken(p),
+		preferred: isPreferredRow(p),
 	};
+};
+
+/** An EMAIL/TEL row: the value plus its TYPE, PREF and LABEL metadata. */
+const typedValueFrom = (p: IrProperty): ContactTypedValue => {
+	const label = labelOf(p);
+	// `label` is included only when present, so label-free values stay
+	// `{value, types}`.
+	return {
+		value: getText(p),
+		types: typesOf(p),
+		preferred: isPreferredRow(p),
+		...(label === "" ? {} : { label }),
+	};
+};
+
+/** An ADR row: the seven address components plus TYPE, PREF and LABEL. */
+const addressFrom = (p: IrProperty): ContactAddress => {
+	const parts = getText(p).split(";");
+	const label = labelOf(p);
+	return {
+		poBox: parts[0] ?? "",
+		extended: parts[1] ?? "",
+		street: parts[2] ?? "",
+		locality: parts[3] ?? "",
+		region: parts[4] ?? "",
+		postalCode: parts[5] ?? "",
+		country: parts[6] ?? "",
+		types: typesOf(p),
+		preferred: isPreferredRow(p),
+		...(label === "" ? {} : { label }),
+	};
+};
+
+/** NICKNAME is a comma list in 4.0 and a single value in older cards. */
+const nicknameFrom = (p: IrProperty): string =>
+	p.value.type === "TEXT_LIST" ? [...p.value.value].join(", ") : getText(p);
+
+/** CATEGORIES is a comma list in 4.0 and a single value in older cards. */
+const categoriesFrom = (p: IrProperty): string =>
+	p.value.type === "TEXT_LIST" ? [...p.value.value].join(", ") : getText(p);
+
+/** A relation surfaced from a pre-canonicalisation form, given the group labels. */
+const legacyRelationFrom = (
+	p: IrProperty,
+	relation: string,
+): ContactRelation => ({
+	target: { kind: "text" },
+	name: getText(p),
+	relation,
+	preferred: isPreferredRow(p),
+});
+
+/**
+ * Properties with no fixed case: the single-property relation forms
+ * (AGENT / X-SPOUSE / …), which only survive on cards stored before
+ * canonicalisation, then anything the generic editor owns.
+ */
+const parseTailProp = (
+	p: IrProperty,
+	relations: Array<ContactRelation>,
+	otherProps: Array<ContactOtherProp>,
+): void => {
+	if (RELATION_SOURCE_PROPS.has(baseName(p.name))) {
+		relations.push(
+			legacyRelationFrom(p, relationForSourceProp(baseName(p.name))),
+		);
+		return;
+	}
+	if (isOtherEditable(p)) {
+		otherProps.push({
+			name: baseName(p.name),
+			group: groupOf(p.name),
+			value: getText(p),
+			params: serializeParams(p.parameters),
+		});
+	}
 };
 
 export const parseVcardToForm = (vcard: IrComponent): ContactFormData => {
@@ -164,34 +223,19 @@ export const parseVcardToForm = (vcard: IrComponent): ContactFormData => {
 				break;
 			}
 			case "NICKNAME":
-				nickname =
-					p.value.type === "TEXT_LIST"
-						? [...p.value.value].join(", ")
-						: getText(p);
+				nickname = nicknameFrom(p);
 				break;
 			case "EMAIL":
-				emails.push({
-					value: getText(p),
-					...prefAndTypes(p),
-					...labelPart(p),
-				});
+				emails.push(typedValueFrom(p));
 				break;
 			case "TEL":
-				tels.push({
-					value: getText(p),
-					...prefAndTypes(p),
-					...labelPart(p),
-				});
+				tels.push(typedValueFrom(p));
 				break;
 			case "URL":
 				urls.push(getText(p));
 				break;
 			case "ADR":
-				addresses.push({
-					...splitAddress(getText(p)),
-					...prefAndTypes(p),
-					...labelPart(p),
-				});
+				addresses.push(addressFrom(p));
 				break;
 			case "SOCIALPROFILE":
 				socialProfiles.push({ service: serviceOf(p), value: getText(p) });
@@ -206,12 +250,9 @@ export const parseVcardToForm = (vcard: IrComponent): ContactFormData => {
 			// grouped pair; surface them so the editor is not blind to them, and
 			// saving rewrites them as RELATED.
 			case AB_RELATED_PROP:
-				relations.push({
-					target: { kind: "text" },
-					name: getText(p),
-					relation: labels.get(groupOf(p.name)) ?? "",
-					preferred: isPreferred(p) || hasPrefTypeToken(p),
-				});
+				relations.push(
+					legacyRelationFrom(p, labels.get(groupOf(p.name)) ?? ""),
+				);
 				break;
 			case "BDAY":
 				bday = dateStr(p);
@@ -238,36 +279,13 @@ export const parseVcardToForm = (vcard: IrComponent): ContactFormData => {
 				note = getText(p);
 				break;
 			case "CATEGORIES":
-				if (p.value.type === "TEXT_LIST") {
-					categoriesCsv = [...p.value.value].join(", ");
-				} else {
-					categoriesCsv = getText(p);
-				}
+				categoriesCsv = categoriesFrom(p);
 				break;
 			case "PHOTO":
 				photo = getText(p);
 				break;
 			default:
-				// The single-property relation forms (AGENT / X-SPOUSE / …) are a
-				// set rather than fixed cases. Like the grouped pair above, these
-				// only survive on cards stored before canonicalisation.
-				if (RELATION_SOURCE_PROPS.has(baseName(p.name))) {
-					relations.push({
-						target: { kind: "text" },
-						name: getText(p),
-						relation: relationForSourceProp(baseName(p.name)),
-						preferred: isPreferred(p) || hasPrefTypeToken(p),
-					});
-					break;
-				}
-				if (isOtherEditable(p)) {
-					otherProps.push({
-						name: baseName(p.name),
-						group: groupOf(p.name),
-						value: getText(p),
-						params: serializeParams(p.parameters),
-					});
-				}
+				parseTailProp(p, relations, otherProps);
 				break;
 		}
 	}

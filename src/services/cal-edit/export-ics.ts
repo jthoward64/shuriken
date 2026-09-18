@@ -4,7 +4,10 @@ import type { IrComponent } from "#src/data/ir.ts";
 import type { DatabaseError, InternalError } from "#src/domain/errors.ts";
 import { CollectionId, EntityId, type UuidString } from "#src/domain/ids.ts";
 import { ComponentRepository } from "#src/services/component/repository.ts";
-import { InstanceRepository } from "#src/services/instance/repository.ts";
+import {
+	InstanceRepository,
+	type InstanceRow,
+} from "#src/services/instance/repository.ts";
 
 // ---------------------------------------------------------------------------
 // exportCalendar — serialize every active instance in a calendar collection
@@ -24,6 +27,51 @@ const tzidOf = (vtimezone: IrComponent): Option.Option<string> => {
 	return Option.some(tzid.value.value);
 };
 
+/** True when the instance body is iCalendar rather than, say, a vCard. */
+const isCalendarInstance = (instance: InstanceRow): boolean =>
+	instance.deletedAt === null &&
+	instance.contentType.split(";")[0]?.trim().toLowerCase() === "text/calendar";
+
+/** The VCALENDAR children of one instance, empty when it stores anything else. */
+const instanceComponents = Effect.fn("cal-edit.export.instanceComponents")(
+	function* (instance: InstanceRow) {
+		if (!isCalendarInstance(instance)) {
+			return [] as ReadonlyArray<IrComponent>;
+		}
+		const componentRepo = yield* ComponentRepository;
+		const treeOpt = yield* componentRepo.loadTree(
+			EntityId(instance.entityId),
+			"icalendar",
+		);
+		return Option.match(treeOpt, {
+			onNone: (): ReadonlyArray<IrComponent> => [],
+			onSome: (root) => (root.name === "VCALENDAR" ? root.components : []),
+		});
+	},
+);
+
+/** Separates VTIMEZONE components, deduped by TZID, from everything else. */
+const partitionByTimezone = (
+	components: ReadonlyArray<IrComponent>,
+): {
+	readonly timezones: ReadonlyMap<string, IrComponent>;
+	readonly events: ReadonlyArray<IrComponent>;
+} => {
+	const timezones = new Map<string, IrComponent>();
+	const events: Array<IrComponent> = [];
+	for (const sub of components) {
+		if (sub.name !== "VTIMEZONE") {
+			events.push(sub);
+			continue;
+		}
+		const tzid = tzidOf(sub);
+		if (Option.isSome(tzid) && !timezones.has(tzid.value)) {
+			timezones.set(tzid.value, sub);
+		}
+	}
+	return { timezones, events };
+};
+
 export const exportCalendarToIcs = (
 	collectionId: UuidString,
 ): Effect.Effect<
@@ -33,46 +81,16 @@ export const exportCalendarToIcs = (
 > =>
 	Effect.gen(function* () {
 		const instanceRepo = yield* InstanceRepository;
-		const componentRepo = yield* ComponentRepository;
-
-		const events: Array<IrComponent> = [];
-		const timezones = new Map<string, IrComponent>();
 
 		const instances = yield* instanceRepo.listByCollection(
 			CollectionId(collectionId),
 		);
+		const all: Array<IrComponent> = [];
 		for (const instance of instances) {
-			if (instance.deletedAt !== null) {
-				continue;
-			}
-			if (
-				instance.contentType.split(";")[0]?.trim().toLowerCase() !==
-				"text/calendar"
-			) {
-				continue;
-			}
-			const treeOpt = yield* componentRepo.loadTree(
-				EntityId(instance.entityId),
-				"icalendar",
-			);
-			if (Option.isNone(treeOpt)) {
-				continue;
-			}
-			const root = treeOpt.value;
-			if (root.name !== "VCALENDAR") {
-				continue;
-			}
-			for (const sub of root.components) {
-				if (sub.name === "VTIMEZONE") {
-					const tzid = tzidOf(sub);
-					if (Option.isSome(tzid) && !timezones.has(tzid.value)) {
-						timezones.set(tzid.value, sub);
-					}
-					continue;
-				}
-				events.push(sub);
-			}
+			all.push(...(yield* instanceComponents(instance)));
 		}
+		const { timezones, events } = partitionByTimezone(all);
+		const components = [...timezones.values(), ...events];
 
 		return yield* encodeICalendar({
 			kind: "icalendar",
@@ -92,7 +110,7 @@ export const exportCalendarToIcs = (
 						isKnown: true,
 					},
 				],
-				components: [...timezones.values(), ...events],
+				components,
 			},
 		});
 	});

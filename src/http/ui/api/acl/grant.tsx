@@ -5,7 +5,7 @@ import type {
 	InternalError,
 } from "#src/domain/errors.ts";
 import { InternalError as InternalErr } from "#src/domain/errors.ts";
-import type { PrincipalId, UuidString } from "#src/domain/ids.ts";
+import { PrincipalId, type UuidString } from "#src/domain/ids.ts";
 import type { DavPrivilege } from "#src/domain/types/dav.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
@@ -72,7 +72,7 @@ export const aclGrantHandler = (
 		if (Option.isNone(maybePrincipal)) {
 			return new Response("Principal not found", { status: 400 });
 		}
-		const targetPrincipalId = maybePrincipal.value.id as PrincipalId;
+		const targetPrincipalId = PrincipalId(maybePrincipal.value.id);
 
 		const existingAces = yield* acl.getAces(resourceId, resourceType);
 		const nonProtected = existingAces.filter((a) => !a.protected);

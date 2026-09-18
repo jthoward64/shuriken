@@ -1,4 +1,4 @@
-import { Effect, Option } from "effect";
+import { Effect, Option, Result } from "effect";
 import type {
 	DatabaseError,
 	DavError,
@@ -32,6 +32,32 @@ import { PrincipalRepository } from "#src/services/principal/repository.ts";
 // setAces call — no window where the principal holds a partial/stale set.
 // ---------------------------------------------------------------------------
 
+// The principal a tier grant targets: the posted id when it names one, else the
+// posted slug. A failure carries the 400 message for the caller to render.
+const resolveTargetPrincipal = Effect.fn("ui.acl.setTier.target")(function* (
+	principalSlug: string,
+	targetPrincipalIdRaw: string,
+) {
+	const principalRepo = yield* PrincipalRepository;
+	if (targetPrincipalIdRaw) {
+		if (!isUuid(targetPrincipalIdRaw)) {
+			return Result.fail("Invalid principalId");
+		}
+		const byId = yield* principalRepo.findPrincipalById(
+			PrincipalId(targetPrincipalIdRaw),
+		);
+		return Option.match(byId, {
+			onNone: () => Result.fail("Principal not found"),
+			onSome: (found) => Result.succeed(PrincipalId(found.id)),
+		});
+	}
+	const bySlug = yield* principalRepo.findPrincipalBySlug(Slug(principalSlug));
+	return Option.match(bySlug, {
+		onNone: () => Result.fail("Principal not found"),
+		onSome: (found) => Result.succeed(PrincipalId(found.id)),
+	});
+});
+
 export const aclSetTierHandler = (
 	req: Request,
 	ctx: HttpRequestContext,
@@ -45,7 +71,6 @@ export const aclSetTierHandler = (
 	Effect.gen(function* () {
 		const principal = yield* requireAuthenticated(ctx.auth);
 		const acl = yield* AclService;
-		const principalRepo = yield* PrincipalRepository;
 
 		yield* acl.check(
 			principal.principalId,
@@ -80,27 +105,14 @@ export const aclSetTierHandler = (
 			});
 		}
 
-		let targetPrincipalId: PrincipalId;
-		if (targetPrincipalIdRaw) {
-			if (!isUuid(targetPrincipalIdRaw)) {
-				return new Response("Invalid principalId", { status: 400 });
-			}
-			const maybePrincipal = yield* principalRepo.findPrincipalById(
-				PrincipalId(targetPrincipalIdRaw),
-			);
-			if (Option.isNone(maybePrincipal)) {
-				return new Response("Principal not found", { status: 400 });
-			}
-			targetPrincipalId = PrincipalId(targetPrincipalIdRaw);
-		} else {
-			const maybePrincipal = yield* principalRepo.findPrincipalBySlug(
-				Slug(principalSlug),
-			);
-			if (Option.isNone(maybePrincipal)) {
-				return new Response("Principal not found", { status: 400 });
-			}
-			targetPrincipalId = maybePrincipal.value.id as PrincipalId;
+		const target = yield* resolveTargetPrincipal(
+			principalSlug,
+			targetPrincipalIdRaw,
+		);
+		if (Result.isFailure(target)) {
+			return new Response(target.failure, { status: 400 });
 		}
+		const targetPrincipalId = target.success;
 
 		const tierPrivileges =
 			tiersFor(resourceType, isCalendar).find((t) => t.tier === tier)

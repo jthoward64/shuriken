@@ -5,7 +5,10 @@ import type { IrComponent, IrDocument, IrProperty } from "#src/data/ir.ts";
 import type { DatabaseError, InternalError } from "#src/domain/errors.ts";
 import { CollectionId, EntityId } from "#src/domain/ids.ts";
 import { ComponentRepository } from "#src/services/component/repository.ts";
-import { InstanceRepository } from "#src/services/instance/repository.ts";
+import {
+	InstanceRepository,
+	type InstanceRow,
+} from "#src/services/instance/repository.ts";
 import type { ShareLinkSummary } from "#src/services/share-link/service.ts";
 import { toFieldVisibility } from "#src/services/share-link/visibility-policy.ts";
 
@@ -73,6 +76,58 @@ const buildVcalendar = (
 	};
 };
 
+/** True when the instance body is iCalendar rather than, say, a vCard. */
+const isCalendarInstance = (instance: InstanceRow): boolean =>
+	instance.deletedAt === null &&
+	instance.contentType.split(";")[0]?.trim().toLowerCase() === "text/calendar";
+
+/** The VCALENDAR children of one instance, empty when it stores anything else. */
+const instanceComponents = Effect.fn("feed.render.instanceComponents")(
+	function* (instance: InstanceRow) {
+		if (!isCalendarInstance(instance)) {
+			return [] as ReadonlyArray<IrComponent>;
+		}
+		const componentRepo = yield* ComponentRepository;
+		const treeOpt = yield* componentRepo.loadTree(
+			EntityId(instance.entityId),
+			"icalendar",
+		);
+		return Option.match(treeOpt, {
+			onNone: (): ReadonlyArray<IrComponent> => [],
+			onSome: (root) => (root.name === "VCALENDAR" ? root.components : []),
+		});
+	},
+);
+
+/**
+ * One shared calendar's visible event components. VTIMEZONEs are not returned:
+ * they are deduped by TZID into the shared `timezoneByTzid` map instead.
+ */
+const collectCalendar = Effect.fn("feed.render.collectCalendar")(function* (
+	cal: ShareLinkSummary["calendars"][number],
+	timezoneByTzid: Map<string, IrComponent>,
+) {
+	const instanceRepo = yield* InstanceRepository;
+	const visibility = toFieldVisibility(cal.visibility);
+	const events: Array<IrComponent> = [];
+	const instances = yield* instanceRepo.listByCollection(
+		CollectionId(cal.calendarId),
+	);
+	for (const instance of instances) {
+		for (const sub of yield* instanceComponents(instance)) {
+			if (sub.name !== "VTIMEZONE") {
+				events.push(applyFieldVisibility(sub, visibility));
+				continue;
+			}
+			const tzid = tzidOf(sub);
+			if (Option.isSome(tzid) && !timezoneByTzid.has(tzid.value)) {
+				timezoneByTzid.set(tzid.value, sub);
+			}
+		}
+	}
+	return events as ReadonlyArray<IrComponent>;
+});
+
 export const renderFeed = (
 	summary: ShareLinkSummary,
 ): Effect.Effect<
@@ -81,56 +136,12 @@ export const renderFeed = (
 	ComponentRepository | InstanceRepository
 > =>
 	Effect.gen(function* () {
-		const instanceRepo = yield* InstanceRepository;
-		const componentRepo = yield* ComponentRepository;
-
-		const eventComponents: Array<IrComponent> = [];
 		const timezoneByTzid = new Map<string, IrComponent>();
-
+		const eventComponents: Array<IrComponent> = [];
 		for (const cal of summary.calendars) {
-			const instances = yield* instanceRepo.listByCollection(
-				CollectionId(cal.calendarId),
-			);
-			for (const instance of instances) {
-				if (instance.deletedAt !== null) {
-					continue;
-				}
-				if (
-					instance.contentType.split(";")[0]?.trim().toLowerCase() !==
-					"text/calendar"
-				) {
-					continue;
-				}
-				const treeOpt = yield* componentRepo.loadTree(
-					EntityId(instance.entityId),
-					"icalendar",
-				);
-				if (Option.isNone(treeOpt)) {
-					continue;
-				}
-				const root = treeOpt.value;
-				if (root.name !== "VCALENDAR") {
-					continue;
-				}
-				for (const sub of root.components) {
-					if (sub.name === "VTIMEZONE") {
-						const tzid = tzidOf(sub);
-						if (Option.isSome(tzid) && !timezoneByTzid.has(tzid.value)) {
-							timezoneByTzid.set(tzid.value, sub);
-						}
-						continue;
-					}
-					eventComponents.push(
-						applyFieldVisibility(sub, toFieldVisibility(cal.visibility)),
-					);
-				}
-			}
+			eventComponents.push(...(yield* collectCalendar(cal, timezoneByTzid)));
 		}
-
-		const allSubComponents: Array<IrComponent> = [
-			...timezoneByTzid.values(),
-			...eventComponents,
-		];
-		const doc = buildVcalendar(allSubComponents, summary.link.displayName);
+		const subComponents = [...timezoneByTzid.values(), ...eventComponents];
+		const doc = buildVcalendar(subComponents, summary.link.displayName);
 		return yield* encodeICalendar(doc);
 	});

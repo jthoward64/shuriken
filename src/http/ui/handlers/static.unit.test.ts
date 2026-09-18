@@ -10,11 +10,9 @@ const QUOTED_ETAG = /^"[0-9a-f]{16}"$/u;
 
 const configLayer = Layer.succeed(AppConfigService, testAppConfig);
 
-const die = () => Effect.die("stub");
-
 const noFilesLayer = Layer.succeed(FileService, {
-	readText: die,
-	readBytes: die,
+	readText: () => Effect.die("stub"),
+	readBytes: () => Effect.die("stub"),
 	exists: () => Effect.succeed(false),
 	mimeType: () => undefined,
 	glob: () => Effect.succeed([]),
@@ -23,7 +21,7 @@ const noFilesLayer = Layer.succeed(FileService, {
 const CONTENT = new TextEncoder().encode("console.log('hi')");
 
 const oneFileLayer = Layer.succeed(FileService, {
-	readText: die,
+	readText: () => Effect.die("stub"),
 	readBytes: () => Effect.succeed(CONTENT),
 	exists: () => Effect.succeed(true),
 	mimeType: () => "text/javascript; charset=utf-8",
@@ -35,12 +33,10 @@ const run = (
 	layer: typeof noFilesLayer = noFilesLayer,
 	headers?: HeadersInit,
 ): Promise<Response> =>
-	Effect.runPromise(
-		Effect.provide(
-			staticHandler(new Request(`http://localhost${path}`, { headers })),
-			Layer.mergeAll(layer, configLayer),
-		),
-	);
+	Effect.provide(
+		staticHandler(new Request(`http://localhost${path}`, { headers })),
+		Layer.mergeAll(layer, configLayer),
+	).pipe(Effect.runPromise);
 
 describe("staticHandler", () => {
 	it("returns 404 when file does not exist", async () => {

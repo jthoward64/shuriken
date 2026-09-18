@@ -1,7 +1,7 @@
 import { expect } from "@std/expect";
 import { beforeAll, describe, it } from "@std/testing/bdd";
 import { Effect, Layer, Option } from "effect";
-import type { ConflictError } from "#src/domain/errors.ts";
+import { ConflictError } from "#src/domain/errors.ts";
 import { GroupId, UserId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import { Email } from "#src/domain/types/strings.ts";
@@ -11,6 +11,14 @@ import { runFailure, runSuccess } from "#src/testing/effect.ts";
 import { makePgliteDatabaseLayer } from "#src/testing/pglite.ts";
 import { GroupRepositoryLive } from "./repository.live.ts";
 import { GroupRepository } from "./repository.ts";
+
+/** Narrows a test failure to a ConflictError so its field can be asserted. */
+const asConflictError = (err: unknown): ConflictError => {
+	if (err instanceof ConflictError) {
+		return err;
+	}
+	throw new Error(`expected a ConflictError, got ${String(err)}`);
+};
 
 // ---------------------------------------------------------------------------
 // Integration tests for GroupRepositoryLive
@@ -285,17 +293,19 @@ describe("GroupRepository unique slug constraint (integration)", () => {
 	});
 
 	it("two groups with the same slug fails with ConflictError", async () => {
-		const err = (await runFailure(
-			GroupRepository.pipe(
-				Effect.flatMap((r) =>
-					Effect.gen(function* () {
-						yield* r.create({ slug: Slug("dup-group") });
-						yield* r.create({ slug: Slug("dup-group") });
-					}),
+		const err = asConflictError(
+			await runFailure(
+				GroupRepository.pipe(
+					Effect.flatMap((r) =>
+						Effect.gen(function* () {
+							yield* r.create({ slug: Slug("dup-group") });
+							yield* r.create({ slug: Slug("dup-group") });
+						}),
+					),
+					Effect.provide(layer),
 				),
-				Effect.provide(layer),
 			),
-		)) as ConflictError;
+		);
 
 		expect(err._tag).toBe("ConflictError");
 		expect(err.field).toBe("slug");

@@ -61,17 +61,17 @@ describe("collectionsDeleteHandler", () => {
 		});
 
 		const res = await Effect.runPromise(
-			collectionsDeleteHandler(
-				new Request("http://localhost", {
-					method: "POST",
-					body: new FormData(),
-				}),
-				makeCtx(principalId),
-				CollectionId(collectionId),
-			).pipe(
-				Effect.provide(Layer.mergeAll(env.toLayer(), configLayer(30))),
-				Effect.orDie,
-			),
+			Effect.provide(
+				collectionsDeleteHandler(
+					new Request("http://localhost", {
+						method: "POST",
+						body: new FormData(),
+					}),
+					makeCtx(principalId),
+					CollectionId(collectionId),
+				),
+				Layer.mergeAll(env.toLayer(), configLayer(30)),
+			).pipe(Effect.orDie),
 		);
 
 		expect(res.status).toBe(303);
@@ -97,17 +97,17 @@ describe("collectionsDeleteHandler", () => {
 		});
 
 		const res = await Effect.runPromise(
-			collectionsDeleteHandler(
-				new Request("http://localhost", {
-					method: "POST",
-					body: new FormData(),
-				}),
-				makeCtx(principalId),
-				CollectionId(collectionId),
-			).pipe(
-				Effect.provide(Layer.mergeAll(env.toLayer(), configLayer(0))),
-				Effect.orDie,
-			),
+			Effect.provide(
+				collectionsDeleteHandler(
+					new Request("http://localhost", {
+						method: "POST",
+						body: new FormData(),
+					}),
+					makeCtx(principalId),
+					CollectionId(collectionId),
+				),
+				Layer.mergeAll(env.toLayer(), configLayer(0)),
+			).pipe(Effect.orDie),
 		);
 
 		expect(res.status).toBe(303);

@@ -1,4 +1,5 @@
 /** biome-ignore-all lint/style/noMagicNumbers: date/time padding lengths */
+import { Option } from "effect";
 import { Temporal } from "temporal-polyfill";
 import type { IrComponent, IrProperty } from "#src/data/ir.ts";
 import type { TaskFormData } from "./types.ts";
@@ -24,98 +25,88 @@ const textProp = (name: string, value: string): IrProperty => ({
 	isKnown: true,
 });
 
-const tryPlainDate = (raw: string): Temporal.PlainDate | null => {
-	try {
-		return Temporal.PlainDate.from(raw);
-	} catch {
-		return null;
-	}
-};
+/** Parses an ISO date, absent when the value is not a valid calendar date */
+const plainDateFrom = Option.liftThrowable((raw: string) =>
+	Temporal.PlainDate.from(raw),
+);
 
-const tryPlainDateTime = (raw: string): Temporal.PlainDateTime | null => {
-	try {
-		return Temporal.PlainDateTime.from(raw);
-	} catch {
-		return null;
-	}
-};
+/** Parses an ISO date-time, absent when the value is not a valid one */
+const plainDateTimeFrom = Option.liftThrowable((raw: string) =>
+	Temporal.PlainDateTime.from(raw),
+);
 
-const formatRruleUntil = (raw: string, allDay: boolean): string | null => {
+const formatRruleUntil = (
+	raw: string,
+	allDay: boolean,
+): Option.Option<string> => {
 	if (raw === "") {
-		return null;
+		return Option.none();
 	}
 	if (allDay) {
-		const d = tryPlainDate(raw);
-		if (!d) {
-			return null;
-		}
-		return `${d.year.toString().padStart(4, "0")}${String(d.month).padStart(2, "0")}${String(d.day).padStart(2, "0")}`;
+		return Option.map(
+			plainDateFrom(raw),
+			(d) =>
+				`${d.year.toString().padStart(4, "0")}${String(d.month).padStart(2, "0")}${String(d.day).padStart(2, "0")}`,
+		);
 	}
-	const dt = tryPlainDateTime(raw);
-	if (!dt) {
-		return null;
-	}
-	const date = `${dt.year.toString().padStart(4, "0")}${String(dt.month).padStart(2, "0")}${String(dt.day).padStart(2, "0")}`;
-	const time = `${String(dt.hour).padStart(2, "0")}${String(dt.minute).padStart(2, "0")}${String(dt.second).padStart(2, "0")}`;
-	return `${date}T${time}Z`;
+	return Option.map(plainDateTimeFrom(raw), (dt) => {
+		const date = `${dt.year.toString().padStart(4, "0")}${String(dt.month).padStart(2, "0")}${String(dt.day).padStart(2, "0")}`;
+		const time = `${String(dt.hour).padStart(2, "0")}${String(dt.minute).padStart(2, "0")}${String(dt.second).padStart(2, "0")}`;
+		return `${date}T${time}Z`;
+	});
 };
 
 const buildDtProp = (
 	name: "DTSTART" | "DUE",
 	raw: string,
 	allDay: boolean,
-): IrProperty | null => {
+): Option.Option<IrProperty> => {
 	if (raw === "") {
-		return null;
+		return Option.none();
 	}
 	if (allDay) {
-		const d = tryPlainDate(raw);
-		if (!d) {
-			return null;
-		}
-		return {
+		return Option.map(plainDateFrom(raw), (d) => ({
 			name,
 			parameters: [{ name: "VALUE", value: "DATE" }],
-			value: { type: "DATE", value: d },
+			value: { type: "DATE" as const, value: d },
 			isKnown: true,
-		};
+		}));
 	}
-	const dt = tryPlainDateTime(raw);
-	if (!dt) {
-		return null;
-	}
-	return {
+	return Option.map(plainDateTimeFrom(raw), (dt) => ({
 		name,
 		parameters: [],
-		value: { type: "PLAIN_DATE_TIME", value: dt },
+		value: { type: "PLAIN_DATE_TIME" as const, value: dt },
 		isKnown: true,
-	};
+	}));
 };
 
-const buildIntProp = (name: string, raw: string): IrProperty | null => {
-	if (raw === "") {
-		return null;
-	}
-	const n = Number.parseInt(raw, 10);
-	if (!Number.isFinite(n)) {
-		return null;
-	}
-	return {
-		name,
-		parameters: [],
-		value: { type: "INTEGER", value: n },
-		isKnown: true,
-	};
+const buildIntProp = (name: string, raw: string): Option.Option<IrProperty> => {
+	const n = raw === "" ? Number.NaN : Number.parseInt(raw, 10);
+	return Number.isFinite(n)
+		? Option.some({
+				name,
+				parameters: [],
+				value: { type: "INTEGER" as const, value: n },
+				isKnown: true,
+			})
+		: Option.none();
 };
 
 export const buildVtodoComponent = (
 	uid: string,
 	form: TaskFormData,
-	completedAt: Temporal.ZonedDateTime | null,
-): IrComponent | null => {
-	if (form.summary === "") {
-		return null;
-	}
+	completedAt: Option.Option<Temporal.ZonedDateTime>,
+): Option.Option<IrComponent> =>
+	form.summary === ""
+		? Option.none()
+		: Option.some(assembleVtodo(uid, form, completedAt));
+
+/** Assembles the VTODO body once the form is known to carry a summary. */
+const assembleVtodo = (
+	uid: string,
+	form: TaskFormData,
+	completedAt: Option.Option<Temporal.ZonedDateTime>,
+): IrComponent => {
 	const props: Array<IrProperty> = [
 		{
 			name: "UID",
@@ -126,14 +117,10 @@ export const buildVtodoComponent = (
 		textProp("SUMMARY", form.summary),
 	];
 
-	const dtstart = buildDtProp("DTSTART", form.start, form.allDay);
-	if (dtstart) {
-		props.push(dtstart);
-	}
-	const due = buildDtProp("DUE", form.due, form.allDay);
-	if (due) {
-		props.push(due);
-	}
+	props.push(
+		...Option.toArray(buildDtProp("DTSTART", form.start, form.allDay)),
+	);
+	props.push(...Option.toArray(buildDtProp("DUE", form.due, form.allDay)));
 	if (form.description !== "") {
 		props.push(textProp("DESCRIPTION", form.description));
 	}
@@ -155,25 +142,20 @@ export const buildVtodoComponent = (
 	if (form.status !== "") {
 		props.push(textProp("STATUS", form.status));
 	}
-	if (completedAt !== null) {
-		props.push({
-			name: "COMPLETED",
-			parameters: [],
-			value: { type: "DATE_TIME", value: completedAt },
-			isKnown: true,
-		});
-	}
-	const priority = buildIntProp("PRIORITY", form.priority);
-	if (priority) {
-		props.push(priority);
-	}
-	const percentComplete = buildIntProp(
-		"PERCENT-COMPLETE",
-		form.percentComplete,
+	props.push(
+		...Option.toArray(
+			Option.map(completedAt, (value) => ({
+				name: "COMPLETED",
+				parameters: [],
+				value: { type: "DATE_TIME" as const, value },
+				isKnown: true,
+			})),
+		),
 	);
-	if (percentComplete) {
-		props.push(percentComplete);
-	}
+	props.push(...Option.toArray(buildIntProp("PRIORITY", form.priority)));
+	props.push(
+		...Option.toArray(buildIntProp("PERCENT-COMPLETE", form.percentComplete)),
+	);
 
 	if (form.recurrenceFreq !== "") {
 		const parts: Array<string> = [`FREQ=${form.recurrenceFreq}`];
@@ -181,10 +163,14 @@ export const buildVtodoComponent = (
 		if (Number.isFinite(count) && count > 0) {
 			parts.push(`COUNT=${count}`);
 		} else {
-			const until = formatRruleUntil(form.recurrenceUntil, form.allDay);
-			if (until !== null) {
-				parts.push(`UNTIL=${until}`);
-			}
+			parts.push(
+				...Option.toArray(
+					Option.map(
+						formatRruleUntil(form.recurrenceUntil, form.allDay),
+						(until) => `UNTIL=${until}`,
+					),
+				),
+			);
 		}
 		props.push({
 			name: "RRULE",

@@ -5,7 +5,13 @@ import {
 	type DavError,
 	InternalError,
 } from "#src/domain/errors.ts";
-import { CollectionId, InstanceId, isUuid } from "#src/domain/ids.ts";
+import {
+	CollectionId,
+	InstanceId,
+	isUuid,
+	type PrincipalId,
+	type UuidString,
+} from "#src/domain/ids.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { HTTP_SEE_OTHER } from "#src/http/status.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
@@ -26,6 +32,31 @@ import { InstanceService } from "#src/services/instance/index.ts";
 
 const MIN_MERGE_MEMBERS = 2;
 
+// The primary is rewritten and the rest unbound, so both privileges are
+// required on every collection whose contacts are involved
+const checkMergePrivileges = Effect.fn("ui.contacts.merge.authorize")(
+	function* (
+		principalId: PrincipalId,
+		collectionIds: ReadonlyArray<UuidString>,
+	) {
+		const acl = yield* AclService;
+		for (const cid of collectionIds) {
+			yield* acl.check(
+				principalId,
+				CollectionId(cid),
+				"collection",
+				"DAV:write-content",
+			);
+			yield* acl.check(
+				principalId,
+				CollectionId(cid),
+				"collection",
+				"DAV:unbind",
+			);
+		}
+	},
+);
+
 export const contactsMergeExecuteHandler = (
 	req: Request,
 	ctx: HttpRequestContext,
@@ -36,7 +67,6 @@ export const contactsMergeExecuteHandler = (
 > =>
 	Effect.gen(function* () {
 		const principal = yield* requireAuthenticated(ctx.auth);
-		const acl = yield* AclService;
 		const mergeSvc = yield* ContactMergeService;
 		const instanceSvc = yield* InstanceService;
 
@@ -65,22 +95,7 @@ export const contactsMergeExecuteHandler = (
 			instanceSvc.findById(id),
 		);
 		const collectionIds = [...new Set(rows.map((r) => r.collectionId))];
-		yield* Effect.forEach(collectionIds, (cid) =>
-			Effect.gen(function* () {
-				yield* acl.check(
-					principal.principalId,
-					CollectionId(cid),
-					"collection",
-					"DAV:write-content",
-				);
-				yield* acl.check(
-					principal.principalId,
-					CollectionId(cid),
-					"collection",
-					"DAV:unbind",
-				);
-			}),
-		);
+		yield* checkMergePrivileges(principal.principalId, collectionIds);
 
 		const result = yield* mergeSvc.merge(instanceIds);
 

@@ -1,4 +1,4 @@
-import { Effect, Match, Metric, Option } from "effect";
+import { Effect, Match, Metric, Option, pipe } from "effect";
 import { AuthService } from "#src/auth/service.ts";
 import { AppConfigService } from "#src/config.ts";
 import type { DatabaseClient } from "#src/db/client.ts";
@@ -212,6 +212,16 @@ const davErrorBody = (precondition: string): Effect.Effect<string, never> => {
 	return buildXml(obj);
 };
 
+// Log an internal failure and answer with a generic 500 that leaks no detail
+const internalErrorResponse = (
+	message: string,
+	annotations: Record<string, unknown>,
+): Effect.Effect<Response, never> =>
+	pipe(
+		Effect.logError(message, annotations),
+		Effect.map(() => new Response("Internal Server Error", { status: 500 })),
+	);
+
 /** Map any AppError to a Response. */
 const mapErrorToResponse = (
 	err: AppError,
@@ -262,27 +272,19 @@ const mapErrorToResponse = (
 			Effect.succeed(new Response(e.message, { status: 409 })),
 		),
 		Match.tag("DatabaseError", "InternalError", (e) =>
-			Effect.succeed(
-				new Response("Internal Server Error", { status: 500 }),
-			).pipe(
-				Effect.tap(() =>
-					Effect.logError("request failed with internal error", {
-						cause: e.cause,
-					}),
-				),
-			),
+			internalErrorResponse("request failed with internal error", {
+				cause: e.cause,
+			}),
 		),
 		Match.tag("ConfigError", (e) =>
-			Effect.succeed(
-				new Response("Internal Server Error", { status: 500 }),
-			).pipe(
-				Effect.tap(() =>
-					Effect.logError("request failed with config error", { key: e.key }),
-				),
-			),
+			internalErrorResponse("request failed with config error", { key: e.key }),
 		),
 		Match.exhaustive,
 	);
+
+// RFC 7809 CalDAV-Timezones header: only "T" and "F" are meaningful values
+const parseCaldavTimezones = (value: string | null): "T" | "F" | null =>
+	value === "T" || value === "F" ? value : null;
 
 /**
  * Main request handler — entry point for every HTTP request.
@@ -361,11 +363,6 @@ export const handleRequest = (
 			cfg.auth.trustedProxies,
 		);
 
-		const caldavTimezones = req.headers.get("CalDAV-Timezones") as
-			| "T"
-			| "F"
-			| null;
-
 		const ctx: HttpRequestContext = {
 			requestId,
 			method: req.method,
@@ -373,27 +370,25 @@ export const handleRequest = (
 			headers: req.headers,
 			auth,
 			clientIp,
-			caldavTimezones,
+			caldavTimezones: parseCaldavTimezones(
+				req.headers.get("CalDAV-Timezones"),
+			),
 		};
 
-		const dispatch = Effect.gen(function* () {
-			if (isDavPath(url.pathname)) {
-				return yield* davRouter(req, ctx);
-			}
+		if (isDavPath(url.pathname)) {
+			return yield* davRouter(req, ctx);
+		}
 
-			if (isTimezonePath(url.pathname)) {
-				return yield* timezonesHandler(req, publicUrl);
-			}
+		if (isTimezonePath(url.pathname)) {
+			return yield* timezonesHandler(req, publicUrl);
+		}
 
-			if (isUiPath(url.pathname)) {
-				return yield* uiRouter(req, ctx);
-			}
+		if (isUiPath(url.pathname)) {
+			return yield* uiRouter(req, ctx);
+		}
 
-			yield* Effect.logDebug("no route matched", { path: url.pathname });
-			return new Response("Not Found", { status: 404 });
-		});
-
-		return yield* dispatch;
+		yield* Effect.logDebug("no route matched", { path: url.pathname });
+		return new Response("Not Found", { status: 404 });
 	}).pipe(
 		Effect.provideService(RequestIdRef, Option.some(requestId)),
 		Effect.annotateLogs({

@@ -12,9 +12,10 @@ import {
 import {
 	addressJoined,
 	adrProp,
-	bdayValue,
+	bdayValueOrText,
 	categoriesValue,
 	emailProp,
+	hasBdayValue,
 	imppProp,
 	isBlankAddress,
 	isBlankRelation,
@@ -290,9 +291,9 @@ const hasSingle = (base: Single, form: ContactFormData): boolean => {
 		case "PRONOUNS":
 			return form.pronouns !== "";
 		case "BDAY":
-			return bdayValue(form.bday) !== null;
+			return hasBdayValue(form.bday);
 		case "ANNIVERSARY":
-			return bdayValue(form.anniversary) !== null;
+			return hasBdayValue(form.anniversary);
 		case "CATEGORIES":
 			return categoriesValue(form.categoriesCsv).length > 0;
 		case "PHOTO":
@@ -325,13 +326,13 @@ const singleValue = (base: Single, form: ContactFormData): IrValue => {
 		case "N":
 			return text(nValue(form));
 		case "BDAY":
-			return bdayValue(form.bday) ?? text(form.bday);
+			return bdayValueOrText(form.bday);
 		case "ANNIVERSARY":
-			return bdayValue(form.anniversary) ?? text(form.anniversary);
+			return bdayValueOrText(form.anniversary);
 		case "CATEGORIES":
 			return {
 				type: "TEXT_LIST",
-				value: [...categoriesValue(form.categoriesCsv)],
+				value: categoriesValue(form.categoriesCsv),
 			};
 		case "PHOTO":
 			return { type: "URI", value: form.photo };
@@ -389,13 +390,19 @@ const reconcilePhotoMeta = (
 		: withoutStaleCrop;
 };
 
-export const mergeFormIntoVcard = (
-	existing: IrComponent,
-	form: ContactFormData,
-	uid: string,
-): IrComponent => {
-	const rows = multiRows(form);
-	const cursor: Record<Multi, number> = {
+/** Mutable bookkeeping carried through one merge pass. */
+interface MergeState {
+	readonly rows: Record<Multi, ReadonlyArray<unknown>>;
+	readonly cursor: Record<Multi, number>;
+	readonly singleEmitted: Set<Single>;
+	readonly removedGroups: Set<string>;
+	readonly seenHeaders: Set<string>;
+	readonly out: Array<IrProperty>;
+}
+
+const newMergeState = (form: ContactFormData): MergeState => ({
+	rows: multiRows(form),
+	cursor: {
 		EMAIL: 0,
 		TEL: 0,
 		URL: 0,
@@ -403,46 +410,56 @@ export const mergeFormIntoVcard = (
 		SOCIALPROFILE: 0,
 		IMPP: 0,
 		RELATED: 0,
-	};
-	const singleEmitted = new Set<Single>();
-	const removedGroups = new Set<string>();
-	const out: Array<IrProperty> = [];
-	let sawVersion = false;
-	let sawUid = false;
+	},
+	singleEmitted: new Set<Single>(),
+	removedGroups: new Set<string>(),
+	seenHeaders: new Set<string>(),
+	out: [],
+});
 
+/** Re-emits one existing repeatable property against the next matching form row. */
+const mergeMultiProp = (
+	state: MergeState,
+	base: string,
+	prop: IrProperty,
+): void => {
+	const m = multiKeyOf(base) as Multi;
+	const list = state.rows[m];
+	const i = state.cursor[m];
+	state.cursor[m] = i + 1;
+	const g = groupOf(prop.name);
+	// A legacy grouped related name leaves as an ungrouped RELATED either
+	// way, so its label is orphaned whether the row survived or not.
+	if (g !== "" && (i >= list.length || base === AB_RELATED_PROP)) {
+		state.removedGroups.add(g);
+	}
+	if (i < list.length) {
+		state.out.push(updateMulti(m, prop, list[i]));
+	}
+};
+
+/** Walks the stored card, rewriting form-owned properties and keeping the rest verbatim. */
+const mergeExistingProps = (
+	existing: IrComponent,
+	form: ContactFormData,
+	state: MergeState,
+): void => {
 	for (const p of existing.properties) {
 		const base = baseName(p.name);
-		if (base === "VERSION") {
-			out.push(p);
-			sawVersion = true;
-			continue;
-		}
-		if (base === "UID") {
-			out.push(p);
-			sawUid = true;
+		if (base === "VERSION" || base === "UID") {
+			state.out.push(p);
+			state.seenHeaders.add(base);
 			continue;
 		}
 		if ((MULTI as ReadonlyArray<string>).includes(multiKeyOf(base))) {
-			const m = multiKeyOf(base) as Multi;
-			const list = rows[m];
-			const i = cursor[m];
-			cursor[m] = i + 1;
-			const g = groupOf(p.name);
-			// A legacy grouped related name leaves as an ungrouped RELATED either
-			// way, so its label is orphaned whether the row survived or not.
-			if (g !== "" && (i >= list.length || base === AB_RELATED_PROP)) {
-				removedGroups.add(g);
-			}
-			if (i < list.length) {
-				out.push(updateMulti(m, p, list[i]));
-			}
+			mergeMultiProp(state, base, p);
 			continue;
 		}
 		if ((SINGLE as ReadonlyArray<string>).includes(base)) {
-			const s = base as Single;
-			singleEmitted.add(s);
-			if (hasSingle(s, form)) {
-				out.push(updateSingle(s, p, form));
+			const single = base as Single;
+			state.singleEmitted.add(single);
+			if (hasSingle(single, form)) {
+				state.out.push(updateSingle(single, p, form));
 			}
 			continue;
 		}
@@ -451,48 +468,55 @@ export const mergeFormIntoVcard = (
 			continue;
 		}
 		// Metadata / X-ABLABEL / exotic-typed tail → verbatim.
-		out.push(p);
+		state.out.push(p);
 	}
+};
 
+/** Appends the form rows that had no counterpart in the stored card. */
+const appendNewRows = (form: ContactFormData, state: MergeState): void => {
 	for (const m of MULTI) {
-		for (let i = cursor[m]; i < rows[m].length; i++) {
-			out.push(buildMulti(m, rows[m][i]));
+		for (let i = state.cursor[m]; i < state.rows[m].length; i++) {
+			state.out.push(buildMulti(m, state.rows[m][i]));
 		}
 	}
 	for (const s of SINGLE) {
-		if (!singleEmitted.has(s) && hasSingle(s, form)) {
-			out.push(buildSingle(s, form));
+		if (!state.singleEmitted.has(s) && hasSingle(s, form)) {
+			state.out.push(buildSingle(s, form));
 		}
 	}
 	for (const o of form.otherProps) {
 		if (o.name.trim() !== "") {
-			out.push(otherProp(o));
+			state.out.push(otherProp(o));
 		}
 	}
+};
 
-	if (!sawUid) {
-		out.unshift({
+/** Restores the VERSION/UID headers the stored card did not carry. */
+const ensureHeaders = (state: MergeState, uid: string): void => {
+	if (!state.seenHeaders.has("UID")) {
+		state.out.unshift({
 			name: "UID",
 			parameters: [],
 			value: { type: "URI", value: uid },
 			isKnown: true,
 		});
 	}
-	if (!sawVersion) {
-		out.unshift({
+	if (!state.seenHeaders.has("VERSION")) {
+		state.out.unshift({
 			name: "VERSION",
 			parameters: [],
 			value: { type: "TEXT", value: "4.0" },
 			isKnown: true,
 		});
 	}
+};
 
-	const photoChanged =
-		getText(existing.properties.find((p) => baseName(p.name) === "PHOTO")) !==
-		form.photo;
-	const reconciled = reconcilePhotoMeta(out, form, photoChanged);
-
-	const pruned = reconciled.filter((p) => {
+/** Drops X-ABLABEL rows whose group lost every property it labelled. */
+const pruneOrphanLabels = (
+	props: ReadonlyArray<IrProperty>,
+	removedGroups: ReadonlySet<string>,
+): ReadonlyArray<IrProperty> =>
+	props.filter((p) => {
 		if (baseName(p.name) !== "X-ABLABEL") {
 			return true;
 		}
@@ -500,11 +524,27 @@ export const mergeFormIntoVcard = (
 		if (g === "" || !removedGroups.has(g)) {
 			return true;
 		}
-		return reconciled.some(
+		return props.some(
 			(q) =>
 				q !== p && groupOf(q.name) === g && baseName(q.name) !== "X-ABLABEL",
 		);
 	});
+
+export const mergeFormIntoVcard = (
+	existing: IrComponent,
+	form: ContactFormData,
+	uid: string,
+): IrComponent => {
+	const state = newMergeState(form);
+	mergeExistingProps(existing, form, state);
+	appendNewRows(form, state);
+	ensureHeaders(state, uid);
+
+	const photoChanged =
+		getText(existing.properties.find((p) => baseName(p.name) === "PHOTO")) !==
+		form.photo;
+	const reconciled = reconcilePhotoMeta(state.out, form, photoChanged);
+	const pruned = pruneOrphanLabels(reconciled, state.removedGroups);
 
 	return { name: "VCARD", properties: pruned, components: existing.components };
 };

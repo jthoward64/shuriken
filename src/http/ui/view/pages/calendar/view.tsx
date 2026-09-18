@@ -1,3 +1,4 @@
+import { encodeJson } from "#src/http/ui/helpers/json.ts";
 import { Button, buttonClass, LinkButton } from "../../components/button.tsx";
 import { contrastTextColor } from "../../components/color-contrast.ts";
 import { Alert, Badge, EmptyState } from "../../components/display.tsx";
@@ -13,7 +14,6 @@ import {
 import { InlineModalPopover } from "../../components/overlay.tsx";
 import { PageHeader } from "../../components/page-header.tsx";
 import { AssetTags, CALENDAR_ASSETS } from "../../shell/assets.tsx";
-
 import { CollectionNewPage } from "../collections.tsx";
 import { SidebarShell } from "../sidebar-shell.tsx";
 import type {
@@ -169,6 +169,128 @@ const NewEventButton = ({ disabled }: { disabled: boolean }) => (
 	</Button>
 );
 
+// One row of the calendar list: the visibility toggle, the switch link, the
+// owner badge, and the owner-only edit/reorder controls
+const CalendarListItem = ({
+	c,
+	visibleIds,
+	monthValue,
+}: {
+	c: CalendarOption;
+	visibleIds: ReadonlyArray<string>;
+	monthValue: string;
+}) => {
+	// Switching active always keeps that calendar visible. The synthetic
+	// "Shared events" entry has no owning collection, so it can never
+	// become active — its name renders as plain text, not a switch link.
+	const isSynthetic = c.id === SHARED_EVENTS_CALENDAR_ID;
+	// Only the caller's own calendars can be reordered/edited/deleted from
+	// here; shared (and the synthetic) entries are read-only in that sense.
+	const mutable = c.ownerSlug === null && !isSynthetic;
+	const switchTo = visibleIds.includes(c.id)
+		? visibleIds
+		: [...visibleIds, c.id];
+	const url = isSynthetic
+		? `/ui/api/calendar/${SHARED_EVENTS_CALENDAR_ID}/events`
+		: `/ui/api/calendar/${c.id}/events`;
+	return (
+		<li
+			data-reorder-item={mutable ? true : undefined}
+			data-collection-id={mutable ? c.id : undefined}
+			class={`flex items-center gap-2 rounded-md px-2 py-1.5 ${
+				c.active ? "bg-surface-2" : "hover:bg-surface-2"
+			}`}
+		>
+			<input
+				type="checkbox"
+				name="cal"
+				value={c.id}
+				checked={c.visible}
+				data-cal-toggle
+				data-cal-id={c.id}
+				data-cal-url={url}
+				data-cal-color={c.color}
+				data-cal-text-color={contrastTextColor(c.color)}
+				aria-label={`Show ${c.displayName}`}
+				class="shrink-0"
+			/>
+			{isSynthetic ? (
+				<span class="flex min-w-0 flex-1 items-center gap-2">
+					<Swatch color={c.color} />
+					<span data-cal-name class="truncate text-muted text-sm">
+						{c.displayName}
+					</span>
+				</span>
+			) : (
+				<a
+					href={calHref(c.id, switchTo, monthValue)}
+					data-cal-nav
+					data-cal-switch
+					data-switch-id={c.id}
+					aria-current={c.active ? "true" : undefined}
+					class="flex min-w-0 flex-1 items-center gap-2"
+				>
+					<Swatch color={c.color} />
+					<span
+						data-cal-name
+						class={`truncate text-sm ${
+							c.active ? "font-semibold text-fg" : "text-muted"
+						}`}
+					>
+						{c.displayName}
+					</span>
+				</a>
+			)}
+			{c.ownerSlug !== null && (
+				<Badge class="shrink-0" title={`Shared by ${c.ownerSlug}`}>
+					{c.ownerSlug}
+				</Badge>
+			)}
+			{mutable ? (
+				<>
+					<a
+						href={`/ui/collections/${c.id}`}
+						target="_blank"
+						rel="noopener"
+						hx-get={`/ui/collections/${c.id}`}
+						hx-target={`#${CALENDAR_POPOVER_BODY_ID}`}
+						hx-swap="innerHTML"
+						data-popover={CALENDAR_POPOVER_ID}
+						aria-label={`Edit ${c.displayName}`}
+						class="shrink-0 rounded p-0.5 text-subtle hover:bg-surface hover:text-fg"
+					>
+						<IconEdit class="size-3.5" />
+					</a>
+					{/* No-JS reorder fallback: real form submits (formmethod/formaction
+							    override the enclosing GET form). Hidden once JS marks the
+							    document — the reorder script drags `[data-reorder-item]` rows
+							    instead. */}
+					<button
+						type="submit"
+						formmethod="POST"
+						formaction={`/ui/api/collections/${c.id}/move/up`}
+						data-nojs-only
+						aria-label={`Move ${c.displayName} up`}
+						class="shrink-0 rounded p-0.5 text-subtle hover:bg-surface hover:text-fg"
+					>
+						<IconChevronDown class="size-3.5 rotate-180" />
+					</button>
+					<button
+						type="submit"
+						formmethod="POST"
+						formaction={`/ui/api/collections/${c.id}/move/down`}
+						data-nojs-only
+						aria-label={`Move ${c.displayName} down`}
+						class="shrink-0 rounded p-0.5 text-subtle hover:bg-surface hover:text-fg"
+					>
+						<IconChevronDown class="size-3.5" />
+					</button>
+				</>
+			) : null}
+		</li>
+	);
+};
+
 // The calendar list — a GET form so no-JS users can toggle visibility and hit
 // Apply; the calendar script instead adds/removes FullCalendar event sources
 // live on change (and the Apply button is hidden once JS marks the document).
@@ -197,118 +319,14 @@ const CalendarList = ({
 			</Button>
 		</div>
 		<ul class="space-y-0.5" data-reorder-list data-collection-type="calendar">
-			{calendars.map((c) => {
-				// Switching active always keeps that calendar visible. The synthetic
-				// "Shared events" entry has no owning collection, so it can never
-				// become active — its name renders as plain text, not a switch link.
-				const isSynthetic = c.id === SHARED_EVENTS_CALENDAR_ID;
-				// Only the caller's own calendars can be reordered/edited/deleted from
-				// here; shared (and the synthetic) entries are read-only in that sense.
-				const mutable = c.ownerSlug === null && !isSynthetic;
-				const switchTo = visibleIds.includes(c.id)
-					? visibleIds
-					: [...visibleIds, c.id];
-				const url = isSynthetic
-					? `/ui/api/calendar/${SHARED_EVENTS_CALENDAR_ID}/events`
-					: `/ui/api/calendar/${c.id}/events`;
-				return (
-					<li
-						key={c.id}
-						data-reorder-item={mutable ? true : undefined}
-						data-collection-id={mutable ? c.id : undefined}
-						class={`flex items-center gap-2 rounded-md px-2 py-1.5 ${
-							c.active ? "bg-surface-2" : "hover:bg-surface-2"
-						}`}
-					>
-						<input
-							type="checkbox"
-							name="cal"
-							value={c.id}
-							checked={c.visible}
-							data-cal-toggle
-							data-cal-id={c.id}
-							data-cal-url={url}
-							data-cal-color={c.color}
-							data-cal-text-color={contrastTextColor(c.color)}
-							aria-label={`Show ${c.displayName}`}
-							class="shrink-0"
-						/>
-						{isSynthetic ? (
-							<span class="flex min-w-0 flex-1 items-center gap-2">
-								<Swatch color={c.color} />
-								<span data-cal-name class="truncate text-muted text-sm">
-									{c.displayName}
-								</span>
-							</span>
-						) : (
-							<a
-								href={calHref(c.id, switchTo, monthValue)}
-								data-cal-nav
-								data-cal-switch
-								data-switch-id={c.id}
-								aria-current={c.active ? "true" : undefined}
-								class="flex min-w-0 flex-1 items-center gap-2"
-							>
-								<Swatch color={c.color} />
-								<span
-									data-cal-name
-									class={`truncate text-sm ${
-										c.active ? "font-semibold text-fg" : "text-muted"
-									}`}
-								>
-									{c.displayName}
-								</span>
-							</a>
-						)}
-						{c.ownerSlug !== null && (
-							<Badge class="shrink-0" title={`Shared by ${c.ownerSlug}`}>
-								{c.ownerSlug}
-							</Badge>
-						)}
-						{mutable ? (
-							<>
-								<a
-									href={`/ui/collections/${c.id}`}
-									target="_blank"
-									rel="noopener"
-									hx-get={`/ui/collections/${c.id}`}
-									hx-target={`#${CALENDAR_POPOVER_BODY_ID}`}
-									hx-swap="innerHTML"
-									data-popover={CALENDAR_POPOVER_ID}
-									aria-label={`Edit ${c.displayName}`}
-									class="shrink-0 rounded p-0.5 text-subtle hover:bg-surface hover:text-fg"
-								>
-									<IconEdit class="size-3.5" />
-								</a>
-								{/* No-JS reorder fallback: real form submits (formmethod/formaction
-								    override the enclosing GET form). Hidden once JS marks the
-								    document — the reorder script drags `[data-reorder-item]` rows
-								    instead. */}
-								<button
-									type="submit"
-									formmethod="POST"
-									formaction={`/ui/api/collections/${c.id}/move/up`}
-									data-nojs-only
-									aria-label={`Move ${c.displayName} up`}
-									class="shrink-0 rounded p-0.5 text-subtle hover:bg-surface hover:text-fg"
-								>
-									<IconChevronDown class="size-3.5 rotate-180" />
-								</button>
-								<button
-									type="submit"
-									formmethod="POST"
-									formaction={`/ui/api/collections/${c.id}/move/down`}
-									data-nojs-only
-									aria-label={`Move ${c.displayName} down`}
-									class="shrink-0 rounded p-0.5 text-subtle hover:bg-surface hover:text-fg"
-								>
-									<IconChevronDown class="size-3.5" />
-								</button>
-							</>
-						) : null}
-					</li>
-				);
-			})}
+			{calendars.map((c) => (
+				<CalendarListItem
+					key={c.id}
+					c={c}
+					visibleIds={visibleIds}
+					monthValue={monthValue}
+				/>
+			))}
 		</ul>
 		<p class="px-1 text-subtle text-xs">
 			The highlighted calendar is where new events, imports, and exports go.
@@ -670,7 +688,7 @@ export const CalendarViewPage = (props: CalendarViewProps) => {
 					class="card card-pad rounded-none lg:min-h-0 lg:flex-1"
 					data-active={activeId}
 					data-initial-date={monthStartIso}
-					data-sources={JSON.stringify(sources)}
+					data-sources={encodeJson(sources)}
 				/>
 
 				{/* calendar.js — FullCalendar (core + plugins) inlined by

@@ -6,7 +6,7 @@ import {
 	InternalError,
 	needPrivileges,
 } from "#src/domain/errors.ts";
-import type { CollectionId, PrincipalId } from "#src/domain/ids.ts";
+import { type CollectionId, PrincipalId } from "#src/domain/ids.ts";
 import {
 	GROUPS_VIRTUAL_RESOURCE_ID,
 	USERS_VIRTUAL_RESOURCE_ID,
@@ -51,7 +51,7 @@ export const collectionsDeleteHandler = (
 		const config = yield* AppConfigService;
 
 		const collection = yield* collectionService.findById(collectionId);
-		const ownerPrincipalId = collection.ownerPrincipalId as PrincipalId;
+		const ownerPrincipalId = PrincipalId(collection.ownerPrincipalId);
 
 		// Auto-managed collections (e.g. birthdays) aren't user-deletable: the
 		// server owns their lifecycle, and deleting one leaves no self-service

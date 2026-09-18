@@ -38,7 +38,8 @@ const regenerateOne =
 				),
 			);
 
-const tickAll = Effect.gen(function* () {
+/** One sweep: regenerate every auto-managed birthdays collection, spread over time. */
+const sweepAll = Effect.fn("scheduler.birthday.sweep")(function* () {
 	const collRepo = yield* CollectionRepository;
 	const birthdays = yield* BirthdayService;
 	const config = yield* AppConfigService;
@@ -82,6 +83,18 @@ const tickAll = Effect.gen(function* () {
 	);
 });
 
+/** Repeats the sweep on the configured tick, logging and continuing past a crash. */
+const sweepForever = Effect.fn("scheduler.birthday.loop")(function* (
+	tickS: number,
+) {
+	yield* sweepAll().pipe(
+		Effect.catchCause((cause) =>
+			Effect.logError("scheduler.birthday: tick crashed", { cause }),
+		),
+		Effect.repeat(Schedule.jittered(Schedule.spaced(Duration.seconds(tickS)))),
+	);
+});
+
 export const BirthdaySchedulerLayer = Layer.effectDiscard(
 	Effect.gen(function* () {
 		const config = yield* AppConfigService;
@@ -95,16 +108,7 @@ export const BirthdaySchedulerLayer = Layer.effectDiscard(
 			startupDelayS,
 		});
 		yield* Effect.sleep(Duration.seconds(startupDelayS)).pipe(
-			Effect.andThen(() =>
-				tickAll.pipe(
-					Effect.catchCause((cause) =>
-						Effect.logError("scheduler.birthday: tick crashed", { cause }),
-					),
-					Effect.repeat(
-						Schedule.jittered(Schedule.spaced(Duration.seconds(tick))),
-					),
-				),
-			),
+			Effect.andThen(() => sweepForever(tick)),
 			Effect.forkScoped,
 		);
 	}),

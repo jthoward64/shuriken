@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import type {
 	DatabaseError,
 	DavError,
@@ -42,12 +42,13 @@ export interface TaskView {
 	readonly recurring: boolean;
 }
 
-const toNumberOrNull = (raw: string): number | null => {
+// An optional integer form field; none when unset or unparseable
+const parseOptionalInt = (raw: string): Option.Option<number> => {
 	if (raw === "") {
-		return null;
+		return Option.none();
 	}
 	const n = Number.parseInt(raw, 10);
-	return Number.isFinite(n) ? n : null;
+	return Number.isFinite(n) ? Option.some(n) : Option.none();
 };
 
 export const collectTasks = (
@@ -93,8 +94,10 @@ export const collectTasks = (
 				allDay: form.allDay,
 				due: form.due !== "" ? form.due : null,
 				status: form.status,
-				priority: toNumberOrNull(form.priority),
-				percentComplete: toNumberOrNull(form.percentComplete),
+				priority: Option.getOrNull(parseOptionalInt(form.priority)),
+				percentComplete: Option.getOrNull(
+					parseOptionalInt(form.percentComplete),
+				),
 				description: form.description,
 				location: form.location,
 				categoriesCsv: form.categoriesCsv,

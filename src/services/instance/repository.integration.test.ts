@@ -46,27 +46,21 @@ function makeTestLayer(): TestLayer {
 }
 
 /** Insert a bare dav_entity row and return its UUID. */
-const insertEntity = (
+const insertEntity = Effect.fn("instance.test.insertEntity")(function* (
 	entityType: EntityType = "icalendar",
-): Effect.Effect<EntityId, never, DatabaseClient> =>
-	DatabaseClient.pipe(
-		Effect.flatMap((db) =>
-			db
-				.insert(davEntity)
-				.values({ entityType })
-				.returning()
-				.pipe(
-					Effect.orDie,
-					Effect.map((rows) => {
-						const row = rows[0];
-						if (!row) {
-							throw new Error("dav_entity insert returned no rows");
-						}
-						return EntityId(row.id);
-					}),
-				),
-		),
-	);
+) {
+	const db = yield* DatabaseClient;
+	const rows = yield* db
+		.insert(davEntity)
+		.values({ entityType })
+		.returning()
+		.pipe(Effect.orDie);
+	const row = rows[0];
+	if (row === undefined) {
+		throw new Error("dav_entity insert returned no rows");
+	}
+	return EntityId(row.id);
+});
 
 // ---------------------------------------------------------------------------
 // insert → findById round-trip

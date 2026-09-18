@@ -1,3 +1,4 @@
+import { Option } from "effect";
 import { Temporal } from "temporal-polyfill";
 import type {
 	IrComponent,
@@ -84,14 +85,14 @@ const typedParams = (
 
 export const emailProp = (tv: ContactTypedValue): IrProperty => ({
 	name: "EMAIL",
-	parameters: [...typedParams(tv.types, tv.label, tv.preferred)],
+	parameters: typedParams(tv.types, tv.label, tv.preferred),
 	value: { type: "TEXT", value: tv.value },
 	isKnown: true,
 });
 
 export const telProp = (tv: ContactTypedValue): IrProperty => ({
 	name: "TEL",
-	parameters: [...typedParams(tv.types, tv.label, tv.preferred)],
+	parameters: typedParams(tv.types, tv.label, tv.preferred),
 	value: { type: "TEXT", value: tv.value },
 	isKnown: true,
 });
@@ -124,29 +125,47 @@ export const isBlankAddress = (addr: ContactAddress): boolean =>
 
 export const adrProp = (addr: ContactAddress): IrProperty => ({
 	name: "ADR",
-	parameters: [...typedParams(addr.types, addr.label, addr.preferred)],
+	parameters: typedParams(addr.types, addr.label, addr.preferred),
 	value: { type: "TEXT", value: addressJoined(addr) },
 	isKnown: true,
 });
 
+/** Parses an ISO date, absent when the value is not a valid calendar date */
+const plainDateFrom = Option.liftThrowable((raw: string) =>
+	Temporal.PlainDate.from(raw),
+);
+
 /**
- * BDAY value from raw input, or null to omit. YYYY-MM-DD → DATE; yearless
- * `--MMDD`/`--MM-DD` → TEXT (canonicalised to `--MMDD`).
+ * BDAY value from raw input, absent when it should be omitted. YYYY-MM-DD →
+ * DATE; yearless `--MMDD`/`--MM-DD` → TEXT (canonicalised to `--MMDD`).
  */
-export const bdayValue = (raw: string): IrValue | null => {
+export const bdayValue = (raw: string): Option.Option<IrValue> => {
 	if (!raw) {
-		return null;
+		return Option.none();
 	}
 	const yearless = YEARLESS_DATE.exec(raw);
 	if (yearless) {
-		return { type: "TEXT", value: `--${yearless[1]}${yearless[2]}` };
+		return Option.some({
+			type: "TEXT",
+			value: `--${yearless[1]}${yearless[2]}`,
+		});
 	}
-	try {
-		return { type: "DATE", value: Temporal.PlainDate.from(raw) };
-	} catch {
-		return null;
-	}
+	return Option.map(
+		plainDateFrom(raw),
+		(value): IrValue => ({ type: "DATE", value }),
+	);
 };
+
+/** True when the raw BDAY/ANNIVERSARY input yields a value worth writing. */
+export const hasBdayValue = (raw: string): boolean =>
+	Option.isSome(bdayValue(raw));
+
+/** BDAY/ANNIVERSARY value, falling back to the raw input as plain text. */
+export const bdayValueOrText = (raw: string): IrValue =>
+	Option.getOrElse(
+		bdayValue(raw),
+		(): IrValue => ({ type: "TEXT", value: raw }),
+	);
 
 /** Non-empty, trimmed CATEGORIES tokens from a CSV string. */
 export const categoriesValue = (csv: string): ReadonlyArray<string> =>
@@ -161,14 +180,14 @@ export const serviceParams = (service: string): ReadonlyArray<IrParameter> =>
 
 export const socialProp = (sv: ContactServiceValue): IrProperty => ({
 	name: "SOCIALPROFILE",
-	parameters: [...serviceParams(sv.service)],
+	parameters: serviceParams(sv.service),
 	value: { type: "URI", value: sv.value },
 	isKnown: false,
 });
 
 export const imppProp = (sv: ContactServiceValue): IrProperty => ({
 	name: "IMPP",
-	parameters: [...serviceParams(sv.service)],
+	parameters: serviceParams(sv.service),
 	value: { type: "URI", value: sv.value },
 	isKnown: true,
 });
@@ -186,16 +205,17 @@ export const isBlankRelation = (relation: ContactRelation): boolean =>
 export const relatedProp = (relation: ContactRelation): IrProperty => {
 	const value = relationValueFromTarget(relation.target, relation.name);
 	const isUri = relation.target.kind !== "text";
+	const parameters: ReadonlyArray<IrParameter> = [
+		{ name: "VALUE", value: isUri ? "uri" : "text" },
+		...relationTypeParams(relation.relation),
+		...(isUri && relation.name !== ""
+			? [{ name: RELATION_NAME_PARAM, value: relation.name }]
+			: []),
+		...prefParams(relation.preferred),
+	];
 	return {
 		name: RELATED_PROP,
-		parameters: [
-			{ name: "VALUE", value: isUri ? "uri" : "text" },
-			...relationTypeParams(relation.relation),
-			...(isUri && relation.name !== ""
-				? [{ name: RELATION_NAME_PARAM, value: relation.name }]
-				: []),
-			...prefParams(relation.preferred),
-		],
+		parameters,
 		value: { type: isUri ? "URI" : "TEXT", value },
 		isKnown: true,
 	};
@@ -265,28 +285,16 @@ const normalizeParamPref = (
 /** Build a raw property from a generic editor row (value stored verbatim as TEXT). */
 export const otherProp = (o: ContactOtherProp): IrProperty => ({
 	name: o.group !== "" ? `${o.group}.${o.name}` : o.name,
-	parameters: [...normalizeParamPref(parseParamString(o.params))],
+	parameters: normalizeParamPref(parseParamString(o.params)),
 	value: { type: "TEXT", value: o.value },
 	isKnown: false,
 });
 
-export const buildVcardComponent = (
-	uid: string,
-	form: ContactFormData,
-): IrComponent => {
-	const props: Array<IrProperty> = [
-		textProp("VERSION", "4.0"),
-		{
-			name: "UID",
-			parameters: [],
-			value: { type: "URI", value: uid },
-			isKnown: true,
-		},
-		textProp("FN", form.fn),
-	];
-
+/** KIND / N / NICKNAME, each omitted when its form fields are blank. */
+const nameProps = (form: ContactFormData): ReadonlyArray<IrProperty> => {
+	const out: Array<IrProperty> = [];
 	if (form.kind !== "") {
-		props.push(textProp("KIND", form.kind));
+		out.push(textProp("KIND", form.kind));
 	}
 	if (
 		form.familyName !== "" ||
@@ -295,105 +303,108 @@ export const buildVcardComponent = (
 		form.prefix !== "" ||
 		form.suffix !== ""
 	) {
-		props.push(textProp("N", nValue(form)));
+		out.push(textProp("N", nValue(form)));
 	}
 	if (form.nickname !== "") {
-		props.push(textProp("NICKNAME", form.nickname));
+		out.push(textProp("NICKNAME", form.nickname));
 	}
+	return out;
+};
 
-	for (const email of form.emails) {
-		if (email.value !== "") {
-			props.push(emailProp(email));
-		}
-	}
-	for (const tel of form.tels) {
-		if (tel.value !== "") {
-			props.push(telProp(tel));
-		}
-	}
-	for (const url of form.urls) {
-		if (url !== "") {
-			props.push(urlProp(url));
-		}
-	}
-	for (const addr of form.addresses) {
-		if (!isBlankAddress(addr)) {
-			props.push(adrProp(addr));
-		}
-	}
-	for (const sv of form.socialProfiles) {
-		if (sv.value !== "") {
-			props.push(socialProp(sv));
-		}
-	}
-	for (const im of form.impps) {
-		if (im.value !== "") {
-			props.push(imppProp(im));
-		}
-	}
-	for (const relation of form.relations) {
-		if (!isBlankRelation(relation)) {
-			props.push(relatedProp(relation));
-		}
-	}
+/** The repeatable contact channels, with blank rows dropped. */
+const channelProps = (form: ContactFormData): ReadonlyArray<IrProperty> => [
+	...form.emails.filter((e) => e.value !== "").map(emailProp),
+	...form.tels.filter((t) => t.value !== "").map(telProp),
+	...form.urls.filter((u) => u !== "").map(urlProp),
+	...form.addresses.filter((a) => !isBlankAddress(a)).map(adrProp),
+	...form.socialProfiles.filter((sv) => sv.value !== "").map(socialProp),
+	...form.impps.filter((im) => im.value !== "").map(imppProp),
+	...form.relations.filter((r) => !isBlankRelation(r)).map(relatedProp),
+];
 
-	const bday = bdayValue(form.bday);
-	if (bday !== null) {
-		props.push({ name: "BDAY", parameters: [], value: bday, isKnown: true });
-	}
-	const anniversary = bdayValue(form.anniversary);
-	if (anniversary !== null) {
-		props.push({
+/** BDAY / ANNIVERSARY, omitted when the raw value cannot be read as a date. */
+const dateProps = (form: ContactFormData): ReadonlyArray<IrProperty> => [
+	...Option.toArray(
+		Option.map(bdayValue(form.bday), (value) => ({
+			name: "BDAY",
+			parameters: [],
+			value,
+			isKnown: true,
+		})),
+	),
+	...Option.toArray(
+		Option.map(bdayValue(form.anniversary), (value) => ({
 			name: "ANNIVERSARY",
 			parameters: [],
-			value: anniversary,
+			value,
 			isKnown: true,
-		});
-	}
-	if (form.gender !== "") {
-		props.push(textProp("GENDER", form.gender));
-	}
-	if (form.gramGender !== "") {
-		props.push(textProp("GRAMGENDER", form.gramGender));
-	}
-	if (form.pronouns !== "") {
-		props.push(textProp("PRONOUNS", form.pronouns));
-	}
+		})),
+	),
+];
 
-	if (form.org !== "") {
-		props.push(textProp("ORG", form.org));
-	}
-	if (form.title !== "") {
-		props.push(textProp("TITLE", form.title));
-	}
-	if (form.note !== "") {
-		props.push(textProp("NOTE", form.note));
-	}
+/** Single-valued descriptive fields, each omitted when blank. */
+const SINGLE_TEXT_FIELDS: ReadonlyArray<
+	readonly [
+		string,
+		keyof Pick<
+			ContactFormData,
+			"gender" | "gramGender" | "pronouns" | "org" | "title" | "note"
+		>,
+	]
+> = [
+	["GENDER", "gender"],
+	["GRAMGENDER", "gramGender"],
+	["PRONOUNS", "pronouns"],
+	["ORG", "org"],
+	["TITLE", "title"],
+	["NOTE", "note"],
+];
 
+const descriptiveProps = (form: ContactFormData): ReadonlyArray<IrProperty> =>
+	SINGLE_TEXT_FIELDS.filter(([, field]) => form[field] !== "").map(
+		([name, field]) => textProp(name, form[field]),
+	);
+
+/** CATEGORIES, PHOTO and the generic editor rows. */
+const extraProps = (form: ContactFormData): ReadonlyArray<IrProperty> => {
+	const out: Array<IrProperty> = [];
 	const categories = categoriesValue(form.categoriesCsv);
 	if (categories.length > 0) {
-		props.push({
+		out.push({
 			name: "CATEGORIES",
 			parameters: [],
 			value: { type: "TEXT_LIST", value: categories },
 			isKnown: true,
 		});
 	}
-
 	if (form.photo !== "") {
 		// PHOTO accepts a URI (http(s):// or data:image/...;base64,...).
-		props.push(uriProp("PHOTO", form.photo));
+		out.push(uriProp("PHOTO", form.photo));
 	}
+	out.push(
+		...form.otherProps.filter((o) => o.name.trim() !== "").map(otherProp),
+	);
+	return out;
+};
 
-	for (const o of form.otherProps) {
-		if (o.name.trim() !== "") {
-			props.push(otherProp(o));
-		}
-	}
-
-	return {
-		name: "VCARD",
-		properties: props,
-		components: [],
-	};
+export const buildVcardComponent = (
+	uid: string,
+	form: ContactFormData,
+): IrComponent => {
+	const properties: ReadonlyArray<IrProperty> = [
+		textProp("VERSION", "4.0"),
+		{
+			name: "UID",
+			parameters: [],
+			value: { type: "URI", value: uid },
+			isKnown: true,
+		},
+		textProp("FN", form.fn),
+		...nameProps(form),
+		...channelProps(form),
+		...dateProps(form),
+		...descriptiveProps(form),
+		...extraProps(form),
+	];
+	return { name: "VCARD", properties, components: [] };
 };

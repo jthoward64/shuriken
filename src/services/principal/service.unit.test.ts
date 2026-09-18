@@ -1,7 +1,7 @@
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
 import { Effect } from "effect";
-import type { DavError } from "#src/domain/errors.ts";
+import { DavError } from "#src/domain/errors.ts";
 import { PrincipalId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import { Email } from "#src/domain/types/strings.ts";
@@ -9,6 +9,14 @@ import { HTTP_NOT_FOUND } from "#src/http/status.ts";
 import { runFailure, runSuccess } from "#src/testing/effect.ts";
 import { makeTestEnv } from "#src/testing/env.ts";
 import { PrincipalService } from "./service.ts";
+
+/** Narrows a test failure to a DavError so its status can be asserted. */
+const asDavError = (err: unknown): DavError => {
+	if (err instanceof DavError) {
+		return err;
+	}
+	throw new Error(`expected a DavError, got ${String(err)}`);
+};
 
 // ---------------------------------------------------------------------------
 // PrincipalService.findById
@@ -41,12 +49,14 @@ describe("PrincipalService.findById", () => {
 	it("fails with 404 for an unknown id", async () => {
 		const env = makeTestEnv();
 
-		const err = (await runFailure(
-			PrincipalService.pipe(
-				Effect.flatMap((s) => s.findById(PrincipalId(crypto.randomUUID()))),
-				Effect.provide(env.toLayer()),
+		const err = asDavError(
+			await runFailure(
+				PrincipalService.pipe(
+					Effect.flatMap((s) => s.findById(PrincipalId(crypto.randomUUID()))),
+					Effect.provide(env.toLayer()),
+				),
 			),
-		)) as DavError;
+		);
 
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_NOT_FOUND);
@@ -77,12 +87,14 @@ describe("PrincipalService.findBySlug", () => {
 	it("fails with 404 for an unknown slug", async () => {
 		const env = makeTestEnv();
 
-		const err = (await runFailure(
-			PrincipalService.pipe(
-				Effect.flatMap((s) => s.findBySlug(Slug("nobody"))),
-				Effect.provide(env.toLayer()),
+		const err = asDavError(
+			await runFailure(
+				PrincipalService.pipe(
+					Effect.flatMap((s) => s.findBySlug(Slug("nobody"))),
+					Effect.provide(env.toLayer()),
+				),
 			),
-		)) as DavError;
+		);
 
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_NOT_FOUND);
@@ -113,12 +125,14 @@ describe("PrincipalService.findByEmail", () => {
 	it("fails with 404 for an unknown email", async () => {
 		const env = makeTestEnv();
 
-		const err = (await runFailure(
-			PrincipalService.pipe(
-				Effect.flatMap((s) => s.findByEmail(Email("ghost@example.com"))),
-				Effect.provide(env.toLayer()),
+		const err = asDavError(
+			await runFailure(
+				PrincipalService.pipe(
+					Effect.flatMap((s) => s.findByEmail(Email("ghost@example.com"))),
+					Effect.provide(env.toLayer()),
+				),
 			),
-		)) as DavError;
+		);
 
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_NOT_FOUND);

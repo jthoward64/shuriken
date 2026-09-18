@@ -81,7 +81,7 @@ const applyGroup = (
 		let succeeded = 0;
 		for (const fix of group.fixes) {
 			const outcome = yield* cleanup.applyFix(group.instanceId, fix).pipe(
-				Effect.as(true),
+				Effect.map(() => true),
 				Effect.catchTag("DavError", () => Effect.succeed(false)),
 			);
 			if (outcome) {

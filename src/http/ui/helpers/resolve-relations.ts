@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Match } from "effect";
 import type { DatabaseError } from "#src/domain/errors.ts";
 import type { CollectionId } from "#src/domain/ids.ts";
 import type { ResolvedRelation } from "#src/http/ui/view/pages/contacts/relations.tsx";
@@ -66,12 +66,11 @@ const labelFor = (relation: ContactRelation): string => {
 	if (relation.name !== "") {
 		return relation.name;
 	}
-	switch (relation.target.kind) {
-		case "contact":
-			return relation.target.uid;
-		case "email":
-			return relation.target.address;
-		case "text":
-			return "";
-	}
+	return Match.value(relation.target).pipe(
+		Match.discriminatorsExhaustive("kind")({
+			contact: (target) => target.uid,
+			email: (target) => target.address,
+			text: () => "",
+		}),
+	);
 };

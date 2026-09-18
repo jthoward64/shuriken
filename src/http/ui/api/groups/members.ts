@@ -4,7 +4,12 @@ import {
 	type DavError,
 	InternalError,
 } from "#src/domain/errors.ts";
-import type { GroupId, PrincipalId, UserId } from "#src/domain/ids.ts";
+import {
+	type GroupId,
+	isUuid,
+	type PrincipalId,
+	UserId,
+} from "#src/domain/ids.ts";
 import { GROUPS_VIRTUAL_RESOURCE_ID } from "#src/domain/virtual-resources.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
@@ -52,10 +57,11 @@ export const groupsMembersHandler = (
 			catch: (e) => new InternalError({ cause: e }),
 		});
 
-		const userId = form.get("userId")?.toString() as UserId | undefined;
-		if (!userId) {
+		const userIdRaw = form.get("userId")?.toString() ?? "";
+		if (!isUuid(userIdRaw)) {
 			return new Response("Missing userId", { status: 400 });
 		}
+		const userId = UserId(userIdRaw);
 		const isMember = form
 			.getAll("members")
 			.some((v) => v.toString() === userId);

@@ -4,6 +4,7 @@ import { someOrNotFound } from "#src/domain/errors.ts";
 import type { UuidString } from "#src/domain/ids.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
 import { requireAuthenticated } from "#src/http/ui/helpers/auth-guard.ts";
+import { encodeJson } from "#src/http/ui/helpers/json.ts";
 import { BulkJobRepository } from "#src/services/bulk-job/index.ts";
 
 // ---------------------------------------------------------------------------
@@ -24,6 +25,73 @@ const HEARTBEAT_EVERY_TICKS = HEARTBEAT_INTERVAL_MS / POLL_INTERVAL_MS;
 
 const isTerminal = (status: string): boolean =>
 	status === "succeeded" || status === "failed";
+
+const SSE_ENCODER = new TextEncoder();
+
+// Push one SSE frame onto the response body
+const sendFrame = (
+	controller: ReadableStreamDefaultController<Uint8Array>,
+	frame: string,
+): void => {
+	controller.enqueue(SSE_ENCODER.encode(frame));
+};
+
+// The progress frame a status change emits
+const progressFrame = (job: {
+	readonly status: string;
+	readonly done: number;
+	readonly total: number;
+	readonly succeeded: number;
+	readonly failed: number;
+}): string =>
+	`data: ${encodeJson({
+		status: job.status,
+		done: job.done,
+		total: job.total,
+		succeeded: job.succeeded,
+		failed: job.failed,
+	})}\n\n`;
+
+// Emit a keep-alive comment once the quiet period has elapsed, and report the new tick count
+const heartbeatTick = (
+	controller: ReadableStreamDefaultController<Uint8Array>,
+	ticksSinceEvent: number,
+): number => {
+	if (ticksSinceEvent + 1 < HEARTBEAT_EVERY_TICKS) {
+		return ticksSinceEvent + 1;
+	}
+	sendFrame(controller, ": heartbeat\n\n");
+	return 0;
+};
+
+// Poll the job row until it reaches a terminal status or the client goes away
+const pollJob = Effect.fn("ui.bulkJobEvents.poll")(function* (
+	controller: ReadableStreamDefaultController<Uint8Array>,
+	jobId: UuidString,
+	isOpen: () => boolean,
+) {
+	const jobRepo = yield* BulkJobRepository;
+	let lastStatus = "";
+	let ticksSinceEvent = 0;
+	while (isOpen()) {
+		const job = Option.getOrUndefined(yield* jobRepo.findById(jobId));
+		if (job === undefined) {
+			return controller.close();
+		}
+		if (job.status === lastStatus) {
+			ticksSinceEvent = heartbeatTick(controller, ticksSinceEvent);
+		} else {
+			lastStatus = job.status;
+			ticksSinceEvent = 0;
+			sendFrame(controller, progressFrame(job));
+			if (isTerminal(job.status)) {
+				return controller.close();
+			}
+		}
+		yield* Effect.sleep(POLL_INTERVAL);
+	}
+	controller.close();
+});
 
 export const contactsBulkJobEventsHandler = (
 	req: Request,
@@ -46,56 +114,16 @@ export const contactsBulkJobEventsHandler = (
 			closed = true;
 		});
 
-		const encoder = new TextEncoder();
-
 		const stream = new ReadableStream<Uint8Array>({
 			start: (controller) => {
-				const poll = Effect.gen(function* () {
-					let lastStatus = "";
-					let ticksSinceEvent = 0;
-					// biome-ignore lint/nursery/noUnmodifiedLoopCondition: the abort listener above flips `closed`
-					while (!closed) {
-						const current = yield* jobRepo.findById(jobId);
-						const job = Option.getOrUndefined(current);
-						if (job === undefined) {
-							controller.close();
-							return;
-						}
-						if (job.status !== lastStatus) {
-							lastStatus = job.status;
-							ticksSinceEvent = 0;
-							controller.enqueue(
-								encoder.encode(
-									`data: ${JSON.stringify({
-										status: job.status,
-										done: job.done,
-										total: job.total,
-										succeeded: job.succeeded,
-										failed: job.failed,
-									})}\n\n`,
-								),
-							);
-							if (isTerminal(job.status)) {
-								controller.close();
-								return;
-							}
-						} else {
-							ticksSinceEvent += 1;
-							if (ticksSinceEvent >= HEARTBEAT_EVERY_TICKS) {
-								ticksSinceEvent = 0;
-								controller.enqueue(encoder.encode(": heartbeat\n\n"));
-							}
-						}
-						yield* Effect.sleep(POLL_INTERVAL);
-					}
-					controller.close();
-				}).pipe(
+				pollJob(controller, jobId, () => !closed).pipe(
 					Effect.catchCause((cause) => {
 						controller.error(new Error(`bulk job poll failed: ${cause}`));
 						return Effect.void;
 					}),
+					Effect.provideService(BulkJobRepository, jobRepo),
+					Effect.runFork,
 				);
-				Effect.runFork(Effect.provideService(poll, BulkJobRepository, jobRepo));
 			},
 		});
 

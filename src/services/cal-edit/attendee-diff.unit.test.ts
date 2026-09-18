@@ -1,6 +1,6 @@
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
-import { Effect } from "effect";
+import { Option } from "effect";
 import { buildVeventComponent } from "#src/services/cal-edit/build-vevent.ts";
 import { parseVeventToForm } from "#src/services/cal-edit/parse-vevent.ts";
 import { emptyEventForm } from "#src/services/cal-edit/types.ts";
@@ -17,13 +17,11 @@ import { extractAttendeeAddresses } from "#src/services/imip/build-message.ts";
 // removed attendees the event was cancelled.
 // ---------------------------------------------------------------------------
 
-const veventFromForm = (form: Parameters<typeof buildVeventComponent>[1]) => {
-	const v = buildVeventComponent("uid", form);
-	if (!v) {
-		throw new Error("buildVeventComponent returned null");
-	}
-	return v;
-};
+const veventFromForm = (form: Parameters<typeof buildVeventComponent>[1]) =>
+	Option.getOrThrowWith(
+		buildVeventComponent("uid", form),
+		() => new Error("buildVeventComponent rejected the form"),
+	);
 
 describe("attendee diff", () => {
 	it("buildVeventComponent emits exactly the form's attendees", () => {
@@ -66,8 +64,7 @@ describe("attendee diff", () => {
 		expect(removed.sort()).toEqual(["bob@x", "carol@x"]);
 	});
 
-	it("extractAttendeeAddresses tolerates an empty VEVENT", async () => {
-		await Effect.runPromise(Effect.succeed(undefined));
+	it("extractAttendeeAddresses tolerates an empty VEVENT", () => {
 		expect(
 			extractAttendeeAddresses({
 				name: "VEVENT",

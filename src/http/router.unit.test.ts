@@ -40,6 +40,7 @@ import { InstanceService } from "#src/services/instance/index.ts";
 import { OidcService } from "#src/services/oidc/service.ts";
 import { PrincipalService } from "#src/services/principal/service.ts";
 import { ProvisioningService } from "#src/services/provisioning/service.ts";
+import { DEFAULT_ROLE } from "#src/services/role/policy.ts";
 import { SchedulingService } from "#src/services/scheduling/service.ts";
 import { OidcLoginRepository } from "#src/services/session/oidc-login-repository.ts";
 import { SessionService } from "#src/services/session/service.ts";
@@ -51,6 +52,7 @@ import { TombstoneRepository } from "#src/services/tombstone/index.ts";
 import { TrashService } from "#src/services/trash/service.ts";
 import { UserRepository, UserService } from "#src/services/user/index.ts";
 import type { UserWithPrincipal } from "#src/services/user/repository.ts";
+import { asDouble } from "#src/testing/doubles.ts";
 import { handleRequest } from "./router.ts";
 
 // ---------------------------------------------------------------------------
@@ -63,7 +65,10 @@ const mockClientAddress: string | undefined = "127.0.0.1";
 // Stub factories
 // ---------------------------------------------------------------------------
 
-const die = () => Effect.die("stub");
+// Stub method body: reaching one means the test wired the wrong layer
+const die = Effect.fn("router.test.stub")(function* () {
+	return yield* Effect.die("stub");
+});
 
 const authLayer = (
 	result: Effect.Effect<
@@ -83,11 +88,12 @@ const authenticated = new Authenticated({
 	},
 });
 
-const noOpRouterDb = {
+// DatabaseClient double whose transaction hands the callback the same double
+const noOpRouterDb: DbClient = asDouble({
 	transaction: <A, E, R>(
 		fn: (tx: DbClient) => Effect.Effect<A, E, R>,
-	): Effect.Effect<A, E, R> => fn(noOpRouterDb as unknown as DbClient),
-} as unknown as DbClient;
+	): Effect.Effect<A, E, R> => fn(noOpRouterDb),
+});
 
 // All-die stub layers for services that must be provided but won't be called.
 // These stubs satisfy the type system; any actual call would crash the test fast.
@@ -398,7 +404,7 @@ const stubLayers = Layer.mergeAll(
 		getGroupPrincipalIds: () => Effect.succeed([]),
 		batchGetGrantedPrivileges: die,
 		getResourceParent: die,
-		getRoleForPrincipal: () => Effect.succeed("normal"),
+		getRoleForPrincipal: () => Effect.succeed(DEFAULT_ROLE),
 	}),
 	Layer.succeed(CardEditService, {
 		create: die,
@@ -496,20 +502,19 @@ const stubLayers = Layer.mergeAll(
 	}),
 );
 
+// Drives the real router for one request; auth defaults to a signed-in principal
 const runWith = (
 	request: Request,
 	auth: Effect.Effect<
 		Authenticated | Unauthenticated,
 		AuthError | DatabaseError
-	>,
-): Promise<Response> => {
-	const layer = Layer.merge(authLayer(auth), stubLayers);
-	return Effect.runPromise(
-		Effect.provide(handleRequest(request, mockClientAddress), layer),
-	);
-};
+	> = Effect.succeed(authenticated),
+): Promise<Response> =>
+	Effect.provide(
+		handleRequest(request, mockClientAddress),
+		Layer.merge(authLayer(auth), stubLayers),
+	).pipe(Effect.runPromise);
 
-const okAuth = Effect.succeed(authenticated);
 const req = (method: string, path: string) =>
 	new Request(`http://localhost${path}`, { method });
 
@@ -519,12 +524,12 @@ const req = (method: string, path: string) =>
 
 describe("handleRequest — routing", () => {
 	it("returns 404 for unknown paths (not DAV, not UI)", async () => {
-		const res = await runWith(req("GET", "/other"), okAuth);
+		const res = await runWith(req("GET", "/other"));
 		expect(res.status).toBe(404);
 	});
 
 	it("returns 404 for /api (not DAV, not UI)", async () => {
-		const res = await runWith(req("GET", "/api/something"), okAuth);
+		const res = await runWith(req("GET", "/api/something"));
 		expect(res.status).toBe(404);
 	});
 
@@ -540,24 +545,24 @@ describe("handleRequest — routing", () => {
 	});
 
 	it("routes / to UI (303 redirect to calendar)", async () => {
-		const res = await runWith(req("GET", "/"), okAuth);
+		const res = await runWith(req("GET", "/"));
 		expect(res.status).toBe(303);
 		expect(res.headers.get("Location")).toBe("/ui/calendar");
 	});
 
 	it("routes /ui to UI (303 redirect to calendar)", async () => {
-		const res = await runWith(req("GET", "/ui"), okAuth);
+		const res = await runWith(req("GET", "/ui"));
 		expect(res.status).toBe(303);
 		expect(res.headers.get("Location")).toBe("/ui/calendar");
 	});
 
 	it("routes /static/ prefix to UI (staticHandler placeholder → 404)", async () => {
-		const res = await runWith(req("GET", "/static/app.js"), okAuth);
+		const res = await runWith(req("GET", "/static/app.js"));
 		expect(res.status).toBe(404);
 	});
 
 	it("routes /ui/ sub-paths to UI router (→ 404 from uiRouter)", async () => {
-		const res = await runWith(req("GET", "/ui/dashboard"), okAuth);
+		const res = await runWith(req("GET", "/ui/dashboard"));
 		expect(res.status).toBe(404);
 	});
 });
@@ -594,7 +599,7 @@ describe("isDavPath coverage", () => {
 		// /dav with auth success → davRouter is called → needs real DAV services.
 		// With stubs that die, this will result in a defect → 500.
 		// The test confirms that /dav IS routed into the DAV handler (not 404).
-		const res = await runWith(req("OPTIONS", "/dav"), okAuth);
+		const res = await runWith(req("OPTIONS", "/dav"));
 		// davRouter will try to parse the path and use services → stubs die → 500
 		// OR davRouter returns a response before needing any service (unlikely)
 		// Either way, status should NOT be 404 (which is the fallback for unknown paths)
@@ -602,12 +607,12 @@ describe("isDavPath coverage", () => {
 	});
 
 	it("/.well-known/caldav is a DAV path (not a 404)", async () => {
-		const res = await runWith(req("GET", "/.well-known/caldav"), okAuth);
+		const res = await runWith(req("GET", "/.well-known/caldav"));
 		expect(res.status).not.toBe(404);
 	});
 
 	it("/.well-known/carddav is a DAV path (not a 404)", async () => {
-		const res = await runWith(req("GET", "/.well-known/carddav"), okAuth);
+		const res = await runWith(req("GET", "/.well-known/carddav"));
 		expect(res.status).not.toBe(404);
 	});
 });

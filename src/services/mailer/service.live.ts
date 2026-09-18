@@ -1,4 +1,4 @@
-import { Effect, Layer, Redacted } from "effect";
+import { Effect, Layer, Option, Redacted } from "effect";
 import nodemailer from "nodemailer";
 import { InternalError } from "#src/domain/errors.ts";
 import type { ResolvedSmtpCreds } from "#src/services/email-credential/service.ts";
@@ -106,10 +106,10 @@ const make = (
 					userEmail,
 					userDisplayName,
 				);
-				if (resolved === null) {
-					return null;
-				}
-				return yield* sendWithCreds(resolved, message);
+				// Mail disabled or no usable creds: the contract reports that as null
+				return Option.isNone(resolved)
+					? null
+					: yield* sendWithCreds(resolved.value, message);
 			}).pipe(
 				Effect.catchTag("DatabaseError", (e) =>
 					Effect.fail(new InternalError({ cause: e })),

@@ -1,3 +1,4 @@
+import { Option } from "effect";
 import { Temporal } from "temporal-polyfill";
 import type { IrComponent } from "#src/data/ir.ts";
 
@@ -12,8 +13,8 @@ const YEARLESS_DATE = /^--\d{2}-\d{2}$/u;
 //   * "YYYY-MM-DD" — year present; DTSTART uses that year
 //   * "--MM-DD"    — yearless; DTSTART uses 1604 sentinel year (Apple/MS
 //                    convention so clients can detect and hide year/age)
-//   * anything else: returns null; the regeneration loop skips these so a
-//                    malformed BDAY never blocks the rest of the calendar.
+//   * anything else: returns Option.none; the regeneration loop skips these so
+//                    a malformed BDAY never blocks the rest of the calendar.
 //
 // All events get RRULE:FREQ=YEARLY so a single row covers every future
 // occurrence. UID is derived from the card UID so regenerate is idempotent
@@ -25,29 +26,31 @@ const YEARLESS_SENTINEL_YEAR = 1604;
 
 export const BIRTHDAY_UID_SUFFIX = "-birthday";
 
-const parseBday = (
-	bday: string,
-): { readonly date: Temporal.PlainDate; readonly yearless: boolean } | null => {
+/** Parses an ISO date, absent when the calendar rejects it (e.g. 1990-02-30) */
+const plainDateFrom = Option.liftThrowable((iso: string) =>
+	Temporal.PlainDate.from(iso),
+);
+
+interface ParsedBday {
+	readonly date: Temporal.PlainDate;
+	readonly yearless: boolean;
+}
+
+/** Reads a normalised BDAY in either "YYYY-MM-DD" or "--MM-DD" form. */
+const parseBday = (bday: string): Option.Option<ParsedBday> => {
 	if (FULL_DATE.test(bday)) {
-		try {
-			return { date: Temporal.PlainDate.from(bday), yearless: false };
-		} catch {
-			return null;
-		}
+		return Option.map(plainDateFrom(bday), (date) => ({
+			date,
+			yearless: false,
+		}));
 	}
 	if (YEARLESS_DATE.test(bday)) {
-		try {
-			return {
-				date: Temporal.PlainDate.from(
-					`${YEARLESS_SENTINEL_YEAR}-${bday.slice(2)}`,
-				),
-				yearless: true,
-			};
-		} catch {
-			return null;
-		}
+		return Option.map(
+			plainDateFrom(`${YEARLESS_SENTINEL_YEAR}-${bday.slice(2)}`),
+			(date) => ({ date, yearless: true }),
+		);
 	}
-	return null;
+	return Option.none();
 };
 
 export interface BirthdayVeventInput {
@@ -64,11 +67,14 @@ export interface BirthdayVevent {
 
 export const buildBirthdayVevent = (
 	input: BirthdayVeventInput,
-): BirthdayVevent | null => {
-	const parsed = parseBday(input.bday);
-	if (parsed === null) {
-		return null;
-	}
+): Option.Option<BirthdayVevent> =>
+	Option.map(parseBday(input.bday), (parsed) => buildFromParsed(input, parsed));
+
+/** Assembles the VEVENT once the BDAY has parsed. */
+const buildFromParsed = (
+	input: BirthdayVeventInput,
+	parsed: ParsedBday,
+): BirthdayVevent => {
 	const uid = `${input.cardUid}${BIRTHDAY_UID_SUFFIX}`;
 	const summary = `${input.fn}'s birthday`;
 

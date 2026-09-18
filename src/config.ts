@@ -8,6 +8,7 @@ import {
 	Option,
 	Redacted,
 	References,
+	Schema,
 } from "effect";
 
 // ---------------------------------------------------------------------------
@@ -25,6 +26,11 @@ import {
 // resolves DATABASE_URL). The constantCase provider is baked into
 // AppConfigService so it applies in all contexts including tests.
 // ---------------------------------------------------------------------------
+
+// JSON-valued env vars: malformed text decodes to None so boot never fails on it
+const decodeJsonValue = Schema.decodeUnknownOption(
+	Schema.UnknownFromJsonString,
+);
 
 const DEFAULT_PORT = 3000;
 
@@ -65,27 +71,21 @@ const DEFAULT_AUTH_RATE_LIMIT_WINDOW_S = 60;
  * (e.g. `{"shuriken-admins":"super_admin","staff":"admin"}`). Malformed input
  * yields an empty map (role sync stays off) rather than failing boot.
  */
-const decodeOidcRoleMap = (raw: string): ReadonlyMap<string, string> => {
-	if (raw.trim() === "") {
-		return new Map();
-	}
-	try {
-		const parsed: unknown = JSON.parse(raw);
-		if (
-			typeof parsed !== "object" ||
-			parsed === null ||
-			Array.isArray(parsed)
-		) {
-			return new Map();
-		}
-		const entries = Object.entries(parsed).filter(
-			(entry): entry is [string, string] => typeof entry[1] === "string",
-		);
-		return new Map(entries);
-	} catch {
-		return new Map();
-	}
-};
+const decodeOidcRoleMap = (raw: string): ReadonlyMap<string, string> =>
+	new Map(
+		Option.match(decodeJsonValue(raw), {
+			onNone: () => [],
+			onSome: roleMapEntries,
+		}),
+	);
+
+// String-valued properties of a decoded JSON object; anything else maps to none
+const roleMapEntries = (parsed: unknown): ReadonlyArray<[string, string]> =>
+	typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+		? Object.entries(parsed).filter(
+				(entry): entry is [string, string] => typeof entry[1] === "string",
+			)
+		: [];
 
 export const AuthConfig = Config.all({
 	/**
@@ -401,31 +401,27 @@ export interface MailProfileShape {
 	readonly security?: "none" | "starttls" | "tls";
 }
 
-const decodeMailProfiles = (raw: string): ReadonlyArray<MailProfileShape> => {
-	if (raw.trim() === "") {
-		return [];
-	}
-	try {
-		const parsed = JSON.parse(raw);
-		if (!Array.isArray(parsed)) {
-			return [];
-		}
-		// Best-effort shape filter; ConfigValidationError is preferable but
-		// SMTP_PROFILES_JSON is admin-controlled, so we just drop malformed
-		// entries rather than failing boot.
-		return parsed
-			.filter(
-				(p): p is RawMailProfileJson =>
-					typeof p === "object" &&
-					p !== null &&
-					typeof (p as { pattern?: unknown }).pattern === "string" &&
-					typeof (p as { host?: unknown }).host === "string",
-			)
-			.map((p) => ({ ...p, password: Redacted.make(p.password) }));
-	} catch {
-		return [];
-	}
-};
+const decodeMailProfiles = (raw: string): ReadonlyArray<MailProfileShape> =>
+	Option.match(decodeJsonValue(raw), {
+		onNone: () => [],
+		onSome: mailProfilesFrom,
+	});
+
+// Best-effort shape filter; ConfigValidationError is preferable but
+// SMTP_PROFILES_JSON is admin-controlled, so we just drop malformed entries
+// rather than failing boot
+const mailProfilesFrom = (parsed: unknown): ReadonlyArray<MailProfileShape> =>
+	Array.isArray(parsed)
+		? parsed
+				.filter(
+					(p): p is RawMailProfileJson =>
+						typeof p === "object" &&
+						p !== null &&
+						typeof (p as { pattern?: unknown }).pattern === "string" &&
+						typeof (p as { host?: unknown }).host === "string",
+				)
+				.map((p) => ({ ...p, password: Redacted.make(p.password) }))
+		: [];
 
 export const MailConfig = Config.all({
 	/**
@@ -576,23 +572,21 @@ export const EmbedConfig = Config.all({
  * empty allowlist (no extra origins permitted) rather than failing boot,
  * matching the `decodeOidcRoleMap`/`decodeMailProfiles` precedent.
  */
-const decodeFrameAncestors = (raw: string): ReadonlyArray<string> => {
-	if (raw.trim() === "") {
-		return [];
-	}
-	try {
-		const parsed: unknown = JSON.parse(raw);
-		if (Array.isArray(parsed)) {
-			return parsed.filter((v): v is string => typeof v === "string");
-		}
-	} catch {
-		// Not JSON — fall through to comma-separated parsing below.
-	}
-	return raw
+const decodeFrameAncestors = (raw: string): ReadonlyArray<string> =>
+	Option.match(decodeJsonValue(raw), {
+		onNone: () => splitOriginList(raw),
+		onSome: (parsed) =>
+			Array.isArray(parsed)
+				? parsed.filter((v): v is string => typeof v === "string")
+				: splitOriginList(raw),
+	});
+
+// Comma-separated origin list, trimmed, with empty entries dropped
+const splitOriginList = (raw: string): ReadonlyArray<string> =>
+	raw
 		.split(",")
 		.map((origin) => origin.trim())
 		.filter((origin) => origin !== "");
-};
 
 export const SecurityHeadersConfig = Config.all({
 	/**

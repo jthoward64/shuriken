@@ -8,11 +8,7 @@ import {
 	SHURIKEN_NS,
 } from "#src/domain/virtual-resources.ts";
 import type { HttpRequestContext } from "#src/http/context.ts";
-import {
-	isXmlNode,
-	xmlPath,
-	xmlText,
-} from "#src/http/dav/methods/xml-node.ts";
+import { isXmlNode, xmlPath, xmlText } from "#src/http/dav/methods/xml-node.ts";
 import { normalizeClarkNames } from "#src/http/dav/xml/clark.ts";
 import { parseXml, readXmlBody } from "#src/http/dav/xml/parser.ts";
 import { HTTP_NO_CONTENT } from "#src/http/status.ts";

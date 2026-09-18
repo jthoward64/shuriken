@@ -1,8 +1,9 @@
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import { Temporal } from "temporal-polyfill";
 import type { DatabaseError } from "#src/domain/errors.ts";
 import type { PrincipalId } from "#src/domain/ids.ts";
 import type { AuthenticatedPrincipal } from "#src/domain/types/dav.ts";
+import { parseFloatingInstant } from "#src/http/ui/helpers/temporal-parse.ts";
 import { SHARED_READ_PRIVILEGES } from "#src/services/acl/read-privileges.ts";
 import { AclRepository } from "#src/services/acl/repository.ts";
 import {
@@ -61,27 +62,16 @@ const overlapsRange = (
 	if (rangeStart === null || rangeEnd === null) {
 		return true;
 	}
-	try {
-		const start = ev.allDay
-			? Temporal.PlainDate.from(ev.start).toZonedDateTime("UTC").toInstant()
-			: Temporal.PlainDateTime.from(ev.start)
-					.toZonedDateTime("UTC")
-					.toInstant();
-		const end =
-			ev.end === null
-				? start
-				: ev.allDay
-					? Temporal.PlainDate.from(ev.end).toZonedDateTime("UTC").toInstant()
-					: Temporal.PlainDateTime.from(ev.end)
-							.toZonedDateTime("UTC")
-							.toInstant();
-		return (
-			Temporal.Instant.compare(start, rangeEnd) < 0 &&
-			Temporal.Instant.compare(end, rangeStart) >= 0
-		);
-	} catch {
-		return true;
-	}
+	const start = parseFloatingInstant(ev.start, ev.allDay, "UTC");
+	const end =
+		ev.end === null ? start : parseFloatingInstant(ev.end, ev.allDay, "UTC");
+	// An unparseable bound keeps the event in the result rather than hiding it
+	return Option.match(Option.all([start, end]), {
+		onNone: () => true,
+		onSome: ([from, to]) =>
+			Temporal.Instant.compare(from, rangeEnd) < 0 &&
+			Temporal.Instant.compare(to, rangeStart) >= 0,
+	});
 };
 
 /** Filter already-hydrated {@link CalendarEventView}s to the given range.

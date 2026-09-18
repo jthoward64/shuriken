@@ -25,6 +25,18 @@ import { UserService } from "#src/services/user/index.ts";
 // for this user (per-user / profile / default / disabled).
 // ---------------------------------------------------------------------------
 
+const compilePattern = Option.liftThrowable(
+	// biome-ignore lint/nursery/useUnicodeRegex: the pattern comes from operator config, and the u flag would reject patterns that work today
+	(pattern: string) => new RegExp(pattern),
+);
+
+// A mail profile matches when its operator-supplied pattern compiles and matches
+const matchesPattern = (pattern: string, value: string): boolean =>
+	Option.match(compilePattern(pattern), {
+		onNone: () => false,
+		onSome: (re) => re.test(value),
+	});
+
 export const emailCredentialsPageHandler = (
 	_req: Request,
 	ctx: HttpRequestContext,
@@ -51,14 +63,9 @@ export const emailCredentialsPageHandler = (
 				activeKind = "user";
 				activeFromAddress = existing.fromAddress;
 			} else {
-				const matched = config.mail.profiles.find((p) => {
-					try {
-						// biome-ignore lint/nursery/useUnicodeRegex: the pattern comes from operator config, and the u flag would reject patterns that work today
-						return new RegExp(p.pattern).test(user.email);
-					} catch {
-						return false;
-					}
-				});
+				const matched = config.mail.profiles.find((p) =>
+					matchesPattern(p.pattern, user.email),
+				);
 				if (matched) {
 					activeKind = "profile";
 					activeFromAddress = user.email;

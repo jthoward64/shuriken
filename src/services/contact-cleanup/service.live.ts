@@ -1,5 +1,6 @@
 import { Effect, Layer, Option, Result } from "effect";
 import { makeEtag } from "#src/data/etag.ts";
+import type { IrComponent } from "#src/data/ir.ts";
 import { encodeVCard } from "#src/data/vcard/codec.ts";
 import { DatabaseClient } from "#src/db/client.ts";
 import { withTransaction } from "#src/db/transaction.ts";
@@ -90,23 +91,46 @@ const applyFix = (
 		const contentLength = new TextEncoder().encode(canonical).byteLength;
 
 		yield* withTransaction(
-			Effect.gen(function* () {
-				yield* componentRepo.deleteByEntity(entityId);
-				yield* componentRepo.insertTree(entityId, vcard);
-				yield* instanceSvc.put(
-					{
-						collectionId: CollectionId(existing.collectionId),
-						entityId,
-						contentType: "text/vcard",
-						etag,
-						slug: Slug(existing.slug),
-						contentLength,
-					},
-					instanceId,
-				);
+			rewriteCleanedCard({
+				collectionId: CollectionId(existing.collectionId),
+				entityId,
+				instanceId,
+				vcard,
+				etag,
+				slug: Slug(existing.slug),
+				contentLength,
 			}),
 		).pipe(Effect.provideService(DatabaseClient, db));
 	});
+
+/** Rewrites a contact's stored tree after a cleanup fix and bumps its etag. */
+const rewriteCleanedCard = Effect.fn("ContactCleanup.rewriteCard")(
+	function* (input: {
+		readonly collectionId: CollectionId;
+		readonly entityId: EntityId;
+		readonly instanceId: InstanceId;
+		readonly vcard: IrComponent;
+		readonly etag: ETag;
+		readonly slug: Slug;
+		readonly contentLength: number;
+	}) {
+		const componentRepo = yield* ComponentRepository;
+		const instanceSvc = yield* InstanceService;
+		yield* componentRepo.deleteByEntity(input.entityId);
+		yield* componentRepo.insertTree(input.entityId, input.vcard);
+		yield* instanceSvc.put(
+			{
+				collectionId: input.collectionId,
+				entityId: input.entityId,
+				contentType: "text/vcard",
+				etag: input.etag,
+				slug: input.slug,
+				contentLength: input.contentLength,
+			},
+			input.instanceId,
+		);
+	},
+);
 
 export const ContactCleanupServiceLive = Layer.effect(
 	ContactCleanupService,

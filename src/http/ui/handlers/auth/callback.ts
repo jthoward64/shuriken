@@ -18,6 +18,7 @@ import {
 import {
 	isSecureRequest,
 	oidcRedirectUri,
+	oidcStepFailed,
 } from "#src/http/ui/handlers/auth/helpers.ts";
 import type { GroupService } from "#src/services/group/index.ts";
 import { resolveOidcPrincipal } from "#src/services/oidc/map-user.ts";
@@ -77,7 +78,7 @@ export const callbackHandler = (
 			});
 		}
 
-		const claims = yield* oidc
+		const claimsOpt = yield* oidc
 			.completeLogin({
 				currentUrl: ctx.url,
 				redirectUri: oidcRedirectUri(ctx.url.origin, cfg),
@@ -86,18 +87,15 @@ export const callbackHandler = (
 				pkceVerifier: pending.pkceVerifier,
 			})
 			.pipe(
+				Effect.map(Option.some),
 				Effect.catchTag("OidcError", (e) =>
-					Effect.as(
-						Effect.logWarning("auth.oidc: completeLogin failed", {
-							reason: e.reason,
-						}),
-						null,
-					),
+					oidcStepFailed("completeLogin", e.reason),
 				),
 			);
-		if (claims === null) {
+		if (Option.isNone(claimsOpt)) {
 			return new Response("Sign-in failed", { status: HTTP_BAD_GATEWAY });
 		}
+		const claims = claimsOpt.value;
 
 		const principalOpt = yield* resolveOidcPrincipal(claims, {
 			autoProvision: cfg.auth.oidcAutoProvision,

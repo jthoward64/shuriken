@@ -1,6 +1,6 @@
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
-import { Effect, ManagedRuntime, Redacted } from "effect";
+import { Effect, ManagedRuntime, Option, Redacted } from "effect";
 import { UserId as makeUserId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import { Email } from "#src/domain/types/strings.ts";
@@ -54,17 +54,19 @@ const buildMail = (mail: MailOverride) => ({
 	})),
 });
 
-const provisionAlice = Effect.gen(function* () {
-	const prov = yield* ProvisioningService;
-	const alice = yield* prov
-		.provisionUser({
-			email: Email("alice@example.com"),
-			name: "Alice",
-			slug: Slug("alice"),
-		})
-		.pipe(Effect.orDie);
-	return makeUserId(alice.user.user.id);
-});
+const provisionAlice = Effect.fn("email-credential.test.provisionAlice")(
+	function* () {
+		const prov = yield* ProvisioningService;
+		const alice = yield* prov
+			.provisionUser({
+				email: Email("alice@example.com"),
+				name: "Alice",
+				slug: Slug("alice"),
+			})
+			.pipe(Effect.orDie);
+		return makeUserId(alice.user.user.id);
+	},
+);
 
 describe("EmailCredentialService resolver (integration)", () => {
 	it("returns null when mail is disabled", async () => {
@@ -72,13 +74,13 @@ describe("EmailCredentialService resolver (integration)", () => {
 			makeScriptRunnerLayer({ mail: buildMail({ enabled: false }) }),
 		);
 		try {
-			const userId = await runtime.runPromise(provisionAlice);
+			const userId = await runtime.runPromise(provisionAlice());
 			const result = await runtime.runPromise(
 				Effect.flatMap(EmailCredentialService, (s) =>
 					s.resolveForUser(userId, "alice@example.com", "Alice"),
 				),
 			);
-			expect(result).toBeNull();
+			expect(Option.isNone(result)).toBe(true);
 		} finally {
 			await runtime.dispose();
 		}
@@ -96,15 +98,16 @@ describe("EmailCredentialService resolver (integration)", () => {
 			}),
 		);
 		try {
-			const userId = await runtime.runPromise(provisionAlice);
+			const userId = await runtime.runPromise(provisionAlice());
 			const result = await runtime.runPromise(
 				Effect.flatMap(EmailCredentialService, (s) =>
 					s.resolveForUser(userId, "alice@example.com", "Alice"),
 				),
 			);
-			expect(result?.kind).toBe("default");
-			expect(result?.fromAddress).toBe("noreply@shuriken");
-			expect(result?.replyTo).toBe("alice@example.com");
+			const creds = Option.getOrThrow(result);
+			expect(creds.kind).toBe("default");
+			expect(creds.fromAddress).toBe("noreply@shuriken");
+			expect(creds.replyTo).toBe("alice@example.com");
 		} finally {
 			await runtime.dispose();
 		}
@@ -131,16 +134,17 @@ describe("EmailCredentialService resolver (integration)", () => {
 			}),
 		);
 		try {
-			const userId = await runtime.runPromise(provisionAlice);
+			const userId = await runtime.runPromise(provisionAlice());
 			const result = await runtime.runPromise(
 				Effect.flatMap(EmailCredentialService, (s) =>
 					s.resolveForUser(userId, "alice@example.com", "Alice"),
 				),
 			);
-			expect(result?.kind).toBe("profile");
-			expect(result?.host).toBe("smtp.example.com");
-			expect(result?.fromAddress).toBe("alice@example.com");
-			expect(result?.replyTo).toBeNull();
+			const creds = Option.getOrThrow(result);
+			expect(creds.kind).toBe("profile");
+			expect(creds.host).toBe("smtp.example.com");
+			expect(creds.fromAddress).toBe("alice@example.com");
+			expect(creds.replyTo).toBeNull();
 		} finally {
 			await runtime.dispose();
 		}
@@ -158,7 +162,7 @@ describe("EmailCredentialService resolver (integration)", () => {
 			}),
 		);
 		try {
-			const userId = await runtime.runPromise(provisionAlice);
+			const userId = await runtime.runPromise(provisionAlice());
 			await runtime.runPromise(
 				Effect.flatMap(EmailCredentialService, (s) =>
 					s.storeForUser({
@@ -179,14 +183,13 @@ describe("EmailCredentialService resolver (integration)", () => {
 					s.resolveForUser(userId, "alice@example.com", "Alice"),
 				),
 			);
-			expect(result?.kind).toBe("user");
-			expect(result?.host).toBe("smtp.my-isp.example");
-			expect(result?.port).toBe(465);
-			expect(result?.fromAddress).toBe("alice@my-isp.example");
-			expect(result?.replyTo).toBeNull();
-			expect(result?.password ? Redacted.value(result.password) : null).toBe(
-				"isp-password",
-			);
+			const creds = Option.getOrThrow(result);
+			expect(creds.kind).toBe("user");
+			expect(creds.host).toBe("smtp.my-isp.example");
+			expect(creds.port).toBe(465);
+			expect(creds.fromAddress).toBe("alice@my-isp.example");
+			expect(creds.replyTo).toBeNull();
+			expect(Redacted.value(creds.password)).toBe("isp-password");
 		} finally {
 			await runtime.dispose();
 		}

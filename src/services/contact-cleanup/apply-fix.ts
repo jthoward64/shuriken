@@ -1,4 +1,4 @@
-import { Data, Result } from "effect";
+import { Data, Match, Result } from "effect";
 import type { IrComponent, IrProperty } from "#src/data/ir.ts";
 import { wrapAppleLabel } from "#src/data/vcard/ab-label.ts";
 import { getText, getTypeTokens, nthPropIndex } from "./fields.ts";
@@ -73,12 +73,18 @@ const withProps = (
 ): IrComponent => ({ ...vcard, properties });
 
 // Locate a property by (name, occurrence) and confirm its text still matches.
+/** A property found by name and occurrence, with its position in the card. */
+interface Located {
+	readonly index: number;
+	readonly prop: IrProperty;
+}
+
 const locate = (
 	vcard: IrComponent,
 	name: string,
 	occurrence: number,
 	expected: string,
-): Result.Result<{ index: number; prop: IrProperty }, CleanupStaleError> => {
+): Result.Result<Located, CleanupStaleError> => {
 	const index = nthPropIndex(vcard.properties, name, occurrence);
 	const prop = vcard.properties[index];
 	if (index < 0 || prop === undefined) {
@@ -90,84 +96,96 @@ const locate = (
 	return Result.succeed({ index, prop });
 };
 
+/** Replaces the located property's text value, preserving TEXT vs URI. */
+const setLocatedText = (
+	vcard: IrComponent,
+	located: Result.Result<Located, CleanupStaleError>,
+	next: string,
+): Result.Result<IrComponent, CleanupStaleError> =>
+	Result.map(located, ({ index, prop }) =>
+		withProps(
+			vcard,
+			replaceAt(vcard.properties, index, withTextValue(prop, next)),
+		),
+	);
+
+/** Rewrites one TYPE token on the nth property, or reports the card as stale. */
+const applySetLabel = (
+	vcard: IrComponent,
+	fix: Extract<CleanupFix, { readonly _tag: "SetLabel" }>,
+): Result.Result<IrComponent, CleanupStaleError> => {
+	const index = nthPropIndex(vcard.properties, fix.propName, fix.occurrence);
+	const prop = vcard.properties[index];
+	if (index < 0 || prop === undefined) {
+		return stale(`${fix.propName} #${fix.occurrence} no longer exists`);
+	}
+	const hasToken = getTypeTokens(prop).some(
+		(t) => t.toLowerCase() === fix.current.toLowerCase(),
+	);
+	if (!hasToken) {
+		return stale(`${fix.propName} #${fix.occurrence} label changed`);
+	}
+	return Result.succeed(
+		withProps(
+			vcard,
+			replaceAt(
+				vcard.properties,
+				index,
+				rewriteTypeTokens(prop, fix.current, fix.newType),
+			),
+		),
+	);
+};
+
+/** Rewrites or drops an X-ABLABEL, depending on whether a new label was given. */
+const applySetAbLabel = (
+	vcard: IrComponent,
+	fix: Extract<CleanupFix, { readonly _tag: "SetAbLabel" }>,
+): Result.Result<IrComponent, CleanupStaleError> =>
+	Result.map(
+		locate(vcard, "X-ABLABEL", fix.occurrence, fix.current),
+		({ index, prop }) =>
+			fix.newLabel === null
+				? withProps(vcard, removeAt(vcard.properties, index))
+				: withProps(
+						vcard,
+						replaceAt(
+							vcard.properties,
+							index,
+							withTextValue(prop, wrapAppleLabel(fix.newLabel)),
+						),
+					),
+	);
+
 export const applyFix = (
 	vcard: IrComponent,
 	fix: CleanupFix,
-): Result.Result<IrComponent, CleanupStaleError> => {
-	switch (fix._tag) {
-		case "SetPhone":
-			return Result.map(
-				locate(vcard, "TEL", fix.occurrence, fix.current),
-				({ index, prop }) =>
-					withProps(
-						vcard,
-						replaceAt(vcard.properties, index, withTextValue(prop, fix.next)),
-					),
-			);
-		case "LowercaseEmail":
-			return Result.map(
-				locate(vcard, "EMAIL", fix.occurrence, fix.current),
-				({ index, prop }) =>
-					withProps(
-						vcard,
-						replaceAt(vcard.properties, index, withTextValue(prop, fix.next)),
-					),
-			);
-		case "SetNameCase":
-			return Result.map(
-				locate(vcard, fix.field, 0, fix.current),
-				({ index, prop }) =>
-					withProps(
-						vcard,
-						replaceAt(vcard.properties, index, withTextValue(prop, fix.next)),
-					),
-			);
-		case "RemoveDuplicate":
-			return Result.map(
-				locate(vcard, fix.propName, fix.occurrence, fix.value),
+): Result.Result<IrComponent, CleanupStaleError> =>
+	Match.value(fix).pipe(
+		Match.tag("SetPhone", (f) =>
+			setLocatedText(
+				vcard,
+				locate(vcard, "TEL", f.occurrence, f.current),
+				f.next,
+			),
+		),
+		Match.tag("LowercaseEmail", (f) =>
+			setLocatedText(
+				vcard,
+				locate(vcard, "EMAIL", f.occurrence, f.current),
+				f.next,
+			),
+		),
+		Match.tag("SetNameCase", (f) =>
+			setLocatedText(vcard, locate(vcard, f.field, 0, f.current), f.next),
+		),
+		Match.tag("RemoveDuplicate", (f) =>
+			Result.map(
+				locate(vcard, f.propName, f.occurrence, f.value),
 				({ index }) => withProps(vcard, removeAt(vcard.properties, index)),
-			);
-		case "SetLabel": {
-			const index = nthPropIndex(
-				vcard.properties,
-				fix.propName,
-				fix.occurrence,
-			);
-			const prop = vcard.properties[index];
-			if (index < 0 || prop === undefined) {
-				return stale(`${fix.propName} #${fix.occurrence} no longer exists`);
-			}
-			const hasToken = getTypeTokens(prop).some(
-				(t) => t.toLowerCase() === fix.current.toLowerCase(),
-			);
-			if (!hasToken) {
-				return stale(`${fix.propName} #${fix.occurrence} label changed`);
-			}
-			return Result.succeed(
-				withProps(
-					vcard,
-					replaceAt(
-						vcard.properties,
-						index,
-						rewriteTypeTokens(prop, fix.current, fix.newType),
-					),
-				),
-			);
-		}
-		case "SetAbLabel":
-			return Result.map(
-				locate(vcard, "X-ABLABEL", fix.occurrence, fix.current),
-				({ index, prop }) =>
-					fix.newLabel === null
-						? withProps(vcard, removeAt(vcard.properties, index))
-						: withProps(
-								vcard,
-								replaceAt(
-									vcard.properties,
-									index,
-									withTextValue(prop, wrapAppleLabel(fix.newLabel)),
-								),
-							),
-			);
-	}
-};
+			),
+		),
+		Match.tag("SetLabel", (f) => applySetLabel(vcard, f)),
+		Match.tag("SetAbLabel", (f) => applySetAbLabel(vcard, f)),
+		Match.exhaustive,
+	);

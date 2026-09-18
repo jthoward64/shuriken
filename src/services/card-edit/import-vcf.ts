@@ -182,6 +182,54 @@ export const detectConflicts = (
 		return conflicts;
 	});
 
+/** Soft-deletes any live instance/entity carrying this UID so the import can replace it. */
+const removeExistingForUid = Effect.fn("card-edit.import.removeExisting")(
+	function* (collectionId: CollectionId, uid: string) {
+		const entityRepo = yield* EntityRepository;
+		const instanceSvc = yield* InstanceService;
+		const existingInstances =
+			yield* entityRepo.listActiveInstancesWithUid(collectionId);
+		for (const ex of existingInstances) {
+			if (ex.logicalUid === uid) {
+				yield* instanceSvc.delete(ex.instanceId);
+				yield* entityRepo.softDelete(ex.entityId);
+			}
+		}
+	},
+);
+
+/** Stores one parsed card as a fresh entity plus instance. */
+const storeCard = Effect.fn("card-edit.import.storeCard")(function* (input: {
+	readonly collectionId: CollectionId;
+	readonly uid: string;
+	readonly root: IrComponent;
+	readonly replaceExisting: boolean;
+}) {
+	const componentRepo = yield* ComponentRepository;
+	const entityRepo = yield* EntityRepository;
+	const instanceSvc = yield* InstanceService;
+	if (input.replaceExisting) {
+		yield* removeExistingForUid(input.collectionId, input.uid);
+	}
+	const canonical = yield* encodeVCard({ kind: "vcard", root: input.root });
+	const etag = ETag(yield* makeEtag(canonical));
+	const contentLength = new TextEncoder().encode(canonical).byteLength;
+	const entityRow = yield* entityRepo.insert({
+		entityType: "vcard",
+		logicalUid: input.uid,
+	});
+	const eid = EntityId(entityRow.id);
+	yield* componentRepo.insertTree(eid, input.root);
+	yield* instanceSvc.put({
+		collectionId: input.collectionId,
+		entityId: eid,
+		contentType: "text/vcard",
+		etag,
+		slug: slugFromUid(input.uid),
+		contentLength,
+	});
+});
+
 /**
  * Write a single parsed card into `collectionId`. When `replaceExisting` is
  * set, every active instance sharing `uid` is soft-deleted first (merge
@@ -203,9 +251,6 @@ export const writeCard = (
 	| InstanceService
 > =>
 	Effect.gen(function* () {
-		const componentRepo = yield* ComponentRepository;
-		const entityRepo = yield* EntityRepository;
-		const instanceSvc = yield* InstanceService;
 		const db = yield* DatabaseClient;
 
 		// No addressbook is currently auto-managed/subscribed, but this mirrors
@@ -218,36 +263,7 @@ export const writeCard = (
 		}
 
 		yield* withTransaction(
-			Effect.gen(function* () {
-				if (replaceExisting) {
-					const existingInstances =
-						yield* entityRepo.listActiveInstancesWithUid(collectionId);
-					for (const ex of existingInstances) {
-						if (ex.logicalUid === uid) {
-							yield* instanceSvc.delete(ex.instanceId);
-							yield* entityRepo.softDelete(ex.entityId);
-						}
-					}
-				}
-				const canonical = yield* encodeVCard({ kind: "vcard", root });
-				const etag = ETag(yield* makeEtag(canonical));
-				const contentLength = new TextEncoder().encode(canonical).byteLength;
-				const slug = slugFromUid(uid);
-				const entityRow = yield* entityRepo.insert({
-					entityType: "vcard",
-					logicalUid: uid,
-				});
-				const eid = EntityId(entityRow.id);
-				yield* componentRepo.insertTree(eid, root);
-				yield* instanceSvc.put({
-					collectionId,
-					entityId: eid,
-					contentType: "text/vcard",
-					etag,
-					slug,
-					contentLength,
-				});
-			}),
+			storeCard({ collectionId, uid, root, replaceExisting }),
 		).pipe(Effect.provideService(DatabaseClient, db));
 	});
 

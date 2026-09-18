@@ -65,6 +65,21 @@ export interface ChunkedJobSpec<Item, E, R> {
 	) => Effect.Effect<BulkJobCompletionResult, never, R>;
 }
 
+/** Records a crashed job on its row and logs the cause. */
+const recordJobFailure = Effect.fn("bulk-job.recordFailure")(function* (
+	jobRepo: BulkJobRepositoryShape,
+	row: BulkJobRow,
+	kind: BulkJobKind,
+	cause: Cause.Cause<unknown>,
+) {
+	yield* Effect.orDie(jobRepo.fail(row.id, Cause.pretty(cause)));
+	yield* Effect.logWarning("bulk-job.runChunkedJob: job failed", {
+		jobId: row.id,
+		kind,
+		cause,
+	});
+});
+
 const runWorker = <Item, E, R>(
 	jobRepo: BulkJobRepositoryShape,
 	row: BulkJobRow,
@@ -96,16 +111,7 @@ const runWorker = <Item, E, R>(
 	}).pipe(
 		Effect.asVoid,
 		Effect.catchCause((cause) =>
-			jobRepo.fail(row.id, Cause.pretty(cause)).pipe(
-				Effect.andThen(
-					Effect.logWarning("bulk-job.runChunkedJob: job failed", {
-						jobId: row.id,
-						kind: spec.kind,
-						cause,
-					}),
-				),
-				Effect.orDie,
-			),
+			recordJobFailure(jobRepo, row, spec.kind, cause),
 		),
 	);
 

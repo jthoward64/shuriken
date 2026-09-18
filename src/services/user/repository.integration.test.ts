@@ -1,7 +1,7 @@
 import { expect } from "@std/expect";
 import { beforeAll, describe, it } from "@std/testing/bdd";
 import { Effect, Layer, Option, Redacted } from "effect";
-import type { ConflictError } from "#src/domain/errors.ts";
+import { ConflictError } from "#src/domain/errors.ts";
 import { UserId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import { Email } from "#src/domain/types/strings.ts";
@@ -9,6 +9,14 @@ import { runFailure, runSuccess } from "#src/testing/effect.ts";
 import { makePgliteDatabaseLayer } from "#src/testing/pglite.ts";
 import { UserRepositoryLive } from "./repository.live.ts";
 import { UserRepository } from "./repository.ts";
+
+/** Narrows a test failure to a ConflictError so its field can be asserted. */
+const asConflictError = (err: unknown): ConflictError => {
+	if (err instanceof ConflictError) {
+		return err;
+	}
+	throw new Error(`expected a ConflictError, got ${String(err)}`);
+};
 
 // ---------------------------------------------------------------------------
 // Integration tests for UserRepositoryLive
@@ -396,49 +404,53 @@ describe("UserRepository unique constraint violations (integration)", () => {
 	});
 
 	it("two users with the same email fails with ConflictError", async () => {
-		const err = (await runFailure(
-			UserRepository.pipe(
-				Effect.flatMap((r) =>
-					Effect.gen(function* () {
-						yield* r.create({
-							slug: Slug("dup-email-a"),
-							email: Email("dup@example.com"),
-							credentials: [],
-						});
-						yield* r.create({
-							slug: Slug("dup-email-b"),
-							email: Email("dup@example.com"),
-							credentials: [],
-						});
-					}),
+		const err = asConflictError(
+			await runFailure(
+				UserRepository.pipe(
+					Effect.flatMap((r) =>
+						Effect.gen(function* () {
+							yield* r.create({
+								slug: Slug("dup-email-a"),
+								email: Email("dup@example.com"),
+								credentials: [],
+							});
+							yield* r.create({
+								slug: Slug("dup-email-b"),
+								email: Email("dup@example.com"),
+								credentials: [],
+							});
+						}),
+					),
+					Effect.provide(layer),
 				),
-				Effect.provide(layer),
 			),
-		)) as ConflictError;
+		);
 
 		expect(err._tag).toBe("ConflictError");
 	});
 
 	it("two principals with the same slug fails with ConflictError", async () => {
-		const err = (await runFailure(
-			UserRepository.pipe(
-				Effect.flatMap((r) =>
-					Effect.gen(function* () {
-						yield* r.create({
-							slug: Slug("dup-slug"),
-							email: Email("dup-slug-a@example.com"),
-							credentials: [],
-						});
-						yield* r.create({
-							slug: Slug("dup-slug"),
-							email: Email("dup-slug-b@example.com"),
-							credentials: [],
-						});
-					}),
+		const err = asConflictError(
+			await runFailure(
+				UserRepository.pipe(
+					Effect.flatMap((r) =>
+						Effect.gen(function* () {
+							yield* r.create({
+								slug: Slug("dup-slug"),
+								email: Email("dup-slug-a@example.com"),
+								credentials: [],
+							});
+							yield* r.create({
+								slug: Slug("dup-slug"),
+								email: Email("dup-slug-b@example.com"),
+								credentials: [],
+							});
+						}),
+					),
+					Effect.provide(layer),
 				),
-				Effect.provide(layer),
 			),
-		)) as ConflictError;
+		);
 
 		expect(err._tag).toBe("ConflictError");
 	});

@@ -1,13 +1,21 @@
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
 import { Effect } from "effect";
-import type { DavError } from "#src/domain/errors.ts";
+import { DavError } from "#src/domain/errors.ts";
 import { CollectionId, PrincipalId } from "#src/domain/ids.ts";
 import { Slug } from "#src/domain/types/path.ts";
 import { HTTP_CONFLICT, HTTP_NOT_FOUND } from "#src/http/status.ts";
 import { runFailure, runSuccess } from "#src/testing/effect.ts";
 import { makeTestEnv } from "#src/testing/env.ts";
 import { CollectionService } from "./service.ts";
+
+/** Narrows a test failure to a DavError so its status can be asserted. */
+const asDavError = (err: unknown): DavError => {
+	if (err instanceof DavError) {
+		return err;
+	}
+	throw new Error(`expected a DavError, got ${String(err)}`);
+};
 
 // ---------------------------------------------------------------------------
 // CollectionService.create
@@ -49,18 +57,20 @@ describe("CollectionService.create", () => {
 			slug: "existing",
 		});
 
-		const err = (await runFailure(
-			CollectionService.pipe(
-				Effect.flatMap((s) =>
-					s.create({
-						ownerPrincipalId: principalId,
-						collectionType: "calendar",
-						slug: Slug("existing"),
-					}),
+		const err = asDavError(
+			await runFailure(
+				CollectionService.pipe(
+					Effect.flatMap((s) =>
+						s.create({
+							ownerPrincipalId: principalId,
+							collectionType: "calendar",
+							slug: Slug("existing"),
+						}),
+					),
+					Effect.provide(env.toLayer()),
 				),
-				Effect.provide(env.toLayer()),
 			),
-		)) as DavError;
+		);
 
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_CONFLICT);
@@ -120,12 +130,14 @@ describe("CollectionService.delete", () => {
 	it("fails with 404 when the collection does not exist", async () => {
 		const env = makeTestEnv();
 
-		const err = (await runFailure(
-			CollectionService.pipe(
-				Effect.flatMap((s) => s.delete(CollectionId(crypto.randomUUID()))),
-				Effect.provide(env.toLayer()),
+		const err = asDavError(
+			await runFailure(
+				CollectionService.pipe(
+					Effect.flatMap((s) => s.delete(CollectionId(crypto.randomUUID()))),
+					Effect.provide(env.toLayer()),
+				),
 			),
-		)) as DavError;
+		);
 
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_NOT_FOUND);
@@ -162,12 +174,14 @@ describe("CollectionService.findById", () => {
 	it("fails with 404 for an unknown id", async () => {
 		const env = makeTestEnv();
 
-		const err = (await runFailure(
-			CollectionService.pipe(
-				Effect.flatMap((s) => s.findById(CollectionId(crypto.randomUUID()))),
-				Effect.provide(env.toLayer()),
+		const err = asDavError(
+			await runFailure(
+				CollectionService.pipe(
+					Effect.flatMap((s) => s.findById(CollectionId(crypto.randomUUID()))),
+					Effect.provide(env.toLayer()),
+				),
 			),
-		)) as DavError;
+		);
 
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_NOT_FOUND);
@@ -207,14 +221,16 @@ describe("CollectionService.findBySlug", () => {
 		const principalId = PrincipalId(crypto.randomUUID());
 		env.withUser({ principalId });
 
-		const err = (await runFailure(
-			CollectionService.pipe(
-				Effect.flatMap((s) =>
-					s.findBySlug(principalId, "calendar", Slug("no-such-cal")),
+		const err = asDavError(
+			await runFailure(
+				CollectionService.pipe(
+					Effect.flatMap((s) =>
+						s.findBySlug(principalId, "calendar", Slug("no-such-cal")),
+					),
+					Effect.provide(env.toLayer()),
 				),
-				Effect.provide(env.toLayer()),
 			),
-		)) as DavError;
+		);
 
 		expect(err._tag).toBe("DavError");
 		expect(err.status).toBe(HTTP_NOT_FOUND);
