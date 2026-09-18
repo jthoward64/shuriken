@@ -711,22 +711,20 @@ describe("ComponentRepository loadTreesByIds (integration)", () => {
 
 	it("omits unknown entityIds and returns empty map for empty input", async () => {
 		const { withMissing, empty } = await runSuccess(
-			Effect.provide(
-				Effect.gen(function* () {
-					const comp = yield* ComponentRepository;
-					const entity = yield* makeEntity("icalendar");
-					const entityId = EntityId(entity.id);
-					yield* comp.insertTree(entityId, named("Only"));
-					const missing = EntityId(crypto.randomUUID());
-					const loadedWithMissing = yield* comp.loadTreesByIds(
-						[entityId, missing],
-						"icalendar",
-					);
-					const loadedForEmpty = yield* comp.loadTreesByIds([], "icalendar");
-					return { withMissing: loadedWithMissing, empty: loadedForEmpty };
-				}),
-				layer,
-			).pipe(Effect.orDie),
+			Effect.gen(function* () {
+				const comp = yield* ComponentRepository;
+				const entity = yield* makeEntity("icalendar");
+				const entityId = EntityId(entity.id);
+				yield* comp.insertTree(entityId, named("Only"));
+				const missing = EntityId(crypto.randomUUID());
+				const loadedWithMissing = yield* comp.loadTreesByIds(
+					[entityId, missing],
+					"icalendar",
+				);
+				const loadedForEmpty = yield* comp.loadTreesByIds([], "icalendar");
+				return { withMissing: loadedWithMissing, empty: loadedForEmpty };
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		expect(withMissing.size).toBe(1);

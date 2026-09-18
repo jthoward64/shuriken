@@ -374,10 +374,12 @@ describe("aclHandler — href principal validation", () => {
 			},
 		]);
 		const res = await runSuccess(
-			Effect.provide(
-				aclHandler(makeCollectionPath(), authenticatedCtx, makeRequest(body)),
-				env.toLayer(),
+			aclHandler(
+				makeCollectionPath(),
+				authenticatedCtx,
+				makeRequest(body),
 			).pipe(Effect.orDie),
+			env.toLayer(),
 		);
 		expect(res.status).toBe(HTTP_OK);
 
@@ -397,10 +399,12 @@ describe("aclHandler — href principal validation", () => {
 			},
 		]);
 		const res = await runSuccess(
-			Effect.provide(
-				aclHandler(makeCollectionPath(), authenticatedCtx, makeRequest(body)),
-				env.toLayer(),
+			aclHandler(
+				makeCollectionPath(),
+				authenticatedCtx,
+				makeRequest(body),
 			).pipe(Effect.orDie),
+			env.toLayer(),
 		);
 		expect(res.status).toBe(HTTP_OK);
 
@@ -446,10 +450,12 @@ describe("aclHandler — pseudo-principals", () => {
 				{ principal: principalXml, privileges: ["read"] },
 			]);
 			const res = await runSuccess(
-				Effect.provide(
-					aclHandler(makeCollectionPath(), authenticatedCtx, makeRequest(body)),
-					env.toLayer(),
+				aclHandler(
+					makeCollectionPath(),
+					authenticatedCtx,
+					makeRequest(body),
 				).pipe(Effect.orDie),
+				env.toLayer(),
 			);
 			expect(res.status).toBe(HTTP_OK);
 		});
@@ -464,10 +470,10 @@ describe("aclHandler — successful writes", () => {
 	it("returns 200 OK for empty body (clears non-protected ACEs)", async () => {
 		const env = makeBaseEnv();
 		const res = await runSuccess(
-			Effect.provide(
-				aclHandler(makeCollectionPath(), authenticatedCtx, emptyRequest),
-				env.toLayer(),
-			).pipe(Effect.orDie),
+			aclHandler(makeCollectionPath(), authenticatedCtx, emptyRequest).pipe(
+				Effect.orDie,
+			),
+			env.toLayer(),
 		);
 		expect(res.status).toBe(HTTP_OK);
 
@@ -481,10 +487,12 @@ describe("aclHandler — successful writes", () => {
 		const env = makeBaseEnv();
 		const body = makeAclXml([{ principal: "<D:all/>", privileges: ["read"] }]);
 		await runSuccess(
-			Effect.provide(
-				aclHandler(makeCollectionPath(), authenticatedCtx, makeRequest(body)),
-				env.toLayer(),
+			aclHandler(
+				makeCollectionPath(),
+				authenticatedCtx,
+				makeRequest(body),
 			).pipe(Effect.orDie),
+			env.toLayer(),
 		);
 
 		const aces = env.stores.acl.get(TEST_COLLECTION_ID) ?? [];
@@ -504,10 +512,12 @@ describe("aclHandler — successful writes", () => {
 			{ principal: "<D:self/>", privileges: ["read-acl"] },
 		]);
 		await runSuccess(
-			Effect.provide(
-				aclHandler(makeCollectionPath(), authenticatedCtx, makeRequest(body)),
-				env.toLayer(),
+			aclHandler(
+				makeCollectionPath(),
+				authenticatedCtx,
+				makeRequest(body),
 			).pipe(Effect.orDie),
+			env.toLayer(),
 		);
 
 		const aces = (env.stores.acl.get(TEST_COLLECTION_ID) ?? [])
@@ -525,10 +535,12 @@ describe("aclHandler — successful writes", () => {
 			{ principal: "<D:all/>", privileges: ["read", "read-acl"] },
 		]);
 		await runSuccess(
-			Effect.provide(
-				aclHandler(makeCollectionPath(), authenticatedCtx, makeRequest(body)),
-				env.toLayer(),
+			aclHandler(
+				makeCollectionPath(),
+				authenticatedCtx,
+				makeRequest(body),
 			).pipe(Effect.orDie),
+			env.toLayer(),
 		);
 
 		const aces = (env.stores.acl.get(TEST_COLLECTION_ID) ?? []).filter(
@@ -546,10 +558,12 @@ describe("aclHandler — successful writes", () => {
 		const env = makeBaseEnv();
 		const body = makeAclXml([{ principal: "<D:all/>", privileges: ["read"] }]);
 		await runSuccess(
-			Effect.provide(
-				aclHandler(makeCollectionPath(), authenticatedCtx, makeRequest(body)),
-				env.toLayer(),
+			aclHandler(
+				makeCollectionPath(),
+				authenticatedCtx,
+				makeRequest(body),
 			).pipe(Effect.orDie),
+			env.toLayer(),
 		);
 
 		const aces = (env.stores.acl.get(TEST_COLLECTION_ID) ?? []).filter(
@@ -562,10 +576,10 @@ describe("aclHandler — successful writes", () => {
 		const env = makeBaseEnv();
 		const body = makeAclXml([{ principal: "<D:all/>", privileges: ["read"] }]);
 		await runSuccess(
-			Effect.provide(
-				aclHandler(makePrincipalPath(), authenticatedCtx, makeRequest(body)),
-				env.toLayer(),
-			).pipe(Effect.orDie),
+			aclHandler(makePrincipalPath(), authenticatedCtx, makeRequest(body)).pipe(
+				Effect.orDie,
+			),
+			env.toLayer(),
 		);
 
 		const aces = (env.stores.acl.get(TEST_PRINCIPAL_ID) ?? []).filter(
@@ -578,10 +592,10 @@ describe("aclHandler — successful writes", () => {
 		const env = makeBaseEnv();
 		const body = makeAclXml([{ principal: "<D:all/>", privileges: ["read"] }]);
 		await runSuccess(
-			Effect.provide(
-				aclHandler(makeInstancePath(), authenticatedCtx, makeRequest(body)),
-				env.toLayer(),
-			).pipe(Effect.orDie),
+			aclHandler(makeInstancePath(), authenticatedCtx, makeRequest(body)).pipe(
+				Effect.orDie,
+			),
+			env.toLayer(),
 		);
 
 		const aces = (env.stores.acl.get(TEST_INSTANCE_ID) ?? []).filter(
@@ -600,10 +614,10 @@ describe("aclHandler — successful writes", () => {
 		});
 		const body = emptyRequest; // clear non-protected ACEs
 		await runSuccess(
-			Effect.provide(
-				aclHandler(makeCollectionPath(), authenticatedCtx, body),
-				env.toLayer(),
-			).pipe(Effect.orDie),
+			aclHandler(makeCollectionPath(), authenticatedCtx, body).pipe(
+				Effect.orDie,
+			),
+			env.toLayer(),
 		);
 
 		const aces = env.stores.acl.get(TEST_COLLECTION_ID) ?? [];

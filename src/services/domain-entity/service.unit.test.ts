@@ -410,18 +410,16 @@ describe("DomainEntityService.remove", () => {
 		const layer = makeTestLayer(entityRepo, compRepo);
 
 		const result = await runSuccess(
-			Effect.provide(
-				Effect.gen(function* () {
-					const svc = yield* DomainEntityService;
-					const entityId = yield* svc.create({
-						entityType: "icalendar",
-						document: minimalIcalDocument(),
-					});
-					yield* svc.remove(entityId);
-					return yield* svc.load(entityId);
-				}),
-				layer,
-			).pipe(Effect.orDie),
+			Effect.gen(function* () {
+				const svc = yield* DomainEntityService;
+				const entityId = yield* svc.create({
+					entityType: "icalendar",
+					document: minimalIcalDocument(),
+				});
+				yield* svc.remove(entityId);
+				return yield* svc.load(entityId);
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		expect(Option.isNone(result)).toBe(true);

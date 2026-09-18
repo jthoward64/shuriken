@@ -331,12 +331,10 @@ describe("InstanceService.listByCollection", () => {
 			.withInstance({ collectionId: collectionB, slug: "b.ics" });
 
 		const result = await runSuccess(
-			Effect.provide(
-				InstanceService.pipe(
-					Effect.flatMap((s) => s.listByCollection(collectionA)),
-				),
-				env.toLayer(),
+			InstanceService.pipe(
+				Effect.flatMap((s) => s.listByCollection(collectionA)),
 			).pipe(Effect.orDie),
+			env.toLayer(),
 		);
 
 		expect(result).toHaveLength(1);

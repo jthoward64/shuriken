@@ -186,19 +186,17 @@ describe("EntityRepository.softDelete (integration)", () => {
 
 	it("marks deletedAt; entity is no longer visible via findById", async () => {
 		const result = await runSuccess(
-			Effect.provide(
-				Effect.gen(function* () {
-					const repo = yield* EntityRepository;
-					const inserted = yield* repo.insert({
-						entityType: "icalendar",
-						logicalUid: null,
-					});
-					const id = EntityId(inserted.id);
-					yield* repo.softDelete(id);
-					return yield* repo.findById(id);
-				}),
-				layer,
-			).pipe(Effect.orDie),
+			Effect.gen(function* () {
+				const repo = yield* EntityRepository;
+				const inserted = yield* repo.insert({
+					entityType: "icalendar",
+					logicalUid: null,
+				});
+				const id = EntityId(inserted.id);
+				yield* repo.softDelete(id);
+				return yield* repo.findById(id);
+			}).pipe(Effect.orDie),
+			layer,
 		);
 
 		expect(Option.isNone(result)).toBe(true);

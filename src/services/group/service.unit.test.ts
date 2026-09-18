@@ -530,14 +530,10 @@ describe("GroupService.syncOidcMembership", () => {
 		env.stores.membershipAutoAssignedBy.set(`${groupId}:${userId}`, null);
 
 		await runSuccess(
-			Effect.provide(
-				GroupService.pipe(
-					Effect.flatMap((s) =>
-						s.syncOidcMembership(UserId(userId), ["other"]),
-					),
-				),
-				env.toLayer(),
+			GroupService.pipe(
+				Effect.flatMap((s) => s.syncOidcMembership(UserId(userId), ["other"])),
 			).pipe(Effect.orDie),
+			env.toLayer(),
 		);
 
 		expect(env.stores.memberships.get(groupId)?.has(userId)).toBe(true);

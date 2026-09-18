@@ -90,7 +90,7 @@ const run = <A>(
 		DavError | DatabaseError | InternalError,
 		AclService | InstanceService | ComponentRepository | IanaTimezoneService
 	>,
-) => runSuccess(Effect.provide(effect, env.toLayer()).pipe(Effect.orDie));
+) => runSuccess(effect.pipe(Effect.orDie), env.toLayer());
 
 const runErr = (
 	env: ReturnType<typeof makeTestEnv>,
@@ -99,7 +99,7 @@ const runErr = (
 		unknown,
 		AclService | InstanceService | ComponentRepository | IanaTimezoneService
 	>,
-) => runFailure(Effect.provide(effect, env.toLayer()));
+) => runFailure(effect, env.toLayer());
 
 // ---------------------------------------------------------------------------
 // Helpers to seed an instance + its component tree via PUT round-trip

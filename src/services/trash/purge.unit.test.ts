@@ -107,12 +107,10 @@ describe("trash purge sweep", () => {
 		expect(expired.map((i) => i.id)).toEqual([oldId]);
 
 		await runSuccess(
-			Effect.provide(
-				InstanceRepository.pipe(
-					Effect.flatMap((repo) => repo.hardDelete(InstanceId(oldId))),
-				),
-				env.toLayer(),
+			InstanceRepository.pipe(
+				Effect.flatMap((repo) => repo.hardDelete(InstanceId(oldId))),
 			).pipe(Effect.orDie),
+			env.toLayer(),
 		);
 
 		expect(env.stores.instances.has(oldId)).toBe(false);

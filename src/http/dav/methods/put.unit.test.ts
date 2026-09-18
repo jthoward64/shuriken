@@ -199,7 +199,7 @@ const run = <A>(
 		| SchedulingService
 		| DatabaseClient
 	>,
-) => runSuccess(Effect.provide(effect, env.toLayer()).pipe(Effect.orDie));
+) => runSuccess(effect.pipe(Effect.orDie), env.toLayer());
 
 const runErr = (
 	env: ReturnType<typeof makeTestEnv>,
@@ -219,7 +219,7 @@ const runErr = (
 		| SchedulingService
 		| DatabaseClient
 	>,
-) => runFailure(Effect.provide(effect, env.toLayer()));
+) => runFailure(effect, env.toLayer());
 
 // ---------------------------------------------------------------------------
 // Create new instance

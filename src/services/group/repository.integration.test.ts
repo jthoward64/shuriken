@@ -300,17 +300,15 @@ describe("GroupRepository unique slug constraint (integration)", () => {
 	it("two groups with the same slug fails with ConflictError", async () => {
 		const err = asConflictError(
 			await runFailure(
-				Effect.provide(
-					GroupRepository.pipe(
-						Effect.flatMap((r) =>
-							Effect.gen(function* () {
-								yield* r.create({ slug: Slug("dup-group") });
-								yield* r.create({ slug: Slug("dup-group") });
-							}),
-						),
+				GroupRepository.pipe(
+					Effect.flatMap((r) =>
+						Effect.gen(function* () {
+							yield* r.create({ slug: Slug("dup-group") });
+							yield* r.create({ slug: Slug("dup-group") });
+						}),
 					),
-					layer,
 				),
+				layer,
 			),
 		);
 

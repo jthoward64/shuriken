@@ -536,40 +536,38 @@ describe("AclRepository.getResourceParent (integration)", () => {
 
 	it("returns the parent collection for an instance", async () => {
 		const result = await runSuccess(
-			Effect.provide(
-				Effect.gen(function* () {
-					const userRepo = yield* UserRepository;
-					const collectionRepo = yield* CollectionRepository;
-					const entityRepo = yield* EntityRepository;
-					const instanceRepo = yield* InstanceRepository;
-					const aclRepo = yield* AclRepository;
+			Effect.gen(function* () {
+				const userRepo = yield* UserRepository;
+				const collectionRepo = yield* CollectionRepository;
+				const entityRepo = yield* EntityRepository;
+				const instanceRepo = yield* InstanceRepository;
+				const aclRepo = yield* AclRepository;
 
-					const { principal } = yield* userRepo.create({
-						slug: Slug("rp-inst-owner"),
-						displayName: "Inst Owner",
-						email: Email("rp-inst@example.com"),
-						credentials: [],
-					});
-					const collection = yield* collectionRepo.insert({
-						ownerPrincipalId: PrincipalId(principal.id),
-						collectionType: "calendar",
-						slug: Slug("rp-inst-cal"),
-					});
-					const entity = yield* entityRepo.insert({
-						entityType: "icalendar",
-						logicalUid: null,
-					});
-					const instance = yield* instanceRepo.insert({
-						collectionId: CollectionId(collection.id),
-						entityId: EntityId(entity.id),
-						contentType: "text/calendar",
-						etag: `"test-etag"` as ETag,
-						slug: Slug("rp-event.ics"),
-					});
-					return yield* aclRepo.getResourceParent(instance.id, "instance");
-				}),
-				layer,
-			).pipe(Effect.orDie),
+				const { principal } = yield* userRepo.create({
+					slug: Slug("rp-inst-owner"),
+					displayName: "Inst Owner",
+					email: Email("rp-inst@example.com"),
+					credentials: [],
+				});
+				const collection = yield* collectionRepo.insert({
+					ownerPrincipalId: PrincipalId(principal.id),
+					collectionType: "calendar",
+					slug: Slug("rp-inst-cal"),
+				});
+				const entity = yield* entityRepo.insert({
+					entityType: "icalendar",
+					logicalUid: null,
+				});
+				const instance = yield* instanceRepo.insert({
+					collectionId: CollectionId(collection.id),
+					entityId: EntityId(entity.id),
+					contentType: "text/calendar",
+					etag: `"test-etag"` as ETag,
+					slug: Slug("rp-event.ics"),
+				});
+				return yield* aclRepo.getResourceParent(instance.id, "instance");
+			}).pipe(Effect.orDie),
+			layer,
 		);
 		expect(Option.isSome(result)).toBe(true);
 		if (Option.isSome(result)) {

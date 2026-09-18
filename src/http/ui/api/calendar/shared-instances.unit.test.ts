@@ -44,13 +44,11 @@ describe("findUncoveredSharedInstances", () => {
 			});
 
 		const result = await runSuccess(
-			Effect.provide(
-				findUncoveredSharedInstances(
-					principalOf(viewer),
-					new Set([collectionId]),
-				),
-				env.toLayer(),
+			findUncoveredSharedInstances(
+				principalOf(viewer),
+				new Set([collectionId]),
 			).pipe(Effect.orDie),
+			env.toLayer(),
 		);
 		expect(result).toEqual([]);
 	});
@@ -77,13 +75,11 @@ describe("findUncoveredSharedInstances", () => {
 		// calendar" — the instance-level grant must not also surface it in the
 		// synthetic pseudo-calendar.
 		const result = await runSuccess(
-			Effect.provide(
-				findUncoveredSharedInstances(
-					principalOf(viewer),
-					new Set([collectionId]),
-				),
-				env.toLayer(),
+			findUncoveredSharedInstances(
+				principalOf(viewer),
+				new Set([collectionId]),
 			).pipe(Effect.orDie),
+			env.toLayer(),
 		);
 		expect(result).toEqual([]);
 	});
@@ -107,10 +103,10 @@ describe("findUncoveredSharedInstances", () => {
 			});
 
 		const result = await runSuccess(
-			Effect.provide(
-				findUncoveredSharedInstances(principalOf(viewer), new Set()),
-				env.toLayer(),
-			).pipe(Effect.orDie),
+			findUncoveredSharedInstances(principalOf(viewer), new Set()).pipe(
+				Effect.orDie,
+			),
+			env.toLayer(),
 		);
 		expect(result.map((i) => i.id)).toEqual([instanceId]);
 	});

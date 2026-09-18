@@ -32,10 +32,8 @@ describe("listOwnedAndShared", () => {
 		});
 
 		const result = await runSuccess(
-			Effect.provide(
-				listOwnedAndShared(principalOf(owner), "calendar"),
-				env.toLayer(),
-			).pipe(Effect.orDie),
+			listOwnedAndShared(principalOf(owner), "calendar").pipe(Effect.orDie),
+			env.toLayer(),
 		);
 
 		expect(result).toHaveLength(1);
@@ -92,10 +90,8 @@ describe("listOwnedAndShared", () => {
 			});
 
 		const result = await runSuccess(
-			Effect.provide(
-				listOwnedAndShared(principalOf(viewer), "calendar"),
-				env.toLayer(),
-			).pipe(Effect.orDie),
+			listOwnedAndShared(principalOf(viewer), "calendar").pipe(Effect.orDie),
+			env.toLayer(),
 		);
 
 		// Owned first, then shared sorted alphabetically by display name.
@@ -136,10 +132,8 @@ describe("listOwnedAndShared", () => {
 			});
 
 		const result = await runSuccess(
-			Effect.provide(
-				listOwnedAndShared(principalOf(owner), "calendar"),
-				env.toLayer(),
-			).pipe(Effect.orDie),
+			listOwnedAndShared(principalOf(owner), "calendar").pipe(Effect.orDie),
+			env.toLayer(),
 		);
 
 		expect(result.map((r) => r.row.id)).toEqual([calendarId]);

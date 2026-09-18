@@ -430,37 +430,35 @@ describe("InstanceRepository.softDelete (integration)", () => {
 
 	it("findById returns None after softDelete", async () => {
 		const result = await runSuccess(
-			Effect.provide(
-				Effect.gen(function* () {
-					const userRepo = yield* UserRepository;
-					const colRepo = yield* CollectionRepository;
-					const instanceRepo = yield* InstanceRepository;
+			Effect.gen(function* () {
+				const userRepo = yield* UserRepository;
+				const colRepo = yield* CollectionRepository;
+				const instanceRepo = yield* InstanceRepository;
 
-					const { principal } = yield* userRepo.create({
-						slug: Slug("heidi"),
-						displayName: "Heidi",
-						email: Email("heidi@example.com"),
-						credentials: [],
-					});
-					const col = yield* colRepo.insert({
-						ownerPrincipalId: PrincipalId(principal.id),
-						collectionType: "calendar",
-						slug: Slug("heidi-cal"),
-					});
-					const entityId = yield* insertEntity();
-					const inserted = yield* instanceRepo.insert({
-						collectionId: CollectionId(col.id),
-						entityId,
-						contentType: "text/calendar",
-						etag: ETag('"x"'),
-						slug: Slug("gone.ics"),
-					});
-					const id = InstanceId(inserted.id);
-					yield* instanceRepo.softDelete(id);
-					return yield* instanceRepo.findById(id);
-				}),
-				layer,
-			).pipe(Effect.orDie),
+				const { principal } = yield* userRepo.create({
+					slug: Slug("heidi"),
+					displayName: "Heidi",
+					email: Email("heidi@example.com"),
+					credentials: [],
+				});
+				const col = yield* colRepo.insert({
+					ownerPrincipalId: PrincipalId(principal.id),
+					collectionType: "calendar",
+					slug: Slug("heidi-cal"),
+				});
+				const entityId = yield* insertEntity();
+				const inserted = yield* instanceRepo.insert({
+					collectionId: CollectionId(col.id),
+					entityId,
+					contentType: "text/calendar",
+					etag: ETag('"x"'),
+					slug: Slug("gone.ics"),
+				});
+				const id = InstanceId(inserted.id);
+				yield* instanceRepo.softDelete(id);
+				return yield* instanceRepo.findById(id);
+			}).pipe(Effect.orDie),
+			layer,
 		);
 		expect(Option.isNone(result)).toBe(true);
 	});

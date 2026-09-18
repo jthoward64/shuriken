@@ -127,12 +127,10 @@ describe("PrincipalService.findByEmail", () => {
 
 		const err = asDavError(
 			await runFailure(
-				Effect.provide(
-					PrincipalService.pipe(
-						Effect.flatMap((s) => s.findByEmail(Email("ghost@example.com"))),
-					),
-					env.toLayer(),
+				PrincipalService.pipe(
+					Effect.flatMap((s) => s.findByEmail(Email("ghost@example.com"))),
 				),
+				env.toLayer(),
 			),
 		);
 

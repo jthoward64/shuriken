@@ -384,27 +384,25 @@ describe("CollectionRepository.softDelete (integration)", () => {
 
 	it("findBySlug returns None after soft delete", async () => {
 		const result = await runSuccess(
-			Effect.provide(
-				Effect.gen(function* () {
-					const user = yield* UserRepository;
-					const col = yield* CollectionRepository;
-					const { principal } = yield* user.create({
-						slug: Slug("gone-owner"),
-						displayName: "Gone",
-						email: Email("gone@example.com"),
-						credentials: [],
-					});
-					const ownerId = PrincipalId(principal.id);
-					const inserted = yield* col.insert({
-						ownerPrincipalId: ownerId,
-						collectionType: "calendar",
-						slug: Slug("gone"),
-					});
-					yield* col.softDelete(CollectionId(inserted.id));
-					return yield* col.findBySlug(ownerId, "calendar", Slug("gone"));
-				}),
-				layer,
-			).pipe(Effect.orDie),
+			Effect.gen(function* () {
+				const user = yield* UserRepository;
+				const col = yield* CollectionRepository;
+				const { principal } = yield* user.create({
+					slug: Slug("gone-owner"),
+					displayName: "Gone",
+					email: Email("gone@example.com"),
+					credentials: [],
+				});
+				const ownerId = PrincipalId(principal.id);
+				const inserted = yield* col.insert({
+					ownerPrincipalId: ownerId,
+					collectionType: "calendar",
+					slug: Slug("gone"),
+				});
+				yield* col.softDelete(CollectionId(inserted.id));
+				return yield* col.findBySlug(ownerId, "calendar", Slug("gone"));
+			}).pipe(Effect.orDie),
+			layer,
 		);
 		expect(Option.isNone(result)).toBe(true);
 	});

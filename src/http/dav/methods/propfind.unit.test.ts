@@ -116,10 +116,8 @@ describe("propfindHandler — Depth: infinity", () => {
 
 		const err = asDavError(
 			await runFailure(
-				Effect.provide(
-					propfindHandler(path, authenticatedCtx, makeRequest("infinity")),
-					env.toLayer(),
-				),
+				propfindHandler(path, authenticatedCtx, makeRequest("infinity")),
+				env.toLayer(),
 			),
 		);
 
@@ -146,10 +144,8 @@ describe("propfindHandler — new-resource paths", () => {
 
 		const err = asDavError(
 			await runFailure(
-				Effect.provide(
-					propfindHandler(path, authenticatedCtx, makeRequest("0")),
-					env.toLayer(),
-				),
+				propfindHandler(path, authenticatedCtx, makeRequest("0")),
+				env.toLayer(),
 			),
 		);
 
@@ -170,10 +166,8 @@ describe("propfindHandler — new-resource paths", () => {
 
 		const err = asDavError(
 			await runFailure(
-				Effect.provide(
-					propfindHandler(path, authenticatedCtx, makeRequest("0")),
-					env.toLayer(),
-				),
+				propfindHandler(path, authenticatedCtx, makeRequest("0")),
+				env.toLayer(),
 			),
 		);
 
@@ -198,10 +192,10 @@ describe("propfindHandler — collection, Depth: 0", () => {
 		};
 
 		const res = await runSuccess(
-			Effect.provide(
-				propfindHandler(path, authenticatedCtx, makeRequest("0")),
-				env.toLayer(),
-			).pipe(Effect.orDie),
+			propfindHandler(path, authenticatedCtx, makeRequest("0")).pipe(
+				Effect.orDie,
+			),
+			env.toLayer(),
 		);
 
 		expect(res.status).toBe(HTTP_MULTI_STATUS);
@@ -223,10 +217,10 @@ describe("propfindHandler — collection, Depth: 0", () => {
 		};
 
 		const res = await runSuccess(
-			Effect.provide(
-				propfindHandler(path, authenticatedCtx, makeRequest("0")),
-				env.toLayer(),
-			).pipe(Effect.orDie),
+			propfindHandler(path, authenticatedCtx, makeRequest("0")).pipe(
+				Effect.orDie,
+			),
+			env.toLayer(),
 		);
 
 		const body = await res.text();
@@ -249,10 +243,10 @@ describe("propfindHandler — collection, Depth: 0", () => {
 		};
 
 		const res = await runSuccess(
-			Effect.provide(
-				propfindHandler(path, authenticatedCtx, makeRequest("0")),
-				env.toLayer(),
-			).pipe(Effect.orDie),
+			propfindHandler(path, authenticatedCtx, makeRequest("0")).pipe(
+				Effect.orDie,
+			),
+			env.toLayer(),
 		);
 
 		const body = await res.text();
@@ -276,10 +270,8 @@ describe("propfindHandler — collection, Depth: 0", () => {
 
 		const req = new Request("http://localhost/", { method: "PROPFIND" }); // no Depth header
 		const res = await runSuccess(
-			Effect.provide(
-				propfindHandler(path, authenticatedCtx, req),
-				env.toLayer(),
-			).pipe(Effect.orDie),
+			propfindHandler(path, authenticatedCtx, req).pipe(Effect.orDie),
+			env.toLayer(),
 		);
 
 		const body = await res.text();
@@ -315,10 +307,10 @@ describe("propfindHandler — collection, Depth: 1", () => {
 		};
 
 		const res = await runSuccess(
-			Effect.provide(
-				propfindHandler(path, authenticatedCtx, makeRequest("1")),
-				env.toLayer(),
-			).pipe(Effect.orDie),
+			propfindHandler(path, authenticatedCtx, makeRequest("1")).pipe(
+				Effect.orDie,
+			),
+			env.toLayer(),
 		);
 
 		const body = await res.text();
@@ -343,10 +335,10 @@ describe("propfindHandler — collection, Depth: 1", () => {
 		};
 
 		const res = await runSuccess(
-			Effect.provide(
-				propfindHandler(path, authenticatedCtx, makeRequest("1")),
-				env.toLayer(),
-			).pipe(Effect.orDie),
+			propfindHandler(path, authenticatedCtx, makeRequest("1")).pipe(
+				Effect.orDie,
+			),
+			env.toLayer(),
 		);
 
 		const body = await res.text();
@@ -387,10 +379,10 @@ describe("propfindHandler — instance, Depth: 0", () => {
 		};
 
 		const res = await runSuccess(
-			Effect.provide(
-				propfindHandler(path, authenticatedCtx, makeRequest("0")),
-				env.toLayer(),
-			).pipe(Effect.orDie),
+			propfindHandler(path, authenticatedCtx, makeRequest("0")).pipe(
+				Effect.orDie,
+			),
+			env.toLayer(),
 		);
 
 		const body = await res.text();
@@ -418,10 +410,10 @@ describe("propfindHandler — named prop", () => {
 		const body = `<D:propfind xmlns:D="DAV:"><D:prop><D:displayname/></D:prop></D:propfind>`;
 
 		const res = await runSuccess(
-			Effect.provide(
-				propfindHandler(path, authenticatedCtx, makeRequest("0", body)),
-				env.toLayer(),
-			).pipe(Effect.orDie),
+			propfindHandler(path, authenticatedCtx, makeRequest("0", body)).pipe(
+				Effect.orDie,
+			),
+			env.toLayer(),
 		);
 
 		const text = await res.text();
@@ -444,10 +436,10 @@ describe("propfindHandler — named prop", () => {
 		const body = `<D:propfind xmlns:D="DAV:" xmlns:X="https://example.com/missing/"><D:prop><X:not-a-real-prop/></D:prop></D:propfind>`;
 
 		const res = await runSuccess(
-			Effect.provide(
-				propfindHandler(path, authenticatedCtx, makeRequest("0", body)),
-				env.toLayer(),
-			).pipe(Effect.orDie),
+			propfindHandler(path, authenticatedCtx, makeRequest("0", body)).pipe(
+				Effect.orDie,
+			),
+			env.toLayer(),
 		);
 
 		const text = await res.text();
@@ -469,10 +461,10 @@ describe("propfindHandler — principal", () => {
 		};
 
 		const res = await runSuccess(
-			Effect.provide(
-				propfindHandler(path, authenticatedCtx, makeRequest("0")),
-				env.toLayer(),
-			).pipe(Effect.orDie),
+			propfindHandler(path, authenticatedCtx, makeRequest("0")).pipe(
+				Effect.orDie,
+			),
+			env.toLayer(),
 		);
 
 		const body = await res.text();
